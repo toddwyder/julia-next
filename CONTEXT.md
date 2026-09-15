@@ -26,6 +26,39 @@ A phone, tablet, or computer signed into the household. Screen preferences (text
 keep-screen-on) belong to the device, not to a person.
 _Avoid_: Client, session, user
 
+## Kitchen
+
+**Recipe**:
+A titled set of ingredient lines and steps with a yield, prep and cook time, notes, and a
+source. Stored as written; everything else (total time, conversions, scaling, badges,
+nutrition) is derived on display.
+_Avoid_: Dish, card, entry
+
+**Ingredient line**:
+One line of a recipe's ingredients as the cook wrote it, plus the parts Julia understood from
+it: amount, unit, ingredient, preparation. The written line is the truth; the parts are the
+understanding.
+_Avoid_: Item, row
+
+**Ingredient**:
+The named thing an ingredient line is about ("all-purpose flour"), independent of amount or
+preparation. What the shopping list, nutrition, and the drawing beside the line key on.
+_Avoid_: Product, item, food
+
+**Step**:
+One numbered action in a recipe's method, as written. Cook mode shows one at a time; the prep
+list is built from them.
+_Avoid_: Instruction, paragraph, direction
+
+**Yield**:
+What a recipe makes: a number and a word ("4 servings", "75 crackers", "1 loaf"). Scaling
+changes the number; nutrition is per one of the word.
+_Avoid_: Servings (as the field name), portions, makes
+
+**Source**:
+Where a recipe came from: a web address, a book and page, or a person.
+_Avoid_: Origin, URL, author
+
 ## Delivery
 
 **Journey**:
