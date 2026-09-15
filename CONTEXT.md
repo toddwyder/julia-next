@@ -59,6 +59,16 @@ _Avoid_: Servings (as the field name), portions, makes
 Where a recipe came from: a web address, a book and page, or a person.
 _Avoid_: Origin, URL, author
 
+**Menu**:
+One sitting: a title, an optional date and serving time, a guest count, and its dishes. Past
+menus move to a Past list by themselves.
+_Avoid_: Meal plan, event, occasion, week
+
+**Dish**:
+A recipe placed on a menu with a multiplier (1×, 1½×, 2×) that Julia proposes and Todd can
+change. A recipe appears at most once per menu.
+_Avoid_: Planned recipe, course, item
+
 **Import**:
 Bringing a recipe into Julia from a link or pasted text. Read exactly when the page publishes
 a machine-readable recipe; otherwise by Julia's own on-device reader, then by a model only for
