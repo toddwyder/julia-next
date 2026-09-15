@@ -61,7 +61,8 @@ _Avoid_: Origin, URL, author
 
 **Import**:
 Bringing a recipe into Julia from a link or pasted text. Read exactly when the page publishes
-a machine-readable recipe; otherwise understood by a model that never rewrites the text.
+a machine-readable recipe; otherwise by Julia's own on-device reader, then by a model only for
+what the reader can't handle. Neither ever rewrites the text.
 _Avoid_: Scrape, fetch, parse (in anything Todd reads)
 
 **Clipper**:
