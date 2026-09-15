@@ -42,3 +42,12 @@ _Avoid_: Demo, proof of work, test results
 The check that evidence passes before it reaches Todd: code for what code can verify, a
 reviewing agent for what needs the recording watched.
 _Avoid_: Review, QA, approval
+
+**Rehearsal copy**:
+A temporary Julia, website and data, created for one proposed change. Evidence is recorded
+there; it's thrown away once the change is accepted or dropped.
+_Avoid_: Preview, staging, test environment
+
+**Real Julia**:
+The one Julia the household actually uses. Only accepted changes reach it.
+_Avoid_: Production, prod, live
