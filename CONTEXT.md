@@ -64,6 +64,11 @@ Bringing a recipe into Julia from a link or pasted text. Read exactly when the p
 a machine-readable recipe; otherwise understood by a model that never rewrites the text.
 _Avoid_: Scrape, fetch, parse (in anything Todd reads)
 
+**Clipper**:
+The Chrome button that sends the page as the browser sees it, plus its address, into Import.
+On phones the same job is done by sharing a link to Julia.
+_Avoid_: Extension (in anything Todd reads), bookmarklet, web clipper
+
 **Keep screen**:
 The imported recipe shown as it would look, with Keep and Discard. The only way an import
 enters the library.
