@@ -59,6 +59,16 @@ _Avoid_: Servings (as the field name), portions, makes
 Where a recipe came from: a web address, a book and page, or a person.
 _Avoid_: Origin, URL, author
 
+**Import**:
+Bringing a recipe into Julia from a link or pasted text. Read exactly when the page publishes
+a machine-readable recipe; otherwise understood by a model that never rewrites the text.
+_Avoid_: Scrape, fetch, parse (in anything Todd reads)
+
+**Keep screen**:
+The imported recipe shown as it would look, with Keep and Discard. The only way an import
+enters the library.
+_Avoid_: Preview, review form, draft
+
 ## Delivery
 
 **Journey**:
