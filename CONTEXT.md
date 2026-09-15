@@ -25,3 +25,20 @@ _Avoid_: Login page, landing page, splash screen
 A phone, tablet, or computer signed into the household. Screen preferences (text size,
 keep-screen-on) belong to the device, not to a person.
 _Avoid_: Client, session, user
+
+## Delivery
+
+**Journey**:
+One thing a person sets out to do in Julia, start to finish, on a named device. The unit the
+spec is written in and the unit Todd accepts.
+_Avoid_: Feature, story, epic, screen
+
+**Evidence**:
+What a builder hands over for a journey: one recording of it on the deployed Julia plus the
+journey's checklist with a proof per line.
+_Avoid_: Demo, proof of work, test results
+
+**Gate**:
+The check that evidence passes before it reaches Todd: code for what code can verify, a
+reviewing agent for what needs the recording watched.
+_Avoid_: Review, QA, approval
