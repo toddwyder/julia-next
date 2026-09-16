@@ -27,11 +27,14 @@ export async function checkReadiness({ config, env = process.env, fetchImpl = fe
       : check('project config', false, 'config did not load as a tracker: "linear" project config'),
   );
 
-  const credentialEnvVar = config?.handoff?.credentialEnvVar ?? 'JULIA_NEXT_GRAPH_WRITE_TOKEN';
+  // run-jul43-coordinator.mjs mints a fresh installation token per run from
+  // these two (see publish-via-github-app.mjs) rather than needing a
+  // pre-placed, eventually-stale JULIA_NEXT_GRAPH_WRITE_TOKEN.
+  const missingAppCreds = ['JULIA_PUBLISHER_APP_ID', 'JULIA_PUBLISHER_APP_PRIVATE_KEY'].filter((name) => !env[name]);
   checks.push(
-    env[credentialEnvVar]
-      ? check('publisher credential', true, `${credentialEnvVar} is set`)
-      : check('publisher credential', false, `${credentialEnvVar} is not set`),
+    missingAppCreds.length === 0
+      ? check('publisher App credentials', true, 'JULIA_PUBLISHER_APP_ID and JULIA_PUBLISHER_APP_PRIVATE_KEY are set')
+      : check('publisher App credentials', false, `${missingAppCreds.join(', ')} ${missingAppCreds.length > 1 ? 'are' : 'is'} not set`),
   );
 
   checks.push(

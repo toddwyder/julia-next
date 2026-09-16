@@ -24,6 +24,7 @@ import { resolve } from 'node:path';
 import { recordCoordinatorEvent } from './coordinator-events.mjs';
 import { runCreate, terminalWait, workerShow, workerStart } from './orca-cli.mjs';
 import { collectWorkerResult } from './collect-worker-result.mjs';
+import { getPublisherInstallationToken } from './publish-via-github-app.mjs';
 
 const execFileAsync = promisify(execFile);
 
@@ -138,13 +139,21 @@ async function main() {
     createLinearAwarePublisherEffects,
     publishSupervisedFinish,
     publishSupervisedStart,
-    requirePublisherCredential,
   } = await import(pathToFileURL(resolve(aiStackDir, 'orchestrator/lib/julia-supervised-publisher.mjs')).href);
   const { createWorkerResult } = await import(pathToFileURL(resolve(aiStackDir, 'orchestrator/lib/claude-worker.mjs')).href);
 
   const configModule = await import(pathToFileURL(projectConfigPath).href);
   const config = defineProjectConfig(configModule.default);
-  const credential = requirePublisherCredential(config);
+  // Mints a fresh ~1-hour installation token from the App's own credentials
+  // on every run, via the mechanism already proven in toddwyder/Julia's
+  // publish-via-github-app.mjs -- so the runner only ever needs to hold the
+  // App's long-lived private key, never a token that goes stale between
+  // runs. JULIA_PUBLISHER_REPO tells it which repo's installation to use.
+  const credential = await getPublisherInstallationToken({
+    ...process.env,
+    JULIA_PUBLISHER_REPO: config.targetRepo.name,
+    JULIA_PUBLISHER_OWNER: config.targetRepo.owner,
+  });
   const effects = createLinearAwarePublisherEffects({ config, linearApiKey: requireLinearApiKey() });
 
   const { stdout: baseCommit } = await execFileAsync('git', ['rev-parse', 'HEAD']);

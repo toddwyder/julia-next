@@ -34,9 +34,9 @@ Checked as of 2026-09-16, not assumed:
 | Prerequisite | Status |
 |---|---|
 | `julia-graph-publisher` GitHub App authorized for `julia-next` | **Done.** Confirmed on both the App's own installation page and `julia-next`'s Settings → Integrations → GitHub Apps. |
-| `PR #2` (journey-relay code) merged to `julia-next` `main` | **Not done.** `graph/julia-next.project.mjs` and `scripts/coordinator-events.mjs` only exist on `PR #2`'s branch until it merges — a run against `main` cannot load them before then. |
-| `julia-graph-publisher`'s private key placed on the OVH runner | **Not done.** Only ever wired into a local dev file (`.env.publisher.local`) on a different machine, per AI-Stack's own `HANDOFF-2026-09-14.md`. Needs the same root-placed, dedicated-account treatment as the Axiom token (see `ops/journey-relay/README.md` for the pattern to follow). |
-| `LINEAR_API_KEY` (a Linear personal API key or OAuth token, scoped to read + comment on team `Julia-next`) placed on the runner | **Not done.** No such credential exists anywhere yet — this is new, not a relocation of an existing one. |
+| `PR #2` (journey-relay code) merged to `julia-next` `main` | **Not done.** `graph/julia-next.project.mjs` and `scripts/*.mjs` only exist on branch `jul43-linear-coordinator-support` until this merges — a run against `main` cannot load them before then. |
+| `JULIA_PUBLISHER_APP_ID` (`4948330`, not secret) and `JULIA_PUBLISHER_APP_PRIVATE_KEY` (the App's private key PEM, secret) set on the runner | **Not done.** `run-jul43-coordinator.mjs` mints its own short-lived installation token from these two at the start of each run (`scripts/publish-via-github-app.mjs`, reused as-is from `toddwyder/Julia`'s Round B1 — already tested there); nothing longer-lived needs placing. The private key value itself has so far only ever been wired into a local dev file (`.env.publisher.local`) on a different machine, per AI-Stack's `HANDOFF-2026-09-14.md` — never the runner. Needs the same root-placed, dedicated-account treatment as the Axiom token (see `ops/journey-relay/README.md` for the pattern). |
+| `LINEAR_API_KEY` (a Linear personal API key, scoped by whatever Linear's own API supports — see the open question below) placed on the runner | **Not done.** No such credential exists anywhere yet — this is new, not a relocation of an existing one. |
 | `AI-Stack` checked out on the runner alongside `julia-next` | Not confirmed in this pass — the orchestrator scripts (`prepare-julia-supervised-run.mjs`, `publish-julia-supervised-run.mjs`, `orchestrator/lib/*`) live in `toddwyder/AI-Stack`, not `julia-next`. A run needs both repos present. |
 
 Do not attempt the initialization command below until the first four rows are all **Done**.
@@ -48,8 +48,10 @@ node scripts/check-readiness.mjs --ai-stack-dir /path/to/AI-Stack
 ```
 
 Checks, each reported separately, pass or fail: the project config loads as a `tracker: 'linear'`
-config; `JULIA_NEXT_GRAPH_WRITE_TOKEN` is set; `LINEAR_API_KEY` is set; the journey-relay is
-reachable **and** reports `sent:true` for a real probe event — an HTTP 200 from the relay is not
+config; `JULIA_PUBLISHER_APP_ID` and `JULIA_PUBLISHER_APP_PRIVATE_KEY` are both set (the two
+values `run-jul43-coordinator.mjs` mints a fresh installation token from — not the token itself);
+`LINEAR_API_KEY` is set; the journey-relay is reachable **and** reports `sent:true` for a real
+probe event — an HTTP 200 from the relay is not
 enough by itself, since the relay can accept the request and still report `sent:false` when Axiom
 delivery itself fails (bad/missing `AXIOM_TOKEN` on the runner). The probe uses its own event,
 `julia.journey0.coordinator_readiness_check`, never `coordinator_started` — see "Distinguishing
@@ -157,6 +159,17 @@ not an idle system.
 - **If a step's output doesn't match what the next step expects** (e.g. a missing required
   field), the publisher fails closed with a `JULIA_SUPERVISED_PUBLISHER_REFUSED` error naming the
   exact missing field — treat that message as the diagnosis, not a signal to bypass validation.
+
+## Known open question: Linear API key scope
+
+Linear's personal API keys are not team-scoped — a key created from Todd's own account carries
+the same access Todd's account has, not a narrow "read + comment on team Julia-next only" grant
+(unlike the Axiom token, which genuinely is ingest-only and dataset-scoped). This runbook and the
+`graph/julia-next.project.mjs` comments describe the intended *usage* as read+comment on
+`Julia-next`, but that is enforced by this code only, not by Linear's own permission system. If
+that gap matters, the alternative is a dedicated Linear workspace member/bot account with
+restricted team access — a larger identity-management step, not attempted here without asking
+first.
 
 ## Known open questions for the live-verification pass
 
