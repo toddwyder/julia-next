@@ -1,10 +1,12 @@
 // relay.mjs -- the trusted Axiom-delivery boundary for JUL-43 journey events.
 //
-// Runs as its own systemd service (root, NOT the 'runner' builder account),
-// bound to 127.0.0.1 only. Holds AXIOM_DATASET/AXIOM_TOKEN in its own
-// process environment, loaded from a root-owned 0400 env file that lives
-// outside this repo and outside any builder worktree. Builder code never
-// sees the token: it only POSTs event JSON to this relay over localhost.
+// Runs as its own systemd service, under the dedicated axiom-relay system
+// account (NOT the 'runner' builder account), bound to 127.0.0.1 only.
+// Holds AXIOM_DATASET/AXIOM_TOKEN in its own
+// process environment, loaded from a root:axiom-relay 0440 env file that
+// lives outside this repo and outside any builder worktree. Builder code
+// never sees the token: it only POSTs event JSON to this relay over
+// localhost.
 import http from 'node:http';
 
 const PORT = Number(process.env.JOURNEY_RELAY_PORT || 8943);
@@ -44,7 +46,7 @@ const server = http.createServer(async (req, res) => {
     }
     const record = {
       _time: incoming._time || new Date().toISOString(),
-      event: incoming.event,
+      event: redact(incoming.event),
       attempted: redact(incoming.attempted),
       reason: redact(incoming.reason),
       context: redact(incoming.context),

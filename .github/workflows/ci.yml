@@ -64,8 +64,9 @@ jobs:
         run: |
           set -euo pipefail
           example=ops/journey-relay/journey-axiom.env.example
-          if grep -qE 'AXIOM_TOKEN=.{20,}' "$example"; then
-            echo "::error::$example looks like it contains a real token value, not a placeholder"
+          value=$(grep -E '^AXIOM_TOKEN=' "$example" | cut -d= -f2-)
+          if [[ "$value" != *REPLACE* && "$value" != *PLACEHOLDER* && "$value" != "" ]]; then
+            echo "::error::$example's AXIOM_TOKEN does not look like a placeholder (expected it to contain REPLACE or PLACEHOLDER)"
             exit 1
           fi
           echo "OK: example env file holds only placeholder values"
