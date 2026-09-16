@@ -128,6 +128,28 @@ The imported recipe shown as it would look, with Keep and Discard. The only way 
 enters the library.
 _Avoid_: Preview, review form, draft
 
+**Lab**:
+Where a new recipe is invented: a spark and a time budget go in, four variations come back,
+and an open conversation shapes one of them into a full draft that is kept or not. Online
+only; one Lab conversation at a time, remembered on the device.
+_Avoid_: Generator, ideation, AI chef, wizard
+
+**Spark**:
+What the Lab starts from: an ingredient or two, a dish name, a mood, or (via Riff) a whole
+existing recipe. Becomes part of the kept recipe's source.
+_Avoid_: Prompt, query, seed, input
+
+**Variation**:
+One of the four cards the Lab answers a spark with, each built from the pairing data a
+different way: Classic, Adventurous, Chemistry, Balanced. A card carries a working title, a
+menu-style description, the key ingredients, and one line on why they belong together.
+_Avoid_: Option, suggestion, direction, result
+
+**Riff**:
+The button on a recipe that sends the whole recipe into the Lab as the spark. The outcome is a
+new recipe; the original is never changed.
+_Avoid_: Remix, improvise, fork, duplicate
+
 ## Delivery
 
 **Journey**:
