@@ -205,6 +205,12 @@ _Avoid_: Preview, staging, test environment
 The one Julia the household actually uses. Only accepted changes reach it.
 _Avoid_: Production, prod, live
 
+**Monday note**:
+The weekly summary posted in Linear by the runner, never by Todd: what was accepted, what
+each journey cost including failed attempts, how long it took, what broke after acceptance and
+who found it, and every time Todd was pulled in, planned or unplanned. Quiet weeks say so.
+_Avoid_: Report, dashboard, metrics (in anything Todd reads)
+
 **Backup**:
 The folder in Todd's Google Drive that mirrors the household: a readable text file per
 recipe, menus and the shopping list as text, and one machine file for restoring. Refreshed
