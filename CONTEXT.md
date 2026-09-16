@@ -196,8 +196,9 @@ reviewing agent for what needs the recording watched.
 _Avoid_: Review, QA, approval
 
 **Rehearsal copy**:
-A temporary Julia, website and data, created for one proposed change. Evidence is recorded
-there; it's thrown away once the change is accepted or dropped.
+A temporary Julia, website and throwaway data, created for one proposed change as the stage to
+record its evidence on. Torn down as soon as the recording exists; rebuilt for that change if
+Todd asks to try it himself. Real Julia is never involved.
 _Avoid_: Preview, staging, test environment
 
 **Real Julia**:
