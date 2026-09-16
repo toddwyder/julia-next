@@ -113,6 +113,11 @@ a machine-readable recipe; otherwise by Julia's own on-device reader, then by a 
 what the reader can't handle. Neither ever rewrites the text.
 _Avoid_: Scrape, fetch, parse (in anything Todd reads)
 
+**Cookbook**:
+The plain-text export of a book the household owns, imported whole: every recipe found in it
+lands in the library with the book as source. Book recipes can't be shared.
+_Avoid_: Book upload, batch import, scan
+
 **Clipper**:
 The Chrome button that sends the page as the browser sees it, plus its address, into Import.
 On phones the same job is done by sharing a link to Julia.
