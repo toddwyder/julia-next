@@ -148,11 +148,36 @@ Both of session 3's blockers are resolved:
   shared registered checkout; the Journey-accounting example passes context as base64, not raw
   JSON in a shell string; the stale App-installation and `LINEAR_API_KEY` claims are removed.
 
-**Not yet done**: a fresh review of PR #3's *fix* commit (the six findings above were fixed after
-the review that found them, not re-reviewed) -- read the fix commit's diff yourself before
-trusting it as clean, the same way you'd verify any other worker's claim. PR #3 itself is **not
-merged** -- Todd's authorization named PR #2 specifically ("other merges remain outside this
-grant"); merging PR #3 needs its own explicit yes.
+**A second fresh Codex worker verified the fix** (run `run_a89db1a55545`, dispatch
+`ctx_d599e322315a`) rather than trusting it. Verdict: request changes -- one P1 remained,
+demonstrated with a real reproduction (a `url.*.insteadOf` rewrite in the repo's own local git
+config survives the first fix's hooks/credential-helper/system/global-config hardening and can
+still redirect the push, carrying the token). Fixed by refusing to push at all when any such
+rewrite is present (`git config --get-regexp` checked first), rather than trying to neutralize a
+mechanism with no enumerable "off" switch. Also fixed: `coordinator-events.mjs`'s CLI crashing
+with a raw stack trace on malformed `--context-b64` instead of a controlled error; `workerStart`
+had no exact `--repo` targeting (worked by inference only because julia-next is the sole
+registered project); a few `SKILL.md` documentation gaps (collector wiring, terminal polling
+before reading). Full verdict saved outside the worktree at `~/jul43-pr3-fix-verification.md`.
+49/49 tests green. Pushed and verified CI green again.
+
+**Live end-to-end proof of Journey accounting, for a real run**: fetched this branch's
+`coordinator-events.mjs` into the OVH runner's shared checkout (temporarily -- reverted with
+`git reset --hard HEAD` afterward, checkout left clean) and ran its real CLI for `started` and
+`completed` against `run_a89db1a55545` (the fix-verification run above). Both delivered:
+```
+[coordinator] julia.journey0.coordinator_started runId=run_a89db1a55545 sent=true
+[coordinator] julia.journey0.coordinator_completed runId=run_a89db1a55545 sent=true
+```
+Not independently re-confirmed in Axiom's own UI this session (no Axiom credential is reachable
+from here, by design -- that boundary is exactly what this whole route protects). `sent:true` is
+the relay's own confirmation of successful forwarding, the same evidentiary bar earlier sessions
+in this ticket's history used once the relay itself was established as genuinely working.
+
+**Not yet done**: PR #3 itself is **not merged** -- Todd's authorization named PR #2 specifically
+("other merges remain outside this grant"); merging PR #3 needs its own explicit yes. No third
+review round was run after the second fix -- two real rounds each found and fixed genuine P1s,
+which is disclosed as the actual review depth this went to, not overclaimed as exhaustive.
 
 ## Verification, after a run
 
