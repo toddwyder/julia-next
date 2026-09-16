@@ -150,6 +150,22 @@ The button on a recipe that sends the whole recipe into the Lab as the spark. Th
 new recipe; the original is never changed.
 _Avoid_: Remix, improvise, fork, duplicate
 
+**Score**:
+The nutrient-density number on every recipe, 0 to 100 per serving: protein and fibre raise it,
+saturated fat, added sugar, and sodium lower it. A "~" in front means an estimate.
+_Avoid_: Health score, rating, grade, NRF
+
+**Glycemic load**:
+The per-serving number beside the score, from each ingredient's carbohydrate and glycemic
+index. Low at 10 or under, medium to 19, high at 20 and over; the badge colour follows.
+_Avoid_: GI (that's the ingredient's index, not the recipe's load), sugar score, carb count
+
+**Nutrition panel**:
+The per-serving block on the recipe page: score, glycemic load, calories, total fat, saturated
+fat, carbs, sugars, protein, fibre, sodium. Always an estimate, worked out on the device from
+the ingredient parts; tapping it lets you fix a wrongly matched ingredient.
+_Avoid_: Nutrition facts, label, macros
+
 **Shared page**:
 The read-and-print page anyone with the link can open, showing a recipe or a whole menu as it
 currently stands, no sign-in. The only thing in Julia the outside world can see; Stop sharing
