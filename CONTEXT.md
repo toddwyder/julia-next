@@ -98,6 +98,12 @@ The household's one list of things to buy, one line per ingredient, grouped by a
 menus, recipes, typing, and voice.
 _Avoid_: Grocery list, cart, basket
 
+**Voice add**:
+Saying "Hey Google, add X to the shopping list" and having X appear on Julia's list a few
+minutes later with no further action. Julia reads the household's Google Keep list through a
+second Google account that exists only for that.
+_Avoid_: Voice input, dictation, mic button, Keep sync (in anything Todd reads)
+
 **Staple**:
 An ingredient the household always has. Left unticked when a menu goes to the shopping list;
 ticked only when running low. No stock is tracked.
