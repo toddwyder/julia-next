@@ -69,6 +69,26 @@ A recipe placed on a menu with a multiplier (1×, 1½×, 2×) that Julia propose
 change. A recipe appears at most once per menu.
 _Avoid_: Planned recipe, course, item
 
+**Shopping list**:
+The household's one list of things to buy, one line per ingredient, grouped by aisle. Fed by
+menus, recipes, typing, and voice.
+_Avoid_: Grocery list, cart, basket
+
+**Staple**:
+An ingredient the household always has. Left unticked when a menu goes to the shopping list;
+ticked only when running low. No stock is tracked.
+_Avoid_: Pantry item, inventory, essential
+
+**Store**:
+A name an item can carry ("Costco") so the list can be filtered to where you are. Remembered
+per ingredient after the first tag.
+_Avoid_: Shop, vendor, location
+
+**Cart Mode**:
+The shopping list during a trip: big targets, screen on, ticked items sink. Exit Cart clears
+what was bought.
+_Avoid_: Shopping mode, checkout
+
 **Import**:
 Bringing a recipe into Julia from a link or pasted text. Read exactly when the page publishes
 a machine-readable recipe; otherwise by Julia's own on-device reader, then by a model only for
