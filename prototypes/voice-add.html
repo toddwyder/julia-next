@@ -1,0 +1,582 @@
+<!--
+  PROTOTYPE. Throwaway. Not production.
+  Question: what should adding to the shopping list by voice feel like? (Linear JUL-18)
+  Three variants on one page, switchable via ?variant=A|B|C and the floating bar at the bottom.
+  Real microphone listening via the browser's built-in speech recognition (Chrome, Edge, Safari).
+  Nothing is saved. Reload and it's gone.
+-->
+<title>Julia Voice Add</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;500;600&family=Roboto+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --cream: #FDFCF7;
+    --ink: #333333;
+    --ink-soft: #6B6A63;
+    --forest: #2D4F36;
+    --button: #2D5A27;
+    --button-ink: #FDFCF7;
+    --terracotta: #C35231;
+    --hairline: #DAD5C6;
+    --wash: #F4F1E6;
+    --serif: "Playfair Display", Georgia, "Times New Roman", serif;
+    --sans: Inter, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --cream: #1F201B;
+      --ink: #ECE8DC;
+      --ink-soft: #A9A597;
+      --forest: #A8CCB2;
+      --button: #3E7A38;
+      --button-ink: #F5F3EA;
+      --terracotta: #E27C5C;
+      --hairline: #3B3C35;
+      --wash: #282923;
+    }
+  }
+  :root[data-theme="dark"] {
+    --cream: #1F201B;
+    --ink: #ECE8DC;
+    --ink-soft: #A9A597;
+    --forest: #A8CCB2;
+    --button: #3E7A38;
+    --button-ink: #F5F3EA;
+    --terracotta: #E27C5C;
+    --hairline: #3B3C35;
+    --wash: #282923;
+  }
+
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--cream);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.45;
+  }
+  * { box-sizing: border-box; }
+  button { font: inherit; cursor: pointer; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--terracotta); outline-offset: 2px; }
+
+  .page {
+    max-width: 800px;
+    margin: 0 auto;
+    padding-block: 20px 140px;
+    padding-inline: 16px;
+  }
+  .masthead {
+    text-align: center;
+    border-bottom: 1px solid var(--hairline);
+    padding-bottom: 14px;
+    margin-bottom: 18px;
+  }
+  .masthead .logo { font-family: var(--serif); font-style: italic; font-size: 30px; color: var(--forest); }
+  .masthead .sub { font-family: var(--sans); font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--ink-soft); margin-top: 4px; }
+  h1 { font-family: var(--serif); font-weight: 600; font-size: 26px; color: var(--forest); margin: 0 0 4px; text-wrap: balance; }
+  .variant-name { font-family: var(--serif); font-style: italic; color: var(--ink-soft); margin: 0 0 18px; }
+  .variant-name strong { font-style: normal; color: var(--terracotta); font-family: var(--mono); font-weight: 500; margin-right: 8px; }
+
+  .label { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--forest); font-weight: 600; }
+  .newitem { display: flex; gap: 8px; margin: 0 0 22px; }
+  .newitem input {
+    flex: 1; min-width: 0; font: inherit; padding: 10px 12px; border: 1px solid var(--hairline);
+    background: var(--cream); color: var(--ink); border-radius: 0;
+  }
+  .btn {
+    background: var(--button); color: var(--button-ink); border: 0; padding: 10px 16px;
+    font-weight: 500; font-size: 13px; letter-spacing: .02em; border-radius: 0;
+  }
+  .btn.quiet { background: transparent; color: var(--forest); border: 1px solid var(--hairline); }
+  .btn.accent { background: var(--terracotta); }
+  .btn:disabled { opacity: .5; cursor: default; }
+
+  .aisle { margin: 0 0 18px; }
+  .aisle h2 { font-family: var(--sans); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--forest); margin: 0 0 4px; padding-bottom: 6px; border-bottom: 1px solid var(--hairline); }
+  .item { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--hairline); }
+  .item .tick { width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--ink-soft); background: transparent; flex: none; padding: 0; }
+  .item.done .tick { background: var(--forest); border-color: var(--forest); }
+  .item .text { flex: 1; font-family: var(--serif); font-size: 17px; }
+  .item.done .text { text-decoration: line-through; color: var(--ink-soft); }
+  .item .qty { font-family: var(--mono); font-size: 13px; color: var(--terracotta); margin-right: 6px; }
+  .item.fresh { background: var(--wash); margin-inline: -8px; padding-inline: 8px; }
+  .item .x { background: none; border: 0; color: var(--ink-soft); font-size: 16px; padding: 4px 6px; }
+  .empty { color: var(--ink-soft); font-style: italic; font-family: var(--serif); padding: 12px 0; }
+
+  .notice { font-family: var(--serif); font-style: italic; color: var(--ink-soft); margin: 0 0 14px; }
+  .transcript { font-family: var(--mono); font-size: 14px; color: var(--ink); min-height: 1.5em; }
+  .transcript .interim { color: var(--ink-soft); }
+
+  /* A: hold to talk */
+  .holdwrap { position: fixed; right: 20px; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); z-index: 5; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .hold {
+    width: 84px; height: 84px; border-radius: 50%; border: 0; background: var(--button); color: var(--button-ink);
+    display: grid; place-items: center; touch-action: none; user-select: none; -webkit-user-select: none;
+    box-shadow: 0 0 0 0 rgba(195,82,49,0);
+  }
+  .hold.live { background: var(--terracotta); animation: pulse 1.2s ease-out infinite; }
+  .hold svg { width: 34px; height: 34px; }
+  .hold-hint { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(195,82,49,.45);} 100% { box-shadow: 0 0 0 22px rgba(195,82,49,0);} }
+  @media (prefers-reduced-motion: reduce) { .hold.live { animation: none; } }
+  .heard { border: 1px solid var(--hairline); background: var(--wash); padding: 10px 12px; margin: 0 0 18px; }
+  .heard .row { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--forest); padding: 4px 6px 4px 10px; font-family: var(--serif); font-size: 15px; background: var(--cream); }
+  .chip input { font: inherit; font-family: var(--serif); border: 0; border-bottom: 1px dashed var(--ink-soft); background: transparent; color: var(--ink); width: 11ch; }
+  .chip button { background: none; border: 0; color: var(--terracotta); padding: 0 2px; font-size: 15px; }
+  .heard .undo { margin-left: auto; }
+
+  /* B: sheet */
+  .sheet-backdrop { position: fixed; inset: 0; background: rgba(30,30,25,.35); z-index: 8; }
+  .sheet {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 9; background: var(--cream); border-top: 1px solid var(--hairline);
+    padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px)); max-width: 800px; margin: 0 auto;
+  }
+  .sheet h3 { font-family: var(--serif); font-weight: 600; color: var(--forest); margin: 0 0 8px; font-size: 20px; display: flex; align-items: center; gap: 10px; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--terracotta); display: inline-block; animation: blink 1s ease-in-out infinite; }
+  @keyframes blink { 50% { opacity: .25; } }
+  @media (prefers-reduced-motion: reduce) { .dot { animation: none; } }
+  .confirm .crow { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--hairline); }
+  .confirm .crow input[type="text"] { flex: 1; min-width: 0; font: inherit; font-family: var(--serif); font-size: 16px; border: 0; border-bottom: 1px dashed transparent; background: transparent; color: var(--ink); padding: 2px 0; }
+  .confirm .crow input[type="text"]:focus { border-bottom-color: var(--ink-soft); }
+  .confirm .crow .aisle-tag { font-family: var(--mono); font-size: 11px; color: var(--ink-soft); }
+  .sheet .actions { display: flex; gap: 8px; margin-top: 14px; justify-content: flex-end; }
+
+  /* C: conversation */
+  .convo { border: 1px solid var(--hairline); padding: 12px 14px; margin: 0 0 18px; display: flex; flex-direction: column; gap: 8px; max-height: 42vh; overflow-y: auto; }
+  .line { display: flex; gap: 10px; align-items: baseline; }
+  .line .who { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); flex: none; width: 5ch; }
+  .line.julia .what { font-family: var(--serif); color: var(--forest); }
+  .line.you .what { font-family: var(--mono); font-size: 14px; }
+  .talkbar { display: flex; gap: 8px; align-items: center; margin: 0 0 18px; }
+  .talkbar .state { font-family: var(--serif); font-style: italic; color: var(--ink-soft); }
+
+  /* shared fallback */
+  .fallback { border-top: 1px dashed var(--hairline); margin-top: 26px; padding-top: 14px; }
+  .fallback p { color: var(--ink-soft); margin: 0 0 8px; font-size: 13px; }
+  .fallback form { display: flex; gap: 8px; }
+  .fallback input { flex: 1; min-width: 0; font: var(--mono); font-family: var(--mono); font-size: 13px; padding: 8px 10px; border: 1px solid var(--hairline); background: var(--cream); color: var(--ink); }
+
+  .cantshow { margin-top: 40px; border-top: 1px solid var(--hairline); padding-top: 14px; color: var(--ink-soft); font-size: 13px; }
+  .cantshow h4 { font-family: var(--sans); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--forest); margin: 0 0 6px; }
+  .cantshow ul { margin: 0; padding-left: 18px; }
+
+  /* prototype switcher: deliberately not part of the design */
+  .switcher {
+    position: fixed; left: 50%; transform: translateX(-50%); bottom: 0; z-index: 20;
+    padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  }
+  .switcher .pill {
+    display: flex; align-items: center; gap: 6px; background: #111; color: #fff; border-radius: 999px; padding: 6px 8px;
+    font-family: system-ui, sans-serif; font-size: 13px; box-shadow: 0 4px 16px rgba(0,0,0,.35);
+  }
+  .switcher button { background: #333; color: #fff; border: 0; border-radius: 999px; width: 30px; height: 30px; font-size: 16px; }
+  .switcher .lbl { padding: 0 6px; white-space: nowrap; }
+  .switcher .lbl b { color: #F6B08F; margin-right: 6px; }
+</style>
+
+<div class="page">
+  <div class="masthead">
+    <div class="logo">Julia</div>
+    <div class="sub">❧ Shopping list · voice prototype ☙</div>
+  </div>
+
+  <h1>Shopping List</h1>
+  <p class="variant-name" id="variantName"></p>
+
+  <div id="variantMount"></div>
+
+  <div id="listMount"></div>
+
+  <div class="fallback" id="fallback" hidden>
+    <p id="fallbackWhy">No microphone here. Type what you'd say instead, and the variant behaves as if you'd said it.</p>
+    <form id="fallbackForm"><input id="fallbackInput" placeholder="add eggs and milk, two lemons"><button class="btn quiet" type="submit">Say it</button></form>
+  </div>
+
+  <div class="cantshow">
+    <h4>What this page can't show</h4>
+    <ul>
+      <li>A wake word ("Hey Julia") with the phone in your pocket. Browsers can't listen all the time; that would need a phone shortcut or a native app.</li>
+      <li>A Siri or Google Assistant shortcut ("add milk to Julia"). Possible later; not something a web page can demonstrate.</li>
+      <li>Julia's real on-device reader. This page splits on "and" and commas and knows a few dozen ingredients; the real one will know more.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="switcher" id="switcher">
+  <div class="pill">
+    <button id="prevBtn" aria-label="Previous variant">‹</button>
+    <span class="lbl" id="switchLabel"></span>
+    <button id="nextBtn" aria-label="Next variant">›</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ---------- shared state (in memory only) ----------
+  const AISLES = ["Produce", "Meat & Fish", "Dairy", "Bakery", "Baking & Spices", "Pantry", "Household", "Other"];
+  const AISLE_OF = {
+    "egg": "Dairy", "eggs": "Dairy", "milk": "Dairy", "butter": "Dairy", "cheese": "Dairy", "yogurt": "Dairy", "cream": "Dairy", "parmesan": "Dairy",
+    "lemon": "Produce", "lemons": "Produce", "lime": "Produce", "limes": "Produce", "onion": "Produce", "onions": "Produce", "shallot": "Produce", "shallots": "Produce",
+    "garlic": "Produce", "thyme": "Produce", "basil": "Produce", "parsley": "Produce", "tomato": "Produce", "tomatoes": "Produce", "apple": "Produce", "apples": "Produce",
+    "banana": "Produce", "bananas": "Produce", "spinach": "Produce", "potato": "Produce", "potatoes": "Produce", "carrot": "Produce", "carrots": "Produce", "avocado": "Produce", "avocados": "Produce",
+    "chicken": "Meat & Fish", "cod": "Meat & Fish", "salmon": "Meat & Fish", "beef": "Meat & Fish", "pork": "Meat & Fish", "shrimp": "Meat & Fish", "bacon": "Meat & Fish",
+    "flour": "Baking & Spices", "sugar": "Baking & Spices", "salt": "Baking & Spices", "pepper": "Baking & Spices", "cinnamon": "Baking & Spices", "vanilla": "Baking & Spices", "baking powder": "Baking & Spices", "yeast": "Baking & Spices",
+    "olive oil": "Pantry", "rice": "Pantry", "pasta": "Pantry", "coffee": "Pantry", "tea": "Pantry", "beans": "Pantry", "capers": "Pantry", "vinegar": "Pantry", "honey": "Pantry",
+    "bread": "Bakery", "baguette": "Bakery", "tortillas": "Bakery",
+    "paper towels": "Household", "dish soap": "Household", "foil": "Household"
+  };
+  const NUMBERS = { "a": 1, "an": 1, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "a dozen": 12, "dozen": 12, "half a dozen": 6, "a couple of": 2, "a couple": 2 };
+
+  let nextId = 1;
+  const list = []; // {id, text, qty, aisle, done, fresh}
+
+  function seed() {
+    [["1 bunch", "fresh thyme", "Produce"], ["3", "shallots", "Produce"], ["2", "cod fillets", "Meat & Fish"], ["", "unsalted butter", "Dairy"], ["2 cups + 250 g", "all-purpose flour", "Baking & Spices"]]
+      .forEach(([qty, text, aisle]) => list.push({ id: nextId++, text, qty, aisle, done: false, fresh: false }));
+  }
+  seed();
+
+  function aisleFor(text) {
+    const t = text.toLowerCase();
+    const keys = Object.keys(AISLE_OF).sort((a, b) => b.length - a.length);
+    for (const k of keys) if (t.includes(k)) return AISLE_OF[k];
+    return "Other";
+  }
+
+  // Split an utterance into items: {qty, text}
+  function parseUtterance(raw) {
+    let s = (raw || "").toLowerCase().trim();
+    s = s.replace(/^(hey julia|julia|ok julia)[,!]?\s*/i, "");
+    s = s.replace(/^(please\s+)?(can you\s+)?(add|we need|i need|put|get|buy|pick up|grab)\s+/i, "");
+    s = s.replace(/\s+(to|on|onto)\s+(the|my|our)\s+(shopping\s+)?list\s*$/i, "");
+    s = s.replace(/\s+please\s*$/i, "");
+    const parts = s.split(/\s*(?:,|\band\b|\balso\b|\bplus\b|\bthen\b)\s*/).map(p => p.trim()).filter(Boolean);
+    return parts.map(p => {
+      let qty = "";
+      let text = p;
+      const words = Object.keys(NUMBERS).sort((a, b) => b.length - a.length);
+      for (const w of words) {
+        const re = new RegExp("^" + w.replace(/ /g, "\\s+") + "\\s+");
+        if (re.test(text)) { qty = String(NUMBERS[w]); text = text.replace(re, ""); break; }
+      }
+      const m = text.match(/^(\d+(?:\.\d+)?)\s+(.+)$/);
+      if (m) { qty = m[1]; text = m[2]; }
+      if (qty === "1" && !/^(a|an|one)\b/.test(p)) { /* keep */ }
+      return { qty, text: text.trim() };
+    }).filter(i => i.text.length > 0);
+  }
+
+  function isRemoval(raw) { return /^(no[,!]?\s+|not\s+|remove\s+|take\s+off\s+|delete\s+|scratch\s+|cancel\s+)/i.test((raw || "").trim()); }
+  function isEnd(raw) { return /^(that'?s\s+all|that\s+is\s+all|done|nothing|no\s+that'?s\s+it|that'?s\s+it|thanks|thank\s+you|stop|goodbye|bye)\b/i.test((raw || "").trim()); }
+
+  function addItem(qty, text) {
+    const existing = list.find(i => !i.done && i.text.toLowerCase() === text.toLowerCase());
+    if (existing) { existing.fresh = true; return existing; }
+    const it = { id: nextId++, text, qty, aisle: aisleFor(text), done: false, fresh: true };
+    list.push(it);
+    return it;
+  }
+  function removeByName(name) {
+    const n = name.toLowerCase().replace(/^(the|that|those)\s+/, "");
+    const idx = list.findIndex(i => i.text.toLowerCase().includes(n) || n.includes(i.text.toLowerCase()));
+    if (idx >= 0) return list.splice(idx, 1)[0];
+    return null;
+  }
+  function removeById(id) { const idx = list.findIndex(i => i.id === id); if (idx >= 0) list.splice(idx, 1); }
+  function clearFresh() { list.forEach(i => i.fresh = false); }
+
+  // ---------- list rendering (shared, the "surface the state" part) ----------
+  const listMount = document.getElementById("listMount");
+  function renderList() {
+    listMount.innerHTML = "";
+    const groups = {};
+    list.forEach(i => (groups[i.aisle] ||= []).push(i));
+    const order = AISLES.filter(a => groups[a]);
+    if (!order.length) { listMount.innerHTML = '<p class="empty">Nothing on the list.</p>'; return; }
+    order.forEach(a => {
+      const sec = document.createElement("section"); sec.className = "aisle";
+      const h = document.createElement("h2"); h.textContent = a; sec.appendChild(h);
+      groups[a].forEach(i => {
+        const row = document.createElement("div"); row.className = "item" + (i.done ? " done" : "") + (i.fresh ? " fresh" : "");
+        row.innerHTML = '<button class="tick" aria-label="Tick"></button><span class="text"></span><button class="x" aria-label="Remove">×</button>';
+        const t = row.querySelector(".text");
+        if (i.qty) { const q = document.createElement("span"); q.className = "qty"; q.textContent = i.qty; t.appendChild(q); }
+        t.appendChild(document.createTextNode(i.text));
+        row.querySelector(".tick").onclick = () => { i.done = !i.done; renderList(); };
+        row.querySelector(".x").onclick = () => { removeById(i.id); renderList(); };
+        sec.appendChild(row);
+      });
+      listMount.appendChild(sec);
+    });
+  }
+
+  // ---------- speech plumbing ----------
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const hasSR = !!SR;
+  const fallback = document.getElementById("fallback");
+  const fallbackForm = document.getElementById("fallbackForm");
+  const fallbackInput = document.getElementById("fallbackInput");
+  let onFallbackSay = null;
+  fallbackForm.onsubmit = (e) => { e.preventDefault(); const v = fallbackInput.value.trim(); if (!v) return; fallbackInput.value = ""; onFallbackSay && onFallbackSay(v); };
+  fallback.hidden = false; // always available: useful on desktop and when the mic is denied
+  document.getElementById("fallbackWhy").textContent = hasSR
+    ? "No microphone handy? Type what you'd say and the variant behaves as if you'd said it."
+    : "This browser can't listen (try Chrome, Edge, or Safari). Type what you'd say instead.";
+
+  function makeRecognizer({ continuous, interim, onInterim, onFinal, onEnd, onError }) {
+    if (!hasSR) return null;
+    const r = new SR();
+    r.lang = "en-US"; r.continuous = !!continuous; r.interimResults = !!interim; r.maxAlternatives = 1;
+    r.onresult = (e) => {
+      let interimText = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const res = e.results[i];
+        if (res.isFinal) onFinal && onFinal(res[0].transcript.trim());
+        else interimText += res[0].transcript;
+      }
+      if (interimText && onInterim) onInterim(interimText.trim());
+    };
+    r.onend = () => onEnd && onEnd();
+    r.onerror = (e) => onError && onError(e.error);
+    return r;
+  }
+
+  function speak(text, done) {
+    if (!("speechSynthesis" in window)) { done && done(); return; }
+    try {
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.rate = 1.02; u.pitch = 1;
+      u.onend = () => done && done();
+      u.onerror = () => done && done();
+      window.speechSynthesis.speak(u);
+    } catch (_) { done && done(); }
+  }
+
+  // ---------- variants ----------
+  const mount = document.getElementById("variantMount");
+  let teardown = () => {};
+
+  const VARIANTS = {
+    A: { name: "Hold to talk", render: renderA },
+    B: { name: "Listen, then confirm", render: renderB },
+    C: { name: "Hands-free conversation", render: renderC }
+  };
+
+  // A: hold the round button, speak, release. Items land immediately with chips to fix.
+  function renderA() {
+    mount.innerHTML = `
+      <p class="notice">Press and hold the button, say what you need, let go. Items land on the list straight away; fix or remove them in the strip that appears.</p>
+      <div class="newitem"><input id="typedA" placeholder="Add an item (e.g. eggs, apples)…"><button class="btn" id="typedAddA">Add</button></div>
+      <div class="heard" id="heardA" hidden></div>
+      <div class="holdwrap" id="holdwrap">
+        <button class="hold" id="holdBtn" aria-label="Hold to talk">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M8 21h8"/></svg>
+        </button>
+        <span class="hold-hint" id="holdHint">Hold to talk</span>
+      </div>`;
+    const btn = document.getElementById("holdBtn"), hint = document.getElementById("holdHint"), heard = document.getElementById("heardA");
+    const typed = document.getElementById("typedA");
+    document.getElementById("typedAddA").onclick = () => { const v = typed.value.trim(); if (!v) return; parseUtterance(v).forEach(i => addItem(i.qty, i.text)); typed.value = ""; renderList(); };
+
+    let rec = null, holding = false, gotFinal = false, interimText = "";
+    let lastBatch = [];
+
+    function showHeard(items, transcript) {
+      lastBatch = items;
+      heard.hidden = false;
+      heard.innerHTML = `<div class="row"><span class="label">Heard</span><span class="transcript">${escapeHtml(transcript)}</span><button class="btn quiet undo" id="undoA">Undo</button></div><div class="chips" id="chipsA"></div>`;
+      const chips = document.getElementById("chipsA");
+      items.forEach(it => {
+        const c = document.createElement("span"); c.className = "chip";
+        const inp = document.createElement("input"); inp.value = (it.qty ? it.qty + " " : "") + it.text; inp.setAttribute("aria-label", "Edit item");
+        inp.onchange = () => { const p = parseUtterance(inp.value)[0]; if (p) { it.text = p.text; it.qty = p.qty; it.aisle = aisleFor(p.text); renderList(); } };
+        const x = document.createElement("button"); x.textContent = "×"; x.setAttribute("aria-label", "Remove");
+        x.onclick = () => { removeById(it.id); c.remove(); renderList(); };
+        c.appendChild(inp); c.appendChild(x); chips.appendChild(c);
+      });
+      document.getElementById("undoA").onclick = () => { lastBatch.forEach(it => removeById(it.id)); heard.hidden = true; renderList(); };
+    }
+    function commit(text) {
+      if (!text) { hint.textContent = "Didn't catch that"; setTimeout(() => hint.textContent = "Hold to talk", 1600); return; }
+      clearFresh();
+      const items = parseUtterance(text).map(i => addItem(i.qty, i.text));
+      renderList();
+      showHeard(items, text);
+      hint.textContent = "Hold to talk";
+    }
+    function start() {
+      if (holding) return; holding = true; gotFinal = false; interimText = "";
+      btn.classList.add("live"); hint.textContent = "Listening…";
+      rec = makeRecognizer({
+        continuous: true, interim: true,
+        onInterim: (t) => { interimText = t; hint.textContent = t; },
+        onFinal: (t) => { gotFinal = true; interimText = t; },
+        onEnd: () => { btn.classList.remove("live"); if (!holding) commit(interimText); },
+        onError: (err) => { btn.classList.remove("live"); holding = false; hint.textContent = err === "not-allowed" ? "Mic blocked; type below" : "Hold to talk"; }
+      });
+      if (!rec) { hint.textContent = "No mic; type below"; holding = false; btn.classList.remove("live"); return; }
+      try { rec.start(); } catch (_) {}
+    }
+    function stop() {
+      if (!holding) return; holding = false;
+      hint.textContent = "…";
+      try { rec && rec.stop(); } catch (_) { commit(interimText); }
+    }
+    btn.addEventListener("pointerdown", (e) => { e.preventDefault(); btn.setPointerCapture(e.pointerId); start(); });
+    btn.addEventListener("pointerup", stop);
+    btn.addEventListener("pointercancel", stop);
+    btn.addEventListener("keydown", (e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); start(); } });
+    btn.addEventListener("keyup", (e) => { if (e.key === " " || e.key === "Enter") stop(); });
+    onFallbackSay = (v) => commit(v);
+    teardown = () => { try { rec && rec.abort(); } catch (_) {} onFallbackSay = null; };
+  }
+
+  // B: tap, a sheet listens with live transcript, then a confirm list before anything is added.
+  function renderB() {
+    mount.innerHTML = `
+      <p class="notice">Tap Speak, say what you need, pause. Julia shows what it heard and asks you to confirm before anything touches the list.</p>
+      <div class="newitem"><input id="typedB" placeholder="Add an item (e.g. eggs, apples)…"><button class="btn" id="typedAddB">Add</button><button class="btn accent" id="speakB">Speak</button></div>
+      <div id="sheetB"></div>`;
+    const typed = document.getElementById("typedB");
+    document.getElementById("typedAddB").onclick = () => { const v = typed.value.trim(); if (!v) return; parseUtterance(v).forEach(i => addItem(i.qty, i.text)); typed.value = ""; renderList(); };
+    const sheetHost = document.getElementById("sheetB");
+    let rec = null, silenceTimer = null, finals = [], interim = "";
+
+    function closeSheet() { try { rec && rec.abort(); } catch (_) {} clearTimeout(silenceTimer); sheetHost.innerHTML = ""; }
+    function openListening() {
+      finals = []; interim = "";
+      sheetHost.innerHTML = `<div class="sheet-backdrop"></div><div class="sheet"><h3><span class="dot"></span>Listening</h3><div class="transcript" id="liveB">Say what you need. Pause when you're done.</div><div class="actions"><button class="btn quiet" id="cancelB">Cancel</button><button class="btn" id="doneB">Done</button></div></div>`;
+      const live = document.getElementById("liveB");
+      document.getElementById("cancelB").onclick = closeSheet;
+      document.getElementById("doneB").onclick = () => { try { rec && rec.stop(); } catch (_) { toConfirm(); } };
+      const armSilence = () => { clearTimeout(silenceTimer); silenceTimer = setTimeout(() => { try { rec && rec.stop(); } catch (_) { toConfirm(); } }, 2500); };
+      rec = makeRecognizer({
+        continuous: true, interim: true,
+        onInterim: (t) => { interim = t; live.innerHTML = escapeHtml(finals.join(", ")) + (finals.length ? ", " : "") + '<span class="interim">' + escapeHtml(t) + "</span>"; armSilence(); },
+        onFinal: (t) => { finals.push(t); interim = ""; live.textContent = finals.join(", "); armSilence(); },
+        onEnd: () => toConfirm(),
+        onError: (err) => { live.textContent = err === "not-allowed" ? "Microphone blocked. Type below instead." : "Couldn't hear anything. Try again."; }
+      });
+      if (!rec) { live.textContent = "This browser can't listen. Type below instead."; return; }
+      try { rec.start(); } catch (_) {}
+    }
+    function toConfirm() {
+      clearTimeout(silenceTimer);
+      const text = [...finals, interim].filter(Boolean).join(", ");
+      const items = parseUtterance(text);
+      if (!items.length) { closeSheet(); return; }
+      sheetHost.innerHTML = `<div class="sheet-backdrop"></div><div class="sheet confirm"><h3>Add these ${items.length === 1 ? "" : items.length + " "}to the list?</h3><div id="rowsB"></div><div class="actions"><button class="btn quiet" id="againB">Say it again</button><button class="btn quiet" id="cancelB2">Cancel</button><button class="btn" id="addB">Add</button></div></div>`;
+      const rows = document.getElementById("rowsB");
+      items.forEach((it, idx) => {
+        const r = document.createElement("div"); r.className = "crow";
+        r.innerHTML = `<input type="checkbox" checked id="ck${idx}" aria-label="Include"><input type="text" id="tx${idx}" aria-label="Item"><span class="aisle-tag"></span>`;
+        r.querySelector("input[type=text]").value = (it.qty ? it.qty + " " : "") + it.text;
+        r.querySelector(".aisle-tag").textContent = aisleFor(it.text);
+        r.querySelector("input[type=text]").oninput = (e) => { const p = parseUtterance(e.target.value)[0]; r.querySelector(".aisle-tag").textContent = p ? aisleFor(p.text) : ""; };
+        rows.appendChild(r);
+      });
+      document.getElementById("againB").onclick = openListening;
+      document.getElementById("cancelB2").onclick = closeSheet;
+      document.getElementById("addB").onclick = () => {
+        clearFresh();
+        items.forEach((_, idx) => {
+          if (!document.getElementById("ck" + idx).checked) return;
+          const p = parseUtterance(document.getElementById("tx" + idx).value)[0];
+          if (p) addItem(p.qty, p.text);
+        });
+        closeSheet(); renderList();
+      };
+    }
+    document.getElementById("speakB").onclick = openListening;
+    onFallbackSay = (v) => { finals = [v]; interim = ""; toConfirm(); };
+    teardown = () => { closeSheet(); onFallbackSay = null; };
+  }
+
+  // C: tap once; Julia listens, talks back, keeps going until you say "that's all".
+  function renderC() {
+    mount.innerHTML = `
+      <p class="notice">Tap once. Julia listens, reads back what it added, and keeps listening until you say "that's all". Say "no, not oat milk" to take something off.</p>
+      <div class="talkbar"><button class="btn accent" id="talkC">Talk to Julia</button><button class="btn quiet" id="stopC" hidden>Stop</button><span class="state" id="stateC">Not listening</span></div>
+      <div class="convo" id="convoC" hidden></div>
+      <div class="newitem"><input id="typedC" placeholder="Add an item (e.g. eggs, apples)…"><button class="btn" id="typedAddC">Add</button></div>`;
+    const typed = document.getElementById("typedC");
+    document.getElementById("typedAddC").onclick = () => { const v = typed.value.trim(); if (!v) return; parseUtterance(v).forEach(i => addItem(i.qty, i.text)); typed.value = ""; renderList(); };
+    const convo = document.getElementById("convoC"), state = document.getElementById("stateC"), talk = document.getElementById("talkC"), stopBtn = document.getElementById("stopC");
+    let rec = null, active = false, idleTimer = null;
+
+    function line(who, what) { convo.hidden = false; const d = document.createElement("div"); d.className = "line " + who; d.innerHTML = `<span class="who">${who}</span><span class="what"></span>`; d.querySelector(".what").textContent = what; convo.appendChild(d); convo.scrollTop = convo.scrollHeight; }
+    function listen() {
+      if (!active) return;
+      state.textContent = "Listening…";
+      rec = makeRecognizer({
+        continuous: false, interim: false,
+        onFinal: (t) => handle(t),
+        onEnd: () => { if (active && !speakingNow) listen(); },
+        onError: (err) => { if (err === "not-allowed") { state.textContent = "Microphone blocked. Type below."; active = false; } }
+      });
+      if (!rec) { state.textContent = "This browser can't listen. Type below instead."; return; }
+      try { rec.start(); } catch (_) {}
+      clearTimeout(idleTimer); idleTimer = setTimeout(() => { if (active) { say("Okay, that's the list.", end); } }, 12000);
+    }
+    let speakingNow = false;
+    function say(text, then) {
+      speakingNow = true; state.textContent = "Julia: " + text; line("julia", text);
+      try { rec && rec.abort(); } catch (_) {}
+      speak(text, () => { speakingNow = false; then ? then() : listen(); });
+    }
+    function handle(t) {
+      clearTimeout(idleTimer);
+      line("you", t);
+      if (isEnd(t)) { say("Okay. " + list.filter(i => !i.done).length + " things on the list.", end); return; }
+      if (isRemoval(t)) {
+        const name = t.replace(/^(no[,!]?\s+|not\s+|remove\s+|take\s+off\s+|delete\s+|scratch\s+|cancel\s+)/i, "").replace(/\s+(from|off)\s+the\s+list\s*$/i, "");
+        const gone = removeByName(name);
+        renderList();
+        say(gone ? "Took off " + gone.text + ". Anything else?" : "I don't see " + name + " on the list. Anything else?");
+        return;
+      }
+      const items = parseUtterance(t);
+      if (!items.length) { say("Sorry, I didn't catch that. What do you need?"); return; }
+      clearFresh();
+      const added = items.map(i => addItem(i.qty, i.text));
+      renderList();
+      const names = added.map(i => (i.qty ? i.qty + " " : "") + i.text);
+      const readback = names.length === 1 ? names[0] : names.slice(0, -1).join(", ") + " and " + names[names.length - 1];
+      say("Added " + readback + ". Anything else?");
+    }
+    function end() { active = false; clearTimeout(idleTimer); try { rec && rec.abort(); } catch (_) {} state.textContent = "Not listening"; talk.hidden = false; stopBtn.hidden = true; }
+    talk.onclick = () => { active = true; talk.hidden = true; stopBtn.hidden = false; convo.innerHTML = ""; say("Listening. What do you need?"); };
+    stopBtn.onclick = end;
+    onFallbackSay = (v) => { if (!active) { active = true; talk.hidden = true; stopBtn.hidden = false; } handle(v); };
+    teardown = () => { end(); try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (_) {} onFallbackSay = null; };
+  }
+
+  function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+  // ---------- switcher ----------
+  const keys = Object.keys(VARIANTS);
+  function currentKey() { const k = (new URLSearchParams(location.search).get("variant") || "A").toUpperCase(); return keys.includes(k) ? k : "A"; }
+  function show(k) {
+    teardown(); teardown = () => {};
+    const u = new URL(location.href); u.searchParams.set("variant", k); history.replaceState(null, "", u);
+    document.getElementById("variantName").innerHTML = `<strong>${k}</strong>${VARIANTS[k].name}`;
+    document.getElementById("switchLabel").innerHTML = `<b>${k}</b>${VARIANTS[k].name}`;
+    clearFresh();
+    VARIANTS[k].render();
+    renderList();
+    window.scrollTo(0, 0);
+  }
+  function step(d) { const i = keys.indexOf(currentKey()); show(keys[(i + d + keys.length) % keys.length]); }
+  document.getElementById("prevBtn").onclick = () => step(-1);
+  document.getElementById("nextBtn").onclick = () => step(1);
+  document.addEventListener("keydown", (e) => {
+    const t = e.target; if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+    if (e.key === "ArrowLeft") step(-1); if (e.key === "ArrowRight") step(1);
+  });
+  show(currentKey());
+})();
+</script>
