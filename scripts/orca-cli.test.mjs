@@ -75,7 +75,7 @@ test('workerStart passes every required flag through, including --agent codex', 
   });
   const result = await workerStart({
     run: 'run_abc', environment: 'OVH runner', from: 'term-1', spec: 'do the thing',
-    worktree: 'new-top-level', name: 'jul43-run', execImpl,
+    worktree: 'new-top-level', name: 'jul43-run', repo: 'path:/home/runner/julia-next', execImpl,
   });
   assert.equal(result.dispatch.id, 'ctx_1');
   assert.deepEqual(calls[0].args, [
@@ -86,10 +86,27 @@ test('workerStart passes every required flag through, including --agent codex', 
     '--spec', 'do the thing',
     '--worktree', 'new-top-level',
     '--name', 'jul43-run',
+    // Exact repo targeting, not left to inference -- installed
+    // `worker-start --help` explicitly says "Use exact --repo on the
+    // selected server" (fix-verification review, C2 residual). Works by
+    // inference today since julia-next is the only registered project on
+    // this environment, but that's fragile the moment a second one is
+    // added, so require it rather than default it away.
+    '--repo', 'path:/home/runner/julia-next',
     '--agent', 'codex',
     '--setup', 'skip',
     '--json',
   ]);
+});
+
+test('workerStart requires an explicit repo selector rather than defaulting it away', async () => {
+  const { execImpl } = fakeExec({ id: 'p', ok: true, result: { dispatch: { id: 'ctx_1' } }, _meta: {} });
+  await assert.rejects(
+    () => workerStart({
+      run: 'run_abc', environment: 'OVH runner', from: 'term-1', spec: 'x', worktree: 'new-top-level', name: 'n', execImpl,
+    }),
+    /workerStart requires an explicit repo selector/,
+  );
 });
 
 test('terminalWait polls with --for tui-idle and the given timeout', async () => {

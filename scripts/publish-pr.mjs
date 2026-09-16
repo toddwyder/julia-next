@@ -67,6 +67,34 @@ export function defaultWriteAskpass() {
   return scriptPath;
 }
 
+// A fix-verification review of the first fix (2026-09-16) demonstrated
+// that disabling hooks/credential-helpers/system/global config is not
+// enough: a url.*.insteadOf rewrite in the repo's own LOCAL .git/config
+// can still redirect the push -- either to a custom remote-helper scheme
+// (git then executes whatever git-remote-<scheme> it finds on PATH,
+// handing it the token) or directly to a different https:// host (which
+// then receives the token as Basic auth). Neither -c credential.helper=
+// nor -c core.hooksPath= touches insteadOf resolution, and an unknown
+// attacker-chosen rewrite key can't be unset via -c. So: refuse to push
+// at all if the repo defines any url.*.insteadOf rewrite, rather than try
+// to neutralize a mechanism with no enumerable "off" switch.
+async function assertNoUrlRewrites({
+  cwd, env, askpassPath, emptyGlobalConfigPath, execImpl,
+}) {
+  try {
+    await execImpl('git', ['config', '--get-regexp', '^url\\..*\\.insteadof$'], {
+      cwd,
+      env: gitEnv(env, { askpassPath, token: '', emptyGlobalConfigPath }),
+    });
+  } catch (error) {
+    // git's own exit behavior: exit 1 with no output means nothing
+    // matched -- the safe, expected case for `git config --get-regexp`.
+    if (error.code === 1) return;
+    throw new Error('could not verify this repo has no url.*.insteadOf rewrites -- refusing to push for safety');
+  }
+  throw new Error(`${cwd} defines a url.*.insteadOf rewrite in its local git config -- refusing to push (it could redirect the push and expose the installation token)`);
+}
+
 export async function pushBranch({
   owner,
   repo,
@@ -78,6 +106,24 @@ export async function pushBranch({
   writeAskpass = defaultWriteAskpass,
 }) {
   assertApproved(owner, repo);
+  const askpassPathForCheck = writeAskpass();
+  const emptyGlobalConfigPathForCheck = join(mkdtempSync(join(tmpdir(), 'julia-publisher-gitconfig-')), 'empty.gitconfig');
+  try {
+    await assertNoUrlRewrites({
+      cwd, env, askpassPath: askpassPathForCheck, emptyGlobalConfigPath: emptyGlobalConfigPathForCheck, execImpl,
+    });
+  } finally {
+    // File-level cleanup only, deliberately: the directory these live in
+    // came from mkdtempSync in the real implementation, but a caller
+    // (including this module's own tests) can inject any path via
+    // writeAskpass -- recursively removing that path's parent directory
+    // would be unsafe for an arbitrary injected path (e.g. a fixed test
+    // path under a shared temp root). The empty leftover mkdtemp
+    // directory this accepts is disclosed, minor housekeeping, not a
+    // credential or correctness issue.
+    try { rmSync(askpassPathForCheck, { force: true }); } catch { /* best-effort cleanup */ }
+    try { rmSync(emptyGlobalConfigPathForCheck, { force: true }); } catch { /* best-effort cleanup */ }
+  }
   const token = await tokenImpl({ ...env, JULIA_PUBLISHER_OWNER: owner, JULIA_PUBLISHER_REPO: repo });
   const askpassPath = writeAskpass();
   const emptyHooksDir = mkdtempSync(join(tmpdir(), 'julia-publisher-hooks-'));

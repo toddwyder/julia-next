@@ -63,10 +63,14 @@ function parseArgs(argv) {
 async function main() {
   const [stage, ...rest] = process.argv.slice(2);
   const args = parseArgs(rest);
-  const context = args['context-b64']
-    ? JSON.parse(Buffer.from(args['context-b64'], 'base64').toString('utf8'))
-    : {};
   try {
+    // Decoding/parsing --context-b64 belongs inside the same try as the
+    // rest of main(): malformed input must produce this script's own
+    // controlled error/exit code, not an uncaught exception's raw stack
+    // trace (fix-verification review, 2026-09-16).
+    const context = args['context-b64']
+      ? JSON.parse(Buffer.from(args['context-b64'], 'base64').toString('utf8'))
+      : {};
     const result = await recordCoordinatorEvent(stage, {
       runId: args['run-id'],
       tokensUsed: args['tokens-used'] !== undefined ? Number(args['tokens-used']) : null,

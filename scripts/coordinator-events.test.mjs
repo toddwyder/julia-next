@@ -101,3 +101,12 @@ test('has a real CLI entry point (this skill\'s runbook invokes it as a plain sh
   assert.match(output, /coordinator_started/);
   assert.match(output, /run-cli-test/);
 });
+
+test('the CLI reports a controlled error for malformed --context-b64 instead of an uncaught stack trace (fix-verification finding)', () => {
+  const scriptPath = new URL('./coordinator-events.mjs', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
+  const { status, stdout, stderr } = spawnSync(process.execPath, [
+    scriptPath, 'started', '--run-id', 'run-x', '--context-b64', 'not-valid-base64-json!!!',
+  ], { encoding: 'utf8' });
+  assert.equal(status, 2);
+  assert.doesNotMatch(stdout + stderr, /at Object\.<anonymous>|node:internal/);
+});

@@ -86,15 +86,24 @@ For the current step of the current item:
    selectors (confirmed live, and by PR #3's independent review, finding C2) -- so targeting the
    shared checkout would fail before dispatch even started, not just violate isolation. Give each
    worktree a distinct `--name` (e.g. `jul43-step-<n>`) so concurrent/retried steps never collide.
-   Hand the worker: the Linear issue, the step's concrete acceptance criteria verbatim, and any
-   prior failure to fix. Emit a `coordinator_started` event (see Journey accounting) before
-   dispatch.
+   Also pass an exact `repo` selector (`path:/home/runner/julia-next`) -- `workerStart` now
+   requires this explicitly rather than inferring it, since inference only happens to work while
+   julia-next is the sole registered project on this environment (fix-verification review, C2
+   residual). Hand the worker: the Linear issue, the step's concrete acceptance criteria
+   verbatim, and any prior failure to fix. Emit a `coordinator_started` event (see Journey
+   accounting) before dispatch.
 2. **Wait** for the dispatch to settle (`orchestration check --wait` / `worker-show`), following
    Orca's own recovery rules -- absence is never proof of failure or success.
-3. **Verify** the step's evidence yourself: `scripts/collect-worker-result.mjs` reads the
-   worker's actual git branch/commit and translates Orca's own outcome, never a hand-typed
-   result. Re-run whatever check the criterion names (a command, a live query) rather than
-   trusting the worker's prose.
+3. **Verify** the step's evidence yourself: `scripts/collect-worker-result.mjs`'s
+   `collectWorkerResult` reads the worker's actual git branch/commit and translates Orca's own
+   outcome, never a hand-typed result. Its two required inputs, concretely: `orcaOutcome` is
+   `worker-show`'s own `projection.outcome` field from step 2 above (`'succeeded'`/`'failed'`/
+   `'timed_out'`), passed straight through; `createWorkerResultImpl` is AI-Stack's
+   `orchestrator/lib/claude-worker.mjs`'s `createWorkerResult`, imported from whichever AI-Stack
+   checkout this session already has (there is no cross-repo import baked into
+   `collect-worker-result.mjs` itself, by design -- it stays testable without an AI-Stack
+   checkout present). Re-run whatever check the criterion names (a command, a live query) rather
+   than trusting the worker's prose.
 4. **Pass** → emit `coordinator_progress`, then either continue to the next step or, if this
    was the last step, go to **After verification** below.
    **Fail, worker-reported** → start a fresh worker on the same step with the failure attached.
@@ -140,7 +149,7 @@ an agent). Pass `context` as base64, never as raw JSON embedded in a shell strin
 quoting and become an injection vector (PR #3 review, finding C3):
 
 ```js
-import { terminalCreate, terminalRead } from './orca-cli.mjs';
+import { terminalCreate, terminalRead, terminalWait } from './orca-cli.mjs';
 const contextB64 = Buffer.from(JSON.stringify(context)).toString('base64');
 const created = await terminalCreate({
   environment: 'OVH runner',
@@ -148,6 +157,11 @@ const created = await terminalCreate({
   command: `node scripts/coordinator-events.mjs ${stage} --run-id ${runId} --context-b64 ${contextB64} --tokens-used ${tokensUsed} --quota-remaining ${quotaRemaining} --interrupted ${interrupted}`,
   title: 'coordinator-events',
 });
+// A single immediate read races the command's own completion -- wait for
+// the shell prompt to return before trusting the output as the command's
+// final state (fix-verification review: "does not guarantee event
+// delivery evidence").
+await terminalWait({ environment: 'OVH runner', terminal: created.terminal.handle, forState: 'tui-idle', timeoutMs: 15000 });
 const read = await terminalRead({ environment: 'OVH runner', terminal: created.terminal.handle });
 // read.terminal.tail (an array of lines) confirms sent:true / sent:false, logged either way.
 ```

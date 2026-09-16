@@ -74,7 +74,17 @@ export async function runCreate({ environment, from, objective, execImpl } = {})
   return run(['orchestration', 'run-create', '--environment', environment, '--from', from, '--objective', objective, '--json'], { execImpl });
 }
 
-export async function workerStart({ run: runId, environment, from, spec, worktree, name, agent = 'codex', setup = 'skip', execImpl } = {}) {
+export async function workerStart({
+  run: runId, environment, from, spec, worktree, name, repo, agent = 'codex', setup = 'skip', execImpl,
+} = {}) {
+  // Installed `orca orchestration worker-start --help` explicitly says
+  // "Use exact --repo on the selected server" for new-worktree creation --
+  // this worked by inference while julia-next was the only registered
+  // project, but that breaks silently the moment a second one exists
+  // (fix-verification review, C2 residual). Required, not defaulted.
+  if (!repo) {
+    throw new Error('workerStart requires an explicit repo selector (e.g. "path:/home/runner/julia-next") -- it is not inferred');
+  }
   return run([
     'orchestration', 'worker-start',
     '--environment', environment,
@@ -83,6 +93,7 @@ export async function workerStart({ run: runId, environment, from, spec, worktre
     '--spec', spec,
     '--worktree', worktree,
     '--name', name,
+    '--repo', repo,
     '--agent', agent,
     '--setup', setup,
     '--json',

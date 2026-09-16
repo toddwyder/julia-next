@@ -8,6 +8,11 @@ test('pushBranch mints a scoped token, writes an askpass helper with no token in
   const calls = [];
   let capturedAskpassPath;
   const execImpl = async (cmd, args, opts) => {
+    if (args[0] === 'config' && args[1] === '--get-regexp') {
+      const error = new Error('Command failed');
+      error.code = 1; // git's real behavior: no url.*.insteadOf rewrites configured
+      throw error;
+    }
     calls.push({ cmd, args, opts });
     capturedAskpassPath = opts.env.GIT_ASKPASS;
     return { stdout: '', stderr: '' };
@@ -71,6 +76,47 @@ test('the real askpass helper file never contains the token itself, only a refer
   const content = readFileSync(askpassPath, 'utf8');
   assert.ok(!content.includes('ghs_super-secret-token'));
   assert.match(content, /JULIA_PUBLISHER_ASKPASS_TOKEN/);
+});
+
+test('pushBranch refuses to push at all when the repo has a url.*.insteadOf rewrite configured (fix-verification finding: repo-local config can redirect the push and exfiltrate the token even with hooks/helpers disabled)', async () => {
+  const calls = [];
+  const execImpl = async (cmd, args) => {
+    calls.push({ cmd, args });
+    if (args[0] === 'config' && args[1] === '--get-regexp') {
+      // git's own exit behavior: exit 1 with no stdout when nothing
+      // matches -- exit 0 with matching lines when something does.
+      return { stdout: 'url.probe::.insteadof https://x-access-token@github.com/\n', stderr: '' };
+    }
+    throw new Error(`unexpected git call in this test: ${args.join(' ')}`);
+  };
+  await assert.rejects(
+    () => pushBranch({
+      owner: 'toddwyder', repo: 'julia-next', branch: 'b', cwd: '.',
+      tokenImpl: async () => 'ghs_super-secret-token', execImpl, writeAskpass: () => '/tmp/x.sh',
+    }),
+    /insteadOf/,
+  );
+  // The actual push must never have been attempted once a rewrite was found.
+  assert.ok(!calls.some((c) => c.args.includes('push')));
+});
+
+test('pushBranch proceeds normally when the repo has no url.*.insteadOf rewrites', async () => {
+  const pushCalls = [];
+  const execImpl = async (cmd, args, opts) => {
+    if (args[0] === 'config' && args[1] === '--get-regexp') {
+      const error = new Error('Command failed');
+      error.code = 1;
+      throw error; // git's real behavior: nonzero exit, no output, when nothing matches
+    }
+    pushCalls.push({ cmd, args, opts });
+    return { stdout: '', stderr: '' };
+  };
+  const result = await pushBranch({
+    owner: 'toddwyder', repo: 'julia-next', branch: 'b', cwd: '.',
+    tokenImpl: async () => 'ghs_super-secret-token', execImpl, writeAskpass: () => '/tmp/x.sh',
+  });
+  assert.deepEqual(result, { pushed: true, branch: 'b' });
+  assert.equal(pushCalls.length, 1);
 });
 
 test('pushBranch rejects a repo outside the approved publisher targets', async () => {
