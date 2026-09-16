@@ -28,6 +28,12 @@ cooking, a device's current block and running timers are visible to the househol
 devices.
 _Avoid_: Client, session, user
 
+**Installed Julia**:
+Julia added to a phone or tablet's home screen, opening with its own icon and no browser
+bar. The expected way to use Julia on a phone or the kitchen tablet; the way "share to Julia"
+reaches it. On the desktop Julia is a Chrome tab.
+_Avoid_: PWA, native app, the app (as if there were a store version)
+
 ## Kitchen
 
 **Recipe**:
