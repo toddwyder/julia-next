@@ -1,0 +1,72 @@
+name: Publisher-only PR
+
+# JUL-43: every PR on this repo must be opened by the julia-graph-publisher
+# GitHub App, never by a personal account -- publishing goes through review,
+# not around it. Mirrors toddwyder/AI-Stack's own publisher-only-pr.yml.
+#
+# Not yet a required branch-protection status check: this repo is private on
+# a plan that doesn't support that GitHub feature (confirmed via the API,
+# not assumed -- see the JUL-43 evidence trail). So this fails visibly on a
+# non-publisher PR but does not yet block the merge button. Flip that once
+# the plan/visibility question is decided.
+#
+# Deliberately no checkout step -- see AI-Stack's copy of this file for why
+# (secrets ARE available to same-repo pull_request runs; not checking out
+# and executing branch code keeps AXIOM_TOKEN out of reach of anything an
+# untrusted PR author could have put in that branch).
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, edited]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify the PR was opened by the julia-graph-publisher GitHub App
+        env:
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          AXIOM_DATASET: ${{ secrets.AXIOM_DATASET }}
+          AXIOM_TOKEN: ${{ secrets.AXIOM_TOKEN }}
+        run: |
+          if [ "$PR_AUTHOR" = "julia-graph-publisher[bot]" ]; then
+            echo "PR #$PR_NUMBER opened by julia-graph-publisher[bot] -- OK."
+            exit 0
+          fi
+
+          reason='author is not julia-graph-publisher[bot]'
+          attempted="PR #$PR_NUMBER ($PR_URL) opened by $PR_AUTHOR"
+          record=$(node -e '
+            const record = {
+              _time: new Date().toISOString(),
+              event: "julia.journey0.coordinator_failed",
+              control: "non-publisher-pr-check-failed",
+              attempted: process.argv[1],
+              reason: process.argv[2],
+            };
+            console.log(JSON.stringify(record));
+          ' "$attempted" "$reason")
+
+          if [ -n "$AXIOM_DATASET" ] && [ -n "$AXIOM_TOKEN" ]; then
+            http_status=$(curl -s -o /tmp/axiom-response.json -w '%{http_code}' \
+              -X POST "https://api.axiom.co/v1/datasets/$AXIOM_DATASET/ingest" \
+              -H "Authorization: Bearer $AXIOM_TOKEN" \
+              -H 'Content-Type: application/x-ndjson' \
+              --data-binary "$record"$'\n')
+            if [ "$http_status" -ge 200 ] && [ "$http_status" -lt 300 ]; then
+              echo "Axiom: delivered refusal for control=non-publisher-pr-check-failed"
+            else
+              echo "Axiom: delivery FAILED (HTTP $http_status) for control=non-publisher-pr-check-failed"
+            fi
+          else
+            echo "(Axiom: not sent -- AXIOM_DATASET/AXIOM_TOKEN not set) $record"
+          fi
+
+          echo "::error::PR #$PR_NUMBER was opened by '$PR_AUTHOR', not julia-graph-publisher[bot]. Every PR on this repo must be opened by the publisher identity."
+          exit 1

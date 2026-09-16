@@ -70,3 +70,6 @@ jobs:
             exit 1
           fi
           echo "OK: example env file holds only placeholder values"
+
+      - name: Run scripts/ unit tests
+        run: node --test scripts/*.test.mjs
