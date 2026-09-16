@@ -69,6 +69,16 @@ A recipe placed on a menu with a multiplier (1×, 1½×, 2×) that Julia propose
 change. A recipe appears at most once per menu.
 _Avoid_: Planned recipe, course, item
 
+**Prep list**:
+The timeline Julia proposes from a menu: make-ahead days, then the day, ordered back from
+serving time. Todd ticks, drags, adds tasks, and pins; regenerating keeps his changes.
+_Avoid_: Prep engine, schedule, plan
+
+**Block**:
+One piece of one dish on the prep list, with its own steps, ingredient lines, and time: a mini
+recipe. A dish may split into a make-ahead block and a day-of block. Opens in cook mode.
+_Avoid_: Task (that's a hand-added item), card, stage
+
 **Shopping list**:
 The household's one list of things to buy, one line per ingredient, grouped by aisle. Fed by
 menus, recipes, typing, and voice.
