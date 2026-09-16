@@ -13,6 +13,13 @@ const execFileAsync = promisify(execFile);
 const DEFAULT_BIN = process.env.ORCA_BIN
   || 'C:\\Users\\toddw\\AppData\\Local\\Programs\\orca\\resources\\bin\\orca.exe';
 
+// Every orchestration/terminal command's real --json output wraps its
+// payload as {id, ok, result, _meta} and reports failure as
+// {id, ok:false, error:{code, message}} -- confirmed live against the
+// installed CLI (2026-09-16), not documented in its --help text. run()
+// unwraps that envelope once here so every exported function below returns
+// the payload callers actually want, and a structured failure surfaces its
+// real code/message instead of an undefined field read downstream.
 async function run(args, { execImpl = defaultExecImpl, bin = 'orca' } = {}) {
   let stdout;
   try {
@@ -21,11 +28,17 @@ async function run(args, { execImpl = defaultExecImpl, bin = 'orca' } = {}) {
     const detail = String(error.stderr || error.message || '').trim();
     throw new Error(`orca ${args.join(' ')} failed: ${detail}`);
   }
+  let parsed;
   try {
-    return JSON.parse(stdout);
+    parsed = JSON.parse(stdout);
   } catch {
     throw new Error(`orca ${args.join(' ')} did not return valid JSON: ${stdout.slice(0, 200)}`);
   }
+  if (parsed.ok === false) {
+    const { code, message } = parsed.error ?? {};
+    throw new Error(`orca ${args.join(' ')} failed (${code ?? 'unknown_error'}): ${message ?? 'no error message'}`);
+  }
+  return parsed.result;
 }
 
 async function defaultExecImpl(bin, args) {
@@ -40,8 +53,8 @@ export async function runCreate({ environment, from, objective, execImpl } = {})
 export async function workerStart({ run: runId, environment, from, spec, worktree, name, agent = 'codex', setup = 'skip', execImpl } = {}) {
   return run([
     'orchestration', 'worker-start',
-    '--run', runId,
     '--environment', environment,
+    '--run', runId,
     '--from', from,
     '--spec', spec,
     '--worktree', worktree,

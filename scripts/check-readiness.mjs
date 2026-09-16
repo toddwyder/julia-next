@@ -54,11 +54,19 @@ async function defaultPublisherCheckImpl() {
   }
 }
 
-async function defaultRelayCheckImpl() {
+// terminalCreate/terminalRead's real --json shape nests everything under
+// result.terminal (a {handle, tail: [...], ...} object, not a flat string)
+// -- confirmed live against the installed CLI, not guessed (see
+// orca-cli.test.mjs). Exported, with the two Orca calls injectable, so this
+// unwrapping is covered by its own test rather than only exercised live.
+export async function defaultRelayCheckImpl({
+  terminalCreateImpl = terminalCreate,
+  terminalReadImpl = terminalRead,
+} = {}) {
   // The relay binds to 127.0.0.1:8943 on the OVH runner only, so this must
   // run from a terminal on that runner, not from wherever this check
   // itself is invoked.
-  const { terminal } = await terminalCreate({
+  const created = await terminalCreateImpl({
     environment: ENVIRONMENT,
     // path:<path> avoids needing this runner's internal repo UUID -- the
     // main julia-next checkout's real filesystem path, confirmed live via
@@ -68,11 +76,12 @@ async function defaultRelayCheckImpl() {
     command: 'curl -s -m 5 -X POST http://127.0.0.1:8943/events -H "content-type: application/json" -d \'{"event":"journey-relay.readiness-check","attempted":"readiness","reason":"check-readiness.mjs","context":"readiness"}\'',
     title: 'readiness-relay-check',
   });
-  const { output } = await terminalRead({ environment: ENVIRONMENT, terminal });
-  if (/"sent":\s*true/.test(output ?? '')) {
+  const read = await terminalReadImpl({ environment: ENVIRONMENT, terminal: created.terminal.handle });
+  const output = (read.terminal.tail ?? []).join('\n');
+  if (/"sent":\s*true/.test(output)) {
     return { reachable: true, detail: output };
   }
-  return { reachable: false, detail: `journey-relay at 127.0.0.1:8943 did not confirm delivery: ${output ?? '(no output)'}` };
+  return { reachable: false, detail: `journey-relay at 127.0.0.1:8943 did not confirm delivery: ${output || '(no output)'}` };
 }
 
 export async function checkReadiness({

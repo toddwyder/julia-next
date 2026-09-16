@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { checkReadiness } from './check-readiness.mjs';
+import { checkReadiness, defaultRelayCheckImpl } from './check-readiness.mjs';
 
 function fakes({
   runtimeReachable = true,
@@ -69,6 +69,27 @@ test('journey-relay unreachable from the runner fails clearly, not silently', as
   const relay = result.checks.find((c) => c.name === 'journey-relay reachable');
   assert.equal(relay.ok, false);
   assert.match(relay.detail, /127\.0\.0\.1:8943/);
+});
+
+test('defaultRelayCheckImpl unwraps the real nested {terminal: {handle, tail}} shape from both calls', async () => {
+  const result = await defaultRelayCheckImpl({
+    terminalCreateImpl: async () => ({ terminal: { handle: 'term_abc', tabId: 't1' } }),
+    terminalReadImpl: async ({ terminal }) => {
+      assert.equal(terminal, 'term_abc');
+      return { terminal: { handle: 'term_abc', tail: ['$ curl ...', '{"sent":true,"event":"journey-relay.readiness-check"}', '$'] } };
+    },
+  });
+  assert.equal(result.reachable, true);
+  assert.match(result.detail, /"sent":true/);
+});
+
+test('defaultRelayCheckImpl reports not-reachable, with the tail as evidence, when the relay never confirms', async () => {
+  const result = await defaultRelayCheckImpl({
+    terminalCreateImpl: async () => ({ terminal: { handle: 'term_abc' } }),
+    terminalReadImpl: async () => ({ terminal: { handle: 'term_abc', tail: ['$ curl ...', 'curl: (7) Failed to connect', '$'] } }),
+  });
+  assert.equal(result.reachable, false);
+  assert.match(result.detail, /127\.0\.0\.1:8943/);
 });
 
 test('an Orca CLI failure (not installed, environment not paired) is its own failed check, not an uncaught throw', async () => {
