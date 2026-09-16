@@ -197,3 +197,9 @@ _Avoid_: Preview, staging, test environment
 **Real Julia**:
 The one Julia the household actually uses. Only accepted changes reach it.
 _Avoid_: Production, prod, live
+
+**Backup**:
+The folder in Todd's Google Drive that mirrors the household: a readable text file per
+recipe, menus and the shopping list as text, and one machine file for restoring. Refreshed
+overnight on days something changed; only changed files are touched.
+_Avoid_: Export, dump, snapshot, sync
