@@ -35,12 +35,22 @@ Checked directly, not assumed:
   read-only Orca queries (`status`, `project setups`, `worktree list`) succeeded here. A live
   coordinator run needs either a session with that permission, or Todd running the dispatch step
   himself using the commands this runbook documents.
-- The `julia-graph-publisher` GitHub App (App ID 4948330) is installed on `toddwyder/Julia` and
-  `toddwyder/AI-Stack` only -- **not on `toddwyder/julia-next`**, per
-  `toddwyder/Julia`'s `docs/credentials-map.md`. `scripts/check-readiness.mjs` will report this
-  as a named, failing check until the App is added to `julia-next`.
-- `julia-next` has **zero** repository secrets today (`gh secret list --repo toddwyder/julia-next`
-  returns nothing). `LINEAR_API_KEY` has never been placed anywhere for this project.
+- **Correction, checked live in the browser against `toddwyder/julia-next`'s own Settings ->
+  Integrations page (2026-09-16), not the frozen `Julia` repo's `docs/credentials-map.md`:** the
+  `julia-graph-publisher` GitHub App **is** installed on `toddwyder/julia-next` -- that doc is
+  stale on this one point, and this runbook's earlier draft this session repeated its stale
+  claim without checking the live page first. Minting a token still needs
+  `JULIA_PUBLISHER_APP_ID`/`JULIA_PUBLISHER_APP_PRIVATE_KEY` readable by whichever process runs
+  `publish-via-github-app.mjs`; that local credential file (`C:\Julia\.env.publisher.local`) is
+  itself unreadable from this particular session -- blocked by the same environment's
+  "Credential Materialization" classifier. That is a session-permission gap, not a missing
+  installation.
+- `julia-next` has **zero** repository secrets (`gh secret list --repo toddwyder/julia-next`
+  returns nothing) -- expected: this route mints the publisher token fresh per use rather than
+  storing a long-lived one, and the coordinator reads/writes Linear through its own MCP tools
+  (`docs/agents/issue-tracker.md`), not a standalone `LINEAR_API_KEY` -- `check-readiness.mjs`
+  no longer checks for one; that requirement was inherited from an earlier session's
+  headless-script design this route doesn't use.
 - PR #2 (`jul43-journey-relay` -> `main`, the Axiom relay client + trusted-boundary code) is
   still **open, unmerged**. `julia-next`'s `main` branch has none of `ops/journey-relay` or
   `scripts/journey-events.mjs` -- only what's on this local branch.
@@ -72,31 +82,37 @@ held). It checks, each as its own pass/fail line:
    `publish-via-github-app.mjs` uses for a real publish (requires
    `JULIA_PUBLISHER_APP_ID`/`JULIA_PUBLISHER_APP_PRIVATE_KEY` in the coordinator's own process
    environment).
-4. **LINEAR_API_KEY configured** -- present in the coordinator's own process environment.
-5. **journey-relay reachable** -- run from **inside a terminal on the OVH runner itself** (the
+4. **journey-relay reachable** -- run from **inside a terminal on the OVH runner itself** (the
    relay binds to `127.0.0.1:8943` there only), via `orca-cli.mjs`'s `terminalCreate`/
    `terminalRead`; a real POST to `/events` should come back `sent:true`.
 
-## Remaining bootstrap approvals needed -- credential/access boundaries, not code
+(No `LINEAR_API_KEY` check -- the coordinator is a live agent session using Linear's MCP tools
+directly, not a headless script needing its own key.)
 
-1. **Install the `julia-graph-publisher` GitHub App on `toddwyder/julia-next`.** One click, by
-   whoever administers the App's GitHub installation (Settings -> Installations ->
-   julia-graph-publisher -> Configure -> add repository). No new App, no new key -- the same
-   App already used for `Julia` and `AI-Stack`.
-2. **Create and place `LINEAR_API_KEY`.** Scoped to Read + Create-comments only, team Julia-next
-   only (Linear's key-creation page supports this scoping, confirmed session 2). Placement
-   target for the coordinator's own process environment is the same pattern already used for the
-   Axiom token and the publisher App's local `.env.publisher.local` on `toddwyder/Julia` -- not
-   chat, not a GitHub Actions secret (this route doesn't run in Actions).
-3. **Decide PR #2's fate.** It carries real, tested relay code `main` is missing. Merging it (a
-   normal review-and-click, the same "one action" pattern JUL-43's own comment history already
-   asked for) is what makes `ops/journey-relay` and `scripts/journey-events.mjs` available to a
-   worker dispatched from a clean `main` checkout, rather than only existing on runner-local
-   worktrees that were deliberately never pushed.
-4. **The remote-exec permission gap this session hit.** Whatever session actually drives the
-   coordinator through a live wake needs permission to create Orca terminals / dispatch workers
-   on "OVH runner" -- this session's own classifier refused that. Confirm which session
-   configuration allows it before expecting a live run to complete unattended.
+## What actually blocks a live run now -- two session permissions, not repo state
+
+Repo/infra state is ready: the publisher App is installed on `julia-next`, the runner is
+reachable, the project is registered there. What's missing is **permission for whichever session
+drives the coordinator**, checked directly this session (2026-09-16):
+
+1. **"Credential Materialization" blocks reading `C:\Julia\.env.publisher.local`** (the publisher
+   App's local `JULIA_PUBLISHER_APP_ID`/`JULIA_PUBLISHER_APP_PRIVATE_KEY`) from this session. No
+   publish and no PR merge can happen without reading that file -- both go through the same
+   `publish-via-github-app.mjs` token mint.
+2. **"Sensitive Remote Exec" blocks creating a terminal or dispatching a worker on "OVH runner"**
+   from this session. No worker step and no Axiom event emission can happen without that.
+
+Both denials name the same fix: "the user can add a Bash permission rule to their settings."
+That is Todd's call to make, not a credential to place or a UI button to click -- it's a
+decision about which session configuration is allowed to actually drive the coordinator's
+write-side steps. The coordinator's read-only reconcile step (Orca status/project-setups
+queries, Linear reads/writes via MCP) already works today, from this session, with no further
+grant.
+
+**PR #2** (the Axiom relay code, still open and unmerged) should be resolved through the
+publisher's own merge capability (`pull_requests:write` is already in its token scope) once
+blocker 1 above is lifted -- not by asking Todd to click GitHub's merge button personally, which
+would recreate the personal-account bypass this whole boundary exists to avoid.
 
 ## Verification, after a run
 

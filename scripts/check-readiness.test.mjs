@@ -3,8 +3,6 @@ import assert from 'node:assert/strict';
 
 import { checkReadiness } from './check-readiness.mjs';
 
-const OK_ENV = { LINEAR_API_KEY: 'lin_api_fake' };
-
 function fakes({
   runtimeReachable = true,
   runtimeConnectionState = 'connected',
@@ -33,18 +31,17 @@ function fakes({
 }
 
 test('all checks pass -> ok: true', async () => {
-  const result = await checkReadiness({ env: OK_ENV, ...fakes() });
+  const result = await checkReadiness({ ...fakes() });
   assert.equal(result.ok, true);
   assert.ok(result.checks.some((c) => c.name === 'OVH runner reachable'));
   assert.ok(result.checks.some((c) => c.name === 'julia-next project registered'));
   assert.ok(result.checks.some((c) => c.name === 'julia-graph-publisher installed on julia-next'));
-  assert.ok(result.checks.some((c) => c.name === 'LINEAR_API_KEY configured'));
   assert.ok(result.checks.some((c) => c.name === 'journey-relay reachable'));
   assert.ok(result.checks.every((c) => c.ok));
 });
 
 test('OVH runner unreachable fails clearly and by name', async () => {
-  const result = await checkReadiness({ env: OK_ENV, ...fakes({ runtimeReachable: false, runtimeConnectionState: 'disconnected' }) });
+  const result = await checkReadiness({ ...fakes({ runtimeReachable: false, runtimeConnectionState: 'disconnected' }) });
   assert.equal(result.ok, false);
   const runner = result.checks.find((c) => c.name === 'OVH runner reachable');
   assert.equal(runner.ok, false);
@@ -52,29 +49,22 @@ test('OVH runner unreachable fails clearly and by name', async () => {
 });
 
 test('julia-next not yet registered on the runner fails only that check', async () => {
-  const result = await checkReadiness({ env: OK_ENV, ...fakes({ projectRegistered: false }) });
+  const result = await checkReadiness({ ...fakes({ projectRegistered: false }) });
   assert.equal(result.ok, false);
   assert.equal(result.checks.find((c) => c.name === 'julia-next project registered').ok, false);
   assert.equal(result.checks.find((c) => c.name === 'OVH runner reachable').ok, true);
 });
 
 test('publisher App not installed on julia-next is its own named, actionable failure', async () => {
-  const result = await checkReadiness({ env: OK_ENV, ...fakes({ publisherInstalled: false }) });
+  const result = await checkReadiness({ ...fakes({ publisherInstalled: false }) });
   assert.equal(result.ok, false);
   const publisher = result.checks.find((c) => c.name === 'julia-graph-publisher installed on julia-next');
   assert.equal(publisher.ok, false);
   assert.match(publisher.detail, /not installed/);
 });
 
-test('missing LINEAR_API_KEY fails only that check', async () => {
-  const result = await checkReadiness({ env: {}, ...fakes() });
-  assert.equal(result.ok, false);
-  assert.equal(result.checks.find((c) => c.name === 'LINEAR_API_KEY configured').ok, false);
-  assert.equal(result.checks.find((c) => c.name === 'OVH runner reachable').ok, true);
-});
-
 test('journey-relay unreachable from the runner fails clearly, not silently', async () => {
-  const result = await checkReadiness({ env: OK_ENV, ...fakes({ relayReachable: false }) });
+  const result = await checkReadiness({ ...fakes({ relayReachable: false }) });
   assert.equal(result.ok, false);
   const relay = result.checks.find((c) => c.name === 'journey-relay reachable');
   assert.equal(relay.ok, false);
@@ -83,7 +73,6 @@ test('journey-relay unreachable from the runner fails clearly, not silently', as
 
 test('an Orca CLI failure (not installed, environment not paired) is its own failed check, not an uncaught throw', async () => {
   const result = await checkReadiness({
-    env: OK_ENV,
     orcaStatusImpl: async () => { throw new Error('environment "OVH runner" is not paired'); },
     orcaProjectSetupsImpl: async () => { throw new Error('environment "OVH runner" is not paired'); },
     publisherCheckImpl: fakes().publisherCheckImpl,

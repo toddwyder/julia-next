@@ -5,6 +5,12 @@
 // precondition is reported as its own pass/fail line, not folded into one
 // generic result -- an unreachable runner and a missing credential are
 // different problems with different fixes.
+//
+// No LINEAR_API_KEY check: the coordinator is a live agent session using
+// Linear's MCP tools directly (docs/agents/issue-tracker.md), not a
+// headless script that needs its own API key -- that requirement was
+// inherited from an earlier session's AI-Stack-headless-script design that
+// this route no longer uses.
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { getPublisherInstallationToken } from './publish-via-github-app.mjs';
@@ -70,7 +76,6 @@ async function defaultRelayCheckImpl() {
 }
 
 export async function checkReadiness({
-  env = process.env,
   orcaStatusImpl = defaultOrcaStatusImpl,
   orcaProjectSetupsImpl = defaultOrcaProjectSetupsImpl,
   publisherCheckImpl = defaultPublisherCheckImpl,
@@ -108,12 +113,6 @@ export async function checkReadiness({
   } catch (error) {
     checks.push(check('julia-graph-publisher installed on julia-next', false, error.message));
   }
-
-  checks.push(
-    env.LINEAR_API_KEY
-      ? check('LINEAR_API_KEY configured', true, 'present')
-      : check('LINEAR_API_KEY configured', false, 'not set in the coordinator process environment'),
-  );
 
   try {
     const { reachable, detail } = await relayCheckImpl();
