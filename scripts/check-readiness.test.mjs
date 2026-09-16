@@ -3,79 +3,48 @@ import assert from 'node:assert/strict';
 
 import { checkReadiness } from './check-readiness.mjs';
 
-const config = { tracker: 'linear', linear: { teamKey: 'JUL' } };
-
-function relay({ status = 200, sent = true, throwError = null } = {}) {
-  return async () => {
-    if (throwError) throw throwError;
-    return { ok: status >= 200 && status < 300, status, json: async () => ({ sent, record: {} }) };
+function gh({ runnerStatus = 'online', secretNames = ['JULIA_NEXT_DEPLOY_KEY', 'JULIA_PUBLISHER_APP_ID', 'JULIA_PUBLISHER_APP_PRIVATE_KEY', 'LINEAR_API_KEY'] } = {}) {
+  return async (args) => {
+    if (args.join(' ') === 'api repos/toddwyder/AI-Stack/actions/runners') {
+      return JSON.stringify({ runners: [{ name: 'BERTHA', status: runnerStatus, os: 'Windows' }] });
+    }
+    if (args.join(' ') === 'secret list -R toddwyder/AI-Stack') {
+      return secretNames.join('\n');
+    }
+    throw new Error(`unexpected gh call: ${args.join(' ')}`);
   };
 }
 
-test('all checks pass -> ok: true, with a plain-English line per check', async () => {
-  const result = await checkReadiness({
-    config,
-    env: { JULIA_PUBLISHER_APP_ID: '4948330', JULIA_PUBLISHER_APP_PRIVATE_KEY: 'pem', LINEAR_API_KEY: 'k' },
-    fetchImpl: relay(),
-  });
+test('all checks pass -> ok: true', async () => {
+  const result = await checkReadiness({ ghImpl: gh() });
   assert.equal(result.ok, true);
   assert.equal(result.checks.every((c) => c.ok), true);
-  assert.ok(result.checks.some((c) => c.name === 'publisher App credentials'));
-  assert.ok(result.checks.some((c) => c.name === 'linear credential'));
-  assert.ok(result.checks.some((c) => c.name === 'relay reachable and accepted the event'));
+  assert.ok(result.checks.some((c) => c.name === 'BERTHA runner online'));
+  assert.ok(result.checks.some((c) => c.name === 'JULIA_NEXT_DEPLOY_KEY configured'));
+  assert.ok(result.checks.some((c) => c.name === 'JULIA_PUBLISHER_APP_ID configured'));
+  assert.ok(result.checks.some((c) => c.name === 'JULIA_PUBLISHER_APP_PRIVATE_KEY configured'));
+  assert.ok(result.checks.some((c) => c.name === 'LINEAR_API_KEY configured'));
 });
 
-test('missing publisher App credentials fails that check only, others still run and report', async () => {
-  const result = await checkReadiness({
-    config, env: { LINEAR_API_KEY: 'k' }, fetchImpl: relay(),
-  });
+test('BERTHA offline fails clearly and by name, not a generic error', async () => {
+  const result = await checkReadiness({ ghImpl: gh({ runnerStatus: 'offline' }) });
   assert.equal(result.ok, false);
-  const cred = result.checks.find((c) => c.name === 'publisher App credentials');
-  assert.equal(cred.ok, false);
-  assert.match(cred.detail, /JULIA_PUBLISHER_APP_ID.*JULIA_PUBLISHER_APP_PRIVATE_KEY/s);
-  const linear = result.checks.find((c) => c.name === 'linear credential');
-  assert.equal(linear.ok, true);
+  const runner = result.checks.find((c) => c.name === 'BERTHA runner online');
+  assert.equal(runner.ok, false);
+  assert.match(runner.detail, /offline/);
 });
 
-test('publisher App credentials check reports which of the two is missing', async () => {
-  const idOnly = await checkReadiness({ config, env: { JULIA_PUBLISHER_APP_ID: '4948330', LINEAR_API_KEY: 'k' }, fetchImpl: relay() });
-  assert.match(idOnly.checks.find((c) => c.name === 'publisher App credentials').detail, /JULIA_PUBLISHER_APP_PRIVATE_KEY is not set/);
-
-  const keyOnly = await checkReadiness({ config, env: { JULIA_PUBLISHER_APP_PRIVATE_KEY: 'pem', LINEAR_API_KEY: 'k' }, fetchImpl: relay() });
-  assert.match(keyOnly.checks.find((c) => c.name === 'publisher App credentials').detail, /JULIA_PUBLISHER_APP_ID is not set/);
-});
-
-test('relay reachable with HTTP 200 but sent:false is reported as a failed check, not swallowed', async () => {
-  const result = await checkReadiness({
-    config,
-    env: { JULIA_PUBLISHER_APP_ID: '4948330', JULIA_PUBLISHER_APP_PRIVATE_KEY: 'pem', LINEAR_API_KEY: 'k' },
-    fetchImpl: relay({ status: 200, sent: false }),
-  });
+test('a missing secret fails only that check; the rest still run and report', async () => {
+  const result = await checkReadiness({ ghImpl: gh({ secretNames: ['JULIA_PUBLISHER_APP_ID', 'JULIA_PUBLISHER_APP_PRIVATE_KEY'] }) });
   assert.equal(result.ok, false);
-  const relayCheck = result.checks.find((c) => c.name === 'relay reachable and accepted the event');
-  assert.equal(relayCheck.ok, false);
-  assert.match(relayCheck.detail, /HTTP 200 but sent:false/);
+  assert.equal(result.checks.find((c) => c.name === 'JULIA_NEXT_DEPLOY_KEY configured').ok, false);
+  assert.equal(result.checks.find((c) => c.name === 'LINEAR_API_KEY configured').ok, false);
+  assert.equal(result.checks.find((c) => c.name === 'JULIA_PUBLISHER_APP_ID configured').ok, true);
 });
 
-test('relay unreachable is reported as a failed check with the real error, not a silent pass', async () => {
-  const result = await checkReadiness({
-    config,
-    env: { JULIA_PUBLISHER_APP_ID: '4948330', JULIA_PUBLISHER_APP_PRIVATE_KEY: 'pem', LINEAR_API_KEY: 'k' },
-    fetchImpl: relay({ throwError: new Error('ECONNREFUSED') }),
-  });
+test('a gh CLI failure (e.g. not authenticated) is reported as its own failed check, not an uncaught throw', async () => {
+  const ghImpl = async () => { throw new Error('gh: not logged in'); };
+  const result = await checkReadiness({ ghImpl });
   assert.equal(result.ok, false);
-  const relayCheck = result.checks.find((c) => c.name === 'relay reachable and accepted the event');
-  assert.equal(relayCheck.ok, false);
-  assert.match(relayCheck.detail, /ECONNREFUSED/);
-});
-
-test('the readiness probe uses a distinct event name, never coordinator_started', async () => {
-  let sentEvent = null;
-  const fetchImpl = async (url, init) => {
-    sentEvent = JSON.parse(init.body).event;
-    return { ok: true, status: 200, json: async () => ({ sent: true }) };
-  };
-  await checkReadiness({ config, env: { JULIA_PUBLISHER_APP_ID: '4948330', JULIA_PUBLISHER_APP_PRIVATE_KEY: 'pem', LINEAR_API_KEY: 'k' }, fetchImpl });
-  assert.equal(sentEvent, 'julia.journey0.coordinator_readiness_check');
-  assert.notEqual(sentEvent, 'julia.journey0.coordinator_started');
+  assert.ok(result.checks.some((c) => !c.ok && /not logged in/.test(c.detail)));
 });

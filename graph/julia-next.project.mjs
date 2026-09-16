@@ -21,14 +21,11 @@ export default {
   },
   linear: { teamKey: 'JUL' },
   handoff: {
-    // Used only by AI-Stack's generic publish-julia-supervised-run.mjs CLI
-    // (the manual --mode finish recovery path in the runbook), which reads
-    // this env var directly -- so that path still needs it exported by
-    // hand. scripts/run-jul43-coordinator.mjs -- the real initialization
-    // command -- does not read this var at all: it mints a fresh ~1-hour
-    // installation token itself, per run, from JULIA_PUBLISHER_APP_ID /
-    // JULIA_PUBLISHER_APP_PRIVATE_KEY (scripts/publish-via-github-app.mjs,
-    // reused from toddwyder/Julia's Round B1) and uses it directly.
-    credentialEnvVar: 'JULIA_NEXT_GRAPH_WRITE_TOKEN',
+    // Matches the env var name julia-next-supervised-worker-manual.yml
+    // (AI-Stack) sets from steps.publisher_token(.outputs.token) before
+    // calling publish-julia-supervised-run.mjs -- same convention as the
+    // existing toddwyder/Julia workflow, not a julia-next-specific name.
+    // requirePublisherCredential(config) reads exactly this var.
+    credentialEnvVar: 'JULIA_GRAPH_WRITE_TOKEN',
   },
 };

@@ -1,109 +1,71 @@
 #!/usr/bin/env node
-// check-readiness.mjs -- one command, checks every precondition a JUL-43
-// coordinator run needs, and fails clearly and separately on each one.
-// An HTTP 200 from the relay is not enough: the relay can accept the
-// request and still report `sent: false` (Axiom delivery itself failed,
-// e.g. a bad/missing token) -- that must show up as a failed check here,
-// not a silent pass.
-//
-// Uses its own distinct event name (coordinator_readiness_check), never
-// coordinator_started, so running this probe can never be mistaken for a
-// hung run by the stalled-run query in docs/agents/jul43-coordinator-runbook.md.
-import { pathToFileURL } from 'node:url';
-import { resolve } from 'node:path';
+// check-readiness.mjs -- checks every precondition for dispatching
+// julia-next-supervised-worker-manual.yml (AI-Stack), the existing
+// BERTHA/GitHub-Actions coordinator this run goes through. Each
+// precondition is reported as its own pass/fail line, not folded into one
+// generic result -- a missing secret and an offline runner are different
+// problems with different fixes.
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 
-const RELAY_URL = process.env.JOURNEY_RELAY_URL || 'http://127.0.0.1:8943/events';
+const execFileAsync = promisify(execFile);
+
+const REQUIRED_SECRETS = ['JULIA_NEXT_DEPLOY_KEY', 'JULIA_PUBLISHER_APP_ID', 'JULIA_PUBLISHER_APP_PRIVATE_KEY', 'LINEAR_API_KEY'];
+
+async function defaultGhImpl(args) {
+  const { stdout } = await execFileAsync('gh', args, { maxBuffer: 10 * 1024 * 1024 });
+  return stdout;
+}
 
 function check(name, ok, detail) {
   return { name, ok, detail };
 }
 
-export async function checkReadiness({ config, env = process.env, fetchImpl = fetch } = {}) {
+export async function checkReadiness({ ghImpl = defaultGhImpl } = {}) {
   const checks = [];
 
-  checks.push(
-    config?.tracker === 'linear' && config?.linear?.teamKey
-      ? check('project config', true, `tracker=linear, team=${config.linear.teamKey}`)
-      : check('project config', false, 'config did not load as a tracker: "linear" project config'),
-  );
-
-  // run-jul43-coordinator.mjs mints a fresh installation token per run from
-  // these two (see publish-via-github-app.mjs) rather than needing a
-  // pre-placed, eventually-stale JULIA_NEXT_GRAPH_WRITE_TOKEN.
-  const missingAppCreds = ['JULIA_PUBLISHER_APP_ID', 'JULIA_PUBLISHER_APP_PRIVATE_KEY'].filter((name) => !env[name]);
-  checks.push(
-    missingAppCreds.length === 0
-      ? check('publisher App credentials', true, 'JULIA_PUBLISHER_APP_ID and JULIA_PUBLISHER_APP_PRIVATE_KEY are set')
-      : check('publisher App credentials', false, `${missingAppCreds.join(', ')} ${missingAppCreds.length > 1 ? 'are' : 'is'} not set`),
-  );
-
-  checks.push(
-    env.LINEAR_API_KEY
-      ? check('linear credential', true, 'LINEAR_API_KEY is set')
-      : check('linear credential', false, 'LINEAR_API_KEY is not set'),
-  );
-
-  // Deliberately not going through journey-events.mjs's recordEvent() here:
-  // that function catches network errors and returns {sent:false} for both
-  // "couldn't reach the relay" and "relay said sent:false" alike -- fine for
-  // a builder script that must never throw, wrong for a readiness check that
-  // needs to tell those two failures apart and report each distinctly.
   try {
-    const response = await fetchImpl(RELAY_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        event: 'julia.journey0.coordinator_readiness_check',
-        attempted: 'readiness-check',
-        reason: 'manual readiness probe',
-        context: 'check-readiness.mjs',
-      }),
-      signal: AbortSignal.timeout(5000),
-    });
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      checks.push(check('relay reachable and accepted the event', false, `relay responded HTTP ${response.status}`));
-    } else if (body.sent !== true) {
-      checks.push(check(
-        'relay reachable and accepted the event',
-        false,
-        'relay responded HTTP 200 but sent:false -- request reached the relay but Axiom delivery failed (check AXIOM_DATASET/AXIOM_TOKEN on the runner)',
-      ));
+    const runnersJson = await ghImpl(['api', 'repos/toddwyder/AI-Stack/actions/runners']);
+    const { runners } = JSON.parse(runnersJson);
+    const bertha = runners.find((r) => r.name === 'BERTHA');
+    if (!bertha) {
+      checks.push(check('BERTHA runner online', false, 'no runner named BERTHA is registered on toddwyder/AI-Stack'));
+    } else if (bertha.status !== 'online') {
+      checks.push(check('BERTHA runner online', false, `BERTHA is registered but status is "${bertha.status}", not online -- start its runner service before dispatching`));
     } else {
-      checks.push(check('relay reachable and accepted the event', true, 'relay responded and reported sent:true (delivered to Axiom)'));
+      checks.push(check('BERTHA runner online', true, 'BERTHA is registered and online'));
     }
   } catch (error) {
-    checks.push(check('relay reachable and accepted the event', false, `relay request failed: ${error.message}`));
+    checks.push(check('BERTHA runner online', false, `could not query AI-Stack's registered runners: ${error.message}`));
+  }
+
+  try {
+    const secretListing = await ghImpl(['secret', 'list', '-R', 'toddwyder/AI-Stack']);
+    const configured = new Set(secretListing.split(/\r?\n/).map((line) => line.split(/\s+/)[0]).filter(Boolean));
+    for (const name of REQUIRED_SECRETS) {
+      checks.push(
+        configured.has(name)
+          ? check(`${name} configured`, true, `present in toddwyder/AI-Stack's Actions secrets`)
+          : check(`${name} configured`, false, `not found in toddwyder/AI-Stack's Actions secrets`),
+      );
+    }
+  } catch (error) {
+    for (const name of REQUIRED_SECRETS) {
+      checks.push(check(`${name} configured`, false, `could not list toddwyder/AI-Stack's secrets: ${error.message}`));
+    }
   }
 
   return { ok: checks.every((c) => c.ok), checks };
 }
 
 async function main() {
-  const aiStackDir = process.argv.includes('--ai-stack-dir')
-    ? process.argv[process.argv.indexOf('--ai-stack-dir') + 1]
-    : null;
-  if (!aiStackDir) {
-    console.error('READY: false');
-    console.error('  [ ] --ai-stack-dir is required (path to a toddwyder/AI-Stack checkout)');
-    process.exitCode = 1;
-    return;
-  }
-  const { defineProjectConfig } = await import(pathToFileURL(resolve(aiStackDir, 'orchestrator/lib/project-config.mjs')).href);
-  let config = null;
-  try {
-    const mod = await import(pathToFileURL(resolve('graph/julia-next.project.mjs')).href);
-    config = defineProjectConfig(mod.default);
-  } catch (error) {
-    console.error(`config failed to load: ${error.message}`);
-  }
-
-  const { ok, checks } = await checkReadiness({ config: config ?? {} });
+  const { ok, checks } = await checkReadiness();
   for (const c of checks) console.log(`  [${c.ok ? 'x' : ' '}] ${c.name}: ${c.detail}`);
   console.log(`READY: ${ok}`);
   process.exitCode = ok ? 0 : 1;
 }
 
+import { pathToFileURL } from 'node:url';
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main();
 }
