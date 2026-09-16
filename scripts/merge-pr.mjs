@@ -27,6 +27,9 @@ export async function mergePullRequest({
   if (!APPROVED_TARGETS.has(`${owner}/${repo}`)) {
     throw new Error(`${owner}/${repo} is not an approved publisher target`);
   }
+  if (!Number.isInteger(Number(number)) || Number(number) <= 0 || String(Number(number)) !== String(number).trim()) {
+    throw new Error(`number must be a positive integer, got ${JSON.stringify(number)}`);
+  }
 
   const token = await tokenImpl({ ...env, JULIA_PUBLISHER_OWNER: owner, JULIA_PUBLISHER_REPO: repo });
 

@@ -40,6 +40,12 @@ test('mints an installation token via the standard two-call GitHub App flow, sco
     }
     if (url.endsWith('/app/installations/999/access_tokens')) {
       assert.equal(init.method, 'POST');
+      // Restrict the minted token to the target repo explicitly -- an
+      // installation token defaults to every repo the App's installation
+      // covers, which can be broader than the one repo this call names
+      // (PR #3 review: "the access-token request supplies no repository
+      // or permission restriction").
+      assert.deepEqual(JSON.parse(init.body), { repositories: ['julia-next'] });
       return { ok: true, json: async () => ({ token: 'ghs_fake-installation-token' }) };
     }
     throw new Error(`unexpected fetch: ${url}`);

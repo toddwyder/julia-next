@@ -12,10 +12,43 @@
 // to a temp file is safe even though the file is plain text on disk.
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { writeFileSync, mkdtempSync, chmodSync, rmSync } from 'node:fs';
+import {
+  writeFileSync, mkdtempSync, chmodSync, rmSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { getPublisherInstallationToken } from './publish-via-github-app.mjs';
+
+// A fresh Codex review of PR #3 (2026-09-16) found that spreading the
+// caller's full environment into the git subprocess handed the App's own
+// signing credentials to any repo hook or credential helper that process
+// runs, and that an unredacted git stderr could echo one straight back
+// into this script's own thrown error. gitEnv() below builds the
+// subprocess environment explicitly instead of spreading -- only what git
+// itself needs, plus the one-time push token via a named var the askpass
+// helper reads, and never JULIA_PUBLISHER_APP_ID/_PRIVATE_KEY.
+const PASSTHROUGH_ENV_KEYS = ['PATH', 'Path', 'SystemRoot', 'TEMP', 'TMP', 'HOMEDRIVE', 'HOMEPATH'];
+
+function gitEnv(callerEnv, { askpassPath, token, emptyGlobalConfigPath }) {
+  const minimal = {};
+  for (const key of PASSTHROUGH_ENV_KEYS) {
+    if (callerEnv[key] !== undefined) minimal[key] = callerEnv[key];
+  }
+  return {
+    ...minimal,
+    GIT_ASKPASS: askpassPath,
+    GIT_TERMINAL_PROMPT: '0',
+    // Neutralize system/global git config layers so an ambient
+    // credential.helper or url.insteadOf rewrite can't apply to this push
+    // (-c credential.helper= below additionally overrides any repo-local
+    // helper for this one invocation). A malicious url.insteadOf rewrite
+    // committed to this repo's own local .git/config is a residual risk
+    // this does not cover -- not reproduced or ruled out here.
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_CONFIG_GLOBAL: emptyGlobalConfigPath,
+    JULIA_PUBLISHER_ASKPASS_TOKEN: token,
+  };
+}
 
 const execFileAsync = promisify(execFile);
 const APPROVED_TARGETS = new Set(['toddwyder/julia-next', 'toddwyder/Julia', 'toddwyder/AI-Stack']);
@@ -47,24 +80,30 @@ export async function pushBranch({
   assertApproved(owner, repo);
   const token = await tokenImpl({ ...env, JULIA_PUBLISHER_OWNER: owner, JULIA_PUBLISHER_REPO: repo });
   const askpassPath = writeAskpass();
+  const emptyHooksDir = mkdtempSync(join(tmpdir(), 'julia-publisher-hooks-'));
+  const emptyGlobalConfigPath = join(mkdtempSync(join(tmpdir(), 'julia-publisher-gitconfig-')), 'empty.gitconfig');
   try {
     await execImpl('git', [
+      '-c', 'credential.helper=',
+      '-c', `core.hooksPath=${emptyHooksDir}`,
       'push',
       `https://x-access-token@github.com/${owner}/${repo}.git`,
       `HEAD:refs/heads/${branch}`,
     ], {
       cwd,
-      env: {
-        ...env,
-        GIT_ASKPASS: askpassPath,
-        GIT_TERMINAL_PROMPT: '0',
-        JULIA_PUBLISHER_ASKPASS_TOKEN: token,
-      },
+      env: gitEnv(env, { askpassPath, token, emptyGlobalConfigPath }),
     });
-  } catch (error) {
-    throw new Error(`git push failed: ${String(error.stderr || error.message || '').trim()}`);
+  } catch {
+    // Deliberately not including the underlying error's stderr/message: a
+    // hook running inside the git subprocess could have printed a
+    // credential to it (JUL-43 PR #3 review, finding S1). Check the
+    // repo's own git state (git status, git log) to diagnose a real push
+    // failure instead.
+    throw new Error(`git push to ${owner}/${repo} failed -- see repo state, not this message, for detail (credential-safe by design)`);
   } finally {
     try { rmSync(askpassPath, { force: true }); } catch { /* best-effort cleanup */ }
+    try { rmSync(emptyHooksDir, { recursive: true, force: true }); } catch { /* best-effort cleanup */ }
+    try { rmSync(emptyGlobalConfigPath, { force: true }); } catch { /* best-effort cleanup */ }
   }
   return { pushed: true, branch };
 }

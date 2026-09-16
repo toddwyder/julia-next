@@ -119,6 +119,22 @@ test('a non-JSON response from orca fails clearly instead of returning undefined
   );
 });
 
+test('a real nonzero-exit failure carrying structured {ok:false,error} JSON on stdout surfaces that code/message, not a generic wrapper error (PR #3 review finding C1)', async () => {
+  // Confirmed live: `orca orchestration worker-show --dispatch <missing> --json`
+  // exits 1 with the structured failure body on STDOUT, not stderr.
+  // execFile's promisified rejection still carries it on error.stdout.
+  const execImpl = async () => {
+    const error = new Error('Command failed: orca orchestration worker-show --dispatch missing --json');
+    error.stdout = JSON.stringify({ id: 'x', ok: false, error: { code: 'dispatch_not_found', message: 'No dispatch with id missing' }, _meta: {} });
+    error.stderr = '';
+    throw error;
+  };
+  await assert.rejects(
+    () => workerShow({ environment: 'OVH runner', dispatch: 'missing', execImpl }),
+    /dispatch_not_found.*No dispatch with id missing/s,
+  );
+});
+
 test('a failing orca process (non-zero exit) surfaces stderr, not a silent empty result', async () => {
   const execImpl = async () => {
     const error = new Error('command failed');

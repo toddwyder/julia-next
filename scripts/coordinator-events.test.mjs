@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 
 import { recordCoordinatorEvent } from './coordinator-events.mjs';
 
@@ -67,4 +68,36 @@ test('recordCoordinatorEvent logs to stderr for a failed stage, and also when th
   assert.match(errors[0], /coordinator_failed/);
   assert.match(errors[1], /coordinator_started/);
   assert.match(errors[1], /sent=false/);
+});
+
+test('forwards tokensUsed/quotaRemaining/interrupted through to the relay record instead of hardcoding them (PR #3 review, JUL-43 criterion 4)', async () => {
+  const { calls, fetchImpl } = fakeRelay();
+  await recordCoordinatorEvent('failed', {
+    runId: 'run-jul43', tokensUsed: 12345, quotaRemaining: 6789, interrupted: true, fetchImpl,
+  });
+  const body = JSON.parse(calls[0].init.body);
+  assert.equal(body.tokensUsed, 12345);
+  assert.equal(body.quotaRemaining, 6789);
+  assert.equal(body.interrupted, true);
+});
+
+test('has a real CLI entry point (this skill\'s runbook invokes it as a plain shell command, not an import)', () => {
+  const scriptPath = new URL('./coordinator-events.mjs', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
+  const { stdout, stderr } = spawnSync(process.execPath, [
+    scriptPath,
+    'started',
+    '--run-id', 'run-cli-test',
+    '--context-b64', Buffer.from(JSON.stringify({ note: "it's a test with an apostrophe" })).toString('base64'),
+  ], {
+    env: { ...process.env, JOURNEY_RELAY_URL: 'http://127.0.0.1:1/unreachable-by-design' },
+    encoding: 'utf8',
+  });
+  // Relay is unreachable by design here -- this only proves the CLI parsed
+  // argv, base64-decoded a context containing shell-unsafe characters
+  // without invoking a shell (no injection, no broken quoting), and
+  // actually called recordCoordinatorEvent (visible as its local log
+  // line), not that delivery succeeded.
+  const output = stdout + stderr;
+  assert.match(output, /coordinator_started/);
+  assert.match(output, /run-cli-test/);
 });

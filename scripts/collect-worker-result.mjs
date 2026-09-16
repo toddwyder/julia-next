@@ -4,9 +4,10 @@
 //
 // createWorkerResultImpl is injected (AI-Stack's claude-worker.mjs
 // createWorkerResult) rather than imported here, so this module has no
-// cross-repo import of its own and stays testable in isolation; the caller
-// (run-jul43-coordinator.mjs) resolves it once from the AI-Stack checkout
-// it's already given.
+// cross-repo import of its own and stays testable in isolation; the
+// julia-coordinator skill (.claude/skills/julia-coordinator/SKILL.md) --
+// not a standalone script -- resolves it once from the AI-Stack checkout
+// it's already given, at "Verify" time in "Running a step".
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 

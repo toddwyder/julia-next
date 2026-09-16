@@ -26,13 +26,23 @@ test('pushBranch mints a scoped token, writes an askpass helper with no token in
 
   const result = await pushBranch({
     owner: 'toddwyder', repo: 'julia-next', branch: 'jul43-linear-coordinator-support', cwd: 'C:\\Dev\\julia-next',
+    // A realistic ambient env, including the App's own signing credentials
+    // -- proving they specifically get excluded, not just absent by luck.
+    env: { PATH: '/usr/bin', JULIA_PUBLISHER_APP_ID: '4948330', JULIA_PUBLISHER_APP_PRIVATE_KEY: '-----BEGIN RSA PRIVATE KEY-----\nfake\n-----END RSA PRIVATE KEY-----' },
     tokenImpl: fakeTokenImpl, execImpl, writeAskpass: fakeWriteAskpass,
   });
 
   assert.deepEqual(result, { pushed: true, branch: 'jul43-linear-coordinator-support' });
   assert.equal(calls.length, 1);
   assert.equal(calls[0].cmd, 'git');
-  assert.deepEqual(calls[0].args, ['push', 'https://x-access-token@github.com/toddwyder/julia-next.git', 'HEAD:refs/heads/jul43-linear-coordinator-support']);
+  // -c credential.helper= and -c core.hooksPath=<empty dir> must precede
+  // the push itself, so no configured credential helper or repo hook runs
+  // (JUL-43 PR #3 review, finding S2).
+  assert.equal(calls[0].args[0], '-c');
+  assert.equal(calls[0].args[1], 'credential.helper=');
+  assert.equal(calls[0].args[2], '-c');
+  assert.match(calls[0].args[3], /^core\.hooksPath=/);
+  assert.deepEqual(calls[0].args.slice(4), ['push', 'https://x-access-token@github.com/toddwyder/julia-next.git', 'HEAD:refs/heads/jul43-linear-coordinator-support']);
   assert.equal(calls[0].opts.cwd, 'C:\\Dev\\julia-next');
   // The token must travel only via a named env var the askpass helper reads
   // at run time -- never as a literal in argv, never in the helper's own
@@ -40,6 +50,16 @@ test('pushBranch mints a scoped token, writes an askpass helper with no token in
   assert.equal(calls[0].opts.env.JULIA_PUBLISHER_ASKPASS_TOKEN, 'ghs_super-secret-token');
   assert.equal(capturedAskpassPath, '/tmp/fake-askpass.sh');
   assert.ok(!JSON.stringify(calls[0].args).includes('ghs_super-secret-token'));
+  // The App's own signing credentials must never reach the git subprocess's
+  // environment -- a repo hook or credential helper running inside that
+  // process could otherwise read and leak them (finding S1).
+  assert.equal(calls[0].opts.env.JULIA_PUBLISHER_APP_PRIVATE_KEY, undefined);
+  assert.equal(calls[0].opts.env.JULIA_PUBLISHER_APP_ID, undefined);
+  // System/global git config layers are neutralized so an ambient
+  // credential.helper or url.insteadOf rewrite outside this repo can't
+  // apply (finding S2's global/system-config half).
+  assert.equal(calls[0].opts.env.GIT_CONFIG_NOSYSTEM, '1');
+  assert.ok(calls[0].opts.env.GIT_CONFIG_GLOBAL);
 });
 
 test('the real askpass helper file never contains the token itself, only a reference to the env var', async () => {
@@ -69,6 +89,27 @@ test('pushBranch never exposes the token in its return value or a thrown error',
     }),
     (error) => {
       assert.doesNotMatch(error.message, /ghs_super-secret-token/);
+      return true;
+    },
+  );
+});
+
+test('pushBranch never repeats raw git stderr in its thrown error, even if a hook printed a credential into it (finding S1)', async () => {
+  const execImpl = async () => {
+    const error = new Error('command failed');
+    // A rogue pre-push hook could print anything, including a credential
+    // it read out of its own process environment, to stderr.
+    error.stderr = 'pre-push hook: leaked JULIA_PUBLISHER_APP_PRIVATE_KEY=-----BEGIN RSA PRIVATE KEY-----FAKE-----END-----';
+    throw error;
+  };
+  await assert.rejects(
+    () => pushBranch({
+      owner: 'toddwyder', repo: 'julia-next', branch: 'b', cwd: '.',
+      tokenImpl: async () => 'ghs_super-secret-token', execImpl, writeAskpass: () => '/tmp/x.sh',
+    }),
+    (error) => {
+      assert.doesNotMatch(error.message, /PRIVATE KEY/);
+      assert.doesNotMatch(error.message, /leaked/);
       return true;
     },
   );

@@ -1,6 +1,17 @@
 # JUL-43 coordinator runbook
 
-Status as of 2026-09-16 (session 3): this route was corrected **twice**. Session 2 held the
+Status as of 2026-09-16 (session 4): the two session permissions session 3 found blocking are
+now granted and verified live -- `check-readiness.mjs` reports `READY: true` end to end,
+including a real `sent:true` event through the journey-relay. PR #2 (the Axiom relay code) is
+merged to `main`. PR #3 (this session's coordinator-adaptation code) went through a real fresh
+Codex review, which found and this session fixed two P1 credential-boundary gaps in
+`publish-pr.mjs` (the App's private key was reaching the git subprocess's environment; nothing
+disabled git hooks/credential helpers) plus four correctness gaps (see "Session 4" below). See
+`.claude/settings.local.json` for the exact granted permissions -- Todd approved that file's
+content directly in chat before it was written, and it is scoped to specific scripts and specific
+`orca.exe` subcommands, not a blanket grant.
+
+Earlier history, unchanged: session 2 held the
 Orca-dispatch coordinator in favor of a GitHub-Actions/BERTHA route
 (`julia-next-supervised-worker-manual.yml`); that route is itself now held, because the
 Linear-tracker AI-Stack code it depended on was only ever built in a throwaway local clone and
@@ -89,30 +100,59 @@ held). It checks, each as its own pass/fail line:
 (No `LINEAR_API_KEY` check -- the coordinator is a live agent session using Linear's MCP tools
 directly, not a headless script needing its own key.)
 
-## What actually blocks a live run now -- two session permissions, not repo state
+## Session 4 (2026-09-16): permissions granted, PR #2 merged, PR #3 reviewed and fixed
 
-Repo/infra state is ready: the publisher App is installed on `julia-next`, the runner is
-reachable, the project is registered there. What's missing is **permission for whichever session
-drives the coordinator**, checked directly this session (2026-09-16):
+Both of session 3's blockers are resolved:
 
-1. **"Credential Materialization" blocks reading `C:\Julia\.env.publisher.local`** (the publisher
-   App's local `JULIA_PUBLISHER_APP_ID`/`JULIA_PUBLISHER_APP_PRIVATE_KEY`) from this session. No
-   publish and no PR merge can happen without reading that file -- both go through the same
-   `publish-via-github-app.mjs` token mint.
-2. **"Sensitive Remote Exec" blocks creating a terminal or dispatching a worker on "OVH runner"**
-   from this session. No worker step and no Axiom event emission can happen without that.
+1. **Credential access**: `.claude/settings.local.json` (project-scoped, in this repo) allows
+   `node --env-file="C:\Julia\.env.publisher.local" scripts/{check-readiness,merge-pr,publish-pr}.mjs`.
+   The credential file is loaded by Node's own `--env-file` flag directly into the subprocess's
+   environment -- never read via the `Read` tool, never printed. Verified live: the private key
+   and every minted installation token stayed out of this session's output across a real PR
+   merge and a real branch push + PR open.
+2. **Orca dispatch**: the same settings file allows the specific `orca.exe` subcommands the
+   coordinator needs (`orchestration run-create/worker-start/worker-show/worker-abandon`,
+   `terminal create/read/wait`), each anchored to `--environment "OVH runner"` immediately after
+   the subcommand name. An open-ended `--command "bash"` terminal was correctly still blocked by
+   the session's own risk classifier (a persistent shell reads as a standing remote-exec risk
+   regardless of the settings file) -- one-shot diagnostic commands and real `worker-start`
+   dispatches both work.
 
-Both denials name the same fix: "the user can add a Bash permission rule to their settings."
-That is Todd's call to make, not a credential to place or a UI button to click -- it's a
-decision about which session configuration is allowed to actually drive the coordinator's
-write-side steps. The coordinator's read-only reconcile step (Orca status/project-setups
-queries, Linear reads/writes via MCP) already works today, from this session, with no further
-grant.
+**What actually happened this session, in order:**
+- Fixed real bugs in `orca-cli.mjs`/`check-readiness.mjs`: the installed CLI's actual `--json`
+  envelope is `{id, ok, result, _meta}` / `{ok:false, error:{code,message}}`, and a real failure
+  can carry that structured body on **stdout with a nonzero exit**, not just `ok:false` on a
+  successful process -- neither was handled before. `workerStart`'s flag order was also fixed so
+  `--environment` has a fixed position in every subcommand (needed to write a scoped permission
+  rule at all).
+- Merged PR #2 (`79f9de3`, by `app/julia-graph-publisher`) after confirming its head was already
+  independently reviewed, checks were green, and no review was outstanding.
+- Built `merge-pr.mjs` and `publish-pr.mjs` -- the coordinator's actual publish actions (merge,
+  branch push, PR open). Opened PR #3 with this session's coordinator-adaptation code, resolved
+  one real merge conflict (`.github/workflows/ci.yml`, both branches had independently added the
+  file) with a normal local merge, not a force-push.
+- Dispatched a **real, fresh Codex worker** (`orchestration worker-start --agent codex`, run
+  `run_f343594b358f`, dispatch `ctx_18d60b488250`) to review PR #3 against JUL-43, per this
+  skill's own "After verification" step. Verdict: **request changes** -- two P1 security findings
+  (`publish-pr.mjs` spread the App's private key into the git subprocess's environment, where a
+  repo hook could read and leak it; nothing disabled git credential helpers/hooks) and four
+  correctness findings (this skill's own dispatch instructions conflicted with the installed
+  CLI's real flag rejections; `coordinator-events.mjs` had no CLI entry point despite this skill
+  documenting one; a real Orca failure's structured error was being dropped; this skill had
+  stale claims about the App's installation and a `LINEAR_API_KEY` requirement that
+  `check-readiness.mjs` had already dropped). Full review saved on the runner at
+  `~/jul43-pr3-review.md` (outside the candidate worktree, per this skill's own instruction).
+- Fixed all six findings via TDD (failing test first) in this same session -- see the commit that
+  follows this runbook update for the exact diff. 45/45 tests green afterward. This skill's own
+  text was corrected to match: worker dispatch now documents `worktree: 'new-top-level'`, not the
+  shared registered checkout; the Journey-accounting example passes context as base64, not raw
+  JSON in a shell string; the stale App-installation and `LINEAR_API_KEY` claims are removed.
 
-**PR #2** (the Axiom relay code, still open and unmerged) should be resolved through the
-publisher's own merge capability (`pull_requests:write` is already in its token scope) once
-blocker 1 above is lifted -- not by asking Todd to click GitHub's merge button personally, which
-would recreate the personal-account bypass this whole boundary exists to avoid.
+**Not yet done**: a fresh review of PR #3's *fix* commit (the six findings above were fixed after
+the review that found them, not re-reviewed) -- read the fix commit's diff yourself before
+trusting it as clean, the same way you'd verify any other worker's claim. PR #3 itself is **not
+merged** -- Todd's authorization named PR #2 specifically ("other merges remain outside this
+grant"); merging PR #3 needs its own explicit yes.
 
 ## Verification, after a run
 

@@ -20,11 +20,35 @@ const DEFAULT_BIN = process.env.ORCA_BIN
 // unwraps that envelope once here so every exported function below returns
 // the payload callers actually want, and a structured failure surfaces its
 // real code/message instead of an undefined field read downstream.
+// Confirmed live (JUL-43 PR #3 review, finding C1): a real Orca failure
+// such as `orchestration worker-show --dispatch <missing>` exits nonzero
+// with its structured {ok:false, error:{code,message}} body on STDOUT, not
+// stderr -- so a rejected execFile call still carries the real diagnostic
+// on error.stdout, and must be checked before falling back to raw stderr.
+function parseStructuredFailure(stdoutText) {
+  const text = String(stdoutText ?? '').trim();
+  if (!text) return null;
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed && parsed.ok === false) {
+      const { code, message } = parsed.error ?? {};
+      return { code: code ?? 'unknown_error', message: message ?? 'no error message' };
+    }
+  } catch {
+    // Not JSON -- fall through to the generic stderr-based error.
+  }
+  return null;
+}
+
 async function run(args, { execImpl = defaultExecImpl, bin = 'orca' } = {}) {
   let stdout;
   try {
     ({ stdout } = await execImpl(bin, args));
   } catch (error) {
+    const structured = parseStructuredFailure(error.stdout);
+    if (structured) {
+      throw new Error(`orca ${args.join(' ')} failed (${structured.code}): ${structured.message}`);
+    }
     const detail = String(error.stderr || error.message || '').trim();
     throw new Error(`orca ${args.join(' ')} failed: ${detail}`);
   }

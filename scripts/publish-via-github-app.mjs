@@ -57,7 +57,12 @@ export async function getPublisherInstallationToken(env = process.env, fetchImpl
 
   const tokenRes = await fetchImpl(`https://api.github.com/app/installations/${installation.id}/access_tokens`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${jwt}`, Accept: 'application/vnd.github+json' },
+    headers: { Authorization: `Bearer ${jwt}`, Accept: 'application/vnd.github+json', 'content-type': 'application/json' },
+    // Restrict the minted token to this one repo explicitly -- otherwise
+    // it defaults to every repo the App's installation covers, which can
+    // be broader than the single repo this call names (PR #3 review,
+    // JUL-43 coordinator adaptation).
+    body: JSON.stringify({ repositories: [repo] }),
   });
   if (!tokenRes.ok) {
     throw new Error(`Failed to mint a julia-graph-publisher installation token (HTTP ${tokenRes.status})`);

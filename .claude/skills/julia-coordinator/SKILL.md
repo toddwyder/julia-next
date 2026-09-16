@@ -16,10 +16,12 @@ tracker, worker dispatch, and publisher.
 
 Use Orca orchestration (`scripts/orca-cli.mjs`) for every Run, Task, worker, and diagnostic
 terminal, following Orca's own `orchestration` skill. Every GitHub write -- PR open, branch
-push, issue/comment -- goes through the **publisher** (`scripts/publish-via-github-app.mjs`).
-It is the only component with GitHub write access. Every Linear write goes through the
-tracker's own comment/state calls (`mcp__linear__*` or AI-Stack's headless Linear client),
-never a personal session standing in for the coordinator.
+push, merge -- goes through the **publisher** (`scripts/publish-pr.mjs` for branch-push/PR-open,
+`scripts/merge-pr.mjs` for merging; both call `scripts/publish-via-github-app.mjs` internally to
+mint a fresh installation token per use -- that module only mints tokens, it does not itself
+publish anything). The publisher is the only component with GitHub write access. Every Linear
+write goes through the tracker's own comment/state calls (`mcp__linear__*`), never a personal
+session standing in for the coordinator.
 
 **Width is 1**: at most one work item in flight.
 
@@ -75,12 +77,18 @@ An issue on a route that is not enabled stays in the backlog and counts toward s
 
 For the current step of the current item:
 
-1. **Start a fresh worker.** `runCreate` then `workerStart` (`scripts/orca-cli.mjs`), targeting
-   `--environment "OVH runner"`, `--agent codex` (or `claude` when the step needs it), on the
-   registered `julia-next` worktree (`orca project setups` shows it ready at
-   `/home/runner/julia-next`). Hand the worker: the Linear issue, the step's concrete acceptance
-   criteria verbatim, and any prior failure to fix. Emit a `coordinator_started` event
-   (see Journey accounting) before dispatch.
+1. **Start a fresh worker in its own fresh worktree.** `runCreate` then `workerStart`
+   (`scripts/orca-cli.mjs`), targeting `--environment "OVH runner"`, `--agent codex` (or `claude`
+   when the step needs it), `worktree: 'new-top-level'` -- **not** the shared registered
+   `/home/runner/julia-next` checkout. Two reasons, not one: criterion 2 requires an *isolated*
+   worktree per attempt, and `orca-cli.mjs`'s `workerStart` always sends the creation-only flags
+   `--name`/`--setup`, which the real CLI rejects outright for `current`/existing-worktree
+   selectors (confirmed live, and by PR #3's independent review, finding C2) -- so targeting the
+   shared checkout would fail before dispatch even started, not just violate isolation. Give each
+   worktree a distinct `--name` (e.g. `jul43-step-<n>`) so concurrent/retried steps never collide.
+   Hand the worker: the Linear issue, the step's concrete acceptance criteria verbatim, and any
+   prior failure to fix. Emit a `coordinator_started` event (see Journey accounting) before
+   dispatch.
 2. **Wait** for the dispatch to settle (`orchestration check --wait` / `worker-show`), following
    Orca's own recovery rules -- absence is never proof of failure or success.
 3. **Verify** the step's evidence yourself: `scripts/collect-worker-result.mjs` reads the
@@ -101,19 +109,22 @@ For the current step of the current item:
    the issue's acceptance criteria. It saves its review as a file **outside** the candidate
    worktree -- the review must never become part of, or be mistaken for a change to, the thing
    it reviews.
-2. The publisher (`scripts/publish-via-github-app.mjs`, `JULIA_PUBLISHER_REPO=julia-next`)
-   mints a fresh installation token and opens a PR with the evidence and review attached, or
-   posts the Linear evidence comment for a non-code item. Check whether a PR already exists
-   before creating one.
+2. The publisher pushes the worker's verified branch (`scripts/publish-pr.mjs push`) and opens a
+   PR with the evidence and review attached (`scripts/publish-pr.mjs open`), or posts the Linear
+   evidence comment for a non-code item. Check whether a PR already exists before creating one.
+   Resolve a base-branch conflict (e.g. another merge landed on `main` first) with a normal local
+   merge before re-pushing -- do not force-push.
 3. Emit `coordinator_completed` (or `coordinator_failed` if publishing itself failed) and park
    the item with an **acceptance** queue item naming the result.
 
-**Publisher prerequisite, checked not assumed:** the `julia-graph-publisher` GitHub App must be
-installed on `toddwyder/julia-next` specifically (it is currently installed on `toddwyder/Julia`
-and `toddwyder/AI-Stack` only -- see `docs/credentials-map.md` in the frozen `Julia` repo). If
-`publish-via-github-app.mjs` reports "not installed on toddwyder/julia-next", that is a real,
-disclosed blocker -- park the item and ask Todd to add the repo under the App's GitHub
-installation settings (one click, App-owner only). Never substitute a personal `gh`/git push.
+**Publisher prerequisite, checked not assumed (2026-09-16):** the `julia-graph-publisher` GitHub
+App **is installed on `toddwyder/julia-next`** -- confirmed live against the repo's own Settings
+-> Integrations page and by a real successful token mint; an earlier draft of this skill claimed
+otherwise from a stale cross-repo doc (`docs/credentials-map.md` in the frozen `Julia` repo),
+never re-checked against the live page. If `check-readiness.mjs` or `publish-pr.mjs`/`merge-pr.mjs`
+ever again report "not installed on toddwyder/julia-next", that is a real, disclosed blocker --
+park the item and ask Todd to add the repo under the App's GitHub installation settings (one
+click, App-owner only). Never substitute a personal `gh`/git push.
 
 ---
 
@@ -121,19 +132,24 @@ installation settings (one click, App-owner only). Never substitute a personal `
 
 The relay (`ops/journey-relay/relay.mjs`) binds to `127.0.0.1:8943` **on the OVH runner only** --
 it is not reachable from wherever the coordinator's own process happens to run. So every
-`coordinator_*` event is emitted by running `scripts/coordinator-events.mjs` **inside a plain
-diagnostic terminal on the OVH runner itself**, via `orca-cli.mjs`'s `terminalCreate`/
-`terminalRead` (not a supervised worker -- this is a one-off shell command, not an agent):
+`coordinator_*` event is emitted by running `scripts/coordinator-events.mjs`'s real CLI entry
+point **inside a plain diagnostic terminal on the OVH runner itself**, via `orca-cli.mjs`'s
+`terminalCreate`/`terminalRead` (not a supervised worker -- this is a one-off shell command, not
+an agent). Pass `context` as base64, never as raw JSON embedded in a shell string --
+`JSON.stringify` does not escape apostrophes for a shell, so an unescaped context value can break
+quoting and become an injection vector (PR #3 review, finding C3):
 
 ```js
 import { terminalCreate, terminalRead } from './orca-cli.mjs';
-const { terminal } = await terminalCreate({
+const contextB64 = Buffer.from(JSON.stringify(context)).toString('base64');
+const created = await terminalCreate({
   environment: 'OVH runner',
   worktree: 'path:/home/runner/julia-next',
-  command: `node scripts/coordinator-events.mjs ${stage} --run-id ${runId} --context '${JSON.stringify(context)}'`,
+  command: `node scripts/coordinator-events.mjs ${stage} --run-id ${runId} --context-b64 ${contextB64} --tokens-used ${tokensUsed} --quota-remaining ${quotaRemaining} --interrupted ${interrupted}`,
   title: 'coordinator-events',
 });
-// then terminalRead to confirm sent:true / sent:false, logged either way.
+const read = await terminalRead({ environment: 'OVH runner', terminal: created.terminal.handle });
+// read.terminal.tail (an array of lines) confirms sent:true / sent:false, logged either way.
 ```
 
 Correlate every event of one coordinator pass by a single `runId` (the same id used for
@@ -161,11 +177,12 @@ the record.
 (Adjust the join condition to however the APL parser resolves nested `context.runId` in the
 live dataset -- verify against a real query before trusting the exact syntax above.)
 
-**Readiness check** (`node scripts/check-readiness.mjs`): before starting any run, confirm Orca
-reports the OVH runner `reachable`/`connected`, the `julia-next` project is registered there,
-the publisher App is installed on `julia-next`, `LINEAR_API_KEY` is available to the
-coordinator's own process, and the journey-relay is reachable (checked the same
-terminal-on-runner way, not assumed from wherever the check itself runs).
+**Readiness check** (`node --env-file=<publisher credential file> scripts/check-readiness.mjs`):
+before starting any run, confirm Orca reports the OVH runner `reachable`/`connected`, the
+`julia-next` project is registered there, the publisher App is installed on `julia-next`, and
+the journey-relay is reachable (checked the same terminal-on-runner way, not assumed from
+wherever the check itself runs). No `LINEAR_API_KEY` check -- the coordinator is a live agent
+session using Linear's MCP tools directly, not a headless script needing its own key.
 
 **Preserve JUL-43's own accounting fields**: time, context, token, quota, and interruption
 counts belong in the event `context` payload exactly as `scripts/journey-events.mjs` already

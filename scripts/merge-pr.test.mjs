@@ -44,6 +44,17 @@ test('never exposes the installation token in its return value, even on failure'
   );
 });
 
+test('rejects a non-positive-integer PR number instead of forwarding caller-supplied text into the API path (PR #3 review)', async () => {
+  await assert.rejects(
+    () => mergePullRequest({ owner: 'toddwyder', repo: 'julia-next', number: '2/../evil', fetchImpl: async () => ({}), tokenImpl: async () => 'x' }),
+    /number must be a positive integer/,
+  );
+  await assert.rejects(
+    () => mergePullRequest({ owner: 'toddwyder', repo: 'julia-next', number: -1, fetchImpl: async () => ({}), tokenImpl: async () => 'x' }),
+    /number must be a positive integer/,
+  );
+});
+
 test('rejects a repo other than toddwyder/julia-next or toddwyder/Julia (no scope creep via CLI args)', async () => {
   await assert.rejects(
     () => mergePullRequest({ owner: 'someone-else', repo: 'unrelated-repo', number: 1, fetchImpl: async () => ({}), tokenImpl: async () => 'x' }),
