@@ -150,6 +150,12 @@ The button on a recipe that sends the whole recipe into the Lab as the spark. Th
 new recipe; the original is never changed.
 _Avoid_: Remix, improvise, fork, duplicate
 
+**Shared page**:
+The read-and-print page anyone with the link can open, showing a recipe or a whole menu as it
+currently stands, no sign-in. The only thing in Julia the outside world can see; Stop sharing
+removes it. Book recipes never appear on one in full.
+_Avoid_: Public link, published recipe, export
+
 ## Delivery
 
 **Journey**:
