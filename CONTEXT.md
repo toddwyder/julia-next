@@ -113,6 +113,17 @@ The shopping list during a trip: big targets, screen on, ticked items sink. Exit
 what was bought.
 _Avoid_: Shopping mode, checkout
 
+**Library**:
+The household's whole collection of recipes, one alphabetical list with a search box that
+matches title, ingredients, and source, a Recent strip on top, and one Under 30 minutes
+switch. There is no other grouping: no folders, tags, or categories.
+_Avoid_: Collection, recipe box, catalogue, cookbook (that's an import)
+
+**Recent strip**:
+The five recipes most recently added or edited, shown above the alphabetical list when the
+search box is empty.
+_Avoid_: Recently viewed, history, favourites
+
 **Import**:
 Bringing a recipe into Julia from a link or pasted text. Read exactly when the page publishes
 a machine-readable recipe; otherwise by Julia's own on-device reader, then by a model only for
