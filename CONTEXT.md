@@ -23,7 +23,9 @@ _Avoid_: Login page, landing page, splash screen
 
 **Device**:
 A phone, tablet, or computer signed into the household. Screen preferences (text size,
-keep-screen-on) belong to the device, not to a person.
+keep-screen-on) and the current cook-mode step belong to the device, not to a person. While
+cooking, a device's current block and running timers are visible to the household's other
+devices.
 _Avoid_: Client, session, user
 
 ## Kitchen
