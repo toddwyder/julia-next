@@ -1,16 +1,25 @@
-// julia-next.project.mjs -- the project config for JUL-43's supervised graph
-// run, loaded by AI-Stack's orchestrator/prepare-julia-supervised-run.mjs
-// and orchestrator/publish-julia-supervised-run.mjs via --project-config.
+// julia-next.project.mjs -- the declarative project config the
+// julia-coordinator skill (.claude/skills/julia-coordinator/SKILL.md) reads
+// for its target repo, tracker, and gate check.
 //
 // This lives inside julia-next's own graph/ directory -- a path the trusted
-// publisher's PROTECTED_WORKER_PATHS already refuses to let a credential-
-// free worker touch (orchestrator/lib/julia-supervised-publisher.mjs).
+// publisher's PROTECTED_WORKER_PATHS convention (established in
+// toddwyder/Julia) reserves as coordinator-owned, not worker-editable.
 //
 // tracker: 'linear' is a smaller shape than the native GitHub-Project-board
-// configs used by toddwyder/Julia and toddwyder/AI-Stack: no project board
-// number, work graph, or field mapping, because none of that exists for
-// julia-next yet. See orchestrator/lib/project-config.mjs for what each
-// tracker value requires and forbids.
+// configs used by toddwyder/Julia: no project board number, work graph, or
+// field mapping, because none of that exists for julia-next yet.
+//
+// Checked, not assumed (2026-09-16): the AI-Stack orchestrator functions
+// this file's earlier comment claimed as its consumer
+// (prepare-julia-supervised-run.mjs, publish-julia-supervised-run.mjs,
+// --project-config) do not exist on toddwyder/AI-Stack's real main branch --
+// only in a throwaway local clone from an earlier session. The
+// julia-coordinator skill does not depend on them; it dispatches directly
+// through scripts/orca-cli.mjs and publishes through
+// scripts/publish-via-github-app.mjs. This config stays in the AI-Stack
+// project-config shape in case that integration is built for real later,
+// but nothing in this repo currently requires it.
 export default {
   id: 'julia-next',
   tracker: 'linear',
@@ -20,12 +29,4 @@ export default {
     checkName: 'checks',
   },
   linear: { teamKey: 'JUL' },
-  handoff: {
-    // Matches the env var name julia-next-supervised-worker-manual.yml
-    // (AI-Stack) sets from steps.publisher_token(.outputs.token) before
-    // calling publish-julia-supervised-run.mjs -- same convention as the
-    // existing toddwyder/Julia workflow, not a julia-next-specific name.
-    // requirePublisherCredential(config) reads exactly this var.
-    credentialEnvVar: 'JULIA_GRAPH_WRITE_TOKEN',
-  },
 };

@@ -1,155 +1,137 @@
 # JUL-43 coordinator runbook
 
-Status as of 2026-09-16: **code, tests, and this document are complete; no live run has
-happened yet.** This route was corrected once already this session: an earlier version of this
-runbook drove JUL-43 through Orca CLI dispatch plus a bespoke `run-jul43-coordinator.mjs`, with a
-proposal to add a new privileged Orca terminal on the runner to hold credentials. Both were held
-and superseded — see "What changed and why" below. Everything below uses the **coordinator that
-already existed**, not a new one.
+Status as of 2026-09-16 (session 3): this route was corrected **twice**. Session 2 held the
+Orca-dispatch coordinator in favor of a GitHub-Actions/BERTHA route
+(`julia-next-supervised-worker-manual.yml`); that route is itself now held, because the
+Linear-tracker AI-Stack code it depended on was only ever built in a throwaway local clone and
+never actually pushed to `toddwyder/AI-Stack` -- checked directly against AI-Stack's real `main`
+branch, not assumed. This session restores the Orca-dispatch pieces session 2 deleted (adapted,
+not reverted verbatim) and wires them to `.claude/skills/julia-coordinator/SKILL.md`, julia-next's
+own copy of the verified coordinator decision procedure already running in the frozen
+`toddwyder/Julia` repo.
 
-## What changed and why
+**The coordinator is the skill, not a script.** `scripts/orca-cli.mjs`,
+`scripts/collect-worker-result.mjs`, and `scripts/publish-via-github-app.mjs` are library
+functions the skill's steps call while a live agent session follows its decision procedure --
+there is no standalone `run-jul43-coordinator.mjs` entry point anymore, on purpose. Treating a
+JUL-43-specific wrapper script as "the coordinator" was exactly what session 2's hold-commit
+correctly avoided repeating.
 
-`toddwyder/AI-Stack` already has a working, tested coordinator for `toddwyder/Julia`:
-`.github/workflows/julia-supervised-worker-manual.yml`, a `workflow_dispatch` job that runs on
-**BERTHA**, a self-hosted GitHub Actions runner (confirmed to be this machine — `hostname` returns
-`BERTHA`). Its trusted-publishing boundary is GitHub Actions' own repository secrets: a
-`julia-graph-publisher` GitHub App installation token is minted fresh inside specific job steps
-(`actions/create-github-app-token@v2`) and is never exposed to the worker step, which runs with no
-GitHub credential at all. This is a real, already-proven boundary — not something this session
-built.
+## What's verified live, as of this session
 
-`julia-next-supervised-worker-manual.yml` (new, in `toddwyder/AI-Stack`) is the same mechanism
-adapted for `julia-next`: a Linear ticket identifier instead of a GitHub issue number, no
-packet/review-comment protocol (the Linear ticket's own description is the approved work
-definition), no Firestore preflight (not applicable), a new `julia-next`-scoped read-only deploy
-key, and the publisher token minted for `repositories: julia-next` — reusing the **same**
-`JULIA_PUBLISHER_APP_ID`/`JULIA_PUBLISHER_APP_PRIVATE_KEY` secrets already configured on
-`toddwyder/AI-Stack` (confirmed present via `gh secret list`; the App is already authorized for
-`julia-next`). `prepare-julia-supervised-run.mjs` and `publish-julia-supervised-run.mjs` are used
-**unchanged** — both already branch on the project config's `tracker` field, so pointing them at
-`graph/julia-next.project.mjs` (`tracker: 'linear'`) was the only change needed. No new coordinator,
-no new publisher, no new terminal pathway.
+Checked directly, not assumed:
+- Orca CLI is real and reachable from this machine at
+  `C:\Users\toddw\AppData\Local\Programs\orca\resources\bin\orca.exe`. `orca status
+  --environment "OVH runner" --json` returns `runtime.reachable: true`,
+  `connectionState: connected`.
+- `orca project setups --environment "OVH runner" --json` shows `julia-next` registered and
+  `ready` at `/home/runner/julia-next`.
+- `orca worktree list --environment "OVH runner" --json` shows the worktrees named in JUL-43's
+  Linear comment history really exist (`jul43-axiom-boundary`, `jul43-clean-run`,
+  `jul43-codex-proof`, etc.) -- that history is real, not fabricated.
+- **Creating a terminal or dispatching a worker on the OVH runner is blocked from this
+  particular session** by this environment's own safety classifier ("Sensitive Remote Exec") --
+  the same guardrail class earlier JUL-43 sessions hit and correctly did not route around. Only
+  read-only Orca queries (`status`, `project setups`, `worktree list`) succeeded here. A live
+  coordinator run needs either a session with that permission, or Todd running the dispatch step
+  himself using the commands this runbook documents.
+- The `julia-graph-publisher` GitHub App (App ID 4948330) is installed on `toddwyder/Julia` and
+  `toddwyder/AI-Stack` only -- **not on `toddwyder/julia-next`**, per
+  `toddwyder/Julia`'s `docs/credentials-map.md`. `scripts/check-readiness.mjs` will report this
+  as a named, failing check until the App is added to `julia-next`.
+- `julia-next` has **zero** repository secrets today (`gh secret list --repo toddwyder/julia-next`
+  returns nothing). `LINEAR_API_KEY` has never been placed anywhere for this project.
+- PR #2 (`jul43-journey-relay` -> `main`, the Axiom relay client + trusted-boundary code) is
+  still **open, unmerged**. `julia-next`'s `main` branch has none of `ops/journey-relay` or
+  `scripts/journey-events.mjs` -- only what's on this local branch.
 
-**What this means "server-side" actually refers to here**: not a different physical machine (BERTHA
-is Todd's own machine) — the boundary that matters is that the publish step never uses Todd's
-personal `gh auth` session. It uses a GitHub App installation token, scoped only to `julia-next`,
-minted fresh and held only inside GitHub Actions' own encrypted secrets and the job's ephemeral
-environment. That's what makes this not a personal-account merge bypass.
+## The coordinator's actual startup
 
-**Known gap, disclosed not hidden**: the journey-relay (`http://127.0.0.1:8943/events`, JUL-43's
-criterion-4 Axiom event path) is bound to loopback on the separate Linux OVH runner used earlier in
-JUL-43 for the Orca-dispatched proof of criteria 2/3. BERTHA cannot reach that loopback address —
-they are different machines. This workflow does **not** emit `julia.journey0.coordinator_*` events
-(`scripts/coordinator-events.mjs` exists, is tested, and remains available, but nothing in this
-workflow calls it, since it has no way to reach the relay from BERTHA). Criterion 4 (journey-
-accounting events, real Axiom delivery) was proven earlier in JUL-43 via the separate Orca/Linux
-run — this workflow proves criteria 1, 2, 3, and 5 in one place. Whether JUL-43 counts as fully
-closed on a single run through this coordinator, or on criterion 4's evidence plus this run's
-evidence taken together, is Todd's call to make when reviewing the final evidence package, not
-something to resolve by assumption here.
-
-## The existing coordinator's actual startup command
-
-```sh
-gh workflow run julia-next-supervised-worker-manual.yml \
-  -R toddwyder/AI-Stack \
-  -f expected_issue=JUL-43 \
-  -f julia_next_ref=main
-```
-
-(Or the GitHub UI: Actions → "Julia-next Supervised Worker (Manual)" → Run workflow.) This is a
-`workflow_dispatch`-only trigger (`docs/agents/jul43-coordinator-runbook.md`'s workflow test
-confirms no `schedule:`, no `repository_dispatch`/`workflow_run`/`pull_request_target` — nothing
-runs unattended). `concurrency: { group: julia-next-supervised-worker, cancel-in-progress: false }`
-means only one run at a time; a second dispatch queues rather than racing the first.
-
-## The trusted publishing boundary, and where credentials go
-
-GitHub Actions repository secrets on `toddwyder/AI-Stack` — the exact same boundary the existing
-`toddwyder/Julia` coordinator already uses, not a new mechanism:
-
-| Secret | Status |
-|---|---|
-| `JULIA_PUBLISHER_APP_ID` | **Already present** (since 2026-09-15, per `gh secret list`). Reused unchanged. |
-| `JULIA_PUBLISHER_APP_PRIVATE_KEY` | **Already present.** Reused unchanged — the App's private key never needs placing again; it's already where this boundary expects it. |
-| `JULIA_NEXT_DEPLOY_KEY` | **Not present.** A new SSH keypair scoped to `julia-next` only, distinct from the existing `JULIA_DEPLOY_KEY` (which is scoped to `toddwyder/Julia`). Generating this needs no credential I don't already have: I create the keypair, register the public half as a read-only deploy key on `julia-next` via `gh`, and set the private half as this secret via `gh secret set` — piped directly from the freshly generated file, never displayed. No browser session needed for this one. |
-| `LINEAR_API_KEY` | **Not present.** Needs Todd's authenticated Linear session to create — see below. |
-
-`JULIA_PUBLISHER_APP_ID`/`PRIVATE_KEY` already being in place is why the credential plan shrank
-from this session's earlier proposal: there is no new GitHub App key to generate or place at all.
-
-**Linear key — corrected from an earlier, wrong claim this session made.** Linear's key-creation
-page (`https://linear.app/julia-next/settings/account/security/api-keys/new`, checked directly, not
-assumed) has explicit "Only select permissions…" (Read, Write, Create issues, Create comments,
-Admin — independently toggleable) and "Only select teams…" controls. The key will be created with
-only **Read** and **Create comments**, restricted to team **Julia-next** — genuinely scoped, not
-full-account access.
-
-## Remaining bootstrap approval needed
-
-Three things, one approval, no terminal or typing for Todd:
-
-1. **Start BERTHA's runner service.** `gh api repos/toddwyder/AI-Stack/actions/runners` currently
-   reports it `offline`. I have not yet located how its service is installed/started on this
-   machine — this is the one piece I can't yet act on without looking further, and I won't
-   guess-and-restart a service blind. If it's a Windows service, I can start it directly; if it
-   needs re-registration, that's a bigger step to flag separately.
-2. **Generate and place `JULIA_NEXT_DEPLOY_KEY`** — I do this myself (keypair generation, `gh repo
-   deploy-key add`, `gh secret set`), no browser or terminal action from Todd.
-3. **Create and place `LINEAR_API_KEY`** — via Todd's already-authenticated Linear browser session
-   (Read + Create-comments only, team Julia-next only, per the corrected scoping above), copied via
-   manual select+Ctrl+C the same way the Axiom token was handled, piped directly into `gh secret
-   set` without ever being displayed.
-
-## Readiness check (one command)
+There is no scheduled trigger -- explicit launch only, per instruction. Starting a fresh Claude
+Code (or equivalent) session in this repo and invoking the `julia-coordinator` skill (it has
+`disable-model-invocation: true`, so it must be invoked by name, not inferred) begins a wake:
+it reconciles Orca + Linear state, advances the current in-flight item (JUL-43 itself, until its
+five criteria pass together), and admits the next eligible Linear issue once a slot is free.
 
 ```sh
 node scripts/check-readiness.mjs
 ```
 
-Reports each precondition separately: BERTHA registered and online; each of the four secrets
-present on `toddwyder/AI-Stack` (existence only — `gh secret list` cannot confirm a secret's
-*value* is correct, only that something is set). A `gh` CLI failure (e.g. not authenticated) is
-reported as its own failed check rather than an uncaught crash. Exits non-zero with a per-line
-`[ ]`/`[x]` report if anything isn't ready.
+first -- see below for what it actually checks now.
+
+## Readiness check (rewired to the real boundary)
+
+`scripts/check-readiness.mjs` no longer checks BERTHA/GitHub-Actions secrets (that route is
+held). It checks, each as its own pass/fail line:
+
+1. **OVH runner reachable** -- `orca status --environment "OVH runner" --json`,
+   `runtime.reachable` and `connectionState === 'connected'`.
+2. **julia-next project registered** -- `orca project setups`, a `ready` entry for
+   `github:toddwyder/julia-next`.
+3. **julia-graph-publisher installed on julia-next** -- attempts the same installation lookup
+   `publish-via-github-app.mjs` uses for a real publish (requires
+   `JULIA_PUBLISHER_APP_ID`/`JULIA_PUBLISHER_APP_PRIVATE_KEY` in the coordinator's own process
+   environment).
+4. **LINEAR_API_KEY configured** -- present in the coordinator's own process environment.
+5. **journey-relay reachable** -- run from **inside a terminal on the OVH runner itself** (the
+   relay binds to `127.0.0.1:8943` there only), via `orca-cli.mjs`'s `terminalCreate`/
+   `terminalRead`; a real POST to `/events` should come back `sent:true`.
+
+## Remaining bootstrap approvals needed -- credential/access boundaries, not code
+
+1. **Install the `julia-graph-publisher` GitHub App on `toddwyder/julia-next`.** One click, by
+   whoever administers the App's GitHub installation (Settings -> Installations ->
+   julia-graph-publisher -> Configure -> add repository). No new App, no new key -- the same
+   App already used for `Julia` and `AI-Stack`.
+2. **Create and place `LINEAR_API_KEY`.** Scoped to Read + Create-comments only, team Julia-next
+   only (Linear's key-creation page supports this scoping, confirmed session 2). Placement
+   target for the coordinator's own process environment is the same pattern already used for the
+   Axiom token and the publisher App's local `.env.publisher.local` on `toddwyder/Julia` -- not
+   chat, not a GitHub Actions secret (this route doesn't run in Actions).
+3. **Decide PR #2's fate.** It carries real, tested relay code `main` is missing. Merging it (a
+   normal review-and-click, the same "one action" pattern JUL-43's own comment history already
+   asked for) is what makes `ops/journey-relay` and `scripts/journey-events.mjs` available to a
+   worker dispatched from a clean `main` checkout, rather than only existing on runner-local
+   worktrees that were deliberately never pushed.
+4. **The remote-exec permission gap this session hit.** Whatever session actually drives the
+   coordinator through a live wake needs permission to create Orca terminals / dispatch workers
+   on "OVH runner" -- this session's own classifier refused that. Confirm which session
+   configuration allows it before expecting a live run to complete unattended.
 
 ## Verification, after a run
 
-1. `gh run list -R toddwyder/AI-Stack --workflow julia-next-supervised-worker-manual.yml` and
-   inspect the run — the "Enforce successful worker publication" step fails the whole run unless
-   both the worker and the finish-publish step succeeded.
-2. Confirm the PR was opened by `julia-graph-publisher[bot]`, not a personal account — julia-next's
-   own `publisher-only-pr.yml` check on the PR shows this automatically.
-3. Confirm in Linear that JUL-43 received the start comment and the finish comment (or the failure
-   comment, if the worker didn't complete).
-4. Confirm `git log` on the pushed branch shows a real commit, and that `julia-next`'s own `main`
-   was never pushed to directly (only the PR branch).
-5. Download the run's artifact (`julia-next-supervised-worker-<run-id>`) for the packet, the
-   worker's raw stdout/stderr, and `changes.patch` — the audit trail, not the worktree itself.
+1. Read the Linear issue's own comment thread -- the coordinator posts admission, blocked, and
+   acceptance updates there, not in chat.
+2. Confirm the PR (if any) was opened by `julia-graph-publisher[bot]`, not a personal account --
+   `julia-next`'s own `publisher-only-pr.yml` check on the PR shows this automatically.
+3. Confirm in Axiom (dataset `julia-next-journey0`) that `coordinator_started` /
+   `coordinator_progress` / `coordinator_completed` (or `_failed`) events exist for the run's
+   `runId`, and that no run is stalled (see the query in the skill's Journey accounting
+   section).
+4. Confirm `git log` on the pushed branch shows a real commit, and that `julia-next`'s own
+   `main` was never pushed to directly (only the PR branch).
 
 ## Stop / recovery
 
-- **Stopping a run in progress**: cancel the Actions run from the GitHub UI or `gh run cancel`.
-  `concurrency: cancel-in-progress: false` means a second dispatch won't do this for you — it
-  queues instead.
-- **Recovering from a publish failure** (worker succeeded, but the finish step failed to push, open
-  the PR, or comment on Linear): the worker's commit exists in the run's artifact
-  (`changes.patch`) even though the ephemeral worktree itself is gone once the job ends. Fix the
-  underlying cause and re-dispatch; this starts a fresh run rather than resuming the old one.
-- **If a step's output doesn't match what the next step expects**, the publisher fails closed with
-  a `JULIA_SUPERVISED_PUBLISHER_REFUSED` error naming the exact missing field — treat that as the
-  diagnosis, not a signal to bypass validation.
+- **Stopping a run in progress**: use Orca's own recovery verbs (`worker-stop` for a proven
+  failed/stopped attempt, `worker-abandon` to fence orchestration while accepting resources may
+  remain live) -- never `terminal close` as a substitute. See Orca's own `orchestration` skill,
+  "Recovery and cleanup".
+- **Recovering from a publish failure** (worker succeeded, publish step failed): the worker's
+  commit still exists in its worktree on the runner even if the publish step errored --
+  re-run just the publish step against that same worktree rather than re-dispatching the whole
+  step.
+- **If `publish-via-github-app.mjs` reports "not installed on toddwyder/julia-next"**, that is
+  bootstrap approval #1 above, not a bug -- park the item and ask, don't retry blindly.
 
 ## Known open questions for the live-verification pass
 
-- Linear's `commentCreate` mutation is called with the ticket's internal UUID
-  (`selection.issueId`), on the assumption that Linear's API requires the UUID there even though
-  its `issue(id:)` query accepts either the UUID or the human identifier. Untested against the real
-  API — confirm on the first live comment, not before.
+- Linear's `commentCreate` mutation may need the ticket's internal UUID rather than its human
+  identifier -- untested against the real API from this route yet; confirm on the first live
+  comment, not before.
+- The exact APL join syntax in the skill's stalled-run query is written from APL's documented
+  shape, not verified against a real query on the live `julia-next-journey0` dataset -- verify
+  before trusting it as a monitoring step.
 - `gate.checkName: 'checks'` in `graph/julia-next.project.mjs` names the CI job in
-  `.github/workflows/ci.yml`; nothing yet reads `gate` for `tracker: 'linear'` configs (the
-  GitHub-Project gate-checking code path is native-board-specific). Present for parity with the
-  existing config shape, currently unused by the Linear path.
-- The criterion-4/Axiom gap above: if a single clean run needs to demonstrate all five criteria
-  together, this workflow alone does not close criterion 4. Flag this explicitly when assembling
-  the final evidence package rather than letting it pass unnoticed.
+  `.github/workflows/ci.yml`; nothing in this route currently reads `gate` for `tracker: 'linear'`
+  configs. Present for parity with the config shape, currently unused.

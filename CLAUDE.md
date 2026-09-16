@@ -13,7 +13,8 @@ intake, menu planning, shopping lists, kitchen prep, full-screen cook mode). The
 
 ### Issue tracker
 
-Issues live as GitHub issues on this repo, via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+Issues live in Linear (team Julia-next), via the Linear MCP tools — not GitHub issues. See
+`docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
