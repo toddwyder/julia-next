@@ -1,0 +1,21 @@
+[Unit]
+Description=JUL-43 journey-accounting Axiom relay (trusted boundary)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/node /home/runner/julia-next/ops/journey-relay/relay.mjs
+EnvironmentFile=/etc/orca-runner/journey-axiom.env
+# Runs as root deliberately: the whole point is that the 'runner' builder
+# account (which runs all worktree/agent code) must not be able to read
+# this process's environment via /proc/<pid>/environ, which same-UID
+# processes can do on Linux by default. There is no separate low-privilege
+# service account on this box today (see JUL-59); root is the only account
+# distinct from 'runner' available without provisioning a new one.
+User=root
+NoNewPrivileges=false
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
