@@ -69,6 +69,12 @@ A recipe placed on a menu with a multiplier (1×, 1½×, 2×) that Julia propose
 change. A recipe appears at most once per menu.
 _Avoid_: Planned recipe, course, item
 
+**Cook mode**:
+The full-screen view of one recipe or block, one step at a time with that step's ingredients,
+screen kept awake. Moved through by tap zones or, when enabled, voice. Timers come from the
+step text.
+_Avoid_: Cooking mode, step mode, kitchen view
+
 **Prep list**:
 The timeline Julia proposes from a menu: make-ahead days, then the day, ordered back from
 serving time. Todd ticks, drags, adds tasks, and pins; regenerating keeps his changes.
