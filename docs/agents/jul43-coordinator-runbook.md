@@ -2,12 +2,20 @@
 
 Status as of 2026-09-16: **code, tests, and this document are complete; no live run has
 happened yet.** Every command below is proven only against mocked tests (see
-`orchestrator/test/*.test.mjs` in AI-Stack and `scripts/coordinator-events.test.mjs` here) or is
-the same Orca dispatch mechanism already proven live earlier in JUL-43 (isolated worktree, real
-commit, push denied). The Linear- and GitHub-App-specific pieces below — the actual live API
-calls — are new and have never run against the real services. Treat every command here as
-**designed, not demonstrated**, until the live-verification pass in JUL-43's Linear thread says
-otherwise.
+`orchestrator/test/*.test.mjs` in AI-Stack and `scripts/*.test.mjs` here — 26 tests covering
+`run-jul43-coordinator.mjs`'s orchestration logic, `orca-cli.mjs`'s CLI invocations,
+`collect-worker-result.mjs`'s git-state collection, and `check-readiness.mjs`'s failure
+reporting) or is the same Orca dispatch mechanism already proven live earlier in JUL-43 (isolated
+worktree, real commit, push denied). The Linear- and GitHub-App-specific pieces below — the
+actual live API calls — are new and have never run against the real services. Treat every command
+here as **designed, not demonstrated**, until the live-verification pass in JUL-43's Linear
+thread says otherwise.
+
+Initialization is one command (`scripts/run-jul43-coordinator.mjs`, below) — not a sequence of
+manual steps. It calls the existing coordinator pipeline itself: prepare, dispatch through Orca,
+collect the worker's real result from git, and publish, emitting lifecycle events automatically
+at each stage. Nothing about a run requires hand-constructing JSON or filling in a placeholder
+URL.
 
 ## What this replaces
 
@@ -35,71 +43,51 @@ Do not attempt the initialization command below until the first four rows are al
 
 ## Readiness check (one command)
 
-Run from a runner terminal with both repos checked out:
-
-```
-curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8943/events -X POST \
-  -H 'content-type: application/json' \
-  -d '{"event":"julia.journey0.coordinator_started","attempted":"readiness-check","reason":"manual","context":"runbook"}' \
-&& node -e "import('$(pwd)/AI-Stack/orchestrator/lib/project-config.mjs').then(({defineProjectConfig}) => import('$(pwd)/julia-next/graph/julia-next.project.mjs')).then(m=>console.log('config OK'))" \
-&& [ -n "$JULIA_NEXT_GRAPH_WRITE_TOKEN" ] && echo 'publisher credential present' || echo 'MISSING: JULIA_NEXT_GRAPH_WRITE_TOKEN' \
-&& [ -n "$LINEAR_API_KEY" ] && echo 'linear credential present' || echo 'MISSING: LINEAR_API_KEY'
+```sh
+node scripts/check-readiness.mjs --ai-stack-dir /path/to/AI-Stack
 ```
 
-Expect: `200` from the relay POST, `config OK` from loading the project config, and both
-credential lines confirming present. Any other output names exactly what isn't ready — treat that
-as the report to give, not something to route around.
+Checks, each reported separately, pass or fail: the project config loads as a `tracker: 'linear'`
+config; `JULIA_NEXT_GRAPH_WRITE_TOKEN` is set; `LINEAR_API_KEY` is set; the journey-relay is
+reachable **and** reports `sent:true` for a real probe event — an HTTP 200 from the relay is not
+enough by itself, since the relay can accept the request and still report `sent:false` when Axiom
+delivery itself fails (bad/missing `AXIOM_TOKEN` on the runner). The probe uses its own event,
+`julia.journey0.coordinator_readiness_check`, never `coordinator_started` — see "Distinguishing
+idle, failed, and stalled" below for why that separation matters. Exits non-zero, with each failed
+line marked `[ ]`, if anything isn't ready; prints `READY: true` and exits 0 only when every check
+passes.
 
 ## Exact initialization command
 
-Once every prerequisite above is **Done**, from the runner, with `AI-Stack` and `julia-next`
-checked out as siblings:
+Once every prerequisite above is **Done** and the readiness check passes, from a machine with
+`orca` on `PATH` (this ticket has run it from Todd's local machine throughout, targeting
+`--environment "OVH runner"`; see the JUL-43 Linear thread for that machine's `orca` path) and
+both `AI-Stack` and `julia-next` checked out as siblings:
 
 ```sh
-# 1. Prepare -- resolves the Linear ticket, stages its description as the
-#    approved work definition. Trusted step; does not touch GitHub.
-RUN_ID="jul43-$(date -u +%Y%m%dT%H%M%SZ)"
-node AI-Stack/orchestrator/prepare-julia-supervised-run.mjs \
-  --project-config julia-next/graph/julia-next.project.mjs \
+node julia-next/scripts/run-jul43-coordinator.mjs \
+  --ai-stack-dir /path/to/AI-Stack \
   --expected-issue JUL-43 \
-  --output-dir /tmp/$RUN_ID
-
-# 2. Announce the run to Linear (posts one comment on JUL-43).
-node AI-Stack/orchestrator/publish-julia-supervised-run.mjs \
-  --mode start \
-  --project-config julia-next/graph/julia-next.project.mjs \
-  --selection /tmp/$RUN_ID/selection.json \
-  --run-id "$RUN_ID" \
-  --run-url "<the Orca run's own URL, once dispatched>" \
-  --base-commit "$(git -C julia-next rev-parse HEAD)"
-
-# 3. Dispatch the worker through Orca (the already-proven path -- see
-#    docs/agents/jul43-coordinator-runbook.md's "Orca mechanics" reference
-#    in the JUL-43 Linear thread for the exact orca CLI invocations).
-#    Hand the worker /tmp/$RUN_ID/approved-work-definition.md and
-#    /tmp/$RUN_ID/bounded-context.md as its brief. The worker commits but
-#    cannot push (read-only deploy key, unchanged).
-
-# 4. Once the worker reports done, write its result to
-#    /tmp/$RUN_ID/result.json in the shape julia-supervised-publisher.mjs
-#    expects (runId, workItemId, branch, baseCommit, commit, worktree,
-#    outcome, process, evidenceRefs), then publish the finish:
-node AI-Stack/orchestrator/publish-julia-supervised-run.mjs \
-  --mode finish \
-  --project-config julia-next/graph/julia-next.project.mjs \
-  --selection /tmp/$RUN_ID/selection.json \
-  --result /tmp/$RUN_ID/result.json \
-  --run-id "$RUN_ID" \
-  --run-url "<the Orca run's own URL>"
+  --from-terminal <an existing plain-bash terminal handle on the runner> \
+  --environment "OVH runner"
 ```
 
-Every one of these four steps should also emit a `julia.journey0.coordinator_*` event via
-`scripts/coordinator-events.mjs`'s `recordCoordinatorEvent(stage, { runId: RUN_ID })` (`started`
-before step 1, `progress` after step 2, `completed` after step 4 succeeds, `failed` from a
-`catch` around any step) — all four sharing the same `RUN_ID`, which is also what steps 2 and 4
-pass as `--run-id`. This is not yet wired into the orchestrator scripts themselves (that would be
-a further, still-undemonstrated change); until it is, emit these calls by hand around the
-commands above, or from whatever wrapper script actually drives a live run.
+This one command does the whole route: resolves the Linear ticket (`prepareLinearSupervisedRun`),
+posts the start comment, dispatches a real Orca worker (`orca orchestration run-create` /
+`worker-start`, the same mechanism already proven live earlier in JUL-43), waits for it, reads the
+worker's **actual** git state from its worktree to build the result (`collect-worker-result.mjs`
+— never a hand-typed `result.json`), publishes the finish (push, open the PR through the App,
+comment the outcome to Linear), and emits a `julia.journey0.coordinator_*` event at every stage —
+`started` immediately, `progress` after each major step, then `completed` or `failed` — all
+sharing one run ID, automatically, from inside the run itself (`run-jul43-coordinator.mjs`'s own
+`runCoordinator()`, not a separate manual step). Its orchestration logic (event sequencing, what
+happens when a step throws, how an Orca outcome maps to a worker result) is covered by
+`scripts/run-jul43-coordinator.test.mjs`, `scripts/orca-cli.test.mjs`, and
+`scripts/collect-worker-result.test.mjs` against mocked Orca/git/publish calls. The live API calls
+inside it (Orca, Linear, the GitHub App) have not run for real — see "Known open questions" below.
+
+`--from-terminal` needs an existing plain-bash terminal handle on the runner (any one works, per
+this ticket's earlier Orca sessions) — the command does not create one for you.
 
 ## Verification, after a run
 
@@ -147,23 +135,28 @@ not an idle system.
 
 - **Stopping a run in progress**: `orca orchestration worker-abandon --environment "OVH runner"
   --dispatch <id> --json` (the already-documented, proven-safe path — it does not delete the
-  worktree/terminal, so note any residue rather than assuming it's gone). Then manually emit a
-  `coordinator_failed` event for that `runId` with `reason: "abandoned"`, since an abandoned
-  worker never gets to report its own outcome.
+  worktree/terminal, so note any residue rather than assuming it's gone). `run-jul43-coordinator.mjs`
+  is still waiting on that dispatch when you do this, so it will itself receive the resulting
+  error from `terminalWait`/`workerShow` and emit `coordinator_failed` with that real error —
+  abandoning the worker does not require a separate manual event.
 - **Recovering from a stalled run**: confirm via `orca orchestration worker-show` whether the
   dispatch is actually still alive before treating it as dead. If it's genuinely gone (crashed
-  terminal, unreachable runner), abandon it as above, emit `coordinator_failed`, and start a new
-  run with a fresh `RUN_ID` — never reuse a `runId` that already has a `coordinator_started`
-  event, since that would make two runs look like one in the event stream.
-- **Recovering from a publish failure** (worker succeeded, but `--mode finish` failed to push or
-  open the PR, or failed to comment on Linear): the worker's commit still exists in its worktree
-  on the runner — nothing is lost. Fix the underlying cause (credential, network, Linear/GitHub
-  API error visible in the command's own output) and re-run `--mode finish` with the same
-  `selection.json` and `result.json`; it is not destructive to re-attempt.
-- **If a step's output doesn't match what the next step expects** (e.g. `result.json` missing a
-  required field), the publisher fails closed with a `JULIA_SUPERVISED_PUBLISHER_REFUSED` error
-  naming the exact missing field — treat that message as the diagnosis, not a signal to bypass
-  validation.
+  terminal, unreachable runner), abandon it as above and start a new run with a fresh run ID (the
+  command generates one automatically each invocation, from the current timestamp) — never
+  re-invoke against a `runId` that already has a `coordinator_started` event, since that would
+  make two runs look like one in the event stream.
+- **Recovering from a publish failure** (worker succeeded, but the finish publish failed to push,
+  open the PR, or comment on Linear): the worker's commit still exists in its worktree on the
+  runner — nothing is lost. `run-jul43-coordinator.mjs` does not currently retry the finish step
+  on its own; fix the underlying cause (credential, network, Linear/GitHub API error visible in
+  the command's own output, which also landed in the `coordinator_failed` event's `context`) and
+  re-run the same command. This starts a fresh run (new worktree, new commit) rather than resuming
+  the old one — re-running `--mode finish` against the original worker's worktree directly, the
+  way earlier manual runs did, remains possible with AI-Stack's `publish-julia-supervised-run.mjs`
+  if reusing that exact worktree is preferable to a fresh dispatch.
+- **If a step's output doesn't match what the next step expects** (e.g. a missing required
+  field), the publisher fails closed with a `JULIA_SUPERVISED_PUBLISHER_REFUSED` error naming the
+  exact missing field — treat that message as the diagnosis, not a signal to bypass validation.
 
 ## Known open questions for the live-verification pass
 
@@ -176,3 +169,15 @@ not an idle system.
   GitHub-Project gate-checking code path is native-board-specific). This field is present for
   parity with the existing config shape but currently unused by the Linear path — note this
   rather than implying it's enforced.
+- `scripts/orca-cli.mjs`'s exact flag names (`--environment`, `--from`, `--objective`, `--run`,
+  `--spec`, `--worktree`, `--name`, `--agent`, `--setup`, `--for`, `--timeout-ms`, `--dispatch`)
+  match command lines already run live earlier in this ticket, not a fresh read of `orca --help`
+  (reading that CLI's full help output was previously flagged by this environment's own safety
+  layer as out of scope for an agent to probe). If the real CLI's flags have since changed, the
+  first live run will surface that as a clear `orca ... failed: <stderr>` or `did not return
+  valid JSON` error, not a silently wrong dispatch.
+- `worker.worktree` and `worker.terminal` are read directly off `worker-start`'s JSON response in
+  `run-jul43-coordinator.mjs`, on the assumption that those field names match what the CLI
+  actually returns. Confirm this on the first live dispatch; if the field names differ, the
+  failure will surface as `collectWorkerResult`'s git commands failing against an undefined path,
+  not silent wrong data.
