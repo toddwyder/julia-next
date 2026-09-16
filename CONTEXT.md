@@ -192,8 +192,15 @@ _Avoid_: Demo, proof of work, test results
 
 **Gate**:
 The check that evidence passes before it reaches Todd: code for what code can verify, a
-reviewing agent for what needs the recording watched.
+separate reviewing agent for what needs the recording watched. Runs on the OVH runner. A
+failed check is a bounce back to the builder; a third bounce on one journey becomes Todd's
+ticket the same day.
 _Avoid_: Review, QA, approval
+
+**Bounce**:
+The gate sending evidence back to its builder with the rule or checklist line it failed.
+Counted as an attempt; never seen on Todd's ticket except as a count in the "Gate passed" line.
+_Avoid_: Rejection, fail, kickback
 
 **Rehearsal copy**:
 A temporary Julia, website and throwaway data, created for one proposed change as the stage to

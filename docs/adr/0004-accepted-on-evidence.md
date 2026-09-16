@@ -34,6 +34,7 @@ recordings, expensive send-backs).
 - Every journey in the spec carries a device and at least one failure case, or it can't be
   accepted.
 - Use is not testing: anything Todd notices in real use becomes a new ticket in his words.
-- How the gate is built (what code runs where) waits on the technical foundation.
+- How the gate is built (what code runs where, the checklist format, the three-bounce rule,
+  the "Gate passed" line) is decided in [The evidence gate](https://linear.app/julia-next/issue/JUL-35).
 
 Decided in [What counts as "accepted on evidence" for a finished user journey?](https://linear.app/julia-next/issue/JUL-9).
