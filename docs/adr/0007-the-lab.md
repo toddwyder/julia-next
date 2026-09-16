@@ -2,7 +2,7 @@
 
 Date: 2026-09-16
 
-Status: accepted; the pairing source is not yet named (see below).
+Status: accepted; amended 2026-09-16 to name the pairing sources (see Consequences).
 
 The Lab takes a spark and a time budget and answers with four variations, each a different use
 of an ingredient-pairing graph: the spark's closest partners (Classic), a plausible but rarely
@@ -27,9 +27,16 @@ result without steps is not a recipe, and the Lab is already online-only (ADR 00
   Julia does after sign-in.
 - Sharma's framework is encoded as Julia's own rubric (ingredient to taste tags); the book's
   text is never reproduced.
-- The pairing source is chosen after Todd scores twenty sparks side by side from FlavorGraph
-  and Epicure. Julia is personal use only, so FlavorGraph's non-commercial chemistry data is
-  usable. The Lab is built so the source can be swapped; this ADR is amended with the name.
+- Two pairing sources, one per variation. FlavorGraph makes Classic, Adventurous and Chemistry;
+  Epicure makes Balanced. Chosen after Todd scored twenty sparks side by side
+  ([JUL-40](https://linear.app/julia-next/issue/JUL-40)): FlavorGraph won or tied Classic on
+  17 of 20 and is the only source with molecule data; Epicure's taste readings were useful on all
+  20 and it is the only source that has them. Both are bundled on the device: FlavorGraph under
+  Apache 2.0 (its chemistry edges are non-commercial, fine for personal use), Epicure's model
+  under CC BY 4.0 with attribution. FlavorGraph's names get a canonical pass before display and
+  its generic-molecule artefact is filtered out of Chemistry; Epicure seeds the Balanced taste
+  tags for a Western pantry, brightness is hand-tagged, and every tag is correctable by Todd.
+  The Lab still reads each source through one seam so either can be swapped.
 - A Lab recipe's source is "The Lab: <spark>", so Lab recipes are findable in the library.
 
 Decided in [The Lab: what creating a new recipe should feel like](https://linear.app/julia-next/issue/JUL-26).
