@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   juliaRun, assertIssueId, assertAccount, assertReady, ensureCheckoutSynced, findExistingRun, startOrchestrator,
-  prepareServerEnvironment, getRemoteMainHead,
+  prepareServerEnvironment, getRemoteMainHead, defaultPostCommentImpl,
 } from './julia-run.mjs';
 
 const READY = { ok: true, checks: [{ name: 'OVH runner reachable', ok: true, detail: 'connected' }] };
@@ -181,4 +181,38 @@ test('prepareServerEnvironment never overwrites an explicit override', () => {
   prepareServerEnvironment({ env, loadEnvFileImpl: () => { throw new Error('must not load when creds are already present'); } });
   assert.equal(env.ORCA_BIN, '/custom/orca');
   assert.equal(env.ORCA_ENVIRONMENT, 'custom-env');
+});
+
+test('defaultPostCommentImpl allows both Linear tool names, so whichever the model picks is permitted', async () => {
+  let calledArgs;
+  const execImpl = async (cmd, args) => {
+    calledArgs = args;
+    return { stdout: JSON.stringify({ is_error: false, permission_denials: [], result: 'posted' }) };
+  };
+  await defaultPostCommentImpl('JUL-64', 'body text', { execImpl });
+  const allowedToolsIndex = calledArgs.indexOf('--allowedTools');
+  assert.equal(calledArgs[allowedToolsIndex + 1], 'mcp__linear__save_comment,mcp__claude_ai_Linear__save_comment');
+  assert.deepEqual(calledArgs.slice(-2), ['--output-format', 'json']);
+});
+
+test('defaultPostCommentImpl throws when the tool call was denied, even though claude -p itself exits 0 (JUL-63, hit live)', async () => {
+  const execImpl = async () => ({
+    stdout: JSON.stringify({
+      is_error: false,
+      permission_denials: [{ tool_name: 'mcp__claude_ai_Linear__save_comment' }],
+      result: "I couldn't post the comment -- permission needed first.",
+    }),
+  });
+  await assert.rejects(
+    () => defaultPostCommentImpl('JUL-64', 'body text', { execImpl }),
+    /failed to post the start comment on JUL-64: I couldn't post the comment/,
+  );
+});
+
+test('defaultPostCommentImpl throws on is_error even with no permission_denials', async () => {
+  const execImpl = async () => ({ stdout: JSON.stringify({ is_error: true, permission_denials: [], result: 'something else went wrong' }) });
+  await assert.rejects(
+    () => defaultPostCommentImpl('JUL-64', 'body text', { execImpl }),
+    /failed to post the start comment on JUL-64: something else went wrong/,
+  );
 });

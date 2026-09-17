@@ -139,9 +139,27 @@ export async function postStartComment(issueId, runId, { postCommentImpl = defau
 // connection (the one from JUL-61 step 2/3) rather than a separate
 // LINEAR_API_KEY -- exactly the pattern already verified live for posting
 // evidence as this account.
-async function defaultPostCommentImpl(issueId, body, { execImpl = execFileAsync } = {}) {
+//
+// Two real bugs found live (JUL-63) and fixed here:
+// 1. From this checkout's CWD, the model sometimes reaches for the
+//    built-in `mcp__claude_ai_Linear__save_comment` connector instead of
+//    the standalone `mcp__linear__save_comment` server -- allow both, so
+//    whichever one it picks is permitted rather than silently denied.
+// 2. `claude -p` exits 0 even when its only tool call was denied -- it
+//    just explains the failure in its text result instead of erroring.
+//    --output-format json exposes `permission_denials`/`is_error`, which
+//    this actually checks instead of trusting the exit code.
+export async function defaultPostCommentImpl(issueId, body, { execImpl = execFileAsync } = {}) {
   const prompt = `Use the Linear MCP tool to post exactly this comment (verbatim, no changes) on issue ${issueId}:\n\n${body}`;
-  await execImpl('claude', ['-p', prompt, '--allowedTools', 'mcp__linear__save_comment']);
+  const { stdout } = await execImpl('claude', [
+    '-p', prompt,
+    '--allowedTools', 'mcp__linear__save_comment,mcp__claude_ai_Linear__save_comment',
+    '--output-format', 'json',
+  ]);
+  const result = JSON.parse(stdout);
+  if (result.is_error || (result.permission_denials ?? []).length > 0) {
+    throw new Error(`failed to post the start comment on ${issueId}: ${result.result ?? JSON.stringify(result.permission_denials)}`);
+  }
 }
 
 export async function juliaRun(issueId, impls = {}) {
