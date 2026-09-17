@@ -161,6 +161,9 @@ test('happy path: readiness, synced checkout, no existing run -> orchestrator st
   assert.match(calls.terminalsCreated[0].command, /--allowedTools/);
   assert.match(calls.terminalsCreated[0].command, /mcp__linear__\*/);
   assert.match(calls.terminalsCreated[0].command, /mcp__claude_ai_Linear__\*/);
+  assert.match(calls.terminalsCreated[0].command, /Bash\(node --env-file=\/etc\/orchestrator-svc\/\.env\.publisher scripts\/publish-pr\.mjs:\*\)/);
+  assert.match(calls.terminalsCreated[0].command, /Bash\(node --env-file=\/etc\/orchestrator-svc\/\.env\.publisher scripts\/merge-pr\.mjs:\*\)/);
+  assert.match(calls.terminalsCreated[0].command, /Bash\(node scripts\/coordinator-events\.mjs:\*\)/);
 
   assert.equal(calls.comments.length, 1);
   const { issueId, body } = calls.comments[0];
