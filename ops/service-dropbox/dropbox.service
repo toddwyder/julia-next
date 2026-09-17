@@ -1,0 +1,30 @@
+[Unit]
+Description=JUL-72 one-time service sign-up code drop box
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/node /opt/orca-runner/service-dropbox/dropbox.mjs
+EnvironmentFile=/etc/orca-runner/dropbox.env
+# Runs as the dedicated dropbox-svc account, not `runner` and not
+# `orchestrator-svc` -- same reasoning as journey-relay.service: same-UID
+# processes can read each other's environment via /proc/<pid>/environ, and
+# this process briefly handles four raw bearer tokens in memory per
+# request, so it must not share a UID with any builder worktree or the
+# publisher.
+User=dropbox-svc
+Group=dropbox-svc
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/opt/orca-runner/service-dropbox
+ReadWritePaths=/var/lib/dropbox-svc
+UMask=0077
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
