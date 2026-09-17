@@ -244,6 +244,17 @@ English; (b) whether anything needs his decision -- write `nothing` if not. Inst
 decisions arrive on the issue as comments prefixed `Instruction:` or `Decision:`; read the
 newest of those before acting on any step.
 
+**A correction is reposted whole, never patched in a follow-up comment.** If Todd is meant to
+follow something step by step (a walkthrough, a checklist, a runbook posted as a comment), a
+correction to it never lands as a separate "see the fix above" comment -- that leaves two
+comments a reader has to cross-check, and JUL-72 proved a real reader (Todd himself) can follow
+the older, now-wrong one by mistake. Instead: post one new comment containing the complete,
+corrected, standalone version (every earlier correction folded in, no references to other
+comments), then edit every comment it supersedes to prepend `SUPERSEDED -- do not follow. The
+current version is the newest comment on this issue.` (keep the rest of the superseded comment's
+text intact, for the record). This applies to any step-by-step artifact, not just walkthroughs --
+the same rule holds for a checklist or set of instructions Todd is actively executing.
+
 **Laptop-bypass rule.** Laptop Claude Code running with permissions bypassed
 (`--dangerously-skip-permissions`) is for infrastructure/setup tickets only. Product tickets run
 on the server orchestrator (`orchestrator-svc` via Orca). A product ticket found running on
