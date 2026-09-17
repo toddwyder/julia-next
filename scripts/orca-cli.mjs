@@ -10,8 +10,20 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
-const DEFAULT_BIN = process.env.ORCA_BIN
-  || 'C:\\Users\\toddw\\AppData\\Local\\Programs\\orca\\resources\\bin\\orca.exe';
+// No personal-machine fallback path here on purpose (retro finding, JUL-61
+// closing pass): a hardcoded laptop path silently produces a raw ENOENT on
+// any other machine instead of an actionable error -- caught live when a
+// fresh session tried this on the OVH server. Every caller must set
+// ORCA_BIN for its own environment (the laptop's orca.exe, or
+// /opt/Orca/orca-ide on the server -- see the runbook's local-pairing
+// section).
+function requireOrcaBin() {
+  const bin = process.env.ORCA_BIN;
+  if (!bin) {
+    throw new Error('ORCA_BIN is not set -- point it at this machine\'s orca binary (e.g. the laptop\'s orca.exe, or /opt/Orca/orca-ide on the server)');
+  }
+  return bin;
+}
 
 // Every orchestration/terminal command's real --json output wraps its
 // payload as {id, ok, result, _meta} and reports failure as
@@ -66,7 +78,7 @@ async function run(args, { execImpl = defaultExecImpl, bin = 'orca' } = {}) {
 }
 
 async function defaultExecImpl(bin, args) {
-  const resolvedBin = bin === 'orca' ? DEFAULT_BIN : bin;
+  const resolvedBin = bin === 'orca' ? requireOrcaBin() : bin;
   return execFileAsync(resolvedBin, args, { maxBuffer: 10 * 1024 * 1024 });
 }
 

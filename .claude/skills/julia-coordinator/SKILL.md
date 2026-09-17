@@ -23,6 +23,14 @@ publish anything). The publisher is the only component with GitHub write access.
 write goes through the tracker's own comment/state calls (`mcp__linear__*`), never a personal
 session standing in for the coordinator.
 
+**A discovery about the server or its tools is not recorded until it's in the runbook.** Any
+new fact about the OVH box or the tooling on it -- a binary's real path, a socket location, a
+pairing mechanism, a systemd unit's behavior -- goes into
+`docs/agents/jul43-coordinator-runbook.md` **in the same PR** that used the discovery, not only
+narrated in a Linear comment. A Linear comment documents what happened *this session*; the
+runbook is what a fresh session with no memory of this conversation reads instead. Treat
+"discovered it, used it, moved on without updating the runbook" as an incomplete step.
+
 **Width is 1**: at most one work item in flight.
 
 ---

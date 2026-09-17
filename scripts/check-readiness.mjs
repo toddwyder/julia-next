@@ -17,8 +17,16 @@ import { getPublisherInstallationToken } from './publish-via-github-app.mjs';
 import { terminalCreate, terminalRead } from './orca-cli.mjs';
 
 const execFileAsync = promisify(execFile);
-const ORCA_BIN = process.env.ORCA_BIN
-  || 'C:\\Users\\toddw\\AppData\\Local\\Programs\\orca\\resources\\bin\\orca.exe';
+// No personal-machine fallback path here on purpose (retro finding, JUL-61
+// closing pass) -- see the matching comment in orca-cli.mjs. Callers must
+// set ORCA_BIN for their own machine.
+function requireOrcaBin() {
+  const bin = process.env.ORCA_BIN;
+  if (!bin) {
+    throw new Error('ORCA_BIN is not set -- point it at this machine\'s orca binary (e.g. the laptop\'s orca.exe, or /opt/Orca/orca-ide on the server)');
+  }
+  return bin;
+}
 // 'OVH runner' is the laptop's own registered name for this runtime
 // (orca.exe pairs to it remotely). Running this same check as
 // orchestrator-svc ON that runner uses a different local pairing --
@@ -38,12 +46,12 @@ function check(name, ok, detail) {
 }
 
 async function defaultOrcaStatusImpl() {
-  const { stdout } = await execFileAsync(ORCA_BIN, ['status', '--environment', getEnvironment(), '--json']);
+  const { stdout } = await execFileAsync(requireOrcaBin(), ['status', '--environment', getEnvironment(), '--json']);
   return JSON.parse(stdout);
 }
 
 async function defaultOrcaProjectSetupsImpl() {
-  const { stdout } = await execFileAsync(ORCA_BIN, ['project', 'setups', '--environment', getEnvironment(), '--json']);
+  const { stdout } = await execFileAsync(requireOrcaBin(), ['project', 'setups', '--environment', getEnvironment(), '--json']);
   return JSON.parse(stdout);
 }
 
