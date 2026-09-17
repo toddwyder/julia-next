@@ -19,6 +19,7 @@ export async function mergePullRequest({
   owner,
   repo,
   number,
+  expectedHeadSha,
   mergeMethod = 'squash',
   env = process.env,
   fetchImpl = fetch,
@@ -30,9 +31,14 @@ export async function mergePullRequest({
   if (!Number.isInteger(Number(number)) || Number(number) <= 0 || String(Number(number)) !== String(number).trim()) {
     throw new Error(`number must be a positive integer, got ${JSON.stringify(number)}`);
   }
+  if (!/^[0-9a-f]{40}$/i.test(expectedHeadSha ?? '')) {
+    throw new Error(`expectedHeadSha must be a 40-character commit SHA, got ${JSON.stringify(expectedHeadSha)}`);
+  }
 
   const token = await tokenImpl({ ...env, JULIA_PUBLISHER_OWNER: owner, JULIA_PUBLISHER_REPO: repo });
 
+  // sha pins the merge to the exact commit that was reviewed -- GitHub
+  // refuses with 409 if the PR head has moved since (JUL-61 step 4).
   const res = await fetchImpl(`https://api.github.com/repos/${owner}/${repo}/pulls/${number}/merge`, {
     method: 'PUT',
     headers: {
@@ -40,7 +46,7 @@ export async function mergePullRequest({
       Accept: 'application/vnd.github+json',
       'content-type': 'application/json',
     },
-    body: JSON.stringify({ merge_method: mergeMethod }),
+    body: JSON.stringify({ merge_method: mergeMethod, sha: expectedHeadSha }),
   });
   const body = await res.json();
   if (!res.ok) {
@@ -59,15 +65,15 @@ function parseArgs(argv) {
 }
 
 async function main() {
-  const { repo, number } = parseArgs(process.argv.slice(2));
-  if (!repo || !number) {
-    console.error('usage: node merge-pr.mjs --repo <owner/name> --number <pr-number>');
+  const { repo, number, sha } = parseArgs(process.argv.slice(2));
+  if (!repo || !number || !sha) {
+    console.error('usage: node merge-pr.mjs --repo <owner/name> --number <pr-number> --sha <reviewed-head-sha>');
     process.exitCode = 2;
     return;
   }
   const [owner, name] = repo.split('/');
   try {
-    const result = await mergePullRequest({ owner, repo: name, number: Number(number) });
+    const result = await mergePullRequest({ owner, repo: name, number: Number(number), expectedHeadSha: sha });
     console.log(JSON.stringify(result));
     process.exitCode = result.merged ? 0 : 1;
   } catch (error) {
