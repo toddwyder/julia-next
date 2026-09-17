@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   juliaRun, assertIssueId, assertAccount, assertReady, ensureCheckoutSynced, findExistingRun, startOrchestrator,
+  prepareServerEnvironment,
 } from './julia-run.mjs';
 
 const READY = { ok: true, checks: [{ name: 'OVH runner reachable', ok: true, detail: 'connected' }] };
@@ -20,6 +21,8 @@ function fakeImpls(overrides = {}) {
     calls,
     impls: {
       usernameImpl: () => 'orchestrator-svc',
+      env: { ORCA_BIN: 'fake-orca', ORCA_ENVIRONMENT: 'fake-env', JULIA_PUBLISHER_APP_ID: 'x', JULIA_PUBLISHER_APP_PRIVATE_KEY: 'y' },
+      loadEnvFileImpl: () => { throw new Error('should not need to load the env file when publisher creds are already present'); },
       checkReadinessImpl: async () => READY,
       execImpl: async (cmd, args) => {
         if (cmd === 'git' && args.includes('rev-parse')) return { stdout: 'abc123\n' };
@@ -138,4 +141,21 @@ test('happy path: readiness, synced checkout, no existing run -> orchestrator st
   assert.equal(issueId, 'JUL-63');
   assert.match(body, /^Instruction: run started by julia-run at .+, orchestrator run_fake456/);
   assert.match(body, /For Todd:/);
+});
+
+test('prepareServerEnvironment fills in ORCA_BIN/ORCA_ENVIRONMENT and loads the publisher env file only when needed', () => {
+  const env = {};
+  let loaderCalled = false;
+  prepareServerEnvironment({ env, loadEnvFileImpl: () => { loaderCalled = true; env.JULIA_PUBLISHER_APP_ID = 'loaded'; } });
+  assert.equal(env.ORCA_BIN, '/opt/Orca/orca-ide');
+  assert.equal(env.ORCA_ENVIRONMENT, 'ovh-local');
+  assert.equal(loaderCalled, true);
+  assert.equal(env.JULIA_PUBLISHER_APP_ID, 'loaded');
+});
+
+test('prepareServerEnvironment never overwrites an explicit override', () => {
+  const env = { ORCA_BIN: '/custom/orca', ORCA_ENVIRONMENT: 'custom-env', JULIA_PUBLISHER_APP_ID: 'already-set', JULIA_PUBLISHER_APP_PRIVATE_KEY: 'already-set' };
+  prepareServerEnvironment({ env, loadEnvFileImpl: () => { throw new Error('must not load when creds are already present'); } });
+  assert.equal(env.ORCA_BIN, '/custom/orca');
+  assert.equal(env.ORCA_ENVIRONMENT, 'custom-env');
 });

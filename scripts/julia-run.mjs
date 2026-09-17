@@ -21,6 +21,25 @@ const REPO_URL = 'https://github.com/toddwyder/julia-next.git';
 const ORCHESTRATOR_ENVIRONMENT = 'orchestrator-local';
 const DISPATCH_ENVIRONMENT = 'ovh-local';
 const WORKTREE_SELECTOR = `path:${CHECKOUT}`;
+const PUBLISHER_ENV_FILE = '/etc/orchestrator-svc/.env.publisher';
+
+// The ticket's own step 2 ("runs check-readiness.mjs with the server
+// environment") means julia-run encodes that itself -- a caller that
+// forgets `--env-file=...` shouldn't get a confusing readiness failure
+// instead of a working run. Only fills in what's missing, never
+// overwrites an explicit override (e.g. a test's injected fakes).
+function defaultLoadEnvFile() {
+  process.loadEnvFile(PUBLISHER_ENV_FILE);
+}
+
+export function prepareServerEnvironment({ env = process.env, loadEnvFileImpl = defaultLoadEnvFile } = {}) {
+  if (!env.ORCA_BIN) env.ORCA_BIN = '/opt/Orca/orca-ide';
+  if (!env.ORCA_ENVIRONMENT) env.ORCA_ENVIRONMENT = DISPATCH_ENVIRONMENT;
+  if (!env.JULIA_PUBLISHER_APP_ID || !env.JULIA_PUBLISHER_APP_PRIVATE_KEY) {
+    loadEnvFileImpl(env);
+  }
+  return env;
+}
 
 export function assertIssueId(issueId) {
   if (typeof issueId !== 'string' || !/^[A-Za-z]+-\d+$/.test(issueId)) {
@@ -111,6 +130,7 @@ async function defaultPostCommentImpl(issueId, body, { execImpl = execFileAsync 
 export async function juliaRun(issueId, impls = {}) {
   assertIssueId(issueId);
   assertAccount(impls);
+  prepareServerEnvironment(impls);
   await assertReady(impls);
   await ensureCheckoutSynced(impls);
 
