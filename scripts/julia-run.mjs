@@ -11,7 +11,9 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import os from 'node:os';
 import { checkReadiness } from './check-readiness.mjs';
-import { runCreate, runList, terminalCreate } from './orca-cli.mjs';
+import {
+  runCreate, runList, taskList, terminalCreate,
+} from './orca-cli.mjs';
 import { getPublisherInstallationToken } from './publish-via-github-app.mjs';
 
 const execFileAsync = promisify(execFile);
@@ -96,16 +98,50 @@ export async function ensureCheckoutSynced({ execImpl = execFileAsync, getRemote
   return { head: afterHead, triggeredSync: true };
 }
 
-// No clean "is this run still active" field exists on run-list (JUL-63
-// research) -- this checks for any run ever created with this exact
-// objective, which is what the double-start guard actually needs to
-// test against (a second invocation for the same issue while the first
-// is still in flight). A completed run for the same issue blocking a
-// legitimate re-run is a known, disclosed limitation, not silently
-// assumed away.
-export async function findExistingRun(issueId, { runListImpl = runList } = {}) {
+const TERMINAL_TASK_STATUSES = new Set(['completed', 'failed', 'stopped', 'cancelled']);
+
+// JUL-44's first real run (run_c404a384fb43) stopped at preflight before
+// any Task was ever created for it -- zero Tasks, forever, once blocked.
+// A run with an active Task is unambiguously still in progress. A run
+// with zero Tasks is ambiguous by task-list alone (a brand-new run also
+// has zero Tasks, for the seconds/minutes its preflight takes) -- so a
+// zero-Task run only counts as finished once it's older than a
+// generous grace window past any real preflight pass. This is a
+// deliberately conservative heuristic (favors "still blocks") given no
+// queryable run-level status field or Axiom read access exists yet (see
+// docs/agents/jul43-coordinator-runbook.md).
+//
+// Live-verified 2026-09-17 (JUL-70): every real run on orchestrator-local
+// (run_c404a384fb43 included, plus six other journey-zero runs) has zero
+// Tasks -- this coordinator has never actually called task-create yet, so
+// the zero-Task branch above is the only one exercised in practice today,
+// not a theoretical fallback. `task-list --run <id> --environment
+// orchestrator-local --json` returns the {runId, legacyReadOnly, tasks,
+// count} shape assumed here. Ran the real fixed findExistingRun('JUL-44')
+// against the live server (a scratch copy of this file, as
+// orchestrator-svc, read-only inspection only) and confirmed it now
+// returns null instead of the stuck run. The active-Task branch (a
+// non-terminal `status` value) remains unverified -- no live Task has
+// ever existed to check it against.
+const ZERO_TASK_RUN_GRACE_MS = 15 * 60 * 1000;
+
+export async function isRunFinished(existingRun, { taskListImpl = taskList, now = () => Date.now() } = {}) {
+  const { tasks } = await taskListImpl({ environment: ORCHESTRATOR_ENVIRONMENT, runId: existingRun.id });
+  const hasActiveTask = tasks.some((t) => !TERMINAL_TASK_STATUSES.has(t.status));
+  if (hasActiveTask) return false;
+  if (tasks.length > 0) return true;
+
+  const lastActivity = Date.parse(existingRun.updated_at ?? existingRun.created_at ?? 0);
+  if (Number.isNaN(lastActivity)) return false;
+  return now() - lastActivity > ZERO_TASK_RUN_GRACE_MS;
+}
+
+export async function findExistingRun(issueId, { runListImpl = runList, isRunFinishedImpl = isRunFinished } = {}) {
   const { runs } = await runListImpl({ environment: ORCHESTRATOR_ENVIRONMENT, limit: 100 });
-  return runs.find((r) => r.objective === issueId) ?? null;
+  const match = runs.find((r) => r.objective === issueId);
+  if (!match) return null;
+  if (await isRunFinishedImpl(match)) return null;
+  return match;
 }
 
 export async function startOrchestrator(issueId, {
@@ -138,7 +174,18 @@ export async function startOrchestrator(issueId, {
     // own comment on why), Bash access to the exact scripts the skill's
     // "Each wake"/"Running a step"/"After verification" procedures name,
     // and the publisher credential file for the two scripts that need it.
-    command: `claude --permission-mode acceptEdits --allowedTools "mcp__linear__*,mcp__claude_ai_Linear__*,Bash(node scripts/orca-cli.mjs:*),Bash(node scripts/check-readiness.mjs:*),Bash(node scripts/collect-worker-result.mjs:*),Bash(node scripts/verify-reviewer-worktree.mjs:*),Bash(node scripts/coordinator-events.mjs:*),Bash(node --env-file=/etc/orchestrator-svc/.env.publisher scripts/publish-pr.mjs:*),Bash(node --env-file=/etc/orchestrator-svc/.env.publisher scripts/merge-pr.mjs:*),Bash(orca *)" -p "/julia-coordinator ${issueId}"`,
+    //
+    // Env prefix (JUL-44 preflight misses 1 and 2): the `claude -p`
+    // process this launches is a fresh shell on the orchestrator-local
+    // runtime -- it does not inherit julia-run's own process env, so
+    // every orca-cli.mjs-based script it runs (check-readiness.mjs,
+    // workerStart, coordinator-events.mjs) failed with "ORCA_BIN is not
+    // set", and check-readiness.mjs's publisher check failed for want of
+    // JULIA_PUBLISHER_APP_ID/_PRIVATE_KEY. Export both before the claude
+    // invocation so every Bash subprocess it spawns inherits them too;
+    // `set -a`/`set +a` auto-exports every name sourced from the
+    // publisher env file without listing them one by one.
+    command: `export ORCA_BIN=/opt/Orca/orca-ide ORCA_ENVIRONMENT=${DISPATCH_ENVIRONMENT}; set -a; . ${PUBLISHER_ENV_FILE}; set +a; claude --permission-mode acceptEdits --allowedTools "mcp__linear__*,mcp__claude_ai_Linear__*,Bash(node scripts/orca-cli.mjs:*),Bash(node scripts/check-readiness.mjs:*),Bash(node scripts/collect-worker-result.mjs:*),Bash(node scripts/verify-reviewer-worktree.mjs:*),Bash(node scripts/coordinator-events.mjs:*),Bash(node --env-file=/etc/orchestrator-svc/.env.publisher scripts/publish-pr.mjs:*),Bash(node --env-file=/etc/orchestrator-svc/.env.publisher scripts/merge-pr.mjs:*),Bash(orca *)" -p "/julia-coordinator ${issueId}"`,
     title: `julia-run-${issueId}`,
   });
 

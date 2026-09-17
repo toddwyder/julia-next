@@ -214,6 +214,14 @@ pass):
   checkout post-sync.
 - **JUL-63**: `orchestrator-svc` can also trigger this itself, narrowly — see the sudo rule in
   the "Bootstrap from a laptop" section above, which `scripts/julia-run.mjs` uses.
+- **JUL-70**: the same script/timer now also syncs `/home/runner/julia-next` (fetch +
+  `merge --ff-only origin/main`, run as `runner` via `sudo -u runner`, no permission-lockdown
+  afterward since that checkout stays writable for builder worktrees). This checkout had no
+  sync mechanism at all before JUL-70 — only the orchestrator's own copy did — so it silently
+  went stale (found at PR #3 while `origin/main` was at PR #20, the exact commit builder
+  worktrees would have branched from). Verified live: a real timer-fired run
+  (`journalctl -u julia-next-checkout-sync.service`) brought both checkouts to the same HEAD as
+  `git ls-remote origin main`.
 
 Manual sync is still available for an out-of-band update without waiting up to 15 minutes:
 `sudo systemctl start julia-next-checkout-sync.service`. Check its history with `sudo
