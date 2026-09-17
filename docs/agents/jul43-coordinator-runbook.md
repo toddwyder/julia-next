@@ -115,6 +115,27 @@ Verified live, all four checks green, entirely server-local, no laptop involved.
 Verified live: `runner` cannot read `/etc/orchestrator-svc/.env.publisher` (permission denied);
 `orchestrator-svc` can; `orchestrator-svc`'s checkout write is denied (`touch` inside it fails).
 
+**The read-only checkout cannot update itself — by design, and this needs a deliberate sync
+step.** `orchestrator-svc` has no write access to `/srv/orchestrator-svc/julia-next`, including
+its `.git` directory, so it cannot `git pull`/`fetch` its own checkout (a real fresh-session
+acceptance run hit exactly this: the checkout was stuck at an old commit and reported stale
+readiness results). Sync it from the `ubuntu` admin channel whenever `main` moves and the
+orchestrator needs the update:
+
+```sh
+sudo git config --global --add safe.directory /srv/orchestrator-svc/julia-next   # once
+sudo GIT_SSH_COMMAND="ssh -i /etc/orca-runner/julia-next-deploy-key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" \
+  git -C /srv/orchestrator-svc/julia-next fetch origin main
+sudo git -C /srv/orchestrator-svc/julia-next reset --hard origin/main
+sudo chown -R root:orchestrator-svc /srv/orchestrator-svc/julia-next
+sudo find /srv/orchestrator-svc/julia-next -type d -exec chmod 0550 {} \;
+sudo find /srv/orchestrator-svc/julia-next -type f -exec chmod 0440 {} \;
+```
+Re-verify write is still denied for `orchestrator-svc` after re-locking (the `chown`/`chmod`
+above must be the last thing that touches the checkout). There is no automated trigger for this
+yet — an open item, not solved here: either a periodic admin-channel sync, or a narrowly-scoped
+sudo rule letting `orchestrator-svc` request a sync without full admin access.
+
 ## Start
 
 There is no scheduled trigger — explicit launch only. On the server, as `orchestrator-svc`,
