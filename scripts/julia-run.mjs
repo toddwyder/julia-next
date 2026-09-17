@@ -122,7 +122,11 @@ export async function startOrchestrator(issueId, {
   await terminalCreateImpl({
     environment: ORCHESTRATOR_ENVIRONMENT,
     worktree: WORKTREE_SELECTOR,
-    command: `claude --permission-mode acceptEdits -p "Invoke the julia-coordinator skill. Work item: ${issueId}."`,
+    // The skill has disable-model-invocation: true (invoked by name only,
+    // never inferred) -- asking in prose was refused live (JUL-63): the
+    // model correctly declined to run the skill's steps by hand and
+    // pointed back at the slash command instead. Pass that explicitly.
+    command: `claude --permission-mode acceptEdits -p "/julia-coordinator ${issueId}"`,
     title: `julia-run-${issueId}`,
   });
 
