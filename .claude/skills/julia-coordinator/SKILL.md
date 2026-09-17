@@ -241,6 +241,12 @@ newest of those before acting on any step.
 on the server orchestrator (`orchestrator-svc` via Orca). A product ticket found running on
 laptop Claude Code is a stop-and-report condition, not a workaround.
 
+**Tick-on-evidence rule.** An issue's acceptance checkbox is ticked when, and only when,
+verified evidence for it exists (a live command run, a real comment posted, a merged PR) --
+never on intent, in-progress work, or a plan to get there. Leave it unticked until the evidence
+exists. JUL-63 is where this rule first applied: its seven checkboxes were ticked only once each
+had a live-verified result cited on the issue.
+
 ---
 
 ## JUL-43 specifically
