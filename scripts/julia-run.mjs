@@ -130,11 +130,15 @@ export async function startOrchestrator(issueId, {
     // --allowedTools: without this, the launch exits 0 having reached
     // neither Linear nor Orca -- caught live because the coordinator's own
     // first real run diagnosed its own missing grants and reported back
-    // instead of silently doing nothing (JUL-63). Both Linear tool
-    // namespaces (see defaultPostCommentImpl's own comment on why), plus
-    // Bash access to the exact scripts the skill's "Each wake"/"Running a
-    // step" procedures name.
-    command: `claude --permission-mode acceptEdits --allowedTools "mcp__linear__*,mcp__claude_ai_Linear__*,Bash(node scripts/orca-cli.mjs:*),Bash(node scripts/check-readiness.mjs:*),Bash(node scripts/collect-worker-result.mjs:*),Bash(node scripts/verify-reviewer-worktree.mjs:*),Bash(orca *)" -p "/julia-coordinator ${issueId}"`,
+    // instead of silently doing nothing (JUL-63). A second real wake then
+    // found the remaining gap itself: dispatch/readiness scripts were
+    // granted, but publish-pr.mjs/merge-pr.mjs/coordinator-events.mjs
+    // weren't, so a real ticket would build and review, then be refused at
+    // publish. Both Linear tool namespaces (see defaultPostCommentImpl's
+    // own comment on why), Bash access to the exact scripts the skill's
+    // "Each wake"/"Running a step"/"After verification" procedures name,
+    // and the publisher credential file for the two scripts that need it.
+    command: `claude --permission-mode acceptEdits --allowedTools "mcp__linear__*,mcp__claude_ai_Linear__*,Bash(node scripts/orca-cli.mjs:*),Bash(node scripts/check-readiness.mjs:*),Bash(node scripts/collect-worker-result.mjs:*),Bash(node scripts/verify-reviewer-worktree.mjs:*),Bash(node scripts/coordinator-events.mjs:*),Bash(node --env-file=/etc/orchestrator-svc/.env.publisher scripts/publish-pr.mjs:*),Bash(node --env-file=/etc/orchestrator-svc/.env.publisher scripts/merge-pr.mjs:*),Bash(orca *)" -p "/julia-coordinator ${issueId}"`,
     title: `julia-run-${issueId}`,
   });
 

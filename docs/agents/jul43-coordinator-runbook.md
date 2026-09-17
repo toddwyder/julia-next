@@ -235,13 +235,19 @@ in-flight item, and admits the next eligible issue once a slot is free — see
 `.claude/skills/julia-coordinator/SKILL.md` for that procedure.
 
 **The headless launch needs its own tool grants — `claude -p` exits 0 even when every tool call
-was refused.** The coordinator's own first real run diagnosed this itself and reported back
-instead of silently doing nothing: launched with no `--allowedTools`, it could reach neither
-Linear nor Orca. `julia-run.mjs`'s launch command now grants `mcp__linear__*`,
-`mcp__claude_ai_Linear__*` (both Linear tool namespaces — see the CWD-dependent tool-name
-caveat on the start-comment step above), and `Bash` access to exactly the scripts the skill's
-"Each wake"/"Running a step" procedures name (`orca-cli.mjs`, `check-readiness.mjs`,
-`collect-worker-result.mjs`, `verify-reviewer-worktree.mjs`) plus the bare `orca` CLI. If the
+was refused.** Found across two real live wakes, each diagnosing its own gap and reporting back
+instead of silently doing nothing:
+1. Launched with no `--allowedTools` at all, the coordinator could reach neither Linear nor
+   Orca.
+2. With dispatch/readiness scripts granted but not the publish path, a real ticket would build
+   and review, then be refused at publish.
+
+`julia-run.mjs`'s launch command now grants: `mcp__linear__*` and `mcp__claude_ai_Linear__*`
+(both Linear tool namespaces — see the CWD-dependent tool-name caveat on the start-comment step
+above); `Bash` access to the exact scripts the skill's "Each wake"/"Running a step"/"After
+verification" procedures name (`orca-cli.mjs`, `check-readiness.mjs`, `collect-worker-result.mjs`,
+`verify-reviewer-worktree.mjs`, `coordinator-events.mjs`); the publisher credential file for the
+two scripts that need it (`publish-pr.mjs`, `merge-pr.mjs`); and the bare `orca` CLI. If the
 skill's own procedure grows to need another script or tool, its `--allowedTools` list in
 `scripts/julia-run.mjs`'s `startOrchestrator` needs the matching grant added in the same PR.
 
