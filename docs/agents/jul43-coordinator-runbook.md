@@ -29,6 +29,12 @@ ssh -i ~/.ssh/ovh_runner_ed25519 ubuntu@100.125.239.98
 Tailscale IP `100.125.239.98`. Probe only this named login when checking access — do not try
 alternate ports or hosts to work around the public-hostname block.
 
+**Editing a file on the server: write locally, then `scp` it over — never nested heredocs
+through multiple shells.** `ssh ... bash -s <<'REMOTE'` wrapping a `sudo -u orchestrator-svc
+bash -lc '...'` wrapping a `python3 - <<PYEOF` heredoc reliably breaks on quote/backslash
+collisions across that many shell layers (a real, repeated time sink in JUL-61). Write the
+change to a local file, `scp` it to the server, then run or apply it there.
+
 **Accounts on the server:**
 
 | Account | Role | sudo |
@@ -102,6 +108,14 @@ ORCA_BIN=/opt/Orca/orca-ide ORCA_ENVIRONMENT=ovh-local \
 ```
 Verified live, all four checks green, entirely server-local, no laptop involved.
 
+**Capturing a browser-approval URL (Claude login, Linear MCP login) from tmux: always
+`capture-pane -pJ`, never `-p` alone.** The plain `-p` capture wraps long lines at the terminal
+width, which splits a pairing/OAuth URL mid-string and hands Todd a broken link (happened live
+in JUL-61). `-J` joins wrapped lines back into one before you read it out:
+```sh
+tmux capture-pane -t <session> -p -J
+```
+
 ---
 
 ## Current roles (JUL-61)
@@ -115,28 +129,26 @@ Verified live, all four checks green, entirely server-local, no laptop involved.
 Verified live: `runner` cannot read `/etc/orchestrator-svc/.env.publisher` (permission denied);
 `orchestrator-svc` can; `orchestrator-svc`'s checkout write is denied (`touch` inside it fails).
 
-**The read-only checkout cannot update itself — by design — so a root-owned systemd timer
-syncs it.** `orchestrator-svc` has no write access to `/srv/orchestrator-svc/julia-next`,
-including its `.git` directory, so it cannot `git pull`/`fetch` its own checkout (a real
-fresh-session acceptance run hit exactly this before the timer existed: the checkout was stuck
-at an old commit and reported stale readiness results). Automated 2026-09-17 (JUL-61 closing
-pass):
+**The read-only checkout cannot update itself — by design, and this needs a deliberate sync
+step.** `orchestrator-svc` has no write access to `/srv/orchestrator-svc/julia-next`, including
+its `.git` directory, so it cannot `git pull`/`fetch` its own checkout (a real fresh-session
+acceptance run hit exactly this: the checkout was stuck at an old commit and reported stale
+readiness results). Sync it from the `ubuntu` admin channel whenever `main` moves and the
+orchestrator needs the update:
 
-- `/usr/local/sbin/julia-next-checkout-sync.sh` (root:root, mode `700`) fetches `origin/main`,
-  resets the checkout to it, then re-applies `root:orchestrator-svc` ownership and `550`/`440`
-  permissions — the same sequence the manual procedure used, now scripted.
-- `julia-next-checkout-sync.service` (oneshot, runs as root) executes it;
-  `julia-next-checkout-sync.timer` fires it 30s after boot/enable and every 15 minutes after
-  that (`OnBootSec=1min`, `OnActiveSec=30s`, `OnUnitActiveSec=15min`, `Persistent=true` so a
-  missed run while the box was down catches up on the next boot).
-- Verified live: triggered a real timer-fired run (not a manual `systemctl start`) and confirmed
-  the checkout's HEAD matched `origin/main`'s actual HEAD exactly afterward
-  (`git ls-remote origin main`), and that `orchestrator-svc` still cannot write into the
-  checkout post-sync.
-
-Manual sync is still available for an out-of-band update (e.g. right after a merge, without
-waiting up to 15 minutes): `sudo systemctl start julia-next-checkout-sync.service`. Check its
-history with `sudo journalctl -u julia-next-checkout-sync.service`.
+```sh
+sudo git config --global --add safe.directory /srv/orchestrator-svc/julia-next   # once
+sudo GIT_SSH_COMMAND="ssh -i /etc/orca-runner/julia-next-deploy-key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" \
+  git -C /srv/orchestrator-svc/julia-next fetch origin main
+sudo git -C /srv/orchestrator-svc/julia-next reset --hard origin/main
+sudo chown -R root:orchestrator-svc /srv/orchestrator-svc/julia-next
+sudo find /srv/orchestrator-svc/julia-next -type d -exec chmod 0550 {} \;
+sudo find /srv/orchestrator-svc/julia-next -type f -exec chmod 0440 {} \;
+```
+Re-verify write is still denied for `orchestrator-svc` after re-locking (the `chown`/`chmod`
+above must be the last thing that touches the checkout). There is no automated trigger for this
+yet — an open item, not solved here: either a periodic admin-channel sync, or a narrowly-scoped
+sudo rule letting `orchestrator-svc` request a sync without full admin access.
 
 ## Start
 
@@ -188,7 +200,19 @@ Every GitHub write — branch push, PR open, merge — goes through the publishe
 requires `--sha <reviewed-head-commit>`; GitHub refuses the merge with 409 if the PR head moved
 since review (`scripts/merge-pr.mjs`, JUL-61 step 4).
 
-**Verified server-side, 2026-09-17 (JUL-61 closing pass):** this very change was pushed, opened, and merged entirely by `orchestrator-svc` on the server, using `/etc/orchestrator-svc/.env.publisher` -- no laptop involvement.
+**The publisher App cannot edit `.github/workflows/*` — deliberately, not a bug to work
+around.** `julia-graph-publisher` has no `workflows` permission, so GitHub refuses any push
+that touches a workflow file with "refusing to allow a GitHub App to create or update
+workflow ... without `workflows` permission" (hit live, JUL-61 retro follow-up). The machine
+that publishes code should not also be able to edit its own CI. A check that would otherwise
+need a new CI step belongs in `scripts/*.test.mjs` instead — CI already runs that whole suite,
+so a new test file lands the check without ever touching `.github/workflows/`.
+
+**After a PR merges, start the next change from `git checkout -b <name> origin/main` — never
+rebase the old local branch.** Rebasing a branch whose earlier commit was already squash-merged
+produces a "skipped previously applied commit" warning and a non-fast-forward push, and
+recovering the pre-rebase state costs a `git reflog`/`git fsck` detour (a real incident in
+JUL-61). A fresh branch from `origin/main` avoids the whole class of problem.
 
 **Credential location, moved 2026-09-17 (JUL-61):** the App's private key now lives at
 `/etc/orchestrator-svc/.env.publisher` on the server (owner `orchestrator-svc:orchestrator-svc`,
