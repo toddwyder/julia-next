@@ -157,7 +157,7 @@ test('happy path: readiness, synced checkout, no existing run -> orchestrator st
   assert.equal(result.runId, 'run_fake456');
   assert.deepEqual(calls.runsCreated, ['JUL-63']);
   assert.equal(calls.terminalsCreated.length, 1);
-  assert.match(calls.terminalsCreated[0].command, /julia-coordinator skill.*JUL-63/);
+  assert.match(calls.terminalsCreated[0].command, /\/julia-coordinator JUL-63/);
 
   assert.equal(calls.comments.length, 1);
   const { issueId, body } = calls.comments[0];
