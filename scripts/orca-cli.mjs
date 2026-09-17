@@ -124,6 +124,17 @@ export async function workerStart({
   ], { execImpl });
 }
 
+// JUL-70: the restart guard needs to tell a still-in-progress run from a
+// finished one. task-list --run <id> is the call SKILL.md's own
+// "Reconcile" step already names for exactly this kind of query. Real
+// task status vocabulary confirmed only partially live so far (`ready`,
+// `completed`, `failed`, `stopped` appear in the installed CLI's own
+// error-recovery text -- see docs/research/jul61-orca-orchestration-source.txt);
+// treat any status outside that terminal set as still active.
+export async function taskList({ environment, runId, execImpl } = {}) {
+  return run(['orchestration', 'task-list', '--run', runId, '--environment', environment, '--json'], { execImpl });
+}
+
 export async function terminalWait({ environment, terminal, forState = 'tui-idle', timeoutMs, execImpl } = {}) {
   return run(['terminal', 'wait', '--environment', environment, '--terminal', terminal, '--for', forState, '--timeout-ms', String(timeoutMs), '--json'], { execImpl });
 }

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  juliaRun, assertIssueId, assertAccount, assertReady, ensureCheckoutSynced, findExistingRun, startOrchestrator,
+  juliaRun, assertIssueId, assertAccount, assertReady, ensureCheckoutSynced, findExistingRun, isRunFinished, startOrchestrator,
   prepareServerEnvironment, getRemoteMainHead, defaultPostCommentImpl,
 } from './julia-run.mjs';
 
@@ -31,6 +31,7 @@ function fakeImpls(overrides = {}) {
       },
       getRemoteMainHeadImpl: async () => 'abc123',
       runListImpl: async () => ({ runs: [] }),
+      isRunFinishedImpl: async () => false,
       fromHandle: 'term_fake123',
       runCreateImpl: async ({ objective }) => {
         calls.runsCreated.push(objective);
@@ -137,10 +138,48 @@ test('double-start: a second invocation for the same issue refuses, naming the e
 
 test('findExistingRun matches on exact objective only', async () => {
   const runs = [{ id: 'run_a', objective: 'JUL-62' }, { id: 'run_b', objective: 'JUL-63' }];
-  const found = await findExistingRun('JUL-63', { runListImpl: async () => ({ runs }) });
+  const isRunFinishedImpl = async () => false;
+  const found = await findExistingRun('JUL-63', { runListImpl: async () => ({ runs }), isRunFinishedImpl });
   assert.equal(found.id, 'run_b');
-  const notFound = await findExistingRun('JUL-99', { runListImpl: async () => ({ runs }) });
+  const notFound = await findExistingRun('JUL-99', { runListImpl: async () => ({ runs }), isRunFinishedImpl });
   assert.equal(notFound, null);
+});
+
+test('findExistingRun does not treat a finished run as blocking (restart guard, JUL-70)', async () => {
+  const runs = [{ id: 'run_b', objective: 'JUL-63' }];
+  const found = await findExistingRun('JUL-63', { runListImpl: async () => ({ runs }), isRunFinishedImpl: async () => true });
+  assert.equal(found, null);
+});
+
+test('isRunFinished: a run with an active task still refuses (JUL-70)', async () => {
+  const taskListImpl = async () => ({ tasks: [{ id: 't1', status: 'running' }] });
+  const finished = await isRunFinished({ id: 'run_x', updated_at: new Date().toISOString() }, { taskListImpl });
+  assert.equal(finished, false);
+});
+
+test('isRunFinished: every task terminal -> finished, restart allowed (JUL-70)', async () => {
+  const taskListImpl = async () => ({ tasks: [{ id: 't1', status: 'completed' }, { id: 't2', status: 'failed' }] });
+  const finished = await isRunFinished({ id: 'run_x', updated_at: new Date().toISOString() }, { taskListImpl });
+  assert.equal(finished, true);
+});
+
+test('isRunFinished: a zero-task run just created is still within its preflight grace window, not finished', async () => {
+  const taskListImpl = async () => ({ tasks: [] });
+  const finished = await isRunFinished(
+    { id: 'run_x', updated_at: new Date().toISOString() },
+    { taskListImpl, now: () => Date.now() },
+  );
+  assert.equal(finished, false);
+});
+
+test('isRunFinished: a zero-task run stopped at preflight (JUL-44s real case) is finished once past the grace window', async () => {
+  const taskListImpl = async () => ({ tasks: [] });
+  const oldTimestamp = new Date(Date.now() - 20 * 60 * 1000).toISOString();
+  const finished = await isRunFinished(
+    { id: 'run_c404a384fb43', updated_at: oldTimestamp },
+    { taskListImpl, now: () => Date.now() },
+  );
+  assert.equal(finished, true);
 });
 
 test('startOrchestrator refuses outside an Orca-managed terminal (no ORCA_TERMINAL_HANDLE)', async () => {
@@ -157,6 +196,8 @@ test('happy path: readiness, synced checkout, no existing run -> orchestrator st
   assert.equal(result.runId, 'run_fake456');
   assert.deepEqual(calls.runsCreated, ['JUL-63']);
   assert.equal(calls.terminalsCreated.length, 1);
+  assert.match(calls.terminalsCreated[0].command, /export ORCA_BIN=\/opt\/Orca\/orca-ide ORCA_ENVIRONMENT=ovh-local/);
+  assert.match(calls.terminalsCreated[0].command, /set -a; \. \/etc\/orchestrator-svc\/\.env\.publisher; set \+a/);
   assert.match(calls.terminalsCreated[0].command, /\/julia-coordinator JUL-63/);
   assert.match(calls.terminalsCreated[0].command, /--allowedTools/);
   assert.match(calls.terminalsCreated[0].command, /mcp__linear__\*/);

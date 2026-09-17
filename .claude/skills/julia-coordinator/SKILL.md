@@ -86,7 +86,9 @@ An issue on a route that is not enabled stays in the backlog and counts toward s
 For the current step of the current item:
 
 1. **Start a fresh worker in its own fresh worktree.** `runCreate` then `workerStart`
-   (`scripts/orca-cli.mjs`), targeting `--environment "OVH runner"`, `--agent codex` (or `claude`
+   (`scripts/orca-cli.mjs`), targeting `--environment "ovh-local"` (the orchestrator's own local
+   pairing to the runner's daemon -- **not** `"OVH runner"`, the laptop's pairing name; JUL-70
+   preflight miss 4), `--agent codex` (or `claude`
    when the step needs it), `worktree: 'new-top-level'` -- **not** the shared registered
    `/home/runner/julia-next` checkout. Two reasons, not one: criterion 2 requires an *isolated*
    worktree per attempt, and `orca-cli.mjs`'s `workerStart` always sends the creation-only flags
@@ -168,7 +170,7 @@ quoting and become an injection vector (PR #3 review, finding C3):
 import { terminalCreate, terminalRead, terminalWait } from './orca-cli.mjs';
 const contextB64 = Buffer.from(JSON.stringify(context)).toString('base64');
 const created = await terminalCreate({
-  environment: 'OVH runner',
+  environment: 'ovh-local', // the orchestrator's own local pairing -- 'OVH runner' is the laptop's name for this same runtime (JUL-70 preflight miss 4)
   worktree: 'path:/home/runner/julia-next',
   command: `node scripts/coordinator-events.mjs ${stage} --run-id ${runId} --context-b64 ${contextB64} --tokens-used ${tokensUsed} --quota-remaining ${quotaRemaining} --interrupted ${interrupted}`,
   title: 'coordinator-events',
@@ -177,8 +179,8 @@ const created = await terminalCreate({
 // the shell prompt to return before trusting the output as the command's
 // final state (fix-verification review: "does not guarantee event
 // delivery evidence").
-await terminalWait({ environment: 'OVH runner', terminal: created.terminal.handle, forState: 'tui-idle', timeoutMs: 15000 });
-const read = await terminalRead({ environment: 'OVH runner', terminal: created.terminal.handle });
+await terminalWait({ environment: 'ovh-local', terminal: created.terminal.handle, forState: 'tui-idle', timeoutMs: 15000 });
+const read = await terminalRead({ environment: 'ovh-local', terminal: created.terminal.handle });
 // read.terminal.tail (an array of lines) confirms sent:true / sent:false, logged either way.
 ```
 
@@ -235,6 +237,18 @@ section headed exactly `For Todd:` of at most two lines: (a) what just happened,
 English; (b) whether anything needs his decision -- write `nothing` if not. Instructions and
 decisions arrive on the issue as comments prefixed `Instruction:` or `Decision:`; read the
 newest of those before acting on any step.
+
+**Waiting-on-Todd rule** (landed JUL-70, from JUL-44's Instruction). Whenever a coordinator or
+worker stops because it needs Todd:
+1. The `For Todd:` section's first line starts with **WAITING ON YOU:**, followed by a single
+   plain-English question with no jargon (not "how credentials reach the graph"). Ask only the
+   first question if there are more; hold the rest for the next round.
+2. Assign the issue that holds the question to Todd. If a decision ticket is opened, assign that
+   ticket to him instead.
+3. Once his answer lands, unassign him.
+
+When nothing is needed, the `For Todd:` line stays `nothing` -- unchanged from the Report
+trailer rule above.
 
 **Laptop-bypass rule.** Laptop Claude Code running with permissions bypassed
 (`--dangerously-skip-permissions`) is for infrastructure/setup tickets only. Product tickets run
