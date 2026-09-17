@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import {
-  createServer, validateFieldShape, isArmed, saveState, loadState, rearm, FIELDS,
+  createServer, validateFieldShape, isArmed, saveState, loadState, rearm, FIELDS, allReceived,
 } from './dropbox.mjs';
 
 function tmpState() {
@@ -22,21 +22,34 @@ test('validateFieldShape rejects an obviously wrong paste', () => {
   assert.equal(validateFieldShape('sentry', 'a'.repeat(40)).ok, true, 'a plausible unbroken token is accepted');
 });
 
-test('isArmed: true when freshly armed, false once used, false after 24h', () => {
+test('isArmed: true when freshly armed, false once all four received, false after 24h', () => {
   const armedAt = new Date('2026-09-17T00:00:00.000Z').toISOString();
-  const fresh = { armedAt, used: false, usedAt: null };
+  const fresh = { armedAt, received: {}, usedAt: null };
+  const partial = { armedAt, received: { sentry: true, supabase: true }, usedAt: null };
+  const complete = { armedAt, received: { sentry: true, supabase: true, powersync: true, axiom: true }, usedAt: null };
   assert.equal(isArmed(fresh, Date.parse('2026-09-17T01:00:00.000Z')), true);
-  assert.equal(isArmed({ ...fresh, used: true }, Date.parse('2026-09-17T01:00:00.000Z')), false, 'used disarms regardless of time');
+  assert.equal(isArmed(partial, Date.parse('2026-09-17T01:00:00.000Z')), true, 'a partial round stays armed');
+  assert.equal(isArmed(complete, Date.parse('2026-09-17T01:00:00.000Z')), false, 'all four received disarms regardless of time');
   assert.equal(isArmed(fresh, Date.parse('2026-09-18T00:00:01.000Z')), false, '24h + 1s later is expired');
 });
 
-test('rearm resets used/expiry so a prior sitting cannot block a new one', async () => {
+test('allReceived is true only when every field in FIELDS has been received', () => {
+  assert.equal(allReceived({ received: {} }), false);
+  assert.equal(allReceived({ received: { sentry: true, supabase: true, powersync: true } }), false, 'axiom missing');
+  assert.equal(allReceived({ received: { sentry: true, supabase: true, powersync: true, axiom: true } }), true);
+});
+
+test('rearm resets received/expiry so a prior sitting cannot block a new one', async () => {
   const statePath = tmpState();
-  await saveState(statePath, { armedAt: '2020-01-01T00:00:00.000Z', used: true, usedAt: '2020-01-01T00:00:01.000Z' });
+  await saveState(statePath, {
+    armedAt: '2020-01-01T00:00:00.000Z',
+    received: { sentry: true, supabase: true, powersync: true, axiom: true },
+    usedAt: '2020-01-01T00:00:01.000Z',
+  });
   const rearmed = await rearm(statePath, { now: () => new Date('2026-09-17T12:00:00.000Z') });
-  assert.equal(rearmed.used, false);
+  assert.deepEqual(rearmed.received, {});
   const reloaded = await loadState(statePath);
-  assert.equal(reloaded.used, false);
+  assert.deepEqual(reloaded.received, {});
   assert.equal(isArmed(reloaded, Date.parse('2026-09-17T12:00:01.000Z')), true);
 });
 
@@ -63,7 +76,7 @@ function request(url, opts = {}) {
 
 test('a valid save is written via the injected writer and reported as received, never echoed', async (t) => {
   const statePath = tmpState();
-  await saveState(statePath, { armedAt: new Date().toISOString(), used: false, usedAt: null });
+  await saveState(statePath, { armedAt: new Date().toISOString(), received: {}, usedAt: null });
   const written = [];
   const writeSecret = async (name, value) => { written.push({ name, value }); };
   await withServer(t, { statePath, writeSecret, now: () => Date.now() }, async (base) => {
@@ -82,7 +95,7 @@ test('a valid save is written via the injected writer and reported as received, 
 
 test('an invalid field is reported as rejected and never reaches the writer', async (t) => {
   const statePath = tmpState();
-  await saveState(statePath, { armedAt: new Date().toISOString(), used: false, usedAt: null });
+  await saveState(statePath, { armedAt: new Date().toISOString(), received: {}, usedAt: null });
   const written = [];
   const writeSecret = async (name, value) => { written.push({ name, value }); };
   await withServer(t, { statePath, writeSecret, now: () => Date.now() }, async (base) => {
@@ -97,30 +110,70 @@ test('an invalid field is reported as rejected and never reaches the writer', as
   });
 });
 
-test('the box turns itself off after a successful save -- a second save is refused', async (t) => {
+test('a partial round (one box filled) stays armed, and a later round can save the rest', async (t) => {
   const statePath = tmpState();
-  await saveState(statePath, { armedAt: new Date().toISOString(), used: false, usedAt: null });
-  const writeSecret = async () => {};
+  await saveState(statePath, { armedAt: new Date().toISOString(), received: {}, usedAt: null });
+  const written = [];
+  const writeSecret = async (name, value) => { written.push({ name, value }); };
+  await withServer(t, { statePath, writeSecret, now: () => Date.now() }, async (base) => {
+    const first = await request(`${base}/save`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sentry: 'a'.repeat(40) }),
+    });
+    const firstParsed = JSON.parse(first.body);
+    assert.equal(firstParsed.sentry.ok, true);
+    assert.equal(firstParsed.allReceived, false, 'three fields still missing');
+
+    const stillOpen = await request(`${base}/`);
+    assert.doesNotMatch(stillOpen.body, /page is off/i, 'a partial round must not turn the page off');
+
+    const second = await request(`${base}/save`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        supabase: 'b'.repeat(40), powersync: 'c'.repeat(40), axiom: 'd'.repeat(40),
+      }),
+    });
+    const secondParsed = JSON.parse(second.body);
+    assert.equal(secondParsed.allReceived, true, 'the fourth field completes the sitting');
+    assert.equal(written.length, 4);
+
+    const now403 = await request(`${base}/save`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sentry: 'e'.repeat(40) }),
+    });
+    assert.equal(now403.status, 403, 'the box is off once all four are received');
+  });
+});
+
+test('a field already received is never overwritten by a later round, even if resubmitted', async (t) => {
+  const statePath = tmpState();
+  await saveState(statePath, { armedAt: new Date().toISOString(), received: {}, usedAt: null });
+  const written = [];
+  const writeSecret = async (name, value) => { written.push({ name, value }); };
   await withServer(t, { statePath, writeSecret, now: () => Date.now() }, async (base) => {
     await request(`${base}/save`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ sentry: 'a'.repeat(40) }),
     });
-    const second = await request(`${base}/save`, {
+    const resubmit = await request(`${base}/save`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ sentry: 'b'.repeat(40) }),
+      body: JSON.stringify({ sentry: 'DIFFERENT'.repeat(5) }),
     });
-    assert.equal(second.status, 403);
-    const getRes = await request(`${base}/`);
-    assert.match(getRes.body, /off/i);
+    const parsed = JSON.parse(resubmit.body);
+    assert.equal(parsed.sentry.alreadyReceived, true);
+    assert.equal(written.length, 1, 'the helper is never invoked a second time for the same field');
+    assert.equal(written[0].value, 'a'.repeat(40), 'the original value is untouched');
   });
 });
 
 test('the box is off once the 24-hour window has passed, even with no save', async (t) => {
   const statePath = tmpState();
-  await saveState(statePath, { armedAt: '2020-01-01T00:00:00.000Z', used: false, usedAt: null });
+  await saveState(statePath, { armedAt: '2020-01-01T00:00:00.000Z', received: {}, usedAt: null });
   const writeSecret = async () => {};
   await withServer(t, { statePath, writeSecret, now: () => Date.parse('2020-01-03T00:00:00.000Z') }, async (base) => {
     const res = await request(`${base}/save`, {
@@ -134,7 +187,7 @@ test('the box is off once the 24-hour window has passed, even with no save', asy
 
 test('no raw field value is ever written to console output during a save', async (t) => {
   const statePath = tmpState();
-  await saveState(statePath, { armedAt: new Date().toISOString(), used: false, usedAt: null });
+  await saveState(statePath, { armedAt: new Date().toISOString(), received: {}, usedAt: null });
   const writeSecret = async () => {};
   const secretValue = `SECRETVALUE${'x'.repeat(30)}`;
   const originalLog = console.log;
@@ -157,7 +210,7 @@ test('no raw field value is ever written to console output during a save', async
 
 test('GET / never contains any field value from a prior save', async (t) => {
   const statePath = tmpState();
-  await saveState(statePath, { armedAt: new Date().toISOString(), used: false, usedAt: null });
+  await saveState(statePath, { armedAt: new Date().toISOString(), received: {}, usedAt: null });
   const writeSecret = async () => {};
   await withServer(t, { statePath, writeSecret, now: () => Date.now() }, async (base) => {
     const res = await request(`${base}/`);

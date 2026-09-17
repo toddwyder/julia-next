@@ -54,7 +54,7 @@ export function logField(name, ok) {
   console.log(`dropbox: field=${name} ${ok ? 'received' : 'rejected'}`);
 }
 
-const DEFAULT_STATE = { armedAt: null, used: false, usedAt: null };
+const DEFAULT_STATE = { armedAt: null, received: {}, usedAt: null };
 
 export async function loadState(statePath) {
   try {
@@ -73,10 +73,21 @@ export async function saveState(statePath, state) {
 
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
+// A partial round (fewer than all four boxes filled in) used to disarm the
+// whole page on its very first Save -- Todd flagged this as "a new question
+// waiting to happen" (JUL-72 walkthrough-correction Instruction, 2026-09-17):
+// each field now saves independently the moment it's received, and the page
+// only goes off once every field in FIELDS has been received, or the
+// 24-hour window passes, whichever comes first. A field already marked
+// received is never asked for again in the same sitting.
+export function allReceived(state) {
+  return FIELDS.every((f) => state.received && state.received[f] === true);
+}
+
 // Exported and pure (no I/O) so both the server and its tests can reason
 // about "armed" identically without needing a real clock or a real file.
 export function isArmed(state, nowMs) {
-  if (state.used) return false;
+  if (allReceived(state)) return false;
   if (!state.armedAt) return false;
   const armedAtMs = Date.parse(state.armedAt);
   if (Number.isNaN(armedAtMs)) return false;
@@ -88,7 +99,7 @@ export function isArmed(state, nowMs) {
 // sittings; see README.md. Deliberately not a network-reachable endpoint:
 // re-arming is a decision this box should never make for itself.
 export async function rearm(statePath, { now = () => new Date() } = {}) {
-  const state = { armedAt: now().toISOString(), used: false, usedAt: null };
+  const state = { armedAt: now().toISOString(), received: {}, usedAt: null };
   await saveState(statePath, state);
   return state;
 }
@@ -118,44 +129,62 @@ const PAGE_HEAD = '<!doctype html><html><head><meta charset="utf-8">'
   + '.ok{color:#0a7a2f}.bad{color:#a30000}</style></head><body>';
 
 const HINTS = {
-  sentry: 'From Sentry: Settings -> Auth Tokens. A long string of letters/numbers, no spaces.',
+  sentry: 'From Sentry: your account menu -> Personal Tokens (not an Organization Token). A long string of letters/numbers, no spaces.',
   supabase: 'From Supabase: Account -> Access Tokens. A long string of letters/numbers, no spaces.',
   powersync: 'From PowerSync: Account -> Access Tokens. A long string of letters/numbers, no spaces.',
   axiom: 'From Axiom: Settings -> API tokens. A long string of letters/numbers, no spaces.',
 };
 
-function renderForm() {
-  const boxes = FIELDS.map((f) => `
+function renderForm(state) {
+  const received = state.received || {};
+  const boxes = FIELDS.map((f) => {
+    const done = received[f] === true;
+    return `
     <label for="${f}">${f[0].toUpperCase()}${f.slice(1)}
       <div class="hint">${HINTS[f]}</div>
     </label>
-    <input type="text" id="${f}" name="${f}" autocomplete="off" spellcheck="false">
-    <div class="status" id="${f}-status"></div>
-  `).join('\n');
+    <input type="text" id="${f}" name="${f}" autocomplete="off" spellcheck="false" ${done ? 'disabled' : ''}>
+    <div class="status ${done ? 'ok' : ''}" id="${f}-status">${done ? 'received ✓' : ''}</div>
+  `;
+  }).join('\n');
   return `${PAGE_HEAD}
   <h1>Julia-next setup codes</h1>
-  <p>Paste each code into its box, then click Save once. This page turns itself off after you save,
-  or after 24 hours, whichever comes first.</p>
+  <p><strong>Each box saves on its own the moment you click Save</strong> -- you can fill in one now
+  and come back for the rest later, in any order. Boxes already marked "received ✓" are done and
+  locked; you don't need to fill them in again. This page turns itself off only once all four boxes
+  are received, or after 24 hours, whichever comes first.</p>
   <form id="f">${boxes}
     <button type="submit">Save</button>
   </form>
-  <p id="done" style="display:none;font-weight:600">Saved. This page is now off.</p>
+  <p id="progress" style="display:none;font-weight:600"></p>
+  <p id="done" style="display:none;font-weight:600">Saved. All four received -- this page is now off.</p>
   <script>
   document.getElementById('f').addEventListener('submit', async (e) => {
     e.preventDefault();
     const body = {};
-    for (const f of ${JSON.stringify(FIELDS)}) body[f] = document.getElementById(f).value;
+    for (const f of ${JSON.stringify(FIELDS)}) {
+      const el = document.getElementById(f);
+      if (!el || el.disabled) continue;
+      body[f] = el.value;
+    }
     const res = await fetch('/save', { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify(body) });
     const result = await res.json();
     for (const f of ${JSON.stringify(FIELDS)}) {
       const el = document.getElementById(f + '-status');
+      const input = document.getElementById(f);
       const r = result[f];
-      if (!r) { el.textContent = ''; continue; }
+      if (!r) continue;
       el.textContent = r.ok ? 'received ✓' : "doesn't look right ✗ (" + r.reason + ')';
       el.className = 'status ' + (r.ok ? 'ok' : 'bad');
+      if (r.ok) input.disabled = true;
     }
-    document.getElementById('f').style.display = 'none';
-    document.getElementById('done').style.display = 'block';
+    if (result.allReceived) {
+      document.getElementById('f').style.display = 'none';
+      document.getElementById('done').style.display = 'block';
+    } else {
+      document.getElementById('progress').textContent = 'Saved so far. Come back any time for the rest -- this page stays on.';
+      document.getElementById('progress').style.display = 'block';
+    }
   });
   </script>
   </body></html>`;
@@ -176,7 +205,7 @@ export function createServer({
 
     if (req.method === 'GET' && req.url === '/') {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-      res.end(armed ? renderForm() : OFF_PAGE);
+      res.end(armed ? renderForm(state) : OFF_PAGE);
       return;
     }
 
@@ -197,11 +226,19 @@ export function createServer({
           res.end(JSON.stringify({ error: 'invalid request' }));
           return;
         }
+        const received = { ...(state.received || {}) };
         const result = {};
-        let anyOk = false;
         for (const field of FIELDS) {
+          if (received[field]) {
+            // Already saved in an earlier round of this same sitting --
+            // don't overwrite a working secret just because the field was
+            // resubmitted (the client disables it, but never trust that
+            // alone), and don't touch write-secret.sh for it again.
+            result[field] = { ok: true, alreadyReceived: true };
+            continue;
+          }
           const raw = parsed[field];
-          if (raw === undefined || raw === '') continue;
+          if (raw === undefined || raw === '') continue; // left blank this round -- fine, ask again next time
           const shape = validateFieldShape(field, raw);
           logField(field, shape.ok);
           if (!shape.ok) {
@@ -212,7 +249,7 @@ export function createServer({
             // eslint-disable-next-line no-await-in-loop
             await writeSecret(field, shape.value);
             result[field] = { ok: true };
-            anyOk = true;
+            received[field] = true;
           } catch {
             // Deliberately not including the underlying error's message --
             // it could echo the value back via a shell/stderr path (same
@@ -220,12 +257,17 @@ export function createServer({
             result[field] = { ok: false, reason: 'could not be saved -- see the server-side log for detail, not this message' };
           }
         }
-        const newState = { ...state, used: true, usedAt: new Date(now()).toISOString() };
+        const nowComplete = FIELDS.every((f) => received[f] === true);
+        const newState = {
+          ...state,
+          received,
+          usedAt: nowComplete ? new Date(now()).toISOString() : state.usedAt,
+        };
         await saveState(statePath, newState);
         res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(JSON.stringify(result));
-        if (!anyOk) {
-          console.log('dropbox: save submitted with no valid fields -- box is now off regardless (one-time use)');
+        res.end(JSON.stringify({ ...result, allReceived: nowComplete }));
+        if (nowComplete) {
+          console.log('dropbox: all four fields received -- box is now off');
         }
       });
       return;
