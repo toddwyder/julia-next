@@ -86,6 +86,18 @@ export async function runCreate({ environment, from, objective, execImpl } = {})
   return run(['orchestration', 'run-create', '--environment', environment, '--from', from, '--objective', objective, '--json'], { execImpl });
 }
 
+// Real shape confirmed live (JUL-63): {runs: [{id, objective,
+// coordinator_handle, consumer_generation, legacy, created_at,
+// updated_at}], nextCursor}. No status/active field -- a caller checking
+// for an in-flight run has to match on objective, not a lifecycle state
+// this endpoint doesn't expose.
+export async function runList({ environment, limit, cursor, execImpl } = {}) {
+  const args = ['orchestration', 'run-list', '--environment', environment, '--json'];
+  if (limit !== undefined) args.push('--limit', String(limit));
+  if (cursor !== undefined) args.push('--cursor', cursor);
+  return run(args, { execImpl });
+}
+
 export async function workerStart({
   run: runId, environment, from, spec, worktree, name, repo, agent = 'codex', setup = 'skip', execImpl,
 } = {}) {

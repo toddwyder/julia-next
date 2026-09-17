@@ -108,6 +108,71 @@ ORCA_BIN=/opt/Orca/orca-ide ORCA_ENVIRONMENT=ovh-local \
 ```
 Verified live, all four checks green, entirely server-local, no laptop involved.
 
+**A second Orca daemon runs as `orchestrator-svc` itself (JUL-63).** `ovh-local` above is
+`orchestrator-svc` pairing to the *existing* daemon (`orca-server.service`, `User=runner`) --
+every terminal that daemon spawns runs as `runner`, no matter which account invoked the CLI to
+create it (confirmed live: `id` inside a terminal created via `ovh-local` reports
+`uid=1001(runner)`). Builder/reviewer dispatch is fine running as `runner` (that's the intended
+role), but the orchestrator itself needs terminals that are genuinely `orchestrator-svc` --
+`ovh-local` cannot provide that. So a **second, independent Orca daemon** runs as
+`orchestrator-svc`, on its own port, paired under its own environment name:
+
+| | Runner's daemon | Orchestrator's daemon |
+| --- | --- | --- |
+| systemd unit | `orca-server.service` | `orca-server-orchestrator.service` |
+| Runs as | `runner` | `orchestrator-svc` |
+| Port | 6768 | 6769 |
+| Xvfb display | `:99` (unmanaged background process) | `:98`, via `xvfb-orchestrator.service` |
+| Env file | `/etc/orca-runner/orca-server.env` | `/etc/orchestrator-svc/orca-server.env` |
+| `orchestrator-svc`'s pairing name | `ovh-local` | `orchestrator-local` |
+| Registered project | `/home/runner/julia-next` | `/srv/orchestrator-svc/julia-next` |
+| Used for | Dispatching builders/reviewers | The orchestrator's own Run/terminal |
+
+Both daemons run the same `/opt/Orca/orca-ide` binary as the `ovh-local` setup above -- this is
+two instances of one binary, not new software. `orca-server.service`'s own Xvfb (`:99`) is a
+bare background process (not a systemd unit) that happened to already exist; the orchestrator's
+Xvfb (`:98`) is deliberately a proper `xvfb-orchestrator.service` instead, so it survives
+reboots and isn't tied to any one shell session -- a bare background Xvfb died the first time
+this was tried, taking the daemon down with it.
+
+**One-time setup for the second daemon** (as `ubuntu`, the admin channel):
+```sh
+sudo tee /etc/orchestrator-svc/orca-server.env >/dev/null <<'ENV'
+ORCA_SERVE_ARGS=serve --pairing-address 100.125.239.98 --port 6769
+ENV
+sudo chown root:orchestrator-svc /etc/orchestrator-svc/orca-server.env
+sudo chmod 0644 /etc/orchestrator-svc/orca-server.env
+
+# Xvfb display :98, supervised (mirror this unit's shape for orca-server-orchestrator.service
+# itself, using orca-server.service as the template per JUL-63's decision):
+sudo systemctl enable --now xvfb-orchestrator.service
+sudo systemctl enable --now orca-server-orchestrator.service
+```
+Then pair `orchestrator-svc` to its own new daemon and register the project, exactly like the
+`ovh-local` setup above but against port 6769:
+```sh
+CODE=$(sudo journalctl -u orca-server-orchestrator.service --no-pager | grep "Pairing URL:" | tail -1 | sed 's/.*Pairing URL: //')
+sudo -u orchestrator-svc /opt/Orca/orca-ide environment add --name orchestrator-local --pairing-code "$CODE"
+
+# Get the new environment's id from `orca environment list --json`, then:
+sudo -u orchestrator-svc /opt/Orca/orca-ide project setup-existing-folder \
+  --environment orchestrator-local --project github:toddwyder/julia-next \
+  --host "runtime:<environment-id>" --path /srv/orchestrator-svc/julia-next --kind git
+```
+**Re-pairing** (if the daemon restarts and the old pairing goes stale -- watch for `status:
+disconnected` on `orchestrator-local`): re-run the `environment add` step above with a fresh
+pairing URL from a fresh `journalctl` grep; the project registration does not need repeating.
+
+Verified live (2026-09-17): a terminal created via `--environment orchestrator-local` reports
+`uid=1002(orchestrator-svc)` -- a real, independent orchestrator identity, not a reused `runner`
+terminal with a different label.
+
+**A narrow sudo rule lets `orchestrator-svc` trigger its own checkout sync**
+(`/etc/sudoers.d/orchestrator-svc-checkout-sync`, `visudo -c` clean): exactly
+`sudo -n systemctl start julia-next-checkout-sync.service`, nothing else -- `sudo -n systemctl
+status <anything-else>` is still refused. This is what `scripts/julia-run.mjs` uses to self-heal
+a stale checkout instead of needing the `ubuntu` admin channel for that one action.
+
 **Capturing a browser-approval URL (Claude login, Linear MCP login) from tmux: always
 `capture-pane -pJ`, never `-p` alone.** The plain `-p` capture wraps long lines at the terminal
 width, which splits a pairing/OAuth URL mid-string and hands Todd a broken link (happened live
@@ -129,33 +194,45 @@ tmux capture-pane -t <session> -p -J
 Verified live: `runner` cannot read `/etc/orchestrator-svc/.env.publisher` (permission denied);
 `orchestrator-svc` can; `orchestrator-svc`'s checkout write is denied (`touch` inside it fails).
 
-**The read-only checkout cannot update itself — by design, and this needs a deliberate sync
-step.** `orchestrator-svc` has no write access to `/srv/orchestrator-svc/julia-next`, including
-its `.git` directory, so it cannot `git pull`/`fetch` its own checkout (a real fresh-session
-acceptance run hit exactly this: the checkout was stuck at an old commit and reported stale
-readiness results). Sync it from the `ubuntu` admin channel whenever `main` moves and the
-orchestrator needs the update:
+**The read-only checkout cannot update itself — by design — so a root-owned systemd timer
+syncs it.** `orchestrator-svc` has no write access to `/srv/orchestrator-svc/julia-next`,
+including its `.git` directory, so it cannot `git pull`/`fetch` its own checkout (a real
+fresh-session acceptance run hit exactly this before the timer existed: the checkout was stuck
+at an old commit and reported stale readiness results). Automated 2026-09-17 (JUL-61 closing
+pass):
 
-```sh
-sudo git config --global --add safe.directory /srv/orchestrator-svc/julia-next   # once
-sudo GIT_SSH_COMMAND="ssh -i /etc/orca-runner/julia-next-deploy-key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" \
-  git -C /srv/orchestrator-svc/julia-next fetch origin main
-sudo git -C /srv/orchestrator-svc/julia-next reset --hard origin/main
-sudo chown -R root:orchestrator-svc /srv/orchestrator-svc/julia-next
-sudo find /srv/orchestrator-svc/julia-next -type d -exec chmod 0550 {} \;
-sudo find /srv/orchestrator-svc/julia-next -type f -exec chmod 0440 {} \;
-```
-Re-verify write is still denied for `orchestrator-svc` after re-locking (the `chown`/`chmod`
-above must be the last thing that touches the checkout). There is no automated trigger for this
-yet — an open item, not solved here: either a periodic admin-channel sync, or a narrowly-scoped
-sudo rule letting `orchestrator-svc` request a sync without full admin access.
+- `/usr/local/sbin/julia-next-checkout-sync.sh` (root:root, mode `700`) fetches `origin/main`,
+  resets the checkout to it, then re-applies `root:orchestrator-svc` ownership and `550`/`440`
+  permissions — the same sequence the manual procedure used, now scripted.
+- `julia-next-checkout-sync.service` (oneshot, runs as root) executes it;
+  `julia-next-checkout-sync.timer` fires it 30s after boot/enable and every 15 minutes after
+  that (`OnBootSec=1min`, `OnActiveSec=30s`, `OnUnitActiveSec=15min`, `Persistent=true` so a
+  missed run while the box was down catches up on the next boot).
+- Verified live: triggered a real timer-fired run (not a manual `systemctl start`) and confirmed
+  the checkout's HEAD matched `origin/main`'s actual HEAD exactly afterward
+  (`git ls-remote origin main`), and that `orchestrator-svc` still cannot write into the
+  checkout post-sync.
+- **JUL-63**: `orchestrator-svc` can also trigger this itself, narrowly — see the sudo rule in
+  the "Bootstrap from a laptop" section above, which `scripts/julia-run.mjs` uses.
+
+Manual sync is still available for an out-of-band update without waiting up to 15 minutes:
+`sudo systemctl start julia-next-checkout-sync.service`. Check its history with `sudo
+journalctl -u julia-next-checkout-sync.service`.
 
 ## Start
 
-There is no scheduled trigger — explicit launch only. On the server, as `orchestrator-svc`,
-invoke the `julia-coordinator` skill (`disable-model-invocation: true`, so it must be named
-explicitly). It reconciles Orca + Linear state, advances the current in-flight item, and admits
-the next eligible issue once a slot is free.
+There is no scheduled trigger — explicit launch only. From inside an Orca terminal on the
+`orchestrator-local` runtime (as `orchestrator-svc`), run:
+```sh
+node /srv/orchestrator-svc/julia-next/scripts/julia-run.mjs <ISSUE-ID>
+```
+It refuses as any other account, runs readiness, self-heals a stale checkout, refuses a
+double-start, then starts a real Orca Run/terminal that invokes the `julia-coordinator` skill
+(`disable-model-invocation: true`, so it must be named explicitly there) for that issue and
+posts the start comment (JUL-63). Prints the run id on success, or which step failed and why on
+failure. Once started, the coordinator reconciles Orca + Linear state, advances the current
+in-flight item, and admits the next eligible issue once a slot is free — see
+`.claude/skills/julia-coordinator/SKILL.md` for that procedure.
 
 ## Readiness
 
