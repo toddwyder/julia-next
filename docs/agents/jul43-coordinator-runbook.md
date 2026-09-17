@@ -115,26 +115,28 @@ Verified live, all four checks green, entirely server-local, no laptop involved.
 Verified live: `runner` cannot read `/etc/orchestrator-svc/.env.publisher` (permission denied);
 `orchestrator-svc` can; `orchestrator-svc`'s checkout write is denied (`touch` inside it fails).
 
-**The read-only checkout cannot update itself — by design, and this needs a deliberate sync
-step.** `orchestrator-svc` has no write access to `/srv/orchestrator-svc/julia-next`, including
-its `.git` directory, so it cannot `git pull`/`fetch` its own checkout (a real fresh-session
-acceptance run hit exactly this: the checkout was stuck at an old commit and reported stale
-readiness results). Sync it from the `ubuntu` admin channel whenever `main` moves and the
-orchestrator needs the update:
+**The read-only checkout cannot update itself — by design — so a root-owned systemd timer
+syncs it.** `orchestrator-svc` has no write access to `/srv/orchestrator-svc/julia-next`,
+including its `.git` directory, so it cannot `git pull`/`fetch` its own checkout (a real
+fresh-session acceptance run hit exactly this before the timer existed: the checkout was stuck
+at an old commit and reported stale readiness results). Automated 2026-09-17 (JUL-61 closing
+pass):
 
-```sh
-sudo git config --global --add safe.directory /srv/orchestrator-svc/julia-next   # once
-sudo GIT_SSH_COMMAND="ssh -i /etc/orca-runner/julia-next-deploy-key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" \
-  git -C /srv/orchestrator-svc/julia-next fetch origin main
-sudo git -C /srv/orchestrator-svc/julia-next reset --hard origin/main
-sudo chown -R root:orchestrator-svc /srv/orchestrator-svc/julia-next
-sudo find /srv/orchestrator-svc/julia-next -type d -exec chmod 0550 {} \;
-sudo find /srv/orchestrator-svc/julia-next -type f -exec chmod 0440 {} \;
-```
-Re-verify write is still denied for `orchestrator-svc` after re-locking (the `chown`/`chmod`
-above must be the last thing that touches the checkout). There is no automated trigger for this
-yet — an open item, not solved here: either a periodic admin-channel sync, or a narrowly-scoped
-sudo rule letting `orchestrator-svc` request a sync without full admin access.
+- `/usr/local/sbin/julia-next-checkout-sync.sh` (root:root, mode `700`) fetches `origin/main`,
+  resets the checkout to it, then re-applies `root:orchestrator-svc` ownership and `550`/`440`
+  permissions — the same sequence the manual procedure used, now scripted.
+- `julia-next-checkout-sync.service` (oneshot, runs as root) executes it;
+  `julia-next-checkout-sync.timer` fires it 30s after boot/enable and every 15 minutes after
+  that (`OnBootSec=1min`, `OnActiveSec=30s`, `OnUnitActiveSec=15min`, `Persistent=true` so a
+  missed run while the box was down catches up on the next boot).
+- Verified live: triggered a real timer-fired run (not a manual `systemctl start`) and confirmed
+  the checkout's HEAD matched `origin/main`'s actual HEAD exactly afterward
+  (`git ls-remote origin main`), and that `orchestrator-svc` still cannot write into the
+  checkout post-sync.
+
+Manual sync is still available for an out-of-band update (e.g. right after a merge, without
+waiting up to 15 minutes): `sudo systemctl start julia-next-checkout-sync.service`. Check its
+history with `sudo journalctl -u julia-next-checkout-sync.service`.
 
 ## Start
 
