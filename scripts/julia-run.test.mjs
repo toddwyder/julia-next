@@ -158,6 +158,9 @@ test('happy path: readiness, synced checkout, no existing run -> orchestrator st
   assert.deepEqual(calls.runsCreated, ['JUL-63']);
   assert.equal(calls.terminalsCreated.length, 1);
   assert.match(calls.terminalsCreated[0].command, /\/julia-coordinator JUL-63/);
+  assert.match(calls.terminalsCreated[0].command, /--allowedTools/);
+  assert.match(calls.terminalsCreated[0].command, /mcp__linear__\*/);
+  assert.match(calls.terminalsCreated[0].command, /mcp__claude_ai_Linear__\*/);
 
   assert.equal(calls.comments.length, 1);
   const { issueId, body } = calls.comments[0];
