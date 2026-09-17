@@ -30,7 +30,15 @@ PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
 ReadOnlyPaths=/opt/orca-runner/service-dropbox
-ReadWritePaths=/var/lib/dropbox-svc
+# ProtectSystem=strict makes /etc read-only for the WHOLE cgroup, including
+# a child process sudo has escalated to root -- confirmed live, JUL-72:
+# even with NoNewPrivileges gone and sudo genuinely reaching root
+# (pam_unix session opened for user root), write-secret.sh's own mktemp
+# still failed with "Read-only file system", because sudo changes UID, not
+# the mount namespace systemd already set up for this unit. The secrets
+# directory has to be named here explicitly, or root itself still can't
+# write to it from inside this unit.
+ReadWritePaths=/var/lib/dropbox-svc /etc/orca-runner/dropbox-secrets
 UMask=0077
 SystemCallFilter=@system-service
 SystemCallErrorNumber=EPERM
