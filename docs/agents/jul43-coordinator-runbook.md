@@ -234,6 +234,17 @@ failure. Once started, the coordinator reconciles Orca + Linear state, advances 
 in-flight item, and admits the next eligible issue once a slot is free — see
 `.claude/skills/julia-coordinator/SKILL.md` for that procedure.
 
+**The headless launch needs its own tool grants — `claude -p` exits 0 even when every tool call
+was refused.** The coordinator's own first real run diagnosed this itself and reported back
+instead of silently doing nothing: launched with no `--allowedTools`, it could reach neither
+Linear nor Orca. `julia-run.mjs`'s launch command now grants `mcp__linear__*`,
+`mcp__claude_ai_Linear__*` (both Linear tool namespaces — see the CWD-dependent tool-name
+caveat on the start-comment step above), and `Bash` access to exactly the scripts the skill's
+"Each wake"/"Running a step" procedures name (`orca-cli.mjs`, `check-readiness.mjs`,
+`collect-worker-result.mjs`, `verify-reviewer-worktree.mjs`) plus the bare `orca` CLI. If the
+skill's own procedure grows to need another script or tool, its `--allowedTools` list in
+`scripts/julia-run.mjs`'s `startOrchestrator` needs the matching grant added in the same PR.
+
 ## Readiness
 
 ```sh

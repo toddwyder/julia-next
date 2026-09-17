@@ -126,7 +126,15 @@ export async function startOrchestrator(issueId, {
     // never inferred) -- asking in prose was refused live (JUL-63): the
     // model correctly declined to run the skill's steps by hand and
     // pointed back at the slash command instead. Pass that explicitly.
-    command: `claude --permission-mode acceptEdits -p "/julia-coordinator ${issueId}"`,
+    //
+    // --allowedTools: without this, the launch exits 0 having reached
+    // neither Linear nor Orca -- caught live because the coordinator's own
+    // first real run diagnosed its own missing grants and reported back
+    // instead of silently doing nothing (JUL-63). Both Linear tool
+    // namespaces (see defaultPostCommentImpl's own comment on why), plus
+    // Bash access to the exact scripts the skill's "Each wake"/"Running a
+    // step" procedures name.
+    command: `claude --permission-mode acceptEdits --allowedTools "mcp__linear__*,mcp__claude_ai_Linear__*,Bash(node scripts/orca-cli.mjs:*),Bash(node scripts/check-readiness.mjs:*),Bash(node scripts/collect-worker-result.mjs:*),Bash(node scripts/verify-reviewer-worktree.mjs:*),Bash(orca *)" -p "/julia-coordinator ${issueId}"`,
     title: `julia-run-${issueId}`,
   });
 
