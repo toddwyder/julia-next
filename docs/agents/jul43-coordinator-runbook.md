@@ -226,6 +226,23 @@ There is no scheduled trigger — explicit launch only. From inside an Orca term
 ```sh
 node /srv/orchestrator-svc/julia-next/scripts/julia-run.mjs <ISSUE-ID>
 ```
+
+**Getting into that terminal from a bare SSH session** (e.g. via the Orca app itself, or the
+exact commands a fresh session needs — a cold-reader run had to pull these from the CLI's own
+`--help` instead of finding them here, which is the gap this fixes):
+```sh
+# As orchestrator-svc, create the terminal and run julia-run inside it:
+/opt/Orca/orca-ide terminal create --environment orchestrator-local \
+  --worktree "path:/srv/orchestrator-svc/julia-next" \
+  --command "node /srv/orchestrator-svc/julia-next/scripts/julia-run.mjs <ISSUE-ID>" \
+  --title "julia-run-<ISSUE-ID>" --json
+# Returns {"result":{"terminal":{"handle":"term_...", ...}}} -- read that handle back:
+/opt/Orca/orca-ide terminal read --environment orchestrator-local \
+  --terminal <handle from above> --json
+# Poll terminal read until its tail shows a run id (success) or an error line
+# (failure) followed by the shell prompt returning -- there is no separate
+# "wait for exit" step for a plain shell command like this one.
+```
 It refuses as any other account, runs readiness, self-heals a stale checkout, refuses a
 double-start, then starts a real Orca Run/terminal that invokes the `julia-coordinator` skill
 (`disable-model-invocation: true`, so it must be named explicitly there) for that issue and
