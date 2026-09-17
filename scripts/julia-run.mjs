@@ -107,11 +107,22 @@ const TERMINAL_TASK_STATUSES = new Set(['completed', 'failed', 'stopped', 'cance
 // has zero Tasks, for the seconds/minutes its preflight takes) -- so a
 // zero-Task run only counts as finished once it's older than a
 // generous grace window past any real preflight pass. This is a
-// disclosed, deliberately conservative heuristic (favors "still
-// blocks") given no queryable run-level status field or Axiom read
-// access exists yet (see docs/agents/jul43-coordinator-runbook.md); not
-// verified live against the installed CLI's real task-list output --
-// the resume condition for that verification is SSH/server access.
+// deliberately conservative heuristic (favors "still blocks") given no
+// queryable run-level status field or Axiom read access exists yet (see
+// docs/agents/jul43-coordinator-runbook.md).
+//
+// Live-verified 2026-09-17 (JUL-70): every real run on orchestrator-local
+// (run_c404a384fb43 included, plus six other journey-zero runs) has zero
+// Tasks -- this coordinator has never actually called task-create yet, so
+// the zero-Task branch above is the only one exercised in practice today,
+// not a theoretical fallback. `task-list --run <id> --environment
+// orchestrator-local --json` returns the {runId, legacyReadOnly, tasks,
+// count} shape assumed here. Ran the real fixed findExistingRun('JUL-44')
+// against the live server (a scratch copy of this file, as
+// orchestrator-svc, read-only inspection only) and confirmed it now
+// returns null instead of the stuck run. The active-Task branch (a
+// non-terminal `status` value) remains unverified -- no live Task has
+// ever existed to check it against.
 const ZERO_TASK_RUN_GRACE_MS = 15 * 60 * 1000;
 
 export async function isRunFinished(existingRun, { taskListImpl = taskList, now = () => Date.now() } = {}) {
