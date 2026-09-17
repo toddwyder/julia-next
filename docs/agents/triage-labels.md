@@ -13,3 +13,12 @@ The skills speak in terms of five canonical triage roles. This file maps those r
 When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the corresponding label string from this table.
 
 Edit the right-hand column to match whatever vocabulary you actually use.
+
+## `ready-for-agent` requires a passed readiness review
+
+Since JUL-71, `ready-for-agent` is not a plain triage judgment call. Apply it to a ticket only
+after a readiness review (`docs/agents/readiness-review.md`) has been posted and passed for that
+ticket, either individually or as part of a batch that covered it. A ticket whose services and
+decisions aren't all proven reachable or don't have a named, one-time Todd action stays
+unlabeled, no matter how well-specified its description otherwise looks. This applies to every
+other label in the table above unchanged -- only `ready-for-agent` carries the extra gate.

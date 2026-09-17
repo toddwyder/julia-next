@@ -56,9 +56,17 @@ step). A finished worker you have not yet verified comes first.
 
 **3. Admit.** If a slot is free, admit the first eligible issue in board order. Eligible means
 all of:
-- the issue carries label `ready-for-agent`;
+- the issue carries label `ready-for-agent`, which is applied only after a posted readiness
+  review passes (`docs/agents/readiness-review.md`, rule established by JUL-71) -- never apply
+  it yourself from a ticket's description looking plausible;
 - its stated dependencies (Linear `blockedBy`) are closed;
 - its route is enabled (below).
+
+**A passed readiness review is a promise, not a suggestion.** After a review passes, an access
+stop mid-run is a bug in the review, not a new permission question for Todd: fix the review
+(the procedure doc and/or the service-probe findings that should have caught it), log the
+incident on the ticket that hit it, and add the missing check to `readiness-review.md`. Do not
+re-route it to Todd as if no review had happened.
 
 Record the admission with a Linear comment (who/what/when), then start Run/Task creation.
 If a slot is free and nothing is eligible, post a **starvation** status on the wayfinder map
@@ -86,9 +94,7 @@ An issue on a route that is not enabled stays in the backlog and counts toward s
 For the current step of the current item:
 
 1. **Start a fresh worker in its own fresh worktree.** `runCreate` then `workerStart`
-   (`scripts/orca-cli.mjs`), targeting `--environment "ovh-local"` (the orchestrator's own local
-   pairing to the runner's daemon -- **not** `"OVH runner"`, the laptop's pairing name; JUL-70
-   preflight miss 4), `--agent codex` (or `claude`
+   (`scripts/orca-cli.mjs`), targeting `--environment "OVH runner"`, `--agent codex` (or `claude`
    when the step needs it), `worktree: 'new-top-level'` -- **not** the shared registered
    `/home/runner/julia-next` checkout. Two reasons, not one: criterion 2 requires an *isolated*
    worktree per attempt, and `orca-cli.mjs`'s `workerStart` always sends the creation-only flags
@@ -170,7 +176,7 @@ quoting and become an injection vector (PR #3 review, finding C3):
 import { terminalCreate, terminalRead, terminalWait } from './orca-cli.mjs';
 const contextB64 = Buffer.from(JSON.stringify(context)).toString('base64');
 const created = await terminalCreate({
-  environment: 'ovh-local', // the orchestrator's own local pairing -- 'OVH runner' is the laptop's name for this same runtime (JUL-70 preflight miss 4)
+  environment: 'OVH runner',
   worktree: 'path:/home/runner/julia-next',
   command: `node scripts/coordinator-events.mjs ${stage} --run-id ${runId} --context-b64 ${contextB64} --tokens-used ${tokensUsed} --quota-remaining ${quotaRemaining} --interrupted ${interrupted}`,
   title: 'coordinator-events',
@@ -179,8 +185,8 @@ const created = await terminalCreate({
 // the shell prompt to return before trusting the output as the command's
 // final state (fix-verification review: "does not guarantee event
 // delivery evidence").
-await terminalWait({ environment: 'ovh-local', terminal: created.terminal.handle, forState: 'tui-idle', timeoutMs: 15000 });
-const read = await terminalRead({ environment: 'ovh-local', terminal: created.terminal.handle });
+await terminalWait({ environment: 'OVH runner', terminal: created.terminal.handle, forState: 'tui-idle', timeoutMs: 15000 });
+const read = await terminalRead({ environment: 'OVH runner', terminal: created.terminal.handle });
 // read.terminal.tail (an array of lines) confirms sent:true / sent:false, logged either way.
 ```
 
@@ -238,28 +244,31 @@ English; (b) whether anything needs his decision -- write `nothing` if not. Inst
 decisions arrive on the issue as comments prefixed `Instruction:` or `Decision:`; read the
 newest of those before acting on any step.
 
-**Waiting-on-Todd rule** (landed JUL-70, from JUL-44's Instruction). Whenever a coordinator or
-worker stops because it needs Todd:
-1. The `For Todd:` section's first line starts with **WAITING ON YOU:**, followed by a single
-   plain-English question with no jargon (not "how credentials reach the graph"). Ask only the
-   first question if there are more; hold the rest for the next round.
-2. Assign the issue that holds the question to Todd. If a decision ticket is opened, assign that
-   ticket to him instead.
-3. Once his answer lands, unassign him.
-
-When nothing is needed, the `For Todd:` line stays `nothing` -- unchanged from the Report
-trailer rule above.
-
 **Laptop-bypass rule.** Laptop Claude Code running with permissions bypassed
 (`--dangerously-skip-permissions`) is for infrastructure/setup tickets only. Product tickets run
 on the server orchestrator (`orchestrator-svc` via Orca). A product ticket found running on
 laptop Claude Code is a stop-and-report condition, not a workaround.
 
-**Tick-on-evidence rule.** An issue's acceptance checkbox is ticked when, and only when,
-verified evidence for it exists (a live command run, a real comment posted, a merged PR) --
-never on intent, in-progress work, or a plan to get there. Leave it unticked until the evidence
-exists. JUL-63 is where this rule first applied: its seven checkboxes were ticked only once each
-had a live-verified result cited on the issue.
+**Must never do (laptop or server, either identity).** Regardless of which side is running a
+ticket, an agent must never: create, delete, or change anything in one of Todd's service
+accounts (Vercel, Supabase, PowerSync, Sentry, Axiom, GitHub, Linear, or any other) outside a
+step Todd has explicitly approved in a readiness review's "one sitting" list; push to, or open a
+PR against, a repository outside the publisher's own `APPROVED_TARGETS` allowlist
+(`scripts/publish-pr.mjs`: `toddwyder/julia-next`, `toddwyder/Julia`, `toddwyder/AI-Stack`);
+touch any path outside the `julia-next` checkout it was dispatched into; spend money or change
+billing/plan/subscription settings on any service; substitute a personal `gh`/git credential for
+the publisher's GitHub App, from either the laptop or the server; or run more than one work item
+at a time (the width-1 rule, above). A laptop session that cannot reach the publisher (it holds
+no `JULIA_PUBLISHER_APP_ID`/`JULIA_PUBLISHER_APP_PRIVATE_KEY`, and its Orca pairing reaches only
+the `runner` builder identity, never `orchestrator-svc`) must say so and stop, not fall back to a
+personal push.
+
+**How this gets checked.** Every run posts its action log as a Linear comment before being
+called finished (the `For Todd:` trailer below is the summary; the body above it is the log).
+Closing a ticket means checking that log against the must-never-do list above, line by line, not
+just reading the summary. A run found to have touched an account, a repo, or a path outside its
+approved step -- whether laptop or server, whichever identity -- is a stop-and-report bug per the
+laptop-bypass rule, not a shortcut to quietly let finish or a fact to omit from the next report.
 
 ---
 
