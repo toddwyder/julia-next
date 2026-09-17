@@ -230,6 +230,17 @@ and a recommendation. Evidence stays on the issue, not in chat.
 A parked item frees its slot and records its resume condition. When the condition is met, it
 re-enters admission like any other item, and its evidence is re-verified before it is trusted.
 
+**Report trailer.** Every report a coordinator or worker posts on a Linear issue ends with a
+section headed exactly `For Todd:` of at most two lines: (a) what just happened, in plain
+English; (b) whether anything needs his decision -- write `nothing` if not. Instructions and
+decisions arrive on the issue as comments prefixed `Instruction:` or `Decision:`; read the
+newest of those before acting on any step.
+
+**Laptop-bypass rule.** Laptop Claude Code running with permissions bypassed
+(`--dangerously-skip-permissions`) is for infrastructure/setup tickets only. Product tickets run
+on the server orchestrator (`orchestrator-svc` via Orca). A product ticket found running on
+laptop Claude Code is a stop-and-report condition, not a workaround.
+
 ---
 
 ## JUL-43 specifically

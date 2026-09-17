@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  runCreate, terminalCreate, terminalRead, terminalWait, workerShow, workerStart,
+  runCreate, runList, terminalCreate, terminalRead, terminalWait, workerShow, workerStart,
 } from './orca-cli.mjs';
 
 // Fixtures below are real `orca <cmd> --json` output, captured live against
@@ -225,4 +225,22 @@ test('terminalRead returns the real {terminal: {tail: [...]}} shape, not a flat 
     '--terminal', 'term_edd1057b-c44b-4e95-b513-05851efcc6c2',
     '--json',
   ]);
+});
+
+test('runList unwraps the real {runs: [...], nextCursor} shape (JUL-63, captured live 2026-09-17)', async () => {
+  const { execImpl } = fakeExec({
+    id: 'x',
+    ok: true,
+    result: {
+      runs: [
+        { id: 'run_2bb857704f4d', objective: 'JUL-63', coordinator_handle: 'term_abc', consumer_generation: 1, legacy: 0, created_at: '2026-09-17T04:58:03Z', updated_at: '2026-09-17T04:58:03Z' },
+      ],
+      nextCursor: 'cursor123',
+    },
+    _meta: { runtimeId: 'x' },
+  });
+  const result = await runList({ environment: 'orchestrator-local', limit: 50, execImpl });
+  assert.equal(result.runs.length, 1);
+  assert.equal(result.runs[0].id, 'run_2bb857704f4d');
+  assert.equal(result.nextCursor, 'cursor123');
 });
