@@ -8,7 +8,7 @@ test('pushBranch mints a scoped token, writes an askpass helper with no token in
   const calls = [];
   let capturedAskpassPath;
   const execImpl = async (cmd, args, opts) => {
-    if (args[0] === 'config' && args[1] === '--get-regexp') {
+    if (args.includes('config') && args.includes('--get-regexp')) {
       const error = new Error('Command failed');
       error.code = 1; // git's real behavior: no url.*.insteadOf rewrites configured
       throw error;
@@ -47,7 +47,9 @@ test('pushBranch mints a scoped token, writes an askpass helper with no token in
   assert.equal(calls[0].args[1], 'credential.helper=');
   assert.equal(calls[0].args[2], '-c');
   assert.match(calls[0].args[3], /^core\.hooksPath=/);
-  assert.deepEqual(calls[0].args.slice(4), ['push', 'https://x-access-token@github.com/toddwyder/julia-next.git', 'HEAD:refs/heads/jul43-linear-coordinator-support']);
+  assert.equal(calls[0].args[4], '-c');
+  assert.equal(calls[0].args[5], 'safe.directory=C:\\Dev\\julia-next');
+  assert.deepEqual(calls[0].args.slice(6), ['push', 'https://x-access-token@github.com/toddwyder/julia-next.git', 'HEAD:refs/heads/jul43-linear-coordinator-support']);
   assert.equal(calls[0].opts.cwd, 'C:\\Dev\\julia-next');
   // The token must travel only via a named env var the askpass helper reads
   // at run time -- never as a literal in argv, never in the helper's own
@@ -82,7 +84,7 @@ test('pushBranch refuses to push at all when the repo has a url.*.insteadOf rewr
   const calls = [];
   const execImpl = async (cmd, args) => {
     calls.push({ cmd, args });
-    if (args[0] === 'config' && args[1] === '--get-regexp') {
+    if (args.includes('config') && args.includes('--get-regexp')) {
       // git's own exit behavior: exit 1 with no stdout when nothing
       // matches -- exit 0 with matching lines when something does.
       return { stdout: 'url.probe::.insteadof https://x-access-token@github.com/\n', stderr: '' };
@@ -103,7 +105,7 @@ test('pushBranch refuses to push at all when the repo has a url.*.insteadOf rewr
 test('pushBranch proceeds normally when the repo has no url.*.insteadOf rewrites', async () => {
   const pushCalls = [];
   const execImpl = async (cmd, args, opts) => {
-    if (args[0] === 'config' && args[1] === '--get-regexp') {
+    if (args.includes('config') && args.includes('--get-regexp')) {
       const error = new Error('Command failed');
       error.code = 1;
       throw error; // git's real behavior: nonzero exit, no output, when nothing matches
@@ -117,6 +119,28 @@ test('pushBranch proceeds normally when the repo has no url.*.insteadOf rewrites
   });
   assert.deepEqual(result, { pushed: true, branch: 'b' });
   assert.equal(pushCalls.length, 1);
+});
+
+test('pushBranch scopes safe.directory to exactly the passed cwd, on both the rewrite check and the push itself (JUL-71: orchestrator-svc pushing a runner-owned worktree hits git\'s dubious-ownership guard otherwise)', async () => {
+  const calls = [];
+  const execImpl = async (cmd, args, opts) => {
+    calls.push({ args, opts });
+    if (args.includes('config') && args.includes('--get-regexp')) {
+      const error = new Error('Command failed');
+      error.code = 1;
+      throw error;
+    }
+    return { stdout: '', stderr: '' };
+  };
+  await pushBranch({
+    owner: 'toddwyder', repo: 'julia-next', branch: 'b', cwd: '/home/runner/julia-next',
+    tokenImpl: async () => 'ghs_super-secret-token', execImpl, writeAskpass: () => '/tmp/x.sh',
+  });
+  for (const call of calls) {
+    const idx = call.args.indexOf('safe.directory=/home/runner/julia-next');
+    assert.ok(idx > 0, `expected a -c safe.directory=/home/runner/julia-next flag in ${JSON.stringify(call.args)}`);
+    assert.equal(call.args[idx - 1], '-c');
+  }
 });
 
 test('pushBranch rejects a repo outside the approved publisher targets', async () => {

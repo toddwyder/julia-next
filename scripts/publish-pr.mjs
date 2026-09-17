@@ -82,7 +82,7 @@ async function assertNoUrlRewrites({
   cwd, env, askpassPath, emptyGlobalConfigPath, execImpl,
 }) {
   try {
-    await execImpl('git', ['config', '--get-regexp', '^url\\..*\\.insteadof$'], {
+    await execImpl('git', ['-c', `safe.directory=${cwd}`, 'config', '--get-regexp', '^url\\..*\\.insteadof$'], {
       cwd,
       env: gitEnv(env, { askpassPath, token: '', emptyGlobalConfigPath }),
     });
@@ -129,9 +129,25 @@ export async function pushBranch({
   const emptyHooksDir = mkdtempSync(join(tmpdir(), 'julia-publisher-hooks-'));
   const emptyGlobalConfigPath = join(mkdtempSync(join(tmpdir(), 'julia-publisher-gitconfig-')), 'empty.gitconfig');
   try {
+    // JUL-71: the publisher runs as orchestrator-svc, but a coordinator's
+    // worker commits live in runner-owned worktrees (by design -- see the
+    // role table in docs/agents/jul43-coordinator-runbook.md). Git's own
+    // dubious-ownership guard then refuses to operate in `cwd` at all
+    // ("detected dubious ownership in repository at ..."), confirmed live
+    // this session -- this was the runbook's own disclosed, unverified gap
+    // ("not yet verified that orchestrator-svc can read into a
+    // runner-owned worktree path"). A `-c safe.directory=<cwd>` scoped to
+    // exactly the cwd this trusted caller already passed in is not a new
+    // attack surface: it doesn't come from repo-local config (which a
+    // pushed commit could otherwise poison) and it says nothing about
+    // credentials or remotes, only "trust this exact path's ownership" --
+    // orthogonal to the url.*.insteadOf/credential.helper protections
+    // above, which are about redirecting the push, not about whose UID
+    // owns the working tree.
     await execImpl('git', [
       '-c', 'credential.helper=',
       '-c', `core.hooksPath=${emptyHooksDir}`,
+      '-c', `safe.directory=${cwd}`,
       'push',
       `https://x-access-token@github.com/${owner}/${repo}.git`,
       `HEAD:refs/heads/${branch}`,
