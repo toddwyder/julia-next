@@ -60,6 +60,48 @@ identity — Linear's OAuth has no concept of a sub-identity per MCP client. Com
 the orchestrator" will show as Todd Wyder in Linear's UI. This is a platform limitation, not a
 bug in this setup; don't try to work around it by minting a separate Linear account.
 
+**Dispatch runs locally on the server, not from the laptop (JUL-61 step 7 finding).** The
+installed Orca CLI at `C:\...\orca.exe` on the laptop is not a separate laptop-only tool — it's
+the *same* binary shipped inside Orca's server install, at `/opt/Orca/orca-ide` on this box
+(confirmed live: `orca-ide --help` and `node /opt/Orca/resources/app.asar.unpacked/out/cli/index.js
+--help` print the identical command tree). `orca-server.service` (the always-on daemon, running
+as `runner`) is what either CLI actually talks to — the laptop reaches it remotely over
+Tailscale/websocket (`--environment "OVH runner"`); `orchestrator-svc`, running on the same box,
+reaches it over the *same* websocket protocol via its own **local** pairing, rather than through
+`runner`'s local unix socket (`~runner/.config/orca/o-*.sock`), which `orchestrator-svc` has no
+permission to touch.
+
+**One-time setup, as `orchestrator-svc` on the server:**
+```sh
+# Get the running daemon's current pairing URL (root only; never print/store it beyond this step):
+sudo journalctl -u orca-server.service --no-pager | grep "Pairing URL:" | tail -1
+# Register it as a new local-named environment (reuses the daemon's advertised
+# ws://100.125.239.98:6768 endpoint -- this does not disturb the laptop's own
+# "OVH runner" pairing; each `environment add` just adds another accepted client):
+/opt/Orca/orca-ide environment add --name ovh-local --pairing-code '<pairing URL from above>'
+```
+Verified live (2026-09-17): `orca status --environment ovh-local --json` as `orchestrator-svc`
+reports `reachable: true`, `connectionState: connected`, and `orca project setups --environment
+ovh-local` lists `julia-next` ready at `/home/runner/julia-next` — proof this is a real,
+independent dispatch path, not a reused laptop credential. The laptop's own `--environment "OVH
+runner"` kept working unaffected after this pairing was added.
+
+Set for `orchestrator-svc`'s environment (e.g. in its shell profile, so every session picks
+it up):
+```sh
+export ORCA_BIN=/opt/Orca/orca-ide
+export ORCA_ENVIRONMENT=ovh-local
+```
+`scripts/orca-cli.mjs` already reads `ORCA_BIN` from the environment; `scripts/check-readiness.mjs`
+reads `ORCA_ENVIRONMENT` the same way (defaulting to `"OVH runner"` for laptop use, unchanged) --
+`getEnvironment()` in that file is exported for exactly this. When invoking `check-readiness.mjs`
+directly, also load the publisher credential (see "Publishing" below):
+```sh
+ORCA_BIN=/opt/Orca/orca-ide ORCA_ENVIRONMENT=ovh-local \
+  node --env-file=/etc/orchestrator-svc/.env.publisher scripts/check-readiness.mjs
+```
+Verified live, all four checks green, entirely server-local, no laptop involved.
+
 ---
 
 ## Current roles (JUL-61)

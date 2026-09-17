@@ -19,7 +19,18 @@ import { terminalCreate, terminalRead } from './orca-cli.mjs';
 const execFileAsync = promisify(execFile);
 const ORCA_BIN = process.env.ORCA_BIN
   || 'C:\\Users\\toddw\\AppData\\Local\\Programs\\orca\\resources\\bin\\orca.exe';
-const ENVIRONMENT = 'OVH runner';
+// 'OVH runner' is the laptop's own registered name for this runtime
+// (orca.exe pairs to it remotely). Running this same check as
+// orchestrator-svc ON that runner uses a different local pairing --
+// 'ovh-local' -- registered via `orca environment add` against the
+// runtime's own advertised endpoint (JUL-61 step 7). Both names point at
+// the same physical Orca runtime; only the calling machine differs. Read
+// lazily (a function, not a module-load-time constant) so a caller --
+// including a test -- can set ORCA_ENVIRONMENT right before invoking a
+// check and see it take effect, rather than needing a fresh process.
+export function getEnvironment() {
+  return process.env.ORCA_ENVIRONMENT || 'OVH runner';
+}
 const JULIA_NEXT_PROJECT_ID = 'github:toddwyder/julia-next';
 
 function check(name, ok, detail) {
@@ -27,12 +38,12 @@ function check(name, ok, detail) {
 }
 
 async function defaultOrcaStatusImpl() {
-  const { stdout } = await execFileAsync(ORCA_BIN, ['status', '--environment', ENVIRONMENT, '--json']);
+  const { stdout } = await execFileAsync(ORCA_BIN, ['status', '--environment', getEnvironment(), '--json']);
   return JSON.parse(stdout);
 }
 
 async function defaultOrcaProjectSetupsImpl() {
-  const { stdout } = await execFileAsync(ORCA_BIN, ['project', 'setups', '--environment', ENVIRONMENT, '--json']);
+  const { stdout } = await execFileAsync(ORCA_BIN, ['project', 'setups', '--environment', getEnvironment(), '--json']);
   return JSON.parse(stdout);
 }
 
@@ -67,7 +78,7 @@ export async function defaultRelayCheckImpl({
   // run from a terminal on that runner, not from wherever this check
   // itself is invoked.
   const created = await terminalCreateImpl({
-    environment: ENVIRONMENT,
+    environment: getEnvironment(),
     // path:<path> avoids needing this runner's internal repo UUID -- the
     // main julia-next checkout's real filesystem path, confirmed live via
     // `orca project setups` (see the "julia-next project registered" check
@@ -76,7 +87,7 @@ export async function defaultRelayCheckImpl({
     command: 'curl -s -m 5 -X POST http://127.0.0.1:8943/events -H "content-type: application/json" -d \'{"event":"journey-relay.readiness-check","attempted":"readiness","reason":"check-readiness.mjs","context":"readiness"}\'',
     title: 'readiness-relay-check',
   });
-  const read = await terminalReadImpl({ environment: ENVIRONMENT, terminal: created.terminal.handle });
+  const read = await terminalReadImpl({ environment: getEnvironment(), terminal: created.terminal.handle });
   const output = (read.terminal.tail ?? []).join('\n');
   if (/"sent":\s*true/.test(output)) {
     return { reachable: true, detail: output };
