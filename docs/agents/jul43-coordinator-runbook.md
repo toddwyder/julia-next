@@ -214,14 +214,6 @@ pass):
   checkout post-sync.
 - **JUL-63**: `orchestrator-svc` can also trigger this itself, narrowly — see the sudo rule in
   the "Bootstrap from a laptop" section above, which `scripts/julia-run.mjs` uses.
-- **JUL-70**: the same script/timer now also syncs `/home/runner/julia-next` (fetch +
-  `merge --ff-only origin/main`, run as `runner` via `sudo -u runner`, no permission-lockdown
-  afterward since that checkout stays writable for builder worktrees). This checkout had no
-  sync mechanism at all before JUL-70 — only the orchestrator's own copy did — so it silently
-  went stale (found at PR #3 while `origin/main` was at PR #20, the exact commit builder
-  worktrees would have branched from). Verified live: a real timer-fired run
-  (`journalctl -u julia-next-checkout-sync.service`) brought both checkouts to the same HEAD as
-  `git ls-remote origin main`.
 
 Manual sync is still available for an out-of-band update without waiting up to 15 minutes:
 `sudo systemctl start julia-next-checkout-sync.service`. Check its history with `sudo
@@ -233,23 +225,6 @@ There is no scheduled trigger — explicit launch only. From inside an Orca term
 `orchestrator-local` runtime (as `orchestrator-svc`), run:
 ```sh
 node /srv/orchestrator-svc/julia-next/scripts/julia-run.mjs <ISSUE-ID>
-```
-
-**Getting into that terminal from a bare SSH session** (e.g. via the Orca app itself, or the
-exact commands a fresh session needs — a cold-reader run had to pull these from the CLI's own
-`--help` instead of finding them here, which is the gap this fixes):
-```sh
-# As orchestrator-svc, create the terminal and run julia-run inside it:
-/opt/Orca/orca-ide terminal create --environment orchestrator-local \
-  --worktree "path:/srv/orchestrator-svc/julia-next" \
-  --command "node /srv/orchestrator-svc/julia-next/scripts/julia-run.mjs <ISSUE-ID>" \
-  --title "julia-run-<ISSUE-ID>" --json
-# Returns {"result":{"terminal":{"handle":"term_...", ...}}} -- read that handle back:
-/opt/Orca/orca-ide terminal read --environment orchestrator-local \
-  --terminal <handle from above> --json
-# Poll terminal read until its tail shows a run id (success) or an error line
-# (failure) followed by the shell prompt returning -- there is no separate
-# "wait for exit" step for a plain shell command like this one.
 ```
 It refuses as any other account, runs readiness, self-heals a stale checkout, refuses a
 double-start, then starts a real Orca Run/terminal that invokes the `julia-coordinator` skill
@@ -341,14 +316,21 @@ copy has **not** been deleted yet pending an explicit decision (see JUL-61's Lin
 treat it as a stale duplicate, not a second source of truth, once the server-side copy is
 confirmed working.
 
-**Open gap, disclosed not solved this session:** the publish scripts were run from the laptop
-against the laptop copy for JUL-61 steps 4 and 5 (PRs #5, #6) — running them *as
-`orchestrator-svc` on the server* against `/etc/orchestrator-svc/.env.publisher` has not yet
-been exercised end to end. The likely remaining wrinkle: `publish-pr.mjs push` needs to run
-with its `cwd` inside a real git worktree holding the commits to push (the builder's worktree,
-owned by `runner`), and it's not yet verified that `orchestrator-svc` can read into a
-`runner`-owned worktree path to do that. Resolve and verify this before treating "publish from
-the server" as proven — don't assume the credential relocation alone finished the job.
+**Resolved (JUL-71):** publishing from the server, as `orchestrator-svc`, against a `runner`-owned
+worktree is now exercised end to end. The wrinkle the previous paragraph anticipated was real:
+`orchestrator-svc` *can* read into `/home/runner/julia-next` (file/dir permissions allow it), but
+git itself refuses with `fatal: detected dubious ownership in repository at '...'` the moment the
+process UID doesn't match the directory owner's UID — a guard unrelated to file permissions.
+`publish-pr.mjs`'s own credential-safety design intentionally neutralizes global/system git config
+per invocation (`GIT_CONFIG_NOSYSTEM=1`, `GIT_CONFIG_GLOBAL=<empty file>`), so adding
+`orchestrator-svc`'s own `--global safe.directory` entry does **not** help — it's wiped before
+every push. The fix landed in `publish-pr.mjs` itself: both the `url.*.insteadOf` check and the
+real push now pass `-c safe.directory=<cwd>`, scoped to exactly the `cwd` the caller already
+passed in. This is a narrow, non-attacker-controlled value (never read from repo-local config),
+orthogonal to the url-rewrite/credential-helper protections — it only asserts "trust this exact
+path's ownership," nothing about credentials or remotes. Verified live: `orchestrator-svc` pushed
+a real commit out of `/home/runner/julia-next` through the publisher successfully after this fix
+(JUL-71's own readiness-review doc landed this way).
 
 ## Stop / resume
 
