@@ -186,6 +186,8 @@ Every GitHub write — branch push, PR open, merge — goes through the publishe
 requires `--sha <reviewed-head-commit>`; GitHub refuses the merge with 409 if the PR head moved
 since review (`scripts/merge-pr.mjs`, JUL-61 step 4).
 
+**Verified server-side, 2026-09-17 (JUL-61 closing pass):** this very change was pushed, opened, and merged entirely by `orchestrator-svc` on the server, using `/etc/orchestrator-svc/.env.publisher` -- no laptop involvement.
+
 **Credential location, moved 2026-09-17 (JUL-61):** the App's private key now lives at
 `/etc/orchestrator-svc/.env.publisher` on the server (owner `orchestrator-svc:orchestrator-svc`,
 mode `600`; parent dir mode `700`). It previously lived only at
