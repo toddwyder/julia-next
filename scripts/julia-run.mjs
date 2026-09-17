@@ -12,12 +12,12 @@ import { promisify } from 'node:util';
 import os from 'node:os';
 import { checkReadiness } from './check-readiness.mjs';
 import { runCreate, runList, terminalCreate } from './orca-cli.mjs';
+import { getPublisherInstallationToken } from './publish-via-github-app.mjs';
 
 const execFileAsync = promisify(execFile);
 
 const REQUIRED_ACCOUNT = 'orchestrator-svc';
 const CHECKOUT = '/srv/orchestrator-svc/julia-next';
-const REPO_URL = 'https://github.com/toddwyder/julia-next.git';
 const ORCHESTRATOR_ENVIRONMENT = 'orchestrator-local';
 const DISPATCH_ENVIRONMENT = 'ovh-local';
 const WORKTREE_SELECTOR = `path:${CHECKOUT}`;
@@ -66,9 +66,26 @@ export async function assertReady({ checkReadinessImpl = checkReadiness } = {}) 
 // see the runbook), so this triggers the one narrowly-scoped sudo rule
 // that lets orchestrator-svc run exactly `systemctl start
 // julia-next-checkout-sync.service`, then re-checks.
-export async function ensureCheckoutSynced({ execImpl = execFileAsync } = {}) {
+// julia-next is a private repo -- an unauthenticated `git ls-remote` hangs
+// forever waiting for a credential prompt in a non-interactive terminal
+// (hit live, JUL-63). Resolve the remote head via the GitHub API with the
+// publisher's own installation token instead of touching git credentials
+// at all for this check.
+export async function getRemoteMainHead({ tokenImpl = getPublisherInstallationToken, fetchImpl = fetch } = {}) {
+  const token = await tokenImpl({ ...process.env, JULIA_PUBLISHER_REPO: 'julia-next' });
+  const res = await fetchImpl('https://api.github.com/repos/toddwyder/julia-next/git/ref/heads/main', {
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
+  });
+  const body = await res.json();
+  if (!res.ok) {
+    throw new Error(`could not resolve origin/main via the GitHub API (HTTP ${res.status}): ${body.message ?? JSON.stringify(body)}`);
+  }
+  return body.object.sha;
+}
+
+export async function ensureCheckoutSynced({ execImpl = execFileAsync, getRemoteMainHeadImpl = getRemoteMainHead } = {}) {
   const localHead = (await execImpl('git', ['-C', CHECKOUT, 'rev-parse', 'HEAD'])).stdout.trim();
-  const remoteHead = (await execImpl('git', ['ls-remote', REPO_URL, 'main'])).stdout.split(/\s+/)[0];
+  const remoteHead = await getRemoteMainHeadImpl({ execImpl });
   if (localHead === remoteHead) return { head: localHead, triggeredSync: false };
 
   await execImpl('sudo', ['-n', 'systemctl', 'start', 'julia-next-checkout-sync.service']);

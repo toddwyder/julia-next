@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   juliaRun, assertIssueId, assertAccount, assertReady, ensureCheckoutSynced, findExistingRun, startOrchestrator,
-  prepareServerEnvironment,
+  prepareServerEnvironment, getRemoteMainHead,
 } from './julia-run.mjs';
 
 const READY = { ok: true, checks: [{ name: 'OVH runner reachable', ok: true, detail: 'connected' }] };
@@ -26,10 +26,10 @@ function fakeImpls(overrides = {}) {
       checkReadinessImpl: async () => READY,
       execImpl: async (cmd, args) => {
         if (cmd === 'git' && args.includes('rev-parse')) return { stdout: 'abc123\n' };
-        if (cmd === 'git' && args.includes('ls-remote')) return { stdout: 'abc123\trefs/heads/main\n' };
         if (cmd === 'sudo') { calls.syncTriggered = true; return { stdout: '' }; }
         throw new Error(`unexpected execImpl call: ${cmd} ${args.join(' ')}`);
       },
+      getRemoteMainHeadImpl: async () => 'abc123',
       runListImpl: async () => ({ runs: [] }),
       fromHandle: 'term_fake123',
       runCreateImpl: async ({ objective }) => {
@@ -85,11 +85,10 @@ test('a stale checkout triggers exactly one sync, then re-checks', async () => {
       // First check: stale. After the triggered sync: matches remote.
       return { stdout: revParseCalls === 1 ? 'oldhead\n' : 'newhead\n' };
     }
-    if (cmd === 'git' && args.includes('ls-remote')) return { stdout: 'newhead\trefs/heads/main\n' };
     if (cmd === 'sudo') return { stdout: '' };
     throw new Error(`unexpected: ${cmd}`);
   };
-  const result = await ensureCheckoutSynced({ execImpl });
+  const result = await ensureCheckoutSynced({ execImpl, getRemoteMainHeadImpl: async () => 'newhead' });
   assert.equal(result.triggeredSync, true);
   assert.equal(result.head, 'newhead');
   assert.equal(revParseCalls, 2);
@@ -98,11 +97,35 @@ test('a stale checkout triggers exactly one sync, then re-checks', async () => {
 test('a checkout still stale after the triggered sync is a hard failure, not a silent pass', async () => {
   const execImpl = async (cmd, args) => {
     if (cmd === 'git' && args.includes('rev-parse')) return { stdout: 'oldhead\n' };
-    if (cmd === 'git' && args.includes('ls-remote')) return { stdout: 'newhead\trefs/heads/main\n' };
     if (cmd === 'sudo') return { stdout: '' };
     throw new Error(`unexpected: ${cmd}`);
   };
-  await assert.rejects(() => ensureCheckoutSynced({ execImpl }), /checkout still at oldhead after triggering a sync, expected newhead/);
+  await assert.rejects(
+    () => ensureCheckoutSynced({ execImpl, getRemoteMainHeadImpl: async () => 'newhead' }),
+    /checkout still at oldhead after triggering a sync, expected newhead/,
+  );
+});
+
+test('getRemoteMainHead resolves via the GitHub API with the publisher token, not git credentials', async () => {
+  const fetchImpl = async (url, init) => {
+    assert.equal(url, 'https://api.github.com/repos/toddwyder/julia-next/git/ref/heads/main');
+    assert.match(init.headers.Authorization, /^Bearer /);
+    return { ok: true, json: async () => ({ object: { sha: 'deadbeef' } }) };
+  };
+  const tokenImpl = async (env) => {
+    assert.equal(env.JULIA_PUBLISHER_REPO, 'julia-next');
+    return 'ghs_fake';
+  };
+  const sha = await getRemoteMainHead({ tokenImpl, fetchImpl });
+  assert.equal(sha, 'deadbeef');
+});
+
+test('getRemoteMainHead surfaces a clear error on an API failure, not a hang', async () => {
+  const fetchImpl = async () => ({ ok: false, status: 404, json: async () => ({ message: 'Not Found' }) });
+  await assert.rejects(
+    () => getRemoteMainHead({ tokenImpl: async () => 'x', fetchImpl }),
+    /could not resolve origin\/main via the GitHub API \(HTTP 404\): Not Found/,
+  );
 });
 
 test('double-start: a second invocation for the same issue refuses, naming the existing run id', async () => {
