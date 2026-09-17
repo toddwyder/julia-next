@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { checkReadiness, defaultRelayCheckImpl } from './check-readiness.mjs';
+import { checkReadiness, defaultRelayCheckImpl, getEnvironment } from './check-readiness.mjs';
 
 function fakes({
   runtimeReachable = true,
@@ -101,4 +101,18 @@ test('an Orca CLI failure (not installed, environment not paired) is its own fai
   });
   assert.equal(result.ok, false);
   assert.ok(result.checks.some((c) => !c.ok && /not paired/.test(c.detail)));
+});
+
+test('getEnvironment() defaults to "OVH runner" but ORCA_ENVIRONMENT overrides it, so this check can target a different Orca pairing (e.g. orchestrator-svc\'s own local "ovh-local" pairing, JUL-61 step 7)', () => {
+  const original = process.env.ORCA_ENVIRONMENT;
+  try {
+    delete process.env.ORCA_ENVIRONMENT;
+    assert.equal(getEnvironment(), 'OVH runner');
+
+    process.env.ORCA_ENVIRONMENT = 'ovh-local';
+    assert.equal(getEnvironment(), 'ovh-local');
+  } finally {
+    if (original === undefined) delete process.env.ORCA_ENVIRONMENT;
+    else process.env.ORCA_ENVIRONMENT = original;
+  }
 });
