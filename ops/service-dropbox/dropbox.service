@@ -14,7 +14,18 @@ EnvironmentFile=/etc/orca-runner/dropbox.env
 # publisher.
 User=dropbox-svc
 Group=dropbox-svc
-NoNewPrivileges=true
+# NoNewPrivileges is deliberately NOT set here, unlike journey-relay.service.
+# journey-relay never escalates privileges -- this process's entire security
+# model depends on being ABLE to: it never has write access to the
+# destination secret files itself, and reaches them only by invoking
+# write-secret.sh (root:root 0700) through the narrowly scoped
+# `dropbox-svc ALL=(root) NOPASSWD: /opt/.../write-secret.sh` sudoers rule
+# (see README.md). NoNewPrivileges blocks sudo's own setuid escalation
+# outright (confirmed live, JUL-72: "sudo: The 'no new privileges' flag is
+# set, which prevents sudo from running as root" -- every save silently
+# failed until this was removed). The privilege this process CAN gain is
+# already the minimum useful one: exactly one fixed, reviewable script, no
+# arguments beyond a closed set of four field names.
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
