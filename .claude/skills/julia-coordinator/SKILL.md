@@ -118,12 +118,20 @@ For the current step of the current item:
    the issue's acceptance criteria. It saves its review as a file **outside** the candidate
    worktree -- the review must never become part of, or be mistaken for a change to, the thing
    it reviews.
-2. The publisher pushes the worker's verified branch (`scripts/publish-pr.mjs push`) and opens a
+2. **Diff the reviewer's worktree against the candidate commit before trusting the review**
+   (`scripts/verify-reviewer-worktree.mjs`'s `rejectIfReviewerTampered`, or the CLI: `node
+   verify-reviewer-worktree.mjs --worktree <reviewer worktree path> --commit <candidate commit
+   sha>`). This catches both an uncommitted edit and a committed one -- `git diff <commit>`
+   against the working tree sees either. **Any** difference rejects the review outright: treat
+   it the same as a failed step (a fresh reviewer worker, same candidate commit, same 3-attempt
+   limit), never a partial pass. A clean diff is required, not sufficient -- still read the
+   review's actual content against the acceptance criteria.
+3. The publisher pushes the worker's verified branch (`scripts/publish-pr.mjs push`) and opens a
    PR with the evidence and review attached (`scripts/publish-pr.mjs open`), or posts the Linear
    evidence comment for a non-code item. Check whether a PR already exists before creating one.
    Resolve a base-branch conflict (e.g. another merge landed on `main` first) with a normal local
    merge before re-pushing -- do not force-push.
-3. Emit `coordinator_completed` (or `coordinator_failed` if publishing itself failed) and park
+4. Emit `coordinator_completed` (or `coordinator_failed` if publishing itself failed) and park
    the item with an **acceptance** queue item naming the result.
 
 **Publisher prerequisite, checked not assumed (2026-09-16):** the `julia-graph-publisher` GitHub
