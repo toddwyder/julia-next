@@ -182,10 +182,20 @@ test('isRunFinished: a zero-task run stopped at preflight (JUL-44s real case) is
 });
 
 test('startOrchestratorEntry refuses outside an Orca-managed terminal (no ORCA_TERMINAL_HANDLE)', async () => {
-  await assert.rejects(
-    () => startOrchestratorEntry('JUL-63', 'claude', { fromHandle: undefined, runCreateImpl: async () => ({ run: { id: 'x' } }), terminalCreateImpl: async () => ({}) }),
-    /ORCA_TERMINAL_HANDLE is not set/,
-  );
+  // This test must simulate the "outside an Orca-managed terminal" state
+  // explicitly: when the suite itself is run from inside an Orca terminal,
+  // the ambient ORCA_TERMINAL_HANDLE would satisfy the default and the
+  // expected refusal would never happen. Clear it for the assertion only.
+  const savedHandle = process.env.ORCA_TERMINAL_HANDLE;
+  delete process.env.ORCA_TERMINAL_HANDLE;
+  try {
+    await assert.rejects(
+      () => startOrchestratorEntry('JUL-63', 'claude', { fromHandle: undefined, runCreateImpl: async () => ({ run: { id: 'x' } }), terminalCreateImpl: async () => ({}) }),
+      /ORCA_TERMINAL_HANDLE is not set/,
+    );
+  } finally {
+    if (savedHandle !== undefined) process.env.ORCA_TERMINAL_HANDLE = savedHandle;
+  }
 });
 
 test('happy path: readiness, synced checkout, no existing run -> orchestrator starts on the table primary, run id returned, no start-comment call', async () => {
