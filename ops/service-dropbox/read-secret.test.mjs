@@ -36,8 +36,17 @@ test('secretAuthHeader wraps the value as a Bearer header, built in-process', ()
   assert.equal(secretAuthHeader('supabase', { dir }), 'Bearer sbp_token_value_1234567890');
 });
 
-test('KNOWN_FIELDS is exactly the four services this ticket names', () => {
-  assert.deepEqual([...KNOWN_FIELDS].sort(), ['axiom', 'powersync', 'sentry', 'supabase']);
+test('KNOWN_FIELDS is exactly the seven services this drop box now names (JUL-72 + JUL-77)', () => {
+  assert.deepEqual(
+    [...KNOWN_FIELDS].sort(),
+    ['axiom', 'deepseek', 'linear', 'powersync', 'sentry', 'supabase', 'zai'],
+  );
+});
+
+test('readSecret reads a JUL-77 field (deepseek/zai/linear) the same as any other field', () => {
+  const dir = tmpDir();
+  writeFileSync(join(dir, 'deepseek.env'), 'sk-deepseek-1234567890abcdef\n');
+  assert.equal(readSecret('deepseek', { dir }), 'sk-deepseek-1234567890abcdef');
 });
 
 test('read-secret.mjs never imports node:child_process -- a static guard against ever shelling out to read a secret', () => {
