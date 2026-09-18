@@ -495,6 +495,30 @@ this session plus the other vendors' documented phrasing; Claude Code's own exac
 never observed live this week (no session in this project's record hit one), so that part of the
 pattern is unverified — a real example should replace the guess the first time one is seen.
 
+### A PR title naming a Linear issue closes that issue on merge (JUL-44)
+
+**Linear's GitHub integration auto-links any PR whose TITLE contains an issue identifier, and
+moves that issue to Done when the PR merges.** The link is title-based, not body-based, and it
+does not require a closing keyword.
+
+This closed JUL-44 twice while all four of its acceptance criteria were still unticked. The two
+verified instances are PR #21 (merge commit 7cda4a9, merged 2026-09-17T13:03:48Z; JUL-44 moved
+to Done at 2026-09-17T13:03:52Z, 4 seconds later) and PR #37 (merge commit 2ed3f6f, merged
+2026-09-18T14:35:55Z; JUL-44 moved to Done at 2026-09-18T14:35:58Z, 3 seconds later). Neither
+PR was the ticket's final step, but both carried `JUL-44` in the title, so Linear treated each
+merge as completion. PR #38 (merge commit 5aa7345, merged 2026-09-18T14:55:19Z) is not a
+verified instance: JUL-44 was already Done at that moment (it stayed Done from 14:35:58Z until
+the coordinator moved it back to In Progress at 15:02:15Z), so no state change can be
+attributed to that merge.
+
+Because a multi-step item gives every step's PR the item's own id, **the coordinator must
+re-assert the issue's real state after EVERY step merge rather than trusting it** — a Done
+status is not evidence that the item is actually finished.
+
+Do **not** fix this by dropping the id from PR titles: the id in the title is what provides
+traceability from a merged PR back to its issue. Do **not** fix it by changing the Linear
+workspace's own settings — an agent must never change Todd's service-account settings.
+
 ## Readiness
 
 ```sh
