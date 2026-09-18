@@ -60,7 +60,111 @@ const COMMENT_CREATE_MUTATION = `
   }
 `;
 
+// ---------------------------------------------------------------------------
+// The For-Todd guard (JUL-79 step 4)
+// ---------------------------------------------------------------------------
+//
+// The rule (coordinator skill / CLAUDE.md, enforced here): only three kinds of
+// thing may ask for Todd -- (a) an action only his account can take (sign-in,
+// payment), (b) a money decision, (c) a product decision or acceptance.
+// Everything else (merges, git, restarts, installs, free-tier resources in
+// approved services) the agent decides, does and logs itself.
+//
+// This guard is deliberately strict and fail-closed, with no intent detection:
+// a forbidden word anywhere in a `For Todd:` line refuses the post outright,
+// even when the agent meant it as information. Rule 1 gates any body that says
+// WAITING ON YOU on naming one of the three categories; rule 2 keeps git
+// vocabulary out of the For Todd trailer. Both return a result object instead
+// of throwing, so callers (postComment, the Ready queue) decide what to do with
+// a refusal; postComment turns it into the error a forced post deserves.
+
+const WAITING_ON_YOU_MARKER = /\bwaiting on you\b/i;
+const CATEGORY_MARKER = /\((?:a|b|c)\)/i;
+const ACCOUNT_ONLY_VOCABULARY = /\b(?:sign[- ]?in|log[- ]?in|payment|payments)\b/i;
+const MONEY_VOCABULARY = /\b(?:money|cost|costs|spend|spent|spending|budget|budgets|billing|subscription|subscriptions|purchase|purchases|price|prices)\b/i;
+const PRODUCT_VOCABULARY = /\b(?:product|products|decision|decisions|accept|accepts|accepted|accepting|acceptance|approve|approves|approved|approving|approval|spec|specs|scope)\b/i;
+
+// Stem-aware, word-boundary patterns. Each matches the bare word and its common
+// inflections, and deliberately NOT inside an unrelated word: `\bmerg` misses
+// "emerge" (a word character precedes the "m"), `\bcommit\b` misses
+// "commitment" (no boundary before the trailing "ment"), and `\bprs?\b` misses
+// "approach"/"imprint" (no boundary before the "pr") and "PRint" (no boundary
+// after it). The inflection trap is real: `\bpush\b` alone misses "pushed".
+const FOR_TODD_GIT_WORDS = [
+  { word: 'merge', pattern: /\bmerg(?:e|es|ed|ing)\b/i },
+  { word: 'push', pattern: /\bpush(?:es|ed|ing)?\b/i },
+  { word: 'branch', pattern: /\bbranch(?:es|ed|ing)?\b/i },
+  { word: 'PR', pattern: /\bprs?\b/i },
+  { word: 'commit', pattern: /\bcommit(?:s|ted|ting)?\b/i },
+  { word: 'rebase', pattern: /\brebas(?:e|es|ed|ing)\b/i },
+];
+
+const FOR_TODD_HEADER = /^\s*(?:[#>*_]+\s*)*For Todd:/i;
+
+function namesACategory(text) {
+  return CATEGORY_MARKER.test(text)
+    || ACCOUNT_ONLY_VOCABULARY.test(text)
+    || MONEY_VOCABULARY.test(text)
+    || PRODUCT_VOCABULARY.test(text);
+}
+
+// The `For Todd:` trailer is the section headed exactly `For Todd:` at the end
+// of the report; everything from that header to the first blank line (or the
+// end of the body) is "a For Todd line". The same words above the header -- in
+// the report body -- are ordinary prose and are not the guard's business.
+function forToddSectionLines(text) {
+  const lines = text.split(/\r?\n/);
+  const start = lines.findIndex((line) => FOR_TODD_HEADER.test(line));
+  if (start === -1) return [];
+  const section = [];
+  for (let i = start; i < lines.length; i += 1) {
+    if (i > start && lines[i].trim() === '') break;
+    section.push(lines[i]);
+  }
+  return section;
+}
+
+// Exported and pure: returns `{ ok: true }` or `{ ok: false, rule, reason }`,
+// never throws, whatever the body is. Rule names `category` and
+// `git-vocabulary` are what the thrown error names too.
+export function checkForToddGuard(body) {
+  const text = typeof body === 'string' ? body : '';
+  if (WAITING_ON_YOU_MARKER.test(text) && !namesACategory(text)) {
+    return {
+      ok: false,
+      rule: 'category',
+      reason: 'a "WAITING ON YOU" comment must name one of the three kinds of Todd-only thing: (a) an action only his account can take (sign-in, payment), (b) a money decision, or (c) a product decision or acceptance -- via the marker (a)/(b)/(c) or that vocabulary',
+    };
+  }
+  for (const line of forToddSectionLines(text)) {
+    const hit = FOR_TODD_GIT_WORDS.find(({ pattern }) => pattern.test(line));
+    if (hit) {
+      return {
+        ok: false,
+        rule: 'git-vocabulary',
+        reason: `a For Todd: line must not mention "${hit.word}" or an inflection of it -- merges, git, branches and the rest are the agent's own to decide, do and log`,
+      };
+    }
+  }
+  return { ok: true };
+}
+
+// Every refusal ends with this: the agent must act, not ask. A genuine
+// Todd-only thing outside the three kinds is a design defect to log, not a
+// post to force through.
+const GUARD_ACTING_INSTRUCTION = 'Act instead of asking: the agent decides, does and logs this itself; a genuinely Todd-only thing outside those three kinds is a design defect -- log it on the ticket or in docs/agents/jul43-coordinator-runbook.md, never force this comment through.';
+
+function guardRefusalError(result) {
+  return new Error(`postComment refused by the For-Todd guard (rule: ${result.rule}): ${result.reason}. ${GUARD_ACTING_INSTRUCTION}`);
+}
+
 export async function postComment(identifier, body, opts) {
+  // The guard runs before the first network call, so a refused post costs no
+  // API request and no Linear write.
+  const guard = checkForToddGuard(body);
+  if (!guard.ok) {
+    throw guardRefusalError(guard);
+  }
   const { issue } = await linearGraphQL(ISSUE_ID_QUERY, { id: identifier }, opts);
   const data = await linearGraphQL(COMMENT_CREATE_MUTATION, { issueId: issue.id, body }, opts);
   if (!data.commentCreate.success) {

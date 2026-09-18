@@ -20,7 +20,7 @@ import { dirname, join } from 'node:path';
 import os from 'node:os';
 import { pathToFileURL } from 'node:url';
 
-import { linearGraphQL } from './linear-cli.mjs';
+import { linearGraphQL, checkForToddGuard } from './linear-cli.mjs';
 import { readSecret } from '../ops/service-dropbox/read-secret.mjs';
 import { runList, taskList, terminalCreate } from './orca-cli.mjs';
 // Reuse julia-run's own definition of "the run is done": a run with an active
@@ -364,6 +364,8 @@ export async function readyQueueCheck(options = {}) {
     writeStateImpl = writeState,
     now = () => Date.now(),
     validateModelChoiceImpl = defaultValidateModelChoice,
+    checkForToddGuardImpl = checkForToddGuard,
+    logErrorImpl = console.error,
     intervalMinutes = DEFAULT_INTERVAL_MINUTES,
   } = options;
 
@@ -411,8 +413,23 @@ export async function readyQueueCheck(options = {}) {
   if (!eligible) {
     const fingerprint = issueFingerprint(top);
     const alreadyCommented = previous.commented[top.id] === fingerprint;
+    let commented = false;
+    let refused = false;
     if (!alreadyCommented) {
-      await linear.comment({ issueId: top.id, body: ineligibleCommentBody(top, reasons) });
+      const body = ineligibleCommentBody(top, reasons);
+      // The same For-Todd guard every Linear post goes through. A refusal must
+      // never crash the check cycle: log it (the timer's journal picks up
+      // stderr) and skip just this one comment, then record the fingerprint so
+      // the queue stays quiet rather than retrying a comment that will always
+      // be refused while the card is unchanged.
+      const guard = checkForToddGuardImpl(body);
+      if (guard.ok) {
+        await linear.comment({ issueId: top.id, body });
+        commented = true;
+      } else {
+        refused = true;
+        logErrorImpl(`ready-queue: refused to post the explanation comment for ${top.identifier} (For-Todd guard rule: ${guard.rule}): ${guard.reason}`);
+      }
     }
     await writeStateImpl({
       ...previous,
@@ -423,7 +440,8 @@ export async function readyQueueCheck(options = {}) {
       status: 'ineligible',
       issue: top.identifier,
       reasons,
-      commented: !alreadyCommented,
+      commented,
+      refused,
       intervalMinutes,
     };
   }
@@ -516,6 +534,9 @@ export function describeResult(result) {
     case 'first-sighting':
       return `${result.issue} is newly in Ready -- waiting one full check before it can start`;
     case 'ineligible':
+      if (result.refused) {
+        return `${result.issue} is ineligible (${result.reasons.join('; ')}) -- refused to post the explanation comment (For-Todd guard); the refusal is logged and the queue stays quiet for this fingerprint`;
+      }
       return `${result.issue} is ineligible (${result.reasons.join('; ')}) -- ${result.commented ? 'posted one comment' : 'already commented, staying quiet'}`;
     case 'started':
       return `started ${result.issue}`;
