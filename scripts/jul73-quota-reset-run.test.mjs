@@ -192,9 +192,38 @@ test('runCloser resolves claude through a login shell (bash -lc), passing every 
   assert.equal(calledArgs[promptIndex + 1], 'do the "tricky" thing\nwith a newline');
   const allowedToolsIndex = calledArgs.indexOf('--allowedTools');
   assert.match(calledArgs[allowedToolsIndex + 1], /mcp__linear__\*/);
-  assert.match(calledArgs[allowedToolsIndex + 1], /Bash\(\/opt\/Orca\/orca-ide \*\)/);
+  assert.match(calledArgs[allowedToolsIndex + 1], /Bash\(\/opt\/Orca\/orca-ide terminal create \*\)/);
   assert.equal(calledOpts.maxBuffer, 10 * 1024 * 1024);
   assert.ok(calledOpts.cwd);
+});
+
+test('the JUL-44 launch command in the closer prompt is covered by the closer\'s own --allowedTools grant -- built from one shared prefix so they cannot drift apart (review finding: an export-prefixed command silently failed to match its own grant)', async () => {
+  const prompt = buildCloserPrompt({
+    sandboxProbe: { publisherReadable: true, orcaReachable: true },
+    acceptanceRun: { finished: true, claudeSeen: false, checkErrors: [] },
+    sinceIso: '2026-09-19T19:43:00.000Z',
+  });
+  const commandMatch = prompt.match(/launch the real next work by running exactly this command, verbatim, with no modification \(it is pre-authorized exactly as written\): `([^`]+)`/);
+  assert.ok(commandMatch, 'expected to find the JUL-44 launch command embedded in the prompt');
+  const launchCommand = commandMatch[1];
+
+  let calledArgs;
+  const execImpl = async (cmd, args) => { calledArgs = args; return { stdout: JSON.stringify({ is_error: false, permission_denials: [], result: 'ok' }) }; };
+  await runCloser({ execImpl, prompt: 'x' });
+  const grant = calledArgs[calledArgs.indexOf('--allowedTools') + 1];
+  const grantPrefix = grant.match(/Bash\(([^)]+) \*\)/)[1];
+  assert.ok(launchCommand.startsWith(grantPrefix), `launch command "${launchCommand}" must start with the grant prefix "${grantPrefix}"`);
+});
+
+test('runCloser parses the last JSON-looking line, tolerating a login shell\'s own banner/motd output before it', async () => {
+  const execImpl = async () => ({ stdout: 'Welcome to Ubuntu\nsome motd line\n{"is_error":false,"permission_denials":[],"result":"posted"}\n' });
+  const result = await runCloser({ execImpl, prompt: 'x' });
+  assert.equal(result.result, 'posted');
+});
+
+test('runCloser throws a clear error, not a raw JSON.parse crash, when stdout has no parseable JSON at all', async () => {
+  const execImpl = async () => ({ stdout: 'claude: command not found\n' });
+  await assert.rejects(() => runCloser({ execImpl, prompt: 'x' }), /closer step produced no parseable JSON output/);
 });
 
 test('runCloser throws when the closer\'s tool call was denied, even though claude -p itself exits 0', async () => {

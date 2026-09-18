@@ -48,6 +48,20 @@
 //   orchestrator-svc` from a systemd unit, not from an interactive Orca
 //   terminal's own shell the way every other `claude` invocation in this
 //   repo does -- an untested code path otherwise.
+//
+// A third review round on the second fix found two more real bugs, also
+// folded in: the JUL-44 launch command handed to the closer began with an
+// `export ...;` prefix that its own `--allowedTools` grant (a literal
+// command-prefix match) never actually covered -- a guaranteed permission
+// denial on the one success path that matters, discovered only by review,
+// not by any test, since no test exercised the two strings against each
+// other. Both are now built from one shared constant so they can't drift
+// apart again. It also flagged that `run.coordinator_handle`'s meaning was
+// asserted, not verified -- see findFreshRun's own comment for the live
+// evidence that settles it. A single-read "shell prompt returned" check
+// was also shown to false-positive on a terminal's own startup banner;
+// completion now requires two consecutive identical, prompt-terminated
+// reads.
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { prepareServerEnvironment } from './julia-run.mjs';
@@ -61,17 +75,29 @@ const PUBLISHER_ENV_FILE = '/etc/orchestrator-svc/.env.publisher';
 const DISPATCH_ENVIRONMENT = 'ovh-local';
 const ISSUE_ID = 'JUL-76';
 const WAIT_INTERVAL_MS = 10_000;
-// Kept well under the unit's TimeoutStartSec (1800s) so the closer always
-// has time left to run even if every mechanical step below times out:
-// dispatch-wait (up to 2 min) + run-discovery (up to 1 min) +
-// wake-wait (up to 6 min) + sandbox probe (up to 3 min) = 12 min worst
-// case, leaving a comfortable margin for `runCloser` itself.
+// Kept well under the unit's TimeoutStartSec (1800s = 30 min) so the closer
+// always has time left to run even if every mechanical step below times
+// out. Sequential worst case for the acceptance chain (dispatch-wait +
+// run-discovery + wake-wait) is 2+2+10 = 14 min; the sandbox probe (3 min)
+// runs concurrently with that chain, not after it -- so 14 min is the real
+// worst-case wall clock, leaving a >15 min margin for `runCloser` itself.
 const DISPATCH_WAIT_POLLS = 12;
 const RUN_DISCOVERY_POLLS = 12;
-const WAKE_WAIT_POLLS = 36;
+const WAKE_WAIT_POLLS = 60;
 const SANDBOX_PROBE_POLLS = 18;
 
-const ENV_PREFIX = `export ORCA_BIN=/opt/Orca/orca-ide ORCA_ENVIRONMENT=${DISPATCH_ENVIRONMENT}; set -a; . ${PUBLISHER_ENV_FILE}; set +a;`;
+const ORCA_BIN_PATH = '/opt/Orca/orca-ide';
+const ENV_PREFIX = `export ORCA_BIN=${ORCA_BIN_PATH} ORCA_ENVIRONMENT=${DISPATCH_ENVIRONMENT}; set -a; . ${PUBLISHER_ENV_FILE}; set +a;`;
+// The exact command the closer is instructed to run to launch JUL-44, and
+// the exact `--allowedTools` grant that must cover it, are built from this
+// one shared prefix so they can never drift apart the way a first draft's
+// `export ORCA_BIN=...; /opt/Orca/orca-ide ...` command and its
+// `Bash(/opt/Orca/orca-ide *)` grant did (caught by review: the grant is a
+// literal command-prefix match, and the `export ...;` prefix meant the
+// actual command never matched it -- a real permission denial on the one
+// success path that matters, discovered only by review, not by any test).
+const JUL44_LAUNCH_COMMAND = `${ORCA_BIN_PATH} terminal create --environment ${ORCHESTRATOR_ENVIRONMENT} --worktree "path:${CHECKOUT}" --command "cd ${CHECKOUT} && node scripts/julia-run.mjs JUL-44" --title julia-run-JUL-44 --json`;
+const JUL44_LAUNCH_ALLOWED_TOOL = `Bash(${ORCA_BIN_PATH} terminal create *)`;
 
 function defaultWait(ms) {
   return new Promise((resolve) => { setTimeout(resolve, ms); });
@@ -105,15 +131,38 @@ async function pollUntil({
   return { tail, done: false };
 }
 
-// The dispatched command's own shell prompt reappearing on the tail's last
-// line is the end marker -- not a single immediate read, and not
-// `terminalWait --for tui-idle` (both proven unreliable live, see the
-// runbook's Journey accounting section and JUL-76's own report). Requires
-// at least one non-blank line of real output first, so a freshly created
-// terminal's bare initial prompt can't be mistaken for completion.
-function shellPromptReturned(tail) {
+// A shell prompt reappearing on the tail's last line is the end marker --
+// not a single immediate read, and not `terminalWait --for tui-idle`
+// (both proven unreliable live, see the runbook's Journey accounting
+// section and JUL-76's own report). This alone still isn't enough: a
+// freshly created terminal's own startup banner/motd can produce a
+// prompt-terminated tail on the very first read even though the real
+// command hasn't finished (caught by review). So this requires the tail
+// to look done on two *consecutive* polls with no new output between them
+// -- a terminal genuinely still working keeps producing output and never
+// stabilizes; only a truly finished one reads identically twice in a row.
+function looksPromptTerminated(tail) {
   const lines = tail.split('\n').filter((l) => l.trim().length > 0);
   return lines.length > 1 && /\$\s*$/.test(lines[lines.length - 1]);
+}
+
+async function pollUntilStable({
+  terminalHandle, terminalReadImpl, waitImpl, maxPolls,
+}) {
+  let previousTail = null;
+  let tail = '';
+  for (let i = 0; i < maxPolls; i += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    const read = await terminalReadImpl({ environment: ORCHESTRATOR_ENVIRONMENT, terminal: terminalHandle });
+    tail = (read.terminal.tail ?? []).join('\n');
+    if (looksPromptTerminated(tail) && tail === previousTail) {
+      return { tail, done: true };
+    }
+    previousTail = tail;
+    // eslint-disable-next-line no-await-in-loop
+    await waitImpl(WAIT_INTERVAL_MS);
+  }
+  return { tail, done: false };
 }
 
 export async function runCodexSandboxProbe({
@@ -154,9 +203,8 @@ export async function dispatchCodexAcceptanceRun({
     title: 'jul73-quota-reset-dispatch',
   });
 
-  const { tail, done } = await pollUntil({
+  const { tail, done } = await pollUntilStable({
     terminalHandle: created.terminal.handle,
-    isDone: shellPromptReturned,
     terminalReadImpl,
     waitImpl,
     maxPolls,
@@ -172,13 +220,25 @@ export async function dispatchCodexAcceptanceRun({
 // caught by review: a stale `julia-run-JUL-76` terminal from the very
 // attempt this ticket exists because it failed would otherwise poison the
 // result). `sinceIso` excludes anything created before this dispatch.
+//
+// `run.coordinator_handle` is the actual vendor/coordinator terminal
+// `startOrchestrator` creates (julia-run.mjs's own second `terminalCreate`
+// call), not this script's own dispatch terminal -- confirmed live, not
+// guessed (a second review round raised this as unverified): JUL-75's own
+// real codex-vendor run this session, `run_90fa4e977883`, carried
+// `coordinator_handle: "term_be9264c3-…"`, and reading that exact handle
+// directly showed the real `codex exec`/SKILL.md transcript and the
+// ChatGPT usage-limit error -- not the separate dispatch terminal
+// (`term_ae19076b-…`) that ran `node scripts/julia-run.mjs JUL-75` and
+// only ever printed the run id and exit code. See JUL-73's Linear thread
+// for that live run's evidence.
 export async function findFreshRun({
   issueId = ISSUE_ID, sinceIso, runListImpl = runList, maxPolls = RUN_DISCOVERY_POLLS, waitImpl = defaultWait,
 }) {
   const sinceMs = Date.parse(sinceIso);
   for (let i = 0; i < maxPolls; i += 1) {
     // eslint-disable-next-line no-await-in-loop
-    const { runs } = await runListImpl({ environment: ORCHESTRATOR_ENVIRONMENT, limit: 20 });
+    const { runs } = await runListImpl({ environment: ORCHESTRATOR_ENVIRONMENT, limit: 100 });
     const fresh = runs
       .filter((r) => r.objective === issueId && Date.parse(r.created_at ?? 0) >= sinceMs && r.coordinator_handle)
       .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
@@ -217,12 +277,17 @@ export async function waitForWakeAndWatchForClaude({
   const checkErrors = [];
   let finished = false;
   let output = '';
+  let previousOutput = null;
 
   for (let i = 0; i < maxPolls; i += 1) {
     // eslint-disable-next-line no-await-in-loop
     const read = await terminalReadImpl({ environment: ORCHESTRATOR_ENVIRONMENT, terminal: coordinatorHandle });
     output = (read.terminal.tail ?? []).join('\n');
-    finished = shellPromptReturned(output);
+    // Two consecutive identical, prompt-terminated reads -- see
+    // looksPromptTerminated's own comment for why a single read isn't
+    // enough (a startup banner can look done on the very first poll).
+    finished = looksPromptTerminated(output) && output === previousOutput;
+    previousOutput = output;
 
     // eslint-disable-next-line no-await-in-loop
     const { sighting, checkError } = await checkForClaudeProcess({ execImpl });
@@ -281,7 +346,7 @@ ${JSON.stringify(acceptanceRun, null, 2)}
 Your job:
 1. Independently verify via the Linear MCP tool whether issue JUL-76 received a fresh comment from a codex-vendor orchestrator wake with a timestamp at or after ${sinceIso}. Read the comment's own content to confirm it is a real coordinator wake report (reconcile, admission or starvation reasoning), not something unrelated.
 2. Cross-check that against the mechanical evidence above. All of these must hold for a PASS: sandboxProbe.publisherReadable=true, sandboxProbe.orcaReachable=true, acceptanceRun.finished=true, acceptanceRun.claudeSeen=false, acceptanceRun.checkErrors is empty, acceptanceRun.error is absent, and a genuine fresh Linear comment on JUL-76 from this run. If acceptanceRun.output shows an error (e.g. Codex's own usage limit again) or acceptanceRun.error is present, that is a FAIL regardless of the other fields.
-3. On PASS: post the full evidence (mechanical evidence above plus your own Linear read) as a comment on JUL-73, then set JUL-73 to Done and close JUL-75 and JUL-76 (Cancelled, as throwaway issues). Then launch the real next work by running exactly this (as one shell command, so the environment variables apply to the same invocation): \`export ORCA_BIN=/opt/Orca/orca-ide ORCA_ENVIRONMENT=orchestrator-local; /opt/Orca/orca-ide terminal create --environment orchestrator-local --worktree "path:${CHECKOUT}" --command "node scripts/julia-run.mjs JUL-44" --title julia-run-JUL-44 --json\`.
+3. On PASS: post the full evidence (mechanical evidence above plus your own Linear read) as a comment on JUL-73, then set JUL-73 to Done and close JUL-75 and JUL-76 (Cancelled, as throwaway issues). Then launch the real next work by running exactly this command, verbatim, with no modification (it is pre-authorized exactly as written): \`${JUL44_LAUNCH_COMMAND}\`.
 4. On FAIL: post a comment on JUL-73 naming exactly which check failed, quoting the relevant piece of the mechanical evidence above (including dispatchOutput/output/claudeSightings/checkErrors, not just true/false), and what it left behind (an Orca run/terminal still worth inspecting, if any -- name its id/handle if present in the evidence). Leave JUL-73, JUL-75 and JUL-76 open. Do not start JUL-44. No retry -- this is a one-shot follow-up; a future explicit relaunch is a human decision, not this script's.
 5. If you cannot complete either branch (e.g. your own Linear access fails), still leave a comment somewhere you can reach explaining exactly what happened, so this is never a silent no-op.`;
 }
@@ -299,13 +364,21 @@ export async function runCloser({ execImpl = execFileAsync, prompt }) {
     '-lc', 'exec claude "$@"', '--',
     '-p', prompt,
     '--permission-mode', 'acceptEdits',
-    '--allowedTools', 'mcp__linear__*,mcp__claude_ai_Linear__*,Bash(/opt/Orca/orca-ide *)',
+    '--allowedTools', `mcp__linear__*,mcp__claude_ai_Linear__*,${JUL44_LAUNCH_ALLOWED_TOOL}`,
     '--output-format', 'json',
   ], {
     cwd: CHECKOUT,
     maxBuffer: 10 * 1024 * 1024,
   });
-  const result = JSON.parse(stdout);
+  // A login shell (`bash -lc`) can print its own banner/motd before
+  // `claude`'s own JSON -- a plain `JSON.parse(stdout)` would then throw
+  // *after* the closer already wrote to Linear (review finding). Parse the
+  // last brace-delimited line instead of assuming stdout is pure JSON.
+  const lastJsonLine = stdout.trim().split('\n').reverse().find((line) => line.trim().startsWith('{') && line.trim().endsWith('}'));
+  if (!lastJsonLine) {
+    throw new Error(`closer step produced no parseable JSON output: ${stdout.slice(0, 2000)}`);
+  }
+  const result = JSON.parse(lastJsonLine);
   if (result.is_error || (result.permission_denials ?? []).length > 0) {
     throw new Error(`closer step failed: ${result.result ?? JSON.stringify(result.permission_denials)}`);
   }
@@ -349,12 +422,14 @@ async function cli() {
     const { closerResult } = await main({ terminalCreateImpl: terminalCreate, terminalReadImpl: terminalRead });
     console.log(JSON.stringify(closerResult));
   } catch (error) {
-    // Never thrown past this point in practice (main()'s gather() wrapper
-    // is the real safety net) -- but if it somehow is, log loudly:
-    // journald keeps this unit's log lines searchable by name even after
-    // the unit files are removed
-    // (`journalctl -u jul73-quota-reset.service --since ...`).
-    console.error(`jul73-quota-reset-run.mjs crashed before the closer could run: ${error.message}`);
+    // main()'s gather() wrapper absorbs every mechanical-step failure, so
+    // a throw reaching here is overwhelmingly the closer step itself
+    // (runCloser) -- i.e. this fires *after* the closer already tried to
+    // write to Linear, not instead of it. Log loudly either way: journald
+    // keeps this unit's log lines searchable by name even after the unit
+    // files are removed (`journalctl -u jul73-quota-reset.service --since
+    // ...`) -- the only forensic trail left once they're gone.
+    console.error(`jul73-quota-reset-run.mjs: closer step threw (main()'s own gather() wrapper already absorbed every mechanical failure into the closer's evidence, so this is almost certainly the closer itself failing after already attempting a Linear write): ${error.message}`);
     process.exitCode = 1;
   }
 }
