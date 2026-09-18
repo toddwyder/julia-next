@@ -293,6 +293,22 @@ available today — scoped to what it already means (this account, this repo, th
 credentials), not a broader bypass. If a future Codex version adds a narrower MCP-write grant,
 prefer it over `danger-full-access` and update this note and `launchCommandFor` together.
 
+**`codex exec` has no "run this literal command, bypass the model" form.** `codex exec --help`
+shows two usage lines, `codex exec [OPTIONS] [PROMPT]` and `codex exec [OPTIONS] <COMMAND>
+[ARGS]` — the second is clap's standard rendering for "or one of these subcommands"
+(`resume`/`fork`/`review`/`help`), not an arbitrary-shell-command escape hatch. An earlier draft
+of `ops/jul73-quota-reset/`'s sandbox probe assumed the latter and would have silently sent a
+shell command as a natural-language prompt instead (caught by review, not live). The only way to
+get Codex to run a specific command and relay its exact output is to ask it to, narrowly, in the
+prompt — trusted the same way every other Codex tool-call transcript in this project already is,
+not a sandbox bypass.
+
+**The reviewer/orchestrator quota-wall problem has a one-time recovery mechanism**
+(`ops/jul73-quota-reset/`): a self-removing systemd timer that re-runs the blocked JUL-73
+acceptance leg 15 minutes after Codex's usage cap resets. See that directory's own README for the
+install procedure and its hard precondition (the commit must already be merged to `origin/main`
+before the fire time, since it runs straight out of the read-only synced checkout).
+
 ## Readiness
 
 ```sh
@@ -352,6 +368,14 @@ workflow ... without `workflows` permission" (hit live, JUL-61 retro follow-up).
 that publishes code should not also be able to edit its own CI. A check that would otherwise
 need a new CI step belongs in `scripts/*.test.mjs` instead — CI already runs that whole suite,
 so a new test file lands the check without ever touching `.github/workflows/`.
+
+**Confirming CI is green before merge: the publisher App has no `checks`/`actions` read scope**
+(live-verified, JUL-73) — `GET .../commits/<sha>/check-runs`, `.../commits/<sha>/status`, and
+`.../actions/runs` all 403 with "Resource not accessible by integration." Use the PR's own
+`mergeable_state` from `GET .../pulls/<number>` instead (`pull_requests: read`, which the App
+already needs to open PRs) — GitHub computes this itself from the branch's required checks:
+`clean` means every required check passed and there's no conflict; `unstable`/`blocked` mean
+not yet. Poll that field rather than trying to reach the Checks/Actions APIs directly.
 
 **After a PR merges, start the next change from `git checkout -b <name> origin/main` — never
 rebase the old local branch.** Rebasing a branch whose earlier commit was already squash-merged
