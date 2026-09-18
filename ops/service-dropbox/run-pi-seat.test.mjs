@@ -13,7 +13,8 @@ test('builder-backup spawns pi with DEEPSEEK_API_KEY in env, never in argv', () 
     },
   });
   assert.equal(spec.command, 'pi');
-  assert.deepEqual(spec.args, ['--provider', 'deepseek', '--model', 'deepseek-v4-flash', '-p', 'do the thing', '--mode', 'json']);
+  // Medium effort (the default) -> --thinking; see the effort tests below.
+  assert.deepEqual(spec.args, ['--provider', 'deepseek', '--model', 'deepseek-v4-flash', '--thinking', '-p', 'do the thing', '--mode', 'json']);
   assert.equal(spec.env.DEEPSEEK_API_KEY, 'super-secret-deepseek-token');
   // The secret must never appear as its own argv entry.
   assert.ok(!spec.args.includes('super-secret-deepseek-token'));
@@ -28,7 +29,7 @@ test('reviewer-backup and orchestrator-backup both route to Pi + GLM-5.3 as a cu
         return 'super-secret-zai-token';
       },
     });
-    assert.deepEqual(spec.args, ['--provider', 'glm-5-3', '--model', 'glm-5.3', '-p', 'review this', '--mode', 'rpc']);
+    assert.deepEqual(spec.args, ['--provider', 'glm-5-3', '--model', 'glm-5.3', '--thinking', '-p', 'review this', '--mode', 'rpc']);
     assert.equal(spec.env.ZAI_PAYG_API_KEY, 'super-secret-zai-token');
     assert.ok(!spec.args.includes('super-secret-zai-token'));
   }

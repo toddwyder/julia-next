@@ -16,6 +16,7 @@ import {
 } from './orca-cli.mjs';
 import { getPublisherInstallationToken } from './publish-via-github-app.mjs';
 import { SEAT_TABLE } from '../graph/seat-table.mjs';
+import { translateEffort, normalizeEffort } from './effort.mjs';
 
 const execFileAsync = promisify(execFile);
 
@@ -159,7 +160,7 @@ const ENV_PREFIX = `export ORCA_BIN=/opt/Orca/orca-ide ORCA_ENVIRONMENT=${DISPAT
 
 const SKILL_PATH = '.claude/skills/julia-coordinator/SKILL.md';
 
-function claudeLaunchCommand(issueId) {
+function claudeLaunchCommand(issueId, effort) {
   // The skill has disable-model-invocation: true (invoked by name only,
   // never inferred) -- asking in prose was refused live (JUL-63): the
   // model correctly declined to run the skill's steps by hand and pointed
@@ -178,23 +179,58 @@ function claudeLaunchCommand(issueId) {
   // the exact scripts the skill's "Each wake"/"Running a step"/"After
   // verification" procedures name, and the publisher credential file for
   // the two scripts that need it.
-  return `${ENV_PREFIX} claude --permission-mode acceptEdits --allowedTools "mcp__linear__*,mcp__claude_ai_Linear__*,Bash(node scripts/orca-cli.mjs:*),Bash(node scripts/check-readiness.mjs:*),Bash(node scripts/collect-worker-result.mjs:*),Bash(node scripts/verify-reviewer-worktree.mjs:*),Bash(node scripts/coordinator-events.mjs:*),Bash(node --env-file=/etc/orchestrator-svc/.env.publisher scripts/publish-pr.mjs:*),Bash(node --env-file=/etc/orchestrator-svc/.env.publisher scripts/merge-pr.mjs:*),Bash(orca *)" -p "/julia-coordinator ${issueId}"`;
+  //
+  // JUL-79 step 3: --effort is Claude Code's own graded setting (live
+  // --help check); translateEffort supplies the level, Medium by default.
+  // Everything after it is unchanged -- the grant list is not an effort
+  // concern and must not be disturbed here.
+  const effortArgs = translateEffort('claude', effort).join(' ');
+  return `${ENV_PREFIX} claude --permission-mode acceptEdits ${effortArgs} --allowedTools "mcp__linear__*,mcp__claude_ai_Linear__*,Bash(node scripts/orca-cli.mjs:*),Bash(node scripts/check-readiness.mjs:*),Bash(node scripts/collect-worker-result.mjs:*),Bash(node scripts/verify-reviewer-worktree.mjs:*),Bash(node scripts/coordinator-events.mjs:*),Bash(node --env-file=/etc/orchestrator-svc/.env.publisher scripts/publish-pr.mjs:*),Bash(node --env-file=/etc/orchestrator-svc/.env.publisher scripts/merge-pr.mjs:*),Bash(orca *)" -p "/julia-coordinator ${issueId}"`;
 }
 
-// Pi + GLM-5.3, the orchestrator's table backup (JUL-77): no slash-command
+// The stdin-pipe preamble every non-Claude entry shares: the checkout's own
+// coordinator skill text followed by the issue id, read live from disk at
+// launch time (never a snapshot baked into this repo's JS). `codex exec -`
+// and run-pi-seat.mjs both read their prompt from stdin, and `-` is the
+// stdin marker -- keeping one helper means the two routes cannot drift.
+function pipedCoordinatorPrompt(issueId) {
+  return `{ cat ${SKILL_PATH}; printf '\\n\\nIssue: %s\\n' '${issueId}'; }`;
+}
+
+// Codex as an orchestrator entry (JUL-79 step 3). The launch shape is
+// live-verified JUL-73: stdin prompt, and `-s danger-full-access` is the
+// ONLY sandbox level under which Codex's per-write MCP approval gate lets
+// Linear write-classified tool calls through -- there is no per-tool
+// allowlist in Codex. The effort is Codex's own `-c
+// model_reasoning_effort=...` setting (live check).
+function codexLaunchCommand(issueId, effort) {
+  const effortArgs = translateEffort('codex', effort).join(' ');
+  return `${ENV_PREFIX} ${pipedCoordinatorPrompt(issueId)} | codex exec - -s danger-full-access ${effortArgs}`;
+}
+
+// Pi (DeepSeek or GLM), the orchestrator's table backups: no slash-command
 // or exec-subcommand equivalent, so the coordinator skill body is piped in
-// on stdin the same way as the codex branch below, read by
-// run-pi-seat.mjs's own CLI entry (`readAllStdin`) and passed to Pi as its
-// `-p` prompt. The secret never appears in this string -- run-pi-seat.mjs
-// reads it in-process via read-secret.mjs, keyed only by the seat name
-// ('orchestrator-backup') that *is* safe to put in a shell string.
-function piLaunchCommand(issueId) {
-  return `${ENV_PREFIX} { cat ${SKILL_PATH}; printf '\\n\\nIssue: %s\\n' '${issueId}'; } | node ops/service-dropbox/run-pi-seat.mjs orchestrator-backup`;
+// on stdin (see pipedCoordinatorPrompt above), read by run-pi-seat.mjs's own
+// CLI entry (`readAllStdin`) and passed to Pi as its `-p` prompt. The secret
+// never appears in this string -- run-pi-seat.mjs reads it in-process via
+// read-secret.mjs, keyed only by the seat name (which *is* safe to put in a
+// shell string). The seat name is a parameter because JUL-79 step 3 adds
+// `orchestrator-deepseek` alongside the GLM `orchestrator-backup`.
+//
+// The effort travels as the neutral `--effort <level>` label, not as a Pi
+// flag: run-pi-seat.mjs owns Pi's actual on/off spelling (`--thinking`), so
+// the launcher never has to know which vendor a seat fronts.
+function piLaunchCommand(issueId, seat, effort) {
+  return `${ENV_PREFIX} ${pipedCoordinatorPrompt(issueId)} | node ops/service-dropbox/run-pi-seat.mjs ${seat} --effort ${normalizeEffort(effort)}`;
 }
 
-export function orchestratorLaunchCommandFor(entry, issueId) {
-  if (entry === 'claude') return claudeLaunchCommand(issueId);
-  if (entry === 'pi-glm') return piLaunchCommand(issueId);
+// `effort` is optional and defaults to Medium (the ticket's stated default),
+// so every existing two-argument caller keeps working unchanged.
+export function orchestratorLaunchCommandFor(entry, issueId, { effort } = {}) {
+  if (entry === 'claude') return claudeLaunchCommand(issueId, effort);
+  if (entry === 'codex') return codexLaunchCommand(issueId, effort);
+  if (entry === 'pi-glm') return piLaunchCommand(issueId, 'orchestrator-backup', effort);
+  if (entry === 'pi-deepseek') return piLaunchCommand(issueId, 'orchestrator-deepseek', effort);
   throw new Error(`unknown orchestrator seat-table entry: ${entry}`);
 }
 

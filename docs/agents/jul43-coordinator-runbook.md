@@ -580,6 +580,69 @@ Do **not** fix this by dropping the id from PR titles: the id in the title is wh
 traceability from a merged PR back to its issue. Do **not** fix it by changing the Linear
 workspace's own settings — an agent must never change Todd's service-account settings.
 
+## Auto-close is a two-way trap, and effort translation (JUL-79 step 3)
+
+### A PR referencing an issue identifier moves the card on OPEN, not just on merge
+
+Live-observed 2026-09-18/19 on this very ticket, which sharpens the merge-only picture in the
+section above: **opening a PR whose identifier-reference (observed via the title) names an issue
+moves that issue to In Progress, and merging it moves the issue to Done.** PR #41 (title `JUL-79:
+...`) opened at 22:12:36 and the JUL-79 card was In Progress by 22:12:46 (10s); the PR merged at
+22:16:28 and the card was Done at 22:16:30 (2s). Neither transition required a closing keyword or
+a body field.
+
+**Consequence for a multi-step item:** every step's PR carries the item's own id, so merely
+opening step N's PR moves the card to In Progress and merging it moves the card to Done — even
+when the item is not finished. This is now a second reason (the merge close in the section above
+is the first) that **the coordinator must reconcile the issue's real state back after EVERY
+step-merge**, not just re-read it: while more steps remain, move the card back to In Progress
+after the merge so the board does not lie. A Done status is never by itself evidence the item is
+finished. The same two "do not fix this" rules apply: keep the id in PR titles for traceability,
+and never touch Todd's Linear workspace settings.
+
+### Effort translation and the new launcher/seat entries
+
+The ticket's one Low/Medium/High choice is translated to each vendor's own spelling by the pure
+`scripts/effort.mjs` (`translateEffort(entry, effort)`, an argv array). Omitted or unrecognized
+effort is **Medium** — the stated default — and an unknown *entry* throws, exactly like
+`orchestratorLaunchCommandFor`. The mappings, each flag spelling live-verified against the
+vendor's own CLI:
+
+| seat-table entry | Low | Medium / High |
+| --- | --- | --- |
+| `claude` | `--effort low` | `--effort medium` / `--effort high` |
+| `codex` | `-c model_reasoning_effort=low` | `-c model_reasoning_effort=medium` / `...=high` |
+| `pi-deepseek`, `pi-glm` | *(no flag)* | `--thinking` |
+
+Pi has no graded setting — only `--thinking` on/off (live-verified) — so Low is thinking off and
+Medium/High thinking on; Pi's own `models.json` `thinkingLevelMap` picks the level behind the flag.
+
+**Launcher (`scripts/julia-run.mjs`, `orchestratorLaunchCommandFor(entry, issueId, { effort })`).**
+Two entries are new alongside `claude`/`pi-glm`:
+
+- `codex` — stdin-pipe shape, same preamble as the Pi route: `{ cat
+  .claude/skills/julia-coordinator/SKILL.md; printf ...; } | codex exec - -s danger-full-access
+  <codex effort args>`, under the shared `ENV_PREFIX`. `-s danger-full-access` is the ONLY sandbox
+  level under which Codex's per-write MCP approval gate lets Linear write-classified tool calls
+  through (live-verified JUL-73; Codex has no per-tool allowlist). Note `orchestrator-svc`'s Codex
+  login is usage-capped until Sep 19, 2026, so don't attempt a live Codex orchestrator run yet.
+- `pi-deepseek` — identical to `pi-glm` but invoking the new `orchestrator-deepseek` seat.
+
+Both existing entries gained effort too: `claude` inserts `--effort <level>` right after
+`--permission-mode acceptEdits` (the `--allowedTools` grant list is untouched), and the Pi routes
+pass the neutral `--effort <level>` label to `run-pi-seat.mjs` rather than a Pi flag, so the
+launcher never has to know which vendor a seat fronts. Omitted effort makes the command identical
+to an explicit `medium`.
+
+**Seat (`ops/service-dropbox/run-pi-seat.mjs`).** New `orchestrator-deepseek` seat: DeepSeek
+provider, `deepseek-v4-flash`, same `deepseek` secret field / `DEEPSEEK_API_KEY` env var as
+`builder-backup` (the seat name carries the semantics; the duplicated config is deliberate so one
+seat's model can never move silently with the other's). `buildPiSpawnSpec`/`runPiSeat`/the CLI
+(`<prompt> | node run-pi-seat.mjs <seat> [--effort low|medium|high]`) accept effort for **all**
+seats, so builder/reviewer Pi dispatches can carry it too. The secret invariant is untouched: the
+secret is read in-process via `read-secret.mjs` and injected only through `spawn`'s `env`, never
+argv or a shell string.
+
 ## Readiness
 
 ```sh
