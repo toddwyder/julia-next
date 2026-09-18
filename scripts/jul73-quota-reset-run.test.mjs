@@ -221,6 +221,12 @@ test('runCloser parses the last JSON-looking line, tolerating a login shell\'s o
   assert.equal(result.result, 'posted');
 });
 
+test('runCloser tries the whole trimmed stdout first, so a pretty-printed multi-line JSON result (an unverified but possible --output-format json shape) still parses', async () => {
+  const execImpl = async () => ({ stdout: '{\n  "is_error": false,\n  "permission_denials": [],\n  "result": "posted"\n}\n' });
+  const result = await runCloser({ execImpl, prompt: 'x' });
+  assert.equal(result.result, 'posted');
+});
+
 test('runCloser throws a clear error, not a raw JSON.parse crash, when stdout has no parseable JSON at all', async () => {
   const execImpl = async () => ({ stdout: 'claude: command not found\n' });
   await assert.rejects(() => runCloser({ execImpl, prompt: 'x' }), /closer step produced no parseable JSON output/);

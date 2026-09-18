@@ -78,10 +78,16 @@ const WAIT_INTERVAL_MS = 10_000;
 // Kept well under the unit's TimeoutStartSec (1800s = 30 min) so the closer
 // always has time left to run even if every mechanical step below times
 // out. Sequential worst case for the acceptance chain (dispatch-wait +
-// run-discovery + wake-wait) is 2+2+10 = 14 min; the sandbox probe (3 min)
-// runs concurrently with that chain, not after it -- so 14 min is the real
-// worst-case wall clock, leaving a >15 min margin for `runCloser` itself.
-const DISPATCH_WAIT_POLLS = 12;
+// run-discovery + wake-wait) is 4+2+10 = 16 min; the sandbox probe (3 min)
+// runs concurrently with that chain, not after it -- so 16 min is the real
+// worst-case wall clock, leaving a >13 min margin for `runCloser` itself.
+// DISPATCH_WAIT_POLLS was doubled after round-4 review flagged the
+// original budget (~110s usable, once the two-consecutive-reads stability
+// requirement is accounted for) as thin against `julia-run.mjs`'s own real
+// work here (readiness checks, a possible checkout-sync, run/terminal
+// creation) -- free insurance given how much TimeoutStartSec headroom
+// there already was.
+const DISPATCH_WAIT_POLLS = 24;
 const RUN_DISCOVERY_POLLS = 12;
 const WAKE_WAIT_POLLS = 60;
 const SANDBOX_PROBE_POLLS = 18;
@@ -372,13 +378,26 @@ export async function runCloser({ execImpl = execFileAsync, prompt }) {
   });
   // A login shell (`bash -lc`) can print its own banner/motd before
   // `claude`'s own JSON -- a plain `JSON.parse(stdout)` would then throw
-  // *after* the closer already wrote to Linear (review finding). Parse the
-  // last brace-delimited line instead of assuming stdout is pure JSON.
-  const lastJsonLine = stdout.trim().split('\n').reverse().find((line) => line.trim().startsWith('{') && line.trim().endsWith('}'));
-  if (!lastJsonLine) {
-    throw new Error(`closer step produced no parseable JSON output: ${stdout.slice(0, 2000)}`);
+  // *after* the closer already wrote to Linear (review finding). Try the
+  // whole trimmed stdout first (the common case, and safe if
+  // `--output-format json` ever pretty-prints across multiple lines, which
+  // a single-line-only parse would reject); only fall back to the last
+  // brace-delimited line for the banner/motd case (round 4 review: a
+  // fourth-round reviewer flagged that a *pretty-printed* multi-line JSON
+  // result -- unverified either way, `--output-format json`'s exact shape
+  // isn't exercised anywhere else in this repo -- would break a
+  // single-line-only parser on every run, not just the banner case this
+  // was written for).
+  let result;
+  try {
+    result = JSON.parse(stdout.trim());
+  } catch {
+    const lastJsonLine = stdout.trim().split('\n').reverse().find((line) => line.trim().startsWith('{') && line.trim().endsWith('}'));
+    if (!lastJsonLine) {
+      throw new Error(`closer step produced no parseable JSON output: ${stdout.slice(0, 2000)}`);
+    }
+    result = JSON.parse(lastJsonLine);
   }
-  const result = JSON.parse(lastJsonLine);
   if (result.is_error || (result.permission_denials ?? []).length > 0) {
     throw new Error(`closer step failed: ${result.result ?? JSON.stringify(result.permission_denials)}`);
   }
