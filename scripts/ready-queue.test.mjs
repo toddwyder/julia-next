@@ -399,7 +399,39 @@ test('resolveLinearApiKey falls back to the in-process drop-box reader', () => {
   assert.equal(key, 'dropbox-key');
 });
 
-test('normalizeIssue reads label names and collects blocked_by relations in either direction', () => {
+test('normalizeIssue (live JUL-78 shape): blockers are the `issue` of inverse `blocks` relations, never this card or the cards it blocks', () => {
+  // Verified live 2026-09-18: JUL-78 blocks JUL-58, and JUL-54/56/55/57 block
+  // JUL-78. There is no `blocked_by` relation type. On JUL-78's own
+  // `inverseRelations` each blocking relation is typed `blocks` with the
+  // BLOCKER in `issue` and JUL-78 itself in `relatedIssue`.
+  const ref = (identifier, name, type) => ({ id: `uuid-${identifier}`, identifier, state: { name, type } });
+  const issue = normalizeIssue({
+    id: 'uuid-JUL-78',
+    identifier: 'JUL-78',
+    title: 't',
+    sortOrder: 1,
+    state: { id: 's', name: 'Ready', type: 'unstarted' },
+    labels: { nodes: [{ name: 'ready-for-agent' }] },
+    relations: {
+      nodes: [
+        { type: 'blocks', issue: ref('JUL-78', 'Ready', 'unstarted'), relatedIssue: ref('JUL-58', 'Todo', 'unstarted') },
+      ],
+    },
+    inverseRelations: {
+      nodes: [
+        { type: 'blocks', issue: ref('JUL-54', 'Done', 'completed'), relatedIssue: ref('JUL-78', 'Ready', 'unstarted') },
+        { type: 'blocks', issue: ref('JUL-56', 'In Progress', 'started'), relatedIssue: ref('JUL-78', 'Ready', 'unstarted') },
+        { type: 'blocks', issue: ref('JUL-55', 'Done', 'completed'), relatedIssue: ref('JUL-78', 'Ready', 'unstarted') },
+        { type: 'blocks', issue: ref('JUL-57', 'Backlog', 'backlog'), relatedIssue: ref('JUL-78', 'Ready', 'unstarted') },
+      ],
+    },
+  });
+  assert.deepEqual(issue.blockers.map((b) => b.identifier), ['JUL-54', 'JUL-56', 'JUL-55', 'JUL-57']);
+  assert.ok(!issue.blockers.some((b) => b.identifier === 'JUL-78'), 'the card must not count itself as its own blocker');
+  assert.ok(!issue.blockers.some((b) => b.identifier === 'JUL-58'), 'a card this card blocks must not count as its blocker');
+});
+
+test('normalizeIssue: relations-side `blocks` and non-blocks inverse relations are not blockers', () => {
   const issue = normalizeIssue({
     id: 'i',
     identifier: 'JUL-9',
@@ -408,14 +440,19 @@ test('normalizeIssue reads label names and collects blocked_by relations in eith
     state: { id: 's', name: 'Ready', type: 'unstarted' },
     labels: { nodes: [{ name: 'ready-for-agent' }] },
     relations: {
-      nodes: [{ type: 'blocked_by', relatedIssue: { id: 'b', identifier: 'JUL-1', state: { name: 'Done', type: 'completed' } } }],
+      nodes: [
+        { type: 'blocks', issue: { id: 'x', identifier: 'JUL-1' }, relatedIssue: { id: 'b', identifier: 'JUL-8', state: { name: 'Done', type: 'completed' } } },
+      ],
     },
     inverseRelations: {
-      nodes: [{ type: 'blocks', relatedIssue: { id: 'c', identifier: 'JUL-2', state: { name: 'In Progress', type: 'started' } } }],
+      nodes: [
+        { type: 'blocks', issue: { id: 'c', identifier: 'JUL-2', state: { name: 'In Progress', type: 'started' } }, relatedIssue: { id: 'i', identifier: 'JUL-9' } },
+        { type: 'related', issue: { id: 'd', identifier: 'JUL-3', state: { name: 'Todo', type: 'unstarted' } }, relatedIssue: { id: 'i', identifier: 'JUL-9' } },
+      ],
     },
   });
   assert.deepEqual(issue.labels, ['ready-for-agent']);
-  assert.deepEqual(issue.blockers.map((b) => b.identifier).sort(), ['JUL-1', 'JUL-2']);
+  assert.deepEqual(issue.blockers.map((b) => b.identifier), ['JUL-2']);
 });
 
 // ---------------------------------------------------------------------------
