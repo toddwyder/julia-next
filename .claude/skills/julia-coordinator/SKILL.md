@@ -186,7 +186,7 @@ For the current step of the current item:
    Resolve a base-branch conflict (e.g. another merge landed on `main` first) with a normal local
    merge before re-pushing -- do not force-push.
 4. **Merges are never Todd's decision.** Once the PR's own checks report green
-   (`mergeable_state: clean` -- see Publishing below) and the review from steps 1-2 approved on a
+   (`mergeable_state: clean`, from the PR's own GitHub API record) and the review from steps 1-2 approved on a
    verified-clean worktree, the coordinator merges it itself
    (`scripts/merge-pr.mjs`, pinned to the reviewed commit) -- do not park a step's PR waiting on
    a merge-decision comment from Todd. If checks are red or the review is CHANGES-NEEDED, that is
