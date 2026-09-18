@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   juliaRun, assertIssueId, assertAccount, assertReady, ensureCheckoutSynced, findExistingRun, isRunFinished, startOrchestrator,
-  prepareServerEnvironment, getRemoteMainHead, defaultPostCommentImpl,
+  prepareServerEnvironment, getRemoteMainHead,
 } from './julia-run.mjs';
 
 const READY = { ok: true, checks: [{ name: 'OVH runner reachable', ok: true, detail: 'connected' }] };
@@ -16,7 +16,7 @@ const NOT_READY = {
 };
 
 function fakeImpls(overrides = {}) {
-  const calls = { comments: [], runsCreated: [], terminalsCreated: [], syncTriggered: false };
+  const calls = { runsCreated: [], terminalsCreated: [], syncTriggered: false };
   return {
     calls,
     impls: {
@@ -40,9 +40,6 @@ function fakeImpls(overrides = {}) {
       terminalCreateImpl: async (args) => {
         calls.terminalsCreated.push(args);
         return { terminal: { handle: 'term_fake789' } };
-      },
-      postCommentImpl: async (issueId, body) => {
-        calls.comments.push({ issueId, body });
       },
       ...overrides,
     },
@@ -189,7 +186,7 @@ test('startOrchestrator refuses outside an Orca-managed terminal (no ORCA_TERMIN
   );
 });
 
-test('happy path: readiness, synced checkout, no existing run -> orchestrator starts, run id returned, comment posted with the trailer', async () => {
+test('happy path: readiness, synced checkout, no existing run -> orchestrator starts, run id returned, no start-comment call', async () => {
   const { impls, calls } = fakeImpls();
   const result = await juliaRun('JUL-63', impls);
 
@@ -205,12 +202,50 @@ test('happy path: readiness, synced checkout, no existing run -> orchestrator st
   assert.match(calls.terminalsCreated[0].command, /Bash\(node --env-file=\/etc\/orchestrator-svc\/\.env\.publisher scripts\/publish-pr\.mjs:\*\)/);
   assert.match(calls.terminalsCreated[0].command, /Bash\(node --env-file=\/etc\/orchestrator-svc\/\.env\.publisher scripts\/merge-pr\.mjs:\*\)/);
   assert.match(calls.terminalsCreated[0].command, /Bash\(node scripts\/coordinator-events\.mjs:\*\)/);
+});
 
-  assert.equal(calls.comments.length, 1);
-  const { issueId, body } = calls.comments[0];
-  assert.equal(issueId, 'JUL-63');
-  assert.match(body, /^Instruction: run started by julia-run at .+, orchestrator run_fake456/);
-  assert.match(body, /For Todd:/);
+test('ORCHESTRATOR_VENDOR defaults to claude when unset', async () => {
+  const { impls, calls } = fakeImpls();
+  assert.equal(impls.env.ORCHESTRATOR_VENDOR, undefined);
+  await juliaRun('JUL-63', impls);
+  assert.match(calls.terminalsCreated[0].command, /claude --permission-mode acceptEdits/);
+});
+
+test('ORCHESTRATOR_VENDOR=codex launches codex instead of claude, with the same env prefix', async () => {
+  const { impls, calls } = fakeImpls();
+  impls.env.ORCHESTRATOR_VENDOR = 'codex';
+  await juliaRun('JUL-63', impls);
+
+  const { command } = calls.terminalsCreated[0];
+  // Same env prefix as the claude branch: ORCA_BIN/ORCA_ENVIRONMENT export, then the publisher env file sourced.
+  assert.match(command, /export ORCA_BIN=\/opt\/Orca\/orca-ide ORCA_ENVIRONMENT=ovh-local/);
+  assert.match(command, /set -a; \. \/etc\/orchestrator-svc\/\.env\.publisher; set \+a/);
+  // Supplies the coordinator skill by piping SKILL.md's text (no slash command equivalent for codex).
+  assert.match(command, /cat \.claude\/skills\/julia-coordinator\/SKILL\.md/);
+  assert.match(command, /\| codex exec/);
+  // The issue id rides along in the piped prompt, not as a slash-command argument.
+  assert.match(command, /JUL-63/);
+  // Permission grant equivalent to the claude branch's --allowedTools (live-verified, JUL-73:
+  // a write-classified Linear MCP call needed danger-full-access -- workspace-write silently
+  // required approval under `-a never`).
+  assert.match(command, /-s danger-full-access/);
+  assert.doesNotMatch(command, /claude --permission-mode/);
+  assert.doesNotMatch(command, /--allowedTools/);
+});
+
+test('an unknown ORCHESTRATOR_VENDOR value is a clear, named failure, not a silent fallback', async () => {
+  const { impls } = fakeImpls();
+  impls.env.ORCHESTRATOR_VENDOR = 'gemini';
+  await assert.rejects(
+    () => juliaRun('JUL-63', impls),
+    /unknown ORCHESTRATOR_VENDOR: gemini/,
+  );
+});
+
+test('no defaultPostCommentImpl and no separate start-comment call: the coordinator posts its own comments during its wake', async () => {
+  const { impls } = fakeImpls();
+  const postCommentImpl = async () => { throw new Error('julia-run must not post a start comment itself'); };
+  await assert.doesNotReject(() => juliaRun('JUL-63', { ...impls, postCommentImpl }));
 });
 
 test('prepareServerEnvironment fills in ORCA_BIN/ORCA_ENVIRONMENT and loads the publisher env file only when needed', () => {
@@ -230,36 +265,3 @@ test('prepareServerEnvironment never overwrites an explicit override', () => {
   assert.equal(env.ORCA_ENVIRONMENT, 'custom-env');
 });
 
-test('defaultPostCommentImpl allows both Linear tool names, so whichever the model picks is permitted', async () => {
-  let calledArgs;
-  const execImpl = async (cmd, args) => {
-    calledArgs = args;
-    return { stdout: JSON.stringify({ is_error: false, permission_denials: [], result: 'posted' }) };
-  };
-  await defaultPostCommentImpl('JUL-64', 'body text', { execImpl });
-  const allowedToolsIndex = calledArgs.indexOf('--allowedTools');
-  assert.equal(calledArgs[allowedToolsIndex + 1], 'mcp__linear__save_comment,mcp__claude_ai_Linear__save_comment');
-  assert.deepEqual(calledArgs.slice(-2), ['--output-format', 'json']);
-});
-
-test('defaultPostCommentImpl throws when the tool call was denied, even though claude -p itself exits 0 (JUL-63, hit live)', async () => {
-  const execImpl = async () => ({
-    stdout: JSON.stringify({
-      is_error: false,
-      permission_denials: [{ tool_name: 'mcp__claude_ai_Linear__save_comment' }],
-      result: "I couldn't post the comment -- permission needed first.",
-    }),
-  });
-  await assert.rejects(
-    () => defaultPostCommentImpl('JUL-64', 'body text', { execImpl }),
-    /failed to post the start comment on JUL-64: I couldn't post the comment/,
-  );
-});
-
-test('defaultPostCommentImpl throws on is_error even with no permission_denials', async () => {
-  const execImpl = async () => ({ stdout: JSON.stringify({ is_error: true, permission_denials: [], result: 'something else went wrong' }) });
-  await assert.rejects(
-    () => defaultPostCommentImpl('JUL-64', 'body text', { execImpl }),
-    /failed to post the start comment on JUL-64: something else went wrong/,
-  );
-});

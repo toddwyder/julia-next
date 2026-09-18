@@ -251,6 +251,45 @@ two scripts that need it (`publish-pr.mjs`, `merge-pr.mjs`); and the bare `orca`
 skill's own procedure grows to need another script or tool, its `--allowedTools` list in
 `scripts/julia-run.mjs`'s `startOrchestrator` needs the matching grant added in the same PR.
 
+## Second vendor on the orchestrator seat (JUL-73)
+
+`julia-run.mjs`'s `startOrchestrator` picks its launch command from `ORCHESTRATOR_VENDOR`
+(`claude`, the default, or `codex`) rather than a single hardcoded string. Both branches share
+the same env prefix (`ORCA_BIN`/`ORCA_ENVIRONMENT` export, then the publisher env file sourced
+with `set -a`/`set +a`). The `codex` branch has no slash-command equivalent, so it pipes the
+checkout's own `.claude/skills/julia-coordinator/SKILL.md` text plus the issue id into `codex
+exec -` as its prompt, reading the file live on the server at launch time rather than a snapshot
+baked into this repo's JS.
+
+**Codex logins, as `orchestrator-svc` (both headless, same shape as `claude mcp login linear` in
+JUL-61 — a URL/code Todd completes in his own browser):**
+```sh
+codex login --device-auth   # prints https://auth.openai.com/codex/device + a one-time code
+codex mcp add linear --url https://mcp.linear.app/mcp   # same MCP URL Claude already uses here
+codex mcp login linear      # prints a https://mcp.linear.app/authorize?... OAuth URL
+```
+**The OAuth callback for `codex mcp login linear` listens on `127.0.0.1:<port>` on the server
+itself**, so a browser running anywhere else (Todd's laptop) cannot deliver it directly — the
+same class of problem noted elsewhere in this file for editing files across shell layers. After
+Todd approves in his browser, he lands on a `127.0.0.1:<port>/callback/...?code=...&state=...`
+page that fails to load; take that exact URL and `curl` it from the server (as `orchestrator-svc`)
+to deliver the callback to the waiting process. The device-code/URL and the OAuth URL are both
+single-use and time-limited (the device code expires in 15 minutes; the OAuth callback listener
+times out on its own deadline, observed live at a few minutes) — if either expires before Todd
+acts, kill the stale attempt and start a fresh one rather than reusing captured text.
+
+**Codex's MCP tool-call approval gate blocks a write-classified MCP call under `workspace-write`,
+even with `--ask-for-approval never`** (live-verified, JUL-73: `codex exec -s workspace-write`
+reading via `linear/get_issue` worked, but `linear/save_comment` failed with "MCP tool call
+requires approval, but approval policy is never" — the approval gate for a write tool isn't
+satisfied by the approval-policy flag the way a shell command's is). This is Codex's own
+per-write-tool confirmation, separate from the sandbox's file/network policy. Only `-s
+danger-full-access` let the write through. There is no per-tool allowlist in Codex the way
+Claude's `--allowedTools` provides, so `danger-full-access` is the closest real equivalent
+available today — scoped to what it already means (this account, this repo, this account's own
+credentials), not a broader bypass. If a future Codex version adds a narrower MCP-write grant,
+prefer it over `danger-full-access` and update this note and `launchCommandFor` together.
+
 ## Readiness
 
 ```sh
