@@ -293,6 +293,61 @@ available today — scoped to what it already means (this account, this repo, th
 credentials), not a broader bypass. If a future Codex version adds a narrower MCP-write grant,
 prefer it over `danger-full-access` and update this note and `launchCommandFor` together.
 
+## Seat-table backups: Pi (JUL-77)
+
+**Pi was not installed anywhere on the server** as of 2026-09-18 — `worker-start`/`orca worktree
+create --agent pi` accepts the id (no enum restriction; `--agent` is free text per `orca-cli`'s
+own skill guide, "Known ids include `claude`, `codex`, `omp`, `pi`, `grok`"), but nothing was
+there to launch. Installed globally: `sudo npm install -g --ignore-scripts
+@earendil-works/pi-coding-agent` (binary: `pi`, v0.85.1 as installed). Live-verified:
+`orca worktree create --repo path:/home/runner/julia-next --agent pi --no-parent --json` actually
+spawns `pi` in the new worktree's terminal (`createdWithAgent: "pi"`, TUI drawn) — the probe
+worktree/branch were removed after (`orca worktree rm --worktree name:<name> --force`).
+
+**Config lives per-identity**, not in the repo: `~/.pi/agent/auth.json` (native providers) and
+`~/.pi/agent/models.json` (custom providers), one pair per Linux account that runs Pi.
+
+- **Builder backup — DeepSeek, native provider.** `~/.pi/agent/auth.json` for `runner`:
+  `{ "deepseek": { "type": "api_key", "key": "$DEEPSEEK_API_KEY" } }` — the `"$VAR"` form
+  interpolates the env var at resolution time (confirmed against the bundled
+  `docs/providers.md`'s own "Key Resolution" section, not the public docs site, which is a
+  different/newer version and gave the wrong `providers` shape below). Launch:
+  `pi --provider deepseek --model deepseek-v4-flash -p "<prompt>" --mode json`, with
+  `DEEPSEEK_API_KEY` set only in the child process's env (never argv) — see
+  `ops/service-dropbox/run-pi-seat.mjs`. Live-verified real reply + real cost
+  (`$0.00025844`, `deepseek-v4-flash`).
+- **Reviewer/orchestrator backup — GLM-5.3, custom provider (pay-per-use, not the ZAI Coding
+  Plan).** `ZAI_API_KEY` is the *native* env var name for ZAI's own Coding Plan integration
+  (`docs/providers.md` table) — using it for a pay-per-use custom provider would be confusing, so
+  the drop-box/launcher env var is named `ZAI_PAYG_API_KEY` instead, kept out of the native
+  name entirely. `~/.pi/agent/models.json` for `orchestrator-svc` (**the public pi.dev docs site
+  describe an older/different `providers: [ {id, type, ...} ]` array shape — wrong for this
+  installed version; confirmed live against the bundled `models.md`**, correct shape is an
+  object keyed by provider id, field `api` not `type`):
+  ```json
+  { "providers": { "glm-5-3": {
+      "baseUrl": "https://api.z.ai/api/paas/v4/", "api": "openai-completions",
+      "apiKey": "$ZAI_PAYG_API_KEY", "models": [ { "id": "glm-5.3", "name": "GLM-5.3" } ]
+  } } }
+  ```
+  Launch: `pi --provider glm-5-3 --model glm-5.3 -p "<prompt>" --mode json`. Live-verified real
+  reply from `api.z.ai`.
+- **`pi`'s default provider is `google`** when `--provider`/`--model` are omitted — the first
+  attempt at the DeepSeek proof hung (no output, no error) for exactly this reason; always pass
+  both explicitly.
+- Both secrets are read in-process via `ops/service-dropbox/read-secret.mjs`'s `readSecret()` and
+  handed to the child only through `spawn`'s `env` option, never argv or a shell string — see
+  that module's comment for the JUL-72 incident this guards against. **Do not `cat` a
+  drop-box secret file directly to inspect it** — these are raw, non-`KEY=VALUE` tokens; a bare
+  `cat` (rather than `readSecret()`) echoes the full value into whatever captured the command's
+  output. Hit live during this same session; caught before it left this session's own scrollback,
+  but treat it as a real near-miss, not a hypothetical.
+- Cost is reported per response (`usage.cost.total`) for DeepSeek; GLM-5.3 via the custom
+  `openai-completions` provider reported `cost: 0` on the one live call made — likely the
+  endpoint doesn't return usage-based pricing in the response for this route, not that the call
+  was actually free. Unresolved: get a real per-session cost figure for the GLM backup seat
+  before relying on the "cost per session recorded for each backup seat" acceptance line.
+
 ## Readiness
 
 ```sh
@@ -352,6 +407,14 @@ workflow ... without `workflows` permission" (hit live, JUL-61 retro follow-up).
 that publishes code should not also be able to edit its own CI. A check that would otherwise
 need a new CI step belongs in `scripts/*.test.mjs` instead — CI already runs that whole suite,
 so a new test file lands the check without ever touching `.github/workflows/`.
+
+**Confirming CI is green before merge: the publisher App has no `checks`/`actions` read scope**
+(live-verified, JUL-73) — `GET .../commits/<sha>/check-runs`, `.../commits/<sha>/status`, and
+`.../actions/runs` all 403 with "Resource not accessible by integration." Use the PR's own
+`mergeable_state` from `GET .../pulls/<number>` instead (`pull_requests: read`, which the App
+already needs to open PRs) — GitHub computes this itself from the branch's required checks:
+`clean` means every required check passed and there's no conflict; `unstable`/`blocked` mean
+not yet. Poll that field rather than trying to reach the Checks/Actions APIs directly.
 
 **After a PR merges, start the next change from `git checkout -b <name> origin/main` — never
 rebase the old local branch.** Rebasing a branch whose earlier commit was already squash-merged

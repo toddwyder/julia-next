@@ -36,8 +36,11 @@ test('secretAuthHeader wraps the value as a Bearer header, built in-process', ()
   assert.equal(secretAuthHeader('supabase', { dir }), 'Bearer sbp_token_value_1234567890');
 });
 
-test('KNOWN_FIELDS is exactly the four services this ticket names', () => {
-  assert.deepEqual([...KNOWN_FIELDS].sort(), ['axiom', 'powersync', 'sentry', 'supabase']);
+test('KNOWN_FIELDS includes the seven services named across JUL-72 and JUL-77', () => {
+  assert.deepEqual(
+    [...KNOWN_FIELDS].sort(),
+    ['axiom', 'deepseek', 'linear', 'powersync', 'sentry', 'supabase', 'zai'],
+  );
 });
 
 test('read-secret.mjs never imports node:child_process -- a static guard against ever shelling out to read a secret', () => {
