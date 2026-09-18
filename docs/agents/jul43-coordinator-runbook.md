@@ -328,6 +328,15 @@ reviewer's worktree against the candidate commit (`scripts/verify-reviewer-workt
 difference, committed or not, rejects the review outright and the step is retried with a fresh
 reviewer. See `SKILL.md`'s "After verification" section for the exact sequence.
 
+**`verify-reviewer-worktree.mjs` hits the same dubious-ownership guard as an unpatched
+`publish-pr.mjs` (live-verified, JUL-73).** Whenever the verifying process's UID doesn't match
+the reviewer worktree's owner UID (the coordinator's own real shape: `orchestrator-svc`
+verifying a `runner`-owned reviewer worktree), plain `git -C <path> diff` silently falls back as
+if run outside any repository at all, rather than failing loudly — so a tampered worktree and a
+clean one both produced empty-looking output, defeating the check it exists to run. Fixed the
+same way as `publish-pr.mjs` (JUL-71): `-c safe.directory=<worktreePath>`, scoped to exactly the
+path the caller passed in.
+
 ## Publishing
 
 Every GitHub write — branch push, PR open, merge — goes through the publisher scripts
