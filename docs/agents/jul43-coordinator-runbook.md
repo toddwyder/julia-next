@@ -230,6 +230,60 @@ checkout, and do not try to `git checkout` it away — the next sync re-creates 
 change would show as added or removed lines, so check `git diff --stat` for nonzero insertions
 before believing the checkout is dirty.
 
+## Ready queue: board order and the /tmp trap (JUL-79 step 1)
+
+`scripts/ready-queue.mjs` is the plain-script half of "run the graph from the board": one
+`node scripts/ready-queue.mjs --check` invocation performs exactly one check cycle and exits. It
+is **not** on a timer yet (the `julia-next-ready-queue.timer` unit is a later, parked step), so
+"explicit launch only" below still holds. When the slot is free it starts the top Ready card via
+the same command `julia-run.mjs` uses for a manual start, and its state file is
+`~/.local/state/julia-next/ready-queue.json` (what the previous check saw). Facts a future
+session must not have to rediscover:
+
+- **Board order is `Issue.sortOrder`, sorted client-side.** Verified live 2026-09-18: the field
+  is a populated float (e.g. `-28624`). Linear's paginated connections only accept
+  `orderBy: createdAt | updatedAt` — `manual` is rejected — so "top card in Ready" is the Ready
+  issue with the lowest `sortOrder`, not the order the connection returns. Moving/reordering a
+  card is never itself a trigger; the next check is what acts.
+- **The check interval is a parameter, not a sleep.** `--interval-minutes` (default `5`, or
+  `READY_QUEUE_INTERVAL_MINUTES`) is echoed only; the script never sleeps. The later timer must
+  set its `OnUnitActiveSec` to the same value and pass `--interval-minutes` so the emitted script
+  and the unit agree. One-full-check rule: a card starts only if the previous check already saw
+  it in Ready, and a card moved into and out of Ready between checks must never start (the state
+  file is rewritten with the whole current Ready set each cycle, so a departure is forgotten).
+  The parked timer this script is built for looks like `julia-next-checkout-sync.timer`; do not
+  create it until the ticket approves it, but the interval belongs in its `ExecStart` and its
+  `OnUnitActiveSec` together:
+
+  ```ini
+  [Unit]
+  Description=Run one julia-next Ready-queue check cycle
+
+  [Service]
+  Type=oneshot
+  User=orchestrator-svc
+  Environment=ORCA_BIN=/opt/Orca/orca-ide
+  ExecStart=/usr/bin/node /srv/orchestrator-svc/julia-next/scripts/ready-queue.mjs --check --interval-minutes 5
+
+  [Timer]
+  OnBootSec=1min
+  OnUnitActiveSec=5min
+  Persistent=true
+  ```
+- **No Ready state or label groups existed as of 2026-09-18.** The script resolves the workflow
+  state named `Ready` on team `Julia-next` at runtime and no-ops quietly when it is absent;
+  creating that state is a separate, Todd-approved step. The label→model "choice" validator is an
+  injected seam with a permissive default until that later step lands. The exact GraphQL shape of
+  `createLinearClient`'s queries (`Team.states`, and which side Linear stores a `blocked_by`
+  relation on) was **not** exercised against the live API in this step — re-check it on the first
+  real run; the injected client boundary keeps any fix local.
+- **Both Orca daemons run with `PrivateTmp=yes`.** A file written to `/tmp` by a terminal of one
+  daemon is INVISIBLE to terminals of the other daemon (`orca-server.service` as `runner` vs
+  `orca-server-orchestrator.service` as `orchestrator-svc`). Coordinator-to-worker prompt handoff
+  must therefore be self-contained in the terminal command itself (e.g. base64-embedded) or live
+  inside the repo — never a `/tmp` path, which silently reads as an empty/missing file to the
+  other side rather than failing loudly.
+
 ## Start
 
 There is no scheduled trigger — explicit launch only. From inside an Orca terminal on the
