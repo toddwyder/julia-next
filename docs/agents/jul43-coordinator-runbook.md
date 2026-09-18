@@ -254,15 +254,22 @@ two scripts that need it (`publish-pr.mjs`, `merge-pr.mjs`); and the bare `orca`
 skill's own procedure grows to need another script or tool, its `--allowedTools` list in
 `scripts/julia-run.mjs`'s `startOrchestrator` needs the matching grant added in the same PR.
 
-## Second vendor on the orchestrator seat (JUL-73)
+## Second vendor on the orchestrator seat (JUL-73, superseded by JUL-77)
 
-`julia-run.mjs`'s `startOrchestrator` picks its launch command from `ORCHESTRATOR_VENDOR`
-(`claude`, the default, or `codex`) rather than a single hardcoded string. Both branches share
-the same env prefix (`ORCA_BIN`/`ORCA_ENVIRONMENT` export, then the publisher env file sourced
-with `set -a`/`set +a`). The `codex` branch has no slash-command equivalent, so it pipes the
-checkout's own `.claude/skills/julia-coordinator/SKILL.md` text plus the issue id into `codex
-exec -` as its prompt, reading the file live on the server at launch time rather than a snapshot
-baked into this repo's JS.
+**`ORCHESTRATOR_VENDOR` is retired.** `julia-run.mjs`'s `startOrchestrator` now reads
+`graph/seat-table.mjs`'s `orchestrator` entry instead: `claude` (primary) or `pi-glm` (backup),
+tried automatically on a detected usage-cap error rather than hand-edited. See "Seat-table
+backups: Pi (JUL-77)" below for the table itself and the cap-detection/fail-over mechanism.
+`codex` is no longer a valid orchestrator entry — the table reserves it for the **reviewer**
+seat instead, so this section's Codex login/MCP-approval knowledge stays relevant, just for a
+different seat. Both orchestrator launch branches (`claude`, `pi-glm`) share the same env prefix
+(`ORCA_BIN`/`ORCA_ENVIRONMENT` export, then the publisher env file sourced with `set -a`/`set
++a`). Neither has a slash-command equivalent to Claude's, so each pipes the checkout's own
+`.claude/skills/julia-coordinator/SKILL.md` text plus the issue id in on stdin — `codex exec -`
+for the historical codex-as-orchestrator path (kept below for the reviewer seat's own launch,
+built separately by the coordinator skill's worker dispatch, not by `julia-run.mjs`), and
+`node ops/service-dropbox/run-pi-seat.mjs orchestrator-backup` for the table's Pi backup — always
+reading the file live on the server at launch time, never a snapshot baked into this repo's JS.
 
 **Codex logins, as `orchestrator-svc` (both headless, same shape as `claude mcp login linear` in
 JUL-61 — a URL/code Todd completes in his own browser):**
@@ -291,7 +298,8 @@ danger-full-access` let the write through. There is no per-tool allowlist in Cod
 Claude's `--allowedTools` provides, so `danger-full-access` is the closest real equivalent
 available today — scoped to what it already means (this account, this repo, this account's own
 credentials), not a broader bypass. If a future Codex version adds a narrower MCP-write grant,
-prefer it over `danger-full-access` and update this note and `launchCommandFor` together.
+prefer it over `danger-full-access` and update this note and the reviewer's worker-dispatch
+launch (`.claude/skills/julia-coordinator/SKILL.md`, "Running a step") together.
 
 ## Seat-table backups: Pi (JUL-77)
 
@@ -347,6 +355,12 @@ worktree/branch were removed after (`orca worktree rm --worktree name:<name> --f
   endpoint doesn't return usage-based pricing in the response for this route, not that the call
   was actually free. Unresolved: get a real per-session cost figure for the GLM backup seat
   before relying on the "cost per session recorded for each backup seat" acceptance line.
+- **The `glm-5-3` `models.json` entry is per-identity, not shared** — it was only written for
+  `orchestrator-svc` initially (which is all `julia-run.mjs`'s orchestrator-backup path needs),
+  but the reviewer-backup seat dispatches as `runner` (PR #36 review finding). `runner` needed
+  the identical `~/.pi/agent/models.json` entry added separately; live-verified working (real
+  `pong` reply) only after that. Any *new* identity that ever runs a `pi-glm` seat needs this
+  file written for it too — it does not follow from `orchestrator-svc`'s copy existing.
 
 **`/home/orchestrator-svc/julia-next` is not a real checkout — ignore it.** Only
 `/srv/orchestrator-svc/julia-next` (read-only, synced) and `/home/runner/julia-next` (writable,
@@ -369,6 +383,19 @@ violation of that invariant, not a design gap. Fixed by resetting `/home/runner/
 **Any session touching this runner going forward should confirm the sync timer is still green**
 (`systemctl status julia-next-checkout-sync.timer`) rather than assume it — this had apparently
 been broken long enough for both checkouts to drift 25+ commits behind before anyone noticed.
+
+**Orchestrator launch and cap fail-over (Build item 3, `scripts/julia-run.mjs`).**
+`startOrchestrator` reads `SEAT_TABLE.orchestrator` and starts the primary entry
+(`orchestratorLaunchCommandFor`), then calls `waitForEarlyCapError` on that terminal: a bounded
+(`45s` default) `terminal wait --for tui-idle` followed by `terminal read`, checked against
+`CAP_ERROR_PATTERN`. A `terminalWait` timeout is *not* treated as a cap or any other kind of
+failure — it means the session is still running normally past the check window, and is left
+alone. Only an actual pattern match starts a second run/terminal on the backup entry, same
+objective (`startOrchestratorEntry` called twice, never more — the table has exactly one backup
+per seat, not a chain). `CAP_ERROR_PATTERN` is built from Codex's real, live-captured cap text
+this session plus the other vendors' documented phrasing; Claude Code's own exact cap text was
+never observed live this week (no session in this project's record hit one), so that part of the
+pattern is unverified — a real example should replace the guess the first time one is seen.
 
 ## Readiness
 
