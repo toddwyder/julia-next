@@ -169,26 +169,110 @@ test('a partial round (one box filled) stays armed, and a later round can save t
   });
 });
 
-test('a field already received is never overwritten by a later round, even if resubmitted', async (t) => {
+test('a field already received can be replaced: the new value reaches the writer and the old one is not kept', async (t) => {
   const statePath = tmpState();
   await saveState(statePath, { armedAt: new Date().toISOString(), received: {}, usedAt: null });
-  const written = [];
-  const writeSecret = async (name, value) => { written.push({ name, value }); };
+  // Stands in for write-secret.sh, which replaces the destination file
+  // atomically (mv -f), so one slot per field is exactly what the server has.
+  const stored = {};
+  const writeSecret = async (name, value) => { stored[name] = value; };
   await withServer(t, { statePath, writeSecret, now: () => Date.now() }, async (base) => {
     await request(`${base}/save`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ sentry: 'a'.repeat(40) }),
     });
-    const resubmit = await request(`${base}/save`, {
+    const replace = await request(`${base}/save`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ sentry: 'DIFFERENT'.repeat(5) }),
+      body: JSON.stringify({ sentry: 'b'.repeat(40) }),
     });
-    const parsed = JSON.parse(resubmit.body);
-    assert.equal(parsed.sentry.alreadyReceived, true);
-    assert.equal(written.length, 1, 'the helper is never invoked a second time for the same field');
-    assert.equal(written[0].value, 'a'.repeat(40), 'the original value is untouched');
+    const parsed = JSON.parse(replace.body);
+    assert.equal(parsed.sentry.ok, true);
+    assert.equal(parsed.sentry.alreadyReceived, undefined, 'a resubmitted field is saved, not skipped');
+    assert.equal(stored.sentry, 'b'.repeat(40), 'the new value overwrote the old one');
+    assert.equal(Object.values(stored).includes('a'.repeat(40)), false, 'the old value is gone');
+    assert.equal(JSON.stringify(parsed).includes('b'.repeat(40)), false, 'the response never contains the raw value');
+    assert.equal((await loadState(statePath)).received.sentry, true, 'the field still counts as received');
+  });
+});
+
+test('every received field can be replaced, not just the first one saved', async (t) => {
+  const statePath = tmpState();
+  await saveState(statePath, { armedAt: new Date().toISOString(), received: {}, usedAt: null });
+  const stored = {};
+  const writeSecret = async (name, value) => { stored[name] = value; };
+  await withServer(t, { statePath, writeSecret, now: () => Date.now() }, async (base) => {
+    const post = (body) => request(`${base}/save`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    // Leave one field unsent so the box stays armed after the first round.
+    const first = {};
+    const second = {};
+    for (const f of FIELDS.filter((x) => x !== 'linear')) {
+      first[f] = `old-${f}-`.padEnd(40, '1');
+      second[f] = `new-${f}-`.padEnd(40, '2');
+    }
+    await post(first);
+    const res = JSON.parse((await post(second)).body);
+    for (const f of FIELDS.filter((x) => x !== 'linear')) {
+      assert.equal(res[f].ok, true, `${f} was replaced`);
+      assert.equal(stored[f], second[f], `${f} holds the new value`);
+    }
+  });
+});
+
+test('a bad replacement is rejected and the working value is left in place', async (t) => {
+  const statePath = tmpState();
+  await saveState(statePath, { armedAt: new Date().toISOString(), received: {}, usedAt: null });
+  const stored = {};
+  const writeSecret = async (name, value) => { stored[name] = value; };
+  await withServer(t, { statePath, writeSecret, now: () => Date.now() }, async (base) => {
+    const post = (body) => request(`${base}/save`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    await post({ sentry: 'a'.repeat(40) });
+    const bad = JSON.parse((await post({ sentry: 'too short' })).body);
+    assert.equal(bad.sentry.ok, false);
+    assert.equal(stored.sentry, 'a'.repeat(40), 'the earlier working value is untouched');
+    assert.equal((await loadState(statePath)).received.sentry, true, 'still counted as received');
+  });
+});
+
+test('a box left blank on a later round does not touch the saved value', async (t) => {
+  const statePath = tmpState();
+  await saveState(statePath, { armedAt: new Date().toISOString(), received: {}, usedAt: null });
+  const written = [];
+  const writeSecret = async (name, value) => { written.push({ name, value }); };
+  await withServer(t, { statePath, writeSecret, now: () => Date.now() }, async (base) => {
+    const post = (body) => request(`${base}/save`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    await post({ sentry: 'a'.repeat(40) });
+    await post({ sentry: '', supabase: 'b'.repeat(40) });
+    assert.deepEqual(written.map((w) => w.name), ['sentry', 'supabase'], 'sentry was written once, never re-written blank');
+  });
+});
+
+test('the form keeps every box open, including ones already received', async (t) => {
+  const statePath = tmpState();
+  await saveState(statePath, {
+    armedAt: new Date().toISOString(),
+    received: { sentry: true, supabase: true },
+    usedAt: null,
+  });
+  const writeSecret = async () => {};
+  await withServer(t, { statePath, writeSecret, now: () => Date.now() }, async (base) => {
+    const res = await request(`${base}/`);
+    assert.doesNotMatch(res.body, /<input[^>]*disabled/, 'no input is locked');
+    assert.doesNotMatch(res.body, /locked/i, 'the page no longer tells Todd a received box is locked');
+    assert.match(res.body, /id="sentry-status"[^>]*>received/, 'a received box still shows it was received');
   });
 });
 

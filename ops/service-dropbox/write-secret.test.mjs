@@ -30,3 +30,13 @@ test('write-secret.sh chowns the temp file to root:$GROUP, never a hard-coded gr
   const text = scriptText();
   assert.match(text, /chown root:"\$GROUP" "\$TMP"/, 'the chown must use the per-field $GROUP variable, not a fixed group');
 });
+
+// A replacement (Todd pastes a new value over a saved one) must leave exactly
+// one copy: the new value written to a temp file, then moved over the old file.
+// mv -n or noclobber would silently keep the old value; a second file name
+// would leave the old value lying around.
+test('write-secret.sh replaces the destination in place, so a new value overwrites the old one', () => {
+  const text = scriptText();
+  assert.match(text, /mv -f "\$TMP" "\$DEST"/, 'the temp file is moved over the destination');
+  assert.doesNotMatch(text, /noclobber|mv -n|mv -i|cp -n/, 'nothing may refuse to overwrite an existing file');
+});
