@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 
 import {
   buildSandboxProbeCommand, buildCodexAcceptanceCommand, buildCloserPrompt,
-  runCodexSandboxProbe, findCoordinatorTerminal, waitForWakeAndWatchForClaude,
-  checkForClaudeProcess, dispatchCodexAcceptanceRun, runCloser, main,
+  runCodexSandboxProbe, dispatchCodexAcceptanceRun, findFreshRun,
+  checkForClaudeProcess, waitForWakeAndWatchForClaude, runCloser, main,
 } from './jul73-quota-reset-run.mjs';
 
 test('buildSandboxProbeCommand asks codex to run the probe script and relay raw output -- not a claimed sandbox bypass', () => {
@@ -13,7 +13,6 @@ test('buildSandboxProbeCommand asks codex to run the probe script and relay raw 
   assert.match(command, /set -a; \. \/etc\/orchestrator-svc\/\.env\.publisher; set \+a/);
   assert.match(command, /codex exec -s danger-full-access/);
   assert.match(command, /node scripts\/jul73-codex-sandbox-probe\.mjs/);
-  // No `--` execution form -- codex exec's only positional is a prompt.
   assert.doesNotMatch(command, /codex exec[^"]*-- /);
 });
 
@@ -41,25 +40,58 @@ test('runCodexSandboxProbe fails closed on no parseable JSON (e.g. codex itself 
   assert.equal(result.orcaReachable, false);
 });
 
-test('findCoordinatorTerminal picks the most recently active terminal titled julia-run-<issueId>', async () => {
-  const execImpl = async () => ({
-    stdout: JSON.stringify({
-      result: {
-        terminals: [
-          { handle: 'term_old', title: 'julia-run-JUL-76', lastOutputAt: 100 },
-          { handle: 'term_other', title: 'julia-run-JUL-44', lastOutputAt: 500 },
-          { handle: 'term_new', title: 'julia-run-JUL-76', lastOutputAt: 300 },
-        ],
-      },
-    }),
-  });
-  const found = await findCoordinatorTerminal({ issueId: 'JUL-76', execImpl });
-  assert.equal(found.handle, 'term_new');
+test('dispatchCodexAcceptanceRun waits for its own dispatch terminal to finish and reports the dispatch output', async () => {
+  let reads = 0;
+  const terminalCreateImpl = async () => ({ terminal: { handle: 'term_dispatch' } });
+  const terminalReadImpl = async () => {
+    reads += 1;
+    if (reads < 2) return { terminal: { tail: ['still starting...'] } };
+    return { terminal: { tail: ['still starting...', 'run_abc123', 'orchestrator-svc@host:~$'] } };
+  };
+  const result = await dispatchCodexAcceptanceRun({ terminalCreateImpl, terminalReadImpl, waitImpl: async () => {}, maxPolls: 5 });
+  assert.equal(result.dispatchFinished, true);
+  assert.match(result.dispatchOutput, /run_abc123/);
+  assert.equal(result.dispatchTerminalHandle, 'term_dispatch');
 });
 
-test('findCoordinatorTerminal returns null when the terminal has not appeared yet', async () => {
-  const execImpl = async () => ({ stdout: JSON.stringify({ result: { terminals: [] } }) });
-  const found = await findCoordinatorTerminal({ issueId: 'JUL-76', execImpl });
+test('dispatchCodexAcceptanceRun reports not-finished (never a crash) if the dispatch never returns within budget', async () => {
+  const terminalCreateImpl = async () => ({ terminal: { handle: 'term_dispatch' } });
+  const terminalReadImpl = async () => ({ terminal: { tail: ['still starting...'] } });
+  const result = await dispatchCodexAcceptanceRun({ terminalCreateImpl, terminalReadImpl, waitImpl: async () => {}, maxPolls: 2 });
+  assert.equal(result.dispatchFinished, false);
+});
+
+test('findFreshRun matches by exact issue id and only accepts a run created at or after sinceIso -- a stale run from an earlier attempt at the same issue must not be picked up', async () => {
+  const runListImpl = async () => ({
+    runs: [
+      { id: 'run_stale', objective: 'JUL-76', coordinator_handle: 'term_stale', created_at: '2026-09-18T00:00:00Z' },
+      { id: 'run_fresh', objective: 'JUL-76', coordinator_handle: 'term_fresh', created_at: '2026-09-19T19:44:00Z' },
+      { id: 'run_other', objective: 'JUL-44', coordinator_handle: 'term_other', created_at: '2026-09-19T19:44:00Z' },
+    ],
+  });
+  const found = await findFreshRun({ issueId: 'JUL-76', sinceIso: '2026-09-19T19:43:00Z', runListImpl });
+  assert.equal(found.id, 'run_fresh');
+});
+
+test('findFreshRun keeps polling until a fresh run appears, then stops', async () => {
+  let calls = 0;
+  const runListImpl = async () => {
+    calls += 1;
+    if (calls < 3) return { runs: [] };
+    return { runs: [{ id: 'run_fresh', objective: 'JUL-76', coordinator_handle: 'term_fresh', created_at: '2026-09-19T19:50:00Z' }] };
+  };
+  const found = await findFreshRun({
+    issueId: 'JUL-76', sinceIso: '2026-09-19T19:43:00Z', runListImpl, waitImpl: async () => {}, maxPolls: 5,
+  });
+  assert.equal(found.id, 'run_fresh');
+  assert.equal(calls, 3);
+});
+
+test('findFreshRun returns null (not a crash) if nothing fresh ever appears', async () => {
+  const runListImpl = async () => ({ runs: [] });
+  const found = await findFreshRun({
+    issueId: 'JUL-76', sinceIso: '2026-09-19T19:43:00Z', runListImpl, waitImpl: async () => {}, maxPolls: 2,
+  });
   assert.equal(found, null);
 });
 
@@ -69,62 +101,61 @@ test('checkForClaudeProcess reports a real sighting', async () => {
     assert.deepEqual(args, ['-u', 'orchestrator-svc', '-a', 'claude']);
     return { stdout: '12345 claude -p something\n' };
   };
-  const sighting = await checkForClaudeProcess({ execImpl });
+  const { sighting, checkError } = await checkForClaudeProcess({ execImpl });
   assert.match(sighting, /claude -p something/);
+  assert.equal(checkError, null);
 });
 
-test('checkForClaudeProcess treats pgrep\'s no-match exit as clean, not an error', async () => {
-  const execImpl = async () => { const e = new Error('exit 1'); throw e; };
-  const sighting = await checkForClaudeProcess({ execImpl });
+test('checkForClaudeProcess treats pgrep exit 1 (no match) as clean, not an error', async () => {
+  const execImpl = async () => { const e = new Error('exit 1'); e.code = 1; throw e; };
+  const { sighting, checkError } = await checkForClaudeProcess({ execImpl });
   assert.equal(sighting, null);
+  assert.equal(checkError, null);
+});
+
+test('checkForClaudeProcess surfaces any OTHER pgrep failure as evidence, never silently reading it as "no claude" (review finding: this failure class must not support a PASS)', async () => {
+  const execImpl = async () => { const e = new Error('pgrep: command not found'); e.code = 127; throw e; };
+  const { sighting, checkError } = await checkForClaudeProcess({ execImpl });
+  assert.equal(sighting, null);
+  assert.match(checkError, /pgrep failed unexpectedly/);
 });
 
 test('waitForWakeAndWatchForClaude finishes once the coordinator terminal\'s shell prompt returns, and flags any claude sighting seen along the way', async () => {
   let reads = 0;
-  const findCoordinatorTerminalImpl = async () => ({ handle: 'term_coord' });
   const terminalReadImpl = async () => {
     reads += 1;
     if (reads < 2) return { terminal: { tail: ['still running...'] } };
-    return { terminal: { tail: ['...', 'orchestrator-svc@host:~$'] } };
+    return { terminal: { tail: ['still running...', 'orchestrator-svc@host:~$'] } };
   };
   let pgrepCalls = 0;
   const execImpl = async () => {
     pgrepCalls += 1;
     if (pgrepCalls === 1) return { stdout: '999 claude -p sneaky\n' };
-    const e = new Error('no match'); throw e;
+    const e = new Error('no match'); e.code = 1; throw e;
   };
   const result = await waitForWakeAndWatchForClaude({
-    terminalReadImpl, execImpl, waitImpl: async () => {}, findCoordinatorTerminalImpl, maxPolls: 5,
+    coordinatorHandle: 'term_coord', terminalReadImpl, execImpl, waitImpl: async () => {}, maxPolls: 5,
   });
   assert.equal(result.finished, true);
   assert.equal(result.claudeSeen, true);
   assert.match(result.claudeSightings[0], /sneaky/);
+  assert.deepEqual(result.checkErrors, []);
 });
 
-test('waitForWakeAndWatchForClaude reports not-finished if the terminal never appears within the poll budget', async () => {
-  const findCoordinatorTerminalImpl = async () => null;
-  const execImpl = async () => { throw new Error('no match'); };
+test('waitForWakeAndWatchForClaude reports not-finished if the terminal never returns to its prompt within budget', async () => {
+  const execImpl = async () => { const e = new Error('no match'); e.code = 1; throw e; };
   const result = await waitForWakeAndWatchForClaude({
-    terminalReadImpl: async () => ({ terminal: { tail: [] } }), execImpl, waitImpl: async () => {}, findCoordinatorTerminalImpl, maxPolls: 2,
+    coordinatorHandle: 'term_coord', terminalReadImpl: async () => ({ terminal: { tail: ['still going'] } }), execImpl, waitImpl: async () => {}, maxPolls: 2,
   });
   assert.equal(result.finished, false);
   assert.equal(result.claudeSeen, false);
-});
-
-test('dispatchCodexAcceptanceRun dispatches into an isolated worktree and returns the terminal handle', async () => {
-  const calls = [];
-  const terminalCreateImpl = async (args) => { calls.push(args); return { terminal: { handle: 'term_dispatch' } }; };
-  const handle = await dispatchCodexAcceptanceRun({ terminalCreateImpl });
-  assert.equal(handle, 'term_dispatch');
-  assert.equal(calls[0].environment, 'orchestrator-local');
-  assert.match(calls[0].command, /ORCHESTRATOR_VENDOR=codex/);
 });
 
 test('buildCloserPrompt embeds the full mechanical evidence objects (not just booleans) and both branch instructions', () => {
   const prompt = buildCloserPrompt({
     sandboxProbe: { publisherReadable: true, orcaReachable: true, raw: '{}' },
     acceptanceRun: {
-      finished: true, claudeSeen: false, claudeSightings: [], output: 'coordinator wake output here',
+      finished: true, claudeSeen: false, claudeSightings: [], checkErrors: [], output: 'coordinator wake output here', runId: 'run_abc',
     },
     sinceIso: '2026-09-19T19:43:00.000Z',
   });
@@ -139,20 +170,29 @@ test('buildCloserPrompt embeds the full mechanical evidence objects (not just bo
   assert.match(prompt, /JUL-44/);
   assert.match(prompt, /No retry/i);
   assert.match(prompt, /SKILL\.md/);
+  assert.match(prompt, /\/opt\/Orca\/orca-ide/);
 });
 
-test('runCloser passes maxBuffer and cwd, and checks for denial the way defaultPostCommentImpl did', async () => {
+test('runCloser resolves claude through a login shell (bash -lc), passing every claude argument through argv, not string interpolation', async () => {
+  let calledCmd;
   let calledArgs;
   let calledOpts;
   const execImpl = async (cmd, args, opts) => {
+    calledCmd = cmd;
     calledArgs = args;
     calledOpts = opts;
     return { stdout: JSON.stringify({ is_error: false, permission_denials: [], result: 'done' }) };
   };
-  await runCloser({ execImpl, prompt: 'do the thing' });
+  await runCloser({ execImpl, prompt: 'do the "tricky" thing\nwith a newline' });
+  assert.equal(calledCmd, 'bash');
+  assert.equal(calledArgs[0], '-lc');
+  assert.match(calledArgs[1], /exec claude/);
+  assert.equal(calledArgs[2], '--');
+  const promptIndex = calledArgs.indexOf('-p');
+  assert.equal(calledArgs[promptIndex + 1], 'do the "tricky" thing\nwith a newline');
   const allowedToolsIndex = calledArgs.indexOf('--allowedTools');
   assert.match(calledArgs[allowedToolsIndex + 1], /mcp__linear__\*/);
-  assert.match(calledArgs[allowedToolsIndex + 1], /Bash\(orca \*\)/);
+  assert.match(calledArgs[allowedToolsIndex + 1], /Bash\(\/opt\/Orca\/orca-ide \*\)/);
   assert.equal(calledOpts.maxBuffer, 10 * 1024 * 1024);
   assert.ok(calledOpts.cwd);
 });
@@ -168,11 +208,14 @@ test('main: everything gathered successfully -> the closer is invoked with real 
   const closerCalls = [];
   const result = await main({
     terminalCreateImpl: async () => ({ terminal: { handle: 'term_x' } }),
-    terminalReadImpl: async () => ({ terminal: { tail: ['{"publisherReadable":true,"orcaReachable":true}'] } }),
-    execImpl: async () => { throw new Error('no claude process'); },
+    terminalReadImpl: async () => ({ terminal: { tail: [] } }),
     waitImpl: async () => {},
     runCloserImpl: async (prompt) => { closerCalls.push(prompt); return { result: 'posted' }; },
     prepareServerEnvironmentImpl: () => {},
+    runCodexSandboxProbeImpl: async () => ({ publisherReadable: true, orcaReachable: true, raw: '{}' }),
+    gatherAcceptanceRunImpl: async () => ({
+      runId: 'run_x', finished: true, claudeSeen: false, claudeSightings: [], checkErrors: [], output: 'ok',
+    }),
   });
   assert.equal(closerCalls.length, 1);
   assert.equal(result.ranCloser, true);
@@ -183,7 +226,6 @@ test('main: a step that throws still reaches the closer, with the error folded i
   const result = await main({
     terminalCreateImpl: async () => { throw new Error('Orca daemon unreachable'); },
     terminalReadImpl: async () => ({ terminal: { tail: [] } }),
-    execImpl: async () => { throw new Error('no claude process'); },
     waitImpl: async () => {},
     runCloserImpl: async (prompt) => { closerCalls.push(prompt); return { result: 'posted the failure' }; },
     prepareServerEnvironmentImpl: () => {},
@@ -193,12 +235,25 @@ test('main: a step that throws still reaches the closer, with the error folded i
   assert.equal(result.ranCloser, true);
 });
 
-test('main calls prepareServerEnvironment before anything else, so the process has ORCA_BIN/publisher creds (review finding #1)', async () => {
+test('main: even a failing prepareServerEnvironment still reaches the closer, with the error as evidence, rather than crashing before Linear is ever reached', async () => {
+  const closerCalls = [];
+  const result = await main({
+    terminalCreateImpl: async () => ({ terminal: { handle: 'x' } }),
+    terminalReadImpl: async () => ({ terminal: { tail: [] } }),
+    waitImpl: async () => {},
+    runCloserImpl: async (prompt) => { closerCalls.push(prompt); return { result: 'ok' }; },
+    prepareServerEnvironmentImpl: () => { throw new Error('cannot load publisher env file'); },
+  });
+  assert.equal(closerCalls.length, 1);
+  assert.match(closerCalls[0], /cannot load publisher env file/);
+  assert.equal(result.ranCloser, true);
+});
+
+test('main calls prepareServerEnvironment before anything else, so the process has ORCA_BIN/publisher creds', async () => {
   let prepared = false;
   await main({
     terminalCreateImpl: async () => { assert.equal(prepared, true, 'env must be prepared before dispatch'); return { terminal: { handle: 'x' } }; },
-    terminalReadImpl: async () => ({ terminal: { tail: ['{"publisherReadable":true,"orcaReachable":true}'] } }),
-    execImpl: async () => { throw new Error('no claude process'); },
+    terminalReadImpl: async () => ({ terminal: { tail: [] } }),
     waitImpl: async () => {},
     runCloserImpl: async () => ({ result: 'ok' }),
     prepareServerEnvironmentImpl: () => { prepared = true; },

@@ -41,7 +41,9 @@ test('every ExecStopPost command is failure-tolerant (- prefixed), since this is
 });
 
 test('the service has a hard timeout so a hung run cannot block cleanup forever', () => {
-  assert.match(SERVICE, /^TimeoutStartSec=\d+$/m);
+  const match = SERVICE.match(/^TimeoutStartSec=(\d+)$/m);
+  assert.ok(match, 'expected a TimeoutStartSec= line');
+  assert.ok(Number(match[1]) >= 1800, 'expected at least 30 minutes of headroom for the closer step');
 });
 
 test('the service runs from the live checkout as its working directory, and passes -H so orchestrator-svc\'s own HOME (credentials, MCP state) is used, not root\'s', () => {
