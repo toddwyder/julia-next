@@ -219,6 +219,17 @@ Manual sync is still available for an out-of-band update without waiting up to 1
 `sudo systemctl start julia-next-checkout-sync.service`. Check its history with `sudo
 journalctl -u julia-next-checkout-sync.service`.
 
+### The read-only checkout's three "modified" files are mode-only noise (JUL-44)
+
+`git status` in `/srv/orchestrator-svc/julia-next` permanently shows these three entries as
+modified: `ops/service-dropbox/write-secret.sh`, `scripts/check-readiness.mjs`, and
+`scripts/julia-run.mjs`. `git diff` shows these are `old mode 100755` / `new mode 100644` with
+ZERO content change: the `chmod 440` hardening in the checkout-sync script strips the executable
+bit from the three files that are committed as executable. Do not treat this as a modified
+checkout, and do not try to `git checkout` it away — the next sync re-creates it. A real CONTENT
+change would show as added or removed lines, so check `git diff --stat` for nonzero insertions
+before believing the checkout is dirty.
+
 ## Start
 
 There is no scheduled trigger — explicit launch only. From inside an Orca terminal on the
@@ -362,6 +373,53 @@ worktree/branch were removed after (`orca worktree rm --worktree name:<name> --f
   `pong` reply) only after that. Any *new* identity that ever runs a `pi-glm` seat needs this
   file written for it too — it does not follow from `orchestrator-svc`'s copy existing.
 
+### Long-running Orca daemons hold stale supplementary groups (JUL-44)
+
+`zai.env` is `root:zai-readers` mode `0440`, and `/etc/group` correctly lists
+`zai-readers:x:1003:runner,orchestrator-svc`. Both `id runner` and `id orchestrator-svc` (NSS
+lookups) show `1003(zai-readers)`. But inside a terminal spawned by either Orca daemon, the `id`
+of the process itself shows only its primary group — `uid=1001(runner) gid=1001(runner)
+groups=1001(runner)` — and `test -r /etc/orca-runner/dropbox-secrets/zai.env` fails.
+
+**Cause:** both daemons (`orca-server.service`, `orca-server-orchestrator.service`) were started
+BEFORE `zai-readers` was created on 2026-09-18, and the supplementary groups of a process are
+fixed at start and inherited by every child.
+
+**Consequence:** the `pi-glm` reviewer-backup and orchestrator-backup seats cannot read their own
+secret from inside a dispatched terminal, even though the drop box is configured exactly as
+`ops/service-dropbox/README.md` specifies. The JUL-77 "live-verified working" check for this seat
+passed from a fresh SSH login (which gets correct groups) and so never exercised the path a real
+dispatch actually uses.
+
+**Workaround, no root required, verified live:** wrap the seat launch in `sg`, which lets a
+process acquire a group it is already entitled to:
+```sh
+sg zai-readers -c "<the run-pi-seat.mjs command>"
+```
+Inside that, `id` reports `gid=1003(zai-readers)` and the secret reads fine.
+
+**Permanent fix** (needs root, and it kills every terminal those daemons own — never do it
+mid-run): `systemctl restart orca-server.service orca-server-orchestrator.service`.
+
+**General rule:** after any `groupadd` or `usermod -aG` that a seat depends on, either restart
+the daemons or wrap the launch in `sg`. Always verify secret access for a seat by reading it FROM
+INSIDE an Orca-spawned terminal, never from an SSH login — those two differ, and only the first
+matches how a real dispatch runs.
+
+### Vercel auth is CLI login state, not a drop-box field (JUL-44)
+
+There is no `vercel.env` in `/etc/orca-runner/dropbox-secrets/`. The fields actually present
+there are `axiom`, `deepseek`, `linear`, `powersync`, `sentry`, `supabase`, and `zai`. Vercel is
+authenticated instead through the stored credential of the CLI itself at
+`/home/orchestrator-svc/.local/share/com.vercel.cli/auth.json` (mode `600`, owner
+`orchestrator-svc`). Verified live 2026-09-18: `npx --yes vercel@latest whoami` as
+`orchestrator-svc` returns `toddwyder-2186`. Do not go looking for a vercel drop-box field or add
+one — check the CLI login state instead.
+
+**Also note** the drop-box files are named `<field>.env`, NOT `<field>`. A readability probe
+written against the bare field name returns a false "not readable" for every field; this cost
+real time during the JUL-44 preflight before it was caught.
+
 **`/home/orchestrator-svc/julia-next` is not a real checkout — ignore it.** Only
 `/srv/orchestrator-svc/julia-next` (read-only, synced) and `/home/runner/julia-next` (writable,
 worktree base) are the checkouts `julia-next-checkout-sync.sh` and `julia-run.mjs`'s `CHECKOUT`
@@ -383,6 +441,38 @@ violation of that invariant, not a design gap. Fixed by resetting `/home/runner/
 **Any session touching this runner going forward should confirm the sync timer is still green**
 (`systemctl status julia-next-checkout-sync.timer`) rather than assume it — this had apparently
 been broken long enough for both checkouts to drift 25+ commits behind before anyone noticed.
+
+### The checkout-sync service can leave the base checkout's `main` stale while exiting 0 (JUL-44)
+
+Found live 2026-09-18: the timer was active and the service ran successfully, yet the local
+`main` of `/home/runner/julia-next` sat at `ac73112` while `origin/main` was `31e89e1` — 8
+commits behind, 0 ahead (a clean ancestor, no divergence). The HEAD of that base checkout was on
+branch `jul72-safe-secret-read`, which already equalled `origin/main`, so the fast-forward in the
+sync succeeded vacuously against the CURRENT branch and never advanced the `main` ref itself.
+This is worse than the loud "fatal: Not possible to fast-forward" failure this runbook already
+records, because it exits 0 and looks healthy.
+
+**Why it matters:** `orca worktree create --base-branch main` forks every builder worktree from
+the `main` ref. A stale `main` silently hands the builder 8-commit-old code — on 2026-09-18 that
+would have produced a worktree with no `graph/seat-table.mjs` and no
+`ops/service-dropbox/run-pi-seat.mjs`, the very files that run depended on.
+
+**Check before every dispatch** (do not assume a green timer means the ref is current); the count
+this prints must be 0:
+```sh
+git -C /home/runner/julia-next rev-list --count main..origin/main
+```
+
+**Repair** when that count is nonzero and `rev-list --count origin/main..main` is 0 (clean
+ancestor, so a fast-forward is safe):
+```sh
+git -C /home/runner/julia-next fetch origin main
+git -C /home/runner/julia-next branch -f main origin/main
+```
+
+Verified live: after this repair, a newly created worktree had head `31e89e1`, not `ac73112`. If
+`origin/main..main` is NONZERO, `main` has genuinely diverged — stop and investigate rather than
+forcing it.
 
 **Orchestrator launch and cap fail-over (Build item 3, `scripts/julia-run.mjs`).**
 `startOrchestrator` reads `SEAT_TABLE.orchestrator` and starts the primary entry
