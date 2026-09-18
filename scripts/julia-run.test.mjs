@@ -242,6 +242,14 @@ test('an unknown ORCHESTRATOR_VENDOR value is a clear, named failure, not a sile
   );
 });
 
+test('an unknown ORCHESTRATOR_VENDOR value fails before a run is created, so retrying after fixing it never blocks on an orphan run (review finding, JUL-73)', async () => {
+  const { impls, calls } = fakeImpls();
+  impls.env.ORCHESTRATOR_VENDOR = 'gemini';
+  await assert.rejects(() => juliaRun('JUL-63', impls));
+  assert.deepEqual(calls.runsCreated, []);
+  assert.equal(calls.terminalsCreated.length, 0);
+});
+
 test('no defaultPostCommentImpl and no separate start-comment call: the coordinator posts its own comments during its wake', async () => {
   const { impls } = fakeImpls();
   const postCommentImpl = async () => { throw new Error('julia-run must not post a start comment itself'); };

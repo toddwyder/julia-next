@@ -228,11 +228,13 @@ node /srv/orchestrator-svc/julia-next/scripts/julia-run.mjs <ISSUE-ID>
 ```
 It refuses as any other account, runs readiness, self-heals a stale checkout, refuses a
 double-start, then starts a real Orca Run/terminal that invokes the `julia-coordinator` skill
-(`disable-model-invocation: true`, so it must be named explicitly there) for that issue and
-posts the start comment (JUL-63). Prints the run id on success, or which step failed and why on
-failure. Once started, the coordinator reconciles Orca + Linear state, advances the current
-in-flight item, and admits the next eligible issue once a slot is free — see
-`.claude/skills/julia-coordinator/SKILL.md` for that procedure.
+(`disable-model-invocation: true`, so it must be named explicitly there) for that issue. Prints
+the run id on success, or which step failed and why on failure. Once started, the coordinator
+posts its own admission comment and reconciles Orca + Linear state itself — see
+`.claude/skills/julia-coordinator/SKILL.md` for that procedure. **`julia-run.mjs` itself no
+longer posts a start comment (JUL-73):** the separate `claude -p` call that used to do this
+(`defaultPostCommentImpl`/`postStartComment`) was a second vendor dependency doing no real work,
+since the coordinator's own first wake already posts admission to Linear.
 
 **The headless launch needs its own tool grants — `claude -p` exits 0 even when every tool call
 was refused.** Found across two real live wakes, each diagnosing its own gap and reporting back
@@ -243,9 +245,10 @@ instead of silently doing nothing:
    and review, then be refused at publish.
 
 `julia-run.mjs`'s launch command now grants: `mcp__linear__*` and `mcp__claude_ai_Linear__*`
-(both Linear tool namespaces — see the CWD-dependent tool-name caveat on the start-comment step
-above); `Bash` access to the exact scripts the skill's "Each wake"/"Running a step"/"After
-verification" procedures name (`orca-cli.mjs`, `check-readiness.mjs`, `collect-worker-result.mjs`,
+(both Linear tool namespaces — from this checkout's CWD, the coordinator sometimes reaches for
+the hosted `mcp__claude_ai_Linear__*` connector instead of the standalone `mcp__linear__*`
+server, so both are allowed); `Bash` access to the exact scripts the skill's "Each wake"/"Running
+a step"/"After verification" procedures name (`orca-cli.mjs`, `check-readiness.mjs`, `collect-worker-result.mjs`,
 `verify-reviewer-worktree.mjs`, `coordinator-events.mjs`); the publisher credential file for the
 two scripts that need it (`publish-pr.mjs`, `merge-pr.mjs`); and the bare `orca` CLI. If the
 skill's own procedure grows to need another script or tool, its `--allowedTools` list in

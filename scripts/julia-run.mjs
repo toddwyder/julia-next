@@ -212,14 +212,20 @@ export async function startOrchestrator(issueId, {
   if (!fromHandle) {
     throw new Error('ORCA_TERMINAL_HANDLE is not set -- julia-run must run inside an Orca-managed terminal on the orchestrator-local runtime, not a bare shell');
   }
+  // Build (and validate) the launch command before creating the run: an
+  // invalid ORCHESTRATOR_VENDOR must fail before anything exists in Orca,
+  // not leave an orphan run with zero tasks that then blocks a retry for
+  // the isRunFinished grace window (JUL-73 review finding).
+  const vendor = env.ORCHESTRATOR_VENDOR ?? 'claude';
+  const command = launchCommandFor(vendor, issueId);
+
   const created = await runCreateImpl({ environment: ORCHESTRATOR_ENVIRONMENT, from: fromHandle, objective: issueId });
   const runId = created.run.id;
 
-  const vendor = env.ORCHESTRATOR_VENDOR ?? 'claude';
   await terminalCreateImpl({
     environment: ORCHESTRATOR_ENVIRONMENT,
     worktree: WORKTREE_SELECTOR,
-    command: launchCommandFor(vendor, issueId),
+    command,
     title: `julia-run-${issueId}`,
   });
 
