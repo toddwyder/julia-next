@@ -353,6 +353,14 @@ that publishes code should not also be able to edit its own CI. A check that wou
 need a new CI step belongs in `scripts/*.test.mjs` instead — CI already runs that whole suite,
 so a new test file lands the check without ever touching `.github/workflows/`.
 
+**Confirming CI is green before merge: the publisher App has no `checks`/`actions` read scope**
+(live-verified, JUL-73) — `GET .../commits/<sha>/check-runs`, `.../commits/<sha>/status`, and
+`.../actions/runs` all 403 with "Resource not accessible by integration." Use the PR's own
+`mergeable_state` from `GET .../pulls/<number>` instead (`pull_requests: read`, which the App
+already needs to open PRs) — GitHub computes this itself from the branch's required checks:
+`clean` means every required check passed and there's no conflict; `unstable`/`blocked` mean
+not yet. Poll that field rather than trying to reach the Checks/Actions APIs directly.
+
 **After a PR merges, start the next change from `git checkout -b <name> origin/main` — never
 rebase the old local branch.** Rebasing a branch whose earlier commit was already squash-merged
 produces a "skipped previously applied commit" warning and a non-fast-forward push, and

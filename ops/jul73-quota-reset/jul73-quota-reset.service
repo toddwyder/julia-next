@@ -1,0 +1,17 @@
+[Unit]
+Description=JUL-73 one-time Codex quota-reset acceptance re-run
+
+[Service]
+Type=oneshot
+# Runs as root (this unit's own account) so it can remove its own unit
+# files afterward without a new sudoers grant; the actual acceptance work
+# runs as orchestrator-svc, which is the account the ticket asked for and
+# the one whose Codex/Linear/Orca credentials this needs.
+ExecStart=/usr/bin/sudo -u orchestrator-svc /usr/bin/node /srv/orchestrator-svc/julia-next/scripts/jul73-quota-reset-run.mjs
+# ExecStopPost runs whether ExecStart exited cleanly, failed, or errored --
+# so a failed acceptance re-run still leaves no stray timer behind. The
+# failure itself is posted to Linear by the script's own closer step
+# (jul73-quota-reset-run.mjs), never lost just because the unit is gone.
+ExecStopPost=/bin/systemctl disable --now jul73-quota-reset.timer
+ExecStopPost=/bin/rm -f /etc/systemd/system/jul73-quota-reset.service /etc/systemd/system/jul73-quota-reset.timer
+ExecStopPost=/bin/systemctl daemon-reload
