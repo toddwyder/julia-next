@@ -16,6 +16,11 @@
 // over stdin, never argv (argv is visible to any other process via /proc or
 // `ps`; stdin to a short-lived child process is not).
 //
+// Not every field lands with the same reader (JUL-77 added three: DeepSeek
+// and Z.ai are read by the runner/builder account, not just
+// orchestrator-svc) -- see FIELD_GROUPS below, which write-secret.sh's case
+// statement must match exactly (write-secret.test.mjs asserts this).
+//
 // Values are never logged, echoed back in any response, or held longer
 // than the single request that carries them -- see logField() below, which
 // is the only thing allowed to touch process.stdout/stderr for a field,
@@ -25,7 +30,28 @@ import { execFile } from 'node:child_process';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
-export const FIELDS = ['sentry', 'supabase', 'powersync', 'axiom'];
+export const FIELDS = ['sentry', 'supabase', 'powersync', 'axiom', 'deepseek', 'zai', 'linear'];
+
+// Which group write-secret.sh chowns each field's file to on the server --
+// the single source of truth for "who can read this key" (JUL-77). The
+// original four are all orchestrator-svc-only, unchanged. write-secret.sh's
+// own test asserts its case statement matches this exactly, so the two
+// files can never silently drift apart.
+export const FIELD_GROUPS = {
+  sentry: 'orchestrator-svc',
+  supabase: 'orchestrator-svc',
+  powersync: 'orchestrator-svc',
+  axiom: 'orchestrator-svc',
+  // Pi builder -- the runner account only, never orchestrator-svc.
+  deepseek: 'runner',
+  // Pi reviewer (runner) AND the orchestrator backup -- a dedicated group
+  // with both accounts as members (see README.md's one-time setup), never
+  // orchestrator-svc's own group directly -- that would let runner read the
+  // orchestrator-only fields (sentry/supabase/powersync/axiom/linear) too.
+  zai: 'zai-readers',
+  // Orchestrator-svc only, same as the original four.
+  linear: 'orchestrator-svc',
+};
 
 // Shape checks are deliberately loose -- the point is to catch an obviously
 // wrong paste (an empty box, a pasted URL, a pasted sentence with spaces),
@@ -133,6 +159,9 @@ const HINTS = {
   supabase: 'From Supabase: Account -> Access Tokens. A long string of letters/numbers, no spaces.',
   powersync: 'From PowerSync: Account -> Access Tokens. A long string of letters/numbers, no spaces.',
   axiom: 'From Axiom: Settings -> API tokens. A long string of letters/numbers, no spaces.',
+  deepseek: 'From DeepSeek: Platform -> API keys. A long string of letters/numbers, no spaces.',
+  zai: 'From Z.ai: Console -> API keys. A long string of letters/numbers, no spaces.',
+  linear: 'From Linear: Settings -> Security & access -> Personal API keys. A long string of letters/numbers, no spaces.',
 };
 
 function renderForm(state) {
