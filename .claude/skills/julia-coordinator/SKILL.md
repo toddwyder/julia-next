@@ -166,10 +166,12 @@ For the current step of the current item:
 
 ## After verification: review and publish
 
-1. Start a **Codex** worker with no prior context on this ticket to review the change against
-   the issue's acceptance criteria. It saves its review as a file **outside** the candidate
-   worktree -- the review must never become part of, or be mistaken for a change to, the thing
-   it reviews.
+1. Start a worker with no prior context on this ticket to review the change against the step's
+   acceptance criteria, on the seat table's `reviewer` entry (`primary` unless this step is
+   force-run on `backup`, or the primary's last review attempt on this exact step ended with a
+   usage-cap error -- same rule as builder dispatch in "Running a step", never a hardcoded
+   vendor). It saves its review as a file **outside** the candidate worktree -- the review must
+   never become part of, or be mistaken for a change to, the thing it reviews.
 2. **Diff the reviewer's worktree against the candidate commit before trusting the review**
    (`scripts/verify-reviewer-worktree.mjs`'s `rejectIfReviewerTampered`, or the CLI: `node
    verify-reviewer-worktree.mjs --worktree <reviewer worktree path> --commit <candidate commit
@@ -183,8 +185,18 @@ For the current step of the current item:
    evidence comment for a non-code item. Check whether a PR already exists before creating one.
    Resolve a base-branch conflict (e.g. another merge landed on `main` first) with a normal local
    merge before re-pushing -- do not force-push.
-4. Emit `coordinator_completed` (or `coordinator_failed` if publishing itself failed) and park
-   the item with an **acceptance** queue item naming the result.
+4. **Merges are never Todd's decision.** Once the PR's own checks report green
+   (`mergeable_state: clean`, from the PR's own GitHub API record) and the review from steps 1-2 approved on a
+   verified-clean worktree, the coordinator merges it itself
+   (`scripts/merge-pr.mjs`, pinned to the reviewed commit) -- do not park a step's PR waiting on
+   a merge-decision comment from Todd. If checks are red or the review is CHANGES-NEEDED, that is
+   an ordinary failed step (back to "Running a step"'s fail handling), not a Todd question either.
+5. **Only the item's own final, user-visible result goes to Todd's queue, as a single
+   acceptance item** -- an intermediate step of a multi-step item (e.g. a runbook-findings step
+   ahead of the actual product work) merges and moves straight to the next step without ever
+   reaching Todd. Emit `coordinator_completed` (or `coordinator_failed` if publishing/merging
+   itself failed) at the end of each step regardless; only post to Todd's queue when the item as
+   a whole is done.
 
 **Publisher prerequisite, checked not assumed (2026-09-16):** the `julia-graph-publisher` GitHub
 App **is installed on `toddwyder/julia-next`** -- confirmed live against the repo's own Settings
@@ -270,6 +282,11 @@ Three kinds, each posted as a Linear comment on the issue: **blocked** (includin
 credential/access boundary a worker hit), **acceptance**, and (once ordinary feature/fix routes
 are enabled) **criteria approval**. Each gives the issue, the kind, one plain-English question,
 and a recommendation. Evidence stays on the issue, not in chat.
+
+**Acceptance is the item's final, user-visible result only -- never a step's merge.** A
+multi-step item (see "After verification" step 5) merges every step's PR itself as it goes;
+Todd sees one acceptance item at the end, for the item as a whole, not one per step. Merge
+decisions are never Todd's, on any step.
 
 A parked item frees its slot and records its resume condition. When the condition is met, it
 re-enters admission like any other item, and its evidence is re-verified before it is trusted.

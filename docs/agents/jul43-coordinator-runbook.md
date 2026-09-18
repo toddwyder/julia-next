@@ -373,7 +373,7 @@ worktree/branch were removed after (`orca worktree rm --worktree name:<name> --f
   `pong` reply) only after that. Any *new* identity that ever runs a `pi-glm` seat needs this
   file written for it too — it does not follow from `orchestrator-svc`'s copy existing.
 
-### Long-running Orca daemons hold stale supplementary groups (JUL-44)
+### Long-running Orca daemons hold stale supplementary groups (JUL-44) — fixed 2026-09-18
 
 `zai.env` is `root:zai-readers` mode `0440`, and `/etc/group` correctly lists
 `zai-readers:x:1003:runner,orchestrator-svc`. Both `id runner` and `id orchestrator-svc` (NSS
@@ -391,20 +391,22 @@ secret from inside a dispatched terminal, even though the drop box is configured
 passed from a fresh SSH login (which gets correct groups) and so never exercised the path a real
 dispatch actually uses.
 
-**Workaround, no root required, verified live:** wrap the seat launch in `sg`, which lets a
-process acquire a group it is already entitled to:
-```sh
-sg zai-readers -c "<the run-pi-seat.mjs command>"
+**Fixed, live 2026-09-18:** `systemctl restart orca-server.service orca-server-orchestrator.service`
+as root, between runs only (confirmed no worker/coordinator process was active first — the
+restart kills every terminal those daemons own, so it must never happen mid-run). Verified from
+inside a freshly Orca-spawned terminal afterward (not an SSH login — those differ):
 ```
-Inside that, `id` reports `gid=1003(zai-readers)` and the secret reads fine.
+id -> uid=1001(runner) gid=1001(runner) groups=1001(runner),1003(zai-readers)
+test -r /etc/orca-runner/dropbox-secrets/zai.env -> readable
+```
+No `sg` wrapper needed or present anywhere in the repo's launch code (`run-pi-seat.mjs`,
+`julia-run.mjs`, `SKILL.md`) — it was only a manual runtime workaround for the one run that hit
+this, never baked into a script.
 
-**Permanent fix** (needs root, and it kills every terminal those daemons own — never do it
-mid-run): `systemctl restart orca-server.service orca-server-orchestrator.service`.
-
-**General rule:** after any `groupadd` or `usermod -aG` that a seat depends on, either restart
-the daemons or wrap the launch in `sg`. Always verify secret access for a seat by reading it FROM
-INSIDE an Orca-spawned terminal, never from an SSH login — those two differ, and only the first
-matches how a real dispatch runs.
+**General rule, still true:** after any `groupadd`/`usermod -aG` that a seat's secret access
+depends on, restart both daemons before the next dispatch that needs it — a process's
+supplementary groups are fixed at daemon start, not re-read live. Always verify secret access for
+a seat by reading it FROM INSIDE an Orca-spawned terminal, never from an SSH login.
 
 ### Vercel auth is CLI login state, not a drop-box field (JUL-44)
 
@@ -442,7 +444,7 @@ violation of that invariant, not a design gap. Fixed by resetting `/home/runner/
 (`systemctl status julia-next-checkout-sync.timer`) rather than assume it — this had apparently
 been broken long enough for both checkouts to drift 25+ commits behind before anyone noticed.
 
-### The checkout-sync service can leave the base checkout's `main` stale while exiting 0 (JUL-44)
+### The checkout-sync service could leave the base checkout's `main` stale while exiting 0 (JUL-44) — fixed 2026-09-18
 
 Found live 2026-09-18: the timer was active and the service ran successfully, yet the local
 `main` of `/home/runner/julia-next` sat at `ac73112` while `origin/main` was `31e89e1` — 8
@@ -455,24 +457,30 @@ records, because it exits 0 and looks healthy.
 **Why it matters:** `orca worktree create --base-branch main` forks every builder worktree from
 the `main` ref. A stale `main` silently hands the builder 8-commit-old code — on 2026-09-18 that
 would have produced a worktree with no `graph/seat-table.mjs` and no
-`ops/service-dropbox/run-pi-seat.mjs`, the very files that run depended on.
+`ops/service-dropbox/run-pi-seat.mjs`, the very files that run depended on. Repaired by hand
+in the moment (`git fetch origin main` + `git branch -f main origin/main`, safe because it was a
+clean ancestor) — but the script itself was still broken for the next time HEAD parked on a
+non-`main` branch.
 
-**Check before every dispatch** (do not assume a green timer means the ref is current); the count
-this prints must be 0:
+**Real fix, landed:** the old root-owned, untracked `/usr/local/sbin/julia-next-checkout-sync.sh`
+is replaced by `scripts/checkout-sync.mjs` (tracked, tested — `scripts/checkout-sync.test.mjs`
+pins the exact failure mode above as a regression test). Its `advanceMainRef` only takes the
+`merge --ff-only` path when `main` is genuinely the checked-out branch; any other branch
+(including detached HEAD) fetches straight into the local `main` ref
+(`git fetch origin main:main`), which git applies unconditionally precisely because `main` isn't
+checked out there — no vacuous success possible. The orchestrator checkout's leg
+(`resetOrchestratorCheckout`) is unchanged in behavior (`reset --hard` is always safe there; it's
+never committed to directly). The systemd service's `ExecStart` now runs `node
+/srv/orchestrator-svc/julia-next/scripts/checkout-sync.mjs` — **note this must point at the
+read-only `/srv/...` checkout's own copy of the script, not a worktree's, since the unit runs as
+root outside any dispatched worktree.** The old shell script was removed.
+
+If a stale `main` is ever suspected anyway (do not assume a green timer alone means current):
 ```sh
 git -C /home/runner/julia-next rev-list --count main..origin/main
 ```
-
-**Repair** when that count is nonzero and `rev-list --count origin/main..main` is 0 (clean
-ancestor, so a fast-forward is safe):
-```sh
-git -C /home/runner/julia-next fetch origin main
-git -C /home/runner/julia-next branch -f main origin/main
-```
-
-Verified live: after this repair, a newly created worktree had head `31e89e1`, not `ac73112`. If
-`origin/main..main` is NONZERO, `main` has genuinely diverged — stop and investigate rather than
-forcing it.
+must print 0. A nonzero count with `rev-list --count origin/main..main` also 0 is now a bug in
+`checkout-sync.mjs` to fix and log, not something to hand-repair again.
 
 **Orchestrator launch and cap fail-over (Build item 3, `scripts/julia-run.mjs`).**
 `startOrchestrator` reads `SEAT_TABLE.orchestrator` and starts the primary entry
