@@ -196,15 +196,16 @@ export function writeState(state, {
 // Linear access
 // ---------------------------------------------------------------------------
 
-// Live-verified (JUL-79 readiness review, 2026-09-18): board order is
-// `Issue.sortOrder` (a populated float, e.g. -28624) and the only allowed
-// `PaginationOrderBy` values are createdAt/updatedAt, so the top card is
-// sorted client-side. The exact field shape of the two queries below
-// (`Team.states`, and both relation directions) was NOT exercised against the
-// live API from this step -- it is written from Linear's public schema and
-// must be re-checked on the first real run. The client boundary
-// (`findState`/`listIssuesInState`/`comment`) is what the tests pin, so a
-// query-shape fix is local to this one function.
+// Live-verified (JUL-79, 2026-09-18): board order is `Issue.sortOrder` (a
+// populated float, e.g. -28624) and the only allowed `PaginationOrderBy`
+// values are createdAt/updatedAt, so the top card is sorted client-side.
+// Relation direction is verified live too: there is no `blocked_by` type and
+// no `blockedBy` field on `Issue`; every blocking relation is typed `blocks`
+// and sits on the blocker's own `relations` connection. The blocked card sees
+// it in its `inverseRelations`, where `issue` is the blocker and `relatedIssue`
+// is the blocked card itself -- so `normalizeIssue` reads blockers from the
+// inverse side and takes `relation.issue`. Both sides are requested so the
+// parse cannot depend on which side Linear happens to return.
 const TEAM_STATES_QUERY = `
   query ReadyQueueTeamStates($teamName: String!) {
     teams(filter: { name: { eq: $teamName } }, first: 1) {
@@ -227,10 +228,18 @@ const READY_ISSUES_QUERY = `
         state { id name type }
         labels { nodes { id name } }
         relations {
-          nodes { type relatedIssue { id identifier state { name type } } }
+          nodes {
+            type
+            issue { id identifier state { name type } }
+            relatedIssue { id identifier state { name type } }
+          }
         }
         inverseRelations {
-          nodes { type relatedIssue { id identifier state { name type } } }
+          nodes {
+            type
+            issue { id identifier state { name type } }
+            relatedIssue { id identifier state { name type } }
+          }
         }
       }
       pageInfo { hasNextPage endCursor }
@@ -247,35 +256,32 @@ const COMMENT_CREATE_MUTATION = `
   }
 `;
 
-function isBlockedByRelation(type) {
-  return /^blocked[_\s-]?by$/i.test(String(type ?? ''));
-}
-
 function isBlocksRelation(type) {
   return /^blocks$/i.test(String(type ?? ''));
 }
 
+// On the inverse side of a `blocks` relation the blocker is `relation.issue`;
+// `relation.relatedIssue` is this card itself.
 function toBlocker(relation) {
-  const related = relation?.relatedIssue ?? relation;
+  const blocker = relation?.issue;
   return {
-    id: related?.id,
-    identifier: related?.identifier,
-    state: related?.state ?? null,
+    id: blocker?.id,
+    identifier: blocker?.identifier,
+    state: blocker?.state ?? null,
   };
 }
 
 // Turn a raw Linear issue (label/relation connections) into the small shape
-// the queue reasons about. A blocker reaches this issue either as a
-// `blocked_by` relation or as the inverse side of a `blocks` relation; both
-// are collected, so the parse does not depend on which side Linear stores.
+// the queue reasons about. A card's blockers are exactly the `inverseRelations`
+// entries typed `blocks` (verified live 2026-09-18); `relations` entries typed
+// `blocks` are the cards THIS card blocks, not blockers of it, and the live API
+// has neither a `blocked_by` relation type nor a `blockedBy` field.
 export function normalizeIssue(raw) {
   const labelNodes = raw?.labels?.nodes ?? raw?.labels ?? [];
   const labels = labelNodes.map((label) => (typeof label === 'string' ? label : label?.name)).filter(Boolean);
-  const blockers = [
-    ...(raw?.relations?.nodes ?? []).filter((r) => isBlockedByRelation(r.type)).map(toBlocker),
-    ...(raw?.inverseRelations?.nodes ?? []).filter((r) => isBlocksRelation(r.type)).map(toBlocker),
-    ...((raw?.blockedBy ?? []).map(toBlocker)),
-  ];
+  const blockers = (raw?.inverseRelations?.nodes ?? [])
+    .filter((relation) => isBlocksRelation(relation.type))
+    .map(toBlocker);
   return {
     id: raw?.id,
     identifier: raw?.identifier,

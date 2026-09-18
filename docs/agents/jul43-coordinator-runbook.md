@@ -273,10 +273,17 @@ session must not have to rediscover:
 - **No Ready state or label groups existed as of 2026-09-18.** The script resolves the workflow
   state named `Ready` on team `Julia-next` at runtime and no-ops quietly when it is absent;
   creating that state is a separate, Todd-approved step. The label→model "choice" validator is an
-  injected seam with a permissive default until that later step lands. The exact GraphQL shape of
-  `createLinearClient`'s queries (`Team.states`, and which side Linear stores a `blocked_by`
-  relation on) was **not** exercised against the live API in this step — re-check it on the first
-  real run; the injected client boundary keeps any fix local.
+  injected seam with a permissive default until that later step lands.
+- **Linear relation direction, verified live 2026-09-18.** There is no `blocked_by` relation type
+  and no `blockedBy` field on `Issue`. Every blocking relation is typed `blocks` and lives on the
+  blocker's own `relations` connection as `{ type: 'blocks', issue: <blocker>, relatedIssue:
+  <blocked> }`. The blocked card sees the same relation in its `inverseRelations` connection,
+  also typed `blocks`, where `relation.issue` is the blocker and `relation.relatedIssue` is the
+  blocked card itself (verified on JUL-78: four `blocks` entries with `issue` JUL-54/56/55/57 and
+  `relatedIssue` JUL-78). `ready-queue.mjs` therefore reads a card's blockers only from its
+  `inverseRelations` entries typed `blocks`, taking `relation.issue`; `relations` entries typed
+  `blocks` are cards THIS card blocks and are ignored. The `Team.states` query shape is confirmed
+  live.
 - **Both Orca daemons run with `PrivateTmp=yes`.** A file written to `/tmp` by a terminal of one
   daemon is INVISIBLE to terminals of the other daemon (`orca-server.service` as `runner` vs
   `orca-server-orchestrator.service` as `orchestrator-svc`). Coordinator-to-worker prompt handoff
