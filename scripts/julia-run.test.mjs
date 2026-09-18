@@ -228,7 +228,7 @@ test('orchestratorLaunchCommandFor: pi-glm (the table backup) pipes the skill in
   assert.match(command, /export ORCA_BIN=\/opt\/Orca\/orca-ide ORCA_ENVIRONMENT=ovh-local/);
   assert.match(command, /set -a; \. \/etc\/orchestrator-svc\/\.env\.publisher; set \+a/);
   assert.match(command, /cat \.claude\/skills\/julia-coordinator\/SKILL\.md/);
-  assert.match(command, /\| node ops\/service-dropbox\/run-pi-seat\.mjs orchestrator-backup/);
+  assert.match(command, /\| node ops\/service-dropbox\/run-pi-seat\.mjs orchestrator-backup --effort medium/);
   assert.match(command, /JUL-63/);
   assert.doesNotMatch(command, /claude --permission-mode/);
   assert.doesNotMatch(command, /codex exec/);
@@ -238,6 +238,59 @@ test('orchestratorLaunchCommandFor: pi-glm (the table backup) pipes the skill in
 
 test('orchestratorLaunchCommandFor refuses an unknown table entry', () => {
   assert.throws(() => orchestratorLaunchCommandFor('gemini', 'JUL-63'), /unknown orchestrator seat-table entry: gemini/);
+});
+
+// JUL-79 step 3: the launch commands carry the ticket's per-agent effort.
+// Claude and Codex have graded settings; Pi translates Low to "no --thinking"
+// and Medium/High to the flag inside run-pi-seat.mjs (the launcher passes the
+// neutral label through, never a vendor flag). Every command is asserted as
+// its exact string so a silently dropped ENV_PREFIX, skill path, issue id or
+// sandbox level cannot pass review.
+const ENV_PREFIX_EXPECTED = 'export ORCA_BIN=/opt/Orca/orca-ide ORCA_ENVIRONMENT=ovh-local; set -a; . /etc/orchestrator-svc/.env.publisher; set +a;';
+const PIPED_PROMPT_EXPECTED = (issueId) => `{ cat .claude/skills/julia-coordinator/SKILL.md; printf '\\n\\nIssue: %s\\n' '${issueId}'; }`;
+
+test('orchestratorLaunchCommandFor: codex pipes the skill + issue id to `codex exec -` with full-access sandbox and the translated effort', () => {
+  assert.equal(
+    orchestratorLaunchCommandFor('codex', 'JUL-79', { effort: 'high' }),
+    `${ENV_PREFIX_EXPECTED} ${PIPED_PROMPT_EXPECTED('JUL-79')} | codex exec - -s danger-full-access -c model_reasoning_effort=high`,
+  );
+});
+
+test('orchestratorLaunchCommandFor: pi-deepseek pipes the skill + issue id to the new orchestrator-deepseek seat with the effort label', () => {
+  assert.equal(
+    orchestratorLaunchCommandFor('pi-deepseek', 'JUL-79', { effort: 'high' }),
+    `${ENV_PREFIX_EXPECTED} ${PIPED_PROMPT_EXPECTED('JUL-79')} | node ops/service-dropbox/run-pi-seat.mjs orchestrator-deepseek --effort high`,
+  );
+});
+
+test('orchestratorLaunchCommandFor: an omitted effort is exactly Medium on every entry', () => {
+  for (const entry of ['claude', 'codex', 'pi-deepseek', 'pi-glm']) {
+    assert.equal(
+      orchestratorLaunchCommandFor(entry, 'JUL-79'),
+      orchestratorLaunchCommandFor(entry, 'JUL-79', { effort: 'medium' }),
+      `${entry} default-medium`,
+    );
+  }
+});
+
+test('orchestratorLaunchCommandFor: claude still gets its full tool grant list, with --effort inserted after --permission-mode', () => {
+  const command = orchestratorLaunchCommandFor('claude', 'JUL-79', { effort: 'low' });
+  assert.match(command, /claude --permission-mode acceptEdits --effort low --allowedTools /);
+  assert.match(command, /mcp__linear__\*/);
+  assert.match(command, /mcp__claude_ai_Linear__\*/);
+  assert.match(command, /Bash\(node --env-file=\/etc\/orchestrator-svc\/\.env\.publisher scripts\/publish-pr\.mjs:\*\)/);
+  assert.match(command, /Bash\(orca \*\)/);
+  assert.match(command, /-p "\/julia-coordinator JUL-79"$/);
+});
+
+test('orchestratorLaunchCommandFor: pi-glm passes the effort label to its seat, and never a vendor flag or a secret', () => {
+  const command = orchestratorLaunchCommandFor('pi-glm', 'JUL-79', { effort: 'low' });
+  assert.equal(
+    command,
+    `${ENV_PREFIX_EXPECTED} ${PIPED_PROMPT_EXPECTED('JUL-79')} | node ops/service-dropbox/run-pi-seat.mjs orchestrator-backup --effort low`,
+  );
+  assert.doesNotMatch(command, /--thinking|model_reasoning_effort/);
+  assert.doesNotMatch(command, /ZAI_PAYG_API_KEY|DEEPSEEK_API_KEY/);
 });
 
 test('an unknown seat-table entry fails before a run is created, so retrying after fixing it never blocks on an orphan run (JUL-73 review finding, preserved under the seat table)', async () => {

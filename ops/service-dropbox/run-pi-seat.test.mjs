@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { buildPiSpawnSpec, SEATS, readAllStdin } from './run-pi-seat.mjs';
+import { buildPiSpawnSpec, runPiSeat, SEATS, readAllStdin, thinkingArgs, parseSeatArgs } from './run-pi-seat.mjs';
 
 test('builder-backup spawns pi with DEEPSEEK_API_KEY in env, never in argv', () => {
   const spec = buildPiSpawnSpec('builder-backup', 'do the thing', {
@@ -40,6 +40,79 @@ test('builder-backup and reviewer-backup never share a model family (family-chec
 
 test('buildPiSpawnSpec refuses an unknown seat', () => {
   assert.throws(() => buildPiSpawnSpec('made-up-seat', 'x'), /unknown seat/);
+});
+
+// JUL-79 step 3: every Pi seat now carries the ticket's Low/Medium/High effort.
+// Pi has no graded setting, so Low is thinking off (no flag) and Medium/High
+// are thinking on; an omitted effort is Medium. The flag is inserted before
+// -p so the prompt text (which may be the whole coordinator skill) always
+// stays at the end of the argv array.
+test('effort -> --thinking: every seat gets the flag for Medium/High and none for Low', () => {
+  for (const seat of Object.keys(SEATS)) {
+    const low = buildPiSpawnSpec(seat, 'p', { effort: 'low', readSecretImpl: () => 'tok' });
+    assert.ok(!low.args.includes('--thinking'), `${seat}/low must not think`);
+    for (const level of ['medium', 'high']) {
+      const spec = buildPiSpawnSpec(seat, 'p', { effort: level, readSecretImpl: () => 'tok' });
+      assert.ok(spec.args.includes('--thinking'), `${seat}/${level} must think`);
+      assert.equal(spec.args.indexOf('--thinking'), spec.args.indexOf('-p') - 1, `${seat}/${level} places the flag before -p`);
+    }
+  }
+});
+
+test('an omitted effort is Medium: the spawn spec is exactly the explicit-medium one', () => {
+  for (const seat of Object.keys(SEATS)) {
+    const omitted = buildPiSpawnSpec(seat, 'p', { readSecretImpl: () => 'tok' });
+    const medium = buildPiSpawnSpec(seat, 'p', { effort: 'medium', readSecretImpl: () => 'tok' });
+    assert.deepEqual(omitted.args, medium.args, `${seat} default`);
+  }
+});
+
+test('thinkingArgs: the pure mapping, including an unknown effort falling back to Medium', () => {
+  assert.deepEqual(thinkingArgs('low'), []);
+  assert.deepEqual(thinkingArgs('medium'), ['--thinking']);
+  assert.deepEqual(thinkingArgs('high'), ['--thinking']);
+  assert.deepEqual(thinkingArgs(undefined), ['--thinking']);
+  assert.deepEqual(thinkingArgs('turbo'), ['--thinking']);
+});
+
+test('orchestrator-deepseek: DeepSeek provider/model, DEEPSEEK_API_KEY in env only, thinking per effort', () => {
+  const spec = buildPiSpawnSpec('orchestrator-deepseek', 'run the graph', {
+    mode: 'json',
+    effort: 'high',
+    readSecretImpl: (field) => {
+      assert.equal(field, 'deepseek');
+      return 'super-secret-deepseek-token';
+    },
+  });
+  assert.deepEqual(spec.args, ['--provider', 'deepseek', '--model', 'deepseek-v4-flash', '--thinking', '-p', 'run the graph', '--mode', 'json']);
+  assert.equal(spec.env.DEEPSEEK_API_KEY, 'super-secret-deepseek-token');
+  assert.ok(!spec.args.includes('super-secret-deepseek-token'));
+});
+
+test('runPiSeat forwards the effort through to the spawn spec (no separate path for a dispatched worker)', () => {
+  const seen = {};
+  const child = runPiSeat('builder-backup', 'p', {
+    effort: 'high',
+    readSecretImpl: () => 'tok',
+    spawnOpts: { stdio: ['ignore', 'ignore', 'ignore'] },
+    spawnImpl: (command, args, opts) => {
+      seen.command = command;
+      seen.args = args;
+      seen.env = opts.env;
+      return { on() {} };
+    },
+  });
+  assert.ok(child);
+  assert.equal(seen.command, 'pi');
+  assert.deepEqual(seen.args, ['--provider', 'deepseek', '--model', 'deepseek-v4-flash', '--thinking', '-p', 'p', '--mode', 'json']);
+  assert.equal(seen.env.DEEPSEEK_API_KEY, 'tok');
+});
+
+test('parseSeatArgs: seat plus an optional --effort (both spellings), defaulting to medium', () => {
+  assert.deepEqual(parseSeatArgs(['orchestrator-deepseek']), { seat: 'orchestrator-deepseek', effort: 'medium' });
+  assert.deepEqual(parseSeatArgs(['builder-backup', '--effort', 'low']), { seat: 'builder-backup', effort: 'low' });
+  assert.deepEqual(parseSeatArgs(['builder-backup', '--effort=high']), { seat: 'builder-backup', effort: 'high' });
+  assert.throws(() => parseSeatArgs(['builder-backup', '--wat']), /unknown argument: --wat/);
 });
 
 test('readAllStdin reads the whole piped prompt (fd 0), for the CLI entry launched from a shell pipe', () => {
