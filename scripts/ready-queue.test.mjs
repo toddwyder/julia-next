@@ -330,6 +330,41 @@ test('an ineligible top card is commented once, stays quiet while the fingerprin
   assert.equal(calls.comments.length, 2);
 });
 
+test('ready-queue: a guard-refused comment is skipped and logged; the cycle still completes and the fingerprint is recorded', async () => {
+  const ineligible = makeIssue({ labels: [] });
+  const { linear, calls } = fakeLinear({ issues: [ineligible] });
+  const store = fakeStore();
+  const orca = fakeOrca();
+  const logs = [];
+  const d = deps({
+    linear,
+    store,
+    orca,
+    checkForToddGuardImpl: () => ({ ok: false, rule: 'git-vocabulary', reason: 'test refusal' }),
+    logErrorImpl: (message) => logs.push(message),
+  });
+
+  await readyQueueCheck(d); // first sighting
+  const second = await readyQueueCheck(d);
+  assert.equal(second.status, 'ineligible');
+  assert.equal(second.refused, true);
+  assert.equal(second.commented, false);
+  assert.equal(calls.comments.length, 0, 'a refused comment must never reach Linear');
+  assert.equal(logs.length, 1, 'the refusal is logged once');
+  assert.match(logs[0], /git-vocabulary/);
+  assert.match(logs[0], /test refusal/);
+  // The fingerprint is still recorded, so the queue stays quiet instead of
+  // retrying the same refused comment every check.
+  assert.equal(store.get().commented[ineligible.id], issueFingerprint(ineligible));
+  assert.equal(orca.calls.terminalsCreated.length, 0);
+
+  const third = await readyQueueCheck(d);
+  assert.equal(third.status, 'ineligible');
+  assert.equal(third.refused, false);
+  assert.equal(calls.comments.length, 0);
+  assert.equal(logs.length, 1);
+});
+
 test('only the top card is ever a candidate; a lower ineligible card cannot block it', async () => {
   const top = makeIssue({ identifier: 'JUL-1', sortOrder: 1 });
   const lower = makeIssue({ identifier: 'JUL-2', sortOrder: 2, labels: [] });

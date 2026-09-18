@@ -643,6 +643,60 @@ seats, so builder/reviewer Pi dispatches can carry it too. The secret invariant 
 secret is read in-process via `read-secret.mjs` and injected only through `spawn`'s `env`, never
 argv or a shell string.
 
+### The `orchestrator-deepseek` seat cannot read its own secret yet (step-3 review finding, carried)
+
+The `orchestrator-deepseek` seat (the `pi-deepseek` orchestrator route) reads the `deepseek`
+drop-box secret field. `ops/service-dropbox/dropbox.mjs`'s `FIELD_GROUPS` maps `deepseek` to
+**`runner` only** -- it was created for the Pi *builder* backup, unlike `zai`, which got a
+dedicated `zai-readers` group holding both `runner` and `orchestrator-svc`. So an
+`orchestrator-svc` terminal running that seat cannot read its own key as configured. Making the
+`pi-deepseek` orchestrator route live needs root work: a `deepseek-readers`-style group, a
+`usermod` adding `orchestrator-svc` (keep `runner` too, for the builder backup), the field's file
+chowned to that group, and -- because a daemon's supplementary groups are fixed at start -- a
+restart of both `orca-server.service` and `orca-server-orchestrator.service` between runs. That
+is the same stale-supplementary-group rule as the `zai-readers` fix above. It is a
+service-account/credential change, so it is parked for the laptop session, not done by an agent
+unprompted.
+
+## The For-Todd guard: only three kinds of thing reach Todd (JUL-79 step 4)
+
+The rule is now code, not just prose. `scripts/linear-cli.mjs` exports the pure
+`checkForToddGuard(body)` (returns `{ ok: true }` or `{ ok: false, rule, reason }`, never
+throws) and runs it inside `postComment` **before the first Linear API call** -- so a refused
+comment costs no network request and no write. The CLI's `comment` subcommand inherits it. The
+Ready queue imports the same function and runs it in its own comment path
+(`checkForToddGuardImpl`, defaulting to the real guard), so its unexplained-comment path can be
+tested by injection; a refusal there is logged with the rule and reason to stderr (the timer's
+journal) and that one comment is skipped, while the cycle and the state file/fingerprint logic
+carry on. The guard's two rules, both fail-closed on ambiguity:
+
+1. **`category`.** If the body says `WAITING ON YOU` (case-insensitive), it must name one of the
+   three kinds Todd legitimately gets -- the marker `(a)`/`(b)`/`(c)` or that category's
+   vocabulary: (a) `sign-in`, `login`, `payment`; (b) `money`, `cost`, `spend`, `budget`,
+   `billing`, `subscription`, `purchase`, `price`; (c) `product`, `decision`, `accept`,
+   `approve`, `spec`, `scope`. No category -> refuse.
+2. **`git-vocabulary`.** Any line in the `For Todd:` trailer (case-insensitive, from the header
+   to the first blank line or the end) must not mention `merge`, `push`, `branch`, `PR`,
+   `commit` or `rebase`, **including inflections** (`merged`, `merges`, `merging`, `pushes`,
+   `pushed`, `pushing`, `branches`, `PRs`, `commits`, `committed`, `committing`, `rebased`,
+   `rebasing`). Matching is word-boundary and stem-aware: `commitment`, `approach`, `imprint`
+   and `PRint` do not trip it, and a bare `\bpush\b` would have missed `pushed`, which is why the
+   patterns carry the stems. The same words **outside** a `For Todd:` line are ordinary prose
+   and pass untouched. Strict by design -- no intent detection; even an informational mention is
+   refused.
+
+**Writing conventions this forces.** A `For Todd:` line describes the *outcome* without git
+vocabulary: write "the step's changes are on main", never "PR merged" or "pushed the branch". A
+park on Todd still says `WAITING ON YOU` and names `(a)`/`(b)`/`(c)` (or that vocabulary); a
+normal report ends with `For Todd: nothing`.
+
+**What a refusal tells the agent.** The thrown error names the rule that tripped and ends with
+the acting instruction: the agent decides, does and logs this itself (merges, git, restarts,
+installs, free-tier resources in approved services are all the agent's). It must not reword the
+comment to slip past the guard. If the thing really is Todd-only and outside the three kinds,
+that is a **design defect**: log it on the ticket and/or here in the runbook (the error names
+`docs/agents/jul43-coordinator-runbook.md`), rather than forcing the post through.
+
 ## Readiness
 
 ```sh
