@@ -355,6 +355,12 @@ worktree/branch were removed after (`orca worktree rm --worktree name:<name> --f
   endpoint doesn't return usage-based pricing in the response for this route, not that the call
   was actually free. Unresolved: get a real per-session cost figure for the GLM backup seat
   before relying on the "cost per session recorded for each backup seat" acceptance line.
+- **The `glm-5-3` `models.json` entry is per-identity, not shared** — it was only written for
+  `orchestrator-svc` initially (which is all `julia-run.mjs`'s orchestrator-backup path needs),
+  but the reviewer-backup seat dispatches as `runner` (PR #36 review finding). `runner` needed
+  the identical `~/.pi/agent/models.json` entry added separately; live-verified working (real
+  `pong` reply) only after that. Any *new* identity that ever runs a `pi-glm` seat needs this
+  file written for it too — it does not follow from `orchestrator-svc`'s copy existing.
 
 **`/home/orchestrator-svc/julia-next` is not a real checkout — ignore it.** Only
 `/srv/orchestrator-svc/julia-next` (read-only, synced) and `/home/runner/julia-next` (writable,

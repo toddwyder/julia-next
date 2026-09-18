@@ -230,6 +230,13 @@ test('orchestratorLaunchCommandFor refuses an unknown table entry', () => {
   assert.throws(() => orchestratorLaunchCommandFor('gemini', 'JUL-63'), /unknown orchestrator seat-table entry: gemini/);
 });
 
+test('an unknown seat-table entry fails before a run is created, so retrying after fixing it never blocks on an orphan run (JUL-73 review finding, preserved under the seat table)', async () => {
+  const { impls, calls } = fakeImpls({ seatTable: { orchestrator: { primary: 'gemini', backup: 'pi-glm' } } });
+  await assert.rejects(() => juliaRun('JUL-63', impls), /unknown orchestrator seat-table entry: gemini/);
+  assert.deepEqual(calls.runsCreated, []);
+  assert.equal(calls.terminalsCreated.length, 0);
+});
+
 test('startOrchestrator: no cap error -> stays on the table primary', async () => {
   const { impls, calls } = fakeImpls();
   const result = await startOrchestrator('JUL-63', impls);
