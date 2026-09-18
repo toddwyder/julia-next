@@ -19,7 +19,16 @@ export async function verifyReviewerWorktreeUnchanged({ worktreePath, candidateC
   // `git diff <commit>` compares the working tree (staged and unstaged) to
   // that commit, so it catches an uncommitted edit and a committed one alike
   // -- a reviewer that commits its tampering doesn't escape this check.
-  const { stdout } = await execFileImpl('git', ['-C', worktreePath, 'diff', '--stat', candidateCommit], {
+  //
+  // `-c safe.directory=<worktreePath>`, scoped to exactly the path passed
+  // in: the same dubious-ownership guard publish-pr.mjs hit (JUL-71) blocks
+  // this check too, silently, whenever the caller's UID doesn't match the
+  // worktree owner's -- exactly the coordinator's own real shape
+  // (orchestrator-svc verifying a runner-owned reviewer worktree). Without
+  // it, git falls back as if run outside any repository at all and this
+  // check can't tell a tampered worktree from a clean one (live-verified,
+  // JUL-73).
+  const { stdout } = await execFileImpl('git', ['-c', `safe.directory=${worktreePath}`, '-C', worktreePath, 'diff', '--stat', candidateCommit], {
     maxBuffer: 10 * 1024 * 1024,
   });
 

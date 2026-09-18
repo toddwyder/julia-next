@@ -81,3 +81,15 @@ test('rejects a candidateCommit that is not a plausible SHA', async () => {
     /candidateCommit must be a commit SHA/,
   );
 });
+
+test('scopes safe.directory to exactly the passed worktreePath (JUL-73: orchestrator-svc verifying a runner-owned reviewer worktree hits git\'s dubious-ownership guard otherwise, live-verified)', async () => {
+  let calledArgs;
+  const execFileImpl = async (cmd, args) => {
+    calledArgs = args;
+    return { stdout: '' };
+  };
+  await verifyReviewerWorktreeUnchanged({ worktreePath: '/home/runner/some-review-worktree', candidateCommit: 'abc1234', execFileImpl });
+  const idx = calledArgs.indexOf('safe.directory=/home/runner/some-review-worktree');
+  assert.ok(idx > 0, `expected a -c safe.directory=/home/runner/some-review-worktree flag in ${JSON.stringify(calledArgs)}`);
+  assert.equal(calledArgs[idx - 1], '-c');
+});

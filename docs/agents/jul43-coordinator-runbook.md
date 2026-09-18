@@ -228,11 +228,13 @@ node /srv/orchestrator-svc/julia-next/scripts/julia-run.mjs <ISSUE-ID>
 ```
 It refuses as any other account, runs readiness, self-heals a stale checkout, refuses a
 double-start, then starts a real Orca Run/terminal that invokes the `julia-coordinator` skill
-(`disable-model-invocation: true`, so it must be named explicitly there) for that issue and
-posts the start comment (JUL-63). Prints the run id on success, or which step failed and why on
-failure. Once started, the coordinator reconciles Orca + Linear state, advances the current
-in-flight item, and admits the next eligible issue once a slot is free — see
-`.claude/skills/julia-coordinator/SKILL.md` for that procedure.
+(`disable-model-invocation: true`, so it must be named explicitly there) for that issue. Prints
+the run id on success, or which step failed and why on failure. Once started, the coordinator
+posts its own admission comment and reconciles Orca + Linear state itself — see
+`.claude/skills/julia-coordinator/SKILL.md` for that procedure. **`julia-run.mjs` itself no
+longer posts a start comment (JUL-73):** the separate `claude -p` call that used to do this
+(`defaultPostCommentImpl`/`postStartComment`) was a second vendor dependency doing no real work,
+since the coordinator's own first wake already posts admission to Linear.
 
 **The headless launch needs its own tool grants — `claude -p` exits 0 even when every tool call
 was refused.** Found across two real live wakes, each diagnosing its own gap and reporting back
@@ -243,13 +245,53 @@ instead of silently doing nothing:
    and review, then be refused at publish.
 
 `julia-run.mjs`'s launch command now grants: `mcp__linear__*` and `mcp__claude_ai_Linear__*`
-(both Linear tool namespaces — see the CWD-dependent tool-name caveat on the start-comment step
-above); `Bash` access to the exact scripts the skill's "Each wake"/"Running a step"/"After
-verification" procedures name (`orca-cli.mjs`, `check-readiness.mjs`, `collect-worker-result.mjs`,
+(both Linear tool namespaces — from this checkout's CWD, the coordinator sometimes reaches for
+the hosted `mcp__claude_ai_Linear__*` connector instead of the standalone `mcp__linear__*`
+server, so both are allowed); `Bash` access to the exact scripts the skill's "Each wake"/"Running
+a step"/"After verification" procedures name (`orca-cli.mjs`, `check-readiness.mjs`, `collect-worker-result.mjs`,
 `verify-reviewer-worktree.mjs`, `coordinator-events.mjs`); the publisher credential file for the
 two scripts that need it (`publish-pr.mjs`, `merge-pr.mjs`); and the bare `orca` CLI. If the
 skill's own procedure grows to need another script or tool, its `--allowedTools` list in
 `scripts/julia-run.mjs`'s `startOrchestrator` needs the matching grant added in the same PR.
+
+## Second vendor on the orchestrator seat (JUL-73)
+
+`julia-run.mjs`'s `startOrchestrator` picks its launch command from `ORCHESTRATOR_VENDOR`
+(`claude`, the default, or `codex`) rather than a single hardcoded string. Both branches share
+the same env prefix (`ORCA_BIN`/`ORCA_ENVIRONMENT` export, then the publisher env file sourced
+with `set -a`/`set +a`). The `codex` branch has no slash-command equivalent, so it pipes the
+checkout's own `.claude/skills/julia-coordinator/SKILL.md` text plus the issue id into `codex
+exec -` as its prompt, reading the file live on the server at launch time rather than a snapshot
+baked into this repo's JS.
+
+**Codex logins, as `orchestrator-svc` (both headless, same shape as `claude mcp login linear` in
+JUL-61 — a URL/code Todd completes in his own browser):**
+```sh
+codex login --device-auth   # prints https://auth.openai.com/codex/device + a one-time code
+codex mcp add linear --url https://mcp.linear.app/mcp   # same MCP URL Claude already uses here
+codex mcp login linear      # prints a https://mcp.linear.app/authorize?... OAuth URL
+```
+**The OAuth callback for `codex mcp login linear` listens on `127.0.0.1:<port>` on the server
+itself**, so a browser running anywhere else (Todd's laptop) cannot deliver it directly — the
+same class of problem noted elsewhere in this file for editing files across shell layers. After
+Todd approves in his browser, he lands on a `127.0.0.1:<port>/callback/...?code=...&state=...`
+page that fails to load; take that exact URL and `curl` it from the server (as `orchestrator-svc`)
+to deliver the callback to the waiting process. The device-code/URL and the OAuth URL are both
+single-use and time-limited (the device code expires in 15 minutes; the OAuth callback listener
+times out on its own deadline, observed live at a few minutes) — if either expires before Todd
+acts, kill the stale attempt and start a fresh one rather than reusing captured text.
+
+**Codex's MCP tool-call approval gate blocks a write-classified MCP call under `workspace-write`,
+even with `--ask-for-approval never`** (live-verified, JUL-73: `codex exec -s workspace-write`
+reading via `linear/get_issue` worked, but `linear/save_comment` failed with "MCP tool call
+requires approval, but approval policy is never" — the approval gate for a write tool isn't
+satisfied by the approval-policy flag the way a shell command's is). This is Codex's own
+per-write-tool confirmation, separate from the sandbox's file/network policy. Only `-s
+danger-full-access` let the write through. There is no per-tool allowlist in Codex the way
+Claude's `--allowedTools` provides, so `danger-full-access` is the closest real equivalent
+available today — scoped to what it already means (this account, this repo, this account's own
+credentials), not a broader bypass. If a future Codex version adds a narrower MCP-write grant,
+prefer it over `danger-full-access` and update this note and `launchCommandFor` together.
 
 ## Readiness
 
@@ -285,6 +327,15 @@ report is saved **outside** the candidate worktree. Before trusting the review, 
 reviewer's worktree against the candidate commit (`scripts/verify-reviewer-worktree.mjs`) — any
 difference, committed or not, rejects the review outright and the step is retried with a fresh
 reviewer. See `SKILL.md`'s "After verification" section for the exact sequence.
+
+**`verify-reviewer-worktree.mjs` hits the same dubious-ownership guard as an unpatched
+`publish-pr.mjs` (live-verified, JUL-73).** Whenever the verifying process's UID doesn't match
+the reviewer worktree's owner UID (the coordinator's own real shape: `orchestrator-svc`
+verifying a `runner`-owned reviewer worktree), plain `git -C <path> diff` silently falls back as
+if run outside any repository at all, rather than failing loudly — so a tampered worktree and a
+clean one both produced empty-looking output, defeating the check it exists to run. Fixed the
+same way as `publish-pr.mjs` (JUL-71): `-c safe.directory=<worktreePath>`, scoped to exactly the
+path the caller passed in.
 
 ## Publishing
 

@@ -144,85 +144,92 @@ export async function findExistingRun(issueId, { runListImpl = runList, isRunFin
   return match;
 }
 
+// Env prefix shared by every vendor branch (JUL-44 preflight misses 1 and
+// 2): whichever process this launches is a fresh shell on the
+// orchestrator-local runtime -- it does not inherit julia-run's own
+// process env, so every orca-cli.mjs-based script it runs
+// (check-readiness.mjs, workerStart, coordinator-events.mjs) failed with
+// "ORCA_BIN is not set", and check-readiness.mjs's publisher check failed
+// for want of JULIA_PUBLISHER_APP_ID/_PRIVATE_KEY. Export both before the
+// vendor invocation so every Bash subprocess it spawns inherits them too;
+// `set -a`/`set +a` auto-exports every name sourced from the publisher env
+// file without listing them one by one.
+const ENV_PREFIX = `export ORCA_BIN=/opt/Orca/orca-ide ORCA_ENVIRONMENT=${DISPATCH_ENVIRONMENT}; set -a; . ${PUBLISHER_ENV_FILE}; set +a;`;
+
+const SKILL_PATH = '.claude/skills/julia-coordinator/SKILL.md';
+
+function claudeLaunchCommand(issueId) {
+  // The skill has disable-model-invocation: true (invoked by name only,
+  // never inferred) -- asking in prose was refused live (JUL-63): the
+  // model correctly declined to run the skill's steps by hand and pointed
+  // back at the slash command instead. Pass that explicitly.
+  //
+  // --allowedTools: without this, the launch exits 0 having reached
+  // neither Linear nor Orca -- caught live because the coordinator's own
+  // first real run diagnosed its own missing grants and reported back
+  // instead of silently doing nothing (JUL-63). A second real wake then
+  // found the remaining gap itself: dispatch/readiness scripts were
+  // granted, but publish-pr.mjs/merge-pr.mjs/coordinator-events.mjs
+  // weren't, so a real ticket would build and review, then be refused at
+  // publish. Both Linear tool namespaces (the coordinator sometimes reaches
+  // for the hosted `mcp__claude_ai_Linear__*` connector instead of the
+  // standalone `mcp__linear__*` server, depending on CWD), Bash access to
+  // the exact scripts the skill's "Each wake"/"Running a step"/"After
+  // verification" procedures name, and the publisher credential file for
+  // the two scripts that need it.
+  return `${ENV_PREFIX} claude --permission-mode acceptEdits --allowedTools "mcp__linear__*,mcp__claude_ai_Linear__*,Bash(node scripts/orca-cli.mjs:*),Bash(node scripts/check-readiness.mjs:*),Bash(node scripts/collect-worker-result.mjs:*),Bash(node scripts/verify-reviewer-worktree.mjs:*),Bash(node scripts/coordinator-events.mjs:*),Bash(node --env-file=/etc/orchestrator-svc/.env.publisher scripts/publish-pr.mjs:*),Bash(node --env-file=/etc/orchestrator-svc/.env.publisher scripts/merge-pr.mjs:*),Bash(orca *)" -p "/julia-coordinator ${issueId}"`;
+}
+
+// Codex has no slash-command equivalent, so the skill body itself is the
+// prompt -- piped in verbatim from the checkout's own copy (always current,
+// never a snapshot baked into this file) with the issue id appended.
+//
+// Permission grant equivalent to the claude branch's --allowedTools:
+// live-verified (JUL-73) that a write-classified Linear MCP call (e.g.
+// linear/save_comment) needs Codex's `danger-full-access` sandbox --
+// `workspace-write` with `--ask-for-approval never` still refused the MCP
+// write pending approval that never comes in a headless run. Codex has no
+// per-command allowlist the way Claude's --allowedTools does, so
+// danger-full-access is the closest real equivalent: broad within this
+// account's own scope (this repo, this checkout, this account's
+// credentials), not a wider bypass of anything outside it.
+function codexLaunchCommand(issueId) {
+  return `${ENV_PREFIX} { cat ${SKILL_PATH}; printf '\\n\\nIssue: %s\\n' '${issueId}'; } | codex exec -s danger-full-access --skip-git-repo-check -`;
+}
+
+export function launchCommandFor(vendor, issueId) {
+  if (vendor === 'claude') return claudeLaunchCommand(issueId);
+  if (vendor === 'codex') return codexLaunchCommand(issueId);
+  throw new Error(`unknown ORCHESTRATOR_VENDOR: ${vendor}`);
+}
+
 export async function startOrchestrator(issueId, {
   runCreateImpl = runCreate,
   terminalCreateImpl = terminalCreate,
   fromHandle = process.env.ORCA_TERMINAL_HANDLE,
+  env = process.env,
 } = {}) {
   if (!fromHandle) {
     throw new Error('ORCA_TERMINAL_HANDLE is not set -- julia-run must run inside an Orca-managed terminal on the orchestrator-local runtime, not a bare shell');
   }
+  // Build (and validate) the launch command before creating the run: an
+  // invalid ORCHESTRATOR_VENDOR must fail before anything exists in Orca,
+  // not leave an orphan run with zero tasks that then blocks a retry for
+  // the isRunFinished grace window (JUL-73 review finding).
+  const vendor = env.ORCHESTRATOR_VENDOR ?? 'claude';
+  const command = launchCommandFor(vendor, issueId);
+
   const created = await runCreateImpl({ environment: ORCHESTRATOR_ENVIRONMENT, from: fromHandle, objective: issueId });
   const runId = created.run.id;
 
   await terminalCreateImpl({
     environment: ORCHESTRATOR_ENVIRONMENT,
     worktree: WORKTREE_SELECTOR,
-    // The skill has disable-model-invocation: true (invoked by name only,
-    // never inferred) -- asking in prose was refused live (JUL-63): the
-    // model correctly declined to run the skill's steps by hand and
-    // pointed back at the slash command instead. Pass that explicitly.
-    //
-    // --allowedTools: without this, the launch exits 0 having reached
-    // neither Linear nor Orca -- caught live because the coordinator's own
-    // first real run diagnosed its own missing grants and reported back
-    // instead of silently doing nothing (JUL-63). A second real wake then
-    // found the remaining gap itself: dispatch/readiness scripts were
-    // granted, but publish-pr.mjs/merge-pr.mjs/coordinator-events.mjs
-    // weren't, so a real ticket would build and review, then be refused at
-    // publish. Both Linear tool namespaces (see defaultPostCommentImpl's
-    // own comment on why), Bash access to the exact scripts the skill's
-    // "Each wake"/"Running a step"/"After verification" procedures name,
-    // and the publisher credential file for the two scripts that need it.
-    //
-    // Env prefix (JUL-44 preflight misses 1 and 2): the `claude -p`
-    // process this launches is a fresh shell on the orchestrator-local
-    // runtime -- it does not inherit julia-run's own process env, so
-    // every orca-cli.mjs-based script it runs (check-readiness.mjs,
-    // workerStart, coordinator-events.mjs) failed with "ORCA_BIN is not
-    // set", and check-readiness.mjs's publisher check failed for want of
-    // JULIA_PUBLISHER_APP_ID/_PRIVATE_KEY. Export both before the claude
-    // invocation so every Bash subprocess it spawns inherits them too;
-    // `set -a`/`set +a` auto-exports every name sourced from the
-    // publisher env file without listing them one by one.
-    command: `export ORCA_BIN=/opt/Orca/orca-ide ORCA_ENVIRONMENT=${DISPATCH_ENVIRONMENT}; set -a; . ${PUBLISHER_ENV_FILE}; set +a; claude --permission-mode acceptEdits --allowedTools "mcp__linear__*,mcp__claude_ai_Linear__*,Bash(node scripts/orca-cli.mjs:*),Bash(node scripts/check-readiness.mjs:*),Bash(node scripts/collect-worker-result.mjs:*),Bash(node scripts/verify-reviewer-worktree.mjs:*),Bash(node scripts/coordinator-events.mjs:*),Bash(node --env-file=/etc/orchestrator-svc/.env.publisher scripts/publish-pr.mjs:*),Bash(node --env-file=/etc/orchestrator-svc/.env.publisher scripts/merge-pr.mjs:*),Bash(orca *)" -p "/julia-coordinator ${issueId}"`,
+    command,
     title: `julia-run-${issueId}`,
   });
 
   return { runId };
-}
-
-export async function postStartComment(issueId, runId, { postCommentImpl = defaultPostCommentImpl } = {}) {
-  const startedAt = new Date().toISOString();
-  const body = `Instruction: run started by julia-run at ${startedAt}, orchestrator ${runId}\n\nFor Todd:\n- julia-run started the orchestrator for this issue.\n- nothing`;
-  await postCommentImpl(issueId, body);
-}
-
-// Reuses orchestrator-svc's own already-authenticated Claude + Linear MCP
-// connection (the one from JUL-61 step 2/3) rather than a separate
-// LINEAR_API_KEY -- exactly the pattern already verified live for posting
-// evidence as this account.
-//
-// Two real bugs found live (JUL-63) and fixed here:
-// 1. From this checkout's CWD, the model sometimes reaches for the
-//    built-in `mcp__claude_ai_Linear__save_comment` connector instead of
-//    the standalone `mcp__linear__save_comment` server -- allow both, so
-//    whichever one it picks is permitted rather than silently denied.
-// 2. `claude -p` exits 0 even when its only tool call was denied -- it
-//    just explains the failure in its text result instead of erroring.
-//    --output-format json exposes `permission_denials`/`is_error`, which
-//    this actually checks instead of trusting the exit code.
-export async function defaultPostCommentImpl(issueId, body, { execImpl = execFileAsync } = {}) {
-  const prompt = `Use the Linear MCP tool to post exactly this comment (verbatim, no changes) on issue ${issueId}:\n\n${body}`;
-  const { stdout } = await execImpl('claude', [
-    '-p', prompt,
-    '--allowedTools', 'mcp__linear__save_comment,mcp__claude_ai_Linear__save_comment',
-    '--output-format', 'json',
-  ]);
-  const result = JSON.parse(stdout);
-  if (result.is_error || (result.permission_denials ?? []).length > 0) {
-    throw new Error(`failed to post the start comment on ${issueId}: ${result.result ?? JSON.stringify(result.permission_denials)}`);
-  }
 }
 
 export async function juliaRun(issueId, impls = {}) {
@@ -238,7 +245,6 @@ export async function juliaRun(issueId, impls = {}) {
   }
 
   const { runId } = await startOrchestrator(issueId, impls);
-  await postStartComment(issueId, runId, impls);
   return { runId };
 }
 
