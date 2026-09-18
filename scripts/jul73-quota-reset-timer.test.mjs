@@ -27,9 +27,26 @@ test('the timer unit points at the acceptance-run service by name', () => {
 test('the service removes both of its own unit files and disables the timer, regardless of the run outcome', () => {
   const execStopPostLines = SERVICE.match(/^ExecStopPost=.+$/gm) ?? [];
   const joined = execStopPostLines.join('\n');
-  assert.match(joined, /systemctl disable --now jul73-quota-reset\.timer/);
+  assert.match(joined, /systemctl disable --now.*jul73-quota-reset\.timer/);
   assert.match(joined, /rm -f .*jul73-quota-reset\.service.*jul73-quota-reset\.timer/);
   assert.match(joined, /systemctl daemon-reload/);
+});
+
+test('every ExecStopPost command is failure-tolerant (- prefixed), since this is the only cleanup path and must not short-circuit on its own first failure', () => {
+  const execStopPostLines = SERVICE.match(/^ExecStopPost=.+$/gm) ?? [];
+  assert.ok(execStopPostLines.length >= 3, 'expected at least 3 ExecStopPost lines');
+  for (const line of execStopPostLines) {
+    assert.match(line, /^ExecStopPost=-\//, `expected a failure-tolerant "-" prefix on: ${line}`);
+  }
+});
+
+test('the service has a hard timeout so a hung run cannot block cleanup forever', () => {
+  assert.match(SERVICE, /^TimeoutStartSec=\d+$/m);
+});
+
+test('the service runs from the live checkout as its working directory, and passes -H so orchestrator-svc\'s own HOME (credentials, MCP state) is used, not root\'s', () => {
+  assert.match(SERVICE, /^WorkingDirectory=\/srv\/orchestrator-svc\/julia-next$/m);
+  assert.match(SERVICE, /sudo -H -u orchestrator-svc/);
 });
 
 test('the service is oneshot (runs once to completion, not a long-lived daemon) and has no Restart= directive', () => {
@@ -38,5 +55,5 @@ test('the service is oneshot (runs once to completion, not a long-lived daemon) 
 });
 
 test('the service runs the acceptance logic as orchestrator-svc, from the live checkout', () => {
-  assert.match(SERVICE, /sudo -u orchestrator-svc .*node \/srv\/orchestrator-svc\/julia-next\/scripts\/jul73-quota-reset-run\.mjs/);
+  assert.match(SERVICE, /sudo -H -u orchestrator-svc .*node \/srv\/orchestrator-svc\/julia-next\/scripts\/jul73-quota-reset-run\.mjs/);
 });

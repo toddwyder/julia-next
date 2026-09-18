@@ -15,4 +15,23 @@ blocked: proving a codex-vendor orchestrator can complete a real wake and post t
 
 Installed by hand as `ubuntu` (root): copy both files into `/etc/systemd/system/`,
 `systemctl daemon-reload`, `systemctl enable --now jul73-quota-reset.timer`. See JUL-73's Linear
-thread for the live install record.
+thread for the live install record, and `docs/agents/jul43-coordinator-runbook.md`'s "Second
+vendor on the orchestrator seat" section for the wider Codex-quota context.
+
+**Hard precondition: this commit must already be on `origin/main` before 19:43 UTC.**
+`ExecStart` runs `/srv/orchestrator-svc/julia-next/scripts/jul73-quota-reset-run.mjs` straight out
+of the live, read-only checkout (root-owned, `550`/`440`, hard-reset to `origin/main` every 15
+minutes -- see the runbook's checkout-sync section). If this branch hasn't merged by the time the
+timer fires, `node` exits with a module-not-found, `ExecStopPost` still removes the units, and
+nothing is posted anywhere -- silently, since the mechanical script never got far enough to reach
+its own closer step. Confirm the merge landed (and the checkout synced) well before the fire time.
+
+**If the box is down at fire time:** `Persistent=false` means the run is simply skipped, not
+queued -- there is nothing to "catch up" to twice for a one-shot. The unit files are left in place
+(their own `ExecStopPost` never runs), so `systemctl list-timers` will still show
+`jul73-quota-reset.timer` afterward; that is the sign this needs a manual re-check rather than an
+assumption the run happened.
+
+**If nothing appears on Linear after the fire time:** the mechanical script logs to stderr/stdout,
+which journald keeps searchable by unit name even after the unit files are removed --
+`journalctl -u jul73-quota-reset.service --since "2026-09-19 19:40 UTC"`.

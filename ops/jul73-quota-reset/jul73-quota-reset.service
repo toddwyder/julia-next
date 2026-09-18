@@ -3,15 +3,23 @@ Description=JUL-73 one-time Codex quota-reset acceptance re-run
 
 [Service]
 Type=oneshot
+WorkingDirectory=/srv/orchestrator-svc/julia-next
 # Runs as root (this unit's own account) so it can remove its own unit
 # files afterward without a new sudoers grant; the actual acceptance work
-# runs as orchestrator-svc, which is the account the ticket asked for and
-# the one whose Codex/Linear/Orca credentials this needs.
-ExecStart=/usr/bin/sudo -u orchestrator-svc /usr/bin/node /srv/orchestrator-svc/julia-next/scripts/jul73-quota-reset-run.mjs
-# ExecStopPost runs whether ExecStart exited cleanly, failed, or errored --
-# so a failed acceptance re-run still leaves no stray timer behind. The
-# failure itself is posted to Linear by the script's own closer step
-# (jul73-quota-reset-run.mjs), never lost just because the unit is gone.
-ExecStopPost=/bin/systemctl disable --now jul73-quota-reset.timer
-ExecStopPost=/bin/rm -f /etc/systemd/system/jul73-quota-reset.service /etc/systemd/system/jul73-quota-reset.timer
-ExecStopPost=/bin/systemctl daemon-reload
+# runs as orchestrator-svc (-H so $HOME is that account's, not root's --
+# both `claude`'s and `codex`'s credential/MCP state live under
+# ~orchestrator-svc), which is the account the ticket asked for and the
+# one whose Codex/Linear/Orca credentials this needs.
+ExecStart=/usr/bin/sudo -H -u orchestrator-svc /usr/bin/node /srv/orchestrator-svc/julia-next/scripts/jul73-quota-reset-run.mjs
+# A hard ceiling so a hung `claude -p` (no per-call timeout of its own)
+# can't block cleanup forever -- systemd's own timeout-kill still counts
+# as "stopped" and still runs ExecStopPost.
+TimeoutStartSec=1200
+# ExecStopPost runs whether ExecStart exited cleanly, failed, timed out, or
+# errored -- so a failed acceptance re-run still leaves no stray timer
+# behind. Each command is `-`-prefixed so one failing (e.g. the timer
+# already disabled) doesn't skip the rest -- this is the only cleanup
+# path, so it must not short-circuit on its own first failure.
+ExecStopPost=-/bin/systemctl disable --now --no-block jul73-quota-reset.timer
+ExecStopPost=-/bin/rm -f /etc/systemd/system/jul73-quota-reset.service /etc/systemd/system/jul73-quota-reset.timer
+ExecStopPost=-/bin/systemctl daemon-reload
