@@ -27,8 +27,10 @@ helper reads the value from stdin (never argv) and is the only thing that ever w
 a file under `/etc/orca-runner/dropbox-secrets/`.
 
 The box is armed once, uses a 24-hour window, and turns itself off (refuses further `/save`
-calls and serves an "off" page) the moment a save is submitted OR the window elapses, whichever
-comes first. Re-arming for a future sitting is a local-only CLI command
+calls and serves an "off" page) once every field is received OR the window elapses, whichever
+comes first. Every field stays replaceable while the box is on: a new value pasted over a
+received field overwrites it (`write-secret.sh` moves the new file over the old one, so no copy
+of the old value is kept), and a blank box leaves the saved value alone. Re-arming for a future sitting is a local-only CLI command
 (`node dropbox.mjs --rearm`), never a network-reachable endpoint.
 
 ## One-time placement (root, on the server -- not in chat, not in this repo)

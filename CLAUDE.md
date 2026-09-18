@@ -2,6 +2,22 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working in this repository.
 
+## Reaching the server
+
+Do not stop and ask whether you can reach the server. The route is set up and used every day:
+
+- **SSH (over Tailscale):** `ssh -i ~/.ssh/ovh_runner_ed25519 ubuntu@100.125.239.98` (`scp -i` the
+  same way; use Git Bash, not raw PowerShell).
+- **`ubuntu` has passwordless sudo.** It is the installation channel: install files under `/opt` and
+  `/etc`, manage systemd, run a command as another account with `sudo -u <account>`.
+- **Publishing runs on the server as `orchestrator-svc`, never with a personal git or `gh`
+  credential from the laptop.** Get the commit onto the server (`git bundle` + `scp`), then run
+  `publish-pr.mjs` and `merge-pr.mjs` from `/srv/orchestrator-svc/julia-next` via
+  `sudo -u orchestrator-svc`, with the App's key loaded from `/etc/orchestrator-svc/.env.publisher`.
+  Merging needs `--sha <reviewed-head-commit>`.
+
+Details, the account table and the known traps are in `docs/agents/jul43-coordinator-runbook.md`.
+
 ## Project Overview
 
 `julia-next` is the restart of Julia, an offline-first PWA culinary management tool (recipe

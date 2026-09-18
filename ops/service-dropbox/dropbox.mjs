@@ -104,8 +104,9 @@ const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 // waiting to happen" (JUL-72 walkthrough-correction Instruction, 2026-09-17):
 // each field now saves independently the moment it's received, and the page
 // only goes off once every field in FIELDS has been received, or the
-// 24-hour window passes, whichever comes first. A field already marked
-// received is never asked for again in the same sitting.
+// 24-hour window passes, whichever comes first. A received field stays open:
+// a new value pasted over it replaces the old one (a token may turn out to
+// have the wrong scopes), and a box left blank leaves the saved value alone.
 export function allReceived(state) {
   return FIELDS.every((f) => state.received && state.received[f] === true);
 }
@@ -172,28 +173,28 @@ function renderForm(state) {
     <label for="${f}">${f[0].toUpperCase()}${f.slice(1)}
       <div class="hint">${HINTS[f]}</div>
     </label>
-    <input type="text" id="${f}" name="${f}" autocomplete="off" spellcheck="false" ${done ? 'disabled' : ''}>
-    <div class="status ${done ? 'ok' : ''}" id="${f}-status">${done ? 'received ✓' : ''}</div>
+    <input type="text" id="${f}" name="${f}" autocomplete="off" spellcheck="false">
+    <div class="status ${done ? 'ok' : ''}" id="${f}-status">${done ? 'received ✓ (paste a new value here to replace it)' : ''}</div>
   `;
   }).join('\n');
   return `${PAGE_HEAD}
   <h1>Julia-next setup codes</h1>
   <p><strong>Each box saves on its own the moment you click Save</strong> -- you can fill in one now
-  and come back for the rest later, in any order. Boxes already marked "received ✓" are done and
-  locked; you don't need to fill them in again. This page turns itself off only once all four boxes
-  are received, or after 24 hours, whichever comes first.</p>
+  and come back for the rest later, in any order. Boxes already marked "received ✓" are saved; leave them
+  blank to keep what is there, or paste a new value to replace it. This page turns itself off only
+  once every box is received, or after 24 hours, whichever comes first.</p>
   <form id="f">${boxes}
     <button type="submit">Save</button>
   </form>
   <p id="progress" style="display:none;font-weight:600"></p>
-  <p id="done" style="display:none;font-weight:600">Saved. All four received -- this page is now off.</p>
+  <p id="done" style="display:none;font-weight:600">Saved. Everything received -- this page is now off.</p>
   <script>
   document.getElementById('f').addEventListener('submit', async (e) => {
     e.preventDefault();
     const body = {};
     for (const f of ${JSON.stringify(FIELDS)}) {
       const el = document.getElementById(f);
-      if (!el || el.disabled) continue;
+      if (!el || el.value === '') continue;
       body[f] = el.value;
     }
     const res = await fetch('/save', { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify(body) });
@@ -205,7 +206,7 @@ function renderForm(state) {
       if (!r) continue;
       el.textContent = r.ok ? 'received ✓' : "doesn't look right ✗ (" + r.reason + ')';
       el.className = 'status ' + (r.ok ? 'ok' : 'bad');
-      if (r.ok) input.disabled = true;
+      if (r.ok) input.value = '';
     }
     if (result.allReceived) {
       document.getElementById('f').style.display = 'none';
@@ -258,14 +259,11 @@ export function createServer({
         const received = { ...(state.received || {}) };
         const result = {};
         for (const field of FIELDS) {
-          if (received[field]) {
-            // Already saved in an earlier round of this same sitting --
-            // don't overwrite a working secret just because the field was
-            // resubmitted (the client disables it, but never trust that
-            // alone), and don't touch write-secret.sh for it again.
-            result[field] = { ok: true, alreadyReceived: true };
-            continue;
-          }
+          // A field received earlier is not skipped: a non-blank value replaces
+          // it (write-secret.sh moves the new file over the old one, so no
+          // copy of the old value is kept). A blank one leaves it untouched,
+          // and a rejected one never reaches the writer, so a working value
+          // survives a bad paste.
           const raw = parsed[field];
           if (raw === undefined || raw === '') continue; // left blank this round -- fine, ask again next time
           const shape = validateFieldShape(field, raw);
@@ -296,7 +294,7 @@ export function createServer({
         res.writeHead(200, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ ...result, allReceived: nowComplete }));
         if (nowComplete) {
-          console.log('dropbox: all four fields received -- box is now off');
+          console.log('dropbox: all fields received -- box is now off');
         }
       });
       return;
