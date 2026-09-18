@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { buildPiSpawnSpec, SEATS } from './run-pi-seat.mjs';
+import { buildPiSpawnSpec, SEATS, readAllStdin } from './run-pi-seat.mjs';
 
 test('builder-backup spawns pi with DEEPSEEK_API_KEY in env, never in argv', () => {
   const spec = buildPiSpawnSpec('builder-backup', 'do the thing', {
@@ -40,6 +40,11 @@ test('builder-backup and reviewer-backup never share a model family (family-chec
 
 test('buildPiSpawnSpec refuses an unknown seat', () => {
   assert.throws(() => buildPiSpawnSpec('made-up-seat', 'x'), /unknown seat/);
+});
+
+test('readAllStdin reads the whole piped prompt (fd 0), for the CLI entry launched from a shell pipe', () => {
+  const text = readAllStdin({ readFileSyncImpl: (fd, enc) => { assert.equal(fd, 0); assert.equal(enc, 'utf8'); return 'the coordinator skill text\n\nIssue: JUL-63\n'; } });
+  assert.equal(text, 'the coordinator skill text\n\nIssue: JUL-63\n');
 });
 
 test('run-pi-seat.mjs never uses exec or shell:true -- spawn with an argv array only', () => {

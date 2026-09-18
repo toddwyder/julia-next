@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   juliaRun, assertIssueId, assertAccount, assertReady, ensureCheckoutSynced, findExistingRun, isRunFinished, startOrchestrator,
+  startOrchestratorEntry, orchestratorLaunchCommandFor, waitForEarlyCapError, CAP_ERROR_PATTERN,
   prepareServerEnvironment, getRemoteMainHead,
 } from './julia-run.mjs';
 
@@ -41,6 +42,7 @@ function fakeImpls(overrides = {}) {
         calls.terminalsCreated.push(args);
         return { terminal: { handle: 'term_fake789' } };
       },
+      waitForEarlyCapErrorImpl: async () => false,
       ...overrides,
     },
   };
@@ -179,18 +181,20 @@ test('isRunFinished: a zero-task run stopped at preflight (JUL-44s real case) is
   assert.equal(finished, true);
 });
 
-test('startOrchestrator refuses outside an Orca-managed terminal (no ORCA_TERMINAL_HANDLE)', async () => {
+test('startOrchestratorEntry refuses outside an Orca-managed terminal (no ORCA_TERMINAL_HANDLE)', async () => {
   await assert.rejects(
-    () => startOrchestrator('JUL-63', { fromHandle: undefined, runCreateImpl: async () => ({ run: { id: 'x' } }), terminalCreateImpl: async () => ({}) }),
+    () => startOrchestratorEntry('JUL-63', 'claude', { fromHandle: undefined, runCreateImpl: async () => ({ run: { id: 'x' } }), terminalCreateImpl: async () => ({}) }),
     /ORCA_TERMINAL_HANDLE is not set/,
   );
 });
 
-test('happy path: readiness, synced checkout, no existing run -> orchestrator starts, run id returned, no start-comment call', async () => {
+test('happy path: readiness, synced checkout, no existing run -> orchestrator starts on the table primary, run id returned, no start-comment call', async () => {
   const { impls, calls } = fakeImpls();
   const result = await juliaRun('JUL-63', impls);
 
   assert.equal(result.runId, 'run_fake456');
+  assert.equal(result.usedEntry, 'claude');
+  assert.equal(result.failedOverFrom, undefined);
   assert.deepEqual(calls.runsCreated, ['JUL-63']);
   assert.equal(calls.terminalsCreated.length, 1);
   assert.match(calls.terminalsCreated[0].command, /export ORCA_BIN=\/opt\/Orca\/orca-ide ORCA_ENVIRONMENT=ovh-local/);
@@ -204,50 +208,85 @@ test('happy path: readiness, synced checkout, no existing run -> orchestrator st
   assert.match(calls.terminalsCreated[0].command, /Bash\(node scripts\/coordinator-events\.mjs:\*\)/);
 });
 
-test('ORCHESTRATOR_VENDOR defaults to claude when unset', async () => {
-  const { impls, calls } = fakeImpls();
-  assert.equal(impls.env.ORCHESTRATOR_VENDOR, undefined);
-  await juliaRun('JUL-63', impls);
-  assert.match(calls.terminalsCreated[0].command, /claude --permission-mode acceptEdits/);
+test('orchestratorLaunchCommandFor: claude is the table primary, unchanged shape', () => {
+  const command = orchestratorLaunchCommandFor('claude', 'JUL-63');
+  assert.match(command, /claude --permission-mode acceptEdits/);
 });
 
-test('ORCHESTRATOR_VENDOR=codex launches codex instead of claude, with the same env prefix', async () => {
-  const { impls, calls } = fakeImpls();
-  impls.env.ORCHESTRATOR_VENDOR = 'codex';
-  await juliaRun('JUL-63', impls);
-
-  const { command } = calls.terminalsCreated[0];
-  // Same env prefix as the claude branch: ORCA_BIN/ORCA_ENVIRONMENT export, then the publisher env file sourced.
+test('orchestratorLaunchCommandFor: pi-glm (the table backup) pipes the skill into run-pi-seat.mjs, orchestrator-backup seat, no secret in the string', () => {
+  const command = orchestratorLaunchCommandFor('pi-glm', 'JUL-63');
   assert.match(command, /export ORCA_BIN=\/opt\/Orca\/orca-ide ORCA_ENVIRONMENT=ovh-local/);
   assert.match(command, /set -a; \. \/etc\/orchestrator-svc\/\.env\.publisher; set \+a/);
-  // Supplies the coordinator skill by piping SKILL.md's text (no slash command equivalent for codex).
   assert.match(command, /cat \.claude\/skills\/julia-coordinator\/SKILL\.md/);
-  assert.match(command, /\| codex exec/);
-  // The issue id rides along in the piped prompt, not as a slash-command argument.
+  assert.match(command, /\| node ops\/service-dropbox\/run-pi-seat\.mjs orchestrator-backup/);
   assert.match(command, /JUL-63/);
-  // Permission grant equivalent to the claude branch's --allowedTools (live-verified, JUL-73:
-  // a write-classified Linear MCP call needed danger-full-access -- workspace-write silently
-  // required approval under `-a never`).
-  assert.match(command, /-s danger-full-access/);
   assert.doesNotMatch(command, /claude --permission-mode/);
-  assert.doesNotMatch(command, /--allowedTools/);
+  assert.doesNotMatch(command, /codex exec/);
+  // No API key, no ZAI/DeepSeek-shaped literal anywhere in the launch string.
+  assert.doesNotMatch(command, /ZAI_PAYG_API_KEY|DEEPSEEK_API_KEY/);
 });
 
-test('an unknown ORCHESTRATOR_VENDOR value is a clear, named failure, not a silent fallback', async () => {
-  const { impls } = fakeImpls();
-  impls.env.ORCHESTRATOR_VENDOR = 'gemini';
-  await assert.rejects(
-    () => juliaRun('JUL-63', impls),
-    /unknown ORCHESTRATOR_VENDOR: gemini/,
-  );
+test('orchestratorLaunchCommandFor refuses an unknown table entry', () => {
+  assert.throws(() => orchestratorLaunchCommandFor('gemini', 'JUL-63'), /unknown orchestrator seat-table entry: gemini/);
 });
 
-test('an unknown ORCHESTRATOR_VENDOR value fails before a run is created, so retrying after fixing it never blocks on an orphan run (review finding, JUL-73)', async () => {
+test('startOrchestrator: no cap error -> stays on the table primary', async () => {
   const { impls, calls } = fakeImpls();
-  impls.env.ORCHESTRATOR_VENDOR = 'gemini';
-  await assert.rejects(() => juliaRun('JUL-63', impls));
-  assert.deepEqual(calls.runsCreated, []);
-  assert.equal(calls.terminalsCreated.length, 0);
+  const result = await startOrchestrator('JUL-63', impls);
+  assert.equal(result.usedEntry, 'claude');
+  assert.equal(result.failedOverFrom, undefined);
+  assert.equal(calls.runsCreated.length, 1);
+  assert.equal(calls.terminalsCreated.length, 1);
+});
+
+test('startOrchestrator: an early cap error on the primary fails over to the table backup, same objective, one retry', async () => {
+  const { impls, calls } = fakeImpls({ waitForEarlyCapErrorImpl: async () => true });
+  const result = await startOrchestrator('JUL-63', impls);
+  assert.equal(result.usedEntry, 'pi-glm');
+  assert.equal(result.failedOverFrom, 'claude');
+  // Both attempts target the same issue, and both a run and a terminal exist for each.
+  assert.deepEqual(calls.runsCreated, ['JUL-63', 'JUL-63']);
+  assert.equal(calls.terminalsCreated.length, 2);
+  assert.match(calls.terminalsCreated[0].command, /claude --permission-mode/);
+  assert.match(calls.terminalsCreated[1].command, /run-pi-seat\.mjs orchestrator-backup/);
+});
+
+test('startOrchestrator: no retry on any other error -- waitForEarlyCapError never resolving true for a non-cap failure means the primary run stands', async () => {
+  // A non-cap error (or a still-running session past the check window) is
+  // exactly what waitForEarlyCapError reports as `false` -- only the cap
+  // pattern itself triggers a retry, nothing else does.
+  const { impls, calls } = fakeImpls({ waitForEarlyCapErrorImpl: async () => false });
+  const result = await startOrchestrator('JUL-63', impls);
+  assert.equal(result.usedEntry, 'claude');
+  assert.equal(calls.terminalsCreated.length, 1);
+});
+
+test('waitForEarlyCapError: detects the verbatim Codex cap text captured live this session', async () => {
+  const terminalReadImpl = async () => ({ terminal: { tail: ["■ You've hit your usage limit. Upgrade to Pro..., try again at Sep 19th, 2026 7:28 PM."] } });
+  const capped = await waitForEarlyCapError('term_x', { terminalWaitImpl: async () => {}, terminalReadImpl });
+  assert.equal(capped, true);
+});
+
+test('waitForEarlyCapError: a terminalWait timeout is not itself evidence of a cap -- falls through to reading current output', async () => {
+  const terminalReadImpl = async () => ({ terminal: { tail: ['still working, no cap message here'] } });
+  const capped = await waitForEarlyCapError('term_x', {
+    terminalWaitImpl: async () => { throw new Error('timed out waiting for tui-idle'); },
+    terminalReadImpl,
+  });
+  assert.equal(capped, false);
+});
+
+test('waitForEarlyCapError: ordinary output, no cap pattern -> false (no retry on any other error)', async () => {
+  const terminalReadImpl = async () => ({ terminal: { tail: ['some unrelated error: ECONNRESET'] } });
+  const capped = await waitForEarlyCapError('term_x', { terminalWaitImpl: async () => {}, terminalReadImpl });
+  assert.equal(capped, false);
+});
+
+test('CAP_ERROR_PATTERN matches common vendor cap phrasing', () => {
+  assert.match("You've hit your usage limit", CAP_ERROR_PATTERN);
+  assert.match('quota exceeded for this project', CAP_ERROR_PATTERN);
+  assert.match('rate limit exceeded, try again later', CAP_ERROR_PATTERN);
+  assert.doesNotMatch('connection refused', CAP_ERROR_PATTERN);
 });
 
 test('no defaultPostCommentImpl and no separate start-comment call: the coordinator posts its own comments during its wake', async () => {

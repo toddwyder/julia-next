@@ -12,9 +12,10 @@ import { promisify } from 'node:util';
 import os from 'node:os';
 import { checkReadiness } from './check-readiness.mjs';
 import {
-  runCreate, runList, taskList, terminalCreate,
+  runCreate, runList, taskList, terminalCreate, terminalWait, terminalRead,
 } from './orca-cli.mjs';
 import { getPublisherInstallationToken } from './publish-via-github-app.mjs';
+import { SEAT_TABLE } from '../graph/seat-table.mjs';
 
 const execFileAsync = promisify(execFile);
 
@@ -180,56 +181,112 @@ function claudeLaunchCommand(issueId) {
   return `${ENV_PREFIX} claude --permission-mode acceptEdits --allowedTools "mcp__linear__*,mcp__claude_ai_Linear__*,Bash(node scripts/orca-cli.mjs:*),Bash(node scripts/check-readiness.mjs:*),Bash(node scripts/collect-worker-result.mjs:*),Bash(node scripts/verify-reviewer-worktree.mjs:*),Bash(node scripts/coordinator-events.mjs:*),Bash(node --env-file=/etc/orchestrator-svc/.env.publisher scripts/publish-pr.mjs:*),Bash(node --env-file=/etc/orchestrator-svc/.env.publisher scripts/merge-pr.mjs:*),Bash(orca *)" -p "/julia-coordinator ${issueId}"`;
 }
 
-// Codex has no slash-command equivalent, so the skill body itself is the
-// prompt -- piped in verbatim from the checkout's own copy (always current,
-// never a snapshot baked into this file) with the issue id appended.
-//
-// Permission grant equivalent to the claude branch's --allowedTools:
-// live-verified (JUL-73) that a write-classified Linear MCP call (e.g.
-// linear/save_comment) needs Codex's `danger-full-access` sandbox --
-// `workspace-write` with `--ask-for-approval never` still refused the MCP
-// write pending approval that never comes in a headless run. Codex has no
-// per-command allowlist the way Claude's --allowedTools does, so
-// danger-full-access is the closest real equivalent: broad within this
-// account's own scope (this repo, this checkout, this account's
-// credentials), not a wider bypass of anything outside it.
-function codexLaunchCommand(issueId) {
-  return `${ENV_PREFIX} { cat ${SKILL_PATH}; printf '\\n\\nIssue: %s\\n' '${issueId}'; } | codex exec -s danger-full-access --skip-git-repo-check -`;
+// Pi + GLM-5.3, the orchestrator's table backup (JUL-77): no slash-command
+// or exec-subcommand equivalent, so the coordinator skill body is piped in
+// on stdin the same way as the codex branch below, read by
+// run-pi-seat.mjs's own CLI entry (`readAllStdin`) and passed to Pi as its
+// `-p` prompt. The secret never appears in this string -- run-pi-seat.mjs
+// reads it in-process via read-secret.mjs, keyed only by the seat name
+// ('orchestrator-backup') that *is* safe to put in a shell string.
+function piLaunchCommand(issueId) {
+  return `${ENV_PREFIX} { cat ${SKILL_PATH}; printf '\\n\\nIssue: %s\\n' '${issueId}'; } | node ops/service-dropbox/run-pi-seat.mjs orchestrator-backup`;
 }
 
-export function launchCommandFor(vendor, issueId) {
-  if (vendor === 'claude') return claudeLaunchCommand(issueId);
-  if (vendor === 'codex') return codexLaunchCommand(issueId);
-  throw new Error(`unknown ORCHESTRATOR_VENDOR: ${vendor}`);
+export function orchestratorLaunchCommandFor(entry, issueId) {
+  if (entry === 'claude') return claudeLaunchCommand(issueId);
+  if (entry === 'pi-glm') return piLaunchCommand(issueId);
+  throw new Error(`unknown orchestrator seat-table entry: ${entry}`);
 }
 
-export async function startOrchestrator(issueId, {
+// A usage-cap error is the only condition that moves the orchestrator to
+// its table backup (JUL-77 Build item 3: "No retry on any other error").
+// The Codex text below is verbatim, captured live this session from a real
+// capped Codex session ("You've hit your usage limit ... try again at Sep
+// 19th, 2026 7:28 PM."); the rest are the vendors' documented phrasing.
+// Claude Code's exact cap text was never observed live this week -- no
+// session in this project's record hit one -- so this pattern is written
+// from the vendors' common phrasing ("usage limit"/"quota"/"rate limit"),
+// not a verified quote for that vendor specifically. If it turns out not to
+// match a real Claude cap message, that's a gap to close with a live
+// example, not a guess to silence.
+export const CAP_ERROR_PATTERN = /usage limit|hit your usage|quota exceeded|rate limit exceeded/i;
+
+// Bounded, not a wait for the whole session: a cap error shows up within
+// the first turn or two (observed live this session, Codex, within ~30s of
+// prompt submission), long before a real multi-step coordinator wake would
+// finish. Timing out without seeing the pattern is not itself an error --
+// it means "no cap seen yet", and the session is left running normally.
+const CAP_CHECK_TIMEOUT_MS = 45000;
+
+export async function waitForEarlyCapError(terminalHandle, {
+  environment = ORCHESTRATOR_ENVIRONMENT,
+  terminalWaitImpl = terminalWait,
+  terminalReadImpl = terminalRead,
+  timeoutMs = CAP_CHECK_TIMEOUT_MS,
+} = {}) {
+  await terminalWaitImpl({
+    environment, terminal: terminalHandle, forState: 'tui-idle', timeoutMs,
+  }).catch(() => {
+    // A wait timeout means "still running, nothing settled yet" -- not an
+    // error, and not evidence of a cap. Fall through to read whatever
+    // output exists so far; if it shows a cap message that already
+    // happened before the wait itself resolved, catch it here too.
+  });
+  const { terminal } = await terminalReadImpl({ environment, terminal: terminalHandle });
+  const tail = (terminal?.tail ?? []).join('\n');
+  return CAP_ERROR_PATTERN.test(tail);
+}
+
+export async function startOrchestratorEntry(issueId, entry, {
   runCreateImpl = runCreate,
   terminalCreateImpl = terminalCreate,
   fromHandle = process.env.ORCA_TERMINAL_HANDLE,
-  env = process.env,
 } = {}) {
   if (!fromHandle) {
     throw new Error('ORCA_TERMINAL_HANDLE is not set -- julia-run must run inside an Orca-managed terminal on the orchestrator-local runtime, not a bare shell');
   }
   // Build (and validate) the launch command before creating the run: an
-  // invalid ORCHESTRATOR_VENDOR must fail before anything exists in Orca,
-  // not leave an orphan run with zero tasks that then blocks a retry for
-  // the isRunFinished grace window (JUL-73 review finding).
-  const vendor = env.ORCHESTRATOR_VENDOR ?? 'claude';
-  const command = launchCommandFor(vendor, issueId);
+  // unknown table entry must fail before anything exists in Orca, not
+  // leave an orphan run with zero tasks that then blocks a retry for the
+  // isRunFinished grace window (JUL-73 review finding).
+  const command = orchestratorLaunchCommandFor(entry, issueId);
 
   const created = await runCreateImpl({ environment: ORCHESTRATOR_ENVIRONMENT, from: fromHandle, objective: issueId });
   const runId = created.run.id;
 
-  await terminalCreateImpl({
+  const { terminal } = await terminalCreateImpl({
     environment: ORCHESTRATOR_ENVIRONMENT,
     worktree: WORKTREE_SELECTOR,
     command,
     title: `julia-run-${issueId}`,
   });
 
-  return { runId };
+  return { runId, terminalHandle: terminal?.handle };
+}
+
+// JUL-77 Build item 3: julia-run reads the seat table instead of
+// ORCHESTRATOR_VENDOR. Tries the table's primary entry; if it shows a cap
+// error within the early check window, starts the same objective on the
+// backup entry instead and returns that run. Any other outcome (success,
+// a non-cap error, or simply still running past the check window) is left
+// alone -- no retry on any other error.
+export async function startOrchestrator(issueId, {
+  seatTable = SEAT_TABLE,
+  waitForEarlyCapErrorImpl = waitForEarlyCapError,
+  ...impls
+} = {}) {
+  const { primary, backup } = seatTable.orchestrator;
+  const first = await startOrchestratorEntry(issueId, primary, impls);
+
+  const capped = await waitForEarlyCapErrorImpl(first.terminalHandle, impls);
+  if (!capped) {
+    return { runId: first.runId, usedEntry: primary };
+  }
+
+  const fallback = await startOrchestratorEntry(issueId, backup, impls);
+  return {
+    runId: fallback.runId, usedEntry: backup, failedOverFrom: primary,
+  };
 }
 
 export async function juliaRun(issueId, impls = {}) {
@@ -244,8 +301,8 @@ export async function juliaRun(issueId, impls = {}) {
     throw new Error(`a run is already active for ${issueId}: ${existing.id}`);
   }
 
-  const { runId } = await startOrchestrator(issueId, impls);
-  return { runId };
+  const result = await startOrchestrator(issueId, impls);
+  return result;
 }
 
 async function main() {

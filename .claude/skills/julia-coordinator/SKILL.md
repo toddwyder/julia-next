@@ -93,9 +93,33 @@ An issue on a route that is not enabled stays in the backlog and counts toward s
 
 For the current step of the current item:
 
-1. **Start a fresh worker in its own fresh worktree.** `runCreate` then `workerStart`
-   (`scripts/orca-cli.mjs`), targeting `--environment "OVH runner"`, `--agent codex` (or `claude`
-   when the step needs it), `worktree: 'new-top-level'` -- **not** the shared registered
+1. **Start a fresh worker in its own fresh worktree, from the seat table
+   (`graph/seat-table.mjs`), never a hardcoded vendor name.** Read `SEAT_TABLE.builder` for a
+   build step, `SEAT_TABLE.reviewer` for a review step. Use the entry's `primary` unless the item
+   is being force-run on its backup (see below) or the primary's last attempt on this exact step
+   ended with a usage-cap error (`scripts/julia-run.mjs`'s `CAP_ERROR_PATTERN`) -- then use the
+   `backup` entry instead, for this step only; the table is re-read fresh on the next step, so a
+   capped seat doesn't stay pinned to its backup for the rest of the item.
+   - **`claude`/`codex` entries** dispatch exactly as before: `runCreate` then `workerStart`
+     (`scripts/orca-cli.mjs`), targeting `--environment "OVH runner"`, `--agent claude`/`--agent
+     codex`, `worktree: 'new-top-level'`.
+   - **`pi-deepseek`/`pi-glm` entries (the backups) cannot go through `workerStart --agent pi`.**
+     `workerStart`'s `--agent <id>` launches a known TUI agent with no way to pass Pi's own
+     `--provider`/`--model` selection or seat-specific secret through it, and `runner` (the one
+     identity both builder and reviewer dispatch as) can't hold two different default
+     models for its one Pi installation at once -- confirmed by reading Pi's own `settings.json`
+     documentation (`defaultProvider`/`defaultModel` are process-wide, not per-invocation, and
+     `workerStart` has no flag-passthrough). Instead: create a plain worktree (`orca worktree
+     create --repo path:/home/runner/julia-next --name <step-name> --base-branch main
+     --no-parent`, no `--agent`), then `orca terminal create --worktree <that path> --command "{
+     cat <the acceptance criteria as a prompt file>; } | node ops/service-dropbox/run-pi-seat.mjs
+     <seat>"` where `<seat>` is `builder-backup` or `reviewer-backup` (`ops/service-dropbox/run-pi-seat.mjs`
+     resolves the right provider/model/secret from the seat name alone -- never pass a secret in
+     this command string). This path has no `worker-show`/`workerAbandon` supervision, so step 3
+     below (Verify) is the only place its evidence gets checked -- read the worktree's actual git
+     commit yourself; there is no `collectWorkerResult`-equivalent for this path yet.
+
+   Either way, the worktree is fresh and top-level -- **not** the shared registered
    `/home/runner/julia-next` checkout. Two reasons, not one: criterion 2 requires an *isolated*
    worktree per attempt, and `orca-cli.mjs`'s `workerStart` always sends the creation-only flags
    `--name`/`--setup`, which the real CLI rejects outright for `current`/existing-worktree
@@ -108,6 +132,12 @@ For the current step of the current item:
    residual). Hand the worker: the Linear issue, the step's concrete acceptance criteria
    verbatim, and any prior failure to fix. Emit a `coordinator_started` event (see Journey
    accounting) before dispatch.
+
+   **Forcing an item onto its backups (JUL-77 acceptance runs)**: an `Instruction:` comment on
+   the issue naming "force backups" makes every step of that item use `backup` instead of
+   `primary` for builder and reviewer, regardless of cap state, until the item completes or is
+   re-parked. Record which mode was used on every step's retro line (below) -- forced-backup is
+   not the default and must never look like an ordinary run in the record.
 2. **Wait** for the dispatch to settle (`orchestration check --wait` / `worker-show`), following
    Orca's own recovery rules -- absence is never proof of failure or success.
 3. **Verify** the step's evidence yourself: `scripts/collect-worker-result.mjs`'s
@@ -127,6 +157,12 @@ For the current step of the current item:
    evidence and emit `coordinator_failed`.
    **Fail, coordinator-found** (you find the failure after the worker reported done) → open a
    new Task for the step with the failure attached; count it toward the same 3-attempt limit.
+   **Fail, usage-cap error on the seat's primary** (its own output matches
+   `scripts/julia-run.mjs`'s `CAP_ERROR_PATTERN`) → restart the same step immediately on the
+   seat's `backup` entry. This restart does **not** count toward the 3-attempt limit -- it's the
+   table doing its job, not a failed attempt. If the *backup* also ends in a cap error, that is
+   an ordinary failure and does count, since the table has no third entry to fall further back
+   to.
 
 ## After verification: review and publish
 
