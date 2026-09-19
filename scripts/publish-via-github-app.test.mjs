@@ -63,6 +63,32 @@ test('mints an installation token via the standard two-call GitHub App flow, sco
   ]);
 });
 
+test('defaults JULIA_PUBLISHER_REPO to julia-next when it is unset', async () => {
+  const calls = [];
+  const fakeFetch = async (url, init) => {
+    calls.push(url);
+    if (url === 'https://api.github.com/repos/toddwyder/julia-next/installation') {
+      return { ok: true, json: async () => ({ id: 7 }) };
+    }
+    if (url === 'https://api.github.com/app/installations/7/access_tokens') {
+      assert.deepEqual(JSON.parse(init.body), { repositories: ['julia-next'] });
+      return { ok: true, json: async () => ({ token: 'ghs_fake-default-repo-token' }) };
+    }
+    throw new Error(`unexpected fetch: ${url}`);
+  };
+
+  const token = await getPublisherInstallationToken(
+    { JULIA_PUBLISHER_APP_ID: '4948330', JULIA_PUBLISHER_APP_PRIVATE_KEY: privateKeyPem },
+    fakeFetch,
+  );
+
+  assert.equal(token, 'ghs_fake-default-repo-token');
+  assert.deepEqual(calls, [
+    'https://api.github.com/repos/toddwyder/julia-next/installation',
+    'https://api.github.com/app/installations/7/access_tokens',
+  ]);
+});
+
 test('a repo the App is not installed on fails clearly instead of falling back to Julia', async () => {
   const fakeFetch = async (url) => {
     if (url.endsWith('/repos/toddwyder/julia-next/installation')) return { ok: false, status: 404 };

@@ -12,8 +12,8 @@
 // at the start of every publish instead. Only the App's own credentials need
 // to live on the runner, not a token that would go stale between runs.
 //
-// JULIA_PUBLISHER_REPO defaults to 'Julia' (this script's origin repo);
-// julia-next's caller sets it to 'julia-next' explicitly.
+// JULIA_PUBLISHER_REPO defaults to 'julia-next' (this repo); set it explicitly
+// to publish elsewhere.
 import { createSign } from 'node:crypto';
 
 function base64url(input) {
@@ -45,7 +45,7 @@ export async function getPublisherInstallationToken(env = process.env, fetchImpl
 
   const jwt = mintAppJwt(appId, privateKey, opts);
   const owner = env.JULIA_PUBLISHER_OWNER ?? 'toddwyder';
-  const repo = env.JULIA_PUBLISHER_REPO ?? 'Julia';
+  const repo = env.JULIA_PUBLISHER_REPO ?? 'julia-next';
 
   const installationRes = await fetchImpl(`https://api.github.com/repos/${owner}/${repo}/installation`, {
     headers: { Authorization: `Bearer ${jwt}`, Accept: 'application/vnd.github+json' },
