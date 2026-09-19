@@ -24,8 +24,10 @@ Every session reads this before writing code:
    (`wayfinder`, `grilling`, `implement-spec`, `to-tickets` and friends from
    `mattpocock/skills`) come first for any nontrivial piece of work — not code first, process
    retrofitted after.
-2. **Orca on the OVH server is the only route for work**, enforced before any code exists in
-   this repo. No ad hoc local pushes standing in for the real delivery path.
+2. **Every change to this repo comes from an agent dispatched through Orca on the OVH server**
+   and published by the publisher GitHub App, enforced before any code exists in this repo. No
+   ad hoc local pushes standing in for the real delivery path. Orca is the agent runner and the
+   evidence gate, not where Julia is hosted; the app itself runs elsewhere (ADR 0005).
 3. **Observability (Sentry, Axiom) and the new architecture are in from the first line**, not
    bolted on after something breaks in production.
 4. **Small, complete user journeys, each accepted by Todd on evidence.** Todd is never the
@@ -52,11 +54,17 @@ Every session reads this before writing code:
 - Sign-in and sessions
 - Offline / PWA
 - Vintage interface
-
-## Out of scope (v2)
-
 - Cookbook import
 - The Lab
+- Sharing
+- Nutrition panel and badges
+
+## Amendments
+
+- 2026-09-15: Cookbook import and the Lab were first listed as "out of scope (v2)". Todd
+  decided the same day that the v1 map covers all fifteen requirements, and sharing and the
+  nutrition panel besides; all four moved into required behaviour. Rule 2 was reworded on
+  2026-09-16 after research showed Orca is an agent runner, not app hosting.
 
 ## Data
 
