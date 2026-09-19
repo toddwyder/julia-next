@@ -804,6 +804,69 @@ through an ungranted interactive session, and do not widen the interactive sessi
 the two publisher scripts to compensate. If the interactive path must publish, add the exact grant;
 otherwise escalate the run to the headless launcher.
 
+## Five JUL-44 step-5 discoveries, each verified 2026-09-19
+
+Each of these was learned while dispatching and provisioning JUL-44 step 4; the date is the day
+it was verified, not the day it was written down.
+
+### `worker-start --agent claude` can start a dead worker
+
+`orca orchestration worker-start --agent claude ...` can create an agent terminal that never
+reports a session — `worker-read --source auto` returns `fallbackReason: session_not_reported`,
+the terminal shows only the launch command, and no report is ever produced (observed: 15 minutes,
+no output).
+
+Recovery: `orca orchestration worker-stop --environment orchestrator-local --dispatch
+<dispatchId>`, then re-dispatch the same reviewer through the **headless** route instead: create a
+worktree and a terminal whose command pipes the spec into `claude --model claude-sonnet-5
+--effort medium --dangerously-skip-permissions -p "$(cat <specfile>)" > <reportfile> 2>&1`. That
+headless route produced the review.
+
+### The coordinator's `ORCA_ENVIRONMENT` is the wrong daemon for orchestration
+
+The coordinator shell has `ORCA_ENVIRONMENT=ovh-local` (the builder daemon), but the coordinator
+terminal lives on `orchestrator-local`. So `orca orchestration run-use` / `worker-start` must pass
+**`--environment orchestrator-local`** (the coordinator's own daemon, where the Run lives) **and**
+`--on ovh-local` (the worker's daemon). Without this, `run-use` fails `stable_pane_required` and
+`worker-start` fails `no_active_sender_terminal`. Bind the Run to this terminal once with:
+```sh
+orca orchestration run-use --environment orchestrator-local --id <runId> --from "$ORCA_TERMINAL_HANDLE"
+```
+then dispatch with `--from "$ORCA_TERMINAL_HANDLE" --run <runId> --environment orchestrator-local
+--on ovh-local`.
+
+### Creating a PowerSync *project* cannot be done headlessly today
+
+`POST https://accounts.powersync.com/api/accounts/v5/apps/create` exists and its required body is
+`{org_id, name, default_region, vcs_mode: "BASIC"|"ADVANCED", source: {type:
+"INTERNAL"|"GITHUB"|"AZURE_DEVOPS", properties: {id}}}` (validation order observed: missing
+`default_region`/`vcs_mode`/`source`, then `source.type` enum, then `source.properties.id`
+required). With `source.type: "INTERNAL"` and any `id`, the PowerSync PAT gets `422 FORBIDDEN`.
+The CLI (`npx powersync link cloud --create`) requires an **existing** `--project-id` and cannot
+create the project. Therefore creating the project currently needs the PowerSync dashboard.
+Supporting commands: `GET https://powersync-api.journeyapps.com/api/v1/regions` lists regions
+(`eu`,`us`,`jp`,`au`,`br`,`dev`); the org id comes from running the CLI `fetch instances --output
+json` with `PS_ADMIN_TOKEN` set (observed org `toddwyder` with **no** projects).
+
+### An Axiom ingest-only key cannot prove delivery by reading events back
+
+`POST /v1/datasets/_apl` and the legacy query route both return `403 token does not have access to
+resource: query with action: read`. Prove delivery with (a) the ingest receipt
+(`{"ingested":1,"failed":0}`) and (b) the absence of the app's own `console.warn('julia-next:
+axiom boot event failed')` in `vercel logs <deployment-url>`; a **query-capable** key is required
+for true read-back. Do not record "Axiom verified" from an ingest-only key.
+
+### Headless Vercel deploy and log reads
+
+A `.vercel/project.json` containing `{"projectId":"<prj_…>","orgId":"<team_…>"}` lets `npx
+vercel deploy --prod --yes` run without an interactive link, and `vercel logs <deployment-url>`
+prints `λ` lines for real function invocations (the proof the Node runtime booted). Vercel REST
+reads (`/v9/projects`, `/v9/projects/<id>/env`) work with the CLI token from
+`~/.local/share/com.vercel.cli/auth.json` (a `403 invalidToken` can be transient — retry before
+concluding the token is bad). Note that the env API **echoes a value back in its own JSON
+response**, so an env write can print a value into the caller's transcript — a DSN is a public
+client key, but treat env writes as potentially noisy.
+
 ## The For-Todd guard: only three kinds of thing reach Todd (JUL-79 step 4)
 
 The rule is now code, not just prose. `scripts/linear-cli.mjs` exports the pure

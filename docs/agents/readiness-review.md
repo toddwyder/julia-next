@@ -56,6 +56,16 @@ the missing check to this procedure. It does not become a new permission questio
      scopes (for Sentry, `GET https://sentry.io/api/0/` returns `auth.scopes`). Reachability and
      authorization are different things; a reachable credential whose declared scope does not
      include the write the ticket needs is a **review failure**, not a pass.
+     - **create capability.** Confirm the credential can **create** the resource the step needs
+       (not just read or list it), by exercising the actual create path read-only where possible.
+       Worked example: the PowerSync PAT could list instances but `apps/create` returned
+       `FORBIDDEN`, so the project-creation step cannot run headlessly (runbook, JUL-44 step 5).
+     - **read scope for delivery proof.** Wherever the step must *prove delivery* (an event
+       arrived, a write took effect), the credential needs a **read** scope for that, distinct
+       from its send/write scope. Worked example: an ingest-only Axiom key can send but cannot
+       read back, so "Axiom received the event" cannot be verified (runbook, JUL-44 step 5). If
+       only a send-only key exists, the review must say so explicitly rather than leave delivery
+       assumed.
    - reuse a recent, still-valid finding from a prior audit instead of re-probing, but cite the
      source doc and its date so staleness can be judged later.
 
