@@ -741,6 +741,69 @@ pushes and opens; `merge-pr.mjs` only merges and does not check mergeability; `g
 deliberately unauthenticated. The coordinator therefore cannot read a PR's `mergeable_state` and
 relies on the merge API refusing a non-mergeable PR. Noted 2026-09-19 as a known gap.
 
+## Three JUL-44 step-4 discoveries (verified 2026-09-18/19)
+
+### `vercel project add` leaves framework `null`, so a Next.js deploy is treated as static
+
+**Verified 2026-09-18.** `vercel project add <name>` creates the project with its framework set
+only when the local directory it is run against carries a detectable framework preset. For a bare
+project created this way the framework stays `null`, Vercel then treats the Next.js app as a static
+site, and the deploy fails with `No Output Directory named "public"` (a Next.js app never emits a
+`public/` build output directory). The project exists and looks healthy, but every deploy fails.
+
+Two correct routes, pick one and never mix them:
+
+- **Let the first deploy create the project** (run `vercel deploy`/`vercel --prod` without a prior
+  `vercel project add`), so Vercel detects `nextjs` itself; or
+- **Explicitly set the preset** on an existing project:
+  `PATCH https://api.vercel.com/v9/projects/<name>` with body `{"framework":"nextjs"}` (CLI
+equivalent: `vercel project` does not expose this — use the REST API with the stored CLI login).
+
+**Never `project add` and then deploy without setting the preset** — the deploy is guaranteed to
+fail with the `No Output Directory named "public"` error above, and the failure message points at
+the build output rather than at the missing framework, so it reads as an app bug.
+
+### A coordinator run can finish without reporting, and the next wake must recover from live Orca
+
+**Verified 2026-09-19.** A coordinator run can dispatch its workers, watch them finish, and then
+end **without posting its outcome** to Linear or emitting a `coordinator_completed`/`_failed`
+event. The card then sits in whatever state the last write left it, and nothing on the board says
+the run is over.
+
+**Recovery (the next wake does this, from live Orca — do not infer state from the last comment):**
+
+```sh
+orca orchestration run-list                      # find the run id
+orca orchestration task-list --run <run id>      # see every worker it dispatched and their status
+orca worker-show <worker id>                     # read the worker's own final state/output
+```
+
+Then reconcile: a worker whose work is done and verified but whose outcome never got reported is
+**not** a completed step until the coordinator re-checks its evidence and writes the outcome
+itself. Do not trust a prior session's claim; re-derive the run's real state from these three
+commands.
+
+### Interactive-launch publisher-grant gap
+
+**Verified 2026-09-19.** `scripts/julia-run.mjs` launches the coordinator with an explicit Claude
+`--allowedTools` list that includes the publisher credential file for `publish-pr.mjs` and
+`merge-pr.mjs`. A coordinator launched **interactively** (a human-started Claude session, or any
+launch path that is *not* `julia-run.mjs`) does **not** inherit those grants — so when it reaches
+the publish step it is refused, even though the same run started headlessly would have been
+allowed to publish. The work can build and review and then stall at publish for no reason visible
+in the run's own output.
+
+**Workaround:** invoke `publish-pr.mjs`/`merge-pr.mjs` only either
+
+- from the headless `julia-run.mjs` launch (which owns the grant), or
+- from an interactive session **with an explicit grant** for the publisher credential file
+  (`/etc/orchestrator-svc/.env.publisher`) for those two scripts only.
+
+This is a real gap, not a documentation nicety: do **not** paper over it by re-running the publish
+through an ungranted interactive session, and do not widen the interactive session's grants beyond
+the two publisher scripts to compensate. If the interactive path must publish, add the exact grant;
+otherwise escalate the run to the headless launcher.
+
 ## The For-Todd guard: only three kinds of thing reach Todd (JUL-79 step 4)
 
 The rule is now code, not just prose. `scripts/linear-cli.mjs` exports the pure

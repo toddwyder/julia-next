@@ -50,6 +50,12 @@ the missing check to this procedure. It does not become a new permission questio
    - if a live probe isn't safe or possible before Todd's approval (e.g. it would create an
      account, spend a quota slot, or need a credential nobody has yet), say exactly why, and mark
      it **not testable before approval** rather than guessing.
+   - **write-scope check.** For every service the ticket will WRITE to, confirm the *specific*
+     scope/capability the step needs — not merely that the credential is reachable or authorized
+     at all. Make the actual privileged call **read-only** and read the credential's own declared
+     scopes (for Sentry, `GET https://sentry.io/api/0/` returns `auth.scopes`). Reachability and
+     authorization are different things; a reachable credential whose declared scope does not
+     include the write the ticket needs is a **review failure**, not a pass.
    - reuse a recent, still-valid finding from a prior audit instead of re-probing, but cite the
      source doc and its date so staleness can be judged later.
 
