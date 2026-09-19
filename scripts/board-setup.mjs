@@ -264,6 +264,20 @@ function assertSuccess(payload, what) {
   return payload;
 }
 
+// Template.templateData is typed JSON! and documented as a JSON-ENCODED
+// STRING (unlike CustomView.filterData, which is a JSONObject). Linear may
+// hand it back either way, so tolerate both and fail loudly on a string that
+// is not JSON rather than silently planning an update on every run.
+export function parseTemplateData(raw, templateName = 'template') {
+  if (raw == null) return null;
+  if (typeof raw !== 'string') return raw;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw new Error(`board-setup: team template "${templateName}" has templateData that is not valid JSON`);
+  }
+}
+
 // Walk a Relay connection to the end. `select` pulls the connection out of the
 // operation's own data shape. A cursor that does not advance, or a connection
 // that never ends, is an error rather than a silent partial read.
@@ -331,7 +345,7 @@ export async function loadBoard({ graphql, apiKey, teamId = TEAM_ID } = {}) {
       id: template.id,
       name: template.name,
       type: template.type,
-      templateData: template.templateData ?? null,
+      templateData: parseTemplateData(template.templateData, template.name),
     })),
     views: viewNodes.map((view) => ({
       id: view.id,
@@ -468,6 +482,25 @@ export function findBlockingMismatches(board) {
     if (existing && !existing.isGroup) {
       mismatches.push({ kind: 'label-group-identity', labelName: group.name });
     }
+    // (8, inverse) A spec'd CHILD name that already exists as a group cannot
+    // be reparented under another group: Linear does not allow a group to be a
+    // child. Planning it would fail mid-apply, so it is reported here instead.
+    for (const child of group.children) {
+      const childLabel = labelsByName.get(child.name);
+      if (childLabel?.isGroup) {
+        mismatches.push({ kind: 'label-child-identity', labelName: child.name, parentName: group.name });
+      }
+    }
+  }
+
+  // (3) A name the spec retires that exists as an ordinary label is not the
+  // group the spec expects. Skipping it silently would leave the retirement
+  // undone, so report it rather than say nothing.
+  for (const name of RETIRED_LABEL_GROUPS) {
+    const existing = labelsByName.get(name);
+    if (existing && !existing.isGroup) {
+      mismatches.push({ kind: 'retired-label-identity', labelName: name });
+    }
   }
 
   return mismatches;
@@ -485,6 +518,10 @@ export function mismatchMessage(mismatch, { issueCountByStateId = {} } = {}) {
       return `state "${mismatch.stateName}" has type "${mismatch.actualType}" but the spec needs "${mismatch.wantedType}"; Linear cannot change a workflow state's type after creation`;
     case 'label-group-identity':
       return `label "${mismatch.labelName}" exists but is not a label group, so it cannot be the parent of the spec's child labels`;
+    case 'label-child-identity':
+      return `label "${mismatch.labelName}" already exists as a label group, but the spec needs it as an ordinary child of "${mismatch.parentName}"; a label group cannot be reparented under another group`;
+    case 'retired-label-identity':
+      return `label "${mismatch.labelName}" exists but is not a label group, so the spec's retirement of the group "${mismatch.labelName}" was not applied; rename or retire it by hand`;
     default:
       return `unknown blocking mismatch: ${JSON.stringify(mismatch)}`;
   }
@@ -706,7 +743,7 @@ export async function applyBoardSetup(actions, {
   const groupIdByName = new Map(board.labels.filter((label) => label.isGroup).map((label) => [label.name, label.id]));
   const templateIdByName = new Map(board.templates.map((template) => [template.name, template.id]));
 
-  for (const action of actions) {
+  const applyAction = async (action) => {
     switch (action.kind) {
       case 'create-state': {
         const data = await graphql(CREATE_STATE_MUTATION, {
@@ -769,7 +806,7 @@ export async function applyBoardSetup(actions, {
       case 'create-template': {
         const labelIds = resolveIds(action.labelNames, labelIdByName);
         const data = await graphql(CREATE_TEMPLATE_MUTATION, {
-          input: { teamId, name: action.name, type: 'issue', templateData: { labelIds, teamId } },
+          input: { teamId, name: action.name, type: 'issue', templateData: JSON.stringify({ labelIds, teamId }) },
         }, callOpts);
         const payload = assertSuccess(data.templateCreate, `creating team template "${action.name}"`);
         templateIdByName.set(action.name, payload.template.id);
@@ -779,7 +816,7 @@ export async function applyBoardSetup(actions, {
         const labelIds = resolveIds(action.labelNames, labelIdByName);
         const data = await graphql(UPDATE_TEMPLATE_MUTATION, {
           id: action.id,
-          input: { templateData: { labelIds, teamId } },
+          input: { templateData: JSON.stringify({ labelIds, teamId }) },
         }, callOpts);
         assertSuccess(data.templateUpdate, `updating team template "${action.name}"`);
         break;
@@ -818,6 +855,19 @@ export async function applyBoardSetup(actions, {
       default:
         throw new Error(`board-setup: unknown action kind '${action.kind}'`);
     }
+  };
+
+  let applied = 0;
+  for (const action of actions) {
+    try {
+      await applyAction(action);
+    } catch (error) {
+      if (error && typeof error === 'object') {
+        error.boardSetupProgress = { applied, total: actions.length, action };
+      }
+      throw error;
+    }
+    applied += 1;
   }
   return actions.length;
 }
@@ -857,6 +907,34 @@ export function describeAction(action) {
     default:
       return `unknown action: ${JSON.stringify(action)}`;
   }
+}
+
+// The human-readable target of an action, for the partial-apply report.
+function actionTargetName(action) {
+  switch (action.kind) {
+    case 'set-default-template':
+      return action.templateName;
+    case 'update-state':
+      return action.name ?? action.currentName;
+    default:
+      return action.name ?? null;
+  }
+}
+
+// When a mutation is refused partway through, say exactly how far the board
+// got, which action failed, and that re-running resumes. The original API
+// error is rethrown untouched and printed after this by main().
+export function renderPartialApplyReport({ applied, total, action } = {}) {
+  const target = action ? actionTargetName(action) : null;
+  const failed = action
+    ? `${action.kind}${target == null ? '' : ` "${target}"`}`
+    : 'unknown action';
+  return [
+    `board-setup: WARNING -- ${applied} of ${total} action(s) succeeded before the failure; the board is now partly migrated`,
+    `board-setup: the action that failed was ${failed}`,
+    'board-setup: re-running the program continues from where it stopped (already-correct items are skipped by name)',
+    '',
+  ].join('\n');
 }
 
 // The evidence block. It is rendered from a fresh board read (after an apply)
@@ -927,9 +1005,11 @@ export async function boardSetup({
   teamId = TEAM_ID,
   apply = false,
   stdout = process.stdout,
+  stderr = process.stderr,
 } = {}) {
   const apiKey = providedApiKey ?? resolveLinearApiKey({ env, readSecretImpl });
   const safeStdout = makeRedactingWriter(stdout, apiKey);
+  const safeStderr = makeRedactingWriter(stderr, apiKey);
 
   const board = await loadBoard({ graphql, apiKey, teamId });
 
@@ -967,7 +1047,16 @@ export async function boardSetup({
   }
 
   if (apply && actions.length > 0) {
-    await applyBoardSetup(actions, { graphql, apiKey, teamId, board });
+    try {
+      await applyBoardSetup(actions, { graphql, apiKey, teamId, board });
+    } catch (error) {
+      // Say how far the apply got before the refusal, on stderr, and then let
+      // the original API error surface unchanged.
+      if (error && typeof error === 'object' && error.boardSetupProgress) {
+        safeStderr.write(renderPartialApplyReport(error.boardSetupProgress));
+      }
+      throw error;
+    }
     safeStdout.write(`board-setup: applied ${actions.length} action(s)\n`);
   }
 
@@ -992,7 +1081,7 @@ export function parseArgs(argv) {
   for (const arg of argv) {
     if (arg === '--apply') parsed.apply = true;
     else if (arg === '--help' || arg === '-h') parsed.help = true;
-    else throw new Error(`unknown argument: ${arg}`);
+    else throw new Error('unknown argument: [redacted]');
   }
   return parsed;
 }

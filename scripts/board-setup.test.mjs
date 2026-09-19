@@ -103,7 +103,7 @@ function issueMatchesFilter(issue, filter) {
   return true;
 }
 
-function makeFakeLinear(initial = freshBoard()) {
+function makeFakeLinear(initial = freshBoard(), { templateDataAsObject = false } = {}) {
   const db = structuredClone(initial);
   const calls = { ops: [], mutations: [] };
   let counter = 0;
@@ -146,7 +146,20 @@ function makeFakeLinear(initial = freshBoard()) {
       case 'BoardSetupLabels':
         return { team: { labels: paginateList(db.labels.map(labelNode), variables.after) } };
       case 'BoardSetupTemplates':
-        return { team: { templates: paginateList(db.templates.map((template) => structuredClone(template)), variables.after) } };
+        return {
+          team: {
+            templates: paginateList(db.templates.map((template) => {
+              const copy = structuredClone(template);
+              // Real Linear documents templateData as a JSON-encoded string;
+              // this option models a response that hands it back as an object
+              // instead, so the program can be shown to tolerate both.
+              if (templateDataAsObject && typeof copy.templateData === 'string') {
+                copy.templateData = JSON.parse(copy.templateData);
+              }
+              return copy;
+            }), variables.after),
+          },
+        };
       case 'BoardSetupViews':
         return { customViews: paginateList(db.views.map(viewNode), variables.after) };
       case 'BoardSetupIssues': {
@@ -210,6 +223,9 @@ function makeFakeLinear(initial = freshBoard()) {
         return { issueLabelRetire: { success: true, issueLabel: labelNode(label) } };
       }
       case 'BoardSetupCreateTemplate': {
+        if (typeof variables.input?.templateData !== 'string') {
+          throw new Error('fake Linear: TemplateCreateInput.templateData is a JSON-encoded string');
+        }
         const template = {
           id: nextId('template'),
           name: variables.input.name,
@@ -220,6 +236,9 @@ function makeFakeLinear(initial = freshBoard()) {
         return { templateCreate: { success: true, template: structuredClone(template) } };
       }
       case 'BoardSetupUpdateTemplate': {
+        if (typeof variables.input?.templateData !== 'string') {
+          throw new Error('fake Linear: TemplateUpdateInput.templateData is a JSON-encoded string');
+        }
         const template = db.templates.find((candidate) => candidate.id === variables.id);
         if (!template) throw new Error(`fake Linear: no template ${variables.id}`);
         template.templateData = structuredClone(variables.input.templateData);
@@ -268,18 +287,22 @@ function captureStdout() {
 }
 
 function run(options = {}) {
-  const fake = makeFakeLinear(options.board ?? freshBoard());
+  const { templateDataAsObject = false, ...setupOptions } = options;
+  const fake = makeFakeLinear(options.board ?? freshBoard(), { templateDataAsObject });
   const capture = captureStdout();
+  const errors = captureStdout();
   return {
     calls: fake.calls,
     db: fake.db,
     capture,
+    errors,
     result: boardSetup({
       graphql: fake.graphql,
       teamId: TEST_TEAM_ID,
       env: { LINEAR_API_KEY: 'test-key' },
       stdout: capture.stdout,
-      ...options,
+      stderr: errors.stdout,
+      ...setupOptions,
     }),
   };
 }
@@ -504,12 +527,44 @@ test('--apply creates the template with every default model and Medium effort la
   const template = db.templates.find((candidate) => candidate.name === TEMPLATE_NAME);
   assert.ok(template, 'the team template must exist');
   assert.equal(db.defaultTemplateId, template.id, 'the template must be the team default');
-  const ids = template.templateData.labelIds;
+  // Template.templateData is documented as a JSON-encoded string, so the write
+  // must be a string that parses back to the documented payload.
+  assert.equal(typeof template.templateData, 'string', 'templateData must be sent as a JSON-encoded string');
+  const data = JSON.parse(template.templateData);
+  assert.equal(data.teamId, TEST_TEAM_ID);
+  const ids = data.labelIds;
   const idToName = new Map(db.labels.map((label) => [label.id, label.name]));
   const names = ids.map((id) => idToName.get(id)).sort();
   const expected = GRAPH_AGENTS.flatMap((agent) => defaultLabelsFor(agent.key)).sort();
   assert.deepEqual(names, expected);
   assert.equal(names.length, 12);
+});
+
+test('templateData returned as a JSON-encoded string still makes a second --apply a no-op', async () => {
+  const { db, graphql, calls } = makeFakeLinear(freshBoard());
+  await boardSetup({ graphql, teamId: TEST_TEAM_ID, env: { LINEAR_API_KEY: 'k' }, apply: true, stdout: { write() {} } });
+  const template = db.templates.find((candidate) => candidate.name === TEMPLATE_NAME);
+  assert.equal(typeof template.templateData, 'string', 'the wire shape is the JSON-encoded string');
+  calls.mutations.length = 0;
+  const second = await boardSetup({ graphql, teamId: TEST_TEAM_ID, env: { LINEAR_API_KEY: 'k' }, apply: true, stdout: { write() {} } });
+  assert.deepEqual(second.actions, []);
+  assert.deepEqual(calls.mutations, [], 'the JSON-encoded string must not be mistaken for a wrong templateData');
+});
+
+test('templateData returned as an object is tolerated too (a second --apply does not repair it)', async () => {
+  const fake = makeFakeLinear(freshBoard(), { templateDataAsObject: true });
+  await boardSetup({ graphql: fake.graphql, teamId: TEST_TEAM_ID, env: { LINEAR_API_KEY: 'k' }, apply: true, stdout: { write() {} } });
+  fake.calls.mutations.length = 0;
+  const second = await boardSetup({ graphql: fake.graphql, teamId: TEST_TEAM_ID, env: { LINEAR_API_KEY: 'k' }, apply: true, stdout: { write() {} } });
+  assert.deepEqual(second.actions, []);
+  assert.deepEqual(fake.calls.mutations, [], 'an object-shaped templateData must be understood, not rewritten');
+});
+
+test('templateData that is a string but not JSON is a clear error', async () => {
+  const board = freshBoard();
+  board.templates.push({ id: 'template-bad', name: TEMPLATE_NAME, type: 'issue', templateData: 'not-json' });
+  const { result } = run({ board, apply: false });
+  await assert.rejects(result, /has templateData that is not valid JSON/);
 });
 
 test('--apply creates the Work view with the spec filter and shared: true (the stored view, not the desired one)', async () => {
@@ -590,7 +645,7 @@ test('the Work view filter excludes cards carrying Decision or Parent and keeps 
   assert.equal(outcome.issueCount, 2);
 });
 
-test('a filter rejected at apply time propagates the exact API error and is never swallowed', async () => {
+test('a mid-apply refusal reports the partial progress on stderr and still surfaces the exact API error', async () => {
   const fake = makeFakeLinear(freshBoard());
   const base = fake.graphql;
   const rejection = 'Linear API error: 400 {"errors":[{"message":"Unknown argument \\"none\\" on field IssueLabelCollectionFilter"}]}';
@@ -598,6 +653,7 @@ test('a filter rejected at apply time propagates the exact API error and is neve
     if (operationName(query) === 'BoardSetupCreateView') throw new Error(rejection);
     return base(query, variables, opts);
   };
+  const stderr = captureStdout();
   await assert.rejects(
     boardSetup({
       graphql,
@@ -605,12 +661,18 @@ test('a filter rejected at apply time propagates the exact API error and is neve
       env: { LINEAR_API_KEY: 'test-key' },
       apply: true,
       stdout: { write() {} },
+      stderr: stderr.stdout,
     }),
     (error) => {
       assert.equal(error.message, rejection, 'the exact API error must surface unchanged');
       return true;
     },
   );
+  const report = stderr.read();
+  assert.match(report, /\d+ of \d+ action\(s\) succeeded before the failure/);
+  assert.match(report, /the board is now partly migrated/);
+  assert.match(report, /the action that failed was create-view "Work"/);
+  assert.match(report, /re-running the program continues from where it stopped/);
 });
 
 test('the evidence names every state, every label group, the template, the view and any position collision', async () => {
@@ -675,6 +737,32 @@ test('a label with a wanted group name that is not a group is a blocking mismatc
   await assert.rejects(result, (error) => {
     assert.ok(error instanceof BoardConflictError);
     assert.match(error.message, /label "Status" exists but is not a label group/);
+    return true;
+  });
+  assert.deepEqual(calls.mutations, []);
+});
+
+test('a child label name that already exists as a group is a blocking mismatch, not an illegal reparent', async () => {
+  const board = freshBoard();
+  // builder-claude-opus is spec'd as an ordinary child of Feature builder
+  // model; a group with that name cannot be reparented under another group.
+  board.labels.find((label) => label.name === 'builder-claude-opus').isGroup = true;
+  const { calls, result } = run({ board, apply: true });
+  await assert.rejects(result, (error) => {
+    assert.ok(error instanceof BoardConflictError);
+    assert.match(error.message, /label "builder-claude-opus" already exists as a label group/);
+    return true;
+  });
+  assert.deepEqual(calls.mutations, []);
+});
+
+test('a retired-group name that exists as an ordinary label is a blocking mismatch, not a silent skip', async () => {
+  const board = freshBoard();
+  board.labels.find((label) => label.name === 'Orchestrator model').isGroup = false;
+  const { calls, result } = run({ board, apply: true });
+  await assert.rejects(result, (error) => {
+    assert.ok(error instanceof BoardConflictError);
+    assert.match(error.message, /label "Orchestrator model" exists but is not a label group/);
     return true;
   });
   assert.deepEqual(calls.mutations, []);
@@ -817,4 +905,13 @@ test('parseArgs defaults to a dry run and turns on --apply only when asked', () 
   assert.deepEqual(parseArgs(['--apply']), { apply: true, help: false });
   assert.deepEqual(parseArgs(['--help']), { apply: false, help: true });
   assert.throws(() => parseArgs(['--nope']), /unknown argument/);
+});
+
+test('parseArgs never echoes an argument value, so a key passed by mistake is not printed', () => {
+  const secret = 'lin_api_synthetic_secret_1234567890';
+  assert.throws(() => parseArgs(['--apply', secret]), (error) => {
+    assert.ok(!error.message.includes(secret), 'an argv value must not reach the error message');
+    assert.match(error.message, /unknown argument: \[redacted\]/);
+    return true;
+  });
 });
