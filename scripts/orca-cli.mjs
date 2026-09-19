@@ -168,3 +168,114 @@ export async function terminalCreate({
 export async function terminalRead({ environment, terminal, execImpl } = {}) {
   return run(['terminal', 'read', '--environment', environment, '--terminal', terminal, '--json'], { execImpl });
 }
+
+// A real CLI entry point for the Orca run/task lookups (JUL-79 step 6).
+// The unattended coordinator previously had no ready-made repo command for
+// these, so it wrote a tiny inline script that was not on its --allowedTools
+// list and stalled with nobody able to approve the prompt. Every command
+// here is a thin passthrough over the exported functions above -- it adds
+// argv parsing, the ORCA_ENVIRONMENT fallback, pretty JSON on stdout and a
+// controlled non-zero exit on bad input or an Orca failure, and nothing else.
+const USAGE = {
+  'run-list': 'usage: orca-cli.mjs run-list [--environment <env>] [--limit <n>] [--cursor <c>]',
+  'task-list': 'usage: orca-cli.mjs task-list --run <runId> [--environment <env>]',
+  'worker-show': 'usage: orca-cli.mjs worker-show --dispatch <dispatchId> [--environment <env>]',
+};
+const USAGE_ROOT = 'usage: orca-cli.mjs <run-list|task-list|worker-show> [options]';
+
+// Distinct from an Orca failure so the exit code can tell the two apart
+// (2 = bad argv, matching the other repo CLIs like linear-cli.mjs; 1 = the
+// Orca call itself failed).
+class UsageError extends Error {}
+
+function parseFlags(args, allowed, usage) {
+  const flags = {};
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i];
+    if (!arg.startsWith('--')) {
+      throw new UsageError(usage);
+    }
+    const name = arg.slice(2);
+    if (!allowed.includes(name)) {
+      throw new UsageError(usage);
+    }
+    const value = args[i + 1];
+    if (value === undefined || value.startsWith('--')) {
+      throw new UsageError(usage);
+    }
+    flags[name] = value;
+    i += 1;
+  }
+  return flags;
+}
+
+function resolveEnvironment(flags, env, usage) {
+  const environment = flags.environment ?? env.ORCA_ENVIRONMENT;
+  if (!environment) {
+    throw new UsageError(usage);
+  }
+  return environment;
+}
+
+// main() takes every dependency as an injectable default so the CLI can be
+// tested against a fake exec and captured streams -- the real orca binary is
+// never spawned from a test. Called bare by the guard at the bottom of this
+// file, where the defaults are the real process argv/env/stdio/exitCode.
+export async function main({
+  argv = process.argv.slice(2),
+  execImpl,
+  env = process.env,
+  stdout = process.stdout,
+  stderr = process.stderr,
+  setExitCode = (code) => { process.exitCode = code; },
+} = {}) {
+  const [command, ...rest] = argv;
+  const usage = USAGE[command];
+  if (!usage) {
+    stderr.write(`${USAGE_ROOT}\n`);
+    setExitCode(2);
+    return;
+  }
+  try {
+    let payload;
+    if (command === 'run-list') {
+      const flags = parseFlags(rest, ['environment', 'limit', 'cursor'], usage);
+      payload = await runList({
+        environment: resolveEnvironment(flags, env, usage),
+        limit: flags.limit,
+        cursor: flags.cursor,
+        execImpl,
+      });
+    } else if (command === 'task-list') {
+      const flags = parseFlags(rest, ['run', 'environment'], usage);
+      if (!flags.run) throw new UsageError(usage);
+      payload = await taskList({
+        runId: flags.run,
+        environment: resolveEnvironment(flags, env, usage),
+        execImpl,
+      });
+    } else {
+      const flags = parseFlags(rest, ['dispatch', 'environment'], usage);
+      if (!flags.dispatch) throw new UsageError(usage);
+      payload = await workerShow({
+        dispatch: flags.dispatch,
+        environment: resolveEnvironment(flags, env, usage),
+        execImpl,
+      });
+    }
+    // The exported function already returns the unwrapped payload; print it
+    // as-is (pretty JSON), never the Orca {id, ok, result, _meta} envelope.
+    stdout.write(`${JSON.stringify(payload, null, 2)}\n`);
+    setExitCode(0);
+  } catch (error) {
+    // A usage error and a real Orca failure both go to stderr as one line;
+    // only the exit code differs (2 vs 1). Never a raw stack trace.
+    stderr.write(`${error.message}\n`);
+    setExitCode(error instanceof UsageError ? 2 : 1);
+  }
+}
+
+import { pathToFileURL } from 'node:url';
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main();
+}
