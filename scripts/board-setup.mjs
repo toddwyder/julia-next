@@ -7,16 +7,23 @@
 //
 // Two things are deliberate:
 //
-//  - Everything is matched BY NAME first. A state called "Todo" is renamed to
-//    "Ready" (same id, so every card in it survives); a state already called
-//    "Ready" is left alone; only a name that exists nowhere is created.
+//  - Everything is matched BY NAME first, but identity is checked too: a state
+//    that would carry a wanted name with the wrong TYPE, a label with a wanted
+//    group name that is NOT a group, or a board where an old state name and
+//    its new name both exist are blocking mismatches. The program reports them
+//    and stops BEFORE any mutation rather than papering over them.
 //  - The default mode is a dry run. The board is Todd's, and a program that
 //    edits it should have to be asked twice.
 //
+// Every read is paginated (states, labels, templates, views, issues): Linear
+// returns 50 records by default and this board alone wants 76 labels, so a
+// single page read is the bug that makes the second apply look like work.
+//
 // The Linear key is read in process only -- from LINEAR_API_KEY or, failing
 // that, the protected drop box via read-secret.mjs. It is never an argv entry,
-// never a shell string, and never printed. That is the same rule
-// scripts/ready-queue.mjs follows.
+// never a shell string, and never printed. Errors from the transport can embed
+// the raw upstream body (which may echo the key), so every stdout/stderr write
+// at this boundary is passed through redactSecret() with the resolved key.
 //
 // Everything goes through the injected `graphql` function, so the unit tests
 // exercise the plan/apply loop with an in-memory board and never touch the
@@ -44,7 +51,7 @@ import {
 export const TEMPLATE_NAME = 'Julia-next agent defaults';
 
 // ---------------------------------------------------------------------------
-// Key handling
+// Key handling and secret redaction
 // ---------------------------------------------------------------------------
 
 export function resolveLinearApiKey({ env = process.env, readSecretImpl = readSecret } = {}) {
@@ -52,10 +59,31 @@ export function resolveLinearApiKey({ env = process.env, readSecretImpl = readSe
   return readSecretImpl('linear');
 }
 
+// linearGraphQL embeds the raw upstream body in its error message, and that
+// body can contain the Authorization value it was sent. The key is known here
+// and nowhere in scripts/linear-cli.mjs, so redaction belongs at this boundary:
+// replace every occurrence of the resolved key before a character reaches
+// stdout or stderr. linear-cli.mjs is deliberately left alone.
+export function redactSecret(text, secret) {
+  const raw = String(text ?? '');
+  if (!secret) return raw;
+  return raw.split(String(secret)).join('[redacted]');
+}
+
+// Wrap a writer (process.stdout, or a test capture) so every chunk is redacted.
+export function makeRedactingWriter(writer, secret) {
+  return {
+    write(chunk) {
+      return writer.write(redactSecret(chunk, secret));
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Linear documents. Every operation has a `BoardSetup`-prefixed name so a test
 // fake (and a human reading a log) can tell them apart without parsing
-// variables.
+// variables. Each paginated connection is its own query so it can carry its
+// own `$after` cursor.
 // ---------------------------------------------------------------------------
 
 const TEAM_QUERY = `
@@ -64,27 +92,59 @@ const TEAM_QUERY = `
       id
       name
       defaultTemplateForMembers { id }
-      states { nodes { id name type position } }
-      labels { nodes { id name description isGroup parent { id } } }
-      templates { nodes { id name type templateData } }
+    }
+  }
+`;
+
+const STATES_QUERY = `
+  query BoardSetupStates($teamId: String!, $after: String) {
+    team(id: $teamId) {
+      states(first: 50, after: $after) {
+        nodes { id name type position color }
+        pageInfo { hasNextPage endCursor }
+      }
+    }
+  }
+`;
+
+const LABELS_QUERY = `
+  query BoardSetupLabels($teamId: String!, $after: String) {
+    team(id: $teamId) {
+      labels(first: 50, after: $after) {
+        nodes { id name description isGroup retiredAt parent { id } }
+        pageInfo { hasNextPage endCursor }
+      }
+    }
+  }
+`;
+
+const TEMPLATES_QUERY = `
+  query BoardSetupTemplates($teamId: String!, $after: String) {
+    team(id: $teamId) {
+      templates(first: 50, after: $after) {
+        nodes { id name type templateData }
+        pageInfo { hasNextPage endCursor }
+      }
     }
   }
 `;
 
 // Saved views are not part of the team payload in Linear, so they are read
-// separately and matched by name like everything else.
+// separately and matched by name like everything else. filterData and shared
+// are read too: a view with the right name but the wrong filter or the wrong
+// sharing does NOT satisfy the spec.
 const VIEWS_QUERY = `
-  query BoardSetupViews($teamId: String!) {
-    customViews(filter: { team: { id: { eq: $teamId } } }, first: 100) {
-      nodes { id name url }
+  query BoardSetupViews($teamId: String!, $after: String) {
+    customViews(filter: { team: { id: { eq: $teamId } } }, first: 50, after: $after) {
+      nodes { id name url description filterData shared }
       pageInfo { hasNextPage endCursor }
     }
   }
 `;
 
 const ISSUES_QUERY = `
-  query BoardSetupWorkIssues($filter: IssueFilter, $after: String) {
-    issues(filter: $filter, first: 100, after: $after) {
+  query BoardSetupIssues($filter: IssueFilter, $after: String) {
+    issues(filter: $filter, first: 50, after: $after) {
       nodes { id }
       pageInfo { hasNextPage endCursor }
     }
@@ -95,16 +155,19 @@ const CREATE_STATE_MUTATION = `
   mutation BoardSetupCreateState($input: WorkflowStateCreateInput!) {
     workflowStateCreate(input: $input) {
       success
-      workflowState { id name type position }
+      workflowState { id name type position color }
     }
   }
 `;
 
+// WorkflowStateUpdateInput has NO type field: Linear cannot change a state's
+// type after creation. The setup never sends one; a wrong type is a blocking
+// mismatch reported before any mutation.
 const UPDATE_STATE_MUTATION = `
   mutation BoardSetupUpdateState($id: String!, $input: WorkflowStateUpdateInput!) {
     workflowStateUpdate(id: $id, input: $input) {
       success
-      workflowState { id name type position }
+      workflowState { id name type position color }
     }
   }
 `;
@@ -127,9 +190,16 @@ const UPDATE_LABEL_MUTATION = `
   }
 `;
 
-const ARCHIVE_LABEL_MUTATION = `
-  mutation BoardSetupArchiveLabel($id: String!) {
-    issueLabelArchive(id: $id) { success }
+// There is no issueLabelArchive mutation. issueLabelRetire keeps the label
+// visible on the cards that already carry it and only stops new applications;
+// on a later run the returned retiredAt tells the planner there is nothing to
+// do.
+const RETIRE_LABEL_MUTATION = `
+  mutation BoardSetupRetireLabel($id: String!) {
+    issueLabelRetire(id: $id) {
+      success
+      issueLabel { id name retiredAt }
+    }
   }
 `;
 
@@ -163,11 +233,22 @@ const SET_DEFAULT_TEMPLATE_MUTATION = `
   }
 `;
 
+// `shared: true` is explicitly requested: the Work view must be visible to
+// every human and agent, not only its creator.
 const CREATE_VIEW_MUTATION = `
   mutation BoardSetupCreateView($input: CustomViewCreateInput!) {
     customViewCreate(input: $input) {
       success
-      customView { id name url }
+      customView { id name url description filterData shared }
+    }
+  }
+`;
+
+const UPDATE_VIEW_MUTATION = `
+  mutation BoardSetupUpdateView($id: String!, $input: CustomViewUpdateInput!) {
+    customViewUpdate(id: $id, input: $input) {
+      success
+      customView { id name url description filterData shared }
     }
   }
 `;
@@ -183,8 +264,29 @@ function assertSuccess(payload, what) {
   return payload;
 }
 
-// Turn the two read queries into the small, flat shape the pure planner
-// reasons about. Anything Linear does not return is simply absent.
+// Walk a Relay connection to the end. `select` pulls the connection out of the
+// operation's own data shape. A cursor that does not advance, or a connection
+// that never ends, is an error rather than a silent partial read.
+export async function paginate({ graphql, apiKey, query, variables = {}, select, pageLimit = 1000 }) {
+  const nodes = [];
+  let after = null;
+  for (let page = 0; page < pageLimit; page += 1) {
+    const data = await graphql(query, { ...variables, after }, { apiKey });
+    const connection = select(data);
+    nodes.push(...(connection?.nodes ?? []));
+    if (!connection?.pageInfo?.hasNextPage) return nodes;
+    const next = connection.pageInfo.endCursor;
+    if (next == null || next === after) {
+      throw new Error('board-setup: Linear reported another page but returned no usable cursor');
+    }
+    after = next;
+  }
+  throw new Error(`board-setup: pagination did not terminate after ${pageLimit} pages`);
+}
+
+// Turn the read queries into the small, flat shape the pure planner reasons
+// about. Anything Linear does not return is simply absent. Every connection is
+// read to the last page before matching or rendering evidence.
 export async function loadBoard({ graphql, apiKey, teamId = TEAM_ID } = {}) {
   const callOpts = { apiKey };
   const data = await graphql(TEAM_QUERY, { teamId }, callOpts);
@@ -192,52 +294,69 @@ export async function loadBoard({ graphql, apiKey, teamId = TEAM_ID } = {}) {
   if (!team) {
     throw new Error(`board-setup: no Linear team with id ${teamId}`);
   }
-  const viewData = await graphql(VIEWS_QUERY, { teamId }, callOpts);
+
+  const stateNodes = await paginate({
+    graphql, apiKey, query: STATES_QUERY, variables: { teamId }, select: (d) => d?.team?.states,
+  });
+  const labelNodes = await paginate({
+    graphql, apiKey, query: LABELS_QUERY, variables: { teamId }, select: (d) => d?.team?.labels,
+  });
+  const templateNodes = await paginate({
+    graphql, apiKey, query: TEMPLATES_QUERY, variables: { teamId }, select: (d) => d?.team?.templates,
+  });
+  const viewNodes = await paginate({
+    graphql, apiKey, query: VIEWS_QUERY, variables: { teamId }, select: (d) => d?.customViews,
+  });
+
   return {
     teamId,
     name: team.name ?? null,
     defaultTemplateId: team.defaultTemplateForMembers?.id ?? null,
-    states: (team.states?.nodes ?? []).map((state) => ({
+    states: stateNodes.map((state) => ({
       id: state.id,
       name: state.name,
       type: state.type,
       position: Number(state.position),
+      color: state.color ?? null,
     })),
-    labels: (team.labels?.nodes ?? []).map((label) => ({
+    labels: labelNodes.map((label) => ({
       id: label.id,
       name: label.name,
       description: label.description ?? null,
       isGroup: label.isGroup === true,
       parentId: label.parent?.id ?? null,
+      retiredAt: label.retiredAt ?? null,
     })),
-    templates: (team.templates?.nodes ?? []).map((template) => ({
+    templates: templateNodes.map((template) => ({
       id: template.id,
       name: template.name,
       type: template.type,
       templateData: template.templateData ?? null,
     })),
-    views: (viewData?.customViews?.nodes ?? []).map((view) => ({
+    views: viewNodes.map((view) => ({
       id: view.id,
       name: view.name,
       url: view.url ?? null,
+      description: view.description ?? null,
+      filterData: view.filterData ?? null,
+      shared: view.shared === true,
     })),
   };
 }
 
-// The issue count the evidence reports. Pages until Linear says there are no
-// more; a 100-page cap keeps a pathological filter from looping forever.
-export async function countWorkViewIssues({ graphql, apiKey, teamId = TEAM_ID } = {}) {
-  const filter = workViewIssueFilter(teamId);
+// Count every issue matching an IssueFilter, paging to the end. Used for the
+// evidence line and for the card counts in a coexistence mismatch.
+export async function countIssues({ graphql, apiKey, filter }) {
   let after = null;
   let count = 0;
-  for (let page = 0; page < 100; page += 1) {
+  for (let page = 0; page < 1000; page += 1) {
     const data = await graphql(ISSUES_QUERY, { filter, after }, { apiKey });
     const connection = data?.issues;
     count += connection?.nodes?.length ?? 0;
-    if (!connection?.pageInfo?.hasNextPage) break;
+    if (!connection?.pageInfo?.hasNextPage) return count;
     after = connection.pageInfo.endCursor;
   }
-  return count;
+  throw new Error('board-setup: issue count did not terminate after 1000 pages');
 }
 
 // ---------------------------------------------------------------------------
@@ -279,65 +398,202 @@ function findRenameSource(statesByName, targetName) {
   return null;
 }
 
-// The pure diff: given a board (the shape loadBoard returns), list the actions
-// that would make it match the spec. An empty list means the board is already
-// correct -- the property a second --apply relies on. No I/O.
-export function planBoardSetup(board) {
-  const actions = [];
-
-  const statesByName = new Map(board.states.map((state) => [state.name, state]));
-  const claimedStateIds = new Set();
-  WORKFLOW_STATES.forEach((state, index) => {
-    const position = index;
-    // Match the target name first (a previous run already renamed it), then
-    // the old name it may still carry. This is the "rename, never replace"
-    // rule: the found state keeps its id and every card in it.
-    const existing = statesByName.get(state.name) ?? findRenameSource(statesByName, state.name);
-    if (!existing) {
-      actions.push({ kind: 'create-state', name: state.name, type: state.type, position });
-      return;
+// Stable stringify so two IssueFilter objects compare equal regardless of key
+// order (Linear may echo the filter in a different order than it was sent).
+function canonical(value) {
+  if (value === undefined) return 'undefined';
+  if (value === null) return 'null';
+  if (Array.isArray(value)) {
+    const items = value.map(canonical);
+    // A filter's `nin` list is a set: order must not make the same filter look
+    // different and drive an endless update-view loop.
+    if (value.every((item) => item === null || ['string', 'number', 'boolean'].includes(typeof item))) {
+      return `[${[...items].sort().join(',')}]`;
     }
-    claimedStateIds.add(existing.id);
-    const changes = {};
-    if (existing.name !== state.name) changes.name = state.name;
-    if (existing.type !== state.type) changes.type = state.type;
-    if (Number(existing.position) !== position) changes.position = position;
-    if (Object.keys(changes).length > 0) {
-      actions.push({
-        kind: 'update-state',
-        id: existing.id,
-        currentName: existing.name,
-        name: state.name,
-        changes,
+    return `[${items.join(',')}]`;
+  }
+  if (typeof value === 'object') {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+export function sameFilterData(a, b) {
+  return canonical(a) === canonical(b);
+}
+
+// A blocking mismatch is something the spec cannot be reached through without
+// losing information or lying. The planner finds them all BEFORE emitting a
+// single action, and boardSetup reports them with card counts and exits
+// non-zero.
+export function findBlockingMismatches(board) {
+  const mismatches = [];
+  const statesByName = new Map(board.states.map((state) => [state.name, state]));
+
+  // (7) Both an old name and its target name exist. There is no safe rename:
+  // updating either one strands the other's cards, so the program stops and
+  // reports both, with counts, before changing anything.
+  for (const [from, to] of Object.entries(STATE_RENAMES)) {
+    const fromState = statesByName.get(from);
+    const toState = statesByName.get(to);
+    if (fromState && toState) {
+      mismatches.push({ kind: 'state-name-coexistence', fromName: from, toName: to, fromState, toState });
+    }
+  }
+
+  // (1) A state that will carry a target name (already named, or about to be
+  // renamed) has the wrong type. WorkflowStateUpdateInput cannot change type,
+  // so this is blocking. When both names exist the coexistence above already
+  // stops the run; skip the duplicate type report.
+  for (const state of WORKFLOW_STATES) {
+    const target = statesByName.get(state.name);
+    const source = findRenameSource(statesByName, state.name);
+    if (target && source) continue;
+    const existing = target ?? source;
+    if (existing && existing.type !== state.type) {
+      mismatches.push({
+        kind: 'state-type',
+        stateName: existing.name,
+        actualType: existing.type,
+        wantedType: state.type,
       });
     }
-  });
+  }
 
-  // States that are not one of the eight (Canceled, Duplicate, any other
-  // custom state) are never renamed, but they must not sit BETWEEN the eight
-  // columns either -- that would make the board order lie. Any such state
-  // still inside the eight's 0..7 range is moved past every existing state,
-  // preserving its name and every card in it.
-  const maxExistingPosition = board.states.reduce((max, state) => {
+  // (8) A label with a wanted GROUP name that is not a group cannot be a
+  // parent. Matching by name alone would let ordinary labels receive children.
+  const labelsByName = new Map(board.labels.map((label) => [label.name, label]));
+  for (const group of desiredLabelGroups()) {
+    const existing = labelsByName.get(group.name);
+    if (existing && !existing.isGroup) {
+      mismatches.push({ kind: 'label-group-identity', labelName: group.name });
+    }
+  }
+
+  return mismatches;
+}
+
+export function mismatchMessage(mismatch, { issueCountByStateId = {} } = {}) {
+  const count = (state) => {
+    const value = issueCountByStateId[state.id];
+    return Number.isFinite(value) ? `${value} card(s)` : 'an unknown number of cards';
+  };
+  switch (mismatch.kind) {
+    case 'state-name-coexistence':
+      return `state "${mismatch.fromName}" (${count(mismatch.fromState)}) and state "${mismatch.toName}" (${count(mismatch.toState)}) both exist; renaming either would strand the other's cards, so no state was changed`;
+    case 'state-type':
+      return `state "${mismatch.stateName}" has type "${mismatch.actualType}" but the spec needs "${mismatch.wantedType}"; Linear cannot change a workflow state's type after creation`;
+    case 'label-group-identity':
+      return `label "${mismatch.labelName}" exists but is not a label group, so it cannot be the parent of the spec's child labels`;
+    default:
+      return `unknown blocking mismatch: ${JSON.stringify(mismatch)}`;
+  }
+}
+
+export class BoardConflictError extends Error {
+  constructor(messages) {
+    super(`board-setup: the board cannot be migrated safely:\n${messages.map((message) => `  - ${message}`).join('\n')}`);
+    this.name = 'BoardConflictError';
+    this.mismatches = messages;
+  }
+}
+
+// The action ordering that keeps intermediate state positions collision-free.
+// Every claimed state that must change position first moves to a temporary
+// slot above every existing and final position; then the missing states are
+// created and the moved states land on their final positions. No step puts two
+// of the eight at the same position. States outside the eight are never moved,
+// even when that leaves an outside state tied with one of the eight -- the
+// evidence listing names those ties.
+function planStatePositions(board, statesByName) {
+  const actions = [];
+  const slots = WORKFLOW_STATES.map((state, index) => ({
+    state,
+    position: index,
+    existing: statesByName.get(state.name) ?? findRenameSource(statesByName, state.name),
+  }));
+
+  const maxExisting = board.states.reduce((max, state) => {
     const value = Number(state.position);
     return Number.isFinite(value) ? Math.max(max, value) : max;
   }, WORKFLOW_STATES.length - 1);
-  let nextPosition = Math.max(WORKFLOW_STATES.length, maxExistingPosition + 1);
-  const unclaimed = board.states
-    .filter((state) => !claimedStateIds.has(state.id))
-    .sort((a, b) => Number(a.position) - Number(b.position));
-  for (const state of unclaimed) {
-    if (Number(state.position) < WORKFLOW_STATES.length) {
+  let tempPosition = Math.max(maxExisting, WORKFLOW_STATES.length - 1) + 1;
+
+  const moved = slots.filter((slot) => slot.existing && Number(slot.existing.position) !== slot.position);
+
+  // First: rename and vacate. The temp slot is always above the final range,
+  // so a second update is needed to land on the final position.
+  for (const slot of moved) {
+    const changes = { position: tempPosition };
+    if (slot.existing.name !== slot.state.name) changes.name = slot.state.name;
+    actions.push({
+      kind: 'update-state',
+      id: slot.existing.id,
+      currentName: slot.existing.name,
+      name: slot.state.name,
+      changes,
+    });
+    tempPosition += 1;
+  }
+
+  // Second: create the missing states at their final positions. Every moved
+  // state is out of the way (at a temp slot), so a create never collides with
+  // a claimed state. A state outside the eight may share the position; that is
+  // left alone and reported by the evidence.
+  for (const slot of slots) {
+    if (!slot.existing) {
       actions.push({
-        kind: 'update-state',
-        id: state.id,
-        currentName: state.name,
-        name: state.name,
-        changes: { position: nextPosition },
+        kind: 'create-state',
+        name: slot.state.name,
+        type: slot.state.type,
+        color: slot.state.color,
+        position: slot.position,
       });
-      nextPosition += 1;
     }
   }
+
+  // Third: land the moved states on their finals; rename any state that only
+  // needed a name change.
+  for (const slot of slots) {
+    if (!slot.existing) continue;
+    const changedPosition = Number(slot.existing.position) !== slot.position;
+    if (!changedPosition) {
+      if (slot.existing.name !== slot.state.name) {
+        actions.push({
+          kind: 'update-state',
+          id: slot.existing.id,
+          currentName: slot.existing.name,
+          name: slot.state.name,
+          changes: { name: slot.state.name },
+        });
+      }
+      continue;
+    }
+    actions.push({
+      kind: 'update-state',
+      id: slot.existing.id,
+      currentName: slot.existing.name,
+      name: slot.state.name,
+      changes: { position: slot.position },
+    });
+  }
+
+  return actions;
+}
+
+// The pure diff: given a board (the shape loadBoard returns), list the actions
+// that would make it match the spec. An empty list means the board is already
+// correct -- the property a second --apply relies on. Blocking mismatches
+// throw here too, so a direct caller cannot get a plan that ignores one. No
+// I/O.
+export function planBoardSetup(board) {
+  const mismatches = findBlockingMismatches(board);
+  if (mismatches.length > 0) {
+    throw new BoardConflictError(mismatches.map((mismatch) => mismatchMessage(mismatch)));
+  }
+
+  const statesByName = new Map(board.states.map((state) => [state.name, state]));
+  const actions = planStatePositions(board, statesByName);
 
   const labelsByName = new Map(board.labels.map((label) => [label.name, label]));
   const labelNameById = new Map(board.labels.map((label) => [label.id, label.name]));
@@ -391,20 +647,34 @@ export function planBoardSetup(board) {
     }
   }
 
+  // A retired group is done: issueLabelRetire keeps it on the board with a
+  // retiredAt stamp, so later runs see it and emit nothing.
   for (const name of RETIRED_LABEL_GROUPS) {
     const existing = labelsByName.get(name);
-    if (existing?.isGroup) {
-      actions.push({ kind: 'archive-label', id: existing.id, name });
+    if (existing?.isGroup && !existing.retiredAt) {
+      actions.push({ kind: 'retire-label', id: existing.id, name });
     }
   }
 
-  if (!board.views.some((view) => view.name === WORK_VIEW.name)) {
+  // Match the Work view on identity, not just its name: the saved filter and
+  // its sharing are both part of what the spec requires.
+  const desiredFilter = workViewIssueFilter(board.teamId);
+  const existingView = board.views.find((view) => view.name === WORK_VIEW.name);
+  if (!existingView) {
     actions.push({
       kind: 'create-view',
       name: WORK_VIEW.name,
       description: WORK_VIEW.description,
-      filterData: workViewIssueFilter(board.teamId),
+      filterData: desiredFilter,
+      shared: true,
     });
+  } else {
+    const changes = {};
+    if (!sameFilterData(existingView.filterData, desiredFilter)) changes.filterData = desiredFilter;
+    if (existingView.shared !== true) changes.shared = true;
+    if (Object.keys(changes).length > 0) {
+      actions.push({ kind: 'update-view', id: existingView.id, name: WORK_VIEW.name, changes });
+    }
   }
 
   return actions;
@@ -440,7 +710,13 @@ export async function applyBoardSetup(actions, {
     switch (action.kind) {
       case 'create-state': {
         const data = await graphql(CREATE_STATE_MUTATION, {
-          input: { teamId, name: action.name, type: action.type, position: action.position },
+          input: {
+            teamId,
+            name: action.name,
+            type: action.type,
+            color: action.color,
+            position: action.position,
+          },
         }, callOpts);
         assertSuccess(data.workflowStateCreate, `creating workflow state "${action.name}"`);
         break;
@@ -448,7 +724,6 @@ export async function applyBoardSetup(actions, {
       case 'update-state': {
         const input = {};
         if (action.changes.name !== undefined) input.name = action.changes.name;
-        if (action.changes.type !== undefined) input.type = action.changes.type;
         if (action.changes.position !== undefined) input.position = action.changes.position;
         const data = await graphql(UPDATE_STATE_MUTATION, { id: action.id, input }, callOpts);
         assertSuccess(data.workflowStateUpdate, `updating workflow state "${action.currentName}"`);
@@ -486,9 +761,9 @@ export async function applyBoardSetup(actions, {
         assertSuccess(data.issueLabelUpdate, `updating label "${action.name}"`);
         break;
       }
-      case 'archive-label': {
-        const data = await graphql(ARCHIVE_LABEL_MUTATION, { id: action.id }, callOpts);
-        assertSuccess(data.issueLabelArchive, `retiring label group "${action.name}"`);
+      case 'retire-label': {
+        const data = await graphql(RETIRE_LABEL_MUTATION, { id: action.id }, callOpts);
+        assertSuccess(data.issueLabelRetire, `retiring label group "${action.name}"`);
         break;
       }
       case 'create-template': {
@@ -526,9 +801,18 @@ export async function applyBoardSetup(actions, {
             name: action.name,
             description: action.description,
             filterData: action.filterData,
+            shared: action.shared === true,
           },
         }, callOpts);
         assertSuccess(data.customViewCreate, `creating the saved view "${action.name}"`);
+        break;
+      }
+      case 'update-view': {
+        const input = {};
+        if (action.changes.filterData !== undefined) input.filterData = action.changes.filterData;
+        if (action.changes.shared !== undefined) input.shared = action.changes.shared;
+        const data = await graphql(UPDATE_VIEW_MUTATION, { id: action.id, input }, callOpts);
+        assertSuccess(data.customViewUpdate, `updating the saved view "${action.name}"`);
         break;
       }
       default:
@@ -549,7 +833,7 @@ function describeChanges(changes) {
 export function describeAction(action) {
   switch (action.kind) {
     case 'create-state':
-      return `create workflow state "${action.name}" (type ${action.type}) at position ${action.position}`;
+      return `create workflow state "${action.name}" (type ${action.type}, color ${action.color}) at position ${action.position}`;
     case 'update-state':
       return `update workflow state "${action.currentName}" -> "${action.name}" [${describeChanges(action.changes)}]`;
     case 'create-label-group':
@@ -558,8 +842,8 @@ export function describeAction(action) {
       return `create label "${action.name}" under "${action.parentName}"${action.description ? ` -- ${action.description}` : ''}`;
     case 'update-label':
       return `update label "${action.name}" [${describeChanges(action.changes)}]`;
-    case 'archive-label':
-      return `retire label group "${action.name}" (archive)`;
+    case 'retire-label':
+      return `retire label group "${action.name}" (issueLabelRetire; cards keep the label)`;
     case 'create-template':
       return `create team template "${action.name}" with ${action.labelNames.length} default label(s)`;
     case 'update-template':
@@ -567,26 +851,47 @@ export function describeAction(action) {
     case 'set-default-template':
       return `set the team default template to "${action.templateName}"`;
     case 'create-view':
-      return `create saved view "${action.name}"`;
+      return `create saved view "${action.name}" (shared)`;
+    case 'update-view':
+      return `update saved view "${action.name}" [${describeChanges(action.changes)}]`;
     default:
       return `unknown action: ${JSON.stringify(action)}`;
   }
 }
 
 // The evidence block. It is rendered from a fresh board read (after an apply)
-// so it describes what is really there, never the plan that was hoped for.
-export function renderEvidence(board, issueCount) {
+// so it describes what is really there, never the plan that was hoped for. The
+// issue count is passed in from the SAVED view's own filter when one exists.
+export function renderEvidence(board, issueCount, { issueCountFromSavedView = false } = {}) {
   const lines = ['EVIDENCE'];
-  const states = [...board.states].sort((a, b) => a.position - b.position);
+  const states = [...board.states].sort((a, b) => a.position - b.position || a.name.localeCompare(b.name));
   lines.push(`States (${states.length}):`);
   for (const state of states) {
     lines.push(`  ${state.name} [${state.type}] position ${state.position}`);
   }
 
+  // States outside the eight are never moved, so one of them can share a
+  // position with a column. Say so here instead of hiding it.
+  const byPosition = new Map();
+  for (const state of board.states) {
+    const names = byPosition.get(state.position) ?? [];
+    names.push(state.name);
+    byPosition.set(state.position, names);
+  }
+  const collisions = [...byPosition.entries()]
+    .filter(([, names]) => names.length > 1)
+    .sort((a, b) => Number(a[0]) - Number(b[0]));
+  if (collisions.length > 0) {
+    lines.push('Position collisions (excluded states are left where they are):');
+    for (const [position, names] of collisions) {
+      lines.push(`  position ${position}: ${names.join(', ')}`);
+    }
+  }
+
   const groups = board.labels.filter((label) => label.isGroup);
   lines.push(`Label groups (${groups.length}):`);
   for (const group of groups) {
-    lines.push(`  ${group.name}`);
+    lines.push(`  ${group.name}${group.retiredAt ? ' (retired)' : ''}`);
     const children = board.labels
       .filter((label) => label.parentId === group.id)
       .sort((a, b) => a.name.localeCompare(b.name));
@@ -598,13 +903,15 @@ export function renderEvidence(board, issueCount) {
   const template = board.templates.find((candidate) => candidate.name === TEMPLATE_NAME);
   lines.push(template
     ? `Template: ${template.name} (id: ${template.id})`
-    : `Template: (none -- dry run before creation)`);
+    : 'Template: (none -- dry run before creation)');
 
   const view = board.views.find((candidate) => candidate.name === WORK_VIEW.name);
   lines.push(view
-    ? `Work view: ${view.name} (id: ${view.id}${view.url ? `, url: ${view.url}` : ''})`
-    : `Work view: (none -- dry run before creation)`);
-  lines.push(`Work view matches ${issueCount} issue(s)`);
+    ? `Work view: ${view.name} (id: ${view.id}${view.url ? `, url: ${view.url}` : ''}, ${view.shared ? 'shared' : 'private'})`
+    : 'Work view: (none -- dry run before creation)');
+  lines.push(`Work view matches ${issueCount} issue(s) (${issueCountFromSavedView
+    ? "counted with the saved view's filter"
+    : 'counted with the desired filter; the view is not saved yet'})`);
   return `${lines.join('\n')}\n`;
 }
 
@@ -616,27 +923,52 @@ export async function boardSetup({
   graphql = linearGraphQL,
   env = process.env,
   readSecretImpl = readSecret,
+  apiKey: providedApiKey,
   teamId = TEAM_ID,
   apply = false,
   stdout = process.stdout,
 } = {}) {
-  const apiKey = resolveLinearApiKey({ env, readSecretImpl });
+  const apiKey = providedApiKey ?? resolveLinearApiKey({ env, readSecretImpl });
+  const safeStdout = makeRedactingWriter(stdout, apiKey);
+
   const board = await loadBoard({ graphql, apiKey, teamId });
+
+  // Blocking mismatches are found BEFORE any mutation. Coexistence needs card
+  // counts, so it is the one mismatch that costs a read; the counts come from
+  // the live board, never from the plan.
+  const mismatches = findBlockingMismatches(board);
+  if (mismatches.length > 0) {
+    const stateIds = new Set();
+    for (const mismatch of mismatches) {
+      if (mismatch.kind === 'state-name-coexistence') {
+        stateIds.add(mismatch.fromState.id);
+        stateIds.add(mismatch.toState.id);
+      }
+    }
+    const issueCountByStateId = {};
+    for (const id of stateIds) {
+      issueCountByStateId[id] = await countIssues({ graphql, apiKey, filter: { state: { id: { eq: id } } } });
+    }
+    throw new BoardConflictError(
+      mismatches.map((mismatch) => mismatchMessage(mismatch, { issueCountByStateId })),
+    );
+  }
+
   const actions = planBoardSetup(board);
 
-  stdout.write(apply
+  safeStdout.write(apply
     ? 'board-setup: APPLY -- changing the Julia-next board to match graph/board-spec.mjs\n'
     : 'board-setup: DRY RUN -- pass --apply to change the board\n');
   if (actions.length === 0) {
-    stdout.write('board-setup: the board already matches graph/board-spec.mjs; no changes\n');
+    safeStdout.write('board-setup: the board already matches graph/board-spec.mjs; no changes\n');
   } else {
-    for (const action of actions) stdout.write(`- ${describeAction(action)}\n`);
-    stdout.write(`board-setup: ${actions.length} action(s) ${apply ? 'to apply' : 'planned'}\n`);
+    for (const action of actions) safeStdout.write(`- ${describeAction(action)}\n`);
+    safeStdout.write(`board-setup: ${actions.length} action(s) ${apply ? 'to apply' : 'planned'}\n`);
   }
 
   if (apply && actions.length > 0) {
     await applyBoardSetup(actions, { graphql, apiKey, teamId, board });
-    stdout.write(`board-setup: applied ${actions.length} action(s)\n`);
+    safeStdout.write(`board-setup: applied ${actions.length} action(s)\n`);
   }
 
   // Re-read after an apply so the evidence is the board as it now is. A dry
@@ -644,8 +976,14 @@ export async function boardSetup({
   const finalBoard = apply && actions.length > 0
     ? await loadBoard({ graphql, apiKey, teamId })
     : board;
-  const issueCount = await countWorkViewIssues({ graphql, apiKey, teamId });
-  stdout.write(renderEvidence(finalBoard, issueCount));
+
+  // The evidence count comes from the SAVED view's own filter when there is
+  // one; a view with a wrong filter must count the wrong things and say so, not
+  // be silently re-counted with the desired filter.
+  const savedView = finalBoard.views.find((view) => view.name === WORK_VIEW.name);
+  const countFilter = savedView?.filterData ?? workViewIssueFilter(finalBoard.teamId);
+  const issueCount = await countIssues({ graphql, apiKey, filter: countFilter });
+  safeStdout.write(renderEvidence(finalBoard, issueCount, { issueCountFromSavedView: Boolean(savedView) }));
   return { actions, board: finalBoard, issueCount };
 }
 
@@ -680,10 +1018,22 @@ async function main() {
     console.log(USAGE);
     return;
   }
+
+  // Resolve the key once, here, so an error thrown by the transport can have
+  // the key redacted before it reaches stderr.
+  let apiKey;
   try {
-    await boardSetup({ apply: options.apply });
+    apiKey = resolveLinearApiKey({});
   } catch (error) {
     console.error(error.message);
+    process.exitCode = 1;
+    return;
+  }
+
+  try {
+    await boardSetup({ apply: options.apply, apiKey });
+  } catch (error) {
+    console.error(redactSecret(error.message, apiKey));
     process.exitCode = 1;
   }
 }

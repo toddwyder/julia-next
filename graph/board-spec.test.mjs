@@ -23,8 +23,8 @@ import {
 import { MODEL_SPECS, DEFAULT_MODEL_SUFFIX_BY_ENTRY } from '../scripts/seat-labels.mjs';
 import { SEAT_TABLE } from './seat-table.mjs';
 
-test('the eight workflow states are exactly the ticket\'s, in board order, with the right types', () => {
-  assert.deepEqual(WORKFLOW_STATES, [
+test('the eight workflow states are exactly the ticket\'s, in board order, with the right types and a color each', () => {
+  assert.deepEqual(WORKFLOW_STATES.map(({ name, type }) => ({ name, type })), [
     { name: 'Backlog', type: 'backlog' },
     { name: 'Ready', type: 'unstarted' },
     { name: 'Implementation', type: 'started' },
@@ -35,6 +35,12 @@ test('the eight workflow states are exactly the ticket\'s, in board order, with 
     { name: 'Complete', type: 'completed' },
   ]);
   assert.equal(new Set(WORKFLOW_STATES.map((state) => state.name)).size, 8);
+  // WorkflowStateCreateInput.color is required; every state carries a fixed
+  // HEX color and no two states reuse one.
+  for (const state of WORKFLOW_STATES) {
+    assert.match(state.color, /^#[0-9a-f]{6}$/i, `${state.name} has no sensible HEX color`);
+  }
+  assert.equal(new Set(WORKFLOW_STATES.map((state) => state.color)).size, 8);
 });
 
 test('the rename map is exactly the four renames and never mentions Canceled or Duplicate', () => {
@@ -145,13 +151,18 @@ test('the Work view names the team and excludes exactly Decision and Parent', ()
   assert.equal(matchesWorkView(['Parent']), false);
   assert.equal(matchesWorkView(['Decision', 'Parent']), false);
   assert.equal(matchesWorkView(['decision']), true, 'names are matched exactly');
+  // Mixed labels: one coordinate label among ordinary labels still fails.
+  assert.equal(matchesWorkView(['ready-for-agent', 'Decision']), false);
+  assert.equal(matchesWorkView(['ready-for-agent', 'Parent']), false);
+  assert.equal(matchesWorkView(['ready-for-agent', 'blocked']), true);
 });
 
-test('workViewIssueFilter is the team plus a none/in exclusion of Decision and Parent', () => {
+test('workViewIssueFilter is the team plus an every/nin exclusion of Decision and Parent (Linear has no labels.none)', () => {
   assert.deepEqual(workViewIssueFilter(TEAM_ID), {
     team: { id: { eq: TEAM_ID } },
-    labels: { none: { name: { in: ['Decision', 'Parent'] } } },
+    labels: { every: { name: { nin: ['Decision', 'Parent'] } } },
   });
+  assert.ok(!Object.hasOwn(workViewIssueFilter(TEAM_ID).labels, 'none'), 'labels.none is not part of IssueLabelCollectionFilter');
   // Defaults to the Julia-next team.
   assert.deepEqual(workViewIssueFilter(), workViewIssueFilter(TEAM_ID));
 });

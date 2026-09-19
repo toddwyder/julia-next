@@ -21,16 +21,22 @@ export const TEAM_ID = '31138162-65a4-4dd3-bcc8-6b6ac0709bca';
 
 // The eight columns, in board order. `position` is assigned from the array
 // index by the setup program (0 for the first), never stored here, so the
-// order is the array and cannot get out of step with it.
+// order is the array and cannot get out of step with it. `color` is a fixed,
+// sensible HEX per column: Linear's WorkflowStateCreateInput requires a color,
+// and keeping it next to the name means every created state gets the same
+// stable color on every run, from the one place the rest of the board shape
+// lives. The type is fixed too -- WorkflowStateUpdateInput has no type field,
+// so a created-or-renamed state whose live type differs is a blocking mismatch
+// the setup reports rather than pretends to repair.
 export const WORKFLOW_STATES = Object.freeze([
-  Object.freeze({ name: 'Backlog', type: 'backlog' }),
-  Object.freeze({ name: 'Ready', type: 'unstarted' }),
-  Object.freeze({ name: 'Implementation', type: 'started' }),
-  Object.freeze({ name: 'Code review', type: 'started' }),
-  Object.freeze({ name: 'Remediation', type: 'started' }),
-  Object.freeze({ name: 'Staging/smoke test', type: 'started' }),
-  Object.freeze({ name: 'UAT', type: 'started' }),
-  Object.freeze({ name: 'Complete', type: 'completed' }),
+  Object.freeze({ name: 'Backlog', type: 'backlog', color: '#bec2c8' }),
+  Object.freeze({ name: 'Ready', type: 'unstarted', color: '#e2e2e2' }),
+  Object.freeze({ name: 'Implementation', type: 'started', color: '#f2c94c' }),
+  Object.freeze({ name: 'Code review', type: 'started', color: '#f2994a' }),
+  Object.freeze({ name: 'Remediation', type: 'started', color: '#eb5757' }),
+  Object.freeze({ name: 'Staging/smoke test', type: 'started', color: '#bb87fc' }),
+  Object.freeze({ name: 'UAT', type: 'started', color: '#4ea7fc' }),
+  Object.freeze({ name: 'Complete', type: 'completed', color: '#5e6ad2' }),
 ]);
 
 // Existing states are RENAMED, never deleted-and-recreated: a card points at a
@@ -79,9 +85,10 @@ export const GRAPH_AGENTS = Object.freeze([
   Object.freeze({ key: 'consultant', code: 'consultant', modelGroup: 'Consultant model', effortGroup: 'Consultant effort' }),
 ]);
 
-// Label groups the graph no longer uses. They are ARCHIVED (not deleted) so a
-// card that still carries one keeps the label and its history; the setup
-// program only touches them if the live board actually has them.
+// Label groups the graph no longer uses. They are RETIRED (not deleted):
+// Linear's issueLabelRetire keeps the label visible on the cards that already
+// carry it and only stops new applications. The setup program only touches
+// them if the live board actually has them and they are not already retired.
 export const RETIRED_LABEL_GROUPS = Object.freeze([
   'Orchestrator model',
   'Orchestrator effort',
@@ -139,13 +146,16 @@ export function defaultLabelsFor(agentKey) {
 
 // The Linear IssueFilter both the saved view and the evidence count use. It
 // says exactly what the view's name says: this team, and no label named
-// Decision or Parent. `none` means "the card has no label from this set", which
-// is the honest reading of "label is not X" (a card with many labels still
-// passes when neither is present).
+// Decision or Parent. Linear's IssueLabelCollectionFilter has no `none`; the
+// supported exclusion is `every: { name: { nin: [...] } }`, which is true when
+// EVERY label on the card is outside the excluded set. An unlabeled card has
+// no labels to falsify that, so `every` is vacuously true and the card IS
+// work -- exactly the intended meaning. A card carrying Decision or Parent (or
+// both) fails the `every` and is excluded.
 export function workViewIssueFilter(teamId = TEAM_ID) {
   return {
     team: { id: { eq: teamId } },
-    labels: { none: { name: { in: [...WORK_VIEW.excludedLabels] } } },
+    labels: { every: { name: { nin: [...WORK_VIEW.excludedLabels] } } },
   };
 }
 
