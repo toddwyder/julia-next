@@ -1,0 +1,18 @@
+# /etc/systemd/system/julia-ready-queue.service -- JUL-79.
+# One Ready-queue check cycle, then exit. Started every 5 minutes by
+# julia-ready-queue.timer. Runs as orchestrator-svc, never root: it executes
+# only node on the queue script in the root-owned, read-only checkout, so it
+# can read and run that code but never change it. Installed by a laptop
+# session (see docs/agents/jul43-coordinator-runbook.md); the graph has no
+# rule that can install or edit this file.
+[Unit]
+Description=Run one julia-next Ready-queue check cycle
+Documentation=file:///srv/orchestrator-svc/julia-next/docs/agents/jul43-coordinator-runbook.md
+
+[Service]
+Type=oneshot
+User=orchestrator-svc
+Group=orchestrator-svc
+NoNewPrivileges=yes
+Environment=ORCA_BIN=/opt/Orca/orca-ide
+ExecStart=/usr/bin/node /srv/orchestrator-svc/julia-next/scripts/ready-queue.mjs --check --interval-minutes 5

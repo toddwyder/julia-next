@@ -1,23 +1,25 @@
-# /etc/sudoers.d/orchestrator-svc-ops -- JUL-79 laptop session.
+# /etc/sudoers.d/orchestrator-svc-ops -- JUL-79 laptop sessions.
 #
 # What orchestrator-svc may do as root, and nothing more. Every rule is one
 # exact command line (sudo matches the arguments literally -- no wildcards
 # anywhere; ops/sudoers/orchestrator-svc-ops.test.mjs enforces that).
 # Documented rule by rule in docs/agents/jul43-coordinator-runbook.md.
 #
-# The unit files below are copied from the read-only checkout, which
-# orchestrator-svc cannot write to (root-owned, synced by
-# julia-next-checkout-sync). A unit only reaches root through a merged PR.
+# There is deliberately NO rule that installs, copies or edits a file. The
+# ready-queue units (ops/ready-queue/) are installed from a laptop session,
+# so a merged change can never become root code through this file. Adding a
+# unit, a group or a rule is a laptop-session edit, never a graph action.
 
-# Install the ready-queue systemd units shipped in ops/ready-queue/.
-orchestrator-svc ALL=(root) NOPASSWD: /usr/bin/install -m 0644 -o root -g root /srv/orchestrator-svc/julia-next/ops/ready-queue/julia-ready-queue.service /etc/systemd/system/julia-ready-queue.service
-orchestrator-svc ALL=(root) NOPASSWD: /usr/bin/install -m 0644 -o root -g root /srv/orchestrator-svc/julia-next/ops/ready-queue/julia-ready-queue.timer /etc/systemd/system/julia-ready-queue.timer
-
-# Load, enable and restart those units.
-orchestrator-svc ALL=(root) NOPASSWD: /usr/bin/systemctl daemon-reload
+# Turn the ready-queue timer on, and start/stop/restart its two units. The
+# units are root-owned files that run as orchestrator-svc; these rules cannot
+# change what they run, only whether they run.
 orchestrator-svc ALL=(root) NOPASSWD: /usr/bin/systemctl enable --now julia-ready-queue.timer
+orchestrator-svc ALL=(root) NOPASSWD: /usr/bin/systemctl start julia-ready-queue.timer
+orchestrator-svc ALL=(root) NOPASSWD: /usr/bin/systemctl stop julia-ready-queue.timer
 orchestrator-svc ALL=(root) NOPASSWD: /usr/bin/systemctl restart julia-ready-queue.timer
 orchestrator-svc ALL=(root) NOPASSWD: /usr/bin/systemctl start julia-ready-queue.service
+orchestrator-svc ALL=(root) NOPASSWD: /usr/bin/systemctl stop julia-ready-queue.service
+orchestrator-svc ALL=(root) NOPASSWD: /usr/bin/systemctl restart julia-ready-queue.service
 
 # Add a named service account to a named key-reader group (the drop box
 # chowns each key file to one of these groups). Only these pairs.

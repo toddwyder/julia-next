@@ -255,21 +255,8 @@ session must not have to rediscover:
   create it until the ticket approves it, but the interval belongs in its `ExecStart` and its
   `OnUnitActiveSec` together:
 
-  ```ini
-  [Unit]
-  Description=Run one julia-next Ready-queue check cycle
-
-  [Service]
-  Type=oneshot
-  User=orchestrator-svc
-  Environment=ORCA_BIN=/opt/Orca/orca-ide
-  ExecStart=/usr/bin/node /srv/orchestrator-svc/julia-next/scripts/ready-queue.mjs --check --interval-minutes 5
-
-  [Timer]
-  OnBootSec=1min
-  OnUnitActiveSec=5min
-  Persistent=true
-  ```
+  The real units live in `ops/ready-queue/` (see the JUL-79 laptop-session section below) — a
+  service file and a separate timer file, installed by a laptop session, not inline here.
 - **No Ready state or label groups existed as of 2026-09-18.** The script resolves the workflow
   state named `Ready` on team `Julia-next` at runtime and no-ops quietly when it is absent;
   creating that state is a separate, Todd-approved step. The label→model "choice" validator is an
@@ -694,48 +681,63 @@ that is a **design defect**: log it on the ticket and/or here in the runbook (th
 ### The sudo rules (`/etc/sudoers.d/orchestrator-svc-ops`)
 
 Source of truth: `ops/sudoers/orchestrator-svc-ops`, guarded by `ops/sudoers/orchestrator-svc-ops.test.mjs`
-(every rule must be one fixed command — no wildcards, no lists, no `ALL`, no paths outside the named
-ones — and `visudo -cf` must accept the file where `visudo` exists). Installed by hand from a laptop
-session with the `ubuntu` channel, **LF line endings only** (a Windows `scp` once carried CRLF into
-the installed copy — pipe the file through `tr -d '\r'` first, then `sudo visudo -cf` it before
-`sudo install -m 0440 -o root -g root`). Each rule, and why it exists:
+(every rule must be one fixed command — no wildcards, no lists, no `ALL`, no `#include`, no paths
+outside the named ones — and `visudo -cf` must accept the file where `visudo` exists). Installed by
+hand from a laptop session with the `ubuntu` channel, **LF line endings only** (a Windows `scp`
+once carried CRLF into an installed copy — pipe the file through `tr -d ''`, `sudo visudo -cf`
+it, then `sudo install -m 0440 -o root -g root`). Rules, as `orchestrator-svc` via `sudo -n`:
 
-| Rule (as `orchestrator-svc`, via `sudo -n`) | Why |
+| Rule | Why |
 | --- | --- |
-| `install -m 0644 -o root -g root <checkout>/ops/ready-queue/julia-ready-queue.service /etc/systemd/system/julia-ready-queue.service` | Puts the ready-queue service unit in place. The source is in the read-only checkout (root-owned; `orchestrator-svc` cannot edit it), so a unit reaches root only by merging a PR. |
-| the same for `julia-ready-queue.timer` | The 5-minute timer that triggers the queue script. |
-| `systemctl daemon-reload` | Makes systemd see a new or changed unit. |
-| `systemctl enable --now julia-ready-queue.timer` | Turns the queue on — the ticket's own final step. |
-| `systemctl restart julia-ready-queue.timer` | Picks up a changed timer. |
-| `systemctl start julia-ready-queue.service` | Runs one queue check on demand (the service is a oneshot, so `start`, not `restart`). |
-| `usermod -aG <group> <account>` for `{deepseek-readers, zai-readers} × {runner, orchestrator-svc}` | Adds a service account to a key-reader group the drop box already uses. Four exact pairs, not a pattern; a new key group means a new rule line plus a test edit. |
+| `systemctl enable --now julia-ready-queue.timer` | Turns the queue on — JUL-79's own final step. |
+| `systemctl start` / `stop` / `restart julia-ready-queue.timer` | Control the timer. |
+| `systemctl start` / `stop` / `restart julia-ready-queue.service` | Run, stop or restart one check on demand (the service is a oneshot). |
+| `usermod -aG <group> <account>` for `{deepseek-readers, zai-readers} × {runner, orchestrator-svc}` | Adds a service account to a key-reader group the drop box already uses. Four exact pairs, not a pattern. |
 
-**The contract the queue's PR must meet:** the rules name exactly
-`ops/ready-queue/julia-ready-queue.service` and `ops/ready-queue/julia-ready-queue.timer`. Ship the
-units under those names, with `User=orchestrator-svc` in the service (never root — the rule installs
-the file as root, but the queue itself must not run as root). A different name needs its own rule.
+**There is no rule that installs, copies or edits a file** (removed after the PR #44 review; the
+test fails if one comes back, and on the server it also tries an `install` as `orchestrator-svc`
+and requires sudo to refuse it). The earlier design copied the unit files from the checkout as root,
+which meant a merged change could become root code — `orchestrator-svc` can merge its own PRs. Now
+the units below are installed **by a laptop session only**; the graph can turn the timer on and off
+but cannot change what it runs. A new unit, a changed unit, a new group or a new rule is a
+laptop-session edit and install, never a graph action — park it, don't work around it.
 
-**The trust boundary, stated plainly (review finding, PR #44):** these rules are *not* a hard
-wall against a bad merge. `orchestrator-svc` also holds the publisher credential and can run
-`merge-pr.mjs`, so a unit that goes through review and merges (for example one with no `User=`, which
-runs as root) can be installed and started through these rules — root is one merge away. That is
-the same class of exposure the checkout-sync service already has (it runs as root from the merged
-checkout, and `orchestrator-svc` can trigger it). What the rules *do* guarantee: only the two named
-unit files can be installed, only from the read-only checkout, only to those two destinations, and
-nothing else on the machine becomes reachable. The real gate is the independent review of any PR
-touching `ops/**` — treat such a PR as a root-code change. A hard gate (a required human approval
-on `ops/**` and `scripts/checkout-sync.mjs`, or a root-owned wrapper that validates the unit before
-installing it) is a design decision not made here; it is recorded on JUL-79 for Todd.
+### The ready-queue units (`ops/ready-queue/`)
 
-Verified 2026-09-19 for the source path: `/`, `/srv` and `/srv/orchestrator-svc` are `root:root`
-`0755`, and `orchestrator-svc` cannot write to either (`test -w` false), so it cannot rename the
-checkout out of the way and substitute its own `ops/ready-queue/` — renaming a directory needs write
-access to its *parent*. The checkout holds no symlinks today. The queue PR must ship the two unit
-files as regular files (git mode `100644`), because `install` follows a symlink at the source; the
-sudoers test checks the mode once the files exist.
+`julia-ready-queue.service` (oneshot, `User=orchestrator-svc`, `Group=orchestrator-svc`,
+`NoNewPrivileges=yes`, `Environment=ORCA_BIN=/opt/Orca/orca-ide`, one `ExecStart`:
+`/usr/bin/node /srv/orchestrator-svc/julia-next/scripts/ready-queue.mjs --check --interval-minutes 5`)
+and `julia-ready-queue.timer` (`OnBootSec=1min`, `OnUnitActiveSec=5min`, `Unit=`, `WantedBy=timers.target`).
+`ops/ready-queue/units.test.mjs` pins all of it: runs as `orchestrator-svc`, never root; no
+`ExecStartPre/Post/Stop/Reload`, no `+`/`!` prefixes, no capability or supplementary-group
+directives; executes only `node` on the queue script in the checkout. That checkout is root-owned
+and read-only to `orchestrator-svc` (verified 2026-09-19: `/`, `/srv`, `/srv/orchestrator-svc` and
+the checkout are not writable by it), so the queue runs code it can read and run but cannot change.
+The queue's needs were checked by running the exact command as `orchestrator-svc` with a bare
+environment: it needs only `ORCA_BIN` (state lives under `$HOME/.local/state/julia-next/`).
 
-Adding a unit or a group means editing `ops/sudoers/orchestrator-svc-ops`, and **that edit only
-takes effect when a laptop session installs it** — the graph cannot widen its own sudo rules.
+**Install (laptop session, `ubuntu`):**
+```sh
+for u in julia-ready-queue.service julia-ready-queue.timer; do
+  sudo install -m 0644 -o root -g root /srv/orchestrator-svc/julia-next/ops/ready-queue/$u /etc/systemd/system/$u
+done
+sudo systemctl daemon-reload
+systemd-analyze verify /etc/systemd/system/julia-ready-queue.service /etc/systemd/system/julia-ready-queue.timer
+sudo systemctl show -p User,ExecStart julia-ready-queue.service   # User=orchestrator-svc
+```
+Do **not** enable the timer in the same session; JUL-79's run does that as its final step. Done
+2026-09-19 from `main` at the merge of this change.
+
+### Trust boundary, after this change
+
+The reviewer's finding (PR #44) was that `orchestrator-svc` can merge its own PRs, so any rule that
+copied a merged file into `/etc` as root made the review the only gate. That path is closed: the
+remaining root actions are start/stop/enable of two units that already exist and run as
+`orchestrator-svc`, and `usermod` into four named groups (each only grants read of the key files
+already `root:<group> 0440`). What is still true and unchanged: the checkout-sync service runs as
+root from the merged checkout and `orchestrator-svc` can trigger it, so merged code in
+`scripts/checkout-sync.mjs` still runs as root — that path pre-dates these rules and is a separate
+gate to consider.
 
 ### `deepseek-readers` (was: `deepseek` readable by `runner` only)
 
