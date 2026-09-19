@@ -804,10 +804,10 @@ through an ungranted interactive session, and do not widen the interactive sessi
 the two publisher scripts to compensate. If the interactive path must publish, add the exact grant;
 otherwise escalate the run to the headless launcher.
 
-## Five JUL-44 step-5 discoveries, each verified 2026-09-19
+## Five JUL-44 step-5 discoveries (verified 2026-09-19)
 
-Each of these was learned while dispatching and provisioning JUL-44 step 4; the date is the day
-it was verified, not the day it was written down.
+Each of these was learned while dispatching and provisioning JUL-44 step 4 and recorded here in
+step 5; the date is the day it was verified, not the day it was written down.
 
 ### `worker-start --agent claude` can start a dead worker
 

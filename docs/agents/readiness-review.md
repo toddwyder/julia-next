@@ -57,15 +57,19 @@ the missing check to this procedure. It does not become a new permission questio
      authorization are different things; a reachable credential whose declared scope does not
      include the write the ticket needs is a **review failure**, not a pass.
      - **create capability.** Confirm the credential can **create** the resource the step needs
-       (not just read or list it), by exercising the actual create path read-only where possible.
-       Worked example: the PowerSync PAT could list instances but `apps/create` returned
-       `FORBIDDEN`, so the project-creation step cannot run headlessly (runbook, JUL-44 step 5).
+       (not just read or list it). Confirm, from the credential's own declared
+       scopes/permissions and by reading the resource the step needs (list/get), that the
+       credential is *authorized* to create that resource. Where the provider offers no read-only
+       way to prove create authorization, exercising the real create path and getting a
+       permission refusal (e.g. PowerSync `apps/create` → `FORBIDDEN`, so the project-creation
+       step cannot run headlessly) is the failure signal — it fails the review, it does not pass
+       it (runbook, "Five JUL-44 step-5 discoveries", verified 2026-09-19).
      - **read scope for delivery proof.** Wherever the step must *prove delivery* (an event
        arrived, a write took effect), the credential needs a **read** scope for that, distinct
        from its send/write scope. Worked example: an ingest-only Axiom key can send but cannot
-       read back, so "Axiom received the event" cannot be verified (runbook, JUL-44 step 5). If
-       only a send-only key exists, the review must say so explicitly rather than leave delivery
-       assumed.
+       read back, so "Axiom received the event" cannot be verified (runbook, "Five JUL-44 step-5
+       discoveries", verified 2026-09-19). If only a send-only key exists, the review must say so
+       explicitly rather than leave delivery assumed.
    - reuse a recent, still-valid finding from a prior audit instead of re-probing, but cite the
      source doc and its date so staleness can be judged later.
 
