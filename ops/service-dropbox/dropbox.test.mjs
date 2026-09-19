@@ -348,8 +348,9 @@ test('FIELD_GROUPS routes each field to the exact reader(s) JUL-77 specifies', (
     supabase: 'orchestrator-svc',
     powersync: 'orchestrator-svc',
     axiom: 'orchestrator-svc',
-    // Pi builder -- the runner account only, never orchestrator-svc.
-    deepseek: 'runner',
+    // Pi builder (runner) AND the orchestrator-deepseek route -- a dedicated
+    // group with both accounts as members, same shape as zai-readers.
+    deepseek: 'deepseek-readers',
     // Pi reviewer (runner) AND the orchestrator backup -- a dedicated group
     // with both accounts as members, never orchestrator-svc's own group
     // directly (that would let runner read the orchestrator-only fields too).

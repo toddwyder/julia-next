@@ -643,7 +643,7 @@ seats, so builder/reviewer Pi dispatches can carry it too. The secret invariant 
 secret is read in-process via `read-secret.mjs` and injected only through `spawn`'s `env`, never
 argv or a shell string.
 
-### The `orchestrator-deepseek` seat cannot read its own secret yet (step-3 review finding, carried)
+### The `orchestrator-deepseek` seat could not read its own secret (step-3 review finding) — fixed in the JUL-79 laptop session below
 
 The `orchestrator-deepseek` seat (the `pi-deepseek` orchestrator route) reads the `deepseek`
 drop-box secret field. `ops/service-dropbox/dropbox.mjs`'s `FIELD_GROUPS` maps `deepseek` to
@@ -696,6 +696,59 @@ installs, free-tier resources in approved services are all the agent's). It must
 comment to slip past the guard. If the thing really is Todd-only and outside the three kinds,
 that is a **design defect**: log it on the ticket and/or here in the runbook (the error names
 `docs/agents/jul43-coordinator-runbook.md`), rather than forcing the post through.
+
+## Narrow root for orchestrator-svc, `deepseek-readers`, and the second Orca window (JUL-79 laptop session)
+
+### The sudo rules (`/etc/sudoers.d/orchestrator-svc-ops`)
+
+Source of truth: `ops/sudoers/orchestrator-svc-ops`, guarded by `ops/sudoers/orchestrator-svc-ops.test.mjs`
+(every rule must be one fixed command — no wildcards, no lists, no `ALL`, no paths outside the named
+ones — and `visudo -cf` must accept the file where `visudo` exists). Installed by hand from a laptop
+session with the `ubuntu` channel, **LF line endings only** (a Windows `scp` once carried CRLF into
+the installed copy — pipe the file through `tr -d '\r'` first, then `sudo visudo -cf` it before
+`sudo install -m 0440 -o root -g root`). Each rule, and why it exists:
+
+| Rule (as `orchestrator-svc`, via `sudo -n`) | Why |
+| --- | --- |
+| `install -m 0644 -o root -g root <checkout>/ops/ready-queue/julia-ready-queue.service /etc/systemd/system/julia-ready-queue.service` | Puts the ready-queue service unit in place. The source is in the read-only checkout (root-owned; `orchestrator-svc` cannot edit it), so a unit reaches root only by merging a PR. |
+| the same for `julia-ready-queue.timer` | The 5-minute timer that triggers the queue script. |
+| `systemctl daemon-reload` | Makes systemd see a new or changed unit. |
+| `systemctl enable --now julia-ready-queue.timer` | Turns the queue on — the ticket's own final step. |
+| `systemctl restart julia-ready-queue.timer` | Picks up a changed timer. |
+| `systemctl start julia-ready-queue.service` | Runs one queue check on demand (the service is a oneshot, so `start`, not `restart`). |
+| `usermod -aG <group> <account>` for `{deepseek-readers, zai-readers} × {runner, orchestrator-svc}` | Adds a service account to a key-reader group the drop box already uses. Four exact pairs, not a pattern; a new key group means a new rule line plus a test edit. |
+
+**The contract the queue's PR must meet:** the rules name exactly
+`ops/ready-queue/julia-ready-queue.service` and `ops/ready-queue/julia-ready-queue.timer`. Ship the
+units under those names, with `User=orchestrator-svc` in the service (never root — the rule installs
+the file as root, but the queue itself must not run as root). A different name needs its own rule.
+
+**The trust boundary, stated plainly:** merged code on `main` can become a root-installed unit. What
+stops that being open-ended is that the rules name fixed paths, the installed unit must be a file
+that already went through review and merge, and `install` cannot be pointed anywhere else. Adding a
+unit or a group means editing `ops/sudoers/orchestrator-svc-ops`, and **the edit itself only takes
+effect when a laptop session installs it** — the graph cannot widen its own root.
+
+### `deepseek-readers` (was: `deepseek` readable by `runner` only)
+
+`deepseek.env` is now `root:deepseek-readers` mode 0440; both `runner` and `orchestrator-svc` are
+members (same shape as `zai-readers`). `FIELD_GROUPS.deepseek`, `write-secret.sh`, its installed copy
+in `/opt/orca-runner/service-dropbox/`, and the drop-box README all say `deepseek-readers` now, so
+re-pasting the key through the drop box keeps that ownership. Both Orca daemons were restarted after
+the `usermod` (a daemon's supplementary groups are fixed at start — see the stale-groups section
+above); `/proc/<daemon pid>/status` showed group 1004 on both. This unblocks the
+`orchestrator-deepseek` seat carried from the step-3 review.
+
+### The laptop Orca app sees both daemons
+
+The laptop's Orca app now lists two environments: **OVH runner** (`ws://100.125.239.98:6768`,
+runs as `runner`) and **OVH orchestrator** (`ws://100.125.239.98:6769`, runs as `orchestrator-svc`),
+so a run's orchestrator terminal and its builder/reviewer terminals both show in one window. Added
+with `orca environment add --name "OVH orchestrator" --pairing-code <URL from
+journalctl -u orca-server-orchestrator.service | grep "Pairing URL:">` (the laptop CLI is
+`%LOCALAPPDATA%\Programs\orca\resources\bin\orca.exe`). If the daemon restarts and the pairing goes
+stale, repeat with a fresh URL. The pairing code is a credential for a daemon that runs as
+`orchestrator-svc` — never paste it into Linear or chat.
 
 ## Readiness
 

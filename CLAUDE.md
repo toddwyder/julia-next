@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working in this repository.
 
+## Laptop sessions are the exception, not the route
+
+The graph does the work. Work reaches it by moving a card to the Ready queue (or by `julia-run`
+on the server), not by a laptop session doing it by hand. Before doing anything else, a laptop
+session must state, in one plain sentence, **why the graph cannot do this job**. The normal
+reason is "the graph is broken and can't repair itself" (for example: the fix needs root, a
+sign-in only Todd's account can do, or the thing that broke is the graph's own launcher). If the
+honest answer is anything else, stop: put the work in the Ready queue instead and end the session.
+
 ## Reaching the server
 
 Do not stop and ask whether you can reach the server. The route is set up and used every day:

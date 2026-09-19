@@ -11,7 +11,7 @@ the group named in `dropbox.mjs`'s `FIELD_GROUPS`:
 | Field | Readable by |
 | --- | --- |
 | sentry, supabase, powersync, axiom, linear | `orchestrator-svc` only |
-| deepseek | `runner` only (the builder needs it to run at all) |
+| deepseek | `runner` AND `orchestrator-svc`, via a dedicated `deepseek-readers` group (builder backup + `orchestrator-deepseek` route) |
 | zai | `runner` AND `orchestrator-svc`, via a dedicated `zai-readers` group |
 
 `runner` is never added to the `orchestrator-svc` group itself -- that would let it read every
@@ -42,13 +42,16 @@ of the old value is kept), and a blank box leaves the saved value alone. Re-armi
 2. Make sure `orchestrator-svc` and `runner` both exist (they already do, per JUL-61) --
    `orchestrator-svc` is the *reader* of most of these secrets, never the writer; `runner` is
    the builder that reads `deepseek` and `zai` (JUL-77).
-3. **JUL-77 only:** create the `zai-readers` group and add both accounts to it -- this is the
-   only field two different accounts must read, so it gets its own group rather than widening
-   either account's existing one:
+3. **JUL-77 / JUL-79:** create the `zai-readers` and `deepseek-readers` groups and add both
+   accounts to each -- these are the fields two different accounts must read, so each gets its own
+   group rather than widening either account's existing one. After adding members, restart both
+   Orca daemons (a daemon's supplementary groups are fixed at start):
    ```
-   groupadd zai-readers
-   usermod -aG zai-readers runner
-   usermod -aG zai-readers orchestrator-svc
+   for g in zai-readers deepseek-readers; do
+     groupadd "$g"
+     usermod -aG "$g" runner
+     usermod -aG "$g" orchestrator-svc
+   done
    ```
 4. Create the secrets directory. Every field's *file* is chmod 0440 to its own owning group
    (see the table above), but the *directory* itself needs `+x` (traverse, not list) for every
