@@ -1,8 +1,9 @@
 // Guards the one sudoers file that gives orchestrator-svc root for a few
 // exact commands (JUL-79 laptop session). The rules are the security
 // boundary, so the test reads them the way sudo would: every rule must be a
-// single fixed command line -- no wildcards, no command lists, no ALL -- and
-// every path it names must sit where orchestrator-svc cannot write.
+// single fixed command line -- no wildcards, no command lists, no ALL as the
+// command -- and every path it names must sit where orchestrator-svc cannot
+// write.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -10,13 +11,15 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const FILE = fileURLToPath(new URL('./orchestrator-svc-ops', import.meta.url));
+const REPO_ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const CHECKOUT_OPS = '/srv/orchestrator-svc/julia-next/ops/';
 const UNIT_NAMES = ['julia-ready-queue.service', 'julia-ready-queue.timer'];
 const ACCOUNTS = ['runner', 'orchestrator-svc'];
 const KEY_GROUPS = ['deepseek-readers', 'zai-readers'];
 
-const rules = readFileSync(FILE, 'utf8')
-  .split('\n')
+const raw = readFileSync(FILE, 'utf8');
+const rules = raw
+  .split(/\r?\n/)
   .filter((line) => line.trim() !== '' && !line.trim().startsWith('#'));
 
 const RULE_SHAPE = /^orchestrator-svc ALL=\(root\) NOPASSWD: (\/\S+(?: \S+)*)$/;
@@ -26,10 +29,17 @@ const commands = rules.map((rule) => {
   return match[1].split(' ');
 });
 
+test('the file pulls in nothing else: no #include/#includedir, no line continuations', () => {
+  // In sudoers "#include" and "#includedir" are directives, not comments, and a
+  // trailing backslash continues a line -- either could hide rules from this test.
+  assert.doesNotMatch(raw, /^\s*[#@]\s*include/mi);
+  assert.doesNotMatch(raw, /\\[ \t]*\r?$/m);
+});
+
 test('every rule is one fixed command: no wildcards, no lists, no ALL, no negation', () => {
   for (const rule of rules) {
-    assert.doesNotMatch(rule, /[*?\[\]{}!\\,]/, `forbidden sudoers metacharacter in: ${rule}`);
-    assert.doesNotMatch(rule, /\bALL\b.*\bALL\b.*\bALL\b/, `ALL as a command in: ${rule}`);
+    assert.doesNotMatch(rule, /[*?[\]{}!\\,]/, `forbidden sudoers metacharacter in: ${rule}`);
+    assert.doesNotMatch(rule, /NOPASSWD:\s*ALL/, `ALL as the command in: ${rule}`);
     assert.doesNotMatch(rule, /\b(SETENV|NOEXEC|EXEC)\b/, `tag beyond NOPASSWD in: ${rule}`);
   }
   assert.ok(commands.length > 0);
@@ -83,6 +93,21 @@ test('no rule lets orchestrator-svc touch sudo itself, the secrets, or any path 
       || path.startsWith('/etc/systemd/system/julia-ready-queue.')
       || ['/usr/bin/install', '/usr/bin/systemctl', '/usr/sbin/usermod'].includes(path);
     assert.ok(ok, `unexpected path in rules: ${path}`);
+  }
+});
+
+test('once the ready-queue unit files exist in git they are regular files (mode 100644), never symlinks', () => {
+  // `install` follows a symlink at its source, so a symlinked unit would copy an
+  // arbitrary root-readable file into /etc/systemd/system. Vacuous until the
+  // queue's PR adds the units.
+  const tracked = execFileSync('git', ['ls-files', '-s', '--', 'ops/ready-queue'], {
+    cwd: REPO_ROOT, encoding: 'utf8',
+  }).split(/\r?\n/).filter(Boolean);
+  for (const line of tracked) {
+    const [mode, , , path] = line.split(/\s+/);
+    if (UNIT_NAMES.some((name) => path.endsWith(`/${name}`))) {
+      assert.equal(mode, '100644', `${path} must be a regular file, got mode ${mode}`);
+    }
   }
 });
 

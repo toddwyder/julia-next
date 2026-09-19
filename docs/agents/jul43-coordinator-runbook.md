@@ -645,18 +645,10 @@ argv or a shell string.
 
 ### The `orchestrator-deepseek` seat could not read its own secret (step-3 review finding) — fixed in the JUL-79 laptop session below
 
-The `orchestrator-deepseek` seat (the `pi-deepseek` orchestrator route) reads the `deepseek`
-drop-box secret field. `ops/service-dropbox/dropbox.mjs`'s `FIELD_GROUPS` maps `deepseek` to
-**`runner` only** -- it was created for the Pi *builder* backup, unlike `zai`, which got a
-dedicated `zai-readers` group holding both `runner` and `orchestrator-svc`. So an
-`orchestrator-svc` terminal running that seat cannot read its own key as configured. Making the
-`pi-deepseek` orchestrator route live needs root work: a `deepseek-readers`-style group, a
-`usermod` adding `orchestrator-svc` (keep `runner` too, for the builder backup), the field's file
-chowned to that group, and -- because a daemon's supplementary groups are fixed at start -- a
-restart of both `orca-server.service` and `orca-server-orchestrator.service` between runs. That
-is the same stale-supplementary-group rule as the `zai-readers` fix above. It is a
-service-account/credential change, so it is parked for the laptop session, not done by an agent
-unprompted.
+Resolved: see "`deepseek-readers`" in the JUL-79 laptop-session section below. The step-3 review
+found that the `pi-deepseek` orchestrator route reads the `deepseek` drop-box field, which
+`FIELD_GROUPS` then mapped to `runner` only; the fix (a `deepseek-readers` group holding `runner`
+and `orchestrator-svc`, the file re-grouped, both Orca daemons restarted) was done in that session.
 
 ## The For-Todd guard: only three kinds of thing reach Todd (JUL-79 step 4)
 
@@ -723,11 +715,27 @@ the installed copy — pipe the file through `tr -d '\r'` first, then `sudo visu
 units under those names, with `User=orchestrator-svc` in the service (never root — the rule installs
 the file as root, but the queue itself must not run as root). A different name needs its own rule.
 
-**The trust boundary, stated plainly:** merged code on `main` can become a root-installed unit. What
-stops that being open-ended is that the rules name fixed paths, the installed unit must be a file
-that already went through review and merge, and `install` cannot be pointed anywhere else. Adding a
-unit or a group means editing `ops/sudoers/orchestrator-svc-ops`, and **the edit itself only takes
-effect when a laptop session installs it** — the graph cannot widen its own root.
+**The trust boundary, stated plainly (review finding, PR #44):** these rules are *not* a hard
+wall against a bad merge. `orchestrator-svc` also holds the publisher credential and can run
+`merge-pr.mjs`, so a unit that goes through review and merges (for example one with no `User=`, which
+runs as root) can be installed and started through these rules — root is one merge away. That is
+the same class of exposure the checkout-sync service already has (it runs as root from the merged
+checkout, and `orchestrator-svc` can trigger it). What the rules *do* guarantee: only the two named
+unit files can be installed, only from the read-only checkout, only to those two destinations, and
+nothing else on the machine becomes reachable. The real gate is the independent review of any PR
+touching `ops/**` — treat such a PR as a root-code change. A hard gate (a required human approval
+on `ops/**` and `scripts/checkout-sync.mjs`, or a root-owned wrapper that validates the unit before
+installing it) is a design decision not made here; it is recorded on JUL-79 for Todd.
+
+Verified 2026-09-19 for the source path: `/`, `/srv` and `/srv/orchestrator-svc` are `root:root`
+`0755`, and `orchestrator-svc` cannot write to either (`test -w` false), so it cannot rename the
+checkout out of the way and substitute its own `ops/ready-queue/` — renaming a directory needs write
+access to its *parent*. The checkout holds no symlinks today. The queue PR must ship the two unit
+files as regular files (git mode `100644`), because `install` follows a symlink at the source; the
+sudoers test checks the mode once the files exist.
+
+Adding a unit or a group means editing `ops/sudoers/orchestrator-svc-ops`, and **that edit only
+takes effect when a laptop session installs it** — the graph cannot widen its own sudo rules.
 
 ### `deepseek-readers` (was: `deepseek` readable by `runner` only)
 
