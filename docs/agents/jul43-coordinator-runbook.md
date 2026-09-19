@@ -260,8 +260,10 @@ session must not have to rediscover:
   service file and a separate timer file, installed by a laptop session, not inline here.
 - **No Ready state or label groups existed as of 2026-09-18.** The script resolves the workflow
   state named `Ready` on team `Julia-next` at runtime and no-ops quietly when it is absent;
-  creating that state is a separate, Todd-approved step. The label→model "choice" validator is an
-  injected seam with a permissive default until that later step lands.
+  creating that state is a separate, Todd-approved step. The label→model/effort choice is now
+  the real rule from `scripts/seat-labels.mjs` (JUL-79 step 5); creating the matching Linear
+  labels is the coordinator's later action. See "Seat labels, the restart-after-finish guard"
+  below.
 - **Linear relation direction, verified live 2026-09-18.** There is no `blocked_by` relation type
   and no `blockedBy` field on `Issue`. Every blocking relation is typed `blocks` and lives on the
   blocker's own `relations` connection as `{ type: 'blocks', issue: <blocker>, relatedIssue:
@@ -642,6 +644,68 @@ Resolved: see "`deepseek-readers`" in the JUL-79 laptop-session section below. T
 found that the `pi-deepseek` orchestrator route reads the `deepseek` drop-box field, which
 `FIELD_GROUPS` then mapped to `runner` only; the fix (a `deepseek-readers` group holding `runner`
 and `orchestrator-svc`, the file re-grouped, both Orca daemons restarted) was done in that session.
+
+## Seat labels, the restart-after-finish guard, and relay reachability (JUL-79 step 5)
+
+### The six label groups and the label-name convention
+
+The card's model/effort choices are six Linear label groups, one label per group:
+`Orchestrator model`, `Builder model`, `Reviewer model`, `Orchestrator effort`, `Builder effort`,
+`Reviewer effort`. The label names follow a fixed convention, and **code is the source of truth**:
+the coordinator creates the matching Linear labels from `scripts/seat-labels.mjs`, never from a
+hand-maintained list.
+
+- Model labels: `<agent>-<vendor>-<model>`, with `<agent>` one of `orch`/`builder`/`reviewer`.
+  Initial catalogue: `claude-opus`, `claude-sonnet`, `claude-haiku`, `codex`, `deepseek-pro`,
+  `deepseek-flash`, `glm-5.3` — e.g. `orch-claude-opus`, `builder-deepseek-flash`,
+  `reviewer-glm-5.3`.
+- Effort labels: `<agent>-effort-low` / `-medium` / `-high`, e.g. `reviewer-effort-medium`.
+
+`scripts/seat-labels.mjs` is pure (no I/O) and exports the group names, the label-name constants,
+and `MODEL_CATALOG` (each model label → the `SEAT_TABLE` entry it means, plus the vendor's model
+id where the route needs one). A later coordinator/launch step extends `MODEL_SPECS` there when a
+vendor ships a new model. `resolveSeatChoices(labels)` returns each seat's `{ entry, effort,
+modelLabel }`: a present model/effort label wins, an absent model falls back to the seat table's
+`primary` and its default model (`claude`→`claude-opus`, `codex`→`codex`,
+`pi-deepseek`→`deepseek-flash`, `pi-glm`→`glm-5.3`), and an absent effort is Medium.
+`validateFamilyChoice` enforces builder family ≠ reviewer family (via `FAMILY_OF`) and that every
+resolved entry is a real seat-table entry. `seatChoicesForIssue(issue)` is the read-only helper
+the coordinator calls on a card it fetched through `linear-cli.mjs` (whose `getIssue` now requests
+`labels { nodes { name } }`). The Ready queue fills any missing model/effort label (default +
+Medium) before starting a card; a label not yet created on the team is skipped and logged, never
+an error.
+
+### The restart-after-finish gap, fixed with two belts
+
+The gap: nothing moved a started card out of Ready, and the double-start guard only held while a
+run was active — a finished run whose card was still in Ready would be started again, forever.
+`scripts/ready-queue.mjs` now has both belts:
+
+1. **State move.** After a successful start the queue sets the card's workflow state to the
+   team's `In Progress` state through the injected Linear client (`findState` + `setIssueState`). A
+   failure here is logged (`could not move <ID> out of Ready`) but never undoes the start.
+2. **`lastStarted` cooldown.** The queue still records `lastStarted` (card id + the start
+   fingerprint of labels/state/blockers + whether the state move succeeded) and, before anything
+   else in the next cycle, refuses to start a card whose id and fingerprint match that record
+   (`status: 'cooldown'`) — but only when that record says the state move **failed**. The fingerprint
+   purposefully includes the labels the queue itself added, so a card Linear now returns with those
+   labels still matches and is held; a genuinely changed card gets a new fingerprint and is allowed
+   through. When the state move succeeded the card really left Ready, so its reappearance in Ready
+   is a deliberate re-queue and is admitted normally.
+
+Together they mean the exact live failure mode — run finished, card still in Ready because the
+state move failed — cannot start the card twice.
+
+### A coordinator process ON the runner reaches the relay directly
+
+Verified live in the coordinator session that dispatched JUL-79 step 5: a coordinator process
+running **on the OVH runner as `orchestrator-svc`** reaches the journey relay at
+`127.0.0.1:8943` **directly**, and the emitted event came back `sent:true`. The "emit from a
+plain diagnostic terminal on the OVH runner" indirection in
+`.claude/skills/julia-coordinator/SKILL.md`'s Journey-accounting section is therefore only needed
+when the coordinator runs **off-box** (e.g. a laptop session); an on-box coordinator can call
+`scripts/coordinator-events.mjs` itself. The SKILL.md text still describes the off-box route and
+is not changed by this step.
 
 ## The For-Todd guard: only three kinds of thing reach Todd (JUL-79 step 4)
 

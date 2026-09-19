@@ -27,6 +27,7 @@ import {
 
 const NOW = Date.parse('2026-09-18T12:00:00Z');
 const READY_STATE = { id: 'state-ready', name: 'Ready', type: 'unstarted' };
+const IN_PROGRESS_STATE = { id: 'state-in-progress', name: 'In Progress', type: 'started' };
 
 function makeIssue(overrides = {}) {
   const identifier = overrides.identifier ?? 'JUL-63';
@@ -42,12 +43,12 @@ function makeIssue(overrides = {}) {
   };
 }
 
-function fakeLinear({ state = READY_STATE, issues = [] } = {}) {
-  const calls = { comments: [], listedStateId: undefined };
+function fakeLinear({ state = READY_STATE, inProgress = IN_PROGRESS_STATE, issues = [], teamLabels = [] } = {}) {
+  const calls = { comments: [], listedStateId: undefined, stateMoves: [], labelLookups: [], labelAdds: [] };
   return {
     calls,
     linear: {
-      findState: async () => state,
+      findState: async ({ stateName } = {}) => (stateName === 'In Progress' ? inProgress : state),
       listIssuesInState: async (stateId) => {
         calls.listedStateId = stateId;
         return issues;
@@ -55,6 +56,33 @@ function fakeLinear({ state = READY_STATE, issues = [] } = {}) {
       comment: async ({ issueId, body }) => {
         calls.comments.push({ issueId, body });
         return { id: `comment-${calls.comments.length}` };
+      },
+      findLabels: async ({ names = [] } = {}) => {
+        calls.labelLookups.push(names);
+        const found = {};
+        const missing = [];
+        for (const name of names) {
+          const match = teamLabels.find((label) => label.name === name);
+          if (match) found[name] = match.id;
+          else missing.push(name);
+        }
+        return { found, missing };
+      },
+      addLabels: async ({ issueId, labelIds }) => {
+        calls.labelAdds.push({ issueId, labelIds });
+        // Mirror Linear: the added labels are on the card the next time it is
+        // listed, which is what the lastStarted fingerprint must match.
+        const byId = new Map(teamLabels.map((label) => [label.id, label.name]));
+        const target = issues.find((candidate) => candidate.id === issueId);
+        if (target) {
+          const names = labelIds.map((id) => byId.get(id)).filter(Boolean);
+          target.labels = [...(target.labels ?? []), ...names];
+        }
+        return { id: issueId };
+      },
+      setIssueState: async ({ issueId, stateId }) => {
+        calls.stateMoves.push({ issueId, stateId });
+        return { id: issueId, state: inProgress };
       },
     },
   };
@@ -88,13 +116,17 @@ function fakeStore(initial = {}) {
   };
 }
 
-function deps({ linear, store, orca = fakeOrca(), ...rest }) {
+function deps({ linear, store, orca = fakeOrca(), logs, ...rest }) {
   return {
     linear,
     ...orca.impls,
     readStateImpl: store.readImpl,
     writeStateImpl: store.writeImpl,
     now: () => NOW,
+    // The real entry logs to stderr; tests that assert on it pass their own
+    // collector. The default is silent so a skipped/uncreated label does not
+    // clutter the suite's output.
+    logErrorImpl: logs ? (message) => logs.push(message) : () => {},
     ...rest,
   };
 }
@@ -183,7 +215,7 @@ test('evaluateEligibility: a model-choice validator refusal is ineligible with t
   assert.match(reasons.join(' '), /no model group/);
 });
 
-test('evaluateEligibility: the default validator is permissive', () => {
+test('evaluateEligibility: the default validator applies the real seat-table rule (defaults differ in family, so it passes)', () => {
   assert.deepEqual(defaultValidateModelChoice(makeIssue()), { ok: true });
   assert.equal(evaluateEligibility(makeIssue()).eligible, true);
 });
@@ -374,6 +406,213 @@ test('only the top card is ever a candidate; a lower ineligible card cannot bloc
   const result = await readyQueueCheck(deps({ linear, store, orca }));
   assert.equal(result.status, 'started');
   assert.equal(result.issue, 'JUL-1');
+});
+
+// ---------------------------------------------------------------------------
+// Real model-choice validation (D2)
+// ---------------------------------------------------------------------------
+
+test('a same-family builder/reviewer label pair is ineligible, gets one comment with the reason, and never starts', async () => {
+  const issue = makeIssue({
+    labels: [READY_FOR_AGENT_LABEL, 'builder-claude-opus', 'reviewer-claude-sonnet'],
+  });
+  const { linear, calls } = fakeLinear({ issues: [issue] });
+  const store = fakeStore({ ready: { [issue.id]: issueFingerprint(issue) } });
+  const orca = fakeOrca();
+  const result = await readyQueueCheck(deps({ linear, store, orca }));
+  assert.equal(result.status, 'ineligible');
+  assert.equal(result.commented, true);
+  assert.match(result.reasons.join(' '), /builder-claude-opus/);
+  assert.match(result.reasons.join(' '), /reviewer-claude-sonnet/);
+  assert.match(result.reasons.join(' '), /different families/);
+  assert.equal(calls.comments.length, 1);
+  assert.equal(orca.calls.terminalsCreated.length, 0);
+});
+
+test('a differing-family explicit pair is eligible and starts', async () => {
+  const issue = makeIssue({
+    labels: [READY_FOR_AGENT_LABEL, 'builder-deepseek-flash', 'reviewer-glm-5.3'],
+  });
+  const { linear } = fakeLinear({ issues: [issue] });
+  const store = fakeStore({ ready: { [issue.id]: issueFingerprint(issue) } });
+  const orca = fakeOrca();
+  const result = await readyQueueCheck(deps({ linear, store, orca }));
+  assert.equal(result.status, 'started');
+  assert.equal(orca.calls.terminalsCreated.length, 1);
+});
+
+// ---------------------------------------------------------------------------
+// Filling missing labels before start (D3)
+// ---------------------------------------------------------------------------
+
+const DEFAULT_TEAM_LABELS = [
+  { id: 'l-orch-model', name: 'orch-claude-opus' },
+  { id: 'l-orch-effort', name: 'orch-effort-medium' },
+  { id: 'l-builder-model', name: 'builder-claude-opus' },
+  { id: 'l-builder-effort', name: 'builder-effort-medium' },
+  { id: 'l-reviewer-model', name: 'reviewer-codex' },
+  { id: 'l-reviewer-effort', name: 'reviewer-effort-medium' },
+];
+
+test('missing default model/effort labels are looked up and added before the card starts', async () => {
+  const issue = makeIssue({ labels: [READY_FOR_AGENT_LABEL] });
+  const { linear, calls } = fakeLinear({ issues: [issue], teamLabels: DEFAULT_TEAM_LABELS });
+  const store = fakeStore({ ready: { [issue.id]: issueFingerprint(issue) } });
+  const orca = fakeOrca();
+  const result = await readyQueueCheck(deps({ linear, store, orca }));
+  assert.equal(result.status, 'started');
+  assert.deepEqual(calls.labelLookups[0], [
+    'orch-claude-opus',
+    'orch-effort-medium',
+    'builder-claude-opus',
+    'builder-effort-medium',
+    'reviewer-codex',
+    'reviewer-effort-medium',
+  ]);
+  assert.equal(calls.labelAdds.length, 1);
+  assert.equal(calls.labelAdds[0].issueId, issue.id);
+  assert.deepEqual([...calls.labelAdds[0].labelIds].sort(), DEFAULT_TEAM_LABELS.map((label) => label.id).sort());
+  // The labels were added before the terminal was created.
+  assert.equal(orca.calls.terminalsCreated.length, 1);
+});
+
+test('a default label that is not on the team yet is skipped and logged, never an error, and the card still starts', async () => {
+  const issue = makeIssue({ labels: [READY_FOR_AGENT_LABEL] });
+  const { linear, calls } = fakeLinear({
+    issues: [issue],
+    teamLabels: [{ id: 'l-orch-model', name: 'orch-claude-opus' }],
+  });
+  const store = fakeStore({ ready: { [issue.id]: issueFingerprint(issue) } });
+  const orca = fakeOrca();
+  const logs = [];
+  const result = await readyQueueCheck(deps({ linear, store, orca, logs }));
+  assert.equal(result.status, 'started');
+  assert.deepEqual(calls.labelAdds, [{ issueId: issue.id, labelIds: ['l-orch-model'] }]);
+  assert.ok(logs.some((line) => /not on team/.test(line)), 'the skipped labels are logged');
+  assert.equal(orca.calls.terminalsCreated.length, 1);
+});
+
+test('a card that already carries every model/effort label is not looked up again', async () => {
+  const issue = makeIssue({
+    labels: [
+      READY_FOR_AGENT_LABEL,
+      'orch-claude-opus', 'orch-effort-medium',
+      'builder-claude-opus', 'builder-effort-medium',
+      'reviewer-codex', 'reviewer-effort-medium',
+    ],
+  });
+  const { linear, calls } = fakeLinear({ issues: [issue], teamLabels: DEFAULT_TEAM_LABELS });
+  const store = fakeStore({ ready: { [issue.id]: issueFingerprint(issue) } });
+  const result = await readyQueueCheck(deps({ linear, store, orca: fakeOrca() }));
+  assert.equal(result.status, 'started');
+  assert.equal(calls.labelLookups.length, 0);
+  assert.equal(calls.labelAdds.length, 0);
+});
+
+// ---------------------------------------------------------------------------
+// Moving the card out of Ready and the restart-after-finish guard (D4)
+// ---------------------------------------------------------------------------
+
+test('starting a card moves it out of Ready to the team In Progress state (D4 belt 1)', async () => {
+  const issue = makeIssue();
+  const { linear, calls } = fakeLinear({ issues: [issue], teamLabels: DEFAULT_TEAM_LABELS });
+  const store = fakeStore({ ready: { [issue.id]: issueFingerprint(issue) } });
+  const result = await readyQueueCheck(deps({ linear, store, orca: fakeOrca() }));
+  assert.equal(result.status, 'started');
+  assert.equal(result.stateMoved, true);
+  assert.deepEqual(calls.stateMoves, [{ issueId: issue.id, stateId: IN_PROGRESS_STATE.id }]);
+});
+
+test('a finished run whose card is still in Ready is never started twice, even when the state move failed (D4 belt 2)', async () => {
+  const issue = makeIssue({ identifier: 'JUL-99' });
+  const { linear } = fakeLinear({ issues: [issue], teamLabels: DEFAULT_TEAM_LABELS });
+  // Reproduce the live failure mode exactly: Linear refuses the state move,
+  // so the card stays in Ready while the run finishes.
+  linear.setIssueState = async () => { throw new Error('Linear refused the state move'); };
+  const store = fakeStore();
+  const orca = fakeOrca(); // isRunFinishedImpl is true: the later run has finished
+  const logs = [];
+  const d = deps({ linear, store, orca, logs });
+
+  assert.equal((await readyQueueCheck(d)).status, 'first-sighting');
+  assert.equal((await readyQueueCheck(d)).status, 'started');
+  assert.equal(orca.calls.terminalsCreated.length, 1);
+  assert.ok(logs.some((line) => /could not move JUL-99 out of Ready/.test(line)));
+
+  // The run is finished and JUL-99 is still in Ready. Every later check must
+  // refuse to start it again -- the exact gap this step closes.
+  assert.equal((await readyQueueCheck(d)).status, 'cooldown');
+  assert.equal((await readyQueueCheck(d)).status, 'cooldown');
+  assert.equal(orca.calls.terminalsCreated.length, 1, 'JUL-99 must never start a second time');
+});
+
+test('a card that changed after it was started is allowed through the cooldown', async () => {
+  let issue = makeIssue({ identifier: 'JUL-99', labels: [READY_FOR_AGENT_LABEL] });
+  const { linear } = fakeLinear({ teamLabels: DEFAULT_TEAM_LABELS });
+  linear.listIssuesInState = async () => [issue];
+  linear.setIssueState = async () => { throw new Error('state move failed on purpose'); };
+  const store = fakeStore();
+  const orca = fakeOrca();
+  const d = deps({ linear, store, orca });
+
+  await readyQueueCheck(d); // first sighting
+  assert.equal((await readyQueueCheck(d)).status, 'started');
+  assert.equal(orca.calls.terminalsCreated.length, 1);
+
+  // The card changed (a valid differing-family pair was chosen): a new
+  // fingerprint, so it is a fresh request -- first sighting, then a start.
+  issue = makeIssue({
+    identifier: 'JUL-99',
+    labels: [READY_FOR_AGENT_LABEL, 'builder-deepseek-flash', 'reviewer-glm-5.3'],
+  });
+  assert.equal((await readyQueueCheck(d)).status, 'first-sighting');
+  assert.equal((await readyQueueCheck(d)).status, 'started');
+  assert.equal(orca.calls.terminalsCreated.length, 2);
+});
+
+test('a card whose state move succeeded and that is deliberately re-queued is admitted and started again', async () => {
+  const issue = makeIssue({ identifier: 'JUL-99' });
+  const { linear } = fakeLinear({ issues: [issue], teamLabels: DEFAULT_TEAM_LABELS });
+  // Belt 1 succeeds, so the card really leaves Ready. `listIssuesInState` keeps
+  // returning it, which is exactly a deliberate re-queue: the card was put back
+  // in Ready carrying the labels it was started with (the label filler's
+  // additions included), unchanged.
+  const store = fakeStore();
+  const orca = fakeOrca(); // isRunFinishedImpl is true: the run has finished
+  const d = deps({ linear, store, orca });
+
+  assert.equal((await readyQueueCheck(d)).status, 'first-sighting');
+  assert.equal((await readyQueueCheck(d)).status, 'started');
+  assert.equal(orca.calls.terminalsCreated.length, 1);
+  assert.equal(store.get().lastStarted.stateMoved, true);
+
+  // The run is finished and someone deliberately moved the card back to Ready.
+  // Belt 1 succeeded, so belt 2 must stand down: the re-queue is a fresh
+  // request -- first sighting, then a second start.
+  assert.equal((await readyQueueCheck(d)).status, 'first-sighting');
+  assert.equal((await readyQueueCheck(d)).status, 'started');
+  assert.equal(orca.calls.terminalsCreated.length, 2, 'a deliberate re-queue must start the card again');
+});
+
+test('lastStarted records whether the state move succeeded', async () => {
+  // Failure: the card stayed in Ready, so belt 2 must hold.
+  const failedIssue = makeIssue({ identifier: 'JUL-41' });
+  const failed = fakeLinear({ issues: [failedIssue], teamLabels: DEFAULT_TEAM_LABELS });
+  failed.linear.setIssueState = async () => { throw new Error('Linear refused the state move'); };
+  const failedStore = fakeStore();
+  const failedDeps = deps({ linear: failed.linear, store: failedStore, orca: fakeOrca() });
+  await readyQueueCheck(failedDeps);
+  assert.equal((await readyQueueCheck(failedDeps)).status, 'started');
+  assert.equal(failedStore.get().lastStarted.stateMoved, false);
+
+  // Success: the card left Ready, so belt 2 must stand down.
+  const movedIssue = makeIssue({ identifier: 'JUL-42' });
+  const moved = fakeLinear({ issues: [movedIssue], teamLabels: DEFAULT_TEAM_LABELS });
+  const movedStore = fakeStore();
+  const movedDeps = deps({ linear: moved.linear, store: movedStore, orca: fakeOrca() });
+  await readyQueueCheck(movedDeps);
+  assert.equal((await readyQueueCheck(movedDeps)).status, 'started');
+  assert.equal(movedStore.get().lastStarted.stateMoved, true);
 });
 
 // ---------------------------------------------------------------------------

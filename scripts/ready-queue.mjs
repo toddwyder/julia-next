@@ -30,9 +30,14 @@ import { runList, taskList, terminalCreate } from './orca-cli.mjs';
 // double-start guard telling the same story; julia-run.mjs's public behavior
 // is unchanged.
 import { isRunFinished } from './julia-run.mjs';
+// JUL-79 step 5: the real model-choice rule and the default-label filler are
+// pure and live in seat-labels.mjs. The queue only wires them in (injectable
+// validator stays injectable, so the pure tests remain pure).
+import { resolveSeatChoices, validateFamilyChoice, missingSeatLabels } from './seat-labels.mjs';
 
 export const DEFAULT_TEAM_NAME = 'Julia-next';
 export const DEFAULT_STATE_NAME = 'Ready';
+export const IN_PROGRESS_STATE_NAME = 'In Progress';
 export const DEFAULT_INTERVAL_MINUTES = 5;
 export const READY_FOR_AGENT_LABEL = 'ready-for-agent';
 export const ORCHESTRATOR_ENVIRONMENT = 'orchestrator-local';
@@ -96,13 +101,14 @@ export function issueFingerprint(issue) {
   });
 }
 
-// The real label-group -> model selection is a later step. Until it exists the
-// validator exists only as this seam: an injected function returning
-// `{ ok: true }` (or `{ ok: false, reason }`), so the queue's contract is
-// tested now and the real rules can land behind it without touching the
-// check cycle.
-export function defaultValidateModelChoice() {
-  return { ok: true };
+// The real label-group -> model/effort rule (JUL-79 step 5): resolve the
+// card's labels to each agent's seat + effort, then enforce that builder and
+// reviewer are from different families and every seat is a real seat-table
+// entry. Still injected through `validateModelChoiceImpl`, so the pure tests
+// stay pure; the default is now the real rule instead of the old permissive
+// placeholder.
+export function defaultValidateModelChoice(issue) {
+  return validateFamilyChoice(resolveSeatChoices(issue?.labels));
 }
 
 export function evaluateEligibility(issue, { validateModelChoiceImpl = defaultValidateModelChoice } = {}) {
@@ -256,6 +262,41 @@ const COMMENT_CREATE_MUTATION = `
   }
 `;
 
+// JUL-79 step 5 (D3): label ids live on the team, not on the card, and the
+// model/effort labels may not exist on the real board until the coordinator
+// creates them -- so a lookup reports what is present and the caller skips
+// the rest.
+const TEAM_LABELS_QUERY = `
+  query ReadyQueueTeamLabels($teamName: String!) {
+    teams(filter: { name: { eq: $teamName } }, first: 1) {
+      nodes {
+        id
+        labels { nodes { id name } }
+      }
+    }
+  }
+`;
+
+const ISSUE_ADD_LABELS_MUTATION = `
+  mutation ReadyQueueAddLabels($issueId: String!, $labelIds: [String!]!) {
+    issueUpdate(id: $issueId, input: { addedLabelIds: $labelIds }) {
+      success
+      issue { id }
+    }
+  }
+`;
+
+// JUL-79 step 5 (D4 belt 1): move a started card out of Ready. `issueUpdate`
+// with a `stateId` is the Linear mutation for that.
+const ISSUE_SET_STATE_MUTATION = `
+  mutation ReadyQueueSetState($issueId: String!, $stateId: String!) {
+    issueUpdate(id: $issueId, input: { stateId: $stateId }) {
+      success
+      issue { id state { id name type } }
+    }
+  }
+`;
+
 function isBlocksRelation(type) {
   return /^blocks$/i.test(String(type ?? ''));
 }
@@ -326,6 +367,39 @@ export function createLinearClient({ apiKey, linearGraphQLImpl = linearGraphQL, 
       }
       return data.commentCreate.comment;
     },
+
+    // Look up the requested label names on the team. Returns
+    // `{ found: { name: id }, missing: [name] }` -- a name that is not on the
+    // team yet is reported, never thrown, so the caller can skip it.
+    async findLabels({ teamName = DEFAULT_TEAM_NAME, names = [] } = {}) {
+      const data = await linearGraphQLImpl(TEAM_LABELS_QUERY, { teamName }, callOpts);
+      const team = data?.teams?.nodes?.[0];
+      const byName = new Map((team?.labels?.nodes ?? []).map((label) => [label.name, label.id]));
+      const found = {};
+      const missing = [];
+      for (const name of names) {
+        if (byName.has(name)) found[name] = byName.get(name);
+        else missing.push(name);
+      }
+      return { found, missing };
+    },
+
+    async addLabels({ issueId, labelIds }) {
+      if (!labelIds || labelIds.length === 0) return null;
+      const data = await linearGraphQLImpl(ISSUE_ADD_LABELS_MUTATION, { issueId, labelIds }, callOpts);
+      if (data?.issueUpdate?.success === false) {
+        throw new Error(`ready-queue: Linear issueUpdate did not add labels to ${issueId}`);
+      }
+      return data?.issueUpdate?.issue ?? null;
+    },
+
+    async setIssueState({ issueId, stateId }) {
+      const data = await linearGraphQLImpl(ISSUE_SET_STATE_MUTATION, { issueId, stateId }, callOpts);
+      if (data?.issueUpdate?.success === false) {
+        throw new Error(`ready-queue: Linear issueUpdate did not move ${issueId} to state ${stateId}`);
+      }
+      return data?.issueUpdate?.issue ?? null;
+    },
   };
 }
 
@@ -345,6 +419,43 @@ function readyFingerprints(issues) {
   const map = {};
   for (const issue of issues) map[issue.id] = issueFingerprint(issue);
   return map;
+}
+
+// D3: add whatever model/effort labels the card is missing, defaulted to the
+// seat-table primary model and Medium. A label that is not on the team yet is
+// skipped and logged, never an error -- the model/effort labels are created by
+// a later coordinator step, so the queue must work before they exist. Returns
+// the label names actually added (for the lastStarted fingerprint); any Linear
+// failure is logged and the start still proceeds.
+export async function addMissingSeatLabels(issue, {
+  linear,
+  teamName = DEFAULT_TEAM_NAME,
+  logErrorImpl = console.error,
+} = {}) {
+  const missing = missingSeatLabels(issue?.labels);
+  if (missing.length === 0) return [];
+
+  let found = {};
+  let absent = [];
+  try {
+    ({ found, missing: absent } = await linear.findLabels({ teamName, names: missing }));
+  } catch (error) {
+    logErrorImpl(`ready-queue: could not look up the default seat labels on team ${teamName}: ${error.message}`);
+    return [];
+  }
+  if (absent.length > 0) {
+    logErrorImpl(`ready-queue: default seat label(s) not on team ${teamName}, skipping: ${absent.join(', ')}`);
+  }
+
+  const names = Object.keys(found);
+  if (names.length === 0) return [];
+  try {
+    await linear.addLabels({ issueId: issue.id, labelIds: names.map((name) => found[name]) });
+  } catch (error) {
+    logErrorImpl(`ready-queue: could not add the default seat labels to ${issue.identifier}: ${error.message}`);
+    return [];
+  }
+  return names;
 }
 
 export async function readyQueueCheck(options = {}) {
@@ -399,6 +510,27 @@ export async function readyQueueCheck(options = {}) {
     return { status: 'empty-ready', intervalMinutes };
   }
 
+  // (d0) The restart-after-finish guard (JUL-79 step 5, D4 belt 2). A card the
+  // queue already started is never started again while its fingerprint is
+  // unchanged -- but ONLY as the fallback for belt 1 having failed. Belt 2
+  // exists to catch the case where the state move below did not happen and the
+  // card therefore stayed in Ready with its run finished; when the state move
+  // succeeded the card left Ready, so it reappearing in Ready is a fresh,
+  // deliberate re-queue and must be admitted normally. This runs BEFORE the
+  // one-full-check bookkeeping so the removal of the card from `ready` at start
+  // cannot be reset into a fresh start. A card that genuinely changed earns a
+  // new fingerprint and is allowed through.
+  const topFingerprint = issueFingerprint(top);
+  const lastStarted = previous.lastStarted;
+  if (
+    !lastStarted?.stateMoved &&
+    lastStarted?.issueId === top.id &&
+    lastStarted?.fingerprint === topFingerprint
+  ) {
+    await writeStateImpl({ ...previous, ready: currentReady }, { statePath });
+    return { status: 'cooldown', issue: top.identifier, intervalMinutes };
+  }
+
   // (d) One-full-check rule: a card is a candidate only if the previous check
   // already saw it in Ready. On the first sighting, record the whole Ready set
   // and leave everything alone.
@@ -446,14 +578,42 @@ export async function readyQueueCheck(options = {}) {
     };
   }
 
-  // (f) Start it. julia-run self-configures its environment and refuses a
-  // double-start; a plain Orca terminal is what gives it ORCA_TERMINAL_HANDLE.
+  // (f) Start it. Before anything is created, make the card show exactly what
+  // will run: add the default model/effort labels it is missing (D3). A label
+  // that is not on the board yet is skipped, never an error. The fingerprint
+  // recorded below reflects the labels the card will actually carry, so the
+  // cooldown still matches on the next check.
+  const existingLabels = [...(top.labels ?? [])];
+  const addedLabels = await addMissingSeatLabels(top, { linear, teamName, logErrorImpl });
+  const startFingerprint = issueFingerprint({
+    ...top,
+    labels: [...existingLabels, ...addedLabels],
+  });
+
+  // julia-run self-configures its environment and refuses a double-start; a
+  // plain Orca terminal is what gives it ORCA_TERMINAL_HANDLE.
   const created = await terminalCreateImpl({
     environment: ORCHESTRATOR_ENVIRONMENT,
     worktree: `path:${ORCHESTRATOR_CHECKOUT}`,
     command: `node ${ORCHESTRATOR_CHECKOUT}/scripts/julia-run.mjs ${top.identifier}`,
     title: `ready-queue-${top.identifier}`,
   });
+
+  // (f2) D4 belt 1: move the started card out of Ready through the injected
+  // Linear client. A failure here is logged but must never undo the start, and
+  // the lastStarted record below (belt 2) still holds the cooldown.
+  let stateMoved = false;
+  try {
+    const inProgress = await linear.findState({ teamName, stateName: IN_PROGRESS_STATE_NAME });
+    if (inProgress) {
+      await linear.setIssueState({ issueId: top.id, stateId: inProgress.id });
+      stateMoved = true;
+    } else {
+      logErrorImpl(`ready-queue: no "${IN_PROGRESS_STATE_NAME}" state on team ${teamName}; could not move ${top.identifier} out of Ready`);
+    }
+  } catch (error) {
+    logErrorImpl(`ready-queue: could not move ${top.identifier} out of Ready: ${error.message}`);
+  }
 
   // Drop the started card from the recorded Ready set: if it is somehow still
   // in Ready on the next check, it must earn another full check before it can
@@ -470,7 +630,10 @@ export async function readyQueueCheck(options = {}) {
       issueId: top.id,
       identifier: top.identifier,
       at: new Date(now()).toISOString(),
-      fingerprint: issueFingerprint(top),
+      fingerprint: startFingerprint,
+      // Belt 2 only applies when belt 1 (the state move) failed: a card that
+      // really left Ready cannot be legitimately re-queued by this guard.
+      stateMoved,
     },
   }, { statePath });
 
@@ -478,6 +641,7 @@ export async function readyQueueCheck(options = {}) {
     status: 'started',
     issue: top.identifier,
     terminalHandle: created?.terminal?.handle,
+    stateMoved,
     intervalMinutes,
   };
 }
@@ -533,6 +697,8 @@ export function describeResult(result) {
       return 'Ready is empty -- no action';
     case 'first-sighting':
       return `${result.issue} is newly in Ready -- waiting one full check before it can start`;
+    case 'cooldown':
+      return `${result.issue} was already started by this queue and has not changed since -- not starting it again`;
     case 'ineligible':
       if (result.refused) {
         return `${result.issue} is ineligible (${result.reasons.join('; ')}) -- refused to post the explanation comment (For-Todd guard); the refusal is logged and the queue stays quiet for this fingerprint`;
