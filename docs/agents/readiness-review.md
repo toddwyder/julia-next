@@ -77,6 +77,12 @@ the missing check to this procedure. It does not become a new permission questio
        read back, so "Axiom received the event" cannot be verified (runbook, "Five JUL-44 step-5
        discoveries", verified 2026-09-19). If only a send-only key exists, the review must say so
        explicitly rather than leave delivery assumed.
+       - **CI green as evidence.** When a ticket claims CI green as evidence, the review must
+         confirm the credential that will check CI can actually read check results. Record this
+         verified fact: the julia-graph-publisher installation token returns HTTP 403 on both the
+         check-runs and the actions endpoints (verified 2026-09-19, JUL-94), so such a ticket has
+         to name its substitute evidence — a local run of the same test suite — rather than assume
+         the coordinator can read GitHub checks.
    - reuse a recent, still-valid finding from a prior audit instead of re-probing, but cite the
      source doc and its date so staleness can be judged later.
 

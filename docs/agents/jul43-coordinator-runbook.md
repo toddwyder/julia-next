@@ -281,6 +281,50 @@ session must not have to rediscover:
   inside the repo — never a `/tmp` path, which silently reads as an empty/missing file to the
   other side rather than failing loudly.
 
+## Six JUL-94 dispatch and publish discoveries (verified 2026-09-19)
+
+1. `orca orchestration run-create` fails with `no_active_sender_terminal` when it is run from a
+   plain shell instead of from inside an Orca terminal. Pass `--from` with any live terminal
+   handle on that environment and the same command succeeds.
+2. `worker-start --base-branch` is handed straight to `git worktree add` as a ref, so a branch
+   that exists only on the remote fails with `fatal: invalid reference`. Fetch it first with
+   `git fetch origin BRANCH:refs/remotes/origin/BRANCH`, then pass `origin/BRANCH` instead of the
+   bare branch name.
+3. A codex worker can fail at stage `agent_readiness` with the message `Agent startup blocked:
+   codex-update-prompt` when the Codex update banner is showing. The verified recovery is to read
+   the agent terminal, send the text `3` to choose Skip until next version, then re-dispatch onto
+   that same ready terminal with `worker-start --terminal HANDLE --worktree path:PATH`, dropping
+   the creation flags `--name`, `--repo`, `--base-branch` and `--setup`, which are rejected for an
+   existing worktree.
+4. `orca terminal wait --for tui-idle` reports satisfied while a codex worker is still mid-turn,
+   so it is not a completion signal. Poll `orca orchestration worker-show` and read
+   `projection.outcome`, or look for the artifact the worker was asked to write.
+5. The julia-graph-publisher installation token cannot read CI results: `GET
+   /repos/OWNER/REPO/commits/SHA/check-runs` and `GET /repos/OWNER/REPO/actions/runs` both return
+   HTTP 403 `Resource not accessible by integration`, so CI green cannot be proven through the
+   publisher. The same token can read the pull request record itself, including `state`,
+   `mergeable`, `mergeable_state` and the head sha. Until the App gains checks read permission,
+   the substitute used on JUL-94 is the CI unit-test step only: run `node --test
+   scripts/*.test.mjs` locally on the candidate commit in the candidate worktree and record its
+   real output as the evidence. That step is not the whole workflow and does not cover the other
+   workflow steps — the `node --check` syntax pass over every `.mjs` under `scripts` and `ops`,
+   the check that no builder-side script under `scripts` reads an Axiom credential, the check
+   that the relay binds to `127.0.0.1`, the check that the relay systemd unit carries its
+   account and hardening directives, and the check that the example env file holds only a
+   placeholder token. A coordinator that needs full coverage must run those checks too.
+6. There is no read-only script for pull request status: `publish-pr.mjs` only pushes and opens,
+   and `merge-pr.mjs` only merges. Reading pull request mergeability on JUL-94 required an ad hoc
+   token-bearing GET run as `orchestrator-svc`; closing this gap with a small read-only script is
+   worth doing. The concrete recipe is:
+
+   ```sh
+   node --env-file /etc/orchestrator-svc/.env.publisher --input-type=module -e "import { getPublisherInstallationToken } from './scripts/publish-via-github-app.mjs'; const token = await getPublisherInstallationToken(); const res = await fetch('https://api.github.com/repos/toddwyder/julia-next/pulls/NUMBER', { headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json' } }); const pr = await res.json(); console.log(JSON.stringify({ state: pr.state, mergeable: pr.mergeable, mergeable_state: pr.mergeable_state, head_sha: pr.head.sha }));"
+   ```
+
+   It is run as `orchestrator-svc` from `/srv/orchestrator-svc/julia-next`. The token is minted
+   inside the process, so it never appears in `argv` and is never printed. This exact read was
+   used on 2026-09-19 to confirm `mergeable_state` clean before merging PR 53.
+
 ## Start
 
 There is no scheduled trigger — explicit launch only. From inside an Orca terminal on the
