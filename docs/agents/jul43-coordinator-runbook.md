@@ -685,10 +685,13 @@ run was active — a finished run whose card was still in Ready would be started
    team's `In Progress` state through the injected Linear client (`findState` + `setIssueState`). A
    failure here is logged (`could not move <ID> out of Ready`) but never undoes the start.
 2. **`lastStarted` cooldown.** The queue still records `lastStarted` (card id + the start
-   fingerprint of labels/state/blockers) and, before anything else in the next cycle, refuses to
-   start a card whose id and fingerprint match that record (`status: 'cooldown'`). The fingerprint
+   fingerprint of labels/state/blockers + whether the state move succeeded) and, before anything
+   else in the next cycle, refuses to start a card whose id and fingerprint match that record
+   (`status: 'cooldown'`) — but only when that record says the state move **failed**. The fingerprint
    purposefully includes the labels the queue itself added, so a card Linear now returns with those
-   labels still matches; a genuinely changed card gets a new fingerprint and is allowed through.
+   labels still matches and is held; a genuinely changed card gets a new fingerprint and is allowed
+   through. When the state move succeeded the card really left Ready, so its reappearance in Ready
+   is a deliberate re-queue and is admitted normally.
 
 Together they mean the exact live failure mode — run finished, card still in Ready because the
 state move failed — cannot start the card twice.

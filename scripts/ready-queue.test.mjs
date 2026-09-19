@@ -570,6 +570,51 @@ test('a card that changed after it was started is allowed through the cooldown',
   assert.equal(orca.calls.terminalsCreated.length, 2);
 });
 
+test('a card whose state move succeeded and that is deliberately re-queued is admitted and started again', async () => {
+  const issue = makeIssue({ identifier: 'JUL-99' });
+  const { linear } = fakeLinear({ issues: [issue], teamLabels: DEFAULT_TEAM_LABELS });
+  // Belt 1 succeeds, so the card really leaves Ready. `listIssuesInState` keeps
+  // returning it, which is exactly a deliberate re-queue: the card was put back
+  // in Ready carrying the labels it was started with (the label filler's
+  // additions included), unchanged.
+  const store = fakeStore();
+  const orca = fakeOrca(); // isRunFinishedImpl is true: the run has finished
+  const d = deps({ linear, store, orca });
+
+  assert.equal((await readyQueueCheck(d)).status, 'first-sighting');
+  assert.equal((await readyQueueCheck(d)).status, 'started');
+  assert.equal(orca.calls.terminalsCreated.length, 1);
+  assert.equal(store.get().lastStarted.stateMoved, true);
+
+  // The run is finished and someone deliberately moved the card back to Ready.
+  // Belt 1 succeeded, so belt 2 must stand down: the re-queue is a fresh
+  // request -- first sighting, then a second start.
+  assert.equal((await readyQueueCheck(d)).status, 'first-sighting');
+  assert.equal((await readyQueueCheck(d)).status, 'started');
+  assert.equal(orca.calls.terminalsCreated.length, 2, 'a deliberate re-queue must start the card again');
+});
+
+test('lastStarted records whether the state move succeeded', async () => {
+  // Failure: the card stayed in Ready, so belt 2 must hold.
+  const failedIssue = makeIssue({ identifier: 'JUL-41' });
+  const failed = fakeLinear({ issues: [failedIssue], teamLabels: DEFAULT_TEAM_LABELS });
+  failed.linear.setIssueState = async () => { throw new Error('Linear refused the state move'); };
+  const failedStore = fakeStore();
+  const failedDeps = deps({ linear: failed.linear, store: failedStore, orca: fakeOrca() });
+  await readyQueueCheck(failedDeps);
+  assert.equal((await readyQueueCheck(failedDeps)).status, 'started');
+  assert.equal(failedStore.get().lastStarted.stateMoved, false);
+
+  // Success: the card left Ready, so belt 2 must stand down.
+  const movedIssue = makeIssue({ identifier: 'JUL-42' });
+  const moved = fakeLinear({ issues: [movedIssue], teamLabels: DEFAULT_TEAM_LABELS });
+  const movedStore = fakeStore();
+  const movedDeps = deps({ linear: moved.linear, store: movedStore, orca: fakeOrca() });
+  await readyQueueCheck(movedDeps);
+  assert.equal((await readyQueueCheck(movedDeps)).status, 'started');
+  assert.equal(movedStore.get().lastStarted.stateMoved, true);
+});
+
 // ---------------------------------------------------------------------------
 // State file I/O
 // ---------------------------------------------------------------------------

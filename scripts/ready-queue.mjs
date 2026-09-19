@@ -512,13 +512,21 @@ export async function readyQueueCheck(options = {}) {
 
   // (d0) The restart-after-finish guard (JUL-79 step 5, D4 belt 2). A card the
   // queue already started is never started again while its fingerprint is
-  // unchanged -- even if it is still in Ready because the state move below
-  // failed. This runs BEFORE the one-full-check bookkeeping so the removal of
-  // the card from `ready` at start cannot be reset into a fresh start. A card
-  // that genuinely changed earns a new fingerprint and is allowed through.
+  // unchanged -- but ONLY as the fallback for belt 1 having failed. Belt 2
+  // exists to catch the case where the state move below did not happen and the
+  // card therefore stayed in Ready with its run finished; when the state move
+  // succeeded the card left Ready, so it reappearing in Ready is a fresh,
+  // deliberate re-queue and must be admitted normally. This runs BEFORE the
+  // one-full-check bookkeeping so the removal of the card from `ready` at start
+  // cannot be reset into a fresh start. A card that genuinely changed earns a
+  // new fingerprint and is allowed through.
   const topFingerprint = issueFingerprint(top);
   const lastStarted = previous.lastStarted;
-  if (lastStarted?.issueId === top.id && lastStarted?.fingerprint === topFingerprint) {
+  if (
+    !lastStarted?.stateMoved &&
+    lastStarted?.issueId === top.id &&
+    lastStarted?.fingerprint === topFingerprint
+  ) {
     await writeStateImpl({ ...previous, ready: currentReady }, { statePath });
     return { status: 'cooldown', issue: top.identifier, intervalMinutes };
   }
@@ -623,6 +631,9 @@ export async function readyQueueCheck(options = {}) {
       identifier: top.identifier,
       at: new Date(now()).toISOString(),
       fingerprint: startFingerprint,
+      // Belt 2 only applies when belt 1 (the state move) failed: a card that
+      // really left Ready cannot be legitimately re-queued by this guard.
+      stateMoved,
     },
   }, { statePath });
 
