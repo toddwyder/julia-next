@@ -600,10 +600,15 @@ vendor's own CLI:
 | --- | --- | --- |
 | `claude` | `--effort low` | `--effort medium` / `--effort high` |
 | `codex` | `-c model_reasoning_effort=low` | `-c model_reasoning_effort=medium` / `...=high` |
-| `pi-deepseek`, `pi-glm` | *(no flag)* | `--thinking` |
+| `pi-deepseek`, `pi-glm` | `--thinking off` | `--thinking medium` / `--thinking high` |
 
-Pi has no graded setting — only `--thinking` on/off (live-verified) — so Low is thinking off and
-Medium/High thinking on; Pi's own `models.json` `thinkingLevelMap` picks the level behind the flag.
+`pi --thinking` REQUIRES a level (`off|minimal|low|medium|high|xhigh|max`). Low is `off`; Medium/High
+pass `medium`/`high`. **A bare `--thinking` is a bug** (fixed 2026-09-19, JUL-79 relaunch): Pi reads the next
+argument as the level, swallowing `-p`, and the coordinator prompt — which starts with the skill's `---`
+front matter — is then rejected as `Error: Unknown option: ---`. The seat died at launch, silently (Pi
+exits with no useful status in a terminal). The prompt is now always the last argument, after a `--`
+separator, so it can never be read as an option. A one-word test prompt hides this bug — always test a
+seat launch with the real skill text.
 
 **Launcher (`scripts/julia-run.mjs`, `orchestratorLaunchCommandFor(entry, issueId, { effort })`).**
 Two entries are new alongside `claude`/`pi-glm`:

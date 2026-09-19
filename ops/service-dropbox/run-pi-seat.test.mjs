@@ -14,7 +14,7 @@ test('builder-backup spawns pi with DEEPSEEK_API_KEY in env, never in argv', () 
   });
   assert.equal(spec.command, 'pi');
   // Medium effort (the default) -> --thinking; see the effort tests below.
-  assert.deepEqual(spec.args, ['--provider', 'deepseek', '--model', 'deepseek-v4-flash', '--thinking', '-p', 'do the thing', '--mode', 'json']);
+  assert.deepEqual(spec.args, ['--provider', 'deepseek', '--model', 'deepseek-v4-flash', '--thinking', 'medium', '-p', '--mode', 'json', '--', 'do the thing']);
   assert.equal(spec.env.DEEPSEEK_API_KEY, 'super-secret-deepseek-token');
   // The secret must never appear as its own argv entry.
   assert.ok(!spec.args.includes('super-secret-deepseek-token'));
@@ -29,7 +29,7 @@ test('reviewer-backup and orchestrator-backup both route to Pi + GLM-5.3 as a cu
         return 'super-secret-zai-token';
       },
     });
-    assert.deepEqual(spec.args, ['--provider', 'glm-5-3', '--model', 'glm-5.3', '--thinking', '-p', 'review this', '--mode', 'rpc']);
+    assert.deepEqual(spec.args, ['--provider', 'glm-5-3', '--model', 'glm-5.3', '--thinking', 'medium', '-p', '--mode', 'rpc', '--', 'review this']);
     assert.equal(spec.env.ZAI_PAYG_API_KEY, 'super-secret-zai-token');
     assert.ok(!spec.args.includes('super-secret-zai-token'));
   }
@@ -48,14 +48,31 @@ test('buildPiSpawnSpec refuses an unknown seat', () => {
 // are thinking on; an omitted effort is Medium. The flag is inserted before
 // -p so the prompt text (which may be the whole coordinator skill) always
 // stays at the end of the argv array.
-test('effort -> --thinking: every seat gets the flag for Medium/High and none for Low', () => {
+test('effort -> --thinking <level>: Low is off, Medium/High are on, and the flag always carries its value', () => {
+  const want = { low: 'off', medium: 'medium', high: 'high' };
   for (const seat of Object.keys(SEATS)) {
-    const low = buildPiSpawnSpec(seat, 'p', { effort: 'low', readSecretImpl: () => 'tok' });
-    assert.ok(!low.args.includes('--thinking'), `${seat}/low must not think`);
-    for (const level of ['medium', 'high']) {
-      const spec = buildPiSpawnSpec(seat, 'p', { effort: level, readSecretImpl: () => 'tok' });
-      assert.ok(spec.args.includes('--thinking'), `${seat}/${level} must think`);
-      assert.equal(spec.args.indexOf('--thinking'), spec.args.indexOf('-p') - 1, `${seat}/${level} places the flag before -p`);
+    for (const [effort, level] of Object.entries(want)) {
+      const spec = buildPiSpawnSpec(seat, 'p', { effort, readSecretImpl: () => 'tok' });
+      const at = spec.args.indexOf('--thinking');
+      assert.ok(at !== -1, `${seat}/${effort} must pass --thinking`);
+      assert.equal(spec.args[at + 1], level, `${seat}/${effort}: --thinking needs its level, or Pi swallows the next flag`);
+      assert.equal(spec.args[at + 2], '-p', `${seat}/${effort} places the pair right before -p`);
+    }
+  }
+});
+
+// The live failure (JUL-79 relaunches): a bare `--thinking` made Pi read `-p`
+// as the thinking level, so the coordinator prompt -- which begins with the
+// skill's `---` front matter -- was parsed as an unknown option and the seat
+// died before doing anything. The prompt now follows a `--` separator.
+test('a prompt that starts with dashes (the coordinator skill front matter) is the last argv entry, after `--`', () => {
+  const prompt = ['---', 'name: julia-coordinator', '---', '# Julia-next coordinator'].join('\n');
+  for (const seat of Object.keys(SEATS)) {
+    for (const effort of ['low', 'medium', 'high']) {
+      const spec = buildPiSpawnSpec(seat, prompt, { effort, readSecretImpl: () => 'tok' });
+      assert.equal(spec.args[spec.args.length - 1], prompt, `${seat}/${effort}: prompt is last`);
+      assert.equal(spec.args[spec.args.length - 2], '--', `${seat}/${effort}: separator before the prompt`);
+      assert.equal(spec.args.filter((arg) => arg === prompt).length, 1);
     }
   }
 });
@@ -69,11 +86,11 @@ test('an omitted effort is Medium: the spawn spec is exactly the explicit-medium
 });
 
 test('thinkingArgs: the pure mapping, including an unknown effort falling back to Medium', () => {
-  assert.deepEqual(thinkingArgs('low'), []);
-  assert.deepEqual(thinkingArgs('medium'), ['--thinking']);
-  assert.deepEqual(thinkingArgs('high'), ['--thinking']);
-  assert.deepEqual(thinkingArgs(undefined), ['--thinking']);
-  assert.deepEqual(thinkingArgs('turbo'), ['--thinking']);
+  assert.deepEqual(thinkingArgs('low'), ['--thinking', 'off']);
+  assert.deepEqual(thinkingArgs('medium'), ['--thinking', 'medium']);
+  assert.deepEqual(thinkingArgs('high'), ['--thinking', 'high']);
+  assert.deepEqual(thinkingArgs(undefined), ['--thinking', 'medium']);
+  assert.deepEqual(thinkingArgs('turbo'), ['--thinking', 'medium']);
 });
 
 test('orchestrator-deepseek: DeepSeek provider/model, DEEPSEEK_API_KEY in env only, thinking per effort', () => {
@@ -85,7 +102,7 @@ test('orchestrator-deepseek: DeepSeek provider/model, DEEPSEEK_API_KEY in env on
       return 'super-secret-deepseek-token';
     },
   });
-  assert.deepEqual(spec.args, ['--provider', 'deepseek', '--model', 'deepseek-v4-flash', '--thinking', '-p', 'run the graph', '--mode', 'json']);
+  assert.deepEqual(spec.args, ['--provider', 'deepseek', '--model', 'deepseek-v4-flash', '--thinking', 'high', '-p', '--mode', 'json', '--', 'run the graph']);
   assert.equal(spec.env.DEEPSEEK_API_KEY, 'super-secret-deepseek-token');
   assert.ok(!spec.args.includes('super-secret-deepseek-token'));
 });
@@ -105,7 +122,7 @@ test('runPiSeat forwards the effort through to the spawn spec (no separate path 
   });
   assert.ok(child);
   assert.equal(seen.command, 'pi');
-  assert.deepEqual(seen.args, ['--provider', 'deepseek', '--model', 'deepseek-v4-flash', '--thinking', '-p', 'p', '--mode', 'json']);
+  assert.deepEqual(seen.args, ['--provider', 'deepseek', '--model', 'deepseek-v4-flash', '--thinking', 'high', '-p', '--mode', 'json', '--', 'p']);
   assert.equal(seen.env.DEEPSEEK_API_KEY, 'tok');
 });
 
