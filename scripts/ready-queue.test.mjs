@@ -22,12 +22,14 @@ import {
   normalizeIssue,
   ineligibleCommentBody,
   READY_FOR_AGENT_LABEL,
+  DECISION_LABEL,
+  PARENT_LABEL,
   DEFAULT_INTERVAL_MINUTES,
 } from './ready-queue.mjs';
 
 const NOW = Date.parse('2026-09-18T12:00:00Z');
 const READY_STATE = { id: 'state-ready', name: 'Ready', type: 'unstarted' };
-const IN_PROGRESS_STATE = { id: 'state-in-progress', name: 'In Progress', type: 'started' };
+const IN_PROGRESS_STATE = { id: 'state-in-progress', name: 'Implementation', type: 'started' };
 
 function makeIssue(overrides = {}) {
   const identifier = overrides.identifier ?? 'JUL-63';
@@ -48,7 +50,7 @@ function fakeLinear({ state = READY_STATE, inProgress = IN_PROGRESS_STATE, issue
   return {
     calls,
     linear: {
-      findState: async ({ stateName } = {}) => (stateName === 'In Progress' ? inProgress : state),
+      findState: async ({ stateName } = {}) => (stateName === 'Implementation' ? inProgress : state),
       listIssuesInState: async (stateId) => {
         calls.listedStateId = stateId;
         return issues;
@@ -185,10 +187,29 @@ test('isBlockerClosed: Done/Canceled (by type or name) is closed, anything else 
   assert.equal(isBlockerClosed({ state: { name: 'Backlog', type: 'backlog' } }), false);
 });
 
-test('evaluateEligibility: a missing ready-for-agent label is ineligible', () => {
+test('evaluateEligibility: a card with no ready-for-agent label is eligible when its model choice validates (JUL-97)', () => {
   const { eligible, reasons } = evaluateEligibility(makeIssue({ labels: [] }));
+  assert.equal(eligible, true);
+  assert.deepEqual(reasons, []);
+});
+
+test('evaluateEligibility: a Decision label is refused, naming the label', () => {
+  const { eligible, reasons } = evaluateEligibility(makeIssue({ labels: [DECISION_LABEL] }));
   assert.equal(eligible, false);
-  assert.match(reasons.join(' '), /ready-for-agent/);
+  assert.match(reasons.join(' '), /Decision/);
+  assert.match(reasons.join(' '), /not agent work/);
+});
+
+test('evaluateEligibility: a Parent label is refused, naming the label', () => {
+  const { eligible, reasons } = evaluateEligibility(makeIssue({ labels: [PARENT_LABEL] }));
+  assert.equal(eligible, false);
+  assert.match(reasons.join(' '), /Parent/);
+});
+
+test('evaluateEligibility: a card carrying both coordinate labels reports both reasons', () => {
+  const { eligible, reasons } = evaluateEligibility(makeIssue({ labels: [DECISION_LABEL, PARENT_LABEL] }));
+  assert.equal(eligible, false);
+  assert.equal(reasons.length, 2);
 });
 
 test('evaluateEligibility: an open blocker is ineligible and names the blocker', () => {
@@ -221,9 +242,9 @@ test('evaluateEligibility: the default validator applies the real seat-table rul
 });
 
 test('ineligibleCommentBody names the card and each reason', () => {
-  const body = ineligibleCommentBody(makeIssue({ identifier: 'JUL-63' }), ['missing the ready-for-agent label']);
+  const body = ineligibleCommentBody(makeIssue({ identifier: 'JUL-63' }), ['the card carries the Decision label; Decision cards are not agent work']);
   assert.match(body, /JUL-63/);
-  assert.match(body, /ready-for-agent/);
+  assert.match(body, /Decision/);
 });
 
 // ---------------------------------------------------------------------------
@@ -336,7 +357,7 @@ test('starting a card creates exactly the rule-6 terminal payload', async () => 
 });
 
 test('an ineligible top card is commented once, stays quiet while the fingerprint is unchanged, and re-comments after a change', async () => {
-  const ineligible = makeIssue({ labels: [] });
+  const ineligible = makeIssue({ labels: [DECISION_LABEL] });
   const { linear, calls } = fakeLinear({ issues: [ineligible] });
   const store = fakeStore();
   const orca = fakeOrca();
@@ -354,8 +375,9 @@ test('an ineligible top card is commented once, stays quiet while the fingerprin
   assert.equal(calls.comments.length, 1);
   assert.equal(orca.calls.terminalsCreated.length, 0);
 
-  // The card changed (a label was added) -> the queue comments again.
-  linear.listIssuesInState = async () => [makeIssue({ labels: ['needs-info'] })];
+  // The card changed (its coordinate label changed) -> a new fingerprint, so
+  // the queue comments again.
+  linear.listIssuesInState = async () => [makeIssue({ labels: [PARENT_LABEL] })];
   const fourth = await readyQueueCheck(d);
   assert.equal(fourth.status, 'ineligible');
   assert.equal(fourth.commented, true);
@@ -363,7 +385,7 @@ test('an ineligible top card is commented once, stays quiet while the fingerprin
 });
 
 test('ready-queue: a guard-refused comment is skipped and logged; the cycle still completes and the fingerprint is recorded', async () => {
-  const ineligible = makeIssue({ labels: [] });
+  const ineligible = makeIssue({ labels: [DECISION_LABEL] });
   const { linear, calls } = fakeLinear({ issues: [ineligible] });
   const store = fakeStore();
   const orca = fakeOrca();
@@ -399,7 +421,7 @@ test('ready-queue: a guard-refused comment is skipped and logged; the cycle stil
 
 test('only the top card is ever a candidate; a lower ineligible card cannot block it', async () => {
   const top = makeIssue({ identifier: 'JUL-1', sortOrder: 1 });
-  const lower = makeIssue({ identifier: 'JUL-2', sortOrder: 2, labels: [] });
+  const lower = makeIssue({ identifier: 'JUL-2', sortOrder: 2, labels: [DECISION_LABEL] });
   const { linear } = fakeLinear({ issues: [lower, top] });
   const store = fakeStore({ ready: { [top.id]: issueFingerprint(top), [lower.id]: issueFingerprint(lower) } });
   const orca = fakeOrca();
@@ -513,7 +535,7 @@ test('a card that already carries every model/effort label is not looked up agai
 // Moving the card out of Ready and the restart-after-finish guard (D4)
 // ---------------------------------------------------------------------------
 
-test('starting a card moves it out of Ready to the team In Progress state (D4 belt 1)', async () => {
+test('starting a card moves it out of Ready to the team Implementation state (D4 belt 1)', async () => {
   const issue = makeIssue();
   const { linear, calls } = fakeLinear({ issues: [issue], teamLabels: DEFAULT_TEAM_LABELS });
   const store = fakeStore({ ready: { [issue.id]: issueFingerprint(issue) } });

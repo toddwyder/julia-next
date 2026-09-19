@@ -18,7 +18,29 @@ test("the default table is exactly Todd's instruction: GLM is no seat default or
     orchestrator: { primary: 'claude', backup: 'pi-deepseek' },
     builder: { primary: 'claude', backup: 'pi-deepseek' },
     reviewer: { primary: 'codex', backup: 'claude' },
+    'feature-builder': { primary: 'claude', backup: 'pi-deepseek' },
+    'defect-fixer': { primary: 'claude', backup: 'pi-deepseek' },
+    refactor: { primary: 'claude', backup: 'pi-deepseek' },
+    'adversarial-reviewer': { primary: 'codex', backup: 'claude' },
+    'evidence-reviewer': { primary: 'codex', backup: 'claude' },
+    consultant: { primary: 'claude', backup: 'pi-deepseek' },
   });
+});
+
+test('the six JUL-97 graph-agent seats have a primary and a backup, and the original three are unchanged', () => {
+  for (const seat of [
+    'feature-builder', 'defect-fixer', 'refactor',
+    'adversarial-reviewer', 'evidence-reviewer', 'consultant',
+  ]) {
+    assert.ok(SEAT_TABLE[seat], `missing seat: ${seat}`);
+    assert.ok(SEAT_TABLE[seat].primary, `${seat} has no primary`);
+    assert.ok(SEAT_TABLE[seat].backup, `${seat} has no backup`);
+  }
+  // The original three remain exactly what the coordinator and the
+  // builder/reviewer family rule already depended on.
+  assert.deepEqual(SEAT_TABLE.orchestrator, { primary: 'claude', backup: 'pi-deepseek' });
+  assert.deepEqual(SEAT_TABLE.builder, { primary: 'claude', backup: 'pi-deepseek' });
+  assert.deepEqual(SEAT_TABLE.reviewer, { primary: 'codex', backup: 'claude' });
 });
 
 test('GLM stays defined in FAMILY_OF and selectable, but is never a seat default or backup', () => {

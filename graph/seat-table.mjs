@@ -15,10 +15,20 @@
 // primary/backup combination" check, which the table below cannot satisfy:
 // Todd's instruction bars GLM (zhipu) as any seat default or backup, and
 // reviewer's backup is claude (anthropic) like the builder's primary.
+// JUL-97 step 1 adds the six agent seats the board's labels and template
+// describe. The three original seats are unchanged -- the coordinator's own
+// launch path still reads `orchestrator`, and the builder/reviewer pair the
+// family rule below is about is still `builder`/`reviewer`.
 export const SEAT_TABLE = {
   orchestrator: { primary: 'claude', backup: 'pi-deepseek' },
   builder: { primary: 'claude', backup: 'pi-deepseek' },
   reviewer: { primary: 'codex', backup: 'claude' },
+  'feature-builder': { primary: 'claude', backup: 'pi-deepseek' },
+  'defect-fixer': { primary: 'claude', backup: 'pi-deepseek' },
+  refactor: { primary: 'claude', backup: 'pi-deepseek' },
+  'adversarial-reviewer': { primary: 'codex', backup: 'claude' },
+  'evidence-reviewer': { primary: 'codex', backup: 'claude' },
+  consultant: { primary: 'claude', backup: 'pi-deepseek' },
 };
 
 // Model family behind each table entry -- not the vendor/tool name, the
