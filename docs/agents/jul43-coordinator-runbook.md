@@ -304,13 +304,26 @@ session must not have to rediscover:
    HTTP 403 `Resource not accessible by integration`, so CI green cannot be proven through the
    publisher. The same token can read the pull request record itself, including `state`,
    `mergeable`, `mergeable_state` and the head sha. Until the App gains checks read permission,
-   the substitute used on JUL-94 is to run the CI workflow equivalent locally on the candidate
-   commit with `node --test scripts/*.test.mjs` in the candidate worktree and record its real
-   output as the evidence.
+   the substitute used on JUL-94 is the CI unit-test step only: run `node --test
+   scripts/*.test.mjs` locally on the candidate commit in the candidate worktree and record its
+   real output as the evidence. That step is not the whole workflow and does not cover the other
+   workflow steps — the `node --check` syntax pass over every `.mjs` under `scripts` and `ops`,
+   the check that no builder-side script under `scripts` reads an Axiom credential, the check
+   that the relay binds to `127.0.0.1`, the check that the relay systemd unit carries its
+   account and hardening directives, and the check that the example env file holds only a
+   placeholder token. A coordinator that needs full coverage must run those checks too.
 6. There is no read-only script for pull request status: `publish-pr.mjs` only pushes and opens,
    and `merge-pr.mjs` only merges. Reading pull request mergeability on JUL-94 required an ad hoc
    token-bearing GET run as `orchestrator-svc`; closing this gap with a small read-only script is
-   worth doing.
+   worth doing. The concrete recipe is:
+
+   ```sh
+   node --env-file /etc/orchestrator-svc/.env.publisher --input-type=module -e "import { getPublisherInstallationToken } from './scripts/publish-via-github-app.mjs'; const token = await getPublisherInstallationToken(); const res = await fetch('https://api.github.com/repos/toddwyder/julia-next/pulls/NUMBER', { headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json' } }); const pr = await res.json(); console.log(JSON.stringify({ state: pr.state, mergeable: pr.mergeable, mergeable_state: pr.mergeable_state, head_sha: pr.head.sha }));"
+   ```
+
+   It is run as `orchestrator-svc` from `/srv/orchestrator-svc/julia-next`. The token is minted
+   inside the process, so it never appears in `argv` and is never printed. This exact read was
+   used on 2026-09-19 to confirm `mergeable_state` clean before merging PR 53.
 
 ## Start
 
