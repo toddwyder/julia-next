@@ -1,5 +1,7 @@
 // Guards the one sudoers file that gives orchestrator-svc root for a few
-// exact commands (JUL-79 laptop session). The rules are the security
+// exact commands (JUL-79 laptop sessions). There is deliberately NO rule that
+// installs or copies a file: units reach /etc/systemd/system only through a
+// laptop session, so no merged change can become root code. The rules are the security
 // boundary, so the test reads them the way sudo would: every rule must be a
 // single fixed command line -- no wildcards, no command lists, no ALL as the
 // command -- and every path it names must sit where orchestrator-svc cannot
@@ -8,12 +10,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
+import { userInfo } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const FILE = fileURLToPath(new URL('./orchestrator-svc-ops', import.meta.url));
-const REPO_ROOT = fileURLToPath(new URL('../..', import.meta.url));
-const CHECKOUT_OPS = '/srv/orchestrator-svc/julia-next/ops/';
-const UNIT_NAMES = ['julia-ready-queue.service', 'julia-ready-queue.timer'];
 const ACCOUNTS = ['runner', 'orchestrator-svc'];
 const KEY_GROUPS = ['deepseek-readers', 'zai-readers'];
 
@@ -45,33 +45,28 @@ test('every rule is one fixed command: no wildcards, no lists, no ALL, no negati
   assert.ok(commands.length > 0);
 });
 
-test('the only programs named are install, systemctl and usermod, by absolute path', () => {
+test('the only programs named are systemctl and usermod, by absolute path', () => {
   for (const [program] of commands) {
-    assert.ok(['/usr/bin/install', '/usr/bin/systemctl', '/usr/sbin/usermod'].includes(program), program);
+    assert.ok(['/usr/bin/systemctl', '/usr/sbin/usermod'].includes(program), program);
   }
 });
 
-test('install copies only the two ready-queue unit files, from the read-only checkout ops folder to /etc/systemd/system', () => {
-  const installs = commands.filter(([program]) => program === '/usr/bin/install');
-  assert.deepEqual(
-    installs.map((c) => c[c.length - 1]).sort(),
-    UNIT_NAMES.map((n) => `/etc/systemd/system/${n}`).sort(),
-  );
-  for (const [, ...args] of installs) {
-    assert.deepEqual(args.slice(0, 6), ['-m', '0644', '-o', 'root', '-g', 'root']);
-    assert.equal(args.length, 8, 'exactly: modes/owner flags, one source, one destination');
-    const [source, destination] = args.slice(6);
-    assert.equal(source, `${CHECKOUT_OPS}ready-queue/${destination.split('/').pop()}`);
-    assert.doesNotMatch(source, /\.\./);
+test('there is no install, cp, mv, tee or any other file-writing rule', () => {
+  assert.equal(commands.filter(([program]) => program === '/usr/bin/install').length, 0);
+  for (const [program] of commands) {
+    assert.doesNotMatch(program, /\/(install|cp|mv|tee|ln|chmod|chown|sh|bash|env)$/);
   }
 });
 
-test('systemctl may only reload, and enable/start/restart the ready-queue units', () => {
+test('systemctl may only enable/start/stop/restart the two named ready-queue units', () => {
   const allowed = new Set([
-    'daemon-reload',
     'enable --now julia-ready-queue.timer',
+    'start julia-ready-queue.timer',
+    'stop julia-ready-queue.timer',
     'restart julia-ready-queue.timer',
     'start julia-ready-queue.service',
+    'stop julia-ready-queue.service',
+    'restart julia-ready-queue.service',
   ]);
   const seen = commands.filter(([p]) => p === '/usr/bin/systemctl').map(([, ...a]) => a.join(' '));
   assert.deepEqual(new Set(seen), allowed);
@@ -89,26 +84,30 @@ test('no rule lets orchestrator-svc touch sudo itself, the secrets, or any path 
   const text = rules.join('\n');
   assert.doesNotMatch(text, /sudoers|dropbox-secrets|\/etc\/orchestrator-svc|\/etc\/passwd|\/etc\/shadow/);
   for (const path of text.match(/\/[\w./-]+/g)) {
-    const ok = path.startsWith(CHECKOUT_OPS)
-      || path.startsWith('/etc/systemd/system/julia-ready-queue.')
-      || ['/usr/bin/install', '/usr/bin/systemctl', '/usr/sbin/usermod'].includes(path);
+    const ok = ['/usr/bin/systemctl', '/usr/sbin/usermod'].includes(path);
     assert.ok(ok, `unexpected path in rules: ${path}`);
   }
 });
 
-test('once the ready-queue unit files exist in git they are regular files (mode 100644), never symlinks', () => {
-  // `install` follows a symlink at its source, so a symlinked unit would copy an
-  // arbitrary root-readable file into /etc/systemd/system. Vacuous until the
-  // queue's PR adds the units.
-  const tracked = execFileSync('git', ['ls-files', '-s', '--', 'ops/ready-queue'], {
-    cwd: REPO_ROOT, encoding: 'utf8',
-  }).split(/\r?\n/).filter(Boolean);
-  for (const line of tracked) {
-    const [mode, , , path] = line.split(/\s+/);
-    if (UNIT_NAMES.some((name) => path.endsWith(`/${name}`))) {
-      assert.equal(mode, '100644', `${path} must be a regular file, got mode ${mode}`);
-    }
-  }
+test('on the server: an install attempt as orchestrator-svc is refused by sudo', (t) => {
+  // Only meaningful where the file is actually installed and this test runs as
+  // orchestrator-svc (the server's read-only checkout); skipped everywhere else.
+  if (userInfo().username !== 'orchestrator-svc') return t.skip('not running as orchestrator-svc');
+  const attempt = spawnSync('sudo', [
+    '-n', '/usr/bin/install', '-m', '0644', '-o', 'root', '-g', 'root',
+    '/srv/orchestrator-svc/julia-next/ops/ready-queue/julia-ready-queue.service',
+    '/etc/systemd/system/julia-ready-queue.service',
+  ], { encoding: 'utf8' });
+  assert.notEqual(attempt.status, 0, 'sudo allowed an install as orchestrator-svc');
+  // The whole live rule set must be exactly this file's rules plus the one
+  // pre-existing checkout-sync rule -- nothing older left installed.
+  const listing = spawnSync('sudo', ['-n', '-l'], { encoding: 'utf8' });
+  assert.equal(listing.status, 0, `sudo -l failed: ${listing.stderr}`);
+  const live = listing.stdout.split('\n')
+    .filter((line) => line.includes('NOPASSWD:'))
+    .map((line) => line.split('NOPASSWD:')[1].trim()).sort();
+  const expected = [...commands.map((c) => c.join(' ')), '/usr/bin/systemctl start julia-next-checkout-sync.service'].sort();
+  assert.deepEqual(live, expected);
 });
 
 test('visudo accepts the file (skipped where visudo is not installed)', (t) => {
