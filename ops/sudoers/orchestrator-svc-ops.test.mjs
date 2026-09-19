@@ -99,8 +99,15 @@ test('on the server: an install attempt as orchestrator-svc is refused by sudo',
     '/etc/systemd/system/julia-ready-queue.service',
   ], { encoding: 'utf8' });
   assert.notEqual(attempt.status, 0, 'sudo allowed an install as orchestrator-svc');
-  const listing = spawnSync('sudo', ['-n', '-l'], { encoding: 'utf8' }).stdout;
-  assert.doesNotMatch(listing, /\/usr\/bin\/install/);
+  // The whole live rule set must be exactly this file's rules plus the one
+  // pre-existing checkout-sync rule -- nothing older left installed.
+  const listing = spawnSync('sudo', ['-n', '-l'], { encoding: 'utf8' });
+  assert.equal(listing.status, 0, `sudo -l failed: ${listing.stderr}`);
+  const live = listing.stdout.split('\n')
+    .filter((line) => line.includes('NOPASSWD:'))
+    .map((line) => line.split('NOPASSWD:')[1].trim()).sort();
+  const expected = [...commands.map((c) => c.join(' ')), '/usr/bin/systemctl start julia-next-checkout-sync.service'].sort();
+  assert.deepEqual(live, expected);
 });
 
 test('visudo accepts the file (skipped where visudo is not installed)', (t) => {

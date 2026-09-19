@@ -41,7 +41,7 @@ change to a local file, `scp` it to the server, then run or apply it there.
 | --- | --- | --- |
 | `ubuntu` | Server administrator. This is the *installation* channel — use it to create accounts, install files under `/etc`, manage systemd. Not a day-to-day operating identity. | Passwordless (`sudo -n true` succeeds) |
 | `runner` | Builder. Runs `orca-server.service`. Writes in its own worktrees, commits locally. | None |
-| `orchestrator-svc` | Orchestrator. Read-only checkout, dispatches builders/reviewers, reads/writes Linear, holds the publisher credential. | None |
+| `orchestrator-svc` | Orchestrator. Read-only checkout, dispatches builders/reviewers, reads/writes Linear, holds the publisher credential. | Narrow exact-command sudo only: `/etc/sudoers.d/orchestrator-svc-checkout-sync` and `-ops` (see the JUL-79 laptop-session section) |
 
 **Orca's own route** (`orca-server.service`, running as `runner`) reaches the server
 independently of SSH entirely — it's a separate channel with its own liveness, not something
@@ -234,8 +234,9 @@ before believing the checkout is dirty.
 
 `scripts/ready-queue.mjs` is the plain-script half of "run the graph from the board": one
 `node scripts/ready-queue.mjs --check` invocation performs exactly one check cycle and exits. It
-is **not** on a timer yet (the `julia-next-ready-queue.timer` unit is a later, parked step), so
-"explicit launch only" below still holds. When the slot is free it starts the top Ready card via
+is **not** on a timer until JUL-79's run enables `julia-ready-queue.timer` (its units are in
+`ops/ready-queue/`, installed disabled by a laptop session), so "explicit launch only" below holds
+until then. When the slot is free it starts the top Ready card via
 the same command `julia-run.mjs` uses for a manual start, and its state file is
 `~/.local/state/julia-next/ready-queue.json` (what the previous check saw). Facts a future
 session must not have to rediscover:
@@ -251,9 +252,9 @@ session must not have to rediscover:
   and the unit agree. One-full-check rule: a card starts only if the previous check already saw
   it in Ready, and a card moved into and out of Ready between checks must never start (the state
   file is rewritten with the whole current Ready set each cycle, so a departure is forgotten).
-  The parked timer this script is built for looks like `julia-next-checkout-sync.timer`; do not
-  create it until the ticket approves it, but the interval belongs in its `ExecStart` and its
-  `OnUnitActiveSec` together:
+  The timer this script is built for is `ops/ready-queue/julia-ready-queue.timer`; the interval
+  belongs in the service's `ExecStart` (`--interval-minutes`) and the timer's `OnUnitActiveSec`
+  together, and `ops/ready-queue/units.test.mjs` pins both to 5.
 
   The real units live in `ops/ready-queue/` (see the JUL-79 laptop-session section below) — a
   service file and a separate timer file, installed by a laptop session, not inline here.
@@ -684,7 +685,7 @@ Source of truth: `ops/sudoers/orchestrator-svc-ops`, guarded by `ops/sudoers/orc
 (every rule must be one fixed command — no wildcards, no lists, no `ALL`, no `#include`, no paths
 outside the named ones — and `visudo -cf` must accept the file where `visudo` exists). Installed by
 hand from a laptop session with the `ubuntu` channel, **LF line endings only** (a Windows `scp`
-once carried CRLF into an installed copy — pipe the file through `tr -d ''`, `sudo visudo -cf`
+once carried CRLF into an installed copy — pipe the file through `tr -d '\r'`, `sudo visudo -cf`
 it, then `sudo install -m 0440 -o root -g root`). Rules, as `orchestrator-svc` via `sudo -n`:
 
 | Rule | Why |
@@ -711,22 +712,36 @@ and `julia-ready-queue.timer` (`OnBootSec=1min`, `OnUnitActiveSec=5min`, `Unit=`
 `ops/ready-queue/units.test.mjs` pins all of it: runs as `orchestrator-svc`, never root; no
 `ExecStartPre/Post/Stop/Reload`, no `+`/`!` prefixes, no capability or supplementary-group
 directives; executes only `node` on the queue script in the checkout. That checkout is root-owned
-and read-only to `orchestrator-svc` (verified 2026-09-19: `/`, `/srv`, `/srv/orchestrator-svc` and
+and read-only to `orchestrator-svc` (verified live: `/`, `/srv`, `/srv/orchestrator-svc` and
 the checkout are not writable by it), so the queue runs code it can read and run but cannot change.
 The queue's needs were checked by running the exact command as `orchestrator-svc` with a bare
 environment: it needs only `ORCA_BIN` (state lives under `$HOME/.local/state/julia-next/`).
 
-**Install (laptop session, `ubuntu`):**
+**Install (laptop session, `ubuntu`).** Install from the reviewed commit, not from whatever the
+checkout holds now: the checkout is synced from `main`, which `orchestrator-svc` can merge to, so
+compare every file to the reviewed SHA first and refuse symlinks. Do the sudoers file first — until
+the old file is replaced, the old install rules are still live.
 ```sh
+SHA=<reviewed merge commit on main>; CK=/srv/orchestrator-svc/julia-next
+for f in ops/ready-queue/julia-ready-queue.service ops/ready-queue/julia-ready-queue.timer ops/sudoers/orchestrator-svc-ops; do
+  sudo test -f "$CK/$f" && sudo test ! -L "$CK/$f" && sudo git -C "$CK" show "$SHA:$f" | sudo cmp - "$CK/$f"
+done
+# 1. sudoers: LF only, syntax-checked, then installed
+sudo sh -c "tr -d '\r' < $CK/ops/sudoers/orchestrator-svc-ops > /tmp/orchestrator-svc-ops"
+sudo visudo -cf /tmp/orchestrator-svc-ops
+sudo install -m 0440 -o root -g root /tmp/orchestrator-svc-ops /etc/sudoers.d/orchestrator-svc-ops && sudo rm /tmp/orchestrator-svc-ops
+sudo -l -U orchestrator-svc            # exactly the file's rules + the one checkout-sync rule
+# 2. the units
 for u in julia-ready-queue.service julia-ready-queue.timer; do
-  sudo install -m 0644 -o root -g root /srv/orchestrator-svc/julia-next/ops/ready-queue/$u /etc/systemd/system/$u
+  sudo install -m 0644 -o root -g root "$CK/ops/ready-queue/$u" /etc/systemd/system/$u
 done
 sudo systemctl daemon-reload
 systemd-analyze verify /etc/systemd/system/julia-ready-queue.service /etc/systemd/system/julia-ready-queue.timer
 sudo systemctl show -p User,ExecStart julia-ready-queue.service   # User=orchestrator-svc
 ```
-Do **not** enable the timer in the same session; JUL-79's run does that as its final step. Done
-2026-09-19 from `main` at the merge of this change.
+Do **not** enable the timer in the same session; JUL-79's run does that as its final step. On the
+server, `node --test ops/sudoers/` run as `orchestrator-svc` from the checkout also checks live that
+an `install` is refused and that the live rule set is exactly the file's.
 
 ### Trust boundary, after this change
 

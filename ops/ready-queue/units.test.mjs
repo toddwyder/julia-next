@@ -19,7 +19,12 @@ function parseUnit(text) {
     const line = raw.trim();
     if (line === '' || line.startsWith('#') || line.startsWith(';')) continue;
     const header = /^\[(\w+)\]$/.exec(line);
-    if (header) { current = sections[header[1]] = []; continue; }
+    if (header) {
+      // systemd merges repeated sections, so a second [Service] could hide a directive.
+      assert.equal(sections[header[1]], undefined, `section [${header[1]}] appears twice`);
+      current = sections[header[1]] = [];
+      continue;
+    }
     assert.ok(current, `directive before any section: ${line}`);
     assert.doesNotMatch(line, /\\$/, `line continuation hides directives: ${line}`);
     const eq = line.indexOf('=');
@@ -57,6 +62,21 @@ test('ExecStart is node on the queue script in the read-only checkout, with fixe
     execStart,
     /^\/usr\/bin\/node \/srv\/orchestrator-svc\/julia-next\/scripts\/ready-queue\.mjs --check --interval-minutes 5$/,
   );
+});
+
+test('only the exact directives listed here exist in either unit (an allowlist, not a denylist)', () => {
+  const allowed = {
+    service: { Unit: ['Description', 'Documentation'], Service: ['Type', 'User', 'Group', 'NoNewPrivileges', 'Environment', 'ExecStart'] },
+    timer: { Unit: ['Description'], Timer: ['OnBootSec', 'OnUnitActiveSec', 'AccuracySec', 'Unit'], Install: ['WantedBy'] },
+  };
+  for (const [name, unit] of Object.entries({ service, timer })) {
+    assert.deepEqual(Object.keys(unit).sort(), Object.keys(allowed[name]).sort(), `${name}: unexpected sections`);
+    for (const [section, entries] of Object.entries(unit)) {
+      for (const [key] of entries) {
+        assert.ok(allowed[name][section].includes(key), `${name} [${section}] has a directive not on the allowlist: ${key}`);
+      }
+    }
+  }
 });
 
 test('the service names only the environment the queue needs', () => {
