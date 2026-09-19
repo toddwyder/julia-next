@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { SEAT_TABLE, FAMILY_OF, assertNoSharedFamily } from './seat-table.mjs';
+import {
+  SEAT_TABLE, FAMILY_OF, assertNoSharedFamily, assertCanPickDifferentFamilies,
+} from './seat-table.mjs';
 
 test('the default seat table has the three seats this ticket names, each with a primary and a backup', () => {
   for (const seat of ['orchestrator', 'builder', 'reviewer']) {
@@ -11,20 +13,49 @@ test('the default seat table has the three seats this ticket names, each with a 
   }
 });
 
-test('builder and reviewer never share a model family, for every combination the default table allows', () => {
-  // Must not throw -- the real, shipped table.
-  assertNoSharedFamily(SEAT_TABLE);
+test("the default table is exactly Todd's instruction: GLM is no seat default or backup", () => {
+  assert.deepEqual(SEAT_TABLE, {
+    orchestrator: { primary: 'claude', backup: 'pi-deepseek' },
+    builder: { primary: 'claude', backup: 'pi-deepseek' },
+    reviewer: { primary: 'codex', backup: 'claude' },
+  });
 });
 
-test('a table where builder and reviewer share a family fails the check', () => {
+test('GLM stays defined in FAMILY_OF and selectable, but is never a seat default or backup', () => {
+  assert.equal(FAMILY_OF['pi-glm'], 'zhipu');
+  for (const [name, seat] of Object.entries(SEAT_TABLE)) {
+    assert.notEqual(seat.primary, 'pi-glm', `${name} primary must not be GLM`);
+    assert.notEqual(seat.backup, 'pi-glm', `${name} backup must not be GLM`);
+  }
+});
+
+test('the real table allows a different-family builder/reviewer pair for every entry', () => {
+  assertCanPickDifferentFamilies(SEAT_TABLE);
+  // The old name stays an alias for anything that still imports it.
+  assert.equal(assertNoSharedFamily, assertCanPickDifferentFamilies);
+});
+
+test('a table where a builder entry has no differing-family reviewer partner throws', () => {
+  const badTable = {
+    ...SEAT_TABLE,
+    builder: { primary: 'claude', backup: 'claude' },
+    reviewer: { primary: 'claude', backup: 'claude' },
+  };
+  assert.throws(
+    () => assertCanPickDifferentFamilies(badTable),
+    /no reviewer entry from a different family/,
+  );
+});
+
+test('a table where a reviewer entry has no differing-family builder partner throws', () => {
   const badTable = {
     ...SEAT_TABLE,
     builder: { primary: 'claude', backup: 'claude' },
     reviewer: { primary: 'claude', backup: 'codex' },
   };
   assert.throws(
-    () => assertNoSharedFamily(badTable),
-    /builder and reviewer share a model family/,
+    () => assertCanPickDifferentFamilies(badTable),
+    /no builder entry from a different family/,
   );
 });
 

@@ -214,14 +214,15 @@ function codexLaunchCommand(issueId, effort) {
   return `${ENV_PREFIX} ${pipedCoordinatorPrompt(issueId)} | codex exec - -s danger-full-access ${effortArgs}`;
 }
 
-// Pi (DeepSeek or GLM), the orchestrator's table backups: no slash-command
+// Pi (DeepSeek or GLM), the orchestrator's Pi routes: no slash-command
 // or exec-subcommand equivalent, so the coordinator skill body is piped in
 // on stdin (see pipedCoordinatorPrompt above), read by run-pi-seat.mjs's own
 // CLI entry (`readAllStdin`) and passed to Pi as its `-p` prompt. The secret
 // never appears in this string -- run-pi-seat.mjs reads it in-process via
 // read-secret.mjs, keyed only by the seat name (which *is* safe to put in a
-// shell string). The seat name is a parameter because JUL-79 step 3 adds
-// `orchestrator-deepseek` alongside the GLM `orchestrator-backup`.
+// shell string). JUL-79 step 8 sets the orchestrator's table backup to
+// `pi-deepseek` and leaves `pi-glm` selectable as a card label, never a seat
+// default or backup -- both still launch through this helper.
 //
 // The effort travels as the neutral `--effort <level>` label, not as a Pi
 // flag: run-pi-seat.mjs owns Pi's actual on/off spelling (`--thinking`), so
@@ -251,7 +252,14 @@ export function orchestratorLaunchCommandFor(entry, issueId, { effort } = {}) {
 // not a verified quote for that vendor specifically. If it turns out not to
 // match a real Claude cap message, that's a gap to close with a live
 // example, not a guess to silence.
-export const CAP_ERROR_PATTERN = /usage limit|hit your usage|quota exceeded|rate limit exceeded/i;
+//
+// Z.ai (GLM) exhaustion is the other live-verified one (2026-09-19,
+// captured twice): a seat with no balance returns
+// `429 {"code":"1113","message":"Insufficient balance or no resource
+// package. Please recharge."}` on every call. "insufficient balance",
+// "no resource package" and "recharge" cover that wording and its close
+// paraphrases without turning ordinary vendor errors into a cap.
+export const CAP_ERROR_PATTERN = /usage limit|hit your usage|quota exceeded|rate limit exceeded|insufficient balance|no resource package|recharge/i;
 
 // Bounded, not a wait for the whole session: a cap error shows up within
 // the first turn or two (observed live this session, Codex, within ~30s of

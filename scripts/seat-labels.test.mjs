@@ -19,6 +19,7 @@ import {
   resolveSeatChoices,
   missingSeatLabels,
   validateFamilyChoice,
+  fallbackSeatChoice,
   seatChoicesForIssue,
 } from './seat-labels.mjs';
 
@@ -139,6 +140,31 @@ test('the family rule rejects a same-family builder/reviewer pair, in one senten
   assert.match(result.reason, /builder-claude-opus/);
   assert.match(result.reason, /reviewer-claude-sonnet/);
   assert.match(result.reason, /different families/);
+});
+
+test('a seat fallback that keeps builder and reviewer in different families is allowed', () => {
+  const choices = resolveSeatChoices([]); // builder claude, reviewer codex
+  const result = fallbackSeatChoice(choices, 'builder');
+  assert.equal(result.ok, true);
+  assert.equal(result.choices.builder.entry, 'pi-deepseek');
+  assert.equal(result.choices.builder.modelLabel, 'builder-deepseek-flash');
+  assert.equal(result.choices.reviewer.entry, 'codex');
+});
+
+test('a fallback whose backup collides with the other seat is refused, not silently used', () => {
+  const choices = resolveSeatChoices([]); // builder claude, reviewer codex
+  // The reviewer's natural backup is claude -- the builder's family. The
+  // fallback must be refused, not produce a same-family pair.
+  const result = fallbackSeatChoice(choices, 'reviewer');
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /refusing the reviewer backup/);
+  assert.match(result.reason, /different families/);
+});
+
+test('GLM is still a selectable seat-label model even though it is no seat default or backup', () => {
+  const choices = resolveSeatChoices(['builder-glm-5.3']);
+  assert.equal(choices.builder.entry, 'pi-glm');
+  assert.equal(choices.builder.modelLabel, 'builder-glm-5.3');
 });
 
 test('the family rule rejects an unknown seat-table entry', () => {

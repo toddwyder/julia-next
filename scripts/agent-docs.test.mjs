@@ -1,0 +1,42 @@
+// agent-docs.test.mjs -- JUL-79 step 8, pieces 4 and 5: the standing cleanup
+// rule must live in BOTH the repo instructions Claude Code reads (CLAUDE.md)
+// and the coordinator skill it follows (SKILL.md), and the runbook must carry
+// the facts verified live on 2026-09-19 that a fresh session cannot re-derive.
+// Pinning the wording here keeps a later edit from silently dropping one.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+
+const read = (relativePath) => readFileSync(new URL(`../${relativePath}`, import.meta.url), 'utf8');
+
+test('CLAUDE.md states the standing cleanup rule for agent-created test/throwaway Linear cards', () => {
+  const text = read('CLAUDE.md');
+  assert.match(text, /test\s+or\s+throwaway/i);
+  assert.match(text, /cancelled\s+by that same agent/i);
+  assert.match(text, /one-line\s+reason/i);
+  assert.match(text, /before its ticket counts as\s+done/i);
+});
+
+test('the coordinator skill states the same standing cleanup rule in its own voice', () => {
+  const text = read('.claude/skills/julia-coordinator/SKILL.md');
+  assert.match(text, /test\s+or\s+throwaway/i);
+  assert.match(text, /cancelled\s+by that same agent/i);
+  assert.match(text, /one-line\s+reason/i);
+  assert.match(text, /before its ticket counts as\s+done/i);
+});
+
+test('the runbook records the JUL-79 step 8 live-verified facts, each dated 2026-09-19', () => {
+  const text = read('docs/agents/jul43-coordinator-runbook.md');
+  // (a) the silent Z.ai exhaustion
+  assert.match(text, /Insufficient balance or no resource package/);
+  // (b) the relay is reachable directly from an on-box coordinator
+  assert.match(text, /127\.0\.0\.1:8943/);
+  // (c) the launcher binds the run to its own terminal, so worker-start fences
+  assert.match(text, /consumer_fenced/);
+  // (d) ORCA_TERMINAL_HANDLE is unset in a julia-run-started Claude orchestrator
+  assert.match(text, /ORCA_TERMINAL_HANDLE/);
+  // (e) nothing can read a PR's mergeable_state with the publisher token
+  assert.match(text, /mergeable_state/);
+  const dated = text.match(/2026-09-19/g) ?? [];
+  assert.ok(dated.length >= 5, `expected at least five 2026-09-19 facts, found ${dated.length}`);
+});

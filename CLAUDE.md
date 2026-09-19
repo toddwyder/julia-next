@@ -41,6 +41,11 @@ intake, menu planning, shopping lists, kitchen prep, full-screen cook mode). The
 Issues live in Linear (team Julia-next), via the Linear MCP tools — not GitHub issues. See
 `docs/agents/issue-tracker.md`.
 
+**Clean up every test or throwaway card you create.** Any test or throwaway Linear card an agent
+creates must be cancelled by that same agent, with a one-line reason, before its ticket counts as
+done. Leftover test cards count as unfinished work, not board noise — five of them sat on the
+board for two days before Todd found them.
+
 ### Triage labels
 
 Default label vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`,

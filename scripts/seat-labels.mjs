@@ -201,6 +201,42 @@ export function validateFamilyChoice(choices) {
   return { ok: true };
 }
 
+// The runtime fallback path (JUL-79 step 8): when a seat's primary ends in a
+// usage-cap error the coordinator restarts that step on the seat's `backup`
+// entry. That fallback is a NEW resolved pair, so it must be re-checked
+// against the same builder/reviewer rule -- via validateFamilyChoice, never a
+// second copy of it. If the natural backup would put builder and reviewer in
+// the same family (e.g. reviewer falling back to claude while the builder is
+// already claude), the fallback is REFUSED rather than silently used. Pure:
+// `{ ok: true, choices }` with the seat moved to its backup, or
+// `{ ok: false, reason }` naming the refused backup and why.
+export function fallbackSeatChoice(choices, seat, { table = SEAT_TABLE } = {}) {
+  const code = AGENT_CODES[seat];
+  if (!code) {
+    return { ok: false, reason: `cannot fall back: '${seat}' is not an agent seat` };
+  }
+  const backupEntry = table?.[seat]?.backup;
+  if (!backupEntry) {
+    return { ok: false, reason: `cannot fall back: ${seat} has no backup entry in the seat table` };
+  }
+  const fallbackChoices = {
+    ...choices,
+    [seat]: {
+      ...choices?.[seat],
+      entry: backupEntry,
+      modelLabel: `${code}-${DEFAULT_MODEL_SUFFIX_BY_ENTRY[backupEntry]}`,
+    },
+  };
+  const valid = validateFamilyChoice(fallbackChoices);
+  if (!valid.ok) {
+    return {
+      ok: false,
+      reason: `refusing the ${seat} backup (${backupEntry}): ${valid.reason}`,
+    };
+  }
+  return { ok: true, choices: fallbackChoices };
+}
+
 // Read-only helper for the coordinator: takes an issue object as
 // linear-cli.mjs's getIssue() returns it (labels as `{ nodes: [{ name }] }`)
 // and resolves the three seats. Pure.

@@ -707,6 +707,40 @@ when the coordinator runs **off-box** (e.g. a laptop session); an on-box coordin
 `scripts/coordinator-events.mjs` itself. The SKILL.md text still describes the off-box route and
 is not changed by this step.
 
+## Five JUL-79 step 8 facts, each verified live 2026-09-19
+
+Each of these was learned on the box and would silently mislead a fresh session; the date is the
+day it was verified, not the day it was written down.
+
+**(a) A spent Z.ai (GLM) balance is invisible unless the JSON stream is read.** With no balance, a
+Z.ai seat returns `429 {"code":"1113","message":"Insufficient balance or no resource package.
+Please recharge."}` on every call; Pi retries three times, settles, and exits 0 with empty stderr.
+The vendor error appears only inside `--mode json`. Verified 2026-09-19, captured twice. The fixes
+are `scripts/julia-run.mjs`'s `CAP_ERROR_PATTERN` (which now recognises that wording) and
+`ops/service-dropbox/run-pi-seat.mjs` (which now exits non-zero and prints the vendor error to
+stderr when the final assistant turn ends in a vendor error).
+
+**(b) The journey relay is reachable directly from an on-box coordinator.** `127.0.0.1:8943` is
+reachable DIRECTLY from a coordinator process running on the box as `orchestrator-svc` from
+`/srv/orchestrator-svc/julia-next` -- confirmed 2026-09-19 by a `coordinator_started` emit
+returning `sent:true`, with no diagnostic-terminal indirection. The terminal-on-runner
+indirection the coordinator skill describes is only needed when the coordinator runs OFF the box.
+
+**(c) `julia-run.mjs` binds the Orca run to the LAUNCHER terminal, not the orchestrator terminal
+it opens.** So the run's `coordinator_handle` is not the terminal the orchestrator runs in, and
+`worker-start --from $ORCA_TERMINAL_HANDLE` fails with `consumer_fenced`. Until the launcher is
+fixed, a fresh orchestrator must run `orca orchestration run-use --id <run id> --from <its own
+terminal handle>`. Verified working 2026-09-19.
+
+**(d) `ORCA_TERMINAL_HANDLE` is not set in a Claude orchestrator started by `julia-run.mjs`.** So
+`orca orchestration run-current` fails there, and every orchestration command needs an explicit
+`--from`. Verified 2026-09-19.
+
+**(e) No repo command READS the GitHub API with the publisher token.** `publish-pr.mjs` only
+pushes and opens; `merge-pr.mjs` only merges and does not check mergeability; `gh` on the server is
+deliberately unauthenticated. The coordinator therefore cannot read a PR's `mergeable_state` and
+relies on the merge API refusing a non-mergeable PR. Noted 2026-09-19 as a known gap.
+
 ## The For-Todd guard: only three kinds of thing reach Todd (JUL-79 step 4)
 
 The rule is now code, not just prose. `scripts/linear-cli.mjs` exports the pure

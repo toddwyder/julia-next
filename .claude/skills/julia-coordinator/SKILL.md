@@ -33,6 +33,12 @@ runbook is what a fresh session with no memory of this conversation reads instea
 
 **Width is 1**: at most one work item in flight.
 
+**Clean up after yourself.** Any test or throwaway Linear card an agent creates must be cancelled
+by that same agent, with a one-line reason, before its ticket counts as done. Leftover test cards
+count as unfinished work, not board noise -- five of them sat on the board for two days before
+Todd found them. Cancelling is part of the step's definition of done, alongside its evidence: a
+card left behind means the step is not actually finished.
+
 ---
 
 ## Tracker: Linear, not GitHub issues

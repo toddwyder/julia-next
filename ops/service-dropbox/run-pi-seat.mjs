@@ -91,6 +91,109 @@ export function runPiSeat(seat, prompt, { spawnImpl = spawn, spawnOpts, ...specO
   return spawnImpl(spec.command, spec.args, { env: spec.env, ...(spawnOpts || {}) });
 }
 
+function errorTextOf(value) {
+  if (typeof value === 'string') return value;
+  if (value && typeof value === 'object') return JSON.stringify(value);
+  return null;
+}
+
+// Read Pi's `--mode json` stream (one JSON event per line) and decide whether
+// the turn ended in a vendor error. Verified live twice on 2026-09-19: a
+// spent Z.ai balance makes Pi retry, settle, and exit 0 with an EMPTY stderr;
+// the only trace is the assistant message's `stopReason: "error"` plus its
+// `errorMessage` (e.g. `429 {"code":"1113","message":"Insufficient balance
+// or no resource package. Please recharge."}`). A later successful assistant
+// message clears an earlier transient error, so only the FINAL assistant
+// stopReason decides. Pure and JSON-only: non-JSON lines are ignored, never a
+// crash.
+export function parsePiJsonStream(text) {
+  let lastAssistant = null;
+  let topLevelError = null;
+  for (const line of String(text).split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    let event;
+    try {
+      event = JSON.parse(trimmed);
+    } catch {
+      continue;
+    }
+    if (event?.type === 'error') {
+      topLevelError = errorTextOf(event.error ?? event.message ?? event);
+    }
+    const messages = [];
+    if (event?.message) messages.push(event.message);
+    if (Array.isArray(event?.messages)) messages.push(...event.messages);
+    for (const message of messages) {
+      if (message?.role === 'assistant' && typeof message.stopReason === 'string') {
+        lastAssistant = message;
+      }
+    }
+  }
+
+  if (lastAssistant) {
+    if (lastAssistant.stopReason === 'error') {
+      return { ok: false, errorText: errorTextOf(lastAssistant.errorMessage) ?? 'Pi reported a vendor error' };
+    }
+    return { ok: true, errorText: null };
+  }
+  if (topLevelError) return { ok: false, errorText: topLevelError };
+  return { ok: true, errorText: null };
+}
+
+// Watch a spawned Pi child to completion: tee its stdout through unchanged
+// (the JSON stream stays visible), then turn a vendor error in that stream
+// into a NON-ZERO exit with the vendor text on stderr. A normal turn resolves
+// with the child's own exit code and writes nothing to stderr. Resolves only
+// once the child has exited AND its stdout has fully drained, so the last
+// JSON line is never missed.
+export function supervisePiSeat(child, { stdout = process.stdout, stderr = process.stderr } = {}) {
+  return new Promise((resolve) => {
+    let output = '';
+    let exited = false;
+    let exitCode = null;
+    let stdoutDone = !child.stdout;
+    let settled = false;
+
+    const finalize = () => {
+      if (settled || !exited || !stdoutDone) return;
+      settled = true;
+      const { ok, errorText } = parsePiJsonStream(output);
+      if (!ok) {
+        stderr.write(`${errorText}\n`);
+        resolve(exitCode && exitCode !== 0 ? exitCode : 1);
+        return;
+      }
+      resolve(exitCode ?? 1);
+    };
+
+    const onExit = (code) => {
+      exited = true;
+      exitCode = code;
+      finalize();
+    };
+
+    child.stdout?.on('data', (chunk) => {
+      output += chunk.toString();
+      stdout.write(chunk);
+    });
+    child.stdout?.on('end', () => {
+      stdoutDone = true;
+      finalize();
+    });
+    child.stderr?.on('data', (chunk) => stderr.write(chunk));
+
+    child.on('error', (error) => {
+      if (settled) return;
+      settled = true;
+      stderr.write(`${error.message}\n`);
+      resolve(1);
+    });
+    child.on('exit', onExit);
+    child.on('close', onExit);
+  });
+}
+
 // CLI entry: `{ cat SKILL.md; printf ...; } | node run-pi-seat.mjs <seat>
 // [--effort low|medium|high]` -- mirrors julia-run.mjs's existing codex launch
 // pattern (prompt text piped in via stdin, not an argv entry) so the same
@@ -128,14 +231,12 @@ async function main() {
     return;
   }
   const prompt = readAllStdin();
-  const child = runPiSeat(seat, prompt, { mode: 'json', effort, spawnOpts: { stdio: ['ignore', 'inherit', 'inherit'] } });
-  child.on('error', (error) => {
-    console.error(error.message);
-    process.exitCode = 1;
-  });
-  child.on('exit', (code) => {
-    process.exitCode = code ?? 1;
-  });
+  // Pipe stdout (rather than inherit it) so the JSON stream can be inspected
+  // for a vendor error while still being shown live; supervisePiSeat turns a
+  // silent vendor failure into a non-zero exit with the vendor text on
+  // stderr -- the fix for the two invisible run deaths (2026-09-19).
+  const child = runPiSeat(seat, prompt, { mode: 'json', effort, spawnOpts: { stdio: ['ignore', 'pipe', 'pipe'] } });
+  process.exitCode = await supervisePiSeat(child);
 }
 
 import { pathToFileURL } from 'node:url';
