@@ -201,9 +201,146 @@ export function validateFamilyChoice(choices) {
   return { ok: true };
 }
 
+// The runtime fallback path (JUL-79 step 8): when a seat's primary ends in a
+// usage-cap error the coordinator restarts that step on the seat's `backup`
+// entry. That fallback is a NEW resolved pair, so it must be re-checked
+// against the same builder/reviewer rule -- via validateFamilyChoice, never a
+// second copy of it. If the natural backup would put builder and reviewer in
+// the same family (e.g. reviewer falling back to claude while the builder is
+// already claude), the fallback is REFUSED rather than silently used. Pure:
+// `{ ok: true, choices }` with the seat moved to its backup, or
+// `{ ok: false, reason }` naming the refused backup and why.
+export function fallbackSeatChoice(choices, seat, { table = SEAT_TABLE } = {}) {
+  const code = AGENT_CODES[seat];
+  if (!code) {
+    return { ok: false, reason: `cannot fall back: '${seat}' is not an agent seat` };
+  }
+  const backupEntry = table?.[seat]?.backup;
+  if (!backupEntry) {
+    return { ok: false, reason: `cannot fall back: ${seat} has no backup entry in the seat table` };
+  }
+  const fallbackChoices = {
+    ...choices,
+    [seat]: {
+      ...choices?.[seat],
+      entry: backupEntry,
+      modelLabel: `${code}-${DEFAULT_MODEL_SUFFIX_BY_ENTRY[backupEntry]}`,
+    },
+  };
+  const valid = validateFamilyChoice(fallbackChoices);
+  if (!valid.ok) {
+    return {
+      ok: false,
+      reason: `refusing the ${seat} backup (${backupEntry}): ${valid.reason}`,
+    };
+  }
+  return { ok: true, choices: fallbackChoices };
+}
+
 // Read-only helper for the coordinator: takes an issue object as
 // linear-cli.mjs's getIssue() returns it (labels as `{ nodes: [{ name }] }`)
 // and resolves the three seats. Pure.
 export function seatChoicesForIssue(issue) {
   return resolveSeatChoices(issue?.labels);
+}
+
+// A real CLI entry point for the fallback guard (JUL-79 step 8 follow-up).
+// The guard above is only real if the coordinator actually runs it: the
+// skill's fallback passages now name this command, so a capped seat's backup
+// is resolved through fallbackSeatChoice instead of being read off the table
+// raw. Given the entry in use on the OTHER seat (the family rule is only
+// builder-vs-reviewer), it prints the backup entry to dispatch, or refuses
+// with the guard's own reason and a non-zero exit. It is a thin passthrough
+// over fallbackSeatChoice/validateFamilyChoice -- never a second copy of the
+// rule.
+const USAGE = {
+  fallback: 'usage: seat-labels.mjs fallback --seat <orchestrator|builder|reviewer> --builder <entry> (when the reviewer falls back) or --reviewer <entry> (when the builder falls back)',
+};
+const USAGE_ROOT = 'usage: seat-labels.mjs fallback --seat <seat> [--builder <entry>] [--reviewer <entry>]';
+
+// Distinct from a refusal so the exit code can tell the two apart (2 = bad
+// argv, matching the other repo CLIs; 1 = the guard refused the fallback).
+class UsageError extends Error {}
+
+function parseFlags(args, allowed, usage) {
+  const flags = {};
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i];
+    if (!arg.startsWith('--')) {
+      throw new UsageError(usage);
+    }
+    const name = arg.slice(2);
+    if (!allowed.includes(name)) {
+      throw new UsageError(usage);
+    }
+    const value = args[i + 1];
+    if (value === undefined || value.startsWith('--')) {
+      throw new UsageError(usage);
+    }
+    flags[name] = value;
+    i += 1;
+  }
+  return flags;
+}
+
+// Re-point one seat's choice at an entry the coordinator says is in use,
+// keeping the label convention (`<code>-<default suffix>`) so the refusal
+// reason names the same model the card does.
+function withEntry(choice, code, entry) {
+  return { ...choice, entry, modelLabel: `${code}-${DEFAULT_MODEL_SUFFIX_BY_ENTRY[entry]}` };
+}
+
+// main() takes every dependency as an injectable default so the CLI can be
+// tested without a subprocess. Called bare by the guard at the bottom of
+// this file, where the defaults are the real process argv/stdio/exitCode.
+export function main({
+  argv = process.argv.slice(2),
+  stdout = process.stdout,
+  stderr = process.stderr,
+  setExitCode = (code) => { process.exitCode = code; },
+} = {}) {
+  const [command, ...rest] = argv;
+  const usage = USAGE[command];
+  if (!usage) {
+    stderr.write(`${USAGE_ROOT}\n`);
+    setExitCode(2);
+    return;
+  }
+  try {
+    const flags = parseFlags(rest, ['seat', 'builder', 'reviewer'], usage);
+    if (!flags.seat || !Object.hasOwn(AGENT_CODES, flags.seat)) {
+      throw new UsageError(usage);
+    }
+    // Start from the table's own resolution, then overlay the entry the
+    // caller says is in use on the other seat. Never assume which flag was
+    // passed: the reviewer's fallback is checked against the builder, and
+    // the builder's against the reviewer.
+    const choices = resolveSeatChoices([]);
+    if (flags.seat === 'reviewer') {
+      if (!flags.builder || !Object.hasOwn(FAMILY_OF, flags.builder)) throw new UsageError(usage);
+      choices.builder = withEntry(choices.builder, 'builder', flags.builder);
+    } else if (flags.seat === 'builder') {
+      if (!flags.reviewer || !Object.hasOwn(FAMILY_OF, flags.reviewer)) throw new UsageError(usage);
+      choices.reviewer = withEntry(choices.reviewer, 'reviewer', flags.reviewer);
+    }
+    const result = fallbackSeatChoice(choices, flags.seat);
+    if (!result.ok) {
+      stderr.write(`${result.reason}\n`);
+      setExitCode(1);
+      return;
+    }
+    const choice = result.choices[flags.seat];
+    stdout.write(`${JSON.stringify({ seat: flags.seat, entry: choice.entry, modelLabel: choice.modelLabel }, null, 2)}\n`);
+    setExitCode(0);
+  } catch (error) {
+    // A usage error and a refused fallback both go to stderr as one line;
+    // only the exit code differs (2 vs 1). Never a raw stack trace.
+    stderr.write(`${error.message}\n`);
+    setExitCode(error instanceof UsageError ? 2 : 1);
+  }
+}
+
+import { pathToFileURL } from 'node:url';
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main();
 }

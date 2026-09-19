@@ -223,7 +223,7 @@ test('orchestratorLaunchCommandFor: claude is the table primary, unchanged shape
   assert.match(command, /claude --permission-mode acceptEdits/);
 });
 
-test('orchestratorLaunchCommandFor: pi-glm (the table backup) pipes the skill into run-pi-seat.mjs, orchestrator-backup seat, no secret in the string', () => {
+test('orchestratorLaunchCommandFor: pi-glm (still a selectable entry, no longer a seat backup) pipes the skill into run-pi-seat.mjs, orchestrator-backup seat, no secret in the string', () => {
   const command = orchestratorLaunchCommandFor('pi-glm', 'JUL-63');
   assert.match(command, /export ORCA_BIN=\/opt\/Orca\/orca-ide ORCA_ENVIRONMENT=ovh-local/);
   assert.match(command, /set -a; \. \/etc\/orchestrator-svc\/\.env\.publisher; set \+a/);
@@ -286,11 +286,16 @@ test('orchestratorLaunchCommandFor: claude still gets its full tool grant list, 
 // JUL-79 step 6: the unattended coordinator stalled because the queue script
 // and the Linear CLI it reaches for were not on its --allowedTools list.
 // Both must be named explicitly, and the grant list must stay narrow -- no
-// blanket `Bash(node:*)` and no permission bypass.
+// blanket `Bash(node:*)` and no permission bypass. JUL-79 step 8 follow-up:
+// the family-collision guard (scripts/seat-labels.mjs) is on the list too,
+// because the skill's fallback passages now require running it before a
+// backup dispatch.
 test('orchestratorLaunchCommandFor: claude grants the ready-queue and linear-cli commands the coordinator procedure runs (JUL-79 step 6)', () => {
   const command = orchestratorLaunchCommandFor('claude', 'JUL-79');
   assert.match(command, /Bash\(node scripts\/ready-queue\.mjs:\*\)/);
   assert.match(command, /Bash\(node scripts\/linear-cli\.mjs:\*\)/);
+  // JUL-79 step 8 follow-up: the fallback guard the skill now requires.
+  assert.match(command, /Bash\(node scripts\/seat-labels\.mjs:\*\)/);
   // Existing entries are untouched.
   assert.match(command, /Bash\(node scripts\/orca-cli\.mjs:\*\)/);
   assert.match(command, /Bash\(node scripts\/check-readiness\.mjs:\*\)/);
@@ -336,13 +341,13 @@ test('startOrchestrator: no cap error -> stays on the table primary', async () =
 test('startOrchestrator: an early cap error on the primary fails over to the table backup, same objective, one retry', async () => {
   const { impls, calls } = fakeImpls({ waitForEarlyCapErrorImpl: async () => true });
   const result = await startOrchestrator('JUL-63', impls);
-  assert.equal(result.usedEntry, 'pi-glm');
+  assert.equal(result.usedEntry, 'pi-deepseek');
   assert.equal(result.failedOverFrom, 'claude');
   // Both attempts target the same issue, and both a run and a terminal exist for each.
   assert.deepEqual(calls.runsCreated, ['JUL-63', 'JUL-63']);
   assert.equal(calls.terminalsCreated.length, 2);
   assert.match(calls.terminalsCreated[0].command, /claude --permission-mode/);
-  assert.match(calls.terminalsCreated[1].command, /run-pi-seat\.mjs orchestrator-backup/);
+  assert.match(calls.terminalsCreated[1].command, /run-pi-seat\.mjs orchestrator-deepseek/);
 });
 
 test('startOrchestrator: no retry on any other error -- waitForEarlyCapError never resolving true for a non-cap failure means the primary run stands', async () => {
@@ -381,6 +386,25 @@ test('CAP_ERROR_PATTERN matches common vendor cap phrasing', () => {
   assert.match('quota exceeded for this project', CAP_ERROR_PATTERN);
   assert.match('rate limit exceeded, try again later', CAP_ERROR_PATTERN);
   assert.doesNotMatch('connection refused', CAP_ERROR_PATTERN);
+});
+
+test('CAP_ERROR_PATTERN recognises the live Z.ai 429 insufficiency wording captured 2026-09-19', () => {
+  // Verbatim, captured twice live on 2026-09-19 from a Z.ai (GLM) seat with
+  // no balance.
+  const live = '429 {"code":"1113","message":"Insufficient balance or no resource package. Please recharge."}';
+  assert.match(live, CAP_ERROR_PATTERN);
+  assert.match('insufficient balance', CAP_ERROR_PATTERN);
+  assert.match('no resource package', CAP_ERROR_PATTERN);
+  assert.match('Please recharge.', CAP_ERROR_PATTERN);
+  assert.match('Z.ai error: InSufficient Balance', CAP_ERROR_PATTERN);
+});
+
+test('CAP_ERROR_PATTERN does not match ordinary failure text', () => {
+  assert.doesNotMatch('connection refused', CAP_ERROR_PATTERN);
+  assert.doesNotMatch('404 Not Found', CAP_ERROR_PATTERN);
+  assert.doesNotMatch('Authentication Fails, your api key is invalid', CAP_ERROR_PATTERN);
+  assert.doesNotMatch('model not found: deepseek-v9', CAP_ERROR_PATTERN);
+  assert.doesNotMatch('the terminal is still working', CAP_ERROR_PATTERN);
 });
 
 test('no defaultPostCommentImpl and no separate start-comment call: the coordinator posts its own comments during its wake', async () => {

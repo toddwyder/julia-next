@@ -1,8 +1,34 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { EventEmitter } from 'node:events';
+import { PassThrough } from 'node:stream';
 
-import { buildPiSpawnSpec, runPiSeat, SEATS, readAllStdin, thinkingArgs, parseSeatArgs } from './run-pi-seat.mjs';
+import {
+  buildPiSpawnSpec, runPiSeat, SEATS, readAllStdin, thinkingArgs, parseSeatArgs,
+  parsePiJsonStream, supervisePiSeat,
+} from './run-pi-seat.mjs';
+
+// A stand-in for a spawned `pi` process: an EventEmitter with pipe-able
+// stdout/stderr, so the JSON-stream detection can be exercised without a
+// live vendor call.
+function fakePiChild() {
+  const child = new EventEmitter();
+  child.stdout = new PassThrough();
+  child.stderr = new PassThrough();
+  return child;
+}
+
+function collectWriters() {
+  let stdout = '';
+  let stderr = '';
+  return {
+    stdout: { write: (chunk) => { stdout += chunk.toString(); } },
+    stderr: { write: (chunk) => { stderr += chunk.toString(); } },
+    get stdoutText() { return stdout; },
+    get stderrText() { return stderr; },
+  };
+}
 
 test('builder-backup spawns pi with DEEPSEEK_API_KEY in env, never in argv', () => {
   const spec = buildPiSpawnSpec('builder-backup', 'do the thing', {
@@ -143,4 +169,68 @@ test('run-pi-seat.mjs never uses exec or shell:true -- spawn with an argv array 
   const text = readFileSync(path, 'utf8');
   assert.doesNotMatch(text, /\bexecFile\b|\bexec\(/, 'run-pi-seat.mjs must never shell out via exec/execFile');
   assert.doesNotMatch(text, /shell:\s*true/, 'run-pi-seat.mjs must never spawn with shell:true');
+});
+
+test('parsePiJsonStream: a normal successful turn has no vendor error', () => {
+  const stream = [
+    '{"type":"session","version":3,"id":"abc"}',
+    '{"type":"agent_start"}',
+    '{"type":"message_start","message":{"role":"assistant","content":[],"stopReason":"pending"}}',
+    '{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"done"}],"stopReason":"stop"}}',
+    '{"type":"agent_end","messages":[{"role":"assistant","stopReason":"stop"}],"willRetry":false}',
+    '{"type":"agent_settled"}',
+  ].join('\n');
+  assert.deepEqual(parsePiJsonStream(stream), { ok: true, errorText: null });
+});
+
+test('parsePiJsonStream: the live Z.ai 429 insufficiency error is a vendor error carrying its text', () => {
+  const vendor = '429 {"code":"1113","message":"Insufficient balance or no resource package. Please recharge."}';
+  const stream = [
+    '{"type":"session","version":3,"id":"abc"}',
+    `{"type":"message_start","message":{"role":"assistant","content":[],"stopReason":"error","errorMessage":${JSON.stringify(vendor)}}}`,
+    `{"type":"message_end","message":{"role":"assistant","content":[],"stopReason":"error","errorMessage":${JSON.stringify(vendor)}}}`,
+    `{"type":"turn_end","message":{"role":"assistant","stopReason":"error","errorMessage":${JSON.stringify(vendor)}},"toolResults":[]}`,
+    '{"type":"agent_settled"}',
+  ].join('\n');
+  const result = parsePiJsonStream(stream);
+  assert.equal(result.ok, false);
+  assert.match(result.errorText, /Insufficient balance or no resource package/);
+});
+
+test('parsePiJsonStream: a transient error followed by a successful turn is NOT a failure', () => {
+  const stream = [
+    '{"type":"message_end","message":{"role":"assistant","stopReason":"error","errorMessage":"429 rate limited"}}',
+    '{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"ok"}],"stopReason":"stop"}}',
+    '{"type":"agent_settled"}',
+  ].join('\n');
+  assert.deepEqual(parsePiJsonStream(stream), { ok: true, errorText: null });
+});
+
+test('parsePiJsonStream: plain, non-JSON output never invents a vendor error', () => {
+  assert.deepEqual(parsePiJsonStream('hello there\nnot json at all\n'), { ok: true, errorText: null });
+  assert.deepEqual(parsePiJsonStream(''), { ok: true, errorText: null });
+});
+
+test('supervisePiSeat: a turn that ends in a vendor error exits non-zero and prints the error to stderr', async () => {
+  const child = fakePiChild();
+  const out = collectWriters();
+  const done = supervisePiSeat(child, out);
+  const vendor = '429 {"code":"1113","message":"Insufficient balance or no resource package. Please recharge."}';
+  child.stdout.end(`{"type":"message_end","message":{"role":"assistant","stopReason":"error","errorMessage":${JSON.stringify(vendor)}}}\n{"type":"agent_settled"}\n`);
+  child.emit('close', 0);
+  const code = await done;
+  assert.equal(code, 1);
+  assert.match(out.stderrText, /Insufficient balance or no resource package/);
+});
+
+test('supervisePiSeat: a normal successful turn exits 0 and prints nothing to stderr', async () => {
+  const child = fakePiChild();
+  const out = collectWriters();
+  const done = supervisePiSeat(child, out);
+  child.stdout.end('{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"ok"}],"stopReason":"stop"}}\n{"type":"agent_settled"}\n');
+  child.emit('close', 0);
+  const code = await done;
+  assert.equal(code, 0);
+  assert.equal(out.stderrText, '');
+  assert.match(out.stdoutText, /agent_settled/);
 });
