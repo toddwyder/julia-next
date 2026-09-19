@@ -867,6 +867,53 @@ concluding the token is bad). Note that the env API **echoes a value back in its
 response**, so an env write can print a value into the caller's transcript — a DSN is a public
 client key, but treat env writes as potentially noisy.
 
+## Three JUL-44 step-6 discoveries (verified 2026-09-19)
+
+Each of these was learned while wiring the PowerSync Production instance to the Supabase
+production database in JUL-44 step 6 and recorded here in step 7; the date is the day it was
+verified, not the day it was written down.
+
+### The drop box has no Postgres credential for PowerSync; the Supabase management key can create one
+
+**Verified 2026-09-19.** The service drop box carries no Postgres credential for PowerSync. The
+Supabase management key (drop-box field `supabase`, a full-access personal access token) can
+create the needed narrow database credential headlessly: `POST
+https://api.supabase.com/v1/projects/{ref}/database/query` with body `{"query": "..."}` runs
+SQL, for example
+
+```sql
+CREATE ROLE powersync_role WITH REPLICATION BYPASSRLS LOGIN PASSWORD '<generated>';
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO powersync_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO powersync_role;
+CREATE PUBLICATION powersync FOR ALL TABLES;
+```
+
+Supabase's own PowerSync guide uses this dedicated-role shape, and the `powersync` publication
+name is required. The database password can separately be rotated with `PATCH
+https://api.supabase.com/v1/projects/{ref}/database/password` with `{"password": "..."}` — but
+rotating the `postgres` password is unnecessary when the dedicated role is used. The direct
+Supabase connection (`db.<ref>.supabase.co:5432`) resolves to IPv6 only and PowerSync Cloud
+reaches it; the Supabase pooler at `aws-0-us-west-2.pooler.supabase.com` has IPv4 if a pooler is
+ever needed.
+
+### PowerSync provisioning sequence: service-config, wait for DNS, then sync-config
+
+**Verified 2026-09-19.** On a freshly created (unprovisioned) instance, `powersync deploy` fails
+after provisioning with "Failed to reach instance after provision", because the instance DNS name
+`*.powersync.journeyapps.com` does not resolve yet. The working sequence is `powersync deploy
+service-config` first, wait for the DNS name to resolve, then `powersync deploy sync-config`. A
+connection password can be supplied in `powersync/service.yaml` as `password: { secret: !env
+POWERSYNC_DATABASE_PASSWORD }`, resolved at deploy time from the process environment. `powersync
+status` then reports the connection and replication slot; `Initial replication done: true` with a
+0-byte replication lag is the proof the sync project is linked to Postgres.
+
+### Provisioning secrets live at `/home/orchestrator-svc/.env.provisioning`, not `/etc`
+
+**Verified 2026-09-19.** Provisioning secrets live at `/home/orchestrator-svc/.env.provisioning`
+(owner `orchestrator-svc:orchestrator-svc`, mode 600), written by the orchestrator itself. The
+Sep 17 Decision named `/etc/orchestrator-svc/.env.provisioning`, but that directory is root-owned
+mode 700 and cannot be written by `orchestrator-svc`.
+
 ## The For-Todd guard: only three kinds of thing reach Todd (JUL-79 step 4)
 
 The rule is now code, not just prose. `scripts/linear-cli.mjs` exports the pure
