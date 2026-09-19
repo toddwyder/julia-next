@@ -22,3 +22,11 @@ ticket, either individually or as part of a batch that covered it. A ticket whos
 decisions aren't all proven reachable or don't have a named, one-time Todd action stays
 unlabeled, no matter how well-specified its description otherwise looks. This applies to every
 other label in the table above unchanged -- only `ready-for-agent` carries the extra gate.
+
+## The Ready queue no longer requires `ready-for-agent`
+
+The label keeps its triage meaning: it still marks a ticket whose services and decisions were
+proven by a readiness review. It is **no longer the queue gate**. A card in the `Ready` state
+with no open blockers is eligible to start; the readiness review is the run's first step, and a
+review that fails parks the card with the reason on it. (Instruction on JUL-97, 2026-09-19; the
+code change is in `scripts/ready-queue.mjs`.)

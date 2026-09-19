@@ -303,6 +303,12 @@ multi-step item (see "After verification" step 5) merges every step's PR itself 
 Todd sees one acceptance item at the end, for the item as a whole, not one per step. Merge
 decisions are never Todd's, on any step.
 
+**DONE MEANS IN USE.** An item reaches Todd as an acceptance item only when what it built is
+switched on and has been used once for real, with that evidence on the card. Building it,
+merging its PR, and passing its tests are not enough; the same rule decides whether the item as
+a whole can close, so a later "switch it on" step belongs inside the item, never in a handover
+note or a parked final laptop step. (Todd, Instruction on JUL-97, 2026-09-19.)
+
 A parked item frees its slot and records its resume condition. When the condition is met, it
 re-enters admission like any other item, and its evidence is re-verified before it is trusted.
 

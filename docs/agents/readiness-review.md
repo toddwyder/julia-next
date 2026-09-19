@@ -28,6 +28,19 @@ stop during a real run is a **bug in the review** — fix the review (this doc a
 service-probe findings it should have caught), log the incident on the ticket that hit it, and add
 the missing check to this procedure. It does not become a new permission question routed to Todd.
 
+## Rule established by JUL-97: DONE MEANS IN USE
+
+A ticket is not done until what it built is switched on and has been used once for real, with
+that evidence on the card. Building the thing, merging its PR, and passing its tests are not
+done — the artifact has to be live and exercised by a real caller at least once.
+
+If going live needs a later step, that step happens inside the ticket; the ticket cannot close
+without it. Nothing is parked as a final laptop step, and "switch it on" is never the last item
+on a handover list. A ticket that cannot reach live use inside its own steps fails the readiness
+review rather than passing with a follow-up note attached.
+
+(Todd, Instruction on JUL-97, 2026-09-19.)
+
 ## Procedure
 
 1. **List the tickets in scope.** For a batch, pull every open ticket in the batch with its full
@@ -56,6 +69,18 @@ the missing check to this procedure. It does not become a new permission questio
      scopes (for Sentry, `GET https://sentry.io/api/0/` returns `auth.scopes`). Reachability and
      authorization are different things; a reachable credential whose declared scope does not
      include the write the ticket needs is a **review failure**, not a pass.
+     - **the identity that makes the call.** Confirm the credential is reachable by the account
+       that will **actually make the call**, not merely by the account running the review. For
+       every service the ticket writes to, name the identity that will run the write and prove
+       the credential is reachable to *that* identity. Worked example (JUL-97, 2026-09-19): the
+       readiness review proved the Linear key works as `orchestrator-svc` and passed, but the key
+       file is `orchestrator-svc`-only by design (`FIELD_GROUPS.linear` in
+       `ops/service-dropbox/dropbox.mjs`), and builders run as `runner`, which is in
+       `deepseek-readers` and `zai-readers` but not `orchestrator-svc`. A builder told to call
+       the Linear API would have stopped dead. The resolution — also the better design — is that
+       the builder writes the program and the coordinator runs it with the key. A review that
+       probes only as itself has not tested the caller, and the access stop that follows is a
+       review bug, not a new permission question.
      - **create capability.** Confirm the credential can **create** the resource the step needs
        (not just read or list it). Confirm, from the credential's own declared
        scopes/permissions and by reading the resource the step needs (list/get), that the
@@ -83,6 +108,12 @@ the missing check to this procedure. It does not become a new permission questio
          check-runs and the actions endpoints (verified 2026-09-19, JUL-94), so such a ticket has
          to name its substitute evidence — a local run of the same test suite — rather than assume
          the coordinator can read GitHub checks.
+   - **probe the seat live, not from the record.** Start each seat tool on the account that will
+     run it, in this review, and read its real output. A previous ticket or review saying a tool
+     is at a sign-in prompt is not evidence today — the prompt, the binary, or the login state can
+     all change. Verified 2026-09-19: JUL-89 and the JUL-97 readiness review both recorded that
+     Claude on `runner` was at a sign-in prompt, and a live probe that evening returned a normal
+     answer and exit 0. Proximity to a prior session's note is not a probe.
    - reuse a recent, still-valid finding from a prior audit instead of re-probing, but cite the
      source doc and its date so staleness can be judged later.
 

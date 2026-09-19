@@ -325,6 +325,69 @@ session must not have to rediscover:
    inside the process, so it never appears in `argv` and is never printed. This exact read was
    used on 2026-09-19 to confirm `mergeable_state` clean before merging PR 53.
 
+## Nine JUL-97 coordinator-run discoveries (verified 2026-09-19)
+
+Each of these was learned on the box during JUL-97 and would quietly mislead a fresh session;
+the date is the day it was verified. Facts (a) through (e) are about dispatch and the seat tools,
+(f) about reading an Orca terminal, (g) about the board reacting to a merge, (h) about Linear's
+GraphQL facts the board work proved, and (i) about the coordinator's own tool grants.
+
+1. **Claude on `runner` works.** A live probe (`claude -p` with a one-line prompt) returned a
+   normal answer and exit 0. JUL-89 and the JUL-97 readiness review both recorded it as stuck at
+   a sign-in prompt; that premise is stale. Probe before believing either way — a prior note is
+   not evidence of today's login state.
+2. **A real Codex usage cap was captured mid-review.** The output was `ERROR: You've hit your
+   usage limit ... try again at Sep 20th, 2026 12:33 AM`. It matches `CAP_ERROR_PATTERN` in
+   `scripts/julia-run.mjs`. Per the seat table this is **not** a failed attempt: the same review
+   restarted on the reviewer backup, and that restart is what produced the verdict. Recognising
+   the pattern is what keeps a capped seat from burning an attempt.
+3. **Launching Claude from an Orca terminal command with the prompt in an argument does not
+   work.** `claude -p ... "$(cat file)"` gets word-split, the prompt fragments are read as
+   `--allowedTools` rules, and the run dies with `Error: Input must be provided either through
+   stdin or as a prompt argument when using --print`. Pipe the prompt on stdin instead:
+
+   ```sh
+   claude -p --permission-mode acceptEdits --effort high --allowedTools Bash Read Grep Glob Write < promptfile
+   ```
+4. **The Pi builder dispatch that works, end to end:**
+
+   ```sh
+   orca worktree create --environment ovh-local --repo path:/home/runner/julia-next --name NAME --base-branch BRANCH --no-parent --setup skip
+   ```
+
+   then `orca terminal create --environment ovh-local --worktree path:THATPATH --command ...`
+   with a quoted heredoc that writes the brief into the worktree and pipes it into
+   `node ops/service-dropbox/run-pi-seat.mjs builder-backup --effort high`, deleting the brief in
+   the same pipeline so it can never be committed. The environment names on the box are
+   `ovh-local` (`runner`) and `orchestrator-local` (`orchestrator-svc`), not the display names.
+5. **`orca terminal wait --for` accepts only `exit` and `tui-idle`.** `tui-idle` is not completion
+   for a Pi or Codex agent, and even `--for exit` times out while a shell stays open after the
+   agent has finished. The reliable completion signals are `pgrep -f` for the agent process and
+   the candidate worktree's own `git log`.
+6. **`orca terminal read` with no cursor returns the OLDEST retained window, not the newest.** A
+   long agent run therefore looks frozen. Use `--screen` for the current frame, or `--cursor`
+   with a number past the last `nextCursor` to see what is new.
+7. **Merging a pull request whose title names the ticket moved JUL-97 straight from Backlog to
+   Done mid-item**, with two steps still to run. The coordinator moved it back to In Progress and
+   said so on the card. Expect this on every step PR whose title names the ticket (see also "A PR
+   title naming a Linear issue closes that issue on merge").
+8. **Linear API facts the board work proved**, each checked against Linear's own published
+   GraphQL schema:
+   - `workflowStateCreate` requires `color`, and `WorkflowStateUpdateInput` has no `type` field,
+     so a state's type can never be repaired through the API.
+   - `IssueLabelCollectionFilter` has `every` and `some` but no `none`.
+   - The retirement mutation is `issueLabelRetire`, not `issueLabelArchive`, and it leaves the
+     label on cards that already carry it.
+   - `Template.templateData` is typed `JSON` and documented as a JSON-encoded STRING, unlike
+     `CustomView.filterData`, which is `JSONObject`.
+   - Every collection returns 50 records a page by default. This board needs 76 labels alone, so
+     an unpaginated read makes a second run look like work to do.
+9. **The coordinator session's own tool grants are narrow** and worth knowing before planning a
+   wake: `node <script>.mjs` under `scripts/` is allowed, the bare `orca` CLI is allowed,
+   `node -e` is NOT, and neither is `env`, `base64` or a `sudo` command. A coordinator that needs
+   a one-off computation must use a script that already exists in the checkout or an Orca
+   terminal, not an inline node expression.
+
 ## Start
 
 There is no scheduled trigger — explicit launch only. From inside an Orca terminal on the
