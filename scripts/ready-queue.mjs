@@ -37,9 +37,19 @@ import { resolveSeatChoices, validateFamilyChoice, missingSeatLabels } from './s
 
 export const DEFAULT_TEAM_NAME = 'Julia-next';
 export const DEFAULT_STATE_NAME = 'Ready';
-export const IN_PROGRESS_STATE_NAME = 'In Progress';
+// JUL-97 step 1: the board's started column is now `Implementation`. The
+// post-start state move follows the renamed column so a started card leaves
+// Ready for the column the board actually has.
+export const IN_PROGRESS_STATE_NAME = 'Implementation';
 export const DEFAULT_INTERVAL_MINUTES = 5;
+// Kept exported because the triage vocabulary still uses it; the Ready queue
+// itself no longer requires it (JUL-97: a card in Ready is eligible without
+// it, and only a Decision or Parent card is refused by label).
 export const READY_FOR_AGENT_LABEL = 'ready-for-agent';
+// The two coordinate-only labels: a Decision is an answer and a Parent is a
+// container, so neither belongs in the Ready queue.
+export const DECISION_LABEL = 'Decision';
+export const PARENT_LABEL = 'Parent';
 export const ORCHESTRATOR_ENVIRONMENT = 'orchestrator-local';
 export const ORCHESTRATOR_CHECKOUT = '/srv/orchestrator-svc/julia-next';
 
@@ -114,9 +124,15 @@ export function defaultValidateModelChoice(issue) {
 export function evaluateEligibility(issue, { validateModelChoiceImpl = defaultValidateModelChoice } = {}) {
   const reasons = [];
 
+  // JUL-97: the ready-for-agent label is no longer a gate -- a card sitting in
+  // Ready is a queue entry by virtue of its column. The two labels that still
+  // refuse a card are the coordinate-only ones, each named in its reason so the
+  // comment on the card says exactly why.
   const labels = new Set(issue?.labels ?? []);
-  if (!labels.has(READY_FOR_AGENT_LABEL)) {
-    reasons.push(`missing the ${READY_FOR_AGENT_LABEL} label`);
+  for (const label of [DECISION_LABEL, PARENT_LABEL]) {
+    if (labels.has(label)) {
+      reasons.push(`the card carries the ${label} label; ${label} cards are not agent work`);
+    }
   }
 
   const open = openBlockers(issue);
