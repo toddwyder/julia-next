@@ -4,6 +4,9 @@
 // depend on.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { fileURLToPath } from 'node:url';
 
 import { SEAT_TABLE, FAMILY_OF } from '../graph/seat-table.mjs';
 import {
@@ -21,7 +24,23 @@ import {
   validateFamilyChoice,
   fallbackSeatChoice,
   seatChoicesForIssue,
+  main,
 } from './seat-labels.mjs';
+
+const execFileAsync = promisify(execFile);
+const SEAT_LABELS_CLI = fileURLToPath(new URL('./seat-labels.mjs', import.meta.url));
+
+// Run the exported CLI main() with captured streams and a captured exit
+// code, so the argv/exit-code behaviour is asserted without a subprocess.
+function runCli(argv) {
+  let out = '';
+  let err = '';
+  let code;
+  const stdout = { write: (chunk) => { out += chunk; } };
+  const stderr = { write: (chunk) => { err += chunk; } };
+  main({ argv, stdout, stderr, setExitCode: (c) => { code = c; } });
+  return { out, err, code };
+}
 
 const AGENTS = ['orchestrator', 'builder', 'reviewer'];
 
@@ -210,4 +229,69 @@ test('seatChoicesForIssue resolves the exact shape linear-cli getIssue returns',
   assert.equal(choices.reviewer.entry, 'codex');
   assert.equal(choices.orchestrator.effort, 'high');
   assert.equal(choices.orchestrator.entry, SEAT_TABLE.orchestrator.primary);
+});
+
+// --- JUL-79 step 8 follow-up: the guard must be callable and tested by the
+// exact real combination the table puts on a card. ---
+
+test('the specific unsafe combination -- builder primary claude plus reviewer backup claude -- is refused by the guard', () => {
+  // Not a synthetic pair: this is literally SEAT_TABLE.builder.primary
+  // ('claude') against SEAT_TABLE.reviewer.backup ('claude'), the collision
+  // the family rule exists to prevent. Pin both the direct validation and the
+  // fallback path that a capped reviewer takes.
+  assert.equal(SEAT_TABLE.builder.primary, 'claude');
+  assert.equal(SEAT_TABLE.reviewer.backup, 'claude');
+  const unsafePair = {
+    orchestrator: { entry: SEAT_TABLE.orchestrator.primary },
+    builder: { entry: SEAT_TABLE.builder.primary },
+    reviewer: { entry: SEAT_TABLE.reviewer.backup },
+  };
+  const validated = validateFamilyChoice(unsafePair);
+  assert.equal(validated.ok, false);
+  assert.match(validated.reason, /anthropic/);
+  const fallback = fallbackSeatChoice(resolveSeatChoices([]), 'reviewer');
+  assert.equal(fallback.ok, false);
+  assert.match(fallback.reason, /refusing the reviewer backup \(claude\)/);
+});
+
+test('the fallback CLI refuses reviewer -> claude while the builder is on claude, and exits non-zero', () => {
+  const { out, err, code } = runCli(['fallback', '--seat', 'reviewer', '--builder', 'claude']);
+  assert.notEqual(code, 0);
+  assert.equal(out, '');
+  assert.match(err, /refusing the reviewer backup \(claude\)/);
+  assert.match(err, /different families/);
+  assert.equal(err.trim().split('\n').length, 1);
+});
+
+test('the fallback CLI allows reviewer -> claude when the builder is on pi-deepseek, printing the entry to use', () => {
+  const { out, err, code } = runCli(['fallback', '--seat', 'reviewer', '--builder', 'pi-deepseek']);
+  assert.equal(code, 0);
+  assert.equal(err, '');
+  assert.deepEqual(JSON.parse(out), { seat: 'reviewer', entry: 'claude', modelLabel: 'reviewer-claude-opus' });
+  assert.match(out, /\n {2}"seat"/);
+});
+
+test('the fallback CLI is a real entry point: the process itself refuses the builder-primary reviewer-backup pair, non-zero', async () => {
+  await assert.rejects(
+    () => execFileAsync(process.execPath, [SEAT_LABELS_CLI, 'fallback', '--seat', 'reviewer', '--builder', 'claude']),
+    (error) => {
+      assert.notEqual(error.code, 0);
+      assert.match(error.stderr, /refusing the reviewer backup \(claude\)/);
+      return true;
+    },
+  );
+});
+
+test('the fallback CLI is a real entry point: the process itself allows the reviewer fallback off a pi-deepseek builder', async () => {
+  const { stdout } = await execFileAsync(process.execPath, [SEAT_LABELS_CLI, 'fallback', '--seat', 'reviewer', '--builder', 'pi-deepseek']);
+  assert.deepEqual(JSON.parse(stdout), { seat: 'reviewer', entry: 'claude', modelLabel: 'reviewer-claude-opus' });
+});
+
+test('the fallback CLI treats a bad seat or an unknown builder entry as a one-line usage error, not a refusal', () => {
+  const badSeat = runCli(['fallback', '--seat', 'potato', '--builder', 'claude']);
+  assert.equal(badSeat.code, 2);
+  assert.match(badSeat.err, /^usage: /);
+  const unknownBuilder = runCli(['fallback', '--seat', 'reviewer', '--builder', 'gemini']);
+  assert.equal(unknownBuilder.code, 2);
+  assert.match(unknownBuilder.err, /^usage: /);
 });

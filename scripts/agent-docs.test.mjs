@@ -40,3 +40,23 @@ test('the runbook records the JUL-79 step 8 live-verified facts, each dated 2026
   const dated = text.match(/2026-09-19/g) ?? [];
   assert.ok(dated.length >= 5, `expected at least five 2026-09-19 facts, found ${dated.length}`);
 });
+
+// JUL-79 step 8 follow-up: the family-collision guard (scripts/seat-labels.mjs)
+// only prevents anthropic-reviewing-anthropic if the written procedure
+// actually tells the coordinator to run it. Both passages that send a capped
+// seat to its backup must name the command, not just the table read.
+test('both coordinator fallback passages require resolving the fallback through the seat-labels CLI', () => {
+  const text = read('.claude/skills/julia-coordinator/SKILL.md');
+  const runningStart = text.indexOf('## Running a step');
+  const afterStart = text.indexOf('## After verification');
+  assert.ok(runningStart >= 0, 'missing "Running a step" section');
+  assert.ok(afterStart > runningStart, 'missing "After verification" section');
+  const running = text.slice(runningStart, afterStart);
+  const nextAfter = text.indexOf('\n## ', afterStart + 1);
+  const after = text.slice(afterStart, nextAfter === -1 ? undefined : nextAfter);
+  assert.match(running, /seat-labels\.mjs fallback/);
+  assert.match(after, /seat-labels\.mjs fallback/);
+  // And the refusal must park the item, never run a same-family pair.
+  assert.match(running, /park the item as \*\*Blocked\*\*/);
+  assert.match(after, /park the item as \*\*Blocked\*\*/);
+});

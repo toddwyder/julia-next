@@ -106,7 +106,12 @@ For the current step of the current item:
    is being force-run on its backup (see below) or the primary's last attempt on this exact step
    ended with a usage-cap error (`scripts/julia-run.mjs`'s `CAP_ERROR_PATTERN`) -- then use the
    `backup` entry instead, for this step only; the table is re-read fresh on the next step, so a
-   capped seat doesn't stay pinned to its backup for the rest of the item.
+   capped seat doesn't stay pinned to its backup for the rest of the item. A fallback is never
+   read off the table raw: resolve it first with `node scripts/seat-labels.mjs fallback --seat
+   reviewer --builder <the builder entry in use>` (or `--seat builder --reviewer <the reviewer
+   entry in use>` when the builder is the capped seat). If the guard refuses, that seat has no
+   usable entry for this step -- every remaining choice would put builder and reviewer in the
+   same model family -- so park the item as **Blocked** rather than run a same-family pair.
    - **`claude`/`codex` entries** dispatch exactly as before: `runCreate` then `workerStart`
      (`scripts/orca-cli.mjs`), targeting `--environment "OVH runner"`, `--agent claude`/`--agent
      codex`, `worktree: 'new-top-level'`.
@@ -177,7 +182,10 @@ For the current step of the current item:
    acceptance criteria, on the seat table's `reviewer` entry (`primary` unless this step is
    force-run on `backup`, or the primary's last review attempt on this exact step ended with a
    usage-cap error -- same rule as builder dispatch in "Running a step", never a hardcoded
-   vendor). It saves its review as a file **outside** the candidate worktree -- the review must
+   vendor). Resolve a reviewer fallback through `node scripts/seat-labels.mjs fallback --seat
+   reviewer --builder <the builder entry in use>` before dispatching; if it refuses, this seat has
+   no usable entry for this step, so park the item as **Blocked** instead of running a same-family
+   review. It saves its review as a file **outside** the candidate worktree -- the review must
    never become part of, or be mistaken for a change to, the thing it reviews.
 2. **Diff the reviewer's worktree against the candidate commit before trusting the review**
    (`scripts/verify-reviewer-worktree.mjs`'s `rejectIfReviewerTampered`, or the CLI: `node

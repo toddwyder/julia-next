@@ -286,11 +286,16 @@ test('orchestratorLaunchCommandFor: claude still gets its full tool grant list, 
 // JUL-79 step 6: the unattended coordinator stalled because the queue script
 // and the Linear CLI it reaches for were not on its --allowedTools list.
 // Both must be named explicitly, and the grant list must stay narrow -- no
-// blanket `Bash(node:*)` and no permission bypass.
+// blanket `Bash(node:*)` and no permission bypass. JUL-79 step 8 follow-up:
+// the family-collision guard (scripts/seat-labels.mjs) is on the list too,
+// because the skill's fallback passages now require running it before a
+// backup dispatch.
 test('orchestratorLaunchCommandFor: claude grants the ready-queue and linear-cli commands the coordinator procedure runs (JUL-79 step 6)', () => {
   const command = orchestratorLaunchCommandFor('claude', 'JUL-79');
   assert.match(command, /Bash\(node scripts\/ready-queue\.mjs:\*\)/);
   assert.match(command, /Bash\(node scripts\/linear-cli\.mjs:\*\)/);
+  // JUL-79 step 8 follow-up: the fallback guard the skill now requires.
+  assert.match(command, /Bash\(node scripts\/seat-labels\.mjs:\*\)/);
   // Existing entries are untouched.
   assert.match(command, /Bash\(node scripts\/orca-cli\.mjs:\*\)/);
   assert.match(command, /Bash\(node scripts\/check-readiness\.mjs:\*\)/);

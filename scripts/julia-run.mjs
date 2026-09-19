@@ -191,7 +191,7 @@ function claudeLaunchCommand(issueId, effort) {
   // Everything after it is unchanged -- the grant list is not an effort
   // concern and must not be disturbed here.
   const effortArgs = translateEffort('claude', effort).join(' ');
-  return `${ENV_PREFIX} claude --permission-mode acceptEdits ${effortArgs} --allowedTools "mcp__linear__*,mcp__claude_ai_Linear__*,Bash(node scripts/orca-cli.mjs:*),Bash(node scripts/ready-queue.mjs:*),Bash(node scripts/linear-cli.mjs:*),Bash(node scripts/check-readiness.mjs:*),Bash(node scripts/collect-worker-result.mjs:*),Bash(node scripts/verify-reviewer-worktree.mjs:*),Bash(node scripts/coordinator-events.mjs:*),Bash(node --env-file=/etc/orchestrator-svc/.env.publisher scripts/publish-pr.mjs:*),Bash(node --env-file=/etc/orchestrator-svc/.env.publisher scripts/merge-pr.mjs:*),Bash(orca *)" -p "/julia-coordinator ${issueId}"`;
+  return `${ENV_PREFIX} claude --permission-mode acceptEdits ${effortArgs} --allowedTools "mcp__linear__*,mcp__claude_ai_Linear__*,Bash(node scripts/orca-cli.mjs:*),Bash(node scripts/ready-queue.mjs:*),Bash(node scripts/seat-labels.mjs:*),Bash(node scripts/linear-cli.mjs:*),Bash(node scripts/check-readiness.mjs:*),Bash(node scripts/collect-worker-result.mjs:*),Bash(node scripts/verify-reviewer-worktree.mjs:*),Bash(node scripts/coordinator-events.mjs:*),Bash(node --env-file=/etc/orchestrator-svc/.env.publisher scripts/publish-pr.mjs:*),Bash(node --env-file=/etc/orchestrator-svc/.env.publisher scripts/merge-pr.mjs:*),Bash(orca *)" -p "/julia-coordinator ${issueId}"`;
 }
 
 // The stdin-pipe preamble every non-Claude entry shares: the checkout's own
