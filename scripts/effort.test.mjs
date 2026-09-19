@@ -27,8 +27,8 @@ test('translateEffort maps every seat-table entry x every level to its vendor sp
     },
     // Pi has no graded effort setting: Low means thinking off (no flag --
     // Pi's own thinkingLevelMap supplies the level), Medium/High mean on.
-    'pi-deepseek': { low: [], medium: ['--thinking'], high: ['--thinking'] },
-    'pi-glm': { low: [], medium: ['--thinking'], high: ['--thinking'] },
+    'pi-deepseek': { low: ['--thinking', 'off'], medium: ['--thinking', 'medium'], high: ['--thinking', 'high'] },
+    'pi-glm': { low: ['--thinking', 'off'], medium: ['--thinking', 'medium'], high: ['--thinking', 'high'] },
   };
   for (const [entry, byLevel] of Object.entries(expected)) {
     for (const level of EFFORT_LEVELS) {
@@ -45,7 +45,7 @@ test('an omitted effort is Medium for every entry -- never throws, never implied
 
 test('an unrecognized effort value also falls back to Medium rather than throwing or guessing a vendor default', () => {
   assert.deepEqual(translateEffort('claude', 'turbo'), ['--effort', 'medium']);
-  assert.deepEqual(translateEffort('pi-glm', 'LOW'), ['--thinking']);
+  assert.deepEqual(translateEffort('pi-glm', 'LOW'), ['--thinking', 'medium']);
   assert.equal(normalizeEffort('turbo'), 'medium');
   assert.equal(normalizeEffort(undefined), 'medium');
   assert.equal(normalizeEffort('high'), 'high');

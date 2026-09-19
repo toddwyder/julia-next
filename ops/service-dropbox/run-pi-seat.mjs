@@ -24,17 +24,17 @@ export const SEATS = {
   'builder-backup': {
     envVar: 'DEEPSEEK_API_KEY',
     secretField: 'deepseek',
-    piArgs: (prompt, mode) => ['--provider', 'deepseek', '--model', 'deepseek-v4-flash', '-p', prompt, '--mode', mode],
+    piArgs: (mode) => ['--provider', 'deepseek', '--model', 'deepseek-v4-flash', '-p', '--mode', mode],
   },
   'reviewer-backup': {
     envVar: 'ZAI_PAYG_API_KEY',
     secretField: 'zai',
-    piArgs: (prompt, mode) => ['--provider', 'glm-5-3', '--model', 'glm-5.3', '-p', prompt, '--mode', mode],
+    piArgs: (mode) => ['--provider', 'glm-5-3', '--model', 'glm-5.3', '-p', '--mode', mode],
   },
   'orchestrator-backup': {
     envVar: 'ZAI_PAYG_API_KEY',
     secretField: 'zai',
-    piArgs: (prompt, mode) => ['--provider', 'glm-5-3', '--model', 'glm-5.3', '-p', prompt, '--mode', mode],
+    piArgs: (mode) => ['--provider', 'glm-5-3', '--model', 'glm-5.3', '-p', '--mode', mode],
   },
   // The orchestrator's DeepSeek route (JUL-79 step 3, `pi-deepseek` in
   // graph/seat-table.mjs). Its config is byte-for-byte builder-backup's --
@@ -45,24 +45,27 @@ export const SEATS = {
   'orchestrator-deepseek': {
     envVar: 'DEEPSEEK_API_KEY',
     secretField: 'deepseek',
-    piArgs: (prompt, mode) => ['--provider', 'deepseek', '--model', 'deepseek-v4-flash', '-p', prompt, '--mode', mode],
+    piArgs: (mode) => ['--provider', 'deepseek', '--model', 'deepseek-v4-flash', '-p', '--mode', mode],
   },
 };
 
-// Pi's effort spelling (live-verified: `pi --thinking` exists). Medium is the
-// default for an omitted or unrecognized level -- never a throw, matching
-// scripts/effort.mjs's own rule and the ticket's stated default.
+// Pi's effort spelling. `--thinking` REQUIRES a level (off|minimal|low|medium|
+// high|xhigh|max; `pi --help`): a bare `--thinking` makes Pi read the next
+// argv entry as the level, which is how the coordinator launch died in the
+// JUL-79 relaunches (`-p` swallowed, prompt parsed as an option). Pi's own
+// levels are graded, so the ticket's Low/Medium/High map to off/medium/high --
+// Low is thinking off, Medium/High are on. Medium is the default for an
+// omitted or unrecognized level -- never a throw, matching scripts/effort.mjs's
+// own rule and the ticket's stated default.
+const THINKING_LEVEL = { low: 'off', medium: 'medium', high: 'high' };
 export function thinkingArgs(effort) {
   const level = EFFORT_LEVELS.includes(effort) ? effort : DEFAULT_EFFORT;
-  return level === 'low' ? [] : ['--thinking'];
+  return ['--thinking', THINKING_LEVEL[level]];
 }
 
-// Put --thinking immediately before `-p`, so the prompt text (which can be
-// the entire coordinator skill) always stays the trailing argv entry and a
-// future flag appended after `--mode` cannot push it around.
+// Put the --thinking pair immediately before `-p`.
 function withThinking(args, effort) {
   const extra = thinkingArgs(effort);
-  if (extra.length === 0) return args;
   const pIndex = args.indexOf('-p');
   const at = pIndex === -1 ? args.length : pIndex;
   return [...args.slice(0, at), ...extra, ...args.slice(at)];
@@ -75,7 +78,10 @@ export function buildPiSpawnSpec(seat, prompt, { mode = 'json', effort, readSecr
   }
   return {
     command: 'pi',
-    args: withThinking(def.piArgs(prompt, mode), effort),
+    // The prompt (which can be the whole coordinator skill, and starts with
+    // `---`) is always the LAST entry, after a `--` separator, so Pi can
+    // never read its leading dashes as an option.
+    args: [...withThinking(def.piArgs(mode), effort), '--', prompt],
     env: { ...process.env, [def.envVar]: readSecretImpl(def.secretField) },
   };
 }
