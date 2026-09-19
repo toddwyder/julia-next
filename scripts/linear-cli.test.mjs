@@ -44,6 +44,31 @@ test('getIssue reads back the issue fields', async () => {
   assert.equal(issue.title, 'Seat table');
 });
 
+test('getIssue asks Linear for the issue labels (and its state), so the coordinator can resolve the seats', async () => {
+  let query;
+  const fetchImpl = async (url, opts) => {
+    query = JSON.parse(opts.body).query;
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: {
+          issue: {
+            id: 'uuid-1',
+            identifier: 'JUL-79',
+            labels: { nodes: [{ name: 'builder-claude-opus' }, { name: 'reviewer-codex' }] },
+            state: { name: 'Ready', type: 'unstarted' },
+          },
+        },
+      }),
+    };
+  };
+  const issue = await getIssue('JUL-79', { apiKey: 'k', fetchImpl });
+  assert.match(query, /labels\s*\{\s*nodes\s*\{\s*name\s*\}\s*\}/);
+  assert.match(query, /state\s*\{\s*name\s+type\s*\}/);
+  assert.deepEqual(issue.labels.nodes.map((node) => node.name), ['builder-claude-opus', 'reviewer-codex']);
+});
+
 test('postComment resolves the identifier to a UUID first, then creates the comment against it', async () => {
   const fetchImpl = fakeFetch([
     { body: { data: { issue: { id: 'uuid-77' } } } },

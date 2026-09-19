@@ -27,6 +27,9 @@ export async function linearGraphQL(query, variables, { apiKey, fetchImpl = fetc
   return body.data;
 }
 
+// JUL-79 step 5: the coordinator reads its own card through this CLI and now
+// needs the model/effort labels to resolve each agent's seat
+// (seat-labels.mjs's seatChoicesForIssue). `state` was already here.
 const GET_ISSUE_QUERY = `
   query GetIssue($id: String!) {
     issue(id: $id) {
@@ -36,6 +39,7 @@ const GET_ISSUE_QUERY = `
       description
       url
       state { name type }
+      labels { nodes { name } }
     }
   }
 `;
