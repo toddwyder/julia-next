@@ -26,7 +26,7 @@ case "$FIELD" in
   supabase)  DEST="$DEST_DIR/supabase.env";     GROUP=orchestrator-svc ;;
   powersync) DEST="$DEST_DIR/powersync.env";    GROUP=orchestrator-svc ;;
   axiom)     DEST="$DEST_DIR/axiom.env";        GROUP=orchestrator-svc ;;
-  deepseek)  DEST="$DEST_DIR/deepseek.env";     GROUP=runner ;;
+  deepseek)  DEST="$DEST_DIR/deepseek.env";     GROUP=deepseek-readers ;;
   zai)       DEST="$DEST_DIR/zai.env";          GROUP=zai-readers ;;
   linear)    DEST="$DEST_DIR/linear.env";       GROUP=orchestrator-svc ;;
   *)
