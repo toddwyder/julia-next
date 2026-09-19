@@ -43,8 +43,9 @@ protocol the way a GitHub-Project board config would need.
 
 ## Each wake
 
-**1. Reconcile.** Read Orca's run/task list (`orchestration run-list`, `task-list --run <id>`)
-for any run this coordinator started, and the matching Linear issue and its comments. For each
+**1. Reconcile.** Read Orca's run/task list (`node scripts/orca-cli.mjs run-list`,
+`node scripts/orca-cli.mjs task-list --run <id>`) for any run this coordinator started, and the
+matching Linear issue and its comments. For each
 in-flight item, find its last **verified** step -- a step counts only when you verified its
 evidence yourself (re-run the check, read the actual Orca outcome, read the actual Axiom
 event), never a worker's claim alone.

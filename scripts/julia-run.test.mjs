@@ -283,6 +283,30 @@ test('orchestratorLaunchCommandFor: claude still gets its full tool grant list, 
   assert.match(command, /-p "\/julia-coordinator JUL-79"$/);
 });
 
+// JUL-79 step 6: the unattended coordinator stalled because the queue script
+// and the Linear CLI it reaches for were not on its --allowedTools list.
+// Both must be named explicitly, and the grant list must stay narrow -- no
+// blanket `Bash(node:*)` and no permission bypass.
+test('orchestratorLaunchCommandFor: claude grants the ready-queue and linear-cli commands the coordinator procedure runs (JUL-79 step 6)', () => {
+  const command = orchestratorLaunchCommandFor('claude', 'JUL-79');
+  assert.match(command, /Bash\(node scripts\/ready-queue\.mjs:\*\)/);
+  assert.match(command, /Bash\(node scripts\/linear-cli\.mjs:\*\)/);
+  // Existing entries are untouched.
+  assert.match(command, /Bash\(node scripts\/orca-cli\.mjs:\*\)/);
+  assert.match(command, /Bash\(node scripts\/check-readiness\.mjs:\*\)/);
+  assert.match(command, /Bash\(node scripts\/collect-worker-result\.mjs:\*\)/);
+  assert.match(command, /Bash\(node scripts\/verify-reviewer-worktree\.mjs:\*\)/);
+  assert.match(command, /Bash\(node scripts\/coordinator-events\.mjs:\*\)/);
+  assert.match(command, /Bash\(orca \*\)/);
+});
+
+test('orchestratorLaunchCommandFor: the allow-list stays narrow -- no blanket Bash(node:*) and no permission bypass (JUL-79 step 6)', () => {
+  const command = orchestratorLaunchCommandFor('claude', 'JUL-79');
+  assert.doesNotMatch(command, /Bash\(node:\*\)/);
+  assert.doesNotMatch(command, /dangerously/i);
+  assert.doesNotMatch(command, /--dangerously-skip-permissions/);
+});
+
 test('orchestratorLaunchCommandFor: pi-glm passes the effort label to its seat, and never a vendor flag or a secret', () => {
   const command = orchestratorLaunchCommandFor('pi-glm', 'JUL-79', { effort: 'low' });
   assert.equal(
