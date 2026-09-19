@@ -64,6 +64,13 @@ the missing check to this procedure. It does not become a new permission questio
        permission refusal (e.g. PowerSync `apps/create` → `FORBIDDEN`, so the project-creation
        step cannot run headlessly) is the failure signal — it fails the review, it does not pass
        it (runbook, "Five JUL-44 step-5 discoveries", verified 2026-09-19).
+     - **database credential for replication.** Where a step needs a DATABASE credential (the
+       Supabase/PowerSync pair is the worked example), confirm the credential can **create the
+       narrow replication role** and the **provider-required publication** the step needs — not
+       merely that it can connect. Note the direct-connection caveat: `db.<ref>.supabase.co:5432`
+       resolves to **IPv6 only** and is reached by the provider's cloud; the Supabase pooler at
+       `aws-0-us-west-2.pooler.supabase.com` has IPv4 if a pooler is ever needed (runbook,
+       "Three JUL-44 step-6 discoveries", verified 2026-09-19).
      - **read scope for delivery proof.** Wherever the step must *prove delivery* (an event
        arrived, a write took effect), the credential needs a **read** scope for that, distinct
        from its send/write scope. Worked example: an ingest-only Axiom key can send but cannot
