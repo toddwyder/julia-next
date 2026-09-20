@@ -44,6 +44,7 @@ import {
   effortLabelsFor,
   defaultLabelsFor,
   workViewIssueFilter,
+  isReservedLabelName,
 } from '../graph/board-spec.mjs';
 
 // The team template every new card starts from. Named so the setup can find it
@@ -395,7 +396,7 @@ export async function countIssues({ graphql, apiKey, filter }) {
 // ---------------------------------------------------------------------------
 
 // Every label group the spec wants, with the children it wants under it. The
-// Status group first, then each agent's model and effort groups; the order is
+// Card status group first, then each agent's model and effort groups; the order is
 // the order the setup applies them, so a parent always exists before its
 // children.
 export function desiredLabelGroups() {
@@ -457,9 +458,25 @@ export function sameFilterData(a, b) {
 // losing information or lying. The planner finds them all BEFORE emitting a
 // single action, and boardSetup reports them with card counts and exits
 // non-zero.
-export function findBlockingMismatches(board) {
+export function findBlockingMismatches(board, { labelGroups = desiredLabelGroups() } = {}) {
   const mismatches = [];
   const statesByName = new Map(board.states.map((state) => [state.name, state]));
+
+  // (9) A label or label group the spec wants whose name Linear reserves.
+  // The real API refuses issueLabelCreate with a 400 INPUT_ERROR ("reserved
+  // label name"), so a plan containing one could never complete. Report every
+  // offender by name before any mutation rather than fail partway through an
+  // apply -- and so the spec (graph/board-spec.mjs) can be fixed.
+  for (const group of labelGroups) {
+    if (isReservedLabelName(group.name)) {
+      mismatches.push({ kind: 'label-name-reserved', labelName: group.name });
+    }
+    for (const child of group.children) {
+      if (isReservedLabelName(child.name)) {
+        mismatches.push({ kind: 'label-name-reserved', labelName: child.name });
+      }
+    }
+  }
 
   // (7) Both an old name and its target name exist. There is no safe rename:
   // updating either one strands the other's cards, so the program stops and
@@ -494,7 +511,7 @@ export function findBlockingMismatches(board) {
   // (8) A label with a wanted GROUP name that is not a group cannot be a
   // parent. Matching by name alone would let ordinary labels receive children.
   const labelsByName = new Map(board.labels.map((label) => [label.name, label]));
-  for (const group of desiredLabelGroups()) {
+  for (const group of labelGroups) {
     const existing = labelsByName.get(group.name);
     if (existing && !existing.isGroup) {
       mismatches.push({ kind: 'label-group-identity', labelName: group.name });
@@ -539,6 +556,8 @@ export function mismatchMessage(mismatch, { issueCountByStateId = {} } = {}) {
       return `label "${mismatch.labelName}" already exists as a label group, but the spec needs it as an ordinary child of "${mismatch.parentName}"; a label group cannot be reparented under another group`;
     case 'retired-label-identity':
       return `label "${mismatch.labelName}" exists but is not a label group, so the spec's retirement of the group "${mismatch.labelName}" was not applied; rename or retire it by hand`;
+    case 'label-name-reserved':
+      return `label "${mismatch.labelName}" is a name Linear reserves and compares case-insensitively, so issueLabelCreate is refused with a 400 INPUT_ERROR ("reserved label name"); observed live on 2026-09-20 with userPresentableMessage "The label name "status" is reserved." Rename it in graph/board-spec.mjs`;
     default:
       return `unknown blocking mismatch: ${JSON.stringify(mismatch)}`;
   }
@@ -640,8 +659,8 @@ function planStatePositions(board, statesByName) {
 // correct -- the property a second --apply relies on. Blocking mismatches
 // throw here too, so a direct caller cannot get a plan that ignores one. No
 // I/O.
-export function planBoardSetup(board) {
-  const mismatches = findBlockingMismatches(board);
+export function planBoardSetup(board, { labelGroups = desiredLabelGroups() } = {}) {
+  const mismatches = findBlockingMismatches(board, { labelGroups });
   if (mismatches.length > 0) {
     throw new BoardConflictError(mismatches.map((mismatch) => mismatchMessage(mismatch)));
   }
@@ -670,7 +689,7 @@ export function planBoardSetup(board) {
       const changes = {};
       const currentParentName = existing.parentId ? (labelNameById.get(existing.parentId) ?? null) : null;
       if (currentParentName !== group.name) changes.parentName = group.name;
-      // A spec'd description (the Status labels) must match; a null one means
+      // A spec'd description (the Card status labels) must match; a null one means
       // "the spec does not care", so an existing description is left alone.
       if (child.description != null && existing.description !== child.description) {
         changes.description = child.description;
@@ -1031,6 +1050,7 @@ export async function boardSetup({
   apply = false,
   stdout = process.stdout,
   stderr = process.stderr,
+  labelGroups = desiredLabelGroups(),
 } = {}) {
   const apiKey = providedApiKey ?? resolveLinearApiKey({ env, readSecretImpl });
   const safeStdout = makeRedactingWriter(stdout, apiKey);
@@ -1041,7 +1061,7 @@ export async function boardSetup({
   // Blocking mismatches are found BEFORE any mutation. Coexistence needs card
   // counts, so it is the one mismatch that costs a read; the counts come from
   // the live board, never from the plan.
-  const mismatches = findBlockingMismatches(board);
+  const mismatches = findBlockingMismatches(board, { labelGroups });
   if (mismatches.length > 0) {
     const stateIds = new Set();
     for (const mismatch of mismatches) {
@@ -1059,7 +1079,7 @@ export async function boardSetup({
     );
   }
 
-  const actions = planBoardSetup(board);
+  const actions = planBoardSetup(board, { labelGroups });
 
   safeStdout.write(apply
     ? 'board-setup: APPLY -- changing the Julia-next board to match graph/board-spec.mjs\n'

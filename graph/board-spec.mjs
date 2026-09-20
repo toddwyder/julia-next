@@ -50,11 +50,29 @@ export const STATE_RENAMES = Object.freeze({
   Done: 'Complete',
 });
 
+// The label names Linear refuses to create. The API reserves them and rejects
+// issueLabelCreate with a 400 INPUT_ERROR ("reserved label name"), compared
+// case-insensitively. Keep the set here, in one place, so a future discovery of
+// another reserved name is a one-line change.
+export const RESERVED_LABEL_NAMES = Object.freeze(['status']);
+
+// True when `name` is one of Linear's reserved label names. Case-insensitive,
+// because the real API compared it that way: it refused "Status" while naming
+// the reserved name "status".
+export function isReservedLabelName(name) {
+  const wanted = String(name ?? '').toLowerCase();
+  return RESERVED_LABEL_NAMES.some((reserved) => reserved.toLowerCase() === wanted);
+}
+
 // The three statuses a card can be parked in, each with the one-line reason
 // shown on the label itself. Every description is a sentence a reader can act
 // on: what the status means, not who set it.
 export const STATUS_LABELS = Object.freeze({
-  group: 'Status',
+  // "Card status", NOT "Status": Linear reserves the label name "status"
+  // (compared case-insensitively) and refused issueLabelCreate on the real
+  // board on 2026-09-20 with userPresentableMessage
+  // "The label name \"status\" is reserved." Do not rename this back.
+  group: 'Card status',
   labels: Object.freeze([
     Object.freeze({
       name: 'waiting-on-todd',

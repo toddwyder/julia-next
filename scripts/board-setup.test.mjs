@@ -37,6 +37,7 @@ import {
   GRAPH_AGENTS,
   defaultLabelsFor,
   workViewIssueFilter,
+  isReservedLabelName,
 } from '../graph/board-spec.mjs';
 
 const TEST_TEAM_ID = '31138162-65a4-4dd3-bcc8-6b6ac0709bca';
@@ -420,6 +421,13 @@ function makeFakeLinear(initial = freshBoard(), { templateDataAsObject = false }
       case 'BoardSetupCreateLabel': {
         const input = variables.input ?? {};
         if (!input.name) throw new Error('fake Linear: IssueLabelCreateInput.name is required');
+        // Linear reserves some label names and refuses issueLabelCreate for
+        // them with a 400 INPUT_ERROR. The real refusal (seen live on
+        // 2026-09-20) is echoed here so a spec that plans one fails in the
+        // fake exactly as it failed on the board.
+        if (isReservedLabelName(input.name)) {
+          throw new Error(`Linear API error: 200 [{"message":"reserved label name","path":["issueLabelCreate"],"extensions":{"type":"invalid input","code":"INPUT_ERROR","statusCode":400,"userError":true,"userPresentableMessage":"The label name \\"${input.name}\\" is reserved."}}]`);
+        }
         if (input.isGroup !== true && !input.parentId) {
           throw new Error('fake Linear: a non-group label needs a parentId');
         }
@@ -678,17 +686,17 @@ test('a second --apply is a no-op: no actions, no mutations, no change to the bo
 });
 
 // ---------------------------------------------------------------------------
-// Label groups and Status descriptions
+// Label groups and Card status descriptions
 // ---------------------------------------------------------------------------
 
-test('--apply creates the Status group with its three described labels', async () => {
+test('--apply creates the Card status group with its three described labels', async () => {
   const { db, result } = run({ apply: true });
   await result;
   const group = db.labels.find((label) => label.name === STATUS_LABELS.group);
-  assert.ok(group?.isGroup, 'Status must be a label group');
+  assert.ok(group?.isGroup, 'Card status must be a label group');
   for (const status of STATUS_LABELS.labels) {
     const child = db.labels.find((label) => label.name === status.name);
-    assert.ok(child, `missing Status label ${status.name}`);
+    assert.ok(child, `missing Card status label ${status.name}`);
     assert.equal(child.parentId, group.id);
     assert.equal(child.description, status.description);
   }
@@ -917,7 +925,7 @@ test('the evidence names every state, every label group, the template, the view 
   assert.match(evidence, /Canceled \[canceled\] position 5/);
   assert.match(evidence, /Position collisions \(excluded states are left where they are\):/);
   assert.match(evidence, /position 5: Canceled, Staging\/smoke test/);
-  assert.match(evidence, /Status/);
+  assert.match(evidence, /Card status/);
   assert.match(evidence, /waiting-on-todd/);
   assert.match(evidence, /Feature builder model/);
   assert.match(evidence, /Orchestrator model \(retired\)/);
@@ -964,11 +972,11 @@ test('an existing state with the wrong type is a blocking mismatch, not an attem
 
 test('a label with a wanted group name that is not a group is a blocking mismatch', async () => {
   const board = freshBoard();
-  board.labels.push({ id: 'label-status-flat', name: 'Status', description: null, isGroup: false, parentId: null, retiredAt: null });
+  board.labels.push({ id: 'label-status-flat', name: 'Card status', description: null, isGroup: false, parentId: null, retiredAt: null });
   const { calls, result } = run({ board, apply: true });
   await assert.rejects(result, (error) => {
     assert.ok(error instanceof BoardConflictError);
-    assert.match(error.message, /label "Status" exists but is not a label group/);
+    assert.match(error.message, /label "Card status" exists but is not a label group/);
     return true;
   });
   assert.deepEqual(calls.mutations, []);
@@ -1009,6 +1017,43 @@ test('findBlockingMismatches and mismatchMessage describe each mismatch in one p
   assert.match(message, /Todo" \(4 card\(s\)\)/);
   assert.match(message, /Ready" \(2 card\(s\)\)/);
   assert.match(message, /renaming either would strand/);
+});
+
+test('planning a reserved Linear label name is refused before any mutation', async () => {
+  // The spec deliberately has no reserved name (Card status, not Status), so
+  // inject the reserved group a future careless rename would bring back.
+  const reservedGroups = [{
+    name: 'Status',
+    children: STATUS_LABELS.labels.map((label) => ({ name: label.name, description: label.description })),
+  }];
+  // The pure planner refuses too, with the name and the reason.
+  assert.throws(
+    () => planBoardSetup(freshBoard(), { labelGroups: reservedGroups }),
+    (error) => {
+      assert.ok(error instanceof BoardConflictError);
+      assert.match(error.message, /label "Status" is a name Linear reserves/);
+      return true;
+    },
+  );
+  const fake = makeFakeLinear(freshBoard());
+  await assert.rejects(
+    boardSetup({
+      graphql: fake.graphql,
+      teamId: TEST_TEAM_ID,
+      env: { LINEAR_API_KEY: 'test-key' },
+      apply: true,
+      stdout: { write() {} },
+      stderr: { write() {} },
+      labelGroups: reservedGroups,
+    }),
+    (error) => {
+      assert.ok(error instanceof BoardConflictError);
+      assert.match(error.message, /label "Status" is a name Linear reserves/);
+      assert.match(error.message, /reserved label name/);
+      return true;
+    },
+  );
+  assert.deepEqual(fake.calls.mutations, [], 'the refusal must come before any mutation');
 });
 
 // ---------------------------------------------------------------------------
@@ -1064,6 +1109,23 @@ test('the fake rejects a state create with no color', async () => {
       input: { teamId: TEST_TEAM_ID, name: 'Colorless', type: 'started', position: 1 },
     }),
     /color is required/,
+  );
+});
+
+test('the fake rejects a create of a reserved label name the way the real API did', async () => {
+  const { graphql } = makeFakeLinear();
+  await assert.rejects(
+    () => graphql('mutation BoardSetupCreateLabel($input: IssueLabelCreateInput!) { issueLabelCreate(input: $input) { success } }', {
+      input: { teamId: TEST_TEAM_ID, name: 'Status', isGroup: true },
+    }),
+    (error) => {
+      // The exact shape Linear returned on 2026-09-20: a 400 wrapped as a 200
+      // payload with INPUT_ERROR and "reserved label name".
+      assert.match(error.message, /reserved label name/);
+      assert.match(error.message, /INPUT_ERROR/);
+      assert.match(error.message, /The label name .*Status.* is reserved/);
+      return true;
+    },
   );
 });
 
