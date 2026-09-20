@@ -130,15 +130,15 @@ For the current step of the current item:
    entry in use>` when the builder is the capped seat). If the guard refuses, that seat has no
    usable entry for this step -- every remaining choice would put builder and reviewer in the
    same model family -- so park the item as **Blocked** rather than run a same-family pair.
-   - **`claude`/`codex` entries** dispatch exactly as before: `runCreate` then `workerStart`
-     (`scripts/orca-cli.mjs`), targeting `--environment orchestrator-local --on ovh-local`,
-     `--agent claude`/`--agent codex`, `worktree: 'new-top-level'`. Those are the only two
-     environment names that exist on the server: the coordinator's own daemon, where the Run
-     lives, and the runner's daemon, where the worker runs. `"OVH runner"` is the *laptop's*
-     name for the runner's pairing and does not exist there (JUL-70 preflight miss 4; runbook,
-     "The coordinator's `ORCA_ENVIRONMENT` is the wrong daemon for orchestration").
-     `orca-cli.mjs`'s `workerStart` sends no `--on` yet, so pass it by calling
-     `orca orchestration worker-start` directly.
+   - **`claude`/`codex` entries** dispatch as before, except for the environment: `runCreate`
+     (`scripts/orca-cli.mjs`), then a worker start targeting
+     `--environment orchestrator-local --on ovh-local`, `--agent claude`/`--agent codex`,
+     `worktree: 'new-top-level'`. Those are the only two environment names that exist on the
+     server: the coordinator's own daemon, where the Run lives, and the runner's daemon, where
+     the worker runs. `"OVH runner"` is the *laptop's* name for the runner's pairing and does not
+     exist there (JUL-70 preflight miss 4; runbook, "The coordinator's `ORCA_ENVIRONMENT` is the
+     wrong daemon for orchestration"). `orca-cli.mjs`'s `workerStart` wrapper sends no `--on`
+     yet, so make the worker start by calling `orca orchestration worker-start` directly.
    - **`pi-deepseek`/`pi-glm` entries cannot go through `workerStart --agent pi`.**
      `workerStart`'s `--agent <id>` launches a known TUI agent with no way to pass Pi's own
      `--provider`/`--model` selection or seat-specific secret through it, and `runner` (the one
@@ -269,7 +269,7 @@ an agent). Pass `context` as base64, never as raw JSON embedded in a shell strin
 quoting and become an injection vector (PR #3 review, finding C3):
 
 ```js
-import { terminalCreate, terminalRead, terminalWait } from './orca-cli.mjs';
+import { terminalCreate, terminalRead } from './orca-cli.mjs';
 const contextB64 = Buffer.from(JSON.stringify(context)).toString('base64');
 const created = await terminalCreate({
   environment: 'ovh-local', // the runner's daemon; 'OVH runner' is only the laptop's name for it (JUL-70 preflight miss 4)
@@ -280,11 +280,17 @@ const created = await terminalCreate({
 // A single immediate read races the command's own completion -- wait for
 // the shell prompt to return before trusting the output as the command's
 // final state (fix-verification review: "does not guarantee event
-// delivery evidence"). Caution: on a plain (non-agent) terminal `tui-idle` can
-// return satisfied immediately even mid-run; only `--for exit --timeout-ms`
-// really blocks (runbook, "Seven findings carried from the cancelled JUL-106").
-await terminalWait({ environment: 'ovh-local', terminal: created.terminal.handle, forState: 'tui-idle', timeoutMs: 15000 });
-const read = await terminalRead({ environment: 'ovh-local', terminal: created.terminal.handle });
+// delivery evidence"). On a plain (non-agent) terminal neither `terminalWait`
+// mode is that signal: `tui-idle` returns at once even mid-run, and `exit`
+// only times out because the shell stays open (runbook, "Seven findings
+// carried from the cancelled JUL-106", item 3). So poll the read until the
+// last line is the shell prompt again.
+let read;
+for (let attempt = 0; attempt < 15; attempt += 1) {
+  read = await terminalRead({ environment: 'ovh-local', terminal: created.terminal.handle });
+  if (/\$\s*$/.test(read.terminal.tail.at(-1) ?? '')) break;
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+}
 // read.terminal.tail (an array of lines) confirms sent:true / sent:false, logged either way.
 ```
 
@@ -359,8 +365,9 @@ stops because it needs Todd:
    plain-English question with no jargon (not "how credentials reach the graph"). Ask only the
    first question if there are more; hold the rest for the next round. The question must also
    name which of the three kinds Todd legitimately gets -- `(a)` sign-in or payment, `(b)` money,
-   `(c)` a product decision -- and use no git words, or the For-Todd guard
-   (`scripts/linear-cli.mjs`; runbook, "The For-Todd guard") refuses the comment.
+   `(c)` a product decision -- and use no git words. `scripts/linear-cli.mjs` refuses a comment
+   that breaks this (runbook, "The For-Todd guard"), but a comment written through the Linear
+   tools above is not checked by it, so keep to the same rules by hand.
 2. Assign the issue that holds the question to Todd. If a decision ticket is opened, assign that
    ticket to him instead.
 3. Once his answer lands, unassign him.
