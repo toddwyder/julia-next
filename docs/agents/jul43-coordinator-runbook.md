@@ -440,6 +440,20 @@ longer posts a start comment (JUL-73):** the separate `claude -p` call that used
 (`defaultPostCommentImpl`/`postStartComment`) was a second vendor dependency doing no real work,
 since the coordinator's own first wake already posts admission to Linear.
 
+**The coordinator is a one-shot headless session, so it has to stay until its card is complete
+or parked (found on JUL-106, 2026-09-20).** `julia-run.mjs` launches `claude -p
+"/julia-coordinator <card>"`; that process exits as soon as the model's reply ends, and nothing
+launches it again (there is no scheduled trigger, and the Ready queue only starts cards that are
+not already in flight). The JUL-96 and JUL-106 coordinators each dispatched their builder and then
+ended the reply, saying a background watcher would wake them ("a watcher will wake me when it
+lands"; "I've armed a background wait ... so I get woken"). That wake-up exists only in an
+interactive Claude Code window, so both left a card marked in flight with nobody supervising it,
+and the queue then started nothing else. JUL-97's coordinator, launched the same way, stayed alive
+for hours because it waited in the foreground (`orca terminal wait ... --timeout-ms 580000` in a
+loop): the difference was what the model chose to do, not how it was launched. The coordinator
+skill now says so in its own voice ("You are a one-shot session"). Symptom to look for: a card in
+flight whose `julia-coordinator <card>` process is gone while its builder session is still open.
+
 **The headless launch needs its own tool grants — `claude -p` exits 0 even when every tool call
 was refused.** Found across two real live wakes, each diagnosing its own gap and reporting back
 instead of silently doing nothing:
