@@ -592,7 +592,8 @@ groups=1001(runner)` — and `test -r /etc/orca-runner/dropbox-secrets/zai.env` 
 BEFORE `zai-readers` was created on 2026-09-18, and the supplementary groups of a process are
 fixed at start and inherited by every child.
 
-**Consequence:** the `pi-glm` reviewer-backup and orchestrator-backup seats cannot read their own
+**Consequence:** the `pi-glm` reviewer-backup and orchestrator-backup seats (as they were on
+2026-09-18; `reviewer-backup` has been DeepSeek Pro since JUL-89) cannot read their own
 secret from inside a dispatched terminal, even though the drop box is configured exactly as
 `ops/service-dropbox/README.md` specifies. The JUL-77 "live-verified working" check for this seat
 passed from a fresh SSH login (which gets correct groups) and so never exercised the path a real
@@ -1296,6 +1297,77 @@ orthogonal to the url-rewrite/credential-helper protections — it only asserts 
 path's ownership," nothing about credentials or remotes. Verified live: `orchestrator-svc` pushed
 a real commit out of `/home/runner/julia-next` through the publisher successfully after this fix
 (JUL-71's own readiness-review doc landed this way).
+
+## The reviewer backup is DeepSeek Pro, not GLM (JUL-89, 2026-09-20)
+
+`reviewer-backup` in `ops/service-dropbox/run-pi-seat.mjs` used to launch GLM-5.3, which the cost
+rule bars (about $10 on a single issue). It is now `--provider deepseek --model deepseek-v4-pro`,
+reading the `deepseek` drop-box field into `DEEPSEEK_API_KEY` in the child's environment only --
+never argv, never a shell string (JUL-72). `deepseek-v4-pro` works through the native `deepseek`
+provider; a full review on it cost about three cents. There is no fifth seat beside it.
+
+- **GLM stays defined and selectable** as the `glm-5.3` model label, so a card can still choose it
+  on purpose. It is never a default or a fallback. Its one remaining launch route is
+  `orchestrator-backup`. **A GLM builder or reviewer has no seat** -- the coordinator parks that
+  item Blocked rather than send it to a DeepSeek seat (see the Pi paragraph in the coordinator
+  skill).
+- **The label names an entry, not the model.** `builder-backup` runs `deepseek-v4-flash` and
+  `reviewer-backup` runs `deepseek-v4-pro`, each fixed in `run-pi-seat.mjs`. A
+  `reviewer-deepseek-flash` or `builder-deepseek-pro` label is not honoured until JUL-102 wires the
+  card's model through. The coordinator says on the card which model actually ran.
+- A DeepSeek builder paired with this DeepSeek reviewer is the same model family; the family guard
+  in `scripts/seat-labels.mjs` (`fallback`), not this file, is what refuses that pair.
+
+## Seven findings carried from the cancelled JUL-106 (recorded 2026-09-20)
+
+JUL-106 (the watchdog) was cancelled after three rejected rounds; its detection code had been
+written against payload shapes nobody had captured. These findings existed only in that card's
+comments and in JUL-109's amendment. **Provenance:** items 1-3 and 5 were observed live on
+2026-09-20 during that card's runs and have not been re-run since; items 4 and 6 were checked
+against the code on `main` when this section was written; item 7 was proven live on 2026-09-20.
+JUL-109 upgrades Orca and re-captures every Orca-side item as a saved fixture, so **re-check 1-3
+and 5 on the pinned version before relying on them.**
+
+1. **`orca orchestration worker-show --dispatch <id> --json` payload shape.** It carries
+   `worker.state`, `worker.stage`, `worker.agentTerminalHandle`, `worker.lastError`; a
+   **top-level** `observation` (`{status, exactWorker}`, plus `agentWait` once Orca has looked); a
+   top-level `projection` (`stage`, `outcome`, `liveness`, `nextAction`); a top-level `terminal`;
+   and `terminalResource.terminalHandle`. There is **no** `worker.status`, no
+   `worker.terminalHandle`, no `worker.observation`. Code that read those absent fields sent every
+   real worker down its "no terminal" path, so a blocking screen was invisible and a healthy worker
+   resolved to `unknown` -- which is what got the watchdog rejected.
+2. **`worker-list` is a different shape** and must never be assumed for `worker-show`: it uses
+   `workerState` / `dispatchStatus`.
+3. **`orca terminal wait` on a plain (non-agent) terminal.** `--for tui-idle` returns
+   `satisfied: true` immediately even when the terminal is demonstrably mid-run -- worse than
+   failing, because it reads as success. `--for exit --timeout-ms <ms>` is the one that really
+   blocks: it holds for the full timeout, then returns `{ok:false, error:{code:"timeout"}}` with the
+   shell still open. That is how anything waits in the foreground on a plain-terminal dispatch.
+   (The `terminalWait` example in the coordinator skill uses `tui-idle`; do not read its result as
+   proof the command finished.)
+4. **What a queue-launched coordinator may actually run.** `scripts/julia-run.mjs` grants
+   `Bash(orca *)` plus a fixed list of `node scripts/<name>.mjs` (`orca-cli`, `ready-queue`,
+   `seat-labels`, `linear-cli`, `check-readiness`, `collect-worker-result`,
+   `verify-reviewer-worktree`, `coordinator-events`, and the two publisher scripts under
+   `--env-file=/etc/orchestrator-svc/.env.publisher`). So no `node -e`, no bare binary path, no
+   `base64`, `printenv`, `ls`, or `git` outside its own checkout. `scripts/orca-cli.mjs` exposes
+   only `run-list`, `task-list` and `worker-show` on the command line. **Every dispatch action goes
+   through the `orca` binary on PATH.** The coordinator skill's examples are written as
+   `orca-cli.mjs` calls that a real queue-launched coordinator cannot execute.
+5. **`orca orchestration run-create` refuses outside an Orca terminal**
+   (`no_active_sender_terminal`). A queue-launched coordinator must create a diagnostic terminal
+   first and pass `--from <handle>`. That handle becomes the run's `coordinator_handle`, which is
+   the wrong-binding trap: the run is bound to a terminal that is not the coordinator's own.
+6. **The Pi seat gap (fixed by this change).** There was no DeepSeek reviewer seat:
+   `reviewer-backup` was GLM, and `builder-backup` and `orchestrator-deepseek` were both pinned to
+   `deepseek-v4-flash`. `scripts/seat-labels.mjs` maps `deepseek-pro` to `deepseek-v4-pro`, which
+   had no launch route, so a coordinator following the skill for a `pi-deepseek` reviewer would
+   have silently launched GLM. Now closed for the reviewer (section above); the label-to-model half
+   is JUL-102, and JUL-89 covers every reviewer seat actually starting.
+7. **The `deepseek` secret is readable by `runner` from inside an Orca-spawned terminal.** Proven
+   live on 2026-09-20: `deepseek-readers` appears in the spawned terminal's own `id`, so the JUL-44
+   stale-supplementary-groups trap (above) is not biting this seat. Confirm it still holds after the
+   Orca upgrade in JUL-109.
 
 ## Stop / resume
 

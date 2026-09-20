@@ -133,7 +133,7 @@ For the current step of the current item:
    - **`claude`/`codex` entries** dispatch exactly as before: `runCreate` then `workerStart`
      (`scripts/orca-cli.mjs`), targeting `--environment "OVH runner"`, `--agent claude`/`--agent
      codex`, `worktree: 'new-top-level'`.
-   - **`pi-deepseek`/`pi-glm` entries (the backups) cannot go through `workerStart --agent pi`.**
+   - **`pi-deepseek`/`pi-glm` entries cannot go through `workerStart --agent pi`.**
      `workerStart`'s `--agent <id>` launches a known TUI agent with no way to pass Pi's own
      `--provider`/`--model` selection or seat-specific secret through it, and `runner` (the one
      identity both builder and reviewer dispatch as) can't hold two different default
@@ -143,9 +143,18 @@ For the current step of the current item:
      create --repo path:/home/runner/julia-next --name <step-name> --base-branch main
      --no-parent`, no `--agent`), then `orca terminal create --worktree <that path> --command "{
      cat <the acceptance criteria as a prompt file>; } | node ops/service-dropbox/run-pi-seat.mjs
-     <seat>"` where `<seat>` is `builder-backup` or `reviewer-backup` (`ops/service-dropbox/run-pi-seat.mjs`
+     <seat>"` where `<seat>` is `builder-backup` (DeepSeek Flash) for a builder or
+     `reviewer-backup` (DeepSeek Pro) for a reviewer (`ops/service-dropbox/run-pi-seat.mjs`
      resolves the right provider/model/secret from the seat name alone -- never pass a secret in
-     this command string). This path has no `worker-show`/`workerAbandon` supervision, so step 3
+     this command string). **`pi-glm` has no builder or reviewer seat.** GLM is barred as a
+     default or a fallback on cost (about $10 on one issue); only the orchestrator route launches
+     it. If a card deliberately picks a GLM builder or reviewer, park the item **Blocked** and say
+     so -- never send it to `builder-backup`/`reviewer-backup`, which are DeepSeek and would
+     silently run a different vendor from the one the card named (before JUL-89 it was the
+     reverse: a Pi reviewer silently launched GLM). A card's model label picks the *entry*, not
+     the exact model: each seat runs the one model fixed in `run-pi-seat.mjs`, so a
+     `reviewer-deepseek-flash` or `builder-deepseek-pro` label is not honoured until JUL-102 --
+     say on the card which model actually ran. This path has no `worker-show`/`workerAbandon` supervision, so step 3
      below (Verify) is the only place its evidence gets checked -- read the worktree's actual git
      commit yourself; there is no `collectWorkerResult`-equivalent for this path yet.
 
