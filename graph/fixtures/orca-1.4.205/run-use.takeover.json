@@ -1,0 +1,22 @@
+{
+  "id": "ad2c8ac7-8dc1-4eb6-9d05-14377221216c",
+  "ok": true,
+  "result": {
+    "run": {
+      "id": "run_1bf570ce5660",
+      "objective": "JUL-109-probe",
+      "coordinator_handle": "term_6fef8c01-6150-40b6-90a5-06a2245df543",
+      "consumer_generation": 2,
+      "legacy": 0,
+      "created_at": "2026-09-20T20:19:07Z",
+      "updated_at": "2026-09-20T20:28:58Z"
+    },
+    "mutation": {
+      "requestId": "638ea092-3f46-41f5-8751-7a006c73986b",
+      "replayed": false
+    }
+  },
+  "_meta": {
+    "runtimeId": "1e7c1ad9-9f69-4fb5-95b2-b3d914969117"
+  }
+}

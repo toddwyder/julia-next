@@ -1391,6 +1391,53 @@ and 5 on the pinned version before relying on them.**
    stale-supplementary-groups trap (above) is not biting this seat. Confirm it still holds after the
    Orca upgrade in JUL-109.
 
+## Orca is pinned at 1.4.205, and the JUL-106 findings re-checked (JUL-109, 2026-09-20)
+
+**Pin.** `orca-ide` is 1.4.205 on the server for both `runner` and `orchestrator-svc`, held with
+`apt-mark hold orca-ide` for the whole controller build. Both packages, their checksums and a
+rollback recipe are in `/opt/orca-pin/`. Changing the pin is an admin session between cards,
+recorded on JUL-109. The full record is `docs/research/jul109-orca-1.4.205-findings.md`; the real
+responses every stand-in should be built from are in `graph/fixtures/orca-1.4.205/` (its README says
+where each came from).
+
+**The seven JUL-106 findings above, re-checked on 1.4.205:**
+
+| # | Result |
+|---|---|
+| 1 `worker-show` shape | Confirmed, with one correction: there is **no** `terminalResource`. Top level is `worker`, `observation`, `projection`, `dispatch`, `terminal`, `server`, `remoteRuntimeEpoch`. The terminal is `terminal.handle` and `worker.agentTerminalHandle`. |
+| 2 `worker-list` is a different shape | Confirmed. |
+| 3 `terminal wait` on a plain terminal | Confirmed live: `--for tui-idle` said `satisfied: true` after 2.5 s on a terminal still running `sleep 90`; `--for exit --timeout-ms 8000` held 8.4 s then `timeout`. |
+| 4 What a queue-launched coordinator may run | Confirmed live with the exact grant list: `orca status --json` allowed; `node -e`, `printenv`, `ls`, `git` refused. |
+| 5 `run-create` outside an Orca terminal | Confirmed: `no_active_sender_terminal`. |
+| 6 The Pi seat gap | Closed for the reviewer (`reviewer-backup` is `deepseek-v4-pro`) and probed the real way, below. The label-to-model half is still JUL-102. |
+| 7 `deepseek-readers` in a spawned terminal | Confirmed: the terminal's own `id` lists `deepseek-readers`. |
+
+**New traps found on 1.4.205** (each has a saved response):
+
+- `projection.stage.activity` in `worker-show` stays `"unknown"` for a worker's whole life. Orca's
+  "working" is `worktree ps` `agents[].state`. Do not wait for `activity` to become `working`.
+- `worker-list` marks **every** worker `liveness: unverifiable / missing_status` and
+  `attention.requiresAction: true`, including ones that finished cleanly, while `worker-show` says
+  `live`. Neither is a stuck signal. The failure signature is `worker.state: failed` with
+  `failedStage: agent_readiness`, `lastError: timeout`, `observation.status: identity_changed`.
+- `worker-start` returning `stage: input_accepted` is **not** proof a turn started. Use
+  `terminal send --wait-submit`: a healthy builder shows `["input_accepted","turn_started"]`, a
+  screen stuck at a question shows `["input_accepted"]` and a warning.
+- `--retry-request` honours only ids Orca issued (`mutation.requestId`, or `orchestrationRequestId`
+  in an error). A client-made id is ignored, not replayed.
+- `--retry-of` needs `--task <failed task>` (not `--spec`), reuses the task, and does not inherit
+  placement. Lineage is `result.dispatch.retryOfDispatchId` (`worker-show`) and
+  `dispatch.retry_of_dispatch_id` (`dispatch-show`).
+- `worker_done` can arrive about 30 s before the agent is idle. Release a worker after
+  `agents[].state` is `done`.
+- Adopting a Pi terminal with `worker-start --terminal` while Pi is still starting loses the task
+  text and still reports `input_accepted`. Wait for Pi to be up.
+- **The runner account's first-run screens are cleared** (JUL-109): base-checkout trust in
+  `~/.claude.json` (worktrees inherit it), `skipDangerousModePermissionPrompt`, and
+  `env.DISABLE_AUTOUPDATER=1` in `~/.claude/settings.json`. Orca rewrites the hooks in that
+  settings file on every daemon start; these keys survived two restarts. If a fresh builder ever
+  fails `agent_readiness` again, read the terminal first: it is almost certainly one of these three.
+
 ## Stop / resume
 
 - **Stopping a run in progress**: Orca's own recovery verbs (`worker-stop` for a proven

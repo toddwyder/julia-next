@@ -1,0 +1,5 @@
+node -e "console.log(1)" DENIED
+orca status --json ALLOWED
+printenv HOME DENIED
+ls /etc DENIED
+git -C /srv/orchestrator-svc/julia-next log -1 --oneline DENIED

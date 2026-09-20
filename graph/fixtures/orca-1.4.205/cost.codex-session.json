@@ -1,0 +1,22 @@
+{
+  "source": "runner: ~/.codex/sessions/YYYY/MM/DD/rollout-<start time>-<session id>.jsonl (find the file whose session_meta.payload.cwd is the worker worktree)",
+  "file": "~/.codex/sessions/2026/09/20/rollout-2026-09-20T20-41-19-01a0c08d-4917-7551-8e97-399cf7ef66ec.jsonl",
+  "how_read": "model = turn_context.payload.model; tokens = the LAST event_msg/token_count payload.info.total_token_usage (cumulative); context window = info.model_context_window; peak context = max over token_count events of info.last_token_usage.input_tokens; duration = last minus first line timestamp",
+  "model": "gpt-6-astra",
+  "effort_recorded": null,
+  "total_token_usage": {
+    "input_tokens": 50976,
+    "cached_input_tokens": 45312,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 223,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 51199
+  },
+  "model_context_window": 258400,
+  "peak_last_turn_input_tokens": 17270,
+  "token_count_events": 3,
+  "duration_seconds": 17.181,
+  "first_timestamp": "2026-09-20T20:41:22.588Z",
+  "last_timestamp": "2026-09-20T20:41:39.769Z",
+  "no_cost_field": "the record has tokens but no dollar cost; cost would be computed from a price table"
+}

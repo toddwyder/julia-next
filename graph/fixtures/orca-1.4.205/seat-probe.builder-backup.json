@@ -1,0 +1,21 @@
+{
+  "seat": "builder-backup",
+  "provider": "deepseek",
+  "model": "deepseek-v4-flash",
+  "usage": {
+    "input": 3664,
+    "output": 9,
+    "cacheRead": 384,
+    "cacheWrite": 0,
+    "reasoning": 0,
+    "totalTokens": 4057,
+    "cost": {
+      "input": 0.00051296,
+      "output": 2.52e-06,
+      "cacheRead": 1.0751999999999999e-06,
+      "cacheWrite": 0,
+      "total": 0.0005165552
+    }
+  },
+  "reply": "BUILDER-SEAT-OK"
+}

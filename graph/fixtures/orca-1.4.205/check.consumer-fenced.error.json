@@ -1,0 +1,11 @@
+{
+  "id": "4fe62d94-91a6-428a-ae4e-e914065a0c00",
+  "ok": false,
+  "error": {
+    "code": "consumer_fenced",
+    "message": "This coordinator terminal is no longer bound to Run run_1bf570ce5660."
+  },
+  "_meta": {
+    "runtimeId": "1e7c1ad9-9f69-4fb5-95b2-b3d914969117"
+  }
+}

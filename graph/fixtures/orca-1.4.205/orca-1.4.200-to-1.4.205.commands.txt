@@ -1,0 +1,28 @@
+commands: 234 -> 234 | added: [] | removed: []
+changed: orchestration check | flags added: []
+   before: orca orchestration check [--terminal <handle>] [--run <run_id>] [--ack <delivery_id>] [--unread | --peek | --all] [--types <type,...>] [--format] [--wait] [--timeout-ms <n>] [--retry-request <id>] [--json]
+  default: return the bound Run's oldest unacknowledged FIFO batch.
+  --ack: acknowledge the prior whole batch before checking/waiting.
+  --peek: return only unread messages without marking them read.
+  --all: return every message for the handle; does not mark read.
+  --wait: block until a matching message arrives or --timeout-ms expires.
+          Emits JSON keepalive lines to stderr every 15s so the caller can
+          tell the process is alive. `_keepalive` is unrelated to heartbeat
+          messages; `_heartbeat` remains as a deprecated compatibility alias.
+          Filter with `jq "select(._keepalive|not)"` when merging streams.
+   after:  orca orchestration check [--terminal <handle>] [--run <run_id>] [--ack <delivery_id>] [--unread | --peek | --all] [--types <type,...>] [--format] [--wait] [--timeout-ms <n>] [--retry-request <id>] [--json]
+  default: return the bound Run's oldest unacknowledged FIFO batch.
+  --ack: acknowledge the prior whole batch before checking/waiting.
+  --peek: return only unread messages without marking them read.
+  --all: return every message for the handle; does not mark read.
+  --wait: block until a matching message arrives or --timeout-ms expires.
+          Emits JSON keepalive lines to stderr every 15s so the caller can
+          tell the process is alive. `_keepalive` is unrelated to heartbeat
+          messages; `_heartbeat` remains as a deprecated compatibility alias.
+          Filter with `jq "select(._keepalive|not)"` when merging streams.
+changed: orchestration send | flags added: []
+   before: orca orchestration send --subject <text> [--to <run:id|dispatch:id|legacy_handle>] [--run <run_id>] [--from <handle>] [--body <text>] [--type <type>] [--priority <level>] [--thread-id <id>] [--payload <json>] [--task-id <id>] [--dispatch-id <id>] [--outcome <succeeded|failed>] [--files-modified <csv>] [--report-path <path>] [--phase <text>] [--retry-request <id>] [--json]
+   after:  orca orchestration send --subject <text> [--to <run:id|dispatch:id|legacy_handle>] [--run <run_id>] [--from <handle>] [--body <text>] [--type <type>] [--priority <level>] [--thread-id <id>] [--payload <json>] [--task-id <id>] [--dispatch-id <id>] [--outcome <succeeded|failed>] [--files-modified <csv>] [--report-path <path>] [--phase <text>] [--retry-request <id>] [--json]
+changed: worktree rm | flags added: ['allow-failed-archive-hook']
+   before: orca worktree rm --worktree <selector> [--force] [--run-hooks] [--json]
+   after:  orca worktree rm --worktree <selector> [--force] [--run-hooks] [--allow-failed-archive-hook] [--json]

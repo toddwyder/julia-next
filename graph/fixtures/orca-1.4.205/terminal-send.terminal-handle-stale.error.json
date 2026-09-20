@@ -1,0 +1,29 @@
+{
+  "id": "fe34c937-9563-418b-8c33-a6ecb7aaf748",
+  "ok": false,
+  "error": {
+    "code": "terminal_handle_stale",
+    "message": "terminal_handle_stale Terminal prompt request ID: efdee8fc-cd14-473e-ab0e-b3a97b7e0cd7. Re-issue the exact command with --retry-request efdee8fc-cd14-473e-ab0e-b3a97b7e0cd7 --wait-submit <seconds>; do not retry it without that ID.",
+    "data": {
+      "orchestrationRequestId": "efdee8fc-cd14-473e-ab0e-b3a97b7e0cd7",
+      "originalCommand": [
+        "orca-ide",
+        "terminal",
+        "send",
+        "--environment",
+        "ovh-local",
+        "--terminal",
+        "term_9d19232e-d0f3-4480-bd17-9f4e8eb88bef",
+        "--text",
+        "Print the single word AGAIN and stop.",
+        "--enter",
+        "--wait-submit",
+        "20",
+        "--json"
+      ]
+    }
+  },
+  "_meta": {
+    "runtimeId": "15dfff83-3c19-44d6-83e4-cb5a753d9033"
+  }
+}

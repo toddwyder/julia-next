@@ -1,0 +1,59 @@
+{
+  "note": "first sample of worktree ps for a brand-new worker worktree: agents[].state is working",
+  "sampled_at": "20:31:41",
+  "worktree": {
+    "workspaceKind": "git",
+    "worktreeId": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109-probe-6",
+    "repoId": "dce3a58b-3035-401c-95df-e36ef2301374",
+    "hostId": "local",
+    "terminalPlatform": "linux",
+    "repo": "julia-next",
+    "path": "/home/runner/orca/workspaces/julia-next/jul109-probe-6",
+    "branch": "refs/heads/jul109-probe-6",
+    "isArchived": false,
+    "isMainWorktree": false,
+    "hasHostSidebarActivity": true,
+    "worktreeInstanceId": "5bf15cab-5c6c-4c3b-8942-0893f8120c9a",
+    "parentWorktreeId": null,
+    "childWorktreeIds": [],
+    "displayName": "jul109-probe-6",
+    "workspaceStatus": "in-progress",
+    "sortOrder": 1789936291830,
+    "lastActivityAt": 1789936291830,
+    "createdAt": 1789936291830,
+    "creatorProvenance": {
+      "kind": "host"
+    },
+    "linkedIssue": null,
+    "linkedPR": null,
+    "linkedLinearIssue": null,
+    "linkedGitLabMR": null,
+    "linkedGitLabIssue": null,
+    "comment": "",
+    "isPinned": false,
+    "isActive": false,
+    "unread": false,
+    "liveTerminalCount": 1,
+    "hasAttachedPty": true,
+    "lastOutputAt": 1789936300717,
+    "preview": "runner@vps-ce27cb55:~/orca/workspaces/julia-next/jul109-probe-6$ claude '--dangerously-skip-permissions' '--model' 'claude-sonnet-5' '--effort' 'low'\nRunningg1oshell com54nd\u2026nd sleep to complete before reporting worker_done.",
+    "status": "working",
+    "agents": [
+      {
+        "paneKey": "68af7c9d-cdd0-4067-ae20-31c08b73b58e:5718ee3f-129e-4c73-949d-5caaf7c46605",
+        "parentPaneKey": null,
+        "state": "working",
+        "agentType": "claude",
+        "prompt": "You are working inside Orca, a multi-agent IDE. Your task ID is: task_b86a25e7a4eb === TASK === JUL-109 working probe. Run the shell command: sleep 35. Then send worker_done with outcome succeeded. Do",
+        "taskTitle": null,
+        "displayName": null,
+        "lastAssistantMessage": null,
+        "toolName": "Bash",
+        "toolInput": "sleep 35",
+        "interrupted": false,
+        "stateStartedAt": 1789936294929,
+        "updatedAt": 1789936299434
+      }
+    ]
+  }
+}

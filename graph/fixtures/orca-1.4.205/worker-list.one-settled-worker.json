@@ -1,0 +1,82 @@
+{
+  "id": "2c52ede6-6d7b-4951-ad8d-9aaefa24a3ce",
+  "ok": true,
+  "result": {
+    "workers": [
+      {
+        "dispatchId": "ctx_937abab903ae",
+        "taskId": "task_dd8a290d7d14",
+        "runId": "run_1bf570ce5660",
+        "workerState": "succeeded",
+        "dispatchStatus": "completed",
+        "agentTerminalHandle": "term_b073045f-4acb-4d94-9ad5-5fadfbe1786d",
+        "terminalState": "retained",
+        "resource": null,
+        "projection": {
+          "id": "ctx_937abab903ae",
+          "dispatchId": "ctx_937abab903ae",
+          "taskId": "task_dd8a290d7d14",
+          "runId": "run_1bf570ce5660",
+          "role": "worker",
+          "parent": null,
+          "provider": null,
+          "host": {
+            "kind": "local",
+            "id": "local"
+          },
+          "workspace": {
+            "id": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109-probe-1",
+            "kind": "folder_or_worktree"
+          },
+          "stage": {
+            "worker": "succeeded",
+            "dispatch": "completed",
+            "detail": "settled",
+            "activity": "unknown"
+          },
+          "outcome": "succeeded",
+          "liveness": {
+            "verdict": "unverifiable",
+            "reason": "missing_status"
+          },
+          "evidence": {
+            "durable": true,
+            "liveStatus": "unavailable",
+            "lastObservedAt": null
+          },
+          "resource": {
+            "state": "absent",
+            "reason": "not_materialized"
+          },
+          "nextAction": {
+            "kind": "none",
+            "argv": []
+          },
+          "attention": {
+            "categories": [
+              "unverifiable",
+              "root_completion"
+            ],
+            "requiresAction": true
+          }
+        }
+      }
+    ],
+    "counts": {
+      "retained": 1
+    },
+    "page": {
+      "limit": 100,
+      "total": 1,
+      "hasMore": false,
+      "nextCursor": null
+    },
+    "scope": {
+      "run": "run_1bf570ce5660",
+      "source": "flag"
+    }
+  },
+  "_meta": {
+    "runtimeId": "1e7c1ad9-9f69-4fb5-95b2-b3d914969117"
+  }
+}
