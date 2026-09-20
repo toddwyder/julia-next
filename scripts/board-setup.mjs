@@ -44,6 +44,7 @@ import {
   effortLabelsFor,
   defaultLabelsFor,
   workViewIssueFilter,
+  isReservedLabelName,
 } from '../graph/board-spec.mjs';
 
 // The team template every new card starts from. Named so the setup can find it
@@ -395,7 +396,7 @@ export async function countIssues({ graphql, apiKey, filter }) {
 // ---------------------------------------------------------------------------
 
 // Every label group the spec wants, with the children it wants under it. The
-// Status group first, then each agent's model and effort groups; the order is
+// Card status group first, then each agent's model and effort groups; the order is
 // the order the setup applies them, so a parent always exists before its
 // children.
 export function desiredLabelGroups() {
@@ -457,9 +458,25 @@ export function sameFilterData(a, b) {
 // losing information or lying. The planner finds them all BEFORE emitting a
 // single action, and boardSetup reports them with card counts and exits
 // non-zero.
-export function findBlockingMismatches(board) {
+export function findBlockingMismatches(board, { labelGroups = desiredLabelGroups() } = {}) {
   const mismatches = [];
   const statesByName = new Map(board.states.map((state) => [state.name, state]));
+
+  // (9) A label or label group the spec wants whose name Linear reserves.
+  // The real API refuses issueLabelCreate with a 400 INPUT_ERROR ("reserved
+  // label name"), so a plan containing one could never complete. Report every
+  // offender by name before any mutation rather than fail partway through an
+  // apply -- and so the spec (graph/board-spec.mjs) can be fixed.
+  for (const group of labelGroups) {
+    if (isReservedLabelName(group.name)) {
+      mismatches.push({ kind: 'label-name-reserved', labelName: group.name });
+    }
+    for (const child of group.children) {
+      if (isReservedLabelName(child.name)) {
+        mismatches.push({ kind: 'label-name-reserved', labelName: child.name });
+      }
+    }
+  }
 
   // (7) Both an old name and its target name exist. There is no safe rename:
   // updating either one strands the other's cards, so the program stops and
@@ -494,7 +511,7 @@ export function findBlockingMismatches(board) {
   // (8) A label with a wanted GROUP name that is not a group cannot be a
   // parent. Matching by name alone would let ordinary labels receive children.
   const labelsByName = new Map(board.labels.map((label) => [label.name, label]));
-  for (const group of desiredLabelGroups()) {
+  for (const group of labelGroups) {
     const existing = labelsByName.get(group.name);
     if (existing && !existing.isGroup) {
       mismatches.push({ kind: 'label-group-identity', labelName: group.name });
@@ -539,6 +556,8 @@ export function mismatchMessage(mismatch, { issueCountByStateId = {} } = {}) {
       return `label "${mismatch.labelName}" already exists as a label group, but the spec needs it as an ordinary child of "${mismatch.parentName}"; a label group cannot be reparented under another group`;
     case 'retired-label-identity':
       return `label "${mismatch.labelName}" exists but is not a label group, so the spec's retirement of the group "${mismatch.labelName}" was not applied; rename or retire it by hand`;
+    case 'label-name-reserved':
+      return `label "${mismatch.labelName}" is a name Linear reserves and compares case-insensitively, so issueLabelCreate is refused with a 400 INPUT_ERROR ("reserved label name"); observed live on 2026-09-20 with userPresentableMessage "The label name "status" is reserved." Rename it in graph/board-spec.mjs`;
     default:
       return `unknown blocking mismatch: ${JSON.stringify(mismatch)}`;
   }
@@ -552,26 +571,53 @@ export class BoardConflictError extends Error {
   }
 }
 
+// The positions the eight spec states must occupy: the eight consecutive slots
+// immediately above the highest position held by any state OUTSIDE the eight.
+// Canceled, Duplicate and every other non-spec state are never moved, so
+// placing the eight above all of them makes their positions strictly increase
+// in spec order and collide with nothing outside the eight. The base is derived
+// from the live board, never hardcoded: a board whose outside states already
+// sit high gets a higher base, and a board with no outside states keeps 0..7.
+export function specStatePositions(board) {
+  const specNames = new Set(WORKFLOW_STATES.map((state) => state.name));
+  const renameSources = new Set(Object.keys(STATE_RENAMES));
+  let outsideMax = -1;
+  for (const state of board.states) {
+    // A state that already carries a spec name, or is about to be renamed to
+    // one, is one of the eight; everything else is outside and sets the floor.
+    if (specNames.has(state.name) || renameSources.has(state.name)) continue;
+    const value = Number(state.position);
+    if (Number.isFinite(value)) outsideMax = Math.max(outsideMax, value);
+  }
+  const positions = new Map();
+  WORKFLOW_STATES.forEach((state, index) => {
+    positions.set(state.name, outsideMax + 1 + index);
+  });
+  return positions;
+}
+
 // The action ordering that keeps intermediate state positions collision-free.
 // Every claimed state that must change position first moves to a temporary
 // slot above every existing and final position; then the missing states are
-// created and the moved states land on their final positions. No step puts two
-// of the eight at the same position. States outside the eight are never moved,
-// even when that leaves an outside state tied with one of the eight -- the
-// evidence listing names those ties.
+// created and given their position explicitly, and finally the moved states
+// land on their final positions. No step puts two of the eight at the same
+// position. States outside the eight are never moved, and because the eight
+// sit above every one of them no outside tie can arise from this plan.
 function planStatePositions(board, statesByName) {
   const actions = [];
-  const slots = WORKFLOW_STATES.map((state, index) => ({
+  const positions = specStatePositions(board);
+  const slots = WORKFLOW_STATES.map((state) => ({
     state,
-    position: index,
+    position: positions.get(state.name),
     existing: statesByName.get(state.name) ?? findRenameSource(statesByName, state.name),
   }));
 
   const maxExisting = board.states.reduce((max, state) => {
     const value = Number(state.position);
     return Number.isFinite(value) ? Math.max(max, value) : max;
-  }, WORKFLOW_STATES.length - 1);
-  let tempPosition = Math.max(maxExisting, WORKFLOW_STATES.length - 1) + 1;
+  }, -1);
+  const maxFinal = slots.reduce((max, slot) => Math.max(max, slot.position), -1);
+  let tempPosition = Math.max(maxExisting, maxFinal) + 1;
 
   const moved = slots.filter((slot) => slot.existing && Number(slot.existing.position) !== slot.position);
 
@@ -590,10 +636,14 @@ function planStatePositions(board, statesByName) {
     tempPosition += 1;
   }
 
-  // Second: create the missing states at their final positions. Every moved
-  // state is out of the way (at a temp slot), so a create never collides with
-  // a claimed state. A state outside the eight may share the position; that is
-  // left alone and reported by the evidence.
+  // Second: create the missing states. Linear assigns a position of its own on
+  // create -- the live board came back with newly created states at 1000 and
+  // 2000 -- so the position sent with the create cannot be trusted. Each
+  // created state therefore gets an explicit update-state, keyed by name, that
+  // the apply resolves to the id it just minted. That is what makes ONE apply
+  // land the column at its spec position instead of leaving the next run to
+  // repair it. Every moved state is out of the way (at a temp slot), so a
+  // create never collides with a claimed state.
   for (const slot of slots) {
     if (!slot.existing) {
       actions.push({
@@ -602,6 +652,12 @@ function planStatePositions(board, statesByName) {
         type: slot.state.type,
         color: slot.state.color,
         position: slot.position,
+      });
+      actions.push({
+        kind: 'update-state',
+        name: slot.state.name,
+        currentName: slot.state.name,
+        changes: { position: slot.position },
       });
     }
   }
@@ -640,8 +696,8 @@ function planStatePositions(board, statesByName) {
 // correct -- the property a second --apply relies on. Blocking mismatches
 // throw here too, so a direct caller cannot get a plan that ignores one. No
 // I/O.
-export function planBoardSetup(board) {
-  const mismatches = findBlockingMismatches(board);
+export function planBoardSetup(board, { labelGroups = desiredLabelGroups() } = {}) {
+  const mismatches = findBlockingMismatches(board, { labelGroups });
   if (mismatches.length > 0) {
     throw new BoardConflictError(mismatches.map((mismatch) => mismatchMessage(mismatch)));
   }
@@ -670,7 +726,7 @@ export function planBoardSetup(board) {
       const changes = {};
       const currentParentName = existing.parentId ? (labelNameById.get(existing.parentId) ?? null) : null;
       if (currentParentName !== group.name) changes.parentName = group.name;
-      // A spec'd description (the Status labels) must match; a null one means
+      // A spec'd description (the Card status labels) must match; a null one means
       // "the spec does not care", so an existing description is left alone.
       if (child.description != null && existing.description !== child.description) {
         changes.description = child.description;
@@ -759,6 +815,10 @@ export async function applyBoardSetup(actions, {
   const labelIdByName = new Map(board.labels.map((label) => [label.name, label.id]));
   const groupIdByName = new Map(board.labels.filter((label) => label.isGroup).map((label) => [label.name, label.id]));
   const templateIdByName = new Map(board.templates.map((template) => [template.name, template.id]));
+  // Created states are addressed by name until the create returns their id:
+  // a create's position is assigned by Linear, so the plan follows it with an
+  // update-state that has no id yet.
+  const stateIdByName = new Map(board.states.map((state) => [state.name, state.id]));
 
   const applyAction = async (action) => {
     switch (action.kind) {
@@ -772,14 +832,21 @@ export async function applyBoardSetup(actions, {
             position: action.position,
           },
         }, callOpts);
-        assertSuccess(data.workflowStateCreate, `creating workflow state "${action.name}"`);
+        const payload = assertSuccess(data.workflowStateCreate, `creating workflow state "${action.name}"`);
+        stateIdByName.set(action.name, payload.workflowState.id);
         break;
       }
       case 'update-state': {
+        // A state that existed before the run carries its id. A state created
+        // during the run is addressed by name and resolved here.
+        const stateId = action.id ?? stateIdByName.get(action.name ?? action.currentName);
+        if (!stateId) {
+          throw new Error(`board-setup: no workflow state named "${action.name ?? action.currentName}" to update`);
+        }
         const input = {};
         if (action.changes.name !== undefined) input.name = action.changes.name;
         if (action.changes.position !== undefined) input.position = action.changes.position;
-        const data = await graphql(UPDATE_STATE_MUTATION, { id: action.id, input }, callOpts);
+        const data = await graphql(UPDATE_STATE_MUTATION, { id: stateId, input }, callOpts);
         assertSuccess(data.workflowStateUpdate, `updating workflow state "${action.currentName}"`);
         break;
       }
@@ -983,6 +1050,20 @@ export function renderEvidence(board, issueCount, { issueCountFromSavedView = fa
     }
   }
 
+  // The ORDER: the eight spec columns in their actual board order, so a reader
+  // can see at a glance whether the board matches the ticket. A missing column
+  // is simply absent; a position tie is already named by the report above.
+  const specNames = new Set(WORKFLOW_STATES.map((state) => state.name));
+  const wantedOrder = WORKFLOW_STATES.map((state) => state.name);
+  const actualOrder = board.states
+    .filter((state) => specNames.has(state.name))
+    .sort((a, b) => a.position - b.position || a.name.localeCompare(b.name))
+    .map((state) => state.name);
+  const orderMatches = actualOrder.length === wantedOrder.length
+    && actualOrder.every((name, index) => name === wantedOrder[index]);
+  lines.push(`Order (the ${wantedOrder.length} spec columns, actual board order${orderMatches ? ', matches the ticket' : ', DOES NOT match the ticket'}):`);
+  lines.push(`  ${actualOrder.length > 0 ? actualOrder.join(', ') : '(none yet)'}`);
+
   const groups = board.labels.filter((label) => label.isGroup);
   lines.push(`Label groups (${groups.length}):`);
   for (const group of groups) {
@@ -1031,6 +1112,7 @@ export async function boardSetup({
   apply = false,
   stdout = process.stdout,
   stderr = process.stderr,
+  labelGroups = desiredLabelGroups(),
 } = {}) {
   const apiKey = providedApiKey ?? resolveLinearApiKey({ env, readSecretImpl });
   const safeStdout = makeRedactingWriter(stdout, apiKey);
@@ -1041,7 +1123,7 @@ export async function boardSetup({
   // Blocking mismatches are found BEFORE any mutation. Coexistence needs card
   // counts, so it is the one mismatch that costs a read; the counts come from
   // the live board, never from the plan.
-  const mismatches = findBlockingMismatches(board);
+  const mismatches = findBlockingMismatches(board, { labelGroups });
   if (mismatches.length > 0) {
     const stateIds = new Set();
     for (const mismatch of mismatches) {
@@ -1059,7 +1141,7 @@ export async function boardSetup({
     );
   }
 
-  const actions = planBoardSetup(board);
+  const actions = planBoardSetup(board, { labelGroups });
 
   safeStdout.write(apply
     ? 'board-setup: APPLY -- changing the Julia-next board to match graph/board-spec.mjs\n'

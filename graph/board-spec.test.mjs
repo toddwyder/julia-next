@@ -11,6 +11,8 @@ import {
   WORKFLOW_STATES,
   STATE_RENAMES,
   STATUS_LABELS,
+  RESERVED_LABEL_NAMES,
+  isReservedLabelName,
   GRAPH_AGENTS,
   RETIRED_LABEL_GROUPS,
   WORK_VIEW,
@@ -61,8 +63,8 @@ test('every rename target is one of the eight states, so a rename can never poin
   }
 });
 
-test('the Status group carries the three described labels, each with a one-line reason', () => {
-  assert.equal(STATUS_LABELS.group, 'Status');
+test('the Card status group carries the three described labels, each with a one-line reason', () => {
+  assert.equal(STATUS_LABELS.group, 'Card status');
   assert.deepEqual(STATUS_LABELS.labels.map((label) => label.name), ['waiting-on-todd', 'blocked', 'stalled']);
   assert.equal(STATUS_LABELS.labels[0].description, 'Assigned to Todd: an account action, a money decision, or a product decision or acceptance');
   assert.equal(STATUS_LABELS.labels[1].description, 'Cannot proceed until a named dependency is resolved');
@@ -82,6 +84,17 @@ test('the six graph agents are exactly the ticket\'s keys, codes and group names
     { key: 'evidence-reviewer', code: 'evidence', modelGroup: 'Evidence reviewer model', effortGroup: 'Evidence reviewer effort' },
     { key: 'consultant', code: 'consultant', modelGroup: 'Consultant model', effortGroup: 'Consultant effort' },
   ]);
+});
+
+test('the reserved Linear label names are kept in one place, with status in the set', () => {
+  assert.deepEqual(RESERVED_LABEL_NAMES, ['status']);
+  assert.equal(isReservedLabelName('status'), true);
+  assert.equal(isReservedLabelName('Status'), true, 'Linear compared the reserved name case-insensitively');
+  assert.equal(isReservedLabelName('STATUS'), true);
+  assert.equal(isReservedLabelName('Card status'), false, 'only the exact reserved word is reserved, not a longer name');
+  assert.equal(isReservedLabelName('blocked'), false);
+  assert.equal(isReservedLabelName(''), false);
+  assert.equal(isReservedLabelName(undefined), false);
 });
 
 test('the retired label groups are exactly the two orchestrator groups', () => {

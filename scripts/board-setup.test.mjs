@@ -37,6 +37,7 @@ import {
   GRAPH_AGENTS,
   defaultLabelsFor,
   workViewIssueFilter,
+  isReservedLabelName,
 } from '../graph/board-spec.mjs';
 
 const TEST_TEAM_ID = '31138162-65a4-4dd3-bcc8-6b6ac0709bca';
@@ -329,6 +330,18 @@ function validateOperation(query, variables) {
   }
 }
 
+// Linear's own position for a state it is asked to create: the next multiple
+// of 1000 above every position already on the board. The exact number is not
+// the point; that it is NOT the requested position is. The live board returned
+// 1000 and 2000 for states created at positions 4 and 5.
+function nextLinearPosition(states) {
+  const max = states.reduce((value, state) => {
+    const position = Number(state.position);
+    return Number.isFinite(position) ? Math.max(value, position) : value;
+  }, 0);
+  return (Math.floor(max / 1000) + 1) * 1000;
+}
+
 function makeFakeLinear(initial = freshBoard(), { templateDataAsObject = false } = {}) {
   const db = structuredClone(initial);
   const calls = { ops: [], mutations: [] };
@@ -404,7 +417,13 @@ function makeFakeLinear(initial = freshBoard(), { templateDataAsObject = false }
         if (db.states.some((state) => state.name === variables.input.name)) {
           throw new Error(`fake Linear: a state named "${variables.input.name}" already exists`);
         }
-        const state = { id: nextId('state'), color: null, ...structuredClone(variables.input) };
+        // The real API does not necessarily honour the position sent on
+        // create: the live board came back with newly created states at 1000
+        // and 2000. Ignore the requested position and assign Linear's own, so
+        // a test that only ever saw an obedient fake can no longer pass.
+        const input = structuredClone(variables.input);
+        input.position = nextLinearPosition(db.states);
+        const state = { id: nextId('state'), color: null, ...input };
         db.states.push(state);
         return { workflowStateCreate: { success: true, workflowState: { ...state } } };
       }
@@ -420,6 +439,13 @@ function makeFakeLinear(initial = freshBoard(), { templateDataAsObject = false }
       case 'BoardSetupCreateLabel': {
         const input = variables.input ?? {};
         if (!input.name) throw new Error('fake Linear: IssueLabelCreateInput.name is required');
+        // Linear reserves some label names and refuses issueLabelCreate for
+        // them with a 400 INPUT_ERROR. The real refusal (seen live on
+        // 2026-09-20) is echoed here so a spec that plans one fails in the
+        // fake exactly as it failed on the board.
+        if (isReservedLabelName(input.name)) {
+          throw new Error(`Linear API error: 200 [{"message":"reserved label name","path":["issueLabelCreate"],"extensions":{"type":"invalid input","code":"INPUT_ERROR","statusCode":400,"userError":true,"userPresentableMessage":"The label name \\"${input.name}\\" is reserved."}}]`);
+        }
         if (input.isGroup !== true && !input.parentId) {
           throw new Error('fake Linear: a non-group label needs a parentId');
         }
@@ -603,22 +629,78 @@ test('existing states are renamed, not replaced: the ids survive and the cards k
   assert.equal(byId.get('state-todo'), 'Ready');
 });
 
-test('workflow states get the spec order as positions, from Backlog (0) to Complete (7)', async () => {
+test('workflow states get the derived spec order as positions, above every outside state', async () => {
   const { db, result } = run({ apply: true });
   await result;
   const position = (name) => db.states.find((state) => state.name === name).position;
-  assert.equal(position('Backlog'), 0);
-  assert.equal(position('Ready'), 1);
-  assert.equal(position('Implementation'), 2);
-  assert.equal(position('Code review'), 3);
-  assert.equal(position('Remediation'), 4);
-  assert.equal(position('Staging/smoke test'), 5);
-  assert.equal(position('UAT'), 6);
-  assert.equal(position('Complete'), 7);
-  // Canceled and Duplicate are never moved: they keep positions 5 and 6, even
-  // though Staging and UAT now sit at the same positions.
+  // freshBoard() has Canceled at 5 and Duplicate at 6, so the eight land on
+  // the eight consecutive slots above 6: 7..14. The base is derived from the
+  // board, not hardcoded.
+  assert.equal(position('Backlog'), 7);
+  assert.equal(position('Ready'), 8);
+  assert.equal(position('Implementation'), 9);
+  assert.equal(position('Code review'), 10);
+  assert.equal(position('Remediation'), 11);
+  assert.equal(position('Staging/smoke test'), 12);
+  assert.equal(position('UAT'), 13);
+  assert.equal(position('Complete'), 14);
+  // Canceled and Duplicate are never moved, and because the eight sit above
+  // them there is no collision.
   assert.equal(position('Canceled'), 5);
   assert.equal(position('Duplicate'), 6);
+});
+
+test('one apply against a fake that ignores create positions lands the eight in order; a second plans nothing', async () => {
+  const { db, graphql, calls } = makeFakeLinear(freshBoard());
+  const first = await boardSetup({
+    graphql, teamId: TEST_TEAM_ID, env: { LINEAR_API_KEY: 'k' }, apply: true, stdout: { write() {} },
+  });
+  assert.ok(first.actions.length > 0);
+  // The fake assigned the newly created states positions of its own (1000,
+  // 2000, ...); the explicit update-state in the plan is what put them right.
+  assert.ok(calls.mutations.includes('BoardSetupCreateState'));
+  const actual = WORKFLOW_STATES
+    .map((spec) => db.states.find((state) => state.name === spec.name).position);
+  assert.deepEqual(actual, [...actual].sort((a, b) => a - b), 'positions are strictly increasing in spec order');
+  assert.deepEqual(actual, [7, 8, 9, 10, 11, 12, 13, 14]);
+
+  calls.mutations.length = 0;
+  const second = await boardSetup({
+    graphql, teamId: TEST_TEAM_ID, env: { LINEAR_API_KEY: 'k' }, apply: true, stdout: { write() {} },
+  });
+  assert.deepEqual(second.actions, []);
+  assert.deepEqual(calls.mutations, []);
+});
+
+test('a board in the exact broken shape from the real run is repaired to the ticket order by one apply', async () => {
+  const board = freshBoard();
+  board.states = [
+    { id: 'state-backlog', name: 'Backlog', type: 'backlog', position: 0, color: '#bec2c8' },
+    { id: 'state-implementation', name: 'Implementation', type: 'started', position: 0, color: '#f2c94c' },
+    { id: 'state-ready', name: 'Ready', type: 'unstarted', position: 1, color: '#e2e2e2' },
+    { id: 'state-code-review', name: 'Code review', type: 'started', position: 3, color: '#f2994a' },
+    { id: 'state-canceled', name: 'Canceled', type: 'canceled', position: 4, color: '#95a2b3' },
+    { id: 'state-duplicate', name: 'Duplicate', type: 'canceled', position: 5, color: '#6b6f76' },
+    { id: 'state-uat', name: 'UAT', type: 'started', position: 6, color: '#4ea7fc' },
+    { id: 'state-complete', name: 'Complete', type: 'completed', position: 7, color: '#5e6ad2' },
+    { id: 'state-remediation', name: 'Remediation', type: 'started', position: 1000, color: '#eb5757' },
+    { id: 'state-staging', name: 'Staging/smoke test', type: 'started', position: 2000, color: '#bb87fc' },
+  ];
+  const { db, result } = run({ board, apply: true });
+  await result;
+  const ordered = db.states
+    .filter((state) => WORKFLOW_STATES.some((spec) => spec.name === state.name))
+    .sort((a, b) => a.position - b.position)
+    .map((state) => state.name);
+  assert.deepEqual(ordered, WORKFLOW_STATES.map((state) => state.name));
+  // outsideMax is 5 (Canceled 4, Duplicate 5), so the eight start at 6.
+  assert.deepEqual(
+    WORKFLOW_STATES.map((spec) => db.states.find((state) => state.name === spec.name).position),
+    [6, 7, 8, 9, 10, 11, 12, 13],
+  );
+  // Canceled and Duplicate never move.
+  assert.equal(db.states.find((state) => state.name === 'Canceled').position, 4);
+  assert.equal(db.states.find((state) => state.name === 'Duplicate').position, 5);
 });
 
 test('no intermediate plan step puts two of the eight at the same position', () => {
@@ -626,6 +708,8 @@ test('no intermediate plan step puts two of the eight at the same position', () 
   const actions = planBoardSetup(board);
   const eight = new Set(WORKFLOW_STATES.map((state) => state.name));
   const live = new Map(board.states.map((state) => [state.id, { name: state.name, position: state.position }]));
+  const idByName = new Map(board.states.map((state) => [state.name, state.id]));
+  let created = 0;
   const check = (step) => {
     const occupied = new Map();
     for (const state of live.values()) {
@@ -639,17 +723,50 @@ test('no intermediate plan step puts two of the eight at the same position', () 
   check('the initial board');
   for (const action of actions) {
     if (action.kind === 'create-state') {
-      live.set(`created-${action.name}`, { name: action.name, position: action.position });
+      const id = `created-${++created}`;
+      live.set(id, { name: action.name, position: action.position });
+      idByName.set(action.name, id);
     } else if (action.kind === 'update-state') {
-      const state = live.get(action.id);
-      assert.ok(state, `update for unknown state ${action.id}`);
+      const id = action.id ?? idByName.get(action.name);
+      const state = live.get(id);
+      assert.ok(state, `update for unknown state ${id}`);
       if (action.changes.name !== undefined) state.name = action.changes.name;
       if (action.changes.position !== undefined) state.position = action.changes.position;
     }
     check(`${action.kind} ${action.name}`);
   }
-  // And the final state is the eight at exactly 0..7.
+  // And the final state is the eight in strictly increasing spec order, above
+  // Canceled (5) and Duplicate (6).
   check('the final board');
+});
+
+test('the planner corrects every merely-wrong position and plans no state action once the order is right', () => {
+  const board = freshBoard();
+  // All eight exist, but the first two are swapped. outsideMax is 6 (Canceled
+  // 5, Duplicate 6), so the eight belong at 7..14.
+  board.states = [
+    { id: 'state-backlog', name: 'Backlog', type: 'backlog', position: 8, color: '#bec2c8' },
+    { id: 'state-ready', name: 'Ready', type: 'unstarted', position: 7, color: '#e2e2e2' },
+    { id: 'state-implementation', name: 'Implementation', type: 'started', position: 9, color: '#f2c94c' },
+    { id: 'state-code-review', name: 'Code review', type: 'started', position: 10, color: '#f2994a' },
+    { id: 'state-remediation', name: 'Remediation', type: 'started', position: 11, color: '#eb5757' },
+    { id: 'state-staging', name: 'Staging/smoke test', type: 'started', position: 12, color: '#bb87fc' },
+    { id: 'state-uat', name: 'UAT', type: 'started', position: 13, color: '#4ea7fc' },
+    { id: 'state-complete', name: 'Complete', type: 'completed', position: 14, color: '#5e6ad2' },
+    { id: 'state-canceled', name: 'Canceled', type: 'canceled', position: 5, color: '#95a2b3' },
+    { id: 'state-duplicate', name: 'Duplicate', type: 'canceled', position: 6, color: '#6b6f76' },
+  ];
+  const stateActions = (candidate) => planBoardSetup(candidate)
+    .filter((action) => action.kind === 'create-state' || action.kind === 'update-state');
+
+  const touched = new Set(stateActions(board).map((action) => action.name ?? action.currentName));
+  assert.deepEqual([...touched].sort(), ['Backlog', 'Ready'], 'only the wrong states are touched');
+  assert.ok(!stateActions(board).some((action) => action.kind === 'create-state'), 'nothing is created');
+
+  // The same board with the two swaps undone plans no state action at all.
+  board.states.find((state) => state.name === 'Backlog').position = 7;
+  board.states.find((state) => state.name === 'Ready').position = 8;
+  assert.deepEqual(stateActions(board), []);
 });
 
 test('a second --apply is a no-op: no actions, no mutations, no change to the board', async () => {
@@ -678,17 +795,17 @@ test('a second --apply is a no-op: no actions, no mutations, no change to the bo
 });
 
 // ---------------------------------------------------------------------------
-// Label groups and Status descriptions
+// Label groups and Card status descriptions
 // ---------------------------------------------------------------------------
 
-test('--apply creates the Status group with its three described labels', async () => {
+test('--apply creates the Card status group with its three described labels', async () => {
   const { db, result } = run({ apply: true });
   await result;
   const group = db.labels.find((label) => label.name === STATUS_LABELS.group);
-  assert.ok(group?.isGroup, 'Status must be a label group');
+  assert.ok(group?.isGroup, 'Card status must be a label group');
   for (const status of STATUS_LABELS.labels) {
     const child = db.labels.find((label) => label.name === status.name);
-    assert.ok(child, `missing Status label ${status.name}`);
+    assert.ok(child, `missing Card status label ${status.name}`);
     assert.equal(child.parentId, group.id);
     assert.equal(child.description, status.description);
   }
@@ -907,23 +1024,36 @@ test('a mid-apply refusal reports the partial progress on stderr and still surfa
   assert.match(report, /re-running the program continues from where it stopped/);
 });
 
-test('the evidence names every state, every label group, the template, the view and any position collision', async () => {
+test('the evidence names every state, every label group, the template, the view and the spec order', async () => {
   const { capture, result } = run({ apply: true });
   await result;
   const evidence = capture.read().slice(capture.read().indexOf('EVIDENCE'));
   assert.match(evidence, /States \(10\):/);
-  assert.match(evidence, /Ready \[unstarted\] position 1/);
-  assert.match(evidence, /Complete \[completed\] position 7/);
+  assert.match(evidence, /Ready \[unstarted\] position 8/);
+  assert.match(evidence, /Complete \[completed\] position 14/);
   assert.match(evidence, /Canceled \[canceled\] position 5/);
-  assert.match(evidence, /Position collisions \(excluded states are left where they are\):/);
-  assert.match(evidence, /position 5: Canceled, Staging\/smoke test/);
-  assert.match(evidence, /Status/);
+  assert.match(evidence, /Order \(the 8 spec columns, actual board order, matches the ticket\):/);
+  assert.match(evidence, /Backlog, Ready, Implementation, Code review, Remediation, Staging\/smoke test, UAT, Complete/);
+  assert.match(evidence, /Card status/);
   assert.match(evidence, /waiting-on-todd/);
   assert.match(evidence, /Feature builder model/);
   assert.match(evidence, /Orchestrator model \(retired\)/);
   assert.match(evidence, new RegExp(`Template: ${TEMPLATE_NAME} \\(id: template-`));
   assert.match(evidence, /Work view: Work \(id: view-\d+, url: https:\/\/linear\.app\/julia-next\/view\/view-\d+-slug, shared\)/);
   assert.match(evidence, /Work view matches 2 issue\(s\)/);
+});
+
+test('the evidence reports a position collision it cannot fix without moving an excluded state', async () => {
+  const board = freshBoard();
+  // Give Canceled and Duplicate the same position: neither is one of the
+  // eight, so they are left where they are and the collision is named.
+  board.states.find((state) => state.name === 'Canceled').position = 4;
+  board.states.find((state) => state.name === 'Duplicate').position = 4;
+  const { capture, result } = run({ board, apply: true });
+  await result;
+  const evidence = capture.read().slice(capture.read().indexOf('EVIDENCE'));
+  assert.match(evidence, /Position collisions \(excluded states are left where they are\):/);
+  assert.match(evidence, /position 4: Canceled, Duplicate/);
 });
 
 // ---------------------------------------------------------------------------
@@ -964,11 +1094,11 @@ test('an existing state with the wrong type is a blocking mismatch, not an attem
 
 test('a label with a wanted group name that is not a group is a blocking mismatch', async () => {
   const board = freshBoard();
-  board.labels.push({ id: 'label-status-flat', name: 'Status', description: null, isGroup: false, parentId: null, retiredAt: null });
+  board.labels.push({ id: 'label-status-flat', name: 'Card status', description: null, isGroup: false, parentId: null, retiredAt: null });
   const { calls, result } = run({ board, apply: true });
   await assert.rejects(result, (error) => {
     assert.ok(error instanceof BoardConflictError);
-    assert.match(error.message, /label "Status" exists but is not a label group/);
+    assert.match(error.message, /label "Card status" exists but is not a label group/);
     return true;
   });
   assert.deepEqual(calls.mutations, []);
@@ -1009,6 +1139,43 @@ test('findBlockingMismatches and mismatchMessage describe each mismatch in one p
   assert.match(message, /Todo" \(4 card\(s\)\)/);
   assert.match(message, /Ready" \(2 card\(s\)\)/);
   assert.match(message, /renaming either would strand/);
+});
+
+test('planning a reserved Linear label name is refused before any mutation', async () => {
+  // The spec deliberately has no reserved name (Card status, not Status), so
+  // inject the reserved group a future careless rename would bring back.
+  const reservedGroups = [{
+    name: 'Status',
+    children: STATUS_LABELS.labels.map((label) => ({ name: label.name, description: label.description })),
+  }];
+  // The pure planner refuses too, with the name and the reason.
+  assert.throws(
+    () => planBoardSetup(freshBoard(), { labelGroups: reservedGroups }),
+    (error) => {
+      assert.ok(error instanceof BoardConflictError);
+      assert.match(error.message, /label "Status" is a name Linear reserves/);
+      return true;
+    },
+  );
+  const fake = makeFakeLinear(freshBoard());
+  await assert.rejects(
+    boardSetup({
+      graphql: fake.graphql,
+      teamId: TEST_TEAM_ID,
+      env: { LINEAR_API_KEY: 'test-key' },
+      apply: true,
+      stdout: { write() {} },
+      stderr: { write() {} },
+      labelGroups: reservedGroups,
+    }),
+    (error) => {
+      assert.ok(error instanceof BoardConflictError);
+      assert.match(error.message, /label "Status" is a name Linear reserves/);
+      assert.match(error.message, /reserved label name/);
+      return true;
+    },
+  );
+  assert.deepEqual(fake.calls.mutations, [], 'the refusal must come before any mutation');
 });
 
 // ---------------------------------------------------------------------------
@@ -1064,6 +1231,36 @@ test('the fake rejects a state create with no color', async () => {
       input: { teamId: TEST_TEAM_ID, name: 'Colorless', type: 'started', position: 1 },
     }),
     /color is required/,
+  );
+});
+
+test('the fake ignores the position requested on a state create and assigns its own', async () => {
+  const { graphql } = makeFakeLinear();
+  const data = await graphql(
+    'mutation BoardSetupCreateState($input: WorkflowStateCreateInput!) { workflowStateCreate(input: $input) { success workflowState { id name position } } }',
+    { input: { teamId: TEST_TEAM_ID, name: 'Linear picks the slot', type: 'started', position: 3, color: '#000000' } },
+  );
+  // The requested 3 is not what a real create returns: Linear assigns the next
+  // multiple of 1000 above the board. That is the behavior the tests need to
+  // see, so an obedient fake can no longer hide the missing position fix.
+  assert.notEqual(data.workflowStateCreate.workflowState.position, 3);
+  assert.equal(data.workflowStateCreate.workflowState.position, 1000);
+});
+
+test('the fake rejects a create of a reserved label name the way the real API did', async () => {
+  const { graphql } = makeFakeLinear();
+  await assert.rejects(
+    () => graphql('mutation BoardSetupCreateLabel($input: IssueLabelCreateInput!) { issueLabelCreate(input: $input) { success } }', {
+      input: { teamId: TEST_TEAM_ID, name: 'Status', isGroup: true },
+    }),
+    (error) => {
+      // The exact shape Linear returned on 2026-09-20: a 400 wrapped as a 200
+      // payload with INPUT_ERROR and "reserved label name".
+      assert.match(error.message, /reserved label name/);
+      assert.match(error.message, /INPUT_ERROR/);
+      assert.match(error.message, /The label name .*Status.* is reserved/);
+      return true;
+    },
   );
 });
 
