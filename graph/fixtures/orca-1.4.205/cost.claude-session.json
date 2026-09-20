@@ -1,51 +1,23 @@
 {
-  "source": "runner: ~/.claude/projects/<worktree path with / as ->/<session id>.jsonl (one file per session; one worktree per worker)",
-  "file": "~/.claude/projects/-home-runner-orca-workspaces-julia-next-jul109-probe-6/6f52e279-cacd-4bc8-9088-cced636237df.jsonl",
-  "how_read": "sum message.usage over every type=assistant line; message.model gives the model; peak context = max over turns of input_tokens+cache_read_input_tokens+cache_creation_input_tokens; duration = last minus first line timestamp",
-  "model": [
-    "claude-sonnet-5"
-  ],
-  "assistant_turns": 8,
-  "input_tokens": 16,
-  "output_tokens": 1142,
-  "cache_read_input_tokens": 463563,
-  "cache_creation_input_tokens": 27141,
-  "peak_context_tokens": 62524,
-  "first_timestamp": "2026-09-20T20:31:32.967Z",
-  "last_timestamp": "2026-09-20T20:32:15.610Z",
-  "duration_seconds": 42.643,
-  "first_assistant_usage_sample": {
-    "input_tokens": 2,
-    "cache_creation_input_tokens": 12159,
-    "cache_read_input_tokens": 47801,
-    "output_tokens": 211,
-    "output_tokens_details": {
-      "thinking_tokens": 104
-    },
-    "server_tool_use": {
-      "web_search_requests": 0,
-      "web_fetch_requests": 0
-    },
-    "service_tier": "standard",
-    "cache_creation": {
-      "ephemeral_1h_input_tokens": 12159,
-      "ephemeral_5m_input_tokens": 0
-    },
-    "inference_geo": "not_available",
-    "iterations": [
-      {
-        "input_tokens": 2,
-        "output_tokens": 211,
-        "cache_read_input_tokens": 47801,
-        "cache_creation_input_tokens": 12159,
-        "cache_creation": {
-          "ephemeral_5m_input_tokens": 0,
-          "ephemeral_1h_input_tokens": 12159
-        },
-        "type": "message"
+  "source": "~/.claude/projects/<worktree path>/<session>.jsonl (probe 6, first round)",
+  "corrects": "cost.claude-session.json in PR #64, which counted repeated transcript lines twice",
+  "transcript": {
+    "assistant_lines": 8,
+    "distinct_messages": 6,
+    "totals_by_model": {
+      "claude-sonnet-5": {
+        "input": 12,
+        "output": 805,
+        "cacheRead": 354494,
+        "cacheWrite5m": 0,
+        "cacheWrite1h": 14683,
+        "cacheWriteTotal": 14683,
+        "messages": 6
       }
-    ],
-    "speed": "standard"
-  },
-  "not_a_source": "~/.claude.json projects[<path>].last* holds cost and tokens but under the base checkout key only (worktree sessions do not get their own key) and is overwritten by every session"
+    },
+    "peak_context_tokens": 62524,
+    "duration_seconds": 42.643,
+    "first_timestamp": "2026-09-20T20:31:32.967Z",
+    "last_timestamp": "2026-09-20T20:32:15.610Z"
+  }
 }

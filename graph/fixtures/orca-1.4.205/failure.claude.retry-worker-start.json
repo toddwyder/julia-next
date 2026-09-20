@@ -1,0 +1,81 @@
+{
+  "id": "3c6889a1-9e93-455c-a8f7-21ad55cafc86",
+  "ok": true,
+  "result": {
+    "runId": "run_b120a7719f64",
+    "taskId": "task_135f133bb075",
+    "dispatchId": "ctx_0092f7e05aae",
+    "state": "ready",
+    "stage": "input_accepted",
+    "server": {
+      "environmentId": "e8b75ed2-0f00-4b2f-ac90-2bfcea792089",
+      "name": "ovh-local"
+    },
+    "setup": {
+      "requested": "run",
+      "effective": "run",
+      "source": "orchestration_default",
+      "hookFound": false,
+      "startupPolicy": "start-immediately",
+      "state": "not_configured"
+    },
+    "launch": {
+      "requested": {
+        "agent": "claude",
+        "model": "claude-sonnet-5",
+        "effort": "low"
+      },
+      "effective": {
+        "agent": "claude",
+        "model": "claude-sonnet-5",
+        "effort": "low"
+      }
+    },
+    "timeoutMs": 60000,
+    "effects": [
+      {
+        "kind": "worktree",
+        "action": "created_top_level",
+        "id": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109b-retry-claude"
+      },
+      {
+        "kind": "terminal",
+        "role": "agent",
+        "action": "created",
+        "id": "term_3826e77a-0eac-4542-9b33-cb064b9d33fd",
+        "tabId": "e4d3b488-62a7-4c6b-abdf-689371429926",
+        "leafId": "d3ea1beb-fdee-4b5e-b447-55deb284cc14"
+      },
+      {
+        "kind": "setup",
+        "action": "run",
+        "requested": "run",
+        "effective": "run",
+        "source": "orchestration_default",
+        "hookFound": false,
+        "startupPolicy": "start-immediately",
+        "state": "not_configured"
+      },
+      {
+        "kind": "dispatch_input",
+        "role": "agent",
+        "id": "term_3826e77a-0eac-4542-9b33-cb064b9d33fd",
+        "state": "accepted"
+      }
+    ],
+    "residualResources": [],
+    "mode": {
+      "mode": "terminal",
+      "preferred": "terminal",
+      "reason": "user_default",
+      "detail": "Started a terminal agent worker, the default for new agent tabs in your settings."
+    },
+    "mutation": {
+      "requestId": "3da8920e-bc28-42d7-847f-477d8fd3c3e2",
+      "replayed": false
+    }
+  },
+  "_meta": {
+    "runtimeId": "1e7c1ad9-9f69-4fb5-95b2-b3d914969117"
+  }
+}

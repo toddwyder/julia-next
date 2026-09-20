@@ -133,6 +133,8 @@ steps, and the ticket does not close until it has.
      launch sat at a folder-trust question for about eight hours. Record the command, the terminal's
      own `id` (a Pi seat must show `deepseek-readers`), the provider and model the run reports, that
      a real answer came back, and the cost. The seat probe checks for the answer, not for exit 0.
+     Re-run the probe from a fresh worktree of the *current* base checkout after that checkout is moved,
+     replaced or re-imported: Claude's folder trust is keyed by the base checkout's exact path.
    - reuse a recent, still-valid finding from a prior audit instead of re-probing, but cite the
      source doc and its date so staleness can be judged later.
 
@@ -170,3 +172,7 @@ steps, and the ticket does not close until it has.
   failure of the review, but it must be resolved by Todd's approval before the ticket can pass.
 
 Never write "should work" or "presumably fine" as a substitute for one of the three above.
+
+**When you record a gap, record what breaks if it stays.** "Not tested" or "no figure for X" is not a
+finding on its own. Say what will go wrong, for whom, and how soon (for example: "the cost line will be
+blank for the seat doing most of the work"). A gap without its consequence reads as a footnote.

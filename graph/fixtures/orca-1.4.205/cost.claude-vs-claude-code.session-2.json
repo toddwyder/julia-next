@@ -1,0 +1,64 @@
+{
+  "what": "One real Claude session, read two ways: Claude Code's own cost record (~/.claude.json projects[<base checkout>].last*, written when the session exits cleanly) and the session transcript.",
+  "claudeCodeRecord": {
+    "lastCost": 0.10825840000000002,
+    "lastAPIDuration": 13069,
+    "lastAPIDurationWithoutRetries": 13000,
+    "lastToolDuration": 541,
+    "lastDuration": 86150,
+    "lastStartTime": 1789945344679,
+    "lastLinesAdded": 0,
+    "lastLinesRemoved": 0,
+    "lastTotalInputTokens": 2972,
+    "lastTotalOutputTokens": 421,
+    "lastTotalCacheCreationInputTokens": 13649,
+    "lastTotalCacheReadInputTokens": 230252,
+    "lastTotalWebSearchRequests": 0,
+    "lastFpsAverage": 1.58,
+    "lastFpsLow1Pct": 128.11,
+    "lastGracefulShutdown": true,
+    "lastVersionBase": "2.1.269",
+    "lastModelUsage": {
+      "claude-haiku-4-5-20251001": {
+        "inputTokens": 2462,
+        "outputTokens": 16,
+        "thinkingTokens": 0,
+        "cacheReadInputTokens": 0,
+        "cacheCreationInputTokens": 0,
+        "webSearchRequests": 0,
+        "costUSD": 0.002542
+      },
+      "claude-sonnet-5": {
+        "inputTokens": 510,
+        "outputTokens": 405,
+        "thinkingTokens": 0,
+        "cacheReadInputTokens": 230252,
+        "cacheCreationInputTokens": 13649,
+        "webSearchRequests": 0,
+        "costUSD": 0.1057164
+      }
+    },
+    "lastSessionId": "01e14d48-58de-4ab7-b1bd-acf53498bef5"
+  },
+  "transcriptFile": "~/.claude/projects/-home-runner-orca-workspaces-julia-next-jul109b-retry-claude/01e14d48-58de-4ab7-b1bd-acf53498bef5.jsonl",
+  "transcript": {
+    "assistant_lines": 4,
+    "distinct_messages": 3,
+    "totals_by_model": {
+      "claude-sonnet-5": {
+        "input": 6,
+        "output": 386,
+        "cacheRead": 168849,
+        "cacheWrite5m": 0,
+        "cacheWrite1h": 13602,
+        "cacheWriteTotal": 13602,
+        "messages": 3
+      }
+    },
+    "peak_context_tokens": 61405,
+    "duration_seconds": 12.744,
+    "first_timestamp": "2026-09-20T23:02:25.905Z",
+    "last_timestamp": "2026-09-20T23:02:38.649Z"
+  },
+  "note": "The transcript writes one line per content block, so a message with a text block and a tool_use block appears twice with identical usage. Count each message id once. Even then the transcript is a lower bound: Claude Code also made calls the transcript does not hold (a Haiku call, and about one extra Sonnet-sized call)."
+}

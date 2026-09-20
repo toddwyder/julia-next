@@ -1,0 +1,25 @@
+{
+  "source": "pi 0.85.1: /usr/lib/node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/providers/data/deepseek.json, openai-completions entries for the two seat models, cost is USD per million tokens",
+  "models": {
+    "deepseek-v4-flash": {
+      "cost": {
+        "input": 0.14,
+        "output": 0.28,
+        "cacheRead": 0.0028,
+        "cacheWrite": 0
+      },
+      "contextWindow": 1000000,
+      "maxTokens": 384000
+    },
+    "deepseek-v4-pro": {
+      "cost": {
+        "input": 0.435,
+        "output": 0.87,
+        "cacheRead": 0.003625,
+        "cacheWrite": 0
+      },
+      "contextWindow": 1000000,
+      "maxTokens": 384000
+    }
+  }
+}

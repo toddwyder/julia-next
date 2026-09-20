@@ -1,0 +1,181 @@
+{
+  "id": "3b8a86b6-94c8-4dc1-b76f-e0cd298ddbcf",
+  "ok": true,
+  "result": {
+    "dispatch": {
+      "id": "ctx_0092f7e05aae",
+      "runId": "run_b120a7719f64",
+      "taskId": "task_135f133bb075",
+      "task_id": "task_135f133bb075",
+      "contractVersion": 1,
+      "assigneeHandle": null,
+      "assigneePaneKey": null,
+      "processIncarnation": null,
+      "capabilityRevokedAt": "2026-09-20T23:02:36.482Z",
+      "retryOfDispatchId": "ctx_49dfb0bddaef",
+      "creatorDispatchId": null,
+      "hostScope": null,
+      "status": "completed",
+      "failureCount": 0,
+      "lastFailure": null,
+      "terminationReason": null,
+      "depth": 1,
+      "dispatchedAt": "2026-09-20 23:02:24",
+      "completedAt": "2026-09-20T23:02:36.482Z",
+      "createdAt": "2026-09-20 23:02:24",
+      "lastHeartbeatAt": null
+    },
+    "worker": {
+      "dispatchId": "ctx_0092f7e05aae",
+      "runtimeEpoch": "1e7c1ad9-9f69-4fb5-95b2-b3d914969117",
+      "state": "succeeded",
+      "stage": "settled",
+      "worktreeId": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109b-retry-claude",
+      "agentTerminalHandle": "term_3826e77a-0eac-4542-9b33-cb064b9d33fd",
+      "setupState": "not_configured",
+      "effects": [
+        {
+          "kind": "worktree",
+          "action": "created_top_level",
+          "id": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109b-retry-claude"
+        },
+        {
+          "kind": "terminal",
+          "role": "agent",
+          "action": "created",
+          "id": "term_3826e77a-0eac-4542-9b33-cb064b9d33fd",
+          "tabId": "e4d3b488-62a7-4c6b-abdf-689371429926",
+          "leafId": "d3ea1beb-fdee-4b5e-b447-55deb284cc14"
+        },
+        {
+          "kind": "setup",
+          "action": "run",
+          "requested": "run",
+          "effective": "run",
+          "source": "orchestration_default",
+          "hookFound": false,
+          "startupPolicy": "start-immediately",
+          "state": "not_configured"
+        },
+        {
+          "kind": "dispatch_input",
+          "role": "agent",
+          "id": "term_3826e77a-0eac-4542-9b33-cb064b9d33fd",
+          "state": "accepted"
+        }
+      ],
+      "residualResources": [],
+      "startOptions": {
+        "on": "e8b75ed2-0f00-4b2f-ac90-2bfcea792089",
+        "serverName": "ovh-local",
+        "worktree": "new-top-level",
+        "name": "jul109b-retry-claude",
+        "repo": "path:/home/runner/julia-next",
+        "baseBranch": "main",
+        "terminal": null,
+        "agent": "claude",
+        "launch": {
+          "requested": {
+            "agent": "claude",
+            "model": "claude-sonnet-5",
+            "effort": "low"
+          },
+          "effective": null
+        },
+        "timeoutMs": 60000,
+        "setup": "run",
+        "setupSource": "orchestration_default"
+      },
+      "lastError": null,
+      "createdAt": "2026-09-20 23:02:24",
+      "updatedAt": "2026-09-20T23:02:36.483Z"
+    },
+    "projection": {
+      "id": "ctx_0092f7e05aae",
+      "dispatchId": "ctx_0092f7e05aae",
+      "taskId": "task_135f133bb075",
+      "runId": "run_b120a7719f64",
+      "role": "worker",
+      "parent": null,
+      "provider": null,
+      "host": {
+        "kind": "remote",
+        "id": "e8b75ed2-0f00-4b2f-ac90-2bfcea792089"
+      },
+      "workspace": {
+        "id": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109b-retry-claude",
+        "kind": "folder_or_worktree"
+      },
+      "stage": {
+        "worker": "succeeded",
+        "dispatch": "completed",
+        "detail": "settled",
+        "activity": "unknown"
+      },
+      "outcome": "succeeded",
+      "liveness": {
+        "verdict": "live",
+        "observedAt": 1789945387961,
+        "source": "execution_host"
+      },
+      "evidence": {
+        "durable": true,
+        "liveStatus": "fresh",
+        "lastObservedAt": 1789945387961
+      },
+      "resource": {
+        "state": "absent",
+        "reason": "not_materialized"
+      },
+      "nextAction": {
+        "kind": "inspect",
+        "argv": [
+          "orchestration",
+          "worker-show",
+          "--dispatch",
+          "ctx_0092f7e05aae"
+        ]
+      },
+      "attention": {
+        "categories": [
+          "root_completion"
+        ],
+        "requiresAction": false
+      }
+    },
+    "server": {
+      "environmentId": "e8b75ed2-0f00-4b2f-ac90-2bfcea792089",
+      "name": "ovh-local"
+    },
+    "remoteRuntimeEpoch": "15dfff83-3c19-44d6-83e4-cb5a753d9033",
+    "terminal": {
+      "handle": "term_3826e77a-0eac-4542-9b33-cb064b9d33fd",
+      "ptyId": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109b-retry-claude@@8526e955",
+      "incarnationId": "d447c69a-8c17-473f-a133-7fa5a5a50e5d",
+      "orphaned": false,
+      "worktreeId": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109b-retry-claude",
+      "worktreePath": "/home/runner/orca/workspaces/julia-next/jul109b-retry-claude",
+      "branch": "refs/heads/jul109b-retry-claude",
+      "tabId": "e4d3b488-62a7-4c6b-abdf-689371429926",
+      "leafId": "d3ea1beb-fdee-4b5e-b447-55deb284cc14",
+      "title": "✳ JUL-109b failure probe",
+      "connected": true,
+      "writable": true,
+      "lastOutputAt": 1789945358676,
+      "preview": "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n❯\n────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents",
+      "executionHostId": "local",
+      "agentIdentity": "claude",
+      "paneRuntimeId": -1,
+      "rendererGraphEpoch": 0,
+      "agentWait": null
+    },
+    "observation": {
+      "status": "live",
+      "exactWorker": true,
+      "agentWait": null
+    }
+  },
+  "_meta": {
+    "runtimeId": "1e7c1ad9-9f69-4fb5-95b2-b3d914969117"
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "id": "8a06b170-c5fc-4af5-a154-3d18986457c7",
+  "ok": true,
+  "result": {
+    "runId": "run_b120a7719f64",
+    "taskId": "task_9b75e45823be",
+    "dispatchId": "ctx_b49a9b2e7e9f",
+    "state": "failed",
+    "stage": "agent_readiness",
+    "server": {
+      "environmentId": "e8b75ed2-0f00-4b2f-ac90-2bfcea792089",
+      "name": "ovh-local"
+    },
+    "failedStage": "agent_readiness",
+    "lastError": "timeout",
+    "setup": {
+      "requested": "run",
+      "effective": "run",
+      "source": "orchestration_default",
+      "hookFound": false,
+      "startupPolicy": "start-immediately",
+      "state": "not_configured"
+    },
+    "launch": {
+      "requested": {
+        "agent": "claude",
+        "model": "claude-sonnet-5",
+        "effort": "low"
+      },
+      "effective": {
+        "agent": "claude",
+        "model": "claude-sonnet-5",
+        "effort": "low"
+      }
+    },
+    "effects": [
+      {
+        "kind": "worktree",
+        "action": "created_top_level",
+        "id": "4a6bfd30-241d-4332-95b8-724bc2fe6918::/home/runner/orca/workspaces/julia-next-b/probe-newbase-untrusted"
+      },
+      {
+        "kind": "terminal",
+        "role": "agent",
+        "action": "created",
+        "id": "term_d7f18caa-53a2-4359-ba20-eb0d4ccad59b",
+        "tabId": "44e2858e-42c1-49a5-8ffd-937f515b91b3",
+        "leafId": "b98aef1a-d65d-4a31-9000-9aa3ee928321"
+      },
+      {
+        "kind": "setup",
+        "action": "run",
+        "requested": "run",
+        "effective": "run",
+        "source": "orchestration_default",
+        "hookFound": false,
+        "startupPolicy": "start-immediately",
+        "state": "not_configured"
+      }
+    ],
+    "residualResources": [
+      {
+        "kind": "worktree",
+        "action": "created_top_level",
+        "id": "4a6bfd30-241d-4332-95b8-724bc2fe6918::/home/runner/orca/workspaces/julia-next-b/probe-newbase-untrusted"
+      },
+      {
+        "kind": "terminal",
+        "role": "agent",
+        "action": "created",
+        "id": "term_d7f18caa-53a2-4359-ba20-eb0d4ccad59b",
+        "tabId": "44e2858e-42c1-49a5-8ffd-937f515b91b3",
+        "leafId": "b98aef1a-d65d-4a31-9000-9aa3ee928321"
+      }
+    ],
+    "mode": {
+      "mode": "terminal",
+      "preferred": "terminal",
+      "reason": "user_default",
+      "detail": "Started a terminal agent worker, the default for new agent tabs in your settings."
+    },
+    "mutation": {
+      "requestId": "4a63ab64-8ee0-43e7-bf8c-9de8d8a6def1",
+      "replayed": false
+    }
+  },
+  "_meta": {
+    "runtimeId": "1e7c1ad9-9f69-4fb5-95b2-b3d914969117"
+  }
+}

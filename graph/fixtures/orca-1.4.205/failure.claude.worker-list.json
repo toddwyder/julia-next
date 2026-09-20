@@ -1,0 +1,82 @@
+{
+  "id": "9985f91e-59a6-45b6-b0d2-48a61b26b0aa",
+  "ok": true,
+  "result": {
+    "workers": [
+      {
+        "dispatchId": "ctx_49dfb0bddaef",
+        "taskId": "task_135f133bb075",
+        "runId": "run_b120a7719f64",
+        "workerState": "failed",
+        "dispatchStatus": "failed",
+        "agentTerminalHandle": "term_cea94f19-f4be-4079-be80-306f632d2de7",
+        "terminalState": "retained",
+        "resource": null,
+        "projection": {
+          "id": "ctx_49dfb0bddaef",
+          "dispatchId": "ctx_49dfb0bddaef",
+          "taskId": "task_135f133bb075",
+          "runId": "run_b120a7719f64",
+          "role": "worker",
+          "parent": null,
+          "provider": null,
+          "host": {
+            "kind": "local",
+            "id": "local"
+          },
+          "workspace": {
+            "id": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109b-fail-claude",
+            "kind": "folder_or_worktree"
+          },
+          "stage": {
+            "worker": "failed",
+            "dispatch": "failed",
+            "detail": "settled",
+            "activity": "unknown"
+          },
+          "outcome": "failed",
+          "liveness": {
+            "verdict": "unverifiable",
+            "reason": "missing_status"
+          },
+          "evidence": {
+            "durable": true,
+            "liveStatus": "unavailable",
+            "lastObservedAt": null
+          },
+          "resource": {
+            "state": "absent",
+            "reason": "not_materialized"
+          },
+          "nextAction": {
+            "kind": "none",
+            "argv": []
+          },
+          "attention": {
+            "categories": [
+              "failure",
+              "unverifiable"
+            ],
+            "requiresAction": true
+          }
+        }
+      }
+    ],
+    "counts": {
+      "retained": 1
+    },
+    "page": {
+      "limit": 100,
+      "total": 1,
+      "hasMore": false,
+      "nextCursor": null
+    },
+    "scope": {
+      "run": "run_b120a7719f64",
+      "source": "flag"
+    }
+  },
+  "_meta": {
+    "runtimeId": "1e7c1ad9-9f69-4fb5-95b2-b3d914969117"
+  }
+}
