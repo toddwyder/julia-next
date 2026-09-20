@@ -46,23 +46,44 @@ test('builder-backup spawns pi with DEEPSEEK_API_KEY in env, never in argv', () 
   assert.ok(!spec.args.includes('super-secret-deepseek-token'));
 });
 
-test('reviewer-backup and orchestrator-backup both route to Pi + GLM-5.3 as a custom provider', () => {
-  for (const seat of ['reviewer-backup', 'orchestrator-backup']) {
-    const spec = buildPiSpawnSpec(seat, 'review this', {
-      mode: 'rpc',
-      readSecretImpl: (field) => {
-        assert.equal(field, 'zai');
-        return 'super-secret-zai-token';
-      },
-    });
-    assert.deepEqual(spec.args, ['--provider', 'glm-5-3', '--model', 'glm-5.3', '--thinking', 'medium', '-p', '--mode', 'rpc', '--', 'review this']);
-    assert.equal(spec.env.ZAI_PAYG_API_KEY, 'super-secret-zai-token');
-    assert.ok(!spec.args.includes('super-secret-zai-token'));
-  }
+test('reviewer-backup routes to Pi + DeepSeek Pro on the native provider, secret in env only (JUL-89)', () => {
+  const spec = buildPiSpawnSpec('reviewer-backup', 'review this', {
+    mode: 'rpc',
+    readSecretImpl: (field) => {
+      assert.equal(field, 'deepseek');
+      return 'super-secret-deepseek-token';
+    },
+  });
+  assert.equal(spec.command, 'pi');
+  assert.deepEqual(spec.args, ['--provider', 'deepseek', '--model', 'deepseek-v4-pro', '--thinking', 'medium', '-p', '--mode', 'rpc', '--', 'review this']);
+  assert.equal(spec.env.DEEPSEEK_API_KEY, 'super-secret-deepseek-token');
+  // Never argv, never a shell string.
+  assert.ok(!spec.args.some((arg) => arg.includes('super-secret-deepseek-token')));
 });
 
-test('builder-backup and reviewer-backup never share a model family (family-check precondition)', () => {
-  assert.notEqual(SEATS['builder-backup'].secretField, SEATS['reviewer-backup'].secretField);
+test('orchestrator-backup still routes to Pi + GLM-5.3 as a custom provider (the only GLM seat left)', () => {
+  const spec = buildPiSpawnSpec('orchestrator-backup', 'wake up', {
+    mode: 'rpc',
+    readSecretImpl: (field) => {
+      assert.equal(field, 'zai');
+      return 'super-secret-zai-token';
+    },
+  });
+  assert.deepEqual(spec.args, ['--provider', 'glm-5-3', '--model', 'glm-5.3', '--thinking', 'medium', '-p', '--mode', 'rpc', '--', 'wake up']);
+  assert.equal(spec.env.ZAI_PAYG_API_KEY, 'super-secret-zai-token');
+  assert.ok(!spec.args.includes('super-secret-zai-token'));
+});
+
+// The cost rule (JUL-89): GLM is never a default or a fallback. Only the
+// orchestrator seat that a card selects on purpose (`pi-glm`) may launch it;
+// no builder or reviewer seat may, so a reviewer wake can never silently fall
+// onto the barred vendor again.
+test('no builder or reviewer seat launches GLM', () => {
+  for (const seat of Object.keys(SEATS).filter((name) => name.startsWith('builder') || name.startsWith('reviewer'))) {
+    const args = SEATS[seat].piArgs('json');
+    assert.ok(!args.includes('glm-5-3'), `${seat} must not use the GLM provider`);
+    assert.notEqual(SEATS[seat].secretField, 'zai', `${seat} must not read the Z.ai secret`);
+  }
 });
 
 test('buildPiSpawnSpec refuses an unknown seat', () => {
