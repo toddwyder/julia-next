@@ -542,8 +542,10 @@ worktree/branch were removed after (`orca worktree rm --worktree name:<name> --f
   `DEEPSEEK_API_KEY` set only in the child process's env (never argv) — see
   `ops/service-dropbox/run-pi-seat.mjs`. Live-verified real reply + real cost
   (`$0.00025844`, `deepseek-v4-flash`).
-- **Reviewer/orchestrator backup — GLM-5.3, custom provider (pay-per-use, not the ZAI Coding
-  Plan).** `ZAI_API_KEY` is the *native* env var name for ZAI's own Coding Plan integration
+- **Orchestrator backup — GLM-5.3, custom provider (pay-per-use, not the ZAI Coding
+  Plan).** This was also the reviewer backup until JUL-89; the reviewer backup is now DeepSeek
+  Pro on the native provider (see "The reviewer backup is DeepSeek Pro, not GLM"), and only
+  `orchestrator-backup` still launches GLM. `ZAI_API_KEY` is the *native* env var name for ZAI's own Coding Plan integration
   (`docs/providers.md` table) — using it for a pay-per-use custom provider would be confusing, so
   the drop-box/launcher env var is named `ZAI_PAYG_API_KEY` instead, kept out of the native
   name entirely. `~/.pi/agent/models.json` for `orchestrator-svc` (**the public pi.dev docs site
@@ -575,10 +577,11 @@ worktree/branch were removed after (`orca worktree rm --worktree name:<name> --f
   before relying on the "cost per session recorded for each backup seat" acceptance line.
 - **The `glm-5-3` `models.json` entry is per-identity, not shared** — it was only written for
   `orchestrator-svc` initially (which is all `julia-run.mjs`'s orchestrator-backup path needs),
-  but the reviewer-backup seat dispatches as `runner` (PR #36 review finding). `runner` needed
-  the identical `~/.pi/agent/models.json` entry added separately; live-verified working (real
-  `pong` reply) only after that. Any *new* identity that ever runs a `pi-glm` seat needs this
-  file written for it too — it does not follow from `orchestrator-svc`'s copy existing.
+  but the reviewer-backup seat then dispatched as `runner` (PR #36 review finding), so `runner`
+  needed the identical `~/.pi/agent/models.json` entry added separately; live-verified working
+  (real `pong` reply) only after that. (Historical for the reviewer since JUL-89: that seat is
+  DeepSeek now and needs no `glm-5-3` entry.) Any *new* identity that ever runs a `pi-glm` seat
+  needs this file written for it too — it does not follow from `orchestrator-svc`'s copy existing.
 
 ### Long-running Orca daemons hold stale supplementary groups (JUL-44) — fixed 2026-09-18
 
