@@ -1,10 +1,11 @@
 # Readiness review
 
-A repeatable check, run before any ticket gets the `ready-for-agent` label
-(`docs/agents/triage-labels.md`). It proves a ticket (or a batch of related tickets) can run
-all the way through the coordinator without stopping mid-flight on access it turns out nobody
-tested. See JUL-71 for why this exists and for a worked example of running it across a whole
-batch of tickets.
+A repeatable check, used at two points: before any ticket gets the `ready-for-agent` label
+(`docs/agents/triage-labels.md`), and at the start of a run, by the coordinator before the
+first build step. It proves a ticket (or a batch of related tickets) can run all the way
+through the coordinator without stopping mid-flight on access it turns out nobody tested. See
+JUL-71 for why this exists and for a worked example of running it across a whole batch of
+tickets.
 
 Sits next to the coordinator skill (`.claude/skills/julia-coordinator/SKILL.md`) and the
 runbook (`docs/agents/jul43-coordinator-runbook.md`) — read both before running a review, since
@@ -20,6 +21,8 @@ this procedure only adds the pre-flight check those two don't already cover.
 - Again, for a ticket that already passed, if a service it depends on changes (new provider, new
   credential location, a prior probe goes stale) — a readiness review is a snapshot, not a
   standing guarantee.
+- At the start of a run, by the coordinator, before the first build step: post the verdict on the
+  card. A pass starts the build; a fail parks the card with the reason on it.
 
 ## Rule established by JUL-71
 
@@ -27,6 +30,26 @@ this procedure only adds the pre-flight check those two don't already cover.
 stop during a real run is a **bug in the review** — fix the review (this doc and/or the
 service-probe findings it should have caught), log the incident on the ticket that hit it, and add
 the missing check to this procedure. It does not become a new permission question routed to Todd.
+
+## Rule established by JUL-97: DONE MEANS IN USE
+
+A ticket is not done until what it built is switched on and has been used once for real, with
+that evidence on the card. Building the thing, merging its PR, and passing its tests are not
+done — the artifact has to be live and exercised by a real caller at least once.
+
+If going live needs a later step, that step happens inside the ticket; the ticket cannot close
+without it. Nothing is parked as a final laptop step, and "switch it on" is never the last item
+on a handover list. A ticket that cannot reach live use as a step inside itself fails this rule
+rather than passing with the switch-on deferred to a follow-up note.
+
+**This governs when the ticket may close, not whether it passes the readiness review.** The
+review still passes with a named, one-time Todd action (step 4) or with a finding marked not
+testable before approval: a Todd-only action such as a sign-in or a payment is allowed to be the
+switch-on step **inside** the ticket. What is never allowed is closing the ticket with that
+switch-on left as a follow-up or a handover note -- the action happens inside the ticket's own
+steps, and the ticket does not close until it has.
+
+(Todd, Instruction on JUL-97, 2026-09-19.)
 
 ## Procedure
 
@@ -56,6 +79,18 @@ the missing check to this procedure. It does not become a new permission questio
      scopes (for Sentry, `GET https://sentry.io/api/0/` returns `auth.scopes`). Reachability and
      authorization are different things; a reachable credential whose declared scope does not
      include the write the ticket needs is a **review failure**, not a pass.
+     - **the identity that makes the call.** Confirm the credential is reachable by the account
+       that will **actually make the call**, not merely by the account running the review. For
+       every service the ticket writes to, name the identity that will run the write and prove
+       the credential is reachable to *that* identity. Worked example (JUL-97, 2026-09-19): the
+       readiness review proved the Linear key works as `orchestrator-svc` and passed, but the key
+       file is `orchestrator-svc`-only by design (`FIELD_GROUPS.linear` in
+       `ops/service-dropbox/dropbox.mjs`), and builders run as `runner`, which is in
+       `deepseek-readers` and `zai-readers` but not `orchestrator-svc`. A builder told to call
+       the Linear API would have stopped dead. The resolution — also the better design — is that
+       the builder writes the program and the coordinator runs it with the key. A review that
+       probes only as itself has not tested the caller, and the access stop that follows is a
+       review bug, not a new permission question.
      - **create capability.** Confirm the credential can **create** the resource the step needs
        (not just read or list it). Confirm, from the credential's own declared
        scopes/permissions and by reading the resource the step needs (list/get), that the
@@ -83,6 +118,12 @@ the missing check to this procedure. It does not become a new permission questio
          check-runs and the actions endpoints (verified 2026-09-19, JUL-94), so such a ticket has
          to name its substitute evidence — a local run of the same test suite — rather than assume
          the coordinator can read GitHub checks.
+   - **probe the seat live, not from the record.** Start each seat tool on the account that will
+     run it, in this review, and read its real output. A previous ticket or review saying a tool
+     is at a sign-in prompt is not evidence today — the prompt, the binary, or the login state can
+     all change. Verified 2026-09-19: JUL-89 and the JUL-97 readiness review both recorded that
+     Claude on `runner` was at a sign-in prompt, and a live probe that evening returned a normal
+     answer and exit 0. Proximity to a prior session's note is not a probe.
    - reuse a recent, still-valid finding from a prior audit instead of re-probing, but cite the
      source doc and its date so staleness can be judged later.
 
@@ -102,10 +143,11 @@ the missing check to this procedure. It does not become a new permission questio
    the page **tested** or **not testable before approval**, with why — a page a non-technical
    reader can act on without opening any other comment or doc.
 
-7. **Post it** as a Linear comment on the review ticket. Only after Todd approves does
-   `ready-for-agent` go back on the tickets that passed. Tickets that failed stay unlabeled until
-   their named gap is closed and they're re-reviewed — don't relabel on an assumption that a gap
-   was closed elsewhere.
+7. **Post it** as a Linear comment on the review ticket. Posted at triage time, `ready-for-agent`
+   goes back on the tickets that passed only after Todd approves. Posted at run time by the
+   coordinator, a pass starts the build and no approval is needed. Tickets that failed stay
+   unlabeled until their named gap is closed and they're re-reviewed — don't relabel on an
+   assumption that a gap was closed elsewhere.
 
 ## What "tested" means here
 

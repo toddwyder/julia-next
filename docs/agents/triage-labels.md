@@ -22,3 +22,23 @@ ticket, either individually or as part of a batch that covered it. A ticket whos
 decisions aren't all proven reachable or don't have a named, one-time Todd action stays
 unlabeled, no matter how well-specified its description otherwise looks. This applies to every
 other label in the table above unchanged -- only `ready-for-agent` carries the extra gate.
+
+## The Ready queue no longer requires `ready-for-agent`
+
+The label keeps its triage meaning: it still marks a ticket whose services and decisions were
+proven by a readiness review. It is **no longer the queue gate**: `evaluateEligibility` in
+`scripts/ready-queue.mjs` no longer consults it (`ready-for-agent` is still exported and still
+means what triage means by it).
+
+Under `evaluateEligibility`, a card in the `Ready` state is refused for any of three reasons:
+
+- it carries the `Decision` or the `Parent` label -- both are coordinate-only, not agent work;
+- it has an open blocker;
+- its model choice does not validate -- `validateFamilyChoice(resolveSeatChoices(issue.labels))`
+  does not return `ok: true`.
+
+No open blockers is necessary but not sufficient: a `Decision` card at the top of Ready with no
+blockers is still ineligible, and so is a card with no valid model choice. `evaluateEligibility`
+is the place to look. The readiness review is the run's first step, and a review that fails parks
+the card with the reason on it. (Instruction on JUL-97, 2026-09-19; the code is in
+`scripts/ready-queue.mjs`.)
