@@ -59,7 +59,8 @@ event), never a worker's claim alone.
 
 **2. Advance in-flight work.** For each in-flight item, take its next action (see Running a
 step). A finished worker you have not yet verified comes first.
-*Done when* every in-flight item is running, verified-and-advanced, or parked in the queue.
+*Done when* every in-flight item is verified-and-advanced, or parked in the queue. An item whose
+worker is merely still running is not done: wait for it (see "You are a one-shot session" below).
 
 **3. Admit.** If a slot is free, admit the first eligible issue in board order. Eligible means
 all of:
@@ -86,8 +87,19 @@ If a slot is free and nothing is eligible, post a **starvation** status on the w
 (`JUL-5`) naming the cause: backlog empty, everything blocked, or route not enabled.
 *Done when* the slot is filled or starvation is reported with its cause.
 
-End the wake. The next explicit launch continues from Orca's and Linear's recorded state --
-there is no scheduled trigger yet (see `docs/agents/jul43-coordinator-runbook.md`).
+**You are a one-shot session: do not end your reply while any work is in flight.** You are
+launched as `claude -p`, which exits the moment your reply ends, and nothing wakes it again --
+there is no scheduled trigger, and the Ready queue never re-launches a card that is already in
+flight. A background watcher, a "wake me when it goes idle" wait, or a note that you will resume
+later cannot bring you back (the JUL-96 and JUL-106 coordinators each ended their reply that way
+and left a card running with nobody supervising it). So while a worker is running or a step is
+unverified, keep waiting inside this reply: wait in the foreground, in a loop, with each wait
+bounded by a timeout under 10 minutes (the settle check in "Running a step", or `orca terminal
+wait --timeout-ms 580000`), and read the worker's actual terminal output and git state between
+waits. End the wake only when the item is complete, or parked with the reason posted on its
+card. If you cannot keep waiting (a tool refused, out of budget), say so on the card before you
+stop, so the next launch does not find a silent run. The next explicit launch continues from
+Orca's and Linear's recorded state (see `docs/agents/jul43-coordinator-runbook.md`).
 
 ---
 

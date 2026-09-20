@@ -60,3 +60,14 @@ test('both coordinator fallback passages require resolving the fallback through 
   assert.match(running, /park the item as \*\*Blocked\*\*/);
   assert.match(after, /park the item as \*\*Blocked\*\*/);
 });
+
+test('the coordinator skill and the runbook say the headless coordinator is one-shot and must stay until its card is done or parked (JUL-106)', () => {
+  const skill = read('.claude/skills/julia-coordinator/SKILL.md').replace(/\r\n/g, '\n').replace(/\s+/g, ' ');
+  assert.match(skill, /You are a one-shot session: do not end your reply while any work is in flight/);
+  assert.match(skill, /A background watcher, a "wake me when it goes idle" wait/);
+  assert.match(skill, /End the wake only when the item is complete, or parked with the reason posted/);
+  // The old step-2 wording counted a still-running worker as done, which invited the early exit.
+  assert.doesNotMatch(skill, /every in-flight item is running, verified-and-advanced/);
+  const runbook = read('docs/agents/jul43-coordinator-runbook.md').replace(/\s+/g, ' ');
+  assert.match(runbook, /one-shot headless session, so it has to stay until its card is complete or parked/);
+});
