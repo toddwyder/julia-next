@@ -4,6 +4,8 @@ import http from 'node:http';
 import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 import {
   createServer, validateFieldShape, isArmed, saveState, loadState, rearm, FIELDS, allReceived,
@@ -362,4 +364,102 @@ test('FIELD_GROUPS routes each field to the exact reader(s) JUL-77 specifies', (
 
 test('every field in FIELDS has exactly one entry in FIELD_GROUPS, and vice versa', () => {
   assert.deepEqual([...FIELDS].sort(), Object.keys(FIELD_GROUPS).sort());
+});
+
+// --- Tripwires for the bind-address protections (JUL-62) ----------------
+// The protections live in dropbox.mjs and dropbox.env.example. These tests
+// exist so removing or weakening one turns the suite red. They were first
+// written as steps in ci.yml (JUL-72, 17 Sep) and dropped when CI wiring
+// moved to scripts/*.test.mjs, so they live here as ordinary tests instead.
+const DROPBOX_PATH = fileURLToPath(new URL('./dropbox.mjs', import.meta.url));
+
+function sourceText(name) {
+  // Normalize CRLF -> LF: a Windows checkout with core.autocrlf can
+  // materialize these files as CRLF.
+  return readFileSync(new URL(name, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+}
+
+// Really starts dropbox.mjs with the given bind address (undefined = unset)
+// on an OS-picked port and a throwaway state file. Resolves with what
+// happened: it exited (refused) or it printed "listening" (bound), in which
+// case it is killed straight away so a broken guard never leaves a server up.
+function startDropbox(bindAddr) {
+  const stateDir = mkdtempSync(join(tmpdir(), 'dropbox-bind-'));
+  const env = {
+    PATH: process.env.PATH,
+    DROPBOX_PORT: '0',
+    DROPBOX_STATE_PATH: join(stateDir, 'state.json'),
+  };
+  if (bindAddr !== undefined) env.DROPBOX_BIND_ADDR = bindAddr;
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, [DROPBOX_PATH], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+    let out = '';
+    let settled = false;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      child.kill();
+      rmSync(stateDir, { recursive: true, force: true });
+      resolve({ ...result, output: out });
+    };
+    const timer = setTimeout(() => finish({ outcome: 'timed out' }), 10000);
+    child.stdout.on('data', (d) => { out += d; if (/dropbox listening/.test(out)) finish({ outcome: 'bound' }); });
+    child.stderr.on('data', (d) => { out += d; });
+    child.on('exit', (code) => finish({ outcome: 'exited', code }));
+  });
+}
+
+test('dropbox.mjs refuses to start with an unset bind address', async () => {
+  const r = await startDropbox(undefined);
+  assert.equal(r.outcome, 'exited', `expected a refusal, got: ${r.outcome}\n${r.output}`);
+  assert.notEqual(r.code, 0);
+  assert.match(r.output, /DROPBOX_BIND_ADDR must be set/);
+});
+
+test('dropbox.mjs refuses to start with an empty bind address', async () => {
+  const r = await startDropbox('');
+  assert.equal(r.outcome, 'exited', `expected a refusal, got: ${r.outcome}\n${r.output}`);
+  assert.notEqual(r.code, 0);
+  assert.match(r.output, /DROPBOX_BIND_ADDR must be set/);
+});
+
+test('dropbox.mjs refuses to start bound to 0.0.0.0 (every IPv4 interface)', async () => {
+  const r = await startDropbox('0.0.0.0');
+  assert.equal(r.outcome, 'exited', `expected a refusal, got: ${r.outcome}\n${r.output}`);
+  assert.notEqual(r.code, 0);
+  assert.match(r.output, /refusing to bind to all interfaces/);
+});
+
+test('dropbox.mjs refuses to start bound to :: (every IPv6 interface)', async () => {
+  const r = await startDropbox('::');
+  assert.equal(r.outcome, 'exited', `expected a refusal, got: ${r.outcome}\n${r.output}`);
+  assert.notEqual(r.code, 0);
+  assert.match(r.output, /refusing to bind to all interfaces/);
+});
+
+// Control: without this, the four refusals above would also pass if the
+// server could never start at all.
+test('dropbox.mjs does start when given one specific address', async () => {
+  const r = await startDropbox('127.0.0.1');
+  assert.equal(r.outcome, 'bound', `expected it to start, got: ${r.outcome}\n${r.output}`);
+});
+
+test('dropbox.mjs only ever listens on the configured address, never a literal all-interfaces one', () => {
+  const src = sourceText('./dropbox.mjs');
+  const listenCalls = src.match(/\.listen\([^)]*\)/g) ?? [];
+  assert.ok(listenCalls.length > 0, 'expected dropbox.mjs to call listen()');
+  for (const call of listenCalls) {
+    assert.doesNotMatch(call, /0\.0\.0\.0|'::'|"::"/, `listen call binds all interfaces: ${call}`);
+    assert.match(call, /BIND_ADDR/, `listen call must bind the configured BIND_ADDR: ${call}`);
+  }
+});
+
+test('the example env file holds only a placeholder bind address, no real address', () => {
+  const lines = sourceText('./dropbox.env.example').split('\n');
+  const binds = lines.filter((l) => /^DROPBOX_BIND_ADDR=/.test(l));
+  assert.equal(binds.length, 1, 'expected exactly one DROPBOX_BIND_ADDR line');
+  assert.match(binds[0], /^DROPBOX_BIND_ADDR=REPLACE_[A-Z_]+$/, 'bind address must be a REPLACE_... placeholder');
+  const uncommented = lines.filter((l) => !l.startsWith('#')).join('\n');
+  assert.doesNotMatch(uncommented, /\b\d{1,3}(\.\d{1,3}){3}\b/, 'no IPv4 address may appear in the example env file');
 });
