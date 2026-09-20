@@ -63,11 +63,17 @@ step). A finished worker you have not yet verified comes first.
 
 **3. Admit.** If a slot is free, admit the first eligible issue in board order. Eligible means
 all of:
-- the issue carries label `ready-for-agent`, which is applied only after a posted readiness
-  review passes (`docs/agents/readiness-review.md`, rule established by JUL-71) -- never apply
-  it yourself from a ticket's description looking plausible;
-- its stated dependencies (Linear `blockedBy`) are closed;
+- `evaluateEligibility` (`scripts/ready-queue.mjs`) returns eligible: the card is in `Ready`, has
+  no open blockers (its Linear `blockedBy` dependencies are closed), does not carry the
+  `Decision` or `Parent` label, and has a valid model choice
+  (`validateFamilyChoice(resolveSeatChoices(issue.labels))` returns `ok: true`) -- those are the
+  same three refusals the queue applies, and `ready-for-agent` is no longer one of them;
 - its route is enabled (below).
+
+**The run's first step is a readiness review** (`docs/agents/readiness-review.md`), run by the
+coordinator before any build starts: post its verdict on the card; a failed review parks the card
+with the reason on it instead of starting the build. This is not `scripts/check-readiness.mjs`,
+which is the Orca, publisher and relay health check (see "Readiness check" below).
 
 **A passed readiness review is a promise, not a suggestion.** After a review passes, an access
 stop mid-run is a bug in the review, not a new permission question for Todd: fix the review

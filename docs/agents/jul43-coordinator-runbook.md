@@ -328,9 +328,9 @@ session must not have to rediscover:
 ## Nine JUL-97 coordinator-run discoveries (verified 2026-09-19)
 
 Each of these was learned on the box during JUL-97 and would quietly mislead a fresh session;
-the date is the day it was verified. Facts (a) through (e) are about dispatch and the seat tools,
-(f) about reading an Orca terminal, (g) about the board reacting to a merge, (h) about Linear's
-GraphQL facts the board work proved, and (i) about the coordinator's own tool grants.
+the date is the day it was verified. Items 1-5 are about dispatch and the seat tools, 6 about
+reading an Orca terminal, 7 about the board reacting to a merge, 8 about Linear's GraphQL facts
+the board work proved, and 9 about the coordinator's own tool grants.
 
 1. **Claude on `runner` works.** A live probe (`claude -p` with a one-line prompt) returned a
    normal answer and exit 0. JUL-89 and the JUL-97 readiness review both recorded it as stuck at
@@ -338,13 +338,19 @@ GraphQL facts the board work proved, and (i) about the coordinator's own tool gr
    not evidence of today's login state.
 2. **A real Codex usage cap was captured mid-review.** The output was `ERROR: You've hit your
    usage limit ... try again at Sep 20th, 2026 12:33 AM`. It matches `CAP_ERROR_PATTERN` in
-   `scripts/julia-run.mjs`. Per the seat table this is **not** a failed attempt: the same review
+   `scripts/julia-run.mjs`. This is **not** a failed attempt -- that accounting rule does not live
+   in `graph/seat-table.mjs`, which only maps seats to their primary/backup entries; it lives in
+   the coordinator skill (`.claude/skills/julia-coordinator/SKILL.md`, "Running a step" step 4: a
+   restart on the backup is "the table doing its job, not a failed attempt"). The same review
    restarted on the reviewer backup, and that restart is what produced the verdict. Recognising
-   the pattern is what keeps a capped seat from burning an attempt.
+   the pattern is what keeps a capped seat from burning an attempt. The automatic cap fail-over
+   in `scripts/julia-run.mjs` (`waitForEarlyCapError`) covers the **orchestrator** seat only; a
+   builder or reviewer cap is the coordinator's own manual check.
 3. **Launching Claude from an Orca terminal command with the prompt in an argument does not
-   work.** `claude -p ... "$(cat file)"` gets word-split, the prompt fragments are read as
-   `--allowedTools` rules, and the run dies with `Error: Input must be provided either through
-   stdin or as a prompt argument when using --print`. Pipe the prompt on stdin instead:
+   work.** Claude Code's `--allowedTools` is **variadic**, so every bare word after it is read as
+   another tool rule; the prompt argument is swallowed and the run dies with `Error: Input must be
+   provided either through stdin or as a prompt argument when using --print`. The rule that
+   follows: `--allowedTools` must be the **last** flag, and the prompt belongs on stdin:
 
    ```sh
    claude -p --permission-mode acceptEdits --effort high --allowedTools Bash Read Grep Glob Write < promptfile
@@ -353,24 +359,33 @@ GraphQL facts the board work proved, and (i) about the coordinator's own tool gr
 
    ```sh
    orca worktree create --environment ovh-local --repo path:/home/runner/julia-next --name NAME --base-branch BRANCH --no-parent --setup skip
+
+   orca terminal create --environment ovh-local --worktree path:THATPATH --command "{ cat > BRIEF.md <<'BRIEF'
+   <the step brief: ticket id, step, acceptance criteria, candidate branch>
+   BRIEF
+   cat BRIEF.md; rm -f BRIEF.md; } | node ops/service-dropbox/run-pi-seat.mjs builder-backup --effort high"
    ```
 
-   then `orca terminal create --environment ovh-local --worktree path:THATPATH --command ...`
-   with a quoted heredoc that writes the brief into the worktree and pipes it into
-   `node ops/service-dropbox/run-pi-seat.mjs builder-backup --effort high`, deleting the brief in
-   the same pipeline so it can never be committed. The environment names on the box are
+   The heredoc writes the brief into the candidate worktree (the terminal's own CWD), and the
+   brief is fed to `builder-backup` and deleted **inside the same pipeline**, so no file the
+   builder could commit ever outlives the dispatch. The environment names on the box are
    `ovh-local` (`runner`) and `orchestrator-local` (`orchestrator-svc`), not the display names.
 5. **`orca terminal wait --for` accepts only `exit` and `tui-idle`.** `tui-idle` is not completion
    for a Pi or Codex agent, and even `--for exit` times out while a shell stays open after the
    agent has finished. The reliable completion signals are `pgrep -f` for the agent process and
    the candidate worktree's own `git log`.
 6. **`orca terminal read` with no cursor returns the OLDEST retained window, not the newest.** A
-   long agent run therefore looks frozen. Use `--screen` for the current frame, or `--cursor`
-   with a number past the last `nextCursor` to see what is new.
+   long agent run therefore looks frozen. Use `--screen` for the current frame, and `--limit <n>`
+   to request more retained lines for a long agent response. The documented use of `--cursor` is
+   to pass the `nextCursor` value from a previous read to get only new output since that read;
+   passing a cursor past the last `nextCursor` jumps forward but silently skips output, so it is a
+   trade-off, not the normal use.
 7. **Merging a pull request whose title names the ticket moved JUL-97 straight from Backlog to
-   Done mid-item**, with two steps still to run. The coordinator moved it back to In Progress and
-   said so on the card. Expect this on every step PR whose title names the ticket (see also "A PR
-   title naming a Linear issue closes that issue on merge").
+   Complete mid-item**, with two steps still to run. The coordinator moved it back to
+   Implementation and said so on the card. (These are the columns after JUL-97 step 1's rename:
+   `Done` → `Complete`, `In Progress` → `Implementation`.) Expect this on every step PR whose
+   title names the ticket (see also "A PR title naming a Linear issue closes that issue on
+   merge").
 8. **Linear API facts the board work proved**, each checked against Linear's own published
    GraphQL schema:
    - `workflowStateCreate` requires `color`, and `WorkflowStateUpdateInput` has no `type` field,
@@ -382,11 +397,29 @@ GraphQL facts the board work proved, and (i) about the coordinator's own tool gr
      `CustomView.filterData`, which is `JSONObject`.
    - Every collection returns 50 records a page by default. This board needs 76 labels alone, so
      an unpaginated read makes a second run look like work to do.
-9. **The coordinator session's own tool grants are narrow** and worth knowing before planning a
-   wake: `node <script>.mjs` under `scripts/` is allowed, the bare `orca` CLI is allowed,
-   `node -e` is NOT, and neither is `env`, `base64` or a `sudo` command. A coordinator that needs
-   a one-off computation must use a script that already exists in the checkout or an Orca
-   terminal, not an inline node expression.
+9. **The coordinator session's own tool grants are an explicit per-script allowlist, not a
+   blanket `node scripts/` permission.** The list is written in `scripts/julia-run.mjs`'s
+   `startOrchestrator`; it grants both Linear tool namespaces, then Bash access to exactly these
+   scripts, plus the bare `orca` CLI:
+
+   ```
+   mcp__linear__*, mcp__claude_ai_Linear__*,
+   Bash(node scripts/orca-cli.mjs:*), Bash(node scripts/ready-queue.mjs:*),
+   Bash(node scripts/seat-labels.mjs:*), Bash(node scripts/linear-cli.mjs:*),
+   Bash(node scripts/check-readiness.mjs:*), Bash(node scripts/collect-worker-result.mjs:*),
+   Bash(node scripts/verify-reviewer-worktree.mjs:*), Bash(node scripts/coordinator-events.mjs:*),
+   Bash(node --env-file=/etc/orchestrator-svc/.env.publisher scripts/publish-pr.mjs:*),
+   Bash(node --env-file=/etc/orchestrator-svc/.env.publisher scripts/merge-pr.mjs:*),
+   Bash(orca *)
+   ```
+
+   `publish-pr.mjs` and `merge-pr.mjs` sit behind the publisher env-file prefix. A script with no
+   grant cannot be run even though it sits in the checkout -- `scripts/board-setup.mjs`, for
+   example, has no grant yet. Adding a script to the skill's procedure means adding its grant in
+   `startOrchestrator` in the same PR (see "The headless launch needs its own tool grants"
+   above). `node -e` is NOT granted, and neither is `env`, `base64` or a `sudo` command. A
+   coordinator that needs a one-off computation must use a granted script or an Orca terminal,
+   not an inline node expression.
 
 ## Start
 

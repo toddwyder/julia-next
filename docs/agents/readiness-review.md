@@ -36,8 +36,15 @@ done — the artifact has to be live and exercised by a real caller at least onc
 
 If going live needs a later step, that step happens inside the ticket; the ticket cannot close
 without it. Nothing is parked as a final laptop step, and "switch it on" is never the last item
-on a handover list. A ticket that cannot reach live use inside its own steps fails the readiness
-review rather than passing with a follow-up note attached.
+on a handover list. A ticket that cannot reach live use as a step inside itself fails this rule
+rather than passing with the switch-on deferred to a follow-up note.
+
+**This governs when the ticket may close, not whether it passes the readiness review.** The
+review still passes with a named, one-time Todd action (step 4) or with a finding marked not
+testable before approval: a Todd-only action such as a sign-in or a payment is allowed to be the
+switch-on step **inside** the ticket. What is never allowed is closing the ticket with that
+switch-on left as a follow-up or a handover note -- the action happens inside the ticket's own
+steps, and the ticket does not close until it has.
 
 (Todd, Instruction on JUL-97, 2026-09-19.)
 
