@@ -1,10 +1,11 @@
 # Readiness review
 
-A repeatable check, run before any ticket gets the `ready-for-agent` label
-(`docs/agents/triage-labels.md`). It proves a ticket (or a batch of related tickets) can run
-all the way through the coordinator without stopping mid-flight on access it turns out nobody
-tested. See JUL-71 for why this exists and for a worked example of running it across a whole
-batch of tickets.
+A repeatable check, used at two points: before any ticket gets the `ready-for-agent` label
+(`docs/agents/triage-labels.md`), and at the start of a run, by the coordinator before the
+first build step. It proves a ticket (or a batch of related tickets) can run all the way
+through the coordinator without stopping mid-flight on access it turns out nobody tested. See
+JUL-71 for why this exists and for a worked example of running it across a whole batch of
+tickets.
 
 Sits next to the coordinator skill (`.claude/skills/julia-coordinator/SKILL.md`) and the
 runbook (`docs/agents/jul43-coordinator-runbook.md`) — read both before running a review, since
@@ -20,6 +21,8 @@ this procedure only adds the pre-flight check those two don't already cover.
 - Again, for a ticket that already passed, if a service it depends on changes (new provider, new
   credential location, a prior probe goes stale) — a readiness review is a snapshot, not a
   standing guarantee.
+- At the start of a run, by the coordinator, before the first build step: post the verdict on the
+  card. A pass starts the build; a fail parks the card with the reason on it.
 
 ## Rule established by JUL-71
 
@@ -140,10 +143,11 @@ steps, and the ticket does not close until it has.
    the page **tested** or **not testable before approval**, with why — a page a non-technical
    reader can act on without opening any other comment or doc.
 
-7. **Post it** as a Linear comment on the review ticket. Only after Todd approves does
-   `ready-for-agent` go back on the tickets that passed. Tickets that failed stay unlabeled until
-   their named gap is closed and they're re-reviewed — don't relabel on an assumption that a gap
-   was closed elsewhere.
+7. **Post it** as a Linear comment on the review ticket. Posted at triage time, `ready-for-agent`
+   goes back on the tickets that passed only after Todd approves. Posted at run time by the
+   coordinator, a pass starts the build and no approval is needed. Tickets that failed stay
+   unlabeled until their named gap is closed and they're re-reviewed — don't relabel on an
+   assumption that a gap was closed elsewhere.
 
 ## What "tested" means here
 

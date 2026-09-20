@@ -350,7 +350,9 @@ the board work proved, and 9 about the coordinator's own tool grants.
    work.** Claude Code's `--allowedTools` is **variadic**, so every bare word after it is read as
    another tool rule; the prompt argument is swallowed and the run dies with `Error: Input must be
    provided either through stdin or as a prompt argument when using --print`. The rule that
-   follows: `--allowedTools` must be the **last** flag, and the prompt belongs on stdin:
+   follows: nothing that isn't a flag may follow `--allowedTools`; the prompt belongs on stdin.
+   A quoted, comma-separated tool list followed by more flags is fine — that is exactly what
+   `julia-run.mjs`'s own launch command does:
 
    ```sh
    claude -p --permission-mode acceptEdits --effort high --allowedTools Bash Read Grep Glob Write < promptfile
@@ -397,10 +399,10 @@ the board work proved, and 9 about the coordinator's own tool grants.
      `CustomView.filterData`, which is `JSONObject`.
    - Every collection returns 50 records a page by default. This board needs 76 labels alone, so
      an unpaginated read makes a second run look like work to do.
-9. **The coordinator session's own tool grants are an explicit per-script allowlist, not a
-   blanket `node scripts/` permission.** The list is written in `scripts/julia-run.mjs`'s
-   `startOrchestrator`; it grants both Linear tool namespaces, then Bash access to exactly these
-   scripts, plus the bare `orca` CLI:
+9. **On the `claude` orchestrator route, the coordinator session's own tool grants are an
+   explicit per-script allowlist, not a blanket `node scripts/` permission.** The list is written
+   in `scripts/julia-run.mjs`'s `startOrchestrator`; it grants both Linear tool namespaces, then
+   Bash access to exactly these scripts, plus the bare `orca` CLI:
 
    ```
    mcp__linear__*, mcp__claude_ai_Linear__*,
@@ -417,7 +419,7 @@ the board work proved, and 9 about the coordinator's own tool grants.
    grant cannot be run even though it sits in the checkout -- `scripts/board-setup.mjs`, for
    example, has no grant yet. Adding a script to the skill's procedure means adding its grant in
    `startOrchestrator` in the same PR (see "The headless launch needs its own tool grants"
-   above). `node -e` is NOT granted, and neither is `env`, `base64` or a `sudo` command. A
+   below). `node -e` is NOT granted, and neither is `env`, `base64` or a `sudo` command. A
    coordinator that needs a one-off computation must use a granted script or an Orca terminal,
    not an inline node expression.
 
