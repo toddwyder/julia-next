@@ -28,6 +28,7 @@ import {
   planBoardSetup,
   BoardConflictError,
   TEMPLATE_NAME,
+  customViewUrl,
 } from './board-setup.mjs';
 import {
   WORK_VIEW,
@@ -103,6 +104,231 @@ function issueMatchesFilter(issue, filter) {
   return true;
 }
 
+// ---------------------------------------------------------------------------
+// The declared schema the fake answers to. It is not the whole Linear schema,
+// it is the exact slice this program touches, written down as data so that a
+// selection or a variable type the real API would reject is rejected here
+// first. That is the check that keeps a GRAPHQL_VALIDATION_FAILED off the real
+// board. Two facts are load-bearing:
+//   - CustomView has NO `url` field. It has `id`, `slugId` and `organization`.
+//   - a variable used in a filter keyed by id (CustomViewFilter.team.id.eq) is
+//     an ID, even though `team(id:)` itself takes a String.
+// ---------------------------------------------------------------------------
+
+const TEST_ORG_URL_KEY = 'julia-next';
+
+const SCALAR_TYPES = new Set(['ID', 'String', 'Boolean', 'Int', 'Float', 'DateTime', 'JSON', 'JSONObject']);
+
+const TYPE_FIELDS = {
+  Query: { team: 'Team', customViews: 'CustomViewConnection', issues: 'IssueConnection' },
+  Mutation: {
+    workflowStateCreate: 'WorkflowStatePayload',
+    workflowStateUpdate: 'WorkflowStatePayload',
+    issueLabelCreate: 'IssueLabelPayload',
+    issueLabelUpdate: 'IssueLabelPayload',
+    issueLabelRetire: 'IssueLabelPayload',
+    templateCreate: 'TemplatePayload',
+    templateUpdate: 'TemplatePayload',
+    teamUpdate: 'TeamPayload',
+    customViewCreate: 'CustomViewPayload',
+    customViewUpdate: 'CustomViewPayload',
+  },
+  Team: {
+    id: 'ID',
+    name: 'String',
+    defaultTemplateForMembers: 'Template',
+    states: 'WorkflowStateConnection',
+    labels: 'IssueLabelConnection',
+    templates: 'TemplateConnection',
+  },
+  Template: { id: 'ID', name: 'String', type: 'String', templateData: 'JSON' },
+  WorkflowState: { id: 'ID', name: 'String', type: 'String', position: 'Float', color: 'String' },
+  IssueLabel: {
+    id: 'ID',
+    name: 'String',
+    description: 'String',
+    isGroup: 'Boolean',
+    retiredAt: 'DateTime',
+    parent: 'IssueLabel',
+  },
+  // CustomView deliberately has no `url`: the real type does not either.
+  CustomView: {
+    id: 'ID',
+    name: 'String',
+    slugId: 'String',
+    organization: 'Organization',
+    description: 'String',
+    filterData: 'JSONObject',
+    shared: 'Boolean',
+  },
+  Organization: { urlKey: 'String' },
+  Issue: { id: 'ID' },
+  PageInfo: { hasNextPage: 'Boolean', endCursor: 'String' },
+  WorkflowStateConnection: { nodes: 'WorkflowState', pageInfo: 'PageInfo' },
+  IssueLabelConnection: { nodes: 'IssueLabel', pageInfo: 'PageInfo' },
+  TemplateConnection: { nodes: 'Template', pageInfo: 'PageInfo' },
+  CustomViewConnection: { nodes: 'CustomView', pageInfo: 'PageInfo' },
+  IssueConnection: { nodes: 'Issue', pageInfo: 'PageInfo' },
+  WorkflowStatePayload: { success: 'Boolean', workflowState: 'WorkflowState' },
+  IssueLabelPayload: { success: 'Boolean', issueLabel: 'IssueLabel' },
+  TemplatePayload: { success: 'Boolean', template: 'Template' },
+  TeamPayload: { success: 'Boolean', team: 'Team' },
+  CustomViewPayload: { success: 'Boolean', customView: 'CustomView' },
+};
+
+// name -> the root field it uses and the variable declarations it may make.
+// The declared types are what the real schema's argument positions require; a
+// declaration that differs is a validation error, not a tolerated quirk.
+const OPERATIONS = {
+  BoardSetupTeam: { parent: 'Query', field: 'team', variables: { teamId: 'String!' } },
+  BoardSetupStates: { parent: 'Query', field: 'team', variables: { teamId: 'String!', after: 'String' } },
+  BoardSetupLabels: { parent: 'Query', field: 'team', variables: { teamId: 'String!', after: 'String' } },
+  BoardSetupTemplates: { parent: 'Query', field: 'team', variables: { teamId: 'String!', after: 'String' } },
+  // $teamId feeds CustomViewFilter.team.id.eq, whose `eq` is an ID. `team(id:)`
+  // takes a String, but this operation never calls it -- so ID! is correct here
+  // and String! is the exact fault that reached the real API.
+  BoardSetupViews: { parent: 'Query', field: 'customViews', variables: { teamId: 'ID!', after: 'String' } },
+  BoardSetupIssues: { parent: 'Query', field: 'issues', variables: { filter: 'IssueFilter', after: 'String' } },
+  BoardSetupCreateState: { parent: 'Mutation', field: 'workflowStateCreate', variables: { input: 'WorkflowStateCreateInput!' } },
+  BoardSetupUpdateState: { parent: 'Mutation', field: 'workflowStateUpdate', variables: { id: 'String!', input: 'WorkflowStateUpdateInput!' } },
+  BoardSetupCreateLabel: { parent: 'Mutation', field: 'issueLabelCreate', variables: { input: 'IssueLabelCreateInput!' } },
+  BoardSetupUpdateLabel: { parent: 'Mutation', field: 'issueLabelUpdate', variables: { id: 'String!', input: 'IssueLabelUpdateInput!' } },
+  BoardSetupRetireLabel: { parent: 'Mutation', field: 'issueLabelRetire', variables: { id: 'String!' } },
+  BoardSetupCreateTemplate: { parent: 'Mutation', field: 'templateCreate', variables: { input: 'TemplateCreateInput!' } },
+  BoardSetupUpdateTemplate: { parent: 'Mutation', field: 'templateUpdate', variables: { id: 'String!', input: 'TemplateUpdateInput!' } },
+  BoardSetupSetDefaultTemplate: { parent: 'Mutation', field: 'teamUpdate', variables: { id: 'String!', input: 'TeamUpdateInput!' } },
+  BoardSetupCreateView: { parent: 'Mutation', field: 'customViewCreate', variables: { input: 'CustomViewCreateInput!' } },
+  BoardSetupUpdateView: { parent: 'Mutation', field: 'customViewUpdate', variables: { id: 'String!', input: 'CustomViewUpdateInput!' } },
+};
+
+function operationSignature(query) {
+  const match = String(query).match(/\b(query|mutation)\s+(\w+)\s*(?:\(([^()]*)\))?\s*\{/);
+  if (!match) throw new Error('fake Linear: could not parse the operation');
+  const variables = {};
+  const declared = (match[3] ?? '').trim();
+  if (declared) {
+    for (const part of declared.split(',')) {
+      const trimmed = part.trim();
+      const varMatch = trimmed.match(/^\$(\w+)\s*:\s*(.+)$/);
+      if (!varMatch) throw new Error(`fake Linear: cannot parse variable declaration "${trimmed}"`);
+      variables[varMatch[1]] = varMatch[2].replace(/\s+/g, '');
+    }
+  }
+  return { kind: match[1], name: match[2], variables };
+}
+
+// Tokenize a selection set, dropping every argument list whole (its nested
+// filter object braces must not be read as selections).
+function tokenizeSelection(text) {
+  const tokens = [];
+  let i = 0;
+  while (i < text.length) {
+    const ch = text[i];
+    if (/\s|,/.test(ch)) { i += 1; continue; }
+    if (ch === '(') {
+      let depth = 0;
+      do {
+        if (text[i] === '(') depth += 1;
+        else if (text[i] === ')') depth -= 1;
+        i += 1;
+      } while (i < text.length && depth > 0);
+      continue;
+    }
+    if (ch === '{' || ch === '}' || ch === ':' || ch === '@') { tokens.push(ch); i += 1; continue; }
+    if (ch === '.') { while (text[i] === '.') i += 1; tokens.push('...'); continue; }
+    if (/[A-Za-z_]/.test(ch)) {
+      let j = i;
+      while (j < text.length && /[A-Za-z0-9_]/.test(text[j])) j += 1;
+      tokens.push(text.slice(i, j));
+      i = j;
+      continue;
+    }
+    i += 1;
+  }
+  return tokens;
+}
+
+function skipSelection(tokens, start) {
+  let depth = 0;
+  for (let i = start; i < tokens.length; i += 1) {
+    if (tokens[i] === '{') depth += 1;
+    else if (tokens[i] === '}') {
+      depth -= 1;
+      if (depth === 0) return i + 1;
+    }
+  }
+  return tokens.length;
+}
+
+// Walk the selection set against TYPE_FIELDS, tracking the type at each depth.
+// A field that does not exist on the type it is selected from is an error, as
+// is a composite field with no selection or a scalar with one.
+function parseSelectionFields(tokens, start, typeName, path, errors) {
+  let i = start + 1;
+  while (i < tokens.length && tokens[i] !== '}') {
+    const token = tokens[i];
+    if (token === '...') {
+      errors.push(`fragments are not part of this program (${path})`);
+      i = skipSelection(tokens, i + 1);
+      continue;
+    }
+    if (token === '@') { i += 2; continue; }
+    if (!/^[A-Za-z_]/.test(token)) { i += 1; continue; }
+    let fieldName = token;
+    i += 1;
+    if (tokens[i] === ':') { fieldName = tokens[i + 1]; i += 2; }
+    const fieldType = TYPE_FIELDS[typeName]?.[fieldName];
+    const hasSelection = tokens[i] === '{';
+    if (fieldType === undefined) {
+      errors.push(`field "${fieldName}" does not exist on type "${typeName}"`);
+      if (hasSelection) i = skipSelection(tokens, i);
+      continue;
+    }
+    if (SCALAR_TYPES.has(fieldType)) {
+      if (hasSelection) {
+        errors.push(`field "${fieldName}" of scalar type "${fieldType}" cannot have a selection set`);
+        i = skipSelection(tokens, i);
+      }
+    } else if (hasSelection) {
+      i = parseSelectionFields(tokens, i, fieldType, `${path}.${fieldName}`, errors);
+    } else {
+      errors.push(`field "${fieldName}" of type "${fieldType}" must have a selection set`);
+    }
+  }
+  return i + 1;
+}
+
+// Throws with every validation error at once, the way the real API returns a
+// list of GraphQL errors. An unknown operation is rejected before anything
+// else, so the archive mutation that does not exist still fails.
+function validateOperation(query, variables) {
+  const { kind, name, variables: declared } = operationSignature(query);
+  const operation = OPERATIONS[name];
+  if (!operation) throw new Error(`fake Linear: unexpected operation ${name}`);
+  const errors = [];
+  for (const [varName, varType] of Object.entries(declared)) {
+    if (!(varName in operation.variables)) errors.push(`operation ${name} declares an unknown variable $${varName}`);
+    else if (operation.variables[varName] !== varType) {
+      errors.push(`$${varName} is declared "${varType}" but the schema expects "${operation.variables[varName]}"`);
+    }
+  }
+  for (const [varName, varType] of Object.entries(operation.variables)) {
+    if (!(varName in declared)) errors.push(`$${varName} of type "${varType}" is not declared`);
+  }
+  for (const key of Object.keys(variables ?? {})) {
+    if (!(key in declared)) errors.push(`variable $${key} was supplied but not declared`);
+  }
+  const bodyStart = String(query).indexOf('{');
+  const tokens = tokenizeSelection(String(query).slice(bodyStart));
+  if (tokens[0] !== '{' || tokens[1] !== operation.field) {
+    errors.push(`operation ${name} must select ${operation.field}`);
+  }
+  parseSelectionFields(tokens, 0, kind === 'query' ? 'Query' : 'Mutation', name, errors);
+  if (errors.length > 0) {
+    throw new Error(`fake Linear: GraphQL validation failed for ${name}:\n  - ${errors.join('\n  - ')}`);
+  }
+}
+
 function makeFakeLinear(initial = freshBoard(), { templateDataAsObject = false } = {}) {
   const db = structuredClone(initial);
   const calls = { ops: [], mutations: [] };
@@ -121,7 +347,8 @@ function makeFakeLinear(initial = freshBoard(), { templateDataAsObject = false }
   const viewNode = (view) => ({
     id: view.id,
     name: view.name,
-    url: view.url ?? null,
+    slugId: view.slugId ?? null,
+    organization: { urlKey: TEST_ORG_URL_KEY },
     description: view.description ?? null,
     filterData: view.filterData === undefined || view.filterData === null ? null : structuredClone(view.filterData),
     shared: view.shared === true,
@@ -129,6 +356,7 @@ function makeFakeLinear(initial = freshBoard(), { templateDataAsObject = false }
 
   const graphql = async (query, variables = {}) => {
     const op = operationName(query);
+    validateOperation(query, variables);
     calls.ops.push(op);
     if (/^BoardSetup(Create|Update|Retire|Set)/.test(op)) calls.mutations.push(op);
 
@@ -254,7 +482,10 @@ function makeFakeLinear(initial = freshBoard(), { templateDataAsObject = false }
         const view = {
           id,
           name: variables.input.name,
-          url: `https://linear.app/view/${id}`,
+          // The schema's addressable fields: a view has a slugId and an owning
+          // organization, never a url. The URL is built from those.
+          slugId: `${id}-slug`,
+          organization: { urlKey: TEST_ORG_URL_KEY },
           description: variables.input.description ?? null,
           filterData: structuredClone(variables.input.filterData ?? null),
           shared: variables.input.shared === true,
@@ -572,7 +803,8 @@ test('--apply creates the Work view with the spec filter and shared: true (the s
   await result;
   const view = db.views.find((candidate) => candidate.name === WORK_VIEW.name);
   assert.ok(view, 'the Work view must exist');
-  assert.ok(view.url, 'the evidence needs a URL');
+  assert.ok(view.slugId, 'the view needs a slug to build its URL from');
+  assert.equal(customViewUrl(view), `https://linear.app/${TEST_ORG_URL_KEY}/view/${view.slugId}`);
   // Read what the view was actually created with.
   assert.deepEqual(view.filterData, workViewIssueFilter(TEST_TEAM_ID));
   assert.equal(view.shared, true, 'the Work view must be shared with everyone');
@@ -583,7 +815,7 @@ test('a preexisting Work view with the wrong filter is updated, not accepted by 
   board.views.push({
     id: 'view-work',
     name: WORK_VIEW.name,
-    url: 'https://linear.app/view/existing',
+    slugId: 'existing-view-slug',
     description: 'stale',
     filterData: { team: { id: { eq: TEST_TEAM_ID } } }, // no label exclusion at all
     shared: true,
@@ -602,7 +834,7 @@ test('a preexisting private Work view is made shared', async () => {
   board.views.push({
     id: 'view-work',
     name: WORK_VIEW.name,
-    url: 'https://linear.app/view/existing',
+    slugId: 'existing-view-slug',
     description: WORK_VIEW.description,
     filterData: workViewIssueFilter(TEST_TEAM_ID),
     shared: false,
@@ -620,7 +852,7 @@ test('the evidence count comes from the SAVED view filter, not a separately buil
   board.views.push({
     id: 'view-work',
     name: WORK_VIEW.name,
-    url: 'https://linear.app/view/existing',
+    slugId: 'existing-view-slug',
     description: 'wrong filter',
     filterData: {
       team: { id: { eq: TEST_TEAM_ID } },
@@ -690,7 +922,7 @@ test('the evidence names every state, every label group, the template, the view 
   assert.match(evidence, /Feature builder model/);
   assert.match(evidence, /Orchestrator model \(retired\)/);
   assert.match(evidence, new RegExp(`Template: ${TEMPLATE_NAME} \\(id: template-`));
-  assert.match(evidence, /Work view: Work \(id: view-\d+, url: https:\/\/linear\.app\/view\/view-\d+, shared\)/);
+  assert.match(evidence, /Work view: Work \(id: view-\d+, url: https:\/\/linear\.app\/julia-next\/view\/view-\d+-slug, shared\)/);
   assert.match(evidence, /Work view matches 2 issue\(s\)/);
 });
 
@@ -828,7 +1060,7 @@ test('a transport error that echoes the key is redacted before boardSetup rethro
 test('the fake rejects a state create with no color', async () => {
   const { graphql } = makeFakeLinear();
   await assert.rejects(
-    () => graphql('mutation BoardSetupCreateState($input: WorkflowStateCreateInput!) { x }', {
+    () => graphql('mutation BoardSetupCreateState($input: WorkflowStateCreateInput!) { workflowStateCreate(input: $input) { success } }', {
       input: { teamId: TEST_TEAM_ID, name: 'Colorless', type: 'started', position: 1 },
     }),
     /color is required/,
@@ -838,10 +1070,34 @@ test('the fake rejects a state create with no color', async () => {
 test('the fake rejects an update-state carrying a type (WorkflowStateUpdateInput has none)', async () => {
   const { graphql } = makeFakeLinear();
   await assert.rejects(
-    () => graphql('mutation BoardSetupUpdateState($id: String!, $input: WorkflowStateUpdateInput!) { x }', {
+    () => graphql('mutation BoardSetupUpdateState($id: String!, $input: WorkflowStateUpdateInput!) { workflowStateUpdate(id: $id, input: $input) { success } }', {
       id: 'state-todo', input: { type: 'started' },
     }),
     /no type field/,
+  );
+});
+
+// The two faults that reached the real API, as schema-validation cases: the
+// fake now fails them the way the real API failed the dry run.
+test('the fake rejects `url` selected on a view (CustomView has no url field)', async () => {
+  const { graphql } = makeFakeLinear();
+  await assert.rejects(
+    () => graphql(
+      'query BoardSetupViews($teamId: ID!, $after: String) { customViews(filter: { team: { id: { eq: $teamId } } }, first: 50, after: $after) { nodes { id name url } pageInfo { hasNextPage endCursor } } }',
+      { teamId: TEST_TEAM_ID },
+    ),
+    /field "url" does not exist on type "CustomView"/,
+  );
+});
+
+test('the fake rejects $teamId declared String! in BoardSetupViews, where the id filter needs ID!', async () => {
+  const { graphql } = makeFakeLinear();
+  await assert.rejects(
+    () => graphql(
+      'query BoardSetupViews($teamId: String!, $after: String) { customViews(filter: { team: { id: { eq: $teamId } } }, first: 50, after: $after) { nodes { id } pageInfo { hasNextPage endCursor } } }',
+      { teamId: TEST_TEAM_ID },
+    ),
+    /\$teamId is declared "String!" but the schema expects "ID!"/,
   );
 });
 
@@ -867,10 +1123,10 @@ test('the fake paginates its own responses at 50 records a page', async () => {
     board.labels.push({ id: `extra-${i}`, name: `extra-label-${i}`, description: null, isGroup: false, parentId: null, retiredAt: null });
   }
   const { graphql } = makeFakeLinear(board);
-  const first = await graphql('query BoardSetupLabels($teamId: String!, $after: String) { x }', { teamId: TEST_TEAM_ID });
+  const first = await graphql('query BoardSetupLabels($teamId: String!, $after: String) { team(id: $teamId) { labels(first: 50, after: $after) { nodes { id } pageInfo { hasNextPage endCursor } } } }', { teamId: TEST_TEAM_ID });
   assert.equal(first.team.labels.nodes.length, 50);
   assert.equal(first.team.labels.pageInfo.hasNextPage, true);
-  const second = await graphql('query BoardSetupLabels($teamId: String!, $after: String) { x }', {
+  const second = await graphql('query BoardSetupLabels($teamId: String!, $after: String) { team(id: $teamId) { labels(first: 50, after: $after) { nodes { id } pageInfo { hasNextPage endCursor } } } }', {
     teamId: TEST_TEAM_ID, after: first.team.labels.pageInfo.endCursor,
   });
   assert.ok(second.team.labels.nodes.length > 0);
