@@ -1,0 +1,24 @@
+{
+  "source": "the seat launcher run-pi-seat.mjs streams Pi in --mode json to stdout, one JSON event per line; captured here from a reviewer-backup run started in an Orca plain terminal",
+  "how_read": "the last type=message_end event with message.role=assistant carries provider, model and usage (input, output, cacheRead, cacheWrite, reasoning, totalTokens, cost.total in dollars)",
+  "provider": "deepseek",
+  "model": "deepseek-v4-pro",
+  "stopReason": "stop",
+  "usage": {
+    "input": 1850,
+    "output": 44,
+    "cacheRead": 640,
+    "cacheWrite": 0,
+    "reasoning": 17,
+    "totalTokens": 2534,
+    "cost": {
+      "input": 0.00080475,
+      "output": 3.828e-05,
+      "cacheRead": 2.3200000000000002e-06,
+      "cacheWrite": 0,
+      "total": 0.00084535
+    }
+  },
+  "verdict_text": "VERDICT: FAIL \u2014 the change implements subtraction instead of addition, contradicting the commit message and the function's intended behavior.",
+  "gaps": "no peak-context figure (only per-message totals, which for a multi-turn run the controller must track itself) and no duration field on events (the controller must time the process)"
+}

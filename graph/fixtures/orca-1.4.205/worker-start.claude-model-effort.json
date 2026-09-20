@@ -1,0 +1,81 @@
+{
+  "id": "40dc6da2-524b-4dac-babe-3c9b158d6e9f",
+  "ok": true,
+  "result": {
+    "runId": "run_1bf570ce5660",
+    "taskId": "task_dd8a290d7d14",
+    "dispatchId": "ctx_937abab903ae",
+    "state": "ready",
+    "stage": "input_accepted",
+    "server": {
+      "environmentId": "e8b75ed2-0f00-4b2f-ac90-2bfcea792089",
+      "name": "ovh-local"
+    },
+    "setup": {
+      "requested": "run",
+      "effective": "run",
+      "source": "orchestration_default",
+      "hookFound": false,
+      "startupPolicy": "start-immediately",
+      "state": "not_configured"
+    },
+    "launch": {
+      "requested": {
+        "agent": "claude",
+        "model": "claude-sonnet-5",
+        "effort": "low"
+      },
+      "effective": {
+        "agent": "claude",
+        "model": "claude-sonnet-5",
+        "effort": "low"
+      }
+    },
+    "timeoutMs": 60000,
+    "effects": [
+      {
+        "kind": "worktree",
+        "action": "created_top_level",
+        "id": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109-probe-1"
+      },
+      {
+        "kind": "terminal",
+        "role": "agent",
+        "action": "created",
+        "id": "term_b073045f-4acb-4d94-9ad5-5fadfbe1786d",
+        "tabId": "89f5b7d2-1a5b-4639-9e64-c24d5a061933",
+        "leafId": "760891d9-03e6-405f-904a-9aedc3dac992"
+      },
+      {
+        "kind": "setup",
+        "action": "run",
+        "requested": "run",
+        "effective": "run",
+        "source": "orchestration_default",
+        "hookFound": false,
+        "startupPolicy": "start-immediately",
+        "state": "not_configured"
+      },
+      {
+        "kind": "dispatch_input",
+        "role": "agent",
+        "id": "term_b073045f-4acb-4d94-9ad5-5fadfbe1786d",
+        "state": "accepted"
+      }
+    ],
+    "residualResources": [],
+    "mode": {
+      "mode": "terminal",
+      "preferred": "terminal",
+      "reason": "user_default",
+      "detail": "Started a terminal agent worker, the default for new agent tabs in your settings."
+    },
+    "mutation": {
+      "requestId": "3e2b83ef-d870-408f-9b81-488a9e1f671d",
+      "replayed": false
+    }
+  },
+  "_meta": {
+    "runtimeId": "1e7c1ad9-9f69-4fb5-95b2-b3d914969117"
+  }
+}

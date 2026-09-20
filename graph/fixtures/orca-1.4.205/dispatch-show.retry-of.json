@@ -1,0 +1,36 @@
+{
+  "id": "d1ea2995-e912-4194-9aff-082bebbdf82f",
+  "ok": true,
+  "result": {
+    "dispatch": {
+      "id": "ctx_2e1d6576265b",
+      "run_id": "run_1bf570ce5660",
+      "task_id": "task_d43d404304fd",
+      "contract_version": 1,
+      "launch_token_hash": null,
+      "assignee_handle": null,
+      "assignee_pane_key": null,
+      "capability_hash": null,
+      "process_incarnation": null,
+      "capability_revoked_at": "2026-09-20T20:30:44.029Z",
+      "retry_of_dispatch_id": "ctx_b93c24cc4e31",
+      "creator_dispatch_id": null,
+      "creator_handle": "term_6f743d87-5088-433b-b424-cbc36af062b1",
+      "creator_pane_key": "db13a2ce-ac96-4188-af56-5a02fa8be495:b41835e0-7ab5-4f77-819f-d6218425a032",
+      "host_scope": null,
+      "status": "completed",
+      "failure_count": 0,
+      "last_failure": null,
+      "termination_reason": null,
+      "depth": 1,
+      "consumer_generation": 0,
+      "dispatched_at": "2026-09-20 20:30:32",
+      "completed_at": "2026-09-20T20:30:44.029Z",
+      "created_at": "2026-09-20 20:30:32",
+      "last_heartbeat_at": null
+    }
+  },
+  "_meta": {
+    "runtimeId": "1e7c1ad9-9f69-4fb5-95b2-b3d914969117"
+  }
+}

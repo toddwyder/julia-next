@@ -124,6 +124,15 @@ steps, and the ticket does not close until it has.
      all change. Verified 2026-09-19: JUL-89 and the JUL-97 readiness review both recorded that
      Claude on `runner` was at a sign-in prompt, and a live probe that evening returned a normal
      answer and exit 0. Proximity to a prior session's note is not a probe.
+   - **probe the real launch path, not a stand-in (JUL-109, 2026-09-20).** A seat is proven only when
+     it is started the way the controller will really start it: an interactive session in a fresh
+     Orca worktree (`orca orchestration worker-start`, or for a Pi seat a plain terminal created
+     through Orca on the runner's daemon with the prompt piped into
+     `node ops/service-dropbox/run-pi-seat.mjs <seat>`). A login shell of our own, `ssh runner@...`,
+     or `claude -p` does not prove the seat: on 2026-09-20 a `claude -p` probe passed while the real
+     launch sat at a folder-trust question for about eight hours. Record the command, the terminal's
+     own `id` (a Pi seat must show `deepseek-readers`), the provider and model the run reports, that
+     a real answer came back, and the cost. The seat probe checks for the answer, not for exit 0.
    - reuse a recent, still-valid finding from a prior audit instead of re-probing, but cite the
      source doc and its date so staleness can be judged later.
 

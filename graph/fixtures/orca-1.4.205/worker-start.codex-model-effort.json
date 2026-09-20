@@ -1,0 +1,81 @@
+{
+  "id": "b42fd1b4-e30b-46eb-a461-46f1fd7fa033",
+  "ok": true,
+  "result": {
+    "runId": "run_1bf570ce5660",
+    "taskId": "task_943761376874",
+    "dispatchId": "ctx_7bc78755f99a",
+    "state": "ready",
+    "stage": "input_accepted",
+    "server": {
+      "environmentId": "e8b75ed2-0f00-4b2f-ac90-2bfcea792089",
+      "name": "ovh-local"
+    },
+    "setup": {
+      "requested": "run",
+      "effective": "run",
+      "source": "orchestration_default",
+      "hookFound": false,
+      "startupPolicy": "start-immediately",
+      "state": "not_configured"
+    },
+    "launch": {
+      "requested": {
+        "agent": "codex",
+        "model": "gpt-6-astra",
+        "effort": "low"
+      },
+      "effective": {
+        "agent": "codex",
+        "model": "gpt-6-astra",
+        "effort": "low"
+      }
+    },
+    "timeoutMs": 60000,
+    "effects": [
+      {
+        "kind": "worktree",
+        "action": "created_top_level",
+        "id": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109-probe-codex-2"
+      },
+      {
+        "kind": "terminal",
+        "role": "agent",
+        "action": "created",
+        "id": "term_fff103da-159e-4364-96d4-62e8a202df76",
+        "tabId": "e2b8cbd8-be67-4fa0-abfc-8f86da014bb5",
+        "leafId": "d4547a7c-f36e-486a-9d9f-672e9d702d42"
+      },
+      {
+        "kind": "setup",
+        "action": "run",
+        "requested": "run",
+        "effective": "run",
+        "source": "orchestration_default",
+        "hookFound": false,
+        "startupPolicy": "start-immediately",
+        "state": "not_configured"
+      },
+      {
+        "kind": "dispatch_input",
+        "role": "agent",
+        "id": "term_fff103da-159e-4364-96d4-62e8a202df76",
+        "state": "accepted"
+      }
+    ],
+    "residualResources": [],
+    "mode": {
+      "mode": "terminal",
+      "preferred": "terminal",
+      "reason": "user_default",
+      "detail": "Started a terminal agent worker, the default for new agent tabs in your settings."
+    },
+    "mutation": {
+      "requestId": "69f37675-1774-4c5f-8059-bae6f3011566",
+      "replayed": false
+    }
+  },
+  "_meta": {
+    "runtimeId": "1e7c1ad9-9f69-4fb5-95b2-b3d914969117"
+  }
+}

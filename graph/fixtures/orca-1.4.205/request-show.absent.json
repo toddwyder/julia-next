@@ -1,0 +1,12 @@
+{
+  "id": "ad855d44-c36c-4665-8456-bb088162aea7",
+  "ok": true,
+  "result": {
+    "requestId": "8c1b024d-6d6b-4876-8580-db9a6442dd10",
+    "state": "absent",
+    "interpretation": "No receipt for request 8c1b024d-6d6b-4876-8580-db9a6442dd10 under this caller identity. It never reached this Orca runtime, failed before recording anything, or its receipt was pruned. Absent is not proof that nothing happened."
+  },
+  "_meta": {
+    "runtimeId": "1e7c1ad9-9f69-4fb5-95b2-b3d914969117"
+  }
+}

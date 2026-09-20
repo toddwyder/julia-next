@@ -1,0 +1,74 @@
+{
+  "id": "08f08dd9-403b-46f8-b7a6-b7282c7bae51",
+  "ok": true,
+  "result": {
+    "runId": "run_1bf570ce5660",
+    "taskId": "task_410795cfe8d6",
+    "dispatchId": "ctx_c24c6c49df9a",
+    "state": "ready",
+    "stage": "input_accepted",
+    "server": {
+      "environmentId": "e8b75ed2-0f00-4b2f-ac90-2bfcea792089",
+      "name": "ovh-local"
+    },
+    "setup": {
+      "requested": "not_applicable",
+      "effective": "not_applicable",
+      "source": "existing_worktree",
+      "hookFound": false,
+      "startupPolicy": "start-immediately",
+      "state": "not_applicable"
+    },
+    "launch": {
+      "requested": {
+        "agent": null,
+        "model": null,
+        "effort": null
+      },
+      "effective": {
+        "agent": null,
+        "model": null,
+        "effort": null
+      }
+    },
+    "timeoutMs": 60000,
+    "effects": [
+      {
+        "kind": "worktree",
+        "action": "reused",
+        "id": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109-pi-review"
+      },
+      {
+        "kind": "setup",
+        "action": "not_applicable",
+        "state": "not_applicable"
+      },
+      {
+        "kind": "terminal",
+        "role": "agent",
+        "action": "reused",
+        "id": "term_3291f7c0-3357-4474-b58f-54a483572cf4"
+      },
+      {
+        "kind": "dispatch_input",
+        "role": "agent",
+        "id": "term_3291f7c0-3357-4474-b58f-54a483572cf4",
+        "state": "accepted"
+      }
+    ],
+    "residualResources": [],
+    "mode": {
+      "mode": "terminal",
+      "preferred": "terminal",
+      "reason": "user_default",
+      "detail": "Started a terminal agent worker, the default for new agent tabs in your settings."
+    },
+    "mutation": {
+      "requestId": "9a071dcc-50a3-4177-86c0-0afcaecf1ccc",
+      "replayed": false
+    }
+  },
+  "_meta": {
+    "runtimeId": "1e7c1ad9-9f69-4fb5-95b2-b3d914969117"
+  }
+}

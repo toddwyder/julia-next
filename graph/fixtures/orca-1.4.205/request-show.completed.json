@@ -1,0 +1,30 @@
+{
+  "id": "d735907b-9d85-4b44-a97c-98715c790317",
+  "ok": true,
+  "result": {
+    "requestId": "92524780-37ce-40cc-9b07-a033ddff9c54",
+    "state": "completed",
+    "method": "orchestration.runCreate",
+    "createdAt": "2026-09-20 20:19:07",
+    "updatedAt": "2026-09-20 20:19:07",
+    "receipt": {
+      "run": {
+        "id": "run_1bf570ce5660",
+        "objective": "JUL-109-probe",
+        "coordinator_handle": "term_6f743d87-5088-433b-b424-cbc36af062b1",
+        "consumer_generation": 1,
+        "legacy": 0,
+        "created_at": "2026-09-20T20:19:07Z",
+        "updated_at": "2026-09-20T20:19:07Z"
+      },
+      "mutation": {
+        "requestId": "92524780-37ce-40cc-9b07-a033ddff9c54",
+        "replayed": false
+      }
+    },
+    "interpretation": "Request 92524780-37ce-40cc-9b07-a033ddff9c54 already took effect (orchestration.runCreate). Replaying it with --retry-request 92524780-37ce-40cc-9b07-a033ddff9c54 returns the recorded outcome and starts nothing new."
+  },
+  "_meta": {
+    "runtimeId": "1e7c1ad9-9f69-4fb5-95b2-b3d914969117"
+  }
+}

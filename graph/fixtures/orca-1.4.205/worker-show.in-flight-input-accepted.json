@@ -1,0 +1,167 @@
+{
+  "id": "38d4783e-395c-42e5-9e23-b6a8ec3fc15d",
+  "ok": true,
+  "result": {
+    "dispatch": {
+      "id": "ctx_506b46e14bb4",
+      "runId": "run_1bf570ce5660",
+      "taskId": "task_9f8021d19a59",
+      "task_id": "task_9f8021d19a59",
+      "contractVersion": 1,
+      "assigneeHandle": null,
+      "assigneePaneKey": null,
+      "processIncarnation": null,
+      "capabilityRevokedAt": null,
+      "retryOfDispatchId": null,
+      "creatorDispatchId": null,
+      "hostScope": null,
+      "status": "dispatched",
+      "failureCount": 0,
+      "lastFailure": null,
+      "terminationReason": null,
+      "depth": 1,
+      "dispatchedAt": "2026-09-20 20:35:33",
+      "completedAt": null,
+      "createdAt": "2026-09-20 20:35:33",
+      "lastHeartbeatAt": null
+    },
+    "worker": {
+      "dispatchId": "ctx_506b46e14bb4",
+      "runtimeEpoch": "1e7c1ad9-9f69-4fb5-95b2-b3d914969117",
+      "state": "ready",
+      "stage": "input_accepted",
+      "worktreeId": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109-pi-review",
+      "agentTerminalHandle": "term_6c810203-5a3b-4819-8c8b-ae8fb3320055",
+      "setupState": "not_applicable",
+      "effects": [
+        {
+          "kind": "worktree",
+          "action": "reused",
+          "id": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109-pi-review"
+        },
+        {
+          "kind": "setup",
+          "action": "not_applicable",
+          "state": "not_applicable"
+        },
+        {
+          "kind": "terminal",
+          "role": "agent",
+          "action": "reused",
+          "id": "term_6c810203-5a3b-4819-8c8b-ae8fb3320055"
+        },
+        {
+          "kind": "dispatch_input",
+          "role": "agent",
+          "id": "term_6c810203-5a3b-4819-8c8b-ae8fb3320055",
+          "state": "accepted"
+        }
+      ],
+      "residualResources": [],
+      "startOptions": {
+        "on": "e8b75ed2-0f00-4b2f-ac90-2bfcea792089",
+        "serverName": "ovh-local",
+        "worktree": "path:/home/runner/orca/workspaces/julia-next/jul109-pi-review",
+        "name": null,
+        "repo": null,
+        "baseBranch": null,
+        "terminal": "term_6c810203-5a3b-4819-8c8b-ae8fb3320055",
+        "agent": null,
+        "launch": {
+          "requested": {
+            "agent": null,
+            "model": null,
+            "effort": null
+          },
+          "effective": null
+        },
+        "timeoutMs": 60000,
+        "setup": "not_applicable",
+        "setupSource": "existing_worktree"
+      },
+      "lastError": null,
+      "createdAt": "2026-09-20 20:35:33",
+      "updatedAt": "2026-09-20T20:35:36.302Z"
+    },
+    "projection": {
+      "id": "ctx_506b46e14bb4",
+      "dispatchId": "ctx_506b46e14bb4",
+      "taskId": "task_9f8021d19a59",
+      "runId": "run_1bf570ce5660",
+      "role": "worker",
+      "parent": null,
+      "provider": null,
+      "host": {
+        "kind": "remote",
+        "id": "e8b75ed2-0f00-4b2f-ac90-2bfcea792089"
+      },
+      "workspace": {
+        "id": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109-pi-review",
+        "kind": "folder_or_worktree"
+      },
+      "stage": {
+        "worker": "ready",
+        "dispatch": "dispatched",
+        "detail": "input_accepted",
+        "activity": "unknown"
+      },
+      "outcome": "in_progress",
+      "liveness": {
+        "verdict": "live",
+        "observedAt": 1789936590139,
+        "source": "execution_host"
+      },
+      "evidence": {
+        "durable": true,
+        "liveStatus": "fresh",
+        "lastObservedAt": 1789936590139
+      },
+      "resource": {
+        "state": "absent",
+        "reason": "not_materialized"
+      },
+      "nextAction": {
+        "kind": "none",
+        "argv": []
+      },
+      "attention": {
+        "categories": [],
+        "requiresAction": false
+      }
+    },
+    "server": {
+      "environmentId": "e8b75ed2-0f00-4b2f-ac90-2bfcea792089",
+      "name": "ovh-local"
+    },
+    "remoteRuntimeEpoch": "15dfff83-3c19-44d6-83e4-cb5a753d9033",
+    "terminal": {
+      "handle": "term_6c810203-5a3b-4819-8c8b-ae8fb3320055",
+      "ptyId": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109-pi-review@@0aeaaf7d",
+      "incarnationId": "cb888567-12d3-4a06-b82e-7fe21a992949",
+      "orphaned": false,
+      "worktreeId": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109-pi-review",
+      "worktreePath": "/home/runner/orca/workspaces/julia-next/jul109-pi-review",
+      "branch": "refs/heads/jul109-pi-review",
+      "tabId": "2870c6d0-4880-4098-9118-35fa92575c0f",
+      "leafId": "69e3ffb9-6e8d-4b8c-b15f-f74192f14900",
+      "title": "π - jul109-pi-review",
+      "connected": true,
+      "writable": true,
+      "lastOutputAt": 1789936537570,
+      "preview": "ailable. Run pi update\nChangelog: https://pi.dev/changelog\n────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────",
+      "executionHostId": "local",
+      "agentIdentity": "pi",
+      "paneRuntimeId": -1,
+      "rendererGraphEpoch": 0,
+      "agentWait": null
+    },
+    "observation": {
+      "status": "live",
+      "exactWorker": true,
+      "agentWait": null
+    }
+  },
+  "_meta": {
+    "runtimeId": "1e7c1ad9-9f69-4fb5-95b2-b3d914969117"
+  }
+}

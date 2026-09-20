@@ -1,0 +1,39 @@
+{
+  "id": "5f0dd318-9812-42eb-ad9a-8c56fce475e0",
+  "ok": true,
+  "result": {
+    "requestId": "b6edba08-f712-4404-88b4-8e904e89225d",
+    "state": "completed",
+    "method": "terminal.send",
+    "createdAt": "2026-09-20 20:27:46",
+    "updatedAt": "2026-09-20 20:28:10",
+    "receipt": {
+      "send": {
+        "handle": "term_424ef221-471b-4770-8af2-b3f53d262318",
+        "accepted": true,
+        "bytesWritten": 50,
+        "prompt": {
+          "requestId": "b6edba08-f712-4404-88b4-8e904e89225d",
+          "stages": [
+            "input_accepted"
+          ],
+          "provider": "claude",
+          "observation": "supported",
+          "processIncarnation": "060f508a-f330-4232-8d43-d73709facecc",
+          "generation": 5,
+          "baselineWorkingSequence": 0,
+          "baselineExplicitWorkingStartedAt": null,
+          "baselinePermissionSequence": 0
+        }
+      },
+      "mutation": {
+        "requestId": "b6edba08-f712-4404-88b4-8e904e89225d",
+        "replayed": false
+      }
+    },
+    "interpretation": "Request b6edba08-f712-4404-88b4-8e904e89225d already took effect (terminal.send). Replaying it with --retry-request b6edba08-f712-4404-88b4-8e904e89225d returns the recorded outcome and starts nothing new."
+  },
+  "_meta": {
+    "runtimeId": "15dfff83-3c19-44d6-83e4-cb5a753d9033"
+  }
+}

@@ -1,0 +1,119 @@
+{
+  "id": "c4864a6a-b48f-48c8-abc9-0d350b19e35e",
+  "ok": true,
+  "result": {
+    "messages": [
+      {
+        "id": "relay_930f27ac3e8d",
+        "run_id": "run_1bf570ce5660",
+        "delivery_contract": "current_delivery",
+        "from_handle": "dispatch:ctx_25889cbfea14",
+        "to_handle": "run:run_1bf570ce5660",
+        "subject": "Probe complete",
+        "body": "Executed the JUL-109 mailbox probe sequence: sent step-1 status, slept 45s, sent heartbeat, sent test escalation, sent step-2 status, and checked for follow-ups (none found). No files were touched, as instructed. Nothing further is left to do.",
+        "type": "worker_done",
+        "priority": "normal",
+        "thread_id": null,
+        "payload": "{\"taskId\":\"task_12996abe9a89\",\"dispatchId\":\"ctx_25889cbfea14\",\"outcome\":\"succeeded\"}",
+        "created_at": "2026-09-20T20:26:30Z",
+        "delivered_at": null
+      },
+      {
+        "id": "relay_b0fae43afd4d",
+        "run_id": "run_1bf570ce5660",
+        "delivery_contract": "current_delivery",
+        "from_handle": "dispatch:ctx_25889cbfea14",
+        "to_handle": "run:run_1bf570ce5660",
+        "subject": "step-2",
+        "body": "continuing",
+        "type": "status",
+        "priority": "normal",
+        "thread_id": null,
+        "payload": "{\"taskId\":\"task_12996abe9a89\",\"dispatchId\":\"ctx_25889cbfea14\",\"phase\":\"step-2\"}",
+        "created_at": "2026-09-20T20:26:23Z",
+        "delivered_at": null
+      },
+      {
+        "id": "relay_a51ed26cde91",
+        "run_id": "run_1bf570ce5660",
+        "delivery_contract": "current_delivery",
+        "from_handle": "dispatch:ctx_25889cbfea14",
+        "to_handle": "run:run_1bf570ce5660",
+        "subject": "probe-escalation",
+        "body": "This is a deliberate test escalation, nothing is wrong.",
+        "type": "escalation",
+        "priority": "normal",
+        "thread_id": null,
+        "payload": "{\"taskId\":\"task_12996abe9a89\",\"dispatchId\":\"ctx_25889cbfea14\"}",
+        "created_at": "2026-09-20T20:26:19Z",
+        "delivered_at": null
+      },
+      {
+        "id": "relay_bcee3827f72c",
+        "run_id": "run_1bf570ce5660",
+        "delivery_contract": "current_delivery",
+        "from_handle": "dispatch:ctx_25889cbfea14",
+        "to_handle": "run:run_1bf570ce5660",
+        "subject": "alive",
+        "body": "",
+        "type": "heartbeat",
+        "priority": "normal",
+        "thread_id": null,
+        "payload": "{\"taskId\":\"task_12996abe9a89\",\"dispatchId\":\"ctx_25889cbfea14\",\"phase\":\"waiting\"}",
+        "created_at": "2026-09-20T20:26:16Z",
+        "delivered_at": null
+      },
+      {
+        "id": "relay_0c197f511a8d",
+        "run_id": "run_1bf570ce5660",
+        "delivery_contract": "current_delivery",
+        "from_handle": "dispatch:ctx_25889cbfea14",
+        "to_handle": "run:run_1bf570ce5660",
+        "subject": "step-1",
+        "body": "starting",
+        "type": "status",
+        "priority": "normal",
+        "thread_id": null,
+        "payload": "{\"taskId\":\"task_12996abe9a89\",\"dispatchId\":\"ctx_25889cbfea14\",\"phase\":\"step-1\"}",
+        "created_at": "2026-09-20T20:25:25Z",
+        "delivered_at": null
+      },
+      {
+        "id": "relay_d8908f56cc7c",
+        "run_id": "run_1bf570ce5660",
+        "delivery_contract": "current_delivery",
+        "from_handle": "dispatch:ctx_866d6d92d021",
+        "to_handle": "run:run_1bf570ce5660",
+        "subject": "Probe complete",
+        "body": "Printed the single word READY as requested. No files were touched. Nothing remains for this task.",
+        "type": "worker_done",
+        "priority": "normal",
+        "thread_id": null,
+        "payload": "{\"taskId\":\"task_80c37d2476bb\",\"dispatchId\":\"ctx_866d6d92d021\",\"outcome\":\"succeeded\"}",
+        "created_at": "2026-09-20T20:24:11Z",
+        "delivered_at": null
+      },
+      {
+        "id": "relay_07ed40077b81",
+        "run_id": "run_1bf570ce5660",
+        "delivery_contract": "current_delivery",
+        "from_handle": "dispatch:ctx_937abab903ae",
+        "to_handle": "run:run_1bf570ce5660",
+        "subject": "Probe complete",
+        "body": "Printed the single word READY as requested and touched no files. No investigation or changes were needed for this probe task. Nothing remains to do.",
+        "type": "worker_done",
+        "priority": "normal",
+        "thread_id": null,
+        "payload": "{\"taskId\":\"task_dd8a290d7d14\",\"dispatchId\":\"ctx_937abab903ae\",\"outcome\":\"succeeded\"}",
+        "created_at": "2026-09-20T20:19:18Z",
+        "delivered_at": null
+      }
+    ],
+    "count": 7,
+    "acknowledged": null,
+    "runId": "run_1bf570ce5660"
+  },
+  "_meta": {
+    "runtimeId": "1e7c1ad9-9f69-4fb5-95b2-b3d914969117"
+  }
+}

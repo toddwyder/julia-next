@@ -1,0 +1,181 @@
+{
+  "id": "99d70f5c-3ee4-4fcb-907e-0126eb3aadee",
+  "ok": true,
+  "result": {
+    "dispatch": {
+      "id": "ctx_866d6d92d021",
+      "runId": "run_1bf570ce5660",
+      "taskId": "task_80c37d2476bb",
+      "task_id": "task_80c37d2476bb",
+      "contractVersion": 1,
+      "assigneeHandle": null,
+      "assigneePaneKey": null,
+      "processIncarnation": null,
+      "capabilityRevokedAt": "2026-09-20T20:24:11.621Z",
+      "retryOfDispatchId": null,
+      "creatorDispatchId": null,
+      "hostScope": null,
+      "status": "completed",
+      "failureCount": 0,
+      "lastFailure": null,
+      "terminationReason": null,
+      "depth": 1,
+      "dispatchedAt": "2026-09-20 20:24:03",
+      "completedAt": "2026-09-20T20:24:11.621Z",
+      "createdAt": "2026-09-20 20:24:03",
+      "lastHeartbeatAt": null
+    },
+    "worker": {
+      "dispatchId": "ctx_866d6d92d021",
+      "runtimeEpoch": "1e7c1ad9-9f69-4fb5-95b2-b3d914969117",
+      "state": "succeeded",
+      "stage": "settled",
+      "worktreeId": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109-probe-3",
+      "agentTerminalHandle": "term_e2b85ca8-a325-4c3e-90e7-387945950d46",
+      "setupState": "not_configured",
+      "effects": [
+        {
+          "kind": "worktree",
+          "action": "created_top_level",
+          "id": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109-probe-3"
+        },
+        {
+          "kind": "terminal",
+          "role": "agent",
+          "action": "created",
+          "id": "term_e2b85ca8-a325-4c3e-90e7-387945950d46",
+          "tabId": "5b5398d5-d6c9-45ca-ae3f-d6da772b23d6",
+          "leafId": "8b230760-a01c-463a-9555-3ef248daafb0"
+        },
+        {
+          "kind": "setup",
+          "action": "run",
+          "requested": "run",
+          "effective": "run",
+          "source": "orchestration_default",
+          "hookFound": false,
+          "startupPolicy": "start-immediately",
+          "state": "not_configured"
+        },
+        {
+          "kind": "dispatch_input",
+          "role": "agent",
+          "id": "term_e2b85ca8-a325-4c3e-90e7-387945950d46",
+          "state": "accepted"
+        }
+      ],
+      "residualResources": [],
+      "startOptions": {
+        "on": "e8b75ed2-0f00-4b2f-ac90-2bfcea792089",
+        "serverName": "ovh-local",
+        "worktree": "new-top-level",
+        "name": "jul109-probe-3",
+        "repo": "path:/home/runner/julia-next",
+        "baseBranch": "main",
+        "terminal": null,
+        "agent": "claude",
+        "launch": {
+          "requested": {
+            "agent": "claude",
+            "model": "claude-sonnet-5",
+            "effort": "low"
+          },
+          "effective": null
+        },
+        "timeoutMs": 60000,
+        "setup": "run",
+        "setupSource": "orchestration_default"
+      },
+      "lastError": null,
+      "createdAt": "2026-09-20 20:24:03",
+      "updatedAt": "2026-09-20T20:24:11.621Z"
+    },
+    "projection": {
+      "id": "ctx_866d6d92d021",
+      "dispatchId": "ctx_866d6d92d021",
+      "taskId": "task_80c37d2476bb",
+      "runId": "run_1bf570ce5660",
+      "role": "worker",
+      "parent": null,
+      "provider": null,
+      "host": {
+        "kind": "remote",
+        "id": "e8b75ed2-0f00-4b2f-ac90-2bfcea792089"
+      },
+      "workspace": {
+        "id": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109-probe-3",
+        "kind": "folder_or_worktree"
+      },
+      "stage": {
+        "worker": "succeeded",
+        "dispatch": "completed",
+        "detail": "settled",
+        "activity": "unknown"
+      },
+      "outcome": "succeeded",
+      "liveness": {
+        "verdict": "live",
+        "observedAt": 1789935879939,
+        "source": "execution_host"
+      },
+      "evidence": {
+        "durable": true,
+        "liveStatus": "fresh",
+        "lastObservedAt": 1789935879939
+      },
+      "resource": {
+        "state": "absent",
+        "reason": "not_materialized"
+      },
+      "nextAction": {
+        "kind": "inspect",
+        "argv": [
+          "orchestration",
+          "worker-show",
+          "--dispatch",
+          "ctx_866d6d92d021"
+        ]
+      },
+      "attention": {
+        "categories": [
+          "root_completion"
+        ],
+        "requiresAction": false
+      }
+    },
+    "server": {
+      "environmentId": "e8b75ed2-0f00-4b2f-ac90-2bfcea792089",
+      "name": "ovh-local"
+    },
+    "remoteRuntimeEpoch": "15dfff83-3c19-44d6-83e4-cb5a753d9033",
+    "terminal": {
+      "handle": "term_e2b85ca8-a325-4c3e-90e7-387945950d46",
+      "ptyId": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109-probe-3@@7b4f66ea",
+      "incarnationId": "c01eb1ee-19d0-40d1-9a0e-9c4959ea5d4a",
+      "orphaned": false,
+      "worktreeId": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109-probe-3",
+      "worktreePath": "/home/runner/orca/workspaces/julia-next/jul109-probe-3",
+      "branch": "refs/heads/jul109-probe-3",
+      "tabId": "5b5398d5-d6c9-45ca-ae3f-d6da772b23d6",
+      "leafId": "8b230760-a01c-463a-9555-3ef248daafb0",
+      "title": "✳ JUL-109 probe",
+      "connected": true,
+      "writable": true,
+      "lastOutputAt": 1789935855742,
+      "preview": "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n❯\n────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents",
+      "executionHostId": "local",
+      "agentIdentity": "claude",
+      "paneRuntimeId": -1,
+      "rendererGraphEpoch": 0,
+      "agentWait": null
+    },
+    "observation": {
+      "status": "live",
+      "exactWorker": true,
+      "agentWait": null
+    }
+  },
+  "_meta": {
+    "runtimeId": "1e7c1ad9-9f69-4fb5-95b2-b3d914969117"
+  }
+}
