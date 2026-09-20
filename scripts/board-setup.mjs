@@ -133,10 +133,13 @@ const TEMPLATES_QUERY = `
 // separately and matched by name like everything else. filterData and shared
 // are read too: a view with the right name but the wrong filter or the wrong
 // sharing does NOT satisfy the spec.
+// CustomView has NO `url` field. The human URL is built from the two fields
+// the schema does expose for addressing a view: `slugId` (the view's unique
+// URL slug) and the owning organization's `urlKey`. See customViewUrl().
 const VIEWS_QUERY = `
-  query BoardSetupViews($teamId: String!, $after: String) {
+  query BoardSetupViews($teamId: ID!, $after: String) {
     customViews(filter: { team: { id: { eq: $teamId } } }, first: 50, after: $after) {
-      nodes { id name url description filterData shared }
+      nodes { id name slugId organization { urlKey } description filterData shared }
       pageInfo { hasNextPage endCursor }
     }
   }
@@ -239,7 +242,7 @@ const CREATE_VIEW_MUTATION = `
   mutation BoardSetupCreateView($input: CustomViewCreateInput!) {
     customViewCreate(input: $input) {
       success
-      customView { id name url description filterData shared }
+      customView { id name slugId organization { urlKey } description filterData shared }
     }
   }
 `;
@@ -248,7 +251,7 @@ const UPDATE_VIEW_MUTATION = `
   mutation BoardSetupUpdateView($id: String!, $input: CustomViewUpdateInput!) {
     customViewUpdate(id: $id, input: $input) {
       success
-      customView { id name url description filterData shared }
+      customView { id name slugId organization { urlKey } description filterData shared }
     }
   }
 `;
@@ -262,6 +265,18 @@ function assertSuccess(payload, what) {
     throw new Error(`board-setup: Linear did not confirm ${what}`);
   }
   return payload;
+}
+
+// CustomView exposes no `url` field (the real API rejects it with
+// GRAPHQL_VALIDATION_FAILED). The addressable fields it does expose are `id`,
+// `slugId` and `organization { urlKey }`, so the linear.app URL is assembled
+// from the organization url key and the view slug. If either is missing, return
+// null rather than inventing a URL.
+export function customViewUrl(view) {
+  const urlKey = view?.organization?.urlKey;
+  const slugId = view?.slugId;
+  if (!urlKey || !slugId) return null;
+  return `https://linear.app/${urlKey}/view/${slugId}`;
 }
 
 // Template.templateData is typed JSON! and documented as a JSON-ENCODED
@@ -350,7 +365,9 @@ export async function loadBoard({ graphql, apiKey, teamId = TEAM_ID } = {}) {
     views: viewNodes.map((view) => ({
       id: view.id,
       name: view.name,
-      url: view.url ?? null,
+      url: customViewUrl(view),
+      slugId: view.slugId ?? null,
+      organizationUrlKey: view.organization?.urlKey ?? null,
       description: view.description ?? null,
       filterData: view.filterData ?? null,
       shared: view.shared === true,
@@ -984,8 +1001,16 @@ export function renderEvidence(board, issueCount, { issueCountFromSavedView = fa
     : 'Template: (none -- dry run before creation)');
 
   const view = board.views.find((candidate) => candidate.name === WORK_VIEW.name);
+  // CustomView has no url field: when a URL is present it was built from
+  // slugId + organization.urlKey. If the schema returned neither, say so
+  // instead of inventing one.
+  const viewUrl = view
+    ? (view.url
+      ? `, url: ${view.url}`
+      : `, url: none -- Linear exposes no URL field for a view; address it by id ${view.id}`)
+    : '';
   lines.push(view
-    ? `Work view: ${view.name} (id: ${view.id}${view.url ? `, url: ${view.url}` : ''}, ${view.shared ? 'shared' : 'private'})`
+    ? `Work view: ${view.name} (id: ${view.id}${viewUrl}, ${view.shared ? 'shared' : 'private'})`
     : 'Work view: (none -- dry run before creation)');
   lines.push(`Work view matches ${issueCount} issue(s) (${issueCountFromSavedView
     ? "counted with the saved view's filter"
