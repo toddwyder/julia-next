@@ -131,8 +131,14 @@ For the current step of the current item:
    usable entry for this step -- every remaining choice would put builder and reviewer in the
    same model family -- so park the item as **Blocked** rather than run a same-family pair.
    - **`claude`/`codex` entries** dispatch exactly as before: `runCreate` then `workerStart`
-     (`scripts/orca-cli.mjs`), targeting `--environment "OVH runner"`, `--agent claude`/`--agent
-     codex`, `worktree: 'new-top-level'`.
+     (`scripts/orca-cli.mjs`), targeting `--environment orchestrator-local --on ovh-local`,
+     `--agent claude`/`--agent codex`, `worktree: 'new-top-level'`. Those are the only two
+     environment names that exist on the server: the coordinator's own daemon, where the Run
+     lives, and the runner's daemon, where the worker runs. `"OVH runner"` is the *laptop's*
+     name for the runner's pairing and does not exist there (JUL-70 preflight miss 4; runbook,
+     "The coordinator's `ORCA_ENVIRONMENT` is the wrong daemon for orchestration").
+     `orca-cli.mjs`'s `workerStart` sends no `--on` yet, so pass it by calling
+     `orca orchestration worker-start` directly.
    - **`pi-deepseek`/`pi-glm` entries cannot go through `workerStart --agent pi`.**
      `workerStart`'s `--agent <id>` launches a known TUI agent with no way to pass Pi's own
      `--provider`/`--model` selection or seat-specific secret through it, and `runner` (the one
@@ -266,7 +272,7 @@ quoting and become an injection vector (PR #3 review, finding C3):
 import { terminalCreate, terminalRead, terminalWait } from './orca-cli.mjs';
 const contextB64 = Buffer.from(JSON.stringify(context)).toString('base64');
 const created = await terminalCreate({
-  environment: 'OVH runner',
+  environment: 'ovh-local', // the runner's daemon; 'OVH runner' is only the laptop's name for it (JUL-70 preflight miss 4)
   worktree: 'path:/home/runner/julia-next',
   command: `node scripts/coordinator-events.mjs ${stage} --run-id ${runId} --context-b64 ${contextB64} --tokens-used ${tokensUsed} --quota-remaining ${quotaRemaining} --interrupted ${interrupted}`,
   title: 'coordinator-events',
@@ -274,9 +280,11 @@ const created = await terminalCreate({
 // A single immediate read races the command's own completion -- wait for
 // the shell prompt to return before trusting the output as the command's
 // final state (fix-verification review: "does not guarantee event
-// delivery evidence").
-await terminalWait({ environment: 'OVH runner', terminal: created.terminal.handle, forState: 'tui-idle', timeoutMs: 15000 });
-const read = await terminalRead({ environment: 'OVH runner', terminal: created.terminal.handle });
+// delivery evidence"). Caution: on a plain (non-agent) terminal `tui-idle` can
+// return satisfied immediately even mid-run; only `--for exit --timeout-ms`
+// really blocks (runbook, "Seven findings carried from the cancelled JUL-106").
+await terminalWait({ environment: 'ovh-local', terminal: created.terminal.handle, forState: 'tui-idle', timeoutMs: 15000 });
+const read = await terminalRead({ environment: 'ovh-local', terminal: created.terminal.handle });
 // read.terminal.tail (an array of lines) confirms sent:true / sent:false, logged either way.
 ```
 
@@ -345,6 +353,20 @@ English; (b) whether anything needs his decision -- write `nothing` if not. Inst
 decisions arrive on the issue as comments prefixed `Instruction:` or `Decision:`; read the
 newest of those before acting on any step.
 
+**Waiting-on-Todd rule** (Todd's Instruction on JUL-44, Sep 17). Whenever a coordinator or worker
+stops because it needs Todd:
+1. The `For Todd:` section's first line starts with **WAITING ON YOU:**, followed by a single
+   plain-English question with no jargon (not "how credentials reach the graph"). Ask only the
+   first question if there are more; hold the rest for the next round. The question must also
+   name which of the three kinds Todd legitimately gets -- `(a)` sign-in or payment, `(b)` money,
+   `(c)` a product decision -- and use no git words, or the For-Todd guard
+   (`scripts/linear-cli.mjs`; runbook, "The For-Todd guard") refuses the comment.
+2. Assign the issue that holds the question to Todd. If a decision ticket is opened, assign that
+   ticket to him instead.
+3. Once his answer lands, unassign him.
+
+When nothing is needed, the `For Todd:` line stays `nothing`, as the Report trailer says above.
+
 **A correction is reposted whole, never patched in a follow-up comment.** If Todd is meant to
 follow something step by step (a walkthrough, a checklist, a runbook posted as a comment), a
 correction to it never lands as a separate "see the fix above" comment -- that leaves two
@@ -360,6 +382,12 @@ the same rule holds for a checklist or set of instructions Todd is actively exec
 (`--dangerously-skip-permissions`) is for infrastructure/setup tickets only. Product tickets run
 on the server orchestrator (`orchestrator-svc` via Orca). A product ticket found running on
 laptop Claude Code is a stop-and-report condition, not a workaround.
+
+**Tick-on-evidence rule.** An issue's acceptance checkbox is ticked when, and only when, verified
+evidence for it exists (a live command run, a real comment posted, a merged change) -- never on
+intent, in-progress work, or a plan to get there. Leave it unticked until the evidence exists.
+JUL-63 is where this rule first applied: its seven checkboxes were ticked only once each had a
+live-verified result cited on the issue.
 
 **Must never do (laptop or server, either identity).** Regardless of which side is running a
 ticket, an agent must never: create, delete, or change anything in one of Todd's service
