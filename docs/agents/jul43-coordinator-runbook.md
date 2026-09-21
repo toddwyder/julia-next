@@ -808,19 +808,32 @@ and `orchestrator-svc`, the file re-grouped, both Orca daemons restarted) was do
 
 ## Seat labels, the restart-after-finish guard, and relay reachability (JUL-79 step 5)
 
-### The six label groups and the label-name convention
+### The twelve label groups and the label-name convention
 
-The card's model/effort choices are six Linear label groups, one label per group:
-`Orchestrator model`, `Builder model`, `Reviewer model`, `Orchestrator effort`, `Builder effort`,
-`Reviewer effort`. The label names follow a fixed convention, and **code is the source of truth**:
+**Rewritten 2026-09-21 (JUL-97 step 2): the BOARD's six-agent vocabulary won and the code follows
+it.** The card's model/effort choices are **twelve** Linear label groups, one label per group: a
+`<Agent> model` and an `<Agent> effort` group for each of the board's six agents —
+`Feature builder`, `Defect fixer`, `Refactor`, `Adversarial reviewer`, `Evidence reviewer`,
+`Consultant`. The label names follow a fixed convention, and **code is the source of truth**:
 the coordinator creates the matching Linear labels from `scripts/seat-labels.mjs`, never from a
-hand-maintained list.
+hand-maintained list. No live label name was renamed — cards already carry them.
 
-- Model labels: `<agent>-<vendor>-<model>`, with `<agent>` one of `orch`/`builder`/`reviewer`.
-  Initial catalogue: `claude-opus`, `claude-sonnet`, `claude-haiku`, `codex`, `deepseek-pro`,
-  `deepseek-flash` — e.g. `orch-claude-opus`, `builder-deepseek-flash`,
-  `reviewer-deepseek-pro`. (`glm-5.3` was removed in JUL-93.)
-- Effort labels: `<agent>-effort-low` / `-medium` / `-high`, e.g. `reviewer-effort-medium`.
+- Model labels: `<code>-<vendor>-<model>`, with `<code>` one of
+  `builder`/`fixer`/`refactor`/`adversary`/`evidence`/`consultant` (`builder-` is the **Feature
+  builder's** prefix). Initial catalogue: `claude-opus`, `claude-sonnet`, `claude-haiku`, `codex`,
+  `deepseek-pro`, `deepseek-flash` — e.g. `builder-deepseek-flash`, `adversary-codex`,
+  `consultant-claude-opus`. (`glm-5.3` was removed in JUL-93, and since JUL-97 step 2
+  `board-setup.mjs` retires any `*-glm-5.3` label still sitting in a spec'd group.)
+- Effort labels: `<code>-effort-low` / `-medium` / `-high`, e.g. `adversary-effort-medium`.
+- **The old three-seat vocabulary is gone**: there is no `Orchestrator`/`Builder`/`Reviewer` model
+  or effort group and no `orch-` prefix. The two Orchestrator groups are retired on the board
+  (`RETIRED_LABEL_GROUPS` in `graph/board-spec.mjs`), which keeps them on the cards that carry
+  them and only stops new applications.
+- **The two seat names the coordinator dispatches are unchanged.** `builder` and `reviewer` are
+  still the names `worker-start`, `validateFamilyChoice`, `fallbackSeatChoice` and
+  `seat-labels.mjs fallback --seat <seat>` use; they now resolve to the Feature builder and the
+  Adversarial reviewer respectively (`DISPATCH_SEATS` in `scripts/seat-labels.mjs`). Wiring all
+  six seats into dispatch is JUL-102, not done here.
 
 `scripts/seat-labels.mjs` is pure (no I/O) and exports the group names, the label-name constants,
 and `MODEL_CATALOG` (each model label → the `SEAT_TABLE` entry it means, plus the vendor's model
@@ -829,12 +842,16 @@ vendor ships a new model. `resolveSeatChoices(labels)` returns each seat's `{ en
 modelLabel }`: a present model/effort label wins, an absent model falls back to the seat table's
 `primary` and its default model (`claude`→`claude-opus`, `codex`→`codex`,
 `pi-deepseek`→`deepseek-flash`), and an absent effort is Medium.
-`validateFamilyChoice` enforces builder family ≠ reviewer family (via `FAMILY_OF`) and that every
-resolved entry is a real seat-table entry. `seatChoicesForIssue(issue)` is the read-only helper
+`validateFamilyChoice` enforces builder family ≠ reviewer family (via `FAMILY_OF`) — that is the
+dispatched pair, i.e. Feature builder vs Adversarial reviewer — and that every one of the six
+resolved entries is a real seat-table entry, so a leftover `*-glm-5.3` label refuses the card
+whichever of the six prefixes carries it. `seatChoicesForIssue(issue)` is the read-only helper
 the coordinator calls on a card it fetched through `linear-cli.mjs` (whose `getIssue` now requests
 `labels { nodes { name } }`). The Ready queue fills any missing model/effort label (default +
-Medium) before starting a card; a label not yet created on the team is skipped and logged, never
-an error.
+Medium) before starting a card — **twelve** of them for a card carrying none; a label not yet
+created on the team is skipped and logged, never an error. Since JUL-97 step 2 the queue reads
+the team's labels through every page of the connection (the team holds 88 and Linear returns 50 a
+page), so an existing label is no longer reported as missing.
 
 ### The restart-after-finish gap, fixed with two belts
 
@@ -845,11 +862,17 @@ run was active — a finished run whose card was still in Ready would be started
 1. **State move.** After a successful start the queue sets the card's workflow state to the
    team's `In Progress` state through the injected Linear client (`findState` + `setIssueState`). A
    failure here is logged (`could not move <ID> out of Ready`) but never undoes the start.
-2. **`lastStarted` cooldown.** The queue still records `lastStarted` (card id + the start
-   fingerprint of labels/state/blockers + whether the state move succeeded) and, before anything
-   else in the next cycle, refuses to start a card whose id and fingerprint match that record
-   (`status: 'cooldown'`) — but only when that record says the state move **failed**. The fingerprint
-   purposefully includes the labels the queue itself added, so a card Linear now returns with those
+2. **Per-issue start cooldown.** The queue still records every start in `started`, a map keyed by
+   issue id (the start fingerprint of labels/state/blockers + whether the state move succeeded) and,
+   before anything else in the next cycle, refuses to start a card whose own record matches its
+   current fingerprint (`status: 'cooldown'`). The map replaced a single `lastStarted` record on
+   2026-09-21 (JUL-97 step 2): now that the queue walks past a card and starts a later one,
+   a single record meant starting the later card erased the earlier card's cooldown and the earlier
+   card restarted forever. An old single-record state file is migrated into the map on read
+   unconditionally (`startedRecords`): the one card the old file knew about keeps its record —
+   `stateMoved` included — under its own id. The **failed** state move is the cooldown guard's
+   condition, not the migration's: the guard holds a card only when its record says the state move
+   failed *and* the fingerprint still matches. The fingerprint purposefully includes the labels the queue itself added, so a card Linear now returns with those
    labels still matches and is held; a genuinely changed card gets a new fingerprint and is allowed
    through. When the state move succeeded the card really left Ready, so its reappearance in Ready
    is a deliberate re-queue and is admitted normally.
@@ -893,6 +916,19 @@ it opens.** So the run's `coordinator_handle` is not the terminal the orchestrat
 fixed, a fresh orchestrator must run `orca orchestration run-use --id <run id> --from <its own
 terminal handle>`. Verified working 2026-09-19.
 
+**Extended 2026-09-21 (JUL-97): this is now the NORMAL case, not the fresh-orchestrator case.**
+A coordinator launched by the Ready queue is not the bound consumer of its own Run either -- the
+queue creates a terminal that runs `julia-run.mjs`, so the binding lands on that launcher terminal
+exactly as above. Every queue-launched coordinator must therefore run, before its first
+`worker-start`:
+
+```sh
+orca orchestration run-use --environment orchestrator-local --id <runId> --from <its own terminal handle>
+```
+
+Skipping it fails `consumer_fenced` on the first dispatch, which reads as a permissions problem
+and is not one.
+
 **(d) `ORCA_TERMINAL_HANDLE` is not set in a Claude orchestrator started by `julia-run.mjs`.** So
 `orca orchestration run-current` fails there, and every orchestration command needs an explicit
 `--from`. Verified 2026-09-19.
@@ -901,6 +937,67 @@ terminal handle>`. Verified working 2026-09-19.
 pushes and opens; `merge-pr.mjs` only merges and does not check mergeability; `gh` on the server is
 deliberately unauthenticated. The coordinator therefore cannot read a PR's `mergeable_state` and
 relies on the merge API refusing a non-mergeable PR. Noted 2026-09-19 as a known gap.
+
+## Six JUL-97 step 2 discoveries (verified 2026-09-21)
+
+Each was established live while building JUL-97 step 2. Two of the six extend facts this runbook
+already carried rather than adding new ones; both say so and point at the passage they extend.
+
+### 1. A queue-launched coordinator must bind its own Run first
+
+**Already recorded, extended in place.** See "(c) `julia-run.mjs` binds the Orca run to the
+LAUNCHER terminal" above: the fresh-orchestrator case is now the ordinary one, because the Ready
+queue launches every coordinator the same way. The `run-use` line is there.
+
+### 2. `run_not_found` on an orchestration command is the wrong daemon, not a missing Run
+
+**Already recorded in part, extended here.** "The coordinator's `ORCA_ENVIRONMENT` is the wrong
+daemon for orchestration" below already says `run-use`/`worker-start` need
+`--environment orchestrator-local` and `--on ovh-local`. The new fact, verified 2026-09-21, is the
+error an omission produces and why: `scripts/julia-run.mjs` exports `ORCA_ENVIRONMENT=ovh-local`
+into the coordinator's shell, so `scripts/orca-cli.mjs` defaults **every** orchestration command
+to the runner's daemon, where the Run does not exist -- and the command fails `run_not_found`,
+which reads as "the Run is gone" when the Run is fine and merely lives on the other daemon. The
+split to remember: **orchestration** commands need an explicit `--environment orchestrator-local`;
+**worker** and **terminal** commands on the runner need `ovh-local`.
+
+### 3. `worker-stop` and `worker-list` reject `--from`
+
+Unlike `worker-start` and `run-use`, which require it, `orca orchestration worker-stop` and
+`orca orchestration worker-list` **reject** `--from` outright. `worker-list` takes `--run`. Passing
+the flag out of habit turns a recovery step into an argument error in the middle of an incident.
+
+### 4. Only a step dispatched as a supervised worker can be timed
+
+Orca Task records carry `created_at` and `completed_at`, so a step dispatched through
+`worker-start` can be timed exactly. A run driven through plain terminals creates no Task and
+therefore leaves **no timing record at all** -- not an imprecise one, none. Concretely: JUL-97's
+own 2026-09-19/20 run has zero Tasks, so none of its nine build attempts can be timed, and any
+duration quoted for them would be invented. If a step's duration will be asked for, it has to be
+dispatched as a supervised worker.
+
+### 5. The coordinator's granted command list refuses the documented `check-readiness` invocation
+
+`scripts/julia-run.mjs`'s `--allowedTools` list allows `Bash(node scripts/check-readiness.mjs:*)`
+but **not** the `node --env-file=/etc/orchestrator-svc/.env.publisher scripts/check-readiness.mjs`
+form this runbook's own Bootstrap section shows. The `--env-file` prefix makes it a different
+command, so in an unattended run the documented invocation is refused. **Use the plain form**
+(`node scripts/check-readiness.mjs`) in a coordinator run; the `--env-file` prefix is for a
+laptop or interactive session, where it is granted by hand. Only `publish-pr.mjs` and
+`merge-pr.mjs` are granted with their `--env-file` prefix.
+
+### 6. "The board already matches the spec" could be true while the board offered a removed model
+
+`scripts/board-setup.mjs` only ever ADDED labels a spec'd group was missing, so a label sitting in
+a group the spec names that the spec no longer names was left alone -- and the program still
+printed `board-setup: the board already matches graph/board-spec.mjs; no changes`. That is why the
+live board still carried `builder-glm-5.3`, `fixer-glm-5.3`, `refactor-glm-5.3`,
+`adversary-glm-5.3`, `evidence-glm-5.3` and `consultant-glm-5.3` after GLM was removed in JUL-93:
+six model choices Todd could pick that could never run, with the setup program reporting the board
+clean. JUL-97 step 2 closes it: a child of a spec'd group that the spec does not name is retired
+(`issueLabelRetire`, never deleted, so cards keep showing it), planned and printed as its own
+action. A group the spec does NOT name is still untouched. Read a "no changes" from before
+2026-09-21 with that blind spot in mind.
 
 ## Three JUL-44 step-4 discoveries (verified 2026-09-18/19)
 

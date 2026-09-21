@@ -1,5 +1,5 @@
-// board-spec.test.mjs -- JUL-97 step 1. Pure: no I/O, no Linear. Pins the
-// board description the setup program plans against: the eight states and
+// board-spec.test.mjs -- JUL-97 steps 1 and 2. Pure: no I/O, no Linear. Pins
+// the board description the setup program plans against: the nine states and
 // their order, the rename map (so no card is ever dropped), the label groups
 // and their derived children, and the Work view's filter.
 import test from 'node:test';
@@ -9,6 +9,9 @@ import {
   TEAM_NAME,
   TEAM_ID,
   WORKFLOW_STATES,
+  WORKFLOW_STATE_NAMES,
+  workflowColumnIndex,
+  TEMPLATE_NAME,
   STATE_RENAMES,
   STATUS_LABELS,
   RESERVED_LABEL_NAMES,
@@ -25,7 +28,22 @@ import {
 import { MODEL_SPECS, DEFAULT_MODEL_SUFFIX_BY_ENTRY } from '../scripts/seat-labels.mjs';
 import { SEAT_TABLE } from './seat-table.mjs';
 
-test('the eight workflow states are exactly the ticket\'s, in board order, with the right types and a color each', () => {
+// JUL-97 step 2, item 1: the ninth column. The exact order is pinned as a
+// plain list so a reordering -- or an accidental move of Evidence review past
+// UAT, which would silently change which blockers count as cleared -- fails
+// loudly here.
+test('the nine workflow states are exactly the ticket\'s, in board order, with the right types and a color each', () => {
+  assert.deepEqual(WORKFLOW_STATE_NAMES, [
+    'Backlog',
+    'Ready',
+    'Implementation',
+    'Code review',
+    'Remediation',
+    'Staging/smoke test',
+    'Evidence review',
+    'UAT',
+    'Complete',
+  ]);
   assert.deepEqual(WORKFLOW_STATES.map(({ name, type }) => ({ name, type })), [
     { name: 'Backlog', type: 'backlog' },
     { name: 'Ready', type: 'unstarted' },
@@ -33,16 +51,30 @@ test('the eight workflow states are exactly the ticket\'s, in board order, with 
     { name: 'Code review', type: 'started' },
     { name: 'Remediation', type: 'started' },
     { name: 'Staging/smoke test', type: 'started' },
+    { name: 'Evidence review', type: 'started' },
     { name: 'UAT', type: 'started' },
     { name: 'Complete', type: 'completed' },
   ]);
-  assert.equal(new Set(WORKFLOW_STATES.map((state) => state.name)).size, 8);
+  assert.equal(new Set(WORKFLOW_STATE_NAMES).size, 9);
   // WorkflowStateCreateInput.color is required; every state carries a fixed
   // HEX color and no two states reuse one.
   for (const state of WORKFLOW_STATES) {
     assert.match(state.color, /^#[0-9a-f]{6}$/i, `${state.name} has no sensible HEX color`);
   }
-  assert.equal(new Set(WORKFLOW_STATES.map((state) => state.color)).size, 8);
+  assert.equal(new Set(WORKFLOW_STATES.map((state) => state.color)).size, 9);
+  // Evidence review sits between the smoke test and UAT, and before Complete.
+  assert.equal(workflowColumnIndex('Evidence review'), workflowColumnIndex('Staging/smoke test') + 1);
+  assert.equal(workflowColumnIndex('UAT'), workflowColumnIndex('Evidence review') + 1);
+  assert.ok(workflowColumnIndex('Evidence review') < workflowColumnIndex('UAT'));
+  // A name that is not one of the nine has no place in the order.
+  assert.equal(workflowColumnIndex('Canceled'), -1);
+  assert.equal(workflowColumnIndex(undefined), -1);
+});
+
+// JUL-97 step 2, item 7: the template name is spelled once, here, so every
+// code path, document and skill that creates a card names the same template.
+test('the team template name lives in the board spec', () => {
+  assert.equal(TEMPLATE_NAME, 'Julia-next agent defaults');
 });
 
 test('the rename map is exactly the four renames and never mentions Canceled or Duplicate', () => {
@@ -56,7 +88,7 @@ test('the rename map is exactly the four renames and never mentions Canceled or 
   assert.ok(!Object.hasOwn(STATE_RENAMES, 'Duplicate'));
 });
 
-test('every rename target is one of the eight states, so a rename can never point at a state we do not create', () => {
+test('every rename target is one of the nine states, so a rename can never point at a state we do not create', () => {
   const names = new Set(WORKFLOW_STATES.map((state) => state.name));
   for (const target of Object.values(STATE_RENAMES)) {
     assert.ok(names.has(target), `rename target '${target}' is not a workflow state`);

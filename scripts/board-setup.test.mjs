@@ -26,6 +26,7 @@ import {
   findBlockingMismatches,
   mismatchMessage,
   planBoardSetup,
+  describeAction,
   BoardConflictError,
   TEMPLATE_NAME,
   customViewUrl,
@@ -35,6 +36,7 @@ import {
   WORKFLOW_STATES,
   STATUS_LABELS,
   GRAPH_AGENTS,
+  modelLabelsFor,
   defaultLabelsFor,
   workViewIssueFilter,
   isReservedLabelName,
@@ -585,12 +587,12 @@ test('--apply creates only what is missing and leaves the existing states in pla
   const { db, calls, result } = run({ apply: true });
   const outcome = await result;
 
-  // The three states that did not exist are created; the four renames are not.
+  // The four states that did not exist are created; the four renames are not.
   const created = calls.mutations.filter((op) => op === 'BoardSetupCreateState');
-  assert.equal(created.length, 3, 'only Remediation, Staging/smoke test and UAT are new');
+  assert.equal(created.length, 4, 'only Remediation, Staging/smoke test, Evidence review and UAT are new');
 
   const names = db.states.map((state) => state.name).sort();
-  for (const expected of ['Backlog', 'Ready', 'Implementation', 'Code review', 'Remediation', 'Staging/smoke test', 'UAT', 'Complete']) {
+  for (const expected of WORKFLOW_STATES.map((state) => state.name)) {
     assert.ok(names.includes(expected), `missing state ${expected}`);
   }
   // Canceled and Duplicate are left alone -- never moved, never renamed.
@@ -607,7 +609,7 @@ test('every created state carries a color (WorkflowStateCreateInput.color is req
   // The fake rejects a colorless create, so the apply reaching the end proves
   // every create had one; the spec itself supplies exactly one per state.
   assert.deepEqual(WORKFLOW_STATES.map((state) => state.color), [
-    '#bec2c8', '#e2e2e2', '#f2c94c', '#f2994a', '#eb5757', '#bb87fc', '#4ea7fc', '#5e6ad2',
+    '#bec2c8', '#e2e2e2', '#f2c94c', '#f2994a', '#eb5757', '#bb87fc', '#26b5ce', '#4ea7fc', '#5e6ad2',
   ]);
 });
 
@@ -633,8 +635,8 @@ test('workflow states get the derived spec order as positions, above every outsi
   const { db, result } = run({ apply: true });
   await result;
   const position = (name) => db.states.find((state) => state.name === name).position;
-  // freshBoard() has Canceled at 5 and Duplicate at 6, so the eight land on
-  // the eight consecutive slots above 6: 7..14. The base is derived from the
+  // freshBoard() has Canceled at 5 and Duplicate at 6, so the nine land on
+  // the nine consecutive slots above 6: 7..15. The base is derived from the
   // board, not hardcoded.
   assert.equal(position('Backlog'), 7);
   assert.equal(position('Ready'), 8);
@@ -642,15 +644,16 @@ test('workflow states get the derived spec order as positions, above every outsi
   assert.equal(position('Code review'), 10);
   assert.equal(position('Remediation'), 11);
   assert.equal(position('Staging/smoke test'), 12);
-  assert.equal(position('UAT'), 13);
-  assert.equal(position('Complete'), 14);
-  // Canceled and Duplicate are never moved, and because the eight sit above
+  assert.equal(position('Evidence review'), 13);
+  assert.equal(position('UAT'), 14);
+  assert.equal(position('Complete'), 15);
+  // Canceled and Duplicate are never moved, and because the nine sit above
   // them there is no collision.
   assert.equal(position('Canceled'), 5);
   assert.equal(position('Duplicate'), 6);
 });
 
-test('one apply against a fake that ignores create positions lands the eight in order; a second plans nothing', async () => {
+test('one apply against a fake that ignores create positions lands the nine in order; a second plans nothing', async () => {
   const { db, graphql, calls } = makeFakeLinear(freshBoard());
   const first = await boardSetup({
     graphql, teamId: TEST_TEAM_ID, env: { LINEAR_API_KEY: 'k' }, apply: true, stdout: { write() {} },
@@ -662,7 +665,7 @@ test('one apply against a fake that ignores create positions lands the eight in 
   const actual = WORKFLOW_STATES
     .map((spec) => db.states.find((state) => state.name === spec.name).position);
   assert.deepEqual(actual, [...actual].sort((a, b) => a - b), 'positions are strictly increasing in spec order');
-  assert.deepEqual(actual, [7, 8, 9, 10, 11, 12, 13, 14]);
+  assert.deepEqual(actual, [7, 8, 9, 10, 11, 12, 13, 14, 15]);
 
   calls.mutations.length = 0;
   const second = await boardSetup({
@@ -685,6 +688,7 @@ test('a board in the exact broken shape from the real run is repaired to the tic
     { id: 'state-complete', name: 'Complete', type: 'completed', position: 7, color: '#5e6ad2' },
     { id: 'state-remediation', name: 'Remediation', type: 'started', position: 1000, color: '#eb5757' },
     { id: 'state-staging', name: 'Staging/smoke test', type: 'started', position: 2000, color: '#bb87fc' },
+    { id: 'state-evidence-review', name: 'Evidence review', type: 'started', position: 3000, color: '#26b5ce' },
   ];
   const { db, result } = run({ board, apply: true });
   await result;
@@ -693,17 +697,17 @@ test('a board in the exact broken shape from the real run is repaired to the tic
     .sort((a, b) => a.position - b.position)
     .map((state) => state.name);
   assert.deepEqual(ordered, WORKFLOW_STATES.map((state) => state.name));
-  // outsideMax is 5 (Canceled 4, Duplicate 5), so the eight start at 6.
+  // outsideMax is 5 (Canceled 4, Duplicate 5), so the nine start at 6.
   assert.deepEqual(
     WORKFLOW_STATES.map((spec) => db.states.find((state) => state.name === spec.name).position),
-    [6, 7, 8, 9, 10, 11, 12, 13],
+    [6, 7, 8, 9, 10, 11, 12, 13, 14],
   );
   // Canceled and Duplicate never move.
   assert.equal(db.states.find((state) => state.name === 'Canceled').position, 4);
   assert.equal(db.states.find((state) => state.name === 'Duplicate').position, 5);
 });
 
-test('no intermediate plan step puts two of the eight at the same position', () => {
+test('no intermediate plan step puts two of the nine at the same position', () => {
   const board = freshBoard();
   const actions = planBoardSetup(board);
   const eight = new Set(WORKFLOW_STATES.map((state) => state.name));
@@ -735,15 +739,15 @@ test('no intermediate plan step puts two of the eight at the same position', () 
     }
     check(`${action.kind} ${action.name}`);
   }
-  // And the final state is the eight in strictly increasing spec order, above
+  // And the final state is the nine in strictly increasing spec order, above
   // Canceled (5) and Duplicate (6).
   check('the final board');
 });
 
 test('the planner corrects every merely-wrong position and plans no state action once the order is right', () => {
   const board = freshBoard();
-  // All eight exist, but the first two are swapped. outsideMax is 6 (Canceled
-  // 5, Duplicate 6), so the eight belong at 7..14.
+  // All nine exist, but the first two are swapped. outsideMax is 6 (Canceled
+  // 5, Duplicate 6), so the nine belong at 7..15.
   board.states = [
     { id: 'state-backlog', name: 'Backlog', type: 'backlog', position: 8, color: '#bec2c8' },
     { id: 'state-ready', name: 'Ready', type: 'unstarted', position: 7, color: '#e2e2e2' },
@@ -751,8 +755,9 @@ test('the planner corrects every merely-wrong position and plans no state action
     { id: 'state-code-review', name: 'Code review', type: 'started', position: 10, color: '#f2994a' },
     { id: 'state-remediation', name: 'Remediation', type: 'started', position: 11, color: '#eb5757' },
     { id: 'state-staging', name: 'Staging/smoke test', type: 'started', position: 12, color: '#bb87fc' },
-    { id: 'state-uat', name: 'UAT', type: 'started', position: 13, color: '#4ea7fc' },
-    { id: 'state-complete', name: 'Complete', type: 'completed', position: 14, color: '#5e6ad2' },
+    { id: 'state-evidence-review', name: 'Evidence review', type: 'started', position: 13, color: '#26b5ce' },
+    { id: 'state-uat', name: 'UAT', type: 'started', position: 14, color: '#4ea7fc' },
+    { id: 'state-complete', name: 'Complete', type: 'completed', position: 15, color: '#5e6ad2' },
     { id: 'state-canceled', name: 'Canceled', type: 'canceled', position: 5, color: '#95a2b3' },
     { id: 'state-duplicate', name: 'Duplicate', type: 'canceled', position: 6, color: '#6b6f76' },
   ];
@@ -1028,12 +1033,13 @@ test('the evidence names every state, every label group, the template, the view 
   const { capture, result } = run({ apply: true });
   await result;
   const evidence = capture.read().slice(capture.read().indexOf('EVIDENCE'));
-  assert.match(evidence, /States \(10\):/);
+  assert.match(evidence, /States \(11\):/);
   assert.match(evidence, /Ready \[unstarted\] position 8/);
-  assert.match(evidence, /Complete \[completed\] position 14/);
+  assert.match(evidence, /Evidence review \[started\] position 13/);
+  assert.match(evidence, /Complete \[completed\] position 15/);
   assert.match(evidence, /Canceled \[canceled\] position 5/);
-  assert.match(evidence, /Order \(the 8 spec columns, actual board order, matches the ticket\):/);
-  assert.match(evidence, /Backlog, Ready, Implementation, Code review, Remediation, Staging\/smoke test, UAT, Complete/);
+  assert.match(evidence, /Order \(the 9 spec columns, actual board order, matches the ticket\):/);
+  assert.match(evidence, /Backlog, Ready, Implementation, Code review, Remediation, Staging\/smoke test, Evidence review, UAT, Complete/);
   assert.match(evidence, /Card status/);
   assert.match(evidence, /waiting-on-todd/);
   assert.match(evidence, /Feature builder model/);
@@ -1043,10 +1049,95 @@ test('the evidence names every state, every label group, the template, the view 
   assert.match(evidence, /Work view matches 2 issue\(s\)/);
 });
 
+// ---------------------------------------------------------------------------
+// JUL-97 step 2, item 2: a group the spec NAMES stops offering a model the
+// spec no longer names. Before this, the planner only ADDED missing labels, so
+// the six `*-glm-5.3` labels left in the agents' model groups when GLM was
+// removed (JUL-93) sat there for good and the program still reported "the
+// board already matches the spec".
+// ---------------------------------------------------------------------------
+
+// The exact live shape: every agent's model group still carrying its
+// `<code>-glm-5.3` label after the model itself was removed from the code.
+function boardWithLeftoverGlmLabels() {
+  const board = freshBoard();
+  // freshBoard() carries a loose, ungrouped `builder-claude-opus`; here the
+  // agents' groups own every spec'd label, so drop the duplicate name.
+  board.labels = board.labels.filter((label) => label.name !== 'builder-claude-opus');
+  let n = 0;
+  for (const agent of GRAPH_AGENTS) {
+    const groupId = `label-group-${agent.code}-model`;
+    board.labels.push({ id: groupId, name: agent.modelGroup, description: null, isGroup: true, parentId: null, retiredAt: null });
+    for (const name of modelLabelsFor(agent.key)) {
+      board.labels.push({ id: `fixture-label-${n += 1}`, name, description: null, isGroup: false, parentId: groupId, retiredAt: null });
+    }
+    board.labels.push({
+      id: `fixture-label-glm-${agent.code}`, name: `${agent.code}-glm-5.3`, description: null, isGroup: false, parentId: groupId, retiredAt: null,
+    });
+  }
+  return board;
+}
+
+test('a label in a spec\'d group that the spec no longer names is retired -- exactly one retire per extra label', () => {
+  const board = boardWithLeftoverGlmLabels();
+  const retires = planBoardSetup(board).filter((action) => action.kind === 'retire-label' && action.groupName);
+  assert.deepEqual(
+    retires.map((action) => action.name).sort(),
+    GRAPH_AGENTS.map((agent) => `${agent.code}-glm-5.3`).sort(),
+  );
+  assert.equal(retires.length, GRAPH_AGENTS.length, 'exactly one retire per leftover label');
+  // It is a RETIRE, never a delete: cards keep showing the label they carry.
+  assert.ok(retires.every((action) => action.id.startsWith('fixture-label-glm-')));
+  assert.match(describeAction(retires[0]), /retire label "builder-glm-5\.3"/);
+  assert.match(describeAction(retires[0]), /no longer offers it/);
+});
+
+test('applying the retire plan really retires the leftover labels, and a second run plans nothing', async () => {
+  const { db, graphql, calls } = makeFakeLinear(boardWithLeftoverGlmLabels());
+  await boardSetup({ graphql, teamId: TEST_TEAM_ID, env: { LINEAR_API_KEY: 'k' }, apply: true, stdout: { write() {} } });
+  for (const agent of GRAPH_AGENTS) {
+    const label = db.labels.find((candidate) => candidate.name === `${agent.code}-glm-5.3`);
+    assert.ok(label, `${agent.code}-glm-5.3 must still exist -- retired, never deleted`);
+    assert.ok(label.retiredAt, `${agent.code}-glm-5.3 was not retired`);
+  }
+  calls.mutations.length = 0;
+  const snapshot = structuredClone(db);
+  const second = await boardSetup({ graphql, teamId: TEST_TEAM_ID, env: { LINEAR_API_KEY: 'k' }, apply: true, stdout: { write() {} } });
+  assert.deepEqual(second.actions, [], 'an already-retired label is not retired again');
+  assert.deepEqual(calls.mutations, []);
+  assert.deepEqual(db, snapshot);
+});
+
+test('a label group the spec does not name is never touched, however many children it has', () => {
+  const board = boardWithLeftoverGlmLabels();
+  board.labels.push({ id: 'label-group-area', name: 'Area', description: null, isGroup: true, parentId: null, retiredAt: null });
+  board.labels.push({ id: 'label-area-ui', name: 'area-ui', description: null, isGroup: false, parentId: 'label-group-area', retiredAt: null });
+  board.labels.push({ id: 'label-area-api', name: 'area-api', description: null, isGroup: false, parentId: 'label-group-area', retiredAt: null });
+  const touched = planBoardSetup(board)
+    .filter((action) => ['retire-label', 'update-label', 'create-label'].includes(action.kind))
+    .map((action) => action.name);
+  assert.ok(!touched.includes('area-ui'));
+  assert.ok(!touched.includes('area-api'));
+  assert.ok(!touched.includes('Area'));
+});
+
+test('a name the spec uses under some OTHER group is reparented, never retired out from under it', () => {
+  const board = boardWithLeftoverGlmLabels();
+  // `adversary-codex` belongs to the Adversarial reviewer model group but is
+  // sitting under the Feature builder's. Retiring it would destroy a choice
+  // the spec still names; the plan must move it instead.
+  const misplaced = board.labels.find((label) => label.name === 'adversary-codex');
+  misplaced.parentId = 'label-group-builder-model';
+  const actions = planBoardSetup(board);
+  assert.ok(!actions.some((action) => action.kind === 'retire-label' && action.name === 'adversary-codex'));
+  const move = actions.find((action) => action.kind === 'update-label' && action.name === 'adversary-codex');
+  assert.equal(move?.changes.parentName, 'Adversarial reviewer model');
+});
+
 test('the evidence reports a position collision it cannot fix without moving an excluded state', async () => {
   const board = freshBoard();
   // Give Canceled and Duplicate the same position: neither is one of the
-  // eight, so they are left where they are and the collision is named.
+  // nine, so they are left where they are and the collision is named.
   board.states.find((state) => state.name === 'Canceled').position = 4;
   board.states.find((state) => state.name === 'Duplicate').position = 4;
   const { capture, result } = run({ board, apply: true });

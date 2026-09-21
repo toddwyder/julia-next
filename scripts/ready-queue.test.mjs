@@ -6,9 +6,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { WORKFLOW_STATES } from '../graph/board-spec.mjs';
 import {
   readyQueueCheck,
+  createLinearClient,
   pickTopCard,
+  sortCardsByBoardOrder,
+  BLOCKER_CLEARED_FROM_COLUMN,
   evaluateEligibility,
   issueFingerprint,
   isBlockerClosed,
@@ -110,7 +114,7 @@ function fakeOrca({ runs = [] } = {}) {
 }
 
 function fakeStore(initial = {}) {
-  let state = structuredClone({ ready: {}, commented: {}, lastStarted: null, ...initial });
+  let state = structuredClone({ ready: {}, commented: {}, started: {}, ...initial });
   return {
     readImpl: async () => structuredClone(state),
     writeImpl: async (next) => { state = structuredClone(next); },
@@ -185,6 +189,54 @@ test('isBlockerClosed: Done/Canceled (by type or name) is closed, anything else 
   assert.equal(isBlockerClosed({ state: { name: 'Cancelled', type: 'canceled' } }), true);
   assert.equal(isBlockerClosed({ state: { name: 'In Progress', type: 'started' } }), false);
   assert.equal(isBlockerClosed({ state: { name: 'Backlog', type: 'backlog' } }), false);
+});
+
+// JUL-97 step 2, item 6c: a blocker that has reached UAT counts as cleared --
+// otherwise every dependent card waits on Todd's acceptance and the board
+// serialises on him. UAT's Linear state TYPE is `started`, exactly like
+// Implementation, so the answer cannot come from the type: it comes from the
+// board spec's own column ORDER (graph/board-spec.mjs WORKFLOW_STATE_NAMES).
+test('isBlockerClosed: UAT or later clears a blocker; Evidence review and everything earlier does not', () => {
+  const at = (name, type) => isBlockerClosed({ state: { name, type } });
+  assert.equal(BLOCKER_CLEARED_FROM_COLUMN, 'UAT');
+  assert.equal(at('Implementation', 'started'), false);
+  assert.equal(at('Code review', 'started'), false);
+  assert.equal(at('Staging/smoke test', 'started'), false);
+  assert.equal(at('Evidence review', 'started'), false, 'Evidence review is EARLIER than UAT and must not clear');
+  assert.equal(at('UAT', 'started'), true, 'UAT clears even though its type is "started", like Implementation');
+  assert.equal(at('Complete', 'completed'), true);
+  assert.equal(at('Canceled', 'canceled'), true);
+  // The rule is derived, not typed: Implementation and UAT share a type, so a
+  // type test alone could never separate them.
+  assert.equal(
+    WORKFLOW_STATES.find((state) => state.name === 'UAT').type,
+    WORKFLOW_STATES.find((state) => state.name === 'Implementation').type,
+  );
+});
+
+test('a card whose only blocker sits in UAT is eligible and starts', async () => {
+  const issue = makeIssue({
+    blockers: [{ id: 'uuid-JUL-1', identifier: 'JUL-1', state: { name: 'UAT', type: 'started' } }],
+  });
+  const { linear } = fakeLinear({ issues: [issue], teamLabels: DEFAULT_TEAM_LABELS });
+  const store = fakeStore({ ready: { [issue.id]: issueFingerprint(issue) } });
+  const orca = fakeOrca();
+  const result = await readyQueueCheck(deps({ linear, store, orca }));
+  assert.equal(result.status, 'started');
+  assert.equal(orca.calls.terminalsCreated.length, 1);
+});
+
+test('a card whose blocker sits in Evidence review is still blocked', async () => {
+  const issue = makeIssue({
+    blockers: [{ id: 'uuid-JUL-1', identifier: 'JUL-1', state: { name: 'Evidence review', type: 'started' } }],
+  });
+  const { linear } = fakeLinear({ issues: [issue], teamLabels: DEFAULT_TEAM_LABELS });
+  const store = fakeStore({ ready: { [issue.id]: issueFingerprint(issue) } });
+  const orca = fakeOrca();
+  const result = await readyQueueCheck(deps({ linear, store, orca }));
+  assert.equal(result.status, 'ineligible');
+  assert.match(result.reasons.join(' '), /blocked by JUL-1 \(Evidence review\)/);
+  assert.equal(orca.calls.terminalsCreated.length, 0);
 });
 
 test('evaluateEligibility: a card with no ready-for-agent label is eligible when its model choice validates (JUL-97)', () => {
@@ -450,7 +502,7 @@ test('a card still carrying the retired GLM label is ineligible, gets one commen
 
 test('a same-family builder/reviewer label pair is ineligible, gets one comment with the reason, and never starts', async () => {
   const issue = makeIssue({
-    labels: [READY_FOR_AGENT_LABEL, 'builder-claude-opus', 'reviewer-claude-sonnet'],
+    labels: [READY_FOR_AGENT_LABEL, 'builder-claude-opus', 'adversary-claude-sonnet'],
   });
   const { linear, calls } = fakeLinear({ issues: [issue] });
   const store = fakeStore({ ready: { [issue.id]: issueFingerprint(issue) } });
@@ -459,7 +511,7 @@ test('a same-family builder/reviewer label pair is ineligible, gets one comment 
   assert.equal(result.status, 'ineligible');
   assert.equal(result.commented, true);
   assert.match(result.reasons.join(' '), /builder-claude-opus/);
-  assert.match(result.reasons.join(' '), /reviewer-claude-sonnet/);
+  assert.match(result.reasons.join(' '), /adversary-claude-sonnet/);
   assert.match(result.reasons.join(' '), /different families/);
   assert.equal(calls.comments.length, 1);
   assert.equal(orca.calls.terminalsCreated.length, 0);
@@ -467,7 +519,7 @@ test('a same-family builder/reviewer label pair is ineligible, gets one comment 
 
 test('a differing-family explicit pair is eligible and starts', async () => {
   const issue = makeIssue({
-    labels: [READY_FOR_AGENT_LABEL, 'builder-deepseek-flash', 'reviewer-codex'],
+    labels: [READY_FOR_AGENT_LABEL, 'builder-deepseek-flash', 'adversary-codex'],
   });
   const { linear } = fakeLinear({ issues: [issue] });
   const store = fakeStore({ ready: { [issue.id]: issueFingerprint(issue) } });
@@ -481,14 +533,22 @@ test('a differing-family explicit pair is eligible and starts', async () => {
 // Filling missing labels before start (D3)
 // ---------------------------------------------------------------------------
 
+// The twelve the team template applies, with the names the live board holds.
 const DEFAULT_TEAM_LABELS = [
-  { id: 'l-orch-model', name: 'orch-claude-opus' },
-  { id: 'l-orch-effort', name: 'orch-effort-medium' },
   { id: 'l-builder-model', name: 'builder-claude-opus' },
   { id: 'l-builder-effort', name: 'builder-effort-medium' },
-  { id: 'l-reviewer-model', name: 'reviewer-codex' },
-  { id: 'l-reviewer-effort', name: 'reviewer-effort-medium' },
+  { id: 'l-fixer-model', name: 'fixer-claude-opus' },
+  { id: 'l-fixer-effort', name: 'fixer-effort-medium' },
+  { id: 'l-refactor-model', name: 'refactor-claude-opus' },
+  { id: 'l-refactor-effort', name: 'refactor-effort-medium' },
+  { id: 'l-adversary-model', name: 'adversary-codex' },
+  { id: 'l-adversary-effort', name: 'adversary-effort-medium' },
+  { id: 'l-evidence-model', name: 'evidence-codex' },
+  { id: 'l-evidence-effort', name: 'evidence-effort-medium' },
+  { id: 'l-consultant-model', name: 'consultant-claude-opus' },
+  { id: 'l-consultant-effort', name: 'consultant-effort-medium' },
 ];
+const DEFAULT_TEAM_LABEL_NAMES = DEFAULT_TEAM_LABELS.map((label) => label.name);
 
 test('missing default model/effort labels are looked up and added before the card starts', async () => {
   const issue = makeIssue({ labels: [READY_FOR_AGENT_LABEL] });
@@ -497,14 +557,8 @@ test('missing default model/effort labels are looked up and added before the car
   const orca = fakeOrca();
   const result = await readyQueueCheck(deps({ linear, store, orca }));
   assert.equal(result.status, 'started');
-  assert.deepEqual(calls.labelLookups[0], [
-    'orch-claude-opus',
-    'orch-effort-medium',
-    'builder-claude-opus',
-    'builder-effort-medium',
-    'reviewer-codex',
-    'reviewer-effort-medium',
-  ]);
+  assert.deepEqual(calls.labelLookups[0], DEFAULT_TEAM_LABEL_NAMES);
+  assert.equal(calls.labelLookups[0].length, 12);
   assert.equal(calls.labelAdds.length, 1);
   assert.equal(calls.labelAdds[0].issueId, issue.id);
   assert.deepEqual([...calls.labelAdds[0].labelIds].sort(), DEFAULT_TEAM_LABELS.map((label) => label.id).sort());
@@ -516,26 +570,21 @@ test('a default label that is not on the team yet is skipped and logged, never a
   const issue = makeIssue({ labels: [READY_FOR_AGENT_LABEL] });
   const { linear, calls } = fakeLinear({
     issues: [issue],
-    teamLabels: [{ id: 'l-orch-model', name: 'orch-claude-opus' }],
+    teamLabels: [{ id: 'l-builder-model', name: 'builder-claude-opus' }],
   });
   const store = fakeStore({ ready: { [issue.id]: issueFingerprint(issue) } });
   const orca = fakeOrca();
   const logs = [];
   const result = await readyQueueCheck(deps({ linear, store, orca, logs }));
   assert.equal(result.status, 'started');
-  assert.deepEqual(calls.labelAdds, [{ issueId: issue.id, labelIds: ['l-orch-model'] }]);
+  assert.deepEqual(calls.labelAdds, [{ issueId: issue.id, labelIds: ['l-builder-model'] }]);
   assert.ok(logs.some((line) => /not on team/.test(line)), 'the skipped labels are logged');
   assert.equal(orca.calls.terminalsCreated.length, 1);
 });
 
 test('a card that already carries every model/effort label is not looked up again', async () => {
   const issue = makeIssue({
-    labels: [
-      READY_FOR_AGENT_LABEL,
-      'orch-claude-opus', 'orch-effort-medium',
-      'builder-claude-opus', 'builder-effort-medium',
-      'reviewer-codex', 'reviewer-effort-medium',
-    ],
+    labels: [READY_FOR_AGENT_LABEL, ...DEFAULT_TEAM_LABEL_NAMES],
   });
   const { linear, calls } = fakeLinear({ issues: [issue], teamLabels: DEFAULT_TEAM_LABELS });
   const store = fakeStore({ ready: { [issue.id]: issueFingerprint(issue) } });
@@ -543,6 +592,176 @@ test('a card that already carries every model/effort label is not looked up agai
   assert.equal(result.status, 'started');
   assert.equal(calls.labelLookups.length, 0);
   assert.equal(calls.labelAdds.length, 0);
+});
+
+// ---------------------------------------------------------------------------
+// JUL-97 step 2, item 6a: the team's labels are PAGINATED. The team holds 88
+// labels and Linear returns 50 a page, so the old single-page read reported
+// labels that do exist as missing -- which is why a card started on
+// 2026-09-20 without its seat labels. A fake that answers one page could
+// never catch that, so this fake pages exactly the way Linear does.
+// ---------------------------------------------------------------------------
+
+// A fake linearGraphQL that serves `labels` as a real Relay connection at
+// `pageSize` records a page, and records the cursors it was asked for.
+function fakeLabelPages(labels, { pageSize = 50 } = {}) {
+  const cursors = [];
+  const graphql = async (query, variables) => {
+    if (!/ReadyQueueTeamLabels/.test(query)) throw new Error(`unexpected query: ${query}`);
+    // The query must actually declare and use the cursor, or paging is a lie.
+    assert.match(query, /\$after: String/);
+    assert.match(query, /labels\(first: \d+, after: \$after\)/);
+    cursors.push(variables.after ?? null);
+    const start = variables.after ? Number(variables.after) : 0;
+    const page = labels.slice(start, start + pageSize);
+    const hasNextPage = start + pageSize < labels.length;
+    return {
+      teams: {
+        nodes: [{
+          id: 'team-1',
+          labels: {
+            nodes: page,
+            pageInfo: { hasNextPage, endCursor: hasNextPage ? String(start + pageSize) : null },
+          },
+        }],
+      },
+    };
+  };
+  return { graphql, cursors };
+}
+
+test('findLabels pages through every team label: a label on the SECOND page is found, not reported missing', async () => {
+  // 88 labels, as the live team has. The wanted one is number 70 -- it can
+  // only be seen by asking for the second page.
+  const labels = Array.from({ length: 88 }, (_, index) => ({ id: `l-${index}`, name: `label-${index}` }));
+  labels[69] = { id: 'l-builder-effort', name: 'builder-effort-medium' };
+  const { graphql, cursors } = fakeLabelPages(labels);
+  const client = createLinearClient({ apiKey: 'k', linearGraphQLImpl: graphql });
+
+  const { found, missing } = await client.findLabels({ names: ['label-0', 'builder-effort-medium'] });
+  assert.deepEqual(missing, [], 'a label on the second page must not be reported missing');
+  assert.deepEqual(found, { 'label-0': 'l-0', 'builder-effort-medium': 'l-builder-effort' });
+  // Two pages: the first with no cursor, the second with the first's cursor.
+  assert.deepEqual(cursors, [null, '50']);
+});
+
+test('findLabels still reports a name that is on NO page as missing', async () => {
+  const labels = Array.from({ length: 88 }, (_, index) => ({ id: `l-${index}`, name: `label-${index}` }));
+  const { graphql } = fakeLabelPages(labels);
+  const client = createLinearClient({ apiKey: 'k', linearGraphQLImpl: graphql });
+  const { found, missing } = await client.findLabels({ names: ['label-87', 'consultant-effort-medium'] });
+  assert.deepEqual(found, { 'label-87': 'l-87' });
+  assert.deepEqual(missing, ['consultant-effort-medium']);
+});
+
+test('findLabels refuses a connection that claims another page but hands back no cursor', async () => {
+  const graphql = async () => ({
+    teams: { nodes: [{ id: 'team-1', labels: { nodes: [], pageInfo: { hasNextPage: true, endCursor: null } } }] },
+  });
+  const client = createLinearClient({ apiKey: 'k', linearGraphQLImpl: graphql });
+  await assert.rejects(() => client.findLabels({ names: ['x'] }), /no usable cursor/);
+});
+
+// ---------------------------------------------------------------------------
+// JUL-97 step 2, item 6b: walk Ready in board order and start the FIRST card
+// that can run, instead of stalling on the top one.
+// ---------------------------------------------------------------------------
+
+test('sortCardsByBoardOrder returns every card in ascending sortOrder, stable on ties', () => {
+  const a = makeIssue({ identifier: 'JUL-1', sortOrder: 5 });
+  const b = makeIssue({ identifier: 'JUL-2', sortOrder: -3 });
+  const c = makeIssue({ identifier: 'JUL-3', sortOrder: 5 });
+  assert.deepEqual(
+    sortCardsByBoardOrder([a, b, c]).map((issue) => issue.identifier),
+    ['JUL-2', 'JUL-1', 'JUL-3'],
+  );
+  assert.deepEqual(sortCardsByBoardOrder([]), []);
+});
+
+test('an ineligible first card is passed over: the next eligible card starts and the first gets one comment', async () => {
+  // The top card carries the Decision label -- coordinate-only, never agent
+  // work -- so it can never run. The card below it must not wait for it.
+  const stuck = makeIssue({ identifier: 'JUL-1', sortOrder: -10, labels: [DECISION_LABEL] });
+  const runnable = makeIssue({ identifier: 'JUL-2', sortOrder: -5 });
+  const { linear, calls } = fakeLinear({ issues: [runnable, stuck], teamLabels: DEFAULT_TEAM_LABELS });
+  const store = fakeStore({
+    ready: { [stuck.id]: issueFingerprint(stuck), [runnable.id]: issueFingerprint(runnable) },
+  });
+  const orca = fakeOrca();
+
+  const result = await readyQueueCheck(deps({ linear, store, orca }));
+  assert.equal(result.status, 'started');
+  assert.equal(result.issue, 'JUL-2');
+  assert.deepEqual(result.skipped.map((entry) => [entry.issue, entry.status]), [['JUL-1', 'ineligible']]);
+  // Exactly one comment, on the card that cannot run.
+  assert.equal(calls.comments.length, 1);
+  assert.equal(calls.comments[0].issueId, stuck.id);
+  assert.match(calls.comments[0].body, /JUL-1/);
+  // The stuck card is left exactly where it is: never moved, never relabelled.
+  assert.deepEqual(calls.stateMoves, [{ issueId: runnable.id, stateId: IN_PROGRESS_STATE.id }]);
+  assert.ok(calls.labelAdds.every((add) => add.issueId !== stuck.id));
+  assert.equal(orca.calls.terminalsCreated.length, 1);
+  assert.match(orca.calls.terminalsCreated[0].command, /JUL-2/);
+});
+
+test('a second check with both cards unchanged starts nothing new and does not comment again', async () => {
+  const stuck = makeIssue({ identifier: 'JUL-1', sortOrder: -10, labels: [DECISION_LABEL] });
+  const runnable = makeIssue({ identifier: 'JUL-2', sortOrder: -5 });
+  const { linear, calls } = fakeLinear({ issues: [runnable, stuck], teamLabels: DEFAULT_TEAM_LABELS });
+  const store = fakeStore({
+    ready: { [stuck.id]: issueFingerprint(stuck), [runnable.id]: issueFingerprint(runnable) },
+  });
+  const orca = fakeOrca();
+  await readyQueueCheck(deps({ linear, store, orca }));
+  assert.equal(calls.comments.length, 1);
+
+  // Belt 1 moved JUL-2 out of Ready, so the second check sees only the stuck
+  // card -- already commented on at this fingerprint, so the queue stays quiet.
+  const second = await readyQueueCheck(deps({
+    linear: fakeLinear({ issues: [stuck], teamLabels: DEFAULT_TEAM_LABELS }).linear,
+    store,
+    orca,
+  }));
+  assert.equal(second.status, 'ineligible');
+  assert.equal(second.issue, 'JUL-1');
+  assert.equal(second.commented, false, 'the same fingerprint is never commented on twice');
+  assert.equal(calls.comments.length, 1);
+  assert.equal(orca.calls.terminalsCreated.length, 1, 'nothing new was started');
+});
+
+test('a card that has not yet had its full check is passed over, not waited for', async () => {
+  // JUL-1 is newly in Ready (not in the previous check's set); JUL-2 has been
+  // there a full check and is ready to go.
+  const fresh = makeIssue({ identifier: 'JUL-1', sortOrder: -10 });
+  const waited = makeIssue({ identifier: 'JUL-2', sortOrder: -5 });
+  const { linear, calls } = fakeLinear({ issues: [fresh, waited], teamLabels: DEFAULT_TEAM_LABELS });
+  const store = fakeStore({ ready: { [waited.id]: issueFingerprint(waited) } });
+  const orca = fakeOrca();
+  const result = await readyQueueCheck(deps({ linear, store, orca }));
+  assert.equal(result.status, 'started');
+  assert.equal(result.issue, 'JUL-2');
+  assert.deepEqual(result.skipped.map((entry) => entry.status), ['first-sighting']);
+  assert.equal(calls.comments.length, 0, 'a first sighting is not a complaint');
+  // JUL-1 is still recorded as seen, so it can start on the next check.
+  assert.ok(fresh.id in store.get().ready);
+});
+
+test('when NO card in Ready can run, the cycle reports the first card\'s reason and lists the rest', async () => {
+  const decision = makeIssue({ identifier: 'JUL-1', sortOrder: -10, labels: [DECISION_LABEL] });
+  const parent = makeIssue({ identifier: 'JUL-2', sortOrder: -5, labels: [PARENT_LABEL] });
+  const { linear, calls } = fakeLinear({ issues: [decision, parent], teamLabels: DEFAULT_TEAM_LABELS });
+  const store = fakeStore({
+    ready: { [decision.id]: issueFingerprint(decision), [parent.id]: issueFingerprint(parent) },
+  });
+  const orca = fakeOrca();
+  const result = await readyQueueCheck(deps({ linear, store, orca }));
+  assert.equal(result.status, 'ineligible');
+  assert.equal(result.issue, 'JUL-1', 'the reported status is the first card\'s, as before the walk existed');
+  assert.deepEqual(result.skipped.map((entry) => entry.issue), ['JUL-1', 'JUL-2']);
+  // Both were told why, once each.
+  assert.deepEqual(calls.comments.map((comment) => comment.issueId).sort(), [decision.id, parent.id].sort());
+  assert.equal(orca.calls.terminalsCreated.length, 0);
+  assert.deepEqual(calls.stateMoves, []);
 });
 
 // ---------------------------------------------------------------------------
@@ -582,6 +801,61 @@ test('a finished run whose card is still in Ready is never started twice, even w
   assert.equal(orca.calls.terminalsCreated.length, 1, 'JUL-99 must never start a second time');
 });
 
+test('starting a later card does not erase an earlier card\'s cooldown (JUL-97 step 2, finding 1)', async () => {
+  // The reviewer's three-cycle reproduction. Two eligible cards sit in Ready in
+  // board order; A's state move throws (so A stays in Ready and belt 2 is the
+  // only thing holding it), B's succeeds. With a single `lastStarted` record,
+  // starting B in cycle 2 overwrote A's cooldown and cycle 3 started A a second
+  // time. The cooldown is per issue, so A must never start twice.
+  const a = makeIssue({ identifier: 'JUL-A', sortOrder: 1 });
+  const b = makeIssue({ identifier: 'JUL-B', sortOrder: 2 });
+  const { linear } = fakeLinear({ issues: [a, b], teamLabels: DEFAULT_TEAM_LABELS });
+  linear.setIssueState = async ({ issueId }) => {
+    if (issueId === a.id) throw new Error('Linear refused the state move for JUL-A');
+    return { id: issueId };
+  };
+  const store = fakeStore();
+  const orca = fakeOrca(); // every run has finished, so the slot is never busy
+  const d = deps({ linear, store, orca });
+
+  // Cycle 0: both cards are first sightings, so neither can start yet.
+  assert.equal((await readyQueueCheck(d)).status, 'first-sighting');
+  assert.equal(orca.calls.terminalsCreated.length, 0);
+
+  // Cycle 1: A is the top card and starts; its state move fails, so it stays
+  // in Ready with a cooldown.
+  const cycle1 = await readyQueueCheck(d);
+  assert.equal(cycle1.status, 'started');
+  assert.equal(cycle1.issue, 'JUL-A');
+  assert.equal(cycle1.stateMoved, false);
+
+  // Cycle 2: A is passed over as cooldown and B -- still eligible and already
+  // seen -- is started instead. B's state move succeeds.
+  const cycle2 = await readyQueueCheck(d);
+  assert.equal(cycle2.status, 'started');
+  assert.equal(cycle2.issue, 'JUL-B');
+  assert.equal(cycle2.stateMoved, true);
+  assert.deepEqual(
+    cycle2.skipped.map((entry) => [entry.issue, entry.status]),
+    [['JUL-A', 'cooldown']],
+    'A must be passed over as cooldown, not started',
+  );
+
+  // Cycle 3: the bug. A is unchanged, still in Ready, still already seen -- and
+  // its cooldown must have survived B's start.
+  const cycle3 = await readyQueueCheck(d);
+  assert.equal(cycle3.status, 'cooldown');
+  assert.equal(cycle3.issue, 'JUL-A');
+  assert.deepEqual(
+    orca.calls.terminalsCreated.map((call) => call.title),
+    ['ready-queue-JUL-A', 'ready-queue-JUL-B'],
+    'JUL-A must never start a second time',
+  );
+  // Both cooldown records coexist in the state file.
+  assert.equal(store.get().started[a.id].stateMoved, false);
+  assert.equal(store.get().started[b.id].stateMoved, true);
+});
+
 test('a card that changed after it was started is allowed through the cooldown', async () => {
   let issue = makeIssue({ identifier: 'JUL-99', labels: [READY_FOR_AGENT_LABEL] });
   const { linear } = fakeLinear({ teamLabels: DEFAULT_TEAM_LABELS });
@@ -599,7 +873,7 @@ test('a card that changed after it was started is allowed through the cooldown',
   // fingerprint, so it is a fresh request -- first sighting, then a start.
   issue = makeIssue({
     identifier: 'JUL-99',
-    labels: [READY_FOR_AGENT_LABEL, 'builder-deepseek-flash', 'reviewer-codex'],
+    labels: [READY_FOR_AGENT_LABEL, 'builder-deepseek-flash', 'adversary-codex'],
   });
   assert.equal((await readyQueueCheck(d)).status, 'first-sighting');
   assert.equal((await readyQueueCheck(d)).status, 'started');
@@ -620,7 +894,7 @@ test('a card whose state move succeeded and that is deliberately re-queued is ad
   assert.equal((await readyQueueCheck(d)).status, 'first-sighting');
   assert.equal((await readyQueueCheck(d)).status, 'started');
   assert.equal(orca.calls.terminalsCreated.length, 1);
-  assert.equal(store.get().lastStarted.stateMoved, true);
+  assert.equal(store.get().started[issue.id].stateMoved, true);
 
   // The run is finished and someone deliberately moved the card back to Ready.
   // Belt 1 succeeded, so belt 2 must stand down: the re-queue is a fresh
@@ -630,7 +904,7 @@ test('a card whose state move succeeded and that is deliberately re-queued is ad
   assert.equal(orca.calls.terminalsCreated.length, 2, 'a deliberate re-queue must start the card again');
 });
 
-test('lastStarted records whether the state move succeeded', async () => {
+test('the per-issue start record notes whether the state move succeeded', async () => {
   // Failure: the card stayed in Ready, so belt 2 must hold.
   const failedIssue = makeIssue({ identifier: 'JUL-41' });
   const failed = fakeLinear({ issues: [failedIssue], teamLabels: DEFAULT_TEAM_LABELS });
@@ -639,7 +913,7 @@ test('lastStarted records whether the state move succeeded', async () => {
   const failedDeps = deps({ linear: failed.linear, store: failedStore, orca: fakeOrca() });
   await readyQueueCheck(failedDeps);
   assert.equal((await readyQueueCheck(failedDeps)).status, 'started');
-  assert.equal(failedStore.get().lastStarted.stateMoved, false);
+  assert.equal(failedStore.get().started[failedIssue.id].stateMoved, false);
 
   // Success: the card left Ready, so belt 2 must stand down.
   const movedIssue = makeIssue({ identifier: 'JUL-42' });
@@ -648,7 +922,7 @@ test('lastStarted records whether the state move succeeded', async () => {
   const movedDeps = deps({ linear: moved.linear, store: movedStore, orca: fakeOrca() });
   await readyQueueCheck(movedDeps);
   assert.equal((await readyQueueCheck(movedDeps)).status, 'started');
-  assert.equal(movedStore.get().lastStarted.stateMoved, true);
+  assert.equal(movedStore.get().started[movedIssue.id].stateMoved, true);
 });
 
 // ---------------------------------------------------------------------------
@@ -659,7 +933,7 @@ test('readState returns an empty state when the file does not exist yet', () => 
   const missing = new Error('no file');
   missing.code = 'ENOENT';
   const state = readState({ statePath: '/state/ready-queue.json', readFileImpl: () => { throw missing; } });
-  assert.deepEqual(state, { ready: {}, commented: {}, lastStarted: null });
+  assert.deepEqual(state, { ready: {}, commented: {}, started: {} });
 });
 
 test('readState parses a written state and fills in missing fields', () => {
@@ -669,7 +943,21 @@ test('readState parses a written state and fills in missing fields', () => {
   });
   assert.deepEqual(state.ready, { a: 'fp' });
   assert.deepEqual(state.commented, {});
-  assert.equal(state.lastStarted, null);
+  assert.deepEqual(state.started, {});
+});
+
+test('readState migrates an old single-record state file into the per-issue map', () => {
+  const state = readState({
+    statePath: '/state/ready-queue.json',
+    readFileImpl: () => JSON.stringify({
+      ready: { 'uuid-JUL-1': 'fp' },
+      commented: {},
+      lastStarted: { issueId: 'uuid-JUL-1', identifier: 'JUL-1', at: '2026-09-18T12:00:00.000Z', fingerprint: 'fp', stateMoved: false },
+    }),
+  });
+  assert.deepEqual(state.started, {
+    'uuid-JUL-1': { identifier: 'JUL-1', at: '2026-09-18T12:00:00.000Z', fingerprint: 'fp', stateMoved: false },
+  });
 });
 
 test('writeState creates the parent directory and writes JSON', () => {

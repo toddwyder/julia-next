@@ -45,11 +45,15 @@ import {
   defaultLabelsFor,
   workViewIssueFilter,
   isReservedLabelName,
+  TEMPLATE_NAME,
 } from '../graph/board-spec.mjs';
 
-// The team template every new card starts from. Named so the setup can find it
-// again on the next run.
-export const TEMPLATE_NAME = 'Julia-next agent defaults';
+// The team template every new card starts from. The name lives in
+// graph/board-spec.mjs -- it is the board's shape, and every other code path,
+// document and skill that creates a card has to name the SAME template -- and
+// is re-exported here so the setup's own callers and tests keep importing it
+// from the program that creates it.
+export { TEMPLATE_NAME };
 
 // ---------------------------------------------------------------------------
 // Key handling and secret redaction
@@ -707,7 +711,7 @@ export function planBoardSetup(board, { labelGroups = desiredLabelGroups() } = {
 
   const labelsByName = new Map(board.labels.map((label) => [label.name, label]));
   const labelNameById = new Map(board.labels.map((label) => [label.id, label.name]));
-  for (const group of desiredLabelGroups()) {
+  for (const group of labelGroups) {
     const groupLabel = labelsByName.get(group.name);
     if (!groupLabel) {
       actions.push({ kind: 'create-label-group', name: group.name });
@@ -734,6 +738,27 @@ export function planBoardSetup(board, { labelGroups = desiredLabelGroups() } = {
       if (Object.keys(changes).length > 0) {
         actions.push({ kind: 'update-label', id: existing.id, name: child.name, changes });
       }
+    }
+  }
+
+  // JUL-97 step 2, item 2: a group the spec NAMES must stop offering a choice
+  // the spec no longer names. Adding the missing labels was never enough -- a
+  // leftover child (the six `*-glm-5.3` labels left behind when GLM was
+  // removed in JUL-93) sat in a spec'd group and the program still said "the
+  // board already matches the spec". Such a child is RETIRED, never deleted:
+  // issueLabelRetire keeps it visible on the cards that already carry it and
+  // only stops new applications, and the retiredAt it leaves behind is what
+  // makes a second --apply a no-op. Groups the spec does not name are not
+  // touched at all, and a name the spec uses under SOME other group is left to
+  // the reparenting above rather than retired out from under it.
+  const specdChildNames = new Set(labelGroups.flatMap((group) => group.children.map((child) => child.name)));
+  for (const group of labelGroups) {
+    const groupLabel = labelsByName.get(group.name);
+    if (!groupLabel?.isGroup) continue;
+    for (const label of board.labels) {
+      if (label.parentId !== groupLabel.id) continue;
+      if (specdChildNames.has(label.name) || label.retiredAt) continue;
+      actions.push({ kind: 'retire-label', id: label.id, name: label.name, groupName: group.name });
     }
   }
 
@@ -884,7 +909,9 @@ export async function applyBoardSetup(actions, {
       }
       case 'retire-label': {
         const data = await graphql(RETIRE_LABEL_MUTATION, { id: action.id }, callOpts);
-        assertSuccess(data.issueLabelRetire, `retiring label group "${action.name}"`);
+        assertSuccess(data.issueLabelRetire, action.groupName
+          ? `retiring label "${action.name}"`
+          : `retiring label group "${action.name}"`);
         break;
       }
       case 'create-template': {
@@ -977,7 +1004,9 @@ export function describeAction(action) {
     case 'update-label':
       return `update label "${action.name}" [${describeChanges(action.changes)}]`;
     case 'retire-label':
-      return `retire label group "${action.name}" (issueLabelRetire; cards keep the label)`;
+      return action.groupName
+        ? `retire label "${action.name}" -- "${action.groupName}" no longer offers it (issueLabelRetire; cards keep the label)`
+        : `retire label group "${action.name}" (issueLabelRetire; cards keep the label)`;
     case 'create-template':
       return `create team template "${action.name}" with ${action.labelNames.length} default label(s)`;
     case 'update-template':

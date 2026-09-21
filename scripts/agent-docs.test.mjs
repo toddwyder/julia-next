@@ -5,7 +5,9 @@
 // Pinning the wording here keeps a later edit from silently dropping one.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
+
+import { TEMPLATE_NAME } from '../graph/board-spec.mjs';
 
 const read = (relativePath) => readFileSync(new URL(`../${relativePath}`, import.meta.url), 'utf8');
 
@@ -89,4 +91,110 @@ test('the coordinator skill and the runbook say the headless coordinator is one-
   assert.doesNotMatch(skill, /every in-flight item is running, verified-and-advanced/);
   const runbook = read('docs/agents/jul43-coordinator-runbook.md').replace(/\s+/g, ' ');
   assert.match(runbook, /one-shot headless session, so it has to stay until its card is complete or parked/);
+});
+
+// JUL-97 step 2, item 7: Linear applies a team's default template only to a
+// card a person creates in the app. A card created through the API gets
+// nothing unless the template is NAMED (`save_issue`'s own `template`
+// parameter, "Applied on create only ... Labels merge with the template's
+// own"), proven live 2026-09-20 with two throwaway cards: without the
+// template, zero labels; with it, all twelve. So every document and skill in
+// this repo that tells an agent to create a card has to name it, and the name
+// itself is spelled once, in graph/board-spec.mjs. The skills are discovered
+// by scanning both mirrored trees, so a creation route added later cannot slip
+// past this test the way to-spec and wayfinder did.
+test('every document and skill that creates a Linear card names the team template', () => {
+  assert.equal(TEMPLATE_NAME, 'Julia-next agent defaults');
+  // The name is not duplicated in board-setup.mjs; it imports and re-exports
+  // the spec's constant.
+  const setup = read('scripts/board-setup.mjs');
+  assert.doesNotMatch(setup, /=\s*'Julia-next agent defaults'/, 'the template name is spelled once, in the board spec');
+  assert.match(setup, /TEMPLATE_NAME,?\n\} from '\.\.\/graph\/board-spec\.mjs'/);
+
+  const tracker = read('docs/agents/issue-tracker.md');
+  // The create convention itself names it, and says why.
+  assert.match(tracker, /\*\*Create an issue\*\*[\s\S]{0,200}template: "Julia-next agent\s+defaults"/);
+  assert.match(tracker, /Always name the\s+template/);
+  assert.match(tracker, /only to a card a person creates in the app/);
+  // And so do the other two places this file tells a session to make a card.
+  const publish = tracker.slice(tracker.indexOf('## When a skill says "publish to the issue tracker"'));
+  assert.match(publish.slice(0, 300), /Julia-next agent defaults/);
+  assert.match(tracker, /\*\*Child ticket\*\*[\s\S]{0,160}Julia-next\s+agent defaults/);
+
+  assert.match(read('docs/agents/triage-labels.md'), /template: "Julia-next agent defaults"/);
+
+  // Both skill trees are kept in step; a card published by either names it.
+  // The creating skills are DISCOVERED, not listed: attempt 1 hand-listed
+  // triage and to-tickets and missed to-spec and wayfinder. A seventh skill
+  // that tells a session to create a tracker card has to fail this test, so
+  // the scan reads every SKILL.md in both trees and treats "creates/publishes
+  // an issue, ticket or card" (or calls `save_issue`/`create_issue` at all) as
+  // a creation route.
+  const CREATES_A_CARD = /\bcreat(e|es|ing)\b[^.\n]{0,60}\b(issue|ticket|card)s?\b|\bpublish(es|ing|ed)?\b[^.\n]{0,60}\b(issue|ticket|tracker)\b|save_issue|create_issue/i;
+  const creators = [];
+  for (const root of ['.claude', '.agents']) {
+    for (const skill of readdirSync(new URL(`../${root}/skills`, import.meta.url))) {
+      const relativePath = `${root}/skills/${skill}/SKILL.md`;
+      if (!existsSync(new URL(`../${relativePath}`, import.meta.url))) continue;
+      const text = read(relativePath);
+      if (!CREATES_A_CARD.test(text)) continue;
+      creators.push(relativePath);
+      assert.match(text, /template: "Julia-next agent defaults"/, `${relativePath} creates a card but does not name the template`);
+      assert.match(text, /only to a card a person creates in the app/, `${relativePath} does not say why`);
+    }
+  }
+
+  // The scan must not quietly shrink: every route known today stays in it, in
+  // both mirrored trees.
+  for (const root of ['.claude', '.agents']) {
+    for (const skill of ['triage', 'to-tickets', 'to-spec', 'wayfinder']) {
+      assert.ok(
+        creators.includes(`${root}/skills/${skill}/SKILL.md`),
+        `${root}/skills/${skill} is a known creation route but the scan did not find it`,
+      );
+    }
+  }
+});
+
+// JUL-97 step 2, item 8: six facts this run established live, in the
+// runbook, dated 2026-09-21. A fresh coordinator cannot re-derive any of
+// them from the code, and two of the six were already partly recorded and are
+// extended in place rather than duplicated.
+test('the runbook records the six JUL-97 step 2 facts, dated 2026-09-21', () => {
+  const text = read('docs/agents/jul43-coordinator-runbook.md');
+  const start = text.indexOf('## Six JUL-97 step 2 discoveries (verified 2026-09-21)');
+  assert.ok(start >= 0, 'the JUL-97 step 2 section is missing');
+  const section = text.slice(start, text.indexOf('\n## ', start + 1));
+
+  // (i) the queue-launched coordinator must bind its own Run, or
+  // consumer_fenced. Extended in place on the passage that already carried the
+  // fresh-orchestrator case, and pointed at from the section.
+  assert.match(section, /A queue-launched coordinator must bind its own Run first/);
+  assert.match(section, /Ready\s+queue launches every coordinator the same way/);
+  assert.match(text, /Extended 2026-09-21 \(JUL-97\): this is now the NORMAL case/);
+  assert.match(text, /run-use --environment orchestrator-local --id <runId> --from <its own terminal handle>/);
+  assert.match(text, /Skipping it fails `consumer_fenced` on the first dispatch/);
+  // (ii) ORCA_ENVIRONMENT=ovh-local -> run_not_found on orchestration commands
+  assert.match(section, /run_not_found/);
+  assert.match(section, /ORCA_ENVIRONMENT=ovh-local/);
+  // (iii) worker-stop and worker-list reject --from; worker-list takes --run
+  assert.match(section, /`worker-stop` and `worker-list` reject `--from`/);
+  assert.match(section, /`worker-list` takes `--run`/);
+  // (iv) only a supervised worker leaves a timing record
+  assert.match(section, /created_at` and `completed_at/);
+  assert.match(section, /nine build attempts can be timed/);
+  // (v) the granted list refuses the --env-file form of check-readiness
+  assert.match(section, /--env-file=\/etc\/orchestrator-svc\/\.env\.publisher scripts\/check-readiness\.mjs/);
+  assert.match(section, /Use the plain form/);
+  // (vi) board-setup's "already matches the spec" blind spot
+  assert.match(section, /already matches graph\/board-spec\.mjs; no changes/);
+  assert.match(section, /builder-glm-5\.3/);
+  assert.match(section, /issueLabelRetire/);
+
+  // Two of the six are extensions, and each says so instead of re-stating a
+  // fact the runbook already carried.
+  assert.equal((section.match(/Already recorded/g) ?? []).length, 2);
+
+  const dated = text.match(/2026-09-21/g) ?? [];
+  assert.ok(dated.length >= 3, `expected the 2026-09-21 facts to be dated, found ${dated.length}`);
 });
