@@ -120,6 +120,21 @@ export const DEFAULT_MODEL_SUFFIX_BY_ENTRY = Object.freeze({
   'pi-deepseek': 'deepseek-flash',
 });
 
+// The one place an agent's default model differs from its entry's default: the
+// reviewer seats run DeepSeek *Pro* (the `reviewer-backup` route in
+// ops/service-dropbox/run-pi-seat.mjs), not the entry's Flash, so a card that
+// names no model must say Pro -- the card shows what actually runs (JUL-98).
+const DEFAULT_MODEL_SUFFIX_OVERRIDES = Object.freeze({
+  'adversarial-reviewer': Object.freeze({ 'pi-deepseek': 'deepseek-pro' }),
+});
+
+// The model label suffix an agent gets on an entry when the card names none.
+// `agentKey` may be a dispatch name ('reviewer') or an agent key.
+export function defaultModelSuffix(agentKey, entry) {
+  const agent = Object.hasOwn(DISPATCH_SEATS, agentKey) ? DISPATCH_SEATS[agentKey] : agentKey;
+  return DEFAULT_MODEL_SUFFIX_OVERRIDES[agent]?.[entry] ?? DEFAULT_MODEL_SUFFIX_BY_ENTRY[entry];
+}
+
 function suffixKey(suffix) {
   return suffix.toUpperCase().replace(/[^A-Z0-9]+/g, '_');
 }
@@ -216,7 +231,7 @@ export function resolveSeatChoices(labels) {
     }
     const explicit = explicitModelLabel(code, present);
     const entry = explicit ? MODEL_CATALOG[explicit].entry : SEAT_TABLE[agent].primary;
-    const modelLabel = explicit ?? `${code}-${DEFAULT_MODEL_SUFFIX_BY_ENTRY[entry]}`;
+    const modelLabel = explicit ?? `${code}-${defaultModelSuffix(agent, entry)}`;
     choices[agent] = { entry, effort: effortFor(code, present), modelLabel };
   }
   for (const [seat, agent] of Object.entries(DISPATCH_SEATS)) {
@@ -304,7 +319,7 @@ export function fallbackSeatChoice(choices, seat, { table = SEAT_TABLE } = {}) {
   const moved = {
     ...choiceFor(choices, agent),
     entry: backupEntry,
-    modelLabel: `${code}-${DEFAULT_MODEL_SUFFIX_BY_ENTRY[backupEntry]}`,
+    modelLabel: `${code}-${defaultModelSuffix(agent, backupEntry)}`,
   };
   const fallbackChoices = { ...choices, [agent]: moved };
   if (ALIAS_FOR_AGENT[agent]) fallbackChoices[ALIAS_FOR_AGENT[agent]] = moved;
@@ -370,7 +385,7 @@ function parseFlags(args, allowed, usage) {
 // reason names the same model the card does.
 function withEntry(choices, agent, entry) {
   const code = AGENT_CODES[agent];
-  const moved = { ...choiceFor(choices, agent), entry, modelLabel: `${code}-${DEFAULT_MODEL_SUFFIX_BY_ENTRY[entry]}` };
+  const moved = { ...choiceFor(choices, agent), entry, modelLabel: `${code}-${defaultModelSuffix(agent, entry)}` };
   choices[agent] = moved;
   if (ALIAS_FOR_AGENT[agent]) choices[ALIAS_FOR_AGENT[agent]] = moved;
 }

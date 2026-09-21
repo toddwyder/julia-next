@@ -17,11 +17,11 @@ test("the default table is exactly Todd's instruction: GLM is no seat default or
   assert.deepEqual(SEAT_TABLE, {
     orchestrator: { primary: 'claude', backup: 'pi-deepseek' },
     builder: { primary: 'claude', backup: 'pi-deepseek' },
-    reviewer: { primary: 'codex', backup: 'pi-deepseek' },
+    reviewer: { primary: 'pi-deepseek', backup: 'codex' },
     'feature-builder': { primary: 'claude', backup: 'pi-deepseek' },
     'defect-fixer': { primary: 'claude', backup: 'pi-deepseek' },
     refactor: { primary: 'claude', backup: 'pi-deepseek' },
-    'adversarial-reviewer': { primary: 'codex', backup: 'pi-deepseek' },
+    'adversarial-reviewer': { primary: 'pi-deepseek', backup: 'codex' },
     'evidence-reviewer': { primary: 'codex', backup: 'claude' },
     consultant: { primary: 'claude', backup: 'pi-deepseek' },
   });
@@ -40,7 +40,7 @@ test('the six JUL-97 graph-agent seats have a primary and a backup, and the orig
   // builder/reviewer family rule already depended on.
   assert.deepEqual(SEAT_TABLE.orchestrator, { primary: 'claude', backup: 'pi-deepseek' });
   assert.deepEqual(SEAT_TABLE.builder, { primary: 'claude', backup: 'pi-deepseek' });
-  assert.deepEqual(SEAT_TABLE.reviewer, { primary: 'codex', backup: 'pi-deepseek' });
+  assert.deepEqual(SEAT_TABLE.reviewer, { primary: 'pi-deepseek', backup: 'codex' });
 });
 
 test('GLM is gone: no family, and never a seat default or backup (JUL-93)', () => {
@@ -88,4 +88,16 @@ test('every table entry used by builder or reviewer has a known model family', (
       assert.ok(FAMILY_OF[entry], `no family known for '${entry}' (seat: ${seat})`);
     }
   }
+});
+
+// JUL-98 (Todd's 21 Sep decision): DeepSeek is the reviewer's first choice and
+// Codex its backup, to protect the weekly Codex and Claude quotas. Neither is
+// the builder's default family, so a resolved pair always obeys the family rule.
+test('the reviewer seats default to DeepSeek and back up to Codex, never to the builder family', () => {
+  for (const seat of ['reviewer', 'adversarial-reviewer']) {
+    assert.deepEqual(SEAT_TABLE[seat], { primary: 'pi-deepseek', backup: 'codex' }, seat);
+    assert.notEqual(FAMILY_OF[SEAT_TABLE[seat].primary], FAMILY_OF[SEAT_TABLE.builder.primary], `${seat} primary`);
+    assert.notEqual(FAMILY_OF[SEAT_TABLE[seat].backup], FAMILY_OF[SEAT_TABLE.builder.primary], `${seat} backup`);
+  }
+  assert.equal(SEAT_TABLE.builder.primary, 'claude', 'the builder stays Claude');
 });

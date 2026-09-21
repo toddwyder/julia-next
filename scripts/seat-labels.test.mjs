@@ -15,6 +15,7 @@ import {
   GRAPH_AGENTS,
   DISPATCH_SEATS,
   canonicalAgent,
+  defaultModelSuffix,
   LABEL_GROUPS,
   MODEL_LABEL_GROUP,
   EFFORT_LABEL_GROUP,
@@ -230,32 +231,52 @@ test('the family rule rejects a same-family builder/reviewer pair, in one senten
   assert.match(result.reason, /different families/);
 });
 
-test('a seat fallback that keeps builder and reviewer in different families is allowed', () => {
-  const choices = resolveSeatChoices([]); // builder claude, reviewer codex
-  const result = fallbackSeatChoice(choices, 'builder');
+test('the reviewer resolves to DeepSeek Pro by default, and never to the builder family (JUL-98)', () => {
+  const choices = resolveSeatChoices([]);
+  assert.equal(choices.reviewer.entry, 'pi-deepseek');
+  assert.equal(choices.reviewer.modelLabel, 'adversary-deepseek-pro', 'the label names the model that actually runs (Pro, not Flash)');
+  assert.equal(choices['adversarial-reviewer'].entry, 'pi-deepseek');
+  assert.equal(choices.builder.entry, 'claude', 'the builder stays Claude');
+  assert.notEqual(FAMILY_OF[choices.reviewer.entry], FAMILY_OF[choices.builder.entry]);
+  assert.equal(validateFamilyChoice(choices).ok, true);
+  // Builders that fall back to DeepSeek keep the Flash default: only the reviewer seat runs Pro.
+  assert.equal(defaultModelSuffix('feature-builder', 'pi-deepseek'), 'deepseek-flash');
+  assert.equal(defaultModelSuffix('reviewer', 'pi-deepseek'), 'deepseek-pro', 'a dispatch name resolves like its agent');
+});
+
+test('a builder fallback to DeepSeek is allowed only when the reviewer is not on DeepSeek', () => {
+  // Reviewer moved to Codex on the card: builder claude -> pi-deepseek keeps two different families.
+  const onCodex = resolveSeatChoices(['adversary-codex']);
+  const result = fallbackSeatChoice(onCodex, 'builder');
   assert.equal(result.ok, true);
   assert.equal(result.choices.builder.entry, 'pi-deepseek');
   assert.equal(result.choices.builder.modelLabel, 'builder-deepseek-flash');
   assert.equal(result.choices['feature-builder'].entry, 'pi-deepseek', 'the agent-keyed entry moves too');
   assert.equal(result.choices.reviewer.entry, 'codex');
+  // With the default reviewer (DeepSeek) the same fallback is refused, not silently used.
+  const refused = fallbackSeatChoice(resolveSeatChoices([]), 'builder');
+  assert.equal(refused.ok, false);
+  assert.match(refused.reason, /refusing the builder backup \(pi-deepseek\)/);
+  assert.match(refused.reason, /different families/);
 });
 
-test('a capped reviewer falls back to DeepSeek when the builder is claude (the default) -- JUL-98', () => {
-  const choices = resolveSeatChoices([]); // builder claude, reviewer codex
+test('a DeepSeek reviewer failure falls back to Codex, against a claude builder (the default) -- JUL-98', () => {
+  const choices = resolveSeatChoices([]); // builder claude, reviewer DeepSeek
   assert.equal(choices.builder.entry, 'claude');
   const result = fallbackSeatChoice(choices, 'reviewer');
   assert.equal(result.ok, true, 'the reviewer fallback must succeed against a claude builder');
-  assert.equal(result.choices.reviewer.entry, 'pi-deepseek');
-  assert.equal(result.choices['adversarial-reviewer'].entry, 'pi-deepseek', 'the agent-keyed entry moves too');
+  assert.equal(result.choices.reviewer.entry, 'codex');
+  assert.equal(result.choices.reviewer.modelLabel, 'adversary-codex');
+  assert.equal(result.choices['adversarial-reviewer'].entry, 'codex', 'the agent-keyed entry moves too');
   assert.equal(result.choices.builder.entry, 'claude', 'the builder is untouched');
 });
 
 test('a fallback whose backup collides with the other seat is still refused, not silently used', () => {
-  const choices = resolveSeatChoices([]); // builder claude, reviewer codex
+  const choices = resolveSeatChoices([]); // builder claude, reviewer DeepSeek
   // A table whose reviewer backup is claude (the builder's family): the guard
   // must refuse it, not produce a same-family pair. The real table no longer
   // has this backup (JUL-98), so the guard is exercised on a copy that does.
-  const collidingTable = { ...SEAT_TABLE, 'adversarial-reviewer': { primary: 'codex', backup: 'claude' } };
+  const collidingTable = { ...SEAT_TABLE, 'adversarial-reviewer': { primary: 'pi-deepseek', backup: 'claude' } };
   const result = fallbackSeatChoice(choices, 'reviewer', { table: collidingTable });
   assert.equal(result.ok, false);
   assert.match(result.reason, /refusing the reviewer backup/);
@@ -305,7 +326,7 @@ test('missingSeatLabels returns exactly the twelve default model and effort labe
     'fixer-effort-medium',
     'refactor-claude-opus',
     'refactor-effort-medium',
-    'adversary-codex',
+    'adversary-deepseek-pro',
     'adversary-effort-medium',
     'evidence-codex',
     'evidence-effort-medium',
@@ -321,7 +342,7 @@ test('missingSeatLabels returns exactly the twelve default model and effort labe
     'fixer-effort-medium',
     'refactor-claude-opus',
     'refactor-effort-medium',
-    'adversary-codex',
+    'adversary-deepseek-pro',
     'adversary-effort-medium',
     'evidence-codex',
     'evidence-effort-medium',
@@ -347,13 +368,16 @@ test('seatChoicesForIssue resolves the exact shape linear-cli getIssue returns',
 // --- JUL-79 step 8 follow-up: the guard must be callable and tested by the
 // exact real combination the table puts on a card. ---
 
-test('the reviewer backup is not the builder default family, and the guard still refuses a claude reviewer against a claude builder', () => {
-  // The real table's reviewer backup (deepseek) differs from the builder's
-  // primary (claude), which is what lets the fallback succeed (JUL-98). The
-  // guard itself is unchanged: an explicit claude-vs-claude pair is refused.
+test('neither reviewer choice is the builder default family, and the guard still refuses a claude reviewer against a claude builder', () => {
+  // The real table's reviewer primary (deepseek) and backup (codex) both differ
+  // from the builder's primary (claude), which is what lets the default pair and
+  // the fallback succeed (JUL-98). The guard itself is unchanged: an explicit
+  // claude-vs-claude pair is refused.
   assert.equal(SEAT_TABLE['feature-builder'].primary, 'claude');
-  assert.notEqual(FAMILY_OF[SEAT_TABLE['adversarial-reviewer'].backup], FAMILY_OF[SEAT_TABLE['feature-builder'].primary]);
-  assert.notEqual(FAMILY_OF[SEAT_TABLE.reviewer.backup], FAMILY_OF[SEAT_TABLE.builder.primary]);
+  for (const seat of ['adversarial-reviewer', 'reviewer']) {
+    assert.notEqual(FAMILY_OF[SEAT_TABLE[seat].primary], FAMILY_OF[SEAT_TABLE['feature-builder'].primary], `${seat} primary`);
+    assert.notEqual(FAMILY_OF[SEAT_TABLE[seat].backup], FAMILY_OF[SEAT_TABLE['feature-builder'].primary], `${seat} backup`);
+  }
   const unsafePair = {
     ...resolveSeatChoices([]),
     builder: { entry: 'claude' },
@@ -364,40 +388,46 @@ test('the reviewer backup is not the builder default family, and the guard still
   assert.match(validated.reason, /anthropic/);
 });
 
-test('the fallback CLI allows reviewer -> pi-deepseek while the builder is on claude, printing the entry to use (JUL-98)', () => {
+test('the fallback CLI allows reviewer -> codex while the builder is on claude, printing the entry to use (JUL-98)', () => {
   const { out, err, code } = runCli(['fallback', '--seat', 'reviewer', '--builder', 'claude']);
   assert.equal(code, 0);
   assert.equal(err, '');
   // `--seat reviewer` keeps working and still names the adversarial reviewer;
   // the printed label carries that seat's live board prefix.
-  assert.deepEqual(JSON.parse(out), { seat: 'reviewer', entry: 'pi-deepseek', modelLabel: 'adversary-deepseek-flash' });
+  assert.deepEqual(JSON.parse(out), { seat: 'reviewer', entry: 'codex', modelLabel: 'adversary-codex' });
   assert.match(out, /\n {2}"seat"/);
   // The agent key spells the same fallback.
   const byAgentKey = runCli(['fallback', '--seat', 'adversarial-reviewer', '--builder', 'claude']);
   assert.equal(byAgentKey.code, 0);
-  assert.equal(JSON.parse(byAgentKey.out).entry, 'pi-deepseek');
+  assert.equal(JSON.parse(byAgentKey.out).entry, 'codex');
 });
 
-test('the fallback CLI refuses reviewer -> pi-deepseek while the builder is already on pi-deepseek, and exits non-zero', () => {
-  const { out, err, code } = runCli(['fallback', '--seat', 'reviewer', '--builder', 'pi-deepseek']);
+test('the fallback CLI allows reviewer -> codex while the builder is already on pi-deepseek', () => {
+  const { out, code } = runCli(['fallback', '--seat', 'reviewer', '--builder', 'pi-deepseek']);
+  assert.equal(code, 0);
+  assert.equal(JSON.parse(out).entry, 'codex');
+});
+
+test('the fallback CLI refuses builder -> pi-deepseek while the reviewer is on pi-deepseek, and exits non-zero', () => {
+  const { out, err, code } = runCli(['fallback', '--seat', 'builder', '--reviewer', 'pi-deepseek']);
   assert.notEqual(code, 0);
   assert.equal(out, '');
-  assert.match(err, /refusing the reviewer backup \(pi-deepseek\)/);
+  assert.match(err, /refusing the builder backup \(pi-deepseek\)/);
   assert.match(err, /different families/);
   assert.equal(err.trim().split('\n').length, 1);
 });
 
 test('the fallback CLI is a real entry point: the process itself allows the reviewer fallback off a claude builder (JUL-98)', async () => {
   const { stdout } = await execFileAsync(process.execPath, [SEAT_LABELS_CLI, 'fallback', '--seat', 'reviewer', '--builder', 'claude']);
-  assert.deepEqual(JSON.parse(stdout), { seat: 'reviewer', entry: 'pi-deepseek', modelLabel: 'adversary-deepseek-flash' });
+  assert.deepEqual(JSON.parse(stdout), { seat: 'reviewer', entry: 'codex', modelLabel: 'adversary-codex' });
 });
 
-test('the fallback CLI is a real entry point: the process itself refuses the reviewer fallback off a pi-deepseek builder, non-zero', async () => {
+test('the fallback CLI is a real entry point: the process itself refuses the builder fallback onto the reviewer\'s family, non-zero', async () => {
   await assert.rejects(
-    () => execFileAsync(process.execPath, [SEAT_LABELS_CLI, 'fallback', '--seat', 'reviewer', '--builder', 'pi-deepseek']),
+    () => execFileAsync(process.execPath, [SEAT_LABELS_CLI, 'fallback', '--seat', 'builder', '--reviewer', 'pi-deepseek']),
     (error) => {
       assert.notEqual(error.code, 0);
-      assert.match(error.stderr, /refusing the reviewer backup \(pi-deepseek\)/);
+      assert.match(error.stderr, /refusing the builder backup \(pi-deepseek\)/);
       return true;
     },
   );

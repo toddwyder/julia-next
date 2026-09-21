@@ -10,7 +10,7 @@
 // the plan. Keeping the spec pure means the plan can be tested with no network
 // at all.
 
-import { MODEL_SPECS, DEFAULT_MODEL_SUFFIX_BY_ENTRY, GRAPH_AGENTS } from '../scripts/seat-labels.mjs';
+import { MODEL_SPECS, defaultModelSuffix, GRAPH_AGENTS } from '../scripts/seat-labels.mjs';
 import { EFFORT_LEVELS, DEFAULT_EFFORT } from '../scripts/effort.mjs';
 import { SEAT_TABLE } from './seat-table.mjs';
 
@@ -168,7 +168,7 @@ export function effortLabelsFor(agentKey) {
 }
 
 // The two labels a new card gets from the team template: the agent's
-// seat-table primary model (through DEFAULT_MODEL_SUFFIX_BY_ENTRY) and Medium
+// seat-table primary model (through defaultModelSuffix) and Medium
 // effort. Returned as an array so the template builder can pass it straight
 // through, and the order (model, effort) is stable for tests.
 export function defaultLabelsFor(agentKey) {
@@ -177,7 +177,7 @@ export function defaultLabelsFor(agentKey) {
   if (!entry) {
     throw new Error(`board-spec: graph agent '${agentKey}' has no seat-table primary entry`);
   }
-  const suffix = DEFAULT_MODEL_SUFFIX_BY_ENTRY[entry];
+  const suffix = defaultModelSuffix(agentKey, entry);
   if (!suffix) {
     throw new Error(`board-spec: seat-table entry '${entry}' has no default model suffix`);
   }

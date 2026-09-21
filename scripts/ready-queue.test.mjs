@@ -541,7 +541,7 @@ const DEFAULT_TEAM_LABELS = [
   { id: 'l-fixer-effort', name: 'fixer-effort-medium' },
   { id: 'l-refactor-model', name: 'refactor-claude-opus' },
   { id: 'l-refactor-effort', name: 'refactor-effort-medium' },
-  { id: 'l-adversary-model', name: 'adversary-codex' },
+  { id: 'l-adversary-model', name: 'adversary-deepseek-pro' },
   { id: 'l-adversary-effort', name: 'adversary-effort-medium' },
   { id: 'l-evidence-model', name: 'evidence-codex' },
   { id: 'l-evidence-effort', name: 'evidence-effort-medium' },
