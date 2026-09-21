@@ -124,11 +124,21 @@ export function labelNames(labels) {
     .filter((name) => typeof name === 'string' && name.length > 0);
 }
 
+// Model labels that used to exist and were removed on purpose (GLM, JUL-93).
+// A card that still carries one is REFUSED, never quietly re-mapped to the
+// seat default: "what the card shows is exactly what runs" must hold, and a
+// silent switch of vendor would break it.
+export const RETIRED_MODEL_SUFFIXES = Object.freeze(['glm-5.3']);
+
 function explicitModelLabel(code, present) {
   for (const name of present) {
     if (MODEL_CATALOG[name] && name.startsWith(`${code}-`)) return name;
   }
   return null;
+}
+
+function retiredModelLabel(code, present) {
+  return present.find((name) => RETIRED_MODEL_SUFFIXES.some((suffix) => name === `${code}-${suffix}`)) ?? null;
 }
 
 function effortFor(code, present) {
@@ -150,6 +160,11 @@ export function resolveSeatChoices(labels) {
   const present = labelNames(labels);
   const choices = {};
   for (const [agent, code] of Object.entries(AGENT_CODES)) {
+    const retired = retiredModelLabel(code, present);
+    if (retired) {
+      choices[agent] = { entry: null, effort: effortFor(code, present), modelLabel: retired, retired: true };
+      continue;
+    }
     const explicit = explicitModelLabel(code, present);
     const entry = explicit ? MODEL_CATALOG[explicit].entry : SEAT_TABLE[agent].primary;
     const modelLabel = explicit ?? `${code}-${DEFAULT_MODEL_SUFFIX_BY_ENTRY[entry]}`;
@@ -181,6 +196,12 @@ export function missingSeatLabels(labels) {
 // `{ ok: false, reason }` with one plain-English sentence naming both models.
 export function validateFamilyChoice(choices) {
   for (const agent of Object.keys(AGENT_CODES)) {
+    if (choices?.[agent]?.retired) {
+      return {
+        ok: false,
+        reason: `${agent} carries the retired label ${choices[agent].modelLabel} (that model was removed); change it to a current ${agent} model label`,
+      };
+    }
     const entry = choices?.[agent]?.entry;
     if (!entry || !Object.hasOwn(FAMILY_OF, entry)) {
       return {

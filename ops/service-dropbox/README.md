@@ -1,7 +1,7 @@
 # service-dropbox -- the one-time code drop box (JUL-72, JUL-77)
 
 Todd's browser, over Tailscale only, pastes raw tokens -- Sentry, Supabase, PowerSync, Axiom
-(JUL-72), plus DeepSeek, Z.ai, and a Linear personal API key (JUL-77) -- straight into their
+(JUL-72), plus DeepSeek and a Linear personal API key (JUL-77) -- straight into their
 protected files on the server. No code value ever passes through Linear, email, or an agent
 chat -- see JUL-71's readiness review and JUL-72 for why.
 

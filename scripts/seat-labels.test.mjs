@@ -181,14 +181,25 @@ test('a fallback whose backup collides with the other seat is refused, not silen
   assert.match(result.reason, /different families/);
 });
 
-// GLM was removed (JUL-93). A leftover GLM label on an old card is an unknown
-// label like any other: ignored, so the seat runs its table default -- it can
-// never resolve to a GLM launch route.
-test('a leftover GLM label is ignored and the builder falls back to its table default, never a GLM entry', () => {
-  const choices = resolveSeatChoices(['builder-glm-5.3']);
-  assert.equal(choices.builder.entry, SEAT_TABLE.builder.primary);
-  assert.equal(choices.builder.modelLabel, 'builder-claude-opus');
-  assert.ok(!Object.values(choices).some((choice) => choice.entry === 'pi-glm'));
+// GLM was removed (JUL-93). A card that still carries a GLM label is REFUSED
+// with a plain reason -- never launched on GLM and never quietly re-mapped to
+// the seat default (a silent vendor switch would break "what the card shows is
+// what runs").
+test('a leftover GLM label is refused with a plain reason: no launch entry, no silent default, no label added', () => {
+  for (const agent of AGENTS) {
+    const code = AGENT_CODES[agent];
+    const label = `${code}-glm-5.3`;
+    const choices = resolveSeatChoices([label]);
+    assert.equal(choices[agent].entry, null, `${agent} must not resolve to any launch entry`);
+    assert.equal(choices[agent].modelLabel, label);
+    const verdict = validateFamilyChoice(choices);
+    assert.equal(verdict.ok, false);
+    assert.match(verdict.reason, new RegExp(`${agent} carries the retired label ${label}`));
+    assert.match(verdict.reason, /change it to a current/);
+    // The queue must not paper over it by adding a default model label.
+    assert.ok(!missingSeatLabels([label]).some((name) => name.startsWith(`${code}-`) && !name.includes('-effort-')));
+  }
+  assert.ok(!Object.values(resolveSeatChoices(['builder-glm-5.3'])).some((choice) => choice.entry === 'pi-glm'));
 });
 
 test('the family rule rejects an unknown seat-table entry', () => {

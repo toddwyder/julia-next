@@ -153,8 +153,9 @@ For the current step of the current item:
      `reviewer-backup` (DeepSeek Pro) for a reviewer (`ops/service-dropbox/run-pi-seat.mjs`
      resolves the right provider/model/secret from the seat name alone -- never pass a secret in
      this command string). **GLM was removed (JUL-93):** there is no `pi-glm` entry, no `glm-5.3` label
-     and no GLM seat. If a card still carries an old GLM label, it is ignored and the seat runs its
-     table default -- say so on the card. Never route a Pi item to a vendor the card did not name. A card's model label picks the *entry*, not
+     and no GLM seat. A card that still carries an old GLM label is refused by the Ready queue with a
+     comment saying the label is retired -- never re-map it yourself. Never route a Pi item to a
+     vendor the card did not name. A card's model label picks the *entry*, not
      the exact model: each seat runs the one model fixed in `run-pi-seat.mjs`, so a
      `reviewer-deepseek-flash` or `builder-deepseek-pro` label is not honoured until JUL-102 --
      say on the card which model actually ran. This path has no `worker-show`/`workerAbandon` supervision, so step 3

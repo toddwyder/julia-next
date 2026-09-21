@@ -1307,8 +1307,9 @@ never argv, never a shell string (JUL-72). `deepseek-v4-pro` works through the n
 provider; a full review on it cost about three cents. There is no fifth seat beside it.
 
 - **GLM is removed (JUL-93, 2026-09-21).** It is no longer a selectable label, a seat, a
-  drop-box field or a reader group. A card that still carries an old GLM label has it ignored, and
-  the seat runs its table default (see the Pi paragraph in the coordinator skill).
+  drop-box field or a reader group. A card that still carries an old GLM label is refused by the Ready
+  queue with a comment saying the label is retired; it is never re-mapped to another vendor (see
+  the Pi paragraph in the coordinator skill).
 - **The label names an entry, not the model.** `builder-backup` runs `deepseek-v4-flash` and
   `reviewer-backup` runs `deepseek-v4-pro`, each fixed in `run-pi-seat.mjs`. A
   `reviewer-deepseek-flash` or `builder-deepseek-pro` label is not honoured until JUL-102 wires the
