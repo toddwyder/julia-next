@@ -96,10 +96,12 @@ test('a JSON ARRAY where a map belongs falls back to the empty default, the way 
 });
 
 test('the request ledger and the last error SURVIVE a restart, through the real write-and-read path', () => {
-  // Why this matters, in money: a controller killed between starting a worker
-  // and recording it replays that worker on the way back up. A ledger that is
-  // dropped on read starts a SECOND worker instead -- two workers on one step,
-  // and the width-1 rule broken by the program that enforces it.
+  // Why this matters, in money: the ledger is what makes a re-issued action a
+  // replay rather than a second worker, and it can only do that if it survives
+  // the restart. A ledger that is dropped on read means the same action issued
+  // again starts a SECOND worker -- two workers on one step, and the width-1
+  // rule broken by the program that enforces it. (Nothing here re-issues an
+  // interrupted action by itself; that resume is JUL-99.)
   const dir = mkdtempSync(join(tmpdir(), 'controller-ledger-'));
   try {
     const statePath = join(dir, 'controller.json');

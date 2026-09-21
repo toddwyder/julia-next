@@ -79,7 +79,7 @@ test('a repeated action replays through Orca: the SECOND call carries --retry-re
   assert.equal(second.run.id, ok.run.id, 'the same run, not a second one');
 });
 
-test('the ledger survives a restart as plain JSON, so a controller killed mid-action replays rather than starting a second worker', () => {
+test('the ledger round-trips through plain JSON, and one rebuilt from it gives retry-request flags for a recorded action and none for an unrecorded one', () => {
   const first = createRequestLedger();
   first.record('JUL-98:run', { mutation: { requestId: 'req-1' } });
   const carried = JSON.parse(JSON.stringify(first.entries()));

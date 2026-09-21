@@ -1379,10 +1379,11 @@ directory's README records the exact command pair). There is no `--request-id` f
 
 So a caller that wants a repeat to replay has to keep a ledger: *its own* logical key for an action
 -> the request id Orca issued for it. `graph/controller/wiring.mjs` (`createRequestLedger`) does
-that, and the ledger is plain JSON kept in the controller's state file, so a controller killed
-between starting a worker and recording it replays that worker on the way back up instead of
-starting a second one. Anything written against a caller-invented request id is wrong and will
-silently start a duplicate.
+that, and the ledger is plain JSON kept in the controller's state file, so it survives a restart:
+if the same action is issued again it is recognised as a replay and no second worker is started.
+What the controller does *not* do is re-issue an interrupted action on startup -- a card killed
+mid-flight is not picked back up by itself; that resume is JUL-99. Anything written against a
+caller-invented request id is wrong and will silently start a duplicate.
 
 ### `orca worktree ps --json`: the real shape, and the `truncated` trap (JUL-98 step 4, 2026-09-21)
 
