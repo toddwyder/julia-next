@@ -166,6 +166,7 @@ export async function carryCard({
   seatChoicesImpl = seatChoicesForIssue,
   runBuildAndReviewImpl = runBuildAndReview,
   comments,
+  log = () => {},
 }) {
   const choices = seatChoicesImpl(card);
   // Which vendor each seat is, so the cost reader knows which session file
@@ -193,8 +194,24 @@ export async function carryCard({
     checkWaitImpl: boundaries.checkWaitImpl,
     releaseImpl: boundaries.releaseImpl,
     removeWorktreeImpl: boundaries.removeWorktreeImpl,
-    readCostImpl: ({ seat, dispatchId, worktree }) => readSeatCost({ seat, dispatchId, worktree, agent: agentForSeat[seat] }),
+    // `agent` comes back from the dispatch that actually happened, so a seat
+    // that moved to its backup is costed as the vendor that RAN. The map below
+    // is the fallback for a caller that hands back none.
+    readCostImpl: ({ seat, dispatchId, worktree, agent }) => readSeatCost({ seat, dispatchId, worktree, agent: agent ?? agentForSeat[seat] }),
   });
+
+  // ONE comment per seat that moved to its backup, before anything else is
+  // said about the step: the card must show which seat ran on what, whether or
+  // not the step then passed. Through the same guard as every other comment, so
+  // a replayed cycle does not write it twice.
+  for (const moved of outcome.seatMoves ?? []) {
+    log(`[controller] ${card.identifier}: the ${moved.seat} seat moved from ${moved.from} to ${moved.to} -- ${moved.reason}`);
+    await comments.postOnce({
+      issueId: card.id,
+      key: `seat-move:${moved.seat}:${moved.from}->${moved.to}`,
+      body: moved.comment,
+    });
+  }
 
   const testRun = outcome.testRun;
   if (!outcome.ok) {
@@ -363,7 +380,7 @@ export async function runOnce({
   };
 
   const carried = await carryCardImpl({
-    card, runId: check.runId, from, attempt, boundaries, board, publisher, readSeatCost, comments, now,
+    card, runId: check.runId, from, attempt, boundaries, board, publisher, readSeatCost, comments, now, log,
     // Every mailbox message this card's workers send is mirrored to Axiom on
     // the way through, via the relay that already exists -- no new event
     // vocabulary and no relay change (./mailbox.mjs's createAxiomMirror).
