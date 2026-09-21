@@ -54,8 +54,6 @@
 // action -> the request id Orca issued for it. A repeat of that action replays
 // through Orca instead of starting a second run or a second worker.
 
-import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
@@ -63,7 +61,7 @@ import { orcaCall } from '../../scripts/orca-cli.mjs';
 import { findActiveRun } from '../../scripts/ready-queue.mjs';
 import { pushBranch, openPullRequest } from '../../scripts/publish-pr.mjs';
 import { mergePullRequest } from '../../scripts/merge-pr.mjs';
-import { claudeExtractFromTranscript, codexExtractFromRollout, seatCostLine } from './cost.mjs';
+import { createSeatCostReader, claudeProjectDirName, worktreePathOf, WORKER_HOME } from './cost-read.mjs';
 import { WORKER_MESSAGE_TYPES } from './mailbox.mjs';
 
 const execFileAsync = promisify(execFile);
@@ -119,27 +117,12 @@ export const REPO_SELECTOR = `path:${ORCHESTRATOR_CHECKOUT}`;
 export const WORKER_ENVIRONMENT = 'ovh-local';
 export const WORKER_CHECKOUT = '/home/runner/julia-next';
 export const WORKER_REPO_SELECTOR = `path:${WORKER_CHECKOUT}`;
-// AND THE WORKER'S HOME DIRECTORY, named here for the same reason the daemon
-// and the checkout are: it belongs to `runner`, not to the account this process
-// runs as. A worker's session files -- the Claude transcript under
-// `<home>/.claude/projects/` and the Codex rollout under
-// `<home>/.codex/sessions/` -- are written BY THE WORKER, so they land under
-// this home and nowhere else.
-//
-// THE CONTROLLER'S OWN HOME IS NEVER THE RIGHT PLACE TO LOOK, which is why the
-// cost reader below takes WORKER_HOME and not this process's `os.homedir()`.
-// The controller runs as `orchestrator-svc`, whose home is
-// /home/orchestrator-svc (its passwd entry: `echo ~orchestrator-svc`); no
-// worker has ever written a byte into it, and it is not even readable by
-// `runner` (`ls -a /home/orchestrator-svc` as `runner` on 2026-09-21:
-// "Permission denied"). Looking there finds no transcript, the reader refuses,
-// the seat gets no cost line, and `assertEverySeatCosted` stops the step --
-// which is exactly what happened to JUL-92 on 2026-09-21: "stopped at
-// build-and-review -- no cost line for the builder seat". That worker's
-// transcript is real and is at
-// /home/runner/.claude/projects/-home-runner-orca-workspaces-julia-next-jul-92-work
-// (listed on the host, 2026-09-21).
-export const WORKER_HOME = '/home/runner';
+// AND THE WORKER'S HOME, WORKER_HOME, which now lives in ./cost-read.mjs with
+// the reader that uses it, and is re-exported here so every caller and test
+// that already imports it from this file still does. It belongs to `runner`,
+// never to the account this process runs as, and ./cost-read.mjs's header
+// records the measured 0700 permission that makes it unreadable from here.
+export { createSeatCostReader, claudeProjectDirName, worktreePathOf, WORKER_HOME };
 export const PUBLISH_OWNER = 'toddwyder';
 export const PUBLISH_REPO = 'julia-next';
 export const PUBLISH_BASE = 'main';
@@ -357,6 +340,59 @@ export function createOrcaBoundaries({
       ]);
     },
 
+    // (10) THE WORKER-SIDE COST TERMINAL, and the three verbs it takes.
+    //
+    // THE WHOLE POINT OF IT: a terminal Orca creates on the WORKER daemon runs
+    // as the WORKER, so it can read the worker's own 0700 transcript directory
+    // -- which this process cannot, and cannot be given without root. The
+    // measured permissions are in ./cost-read.mjs's header.
+    //
+    //   --environment  the RUNNER'S daemon, `ovh-local`. The controller's own
+    //                  daemon would give a terminal running as
+    //                  `orchestrator-svc` again, which is the bug.
+    //   --worktree     the CANDIDATE worktree, by path, so the terminal's cwd
+    //                  is the checkout that holds scripts/read-seat-cost.mjs.
+    //   --command      that script, plus the end marker (see
+    //                  `costReadCommand` below).
+    //
+    // `terminal create` and not `worker-start`: `worker-start` begins a
+    // SUPERVISED AGENT with a model allowance, and this is a shell running one
+    // node process -- no model, no tokens, nothing to supervise.
+    async workerTerminalCreateImpl({ worktreePath, title, command } = {}) {
+      return call([
+        'terminal', 'create',
+        '--environment', workerEnvironment,
+        '--worktree', `path:${worktreePath}`,
+        '--title', title,
+        '--command', command,
+      ]);
+    },
+
+    // (11) Reading that terminal back. NOT `--screen`: a screen read is the
+    // current frame only, it cannot be paged, and the one JSON line can have
+    // scrolled off it. The accumulated stream can be paged, and `--cursor`
+    // (the previous read's `nextCursor`) is how the next read returns only
+    // what is new -- which matters because a read with NO cursor returns the
+    // OLDEST retained window, not the newest (runbook, "Seven findings carried
+    // from the cancelled JUL-106", item 6). So: one cursorless read to start
+    // at the oldest line, then cursor-advanced reads to the end.
+    async terminalReadImpl({ terminal, cursor = null, limit = 2000 } = {}) {
+      const args = ['terminal', 'read', '--environment', workerEnvironment, '--terminal', terminal, '--limit', String(limit)];
+      if (cursor !== null && cursor !== undefined) args.push('--cursor', String(cursor));
+      return call(args);
+    },
+
+    // (12) Closing it. `orca terminal close --terminal <handle>` is the verb
+    // (`orca terminal close --help`: "Close one terminal, its whole tab, or
+    // every terminal in a workspace"; without `--all` it "closes one terminal
+    // pane/session"). No `--tab` and no `--worktree ... --all`: this terminal
+    // is one pane the controller made for one read, and `--all` would stop
+    // every terminal in the candidate worktree -- including the worker's own
+    // agent terminal, which Orca closes itself at `worker-release`.
+    async terminalCloseImpl({ terminal } = {}) {
+      return call(['terminal', 'close', '--environment', workerEnvironment, '--terminal', terminal]);
+    },
+
     // (7) The worktree. Orca names one `<repoId>::<path>`, which is exactly the
     // `id:` selector `worktree rm` documents. THE RUNNER'S daemon, for the same
     // reason as `worktree ps`: that is the daemon that has the worktree, and a
@@ -470,114 +506,180 @@ export async function resolveSenderTerminal({
   return { terminal: handle, state: { ...state, senderTerminal: handle }, created: true, source: 'created' };
 }
 
+
 // ---------------------------------------------------------------------------
-// The cost read -- NOT an Orca call, because Orca has no such figure
+// The cost read -- through Orca, as the WORKER, never off this process's disk
 // ---------------------------------------------------------------------------
 
-// Claude Code names a project directory after the worktree path with every
-// character that is not a letter or a digit replaced by a dash
-// (~/.claude/projects/-home-runner-jul109b-base-julia-next-b is the recorded
-// example on this host, and this session's own directory is the same shape).
-export function claudeProjectDirName(worktreePath) {
-  return String(worktreePath).replace(/[^A-Za-z0-9]/g, '-');
+// WHAT CHANGED AND WHY, in one paragraph, because the obvious "simplification"
+// is to put the file read back here and it does not work.
+//
+// Orca exposes no token or dollar figure at all (`worktree ps`, `worker-show`,
+// `terminal list` searched: docs/research/jul109-orca-1.4.205-findings.md
+// section 5; and `orchestration worker-read --source transcript` returns the
+// messages with NO usage, token or cost field, checked on a real dispatch on
+// 2026-09-21). So the figures can only come from the vendor's own session file.
+// Those files are readable only BY THE WORKER: Claude Code creates each
+// per-project transcript directory mode 0700 owned by `runner`, and as
+// `orchestrator-svc` `ls` on it answers "Permission denied" (the measured
+// listing is in ./cost-read.mjs's header). Widening that is not available --
+// `acl` is not installed on this host and installing it needs root, which is
+// not a graph action -- and making transcripts world-readable would widen the
+// boundary far past the problem.
+//
+// So the read happens AS THE WORKER, through Orca: a plain terminal on the
+// worker daemon, in the candidate worktree, running
+// scripts/read-seat-cost.mjs, which prints one line of JSON. That route is how
+// every worker cost figure posted on JUL-98 was obtained by hand before this
+// existed.
+//
+// PUT THE DIRECT FILE READ BACK AND THIS IS WHAT HAPPENS: `readdir` on the
+// per-project directory throws EACCES, the reader refuses, the seat gets no
+// cost line, `assertEverySeatCosted` fails it and the step stops with "no cost
+// line for the builder seat" -- the JUL-92 stop of 2026-09-21, which is the
+// only thing the controller did for a whole evening.
+
+// Named so a human reading Orca's terminal list can see what it is and that it
+// is short-lived.
+export const COST_TERMINAL_TITLE_PREFIX = 'julia-cost-';
+
+// THE END MARKER, and why completion is not `terminal wait`. A plain terminal
+// is NOT finished when `terminal wait` says so: `--for tui-idle` answers
+// `satisfied: true` at once even mid-run (recorded live: satisfied after 2.5 s
+// on a terminal still running `sleep 90`), and `--for exit` only ever times out
+// because the shell stays open after the command returns (8.4 s then
+// `timeout`) -- runbook, "the seven JUL-106 findings re-checked", row 3. The
+// documented way is to poll `terminal read` until the shell prompt is back.
+// This is that, made machine-readable instead of matched against whatever
+// shape the prompt happens to have: the shell prints the marker only once it
+// has the command's exit status in `$?`, i.e. only once the prompt is back, and
+// it carries that status out with it.
+export const COST_READ_END_MARKER = '__JULIA_COST_READ_DONE__';
+
+// Single-quoted for the shell, and a value that could break out of the quoting
+// is refused rather than interpolated.
+function shellArg(value, what) {
+  const text = String(value);
+  if (text.includes("'")) throw new Error(`read-seat-cost: refusing to build a shell command with a quote in ${what}: ${text}`);
+  return `'${text}'`;
 }
 
-// A .jsonl file as the list of its lines, with the blank last line dropped.
-function splitJsonl(text) {
-  return String(text).split('\n').filter((line) => line.trim() !== '');
+export function costReadCommand({ seat, agent, worktreePath }) {
+  const script = `node ${shellArg(`${worktreePath}/scripts/read-seat-cost.mjs`, 'the worktree path')}`
+    + ` --seat ${shellArg(seat, 'the seat')} --agent ${shellArg(agent, 'the agent')} --worktree ${shellArg(worktreePath, 'the worktree path')}`;
+  return `${script}; echo "${COST_READ_END_MARKER}:$?"`;
 }
 
-function newestFile(dir, matches, { readdirImpl, statImpl }) {
-  let entries;
-  try {
-    entries = readdirImpl(dir, { withFileTypes: true });
-  } catch {
-    return null;
+// The marker as the shell printed it, anchored, so the ECHO of the command --
+// which also contains the marker text, inside quotes, after the node call --
+// can never be mistaken for the answer.
+const END_MARKER_LINE = new RegExp(`^${COST_READ_END_MARKER}:(\\d+)$`);
+
+export function costReadExitCode(lines) {
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    const match = END_MARKER_LINE.exec(String(lines[i]).trim());
+    if (match) return Number(match[1]);
   }
-  const files = entries
-    .filter((entry) => entry.isFile() && matches(entry.name))
-    .map((entry) => {
-      const full = join(dir, entry.name);
-      return { full, mtimeMs: statImpl(full).mtimeMs };
-    })
-    .sort((a, b) => b.mtimeMs - a.mtimeMs);
-  return files[0]?.full ?? null;
+  return null;
 }
 
-// Codex writes ~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl, so the newest
-// rollout is found by walking the three date levels newest-first rather than
-// by globbing the whole tree.
-function newestCodexRollout(root, { readdirImpl, statImpl }) {
-  const descend = (dir, depth) => {
-    let names;
-    try {
-      names = readdirImpl(dir, { withFileTypes: true });
-    } catch {
-      return null;
-    }
-    if (depth === 0) return newestFile(dir, (name) => /^rollout-.*\.jsonl$/.test(name), { readdirImpl, statImpl });
-    const dirs = names.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort().reverse();
-    for (const name of dirs) {
-      const found = descend(join(dir, name), depth - 1);
-      if (found) return found;
-    }
-    return null;
-  };
-  return descend(root, 3);
+// ONE line of JSON, so the caller never guesses which line is the answer: the
+// script prints nothing else on stdout, and everything else in the transcript
+// is a prompt, the echoed command or (on failure) stderr. A line that opens
+// like JSON and will not parse is a REFUSAL, never a skip -- skipping it would
+// walk on to "no line at all", which says the wrong thing about what broke.
+export function costLineFromTerminalLines(lines, { seat }) {
+  const candidates = lines.map((line) => String(line).trim()).filter((line) => line.startsWith('{'));
+  if (candidates.length === 0) {
+    throw new Error(`the ${seat} seat's cost read printed no JSON line -- scripts/read-seat-cost.mjs prints exactly one on success, so there is no figure to post and nothing is guessed`);
+  }
+  const text = candidates[candidates.length - 1];
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch (error) {
+    throw new Error(`the ${seat} seat's cost read printed a line that is not valid JSON (${error.message}): ${text.slice(0, 200)}`);
+  }
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error(`the ${seat} seat's cost read printed JSON that is not a cost line: ${text.slice(0, 200)}`);
+  }
+  return parsed;
 }
 
 // One seat's figures, read while the worker's session files still exist --
 // which is why graph/controller/release.mjs reads BEFORE it releases.
 //
-// WHERE A CONTROLLER-STARTED WORKER REALLY WRITES, no longer a guess. The
-// controller ran for real against JUL-92 on 2026-09-21 and the builder it
-// started left its transcript at
-// /home/runner/.claude/projects/-home-runner-orca-workspaces-julia-next-jul-92-work
-// -- i.e. under the WORKER's home, with the directory named by
-// `claudeProjectDirName` of the worker's worktree path. The LAYOUT was already
-// recorded (JUL-109 findings, section 5); that run is what pinned the home.
-export function createSeatCostReader({
-  // THE WORKER'S HOME, never this process's own. See WORKER_HOME at the top of
-  // this file for what breaks when the two are confused -- it is the JUL-92
-  // blank-cost-line stop, not a hypothetical.
-  workerHome = WORKER_HOME,
-  readFileImpl = readFileSync,
-  readdirImpl = readdirSync,
-  statImpl = statSync,
+// EVERY FAILURE IS A REFUSAL. No marker inside the timeout, a non-zero exit, no
+// JSON line, an unparseable one: each throws, finishWorker() in ./release.mjs
+// leaves the worker and its worktree in place, and the step stops saying which
+// seat and why. Nothing here can produce a blank or guessed figure.
+//
+// AND THE TERMINAL IS ALWAYS CLOSED. The close is in a `finally`, so a refusal
+// does not leak a terminal on the worker daemon -- one per failed cost read,
+// for ever, is exactly the leak this had to avoid.
+export function createOrcaSeatCostReader({
+  boundaries,
+  timeoutMs = 120000,
+  pollMs = 1000,
+  readLimit = 2000,
+  sleepImpl = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); }),
+  now = () => Date.now(),
+  warn = console.error,
 } = {}) {
-  return async function readSeatCost({ seat, worktree, agent, startedAt = null, endedAt = null }) {
-    const worktreePath = worktreePathOf(worktree);
-    if (agent === 'claude') {
-      const dir = join(workerHome, '.claude', 'projects', claudeProjectDirName(worktreePath));
-      const file = newestFile(dir, (name) => name.endsWith('.jsonl'), { readdirImpl, statImpl });
-      if (!file) {
-        throw new Error(`no Claude transcript for the ${seat} seat under ${dir} -- its cost cannot be read, so the worker and its worktree are left in place`);
-      }
-      // parseTranscriptLines takes an ARRAY of lines: handing it the raw file
-      // text would iterate it one CHARACTER at a time and total nothing at all
-      // -- the exact silent-blank failure cost.mjs's own header records.
-      return seatCostLine({ seat, ...claudeExtractFromTranscript(splitJsonl(readFileImpl(file, 'utf8'))) });
-    }
-    if (agent === 'codex') {
-      const root = join(workerHome, '.codex', 'sessions');
-      const file = newestCodexRollout(root, { readdirImpl, statImpl });
-      if (!file) {
-        throw new Error(`no Codex rollout for the ${seat} seat under ${root} -- its cost cannot be read, so the worker and its worktree are left in place`);
-      }
-      const lines = splitJsonl(readFileImpl(file, 'utf8')).map((line) => JSON.parse(line));
-      return seatCostLine({ seat, ...codexExtractFromRollout(lines) });
-    }
+  return async function readSeatCost({ seat, worktree, agent }) {
     // A DeepSeek seat never reaches here: graph/controller/dispatch.mjs refuses
-    // to start one with a new worktree at all (JUL-109 section 4).
-    throw new Error(`no cost source is known for a ${JSON.stringify(agent)} seat (${seat}) -- refusing to guess a figure${startedAt && endedAt ? ` for ${startedAt}..${endedAt}` : ''}`);
-  };
-}
+    // to start one with a new worktree at all (JUL-109 section 4). Refused
+    // before a terminal is made, so an unknown vendor costs nothing.
+    if (agent !== 'claude' && agent !== 'codex') {
+      throw new Error(`no cost source is known for a ${JSON.stringify(agent)} seat (${seat}) -- refusing to guess a figure`);
+    }
+    const worktreePath = worktreePathOf(worktree);
+    const created = await boundaries.workerTerminalCreateImpl({
+      worktreePath,
+      title: `${COST_TERMINAL_TITLE_PREFIX}${seat}`,
+      command: costReadCommand({ seat, agent, worktreePath }),
+    });
+    const terminal = created?.terminal?.handle ?? null;
+    if (!terminal) {
+      throw new Error(`the ${seat} seat's cost read could not start: orca terminal create on the worker daemon answered no terminal handle (${JSON.stringify(created ?? null).slice(0, 200)})`);
+    }
+    // A create Orca could not make visible still gives a working handle and
+    // says so in `warning` (recorded: terminal-create.plain-diagnostic.json).
+    // A note, not a failure -- nothing is ever typed into this terminal.
+    if (created.terminal.warning) warn(`[controller] ${created.terminal.warning}`);
 
-// Orca names a worktree `<repoId>::<path>`.
-export function worktreePathOf(worktreeId) {
-  if (typeof worktreeId !== 'string') return worktreeId;
-  const marker = worktreeId.indexOf('::');
-  return marker < 0 ? worktreeId : worktreeId.slice(marker + 2);
+    try {
+      const lines = [];
+      let cursor = null;
+      let exitCode = null;
+      const deadline = now() + timeoutMs;
+      for (;;) {
+        const answer = await boundaries.terminalReadImpl({ terminal, cursor, limit: readLimit });
+        const read = answer?.terminal ?? {};
+        for (const line of read.tail ?? []) lines.push(String(line));
+        if (read.nextCursor !== null && read.nextCursor !== undefined) cursor = read.nextCursor;
+        exitCode = costReadExitCode(lines);
+        if (exitCode !== null) break;
+        if (now() >= deadline) {
+          throw new Error(`the ${seat} seat's cost read did not finish within ${timeoutMs} ms -- no "${COST_READ_END_MARKER}" line came back from the worker terminal, so the figures were not read and nothing is guessed`);
+        }
+        await sleepImpl(pollMs);
+      }
+      if (exitCode !== 0) {
+        const tail = lines.filter((line) => !END_MARKER_LINE.test(line.trim())).slice(-5).join(' | ');
+        throw new Error(`the ${seat} seat's cost read failed on the worker: scripts/read-seat-cost.mjs exited ${exitCode} -- ${tail || 'it printed nothing'}`);
+      }
+      return costLineFromTerminalLines(lines, { seat });
+    } finally {
+      // Even on the failure path. A close that itself fails is said out loud
+      // and does not replace the real reason the read failed.
+      try {
+        await boundaries.terminalCloseImpl({ terminal });
+      } catch (error) {
+        warn(`[controller] could not close the ${seat} seat's cost terminal ${terminal}: ${error.message}`);
+      }
+    }
+  };
 }
 
 // ---------------------------------------------------------------------------

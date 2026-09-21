@@ -19,6 +19,11 @@ import {
   createOrcaBoundaries,
   createRequestLedger,
   createSeatCostReader,
+  createOrcaSeatCostReader,
+  costReadCommand,
+  costReadExitCode,
+  COST_READ_END_MARKER,
+  COST_TERMINAL_TITLE_PREFIX,
   createPublisher,
   claudeProjectDirName,
   worktreePathOf,
@@ -34,6 +39,12 @@ import {
   CONTROLLER_TERMINAL_TITLE,
 } from '../graph/controller/wiring.mjs';
 import { gitSafeDirectoryEnv, createSuiteRunner } from '../graph/controller/test-run.mjs';
+import { seatCostLine, assertCostLineComplete } from '../graph/controller/cost.mjs';
+import { main as readSeatCostMain } from './read-seat-cost.mjs';
+
+// Temp worker homes the two script tests make, removed when the file is done.
+const t_cleanup = [];
+test.after(() => { for (const dir of t_cleanup) rmSync(dir, { recursive: true, force: true }); });
 import { currentBranch } from '../graph/controller/main.mjs';
 import { proveTurnStarted } from '../graph/controller/turn-start.mjs';
 import { loadOrcaFixture, orcaErrorFromFixture } from '../graph/controller/fixture-orca.mjs';
@@ -319,6 +330,234 @@ test('an Orca worktree id is split on "::" so the cost reader looks in the PATH,
   assert.equal(worktreePathOf('repo-1::/home/runner/w'), '/home/runner/w');
   assert.equal(worktreePathOf('/home/runner/w'), '/home/runner/w');
   assert.equal(claudeProjectDirName('/home/runner/w/jul-98'), '-home-runner-w-jul-98');
+});
+
+// ---------------------------------------------------------------------------
+// The cost read through Orca, as the WORKER (JUL-98 step 5, fourth fix)
+// ---------------------------------------------------------------------------
+//
+// WHY THESE EXIST. The controller runs as `orchestrator-svc`; the worker's
+// transcript directory is mode 0700 owned by `runner`, so reading it off disk
+// from this process is impossible without root (measured listing in
+// graph/controller/cost-read.mjs's header). The read now happens inside a plain
+// Orca terminal on the WORKER daemon. These tests prove the argv, and prove
+// that every way the read can go wrong is a refusal with the terminal closed.
+// They prove nothing about the live Orca -- no `orca` binary is spawned here.
+
+// The recorded shapes these stand-ins copy:
+//   create -> graph/fixtures/orca-1.4.205/terminal-create.plain-diagnostic.json
+//             (result.terminal.handle, plus a `warning` on a create Orca could
+//             not make visible)
+//   read   -> graph/fixtures/orca-1.4.205/terminal-read.trust-screen.json
+//             (result.terminal.tail[], nextCursor, latestCursor)
+const CREATED_TERMINAL = loadOrcaFixture('terminal-create.plain-diagnostic.json').result;
+
+// A stand-in for the three worker-terminal boundaries. `screens` is the list of
+// `tail` arrays successive reads return, exactly as the recorded read shape
+// carries them.
+function costTerminal({ screens, created = CREATED_TERMINAL, closeThrows = null }) {
+  const calls = { create: [], read: [], close: [] };
+  let index = 0;
+  return {
+    calls,
+    async workerTerminalCreateImpl(args) { calls.create.push(args); return created; },
+    async terminalReadImpl(args) {
+      calls.read.push(args);
+      const tail = screens[Math.min(index, screens.length - 1)] ?? [];
+      index += 1;
+      return { terminal: { handle: args.terminal, tail, nextCursor: String(index * 10), latestCursor: String(index * 10) } };
+    },
+    async terminalCloseImpl(args) {
+      calls.close.push(args);
+      if (closeThrows) throw new Error(closeThrows);
+      return { closed: true };
+    },
+  };
+}
+
+const PROMPT = 'runner@vps-ce27cb55:~/orca/workspaces/julia-next/jul-92-work$';
+const done = (code) => `${COST_READ_END_MARKER}:${code}`;
+// A real seat cost line, as scripts/read-seat-cost.mjs prints it: one line,
+// JSON, nothing else. Built through the same seatCostLine() the script uses.
+const GOOD_LINE = JSON.stringify(seatCostLine({
+  seat: 'builder',
+  model: 'claude-opus-5',
+  tokens: { input: 1000, output: 200, cacheRead: 50, cacheWrite5m: 0, cacheWrite1h: 0 },
+  peakContext: 1050,
+  startedAt: '2026-09-21T14:00:00.000Z',
+  endedAt: '2026-09-21T14:30:00.000Z',
+  lowerBound: true,
+}));
+
+test('the cost read is an orca terminal on the WORKER daemon, in the candidate worktree, running scripts/read-seat-cost.mjs', async () => {
+  const boundaries = costTerminal({ screens: [[PROMPT, GOOD_LINE, done(0)]] });
+  const read = createOrcaSeatCostReader({ boundaries, pollMs: 0 });
+  await read({ seat: 'builder', worktree: 'repo-1::/home/runner/orca/workspaces/julia-next/jul-92-work', agent: 'claude' });
+
+  const create = boundaries.calls.create[0];
+  assert.equal(create.worktreePath, '/home/runner/orca/workspaces/julia-next/jul-92-work', 'the CANDIDATE worktree, not the controller checkout');
+  assert.equal(create.title, `${COST_TERMINAL_TITLE_PREFIX}builder`);
+  assert.match(create.command, /read-seat-cost\.mjs/);
+  assert.match(create.command, /--seat 'builder'/);
+  assert.match(create.command, /--agent 'claude'/);
+  assert.match(create.command, /--worktree '\/home\/runner\/orca\/workspaces\/julia-next\/jul-92-work'/);
+  assert.ok(create.command.endsWith(`; echo "${COST_READ_END_MARKER}:$?"`), 'and the end marker that carries the exit status out');
+});
+
+test('the three worker-terminal boundaries name the RUNNER daemon, and close closes ONE pane', async () => {
+  const orcaCallImpl = recorder([{ terminal: { handle: 'term_cost' } }]);
+  const boundaries = createOrcaBoundaries({ orcaCallImpl });
+  await boundaries.workerTerminalCreateImpl({ worktreePath: '/home/runner/w/jul-92', title: 'julia-cost-builder', command: 'node x' });
+  await boundaries.terminalReadImpl({ terminal: 'term_cost' });
+  await boundaries.terminalReadImpl({ terminal: 'term_cost', cursor: '18' });
+  await boundaries.terminalCloseImpl({ terminal: 'term_cost' });
+
+  const [create, firstRead, nextRead, close] = orcaCallImpl.calls;
+  assert.deepEqual(create.slice(0, 2), ['terminal', 'create']);
+  assert.equal(flag(create, '--environment'), WORKER_ENVIRONMENT, "the worker's daemon, so the terminal runs as the worker");
+  assert.equal(flag(create, '--worktree'), 'path:/home/runner/w/jul-92');
+  assert.equal(flag(create, '--command'), 'node x');
+  // The first read carries NO cursor on purpose: a cursorless read returns the
+  // OLDEST retained window, which is where this terminal's output starts.
+  assert.equal(flag(firstRead, '--cursor'), null);
+  assert.equal(flag(firstRead, '--environment'), WORKER_ENVIRONMENT);
+  assert.ok(!firstRead.includes('--screen'), 'not --screen: a screen read is one frame and cannot be paged');
+  assert.equal(flag(nextRead, '--cursor'), '18', "and the next read pages on from the previous read's nextCursor");
+  assert.deepEqual(close.slice(0, 2), ['terminal', 'close']);
+  assert.equal(flag(close, '--terminal'), 'term_cost');
+  assert.ok(!close.includes('--all') && !close.includes('--tab'), "one pane only -- --all would stop the worker's own terminal too");
+});
+
+test('a well-formed one-line answer becomes a complete cost line, and the terminal is closed', async () => {
+  const boundaries = costTerminal({ screens: [[PROMPT], [GOOD_LINE, done(0)]] });
+  const read = createOrcaSeatCostReader({ boundaries, pollMs: 0 });
+  const cost = await read({ seat: 'builder', worktree: 'repo-1::/home/runner/w/jul-92', agent: 'claude' });
+
+  assert.doesNotThrow(() => assertCostLineComplete(cost), 'the line the guard demands, not a blank one');
+  assert.equal(cost.seat, 'builder');
+  assert.equal(cost.model, 'claude-opus-5');
+  assert.equal(cost.totalTokens, 1250, 'the figures the worker computed, not re-derived here');
+  assert.equal(cost.minutes, 30);
+  assert.ok(cost.usd > 0);
+  assert.deepEqual(boundaries.calls.close, [{ terminal: CREATED_TERMINAL.terminal.handle }], 'closed on the happy path');
+  assert.equal(boundaries.calls.read.length, 2, 'polled until the marker came back -- terminal wait cannot say when a plain terminal is done');
+});
+
+test('a MISSING JSON line REFUSES, names the seat and why, and still closes the terminal', async () => {
+  const boundaries = costTerminal({ screens: [[PROMPT, done(0)]] });
+  const read = createOrcaSeatCostReader({ boundaries, pollMs: 0 });
+  await assert.rejects(
+    () => read({ seat: 'builder', worktree: 'repo-1::/home/runner/w/jul-92', agent: 'claude' }),
+    /the builder seat's cost read printed no JSON line/,
+  );
+  assert.equal(boundaries.calls.close.length, 1, 'closed on the failure path too -- a leaked terminal per failed read is the leak this avoids');
+});
+
+test('a MALFORMED JSON line REFUSES rather than being skipped as if nothing was printed', async () => {
+  const boundaries = costTerminal({ screens: [[PROMPT, '{"seat":"builder","model":"claude-opus-5"', done(0)]] });
+  const read = createOrcaSeatCostReader({ boundaries, pollMs: 0 });
+  await assert.rejects(
+    () => read({ seat: 'builder', worktree: 'repo-1::/home/runner/w/jul-92', agent: 'claude' }),
+    /the builder seat's cost read printed a line that is not valid JSON/,
+  );
+  assert.equal(boundaries.calls.close.length, 1);
+});
+
+test('a NON-ZERO exit REFUSES, carries the worker\'s own reason, and closes the terminal', async () => {
+  const boundaries = costTerminal({
+    screens: [[PROMPT, 'no Claude transcript for the builder seat under /home/runner/.claude/projects/-x -- its cost cannot be read', done(1)]],
+  });
+  const read = createOrcaSeatCostReader({ boundaries, pollMs: 0 });
+  await assert.rejects(
+    () => read({ seat: 'builder', worktree: 'repo-1::/home/runner/w/jul-92', agent: 'claude' }),
+    (error) => {
+      assert.match(error.message, /the builder seat's cost read failed on the worker: scripts\/read-seat-cost\.mjs exited 1/);
+      assert.match(error.message, /no Claude transcript/, "the worker's own stderr, so the card says what actually broke");
+      return true;
+    },
+  );
+  assert.equal(boundaries.calls.close.length, 1);
+});
+
+test('a cost read that never finishes REFUSES on the timeout instead of posting a blank figure', async () => {
+  const boundaries = costTerminal({ screens: [[PROMPT]] });
+  let clock = 0;
+  const read = createOrcaSeatCostReader({ boundaries, pollMs: 0, timeoutMs: 50, now: () => { clock += 30; return clock; } });
+  await assert.rejects(
+    () => read({ seat: 'reviewer', worktree: 'repo-1::/home/runner/w/jul-92', agent: 'codex' }),
+    /the reviewer seat's cost read did not finish within 50 ms/,
+  );
+  assert.equal(boundaries.calls.close.length, 1);
+});
+
+test('a seat with no known cost source is refused BEFORE any terminal is created', async () => {
+  const boundaries = costTerminal({ screens: [[done(0)]] });
+  const read = createOrcaSeatCostReader({ boundaries, pollMs: 0 });
+  await assert.rejects(
+    () => read({ seat: 'reviewer', worktree: 'x', agent: 'pi' }),
+    /refusing to guess a figure/,
+  );
+  assert.equal(boundaries.calls.create.length, 0);
+});
+
+test('a close that itself fails does not hide the real reason the read failed', async () => {
+  const boundaries = costTerminal({ screens: [[PROMPT, done(0)]], closeThrows: 'terminal_handle_stale' });
+  const warned = [];
+  const read = createOrcaSeatCostReader({ boundaries, pollMs: 0, warn: (text) => warned.push(text) });
+  await assert.rejects(
+    () => read({ seat: 'builder', worktree: 'repo-1::/home/runner/w/jul-92', agent: 'claude' }),
+    /printed no JSON line/,
+  );
+  assert.ok(warned.some((text) => text.includes('could not close')), 'the close failure is said out loud');
+});
+
+test('the end marker is read from the shell, never from the echo of the command that contains it', () => {
+  const echoed = `${PROMPT} node scripts/read-seat-cost.mjs --seat 'builder' --agent 'claude' --worktree '/w'; echo "${COST_READ_END_MARKER}:$?"`;
+  assert.equal(costReadExitCode([echoed]), null, 'the echoed command line is not an answer');
+  assert.equal(costReadExitCode([echoed, done(0)]), 0);
+  assert.equal(costReadExitCode([echoed, done(0), done(7)]), 7, 'the last marker wins');
+  assert.match(costReadCommand({ seat: 'builder', agent: 'claude', worktreePath: '/w' }), /^node '\/w\/scripts\/read-seat-cost\.mjs'/);
+  assert.throws(() => costReadCommand({ seat: "b'; rm -rf /; #", agent: 'claude', worktreePath: '/w' }), /refusing to build a shell command with a quote/);
+});
+
+// --- the worker-side script itself -------------------------------------------
+
+test('scripts/read-seat-cost.mjs prints EXACTLY one line, and it is the seat cost line as JSON', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'worker-home-'));
+  t_cleanup.push(home);
+  const dir = join(home, '.claude', 'projects', claudeProjectDirName('/home/runner/w/jul-92'));
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'session.jsonl'), [
+    JSON.stringify({ type: 'assistant', timestamp: '2026-09-21T14:00:00.000Z', message: { id: 'm1', model: 'claude-opus-5', usage: { input_tokens: 1000, output_tokens: 200, cache_read_input_tokens: 50, cache_creation_input_tokens: 0 } } }),
+    JSON.stringify({ type: 'assistant', timestamp: '2026-09-21T14:30:00.000Z', message: { id: 'm2', model: 'claude-opus-5', usage: { input_tokens: 10, output_tokens: 20, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } } }),
+  ].join('\n'));
+  const out = [];
+  const code = await readSeatCostMain(
+    ['--seat', 'builder', '--agent', 'claude', '--worktree', '/home/runner/w/jul-92'],
+    { out: (text) => out.push(text), err: () => {}, setExitCode: () => {}, readSeatCostImpl: createSeatCostReader({ workerHome: home }) },
+  );
+  assert.equal(code, 0);
+  assert.equal(out.length, 1, 'one write');
+  assert.equal(out[0].trimEnd().split('\n').length, 1, 'one line, so the caller never has to guess which line is the answer');
+  const parsed = JSON.parse(out[0]);
+  assert.equal(parsed.seat, 'builder');
+  assert.doesNotThrow(() => assertCostLineComplete(parsed));
+});
+
+test('scripts/read-seat-cost.mjs prints a clear error on STDERR and exits non-zero rather than a plausible blank', async () => {
+  const out = [];
+  const err = [];
+  let exit = 0;
+  const home = mkdtempSync(join(tmpdir(), 'worker-home-'));
+  t_cleanup.push(home);
+  const code = await readSeatCostMain(
+    ['--seat', 'builder', '--agent', 'claude', '--worktree', '/home/runner/w/nothing-here'],
+    { out: (text) => out.push(text), err: (text) => err.push(text), setExitCode: (value) => { exit = value; }, readSeatCostImpl: createSeatCostReader({ workerHome: home }) },
+  );
+  assert.equal(code, 1);
+  assert.equal(exit, 1);
+  assert.deepEqual(out, [], 'nothing on stdout: a blank line would read as $0');
+  assert.match(err.join(''), /no Claude transcript/);
 });
 
 // ---------------------------------------------------------------------------

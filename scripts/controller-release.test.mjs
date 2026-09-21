@@ -9,6 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { finishWorker, assertEverySeatCosted } from '../graph/controller/release.mjs';
+import { createOrcaSeatCostReader } from '../graph/controller/wiring.mjs';
 
 const COST = {
   seat: 'builder', model: 'claude-opus-5', totalTokens: 369994, peakContext: 62524, minutes: 0.71, usd: 0.1057, capped: false, failedOverTo: null,
@@ -141,6 +142,39 @@ test('a worker that never started is still cleaned up: no cost is read, and the 
   assert.equal(result.cost.totalTokens, 0);
   assert.equal(result.released, true);
   assert.equal(result.worktreeRemoved, true, 'the worktree must not leak');
+});
+
+// JUL-98 step 5, fourth fix: the cost read is now an Orca terminal on the
+// worker daemon, which costs a terminal and a poll. A never-started worker has
+// nothing to read, so it must not pay either -- and, more importantly, must
+// still get its explicit never-started line rather than the refusal that
+// terminal would produce. This runs the REAL reader, not a stand-in, so the
+// claim is about the code that ships.
+test('the never-started path never creates a cost terminal -- it is still an explicit never-started line, not an error', async () => {
+  const r = recorder();
+  const created = [];
+  r.readCostImpl = createOrcaSeatCostReader({
+    boundaries: {
+      async workerTerminalCreateImpl(args) { created.push(args); return { terminal: { handle: 'term_x' } }; },
+      async terminalReadImpl() { return { terminal: { tail: [] } }; },
+      async terminalCloseImpl() { return {}; },
+    },
+    pollMs: 0,
+    timeoutMs: 0,
+  });
+  const result = await finishWorker({
+    seat: 'builder',
+    dispatchId: 'ctx_937abab903ae',
+    worktree: 'dce3a58b::/home/runner/orca/workspaces/julia-next/jul92-step-1',
+    turnStarted: false,
+    ...r,
+  });
+
+  assert.deepEqual(created, [], 'no terminal is created for a worker that never began a turn');
+  assert.equal(result.ok, true);
+  assert.equal(result.cost.neverStarted, true);
+  assert.equal(result.cost.totalTokens, 0);
+  assert.equal(result.worktreeRemoved, true);
 });
 
 test('a worker that DID run still has its cost read before anything is released -- the never-started path does not weaken the order', async () => {
