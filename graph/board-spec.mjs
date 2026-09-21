@@ -10,7 +10,7 @@
 // the plan. Keeping the spec pure means the plan can be tested with no network
 // at all.
 
-import { MODEL_SPECS, DEFAULT_MODEL_SUFFIX_BY_ENTRY } from '../scripts/seat-labels.mjs';
+import { MODEL_SPECS, DEFAULT_MODEL_SUFFIX_BY_ENTRY, GRAPH_AGENTS } from '../scripts/seat-labels.mjs';
 import { EFFORT_LEVELS, DEFAULT_EFFORT } from '../scripts/effort.mjs';
 import { SEAT_TABLE } from './seat-table.mjs';
 
@@ -19,7 +19,7 @@ import { SEAT_TABLE } from './seat-table.mjs';
 export const TEAM_NAME = 'Julia-next';
 export const TEAM_ID = '31138162-65a4-4dd3-bcc8-6b6ac0709bca';
 
-// The eight columns, in board order. `position` is assigned from the array
+// The nine columns, in board order. `position` is assigned from the array
 // index by the setup program (0 for the first), never stored here, so the
 // order is the array and cannot get out of step with it. `color` is a fixed,
 // sensible HEX per column: Linear's WorkflowStateCreateInput requires a color,
@@ -35,9 +35,36 @@ export const WORKFLOW_STATES = Object.freeze([
   Object.freeze({ name: 'Code review', type: 'started', color: '#f2994a' }),
   Object.freeze({ name: 'Remediation', type: 'started', color: '#eb5757' }),
   Object.freeze({ name: 'Staging/smoke test', type: 'started', color: '#bb87fc' }),
+  // JUL-97 step 2: the evidence reviewer's own column, between the smoke test
+  // and Todd's acceptance. Its Linear TYPE is `started` like every other
+  // in-flight column -- only its POSITION in this list says it comes before
+  // UAT, which is what makes the ordering below the one source of that fact.
+  Object.freeze({ name: 'Evidence review', type: 'started', color: '#26b5ce' }),
   Object.freeze({ name: 'UAT', type: 'started', color: '#4ea7fc' }),
   Object.freeze({ name: 'Complete', type: 'completed', color: '#5e6ad2' }),
 ]);
+
+// The column names in board order, as a plain list. Exported so a caller that
+// needs to reason about "this column comes before that one" derives the answer
+// from the same ordering the board is built from, instead of hardcoding a
+// second copy that a later inserted column would silently invalidate.
+export const WORKFLOW_STATE_NAMES = Object.freeze(WORKFLOW_STATES.map((state) => state.name));
+
+// Where a state name sits in the board order, or -1 for a name that is not one
+// of the spec's columns (Canceled and Duplicate, for instance). Matching is by
+// exact name, the same way every other part of this spec matches.
+export function workflowColumnIndex(stateName) {
+  return WORKFLOW_STATE_NAMES.indexOf(String(stateName ?? ''));
+}
+
+// The name of the team template every new card starts from, and the ONE place
+// it is spelled. scripts/board-setup.mjs creates the template with this name;
+// every other code path, document and skill that creates a Linear card must
+// name the same template, because Linear applies a team's default template
+// only to a card a person creates in the app -- a card created through the API
+// gets nothing unless the template is named (proven live 2026-09-20 with two
+// throwaway cards: without the template, zero labels; with it, all twelve).
+export const TEMPLATE_NAME = 'Julia-next agent defaults';
 
 // Existing states are RENAMED, never deleted-and-recreated: a card points at a
 // state id, so replacing the state would drop every card sitting in it. The
@@ -89,19 +116,14 @@ export const STATUS_LABELS = Object.freeze({
   ]),
 });
 
-// The six agents the graph runs, each with the label-group names it owns. The
-// `code` is the label prefix: model labels are `<code>-<model suffix>` and
-// effort labels are `<code>-effort-<level>`, exactly the convention
-// scripts/seat-labels.mjs already uses. `key` is the SEAT_TABLE entry the
-// default model is read from.
-export const GRAPH_AGENTS = Object.freeze([
-  Object.freeze({ key: 'feature-builder', code: 'builder', modelGroup: 'Feature builder model', effortGroup: 'Feature builder effort' }),
-  Object.freeze({ key: 'defect-fixer', code: 'fixer', modelGroup: 'Defect fixer model', effortGroup: 'Defect fixer effort' }),
-  Object.freeze({ key: 'refactor', code: 'refactor', modelGroup: 'Refactor model', effortGroup: 'Refactor effort' }),
-  Object.freeze({ key: 'adversarial-reviewer', code: 'adversary', modelGroup: 'Adversarial reviewer model', effortGroup: 'Adversarial reviewer effort' }),
-  Object.freeze({ key: 'evidence-reviewer', code: 'evidence', modelGroup: 'Evidence reviewer model', effortGroup: 'Evidence reviewer effort' }),
-  Object.freeze({ key: 'consultant', code: 'consultant', modelGroup: 'Consultant model', effortGroup: 'Consultant effort' }),
-]);
+// The six agents the graph runs, each with the label-group names it owns, are
+// defined in scripts/seat-labels.mjs -- the single source of truth for the six
+// agents, their label prefixes and their twelve group names (JUL-97 step 2,
+// item 3). They are re-exported here because the board setup and this spec's
+// own helpers read them as part of the board shape. The import direction is
+// deliberate: this file already imports MODEL_SPECS from seat-labels.mjs, so
+// defining them here and importing them back would be a circular import.
+export { GRAPH_AGENTS };
 
 // Label groups the graph no longer uses. They are RETIRED (not deleted):
 // Linear's issueLabelRetire keeps the label visible on the cards that already

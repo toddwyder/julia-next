@@ -9,8 +9,13 @@ identifier rides inside the link.
 
 ## Conventions
 
-- **Create an issue**: `save_issue` with `team: "Julia-next"`, `title`, `description` (Markdown,
-  literal newlines), and `labels`.
+- **Create an issue**: `save_issue` with `team: "Julia-next"`, `template: "Julia-next agent
+  defaults"`, `title`, `description` (Markdown, literal newlines), and `labels`. **Always name the
+  template.** Linear applies a team's default template only to a card a person creates in the app;
+  a card created through the API gets nothing unless `template` is passed, so a card created
+  without it comes out with none of the twelve model/effort labels the graph reads (proven live
+  2026-09-20 with two throwaway cards: without the template, zero labels; with it, all twelve).
+  The template name is spelled once in code, in `graph/board-spec.mjs` as `TEMPLATE_NAME`.
 - **Read an issue**: `get_issue` (add `includeRelations: true` for blocking); `list_comments` for
   the thread.
 - **List issues**: `list_issues` with `team: "Julia-next"` plus `label`, `state`, `assignee`, or
@@ -30,7 +35,8 @@ then mirrored into Linear as issues carrying the same labels and states.
 
 ## When a skill says "publish to the issue tracker"
 
-Create a Linear issue on team Julia-next.
+Create a Linear issue on team Julia-next, naming the team template
+`Julia-next agent defaults` on every create.
 
 ## When a skill says "fetch the relevant ticket"
 
@@ -43,7 +49,8 @@ map is **Julia restart: chart the way to a v1 spec** (`JUL-5`).
 
 - **Map**: a single issue labelled `wayfinder:map`, holding the Destination / Notes /
   Decisions-so-far / Not-yet-specified / Out-of-scope body.
-- **Child ticket**: an issue created with `parentId` set to the map. Labels: `wayfinder:<type>`
+- **Child ticket**: an issue created with `parentId` set to the map and `template: "Julia-next
+  agent defaults"`. Labels: `wayfinder:<type>`
   (`research` / `prototype` / `grilling` / `task`). Once claimed, the ticket is assigned to the
   driving dev.
 - **Blocking**: Linear's **native** blocked-by relation, the canonical, UI-visible representation.

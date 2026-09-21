@@ -42,3 +42,17 @@ blockers is still ineligible, and so is a card with no valid model choice. `eval
 is the place to look. The readiness review is the run's first step, and a review that fails parks
 the card with the reason on it. (Instruction on JUL-97, 2026-09-19; the code is in
 `scripts/ready-queue.mjs`.)
+
+A refused card no longer stalls the queue: since JUL-97 step 2 the queue walks Ready in board
+order and starts the first card that can run, passing over the ones that cannot. A passed-over
+card keeps its place in Ready -- it is never moved and never relabelled -- and still gets exactly
+one comment per distinct fingerprint. A blocker is also cleared once it reaches `UAT` or later,
+so a dependent card no longer waits on Todd's acceptance.
+
+## Every card a triage session creates names the team template
+
+When triage mirrors a PR or an external request into Linear, create the card with `save_issue`
+and `template: "Julia-next agent defaults"`. Linear applies a team's default template only to a
+card a person creates in the app, so a card created through the API without the template comes
+out with none of the twelve model/effort labels the Ready queue and the coordinator read from it.
+The name is spelled once in code, in `graph/board-spec.mjs` as `TEMPLATE_NAME`.

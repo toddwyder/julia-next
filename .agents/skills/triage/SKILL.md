@@ -10,6 +10,11 @@ Move issues on the project issue tracker through a small state machine of triage
 
 If this repo treats external pull requests as a request surface (see the issue-tracker config), triage covers them too: **a PR is an issue with attached code**, using the same roles, same states, and same machine, with a few deltas marked "for a PR" below. Resolve a bare `#42` to an issue or PR per the tracker config.
 
+Every issue you create on the tracker **must** name the team template `Julia-next agent defaults`
+(`save_issue` with `template: "Julia-next agent defaults"`): Linear applies a team's default
+template only to a card a person creates in the app, so a card created through the API without it
+comes out with none of the labels the graph reads.
+
 Every comment or issue posted to the issue tracker during triage **must** start with this disclaimer:
 
 ```

@@ -34,6 +34,11 @@ import { isRunFinished } from './julia-run.mjs';
 // pure and live in seat-labels.mjs. The queue only wires them in (injectable
 // validator stays injectable, so the pure tests remain pure).
 import { resolveSeatChoices, validateFamilyChoice, missingSeatLabels } from './seat-labels.mjs';
+// JUL-97 step 2, item 6c: "a blocker at UAT or later is cleared" is a fact
+// about the board's COLUMN ORDER, not about Linear state types -- UAT's type
+// is `started`, exactly like Implementation. Reading the order from the board
+// spec means inserting a column later cannot silently change the answer.
+import { WORKFLOW_STATE_NAMES, workflowColumnIndex } from '../graph/board-spec.mjs';
 
 export const DEFAULT_TEAM_NAME = 'Julia-next';
 export const DEFAULT_STATE_NAME = 'Ready';
@@ -69,22 +74,46 @@ function sortOrderOf(issue) {
   return Number.isFinite(value) ? value : Number.POSITIVE_INFINITY;
 }
 
-// "Top card in Ready" is board order: the lowest `Issue.sortOrder`, not the
-// order Linear happened to return the connection in. Ties keep the incoming
-// (board) order -- Array.prototype.sort is stable, so copies preserve it.
+// Board order: ascending `Issue.sortOrder`, not the order Linear happened to
+// return the connection in. Ties keep the incoming (board) order --
+// Array.prototype.sort is stable, so copies preserve it.
+export function sortCardsByBoardOrder(issues) {
+  return [...(issues ?? [])].sort((a, b) => sortOrderOf(a) - sortOrderOf(b));
+}
+
+// The single top card, kept for callers that only want to name it.
 export function pickTopCard(issues) {
-  if (!issues || issues.length === 0) return null;
-  return [...issues].sort((a, b) => sortOrderOf(a) - sortOrderOf(b))[0];
+  return sortCardsByBoardOrder(issues)[0] ?? null;
+}
+
+// The column from which a blocker counts as cleared. A card that has reached
+// UAT has been built, reviewed and smoke-tested; what remains is Todd's
+// acceptance, and holding a dependent card for that serialises the whole
+// board on him. `Evidence review` sits EARLIER in WORKFLOW_STATE_NAMES and
+// therefore does NOT clear.
+export const BLOCKER_CLEARED_FROM_COLUMN = 'UAT';
+const CLEARED_FROM_INDEX = workflowColumnIndex(BLOCKER_CLEARED_FROM_COLUMN);
+if (CLEARED_FROM_INDEX < 0) {
+  throw new Error(`ready-queue: the board spec has no "${BLOCKER_CLEARED_FROM_COLUMN}" column (columns: ${WORKFLOW_STATE_NAMES.join(', ')})`);
 }
 
 export function isBlockerClosed(blocker) {
   const state = blocker?.state ?? {};
   const type = String(state.type ?? '').toLowerCase();
-  // Prefer the stable machine type when Linear returns one; fall back to the
-  // human name for a blocker shape that only carries a name.
-  if (type) return type === 'completed' || type === 'canceled';
-  const name = String(state.name ?? '').toLowerCase();
-  return name === 'done' || name === 'canceled' || name === 'cancelled';
+  // A finished or abandoned blocker is cleared whatever its column is called.
+  if (type === 'completed' || type === 'canceled') return true;
+  // Otherwise the board order decides: UAT or later clears, everything before
+  // it does not. Derived from WORKFLOW_STATE_NAMES, never from the state type
+  // -- UAT is `started` just like Implementation, so a type test cannot tell
+  // them apart.
+  const name = String(state.name ?? '');
+  const index = workflowColumnIndex(name);
+  if (index >= 0) return index >= CLEARED_FROM_INDEX;
+  // A blocker shape that carries no type and no spec column name at all: fall
+  // back to the human name, as before.
+  if (type) return false;
+  const lower = name.toLowerCase();
+  return lower === 'done' || lower === 'canceled' || lower === 'cancelled';
 }
 
 export function openBlockers(issue) {
@@ -282,12 +311,19 @@ const COMMENT_CREATE_MUTATION = `
 // model/effort labels may not exist on the real board until the coordinator
 // creates them -- so a lookup reports what is present and the caller skips
 // the rest.
+// Paginated: the team holds 88 labels and Linear returns 50 a page, so the
+// single-page read this query used to do reported labels that DO exist as
+// missing (observed on the live board 2026-09-20, which is why a started card
+// came out without its seat labels). `$after` walks the connection to the end.
 const TEAM_LABELS_QUERY = `
-  query ReadyQueueTeamLabels($teamName: String!) {
+  query ReadyQueueTeamLabels($teamName: String!, $after: String) {
     teams(filter: { name: { eq: $teamName } }, first: 1) {
       nodes {
         id
-        labels { nodes { id name } }
+        labels(first: 50, after: $after) {
+          nodes { id name }
+          pageInfo { hasNextPage endCursor }
+        }
       }
     }
   }
@@ -388,9 +424,24 @@ export function createLinearClient({ apiKey, linearGraphQLImpl = linearGraphQL, 
     // `{ found: { name: id }, missing: [name] }` -- a name that is not on the
     // team yet is reported, never thrown, so the caller can skip it.
     async findLabels({ teamName = DEFAULT_TEAM_NAME, names = [] } = {}) {
-      const data = await linearGraphQLImpl(TEAM_LABELS_QUERY, { teamName }, callOpts);
-      const team = data?.teams?.nodes?.[0];
-      const byName = new Map((team?.labels?.nodes ?? []).map((label) => [label.name, label.id]));
+      const byName = new Map();
+      let after = null;
+      // A cursor that does not advance, or a connection that never ends, is an
+      // error rather than a silent partial read -- the same discipline
+      // board-setup.mjs's paginate() uses.
+      for (let page = 0; page < 100; page += 1) {
+        const data = await linearGraphQLImpl(TEAM_LABELS_QUERY, { teamName, after }, callOpts);
+        const team = data?.teams?.nodes?.[0];
+        const connection = team?.labels;
+        for (const label of connection?.nodes ?? []) byName.set(label.name, label.id);
+        if (!connection?.pageInfo?.hasNextPage) break;
+        const next = connection.pageInfo.endCursor;
+        if (next == null || next === after) {
+          throw new Error(`ready-queue: Linear reported another page of ${teamName} labels but returned no usable cursor`);
+        }
+        after = next;
+        if (page === 99) throw new Error(`ready-queue: reading ${teamName}'s labels did not terminate after 100 pages`);
+      }
       const found = {};
       const missing = [];
       for (const name of names) {
@@ -513,58 +564,77 @@ export async function readyQueueCheck(options = {}) {
   const busy = await isSlotBusy({ runListImpl, isRunFinishedImpl, taskListImpl, now });
   if (busy) return { status: 'slot-busy', intervalMinutes };
 
-  // (c) Top card in Ready by board order.
+  // (c) The Ready cards in board order. JUL-97 step 2, item 6b: the queue
+  // walks them and starts the FIRST card that can actually run, instead of
+  // stopping at the top one. A card that cannot run is passed over, never
+  // moved and never relabelled -- it keeps its place in Ready and, when it is
+  // ineligible, still gets exactly one comment per distinct fingerprint.
   const issues = await linear.listIssuesInState(readyState.id);
   const previous = normalizeState(await readStateImpl({ statePath }));
-  const top = pickTopCard(issues);
+  const ordered = sortCardsByBoardOrder(issues);
   const currentReady = readyFingerprints(issues);
 
-  if (!top) {
+  if (ordered.length === 0) {
     // Persist the now-empty set so a card that left Ready since the last check
     // is forgotten -- if it later returns it must earn a fresh full check.
     await writeStateImpl({ ...previous, ready: currentReady }, { statePath });
     return { status: 'empty-ready', intervalMinutes };
   }
 
-  // (d0) The restart-after-finish guard (JUL-79 step 5, D4 belt 2). A card the
-  // queue already started is never started again while its fingerprint is
-  // unchanged -- but ONLY as the fallback for belt 1 having failed. Belt 2
-  // exists to catch the case where the state move below did not happen and the
-  // card therefore stayed in Ready with its run finished; when the state move
-  // succeeded the card left Ready, so it reappearing in Ready is a fresh,
-  // deliberate re-queue and must be admitted normally. This runs BEFORE the
-  // one-full-check bookkeeping so the removal of the card from `ready` at start
-  // cannot be reset into a fresh start. A card that genuinely changed earns a
-  // new fingerprint and is allowed through.
-  const topFingerprint = issueFingerprint(top);
-  const lastStarted = previous.lastStarted;
-  if (
-    !lastStarted?.stateMoved &&
-    lastStarted?.issueId === top.id &&
-    lastStarted?.fingerprint === topFingerprint
-  ) {
-    await writeStateImpl({ ...previous, ready: currentReady }, { statePath });
-    return { status: 'cooldown', issue: top.identifier, intervalMinutes };
-  }
+  // Everything the walk accumulates before a card is chosen: the comment
+  // bookkeeping for the cards passed over, why each was passed over, and the
+  // very first reason -- which is what the cycle reports when no card can run,
+  // so a queue with one stuck card says exactly what today's queue says.
+  const nextCommented = { ...previous.commented };
+  const skipped = [];
+  let chosen = null;
+  let firstBlock = null;
 
-  // (d) One-full-check rule: a card is a candidate only if the previous check
-  // already saw it in Ready. On the first sighting, record the whole Ready set
-  // and leave everything alone.
-  if (!(top.id in previous.ready)) {
-    await writeStateImpl({ ...previous, ready: currentReady }, { statePath });
-    return { status: 'first-sighting', issue: top.identifier, intervalMinutes };
-  }
+  const passOver = (result) => {
+    skipped.push({ issue: result.issue, status: result.status, reasons: result.reasons ?? null });
+    firstBlock ??= result;
+  };
 
-  // (e) Only the top card is ever a candidate. Ineligible -> one comment per
-  // distinct fingerprint, then quiet.
-  const { eligible, reasons } = evaluateEligibility(top, { validateModelChoiceImpl });
-  if (!eligible) {
-    const fingerprint = issueFingerprint(top);
-    const alreadyCommented = previous.commented[top.id] === fingerprint;
+  for (const issue of ordered) {
+    const fingerprint = issueFingerprint(issue);
+
+    // (d0) The restart-after-finish guard (JUL-79 step 5, D4 belt 2). A card
+    // the queue already started is never started again while its fingerprint
+    // is unchanged -- but ONLY as the fallback for belt 1 having failed. Belt
+    // 2 exists to catch the case where the state move below did not happen and
+    // the card therefore stayed in Ready with its run finished; when the state
+    // move succeeded the card left Ready, so it reappearing in Ready is a
+    // fresh, deliberate re-queue and must be admitted normally. A card that
+    // genuinely changed earns a new fingerprint and is allowed through.
+    const lastStarted = previous.lastStarted;
+    if (
+      !lastStarted?.stateMoved &&
+      lastStarted?.issueId === issue.id &&
+      lastStarted?.fingerprint === fingerprint
+    ) {
+      passOver({ status: 'cooldown', issue: issue.identifier });
+      continue;
+    }
+
+    // (d) One-full-check rule: a card is a candidate only if the previous
+    // check already saw it in Ready.
+    if (!(issue.id in previous.ready)) {
+      passOver({ status: 'first-sighting', issue: issue.identifier });
+      continue;
+    }
+
+    // (e) Ineligible -> one comment per distinct fingerprint, then quiet, and
+    // on to the next card.
+    const { eligible, reasons } = evaluateEligibility(issue, { validateModelChoiceImpl });
+    if (eligible) {
+      chosen = issue;
+      break;
+    }
+    const alreadyCommented = previous.commented[issue.id] === fingerprint;
     let commented = false;
     let refused = false;
     if (!alreadyCommented) {
-      const body = ineligibleCommentBody(top, reasons);
+      const body = ineligibleCommentBody(issue, reasons);
       // The same For-Todd guard every Linear post goes through. A refusal must
       // never crash the check cycle: log it (the timer's journal picks up
       // stderr) and skip just this one comment, then record the fingerprint so
@@ -572,26 +642,27 @@ export async function readyQueueCheck(options = {}) {
       // be refused while the card is unchanged.
       const guard = checkForToddGuardImpl(body);
       if (guard.ok) {
-        await linear.comment({ issueId: top.id, body });
+        await linear.comment({ issueId: issue.id, body });
         commented = true;
       } else {
         refused = true;
-        logErrorImpl(`ready-queue: refused to post the explanation comment for ${top.identifier} (For-Todd guard rule: ${guard.rule}): ${guard.reason}`);
+        logErrorImpl(`ready-queue: refused to post the explanation comment for ${issue.identifier} (For-Todd guard rule: ${guard.rule}): ${guard.reason}`);
       }
     }
+    nextCommented[issue.id] = fingerprint;
+    passOver({ status: 'ineligible', issue: issue.identifier, reasons, commented, refused });
+  }
+
+  if (!chosen) {
+    // Nothing in Ready can run right now. Report the first card's reason --
+    // the same status this cycle reported before the walk existed -- and list
+    // every card passed over.
     await writeStateImpl({
       ...previous,
       ready: currentReady,
-      commented: { ...previous.commented, [top.id]: fingerprint },
+      commented: nextCommented,
     }, { statePath });
-    return {
-      status: 'ineligible',
-      issue: top.identifier,
-      reasons,
-      commented,
-      refused,
-      intervalMinutes,
-    };
+    return { ...firstBlock, skipped, intervalMinutes };
   }
 
   // (f) Start it. Before anything is created, make the card show exactly what
@@ -599,10 +670,10 @@ export async function readyQueueCheck(options = {}) {
   // that is not on the board yet is skipped, never an error. The fingerprint
   // recorded below reflects the labels the card will actually carry, so the
   // cooldown still matches on the next check.
-  const existingLabels = [...(top.labels ?? [])];
-  const addedLabels = await addMissingSeatLabels(top, { linear, teamName, logErrorImpl });
+  const existingLabels = [...(chosen.labels ?? [])];
+  const addedLabels = await addMissingSeatLabels(chosen, { linear, teamName, logErrorImpl });
   const startFingerprint = issueFingerprint({
-    ...top,
+    ...chosen,
     labels: [...existingLabels, ...addedLabels],
   });
 
@@ -611,8 +682,8 @@ export async function readyQueueCheck(options = {}) {
   const created = await terminalCreateImpl({
     environment: ORCHESTRATOR_ENVIRONMENT,
     worktree: `path:${ORCHESTRATOR_CHECKOUT}`,
-    command: `node ${ORCHESTRATOR_CHECKOUT}/scripts/julia-run.mjs ${top.identifier}`,
-    title: `ready-queue-${top.identifier}`,
+    command: `node ${ORCHESTRATOR_CHECKOUT}/scripts/julia-run.mjs ${chosen.identifier}`,
+    title: `ready-queue-${chosen.identifier}`,
   });
 
   // (f2) D4 belt 1: move the started card out of Ready through the injected
@@ -622,29 +693,30 @@ export async function readyQueueCheck(options = {}) {
   try {
     const inProgress = await linear.findState({ teamName, stateName: IN_PROGRESS_STATE_NAME });
     if (inProgress) {
-      await linear.setIssueState({ issueId: top.id, stateId: inProgress.id });
+      await linear.setIssueState({ issueId: chosen.id, stateId: inProgress.id });
       stateMoved = true;
     } else {
-      logErrorImpl(`ready-queue: no "${IN_PROGRESS_STATE_NAME}" state on team ${teamName}; could not move ${top.identifier} out of Ready`);
+      logErrorImpl(`ready-queue: no "${IN_PROGRESS_STATE_NAME}" state on team ${teamName}; could not move ${chosen.identifier} out of Ready`);
     }
   } catch (error) {
-    logErrorImpl(`ready-queue: could not move ${top.identifier} out of Ready: ${error.message}`);
+    logErrorImpl(`ready-queue: could not move ${chosen.identifier} out of Ready: ${error.message}`);
   }
 
   // Drop the started card from the recorded Ready set: if it is somehow still
   // in Ready on the next check, it must earn another full check before it can
   // start again (and julia-run will refuse while its run is active anyway).
+  // The cards passed over keep their recorded fingerprints, so none of them is
+  // commented on twice.
   const nextReady = { ...currentReady };
-  delete nextReady[top.id];
-  const nextCommented = { ...previous.commented };
-  delete nextCommented[top.id];
+  delete nextReady[chosen.id];
+  delete nextCommented[chosen.id];
   await writeStateImpl({
     ...previous,
     ready: nextReady,
     commented: nextCommented,
     lastStarted: {
-      issueId: top.id,
-      identifier: top.identifier,
+      issueId: chosen.id,
+      identifier: chosen.identifier,
       at: new Date(now()).toISOString(),
       fingerprint: startFingerprint,
       // Belt 2 only applies when belt 1 (the state move) failed: a card that
@@ -655,9 +727,10 @@ export async function readyQueueCheck(options = {}) {
 
   return {
     status: 'started',
-    issue: top.identifier,
+    issue: chosen.identifier,
     terminalHandle: created?.terminal?.handle,
     stateMoved,
+    skipped,
     intervalMinutes,
   };
 }
@@ -720,8 +793,12 @@ export function describeResult(result) {
         return `${result.issue} is ineligible (${result.reasons.join('; ')}) -- refused to post the explanation comment (For-Todd guard); the refusal is logged and the queue stays quiet for this fingerprint`;
       }
       return `${result.issue} is ineligible (${result.reasons.join('; ')}) -- ${result.commented ? 'posted one comment' : 'already commented, staying quiet'}`;
-    case 'started':
-      return `started ${result.issue}`;
+    case 'started': {
+      const passedOver = result.skipped ?? [];
+      return passedOver.length === 0
+        ? `started ${result.issue}`
+        : `started ${result.issue} (passed over ${passedOver.map((entry) => `${entry.issue}: ${entry.status}`).join('; ')})`;
+    }
     default:
       return `unknown ready-queue status: ${JSON.stringify(result)}`;
   }

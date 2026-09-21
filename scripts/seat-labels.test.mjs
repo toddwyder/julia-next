@@ -1,7 +1,9 @@
-// seat-labels.test.mjs -- JUL-79 step 5. Pure: no I/O, no network. Pins the
-// label-group and label-name vocabulary, the catalogue -> seat-table mapping,
-// and the resolution/family rules the Ready queue and the coordinator both
-// depend on.
+// seat-labels.test.mjs -- JUL-79 step 5, widened by JUL-97 step 2. Pure: no
+// I/O, no network. Pins the label-group and label-name vocabulary for the
+// board's SIX agents, the catalogue -> seat-table mapping, and the
+// resolution/family rules the Ready queue and the coordinator both depend on
+// -- including that the two seats the coordinator dispatches, `builder` and
+// `reviewer`, keep naming the Feature builder and the Adversarial reviewer.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
@@ -10,6 +12,9 @@ import { fileURLToPath } from 'node:url';
 
 import { SEAT_TABLE, FAMILY_OF } from '../graph/seat-table.mjs';
 import {
+  GRAPH_AGENTS,
+  DISPATCH_SEATS,
+  canonicalAgent,
   LABEL_GROUPS,
   MODEL_LABEL_GROUP,
   EFFORT_LABEL_GROUP,
@@ -42,29 +47,73 @@ function runCli(argv) {
   return { out, err, code };
 }
 
-const AGENTS = ['orchestrator', 'builder', 'reviewer'];
+const AGENTS = [
+  'feature-builder',
+  'defect-fixer',
+  'refactor',
+  'adversarial-reviewer',
+  'evidence-reviewer',
+  'consultant',
+];
 
-test('the six label groups are exactly the ticket\'s, in the ticket\'s order and spelling', () => {
-  assert.deepEqual(LABEL_GROUPS, [
-    'Orchestrator model',
-    'Builder model',
-    'Reviewer model',
-    'Orchestrator effort',
-    'Builder effort',
-    'Reviewer effort',
+// JUL-97 step 2, item 3: this file is the single source of truth for the six
+// agents, their prefixes and their twelve group names. The names below are
+// exactly what the live Julia-next board holds; none of them is renamed.
+test('the six agents, their label prefixes and their twelve group names are exactly the board\'s', () => {
+  assert.deepEqual(GRAPH_AGENTS.map((agent) => agent.key), AGENTS);
+  assert.deepEqual(GRAPH_AGENTS.map((agent) => agent.code), [
+    'builder', 'fixer', 'refactor', 'adversary', 'evidence', 'consultant',
   ]);
-  assert.deepEqual(Object.values(MODEL_LABEL_GROUP), ['Orchestrator model', 'Builder model', 'Reviewer model']);
-  assert.deepEqual(Object.values(EFFORT_LABEL_GROUP), ['Orchestrator effort', 'Builder effort', 'Reviewer effort']);
+  assert.deepEqual(LABEL_GROUPS, [
+    'Feature builder model',
+    'Defect fixer model',
+    'Refactor model',
+    'Adversarial reviewer model',
+    'Evidence reviewer model',
+    'Consultant model',
+    'Feature builder effort',
+    'Defect fixer effort',
+    'Refactor effort',
+    'Adversarial reviewer effort',
+    'Evidence reviewer effort',
+    'Consultant effort',
+  ]);
+  assert.equal(LABEL_GROUPS.length, 12);
+  assert.deepEqual(Object.keys(MODEL_LABEL_GROUP), AGENTS);
+  assert.deepEqual(Object.keys(EFFORT_LABEL_GROUP), AGENTS);
+  assert.equal(MODEL_LABEL_GROUP['feature-builder'], 'Feature builder model');
+  assert.equal(EFFORT_LABEL_GROUP['adversarial-reviewer'], 'Adversarial reviewer effort');
+  // The old three-seat vocabulary is gone.
+  assert.ok(!LABEL_GROUPS.some((name) => /^(Orchestrator|Builder|Reviewer) (model|effort)$/.test(name)));
+  assert.ok(!Object.values(AGENT_CODES).includes('orch'));
+});
+
+// Full six-seat dispatch is JUL-102's job. Until then the coordinator still
+// dispatches exactly two seats by the names `builder` and `reviewer`, and they
+// must keep naming the Feature builder and the Adversarial reviewer.
+test('the two dispatched seat names still name the feature builder and the adversarial reviewer', () => {
+  assert.deepEqual(DISPATCH_SEATS, { builder: 'feature-builder', reviewer: 'adversarial-reviewer' });
+  assert.equal(canonicalAgent('builder'), 'feature-builder');
+  assert.equal(canonicalAgent('reviewer'), 'adversarial-reviewer');
+  assert.equal(canonicalAgent('consultant'), 'consultant');
+  const choices = resolveSeatChoices([]);
+  assert.equal(choices.builder, choices['feature-builder'], 'the dispatched builder IS the feature builder');
+  assert.equal(choices.reviewer, choices['adversarial-reviewer'], 'the dispatched reviewer IS the adversarial reviewer');
 });
 
 test('the label-name convention produces the exact names the ticket gives', () => {
-  assert.equal(MODEL_LABELS.ORCH_CLAUDE_OPUS, 'orch-claude-opus');
+  assert.equal(MODEL_LABELS.BUILDER_CLAUDE_OPUS, 'builder-claude-opus');
   assert.equal(MODEL_LABELS.BUILDER_DEEPSEEK_FLASH, 'builder-deepseek-flash');
-  assert.equal(MODEL_LABELS.REVIEWER_DEEPSEEK_PRO, 'reviewer-deepseek-pro');
-  assert.equal(MODEL_LABELS.REVIEWER_CODEX, 'reviewer-codex');
+  assert.equal(MODEL_LABELS.FIXER_DEEPSEEK_PRO, 'fixer-deepseek-pro');
+  assert.equal(MODEL_LABELS.ADVERSARY_CODEX, 'adversary-codex');
+  assert.equal(MODEL_LABELS.EVIDENCE_CODEX, 'evidence-codex');
+  assert.equal(MODEL_LABELS.CONSULTANT_CLAUDE_SONNET, 'consultant-claude-sonnet');
   assert.ok(!Object.values(MODEL_LABELS).some((name) => name.includes('glm')), 'no GLM label exists (JUL-93)');
-  assert.equal(EFFORT_LABELS.REVIEWER_EFFORT_MEDIUM, 'reviewer-effort-medium');
-  assert.equal(EFFORT_LABELS.ORCH_EFFORT_LOW, 'orch-effort-low');
+  assert.equal(EFFORT_LABELS.ADVERSARY_EFFORT_MEDIUM, 'adversary-effort-medium');
+  assert.equal(EFFORT_LABELS.REFACTOR_EFFORT_LOW, 'refactor-effort-low');
+  // No label still carries the retired `orch-` prefix.
+  assert.ok(!Object.values(MODEL_LABELS).some((name) => name.startsWith('orch-')));
+  assert.ok(!Object.values(EFFORT_LABELS).some((name) => name.startsWith('orch-')));
 
   // Every agent offers every catalogue model and every effort level.
   for (const [agent, code] of Object.entries(AGENT_CODES)) {
@@ -112,53 +161,72 @@ test('every agent has a default for all three choices', () => {
 });
 
 test('a present model label wins over the default, for each agent', () => {
-  const choices = resolveSeatChoices(['orch-codex', 'builder-deepseek-pro', 'reviewer-claude-haiku']);
-  assert.equal(choices.orchestrator.entry, 'codex');
-  assert.equal(choices.orchestrator.modelLabel, 'orch-codex');
+  const choices = resolveSeatChoices([
+    'builder-deepseek-pro', 'fixer-codex', 'refactor-claude-haiku',
+    'adversary-claude-haiku', 'evidence-deepseek-flash', 'consultant-codex',
+  ]);
+  assert.equal(choices['feature-builder'].entry, 'pi-deepseek');
+  assert.equal(choices['feature-builder'].modelLabel, 'builder-deepseek-pro');
+  assert.equal(choices['defect-fixer'].entry, 'codex');
+  assert.equal(choices.refactor.modelLabel, 'refactor-claude-haiku');
+  assert.equal(choices['adversarial-reviewer'].entry, 'claude');
+  assert.equal(choices['evidence-reviewer'].entry, 'pi-deepseek');
+  assert.equal(choices.consultant.entry, 'codex');
+});
+
+// The card names a model with the `builder-` prefix; BOTH the feature builder
+// and the seat the coordinator dispatches as `builder` must run it.
+test('builder-deepseek-flash resolves the feature builder AND the dispatched builder seat to pi-deepseek', () => {
+  const choices = resolveSeatChoices(['builder-deepseek-flash']);
+  assert.equal(choices['feature-builder'].entry, 'pi-deepseek');
+  assert.equal(choices['feature-builder'].modelLabel, 'builder-deepseek-flash');
   assert.equal(choices.builder.entry, 'pi-deepseek');
-  assert.equal(choices.builder.modelLabel, 'builder-deepseek-pro');
-  assert.equal(choices.reviewer.entry, 'claude');
-  assert.equal(choices.reviewer.modelLabel, 'reviewer-claude-haiku');
+  assert.equal(choices.builder.modelLabel, 'builder-deepseek-flash');
+  // And the adversary prefix does the same for the dispatched reviewer seat.
+  const reviewed = resolveSeatChoices(['adversary-deepseek-pro']);
+  assert.equal(reviewed['adversarial-reviewer'].entry, 'pi-deepseek');
+  assert.equal(reviewed.reviewer.modelLabel, 'adversary-deepseek-pro');
 });
 
 test('a present effort label wins; absent is Medium', () => {
-  const choices = resolveSeatChoices(['orch-effort-high', 'builder-effort-low']);
-  assert.equal(choices.orchestrator.effort, 'high');
+  const choices = resolveSeatChoices(['consultant-effort-high', 'builder-effort-low']);
+  assert.equal(choices.consultant.effort, 'high');
+  assert.equal(choices['feature-builder'].effort, 'low');
   assert.equal(choices.builder.effort, 'low');
-  assert.equal(choices.reviewer.effort, 'medium');
+  assert.equal(choices['adversarial-reviewer'].effort, 'medium');
 });
 
 test('unknown and malformed labels are ignored, never a crash', () => {
-  const choices = resolveSeatChoices([42, null, undefined, {}, 'not-a-real-label', 'reviewer-effort-turbo', { name: 'builder-effort-high' }]);
+  const choices = resolveSeatChoices([42, null, undefined, {}, 'not-a-real-label', 'adversary-effort-turbo', { name: 'builder-effort-high' }]);
   assert.equal(choices.builder.effort, 'high');
   assert.equal(choices.reviewer.effort, 'medium');
-  assert.equal(choices.orchestrator.entry, SEAT_TABLE.orchestrator.primary);
+  assert.equal(choices.consultant.entry, SEAT_TABLE.consultant.primary);
   assert.deepEqual(resolveSeatChoices(undefined), resolveSeatChoices([]));
 });
 
 test('labelNames reads plain arrays, getIssue connections, and objects, dropping junk', () => {
   assert.deepEqual(labelNames(['a', { name: 'b' }, null, 3]), ['a', 'b']);
-  assert.deepEqual(labelNames({ nodes: [{ name: 'orch-codex' }] }), ['orch-codex']);
+  assert.deepEqual(labelNames({ nodes: [{ name: 'adversary-codex' }] }), ['adversary-codex']);
   assert.deepEqual(labelNames(undefined), []);
 });
 
 test('the family rule accepts the default table and an explicitly differing pair', () => {
   assert.deepEqual(validateFamilyChoice(resolveSeatChoices([])), { ok: true });
   assert.deepEqual(
-    validateFamilyChoice(resolveSeatChoices(['builder-claude-opus', 'reviewer-codex'])),
+    validateFamilyChoice(resolveSeatChoices(['builder-claude-opus', 'adversary-codex'])),
     { ok: true },
   );
   assert.deepEqual(
-    validateFamilyChoice(resolveSeatChoices(['builder-deepseek-flash', 'reviewer-claude-sonnet'])),
+    validateFamilyChoice(resolveSeatChoices(['builder-deepseek-flash', 'adversary-claude-sonnet'])),
     { ok: true },
   );
 });
 
 test('the family rule rejects a same-family builder/reviewer pair, in one sentence naming both models', () => {
-  const result = validateFamilyChoice(resolveSeatChoices(['builder-claude-opus', 'reviewer-claude-sonnet']));
+  const result = validateFamilyChoice(resolveSeatChoices(['builder-claude-opus', 'adversary-claude-sonnet']));
   assert.equal(result.ok, false);
   assert.match(result.reason, /builder-claude-opus/);
-  assert.match(result.reason, /reviewer-claude-sonnet/);
+  assert.match(result.reason, /adversary-claude-sonnet/);
   assert.match(result.reason, /different families/);
 });
 
@@ -168,6 +236,7 @@ test('a seat fallback that keeps builder and reviewer in different families is a
   assert.equal(result.ok, true);
   assert.equal(result.choices.builder.entry, 'pi-deepseek');
   assert.equal(result.choices.builder.modelLabel, 'builder-deepseek-flash');
+  assert.equal(result.choices['feature-builder'].entry, 'pi-deepseek', 'the agent-keyed entry moves too');
   assert.equal(result.choices.reviewer.entry, 'codex');
 });
 
@@ -194,7 +263,7 @@ test('a leftover GLM label is refused with a plain reason: no launch entry, no s
     assert.equal(choices[agent].modelLabel, label);
     const verdict = validateFamilyChoice(choices);
     assert.equal(verdict.ok, false);
-    assert.match(verdict.reason, new RegExp(`${agent} carries the retired label ${label}`));
+    assert.match(verdict.reason, new RegExp(`${agent} carries the retired label ${label.replace('.', '\\.')}`));
     assert.match(verdict.reason, /change it to a current/);
     // The queue must not paper over it by adding a default model label.
     assert.ok(!missingSeatLabels([label]).some((name) => name.startsWith(`${code}-`) && !name.includes('-effort-')));
@@ -203,48 +272,64 @@ test('a leftover GLM label is refused with a plain reason: no launch entry, no s
 });
 
 test('the family rule rejects an unknown seat-table entry', () => {
-  const result = validateFamilyChoice({
-    orchestrator: { entry: 'claude' },
-    builder: { entry: 'gemini' },
-    reviewer: { entry: 'codex' },
-  });
+  const result = validateFamilyChoice({ ...resolveSeatChoices([]), builder: { entry: 'gemini' } });
   assert.equal(result.ok, false);
-  assert.match(result.reason, /builder/);
-  assert.match(result.reason, /unknown seat-table entry/);
+  assert.match(result.reason, /feature-builder/);
+  assert.match(result.reason, /unknown seat-table entry \(gemini\)/);
+  // And an unknown entry on a seat that is NOT dispatched is caught too: all
+  // six agents are checked, not only the builder/reviewer pair.
+  const consultant = validateFamilyChoice({ ...resolveSeatChoices([]), consultant: { entry: 'gemini' } });
+  assert.equal(consultant.ok, false);
+  assert.match(consultant.reason, /consultant resolved to an unknown seat-table entry/);
 });
 
-test('missingSeatLabels returns exactly the default model and effort labels not already present', () => {
+// JUL-97 step 2, item 5: the twelve labels the team template applies, with
+// exactly the names the live board holds.
+test('missingSeatLabels returns exactly the twelve default model and effort labels not already present', () => {
   assert.deepEqual(missingSeatLabels([]), [
-    'orch-claude-opus',
-    'orch-effort-medium',
     'builder-claude-opus',
     'builder-effort-medium',
-    'reviewer-codex',
-    'reviewer-effort-medium',
+    'fixer-claude-opus',
+    'fixer-effort-medium',
+    'refactor-claude-opus',
+    'refactor-effort-medium',
+    'adversary-codex',
+    'adversary-effort-medium',
+    'evidence-codex',
+    'evidence-effort-medium',
+    'consultant-claude-opus',
+    'consultant-effort-medium',
   ]);
+  assert.equal(missingSeatLabels([]).length, 12);
+  // Twelve, not fourteen: the two dispatch aliases name agents already in the
+  // list and must not duplicate their labels.
+  assert.equal(new Set(missingSeatLabels([])).size, 12);
   assert.deepEqual(missingSeatLabels(['builder-claude-opus', 'builder-effort-high']), [
-    'orch-claude-opus',
-    'orch-effort-medium',
-    'reviewer-codex',
-    'reviewer-effort-medium',
+    'fixer-claude-opus',
+    'fixer-effort-medium',
+    'refactor-claude-opus',
+    'refactor-effort-medium',
+    'adversary-codex',
+    'adversary-effort-medium',
+    'evidence-codex',
+    'evidence-effort-medium',
+    'consultant-claude-opus',
+    'consultant-effort-medium',
   ]);
-  assert.deepEqual(
-    missingSeatLabels(['orch-codex', 'builder-deepseek-pro', 'reviewer-claude-haiku','orch-effort-low', 'builder-effort-high', 'reviewer-effort-medium']),
-    [],
-  );
+  assert.deepEqual(missingSeatLabels(missingSeatLabels([])), []);
 });
 
 test('seatChoicesForIssue resolves the exact shape linear-cli getIssue returns', () => {
   const issue = {
     id: 'uuid-1',
     identifier: 'JUL-79',
-    labels: { nodes: [{ name: 'builder-claude-opus' }, { name: 'reviewer-codex' }, { name: 'orch-effort-high' }] },
+    labels: { nodes: [{ name: 'builder-claude-opus' }, { name: 'adversary-codex' }, { name: 'consultant-effort-high' }] },
   };
   const choices = seatChoicesForIssue(issue);
   assert.equal(choices.builder.entry, 'claude');
   assert.equal(choices.reviewer.entry, 'codex');
-  assert.equal(choices.orchestrator.effort, 'high');
-  assert.equal(choices.orchestrator.entry, SEAT_TABLE.orchestrator.primary);
+  assert.equal(choices.consultant.effort, 'high');
+  assert.equal(choices.consultant.entry, SEAT_TABLE.consultant.primary);
 });
 
 // --- JUL-79 step 8 follow-up: the guard must be callable and tested by the
@@ -255,12 +340,12 @@ test('the specific unsafe combination -- builder primary claude plus reviewer ba
   // ('claude') against SEAT_TABLE.reviewer.backup ('claude'), the collision
   // the family rule exists to prevent. Pin both the direct validation and the
   // fallback path that a capped reviewer takes.
-  assert.equal(SEAT_TABLE.builder.primary, 'claude');
-  assert.equal(SEAT_TABLE.reviewer.backup, 'claude');
+  assert.equal(SEAT_TABLE['feature-builder'].primary, 'claude');
+  assert.equal(SEAT_TABLE['adversarial-reviewer'].backup, 'claude');
   const unsafePair = {
-    orchestrator: { entry: SEAT_TABLE.orchestrator.primary },
-    builder: { entry: SEAT_TABLE.builder.primary },
-    reviewer: { entry: SEAT_TABLE.reviewer.backup },
+    ...resolveSeatChoices([]),
+    builder: { entry: SEAT_TABLE['feature-builder'].primary },
+    reviewer: { entry: SEAT_TABLE['adversarial-reviewer'].backup },
   };
   const validated = validateFamilyChoice(unsafePair);
   assert.equal(validated.ok, false);
@@ -283,8 +368,14 @@ test('the fallback CLI allows reviewer -> claude when the builder is on pi-deeps
   const { out, err, code } = runCli(['fallback', '--seat', 'reviewer', '--builder', 'pi-deepseek']);
   assert.equal(code, 0);
   assert.equal(err, '');
-  assert.deepEqual(JSON.parse(out), { seat: 'reviewer', entry: 'claude', modelLabel: 'reviewer-claude-opus' });
+  // `--seat reviewer` keeps working and still names the adversarial reviewer;
+  // the printed label carries that seat's live board prefix.
+  assert.deepEqual(JSON.parse(out), { seat: 'reviewer', entry: 'claude', modelLabel: 'adversary-claude-opus' });
   assert.match(out, /\n {2}"seat"/);
+  // The agent key spells the same fallback.
+  const byAgentKey = runCli(['fallback', '--seat', 'adversarial-reviewer', '--builder', 'pi-deepseek']);
+  assert.equal(byAgentKey.code, 0);
+  assert.equal(JSON.parse(byAgentKey.out).entry, 'claude');
 });
 
 test('the fallback CLI is a real entry point: the process itself refuses the builder-primary reviewer-backup pair, non-zero', async () => {
@@ -300,7 +391,7 @@ test('the fallback CLI is a real entry point: the process itself refuses the bui
 
 test('the fallback CLI is a real entry point: the process itself allows the reviewer fallback off a pi-deepseek builder', async () => {
   const { stdout } = await execFileAsync(process.execPath, [SEAT_LABELS_CLI, 'fallback', '--seat', 'reviewer', '--builder', 'pi-deepseek']);
-  assert.deepEqual(JSON.parse(stdout), { seat: 'reviewer', entry: 'claude', modelLabel: 'reviewer-claude-opus' });
+  assert.deepEqual(JSON.parse(stdout), { seat: 'reviewer', entry: 'claude', modelLabel: 'adversary-claude-opus' });
 });
 
 test('the fallback CLI treats a bad seat or an unknown builder entry as a one-line usage error, not a refusal', () => {
@@ -310,4 +401,8 @@ test('the fallback CLI treats a bad seat or an unknown builder entry as a one-li
   const unknownBuilder = runCli(['fallback', '--seat', 'reviewer', '--builder', 'gemini']);
   assert.equal(unknownBuilder.code, 2);
   assert.match(unknownBuilder.err, /^usage: /);
+  // `orchestrator` is no longer a seat: the vocabulary is the board's six.
+  const retiredSeat = runCli(['fallback', '--seat', 'orchestrator']);
+  assert.equal(retiredSeat.code, 2);
+  assert.match(retiredSeat.err, /^usage: /);
 });
