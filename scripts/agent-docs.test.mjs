@@ -17,6 +17,19 @@ test('CLAUDE.md states the standing cleanup rule for agent-created test/throwawa
   assert.match(text, /before its ticket counts as\s+done/i);
 });
 
+// Laptop sessions do not load the coordinator skill, so the card-hygiene rules
+// live here, where every session reads them (Todd, 2026-09-21): tick as you go,
+// and finish the card (UAT, assigned to Todd, never Complete).
+test('CLAUDE.md carries the two card-hygiene rules for laptop sessions: tick as you go, and finish the card', () => {
+  const text = read('CLAUDE.md');
+  assert.match(text, /\*\*Tick as you go\.\*\*/);
+  assert.match(text, /the\s+moment\s+its\s+evidence\s+is\s+posted,\s+in\s+the\s+same\s+step/i);
+  assert.match(text, /never\s+tick\s+at\s+the\s+end,\s+and\s+never\s+tick\s+before\s+the\s+evidence\s+exists/i);
+  assert.match(text, /\*\*Finish the card\.\*\*/);
+  assert.match(text, /move\s+the\s+card\s+to\s+UAT\s+and\s+assign\s+it\s+to\s+Todd/i);
+  assert.match(text, /never\s+move\s+it\s+to\s+Complete;\s+acceptance\s+is\s+Todd's/i);
+});
+
 test('the coordinator skill states the same standing cleanup rule in its own voice', () => {
   const text = read('.claude/skills/julia-coordinator/SKILL.md');
   assert.match(text, /test\s+or\s+throwaway/i);

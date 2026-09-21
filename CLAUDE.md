@@ -11,6 +11,10 @@ reason is "the graph is broken and can't repair itself" (for example: the fix ne
 sign-in only Todd's account can do, or the thing that broke is the graph's own launcher). If the
 honest answer is anything else, stop: put the work in the Ready queue instead and end the session.
 
+**Tick as you go.** Tick each checkbox on the card you're working the moment its evidence is posted, in the same step. Never tick at the end, and never tick before the evidence exists. The checkbox count is Todd's only view of progress.
+
+**Finish the card.** When the work is done and the report is posted, move the card to UAT and assign it to Todd. Never leave a finished card in Backlog, and never move it to Complete; acceptance is Todd's.
+
 ## Reaching the server
 
 Do not stop and ask whether you can reach the server. The route is set up and used every day:
