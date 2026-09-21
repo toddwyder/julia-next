@@ -1,0 +1,174 @@
+{
+  "id": "317cc55b-5645-4251-895a-9134e4665499",
+  "ok": true,
+  "result": {
+    "dispatch": {
+      "id": "ctx_e3c93fd9ac95",
+      "runId": "run_b120a7719f64",
+      "taskId": "task_30e2c77fe39c",
+      "task_id": "task_30e2c77fe39c",
+      "contractVersion": 1,
+      "assigneeHandle": null,
+      "assigneePaneKey": null,
+      "processIncarnation": null,
+      "capabilityRevokedAt": "2026-09-20T23:08:58.255Z",
+      "retryOfDispatchId": null,
+      "creatorDispatchId": null,
+      "hostScope": null,
+      "status": "failed",
+      "failureCount": 0,
+      "lastFailure": "{\"provenance\":\"worker_report\",\"outcome\":\"failed\",\"messageId\":\"relay_1b7744683a7d\",\"reportedBy\":\"dispatch:ctx_e3c93fd9ac95\",\"subject\":\"Failed: /home/runner/jul109b-flag.txt missing\",\"body\":\"I checked for the required probe file /home/runner/jul109b-flag.txt with the shell (ls -la) and confirmed it does not exist. Because the file is missing, the probe task could not be completed as specified, and I created or modified no files. Nothing is left to do on my side; this is a deliberate failure probe expecting outcome failed.\",\"completedBy\":\"dispatch:ctx_e3c93fd9ac95\",\"filesModified\":[],\"reportPath\":null,\"completedAt\":\"2026-09-20T23:08:58.254Z\"}",
+      "terminationReason": null,
+      "depth": 1,
+      "dispatchedAt": "2026-09-20 23:08:54",
+      "completedAt": "2026-09-20T23:08:58.255Z",
+      "createdAt": "2026-09-20 23:08:54",
+      "lastHeartbeatAt": null
+    },
+    "worker": {
+      "dispatchId": "ctx_e3c93fd9ac95",
+      "runtimeEpoch": "1e7c1ad9-9f69-4fb5-95b2-b3d914969117",
+      "state": "failed",
+      "stage": "settled",
+      "worktreeId": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109b-pi",
+      "agentTerminalHandle": "term_80b4cfbb-6b6c-474f-ba3f-1e258617862f",
+      "setupState": "not_applicable",
+      "effects": [
+        {
+          "kind": "worktree",
+          "action": "reused",
+          "id": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109b-pi"
+        },
+        {
+          "kind": "setup",
+          "action": "not_applicable",
+          "state": "not_applicable"
+        },
+        {
+          "kind": "terminal",
+          "role": "agent",
+          "action": "reused",
+          "id": "term_80b4cfbb-6b6c-474f-ba3f-1e258617862f"
+        },
+        {
+          "kind": "dispatch_input",
+          "role": "agent",
+          "id": "term_80b4cfbb-6b6c-474f-ba3f-1e258617862f",
+          "state": "accepted"
+        }
+      ],
+      "residualResources": [],
+      "startOptions": {
+        "on": "e8b75ed2-0f00-4b2f-ac90-2bfcea792089",
+        "serverName": "ovh-local",
+        "worktree": "path:/home/runner/orca/workspaces/julia-next/jul109b-pi",
+        "name": null,
+        "repo": null,
+        "baseBranch": null,
+        "terminal": "term_80b4cfbb-6b6c-474f-ba3f-1e258617862f",
+        "agent": null,
+        "launch": {
+          "requested": {
+            "agent": null,
+            "model": null,
+            "effort": null
+          },
+          "effective": null
+        },
+        "timeoutMs": 60000,
+        "setup": "not_applicable",
+        "setupSource": "existing_worktree"
+      },
+      "lastError": null,
+      "createdAt": "2026-09-20 23:08:54",
+      "updatedAt": "2026-09-20T23:08:58.256Z"
+    },
+    "projection": {
+      "id": "ctx_e3c93fd9ac95",
+      "dispatchId": "ctx_e3c93fd9ac95",
+      "taskId": "task_30e2c77fe39c",
+      "runId": "run_b120a7719f64",
+      "role": "worker",
+      "parent": null,
+      "provider": null,
+      "host": {
+        "kind": "remote",
+        "id": "e8b75ed2-0f00-4b2f-ac90-2bfcea792089"
+      },
+      "workspace": {
+        "id": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109b-pi",
+        "kind": "folder_or_worktree"
+      },
+      "stage": {
+        "worker": "failed",
+        "dispatch": "failed",
+        "detail": "settled",
+        "activity": "unknown"
+      },
+      "outcome": "failed",
+      "liveness": {
+        "verdict": "live",
+        "observedAt": 1789945780712,
+        "source": "execution_host"
+      },
+      "evidence": {
+        "durable": true,
+        "liveStatus": "fresh",
+        "lastObservedAt": 1789945780712
+      },
+      "resource": {
+        "state": "absent",
+        "reason": "not_materialized"
+      },
+      "nextAction": {
+        "kind": "inspect",
+        "argv": [
+          "orchestration",
+          "worker-show",
+          "--dispatch",
+          "ctx_e3c93fd9ac95"
+        ]
+      },
+      "attention": {
+        "categories": [
+          "failure"
+        ],
+        "requiresAction": true
+      }
+    },
+    "server": {
+      "environmentId": "e8b75ed2-0f00-4b2f-ac90-2bfcea792089",
+      "name": "ovh-local"
+    },
+    "remoteRuntimeEpoch": "15dfff83-3c19-44d6-83e4-cb5a753d9033",
+    "terminal": {
+      "handle": "term_80b4cfbb-6b6c-474f-ba3f-1e258617862f",
+      "ptyId": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109b-pi@@1edf39f0",
+      "incarnationId": "b86ebcc7-6381-41ec-a837-8851ac5ca354",
+      "orphaned": false,
+      "worktreeId": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109b-pi",
+      "worktreePath": "/home/runner/orca/workspaces/julia-next/jul109b-pi",
+      "branch": "refs/heads/jul109b-pi",
+      "tabId": "ea4b8540-7786-48e0-9ce5-cdb80851d2fa",
+      "leafId": "217663e4-caa8-4405-b729-699fc9d75530",
+      "title": "π - jul109b-pi",
+      "connected": true,
+      "writable": true,
+      "lastOutputAt": 1789945739046,
+      "preview": "file in the body. No files were created or touched.\n────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────",
+      "executionHostId": "local",
+      "agentIdentity": "pi",
+      "paneRuntimeId": -1,
+      "rendererGraphEpoch": 0,
+      "agentWait": null
+    },
+    "observation": {
+      "status": "live",
+      "exactWorker": true,
+      "agentWait": null
+    }
+  },
+  "_meta": {
+    "runtimeId": "1e7c1ad9-9f69-4fb5-95b2-b3d914969117"
+  }
+}

@@ -1,0 +1,181 @@
+{
+  "id": "aedef16f-4564-4720-9de1-4236948923bc",
+  "ok": true,
+  "result": {
+    "dispatch": {
+      "id": "ctx_9a7611eda85d",
+      "runId": "run_b120a7719f64",
+      "taskId": "task_9a937c258f09",
+      "task_id": "task_9a937c258f09",
+      "contractVersion": 1,
+      "assigneeHandle": null,
+      "assigneePaneKey": null,
+      "processIncarnation": null,
+      "capabilityRevokedAt": "2026-09-20T23:05:00.475Z",
+      "retryOfDispatchId": null,
+      "creatorDispatchId": null,
+      "hostScope": null,
+      "status": "failed",
+      "failureCount": 0,
+      "lastFailure": "{\"provenance\":\"worker_report\",\"outcome\":\"failed\",\"messageId\":\"relay_78a69f6366f7\",\"reportedBy\":\"dispatch:ctx_9a7611eda85d\",\"subject\":\"Failed: required file missing\",\"body\":\"I checked whether /home/runner/jul109b-flag.txt exists using the shell. The file /home/runner/jul109b-flag.txt is missing. The task cannot succeed until the required file exists, and I created or touched no files.\",\"completedBy\":\"dispatch:ctx_9a7611eda85d\",\"filesModified\":[],\"reportPath\":null,\"completedAt\":\"2026-09-20T23:05:00.474Z\"}",
+      "terminationReason": null,
+      "depth": 1,
+      "dispatchedAt": "2026-09-20 23:04:41",
+      "completedAt": "2026-09-20T23:05:00.475Z",
+      "createdAt": "2026-09-20 23:04:41",
+      "lastHeartbeatAt": null
+    },
+    "worker": {
+      "dispatchId": "ctx_9a7611eda85d",
+      "runtimeEpoch": "1e7c1ad9-9f69-4fb5-95b2-b3d914969117",
+      "state": "failed",
+      "stage": "settled",
+      "worktreeId": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109b-fail-codex",
+      "agentTerminalHandle": "term_9d460611-4bc9-4f5a-bae2-c2b49bf7a586",
+      "setupState": "not_configured",
+      "effects": [
+        {
+          "kind": "worktree",
+          "action": "created_top_level",
+          "id": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109b-fail-codex"
+        },
+        {
+          "kind": "terminal",
+          "role": "agent",
+          "action": "created",
+          "id": "term_9d460611-4bc9-4f5a-bae2-c2b49bf7a586",
+          "tabId": "bdb99d4f-fc9d-47e8-8f47-51ca4717ecd7",
+          "leafId": "5cd3218a-621c-4606-8765-ed83306f001f"
+        },
+        {
+          "kind": "setup",
+          "action": "run",
+          "requested": "run",
+          "effective": "run",
+          "source": "orchestration_default",
+          "hookFound": false,
+          "startupPolicy": "start-immediately",
+          "state": "not_configured"
+        },
+        {
+          "kind": "dispatch_input",
+          "role": "agent",
+          "id": "term_9d460611-4bc9-4f5a-bae2-c2b49bf7a586",
+          "state": "accepted"
+        }
+      ],
+      "residualResources": [],
+      "startOptions": {
+        "on": "e8b75ed2-0f00-4b2f-ac90-2bfcea792089",
+        "serverName": "ovh-local",
+        "worktree": "new-top-level",
+        "name": "jul109b-fail-codex",
+        "repo": "path:/home/runner/julia-next",
+        "baseBranch": "main",
+        "terminal": null,
+        "agent": "codex",
+        "launch": {
+          "requested": {
+            "agent": "codex",
+            "model": "gpt-6-astra",
+            "effort": "low"
+          },
+          "effective": null
+        },
+        "timeoutMs": 60000,
+        "setup": "run",
+        "setupSource": "orchestration_default"
+      },
+      "lastError": null,
+      "createdAt": "2026-09-20 23:04:41",
+      "updatedAt": "2026-09-20T23:05:00.475Z"
+    },
+    "projection": {
+      "id": "ctx_9a7611eda85d",
+      "dispatchId": "ctx_9a7611eda85d",
+      "taskId": "task_9a937c258f09",
+      "runId": "run_b120a7719f64",
+      "role": "worker",
+      "parent": null,
+      "provider": null,
+      "host": {
+        "kind": "remote",
+        "id": "e8b75ed2-0f00-4b2f-ac90-2bfcea792089"
+      },
+      "workspace": {
+        "id": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109b-fail-codex",
+        "kind": "folder_or_worktree"
+      },
+      "stage": {
+        "worker": "failed",
+        "dispatch": "failed",
+        "detail": "settled",
+        "activity": "unknown"
+      },
+      "outcome": "failed",
+      "liveness": {
+        "verdict": "live",
+        "observedAt": 1789945530998,
+        "source": "execution_host"
+      },
+      "evidence": {
+        "durable": true,
+        "liveStatus": "fresh",
+        "lastObservedAt": 1789945530998
+      },
+      "resource": {
+        "state": "absent",
+        "reason": "not_materialized"
+      },
+      "nextAction": {
+        "kind": "inspect",
+        "argv": [
+          "orchestration",
+          "worker-show",
+          "--dispatch",
+          "ctx_9a7611eda85d"
+        ]
+      },
+      "attention": {
+        "categories": [
+          "failure"
+        ],
+        "requiresAction": true
+      }
+    },
+    "server": {
+      "environmentId": "e8b75ed2-0f00-4b2f-ac90-2bfcea792089",
+      "name": "ovh-local"
+    },
+    "remoteRuntimeEpoch": "15dfff83-3c19-44d6-83e4-cb5a753d9033",
+    "terminal": {
+      "handle": "term_9d460611-4bc9-4f5a-bae2-c2b49bf7a586",
+      "ptyId": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109b-fail-codex@@5f95a6d1",
+      "incarnationId": "7617edee-f1a0-46a6-acee-f759bed89dc5",
+      "orphaned": false,
+      "worktreeId": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109b-fail-codex",
+      "worktreePath": "/home/runner/orca/workspaces/julia-next/jul109b-fail-codex",
+      "branch": "refs/heads/jul109b-fail-codex",
+      "tabId": "bdb99d4f-fc9d-47e8-8f47-51ca4717ecd7",
+      "leafId": "5cd3218a-621c-4606-8765-ed83306f001f",
+      "title": "Report task outcome | jul109b-fail-codex",
+      "connected": true,
+      "writable": true,
+      "lastOutputAt": 1789945502020,
+      "preview": " Working • orking  • rking  •king  ing • ng   g             6\n────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  › Ask Codex to do anything   gpt-6-astra low · ~/orca/workspaces/julia-next/jul109b-fail-codex · Report task outcome",
+      "executionHostId": "local",
+      "agentIdentity": "codex",
+      "paneRuntimeId": -1,
+      "rendererGraphEpoch": 0,
+      "agentWait": null
+    },
+    "observation": {
+      "status": "live",
+      "exactWorker": true,
+      "agentWait": null
+    }
+  },
+  "_meta": {
+    "runtimeId": "1e7c1ad9-9f69-4fb5-95b2-b3d914969117"
+  }
+}

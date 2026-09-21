@@ -50,8 +50,19 @@ Times are UTC. "probe N" is a real worker in its own brand-new worktree, all rem
 | `worktree-ps.agent-working.json` | `worktree ps --json`, cut to one worktree | probe 6 at 20:31:41: `agents[0].state: "working"` on a brand-new worktree |
 | `worktree-ps.pi-agent-done.json` | same | a Pi run in a plain terminal: `agentType: "pi"`, `state: "done"`, `lastAssistantMessage` |
 | `coordinator-grants.live.txt` | headless `claude -p` as `orchestrator-svc` with the exact `--allowedTools` list from `scripts/julia-run.mjs`, asked to try five commands | `orca status` allowed; `node -e`, `printenv`, `ls`, `git` refused |
-| `cost.claude-session.json`, `cost.codex-session.json`, `cost.pi-deepseek-stream.json` | read from one real session record each | the file says exactly which file and fields |
+| `cost.codex-session.json`, `cost.pi-deepseek-stream.json` | read from one real session record each | the file says exactly which file and fields |
 | `seat-probe.reviewer-backup.json`, `seat-probe.builder-backup.json` | `node ops/service-dropbox/run-pi-seat.mjs <seat>` in a plain Orca terminal on the runner's daemon | provider and model the run reported, its cost, and the terminal's own `id` |
+| `failure.claude.*`, `failure.codex.worker-show.json`, `failure.pi-adopted.worker-show.json`, `failure.mailbox.check-all.claude-codex-pi.json`, `failure.worker-list.all-vendors.json` | a worker told its task cannot be done reports `worker_done --outcome failed`; the coordinator was already blocked in `check --wait --types worker_done` | 23:01-23:09Z. `failure.claude.coordinator-wait-woke-on-worker-done.txt`: waiter woke at 23:01:15.537 on a report created 23:01:15. `worker-show`: `failed / settled`, `projection.outcome: failed`, `lastError: null`; the report is in the task `result` |
+| `failure.claude.retry-*`, `failure.claude.task-list-after-retry.json`, `failure.claude.worker-list-after-retry.json` | fix the cause, then `worker-start --task <same> --retry-of <failed dispatch>` | task goes `failed` to `completed`; new dispatch carries `retryOfDispatchId`; the failed one stays in history |
+| `base-checkout.replaced-in-place.worker-show.json` | fresh builder after the base checkout was replaced by a fresh clone at the same path | `succeeded` |
+| `base-checkout.new-path-untrusted.*` | fresh builder against a base checkout at a different path | `failed / agent_readiness / timeout`; the trust question |
+| `base-checkout.new-path-exact-trust.worker-show.json` | same, after trusting the exact new base path | `succeeded` |
+| `base-checkout.moved-not-reregistered.worker-start.error.json` | worker start after moving the base on disk without re-importing it in Orca | `repo_not_found` |
+| `cost.claude-vs-claude-code.session-*.json` | Claude Code's own cost record (`~/.claude.json` `last*`) beside the same session's transcript | the record's `lastModelUsage` is what the rate table is proven against; the transcript block counts each message id once |
+| `cost.claude-session.json` | probe 6's transcript, corrected | replaces the version in PR #64, which counted repeated lines twice |
+| `cost.pi.seat-json-stream.multi-turn.jsonl`, `cost.pi.rpc-get-session-stats.json` | the seat launcher's JSON output for a two-turn run that uses a tool; Pi's own `get_session_stats` in RPC mode | peak prompt 2,530 derived from per-call usage; Pi's own `contextUsage.tokens` 2,507 equals the last call's total |
+| `pi.timing.*.txt` | a wrapper that stamps start and exit around the seat | 2.416 s from either clock |
+| `pi-registry.deepseek.json` | Pi's built-in model list, the two seat models | Pi's rates (lower than DeepSeek's published price) and the 1,000,000 window |
 | `orca-1.4.200-to-1.4.205.commands.txt`, `orca-1.4.200-to-1.4.205.orchestration-guide.diff` | `orca agent-context --json` and `orca skills get orchestration --full`, before and after the upgrade | what the upgrade changed |
 
 ## Reading these safely
@@ -67,3 +78,7 @@ Times are UTC. "probe N" is a real worker in its own brand-new worktree, all rem
   for every worker, including ones that finished successfully. That is not a stuck signal.
 - Nothing in these files is a secret. They were scanned for keys, tokens and private-key headers before
   they were saved. Dispatch capabilities never appear in these payloads.
+- A Claude transcript writes one line per content block, so one message can appear twice with identical
+  usage. Any code reading these files must count each `message.id` once.
+- DeepSeek's published price and Pi's built-in price disagree (`graph/rate-table.mjs`, and the test that
+  records the disagreement). Neither is proven to be the real charge.

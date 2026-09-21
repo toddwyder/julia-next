@@ -1,0 +1,312 @@
+{
+  "id": "1796d257-d2ff-492b-ad89-34c0c8dfc39e",
+  "ok": true,
+  "result": {
+    "workers": [
+      {
+        "dispatchId": "ctx_49dfb0bddaef",
+        "taskId": "task_135f133bb075",
+        "runId": "run_b120a7719f64",
+        "workerState": "failed",
+        "dispatchStatus": "failed",
+        "agentTerminalHandle": null,
+        "terminalState": null,
+        "resource": null,
+        "projection": {
+          "id": "ctx_49dfb0bddaef",
+          "dispatchId": "ctx_49dfb0bddaef",
+          "taskId": "task_135f133bb075",
+          "runId": "run_b120a7719f64",
+          "role": "worker",
+          "parent": null,
+          "provider": null,
+          "host": {
+            "kind": "local",
+            "id": "local"
+          },
+          "workspace": {
+            "id": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109b-fail-claude",
+            "kind": "folder_or_worktree"
+          },
+          "stage": {
+            "worker": "failed",
+            "dispatch": "failed",
+            "detail": "released",
+            "activity": "unknown"
+          },
+          "outcome": "failed",
+          "liveness": {
+            "verdict": "exited",
+            "source": "execution_host"
+          },
+          "evidence": {
+            "durable": true,
+            "liveStatus": "unavailable",
+            "lastObservedAt": null
+          },
+          "resource": {
+            "state": "absent",
+            "reason": "not_materialized"
+          },
+          "nextAction": {
+            "kind": "none",
+            "argv": []
+          },
+          "attention": {
+            "categories": [
+              "failure"
+            ],
+            "requiresAction": true
+          }
+        }
+      },
+      {
+        "dispatchId": "ctx_0092f7e05aae",
+        "taskId": "task_135f133bb075",
+        "runId": "run_b120a7719f64",
+        "workerState": "succeeded",
+        "dispatchStatus": "completed",
+        "agentTerminalHandle": "term_3826e77a-0eac-4542-9b33-cb064b9d33fd",
+        "terminalState": "retained",
+        "resource": null,
+        "projection": {
+          "id": "ctx_0092f7e05aae",
+          "dispatchId": "ctx_0092f7e05aae",
+          "taskId": "task_135f133bb075",
+          "runId": "run_b120a7719f64",
+          "role": "worker",
+          "parent": null,
+          "provider": null,
+          "host": {
+            "kind": "local",
+            "id": "local"
+          },
+          "workspace": {
+            "id": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109b-retry-claude",
+            "kind": "folder_or_worktree"
+          },
+          "stage": {
+            "worker": "succeeded",
+            "dispatch": "completed",
+            "detail": "settled",
+            "activity": "unknown"
+          },
+          "outcome": "succeeded",
+          "liveness": {
+            "verdict": "unverifiable",
+            "reason": "missing_status"
+          },
+          "evidence": {
+            "durable": true,
+            "liveStatus": "unavailable",
+            "lastObservedAt": null
+          },
+          "resource": {
+            "state": "absent",
+            "reason": "not_materialized"
+          },
+          "nextAction": {
+            "kind": "none",
+            "argv": []
+          },
+          "attention": {
+            "categories": [
+              "unverifiable",
+              "root_completion"
+            ],
+            "requiresAction": true
+          }
+        }
+      },
+      {
+        "dispatchId": "ctx_9a7611eda85d",
+        "taskId": "task_9a937c258f09",
+        "runId": "run_b120a7719f64",
+        "workerState": "failed",
+        "dispatchStatus": "failed",
+        "agentTerminalHandle": "term_9d460611-4bc9-4f5a-bae2-c2b49bf7a586",
+        "terminalState": "retained",
+        "resource": null,
+        "projection": {
+          "id": "ctx_9a7611eda85d",
+          "dispatchId": "ctx_9a7611eda85d",
+          "taskId": "task_9a937c258f09",
+          "runId": "run_b120a7719f64",
+          "role": "worker",
+          "parent": null,
+          "provider": null,
+          "host": {
+            "kind": "local",
+            "id": "local"
+          },
+          "workspace": {
+            "id": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109b-fail-codex",
+            "kind": "folder_or_worktree"
+          },
+          "stage": {
+            "worker": "failed",
+            "dispatch": "failed",
+            "detail": "settled",
+            "activity": "unknown"
+          },
+          "outcome": "failed",
+          "liveness": {
+            "verdict": "unverifiable",
+            "reason": "missing_status"
+          },
+          "evidence": {
+            "durable": true,
+            "liveStatus": "unavailable",
+            "lastObservedAt": null
+          },
+          "resource": {
+            "state": "absent",
+            "reason": "not_materialized"
+          },
+          "nextAction": {
+            "kind": "none",
+            "argv": []
+          },
+          "attention": {
+            "categories": [
+              "failure",
+              "unverifiable"
+            ],
+            "requiresAction": true
+          }
+        }
+      },
+      {
+        "dispatchId": "ctx_071f0415dc3c",
+        "taskId": "task_aab36fc155f8",
+        "runId": "run_b120a7719f64",
+        "workerState": "ready",
+        "dispatchStatus": "dispatched",
+        "agentTerminalHandle": "term_1b5fb322-b1fc-4f52-97c8-2c6d0f895a9c",
+        "terminalState": "retained",
+        "resource": null,
+        "projection": {
+          "id": "ctx_071f0415dc3c",
+          "dispatchId": "ctx_071f0415dc3c",
+          "taskId": "task_aab36fc155f8",
+          "runId": "run_b120a7719f64",
+          "role": "worker",
+          "parent": null,
+          "provider": null,
+          "host": {
+            "kind": "local",
+            "id": "local"
+          },
+          "workspace": {
+            "id": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109b-pi",
+            "kind": "folder_or_worktree"
+          },
+          "stage": {
+            "worker": "ready",
+            "dispatch": "dispatched",
+            "detail": "input_accepted",
+            "activity": "unknown"
+          },
+          "outcome": "in_progress",
+          "liveness": {
+            "verdict": "unverifiable",
+            "reason": "missing_status"
+          },
+          "evidence": {
+            "durable": true,
+            "liveStatus": "unavailable",
+            "lastObservedAt": null
+          },
+          "resource": {
+            "state": "absent",
+            "reason": "not_materialized"
+          },
+          "nextAction": {
+            "kind": "none",
+            "argv": []
+          },
+          "attention": {
+            "categories": [
+              "unverifiable"
+            ],
+            "requiresAction": true
+          }
+        }
+      },
+      {
+        "dispatchId": "ctx_e3c93fd9ac95",
+        "taskId": "task_30e2c77fe39c",
+        "runId": "run_b120a7719f64",
+        "workerState": "failed",
+        "dispatchStatus": "failed",
+        "agentTerminalHandle": "term_80b4cfbb-6b6c-474f-ba3f-1e258617862f",
+        "terminalState": "retained",
+        "resource": null,
+        "projection": {
+          "id": "ctx_e3c93fd9ac95",
+          "dispatchId": "ctx_e3c93fd9ac95",
+          "taskId": "task_30e2c77fe39c",
+          "runId": "run_b120a7719f64",
+          "role": "worker",
+          "parent": null,
+          "provider": null,
+          "host": {
+            "kind": "local",
+            "id": "local"
+          },
+          "workspace": {
+            "id": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul109b-pi",
+            "kind": "folder_or_worktree"
+          },
+          "stage": {
+            "worker": "failed",
+            "dispatch": "failed",
+            "detail": "settled",
+            "activity": "unknown"
+          },
+          "outcome": "failed",
+          "liveness": {
+            "verdict": "unverifiable",
+            "reason": "missing_status"
+          },
+          "evidence": {
+            "durable": true,
+            "liveStatus": "unavailable",
+            "lastObservedAt": null
+          },
+          "resource": {
+            "state": "absent",
+            "reason": "not_materialized"
+          },
+          "nextAction": {
+            "kind": "none",
+            "argv": []
+          },
+          "attention": {
+            "categories": [
+              "failure",
+              "unverifiable"
+            ],
+            "requiresAction": true
+          }
+        }
+      }
+    ],
+    "counts": {
+      "retained": 4
+    },
+    "page": {
+      "limit": 100,
+      "total": 5,
+      "hasMore": false,
+      "nextCursor": null
+    },
+    "scope": {
+      "run": "run_b120a7719f64",
+      "source": "flag"
+    }
+  },
+  "_meta": {
+    "runtimeId": "1e7c1ad9-9f69-4fb5-95b2-b3d914969117"
+  }
+}

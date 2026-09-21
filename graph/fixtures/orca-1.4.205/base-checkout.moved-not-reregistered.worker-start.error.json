@@ -1,0 +1,42 @@
+{
+  "id": "74d4bfe4-5124-4ff7-b6a0-0e9ed0cc8023",
+  "ok": true,
+  "result": {
+    "taskId": "task_6ffc16008205",
+    "dispatchId": "ctx_0c1f19fc9aff",
+    "state": "outcome_unknown",
+    "stage": "remote_attach",
+    "server": {
+      "name": "ovh-local"
+    },
+    "launch": {
+      "requested": {
+        "agent": "claude",
+        "model": "claude-sonnet-5",
+        "effort": "low"
+      },
+      "effective": null
+    },
+    "failedStage": "remote_attach",
+    "lastError": "repo_not_found",
+    "effects": [],
+    "residualResources": [],
+    "nextCommands": [
+      "orca-ide orchestration worker-show --dispatch ctx_0c1f19fc9aff --json",
+      "orca-ide orchestration worker-abandon --dispatch ctx_0c1f19fc9aff --json"
+    ],
+    "mode": {
+      "mode": "terminal",
+      "preferred": "terminal",
+      "reason": "user_default",
+      "detail": "Started a terminal agent worker, the default for new agent tabs in your settings."
+    },
+    "mutation": {
+      "requestId": "16d4af8f-3aae-499d-af7a-6305742cfbc2",
+      "replayed": false
+    }
+  },
+  "_meta": {
+    "runtimeId": "1e7c1ad9-9f69-4fb5-95b2-b3d914969117"
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "stats": {
+    "id": "s1",
+    "type": "response",
+    "command": "get_session_stats",
+    "success": true,
+    "data": {
+      "sessionId": "01a0c10b-ba21-76fb-91ff-7594e98931d6",
+      "userMessages": 1,
+      "assistantMessages": 2,
+      "toolCalls": 1,
+      "toolResults": 1,
+      "totalMessages": 4,
+      "tokens": {
+        "input": 2150,
+        "output": 40,
+        "cacheRead": 2688,
+        "cacheWrite": 0,
+        "total": 4878
+      },
+      "cost": 0.0003197264,
+      "contextUsage": {
+        "tokens": 2507,
+        "contextWindow": 1000000,
+        "percent": 0.25070000000000003
+      }
+    }
+  },
+  "assistant_usage": [
+    {
+      "input": 1950,
+      "output": 37,
+      "cacheRead": 384,
+      "cacheWrite": 0,
+      "reasoning": 0,
+      "totalTokens": 2371,
+      "cost": {
+        "input": 0.000273,
+        "output": 0.00001036,
+        "cacheRead": 0.0000010751999999999999,
+        "cacheWrite": 0,
+        "total": 0.00028443520000000005
+      }
+    },
+    {
+      "input": 200,
+      "output": 3,
+      "cacheRead": 2304,
+      "cacheWrite": 0,
+      "reasoning": 0,
+      "totalTokens": 2507,
+      "cost": {
+        "input": 0.000028000000000000003,
+        "output": 8.4e-7,
+        "cacheRead": 0.000006451199999999999,
+        "cacheWrite": 0,
+        "total": 0.0000352912
+      }
+    }
+  ]
+}

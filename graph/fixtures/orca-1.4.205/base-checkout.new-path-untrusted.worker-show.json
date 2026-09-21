@@ -1,0 +1,146 @@
+{
+  "id": "ee38ae45-d7d4-45c2-8438-6870e95c216a",
+  "ok": true,
+  "result": {
+    "dispatch": {
+      "id": "ctx_b49a9b2e7e9f",
+      "runId": "run_b120a7719f64",
+      "taskId": "task_9b75e45823be",
+      "task_id": "task_9b75e45823be",
+      "contractVersion": 1,
+      "assigneeHandle": null,
+      "assigneePaneKey": null,
+      "processIncarnation": null,
+      "capabilityRevokedAt": "2026-09-20T23:13:27.695Z",
+      "retryOfDispatchId": null,
+      "creatorDispatchId": null,
+      "hostScope": null,
+      "status": "failed",
+      "failureCount": 0,
+      "lastFailure": "timeout",
+      "terminationReason": null,
+      "depth": 1,
+      "dispatchedAt": "2026-09-20 23:12:27",
+      "completedAt": "2026-09-20T23:13:27.695Z",
+      "createdAt": "2026-09-20 23:12:27",
+      "lastHeartbeatAt": null
+    },
+    "worker": {
+      "dispatchId": "ctx_b49a9b2e7e9f",
+      "runtimeEpoch": "1e7c1ad9-9f69-4fb5-95b2-b3d914969117",
+      "state": "failed",
+      "stage": "agent_readiness",
+      "worktreeId": null,
+      "agentTerminalHandle": null,
+      "setupState": "not_configured",
+      "effects": [
+        {
+          "kind": "worktree",
+          "action": "created_top_level",
+          "id": "4a6bfd30-241d-4332-95b8-724bc2fe6918::/home/runner/orca/workspaces/julia-next-b/probe-newbase-untrusted"
+        },
+        {
+          "kind": "terminal",
+          "role": "agent",
+          "action": "created",
+          "id": "term_d7f18caa-53a2-4359-ba20-eb0d4ccad59b",
+          "tabId": "44e2858e-42c1-49a5-8ffd-937f515b91b3",
+          "leafId": "b98aef1a-d65d-4a31-9000-9aa3ee928321"
+        },
+        {
+          "kind": "setup",
+          "action": "run",
+          "requested": "run",
+          "effective": "run",
+          "source": "orchestration_default",
+          "hookFound": false,
+          "startupPolicy": "start-immediately",
+          "state": "not_configured"
+        }
+      ],
+      "residualResources": [],
+      "startOptions": {
+        "on": "e8b75ed2-0f00-4b2f-ac90-2bfcea792089",
+        "serverName": "ovh-local",
+        "worktree": "new-top-level",
+        "name": "probe-newbase-untrusted",
+        "repo": "path:/home/runner/jul109b-base/julia-next-b",
+        "baseBranch": "main",
+        "terminal": null,
+        "agent": "claude",
+        "launch": {
+          "requested": {
+            "agent": "claude",
+            "model": "claude-sonnet-5",
+            "effort": "low"
+          },
+          "effective": null
+        },
+        "timeoutMs": 60000,
+        "setup": "run",
+        "setupSource": "orchestration_default"
+      },
+      "lastError": "timeout",
+      "createdAt": "2026-09-20 23:12:27",
+      "updatedAt": "2026-09-20T23:13:53.240Z"
+    },
+    "projection": {
+      "id": "ctx_b49a9b2e7e9f",
+      "dispatchId": "ctx_b49a9b2e7e9f",
+      "taskId": "task_9b75e45823be",
+      "runId": "run_b120a7719f64",
+      "role": "worker",
+      "parent": null,
+      "provider": null,
+      "host": {
+        "kind": "remote",
+        "id": "e8b75ed2-0f00-4b2f-ac90-2bfcea792089"
+      },
+      "workspace": null,
+      "stage": {
+        "worker": "failed",
+        "dispatch": "failed",
+        "detail": "agent_readiness",
+        "activity": "unknown"
+      },
+      "outcome": "failed",
+      "liveness": {
+        "verdict": "unverifiable",
+        "reason": "host_indeterminate"
+      },
+      "evidence": {
+        "durable": true,
+        "liveStatus": "unavailable",
+        "lastObservedAt": null
+      },
+      "resource": {
+        "state": "absent",
+        "reason": "not_materialized"
+      },
+      "nextAction": {
+        "kind": "none",
+        "argv": []
+      },
+      "attention": {
+        "categories": [
+          "failure",
+          "unverifiable"
+        ],
+        "requiresAction": true
+      }
+    },
+    "server": {
+      "environmentId": "e8b75ed2-0f00-4b2f-ac90-2bfcea792089",
+      "name": "ovh-local"
+    },
+    "remoteRuntimeEpoch": "15dfff83-3c19-44d6-83e4-cb5a753d9033",
+    "terminal": null,
+    "observation": {
+      "status": "identity_changed",
+      "exactWorker": false
+    }
+  },
+  "_meta": {
+    "runtimeId": "1e7c1ad9-9f69-4fb5-95b2-b3d914969117"
+  }
+}

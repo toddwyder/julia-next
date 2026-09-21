@@ -1,0 +1,43 @@
+{
+  "what": "Claude Code's own cost record for an older session (probe 1 of the first round), kept only as a second pair of token counts and dollars to check the rate table against.",
+  "claudeCodeRecord": {
+    "lastCost": 0.11455,
+    "lastAPIDuration": 11278,
+    "lastAPIDurationWithoutRetries": 11217,
+    "lastToolDuration": 911,
+    "lastDuration": 269637,
+    "lastStartTime": 1789935548185,
+    "lastLinesAdded": 0,
+    "lastLinesRemoved": 0,
+    "lastTotalInputTokens": 2914,
+    "lastTotalOutputTokens": 309,
+    "lastTotalCacheCreationInputTokens": 18922,
+    "lastTotalCacheReadInputTokens": 162125,
+    "lastTotalWebSearchRequests": 0,
+    "lastFpsAverage": 0.44,
+    "lastFpsLow1Pct": 55.01,
+    "lastGracefulShutdown": false,
+    "lastVersionBase": "2.1.269",
+    "lastModelUsage": {
+      "claude-haiku-4-5-20251001": {
+        "inputTokens": 2406,
+        "outputTokens": 15,
+        "thinkingTokens": 0,
+        "cacheReadInputTokens": 0,
+        "cacheCreationInputTokens": 0,
+        "webSearchRequests": 0,
+        "costUSD": 0.002481
+      },
+      "claude-sonnet-5": {
+        "inputTokens": 508,
+        "outputTokens": 294,
+        "thinkingTokens": 0,
+        "cacheReadInputTokens": 162125,
+        "cacheCreationInputTokens": 18922,
+        "webSearchRequests": 0,
+        "costUSD": 0.11206899999999999
+      }
+    },
+    "lastSessionId": "50c62d37-6805-4cf9-8e36-589b15020a19"
+  }
+}

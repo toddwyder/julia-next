@@ -1433,10 +1433,46 @@ where each came from).
 - Adopting a Pi terminal with `worker-start --terminal` while Pi is still starting loses the task
   text and still reports `input_accepted`. Wait for Pi to be up.
 - **The runner account's first-run screens are cleared** (JUL-109): base-checkout trust in
-  `~/.claude.json` (worktrees inherit it), `skipDangerousModePermissionPrompt`, and
+  `~/.claude.json` (worktrees inherit it, but only from the exact base path; see the next section), `skipDangerousModePermissionPrompt`, and
   `env.DISABLE_AUTOUPDATER=1` in `~/.claude/settings.json`. Orca rewrites the hooks in that
   settings file on every daemon start; these keys survived two restarts. If a fresh builder ever
   fails `agent_readiness` again, read the terminal first: it is almost certainly one of these three.
+
+## When a builder fails to start after a checkout change, and the failure path (JUL-109 follow-up)
+
+**The base checkout's path is what Claude trusts.** Tested 2026-09-20: replacing the base checkout in
+place (same path, fresh clone) is safe. Putting it at a **different path** brings back the eight-hour
+failure exactly: `worker-start` returns `failed / agent_readiness / timeout` after 60 s and the terminal
+shows "Is this a project you created or one you trust?". Trusting a parent folder does not help; only
+the exact base path does. So, whenever the base checkout is moved or re-imported in Orca (Orca refuses
+`project setup-update --path` for a repo-backed project; re-import it):
+
+1. In `runner`'s `~/.claude.json`, set `projects["<new base path>"].hasTrustDialogAccepted = true`
+   (with `allowedTools: []`). Do it in the same admin step as the move.
+2. Start one builder in a fresh worktree of the new base and read `worker-show`. Success is
+   `succeeded / settled` (or `worktree ps` `agents[].state: working`), not just a start that returned.
+3. If it fails, read the worker's terminal before anything else.
+
+**A reported failure looks like this.** `worker-show`: `worker.state: failed`, `stage: settled`,
+`projection.outcome: failed`, `worker.lastError: null`, a terminal present. The worker's own reason is in
+the task's `result` and in `dispatch.lastFailure`. A worker that never started instead has
+`lastError: "timeout"` and no terminal. Fixtures: `graph/fixtures/orca-1.4.205/failure.*`. Acknowledge
+each delivery (`check --ack <deliveryId>`) or the same message wakes the next wait. Retry with
+`worker-start --task <same task> --retry-of <failed dispatch>` (repeat `--on`, `--worktree`, `--agent`);
+Orca's own `failureCount` stays 0 for a reported failure, so the two-rounds rule is the controller's to count.
+
+**Cost sources and rates** are in `docs/research/jul109-orca-1.4.205-findings.md` section 5 and
+`graph/rate-table.mjs`. Two things to remember: a Claude transcript repeats each message once per content
+block (count each `message.id` once) and is still about 15% under Claude Code's own record; and Pi's
+printed dollars are lower than DeepSeek's published price, which of the two is the real charge is not
+settled.
+
+**Standing rule for every finding: a gap is recorded with what breaks if it stays.** "No dollar figure for
+Claude" is not a note, it is "the cost line will be blank for the seat doing most of the work". A gap
+written down without its consequence reads as a footnote and gets skipped. Each row in a "not proven" list
+carries two things: what was not proven, and what breaks if it stays that way. This sits beside the rule
+that nothing is written as "assumed" or "should work": both exist so a reader cannot mistake an unknown
+for a small thing.
 
 ## Stop / resume
 
