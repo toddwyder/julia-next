@@ -868,8 +868,11 @@ run was active — a finished run whose card was still in Ready would be started
    current fingerprint (`status: 'cooldown'`). The map replaced a single `lastStarted` record on
    2026-09-21 (JUL-97 step 2): now that the queue walks past a card and starts a later one,
    a single record meant starting the later card erased the earlier card's cooldown and the earlier
-   card restarted forever. An old single-record state file is migrated into the map on read — but only when that record says the state move **failed**. The fingerprint
-   purposefully includes the labels the queue itself added, so a card Linear now returns with those
+   card restarted forever. An old single-record state file is migrated into the map on read
+   unconditionally (`startedRecords`): the one card the old file knew about keeps its record —
+   `stateMoved` included — under its own id. The **failed** state move is the cooldown guard's
+   condition, not the migration's: the guard holds a card only when its record says the state move
+   failed *and* the fingerprint still matches. The fingerprint purposefully includes the labels the queue itself added, so a card Linear now returns with those
    labels still matches and is held; a genuinely changed card gets a new fingerprint and is allowed
    through. When the state move succeeded the card really left Ready, so its reappearance in Ready
    is a deliberate re-queue and is admitted normally.
