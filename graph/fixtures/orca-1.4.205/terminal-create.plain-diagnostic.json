@@ -1,0 +1,22 @@
+{
+  "id": "ee7bb231-1c5c-42a8-b43d-eaf296366486",
+  "ok": true,
+  "result": {
+    "terminal": {
+      "handle": "term_fff8c7e5-94a7-4bf9-8e16-04c23473503f",
+      "tabId": "4c6359a8-34ba-4409-9e34-086af4ca96fd",
+      "paneKey": "4c6359a8-34ba-4409-9e34-086af4ca96fd:b5e5809e-ff8c-4250-b9a4-1c44c4ac54b4",
+      "ptyId": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul98-step-5a@@9b0b38a8",
+      "worktreeId": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul98-step-5a",
+      "title": "julia-controller-probe",
+      "executionHostId": "local",
+      "incarnationId": "0cad617b-1ee7-4a8d-80e2-e83bac31fd93",
+      "hostPlatform": "linux",
+      "surface": "background",
+      "warning": "Terminal term_fff8c7e5-94a7-4bf9-8e16-04c23473503f is running, but Orca could not make it discoverable. Run `orca terminal focus --terminal term_fff8c7e5-94a7-4bf9-8e16-04c23473503f` to reveal and focus it."
+    }
+  },
+  "_meta": {
+    "runtimeId": "a53bb33a-2871-40c3-ae9f-eced82e71b6e"
+  }
+}

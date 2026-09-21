@@ -40,6 +40,15 @@
 //                     resume is JUL-99.
 //   lastError         the last cycle error, so a crash-loop comment can name
 //                     what caused the loop.
+//   senderTerminal    the Orca terminal handle this controller sends from
+//                     (JUL-98 step 5). An Orca terminal handle does not
+//                     survive an Orca restart, so it cannot be a thing a human
+//                     pastes into the unit once; the controller provisions its
+//                     own. It is remembered HERE so a restart re-uses the
+//                     terminal it already has instead of creating a fresh one
+//                     every RestartSec=5 -- a leak of one terminal every five
+//                     seconds, for ever. Checked against Orca before it is
+//                     reused: a handle Orca no longer knows is replaced.
 //
 // EVERY ONE OF THOSE ROUND-TRIPS. `normalize` below is the serializer for both
 // directions, so a field it forgets is a field that is silently dropped on read
@@ -63,7 +72,7 @@ export function defaultStatePath(options = {}) {
 }
 
 export function emptyControllerState() {
-  return { ready: {}, commented: {}, starts: [], carrying: null, crashReported: null, requests: {}, lastError: null };
+  return { ready: {}, commented: {}, starts: [], carrying: null, crashReported: null, requests: {}, lastError: null, senderTerminal: null };
 }
 
 // A state path inside the read-only checkout is refused OUTRIGHT rather than
@@ -98,6 +107,14 @@ function normalize(parsed) {
     crashReported: parsed.crashReported ?? null,
     requests: isMap(parsed.requests) ? parsed.requests : base.requests,
     lastError: typeof parsed.lastError === 'string' ? parsed.lastError : base.lastError,
+    // Guarded as a STRING, the same way lastError is: a handle is a string and
+    // nothing else, and anything else on disk means the file was written by
+    // something other than this controller. Listed here at all because this
+    // file's header rule is real -- a field normalize() forgets is dropped on
+    // read, and a dropped senderTerminal is a new terminal on every restart.
+    senderTerminal: typeof parsed.senderTerminal === 'string' && parsed.senderTerminal !== ''
+      ? parsed.senderTerminal
+      : base.senderTerminal,
   };
 }
 

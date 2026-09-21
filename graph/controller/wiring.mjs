@@ -23,6 +23,10 @@
 //   worktree rm             the worktree removed
 //   --retry-request         Orca's own idempotency, instead of a hand-built
 //                           "did I already do this?" check
+//   terminal show           the liveness check for a terminal handle. A handle
+//                           Orca still knows answers `result.terminal`; one it
+//                           no longer knows is refused `terminal_handle_stale`
+//   terminal create         the controller's own sender terminal, made by Orca
 //
 // THE THREE BOUNDARIES ORCA DOES NOT COVER, and why each is not an Orca call:
 //
@@ -71,6 +75,9 @@ export const REPO_SELECTOR = `path:${ORCHESTRATOR_CHECKOUT}`;
 export const PUBLISH_OWNER = 'toddwyder';
 export const PUBLISH_REPO = 'julia-next';
 export const PUBLISH_BASE = 'main';
+// Named so a human looking at Orca's terminal list can tell at a glance which
+// tab belongs to the controller and must not be closed or typed into.
+export const CONTROLLER_TERMINAL_TITLE = 'julia-controller';
 
 // ---------------------------------------------------------------------------
 // The request-id ledger
@@ -219,6 +226,33 @@ export function createOrcaBoundaries({
       return call(['orchestration', 'worker-release', '--dispatch', dispatchId]);
     },
 
+    // (8) The liveness check for a terminal handle. `terminal show` is the
+    // only read verb that takes ONE handle and answers whether Orca still
+    // knows it; `terminal list` would answer a page that has to be searched
+    // (and is capped by --limit), `terminal read` fetches screen output the
+    // controller has no use for, and `terminal wait` BLOCKS, which is the one
+    // thing a startup check must not do. Recorded live at 1.4.205:
+    // terminal-show.plain-diagnostic-live.json and
+    // terminal-show.unknown-handle.error.json.
+    async terminalShowImpl({ terminal } = {}) {
+      return call(['terminal', 'show', '--environment', environment, '--terminal', terminal]);
+    },
+
+    // (9) The controller's own sender terminal. `terminal create` is Orca's
+    // own verb for a plain terminal in an existing worktree -- its own help
+    // says "Use this, not worktree create, for a fresh agent in the current
+    // checkout" -- and `worker-start` is wrong here because that starts a
+    // SUPERVISED AGENT with a model allowance, which this terminal must never
+    // be: nothing runs in it. No --command, so it is a bare shell.
+    async terminalCreateImpl({ title = CONTROLLER_TERMINAL_TITLE } = {}) {
+      return call([
+        'terminal', 'create',
+        '--environment', environment,
+        '--worktree', repo,
+        '--title', title,
+      ]);
+    },
+
     // (7) The worktree. Orca names one `<repoId>::<path>`, which is exactly the
     // `id:` selector `worktree rm` documents.
     async removeWorktreeImpl({ worktree } = {}) {
@@ -226,6 +260,107 @@ export function createOrcaBoundaries({
       return call(['worktree', 'rm', '--worktree', `id:${worktree}`]);
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// The controller's own sender terminal
+// ---------------------------------------------------------------------------
+
+// WHY THIS EXISTS. The controller cannot make its two dispatch calls without a
+// sender terminal handle: `runCreateImpl` and `workerStartImpl` above both pass
+// it as `--from`, and `run-create` is refused outright without one
+// (graph/fixtures/orca-1.4.205/run-create.no-sender-terminal.error.json). The
+// mailbox wait (`checkWaitImpl`) carries the same handle under a different
+// flag, `--terminal`. The remaining calls -- `worker-release`, `worktree ps`,
+// `worktree rm` -- do not carry it at all. Until
+// JUL-98 step 5 that handle came only from $JULIA_CONTROLLER_TERMINAL, which
+// NOTHING set -- not ops/controller/julia-controller.service, not the runbook --
+// so the controller printed its banner, refused and exited 1 on every start.
+// Behind `Restart=always` / `RestartSec=5` / `StartLimitIntervalSec=0` that is a
+// five-second crash loop that never stops and never moves a card.
+//
+// And a handle is not a thing a human could paste in once and be done: an Orca
+// terminal handle does not survive an Orca restart (recorded:
+// terminal-send.terminal-handle-stale.error.json is a send into a terminal an
+// Orca restart had killed). So the controller finds or makes its own.
+//
+// THE ORDER, and what each branch is protecting against:
+//   (a) $JULIA_CONTROLLER_TERMINAL, if Orca still knows it -- an operator
+//       pointing the controller at a terminal they are watching still works.
+//   (b) the handle this controller recorded on a previous start, if Orca still
+//       knows it. This branch is the whole reason the handle is in the state
+//       file: without it a restart makes a NEW terminal, and a crash loop makes
+//       one every five seconds for ever.
+//   (c) a fresh one from Orca, recorded before it is used.
+//
+// LIVENESS IS ASKED, NEVER ASSUMED. A handle being present in the environment
+// or on disk says nothing about whether Orca still has it; only `terminal show`
+// does. A handle Orca refuses is replaced, not used.
+//
+// AND IF NONE OF THAT WORKS it throws, and main() refuses loudly and exits
+// non-zero exactly as it did before. Starting without a sender terminal would
+// only move the same failure to the first `run-create`, with less to say.
+export async function resolveSenderTerminal({
+  env = process.env,
+  state = {},
+  boundaries,
+  title = CONTROLLER_TERMINAL_TITLE,
+  warn = console.error,
+} = {}) {
+  const isLive = async (handle) => {
+    if (!handle) return false;
+    try {
+      const answer = await boundaries.terminalShowImpl({ terminal: handle });
+      // The recorded live answer carries `result.terminal.handle`; a handle
+      // Orca no longer knows is the thrown `terminal_handle_stale` below.
+      // `orphaned: true` is Orca still holding a row for a terminal whose pty
+      // is gone -- not something to send from either.
+      const terminal = answer?.terminal ?? null;
+      return Boolean(terminal?.handle) && terminal.orphaned !== true;
+    } catch (error) {
+      // ONLY Orca saying it no longer knows this handle counts as "dead".
+      // scripts/orca-cli.mjs run() throws three different things and only one
+      // of them is that answer: the structured refusal carries Orca's own code
+      // on the error (`failure.code = code`, orca-cli.mjs line 82), while a
+      // daemon that is down or an exec that fails throws a plain
+      // `orca ... failed: <detail>` with NO `.code` (line 71) and malformed
+      // output throws `did not return valid JSON`, also with no `.code`
+      // (line 77). Reading all three as "dead" would skip the configured
+      // handle, skip the recorded handle for the same wrong reason, and fall
+      // through to `terminal create` -- one new terminal per start, which under
+      // RestartSec=5 is one every five seconds: exactly the leak the recorded
+      // branch exists to prevent, wearing a different hat.
+      //
+      // WHAT THIS TRADES. A daemon blip now makes the controller refuse and be
+      // restarted by systemd every five seconds, which the crash-loop detector
+      // makes visible on the board. The alternative was silently leaking a
+      // terminal every five seconds, which nothing anywhere would show.
+      // Visible and stopped beats invisible and spreading.
+      if (error?.code !== 'terminal_handle_stale') throw error;
+      warn(`[controller] terminal ${handle} is not usable (${error.code}): ${error.message}`);
+      return false;
+    }
+  };
+
+  const configured = env.JULIA_CONTROLLER_TERMINAL?.trim() || null;
+  if (configured && await isLive(configured)) {
+    return { terminal: configured, state, created: false, source: 'configured' };
+  }
+  const recorded = state.senderTerminal ?? null;
+  if (recorded && await isLive(recorded)) {
+    return { terminal: recorded, state, created: false, source: 'recorded' };
+  }
+
+  const answer = await boundaries.terminalCreateImpl({ title });
+  const handle = answer?.terminal?.handle ?? null;
+  if (!handle) {
+    throw new Error(`orca terminal create answered no terminal handle (${JSON.stringify(answer ?? null).slice(0, 200)})`);
+  }
+  // A create that Orca could not make visible still gives a working handle and
+  // says so in `warning` (recorded: terminal-create.plain-diagnostic.json).
+  // That is a note, not a failure -- nothing is ever typed into this terminal.
+  if (answer.terminal.warning) warn(`[controller] ${answer.terminal.warning}`);
+  return { terminal: handle, state: { ...state, senderTerminal: handle }, created: true, source: 'created' };
 }
 
 // ---------------------------------------------------------------------------

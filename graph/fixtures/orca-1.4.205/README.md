@@ -46,6 +46,9 @@ Times are UTC. "probe N" is a real worker in its own brand-new worktree, all rem
 | `terminal-wait.exit-timeout.json` | `terminal wait --for exit --timeout-ms 8000` on the same terminal | held 8.4 s, then `error.code: "timeout"` |
 | `terminal-wait.tui-idle-on-agent.json` | `--for tui-idle` on an idle Claude terminal | `satisfied: true` after 0.4 s |
 | `terminal-read.trust-screen.json` | `terminal read` on the probe 2 terminal | the "Is this a project you created or one you trust?" screen |
+| `terminal-show.plain-diagnostic-live.json` | `terminal show --terminal <handle>` on a live plain terminal (recorded 2026-09-21, JUL-98 step 5) | `result.terminal` with `handle`, `connected: true`, `orphaned: false`, and **no `agentIdentity`** -- that key is present only on an agent terminal |
+| `terminal-show.unknown-handle.error.json` | the same on a handle Orca has never had | error `terminal_handle_stale`, message identical to the code. This is the liveness check the controller uses |
+| `terminal-create.plain-diagnostic.json` | `terminal create --worktree path:<checkout> --title julia-controller-probe --json`, no `--command` (recorded 2026-09-21, JUL-98 step 5; the terminal was closed again straight after) | `result.terminal.handle`, `surface: "background"`, and a `warning` saying Orca could not make the tab discoverable -- the handle still works. The tab title Orca reports back afterwards is the shell's own prompt title, not the `--title` given |
 | `dispatch-show.retry-of.json` | `orchestration dispatch-show --task task_d43d404304fd --json` | `dispatch.retry_of_dispatch_id` |
 | `worktree-ps.agent-working.json` | `worktree ps --json`, cut to one worktree | probe 6 at 20:31:41: `agents[0].state: "working"` on a brand-new worktree |
 | `worktree-ps.pi-agent-done.json` | same | a Pi run in a plain terminal: `agentType: "pi"`, `state: "done"`, `lastAssistantMessage` |

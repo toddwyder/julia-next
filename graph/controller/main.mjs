@@ -45,6 +45,7 @@ import {
   createRequestLedger,
   createSeatCostReader,
   createPublisher,
+  resolveSenderTerminal,
   worktreePathOf,
   ORCHESTRATOR_CHECKOUT,
   ORCHESTRATOR_ENVIRONMENT,
@@ -414,6 +415,11 @@ export async function main({
   statePath = null,
   now = () => new Date().toISOString(),
   setExitCode = (code) => { process.exitCode = code; },
+  // Injected so the tests never spawn the real `orca` binary, and so a test
+  // can stand exactly where the first cycle starts. The defaults are the real
+  // resolver over the real boundaries, and the real cycle.
+  resolveSenderTerminalImpl = resolveSenderTerminal,
+  runOnceImpl = runOnce,
 } = {}) {
   let options;
   try {
@@ -437,7 +443,6 @@ export async function main({
   const board = createControllerBoard();
   const publisher = createPublisher({ env });
   const readSeatCost = createSeatCostReader({ homedir: os.homedir() });
-  const from = env.JULIA_CONTROLLER_TERMINAL ?? null;
 
   const saveState = (next) => {
     writeControllerState({ ...next, requests: ledger.entries() }, { statePath: path });
@@ -467,8 +472,34 @@ export async function main({
     // has already cost two workers.
     warn(`[controller] publishing is not configured: ${missing.join(' and ')} are not set (EnvironmentFile=-/etc/orchestrator-svc/.env.publisher). Cards will build and review but cannot be published.`);
   }
-  if (!from) {
-    warn('[controller] JULIA_CONTROLLER_TERMINAL is not set -- Orca refuses a run-create with no sender terminal (run-create.no-sender-terminal.error.json)');
+  // THE SENDER TERMINAL. `run-create` and `worker-start` carry the handle as
+  // `--from`, and `run-create` is refused outright without one
+  // (run-create.no-sender-terminal.error.json); the mailbox wait carries the
+  // same handle as `--terminal`. The controller finds or makes
+  // its own (wiring.mjs's resolveSenderTerminal): an operator's
+  // $JULIA_CONTROLLER_TERMINAL if Orca still knows it, else the handle this
+  // controller recorded on a previous start if Orca still knows THAT, else a
+  // fresh `terminal create`. Nothing has to supply a handle -- and a handle
+  // could not be supplied durably anyway, since one does not survive an Orca
+  // restart.
+  let from;
+  try {
+    const resolved = await resolveSenderTerminalImpl({ env, state, boundaries, warn });
+    from = resolved.terminal;
+    if (resolved.created) {
+      // Written to disk IMMEDIATELY, before a single cycle runs: a handle held
+      // only in memory is a handle the next restart cannot see, and under
+      // RestartSec=5 that is one leaked terminal every five seconds.
+      state = resolved.state;
+      saveState(state);
+      log(`[controller] created its own Orca sender terminal ${from} (${ORCHESTRATOR_ENVIRONMENT}, ${ORCHESTRATOR_CHECKOUT})`);
+    } else {
+      log(`[controller] sending from the ${resolved.source} Orca terminal ${from}`);
+    }
+  } catch (error) {
+    // Losing the ability to SAY WHY is worse than not starting, so this stays
+    // as loud as the refusal it replaces, and still exits non-zero.
+    warn(`[controller] no Orca sender terminal: ${error.message} -- Orca refuses a run-create with no sender terminal (run-create.no-sender-terminal.error.json). Set JULIA_CONTROLLER_TERMINAL to a live handle to override, or fix the Orca daemon so the controller can create its own.`);
     setExitCode(1);
     return null;
   }
@@ -481,7 +512,7 @@ export async function main({
     ...shared,
     intervalSeconds: options.intervalSeconds,
     cycles: options.once ? 1 : Infinity,
-    runOnceImpl: runOnce,
+    runOnceImpl,
     warn,
   });
   saveState(final);

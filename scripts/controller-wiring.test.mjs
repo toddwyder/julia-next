@@ -22,10 +22,13 @@ import {
   createPublisher,
   claudeProjectDirName,
   worktreePathOf,
+  resolveSenderTerminal,
   REPO_SELECTOR,
+  CONTROLLER_TERMINAL_TITLE,
 } from '../graph/controller/wiring.mjs';
 import { proveTurnStarted } from '../graph/controller/turn-start.mjs';
-import { loadOrcaFixture } from '../graph/controller/fixture-orca.mjs';
+import { loadOrcaFixture, orcaErrorFromFixture } from '../graph/controller/fixture-orca.mjs';
+import { emptyControllerState } from '../graph/controller/state.mjs';
 
 // A recorder standing where the `orca` binary does. It NEVER spawns anything.
 function recorder(answers = []) {
@@ -298,4 +301,244 @@ test('a merge GitHub did not perform is reported as a failure, never smoothed in
   const result = await publisher.publishAndMerge({ branch: 'b', worktreePath: '/w', title: 't', body: 'b' });
   assert.equal(result.ok, false);
   assert.equal(result.reason, 'Head branch was modified');
+});
+
+// ---------------------------------------------------------------------------
+// JUL-98 step 5: the controller's own sender terminal
+// ---------------------------------------------------------------------------
+//
+// THE DEFECT THESE PIN. Before step 5 the sender handle came only from
+// $JULIA_CONTROLLER_TERMINAL, and nothing anywhere set it -- not the unit, not
+// the runbook -- so the real run on 2026-09-21T18:11:14Z printed the banner,
+// refused and exited. Behind Restart=always/RestartSec=5/StartLimitIntervalSec=0
+// that is a crash loop with nothing ever moving on the board. Each test below
+// is one branch of resolveSenderTerminal, and the Orca answers are the recorded
+// 1.4.205 ones (terminal-show.plain-diagnostic-live.json,
+// terminal-show.unknown-handle.error.json, terminal-create.plain-diagnostic.json).
+
+const LIVE_SHOW = loadOrcaFixture('terminal-show.plain-diagnostic-live.json').result;
+const CREATED = loadOrcaFixture('terminal-create.plain-diagnostic.json').result;
+const LIVE_HANDLE = LIVE_SHOW.terminal.handle;
+const CREATED_HANDLE = CREATED.terminal.handle;
+
+// A stand-in Orca that answers `terminal show` for exactly the handles it was
+// told are live and refuses every other one the way the recording does, and
+// answers `terminal create` with the recorded create (a fresh handle each
+// time, so a second create is visible as a second handle).
+function terminalOrca({ live = [], createFails = null } = {}) {
+  const calls = [];
+  let creates = 0;
+  const impl = async (args) => {
+    calls.push(args);
+    const verb = `${args[0]} ${args[1]}`;
+    if (verb === 'terminal show') {
+      const handle = args[args.indexOf('--terminal') + 1];
+      if (live.includes(handle)) {
+        return { ...LIVE_SHOW, terminal: { ...LIVE_SHOW.terminal, handle } };
+      }
+      throw orcaErrorFromFixture('terminal-show.unknown-handle.error.json', 'terminal show');
+    }
+    if (verb === 'terminal create') {
+      if (createFails) throw createFails;
+      creates += 1;
+      return { ...CREATED, terminal: { ...CREATED.terminal, handle: `${CREATED_HANDLE}-${creates}`, warning: undefined } };
+    }
+    throw new Error(`unexpected orca call: ${args.join(' ')}`);
+  };
+  impl.calls = calls;
+  impl.creates = () => creates;
+  return impl;
+}
+
+const boundariesFor = (impl) => createOrcaBoundaries({ orcaCallImpl: impl });
+
+test('terminal show is the liveness check, and it is sent as one handle in the controller environment', async () => {
+  const impl = terminalOrca({ live: [LIVE_HANDLE] });
+  await boundariesFor(impl).terminalShowImpl({ terminal: LIVE_HANDLE });
+  assert.deepEqual(impl.calls[0], [
+    'terminal', 'show', '--environment', 'orchestrator-local', '--terminal', LIVE_HANDLE, '--json',
+  ]);
+});
+
+test('terminal create makes a PLAIN terminal in the controller checkout -- no --command, so no agent and no model allowance', async () => {
+  const impl = terminalOrca();
+  await boundariesFor(impl).terminalCreateImpl({});
+  const args = impl.calls[0];
+  assert.deepEqual(args, [
+    'terminal', 'create',
+    '--environment', 'orchestrator-local',
+    '--worktree', REPO_SELECTOR,
+    '--title', CONTROLLER_TERMINAL_TITLE,
+    '--json',
+  ]);
+  assert.equal(args.includes('--command'), false, 'a --command here would start something in the controller\'s own terminal');
+  assert.equal(REPO_SELECTOR, 'path:/srv/orchestrator-svc/julia-next');
+});
+
+test('a configured JULIA_CONTROLLER_TERMINAL that is live is used as-is and NO terminal is created', async () => {
+  const impl = terminalOrca({ live: [LIVE_HANDLE] });
+  const resolved = await resolveSenderTerminal({
+    env: { JULIA_CONTROLLER_TERMINAL: LIVE_HANDLE },
+    state: emptyControllerState(),
+    boundaries: boundariesFor(impl),
+    warn: () => {},
+  });
+  assert.equal(resolved.terminal, LIVE_HANDLE, 'the operator override still works');
+  assert.equal(resolved.created, false);
+  assert.equal(impl.creates(), 0, 'an operator who points the controller at a terminal they are watching gets THAT terminal');
+  assert.equal(resolved.state.senderTerminal, null, 'a handle the controller did not make is not claimed as its own');
+});
+
+test('no configured handle and no recorded handle: a terminal is created ONCE and its handle goes into the state', async () => {
+  const impl = terminalOrca();
+  const resolved = await resolveSenderTerminal({
+    env: {},
+    state: emptyControllerState(),
+    boundaries: boundariesFor(impl),
+    warn: () => {},
+  });
+  assert.equal(impl.creates(), 1);
+  assert.equal(resolved.created, true);
+  assert.equal(resolved.terminal, `${CREATED_HANDLE}-1`);
+  assert.equal(resolved.state.senderTerminal, `${CREATED_HANDLE}-1`, 'recorded, or the next restart makes another one');
+});
+
+test('a recorded handle that is still live is REUSED and no second terminal is created -- the leak-every-restart case', async () => {
+  // RestartSec=5. A controller that created a terminal on every start would
+  // leak one every five seconds for as long as the loop lasted.
+  const impl = terminalOrca({ live: [LIVE_HANDLE] });
+  const boundaries = boundariesFor(impl);
+  let state = { ...emptyControllerState(), senderTerminal: LIVE_HANDLE };
+  for (let restart = 0; restart < 5; restart += 1) {
+    const resolved = await resolveSenderTerminal({ env: {}, state, boundaries, warn: () => {} });
+    assert.equal(resolved.terminal, LIVE_HANDLE);
+    assert.equal(resolved.created, false);
+    state = resolved.state;
+  }
+  assert.equal(impl.creates(), 0, 'five restarts, zero new terminals');
+});
+
+test('a recorded handle Orca no longer knows is REPLACED, and the new handle is what gets recorded', async () => {
+  // An Orca terminal handle does not survive an Orca restart
+  // (terminal-send.terminal-handle-stale.error.json), so this is the ordinary
+  // case after the daemon has been restarted, not an exotic one.
+  const impl = terminalOrca({ live: [] });
+  const warned = [];
+  const resolved = await resolveSenderTerminal({
+    env: {},
+    state: { ...emptyControllerState(), senderTerminal: 'term_gone' },
+    boundaries: boundariesFor(impl),
+    warn: (line) => warned.push(line),
+  });
+  assert.equal(resolved.terminal, `${CREATED_HANDLE}-1`);
+  assert.notEqual(resolved.state.senderTerminal, 'term_gone');
+  assert.equal(resolved.state.senderTerminal, `${CREATED_HANDLE}-1`);
+  assert.equal(impl.creates(), 1);
+  assert.ok(warned.some((line) => line.includes('term_gone') && line.includes('terminal_handle_stale')),
+    'the dead handle and Orca\'s own code for it are said out loud, not swallowed');
+});
+
+test('liveness is ASKED of Orca, never assumed from the handle being present', async () => {
+  // A configured handle Orca does not know is not used. Mutation check: delete
+  // the `await isLive(configured)` guard and this test fails on the handle.
+  const impl = terminalOrca({ live: [] });
+  const resolved = await resolveSenderTerminal({
+    env: { JULIA_CONTROLLER_TERMINAL: 'term_operator_set_but_dead' },
+    state: emptyControllerState(),
+    boundaries: boundariesFor(impl),
+    warn: () => {},
+  });
+  assert.notEqual(resolved.terminal, 'term_operator_set_but_dead');
+  assert.equal(resolved.created, true);
+});
+
+test('an ORPHANED terminal Orca still has a row for is not sent from either', async () => {
+  const impl = async (args) => {
+    if (args[1] === 'show') return { ...LIVE_SHOW, terminal: { ...LIVE_SHOW.terminal, orphaned: true } };
+    return { ...CREATED, terminal: { ...CREATED.terminal, handle: 'term_fresh' } };
+  };
+  const resolved = await resolveSenderTerminal({
+    env: {},
+    state: { ...emptyControllerState(), senderTerminal: LIVE_HANDLE },
+    boundaries: boundariesFor(impl),
+    warn: () => {},
+  });
+  assert.equal(resolved.terminal, 'term_fresh');
+});
+
+test('a create Orca could not accept is raised, with its own code, rather than becoming a null handle', async () => {
+  const failure = new Error('orca terminal create failed (daemon_unreachable): no Orca daemon');
+  failure.code = 'daemon_unreachable';
+  await assert.rejects(
+    resolveSenderTerminal({
+      env: {},
+      state: emptyControllerState(),
+      boundaries: boundariesFor(terminalOrca({ createFails: failure })),
+      warn: () => {},
+    }),
+    /daemon_unreachable/,
+  );
+});
+
+// THE DEFECT THESE TWO PIN (step 5 round 2, reviewer finding 1). A `terminal
+// show` that fails for ANY reason other than Orca saying the handle is unknown
+// used to be read as "this handle is dead": the configured handle was skipped,
+// the recorded handle was skipped the same way, and the code fell through to
+// `terminal create`. A daemon that is down (`orca ... failed: <detail>`, no
+// `.code`) or output that will not parse (`did not return valid JSON`, no
+// `.code`) would then leak one terminal per start -- one every five seconds
+// under RestartSec=5, which is the very leak the recorded-handle branch exists
+// to prevent. Only `terminal_handle_stale` means dead; everything else is
+// re-thrown so main() refuses loudly.
+test('a terminal show that fails with NO code at all is re-thrown, not read as a dead handle', async () => {
+  // Mutation check: put `return false` back in place of the re-throw and this
+  // test fails on `impl.creates()` -- a terminal is created instead.
+  const daemonDown = new Error('orca terminal show --environment orchestrator-local --terminal term_x failed: connect ECONNREFUSED');
+  const impl = terminalOrca();
+  const boundaries = boundariesFor(async (args) => {
+    if (args[1] === 'show') throw daemonDown;
+    return impl(args);
+  });
+  await assert.rejects(
+    resolveSenderTerminal({
+      env: {},
+      state: { ...emptyControllerState(), senderTerminal: 'term_recorded' },
+      boundaries,
+      warn: () => {},
+    }),
+    /ECONNREFUSED/,
+  );
+  assert.equal(impl.creates(), 0, 'a daemon blip must not quietly create a replacement terminal');
+});
+
+test('a terminal show that fails with a DIFFERENT code is re-thrown too -- only terminal_handle_stale means dead', async () => {
+  const otherCode = new Error('orca terminal show failed (consumer_fenced): a newer consumer holds this run');
+  otherCode.code = 'consumer_fenced';
+  const impl = terminalOrca();
+  const boundaries = boundariesFor(async (args) => {
+    if (args[1] === 'show') throw otherCode;
+    return impl(args);
+  });
+  await assert.rejects(
+    resolveSenderTerminal({
+      env: { JULIA_CONTROLLER_TERMINAL: 'term_configured' },
+      state: emptyControllerState(),
+      boundaries,
+      warn: () => {},
+    }),
+    /consumer_fenced/,
+  );
+  assert.equal(impl.creates(), 0, 'any code but terminal_handle_stale is a refusal, not a verdict on the handle');
+});
+
+test('a create that answers no handle at all is refused rather than carried forward as null', async () => {
+  await assert.rejects(
+    resolveSenderTerminal({
+      env: {},
+      state: emptyControllerState(),
+      boundaries: boundariesFor(async () => ({ terminal: {} })),
+      warn: () => {},
+    }),
+    /answered no terminal handle/,
+  );
 });

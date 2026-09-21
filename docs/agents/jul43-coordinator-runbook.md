@@ -1315,6 +1315,50 @@ only true because `normalize()` in `graph/controller/state.mjs` round-trips
 every field the controller keeps: a field that serializer forgets is silently dropped on read, with no
 error anywhere, so anything added to the controller's state must be added there too.
 
+**The controller finds or makes its own Orca sender terminal (JUL-98 step 5).** The controller's two
+dispatch calls carry the handle as `--from` -- `orchestration run-create` (`runCreateImpl`) and
+`orchestration worker-start` (`workerStartImpl`), both in `graph/controller/wiring.mjs` -- and
+`run-create` is refused outright without one
+(`graph/fixtures/orca-1.4.205/run-create.no-sender-terminal.error.json`). The mailbox wait
+(`orchestration check`, `checkWaitImpl`) carries the same handle under a different flag,
+`--terminal`. The rest -- `orchestration worker-release`, `worktree ps`, `worktree rm` -- do not
+carry it at all.
+**Neither the unit nor an operator has to supply that handle.** At startup `main()` resolves it in
+this order (`resolveSenderTerminal` in `graph/controller/wiring.mjs`):
+
+1. `$JULIA_CONTROLLER_TERMINAL`, **if** Orca still knows that handle -- an optional operator
+   override, for pointing the controller at a terminal you are watching. Nothing sets it: the unit
+   does not, and its only `EnvironmentFile` is the publisher credential file.
+2. otherwise the handle the controller recorded on a previous start (`senderTerminal` in
+   `$XDG_STATE_HOME/julia-next/controller.json`), **if** Orca still knows that one. This is what
+   stops `RestartSec=5` from leaking a new Orca terminal every five seconds.
+3. otherwise a fresh one from `orca terminal create --environment orchestrator-local --worktree
+   path:/srv/orchestrator-svc/julia-next --title julia-controller`, recorded in the state file
+   before the first cycle runs.
+
+"Still knows" is **asked of Orca, never assumed from the handle being present**: `orca terminal show
+--terminal <handle>` answers `result.terminal` for a live one and is refused with
+`terminal_handle_stale` for one it no longer has (recorded live at 1.4.205 on 2026-09-21:
+`graph/fixtures/orca-1.4.205/terminal-show.plain-diagnostic-live.json` and
+`terminal-show.unknown-handle.error.json`). A handle Orca refuses -- or one it reports `orphaned` --
+is replaced, not used. **A handle is not durable:** an Orca terminal handle does not survive an Orca
+restart, so pasting one into the unit would work only until the next restart. That is why the
+controller provisions its own rather than being handed one.
+
+The terminal it creates is a **plain diagnostic terminal, not an agent**: `terminal create` with no
+`--command`, so it is a bare shell with no model allowance, and nothing is ever typed into it. A
+create Orca could not make visible still returns a working handle and says so in `warning`; that is
+logged and the handle is used. If a terminal can be neither reused nor created, the controller
+**still refuses loudly and exits non-zero** -- the journal line names Orca's own error code and names
+`JULIA_CONTROLLER_TERMINAL` as the override -- exactly as it did before step 5, because starting
+without a sender terminal would only move the same failure to the first `run-create` with less to
+say.
+
+*Before step 5 this was broken outright:* the handle came only from `$JULIA_CONTROLLER_TERMINAL`,
+nothing set it, and a real `--once` run on 2026-09-21 at 18:11Z printed the banner, refused and
+exited. Under `Restart=always` that is a five-second crash loop with nothing ever moving on the
+board.
+
 **The trade-off, stated plainly.** A merged change to that unit file becomes code running as
 `orchestrator-svc`. That is not root, and it is the account that already merges its own PRs and holds
 the publisher credential, so it adds no reach the graph did not have. The root-code boundary in the
