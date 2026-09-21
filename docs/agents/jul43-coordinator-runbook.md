@@ -1255,8 +1255,9 @@ laptop-session edit and install, never a graph action — park it, don't work ar
 exists, `loginctl show-user orchestrator-svc` says `Linger=yes State=lingering`, and
 `user@1002.service` is active with nobody logged in; 1002 is this host's uid for the account). After that the graph installs and updates the
 controller with **no sudo**, from an Orca terminal on `orchestrator-local` (the terminal's
-environment has no `XDG_RUNTIME_DIR`, so set both variables yourself; the user id is 1002 on this host,
-and `$(id -u)` gives it inside the terminal). `ops/controller/julia-controller.service` does not exist
+environment has no `XDG_RUNTIME_DIR`, so set both variables yourself, or every `systemctl --user`
+command fails silently -- see "`systemctl --user` fails silently in an Orca terminal" below; the user
+id is 1002 on this host, and `$(id -u)` gives it inside the terminal). `ops/controller/julia-controller.service` does not exist
 yet: the controller's own card writes it, and these commands are for then.
 
 ```sh
@@ -1291,6 +1292,49 @@ rebooted to prove the controller comes back on its own. *If that is wrong:* afte
 controller would stay down until someone starts it, and nothing would move on the board. The first real
 reboot is the test; afterwards, with the two `export` lines above set, check
 `systemctl --user is-enabled julia-controller.service` and `systemctl --user is-active julia-controller.service`.
+
+### `systemctl --user` fails silently in an Orca terminal, and silence reads as success (JUL-98, 2026-09-21)
+
+**Read this before running any `systemctl --user` command from a terminal Orca started.**
+
+In a terminal started by Orca on the orchestrator daemon, the two values the user systemd
+manager needs are not set:
+
+- `XDG_RUNTIME_DIR` is **empty**;
+- `DBUS_SESSION_BUS_ADDRESS` is the literal string **`disabled:`** — set, but to a value that
+  means "no bus".
+
+With those two in that state, **every `systemctl --user` command fails silently**: it prints
+nothing at all, on stdout or stderr, and returns 1. Nothing says "no bus", nothing says
+"failed". A step that runs it and does not check `$?` sees empty output and moves on, which is
+exactly what a successful `systemctl --user enable --now` also looks like.
+
+**The fix — export both first, every time:**
+
+```sh
+export XDG_RUNTIME_DIR=/run/user/1002
+export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1002/bus
+```
+
+1002 is this host's uid for `orchestrator-svc`; `$(id -u)` gives it inside the terminal.
+
+**Evidence, live 2026-09-21 (coordinator, server).** With those two set:
+
+- `systemctl --user is-system-running` returns `running` — the manager is reachable, which it
+  was not a moment earlier from the same terminal.
+- A probe unit was installed, started, and killed outright with `kill -9`. Before the kill:
+  `MainPID 990028`, `NRestarts 0`. After: `MainPID 990112`, `NRestarts 1`, still `active` — a
+  new process, the restart counted, the service up. The probe was removed afterwards.
+
+The coordinator's first probe that day died the silent way, with no output to say so, and was
+only caught because the result was checked against the board rather than against the command.
+
+**What breaks if this stays unwritten.** The step that switches the controller on prints
+nothing, returns, and looks like it worked. It silently did nothing. The controller is not
+running, no card ever moves, and nobody learns until someone notices the board has been still
+for hours — by which time the session that ran the step is long gone. Never treat a silent
+`systemctl --user` as success: check the exit status, and then check `is-active` and
+`is-enabled` by name.
 
 ### The ready-queue units (`ops/ready-queue/`)
 

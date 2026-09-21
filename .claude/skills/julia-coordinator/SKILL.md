@@ -196,13 +196,15 @@ For the current step of the current item:
 4. **Pass** → emit `coordinator_progress`, then either continue to the next step or, if this
    was the last step, go to **After verification** below.
    **Fail, worker-reported** → start a fresh worker on the same step with the failure attached.
-   After 3 failed attempts, stop retrying; park the item as **Blocked** in Todd's queue with the
-   evidence and emit `coordinator_failed`.
+   After 2 failed attempts, stop retrying; park the item as **Blocked** in Todd's queue with the
+   evidence and emit `coordinator_failed`. **Two rounds, then park** -- the limit is two
+   everywhere it appears, never three ("The route", Sep 20, "Rules that span every column";
+   code review and the evidence gate get two each, counted separately).
    **Fail, coordinator-found** (you find the failure after the worker reported done) → open a
-   new Task for the step with the failure attached; count it toward the same 3-attempt limit.
+   new Task for the step with the failure attached; count it toward the same 2-attempt limit.
    **Fail, usage-cap error on the seat's primary** (its own output matches
    `scripts/julia-run.mjs`'s `CAP_ERROR_PATTERN`) → restart the same step immediately on the
-   seat's `backup` entry. This restart does **not** count toward the 3-attempt limit -- it's the
+   seat's `backup` entry. This restart does **not** count toward the 2-attempt limit -- it's the
    table doing its job, not a failed attempt. If the *backup* also ends in a cap error, that is
    an ordinary failure and does count, since the table has no third entry to fall further back
    to.
@@ -223,7 +225,7 @@ For the current step of the current item:
    verify-reviewer-worktree.mjs --worktree <reviewer worktree path> --commit <candidate commit
    sha>`). This catches both an uncommitted edit and a committed one -- `git diff <commit>`
    against the working tree sees either. **Any** difference rejects the review outright: treat
-   it the same as a failed step (a fresh reviewer worker, same candidate commit, same 3-attempt
+   it the same as a failed step (a fresh reviewer worker, same candidate commit, same 2-attempt
    limit), never a partial pass. A clean diff is required, not sufficient -- still read the
    review's actual content against the acceptance criteria.
 3. The publisher pushes the worker's verified branch (`scripts/publish-pr.mjs push`) and opens a

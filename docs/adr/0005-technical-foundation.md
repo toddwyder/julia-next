@@ -4,6 +4,25 @@ Date: 2026-09-15
 
 Status: accepted; amended 2026-09-16 to name the sync service.
 
+> **Note, 2026-09-21 (JUL-98). Partly superseded by [The route](https://linear.app/julia-next/document/the-route-one-description-of-how-a-change-reaches-real-julia-88d1f95bbbfa).**
+> The route is now the one description of how a change reaches Real Julia, and where this
+> record disagrees with it, the route wins. What the route replaces here:
+>
+> - **The rehearsal copy is a column, with owners.** "Every proposed change gets a rehearsal
+>   copy" below is now the **Staging and smoke test** column, and the rehearsal copy is proven
+>   by carrying real work — there is no canary change invented to be carried.
+> - **A card crosses only the columns its work needs.** "Every proposed change" is not literal:
+>   a change with nothing a person could look at skips Staging and smoke test and Evidence
+>   review, and records why. A change a person could look at never skips them.
+> - **Journey zero is the route, not one trivial change.** The pipeline is proven by a real card
+>   walking all nine columns, not by shipping a trivial change through a gate.
+>
+> Everything else this record decided still stands: Vercel on the free personal plan at a
+> Vercel-made address, PowerSync over a Postgres database we own, Sentry and Axiom from the
+> first line, the OVH server as runner and gate only, unaccepted changes never touching real
+> data, and a new error in the real Julia opening its own ticket. The original text is unchanged
+> below.
+
 The website runs on Vercel, as before, on the free personal plan at a Vercel-made address. The
 data lives in a purpose-built offline-sync service (the "every device has a full copy, syncs
 when it can" category), not Firebase. That service is **PowerSync** on its free plan, with the
