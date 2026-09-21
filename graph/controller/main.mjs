@@ -239,8 +239,19 @@ export async function carryCard({
   return { ok: true, stage: 'carried', outcome, published, moves, column };
 }
 
-async function currentBranch(worktreePath, { execImpl = execFileAsync } = {}) {
-  const { stdout } = await execImpl('git', ['-C', worktreePath, 'rev-parse', '--abbrev-ref', 'HEAD']);
+// The branch the builder committed on, read out of the candidate worktree so
+// the publisher pushes the branch that exists rather than a name guessed from
+// the card.
+//
+// `-c safe.directory=<worktreePath>`, for the reason `headShaOf` in
+// ./wiring.mjs states at length: the controller is `orchestrator-svc` and the
+// candidate worktree is owned by `runner`, and git's dubious-ownership guard
+// refuses the directory outright on the UID mismatch alone. Scoped to exactly
+// the path the caller passed, the same way scripts/publish-pr.mjs and
+// scripts/verify-reviewer-worktree.mjs do it. Without it the branch cannot be
+// read and a passing step never reaches the publish it earned.
+export async function currentBranch(worktreePath, { execImpl = execFileAsync } = {}) {
+  const { stdout } = await execImpl('git', ['-c', `safe.directory=${worktreePath}`, '-C', worktreePath, 'rev-parse', '--abbrev-ref', 'HEAD']);
   return String(stdout).trim();
 }
 

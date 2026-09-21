@@ -69,9 +69,57 @@ import { WORKER_MESSAGE_TYPES } from './mailbox.mjs';
 
 const execFileAsync = promisify(execFile);
 
+// TWO DAEMONS AND TWO CHECKOUTS, AND THEY ARE NOT INTERCHANGEABLE. Read this
+// before you "simplify" one pair into the other, because JUL-98 step 5 already
+// shipped that bug once and it stopped the controller dead.
+//
+// THE CONTROLLER'S OWN SIDE (the three constants immediately below). The
+// controller process runs as `orchestrator-svc`, from
+// /srv/orchestrator-svc/julia-next, and the Orca daemon that owns its Run is
+// `orchestrator-local`. That checkout is root-owned and READ-ONLY to
+// `orchestrator-svc` on purpose -- verified live: `ls -ld` answers
+// `dr-xr-x--- root orchestrator-svc`, which is why ./state.mjs refuses to keep
+// the controller's state file inside it and says so in its own header.
+//
+// THE WORKER SIDE (WORKER_ENVIRONMENT / WORKER_CHECKOUT below). A worker runs
+// as `runner`, on the `ovh-local` daemon, in a worktree Orca creates from
+// /home/runner/julia-next -- the runner-owned registered checkout. That is how
+// every worker this graph has ever started was started:
+// `worker-start --environment orchestrator-local --on ovh-local --repo
+// path:/home/runner/julia-next` (graph/fixtures/orca-1.4.205/README.md lines
+// 9-12, recorded against the real daemon).
+//
+// WHAT BREAKS WHEN THEY ARE CONFUSED, which is not hypothetical -- it is the
+// defect this constant pair exists to fix. Creating a worktree from a
+// repository WRITES A BRANCH REF INTO THAT REPOSITORY. So pointing
+// `worker-start --repo` at the controller's own read-only checkout makes Orca
+// run `git worktree add -b <branch> ... ` inside it, and git answers:
+//
+//   state: failed, stage: worktree_create
+//   fatal: cannot lock ref refs/heads/jul-92-probe: Unable to create
+//   /srv/orchestrator-svc/julia-next/.git/refs/heads/jul-92-probe.lock:
+//   Permission denied
+//
+// (reproduced by hand on 2026-09-21 after the controller did it for real to
+// card JUL-92 at 18:54Z). EVERY dispatch fails identically, the card is left
+// sitting in Implementation with nothing working on it, and the cycles after it
+// report nothing-eligible because the run is still in flight. The fix is never
+// to make the controller's checkout writable -- it is deliberately not -- but to
+// dispatch into the runner's checkout on the runner's daemon.
+//
+// AND THE OTHER DIRECTION IS ALSO WRONG: the controller's Run, its mailbox and
+// its own sender terminal live on `orchestrator-local`. Moving those to
+// `ovh-local` answers `run_not_found` (runbook: "`run_not_found` on an
+// orchestration command is the wrong daemon, not a missing Run"). Neither pair
+// is a superset of the other; each Orca call below picks one deliberately.
 export const ORCHESTRATOR_ENVIRONMENT = 'orchestrator-local';
 export const ORCHESTRATOR_CHECKOUT = '/srv/orchestrator-svc/julia-next';
 export const REPO_SELECTOR = `path:${ORCHESTRATOR_CHECKOUT}`;
+// The worker daemon and the worker checkout: `runner`'s, writable by `runner`,
+// which is what makes `git worktree add` possible at all.
+export const WORKER_ENVIRONMENT = 'ovh-local';
+export const WORKER_CHECKOUT = '/home/runner/julia-next';
+export const WORKER_REPO_SELECTOR = `path:${WORKER_CHECKOUT}`;
 export const PUBLISH_OWNER = 'toddwyder';
 export const PUBLISH_REPO = 'julia-next';
 export const PUBLISH_BASE = 'main';
@@ -114,9 +162,15 @@ export function createRequestLedger(entries = {}) {
 // The Orca boundaries
 // ---------------------------------------------------------------------------
 
+// `environment`/`repo` are the CONTROLLER'S OWN daemon and checkout;
+// `workerEnvironment`/`workerRepo` are the RUNNER'S. See the constant block at
+// the top of this file for why the two pairs can never be collapsed into one.
+// Each boundary below names which pair it uses and why.
 export function createOrcaBoundaries({
   environment = ORCHESTRATOR_ENVIRONMENT,
   repo = REPO_SELECTOR,
+  workerEnvironment = WORKER_ENVIRONMENT,
+  workerRepo = WORKER_REPO_SELECTOR,
   ledger = createRequestLedger(),
   // High enough that the shared row cap cannot hide this controller's own
   // worker on a busy host; `truncated` above catches it if it ever does.
@@ -151,16 +205,31 @@ export function createOrcaBoundaries({
     // (3) A fresh worker: new worktree, new terminal, new task and dispatch
     // ids, all Orca's. `--setup skip` matches the recorded probe that started
     // a healthy Claude worker (worker-start.claude-model-effort.json).
+    //
+    // THE ONE CALL THAT CARRIES BOTH SIDES, and the only one that needs `--on`.
+    // `worker-start --help` says it in one line: "--on selects only the worker
+    // server; the Run and this command remain on the current Orca server", and
+    // on the next line "Use exact --repo on the selected server". So:
+    //   --environment  the CONTROLLER'S daemon -- that is where `--run` lives,
+    //                  and the wrong one answers `run_not_found`.
+    //   --on           the RUNNER'S daemon -- where the worker process runs.
+    //   --repo         the RUNNER'S checkout -- resolved on the `--on` server,
+    //                  and writable by `runner`, so `git worktree add` can
+    //                  create the branch ref it has to create.
+    // Before JUL-98 step 5's fix there was no `--on` at all and `--repo` was
+    // the controller's own read-only checkout, so every dispatch died in
+    // `stage: worktree_create` with "Permission denied" (top of this file).
     async workerStartImpl({ run, from, spec, worktree, name, agent, model, effort, requestId } = {}) {
       const args = [
         'orchestration', 'worker-start',
         '--environment', environment,
+        '--on', workerEnvironment,
         '--run', run,
         '--from', from,
         '--spec', spec,
         '--worktree', worktree,
         '--name', name,
-        '--repo', repo,
+        '--repo', workerRepo,
         '--agent', agent,
         '--setup', 'skip',
       ];
@@ -187,8 +256,14 @@ export function createOrcaBoundaries({
     // worktree. "Absent" would then be read as "no turn started", and
     // step-runner.mjs would release a perfectly healthy worker as never-started.
     // So an absent row on a TRUNCATED page is an error, not a verdict.
+    //
+    // AND IT IS ASKED OF THE RUNNER'S DAEMON. The worktree being looked for was
+    // created by `worker-start --on ovh-local`, so `ovh-local` is the only
+    // daemon that has a row for it. Until JUL-98 step 5 this call passed no
+    // `--environment` at all and fell back to the process default -- which
+    // under systemd is unset, because the unit sets no ORCA_ENVIRONMENT.
     async observeStartImpl({ dispatch } = {}) {
-      const answer = await call(['worktree', 'ps', '--limit', String(worktreePsLimit)]);
+      const answer = await call(['worktree', 'ps', '--environment', workerEnvironment, '--limit', String(worktreePsLimit)]);
       const worktrees = answer?.worktrees ?? [];
       const wanted = dispatch?.worktree ?? null;
       const worktree = worktrees.find((row) => row?.worktreeId === wanted) ?? null;
@@ -222,8 +297,13 @@ export function createOrcaBoundaries({
 
     // (6) Release: output archived, terminal closed. Idempotent in Orca itself
     // ("repeating the call reports already_released"), so no guard here.
+    //
+    // THE CONTROLLER'S daemon, because a Dispatch belongs to the Run and the
+    // Run is there. This too passed no `--environment` before JUL-98 step 5,
+    // for the same reason `worktree ps` did not: the process default looked
+    // like enough on a laptop and is unset under the unit.
     async releaseImpl({ dispatchId } = {}) {
-      return call(['orchestration', 'worker-release', '--dispatch', dispatchId]);
+      return call(['orchestration', 'worker-release', '--environment', environment, '--dispatch', dispatchId]);
     },
 
     // (8) The liveness check for a terminal handle. `terminal show` is the
@@ -244,6 +324,10 @@ export function createOrcaBoundaries({
     // checkout" -- and `worker-start` is wrong here because that starts a
     // SUPERVISED AGENT with a model allowance, which this terminal must never
     // be: nothing runs in it. No --command, so it is a bare shell.
+    // THE CONTROLLER'S OWN daemon and THE CONTROLLER'S OWN checkout, and it
+    // stays there: this terminal is the controller's `--from` handle, it must
+    // live on the daemon the Run lives on, and nothing is ever run in it -- so
+    // the read-only checkout being read-only costs it nothing.
     async terminalCreateImpl({ title = CONTROLLER_TERMINAL_TITLE } = {}) {
       return call([
         'terminal', 'create',
@@ -254,10 +338,13 @@ export function createOrcaBoundaries({
     },
 
     // (7) The worktree. Orca names one `<repoId>::<path>`, which is exactly the
-    // `id:` selector `worktree rm` documents.
+    // `id:` selector `worktree rm` documents. THE RUNNER'S daemon, for the same
+    // reason as `worktree ps`: that is the daemon that has the worktree, and a
+    // removal sent to the controller's daemon would leave the real worktree on
+    // disk for ever. Also `--environment`-less before JUL-98 step 5.
     async removeWorktreeImpl({ worktree } = {}) {
       if (!worktree) return { removed: false, reason: 'the dispatch recorded no worktree' };
-      return call(['worktree', 'rm', '--worktree', `id:${worktree}`]);
+      return call(['worktree', 'rm', '--environment', workerEnvironment, '--worktree', `id:${worktree}`]);
     },
   };
 }
@@ -476,8 +563,20 @@ export function worktreePathOf(worktreeId) {
 // refuses anything that is not a 40-character sha, and GitHub refuses the merge
 // with a 409 if the PR head has moved since -- so the commit that is merged is
 // the commit that was reviewed, proven by GitHub rather than by trust.
+//
+// ACROSS THE OWNERSHIP BOUNDARY. This runs as `orchestrator-svc` against a
+// worktree owned by `runner` (JUL-98 step 5: the candidate worktree now lives
+// under /home/runner/orca/workspaces/julia-next/). Git's dubious-ownership
+// guard -- which is about the owning UID, not about file permissions -- then
+// refuses to operate in that directory at all: "fatal: detected dubious
+// ownership in repository at ...". So `-c safe.directory=<the exact path the
+// caller passed in>`, the same fix scripts/publish-pr.mjs (pushBranch) and
+// scripts/verify-reviewer-worktree.mjs already use, scoped to that one path and
+// never read from repo-local config, where a pushed commit could poison it.
+// WITHOUT IT the read fails, so no sha reaches merge-pr.mjs and the card stops
+// at `stage: publish` after the work has already passed.
 export async function headShaOf(worktreePath, { execImpl = execFileAsync } = {}) {
-  const { stdout } = await execImpl('git', ['-C', worktreePath, 'rev-parse', 'HEAD']);
+  const { stdout } = await execImpl('git', ['-c', `safe.directory=${worktreePath}`, '-C', worktreePath, 'rev-parse', 'HEAD']);
   return String(stdout).trim();
 }
 

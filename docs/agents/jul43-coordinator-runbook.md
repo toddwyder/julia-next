@@ -1359,6 +1359,93 @@ nothing set it, and a real `--once` run on 2026-09-21 at 18:11Z printed the bann
 exited. Under `Restart=always` that is a five-second crash loop with nothing ever moving on the
 board.
 
+**Two daemons and two checkouts: which Orca call goes where (JUL-98 step 5c).** The controller's
+own side and the worker's side are different daemons *and* different checkouts, and no call may use
+the wrong pair.
+
+**The one-line reason the controller's own checkout can never be the worker's:** creating a worktree
+writes a branch ref into the repository it is created from, and `/srv/orchestrator-svc/julia-next` is
+root-owned and read-only to `orchestrator-svc` on purpose.
+
+*This was live, not theoretical.* On 2026-09-21 at 18:54Z the controller moved **JUL-92** from Ready
+to Implementation, failed to start a builder for it, and then reported nothing-eligible on every
+cycle afterwards -- leaving a real card in Implementation with nothing working on it. Re-running the
+controller's own recorded `worker-start` by hand gave the reason its `lastError` had dropped:
+
+```
+state: failed, stage: worktree_create
+Command failed: git worktree add --no-track -b jul-92-probe ... refs/remotes/origin/main
+fatal: cannot lock ref refs/heads/jul-92-probe: Unable to create
+/srv/orchestrator-svc/julia-next/.git/refs/heads/jul-92-probe.lock: Permission denied
+```
+
+Every dispatch failed identically, so the controller could never start a single worker. The fix is
+**never** to make that checkout writable and **never** to add a sudo rule -- it is deliberately
+read-only, which is also why `graph/controller/state.mjs` refuses to keep the state file inside it --
+but to dispatch onto the runner's daemon, into the runner's checkout.
+
+| Orca call | boundary (`graph/controller/wiring.mjs`) | `--environment` | `--on` | repo / worktree flag |
+| --- | --- | --- | --- | --- |
+| `orchestration run-create` | `runCreateImpl` (line 187) | `orchestrator-local` | — | — |
+| `orchestration run-list` (via `findActiveRun`) | `activeRunImpl` (line 201) | `orchestrator-local` | — | — |
+| `orchestration worker-start` | `workerStartImpl` (line 222) | `orchestrator-local` | **`ovh-local`** | `--repo path:/home/runner/julia-next` |
+| `worktree ps` | `observeStartImpl` (line 265) | **`ovh-local`** | — | — |
+| `orchestration check --wait` | `checkWaitImpl` (line 282) | `orchestrator-local` | — | — |
+| `orchestration worker-release` | `releaseImpl` (line 305) | `orchestrator-local` | — | — |
+| `terminal show` | `terminalShowImpl` (line 317) | `orchestrator-local` | — | — |
+| `terminal create` | `terminalCreateImpl` (line 331) | `orchestrator-local` | — | `--worktree path:/srv/orchestrator-svc/julia-next` |
+| `worktree rm` | `removeWorktreeImpl` (line 345) | **`ovh-local`** | — | `--worktree id:<repoId>::<path>` |
+
+Why it splits that way:
+
+- **The Run and everything hanging off it stay on `orchestrator-local`**: `run-create`, the run-list
+  walk, the mailbox `check --wait`, `worker-release`, and the controller's own sender terminal
+  (`terminal show` / `terminal create`). The wrong daemon here answers `run_not_found` -- see
+  "`run_not_found` on an orchestration command is the wrong daemon, not a missing Run" above.
+- **`worker-start` carries both sides.** `orca orchestration worker-start --help` states it: "`--on`
+  selects only the worker server; the Run and this command remain on the current Orca server", and
+  "Use exact `--repo` on the selected server." So `--environment orchestrator-local` (the Run),
+  `--on ovh-local` (where the worker process runs), `--repo path:/home/runner/julia-next` (the
+  runner-owned checkout a branch ref can actually be written into). Before this fix the call passed
+  **no `--on` at all** and pointed `--repo` at the controller's own checkout.
+- **`worktree ps` and `worktree rm` act on the worker's worktree, so they go to `ovh-local`.** Both
+  previously passed no `--environment` and fell back to the process default; the unit sets no
+  `ORCA_ENVIRONMENT`, so under systemd there is no default to fall back to. `worker-release` was
+  `--environment`-less for the same reason and now names `orchestrator-local` explicitly.
+- **The controller's sender terminal does not move.** It must live on the daemon its Run lives on,
+  and nothing is ever run in it, so the read-only checkout costs it nothing.
+
+**The ownership boundary this opens, and the three places that cross it.** The controller runs as
+`orchestrator-svc`; the candidate worktree is now owned by `runner` under
+`/home/runner/orca/workspaces/julia-next/`. `orchestrator-svc` can read there, but git's
+*dubious-ownership* guard is about the owning UID, not file permissions, and refuses the directory
+outright: "fatal: detected dubious ownership in repository at ...". Each crossing gets
+`safe.directory` scoped to **exactly** the worktree path the caller passed -- the same fix
+`scripts/publish-pr.mjs` (`pushBranch`, line 150) and `scripts/verify-reviewer-worktree.mjs`
+(line 31) already use. **No global git config, and no wildcard.**
+
+- `headShaOf` (`graph/controller/wiring.mjs` line 578) -- `git -c safe.directory=<path> -C <path>
+  rev-parse HEAD`. Without it there is no reviewed sha for `merge-pr.mjs`.
+- `currentBranch` (`graph/controller/main.mjs` line 253) -- the same, for `rev-parse --abbrev-ref
+  HEAD`. Without it a passing step never reaches the publish it earned.
+- **The suite run** (`graph/controller/test-run.mjs`, `gitSafeDirectoryEnv`, line 82). The command is
+  `node --test scripts/*.test.mjs`, not git, so there is no argv position for `-c`; it carries git's
+  own documented environment form instead -- `GIT_CONFIG_COUNT` / `GIT_CONFIG_KEY_n` /
+  `GIT_CONFIG_VALUE_n`, one entry, value exactly the worktree path -- which every git process the
+  suite starts inherits. This matters because `scripts/line-endings.test.mjs` shells out to `git
+  ls-files --eol` in the repo root and turns a failure into `t.skip('not inside a git checkout')`:
+  without this the repo's line-ending guard would **silently skip** on every controller-run suite and
+  be reported as a pass.
+
+`pushBranch` and `assertNoUrlRewrites` in `scripts/publish-pr.mjs` already pass `-c
+safe.directory=<cwd>` (lines 150 and 85) and were left unchanged. `openPullRequest` and
+`mergePullRequest` are GitHub REST calls that never touch the worktree, so they need nothing.
+
+*Not verified live:* every routing and `safe.directory` claim above is pinned by
+`scripts/controller-wiring.test.mjs`, which asserts the argv the controller builds and spawns
+nothing. That the real `orca` and the real `git` behave as described when the controller runs as
+`orchestrator-svc` is only provable on the server.
+
 **The trade-off, stated plainly.** A merged change to that unit file becomes code running as
 `orchestrator-svc`. That is not root, and it is the account that already merges its own PRs and holds
 the publisher credential, so it adds no reach the graph did not have. The root-code boundary in the
