@@ -1719,6 +1719,18 @@ guard's own words. And it never moves a seat that has already run: the partner m
 while no seat has run yet (`movePartner: ran.size === 0`), so a reviewer falling back can never
 rewrite a builder that is already finished.
 
+**And it only says a seat *ran* on its backup when the backup actually got going.** `launchRefused`
+is the right test for *starting* a fallback — it marks the one case where nothing at all was
+created — but it is the wrong test for whether the fallback then worked. A `worker-start` that
+*failed* (the `agent_readiness` / folder-trust case of 19-20 September) comes back without the
+mark, and so does a worker whose turn was never proven. Both come back from `runWorkerStep` with a
+never-started cost line and a `stage` of `dispatch` or `turn-start`, and it is that `stage` the
+backup branch gates on (`neverGotGoing` in `graph/controller/step-runner.mjs`). A backup that was
+refused, that failed to start, or whose turn never began therefore takes the stop path that names
+both entries and both reasons, and `seatMoveComment` is not written at all — so a card can no
+longer be told "it ran on `codex`", "worker-start failed at agent_readiness" and "never started"
+in one step.
+
 **A refusal is no longer reported as a blank.** A seat refused before dispatch has no session file
 to read, so it gets the explicit never-started line `neverStartedCostLine` in
 `graph/controller/cost.mjs` already produces for a worker whose turn never began — 0 tokens, $0,

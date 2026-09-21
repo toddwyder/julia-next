@@ -313,6 +313,26 @@ export async function runBuildAndReview({
     ...base, ok: false, reason, cost: neverStartedCostLine({ seat, reason }),
   });
 
+  // ITEM 3 (JUL-98 step 5, round 2): WHAT "IT RAN ON THE BACKUP" IS ALLOWED TO
+  // MEAN. The move comment below tells the card the seat RAN on its backup, so
+  // it may only be written when the backup's worker actually got going.
+  //
+  // `launchRefused` is NOT that test. It marks only the one case where nothing
+  // at all was created -- ./dispatch.mjs's own comment says so, and says that a
+  // `worker-start` that FAILED deliberately keeps `ok: false` WITHOUT the mark.
+  // Both of those come back from `runWorkerStep` with `stage: 'dispatch'` and a
+  // never-started cost line (line 81 and line 86 above). A worker that was
+  // created but whose turn was never proven is the same kind of thing again:
+  // `stage: 'turn-start'`, `turnStarted: false`, a never-started cost line, and
+  // no work done (line 138).
+  //
+  // Before this, only `launchRefused` took the stop path, so a backup that
+  // failed at `agent_readiness` or the trust screen -- the 19-20 September
+  // failure -- put three contradictory things on one card: "it ran on codex",
+  // "worker-start failed at agent_readiness", and a cost line reading "never
+  // started". So the gate is the stage, which covers all three.
+  const neverGotGoing = (result) => result.stage === 'dispatch' || result.stage === 'turn-start';
+
   for (const seat of seats) {
     const first = inPlay[seat];
     let result = await startSeat(seat, first, '');
@@ -329,7 +349,7 @@ export async function runBuildAndReview({
       } else {
         const backup = fallback.choices[seat];
         const second = await startSeat(seat, backup, '-bk');
-        if (second.launchRefused) {
+        if (neverGotGoing(second)) {
           result = stopped(second, seat, `the ${seat} seat could not be started on ${fromEntry}: ${fromReason} -- and its backup ${backup.entry} could not be started either: ${second.reason}`);
         } else {
           inPlay = fallback.choices;

@@ -432,3 +432,78 @@ test('an ordinary blank cost line still fails the step, and the never-started ma
   assert.match(result.reason, /the reviewer seat's cost line is blank in: model, totalTokens, peakContext, minutes/);
   assert.ok(!h.order.includes('release:reviewer'), 'and it was not released with its figures unread');
 });
+
+// ---------------------------------------------------------------------------
+// A BACKUP THAT NEVER GOT GOING (JUL-98 step 5, round 2)
+// ---------------------------------------------------------------------------
+//
+// The fifth fix gated the "it ran on the backup" comment on `launchRefused`
+// alone. But `launchRefused` marks only the one case where NOTHING WAS CREATED
+// (graph/controller/dispatch.mjs, the comment above the `launchRefused: true`
+// return): a `worker-start` that FAILED keeps `ok: false` without the mark, and
+// a worker whose turn was never proven never had the mark either. Both of those
+// fell into the "it ran on the backup" branch, so a card would be told, in one
+// step: "the reviewer seat moved to its backup ... it ran on codex", then "the
+// step did not pass: worker-start failed at agent_readiness", and a cost line
+// reading "never started" -- three things that cannot all be true.
+//
+// Both of these are real: the trust-screen failure and the turn that never
+// begins are the 19-20 September failures this whole step exists for.
+
+test('a backup whose worker-start FAILS stops the step -- the card is never told the seat ran on it', async () => {
+  const h = harness();
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+  const failedStart = loadOrcaFixture('worker-start.failed-agent-readiness.json').result;
+
+  // The builder starts as usual; the reviewer's backup -- the only reviewer
+  // start there is, since `pi-deepseek` never reaches worker-start -- fails at
+  // the trust screen, exactly as the recording has it.
+  const healthyStart = h.deps.workerStartImpl;
+  h.deps.workerStartImpl = async (options) => (
+    options.agent === 'codex' ? { ...failedStart } : healthyStart(options)
+  );
+
+  const result = await runBuildAndReview({ card: CARD, step: STEP, choices: resolveSeatChoices([]), suiteRunner, ...h.deps });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.seatMoves.length, 0, 'the seat never ran on the backup, so no move comment is written');
+  assert.match(result.reason, /the reviewer seat could not be started on pi-deepseek/);
+  assert.match(result.reason, /its backup codex could not be started either/);
+  assert.match(result.reason, /worker-start failed at agent_readiness \(timeout\)/, "Orca's own failure, carried through");
+  assert.equal(result.reviewer.movedTo, undefined, 'and the result does not claim a move either');
+  const line = result.costLines.find((entry) => entry.seat === 'reviewer');
+  assert.equal(line.neverStarted, true, 'the seat is costed as never started -- which is what it was');
+});
+
+test('a backup whose TURN is never proven stops the step too -- the same claim, the same gate', async () => {
+  const h = harness();
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+
+  // The backup's worker IS created -- so there is no `launchRefused` and no
+  // failed start -- but its turn never begins. That worker wrote no session
+  // file, so it did no work: it cannot be reported as having run.
+  let reviewerStarted = false;
+  h.deps.observeStartImpl = async ({ seat }) => {
+    if (seat === 'reviewer') reviewerStarted = true;
+    return { send: seat === 'reviewer' ? NO_TURN : TURN_STARTED };
+  };
+  const waitForBuilder = h.deps.checkWaitImpl;
+  h.deps.checkWaitImpl = async (options) => {
+    if (reviewerStarted) throw new Error('the mailbox must not be opened for a backup whose turn never started');
+    return waitForBuilder(options);
+  };
+
+  const result = await runBuildAndReview({ card: CARD, step: STEP, choices: resolveSeatChoices([]), suiteRunner, ...h.deps });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.seatMoves.length, 0, 'no work was done on the backup, so the card is told of no move');
+  assert.match(result.reason, /the reviewer seat could not be started on pi-deepseek/);
+  assert.match(result.reason, /its backup codex could not be started either/);
+  assert.match(result.reason, /input.accepted/i, "the turn-start proof's own words");
+  assert.equal(result.reviewer.movedTo, undefined);
+  // The worker that WAS created is still cleaned up, the way every
+  // never-started worker is.
+  assert.ok(h.order.includes('release:reviewer'));
+  assert.ok(h.order.includes('remove-worktree:reviewer'));
+  assert.ok(!h.order.includes('read-cost:reviewer'), 'and its non-existent session file is not read');
+});
