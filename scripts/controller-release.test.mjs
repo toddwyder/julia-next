@@ -106,3 +106,67 @@ test('the card cannot leave its column until every seat has a cost line', () => 
     /minutes/,
   );
 });
+
+// --- A worker that never started ---------------------------------------------
+//
+// The review finding this pins (JUL-98 step 3, attempt 1): read-cost-then-
+// release-then-remove is right for a worker that RAN, but a worker that never
+// started has no session file to read a cost from, so the cost read threw, the
+// order stopped at step 1, and the worktree leaked. Orca's recording of that
+// case is graph/fixtures/orca-1.4.205/worker-start.failed-agent-readiness.json
+// (state failed, failedStage agent_readiness, lastError timeout, and a
+// residualResources list) -- exactly the 19-20 September trust screen, where
+// the leaked worktree is the thing that needs cleaning up.
+
+test('a worker that never started is still cleaned up: no cost is read, and the line says never-started rather than blank', async () => {
+  const r = recorder();
+  // The real never-started case: there is no session file, so a cost read
+  // would throw -- and under attempt 1 that threw refusal stopped the order at
+  // step 1 and leaked the worktree.
+  r.readCostImpl = async () => {
+    r.order.push('read-cost');
+    throw new Error('no session file for this worker: no turn ever started');
+  };
+  const result = await finishWorker({
+    seat: 'builder',
+    dispatchId: 'ctx_937abab903ae',
+    worktree: 'dce3a58b::/home/runner/orca/workspaces/julia-next/jul92-step-1',
+    turnStarted: false,
+    ...r,
+  });
+
+  assert.deepEqual(r.order, ['release', 'remove-worktree'], 'there is no session to read, so the read is skipped -- and it must not block cleanup');
+  assert.equal(result.ok, true);
+  assert.equal(result.cost.neverStarted, true, 'explicitly never-started, not a blank cost line that would silently pass');
+  assert.equal(result.cost.totalTokens, 0);
+  assert.equal(result.released, true);
+  assert.equal(result.worktreeRemoved, true, 'the worktree must not leak');
+});
+
+test('a worker that DID run still has its cost read before anything is released -- the never-started path does not weaken the order', async () => {
+  const r = recorder();
+  const result = await finishWorker({
+    seat: 'builder',
+    dispatchId: 'ctx_937abab903ae',
+    worktree: 'dce3a58b::/home/runner/orca/workspaces/julia-next/jul92-step-1',
+    turnStarted: true,
+    ...r,
+  });
+  assert.deepEqual(r.order, ['read-cost', 'release', 'remove-worktree']);
+  assert.equal(result.cost.neverStarted, undefined);
+});
+
+test('a never-started seat passes the gate before the card moves, and an ordinary blank one still does not', async () => {
+  const neverStarted = await finishWorker({
+    seat: 'builder',
+    dispatchId: 'ctx_937abab903ae',
+    worktree: 'dce3a58b::/home/runner/orca/workspaces/julia-next/jul92-step-1',
+    turnStarted: false,
+    ...recorder(),
+  });
+  assert.doesNotThrow(() => assertEverySeatCosted({ seats: ['builder'], costLines: [neverStarted.cost] }));
+  assert.throws(
+    () => assertEverySeatCosted({ seats: ['builder'], costLines: [{ seat: 'builder', model: null, totalTokens: null, peakContext: null, minutes: null }] }),
+    /blank/,
+  );
+});

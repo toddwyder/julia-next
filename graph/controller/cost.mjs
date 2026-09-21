@@ -39,7 +39,7 @@
 // rate table's own header records that the published price runs above what the
 // account balance actually moved.
 
-import { costOf, claudeUsageFromTranscript, peakPromptTokens, RATE_TABLE } from '../rate-table.mjs';
+import { costOf, claudeUsageFromTranscript, parseTranscriptLines, peakPromptTokens, RATE_TABLE } from '../rate-table.mjs';
 
 export const COST_SOURCES = Object.freeze({
   claude: Object.freeze({
@@ -64,7 +64,27 @@ function minutesBetween(startedAt, endedAt) {
   return Number((ms / 60000).toFixed(2));
 }
 
-function sumTokens(tokens) {
+// THE ONE WAY A TOKEN TOTAL IS COMPUTED. Every seat, every extract and the
+// posted line go through this function and nowhere else.
+//
+// THE RULE: where the record states its own total, THAT is the total. A sum of
+// the component fields is used only when no record total exists.
+//
+// WHY, with the arithmetic. Codex's `input_tokens` already includes the cached
+// part (`total_tokens = input + output`, findings section 5), so summing the
+// fields of the recorded session gives 50,976 + 45,312 + 0 + 223 = 96,511
+// against the record's own 51,199 -- nearly double
+// (graph/fixtures/orca-1.4.205/cost.codex-session.json). This is the same
+// failure mode JUL-109 recorded for Claude in PR #64, where summing one line
+// per content block counted messages twice. Attempt 1 of this step had TWO
+// totals -- `codexExtractFromRollout` got it right and `seatCostLine` summed --
+// and they disagreed by that factor. A doubled cost line is worse than a blank
+// one: it is the figure Todd reads to decide which seat moves to DeepSeek, and
+// it points the decision the wrong way.
+export function tokenTotal(tokens, recordedTotal) {
+  const own = Number(recordedTotal);
+  if (Number.isFinite(own)) return own;
+  if (!tokens) return null;
   return Object.values(tokens).reduce((total, value) => total + (Number(value) || 0), 0);
 }
 
@@ -72,7 +92,13 @@ function sumTokens(tokens) {
 // Claude
 // ---------------------------------------------------------------------------
 
-export function claudeExtractFromTranscript(lines) {
+export function claudeExtractFromTranscript(rawLines) {
+  // Parsed once, through the one reader, so the totals and the peak/duration
+  // below see the same lines whether the caller handed over objects or the raw
+  // JSONL text a `.jsonl` file is read as. Handing over text used to give
+  // totals of nothing at all -- the silent {} that made JUL-98's builder cost
+  // lines blank.
+  const lines = parseTranscriptLines(rawLines);
   const byModel = claudeUsageFromTranscript(lines);
   const models = Object.keys(byModel);
   if (models.length === 0) throw new Error('claudeExtractFromTranscript: the transcript holds no assistant usage, so this seat has no cost figures');
@@ -106,7 +132,9 @@ export function claudeExtractFromTranscript(lines) {
     vendor: 'claude',
     model,
     tokens,
-    totalTokens: sumTokens(tokens),
+    // Claude's transcript states no total of its own, so this is the sum over
+    // fields already de-duplicated by message id (findings section 5, trap 1).
+    totalTokens: tokenTotal(tokens),
     peakContext: peakPromptTokens(calls),
     startedAt: timestamps[0] ?? null,
     endedAt: timestamps[timestamps.length - 1] ?? null,
@@ -146,7 +174,7 @@ export function codexExtractFromRollout(lines) {
     tokens,
     // Codex's input_tokens already INCLUDES the cached part, so the total is
     // the record's own total, never a sum of the fields above.
-    totalTokens: total.total_tokens ?? (tokens.input + tokens.output),
+    totalTokens: tokenTotal(tokens, total.total_tokens),
     peakContext: Math.max(...events.map((event) => event.payload.info.last_token_usage?.input_tokens ?? 0)),
     contextWindow: last.model_context_window ?? RATE_TABLE.models[model]?.contextWindow ?? null,
     startedAt: timestamps[0] ?? null,
@@ -188,7 +216,7 @@ export function deepseekExtractFromSeatStream(events, { startedAt, endedAt } = {
     provider: last.provider ?? null,
     model: last.model,
     tokens,
-    totalTokens: last.usage.totalTokens ?? sumTokens(tokens),
+    totalTokens: tokenTotal(tokens, last.usage.totalTokens),
     peakContext,
     startedAt,
     endedAt,
@@ -217,6 +245,7 @@ export function seatCostLine({
   endedAt,
   minutes,
   usd,
+  totalTokens,
   capped = false,
   failedOverTo = null,
 } = {}) {
@@ -226,7 +255,10 @@ export function seatCostLine({
     vendor: vendor ?? RATE_TABLE.models[model]?.vendor ?? null,
     model,
     tokens,
-    totalTokens: tokens ? sumTokens(tokens) : null,
+    // The SAME function the extracts use, given the extract's own total: a
+    // spread extract carries `totalTokens`, and the line must never re-derive
+    // a figure the record already stated.
+    totalTokens: tokenTotal(tokens, totalTokens),
     peakContext,
     startedAt: startedAt ?? null,
     endedAt: endedAt ?? null,
@@ -237,11 +269,40 @@ export function seatCostLine({
   };
 }
 
+// A WORKER THAT NEVER STARTED. There is no session file to read a cost from --
+// no turn began, so Claude wrote no transcript, Codex no rollout and Pi no
+// message_end. The honest figure is zero, and it must be MARKED, never posted
+// as a bare empty line: `neverStarted: true` is what makes
+// `assertCostLineComplete` accept it, so an ordinary blank (the step-1 failure:
+// figures lost because cleanup ran first) still fails exactly as before.
+export function neverStartedCostLine({ seat, model = null, reason = 'no turn was ever observed to start' } = {}) {
+  return {
+    seat,
+    neverStarted: true,
+    reason,
+    vendor: null,
+    model,
+    tokens: null,
+    totalTokens: 0,
+    peakContext: 0,
+    minutes: 0,
+    usd: 0,
+    capped: false,
+    failedOverTo: null,
+  };
+}
+
 const REQUIRED_FIELDS = ['seat', 'model', 'totalTokens', 'peakContext', 'minutes'];
 
 // A blank cost line for any seat FAILS the step. This is the check that makes
 // that true rather than hoped for.
 export function assertCostLineComplete(line) {
+  // The one exception, and it is an explicit mark rather than an absence: a
+  // worker that never started spent nothing and has no session to read.
+  if (line?.neverStarted === true) {
+    if (!line.seat) throw new Error('a never-started cost line must still name its seat');
+    return line;
+  }
   const blank = REQUIRED_FIELDS.filter((field) => {
     const value = line?.[field];
     return value === null || value === undefined || value === '' || (typeof value === 'number' && !Number.isFinite(value));
@@ -257,6 +318,9 @@ const number = (value) => Number(value).toLocaleString('en-US');
 export function formatCostLine(line) {
   assertCostLineComplete(line);
   const seat = line.seat.charAt(0).toUpperCase() + line.seat.slice(1);
+  if (line.neverStarted === true) {
+    return `- **${seat}** -- never started -- no turn began, so there is no session to read a cost from: 0 tokens, $0.0000 (${line.reason ?? 'no turn was ever observed to start'})`;
+  }
   const capNote = line.capped
     ? `hit its usage cap${line.failedOverTo ? `, failed over to ${line.failedOverTo}` : ''}`
     : (line.failedOverTo ? `failed over to ${line.failedOverTo}` : 'no cap, no failover');

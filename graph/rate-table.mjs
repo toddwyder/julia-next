@@ -140,14 +140,34 @@ export function piReportedCostOf(model, usage = {}, { source = 'registry' } = {}
   return (n('input') * rates.input + n('output') * rates.output + n('cacheRead') * rates.cacheRead) / PER;
 }
 
-// One Claude session transcript (parsed JSON lines) -> usage per model, counting each message id ONCE.
+// One Claude session transcript -> usage per model, counting each message id ONCE.
+//
+// TAKES THE TRANSCRIPT EITHER WAY: already-parsed objects, or the raw JSONL text lines as they come
+// off disk. It used to take only the first, and a `.jsonl` file is read as STRINGS: `l.type` on a
+// string is `undefined`, so every line was skipped and the answer was an EMPTY OBJECT, silently.
+// Measured on 21 Sep against the real transcript of this card's own step-3 attempt-1 builder (777
+// lines, 133 of them claude-opus-5 assistant lines): {}. That silent empty is why every builder cost
+// line on JUL-98 read "not captured", and a blank cost line fails the step. A line that will not
+// parse is skipped (a transcript being written can end mid-line); a line that parses is read as before.
 // A transcript writes one line per content block, so a message with a text block and a tool call
 // appears twice with identical usage; summing lines double-counts (the PR #64 mistake). A cache write
 // with no lifetime split is counted at the 1-hour rate, which is what Claude Code's own record does.
 // The result is a lower bound on the session's cost: Claude Code makes calls the transcript omits.
+// The ONE place a transcript's lines are turned into objects, so every reader of a transcript takes
+// it the same way: parsed objects pass through, raw JSONL text is parsed, an unparseable line is
+// dropped (a transcript being written can end mid-line).
+export function parseTranscriptLines(lines) {
+  const out = [];
+  for (const raw of lines ?? []) {
+    if (typeof raw !== 'string') { out.push(raw); continue; }
+    try { out.push(JSON.parse(raw)); } catch { /* a half-written last line is not usage */ }
+  }
+  return out;
+}
+
 export function claudeUsageFromTranscript(lines) {
   const byId = new Map();
-  for (const l of lines) {
+  for (const l of parseTranscriptLines(lines)) {
     if (l?.type !== 'assistant' || !l.message?.id || !l.message.usage) continue;
     if (l.message.model === '<synthetic>') continue;
     byId.set(l.message.id, l.message);

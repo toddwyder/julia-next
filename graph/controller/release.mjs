@@ -22,7 +22,22 @@
 // asks it to own; step 4, which switches the controller on, wires the real
 // argv and records the answers.
 
-import { assertCostLineComplete } from './cost.mjs';
+import { assertCostLineComplete, neverStartedCostLine } from './cost.mjs';
+
+// THE ONE CASE WITH NO COST TO LOSE: a worker that NEVER STARTED. If no turn
+// ever began there is no session file to read -- Claude wrote no transcript,
+// Codex no rollout, Pi no message_end -- so the cost read can only fail, and
+// under attempt 1 that failure stopped the order at step 1 and LEAKED the
+// worktree. That is precisely the 19-20 September case
+// (graph/fixtures/orca-1.4.205/worker-start.failed-agent-readiness.json: state
+// failed, failedStage agent_readiness, lastError timeout, with a
+// residualResources list), where cleanup is the whole point. So a caller that
+// knows the turn never started passes `turnStarted: false`, the read is
+// skipped, and the seat gets an explicit never-started line (0 tokens, $0,
+// `neverStarted: true`) rather than a blank one that could pass unnoticed.
+// Nothing here weakens the order for a worker that DID run: `turnStarted`
+// defaults to true, and on that path read-then-release-then-remove is
+// unchanged, with a bad cost still stopping everything after it.
 
 // One finished worker, finished properly.
 //
@@ -37,21 +52,28 @@ export async function finishWorker({
   releaseImpl,
   removeWorktreeImpl,
   removeWorktree = true,
+  turnStarted = true,
+  neverStartedReason = 'no turn was ever observed to start, so this worker has no session to read a cost from',
 }) {
-  // 1. READ THE COST. First, always, while the session files still exist.
+  // 1. READ THE COST. First, always, while the session files still exist --
+  //    unless there is nothing to read because the turn never started.
   let cost = null;
-  try {
-    cost = await readCostImpl({ seat, dispatchId, worktree });
-    assertCostLineComplete(cost);
-  } catch (error) {
-    return {
-      ok: false,
-      seat,
-      cost,
-      released: false,
-      worktreeRemoved: false,
-      reason: `${error.message} -- the worker and its worktree were left in place so the figures can be read again`,
-    };
+  if (turnStarted === false) {
+    cost = neverStartedCostLine({ seat, reason: neverStartedReason });
+  } else {
+    try {
+      cost = await readCostImpl({ seat, dispatchId, worktree });
+      assertCostLineComplete(cost);
+    } catch (error) {
+      return {
+        ok: false,
+        seat,
+        cost,
+        released: false,
+        worktreeRemoved: false,
+        reason: `${error.message} -- the worker and its worktree were left in place so the figures can be read again`,
+      };
+    }
   }
 
   // 2. RELEASE. Output archived, terminal closed.

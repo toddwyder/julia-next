@@ -99,7 +99,14 @@ export function createFixtureWorkerOrca({ failStart = false } = {}) {
         ...healthy,
         taskId: nth(healthy.taskId, index),
         dispatchId: nth(healthy.dispatchId, index),
-        effects: healthy.effects.map((effect) => ({ ...effect, id: nth(effect.id, index) })),
+        // Only the effects the recording actually gives an `id` get a
+        // per-start one. The `kind: "setup"` effect has no `id` in any
+        // recording (worker-start.claude-model-effort.json), so none is
+        // produced for it: suffixing a field that is not there would invent
+        // the shape `id: "undefined-N"`, which appears in no recorded payload.
+        effects: healthy.effects.map((effect) => (
+          'id' in effect ? { ...effect, id: nth(effect.id, index) } : { ...effect }
+        )),
         launch: {
           requested: { agent: options.agent, model: options.model, effort: options.effort },
           effective: { agent: options.agent, model: options.model, effort: options.effort },

@@ -204,3 +204,39 @@ test('the review run: the published price is above what the account balance show
   assert.ok(published > 0.10, `published-price estimate ${published} should exceed the charge`);
   assert.ok(run.totalsAsPrintedByPi.cost > 2 * spent, 'Pi printed more than twice the charge');
 });
+
+// ---- The transcript reader must work on a REAL builder transcript, as it is read off disk.
+//
+// Measured by the coordinator on 21 Sep against the real transcript of this card's own step-3
+// attempt-1 worker (/home/runner/.claude/projects/-home-runner-orca-workspaces-julia-next-jul98-step-3,
+// 777 lines, 133 of them assistant lines carrying claude-opus-5 usage): claudeUsageFromTranscript
+// returned an EMPTY object, which is why every builder cost line on this card read "not captured".
+//
+// The mismatch is the INPUT CONTRACT, not the usage shape. A `.jsonl` file read off disk is a list of
+// STRINGS; the function only ever looked at `l.type`, which on a string is `undefined`, so it skipped
+// every line and returned {} without complaint. A silent {} is exactly the blank cost line the card
+// says must fail. `cost.claude-transcript.real-builder-lines.jsonl` is nine of those real lines,
+// verbatim except that `message.content` is elided (no cost extractor reads it): three distinct
+// assistant messages, each repeated as the transcript really repeats them one line per content block,
+// plus one real `user` line that also carries `output_tokens` and must stay uncounted.
+const REAL_TRANSCRIPT = 'cost.claude-transcript.real-builder-lines.jsonl';
+const REAL_TRANSCRIPT_TOTALS = { input: 6, output: 779, cacheRead: 141743, cacheWrite5m: 0, cacheWrite1h: 29707, messages: 3 };
+
+test('a real builder transcript read off disk as JSONL text gives usage, not a silent empty object', () => {
+  const text = readFileSync(fx(REAL_TRANSCRIPT), 'utf8').split('\n').filter(Boolean);
+  const usage = claudeUsageFromTranscript(text);
+  assert.deepEqual(Object.keys(usage), ['claude-opus-5'], 'the real transcript is claude-opus-5 and must not come back empty');
+  assert.deepEqual(usage['claude-opus-5'], REAL_TRANSCRIPT_TOTALS);
+});
+
+test('the same real transcript already parsed gives the identical figures -- one reading, two input forms', () => {
+  assert.deepEqual(claudeUsageFromTranscript(lines(REAL_TRANSCRIPT))['claude-opus-5'], REAL_TRANSCRIPT_TOTALS);
+});
+
+test('the real transcript repeats messages and carries a user line with output_tokens: both stay uncounted', () => {
+  const parsed = lines(REAL_TRANSCRIPT);
+  assert.equal(parsed.length, 9, 'nine real lines');
+  assert.equal(parsed.filter((l) => l.type === 'assistant').length, 8);
+  assert.equal(parsed.filter((l) => l.type === 'user' && JSON.stringify(l).includes('output_tokens')).length, 1);
+  assert.equal(claudeUsageFromTranscript(parsed)['claude-opus-5'].messages, 3, 'eight assistant lines, three distinct messages');
+});

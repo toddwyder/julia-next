@@ -1679,6 +1679,31 @@ Orca's own `failureCount` stays 0 for a reported failure, so the two-rounds rule
 block (count each `message.id` once) and is still about 15% under Claude Code's own record; and Pi's
 Pi's printed DeepSeek dollars, DeepSeek's published price and the account balance all differ (on one measured review the balance was lowest: about $0.09, against $0.155 published and $0.22 Pi-printed), so treat a DeepSeek cost line as an upper estimate until a controlled run settles it.
 
+**Two ways a cost line goes wrong, both found on JUL-98 step 3 (2026-09-21) and both now pinned by tests.**
+
+1. *A total that double-counts.* Codex's `input_tokens` already includes the cached part, so summing the
+   component fields of the recorded session gives 96,511 against the record's own `total_tokens` of
+   51,199. Same failure mode as the PR #64 Claude extract. The rule, now mechanical in
+   `graph/controller/cost.mjs`: `tokenTotal()` is the only place a token total is computed, and where a
+   record states its own total, that total *is* the figure. A sum is used only when no record total
+   exists (Claude's transcript). A doubled figure is worse than a blank one -- it is what the seat-choice
+   decision is read from, and it points it the wrong way.
+2. *A reader that answers "nothing" instead of refusing.* `claudeUsageFromTranscript` took parsed
+   objects only. A real transcript is read off disk as **strings**, so `l.type` was `undefined` on every
+   line and it returned an empty object, silently -- measured against the real 777-line transcript of a
+   JUL-98 builder, 133 of whose lines carry `claude-opus-5` usage. That silent `{}` is why builder cost
+   lines on that card read "not captured". It now takes either form (`parseTranscriptLines()` is the one
+   reader), and nine real lines from that transcript are the fixture
+   (`graph/fixtures/orca-1.4.205/cost.claude-transcript.real-builder-lines.jsonl`).
+
+**A worker that never started has no cost to lose, and must still be cleaned up.** Read-cost-then-release-
+then-remove is right for a worker that ran, but if no turn ever began there is no session file, so the
+cost read can only fail -- and under the first version of `finishWorker` that failure stopped the order
+and leaked the worktree (the `failed / agent_readiness / timeout` case above, whose `residualResources`
+list is exactly the thing needing removal). Pass `turnStarted: false`: the read is skipped and the seat
+gets an explicit never-started line (0 tokens, $0, `neverStarted: true`), which is accepted *because it
+is marked*. An unmarked blank line still fails the step, as it always did.
+
 **Standing rule for every finding: a gap is recorded with what breaks if it stays.** "No dollar figure for
 Claude" is not a note, it is "the cost line will be blank for the seat doing most of the work". A gap
 written down without its consequence reads as a footnote and gets skipped. Each row in a "not proven" list

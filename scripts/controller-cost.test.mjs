@@ -27,6 +27,8 @@ import {
   codexExtractFromRollout,
   deepseekExtractFromSeatStream,
   seatCostLine,
+  tokenTotal,
+  neverStartedCostLine,
   assertCostLineComplete,
   formatCostLine,
 } from '../graph/controller/cost.mjs';
@@ -190,4 +192,101 @@ test('a seat that was neither capped nor failed over says so explicitly, so a bl
     seat: 'reviewer', model: 'deepseek-v4-pro', totalTokens: 121247, peakContext: 2530, minutes: 10, usd: 0.0151, capped: false, failedOverTo: null,
   });
   assert.match(text, /no cap/i);
+});
+
+// --- ONE way a token total is computed ---------------------------------------
+//
+// The review finding this pins (JUL-98 step 3, attempt 1): cost.mjs had TWO
+// token totals. `codexExtractFromRollout` used the record's own
+// `total_tokens`; `seatCostLine` summed the component fields instead, and for
+// the recorded Codex session those disagree by nearly a factor of two --
+// 50,976 + 45,312 + 0 + 223 = 96,511 against the record's own 51,199, because
+// Codex's `input_tokens` ALREADY INCLUDES the cached part
+// (graph/fixtures/orca-1.4.205/cost.codex-session.json, and the findings'
+// section 5 note "total_tokens = input + output").
+//
+// This is the same failure mode JUL-109 recorded in PR #64, where a naive sum
+// over Claude transcript lines double-counted messages. A doubled figure is
+// worse than a blank one: it is what Todd reads to decide which seat moves to
+// DeepSeek, and it points the decision the wrong way.
+
+test('a record that carries its own token total IS the total -- summing the fields would nearly double the Codex seat', () => {
+  const recorded = json('cost.codex-session.json');
+  const total = recorded.total_token_usage;
+  const summed = total.input_tokens + total.cached_input_tokens + total.cache_write_input_tokens + total.output_tokens;
+  assert.equal(summed, 96511, 'the recorded fields really do sum to nearly double -- this is the trap, not a hypothetical');
+  assert.equal(total.total_tokens, 51199);
+
+  assert.equal(
+    tokenTotal({ input: total.input_tokens, cachedInput: total.cached_input_tokens, cacheWrite: total.cache_write_input_tokens, output: total.output_tokens }, total.total_tokens),
+    51199,
+    "the record's own total, never a sum of the fields",
+  );
+});
+
+test('the Codex seat gets the SAME token total whether it is read off the rollout or put through the cost line', () => {
+  const recorded = json('cost.codex-session.json');
+  const lines = [
+    { timestamp: recorded.first_timestamp, type: 'turn_context', payload: { model: recorded.model } },
+    { timestamp: recorded.last_timestamp, type: 'event_msg', payload: { type: 'token_count', info: { total_token_usage: recorded.total_token_usage, last_token_usage: { input_tokens: recorded.peak_last_turn_input_tokens }, model_context_window: recorded.model_context_window } } },
+  ];
+  const extract = codexExtractFromRollout(lines);
+  assert.equal(extract.totalTokens, 51199);
+
+  const line = seatCostLine({ seat: 'reviewer', ...extract });
+  assert.equal(line.totalTokens, extract.totalTokens, 'one token total, not two that disagree');
+  assert.notEqual(line.totalTokens, 96511, 'the summed figure is the bug -- it must not reappear on the posted line');
+  assert.match(formatCostLine(line), /51,199 tokens/);
+});
+
+test("a record with no total of its own -- Claude's transcript -- still totals by summing its de-duplicated fields", () => {
+  const recorded = json('cost.claude-session.json').transcript;
+  const totals = recorded.totals_by_model['claude-sonnet-5'];
+  // The Claude fixture has no record-own total: the findings say the figure is
+  // the sum over messages counted once, and this is that sum.
+  assert.equal(tokenTotal({ input: totals.input, output: totals.output, cacheRead: totals.cacheRead, cacheWrite5m: totals.cacheWrite5m, cacheWrite1h: totals.cacheWrite1h }), 369994);
+
+  const line = seatCostLine({
+    seat: 'builder',
+    model: 'claude-sonnet-5',
+    tokens: { input: totals.input, output: totals.output, cacheRead: totals.cacheRead, cacheWrite5m: totals.cacheWrite5m, cacheWrite1h: totals.cacheWrite1h },
+    peakContext: recorded.peak_context_tokens,
+    startedAt: recorded.first_timestamp,
+    endedAt: recorded.last_timestamp,
+  });
+  assert.equal(line.totalTokens, 369994);
+});
+
+test("the DeepSeek seat's own totalTokens is used, not a re-sum of its usage fields", () => {
+  const events = jsonl('cost.pi.seat-json-stream.multi-turn.jsonl');
+  const extract = deepseekExtractFromSeatStream(events, {
+    startedAt: readFileSync(join(ORCA_FIXTURE_DIR, 'pi.timing.start.txt'), 'utf8').trim(),
+    endedAt: readFileSync(join(ORCA_FIXTURE_DIR, 'pi.timing.exit.txt'), 'utf8').trim(),
+  });
+  // The recorded last assistant message_end carries usage.totalTokens 2534.
+  assert.equal(extract.totalTokens, 2534);
+  assert.equal(seatCostLine({ seat: 'reviewer', ...extract }).totalTokens, 2534, 'the line does not re-derive what the record already states');
+});
+
+// --- A worker that never started ---------------------------------------------
+
+test("a worker that never started yields an explicit never-started cost line, not a blank one", () => {
+  const line = neverStartedCostLine({ seat: 'builder', reason: 'no turn_started was ever observed' });
+  assert.equal(line.neverStarted, true);
+  assert.equal(line.totalTokens, 0);
+  assert.equal(line.usd, 0);
+  assert.doesNotThrow(() => assertCostLineComplete(line), 'it is complete BECAUSE it is marked never-started, not because it is blank');
+  assert.match(formatCostLine(line), /never started/i);
+  // And a line that merely LOOKS empty, without the mark, still fails.
+  assert.throws(() => assertCostLineComplete({ seat: 'builder', model: null, totalTokens: null, peakContext: null, minutes: null }), /blank/);
+});
+
+test('the Claude seat extract works on the real transcript as it is read off disk, and its peak and duration are not lost', () => {
+  const text = readFileSync(join(ORCA_FIXTURE_DIR, 'cost.claude-transcript.real-builder-lines.jsonl'), 'utf8').split('\n').filter(Boolean);
+  const extract = claudeExtractFromTranscript(text);
+  assert.equal(extract.model, 'claude-opus-5');
+  assert.equal(extract.totalTokens, 6 + 779 + 141743 + 0 + 29707, 'the real transcript, counted once per message');
+  assert.ok(extract.peakContext > 0, 'the peak must survive the raw-text form too, not silently read 0');
+  assert.ok(extract.startedAt && extract.endedAt, 'the duration comes off the same lines');
+  assert.ok(extract.usd > 0);
 });

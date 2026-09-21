@@ -255,3 +255,39 @@ test('a worktree with no agent, or an idle one, is not proof', () => {
   assert.equal(turnStartedFromWorktreePs({ agents: [{ state: 'idle', agentType: 'claude' }] }), false);
   assert.equal(turnStartedFromWorktreePs(null), false);
 });
+
+// --- The stand-in invents nothing --------------------------------------------
+//
+// The review finding this pins (JUL-98 step 3, attempt 1): the worker stand-in
+// suffixed `effect.id` on EVERY effect of a recorded worker-start. Three of the
+// four recorded effects carry an `id`; the `kind: "setup"` effect does not
+// (worker-start.claude-model-effort.json: it has kind, action, requested,
+// effective, source, hookFound, startupPolicy, state -- and no id). Suffixing a
+// field that is not there produced `id: "undefined-1"`: a payload shape that
+// appears in no recording. Invented payload shapes are what got an earlier card
+// cancelled, so the stand-in must key off what the recording actually holds.
+
+test('the stand-in gives every effect exactly the keys its recorded effect has -- no field is invented', async () => {
+  const recorded = loadOrcaFixture('worker-start.claude-model-effort.json').result.effects;
+  const orca = createFixtureWorkerOrca();
+  const started = await orca.workerStart({ agent: 'claude', model: 'claude-opus-5', effort: 'medium' });
+
+  assert.equal(started.effects.length, recorded.length);
+  started.effects.forEach((effect, index) => {
+    assert.deepEqual(
+      Object.keys(effect).sort(),
+      Object.keys(recorded[index]).sort(),
+      `effect ${index} (${effect.kind}) must carry the recorded keys and no others`,
+    );
+  });
+
+  const setup = started.effects.find((effect) => effect.kind === 'setup');
+  assert.ok(setup, 'the recording has a setup effect');
+  assert.equal('id' in setup, false, 'no recording gives a setup effect an id, so the stand-in must not produce one');
+
+  // The effects that DO have a recorded id still get a per-start one, because
+  // a second start genuinely has a different worktree and terminal.
+  const worktree = started.effects.find((effect) => effect.kind === 'worktree');
+  assert.ok(worktree.id.startsWith(recorded.find((e) => e.kind === 'worktree').id), 'the shape stays the recorded shape');
+  assert.ok(!worktree.id.includes('undefined'));
+});
