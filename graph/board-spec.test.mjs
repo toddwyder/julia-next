@@ -25,7 +25,7 @@ import {
   workViewIssueFilter,
   matchesWorkView,
 } from './board-spec.mjs';
-import { MODEL_SPECS, DEFAULT_MODEL_SUFFIX_BY_ENTRY } from '../scripts/seat-labels.mjs';
+import { MODEL_SPECS, defaultModelSuffix } from '../scripts/seat-labels.mjs';
 import { SEAT_TABLE } from './seat-table.mjs';
 
 // JUL-97 step 2, item 1: the ninth column. The exact order is pinned as a
@@ -177,8 +177,15 @@ test('each agent resolves to exactly one default model label and one Medium effo
     assert.ok(effortLabelsFor(agent.key).includes(effortLabel));
     // The model label is the seat-table primary's default, not an arbitrary one.
     const entry = SEAT_TABLE[agent.key].primary;
-    assert.equal(modelLabel, `${agent.code}-${DEFAULT_MODEL_SUFFIX_BY_ENTRY[entry]}`);
+    assert.equal(modelLabel, `${agent.code}-${defaultModelSuffix(agent.key, entry)}`);
   }
+});
+
+test('the team template names the DeepSeek Pro model the reviewer actually runs (JUL-98)', () => {
+  assert.deepEqual(defaultLabelsFor('adversarial-reviewer'), ['adversary-deepseek-pro', 'adversary-effort-medium']);
+  // The builders keep Claude; the evidence reviewer is not part of this decision.
+  assert.equal(defaultLabelsFor('feature-builder')[0], 'builder-claude-opus');
+  assert.equal(defaultLabelsFor('evidence-reviewer')[0], 'evidence-codex');
 });
 
 test('defaultLabelsFor rejects an unknown agent instead of silently returning nothing', () => {

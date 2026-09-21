@@ -825,6 +825,15 @@ hand-maintained list. No live label name was renamed — cards already carry the
   `consultant-claude-opus`. (`glm-5.3` was removed in JUL-93, and since JUL-97 step 2
   `board-setup.mjs` retires any `*-glm-5.3` label still sitting in a spec'd group.)
 - Effort labels: `<code>-effort-low` / `-medium` / `-high`, e.g. `adversary-effort-medium`.
+- **The reviewer's first choice is DeepSeek Pro, its backup Codex (JUL-98, Todd's 21 Sep decision,
+  to protect the weekly Codex and Claude quotas; a DeepSeek review costs about half a cent).**
+  `graph/seat-table.mjs` has `reviewer` and `adversarial-reviewer` as `pi-deepseek` then `codex`; the
+  builder stays Claude. A card that names no reviewer model resolves to `adversary-deepseek-pro`
+  (`defaultModelSuffix` in `scripts/seat-labels.mjs`, and the team template's default label), which is
+  the model the `reviewer-backup` route in `run-pi-seat.mjs` really runs. The evidence reviewer is not
+  part of this decision and is still Codex first. *A stall to know about:* if the builder's Claude
+  seat hits its cap, its DeepSeek backup is refused while the reviewer is also on DeepSeek (same
+  family). Move the reviewer to `adversary-codex` on the card first, then fall back the builder.
 - **The old three-seat vocabulary is gone**: there is no `Orchestrator`/`Builder`/`Reviewer` model
   or effort group and no `orch-` prefix. The two Orchestrator groups are retired on the board
   (`RETIRED_LABEL_GROUPS` in `graph/board-spec.mjs`), which keeps them on the cards that carry
