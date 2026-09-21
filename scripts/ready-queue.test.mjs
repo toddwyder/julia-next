@@ -114,7 +114,7 @@ function fakeOrca({ runs = [] } = {}) {
 }
 
 function fakeStore(initial = {}) {
-  let state = structuredClone({ ready: {}, commented: {}, lastStarted: null, ...initial });
+  let state = structuredClone({ ready: {}, commented: {}, started: {}, ...initial });
   return {
     readImpl: async () => structuredClone(state),
     writeImpl: async (next) => { state = structuredClone(next); },
@@ -801,6 +801,61 @@ test('a finished run whose card is still in Ready is never started twice, even w
   assert.equal(orca.calls.terminalsCreated.length, 1, 'JUL-99 must never start a second time');
 });
 
+test('starting a later card does not erase an earlier card\'s cooldown (JUL-97 step 2, finding 1)', async () => {
+  // The reviewer's three-cycle reproduction. Two eligible cards sit in Ready in
+  // board order; A's state move throws (so A stays in Ready and belt 2 is the
+  // only thing holding it), B's succeeds. With a single `lastStarted` record,
+  // starting B in cycle 2 overwrote A's cooldown and cycle 3 started A a second
+  // time. The cooldown is per issue, so A must never start twice.
+  const a = makeIssue({ identifier: 'JUL-A', sortOrder: 1 });
+  const b = makeIssue({ identifier: 'JUL-B', sortOrder: 2 });
+  const { linear } = fakeLinear({ issues: [a, b], teamLabels: DEFAULT_TEAM_LABELS });
+  linear.setIssueState = async ({ issueId }) => {
+    if (issueId === a.id) throw new Error('Linear refused the state move for JUL-A');
+    return { id: issueId };
+  };
+  const store = fakeStore();
+  const orca = fakeOrca(); // every run has finished, so the slot is never busy
+  const d = deps({ linear, store, orca });
+
+  // Cycle 0: both cards are first sightings, so neither can start yet.
+  assert.equal((await readyQueueCheck(d)).status, 'first-sighting');
+  assert.equal(orca.calls.terminalsCreated.length, 0);
+
+  // Cycle 1: A is the top card and starts; its state move fails, so it stays
+  // in Ready with a cooldown.
+  const cycle1 = await readyQueueCheck(d);
+  assert.equal(cycle1.status, 'started');
+  assert.equal(cycle1.issue, 'JUL-A');
+  assert.equal(cycle1.stateMoved, false);
+
+  // Cycle 2: A is passed over as cooldown and B -- still eligible and already
+  // seen -- is started instead. B's state move succeeds.
+  const cycle2 = await readyQueueCheck(d);
+  assert.equal(cycle2.status, 'started');
+  assert.equal(cycle2.issue, 'JUL-B');
+  assert.equal(cycle2.stateMoved, true);
+  assert.deepEqual(
+    cycle2.skipped.map((entry) => [entry.issue, entry.status]),
+    [['JUL-A', 'cooldown']],
+    'A must be passed over as cooldown, not started',
+  );
+
+  // Cycle 3: the bug. A is unchanged, still in Ready, still already seen -- and
+  // its cooldown must have survived B's start.
+  const cycle3 = await readyQueueCheck(d);
+  assert.equal(cycle3.status, 'cooldown');
+  assert.equal(cycle3.issue, 'JUL-A');
+  assert.deepEqual(
+    orca.calls.terminalsCreated.map((call) => call.title),
+    ['ready-queue-JUL-A', 'ready-queue-JUL-B'],
+    'JUL-A must never start a second time',
+  );
+  // Both cooldown records coexist in the state file.
+  assert.equal(store.get().started[a.id].stateMoved, false);
+  assert.equal(store.get().started[b.id].stateMoved, true);
+});
+
 test('a card that changed after it was started is allowed through the cooldown', async () => {
   let issue = makeIssue({ identifier: 'JUL-99', labels: [READY_FOR_AGENT_LABEL] });
   const { linear } = fakeLinear({ teamLabels: DEFAULT_TEAM_LABELS });
@@ -839,7 +894,7 @@ test('a card whose state move succeeded and that is deliberately re-queued is ad
   assert.equal((await readyQueueCheck(d)).status, 'first-sighting');
   assert.equal((await readyQueueCheck(d)).status, 'started');
   assert.equal(orca.calls.terminalsCreated.length, 1);
-  assert.equal(store.get().lastStarted.stateMoved, true);
+  assert.equal(store.get().started[issue.id].stateMoved, true);
 
   // The run is finished and someone deliberately moved the card back to Ready.
   // Belt 1 succeeded, so belt 2 must stand down: the re-queue is a fresh
@@ -849,7 +904,7 @@ test('a card whose state move succeeded and that is deliberately re-queued is ad
   assert.equal(orca.calls.terminalsCreated.length, 2, 'a deliberate re-queue must start the card again');
 });
 
-test('lastStarted records whether the state move succeeded', async () => {
+test('the per-issue start record notes whether the state move succeeded', async () => {
   // Failure: the card stayed in Ready, so belt 2 must hold.
   const failedIssue = makeIssue({ identifier: 'JUL-41' });
   const failed = fakeLinear({ issues: [failedIssue], teamLabels: DEFAULT_TEAM_LABELS });
@@ -858,7 +913,7 @@ test('lastStarted records whether the state move succeeded', async () => {
   const failedDeps = deps({ linear: failed.linear, store: failedStore, orca: fakeOrca() });
   await readyQueueCheck(failedDeps);
   assert.equal((await readyQueueCheck(failedDeps)).status, 'started');
-  assert.equal(failedStore.get().lastStarted.stateMoved, false);
+  assert.equal(failedStore.get().started[failedIssue.id].stateMoved, false);
 
   // Success: the card left Ready, so belt 2 must stand down.
   const movedIssue = makeIssue({ identifier: 'JUL-42' });
@@ -867,7 +922,7 @@ test('lastStarted records whether the state move succeeded', async () => {
   const movedDeps = deps({ linear: moved.linear, store: movedStore, orca: fakeOrca() });
   await readyQueueCheck(movedDeps);
   assert.equal((await readyQueueCheck(movedDeps)).status, 'started');
-  assert.equal(movedStore.get().lastStarted.stateMoved, true);
+  assert.equal(movedStore.get().started[movedIssue.id].stateMoved, true);
 });
 
 // ---------------------------------------------------------------------------
@@ -878,7 +933,7 @@ test('readState returns an empty state when the file does not exist yet', () => 
   const missing = new Error('no file');
   missing.code = 'ENOENT';
   const state = readState({ statePath: '/state/ready-queue.json', readFileImpl: () => { throw missing; } });
-  assert.deepEqual(state, { ready: {}, commented: {}, lastStarted: null });
+  assert.deepEqual(state, { ready: {}, commented: {}, started: {} });
 });
 
 test('readState parses a written state and fills in missing fields', () => {
@@ -888,7 +943,21 @@ test('readState parses a written state and fills in missing fields', () => {
   });
   assert.deepEqual(state.ready, { a: 'fp' });
   assert.deepEqual(state.commented, {});
-  assert.equal(state.lastStarted, null);
+  assert.deepEqual(state.started, {});
+});
+
+test('readState migrates an old single-record state file into the per-issue map', () => {
+  const state = readState({
+    statePath: '/state/ready-queue.json',
+    readFileImpl: () => JSON.stringify({
+      ready: { 'uuid-JUL-1': 'fp' },
+      commented: {},
+      lastStarted: { issueId: 'uuid-JUL-1', identifier: 'JUL-1', at: '2026-09-18T12:00:00.000Z', fingerprint: 'fp', stateMoved: false },
+    }),
+  });
+  assert.deepEqual(state.started, {
+    'uuid-JUL-1': { identifier: 'JUL-1', at: '2026-09-18T12:00:00.000Z', fingerprint: 'fp', stateMoved: false },
+  });
 });
 
 test('writeState creates the parent directory and writes JSON', () => {

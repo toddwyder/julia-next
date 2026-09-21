@@ -5,7 +5,7 @@
 // Pinning the wording here keeps a later edit from silently dropping one.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 
 import { TEMPLATE_NAME } from '../graph/board-spec.mjs';
 
@@ -100,7 +100,9 @@ test('the coordinator skill and the runbook say the headless coordinator is one-
 // own"), proven live 2026-09-20 with two throwaway cards: without the
 // template, zero labels; with it, all twelve. So every document and skill in
 // this repo that tells an agent to create a card has to name it, and the name
-// itself is spelled once, in graph/board-spec.mjs.
+// itself is spelled once, in graph/board-spec.mjs. The skills are discovered
+// by scanning both mirrored trees, so a creation route added later cannot slip
+// past this test the way to-spec and wayfinder did.
 test('every document and skill that creates a Linear card names the team template', () => {
   assert.equal(TEMPLATE_NAME, 'Julia-next agent defaults');
   // The name is not duplicated in board-setup.mjs; it imports and re-exports
@@ -120,12 +122,36 @@ test('every document and skill that creates a Linear card names the team templat
   assert.match(tracker, /\*\*Child ticket\*\*[\s\S]{0,160}Julia-next\s+agent defaults/);
 
   assert.match(read('docs/agents/triage-labels.md'), /template: "Julia-next agent defaults"/);
+
   // Both skill trees are kept in step; a card published by either names it.
+  // The creating skills are DISCOVERED, not listed: attempt 1 hand-listed
+  // triage and to-tickets and missed to-spec and wayfinder. A seventh skill
+  // that tells a session to create a tracker card has to fail this test, so
+  // the scan reads every SKILL.md in both trees and treats "creates/publishes
+  // an issue, ticket or card" (or calls `save_issue`/`create_issue` at all) as
+  // a creation route.
+  const CREATES_A_CARD = /\bcreat(e|es|ing)\b[^.\n]{0,60}\b(issue|ticket|card)s?\b|\bpublish(es|ing|ed)?\b[^.\n]{0,60}\b(issue|ticket|tracker)\b|save_issue|create_issue/i;
+  const creators = [];
   for (const root of ['.claude', '.agents']) {
-    for (const skill of ['triage', 'to-tickets']) {
-      const text = read(`${root}/skills/${skill}/SKILL.md`);
-      assert.match(text, /template: "Julia-next agent defaults"/, `${root}/skills/${skill} does not name the template`);
-      assert.match(text, /only to a card a person creates in the app/, `${root}/skills/${skill} does not say why`);
+    for (const skill of readdirSync(new URL(`../${root}/skills`, import.meta.url))) {
+      const relativePath = `${root}/skills/${skill}/SKILL.md`;
+      if (!existsSync(new URL(`../${relativePath}`, import.meta.url))) continue;
+      const text = read(relativePath);
+      if (!CREATES_A_CARD.test(text)) continue;
+      creators.push(relativePath);
+      assert.match(text, /template: "Julia-next agent defaults"/, `${relativePath} creates a card but does not name the template`);
+      assert.match(text, /only to a card a person creates in the app/, `${relativePath} does not say why`);
+    }
+  }
+
+  // The scan must not quietly shrink: every route known today stays in it, in
+  // both mirrored trees.
+  for (const root of ['.claude', '.agents']) {
+    for (const skill of ['triage', 'to-tickets', 'to-spec', 'wayfinder']) {
+      assert.ok(
+        creators.includes(`${root}/skills/${skill}/SKILL.md`),
+        `${root}/skills/${skill} is a known creation route but the scan did not find it`,
+      );
     }
   }
 });

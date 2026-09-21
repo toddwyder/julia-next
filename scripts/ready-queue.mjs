@@ -60,9 +60,12 @@ export const ORCHESTRATOR_CHECKOUT = '/srv/orchestrator-svc/julia-next';
 
 // The state file holds only what the previous check saw -- newly-ready cards
 // (so a card counts only after one full check) and, per card, the fingerprint
-// of the last ineligible state the queue already commented on. `lastStarted`
-// is the record that a start happened; keeping it separate from `ready` is
-// what makes the script idempotent if it is ever run twice for one card.
+// of the last ineligible state the queue already commented on. `started` is
+// the record that a start happened, keyed BY ISSUE ID; keeping it separate
+// from `ready` is what makes the script idempotent if it is ever run twice for
+// one card, and keying it by issue is what keeps one card's start from erasing
+// another card's cooldown now that the queue can walk past a card and start a
+// later one (JUL-97 step 2, finding 1).
 export const DEFAULT_STATE_PATH = join(os.homedir(), '.local', 'state', 'julia-next', 'ready-queue.json');
 
 // ---------------------------------------------------------------------------
@@ -212,7 +215,40 @@ export async function isSlotBusy({
 // ---------------------------------------------------------------------------
 
 function emptyState() {
-  return { ready: {}, commented: {}, lastStarted: null };
+  return { ready: {}, commented: {}, started: {} };
+}
+
+// Older state files (before JUL-97 step 2) held a single `lastStarted` record
+// instead of the per-issue `started` map. We MIGRATE rather than tolerate both
+// shapes: the old record is folded into the map on read and never written
+// again, so there is exactly one code path for the cooldown lookup and no
+// running queue crashes -- or silently loses a cooldown -- on the first check
+// after the upgrade. The migration is lossless: the one card the old file knew
+// about keeps its cooldown under its own id.
+function startedRecords(parsed) {
+  const started = { ...(parsed?.started ?? {}) };
+  const legacy = parsed?.lastStarted;
+  if (legacy?.issueId && !(legacy.issueId in started)) {
+    started[legacy.issueId] = {
+      identifier: legacy.identifier ?? null,
+      at: legacy.at ?? null,
+      fingerprint: legacy.fingerprint ?? null,
+      stateMoved: legacy.stateMoved ?? false,
+    };
+  }
+  return started;
+}
+
+// The cooldown only ever matters for a card that is still in Ready, so records
+// for cards that have left the column are dropped each cycle -- the same way
+// `ready` itself is replaced wholesale -- and the file cannot grow without
+// bound.
+function pruneStarted(started, currentReady) {
+  const kept = {};
+  for (const [issueId, record] of Object.entries(started)) {
+    if (issueId in currentReady) kept[issueId] = record;
+  }
+  return kept;
 }
 
 export function readState({ statePath = DEFAULT_STATE_PATH, readFileImpl = readFileSync } = {}) {
@@ -230,7 +266,7 @@ export function readState({ statePath = DEFAULT_STATE_PATH, readFileImpl = readF
   return {
     ready: parsed?.ready ?? {},
     commented: parsed?.commented ?? {},
-    lastStarted: parsed?.lastStarted ?? null,
+    started: startedRecords(parsed),
   };
 }
 
@@ -478,7 +514,7 @@ function normalizeState(state) {
   return {
     ready: state?.ready ?? {},
     commented: state?.commented ?? {},
-    lastStarted: state?.lastStarted ?? null,
+    started: startedRecords(state),
   };
 }
 
@@ -492,7 +528,7 @@ function readyFingerprints(issues) {
 // seat-table primary model and Medium. A label that is not on the team yet is
 // skipped and logged, never an error -- the model/effort labels are created by
 // a later coordinator step, so the queue must work before they exist. Returns
-// the label names actually added (for the lastStarted fingerprint); any Linear
+// the label names actually added (for the start fingerprint); any Linear
 // failure is logged and the start still proceeds.
 export async function addMissingSeatLabels(issue, {
   linear,
@@ -577,7 +613,11 @@ export async function readyQueueCheck(options = {}) {
   if (ordered.length === 0) {
     // Persist the now-empty set so a card that left Ready since the last check
     // is forgotten -- if it later returns it must earn a fresh full check.
-    await writeStateImpl({ ...previous, ready: currentReady }, { statePath });
+    await writeStateImpl({
+      ...previous,
+      ready: currentReady,
+      started: pruneStarted(previous.started, currentReady),
+    }, { statePath });
     return { status: 'empty-ready', intervalMinutes };
   }
 
@@ -606,11 +646,13 @@ export async function readyQueueCheck(options = {}) {
     // move succeeded the card left Ready, so it reappearing in Ready is a
     // fresh, deliberate re-queue and must be admitted normally. A card that
     // genuinely changed earns a new fingerprint and is allowed through.
-    const lastStarted = previous.lastStarted;
+    // The record is looked up by THIS card's id, so starting some other card
+    // in an earlier cycle cannot have erased it.
+    const lastStarted = previous.started[issue.id];
     if (
-      !lastStarted?.stateMoved &&
-      lastStarted?.issueId === issue.id &&
-      lastStarted?.fingerprint === fingerprint
+      lastStarted &&
+      !lastStarted.stateMoved &&
+      lastStarted.fingerprint === fingerprint
     ) {
       passOver({ status: 'cooldown', issue: issue.identifier });
       continue;
@@ -661,6 +703,7 @@ export async function readyQueueCheck(options = {}) {
       ...previous,
       ready: currentReady,
       commented: nextCommented,
+      started: pruneStarted(previous.started, currentReady),
     }, { statePath });
     return { ...firstBlock, skipped, intervalMinutes };
   }
@@ -688,7 +731,7 @@ export async function readyQueueCheck(options = {}) {
 
   // (f2) D4 belt 1: move the started card out of Ready through the injected
   // Linear client. A failure here is logged but must never undo the start, and
-  // the lastStarted record below (belt 2) still holds the cooldown.
+  // the per-issue start record below (belt 2) still holds the cooldown.
   let stateMoved = false;
   try {
     const inProgress = await linear.findState({ teamName, stateName: IN_PROGRESS_STATE_NAME });
@@ -714,14 +757,17 @@ export async function readyQueueCheck(options = {}) {
     ...previous,
     ready: nextReady,
     commented: nextCommented,
-    lastStarted: {
-      issueId: chosen.id,
-      identifier: chosen.identifier,
-      at: new Date(now()).toISOString(),
-      fingerprint: startFingerprint,
-      // Belt 2 only applies when belt 1 (the state move) failed: a card that
-      // really left Ready cannot be legitimately re-queued by this guard.
-      stateMoved,
+    // Merge, never replace: every other card's cooldown survives this start.
+    started: {
+      ...pruneStarted(previous.started, currentReady),
+      [chosen.id]: {
+        identifier: chosen.identifier,
+        at: new Date(now()).toISOString(),
+        fingerprint: startFingerprint,
+        // Belt 2 only applies when belt 1 (the state move) failed: a card that
+        // really left Ready cannot be legitimately re-queued by this guard.
+        stateMoved,
+      },
     },
   }, { statePath });
 
