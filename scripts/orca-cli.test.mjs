@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  runCreate, runList, terminalCreate, terminalRead, terminalWait, workerShow, workerStart,
+  runCreate, runList, terminalCreate, terminalRead, terminalShow, terminalWait, workerShow, workerStart,
 } from './orca-cli.mjs';
 
 // Fixtures below are real `orca <cmd> --json` output, captured live against
@@ -223,6 +223,32 @@ test('terminalRead returns the real {terminal: {tail: [...]}} shape, not a flat 
     'terminal', 'read',
     '--environment', 'OVH runner',
     '--terminal', 'term_edd1057b-c44b-4e95-b513-05851efcc6c2',
+    '--json',
+  ]);
+});
+
+test('terminalShow is the one-handle liveness check, and it carries the handle verbatim (recorded live 1.4.205, JUL-98 step 5)', async () => {
+  // graph/fixtures/orca-1.4.205/terminal-show.plain-diagnostic-live.json.
+  const { calls, execImpl } = fakeExec({
+    id: '6eae7fee-a6c8-4165-9636-b6960abaf2b9',
+    ok: true,
+    result: {
+      terminal: {
+        handle: 'term_fff8c7e5-94a7-4bf9-8e16-04c23473503f',
+        orphaned: false,
+        connected: true,
+        writable: true,
+      },
+    },
+    _meta: { runtimeId: 'a53bb33a-2871-40c3-ae9f-eced82e71b6e' },
+  });
+  const result = await terminalShow({ environment: 'orchestrator-local', terminal: 'term_fff8c7e5-94a7-4bf9-8e16-04c23473503f', execImpl });
+  assert.equal(result.terminal.handle, 'term_fff8c7e5-94a7-4bf9-8e16-04c23473503f');
+  assert.equal(result.terminal.orphaned, false);
+  assert.deepEqual(calls[0].args, [
+    'terminal', 'show',
+    '--environment', 'orchestrator-local',
+    '--terminal', 'term_fff8c7e5-94a7-4bf9-8e16-04c23473503f',
     '--json',
   ]);
 });

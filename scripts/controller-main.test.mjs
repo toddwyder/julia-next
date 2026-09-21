@@ -399,9 +399,12 @@ test('the start is written down BEFORE any preflight can exit, or a build that d
   // record were only saved after the preflights, every such loop would restart
   // for ever with an empty start list and never be detected.
   //
-  // main() is called for real here. It reaches no service: with no
-  // JULIA_CONTROLLER_TERMINAL it refuses before the first Orca or Linear call,
-  // which is exactly the early exit being tested.
+  // main() is called for real here. It reaches no service: the one boundary it
+  // would touch before the first cycle -- provisioning its sender terminal --
+  // is injected and made to fail, so main() refuses exactly where the early
+  // exit being tested happens. (Before JUL-98 step 5 this refusal came from an
+  // unset JULIA_CONTROLLER_TERMINAL; now the terminal is provisioned, so the
+  // resolver is the thing that has to be unable to answer.)
   const dir = mkdtempSync(join(tmpdir(), 'controller-main-'));
   try {
     const statePath = join(dir, 'controller.json');
@@ -414,6 +417,7 @@ test('the start is written down BEFORE any preflight can exit, or a build that d
       log: () => {},
       warn,
       setExitCode: (code) => { exit = code; },
+      resolveSenderTerminalImpl: async () => { throw new Error('no Orca daemon'); },
     });
     assert.equal(exit, 1, 'it refused, before any service call');
     assert.ok(warn.lines.some((line) => line.includes('JULIA_CONTROLLER_TERMINAL')));
@@ -421,6 +425,94 @@ test('the start is written down BEFORE any preflight can exit, or a build that d
     const state = JSON.parse(readFileSync(statePath, 'utf8'));
     assert.equal(state.starts.length, 1, 'the start was recorded despite the early exit');
     assert.equal(state.starts[0].build, 'deadbee');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// JUL-98 step 5: the sender terminal, in main()
+// ---------------------------------------------------------------------------
+
+test('the sender terminal round-trips through the state file -- a field normalize() forgot would be a new terminal every restart', () => {
+  // state.mjs's normalize() is the one serializer for BOTH directions, so a
+  // field it does not list is silently dropped on read. Dropped here, the
+  // controller forgets its own terminal on every start, and under RestartSec=5
+  // that is one leaked Orca terminal every five seconds for ever.
+  const dir = mkdtempSync(join(tmpdir(), 'controller-terminal-'));
+  try {
+    const statePath = join(dir, 'controller.json');
+    // Through writeControllerState, not a stand-in that bypasses the serializer.
+    writeControllerState({ ...emptyControllerState(), senderTerminal: 'term_abc123' }, { statePath });
+    assert.equal(readControllerState({ statePath }).senderTerminal, 'term_abc123');
+
+    // A fresh state has none, and a field of the wrong type falls back, the
+    // way the neighbouring fields do.
+    assert.equal(emptyControllerState().senderTerminal, null);
+    writeFileSync(statePath, JSON.stringify({ senderTerminal: 42 }));
+    assert.equal(readControllerState({ statePath }).senderTerminal, null);
+    writeFileSync(statePath, JSON.stringify({ senderTerminal: '' }));
+    assert.equal(readControllerState({ statePath }).senderTerminal, null, 'an empty string is not a handle');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a sender terminal that can be neither reused nor created makes the controller refuse LOUDLY and exit non-zero', async () => {
+  // Losing the ability to say why is worse than not starting. The refusal
+  // still names the reason, still names the override, and still exits 1 --
+  // exactly what the pre-step-5 refusal did, for a cause that is now real.
+  const dir = mkdtempSync(join(tmpdir(), 'controller-refuse-'));
+  try {
+    const statePath = join(dir, 'controller.json');
+    const warn = logged();
+    let exit = 0;
+    const result = await main({
+      argv: ['--once'],
+      env: { JULIA_CONTROLLER_BUILD: 'deadbee' },
+      statePath,
+      log: () => {},
+      warn,
+      setExitCode: (code) => { exit = code; },
+      resolveSenderTerminalImpl: async () => {
+        throw new Error('orca terminal create failed (daemon_unreachable): no Orca daemon');
+      },
+    });
+    assert.equal(result, null, 'it did not go on to run a cycle without a sender terminal');
+    assert.equal(exit, 1);
+    const said = warn.lines.join('\n');
+    assert.match(said, /daemon_unreachable/, 'the reason Orca gave is carried, not swallowed');
+    assert.match(said, /JULIA_CONTROLLER_TERMINAL/, 'and the override is named, so an operator has something to do');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a terminal main() had to create is written to disk BEFORE the first cycle runs', async () => {
+  // In memory only, the handle dies with the process and the next restart
+  // creates another one -- so the check is made from INSIDE the first cycle,
+  // reading the file rather than the object.
+  const dir = mkdtempSync(join(tmpdir(), 'controller-created-'));
+  try {
+    const statePath = join(dir, 'controller.json');
+    let onDiskAtFirstCycle = null;
+    await main({
+      argv: ['--once'],
+      env: { JULIA_CONTROLLER_BUILD: 'deadbee' },
+      statePath,
+      log: () => {},
+      warn: () => {},
+      setExitCode: () => {},
+      resolveSenderTerminalImpl: async ({ state }) => ({
+        terminal: 'term_made', state: { ...state, senderTerminal: 'term_made' }, created: true, source: 'created',
+      }),
+      runOnceImpl: async ({ state, from }) => {
+        onDiskAtFirstCycle = JSON.parse(readFileSync(statePath, 'utf8'));
+        assert.equal(from, 'term_made', 'the cycle sends from the terminal that was just provisioned');
+        return { state };
+      },
+    });
+    assert.equal(onDiskAtFirstCycle.senderTerminal, 'term_made');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
