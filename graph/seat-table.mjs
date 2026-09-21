@@ -12,10 +12,12 @@
 // scripts/seat-labels.mjs's validateFamilyChoice enforces on an actual card).
 //
 // This is deliberately weaker than the old "no shared family across every
-// primary/backup combination" check, which the table below cannot satisfy:
-// reviewer's backup is claude (anthropic) like the builder's primary. (GLM was
-// once barred here as a seat default or backup; it has since been removed
-// entirely, JUL-93.)
+// primary/backup combination" check. The reviewer's backup is DeepSeek, not
+// claude (JUL-98): a claude backup shares the builder's default family, so the
+// runtime fallback guard (scripts/seat-labels.mjs fallbackSeatChoice) refused it
+// whenever the builder was also claude -- which is the default -- and a capped
+// reviewer then stalled the card. (GLM was once barred here as a seat default
+// or backup; it has since been removed entirely, JUL-93.)
 // JUL-97 step 1 adds the six agent seats the board's labels and template
 // describe. The three original seats are unchanged -- the coordinator's own
 // launch path still reads `orchestrator`, and the builder/reviewer pair the
@@ -23,11 +25,11 @@
 export const SEAT_TABLE = {
   orchestrator: { primary: 'claude', backup: 'pi-deepseek' },
   builder: { primary: 'claude', backup: 'pi-deepseek' },
-  reviewer: { primary: 'codex', backup: 'claude' },
+  reviewer: { primary: 'codex', backup: 'pi-deepseek' },
   'feature-builder': { primary: 'claude', backup: 'pi-deepseek' },
   'defect-fixer': { primary: 'claude', backup: 'pi-deepseek' },
   refactor: { primary: 'claude', backup: 'pi-deepseek' },
-  'adversarial-reviewer': { primary: 'codex', backup: 'claude' },
+  'adversarial-reviewer': { primary: 'codex', backup: 'pi-deepseek' },
   'evidence-reviewer': { primary: 'codex', backup: 'claude' },
   consultant: { primary: 'claude', backup: 'pi-deepseek' },
 };

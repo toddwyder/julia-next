@@ -17,11 +17,11 @@ test("the default table is exactly Todd's instruction: GLM is no seat default or
   assert.deepEqual(SEAT_TABLE, {
     orchestrator: { primary: 'claude', backup: 'pi-deepseek' },
     builder: { primary: 'claude', backup: 'pi-deepseek' },
-    reviewer: { primary: 'codex', backup: 'claude' },
+    reviewer: { primary: 'codex', backup: 'pi-deepseek' },
     'feature-builder': { primary: 'claude', backup: 'pi-deepseek' },
     'defect-fixer': { primary: 'claude', backup: 'pi-deepseek' },
     refactor: { primary: 'claude', backup: 'pi-deepseek' },
-    'adversarial-reviewer': { primary: 'codex', backup: 'claude' },
+    'adversarial-reviewer': { primary: 'codex', backup: 'pi-deepseek' },
     'evidence-reviewer': { primary: 'codex', backup: 'claude' },
     consultant: { primary: 'claude', backup: 'pi-deepseek' },
   });
@@ -40,7 +40,7 @@ test('the six JUL-97 graph-agent seats have a primary and a backup, and the orig
   // builder/reviewer family rule already depended on.
   assert.deepEqual(SEAT_TABLE.orchestrator, { primary: 'claude', backup: 'pi-deepseek' });
   assert.deepEqual(SEAT_TABLE.builder, { primary: 'claude', backup: 'pi-deepseek' });
-  assert.deepEqual(SEAT_TABLE.reviewer, { primary: 'codex', backup: 'claude' });
+  assert.deepEqual(SEAT_TABLE.reviewer, { primary: 'codex', backup: 'pi-deepseek' });
 });
 
 test('GLM is gone: no family, and never a seat default or backup (JUL-93)', () => {
