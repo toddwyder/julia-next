@@ -28,8 +28,12 @@ case "$FIELD" in
   axiom)     DEST="$DEST_DIR/axiom.env";        GROUP=orchestrator-svc ;;
   deepseek)  DEST="$DEST_DIR/deepseek.env";     GROUP=deepseek-readers ;;
   linear)    DEST="$DEST_DIR/linear.env";       GROUP=orchestrator-svc ;;
+  linear-app-id)     DEST="$DEST_DIR/linear-app-id.env";     GROUP=orchestrator-svc ;;
+  linear-app-secret) DEST="$DEST_DIR/linear-app-secret.env"; GROUP=orchestrator-svc ;;
+  # The refusal below deliberately does NOT echo the argument: sudo lets the
+  # caller pass any argument, so a mistyped one could be a secret in stderr.
   *)
-    echo "write-secret.sh: unknown field '$FIELD' -- must be one of sentry|supabase|powersync|axiom|deepseek|linear" >&2
+    echo "write-secret.sh: unknown field -- must be one of sentry|supabase|powersync|axiom|deepseek|linear|linear-app-id|linear-app-secret" >&2
     exit 1
     ;;
 esac

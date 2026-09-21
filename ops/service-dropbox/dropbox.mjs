@@ -30,7 +30,10 @@ import { execFile } from 'node:child_process';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
-export const FIELDS = ['sentry', 'supabase', 'powersync', 'axiom', 'deepseek', 'linear'];
+export const FIELDS = [
+  'sentry', 'supabase', 'powersync', 'axiom', 'deepseek', 'linear',
+  'linear-app-id', 'linear-app-secret',
+];
 
 // Which group write-secret.sh chowns each field's file to on the server --
 // the single source of truth for "who can read this key" (JUL-77). The
@@ -50,6 +53,12 @@ export const FIELD_GROUPS = {
   deepseek: 'deepseek-readers',
   // Orchestrator-svc only, same as the original four.
   linear: 'orchestrator-svc',
+  // The controller's own Linear identity (an OAuth app, client-credentials
+  // tokens): the app's client ID and client secret. Orchestrator-svc only --
+  // never a group runner is in, since these let the holder act as the
+  // controller on the board.
+  'linear-app-id': 'orchestrator-svc',
+  'linear-app-secret': 'orchestrator-svc',
 };
 
 // Shape checks are deliberately loose -- the point is to catch an obviously
@@ -161,6 +170,14 @@ const HINTS = {
   axiom: 'From Axiom: Settings -> API tokens. A long string of letters/numbers, no spaces.',
   deepseek: 'From DeepSeek: Platform -> API keys. A long string of letters/numbers, no spaces.',
   linear: 'From Linear: Settings -> Security & access -> Personal API keys. A long string of letters/numbers, no spaces.',
+  'linear-app-id': 'From Linear: Settings -> API -> OAuth applications -> Julia controller (created with client credentials tokens switched on) -> Client ID. A long string of letters/numbers, no spaces.',
+  'linear-app-secret': 'From Linear: the same Julia controller page -> Client secret (shown once, right after you create the app). A long string of letters/numbers, no spaces.',
+};
+
+// Boxes whose name is not just the field id capitalised.
+const LABELS = {
+  'linear-app-id': 'Julia controller: client ID',
+  'linear-app-secret': 'Julia controller: client secret',
 };
 
 function renderForm(state) {
@@ -168,7 +185,7 @@ function renderForm(state) {
   const boxes = FIELDS.map((f) => {
     const done = received[f] === true;
     return `
-    <label for="${f}">${f[0].toUpperCase()}${f.slice(1)}
+    <label for="${f}">${LABELS[f] ?? `${f[0].toUpperCase()}${f.slice(1)}`}
       <div class="hint">${HINTS[f]}</div>
     </label>
     <input type="text" id="${f}" name="${f}" autocomplete="off" spellcheck="false">

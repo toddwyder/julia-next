@@ -58,9 +58,10 @@ test('there is no install, cp, mv, tee or any other file-writing rule', () => {
   }
 });
 
-test('systemctl may only enable/start/stop/restart the two named ready-queue units', () => {
+test('systemctl may only enable/disable/start/stop/restart the two named ready-queue units', () => {
   const allowed = new Set([
     'enable --now julia-ready-queue.timer',
+    'disable --now julia-ready-queue.timer',
     'start julia-ready-queue.timer',
     'stop julia-ready-queue.timer',
     'restart julia-ready-queue.timer',

@@ -25,7 +25,7 @@ test('validateFieldShape rejects an obviously wrong paste', () => {
   assert.equal(validateFieldShape('sentry', 'a'.repeat(40)).ok, true, 'a plausible unbroken token is accepted');
 });
 
-test('isArmed: true when freshly armed, false once all four received, false after 24h', () => {
+test('isArmed: true when freshly armed, false once all eight received, false after 24h', () => {
   const armedAt = new Date('2026-09-17T00:00:00.000Z').toISOString();
   const fresh = { armedAt, received: {}, usedAt: null };
   const partial = { armedAt, received: { sentry: true, supabase: true }, usedAt: null };
@@ -33,12 +33,13 @@ test('isArmed: true when freshly armed, false once all four received, false afte
     armedAt,
     received: {
       sentry: true, supabase: true, powersync: true, axiom: true, deepseek: true, linear: true,
+      'linear-app-id': true, 'linear-app-secret': true,
     },
     usedAt: null,
   };
   assert.equal(isArmed(fresh, Date.parse('2026-09-17T01:00:00.000Z')), true);
   assert.equal(isArmed(partial, Date.parse('2026-09-17T01:00:00.000Z')), true, 'a partial round stays armed');
-  assert.equal(isArmed(complete, Date.parse('2026-09-17T01:00:00.000Z')), false, 'all six received disarms regardless of time');
+  assert.equal(isArmed(complete, Date.parse('2026-09-17T01:00:00.000Z')), false, 'all eight received disarms regardless of time');
   assert.equal(isArmed(fresh, Date.parse('2026-09-18T00:00:01.000Z')), false, '24h + 1s later is expired');
 });
 
@@ -48,13 +49,15 @@ test('allReceived is true only when every field in FIELDS has been received', ()
   assert.equal(allReceived({
     received: {
       sentry: true, supabase: true, powersync: true, axiom: true, deepseek: true, linear: true,
+      'linear-app-id': true, 'linear-app-secret': true,
     },
   }), true);
   assert.equal(allReceived({
     received: {
-      sentry: true, supabase: true, powersync: true, axiom: true, deepseek: true,
+      sentry: true, supabase: true, powersync: true, axiom: true, deepseek: true, linear: true,
+      'linear-app-id': true,
     },
-  }), false, 'linear missing');
+  }), false, 'linear-app-secret missing');
 });
 
 test('rearm resets received/expiry so a prior sitting cannot block a new one', async () => {
@@ -141,7 +144,7 @@ test('a partial round (one box filled) stays armed, and a later round can save t
     });
     const firstParsed = JSON.parse(first.body);
     assert.equal(firstParsed.sentry.ok, true);
-    assert.equal(firstParsed.allReceived, false, 'five fields still missing');
+    assert.equal(firstParsed.allReceived, false, 'seven fields still missing');
 
     const stillOpen = await request(`${base}/`);
     assert.doesNotMatch(stillOpen.body, /page is off/i, 'a partial round must not turn the page off');
@@ -155,18 +158,20 @@ test('a partial round (one box filled) stays armed, and a later round can save t
         axiom: 'd'.repeat(40),
         deepseek: 'e'.repeat(40),
         linear: 'g'.repeat(40),
+        'linear-app-id': 'h'.repeat(32),
+        'linear-app-secret': 'i'.repeat(40),
       }),
     });
     const secondParsed = JSON.parse(second.body);
-    assert.equal(secondParsed.allReceived, true, 'the sixth field completes the sitting');
-    assert.equal(written.length, 6);
+    assert.equal(secondParsed.allReceived, true, 'the eighth field completes the sitting');
+    assert.equal(written.length, 8);
 
     const now403 = await request(`${base}/save`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ sentry: 'e'.repeat(40) }),
     });
-    assert.equal(now403.status, 403, 'the box is off once all six are received');
+    assert.equal(now403.status, 403, 'the box is off once all eight are received');
   });
 });
 
@@ -326,10 +331,10 @@ test('GET / never contains any field value from a prior save', async (t) => {
   });
 });
 
-test('FIELDS is exactly the six services this drop box now names (JUL-72 + JUL-77, GLM removed in JUL-93)', () => {
+test('FIELDS is exactly the eight boxes this drop box now names (JUL-72 + JUL-77, GLM removed in JUL-93, controller app added for JUL-98)', () => {
   assert.deepEqual(
     [...FIELDS].sort(),
-    ['axiom', 'deepseek', 'linear', 'powersync', 'sentry', 'supabase'],
+    ['axiom', 'deepseek', 'linear', 'linear-app-id', 'linear-app-secret', 'powersync', 'sentry', 'supabase'],
   );
 });
 
@@ -342,6 +347,30 @@ test('GLM (zai) is not a drop-box field: no box, no reader group, no hint (JUL-9
 test('a plausible new-field value (deepseek/linear) is accepted the same as any other field', () => {
   assert.equal(validateFieldShape('deepseek', 'd'.repeat(40)).ok, true);
   assert.equal(validateFieldShape('linear', 'lin_api_'.padEnd(40, '1')).ok, true);
+});
+
+test('the controller app boxes accept a plausible client ID and secret, and reject a pasted URL', () => {
+  assert.equal(validateFieldShape('linear-app-id', 'a1b2c3d4'.repeat(4)).ok, true);
+  assert.equal(validateFieldShape('linear-app-secret', 'f9e8d7c6'.repeat(4)).ok, true);
+  assert.equal(validateFieldShape('linear-app-secret', 'https://linear.app/settings/api').ok, false);
+});
+
+test('the form shows a labelled, hinted box for each controller app field, with matching for/id', async (t) => {
+  const statePath = tmpState();
+  await saveState(statePath, { armedAt: new Date().toISOString(), received: {}, usedAt: null });
+  await withServer(t, { statePath, writeSecret: async () => {}, now: () => Date.now() }, async (base) => {
+    const { body } = await request(`${base}/`);
+    for (const [id, label] of [['linear-app-id', 'Julia controller: client ID'], ['linear-app-secret', 'Julia controller: client secret']]) {
+      assert.match(body, new RegExp(`<label for="${id}">${label}`), `${id} has its label`);
+      assert.match(body, new RegExp(`<input type="text" id="${id}" name="${id}"`), `${id} has its input`);
+    }
+    assert.match(body, /client credentials tokens switched on/, 'the hint says to switch client credentials on');
+  });
+});
+
+test('the controller app boxes are readable by orchestrator-svc only, never a group runner is in', () => {
+  assert.equal(FIELD_GROUPS['linear-app-id'], 'orchestrator-svc');
+  assert.equal(FIELD_GROUPS['linear-app-secret'], 'orchestrator-svc');
 });
 
 // JUL-77: two model/service keys land in different readers than the
@@ -361,6 +390,9 @@ test('FIELD_GROUPS routes each field to the exact reader(s) JUL-77 specifies', (
     deepseek: 'deepseek-readers',
     // Orchestrator-svc only, same as the original four.
     linear: 'orchestrator-svc',
+    // The controller's own Linear identity: orchestrator-svc only.
+    'linear-app-id': 'orchestrator-svc',
+    'linear-app-secret': 'orchestrator-svc',
   });
 });
 

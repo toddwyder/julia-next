@@ -11,6 +11,7 @@ the group named in `dropbox.mjs`'s `FIELD_GROUPS`:
 | Field | Readable by |
 | --- | --- |
 | sentry, supabase, powersync, axiom, linear | `orchestrator-svc` only |
+| linear-app-id, linear-app-secret (the controller's own Linear identity, JUL-98) | `orchestrator-svc` only |
 | deepseek | `runner` AND `orchestrator-svc`, via a dedicated `deepseek-readers` group (builder backup + `orchestrator-deepseek` route) |
 
 `runner` is never added to the `orchestrator-svc` group itself -- that would let it read every
@@ -104,8 +105,8 @@ sudo -u dropbox-svc node /opt/orca-runner/service-dropbox/dropbox.mjs --rearm
 ## Why a dedicated account, and why a sudo helper instead of direct writes
 
 Same reasoning as `ops/journey-relay/README.md`: same-UID processes can read each other's
-environment and open files via `/proc/<pid>/`. `dropbox-svc` briefly holds up to seven raw
-bearer tokens per request; if it also owned the destination files, any bug or compromise in
+environment and open files via `/proc/<pid>/`. `dropbox-svc` briefly holds up to eight raw
+tokens and secrets per request; if it also owned the destination files, any bug or compromise in
 this ~250-line HTTP handler would have direct write access to every one of those accounts'
 credential stores, not just `orchestrator-svc`'s.
 Routing every write through one fixed, root-owned, single-purpose helper script means the actual

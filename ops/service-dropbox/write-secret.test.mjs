@@ -56,6 +56,13 @@ test('write-secret.sh names exactly the fixed destination files for FIELDS, and 
   );
 });
 
+test('write-secret.sh never echoes the argument it refused (it could be a secret)', () => {
+  const text = scriptText();
+  const refusal = /^\s*\*\)\s*\n([\s\S]*?)exit 1/m.exec(text);
+  assert.ok(refusal, 'the default case arm exists');
+  assert.doesNotMatch(refusal[1], /\$\{?FIELD/, 'the refusal message must not interpolate the caller-supplied field');
+});
+
 test('write-secret.sh writes only below one fixed directory and never takes a path from its caller', () => {
   const text = scriptText();
   assert.match(text, /^DEST_DIR=\/etc\/orca-runner\/dropbox-secrets$/m, 'DEST_DIR must be the one fixed literal path');
