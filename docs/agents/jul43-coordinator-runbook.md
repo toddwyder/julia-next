@@ -1238,6 +1238,51 @@ the units below are installed **by a laptop session only**; the graph can turn t
 but cannot change what it runs. A new unit, a changed unit, a new group or a new rule is a
 laptop-session edit and install, never a graph action — park it, don't work around it.
 
+### The controller runs as a user service of `orchestrator-svc` (JUL-98, gap 1, 2026-09-21)
+
+**The design: root once, never again.** The controller is a systemd *user* service of
+`orchestrator-svc`, and the system restarts it after a crash. The one root step is done, once:
+`sudo loginctl enable-linger orchestrator-svc` (evidence: `/var/lib/systemd/linger/orchestrator-svc`
+exists, `loginctl show-user orchestrator-svc` says `Linger=yes State=lingering`, and
+`user@1002.service` is active with nobody logged in; 1002 is this host's uid for the account). After that the graph installs and updates the
+controller with **no sudo**, from an Orca terminal on `orchestrator-local` (the terminal's
+environment has no `XDG_RUNTIME_DIR`, so set both variables yourself; the user id is 1002 on this host,
+and `$(id -u)` gives it inside the terminal). `ops/controller/julia-controller.service` does not exist
+yet: the controller's own card writes it, and these commands are for then.
+
+```sh
+export XDG_RUNTIME_DIR=/run/user/$(id -u) DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u)/bus
+systemctl --user link /srv/orchestrator-svc/julia-next/ops/controller/julia-controller.service
+systemctl --user enable --now julia-controller.service
+# after a checkout sync changes the unit file:
+systemctl --user daemon-reload && systemctl --user restart julia-controller.service
+```
+
+`link` points at the unit file inside the read-only, root-owned checkout, so the account never needs
+write access to it. **Proven live 2026-09-21** from a real Orca terminal as `orchestrator-svc`: a probe
+unit linked from a root-owned file was killed with `kill -9`, and the system started a new process
+2 seconds later (`NRestarts=1`, a different pid, `active`). The probe was removed afterwards.
+
+What the controller's unit file must carry: `Restart=always`, `RestartSec=5`, `NoNewPrivileges=yes`
+(accepted in a user unit, checked in the probe), and an `[Install]` section with
+`WantedBy=default.target` (without it `enable` cannot make the lingering user manager start it at boot).
+It should also set `StartLimitIntervalSec=0`: by default a few quick crashes make systemd give up and
+leave the controller down with nothing moving on the board. The trade-off is that a bad build then
+crash-loops forever instead of stopping, bounded to one restart every 5 seconds by `RestartSec`; the
+controller's build must make a crash loop visible (a journal line and a card comment) rather than
+rely on systemd to stop it.
+
+**The trade-off, stated plainly.** A merged change to that unit file becomes code running as
+`orchestrator-svc`. That is not root, and it is the account that already merges its own PRs and holds
+the publisher credential, so it adds no reach the graph did not have. The root-code boundary in the
+sudo section above is unchanged: no sudo rule installs or edits a file.
+
+**Not proven: a real reboot.** Lingering is set and the user manager is up, but the server was not
+rebooted to prove the controller comes back on its own. *If that is wrong:* after the next reboot the
+controller would stay down until someone starts it, and nothing would move on the board. The first real
+reboot is the test; afterwards, with the two `export` lines above set, check
+`systemctl --user is-enabled julia-controller.service` and `systemctl --user is-active julia-controller.service`.
+
 ### The ready-queue units (`ops/ready-queue/`)
 
 `julia-ready-queue.service` (oneshot, `User=orchestrator-svc`, `Group=orchestrator-svc`,
