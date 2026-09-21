@@ -535,7 +535,7 @@ export async function resolveSenderTerminal({
 //
 // PUT THE DIRECT FILE READ BACK AND THIS IS WHAT HAPPENS: `readdir` on the
 // per-project directory throws EACCES, the reader refuses, the seat gets no
-// cost line, `assertCostLineComplete` fails it and the step stops with "no cost
+// cost line, `assertEverySeatCosted` fails it and the step stops with "no cost
 // line for the builder seat" -- the JUL-92 stop of 2026-09-21, which is the
 // only thing the controller did for a whole evening.
 

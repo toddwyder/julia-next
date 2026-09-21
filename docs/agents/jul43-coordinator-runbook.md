@@ -1644,7 +1644,7 @@ never-started line.
 
 **What breaks if someone "simplifies" this back to a direct file read.** `readdir` on the
 per-project directory throws `EACCES` for `orchestrator-svc`, the reader refuses, the seat gets no
-cost line, `assertCostLineComplete` fails it, and the controller stops at `build-and-review` with
+cost line, `assertEverySeatCosted` fails it, and the controller stops at `build-and-review` with
 "no cost line for the builder seat" on every card — which is the JUL-92 stop, the only thing the
 controller did for a whole evening. It cannot be fixed by changing a path; it needs root, and root
 is not a graph action.
