@@ -63,6 +63,8 @@ Times are UTC. "probe N" is a real worker in its own brand-new worktree, all rem
 | `cost.pi.seat-json-stream.multi-turn.jsonl`, `cost.pi.rpc-get-session-stats.json` | the seat launcher's JSON output for a two-turn run that uses a tool; Pi's own `get_session_stats` in RPC mode | peak prompt 2,530 derived from per-call usage; Pi's own `contextUsage.tokens` 2,507 equals the last call's total |
 | `pi.timing.*.txt` | a wrapper that stamps start and exit around the seat | 2.416 s from either clock |
 | `pi-registry.deepseek.json` | Pi's built-in model list, the two seat models | Pi's rates (lower than DeepSeek's published price) and the 1,000,000 window |
+| `pi-models-store.deepseek.json` | `~/.pi/agent/models-store.json` on the runner, as Pi wrote it | the price list Pi fetches from DeepSeek and prefers over its built-in one: `deepseek-v4-pro` at DeepSeek's peak price, `deepseek-flash` (not our `deepseek-v4-flash` id) |
+| `review.pr65.deepseek-pro.run.json` / `.verdict.txt` | the independent review of PR #65 on the DeepSeek Pro reviewer seat | 17 calls with usage and Pi's printed cost per call; the run's timing; the DeepSeek balance before and after ($3.07 to $2.98); the reviewer's verdict text |
 | `orca-1.4.200-to-1.4.205.commands.txt`, `orca-1.4.200-to-1.4.205.orchestration-guide.diff` | `orca agent-context --json` and `orca skills get orchestration --full`, before and after the upgrade | what the upgrade changed |
 
 ## Reading these safely
@@ -80,5 +82,5 @@ Times are UTC. "probe N" is a real worker in its own brand-new worktree, all rem
   they were saved. Dispatch capabilities never appear in these payloads.
 - A Claude transcript writes one line per content block, so one message can appear twice with identical
   usage. Any code reading these files must count each `message.id` once.
-- DeepSeek's published price and Pi's built-in price disagree (`graph/rate-table.mjs`, and the test that
-  records the disagreement). Neither is proven to be the real charge.
+- DeepSeek's published price, Pi's built-in price, Pi's fetched model-store price and the account balance all
+  differ (`graph/rate-table.mjs` and its tests record each). On the one measured run the balance was lowest.

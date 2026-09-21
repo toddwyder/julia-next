@@ -1,0 +1,37 @@
+VERDICT: PASS
+
+The token arithmetic, the deduplication, and every dollar/token/ratio figure I recomputed all check out against the fixtures. The code has no double-counting path, and the recorded sessions reproduce exactly. Four minor issues remain; none is blocking.
+
+## Findings
+
+**1. minor — `graph/rate-table.mjs:130-133` (`peakPromptTokens`) is not actually "for any vendor"**
+The function reads `c.input + c.cacheRead + c.cacheWrite`, but the file's own usage vocabulary (lines 95-97) is: Claude `{input, output, cacheRead, cacheWrite5m, cacheWrite1h}`, Codex `{input, cachedInput, output}`. For Claude there is no `cacheWrite` field (writes are split into `cacheWrite5m`/`cacheWrite1h`), so cache creation is silently dropped from peak context; for Codex the read/write fields are named differently. It is only tested with the Pi shape, where the names happen to match. Example: a Claude call with input 10, cacheRead 1000, cacheWrite1h 500 would return 1010 instead of 1510. No current caller is affected, but the doc section 5 relies on per-vendor peak context being correct.
+
+**2. minor — `graph/rate-table.mjs:47` vs `:107-113` (`gpt-6-astra.cacheWrite` is dead)**
+The table defines `cacheWrite: 12.5` for Codex, but `costOf`'s Codex branch never reads it and never subtracts `cache_write_input_tokens` from the uncached portion. The recorded session has `cache_write_input_tokens: 0`, so no test can catch it. A future session with nonzero cache writes would price those tokens at the $10 input rate instead of the $12.5 cache-write rate (undercharge of $2.5/M), and the `cacheWrite` field sits unused.
+
+**3. minor — `graph/rate-table.test.mjs:38-43` (and `:131-136`) are data-only, not code tests**
+The "count each message id once" test invokes no function from `rate-table.mjs`; it only asserts fixture fields (`assistant_lines > distinct_messages`, `sonnet.messages == distinct_messages`). It would pass no matter what `costOf`/`peakPromptTokens` do, and there is no transcript-summing code in `rate-table.mjs` for it to protect — the dedup lives entirely in how the fixture was produced. The duration test (`:131-136`) similarly just checks three fixture files agree; it exercises no code. Neither is harmful, but neither guards against a regression.
+
+**4. minor — `docs/research/jul109-orca-1.4.205-findings.md:257` ("up to a third")**
+The text says reading Pi's figure "understates spend by up to a third". The reviewer probe actually understates by **36.06%** (published off-peak $0.0013222 vs Pi's $0.00084535), which is *more* than one third (33.3%). "About a third" or "up to about 36%" would be accurate.
+
+## Numbers I re-derived by hand (all match)
+
+- Claude session 2: Sonnet $0.1057164 (510×$2 + 405×$10 + 230,252×$0.20 + 13,649×$4 per M) and Haiku $0.002542 (2462×$1 + 16×$5) — both match Claude Code's `costUSD` exactly.
+- Claude session 1: Sonnet $0.112069 and Haiku $0.002481 — match.
+- Deduplicated transcript (session 2): $0.0920498 → rounds to the doc's $0.0920; ratio to Claude Code's own $0.1082584 is 0.8503 → 15% under. Match.
+- Codex: 5,664 uncached × $10 + 45,312 cached × $1 + 223 output × $50 = $0.113102; `total_tokens 51,199 = 50,976 + 223`. Match.
+- Pi registry (reviewer): $0.00084535; builder: $0.0005165552 — both match `usage.cost.total`.
+- Pi published off-peak: reviewer $0.0013222 (1.564× Pi's figure), builder $0.000556152 (1.0767×). Match the doc's 1.56 and 1.08.
+- Peak prompt (Pi stream): max(1975+384, 226+2304) = 2530. Match.
+- Duration: start/exit stamps differ by 2.416 s; wrapper says `wall_seconds=2.416`. Match.
+- Old→new probe 6 transcript: output 1,142 → 805, peak 62,524 unchanged. Match.
+
+## Checks I actually ran
+
+- `node --test graph/rate-table.test.mjs` — 14/14 pass.
+- `node --test scripts/rate-table.test.mjs` — 14/14 pass (re-import wrapper works).
+- Hand-recomputed every dollar, token, percentage, and ratio in findings section 5, section 10, and the fixture README against the fixtures (all listed above).
+- Spot-checked the failure-path fixtures (`failure.claude.*`, `failure.mailbox.*`) against section 4a's claims — no contradictions.
+- Confirmed `isDeepseekPeak` edge cases and that 2026-09-20 is a Sunday (off-peak).

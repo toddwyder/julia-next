@@ -138,13 +138,19 @@ includes the cached tokens (`total_tokens = input + output`), so the table price
 separately. Codex records tokens but no dollars, so **this is arithmetic proven, not a figure checked
 against anything the vendor reported.**
 
-**DeepSeek.** *Dollars:* Pi prints `usage.cost.total`, but its built-in prices are **lower than
-DeepSeek's own published price**: on the reviewer probe Pi printed $0.000845 and the published off-peak
-price gives $0.001322 (1.56 times); the builder probe is 1.08 times. DeepSeek also charges double at
-peak hours (01-04 and 06-10 UTC, Monday to Friday), which Pi does not model. The table uses the
-published price and records Pi's as `piRegistry`. *Which one is the real charge is not settled:*
-DeepSeek's balance is readable through its API but only to the cent ($3.07 at the time), and settling it
-needs a deliberate spend of about ten cents. *Duration:* the controller starts the process and sees it
+**DeepSeek.** *Dollars:* three different numbers exist, and none is proven to be the charge.
+(1) **Pi's printed figure** comes from one of two price lists, depending on the model id: its built-in list, or a
+model store it fetches from DeepSeek on a run (`~/.pi/agent/models-store.json`, created 20:35Z on 20 Sep). The store
+names `deepseek-v4-pro` at DeepSeek's *peak* price (1.32 / 3.96 / 0.044 per million) and Pi applies it at every hour;
+`deepseek-v4-flash` is not in the store, so it still uses the built-in list. That is why my two early probes printed
+low figures and a Pro run now prints the peak price. (2) **DeepSeek's published price**, doubled at peak hours
+(01-04 and 06-10 UTC, Monday to Friday): what `costOf` computes. (3) **The account balance**, which DeepSeek's API
+reports to the cent. On the PR #65 review run (17 calls, 45,231 input, 32,730 output and 701,440 cache-read tokens)
+Pi printed $0.220, the published price gives $0.155 (7 of the 17 calls fell in peak hours; $0.110 if none had), and
+the balance fell from $3.07 to $2.98, about $0.09, with no other DeepSeek run in between. So on that run **the charge
+was about 2.4 times lower than Pi printed and 1.2 to 1.7 times lower than the published price.** One run at one-cent
+resolution tells the direction (Pi and the table overstate) and roughly the size, not an exact rate. **My earlier
+warning that Pi's figure understated DeepSeek spend was wrong for the Pro seat.** *Duration:* the controller starts the process and sees it
 exit; proven on a real seat run, where the wrapper's clock said 2.416 s and the start and exit stamps
 differ by 2.416 s. *Peak context:* Pi does expose context usage, but only in its RPC mode
 (`get_session_stats.contextUsage`) and its extension API, and the seats run `--mode json`, whose output
@@ -254,7 +260,8 @@ try five commands. `orca status --json` was **allowed**; `node -e "console.log(1
 |---|---|
 | **Claude dollars from the transcript alone are a lower bound** (about 15% under on the proof session). Exact only if the session exits cleanly and Claude Code's own record is read straight afterwards. | The cost line for the seat doing most of the work would read low. Every card would look about a seventh cheaper than it was, and any judgement of model tiering built on it would be skewed toward the more expensive model. Fix: end each Claude session with `/exit` and read Claude Code's record, keeping the transcript figure as the fallback. |
 | **Codex dollars are arithmetic, not checked against a vendor figure** (the record has tokens only, and the login is a subscription). | The Codex cost line is an estimate at list price, not a bill. If OpenAI changes a price, the line is wrong until the table is edited; the test will not notice because there is no vendor dollar to compare with. |
-| **DeepSeek: Pi's printed dollars disagree with DeepSeek's published price** (1.08 to 1.56 times, plus a doubled peak rate Pi ignores). Not settled which is the real charge. | DeepSeek is the one seat billed per token from a real balance. If the published price is right, anything reading Pi's figure understates spend by up to a third, which is the direction that hides a runaway bill. Settling it takes DeepSeek's usage page or a deliberate spend of about ten cents (a money decision, so it was not done). |
+| **DeepSeek dollars: three numbers, none proven to be the charge.** Pi prints one, the published price gives another, the account balance shows a third. On the one review run measured the balance was lowest ($0.09, against $0.155 published and $0.220 Pi-printed). | Cost lines for the DeepSeek seat read high, by about 1.2 to 2.4 times on that run. That is the safe direction (it cannot hide a runaway bill) but a spend guard set from these figures would trip early. A clean measurement needs a controlled run big enough to move the balance by several cents, which spends real money, so it was not done. |
+| **Codex cache writes** were 0 in every recorded session. | The table prices them at the cache-write rate and treats them as inside `input_tokens`, like cached tokens; that placement is unproven. If it is wrong, a session with real cache writes would be mispriced by up to $2.50 per million of those tokens. |
 | **A worker that dies or hangs without reporting** was not tried. | The controller's stuck-detection would be designed against a guess. What is known: the signature of a worker that never starts, and that Orca's own liveness is noisy (section 2, fact 3). |
 | **A worker whose task text was lost** (Pi startup race, twice). Orca says `input_accepted` and nothing happens. | A Pi worker looks in progress for ever. The controller must confirm a turn started (`--wait-submit`) or wait for Pi to be up, not trust `worker-start`. |
 | **GLM was not probed** (barred on cost, deliberately). | Nothing, while the rule stands that a card naming GLM parks Blocked. If the rule changes, GLM has no proven route. |
@@ -262,6 +269,29 @@ try five commands. `orca status --json` was **allowed**; `node -e "console.log(1
 | **The trust entry is per base path** (section 6). Fixed for a move, not prevented. | A base checkout moved without the admin step brings the overnight failure back, looking identical, on the next card. |
 | **Orca cannot delete a run.** | Runs accumulate in `run-list` for ever; the queue's finished-run guess (age plus task state) is what keeps them from blocking. |
 | **The Codex `effort` field is recorded only when one was requested.** | A Codex cost line cannot say what effort ran unless the card set one. |
+
+## 11. Independent review of PR #65
+
+Run on 21 Sep, UTC, by **DeepSeek Pro** (`deepseek` / `deepseek-v4-pro`), a different model family from the author (Claude),
+on the reviewer seat started the way the controller starts it: a plain Orca terminal on the runner's daemon, in a fresh
+worktree of merged `main`, prompt piped into `node ops/service-dropbox/run-pi-seat.mjs reviewer-backup`. The terminal's own
+`id` listed `deepseek-readers`. It made 17 model calls and 33 tool calls (it read every fixture, ran the tests and
+recomputed figures by hand), exit 0, 315.5 s. The prompt named the known failure mode, double counting.
+Cost: Pi printed $0.220; the published price gives $0.155; the balance fell about $0.09 (section 5).
+Files: `review.pr65.deepseek-pro.run.json` and `.verdict.txt`.
+
+**Verdict: PASS, no blocking findings.** Every dollar, token, percentage and ratio it recomputed matched the fixtures,
+and it found no path that double counts. Four minor findings, each checked against the code before acting:
+
+| # | Finding | Checked | Done |
+|---|---|---|---|
+| 1 | `peakPromptTokens` said "any vendor" but only read `cacheWrite`, so Claude's `cacheWrite5m`/`cacheWrite1h` split was dropped | real | fixed; tested for both Claude names and Pi's |
+| 2 | Codex's `cacheWrite` rate was defined but never used | real | fixed (priced, and taken out of the uncached part); placement inside `input_tokens` stays flagged unproven |
+| 3 | Two tests only read fixtures and run no code; the de-duplication lived only in how a fixture was made | fair | the counting is now real code, `claudeUsageFromTranscript`, tested with a transcript that repeats a message; the two data tests are labelled as fixture checks |
+| 4 | "understates by up to a third" was really 36% | real, and the whole DeepSeek explanation it sat in was wrong | rewritten from the new evidence (section 5) |
+
+The review could not see one thing: the Pi model store. That was found afterwards, from the review's own cost line,
+and is what changed section 5.
 
 ## Cleanup
 

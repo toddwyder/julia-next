@@ -41,29 +41,39 @@ export const RATE_TABLE = {
     // OpenAI list prices for the model Codex runs on the server. Codex's token record counts
     // cached_input_tokens INSIDE input_tokens (total_tokens = input_tokens + output_tokens), so
     // the uncached part is input minus cached. Above 272,000 input tokens the whole request is
-    // billed at 2x input and cache rates and 1.5x output.
+    // billed at 2x input and cache rates and 1.5x output. cache_write_input_tokens is priced at
+    // `cacheWrite`, treated like cached tokens (inside input_tokens); every recorded Codex session
+    // has it at 0, so that placement is UNPROVEN (see `unconfirmed`).
     'gpt-6-astra': {
       vendor: 'codex',
       input: 10, cachedInput: 1, cacheWrite: 12.5, output: 50,
       longContextThresholdTokens: 272000, longContextInputMultiplier: 2, longContextOutputMultiplier: 1.5,
       contextWindow: 258400, // model_context_window in the Codex session record
+      unconfirmed: 'cache_write_input_tokens has been 0 in every recorded Codex session, so whether it sits inside input_tokens (as cached tokens do) is not proven',
       source: 'https://developers.openai.com/api/docs/models/gpt-6-astra',
       checkedOn: '2026-09-20',
     },
     // DeepSeek, from DeepSeek's own price page. Peak hours are 01:00-04:00 and 06:00-10:00 UTC,
     // Monday to Friday (Chinese public holidays are off-peak but this table does not know them, so
     // it can only overstate on such a day); every other hour is off-peak, at half the peak price.
-    // `piRegistry` is what Pi's built-in model list charges and what Pi prints as usage.cost.total.
-    // The two DISAGREE (see graph/rate-table.test.mjs): Pi's dollar figure is lower than DeepSeek's
-    // published price. Until DeepSeek's billing page settles it, cost lines use the published
-    // price and say so.
+    // Pi prints usage.cost.total from ONE of two price lists, and which one depends on the model id:
+    //   `piRegistry`   Pi's built-in list. Used for ids Pi's model store does not name (deepseek-v4-flash),
+    //                  and for everything before the store existed (20 Sep 2026, 20:35Z).
+    //   `piModelStore` ~/.pi/agent/models-store.json, which Pi fetches from DeepSeek on a run and
+    //                  which then overrides the built-in list for the ids it names (deepseek-v4-pro).
+    //                  Its numbers are DeepSeek's published PEAK price, applied at every hour.
+    // Neither matches what DeepSeek actually charged: on the PR #65 review run the account balance fell
+    // about $0.09 while Pi printed $0.22 and the published price gives about $0.11 to $0.16. Cost lines
+    // use the published price (the cautious, higher figure than the balance showed) and say so; see
+    // the findings record, section 5.
     'deepseek-v4-pro': {
       vendor: 'pi-deepseek',
       offPeak: { input: 0.66, output: 1.98, cacheRead: 0.022 },
       peak: { input: 1.32, output: 3.96, cacheRead: 0.044 },
       piRegistry: { input: 0.435, output: 0.87, cacheRead: 0.003625 },
+      piModelStore: { input: 1.32, output: 3.96, cacheRead: 0.044 },
       contextWindow: 1000000,
-      source: 'https://api-docs.deepseek.com/quick_start/pricing (page lists it as deepseek-v4-pro); Pi registry: pi-ai providers/data/deepseek.json',
+      source: 'https://api-docs.deepseek.com/quick_start/pricing (page lists it as deepseek-v4-pro); Pi registry: pi-ai providers/data/deepseek.json; Pi model store: ~/.pi/agent/models-store.json',
       checkedOn: '2026-09-20',
     },
     'deepseek-v4-flash': {
@@ -93,7 +103,7 @@ const PER = 1e6;
 
 // usage, by vendor (use the field names the vendor's own record uses, mapped once here):
 //   claude       { input, output, cacheRead, cacheWrite5m, cacheWrite1h }   (input excludes cache)
-//   codex        { input, cachedInput, output }                              (input INCLUDES cached)
+//   codex        { input, cachedInput, cacheWrite, output }                  (input INCLUDES both)
 //   pi-deepseek  { input, output, cacheRead }                                (input excludes cache)
 // `at` (a Date or timestamp) picks DeepSeek's peak or off-peak rate; pass the run's start time.
 export function costOf(model, usage = {}, { at = new Date() } = {}) {
@@ -108,8 +118,9 @@ export function costOf(model, usage = {}, { at = new Date() } = {}) {
     const long = n('input') > r.longContextThresholdTokens;
     const inMul = long ? r.longContextInputMultiplier : 1;
     const outMul = long ? r.longContextOutputMultiplier : 1;
-    const uncached = n('input') - n('cachedInput');
-    return (uncached * r.input * inMul + n('cachedInput') * r.cachedInput * inMul + n('output') * r.output * outMul) / PER;
+    const uncached = n('input') - n('cachedInput') - n('cacheWrite');
+    return (uncached * r.input * inMul + n('cachedInput') * r.cachedInput * inMul
+      + n('cacheWrite') * r.cacheWrite * inMul + n('output') * r.output * outMul) / PER;
   }
   if (r.vendor === 'pi-deepseek') {
     const t = isDeepseekPeak(at) ? r.peak : r.offPeak;
@@ -118,17 +129,53 @@ export function costOf(model, usage = {}, { at = new Date() } = {}) {
   throw new Error(`costOf: unknown vendor '${r.vendor}' for model '${model}'`);
 }
 
-// What Pi itself would print as usage.cost.total, from its built-in registry rates. Used only to
-// show how far Pi's figure is from the published price.
-export function piReportedCostOf(model, usage = {}) {
+// What Pi itself prints as usage.cost.total. `source` is 'registry' (Pi's built-in list) or 'store'
+// (Pi's fetched model store, which overrides the built-in list for the ids it names). Used only to show
+// how far Pi's figure is from the published price and from the account balance.
+export function piReportedCostOf(model, usage = {}, { source = 'registry' } = {}) {
   const r = RATE_TABLE.models[model];
-  if (!r?.piRegistry) throw new Error(`piReportedCostOf: no Pi registry rate for '${model}'`);
+  const rates = source === 'store' ? r?.piModelStore : r?.piRegistry;
+  if (!rates) throw new Error(`piReportedCostOf: no Pi ${source} rate for '${model}'`);
   const n = (k) => usage[k] ?? 0;
-  return (n('input') * r.piRegistry.input + n('output') * r.piRegistry.output + n('cacheRead') * r.piRegistry.cacheRead) / PER;
+  return (n('input') * rates.input + n('output') * rates.output + n('cacheRead') * rates.cacheRead) / PER;
+}
+
+// One Claude session transcript (parsed JSON lines) -> usage per model, counting each message id ONCE.
+// A transcript writes one line per content block, so a message with a text block and a tool call
+// appears twice with identical usage; summing lines double-counts (the PR #64 mistake). A cache write
+// with no lifetime split is counted at the 1-hour rate, which is what Claude Code's own record does.
+// The result is a lower bound on the session's cost: Claude Code makes calls the transcript omits.
+export function claudeUsageFromTranscript(lines) {
+  const byId = new Map();
+  for (const l of lines) {
+    if (l?.type !== 'assistant' || !l.message?.id || !l.message.usage) continue;
+    if (l.message.model === '<synthetic>') continue;
+    byId.set(l.message.id, l.message);
+  }
+  const out = {};
+  for (const m of byId.values()) {
+    const u = m.usage;
+    const split = u.cache_creation;
+    const t = out[m.model] ??= { input: 0, output: 0, cacheRead: 0, cacheWrite5m: 0, cacheWrite1h: 0, messages: 0 };
+    t.input += u.input_tokens ?? 0;
+    t.output += u.output_tokens ?? 0;
+    t.cacheRead += u.cache_read_input_tokens ?? 0;
+    if (split) {
+      t.cacheWrite5m += split.ephemeral_5m_input_tokens ?? 0;
+      t.cacheWrite1h += split.ephemeral_1h_input_tokens ?? 0;
+    } else {
+      t.cacheWrite1h += u.cache_creation_input_tokens ?? 0;
+    }
+    t.messages += 1;
+  }
+  return out;
 }
 
 // Peak context for any vendor: the largest prompt any one model call carried. Each call's
-// prompt = uncached input + cached input (read + written); output is not part of the prompt.
+// prompt = uncached input + cached input (read + written); output is not part of the prompt. Takes
+// each vendor's own cache-write field names: cacheWrite (Pi, Codex) or cacheWrite5m/cacheWrite1h (Claude).
+// For Codex pass last_token_usage.input_tokens as `input`: it already includes the cached part.
 export function peakPromptTokens(calls) {
-  return Math.max(0, ...calls.map((c) => (c.input ?? 0) + (c.cacheRead ?? 0) + (c.cacheWrite ?? 0)));
+  return Math.max(0, ...calls.map((c) => (c.input ?? 0) + (c.cacheRead ?? 0) + (c.cacheWrite ?? 0)
+    + (c.cacheWrite5m ?? 0) + (c.cacheWrite1h ?? 0)));
 }
