@@ -55,18 +55,54 @@ export function testRunLine(result) {
   return `**Tests** (run once by the controller): ${shortStamp(result.startedAt)}-${shortStamp(result.endedAt)}, ${seconds}s -- ${counts}. \`${result.command}\` in \`${result.worktree}\`.`;
 }
 
+// THE OWNERSHIP BOUNDARY, for the one boundary that cannot take a `-c` flag.
+//
+// The controller runs as `orchestrator-svc`; the candidate worktree is owned by
+// `runner` (JUL-98 step 5, and the constant block at the top of ./wiring.mjs).
+// Git's dubious-ownership guard is about the owning UID, not file permissions,
+// so ANY git command run inside that directory is refused with "fatal: detected
+// dubious ownership in repository at ...". The suite is
+// `node --test scripts/*.test.mjs` -- not git, so there is no `-c` to add -- but
+// tests inside it shell out to git in the repo root: scripts/line-endings.test.mjs
+// line 27 runs `git ls-files --eol` with `cwd: ROOT`, and its own catch turns a
+// failure into `t.skip('not inside a git checkout')`. So without this the repo's
+// line-ending guard would SILENTLY SKIP on every controller-run suite, and the
+// controller would report it as a pass.
+//
+// `GIT_CONFIG_COUNT`/`GIT_CONFIG_KEY_n`/`GIT_CONFIG_VALUE_n` is git's own
+// documented environment form of `-c key=value`, and it is inherited by every
+// git process the suite starts. It is the SAME fix as scripts/publish-pr.mjs
+// (pushBranch) and scripts/verify-reviewer-worktree.mjs: one entry, the value is
+// exactly the worktree path the caller passed in, and it is never read from
+// repo-local config -- only the spelling differs, because a shell command has no
+// argv position to put `-c` in.
+//
+// An inherited count is appended to rather than overwritten: writing index 0
+// unconditionally would silently drop a `-c` an outer caller had already set.
+export function gitSafeDirectoryEnv(worktree, env = process.env) {
+  const base = Number.parseInt(env.GIT_CONFIG_COUNT ?? '', 10);
+  const at = Number.isInteger(base) && base >= 0 ? base : 0;
+  return {
+    ...env,
+    [`GIT_CONFIG_KEY_${at}`]: 'safe.directory',
+    [`GIT_CONFIG_VALUE_${at}`]: String(worktree),
+    GIT_CONFIG_COUNT: String(at + 1),
+  };
+}
+
 // The default runner: a plain shell command in the worktree. Injected in every
 // test; nothing here spawns anything when the caller supplies its own.
-async function defaultExecImpl({ command, cwd }) {
+async function defaultExecImpl({ command, cwd, env }) {
   const { execFile } = await import('node:child_process');
   const { promisify } = await import('node:util');
   const execFileAsync = promisify(execFile);
-  return execFileAsync('sh', ['-c', command], { cwd, maxBuffer: 64 * 1024 * 1024 });
+  return execFileAsync('sh', ['-c', command], { cwd, env, maxBuffer: 64 * 1024 * 1024 });
 }
 
 export function createSuiteRunner({
   execImpl = defaultExecImpl,
   command = SUITE_COMMAND,
+  env = process.env,
   now = () => new Date().toISOString(),
 } = {}) {
   const results = new Map();
@@ -82,7 +118,7 @@ export function createSuiteRunner({
       let stdout;
       let exitCode = 0;
       try {
-        ({ stdout } = await execImpl({ command, cwd: worktree }));
+        ({ stdout } = await execImpl({ command, cwd: worktree, env: gitSafeDirectoryEnv(worktree, env) }));
       } catch (error) {
         // `node --test` exits non-zero when a test fails: that is a RESULT, not
         // a crash, and its TAP is on stdout. Only output with no summary at all

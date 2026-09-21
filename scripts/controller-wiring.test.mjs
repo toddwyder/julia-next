@@ -23,9 +23,17 @@ import {
   claudeProjectDirName,
   worktreePathOf,
   resolveSenderTerminal,
+  headShaOf,
   REPO_SELECTOR,
+  WORKER_REPO_SELECTOR,
+  WORKER_CHECKOUT,
+  ORCHESTRATOR_CHECKOUT,
+  ORCHESTRATOR_ENVIRONMENT,
+  WORKER_ENVIRONMENT,
   CONTROLLER_TERMINAL_TITLE,
 } from '../graph/controller/wiring.mjs';
+import { gitSafeDirectoryEnv, createSuiteRunner } from '../graph/controller/test-run.mjs';
+import { currentBranch } from '../graph/controller/main.mjs';
 import { proveTurnStarted } from '../graph/controller/turn-start.mjs';
 import { loadOrcaFixture, orcaErrorFromFixture } from '../graph/controller/fixture-orca.mjs';
 import { emptyControllerState } from '../graph/controller/state.mjs';
@@ -102,7 +110,9 @@ test('worker-start asks Orca for a FRESH worktree and never adopts a terminal', 
   assert.deepEqual(args.slice(0, 2), ['orchestration', 'worker-start']);
   assert.equal(flag(args, '--worktree'), 'new-top-level');
   assert.equal(args.includes('--terminal'), false, 'adopting a terminal is exactly what a fresh worker must not do');
-  assert.equal(flag(args, '--repo'), REPO_SELECTOR);
+  // JUL-98 step 5c: the worker's checkout, NOT the controller's. The
+  // controller's is read-only, so a worktree could never be created in it.
+  assert.equal(flag(args, '--repo'), WORKER_REPO_SELECTOR);
   assert.equal(flag(args, '--agent'), 'claude');
   assert.equal(flag(args, '--model'), 'claude-opus-5');
   assert.equal(flag(args, '--effort'), 'high');
@@ -165,7 +175,7 @@ test('release and worktree removal are the two Orca cleanup verbs, by dispatch a
   const boundaries = createOrcaBoundaries({ orcaCallImpl });
   await boundaries.releaseImpl({ dispatchId: 'disp_1' });
   await boundaries.removeWorktreeImpl({ worktree: 'repo-1::/home/runner/w' });
-  assert.deepEqual(orcaCallImpl.calls[0].slice(0, 3), ['orchestration', 'worker-release', '--dispatch']);
+  assert.deepEqual(orcaCallImpl.calls[0].slice(0, 2), ['orchestration', 'worker-release']);
   assert.equal(flag(orcaCallImpl.calls[0], '--dispatch'), 'disp_1');
   assert.deepEqual(orcaCallImpl.calls[1].slice(0, 2), ['worktree', 'rm']);
   assert.equal(flag(orcaCallImpl.calls[1], '--worktree'), 'id:repo-1::/home/runner/w');
@@ -541,4 +551,155 @@ test('a create that answers no handle at all is refused rather than carried forw
     }),
     /answered no terminal handle/,
   );
+});
+
+// ---------------------------------------------------------------------------
+// JUL-98 step 5c: WHICH DAEMON AND WHICH CHECKOUT
+//
+// The defect these pin. On 2026-09-21 at 18:54Z the controller moved JUL-92 to
+// Implementation and then failed to start a builder on every cycle, because
+// `worker-start` carried `--repo path:/srv/orchestrator-svc/julia-next` -- the
+// controller's own root-owned, read-only checkout -- and no `--on` at all.
+// Creating a worktree writes a branch ref into the repository it is created
+// from, so Orca answered `state: failed, stage: worktree_create` /
+// "fatal: cannot lock ref refs/heads/jul-92-probe: ... Permission denied"
+// (reproduced by hand from the controller's own recorded command). Each test
+// below fails if the two sides are merged back into one.
+// ---------------------------------------------------------------------------
+
+test('the two sides are two different daemons and two different checkouts, and neither constant is the other', () => {
+  assert.equal(ORCHESTRATOR_ENVIRONMENT, 'orchestrator-local');
+  assert.equal(ORCHESTRATOR_CHECKOUT, '/srv/orchestrator-svc/julia-next');
+  assert.equal(WORKER_ENVIRONMENT, 'ovh-local');
+  assert.equal(WORKER_CHECKOUT, '/home/runner/julia-next');
+  assert.equal(WORKER_REPO_SELECTOR, 'path:/home/runner/julia-next');
+  assert.notEqual(WORKER_ENVIRONMENT, ORCHESTRATOR_ENVIRONMENT);
+  assert.notEqual(WORKER_REPO_SELECTOR, REPO_SELECTOR);
+});
+
+test('worker-start carries BOTH sides: --environment the controller daemon (where the Run is), --on the runner daemon, --repo the runner checkout', async () => {
+  const orcaCallImpl = recorder([loadOrcaFixture('worker-start.claude-model-effort.json').result]);
+  const boundaries = createOrcaBoundaries({ orcaCallImpl });
+  await boundaries.workerStartImpl({
+    run: 'run_1', from: 'term_a', spec: 'the brief', worktree: 'new-top-level',
+    name: 'jul-98-work', agent: 'claude', model: 'claude-opus-5', effort: 'high',
+  });
+  const [args] = orcaCallImpl.calls;
+  // `worker-start --help`: "--on selects only the worker server; the Run and
+  // this command remain on the current Orca server."
+  assert.equal(flag(args, '--environment'), 'orchestrator-local', 'the Run lives on the controller daemon; the wrong one answers run_not_found');
+  assert.equal(flag(args, '--on'), 'ovh-local', 'the worker process runs on the runner daemon');
+  // `worker-start --help`: "Use exact --repo on the selected server."
+  assert.equal(flag(args, '--repo'), 'path:/home/runner/julia-next', 'the runner checkout is the only one a worktree branch ref can be written into');
+  assert.equal(args.includes(REPO_SELECTOR), false, "the controller's own read-only checkout must never be a worker's --repo");
+  // The recorded answer for that exact shape says which server ran it.
+  assert.equal(loadOrcaFixture('worker-start.claude-model-effort.json').result.server.name, 'ovh-local');
+});
+
+test('worktree ps names the RUNNER daemon explicitly, because that is the daemon holding the worker worktree', async () => {
+  const orcaCallImpl = recorder([psAnswer([workingRow])]);
+  const boundaries = createOrcaBoundaries({ orcaCallImpl });
+  await boundaries.observeStartImpl({ dispatch: { worktree: workingRow.worktreeId } });
+  const [args] = orcaCallImpl.calls;
+  assert.deepEqual(args.slice(0, 2), ['worktree', 'ps']);
+  assert.equal(flag(args, '--environment'), 'ovh-local');
+  // Before this step the flag was absent, so the call fell back to the process
+  // default -- and the unit sets no ORCA_ENVIRONMENT, so there was none.
+  assert.ok(args.includes('--environment'), 'an absent --environment under systemd is an unset default, not the runner daemon');
+});
+
+test('worktree rm names the RUNNER daemon explicitly, so the worktree that exists is the worktree that is removed', async () => {
+  const orcaCallImpl = recorder([{}]);
+  const boundaries = createOrcaBoundaries({ orcaCallImpl });
+  await boundaries.removeWorktreeImpl({ worktree: 'repo-1::/home/runner/orca/workspaces/julia-next/jul-92' });
+  const [args] = orcaCallImpl.calls;
+  assert.deepEqual(args.slice(0, 2), ['worktree', 'rm']);
+  assert.equal(flag(args, '--environment'), 'ovh-local');
+  assert.equal(flag(args, '--worktree'), 'id:repo-1::/home/runner/orca/workspaces/julia-next/jul-92');
+});
+
+test('run-create, the mailbox check and worker-release all stay on the CONTROLLER daemon, because the Run and its Dispatches are there', async () => {
+  const orcaCallImpl = recorder([loadOrcaFixture('run-create.ok.json').result, { messages: [] }, {}]);
+  const boundaries = createOrcaBoundaries({ orcaCallImpl });
+  await boundaries.runCreateImpl({ from: 'term_a', objective: 'JUL-92' });
+  await boundaries.checkWaitImpl({ terminal: 'term_a', runId: 'run_1', timeoutMs: 1000 });
+  await boundaries.releaseImpl({ dispatchId: 'disp_1' });
+  for (const args of orcaCallImpl.calls) {
+    assert.equal(flag(args, '--environment'), 'orchestrator-local', `${args.slice(0, 2).join(' ')} must stay on the controller daemon`);
+    assert.equal(args.includes('ovh-local'), false, `${args.slice(0, 2).join(' ')} must never name the runner daemon`);
+  }
+});
+
+test("the controller's own sender terminal is created on the CONTROLLER daemon in the CONTROLLER's own checkout, and is not moved to the runner", async () => {
+  const orcaCallImpl = recorder([loadOrcaFixture('terminal-create.plain-diagnostic.json').result]);
+  const boundaries = createOrcaBoundaries({ orcaCallImpl });
+  await boundaries.terminalCreateImpl({});
+  const [args] = orcaCallImpl.calls;
+  assert.deepEqual(args.slice(0, 2), ['terminal', 'create']);
+  assert.equal(flag(args, '--environment'), 'orchestrator-local');
+  assert.equal(flag(args, '--worktree'), 'path:/srv/orchestrator-svc/julia-next');
+  assert.equal(flag(args, '--title'), CONTROLLER_TERMINAL_TITLE);
+  assert.equal(args.includes(WORKER_REPO_SELECTOR), false, 'nothing is ever run in this terminal, so read-only costs it nothing');
+});
+
+// ---------------------------------------------------------------------------
+// JUL-98 step 5c, point 3: crossing the ownership boundary
+//
+// The controller is `orchestrator-svc`; the candidate worktree is now owned by
+// `runner`. Git's dubious-ownership guard is about the owning UID, not file
+// permissions, so every git command the controller runs inside that worktree
+// needs `-c safe.directory=<that exact path>` -- the fix
+// scripts/publish-pr.mjs (pushBranch, line 150) and
+// scripts/verify-reviewer-worktree.mjs (line 31) already use.
+// ---------------------------------------------------------------------------
+
+const CANDIDATE = '/home/runner/orca/workspaces/julia-next/jul-92';
+
+test('headShaOf passes -c safe.directory and the value is EXACTLY the candidate worktree path, never a wildcard or a parent', async () => {
+  const calls = [];
+  const sha = await headShaOf(CANDIDATE, {
+    execImpl: async (bin, args) => { calls.push([bin, args]); return { stdout: 'a3e21c7ad428f2d1b32002effbe08235a92c8d17\n' }; },
+  });
+  const [[bin, args]] = calls;
+  assert.equal(bin, 'git');
+  const at = args.indexOf('-c');
+  assert.ok(at >= 0, 'a -c is the only thing that gets git past the dubious-ownership guard here');
+  assert.equal(args[at + 1], `safe.directory=${CANDIDATE}`);
+  assert.equal(args.includes('safe.directory=*'), false, 'never widened beyond the one path');
+  assert.equal(sha, 'a3e21c7ad428f2d1b32002effbe08235a92c8d17');
+});
+
+test('currentBranch passes -c safe.directory with exactly the candidate worktree path', async () => {
+  const calls = [];
+  const branch = await currentBranch(CANDIDATE, {
+    execImpl: async (bin, args) => { calls.push(args); return { stdout: 'jul-92-work\n' }; },
+  });
+  const [args] = calls;
+  const at = args.indexOf('-c');
+  assert.equal(args[at + 1], `safe.directory=${CANDIDATE}`);
+  assert.equal(branch, 'jul-92-work');
+});
+
+test("the suite run cannot take a -c flag, so it carries git's own env form of it -- one entry, exactly the candidate worktree path", async () => {
+  const seen = [];
+  const runner = createSuiteRunner({
+    env: {},
+    execImpl: async (options) => { seen.push(options); return { stdout: '# tests 1\n# pass 1\n# fail 0\n' }; },
+  });
+  await runner.runOnce({ key: 'work', worktree: CANDIDATE });
+  const [{ cwd, env }] = seen;
+  assert.equal(cwd, CANDIDATE);
+  assert.equal(env.GIT_CONFIG_COUNT, '1');
+  assert.equal(env.GIT_CONFIG_KEY_0, 'safe.directory');
+  assert.equal(env.GIT_CONFIG_VALUE_0, CANDIDATE, 'exactly the worktree, not a wildcard and not its parent');
+});
+
+test('an inherited GIT_CONFIG_COUNT is appended to, not overwritten, so an outer -c is never silently dropped', () => {
+  const env = gitSafeDirectoryEnv(CANDIDATE, {
+    GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'core.hooksPath', GIT_CONFIG_VALUE_0: '/empty',
+  });
+  assert.equal(env.GIT_CONFIG_COUNT, '2');
+  assert.equal(env.GIT_CONFIG_KEY_0, 'core.hooksPath', 'the inherited entry survives');
+  assert.equal(env.GIT_CONFIG_KEY_1, 'safe.directory');
+  assert.equal(env.GIT_CONFIG_VALUE_1, CANDIDATE);
 });
