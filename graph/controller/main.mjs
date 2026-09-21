@@ -25,7 +25,6 @@
 // $XDG_STATE_HOME (./state.mjs), and the in-flight record lives in the Orca
 // run, where it already lived.
 
-import os from 'node:os';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { pathToFileURL } from 'node:url';
@@ -99,6 +98,23 @@ export function parseArgs(argv) {
 // deploy, or a test). Never throws: a controller that cannot name its build
 // still starts, and still says so -- "unknown build" in the journal is far
 // better than no line at all.
+//
+// AND IT TOO CROSSES AN OWNERSHIP BOUNDARY, which is why it carries the same
+// `-c safe.directory=` every other git call in this controller does. The
+// controller runs as `orchestrator-svc`; /srv/orchestrator-svc/julia-next is
+// root-owned (`ls -ld`: `dr-xr-x--- root orchestrator-svc`), and git's
+// dubious-ownership guard is about the owning UID, not about permissions. The
+// flag is scoped to exactly this one path and is never read from repo-local
+// config, the same way `currentBranch` and `headShaOf` do it. What it costs
+// when it is missing is quiet rather than fatal -- the catch below turns the
+// refusal into `null` and every banner, journal line and crash-loop comment
+// then says "unknown build", which is the one thing that names which code is
+// looping. NOT VERIFIED FROM A BUILDER WORKTREE: a worker runs as `runner`,
+// which cannot enter that directory at all (`git -C
+// /srv/orchestrator-svc/julia-next rev-parse` as `runner`, 2026-09-21:
+// "fatal: cannot change to ...: Permission denied"), so whether git refuses it
+// for `orchestrator-svc` today depends on that account's global git config and
+// only the controller's own account can settle it.
 export async function resolveBuild({
   env = process.env,
   checkout = ORCHESTRATOR_CHECKOUT,
@@ -106,7 +122,7 @@ export async function resolveBuild({
 } = {}) {
   if (env.JULIA_CONTROLLER_BUILD) return env.JULIA_CONTROLLER_BUILD;
   try {
-    const { stdout } = await execImpl('git', ['-C', checkout, 'rev-parse', '--short', 'HEAD']);
+    const { stdout } = await execImpl('git', ['-c', `safe.directory=${checkout}`, '-C', checkout, 'rev-parse', '--short', 'HEAD']);
     return String(stdout).trim() || null;
   } catch {
     return null;
@@ -136,6 +152,10 @@ export async function carryCard({
   card,
   runId,
   from,
+  // Which attempt on this card this is (1 the first time). It travels into the
+  // worktree name and the request-ledger key -- see `attemptTag` in
+  // ./step-runner.mjs for what a second attempt collides with without it.
+  attempt = 1,
   boundaries,
   board,
   publisher,
@@ -161,6 +181,7 @@ export async function carryCard({
     card,
     step,
     choices,
+    attempt,
     files: [],
     environment: ORCHESTRATOR_ENVIRONMENT,
     runId,
@@ -313,7 +334,22 @@ export async function runOnce({
   // Recorded BEFORE the work starts, and written to DISK before it: if the
   // controller dies carrying this card, the crash-loop comment has to know
   // where to go, and it reads that from the state file, not from this process.
-  nextState = { ...nextState, carrying: { identifier: card.identifier, id: card.id, at: now() } };
+  //
+  // THE ATTEMPT NUMBER is recorded in the same write, and for the same reason:
+  // it has to survive the process. It counts attempts on THIS card, it only
+  // goes forwards, and it is what keeps a second attempt from asking Orca for
+  // the worktree name a stopped attempt still holds and from replaying the
+  // stopped attempt's `worker-start` through the request ledger
+  // (`attemptTag` in ./step-runner.mjs states both). Incremented BEFORE the
+  // work, not after: an attempt that dies mid-flight has still been made, and
+  // the next one must not reuse its names.
+  const previousAttempts = Number.isInteger(state.attempts?.[card.identifier]) ? state.attempts[card.identifier] : 0;
+  const attempt = previousAttempts + 1;
+  nextState = {
+    ...nextState,
+    attempts: { ...(nextState.attempts ?? {}), [card.identifier]: attempt },
+    carrying: { identifier: card.identifier, id: card.id, at: now() },
+  };
   saveState(nextState);
 
   const comments = {
@@ -327,7 +363,7 @@ export async function runOnce({
   };
 
   const carried = await carryCardImpl({
-    card, runId: check.runId, from, boundaries, board, publisher, readSeatCost, comments, now,
+    card, runId: check.runId, from, attempt, boundaries, board, publisher, readSeatCost, comments, now,
     // Every mailbox message this card's workers send is mirrored to Axiom on
     // the way through, via the relay that already exists -- no new event
     // vocabulary and no relay change (./mailbox.mjs's createAxiomMirror).
@@ -453,7 +489,9 @@ export async function main({
   const boundaries = createOrcaBoundaries({ ledger });
   const board = createControllerBoard();
   const publisher = createPublisher({ env });
-  const readSeatCost = createSeatCostReader({ homedir: os.homedir() });
+  // No home is passed: the reader's default is the WORKER's home, and this
+  // process's own home is never the right place to look (wiring.mjs, WORKER_HOME).
+  const readSeatCost = createSeatCostReader();
 
   const saveState = (next) => {
     writeControllerState({ ...next, requests: ledger.entries() }, { statePath: path });

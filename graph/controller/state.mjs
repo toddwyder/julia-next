@@ -72,7 +72,7 @@ export function defaultStatePath(options = {}) {
 }
 
 export function emptyControllerState() {
-  return { ready: {}, commented: {}, starts: [], carrying: null, crashReported: null, requests: {}, lastError: null, senderTerminal: null };
+  return { ready: {}, commented: {}, starts: [], carrying: null, crashReported: null, requests: {}, attempts: {}, lastError: null, senderTerminal: null };
 }
 
 // A state path inside the read-only checkout is refused OUTRIGHT rather than
@@ -106,6 +106,13 @@ function normalize(parsed) {
     carrying: parsed.carrying ?? null,
     crashReported: parsed.crashReported ?? null,
     requests: isMap(parsed.requests) ? parsed.requests : base.requests,
+    // Card identifier -> how many attempts this controller has started on it.
+    // Listed here for this file's header rule: a field normalize() forgets is
+    // silently dropped on read, and a dropped attempt count makes the next
+    // attempt attempt 1 again -- asking Orca for the worktree name the last
+    // attempt already holds and replaying its `worker-start` through the
+    // request ledger (`attemptTag` in ./step-runner.mjs).
+    attempts: isMap(parsed.attempts) ? parsed.attempts : base.attempts,
     lastError: typeof parsed.lastError === 'string' ? parsed.lastError : base.lastError,
     // Guarded as a STRING, the same way lastError is: a handle is a string and
     // nothing else, and anything else on disk means the file was written by

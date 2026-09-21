@@ -13,7 +13,7 @@ import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'no
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  parseArgs, DEFAULT_INTERVAL_SECONDS, runLoop, runOnce, startup, stepsForCard, resolveBuild, USAGE, main,
+  parseArgs, DEFAULT_INTERVAL_SECONDS, runLoop, runOnce, startup, stepsForCard, resolveBuild, USAGE, main, carryCard,
 } from '../graph/controller/main.mjs';
 import {
   readControllerState, writeControllerState, emptyControllerState, assertStatePathIsWritable, defaultStatePath,
@@ -201,6 +201,24 @@ test('a board that refuses the crash-loop comment does not turn one failure into
 test('a build that cannot be resolved does not stop the controller starting', async () => {
   assert.equal(await resolveBuild({ env: { JULIA_CONTROLLER_BUILD: 'deadbee' } }), 'deadbee');
   assert.equal(await resolveBuild({ env: {}, execImpl: async () => { throw new Error('not a git repo'); } }), null);
+});
+
+// JUL-98 step 5, third fix (the sweep). The controller's own checkout is
+// root-owned and the controller is not root, so this git call crosses an
+// ownership boundary exactly as `currentBranch` and `headShaOf` do -- and it is
+// the call that names which build is looping.
+test('the build read carries the same scoped safe.directory every other git call in the controller carries', async () => {
+  let args = null;
+  const build = await resolveBuild({
+    env: {},
+    checkout: '/srv/orchestrator-svc/julia-next',
+    execImpl: async (command, given) => { args = [command, ...given]; return { stdout: '9a4bfec\n' }; },
+  });
+  assert.equal(build, '9a4bfec');
+  assert.deepEqual(args, [
+    'git', '-c', 'safe.directory=/srv/orchestrator-svc/julia-next',
+    '-C', '/srv/orchestrator-svc/julia-next', 'rev-parse', '--short', 'HEAD',
+  ]);
 });
 
 // ---------------------------------------------------------------------------
@@ -516,4 +534,84 @@ test('a terminal main() had to create is written to disk BEFORE the first cycle 
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// ---------------------------------------------------------------------------
+// The attempt number (JUL-98 step 5, third fix)
+// ---------------------------------------------------------------------------
+
+test('a card carried a second time is carried as attempt 2, written down BEFORE the work starts', async () => {
+  const jul92 = readyCard();
+  const orca = createFixtureOrca();
+  const saved = [];
+  const attempts = [];
+  let savedBeforeCarry = null;
+
+  const cycle = (state, board) => runOnce({
+    state,
+    board,
+    boundaries: { runCreateImpl: orca.runCreate, activeRunImpl: async () => null },
+    from: 'term_controller',
+    log: () => {},
+    now: () => '2026-09-21T14:00:00.000Z',
+    saveState: (next) => { saved.push(next); },
+    carryCardImpl: async ({ attempt }) => {
+      attempts.push(attempt);
+      savedBeforeCarry = saved[saved.length - 1] ?? null;
+      // The stopped attempt: exactly where JUL-92 stopped for real.
+      return { ok: false, stage: 'build-and-review', reason: 'no cost line for the builder seat' };
+    },
+  });
+
+  const first = await cycle(
+    { ...emptyControllerState(), ready: { 'uuid-JUL-92': controllerFingerprint(jul92) } },
+    drainingBoard([jul92]),
+  );
+  assert.deepEqual(attempts, [1], 'a card never carried before is attempt 1');
+  assert.equal(savedBeforeCarry.attempts['JUL-92'], 1, 'and it is on disk before the work that might kill the process');
+
+  // The card is put back in Ready and picked up again, carrying the state the
+  // first attempt left behind.
+  await cycle(
+    { ...first.state, ready: { 'uuid-JUL-92': controllerFingerprint(jul92) } },
+    drainingBoard([readyCard()]),
+  );
+  assert.deepEqual(attempts, [1, 2], 'the second attempt is attempt 2, so its worktree name and request keys are new');
+  assert.equal(savedBeforeCarry.attempts['JUL-92'], 2);
+});
+
+test('the attempt count round-trips the state file -- a dropped one would make the next attempt reuse attempt 1\'s names', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'controller-attempts-'));
+  try {
+    const statePath = join(dir, 'controller.json');
+    // Through writeControllerState, not a stand-in that bypasses the serializer.
+    writeControllerState({ ...emptyControllerState(), attempts: { 'JUL-92': 3 } }, { statePath });
+    assert.deepEqual(readControllerState({ statePath }).attempts, { 'JUL-92': 3 });
+
+    assert.deepEqual(emptyControllerState().attempts, {});
+    writeFileSync(statePath, JSON.stringify({ attempts: [1, 2] }));
+    assert.deepEqual(readControllerState({ statePath }).attempts, {}, 'an array is not a map');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('carryCard hands the attempt number down to the step, so the names the worker-start asks for carry it', async () => {
+  let seen = null;
+  await carryCard({
+    card: { id: 'i1', identifier: 'JUL-92', title: 'a card walks the board by itself' },
+    runId: 'run_1',
+    from: 'term_controller',
+    attempt: 4,
+    boundaries: {},
+    board: { async comment() { return { id: 'c1' }; }, async moveCard() {} },
+    publisher: {},
+    readSeatCost: async () => ({}),
+    comments: { async postOnce() { return { posted: true }; } },
+    runBuildAndReviewImpl: async (options) => {
+      seen = options.attempt;
+      return { ok: false, reason: 'stopped on purpose', costText: [], testRun: null };
+    },
+  });
+  assert.equal(seen, 4);
 });

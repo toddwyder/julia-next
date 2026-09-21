@@ -1,0 +1,72 @@
+{
+  "id": "89a3edef-d053-4597-af13-fd3c81c3c130",
+  "ok": true,
+  "result": {
+    "worktree": {
+      "id": "dce3a58b-3035-401c-95df-e36ef2301374::/home/runner/orca/workspaces/julia-next/jul98-5d-probe-3",
+      "identity": {
+        "key": "wt2:local:0ead48c1-591c-4285-932e-641c3b65c411",
+        "executionHostId": "local",
+        "instanceId": "0ead48c1-591c-4285-932e-641c3b65c411"
+      },
+      "instanceId": "0ead48c1-591c-4285-932e-641c3b65c411",
+      "repoId": "dce3a58b-3035-401c-95df-e36ef2301374",
+      "projectId": "github:toddwyder/julia-next",
+      "hostId": "local",
+      "projectHostSetupId": "dce3a58b-3035-401c-95df-e36ef2301374",
+      "creatorProvenance": {
+        "kind": "host"
+      },
+      "path": "/home/runner/orca/workspaces/julia-next/jul98-5d-probe-3",
+      "head": "9a4bfec15f2172cbd7d5b58b4672e086dcc527a0",
+      "branch": "refs/heads/jul98-5d-probe-3",
+      "isBare": false,
+      "isMainWorktree": false,
+      "displayName": "jul98-5d-probe",
+      "displayNameMode": "fixed",
+      "comment": "",
+      "linkedIssue": null,
+      "linkedPR": null,
+      "linkedLinearIssue": null,
+      "linkedLinearIssueWorkspaceId": null,
+      "linkedLinearIssueOrganizationUrlKey": null,
+      "linkedGitLabMR": null,
+      "linkedGitLabIssue": null,
+      "linkedBitbucketPR": null,
+      "linkedAzureDevOpsPR": null,
+      "linkedGiteaPR": null,
+      "linkedWorkItem": null,
+      "linkedTaskSourceContext": null,
+      "isArchived": false,
+      "isUnread": false,
+      "isPinned": false,
+      "sortOrder": 1790020421226,
+      "lastActivityAt": 1790020421226,
+      "createdAt": 1790020421226,
+      "cliProvenance": {
+        "kind": "created-by-cli",
+        "createdAt": 1790020420659,
+        "callerTerminalHandle": "term_545e7745-1cce-4a20-95ef-c54b05266f00"
+      },
+      "baseRef": "main",
+      "workspaceStatus": "in-progress",
+      "parentWorktreeId": null,
+      "childWorktreeIds": [],
+      "lineage": null,
+      "workspaceLineage": null,
+      "git": {
+        "path": "/home/runner/orca/workspaces/julia-next/jul98-5d-probe-3",
+        "head": "9a4bfec15f2172cbd7d5b58b4672e086dcc527a0",
+        "branch": "refs/heads/jul98-5d-probe-3",
+        "isBare": false,
+        "isMainWorktree": false
+      }
+    },
+    "lineage": null,
+    "workspaceLineage": null,
+    "warnings": []
+  },
+  "_meta": {
+    "runtimeId": "a53bb33a-2871-40c3-ae9f-eced82e71b6e"
+  }
+}
