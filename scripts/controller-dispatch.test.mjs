@@ -1,0 +1,257 @@
+// controller-dispatch.test.mjs -- JUL-98 step 3, items 1 and 3: every step goes
+// to a FRESH worker, and only Orca's own proof that a turn started counts as
+// started.
+//
+// The payload shapes here are not invented. Every Orca answer used below is
+// read off the recorded files in graph/fixtures/orca-1.4.205/ through
+// graph/controller/fixture-orca.mjs:
+//
+//   worker-start.claude-model-effort.json      a healthy start: state ready,
+//                                              stage input_accepted
+//   worker-start.codex-model-effort.json       the same for the Codex seat
+//   worker-start.failed-agent-readiness.json   the start itself failed
+//                                              (failedStage agent_readiness,
+//                                              lastError timeout) -- the trust
+//                                              screen, probe 2
+//   terminal-send.wait-submit.turn-started.json    stages input_accepted,
+//                                                  turn_started
+//   terminal-send.wait-submit.no-turn-started.json stages input_accepted ONLY,
+//                                                  plus Orca's own warning
+//   worktree-ps.agent-working.json             agents[].state "working"
+//
+// The 19-20 September incident this pins: a builder sat at a trust prompt for
+// about eight hours because "input accepted" was read as "started". Orca never
+// said started -- nothing asked it.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import {
+  WORKER_SKILLS,
+  LAUNCH_MODEL_IDS,
+  launchForChoice,
+  buildStepBrief,
+  dispatchWorker,
+} from '../graph/controller/dispatch.mjs';
+import {
+  TURN_STARTED,
+  INPUT_ACCEPTED,
+  turnStartedFromSend,
+  turnStartedFromWorktreePs,
+  proveTurnStarted,
+} from '../graph/controller/turn-start.mjs';
+import { loadOrcaFixture, createFixtureWorkerOrca } from '../graph/controller/fixture-orca.mjs';
+import { RATE_TABLE } from '../graph/rate-table.mjs';
+
+const CARD = {
+  identifier: 'JUL-92',
+  title: 'Docs and settings match how things run now',
+  url: 'https://linear.app/julia-next/issue/JUL-92',
+};
+
+const PLAN = [
+  { key: 'step-1', title: 'fix the stale runbook lines', brief: 'Rewrite the three stale runbook paragraphs.', criteria: ['the runbook names the real paths'] },
+  { key: 'step-2', title: 'fix the wrong settings', brief: 'Correct the two settings that no longer match.', criteria: ['settings match what runs'] },
+  { key: 'step-3', title: 'review', brief: 'Review the two commits above.', criteria: ['every claim names its source'] },
+];
+
+const CHOICES = {
+  builder: { entry: 'claude', modelLabel: 'builder-claude-opus', effort: 'medium' },
+  reviewer: { entry: 'codex', modelLabel: 'adversary-codex', effort: 'medium' },
+};
+
+// ---------------------------------------------------------------------------
+// Item 1: a fresh worker per step, carrying only that step
+// ---------------------------------------------------------------------------
+
+test('the brief carries the card, this step and its skill -- and nothing of any other step', () => {
+  const brief = buildStepBrief({
+    seat: 'builder',
+    card: CARD,
+    step: PLAN[1],
+    files: ['docs/agents/jul43-coordinator-runbook.md'],
+  });
+
+  assert.match(brief, /JUL-92/);
+  assert.match(brief, /Docs and settings match how things run now/);
+  assert.match(brief, /Correct the two settings that no longer match\./);
+  assert.match(brief, /settings match what runs/);
+  assert.match(brief, /docs\/agents\/jul43-coordinator-runbook\.md/);
+  assert.ok(brief.includes(WORKER_SKILLS.builder), 'the builder is pointed at the builder skill');
+  assert.ok(!brief.includes(WORKER_SKILLS.reviewer), 'and not at the reviewer skill');
+
+  // The whole point of a fresh worker: no other step's words reach it.
+  assert.ok(!brief.includes('Rewrite the three stale runbook paragraphs'), 'step 1 must not be in step 2\'s brief');
+  assert.ok(!brief.includes('Review the two commits above'), 'step 3 must not be in step 2\'s brief');
+  assert.ok(!brief.includes('the runbook names the real paths'), 'step 1\'s criteria must not travel either');
+});
+
+test('a review step gets the reviewer skill, not the builder one', () => {
+  const brief = buildStepBrief({ seat: 'reviewer', card: CARD, step: PLAN[2] });
+  assert.ok(brief.includes(WORKER_SKILLS.reviewer));
+  assert.ok(!brief.includes(WORKER_SKILLS.builder));
+});
+
+test('a seat choice becomes the launch Orca actually records: agent, a real model id, effort', () => {
+  assert.deepEqual(launchForChoice(CHOICES.builder), { agent: 'claude', model: LAUNCH_MODEL_IDS.opus, effort: 'medium' });
+  assert.deepEqual(launchForChoice(CHOICES.reviewer), { agent: 'codex', model: LAUNCH_MODEL_IDS.codex, effort: 'medium' });
+
+  // Every model id dispatched is one the cost table can price -- otherwise the
+  // cost line for that seat could only ever be blank, which fails the step.
+  for (const id of Object.values(LAUNCH_MODEL_IDS)) {
+    assert.ok(RATE_TABLE.models[id], `graph/rate-table.mjs has no price for the dispatched model id ${id}`);
+  }
+});
+
+test('a DeepSeek seat is refused a new-worktree start, and says what the recording showed instead', () => {
+  const refusal = launchForChoice({ entry: 'pi-deepseek', modelLabel: 'adversary-deepseek-pro', effort: 'medium' });
+  assert.equal(refusal.agent, undefined);
+  assert.match(refusal.reason, /interactive/i);
+  assert.match(refusal.reason, /terminal/i);
+});
+
+test('each step is a separate worker-start: a new task, a new dispatch, a new worktree, and no terminal reuse', async () => {
+  const orca = createFixtureWorkerOrca();
+
+  const first = await dispatchWorker({
+    workerStartImpl: orca.workerStart,
+    environment: 'ovh-local',
+    runId: 'run_1bf570ce5660',
+    from: 'term_controller',
+    repo: 'path:/home/runner/julia-next',
+    seat: 'builder',
+    card: CARD,
+    step: PLAN[0],
+    choice: CHOICES.builder,
+    worktreeName: 'jul92-step-1',
+    requestId: 'JUL-92:step-1:builder',
+  });
+  const second = await dispatchWorker({
+    workerStartImpl: orca.workerStart,
+    environment: 'ovh-local',
+    runId: 'run_1bf570ce5660',
+    from: 'term_controller',
+    repo: 'path:/home/runner/julia-next',
+    seat: 'builder',
+    card: CARD,
+    step: PLAN[1],
+    choice: CHOICES.builder,
+    worktreeName: 'jul92-step-2',
+    requestId: 'JUL-92:step-2:builder',
+  });
+
+  assert.notEqual(first.dispatchId, second.dispatchId, 'a fresh dispatch per step');
+  assert.notEqual(first.taskId, second.taskId, 'a fresh task per step');
+  assert.equal(second.replayed, false);
+
+  const calls = orca.workerStartCalls();
+  assert.equal(calls.length, 2);
+  for (const call of calls) {
+    assert.equal(call.worktree, 'new-top-level', 'a fresh worktree, never a reused one');
+    assert.equal(call.terminal, undefined, 'never an adopted terminal: that would carry another step\'s session');
+  }
+  assert.ok(calls[1].spec.includes('Correct the two settings'), 'step 2\'s worker got step 2\'s brief');
+  assert.ok(!calls[1].spec.includes('Rewrite the three stale runbook paragraphs'), 'and nothing of step 1');
+});
+
+test('a repeated dispatch with the same request id replays: no second worker for the same step', async () => {
+  const orca = createFixtureWorkerOrca();
+  const args = {
+    workerStartImpl: orca.workerStart,
+    environment: 'ovh-local',
+    runId: 'run_1bf570ce5660',
+    from: 'term_controller',
+    repo: 'path:/home/runner/julia-next',
+    seat: 'builder',
+    card: CARD,
+    step: PLAN[0],
+    choice: CHOICES.builder,
+    worktreeName: 'jul92-step-1',
+    requestId: 'JUL-92:step-1:builder',
+  };
+  const first = await dispatchWorker(args);
+  const again = await dispatchWorker(args);
+  assert.equal(again.dispatchId, first.dispatchId);
+  assert.equal(again.replayed, true);
+  assert.equal(orca.workerStartCalls().length, 2, 'the call was made again');
+  assert.equal(orca.workersStarted(), 1, 'but Orca started only one worker');
+});
+
+test('a start that failed at agent readiness is reported as not started, with Orca\'s own reason', async () => {
+  const orca = createFixtureWorkerOrca({ failStart: true });
+  const result = await dispatchWorker({
+    workerStartImpl: orca.workerStart,
+    environment: 'ovh-local',
+    runId: 'run_1bf570ce5660',
+    from: 'term_controller',
+    repo: 'path:/home/runner/julia-next',
+    seat: 'builder',
+    card: CARD,
+    step: PLAN[0],
+    choice: CHOICES.builder,
+    worktreeName: 'jul92-step-1',
+    requestId: 'r',
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.failedStage, 'agent_readiness');
+  assert.equal(result.lastError, 'timeout');
+  assert.ok(result.residualResources.length > 0, 'the worktree and terminal it left behind are named, so cleanup can find them');
+});
+
+// ---------------------------------------------------------------------------
+// Item 3: only turn_started proves the agent began
+// ---------------------------------------------------------------------------
+
+test('input_accepted alone is NOT treated as started -- the eight-hour trust-screen bug', () => {
+  const send = loadOrcaFixture('terminal-send.wait-submit.no-turn-started.json').result;
+  assert.deepEqual(send.send.prompt.stages, [INPUT_ACCEPTED], 'fixture check: the recording really has only input_accepted');
+
+  assert.equal(turnStartedFromSend(send), false);
+
+  const verdict = proveTurnStarted({ send });
+  assert.equal(verdict.started, false);
+  assert.match(verdict.reason, /input.accepted/i);
+  assert.equal(verdict.retryRequestId, send.send.prompt.requestId, 'Orca names the request id to replay with; it is carried through');
+  assert.ok(verdict.warnings.length > 0, 'Orca\'s own warning is kept, not swallowed');
+});
+
+test('stages including turn_started is proof, and it is the only send-side proof', () => {
+  const send = loadOrcaFixture('terminal-send.wait-submit.turn-started.json').result;
+  assert.ok(send.send.prompt.stages.includes(TURN_STARTED), 'fixture check');
+  assert.equal(turnStartedFromSend(send), true);
+
+  const verdict = proveTurnStarted({ send });
+  assert.equal(verdict.started, true);
+  assert.equal(verdict.source, 'terminal-send');
+});
+
+test('a worker-start answer is never proof on its own: its stage is input_accepted even on a healthy start', () => {
+  const healthy = loadOrcaFixture('worker-start.claude-model-effort.json').result;
+  assert.equal(healthy.state, 'ready');
+  assert.equal(healthy.stage, INPUT_ACCEPTED, 'fixture check: a start that went on to succeed still only says input_accepted');
+
+  const verdict = proveTurnStarted({ start: healthy });
+  assert.equal(verdict.started, false, 'the start alone proves nothing began');
+  assert.match(verdict.reason, /worker-start/);
+});
+
+test('the lost-payload recording is read as not started: a real in-flight worker whose task text never arrived', () => {
+  const show = loadOrcaFixture('worker-show.in-flight-input-accepted.json').result;
+  const verdict = proveTurnStarted({ show });
+  assert.equal(verdict.started, false);
+  assert.match(verdict.reason, /input.accepted/i);
+});
+
+test('worktree ps is the second recorded proof: an agent in state working really began', () => {
+  const ps = loadOrcaFixture('worktree-ps.agent-working.json').worktree;
+  assert.equal(turnStartedFromWorktreePs(ps), true);
+
+  const verdict = proveTurnStarted({ worktree: ps });
+  assert.equal(verdict.started, true);
+  assert.equal(verdict.source, 'worktree-ps');
+});
+
+test('a worktree with no agent, or an idle one, is not proof', () => {
+  assert.equal(turnStartedFromWorktreePs({ agents: [] }), false);
+  assert.equal(turnStartedFromWorktreePs({ agents: [{ state: 'idle', agentType: 'claude' }] }), false);
+  assert.equal(turnStartedFromWorktreePs(null), false);
+});
