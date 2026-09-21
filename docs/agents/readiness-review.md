@@ -51,6 +51,13 @@ steps, and the ticket does not close until it has.
 
 (Todd, Instruction on JUL-97, 2026-09-19.)
 
+## Orca first
+
+**Orca first.** Before planning a step that tracks, waits on, locks, retries, cleans up or reports
+on workers or usage, check Orca's docs and CLI help for the pinned version. Name the Orca feature
+on the card and use it, or say in one line why not. Building by hand what Orca already provides is
+a finding at review.
+
 ## Procedure
 
 1. **List the tickets in scope.** For a batch, pull every open ticket in the batch with its full
@@ -137,6 +144,20 @@ steps, and the ticket does not close until it has.
      replaced or re-imported: Claude's folder trust is keyed by the base checkout's exact path.
    - reuse a recent, still-valid finding from a prior audit instead of re-probing, but cite the
      source doc and its date so staleness can be judged later.
+   - **the coordinator's own command permissions (2026-09-21).** Reachable services are not enough:
+     confirm that the shell the COORDINATOR itself runs in is allowed to run the commands the step
+     needs. Name them and prove each one — `sudo` where the step installs or restarts anything,
+     `git fetch`/`git push` from the coordinator's own checkout where it publishes or rebases, and
+     file reads outside its own project folder where the step reads a key, a service file or
+     another worktree. Worked example (2026-09-21): a coordinator session was launched whose shell
+     could not use `sudo`, could not fetch from GitHub in its own checkout, and could only read
+     files inside its own project folder. It happened not to block that run, because Orca, the
+     publisher, the health check and the Linear tools were all still reachable — but the review had
+     no check that would have caught it either way. **What breaks if this stays:** a coordinator
+     can pass a readiness review and then stop dead mid-run on the permissions of its own machine,
+     which is precisely the kind of access stop the review exists to prevent, and which the rule
+     established by JUL-71 says must be fixed in the review rather than routed to Todd as a new
+     permission question.
 
 4. **Score each ticket pass/fail** against what step 3 actually found: a ticket passes only if
    every service and decision it depends on — including everything upstream in its `blockedBy`

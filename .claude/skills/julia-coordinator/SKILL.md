@@ -396,6 +396,15 @@ intent, in-progress work, or a plan to get there. Leave it unticked until the ev
 JUL-63 is where this rule first applied: its seven checkboxes were ticked only once each had a
 live-verified result cited on the issue.
 
+**Step-plan rule.** After the readiness review, write the step plan under a Steps heading in the
+card's description, one line per step with its state and start and end times, and tick each step
+the moment it lands.
+
+**Orca first.** Before planning a step that tracks, waits on, locks, retries, cleans up or reports
+on workers or usage, check Orca's docs and CLI help for the pinned version. Name the Orca feature
+on the card and use it, or say in one line why not. Building by hand what Orca already provides is
+a finding at review.
+
 **Must never do (laptop or server, either identity).** Regardless of which side is running a
 ticket, an agent must never: create, delete, or change anything in one of Todd's service
 accounts (Vercel, Supabase, PowerSync, Sentry, Axiom, GitHub, Linear, or any other) outside a

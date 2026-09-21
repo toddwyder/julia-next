@@ -64,7 +64,17 @@ export async function runWorkerStep({
   }
 
   // A closure so every exit below cleans up the same way, in the same order.
-  async function close(partial) {
+  //
+  // `turnStarted` is the ONE thing an exit has to tell it. A worker whose turn
+  // never began wrote no session file -- no Claude transcript, no Codex
+  // rollout, no Pi message_end -- so asking the real reader for its figures can
+  // only fail, and that failure stops the order at step 1 and LEAKS the
+  // worktree (the 19-20 September case, which is the whole reason this step
+  // exists). So the turn-start exit below says so, `finishWorker` skips the
+  // read and gives the seat an explicit never-started line, and cleanup still
+  // runs. It defaults to true, so every worker that DID run is unchanged:
+  // read, then release, then remove, with a bad cost still stopping the rest.
+  async function close(partial, { turnStarted = true } = {}) {
     const finished = await finishWorker({
       seat,
       dispatchId: dispatched.dispatchId,
@@ -72,6 +82,8 @@ export async function runWorkerStep({
       readCostImpl,
       releaseImpl,
       removeWorktreeImpl,
+      turnStarted,
+      ...(turnStarted === false && partial?.reason ? { neverStartedReason: partial.reason } : {}),
     });
     return {
       ...partial,
@@ -101,7 +113,7 @@ export async function runWorkerStep({
       warnings: proof.warnings,
       outcome: null,
       testRun: null,
-    });
+    }, { turnStarted: false });
   }
 
   // 3. Sleep on the mailbox.

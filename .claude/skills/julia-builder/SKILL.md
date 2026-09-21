@@ -33,6 +33,11 @@ whether the work is accepted.
    your worktree and hands you that result. You may run tests yourself while building; the
    controller's run is the one that counts.
 
+**Orca first.** Before planning a step that tracks, waits on, locks, retries, cleans up or reports
+on workers or usage, check Orca's docs and CLI help for the pinned version. Name the Orca feature
+on the card and use it, or say in one line why not. Building by hand what Orca already provides is
+a finding at review.
+
 ## How you work
 
 - **Two rejection rounds, not three.** If your work comes back from review, you get one more

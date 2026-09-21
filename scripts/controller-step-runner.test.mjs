@@ -18,6 +18,7 @@ import assert from 'node:assert/strict';
 import { runWorkerStep, runBuildAndReview } from '../graph/controller/step-runner.mjs';
 import { createSuiteRunner } from '../graph/controller/test-run.mjs';
 import { createFixtureWorkerOrca, loadOrcaFixture } from '../graph/controller/fixture-orca.mjs';
+import { turnStartedFromSend } from '../graph/controller/turn-start.mjs';
 
 const ALL = loadOrcaFixture('mailbox.check-all.status-heartbeat-escalation-done.json').result;
 const TURN_STARTED = loadOrcaFixture('terminal-send.wait-submit.turn-started.json').result;
@@ -65,7 +66,20 @@ function harness({ send = TURN_STARTED, outcome = 'succeeded', cost = COST } = {
           timedOut: false,
         };
       },
-      readCostImpl: async ({ seat }) => { order.push(`read-cost:${seat}`); return { seat, ...cost }; },
+      // THE STAND-IN INVENTS NOTHING. The real reader reads the worker's own
+      // session file -- Claude's transcript, Codex's rollout, Pi's
+      // message_end. A worker whose turn never started wrote none of them, so
+      // the real reader can only fail. Handing back a figure here is how the
+      // suite stayed green over a live gap in round 2: the controller sent a
+      // never-started worker down the ordinary read path and the stand-in
+      // covered for it. It refuses now, exactly as the real reader would.
+      readCostImpl: async ({ seat }) => {
+        order.push(`read-cost:${seat}`);
+        if (!turnStartedFromSend(send)) {
+          throw new Error(`no session file exists for the ${seat}: its turn never started, so there is no cost to read`);
+        }
+        return { seat, ...cost };
+      },
       releaseImpl: async ({ seat }) => { order.push(`release:${seat}`); },
       removeWorktreeImpl: async ({ seat }) => { order.push(`remove-worktree:${seat}`); },
       mirrorImpl: async () => { order.push('mirror'); },
@@ -132,9 +146,18 @@ test('a worker that never started is caught at once: the mailbox is never opened
   assert.equal(result.stage, 'turn-start');
   assert.match(result.reason, /input.accepted/i);
   assert.equal(result.retryRequestId, NO_TURN.send.prompt.requestId, 'Orca\'s own replay advice is carried, so confirming costs nothing');
-  // Even here the order holds: the figures are read before anything is closed.
+
+  // AND IT IS CLEANED UP AS A NEVER-STARTED WORKER. There is no session to
+  // read, so the read is not attempted at all: the seat gets an explicit
+  // never-started line and the worktree still goes. Round 2 sent this worker
+  // down the ordinary read path, where the real reader has nothing to read,
+  // and the worktree leaked -- the 19-20 September failure exactly.
+  assert.equal(result.cost.neverStarted, true, 'the seat is costed as never started, not with an invented or blank figure');
+  assert.equal(result.cost.totalTokens, 0);
+  assert.equal(result.released, true);
+  assert.equal(result.worktreeRemoved, true, 'the workspace of a worker that never started is still removed');
   const withoutMirrors = h.order.filter((entry) => entry !== 'mirror');
-  assert.deepEqual(withoutMirrors, ['dispatch', 'prove-start', 'read-cost:builder', 'release:builder', 'remove-worktree:builder']);
+  assert.deepEqual(withoutMirrors, ['dispatch', 'prove-start', 'release:builder', 'remove-worktree:builder']);
 });
 
 test('a worker that reports outcome failed is reported as failed, and is still costed and cleaned up', async () => {
