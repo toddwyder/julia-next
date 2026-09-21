@@ -221,3 +221,115 @@ test('an empty Ready column is a quiet no-op', async () => {
   assert.equal(comments.length, 0);
   assert.equal(moves.length, 0);
 });
+
+// ---------------------------------------------------------------------------
+// JUL-98 step 2, item 6, attempt 2: the ONE comment for the capped-builder move
+// ---------------------------------------------------------------------------
+//
+// The automatic partner move lives in seat-labels.mjs and is pinned there. What
+// is pinned HERE is the half the criterion actually asks for and attempt 1 left
+// undone: the controller calls `fallbackSeatChoice`, and when a partner really
+// moved it says so on the card -- once, and only then.
+
+const CAPPED_BUILDER = { cappedSeat: 'builder' };
+
+test('a capped builder moves its partner and the controller posts that reason as exactly ONE comment on the card', async () => {
+  // No model labels on the card, so the seat table answers: builder Claude,
+  // reviewer pi-deepseek. The builder's backup IS pi-deepseek, so the pair
+  // would collide and the reviewer moves to its own backup, Codex.
+  const jul92 = card({ identifier: 'JUL-92' });
+  const { board, comments, moves } = fakeBoard({ issues: [jul92] });
+
+  const result = await runControllerCheck(deps({
+    board,
+    previousReady: { [jul92.id]: 'seen' },
+    ...CAPPED_BUILDER,
+  }));
+
+  assert.equal(result.status, 'started');
+  assert.deepEqual(result.partnerMoved, {
+    seat: 'reviewer',
+    from: 'pi-deepseek',
+    to: 'codex',
+    modelLabel: 'adversary-codex',
+  });
+  assert.equal(result.seatChoices.builder.entry, 'pi-deepseek', 'the capped seat really did fall back');
+  assert.equal(result.seatChoices.reviewer.entry, 'codex');
+
+  // Two comments in all: the column move, and the seat move. The seat one is
+  // the reason verbatim -- nothing re-worded, so the card and the code cannot
+  // drift apart.
+  const seatComments = comments.filter((entry) => /moved to its own backup/.test(entry.body));
+  assert.equal(seatComments.length, 1, 'exactly one comment for the partner move');
+  assert.equal(seatComments[0].issueId, jul92.id, 'posted on the card that was started');
+  assert.equal(
+    seatComments[0].body,
+    'the builder fell back to pi-deepseek, so the reviewer moved to its own backup adversary-codex to keep builder and reviewer in different families',
+  );
+  assert.equal(comments.length, 2, 'the column move comment and this one, and nothing else');
+  assert.deepEqual(moves, [{ issueId: jul92.id, to: 'Implementation' }]);
+});
+
+test('no partner move, no comment: a capped builder whose reviewer is already on Codex is told nothing', async () => {
+  const jul92 = card({ identifier: 'JUL-92', labels: ['adversary-codex'] });
+  const { board, comments } = fakeBoard({ issues: [jul92] });
+
+  const result = await runControllerCheck(deps({
+    board,
+    previousReady: { [jul92.id]: 'seen' },
+    ...CAPPED_BUILDER,
+  }));
+
+  assert.equal(result.status, 'started');
+  assert.equal(result.partnerMoved, null, 'nothing else had to move');
+  assert.equal(result.seatChoices.builder.entry, 'pi-deepseek');
+  assert.equal(comments.length, 1, 'only the column-move comment');
+  assert.ok(!/moved to its own backup/.test(comments[0].body));
+});
+
+test('a cycle with no capped seat resolves no fallback and posts no seat comment at all', async () => {
+  const jul92 = card({ identifier: 'JUL-92' });
+  const { board, comments } = fakeBoard({ issues: [jul92] });
+
+  const result = await runControllerCheck(deps({ board, previousReady: { [jul92.id]: 'seen' } }));
+
+  assert.equal(result.status, 'started');
+  assert.equal(result.partnerMoved, null);
+  assert.equal(result.seatChoices, null, 'fallbackSeatChoice was not called');
+  assert.equal(comments.length, 1);
+});
+
+test('the partner-move comment is written once even when the same cycle is replayed', async () => {
+  const jul92 = card({ identifier: 'JUL-92' });
+  const { board, comments } = fakeBoard({ issues: [jul92] });
+  const orca = createFixtureOrca();
+  const seen = new Map();
+  const previousReady = { [jul92.id]: 'seen' };
+
+  await runControllerCheck(deps({ board, orca, previousReady, commentsSeen: seen, ...CAPPED_BUILDER }));
+  await runControllerCheck(deps({ board, orca, previousReady, commentsSeen: seen, ...CAPPED_BUILDER }));
+
+  assert.equal(comments.filter((entry) => /moved to its own backup/.test(entry.body)).length, 1);
+});
+
+test('a fallback the seat table cannot make legal stops the card where it is: no comment, no move', async () => {
+  const jul92 = card({ identifier: 'JUL-92' });
+  const { board, comments, moves } = fakeBoard({ issues: [jul92] });
+
+  const result = await runControllerCheck(deps({
+    board,
+    previousReady: { [jul92.id]: 'seen' },
+    cappedSeat: 'builder',
+    // Stand-in for a seat table in which the partner has no legal backup --
+    // the refusal fallbackSeatChoice still makes, which the controller must
+    // not paper over by starting the card anyway.
+    seatFallbackImpl: () => ({ ok: false, reason: 'refusing the builder backup (pi-deepseek): same family' }),
+  }));
+
+  assert.equal(result.status, 'seat-refused');
+  assert.equal(result.issue, 'JUL-92');
+  assert.match(result.reason, /refusing the builder backup/);
+  assert.equal(comments.length, 0, 'the card is not commented on for a refusal it did not cause');
+  assert.deepEqual(moves, [], 'the card stays in Ready');
+  assert.ok(jul92.id in result.nextReady, 'the card keeps its sighting: it never left Ready');
+});

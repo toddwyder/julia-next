@@ -346,6 +346,10 @@ const TEAM_STATES_QUERY = `
   }
 `;
 
+// JUL-98 step 2: `description` is here for the controller's third refusal --
+// does the card carry a `## UAT plan` section? The Ready queue itself does not
+// read it; the controller's board (graph/controller/board.mjs) shares this
+// query and cannot judge a card without it.
 const READY_ISSUES_QUERY = `
   query ReadyQueueIssues($stateId: ID!) {
     issues(filter: { state: { id: { eq: $stateId } } }, first: 100) {
@@ -354,6 +358,7 @@ const READY_ISSUES_QUERY = `
         identifier
         title
         sortOrder
+        description
         state { id name type }
         labels { nodes { id name } }
         relations {
@@ -459,6 +464,10 @@ export function normalizeIssue(raw) {
     title: raw?.title,
     sortOrder: raw?.sortOrder,
     state: raw?.state ?? null,
+    // Carried through for the controller's `## UAT plan` refusal
+    // (graph/controller/eligibility.mjs). Absent on a card Linear returned
+    // without one, which the refusal reads as "no plan".
+    description: raw?.description ?? null,
     labels,
     blockers,
   };

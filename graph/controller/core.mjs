@@ -7,27 +7,39 @@
 //   * it reads no mailbox.
 //
 // Both are step 3. What a cycle does here is decide and record: find the card,
-// refuse the ones that must be refused, take the card's Orca run, write the one
-// column-move comment, and move the card. That is enough for the parts this
-// step is judged on to be real rather than stubbed.
+// refuse the ones that must be refused, resolve a capped seat's fallback (and
+// say on the card when that moved the partner seat), take the card's Orca run,
+// write the one column-move comment, and move the card. That is enough for the
+// parts this step is judged on to be real rather than stubbed.
 //
-// Every boundary is injected. The `board` is the only thing that touches Linear
-// and its real implementation is built on the app token in ./token.mjs, so the
-// writer is the controller's own identity ("Julia controller"), never Todd and
-// never a builder -- a builder runs as `runner` and cannot read the app's
-// credentials at all.
+// Every boundary is injected. The `board` is the only thing that touches
+// Linear, and the implementation that runs for real is `createControllerBoard`
+// in ./board.mjs: it drives every Linear call through `createAuthedLinearCall`
+// in ./token.mjs, so the writer is the controller's own identity ("Julia
+// controller"), never Todd and never a builder -- a builder runs as `runner`
+// and cannot read the app's credentials at all. Every test here injects a
+// stand-in board instead, which is why the suite runs as `runner`.
 
-import { selectStartableCard } from './eligibility.mjs';
+import { selectStartableCard, controllerFingerprint } from './eligibility.mjs';
 import { nextColumnFor, columnMoveComment } from './columns.mjs';
 import { claimCardRun, createCommentGuard, isConsumerFenced } from './inflight.mjs';
+// The seat rules are seat-labels.mjs's, imported rather than repeated: which
+// backup a capped seat takes, and whether the partner has to move out of its
+// way, is one rule with one home.
+import { seatChoicesForIssue, fallbackSeatChoice } from '../../scripts/seat-labels.mjs';
 
 export const READY_COLUMN = 'Ready';
 
 // The default "is a card already in flight?" reader. Width 1 is Orca's, not
 // ours: a run open on this environment means a card is being carried, and the
-// controller does nothing else at all. The real implementation lists the
-// environment's runs; the default here answers "nothing in flight" so a caller
-// that has already established the slot is free need not pass one.
+// controller does nothing else at all.
+//
+// This default answers "nothing in flight", for a caller that has already
+// established the slot is free. It is NOT a production reader and this step
+// wires none: the run-list walk that really answers the question is `isSlotBusy`
+// in scripts/ready-queue.mjs (it follows Orca's cursor to the end), and it
+// returns a boolean where `activeRunImpl` here returns the run itself, so
+// adapting it belongs to the step that switches the controller on.
 async function noActiveRun() {
   return null;
 }
@@ -47,6 +59,14 @@ export async function runControllerCheck({
   // a second identical note (the one thing Orca's replay does not cover).
   commentsSeen = new Map(),
   hasReviewableOutput = true,
+  // Which dispatch seat has hit its weekly cap on this cycle, if any
+  // ('builder' or 'reviewer'). The controller cannot discover this on its own
+  // -- a cap is a fact about a vendor account, learned when a dispatch is
+  // refused -- so the process running the check supplies it. `null` means
+  // nothing is capped and no fallback is resolved at all.
+  cappedSeat = null,
+  seatChoicesImpl = seatChoicesForIssue,
+  seatFallbackImpl = fallbackSeatChoice,
 } = {}) {
   const comments = createCommentGuard({
     postImpl: ({ issueId, body }) => board.comment({ issueId, body }),
@@ -101,7 +121,28 @@ export async function runControllerCheck({
     return { status, skipped, nextReady, nextCommented };
   }
 
-  // (d) Take the card's run. This IS the in-flight record; a repeat of the same
+  // (d) The capped seat, if there is one. This happens BEFORE the run is taken
+  // and before the card moves: a pair the family rule refuses must leave the
+  // card exactly where it was, in Ready, with its sighting intact, rather than
+  // moved into Implementation with nothing able to run on it.
+  let seatFallback = null;
+  if (cappedSeat) {
+    seatFallback = seatFallbackImpl(seatChoicesImpl(chosen), cappedSeat);
+    if (!seatFallback.ok) {
+      return {
+        status: 'seat-refused',
+        issue: chosen.identifier,
+        reason: seatFallback.reason,
+        skipped,
+        // The card never left Ready, so it keeps the sighting
+        // selectStartableCard dropped on the assumption it would start.
+        nextReady: { ...nextReady, [chosen.id]: controllerFingerprint(chosen) },
+        nextCommented,
+      };
+    }
+  }
+
+  // (e) Take the card's run. This IS the in-flight record; a repeat of the same
   // request replays rather than starting a second one.
   const claim = await claimCardRun({
     runCreateImpl,
@@ -111,7 +152,7 @@ export async function runControllerCheck({
     requestId: requestIdFor(chosen.identifier, 'run'),
   });
 
-  // (e) One comment, then the move. The comment first: a card that moved with
+  // (f) One comment, then the move. The comment first: a card that moved with
   // no comment is a silent move, which is the thing the card forbids.
   const move = nextColumnFor(READY_COLUMN, { hasReviewableOutput });
   if (!move.ok) throw new Error(`controller: ${move.reason}`);
@@ -126,6 +167,20 @@ export async function runControllerCheck({
     key: `move:${READY_COLUMN}->${move.to}`,
     body,
   });
+  // (g) The one comment the capped-seat move owes the card, and ONLY when a
+  // partner really moved. `partnerMovedReason` is posted verbatim: the card
+  // says exactly what seat-labels.mjs decided, so the board and the code
+  // cannot tell two different stories. Through the same guard, so a replayed
+  // cycle does not write it twice.
+  const partnerMoved = seatFallback?.partnerMoved ?? null;
+  if (partnerMoved) {
+    await comments.postOnce({
+      issueId: chosen.id,
+      key: `seat-partner-move:${partnerMoved.seat}->${partnerMoved.to}`,
+      body: seatFallback.partnerMovedReason,
+    });
+  }
+
   await board.moveCard({ issueId: chosen.id, to: move.to });
 
   return {
@@ -134,6 +189,10 @@ export async function runControllerCheck({
     runId: claim.runId,
     replayed: claim.replayed,
     movedTo: move.to,
+    // The pair to dispatch, once a capped seat has been resolved. `null` when
+    // nothing was capped -- step 3 is what reads it.
+    seatChoices: seatFallback?.choices ?? null,
+    partnerMoved,
     skipped,
     nextReady,
     nextCommented,

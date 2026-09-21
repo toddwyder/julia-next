@@ -11,13 +11,25 @@
 // for why).
 const LINEAR_GRAPHQL_URL = 'https://api.linear.app/graphql';
 
-export async function linearGraphQL(query, variables, { apiKey, fetchImpl = fetch, url = LINEAR_GRAPHQL_URL } = {}) {
-  if (!apiKey) {
-    throw new Error('linearGraphQL: apiKey is required (pass LINEAR_API_KEY)');
+// Two identities reach Linear through this one function, and they are sent
+// DIFFERENTLY. A personal API key (`lin_api_...`) is sent raw, with no scheme
+// prefix -- Linear expects exactly that, and scripts/linear-cli.test.mjs pins
+// it. An OAuth access token, which is what the "Julia controller" app gets from
+// the client-credentials grant (graph/controller/token.mjs), is a bearer token
+// and must be sent as `Bearer <token>`; sent raw it is refused.
+//
+// JUL-98 step 2: `accessToken` is the app path and is what
+// graph/controller/board.mjs passes, so the controller writes to the board as
+// its own identity. The `apiKey` path is untouched -- the coordinator, the
+// Ready queue and every existing caller still use it.
+export async function linearGraphQL(query, variables, { apiKey, accessToken, fetchImpl = fetch, url = LINEAR_GRAPHQL_URL } = {}) {
+  if (!apiKey && !accessToken) {
+    throw new Error('linearGraphQL: apiKey is required (pass LINEAR_API_KEY), or an accessToken for the app identity');
   }
+  const authorization = accessToken ? `Bearer ${accessToken}` : apiKey;
   const res = await fetchImpl(url, {
     method: 'POST',
-    headers: { Authorization: apiKey, 'Content-Type': 'application/json' },
+    headers: { Authorization: authorization, 'Content-Type': 'application/json' },
     body: JSON.stringify({ query, variables }),
   });
   const body = await res.json();

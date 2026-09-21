@@ -500,12 +500,16 @@ export function main({
     const choice = choiceFor(result.choices, canonicalAgent(flags.seat));
     // `partnerMoved` is printed even when it is null: a caller reading this
     // must be able to see that nothing else changed, rather than infer it from
-    // a missing field.
+    // a missing field. `partnerMovedReason` travels with it (JUL-98 step 2):
+    // it is the one sentence the controller posts on the card, and dropping it
+    // here left the only human-readable account of the move unreachable from
+    // this command.
     stdout.write(`${JSON.stringify({
       seat: flags.seat,
       entry: choice.entry,
       modelLabel: choice.modelLabel,
       partnerMoved: result.partnerMoved ?? null,
+      partnerMovedReason: result.partnerMovedReason ?? null,
     }, null, 2)}\n`);
     setExitCode(0);
   } catch (error) {

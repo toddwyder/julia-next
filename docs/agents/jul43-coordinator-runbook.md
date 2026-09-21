@@ -836,13 +836,18 @@ hand-maintained list. No live label name was renamed — cards already carry the
   2026-09-21). When the builder falls back to its DeepSeek backup while the reviewer is also on
   DeepSeek, `fallbackSeatChoice` in `scripts/seat-labels.mjs` now moves the **reviewer** to its own
   backup (`adversary-codex`) automatically and reports the move in `partnerMoved` /
-  `partnerMovedReason`, which the controller posts as one comment on the card. The same move happens
-  symmetrically for a capped reviewer whose backup would collide. It never invents an entry (the
+  `partnerMovedReason`. `runControllerCheck` (`graph/controller/core.mjs`) calls
+  `fallbackSeatChoice` when it is told which seat is capped (`cappedSeat: 'builder'|'reviewer'`) and
+  posts `partnerMovedReason` verbatim as exactly one comment on the card it is starting -- and only
+  when a partner actually moved; a fallback that needed no partner move says nothing. If the
+  fallback is refused, the check returns `seat-refused` and the card stays in Ready, uncommented and
+  unmoved. The same move happens symmetrically for a capped reviewer whose backup would collide. It never invents an entry (the
   partner's backup comes from the same seat table) and never launches a same-family pair: if the
   partner's backup does not resolve the collision, the fallback is still refused. Pass
   `{ movePartner: false }` for the old strict answer. `seat-labels.mjs fallback --seat builder
-  --reviewer pi-deepseek` now prints the pair to dispatch and the seat it moved, instead of exiting
-  non-zero. *(The by-hand step that used to live here -- "move the reviewer to `adversary-codex` on
+  --reviewer pi-deepseek` now prints the pair to dispatch, the seat it moved (`partnerMoved`) and the
+  one-sentence reason (`partnerMovedReason`, the same sentence the controller posts), instead of
+  exiting non-zero. *(The by-hand step that used to live here -- "move the reviewer to `adversary-codex` on
   the card first, then fall back the builder" -- is gone: it is done automatically.)*
 - **The old three-seat vocabulary is gone**: there is no `Orchestrator`/`Builder`/`Reviewer` model
   or effort group and no `orch-` prefix. The two Orchestrator groups are retired on the board
@@ -1345,6 +1350,27 @@ running, no card ever moves, and nobody learns until someone notices the board h
 for hours — by which time the session that ran the step is long gone. Never treat a silent
 `systemctl --user` as success: check the exit status, and then check `is-active` and
 `is-enabled` by name.
+
+### The controller writes to Linear as the app, and only `orchestrator-svc` can run it (JUL-98 step 2)
+
+`graph/controller/board.mjs` (`createControllerBoard`) is the board `runControllerCheck` actually
+writes through. It reuses `createLinearClient` from `scripts/ready-queue.mjs` — the live-verified
+queries, unchanged — but passes it an injected `linearGraphQLImpl` built from
+`createAuthedLinearCall` in `graph/controller/token.mjs`, so every request carries the "Julia
+controller" app's own OAuth token and a refused one renews and retries exactly once. No personal
+key can reach Linear through it: none is passed anywhere in the module.
+
+`scripts/linear-cli.mjs` therefore has **two** auth paths and they are not interchangeable. A
+personal key (`apiKey`, `lin_api_…`) goes out as the raw `Authorization` value — Linear expects
+exactly that. An app access token (`accessToken`) goes out as `Authorization: Bearer <token>`;
+sent raw it is refused. The old `apiKey` path is untouched, and the coordinator and the Ready
+queue still use it.
+
+**Who can run it.** The token is fetched from `linear-app-id` / `linear-app-secret`, which
+`ops/service-dropbox/read-secret.mjs` makes readable by `orchestrator-svc` only. A builder runs as
+`runner`, cannot read them, and must not try: every test injects a token provider instead. So the
+tests prove the wiring (which header, which query, which retry) and nothing about the live API
+accepting this app on these mutations — that is only provable when the controller runs for real.
 
 ### The ready-queue units (`ops/ready-queue/`)
 

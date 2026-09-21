@@ -404,7 +404,7 @@ test('the fallback CLI allows reviewer -> codex while the builder is on claude, 
   assert.equal(err, '');
   // `--seat reviewer` keeps working and still names the adversarial reviewer;
   // the printed label carries that seat's live board prefix.
-  assert.deepEqual(JSON.parse(out), { seat: 'reviewer', entry: 'codex', modelLabel: 'adversary-codex', partnerMoved: null });
+  assert.deepEqual(JSON.parse(out), { seat: 'reviewer', entry: 'codex', modelLabel: 'adversary-codex', partnerMoved: null, partnerMovedReason: null });
   assert.match(out, /\n {2}"seat"/);
   // The agent key spells the same fallback.
   const byAgentKey = runCli(['fallback', '--seat', 'adversarial-reviewer', '--builder', 'claude']);
@@ -434,11 +434,18 @@ test('the fallback CLI moves the reviewer out of the way for a capped builder, a
     to: 'codex',
     modelLabel: 'adversary-codex',
   });
+  // JUL-98 step 2 attempt 2: the reason travelled too. The CLI used to drop it,
+  // so the one sentence the controller posts on the card existed nowhere a
+  // caller of this command could see it.
+  assert.equal(
+    answer.partnerMovedReason,
+    'the builder fell back to pi-deepseek, so the reviewer moved to its own backup adversary-codex to keep builder and reviewer in different families',
+  );
 });
 
 test('the fallback CLI is a real entry point: the process itself allows the reviewer fallback off a claude builder (JUL-98)', async () => {
   const { stdout } = await execFileAsync(process.execPath, [SEAT_LABELS_CLI, 'fallback', '--seat', 'reviewer', '--builder', 'claude']);
-  assert.deepEqual(JSON.parse(stdout), { seat: 'reviewer', entry: 'codex', modelLabel: 'adversary-codex', partnerMoved: null });
+  assert.deepEqual(JSON.parse(stdout), { seat: 'reviewer', entry: 'codex', modelLabel: 'adversary-codex', partnerMoved: null, partnerMovedReason: null });
 });
 
 test('the fallback CLI is a real entry point: the process itself moves the reviewer for a capped builder (JUL-98 step 2)', async () => {
