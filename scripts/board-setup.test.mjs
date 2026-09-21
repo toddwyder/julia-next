@@ -27,6 +27,7 @@ import {
   mismatchMessage,
   planBoardSetup,
   describeAction,
+  renderEvidence,
   BoardConflictError,
   TEMPLATE_NAME,
   customViewUrl,
@@ -1458,4 +1459,24 @@ test('parseArgs never echoes an argument value, so a key passed by mistake is no
     assert.match(error.message, /unknown argument: \[redacted\]/);
     return true;
   });
+});
+
+// JUL-98 gap 6: the evidence listing must not show a retired label like a live one.
+test('renderEvidence marks a retired child label as retired and leaves a live one unmarked', () => {
+  const board = {
+    states: [],
+    templates: [],
+    views: [],
+    labels: [
+      { id: 'g1', name: 'Adversarial reviewer model', description: null, isGroup: true, parentId: null, retiredAt: null },
+      { id: 'c1', name: 'adversary-codex', description: null, isGroup: false, parentId: 'g1', retiredAt: null },
+      { id: 'c2', name: 'adversary-glm-5.3', description: null, isGroup: false, parentId: 'g1', retiredAt: '2026-09-21T00:00:00.000Z' },
+    ],
+  };
+  const lines = renderEvidence(board, 0).split('\n');
+  const live = lines.find((line) => line.includes('adversary-codex'));
+  const retired = lines.find((line) => line.includes('adversary-glm-5.3'));
+  assert.ok(live && retired, 'both labels are listed');
+  assert.doesNotMatch(live, /retired/, 'a live label carries no retired marker');
+  assert.match(retired, /\(retired\)/, 'a retired label says so on its own line');
 });

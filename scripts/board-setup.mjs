@@ -1101,7 +1101,9 @@ export function renderEvidence(board, issueCount, { issueCountFromSavedView = fa
       .filter((label) => label.parentId === group.id)
       .sort((a, b) => a.name.localeCompare(b.name));
     for (const child of children) {
-      lines.push(`    - ${child.name}${child.description ? `: ${child.description}` : ''}`);
+      // A retired label is no longer offered on the board, so the listing must not
+      // read as if it were (JUL-98: an agent posted six retired GLM labels as live).
+      lines.push(`    - ${child.name}${child.retiredAt ? ' (retired)' : ''}${child.description ? `: ${child.description}` : ''}`);
     }
   }
 
