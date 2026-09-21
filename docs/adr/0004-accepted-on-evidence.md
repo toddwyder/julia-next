@@ -2,6 +2,24 @@
 
 Date: 2026-09-15
 
+> **Note, 2026-09-21 (JUL-98). Partly superseded by [The route](https://linear.app/julia-next/document/the-route-one-description-of-how-a-change-reaches-real-julia-88d1f95bbbfa).**
+> The route is now the one description of how a change reaches Real Julia, and where this
+> record disagrees with it, the route wins. What the route replaces here:
+>
+> - **The gate is two columns, not one.** What this record calls "a gate before Todd" is now
+>   **Staging and smoke test** followed by **Evidence review**, two named columns of the nine.
+>   The scripted check and the separate reviewing agent both live in Evidence review.
+> - **Two bounces, not three.** The "three-bounce rule" named under Consequences below is
+>   **two**. The evidence gate gets two rounds and then the card parks; code review gets its
+>   own two, counted separately.
+> - **A card crosses only the columns its work needs.** A change with nothing a person could
+>   look at — documents, settings, the machinery itself — skips Staging and smoke test and
+>   Evidence review, and records why. A change a person could look at never skips them.
+>
+> Everything else this record decided still stands: the definition of a journey, the six hard
+> rules for evidence, one recording plus a checklist, and Todd judging from the comment and the
+> recording alone without reproducing anything. The original text is unchanged below.
+
 ADR 0001 says every small user journey is accepted by Todd on evidence and Todd is never the
 tester. This makes that concrete.
 
