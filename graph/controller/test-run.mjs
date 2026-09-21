@@ -48,11 +48,184 @@ function shortStamp(iso) {
   return String(iso ?? '').slice(11, 19) + 'Z';
 }
 
+// ---------------------------------------------------------------------------
+// WHICH TEST FAILED -- JUL-98 step 5, sixth fix.
+//
+// THE INCIDENT, 2026-09-21. The controller carried a real card the whole way:
+// builder, suite, cost, seat fallback, an independent reviewer, a cost line for
+// each. The step did not pass because the reviewer reported failed, and the
+// reviewer had been handed "720 pass, 1 fail, 0 skipped of 721" -- counts and
+// nothing else. Nobody could tell WHICH test failed. Afterwards the coordinator
+// re-ran the suite at the very commit the builder produced, with the
+// controller's own environment reproduced, and got 721 of 721 green. The
+// worktree the controller had actually measured was already cleaned up, so the
+// difference can never now be recovered. A number on a card is not a result a
+// reader can act on; a name and the error text is.
+//
+// The cap: at most MAX_REPORTED_FAILURES failures, each with at most
+// MAX_FAILURE_TEXT characters of error text. Five is chosen because a suite with
+// more than five distinct failures has a cause, not five causes -- the first few
+// names are enough to find it -- and 500 characters is about one assertion
+// failure's diff with its header, which is the unit a reader actually reads.
+// Worst case on the card is therefore ~2.5KB, a paragraph, not a novel. What was
+// cut is always stated, so nobody mistakes the cap for the whole story; the full
+// output stays on `result.output` for anyone who needs it.
+export const MAX_REPORTED_FAILURES = 5;
+export const MAX_FAILURE_TEXT = 500;
+
+const NOT_OK_LINE = /^(\s*)not ok (\d+)\s*-\s*(.*)$/;
+
+// One failing test out of a run's TAP: the `not ok` line, the test's name, and
+// the error node's test runner prints under it in the YAML diagnostic block.
+function readFailureBlock(lines, from) {
+  // The diagnostic block is `---` ... `...`, indented under the `not ok` line.
+  let at = from;
+  while (at < lines.length && lines[at].trim() === '') at += 1;
+  if (at >= lines.length || lines[at].trim() !== '---') return { error: '', failureType: null, next: from };
+  at += 1;
+  const body = [];
+  while (at < lines.length && lines[at].trim() !== '...') { body.push(lines[at]); at += 1; }
+
+  let failureType = null;
+  let error = '';
+  for (let i = 0; i < body.length; i += 1) {
+    const typeMatch = /^\s*failureType:\s*'?"?([A-Za-z]+)'?"?\s*$/.exec(body[i]);
+    if (typeMatch) failureType = typeMatch[1];
+    const errorMatch = /^(\s*)error:\s*(.*)$/.exec(body[i]);
+    if (!errorMatch || error) continue;
+    const [, indent, head] = errorMatch;
+    if (/^[|>][-+]?$/.test(head.trim())) {
+      // A YAML block scalar: every following line indented past the key.
+      const block = [];
+      for (let j = i + 1; j < body.length; j += 1) {
+        const line = body[j];
+        if (line.trim() !== '' && !line.startsWith(indent + ' ')) break;
+        block.push(line.slice(indent.length + 2));
+      }
+      error = block.join('\n').trim();
+    } else {
+      error = head.trim().replace(/^['"]|['"]$/g, '');
+    }
+  }
+  return { error, failureType, next: at + 1 };
+}
+
+// Every failing test in a run's TAP, with the text each one printed, capped.
+export function parseTapFailures(output, { maxFailures = MAX_REPORTED_FAILURES, maxText = MAX_FAILURE_TEXT } = {}) {
+  const lines = String(output ?? '').split('\n');
+  const all = [];
+  for (let at = 0; at < lines.length; at += 1) {
+    const match = NOT_OK_LINE.exec(lines[at]);
+    if (!match) continue;
+    const [, , number, rawName] = match;
+    const { error, failureType, next } = readFailureBlock(lines, at + 1);
+    all.push({
+      name: rawName.replace(/\s+#\s.*$/, '').trim(),
+      tapLine: `not ok ${number} - ${rawName.trim()}`,
+      error,
+      failureType,
+    });
+    at = Math.max(at, next - 1);
+  }
+
+  // A file whose only complaint is that something inside it failed says nothing
+  // a reader can act on -- the real failure is already in the list. Dropping it
+  // keeps the cap for the failures that name a cause; if a run has NOTHING but
+  // those, they are all there is, so they are kept.
+  const named = all.filter((one) => one.failureType !== 'subtestFailed');
+  const interesting = named.length ? named : all;
+
+  const shown = interesting.slice(0, maxFailures).map((one) => ({
+    ...one,
+    error: one.error.length > maxText ? `${one.error.slice(0, maxText)}... [cut]` : one.error,
+  }));
+  return { total: interesting.length, shown, truncated: interesting.length > shown.length };
+}
+
+// WHETHER THE RESULT DESCRIBES THE COMMIT -- JUL-98 step 5, sixth fix, item 2.
+//
+// The controller runs the suite in the candidate WORKTREE, which can hold files
+// the candidate COMMIT does not: anything the worker left uncommitted or
+// untracked. So a green run in a dirty worktree is a different claim from a
+// green run on the commit, and until this fix nothing on the card said which one
+// the reviewer had been handed. That is exactly the shape of the incident above.
+//
+// This RECORDS the difference; it does not act on it. A dirty worktree must NOT
+// refuse the step -- deciding what to do about one is a later card's job, and the
+// omission below is deliberate, not an oversight. Git failing to answer at all is
+// likewise not a refusal: the state is recorded as unknown and said to be
+// unknown, because the test result itself is still a real result.
+//
+// The git calls go through the SAME `gitSafeDirectoryEnv` the suite runs under
+// (see the boundary note below it): one entry, exactly this worktree, never a
+// wildcard and never its parent.
+export async function readWorktreeState({ worktree, env = process.env, gitImpl = defaultGitImpl }) {
+  const gitEnv = gitSafeDirectoryEnv(worktree, env);
+  try {
+    const { stdout: status } = await gitImpl({ args: ['status', '--porcelain'], cwd: worktree, env: gitEnv });
+    const { stdout: head } = await gitImpl({ args: ['rev-parse', 'HEAD'], cwd: worktree, env: gitEnv });
+    const dirty = String(status ?? '').split('\n').map((line) => line.trimEnd()).filter(Boolean);
+    const commit = String(head ?? '').trim();
+    return {
+      known: true,
+      clean: dirty.length === 0,
+      commit,
+      shortCommit: commit.slice(0, 7),
+      dirtyCount: dirty.length,
+      // Enough to recognise what was uncommitted, not the whole tree.
+      dirty: dirty.slice(0, MAX_REPORTED_FAILURES),
+    };
+  } catch (error) {
+    return { known: false, reason: String(error?.message ?? error).split('\n')[0].slice(0, 200) };
+  }
+}
+
+// The sentence appended to the test line saying whether the measured worktree
+// matched the commit. A result with no recorded state says nothing extra.
+function worktreeNote(state) {
+  if (!state) return '';
+  if (!state.known) return ` Worktree state unknown (${state.reason}), so whether this result describes the commit is not known.`;
+  if (state.clean) return ` Worktree clean at ${state.shortCommit}, so this result describes that commit.`;
+  const files = state.dirty?.length ? ` (${state.dirty.join('; ')}${state.dirtyCount > state.dirty.length ? '; ...' : ''})` : '';
+  return ` Worktree NOT clean at ${state.shortCommit}: ${state.dirtyCount} uncommitted or untracked ${state.dirtyCount === 1 ? 'entry' : 'entries'}${files} -- this result describes the WORKTREE, not the commit.`;
+}
+
+// The failing tests, as markdown lines under the counts. Empty when the run
+// passed, so a passing run keeps exactly the one-line form it has always had.
+function failureLines(result) {
+  if (result.ok !== false && !(result.fail > 0)) return [];
+  const { total, shown, truncated } = parseTapFailures(result.output);
+  if (!shown.length) {
+    return ['', `**Failing tests:** the run reported ${result.fail} failing, but its output carried no "not ok" line to name them.`];
+  }
+  const head = truncated
+    ? `**Failing tests** (${shown.length} of ${total} shown, error text cut at ${MAX_FAILURE_TEXT} characters):`
+    : `**Failing tests** (${total}):`;
+  const body = shown.flatMap((one) => [
+    `- \`${one.tapLine}\``,
+    ...(one.error ? ['  ```', ...one.error.split('\n').map((line) => `  ${line}`), '  ```'] : []),
+  ]);
+  return ['', head, ...body];
+}
+
 // The line the controller posts on the card, next to that step's cost lines.
 export function testRunLine(result) {
   const counts = `${result.pass} pass, ${result.fail} fail, ${result.skipped} skipped of ${result.total}`;
   const seconds = (result.durationMs / 1000).toFixed(1);
-  return `**Tests** (run once by the controller): ${shortStamp(result.startedAt)}-${shortStamp(result.endedAt)}, ${seconds}s -- ${counts}. \`${result.command}\` in \`${result.worktree}\`.`;
+  const head = `**Tests** (run once by the controller): ${shortStamp(result.startedAt)}-${shortStamp(result.endedAt)}, ${seconds}s -- ${counts}. \`${result.command}\` in \`${result.worktree}\`.${worktreeNote(result.worktreeState)}`;
+  return [head, ...failureLines(result)].join('\n');
+}
+
+// The same facts for the journal, on ONE physical line: `journalctl --user -u
+// julia-controller | grep` is how this is read on the server, and a grep that
+// matches a multi-line message shows only the line it matched.
+export function testRunJournalLine(result) {
+  return testRunLine(result)
+    .replace(/```/g, '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join(' | ');
 }
 
 // THE OWNERSHIP BOUNDARY, for the one boundary that cannot take a `-c` flag.
@@ -99,8 +272,18 @@ async function defaultExecImpl({ command, cwd, env }) {
   return execFileAsync('sh', ['-c', command], { cwd, env, maxBuffer: 64 * 1024 * 1024 });
 }
 
+// git in the candidate worktree, for the two questions of item 2. Injected in
+// every test; nothing here spawns anything when the caller supplies its own.
+async function defaultGitImpl({ args, cwd, env }) {
+  const { execFile } = await import('node:child_process');
+  const { promisify } = await import('node:util');
+  const execFileAsync = promisify(execFile);
+  return execFileAsync('git', args, { cwd, env, maxBuffer: 8 * 1024 * 1024 });
+}
+
 export function createSuiteRunner({
   execImpl = defaultExecImpl,
+  gitImpl = defaultGitImpl,
   command = SUITE_COMMAND,
   env = process.env,
   now = () => new Date().toISOString(),
@@ -115,6 +298,9 @@ export function createSuiteRunner({
         return { ...results.get(key), replayed: true };
       }
       const startedAt = now();
+      // Read BEFORE the suite runs: this is the worktree as it was handed to
+      // the run, not as the run's own temporary files left it.
+      const worktreeState = await readWorktreeState({ worktree, env, gitImpl });
       let stdout;
       let exitCode = 0;
       try {
@@ -137,6 +323,7 @@ export function createSuiteRunner({
         durationMs: Date.parse(endedAt) - Date.parse(startedAt),
         exitCode,
         output: stdout,
+        worktreeState,
         replayed: false,
         ...summary,
       };

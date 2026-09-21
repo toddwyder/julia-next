@@ -683,3 +683,55 @@ test('carryCard costs a seat as the vendor that ACTUALLY ran, not the one the ca
   });
   assert.equal(seen.agent, 'codex', 'the agent the dispatch actually launched wins over the card-resolved one');
 });
+
+// JUL-98 step 5, sixth fix: the journal carries the same test result the card
+// does. The live run on 2026-09-21 left only counts, in both places, and the
+// worktree that would have explained them was cleaned up before anyone looked.
+test('carryCard writes the test result to the journal -- which tests failed, and whether the worktree matched the commit', async () => {
+  const logged = [];
+  const posted = [];
+  await carryCard({
+    card: { id: 'i1', identifier: 'JUL-92', title: 'a card walks the board by itself' },
+    runId: 'run_1',
+    from: 'term_controller',
+    boundaries: {},
+    board: { async comment() { return { id: 'c1' }; }, async moveCard() {} },
+    publisher: {},
+    readSeatCost: async () => ({}),
+    comments: { async postOnce({ body }) { posted.push(body); return { posted: true }; } },
+    log: (line) => logged.push(line),
+    runBuildAndReviewImpl: async () => ({
+      ok: false,
+      reason: 'the reviewer reported failed',
+      costText: [],
+      testRun: {
+        command: 'node --test scripts/*.test.mjs',
+        worktree: '/w',
+        startedAt: '2026-09-21T14:00:00.000Z',
+        endedAt: '2026-09-21T14:00:09.000Z',
+        durationMs: 9000,
+        total: 721, pass: 720, fail: 1, skipped: 0, ok: false,
+        output: [
+          'not ok 7 - the widget counts its parts',
+          '  ---',
+          '  failureType: "testCodeFailure"',
+          '  error: |-',
+          '    Expected values to be strictly equal: 3 !== 4',
+          '  ...',
+          '# tests 721', '# pass 720', '# fail 1', '# skipped 0', '',
+        ].join('\n'),
+        worktreeState: { known: true, clean: false, commit: 'a1b2c3d4e5f6', shortCommit: 'a1b2c3d', dirtyCount: 1, dirty: ['?? scratch.txt'] },
+      },
+    }),
+  });
+
+  const journal = logged.filter((line) => line.includes('720 pass'));
+  assert.equal(journal.length, 1, 'one journal line for the run');
+  assert.match(journal[0], /the widget counts its parts/, 'the journal names the failing test');
+  assert.match(journal[0], /3 !== 4/, 'and carries what it said');
+  assert.match(journal[0], /NOT clean at a1b2c3d/, 'and says the worktree did not match the commit');
+
+  const failure = posted.find((body) => body.includes('did not pass'));
+  assert.match(failure, /the widget counts its parts/, 'the card says the same');
+  assert.match(failure, /NOT clean at a1b2c3d/);
+});

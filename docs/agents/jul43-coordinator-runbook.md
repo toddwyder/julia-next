@@ -1743,6 +1743,59 @@ exactly as before: the never-started mark is explicit, never an absence.
 reviewed by DeepSeek through the controller — every review runs on the Codex backup until an
 adopted-terminal Pi route exists.
 
+### The test line names the failing tests, and says whether the worktree matched the commit (JUL-98 step 5, 2026-09-21)
+
+**The incident.** In the live JUL-92 run of 2026-09-21 the controller carried the card the whole
+way — builder, suite, builder cost, a reviewer seat moved to its backup, an independent review, a
+cost line for each. The step did not pass because the reviewer reported failed, and the reviewer had
+been handed `720 pass, 1 fail, 0 skipped of 721` — counts and nothing else. Nobody could tell which
+test had failed. The coordinator afterwards re-ran the suite at the very commit the builder
+produced, with the controller's own suite environment reproduced, and got 721 of 721 green; the
+worktree the controller had actually measured was already cleaned up, so the difference can never
+now be recovered.
+
+**What the test line carries now.** `testRunLine` in `graph/controller/test-run.mjs` still opens
+with exactly the sentence it always did — times, duration, `pass / fail / skipped of total`, the
+command and the worktree — and then adds:
+
+- **A worktree sentence, on every run.** `Worktree clean at <short sha>, so this result describes
+  that commit.`, or `Worktree NOT clean at <short sha>: <n> uncommitted or untracked entries (...)
+  -- this result describes the WORKTREE, not the commit.`, or, when git would not answer,
+  `Worktree state unknown (<git's first line>) ...`.
+- **A `**Failing tests**` block, only when the run failed.** One bullet per failing test carrying
+  its TAP `not ok` line and, in a fenced block, the error text node printed under it. A passing run
+  gets no block and stays exactly one line, unchanged from before this fix.
+
+`carryCard` in `graph/controller/main.mjs` writes the same facts to the journal through
+`testRunJournalLine`, which folds the block onto one physical line separated by ` | ` — a
+`journalctl --user -u julia-controller | grep` that matches a multi-line message shows only the line
+it matched.
+
+**The cap, and why.** At most **5** failing tests, each with at most **500** characters of error
+text (`MAX_REPORTED_FAILURES` / `MAX_FAILURE_TEXT`). A suite with more than five distinct failures
+has one cause, not five, and the first few names are enough to find it; 500 characters is about one
+assertion's diff with its header. Worst case on the card is therefore roughly 2.5KB. When anything
+is cut the line says so (`5 of 9 shown, error text cut at 500 characters`), and the whole output
+stays on `result.output` for anyone who needs it. A file-level `failureType: subtestFailed` entry is
+dropped when any named failure exists, so the cap is spent on failures that name a cause.
+
+**Why the worktree note exists.** The controller runs the suite in the candidate **worktree**, which
+can hold files the candidate **commit** does not — anything the worker left uncommitted or
+untracked. A result measured on a dirty worktree is therefore a different claim from one measured on
+the commit, and in the incident above nothing said which one the reviewer had been given. The state
+is read with `git status --porcelain` and `git rev-parse HEAD` in the worktree, through the same
+`gitSafeDirectoryEnv` (git's `GIT_CONFIG_COUNT`/`KEY_n`/`VALUE_n` env form of `-c
+safe.directory=<path>`) the suite itself runs under — one entry, exactly that one worktree — because
+the controller runs as `orchestrator-svc` and the worktree belongs to `runner`. It is read **before**
+the suite starts, so it describes the worktree as handed to the run rather than as the run's own
+temporary files left it.
+
+**A dirty worktree does NOT refuse the step, and neither does git failing.** Saying so is this
+change's whole job; deciding what to do about a dirty worktree is a later card's, and the omission is
+deliberate. If git will not answer, the state is recorded as unknown and said to be unknown — the
+test result is still a real result. The one refusal that is unchanged is the old one: output with no
+TAP summary at all still throws, and is never reported as a silent pass.
+
 ### The controller writes to Linear as the app, and only `orchestrator-svc` can run it (JUL-98 step 2)
 
 `graph/controller/board.mjs` (`createControllerBoard`) is the board `runControllerCheck` actually
