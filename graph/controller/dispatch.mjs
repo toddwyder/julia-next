@@ -139,7 +139,13 @@ export async function dispatchWorker({
 }) {
   const launch = launchForChoice(choice);
   if (launch.ok === false) {
-    return { ok: false, seat, reason: launch.reason, residualResources: [] };
+    // `launchRefused` marks the ONE case where nothing at all was created:
+    // this seat's entry cannot be started, so there is no worker, no terminal
+    // and no worktree behind this failure. ../controller/step-runner.mjs
+    // branches on it to resolve the seat's backup (JUL-98 step 5, fifth fix);
+    // a `worker-start` that FAILED is a different thing and keeps `ok: false`
+    // without the mark, because it may have left residual resources.
+    return { ok: false, seat, launchRefused: true, entry: choice?.entry ?? null, reason: launch.reason, residualResources: [] };
   }
   const spec = buildStepBrief({ seat, card, step, files });
 

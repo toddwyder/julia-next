@@ -19,6 +19,9 @@ import { runWorkerStep, runBuildAndReview, attemptTag } from '../graph/controlle
 import { createSuiteRunner } from '../graph/controller/test-run.mjs';
 import { createFixtureWorkerOrca, loadOrcaFixture } from '../graph/controller/fixture-orca.mjs';
 import { turnStartedFromSend } from '../graph/controller/turn-start.mjs';
+import { launchForChoice } from '../graph/controller/dispatch.mjs';
+import { resolveSeatChoices } from '../scripts/seat-labels.mjs';
+import { SEAT_TABLE } from '../graph/seat-table.mjs';
 
 const ALL = loadOrcaFixture('mailbox.check-all.status-heartbeat-escalation-done.json').result;
 const TURN_STARTED = loadOrcaFixture('terminal-send.wait-submit.turn-started.json').result;
@@ -281,4 +284,226 @@ test('the attempt number defaults to the first attempt, and a nonsense one is st
   assert.equal(attemptTag(undefined), 'a1');
   assert.equal(attemptTag(0), 'a1');
   assert.equal(attemptTag(7), 'a7');
+});
+
+// ---------------------------------------------------------------------------
+// A SEAT THAT CANNOT BE LAUNCHED AT ALL (JUL-98 step 5, fifth fix)
+// ---------------------------------------------------------------------------
+//
+// THE LIVE FAILURE these pin, from the JUL-92 run of 2026-09-21. The controller
+// took the card, built it, ran the suite and costed the builder -- then stopped
+// and wrote "no cost line for the reviewer seat". That was TRUE and it was not
+// the reason: the reviewer seat's first choice is `pi-deepseek`, and
+// graph/controller/dispatch.mjs refuses to start a DeepSeek seat with a new
+// worktree outright (PI_REFUSAL: it cannot report to the mailbox, JUL-109
+// section 4). The seat never ran, so it had no cost line, and the blank was the
+// only thing the card was told.
+//
+// The seat table has named `codex` as that seat's backup all along. These pin
+// that it is now USED -- through the very same `fallbackSeatChoice` a capped
+// seat uses, with the same family guard -- and that a stop says the refusal.
+
+test('a reviewer seat whose entry cannot be launched runs on its seat-table backup instead, and the step continues', async () => {
+  const h = harness();
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+
+  // The card's OWN resolution, with no model labels at all: builder `claude`,
+  // reviewer `pi-deepseek` -- which is exactly what the live run had.
+  const choices = resolveSeatChoices([]);
+  assert.equal(choices.reviewer.entry, 'pi-deepseek', 'the reviewer first choice is unchanged by this fix');
+  assert.equal(launchForChoice(choices.reviewer).ok, false, 'and it still cannot be launched');
+
+  const result = await runBuildAndReview({ card: CARD, step: STEP, choices, suiteRunner, ...h.deps });
+
+  assert.equal(result.ok, true, 'the step ran to the end instead of stopping on a seat that could not start');
+  assert.equal(result.reviewer.movedFrom, 'pi-deepseek');
+  assert.equal(result.reviewer.movedTo, 'codex', 'the backup the seat table already names');
+  assert.equal(result.reviewer.outcome, 'succeeded');
+
+  const started = h.orca.workerStartCalls();
+  assert.deepEqual(started.map((call) => call.agent), ['claude', 'codex'], 'only two workers: the refused entry never reached worker-start');
+  assert.equal(started[1].name, 'jul-92-step-1-review-a1-bk', 'the second start asks for a name the refused one did not');
+  assert.notEqual(started[0].requestId, started[1].requestId);
+  assert.equal(result.costLines.length, 2);
+});
+
+test('exactly ONE comment is written for the move, naming both entries and the reason', async () => {
+  const h = harness();
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+  const result = await runBuildAndReview({ card: CARD, step: STEP, choices: resolveSeatChoices([]), suiteRunner, ...h.deps });
+
+  assert.equal(result.seatMoves.length, 1, 'one move, one comment -- not one per attempt and not one per seat');
+  const [moved] = result.seatMoves;
+  assert.equal(moved.seat, 'reviewer');
+  assert.equal(moved.from, 'pi-deepseek');
+  assert.equal(moved.to, 'codex');
+  assert.equal(moved.partnerMoved, null, 'nothing else had to move: claude and codex are already different families');
+  assert.equal(
+    moved.comment,
+    '**The reviewer seat moved to its backup.** It was going to run on `pi-deepseek`, which could not be started: '
+    + 'a DeepSeek (Pi) seat cannot be started with a new worktree: the only recorded route that reports to the mailbox '
+    + 'is an interactive Pi adopted with worker-start --terminal once it has fully started (JUL-109 findings, section 4), '
+    + 'and it carries no model or effort. So it ran on the backup the seat table already names for it, `codex` '
+    + '(adversary-codex).',
+  );
+});
+
+test('a backup that ALSO cannot be launched stops the step, with both entries and both reasons named', async () => {
+  const h = harness();
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+  const choices = resolveSeatChoices([]);
+
+  // Today's table has no seat whose backup the launcher also refuses, and this
+  // code must not depend on that staying true. The real resolver is stood in
+  // front of with one whose backup is a model label no launch model id exists
+  // for -- the launcher's OTHER refusal (dispatch.mjs `launchForChoice`).
+  const seatFallbackImpl = (given, seat) => ({
+    ok: true,
+    partnerMoved: null,
+    partnerMovedReason: null,
+    choices: { ...given, [seat]: { entry: 'claude', modelLabel: 'adversary-claude-turbo', effort: 'medium' } },
+  });
+
+  const result = await runBuildAndReview({ card: CARD, step: STEP, choices, suiteRunner, seatFallbackImpl, ...h.deps });
+
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /the reviewer seat could not be started on pi-deepseek/);
+  assert.match(result.reason, /DeepSeek \(Pi\) seat cannot be started with a new worktree/, 'the first reason');
+  assert.match(result.reason, /its backup claude could not be started either/);
+  assert.match(result.reason, /no launch model id for model label "adversary-claude-turbo"/, 'the second reason');
+  assert.equal(result.seatMoves.length, 0, 'nothing moved, so the card is told of no move');
+  assert.equal(h.orca.workerStartCalls().length, 1, 'only the builder ever reached worker-start; no third entry was tried');
+});
+
+test('the family guard still refuses a same-family pair, and that refusal stops the step rather than running it', async () => {
+  const h = harness();
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+
+  // A card that names Codex for the feature builder. The reviewer's first
+  // choice is refused, and its seat-table backup is Codex TOO -- so the backup
+  // would put builder and reviewer in the same (openai) family. The builder has
+  // already run by then, so it cannot be moved out of the way, and the real
+  // `fallbackSeatChoice` refuses. Nothing here overrides the seat table.
+  const choices = resolveSeatChoices(['builder-codex']);
+  assert.equal(choices.builder.entry, 'codex');
+  assert.equal(SEAT_TABLE['adversarial-reviewer'].backup, 'codex');
+
+  const result = await runBuildAndReview({ card: CARD, step: STEP, choices, suiteRunner, ...h.deps });
+
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /and its backup was refused too: refusing the reviewer backup \(codex\)/);
+  assert.match(result.reason, /both from the openai model family/, "the family guard's own words, not a second copy of them");
+  assert.equal(result.seatMoves.length, 0);
+  assert.deepEqual(h.orca.workerStartCalls().map((call) => call.agent), ['codex'], 'the same-family pair was never dispatched');
+});
+
+test('a seat refused before dispatch gets an explicit never-started cost line naming the refusal, and the stop names the refusal rather than a blank cost line', async () => {
+  const h = harness();
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+  const result = await runBuildAndReview({ card: CARD, step: STEP, choices: resolveSeatChoices(['builder-codex']), suiteRunner, ...h.deps });
+
+  const line = result.costLines.find((entry) => entry.seat === 'reviewer');
+  assert.equal(line.neverStarted, true, 'the seat is costed as never started, the way a worker whose turn never began already is');
+  assert.equal(line.totalTokens, 0);
+  assert.equal(line.usd, 0);
+  assert.match(line.reason, /DeepSeek \(Pi\) seat cannot be started/);
+
+  // THE LIVE FAILURE, gone: the card was told the cost line was blank and was
+  // never told the seat had been refused.
+  assert.equal(result.costLines.length, 2, 'the reviewer HAS a line, so the blank-cost gate is not what stops the step');
+  assert.doesNotMatch(result.reason, /no cost line for the reviewer seat/);
+  assert.match(result.reason, /could not be started/);
+  const reviewerText = result.costText.find((text) => text.startsWith('- **Reviewer**'));
+  assert.match(reviewerText, /never started/);
+  assert.match(reviewerText, /DeepSeek \(Pi\) seat cannot be started/);
+});
+
+test('an ordinary blank cost line still fails the step, and the never-started mark does not excuse it', async () => {
+  const h = harness();
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+  // A seat that DID run and came back with nothing: no mark, no figures.
+  h.deps.readCostImpl = async ({ seat }) => {
+    h.order.push(`read-cost:${seat}`);
+    return seat === 'reviewer' ? { seat } : { seat, ...COST };
+  };
+
+  const result = await runBuildAndReview({ card: CARD, step: STEP, choices: CHOICES, suiteRunner, ...h.deps });
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /the reviewer seat's cost line is blank in: model, totalTokens, peakContext, minutes/);
+  assert.ok(!h.order.includes('release:reviewer'), 'and it was not released with its figures unread');
+});
+
+// ---------------------------------------------------------------------------
+// A BACKUP THAT NEVER GOT GOING (JUL-98 step 5, round 2)
+// ---------------------------------------------------------------------------
+//
+// The fifth fix gated the "it ran on the backup" comment on `launchRefused`
+// alone. But `launchRefused` marks only the one case where NOTHING WAS CREATED
+// (graph/controller/dispatch.mjs, the comment above the `launchRefused: true`
+// return): a `worker-start` that FAILED keeps `ok: false` without the mark, and
+// a worker whose turn was never proven never had the mark either. Both of those
+// fell into the "it ran on the backup" branch, so a card would be told, in one
+// step: "the reviewer seat moved to its backup ... it ran on codex", then "the
+// step did not pass: worker-start failed at agent_readiness", and a cost line
+// reading "never started" -- three things that cannot all be true.
+//
+// Both of these are real: the trust-screen failure and the turn that never
+// begins are the 19-20 September failures this whole step exists for.
+
+test('a backup whose worker-start FAILS stops the step -- the card is never told the seat ran on it', async () => {
+  const h = harness();
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+  const failedStart = loadOrcaFixture('worker-start.failed-agent-readiness.json').result;
+
+  // The builder starts as usual; the reviewer's backup -- the only reviewer
+  // start there is, since `pi-deepseek` never reaches worker-start -- fails at
+  // the trust screen, exactly as the recording has it.
+  const healthyStart = h.deps.workerStartImpl;
+  h.deps.workerStartImpl = async (options) => (
+    options.agent === 'codex' ? { ...failedStart } : healthyStart(options)
+  );
+
+  const result = await runBuildAndReview({ card: CARD, step: STEP, choices: resolveSeatChoices([]), suiteRunner, ...h.deps });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.seatMoves.length, 0, 'the seat never ran on the backup, so no move comment is written');
+  assert.match(result.reason, /the reviewer seat could not be started on pi-deepseek/);
+  assert.match(result.reason, /its backup codex could not be started either/);
+  assert.match(result.reason, /worker-start failed at agent_readiness \(timeout\)/, "Orca's own failure, carried through");
+  assert.equal(result.reviewer.movedTo, undefined, 'and the result does not claim a move either');
+  const line = result.costLines.find((entry) => entry.seat === 'reviewer');
+  assert.equal(line.neverStarted, true, 'the seat is costed as never started -- which is what it was');
+});
+
+test('a backup whose TURN is never proven stops the step too -- the same claim, the same gate', async () => {
+  const h = harness();
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+
+  // The backup's worker IS created -- so there is no `launchRefused` and no
+  // failed start -- but its turn never begins. That worker wrote no session
+  // file, so it did no work: it cannot be reported as having run.
+  let reviewerStarted = false;
+  h.deps.observeStartImpl = async ({ seat }) => {
+    if (seat === 'reviewer') reviewerStarted = true;
+    return { send: seat === 'reviewer' ? NO_TURN : TURN_STARTED };
+  };
+  const waitForBuilder = h.deps.checkWaitImpl;
+  h.deps.checkWaitImpl = async (options) => {
+    if (reviewerStarted) throw new Error('the mailbox must not be opened for a backup whose turn never started');
+    return waitForBuilder(options);
+  };
+
+  const result = await runBuildAndReview({ card: CARD, step: STEP, choices: resolveSeatChoices([]), suiteRunner, ...h.deps });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.seatMoves.length, 0, 'no work was done on the backup, so the card is told of no move');
+  assert.match(result.reason, /the reviewer seat could not be started on pi-deepseek/);
+  assert.match(result.reason, /its backup codex could not be started either/);
+  assert.match(result.reason, /input.accepted/i, "the turn-start proof's own words");
+  assert.equal(result.reviewer.movedTo, undefined);
+  // The worker that WAS created is still cleaned up, the way every
+  // never-started worker is.
+  assert.ok(h.order.includes('release:reviewer'));
+  assert.ok(h.order.includes('remove-worktree:reviewer'));
+  assert.ok(!h.order.includes('read-cost:reviewer'), 'and its non-existent session file is not read');
 });

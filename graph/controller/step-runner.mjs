@@ -23,7 +23,12 @@ import { dispatchWorker } from './dispatch.mjs';
 import { proveTurnStarted } from './turn-start.mjs';
 import { waitForWorkerDone } from './mailbox.mjs';
 import { finishWorker, assertEverySeatCosted } from './release.mjs';
-import { formatCostLine } from './cost.mjs';
+import { formatCostLine, neverStartedCostLine } from './cost.mjs';
+// The seat rules are scripts/seat-labels.mjs's, imported rather than repeated.
+// A seat that CANNOT BE LAUNCHED takes exactly the route a CAPPED seat already
+// takes (JUL-98 step 2, item 6): the same `fallbackSeatChoice`, the same seat
+// table, the same family guard. There is no second fallback machine here.
+import { fallbackSeatChoice } from '../../scripts/seat-labels.mjs';
 
 // One seat, one step.
 export async function runWorkerStep({
@@ -60,7 +65,26 @@ export async function runWorkerStep({
     seat, card, step, choice, files, worktreeName, requestId,
   });
   if (!dispatched.ok) {
-    return { ok: false, seat, stage: 'dispatch', reason: dispatched.reason, dispatchId: dispatched.dispatchId ?? null, residualResources: dispatched.residualResources ?? [] };
+    // ITEM 2 (JUL-98 step 5, fifth fix): A SEAT THAT NEVER STARTED IS COSTED AS
+    // ONE, NOT LEFT BLANK. Nothing was launched, so there is no session file to
+    // read -- exactly the case ./cost.mjs's `neverStartedCostLine` already
+    // exists for, and it is reused here rather than a second line being
+    // written. Without it the seat had NO cost line at all, and
+    // `assertEverySeatCosted` then reported the stop as "no cost line for the
+    // <seat> seat" -- which is what the live JUL-92 run put on the card while
+    // the real reason (the reviewer's entry was refused before dispatch) was
+    // said nowhere. The mark is explicit, so an ORDINARY blank line still fails
+    // the step exactly as before.
+    return {
+      ok: false,
+      seat,
+      stage: 'dispatch',
+      reason: dispatched.reason,
+      launchRefused: dispatched.launchRefused === true,
+      dispatchId: dispatched.dispatchId ?? null,
+      residualResources: dispatched.residualResources ?? [],
+      cost: neverStartedCostLine({ seat, reason: dispatched.reason }),
+    };
   }
 
   // A closure so every exit below cleans up the same way, in the same order.
@@ -79,7 +103,11 @@ export async function runWorkerStep({
       seat,
       dispatchId: dispatched.dispatchId,
       worktree: dispatched.worktree,
-      readCostImpl,
+      // The agent that was ACTUALLY launched travels with the read. A seat that
+      // moved to its backup is a different vendor from the one the card's label
+      // resolved to, and the cost reader has to read the session file of the
+      // vendor that ran -- not the one that was refused.
+      readCostImpl: (args) => readCostImpl({ ...args, agent: dispatched.launch?.agent ?? null }),
       releaseImpl,
       removeWorktreeImpl,
       turnStarted,
@@ -201,8 +229,45 @@ export function attemptTag(attempt) {
   return `a${n}`;
 }
 
+// ITEM 1 (JUL-98 step 5, fifth fix): THE ONE COMMENT A MOVED SEAT OWES THE
+// CARD. Plain English, naming the seat, the entry it was going to run on, the
+// entry it ran on instead, and why. It is ONE comment: when the family guard
+// also had to move the partner seat out of the way, seat-labels.mjs's own
+// `partnerMovedReason` is appended to this same comment verbatim, so the board
+// and the code cannot tell two different stories.
+export function seatMoveComment({ seat, from, to, modelLabel, reason, partnerMovedReason = null }) {
+  const lines = [
+    `**The ${seat} seat moved to its backup.** It was going to run on \`${from}\`, which could not be started: ${reason}. So it ran on the backup the seat table already names for it, \`${to}\` (${modelLabel}).`,
+  ];
+  if (partnerMovedReason) lines.push('', partnerMovedReason);
+  return lines.join('\n');
+}
+
 // One step end to end: the builder, then the reviewer, on ONE test run, with a
 // cost line for each and no way to finish without both.
+//
+// AND THE SEAT FALLBACK (JUL-98 step 5, fifth fix). A seat whose entry CANNOT
+// BE LAUNCHED at all is not a dead end: it takes the same route a CAPPED seat
+// takes. `fallbackSeatChoice` -- the very function the capped case uses, with
+// the same seat table and the same family guard -- resolves that seat's backup,
+// the step is started again on it, and the card is told once.
+//
+// Why this is not a new policy: the reviewer seat's first choice is
+// `pi-deepseek`, and ./dispatch.mjs refuses to start a DeepSeek seat with a new
+// worktree at all (it cannot report to the mailbox; JUL-109 section 4). Until
+// this change the controller could therefore never run a review of any kind, on
+// any card -- and the only thing it said about it was that a cost line was
+// blank. The seat table has named `codex` as that seat's backup all along.
+//
+// THREE THINGS IT DELIBERATELY DOES NOT DO:
+//   * it never tries a third entry, and never guesses one -- the backup comes
+//     from the seat table or the step stops;
+//   * it never runs a same-family pair: if the family guard refuses the backup,
+//     the step stops and says so;
+//   * it never moves a seat that has ALREADY RUN on this step. The partner move
+//     `fallbackSeatChoice` can make is offered only while no seat has run yet
+//     (`movePartner` below), so a reviewer falling back can never rewrite the
+//     builder that is already finished.
 export async function runBuildAndReview({
   card,
   step,
@@ -213,24 +278,104 @@ export async function runBuildAndReview({
   // Which attempt on this card this is. 1 on a card that has never been
   // carried; ./main.mjs increments it before the work starts.
   attempt = 1,
+  // The capped-seat resolver, injected only so a test can stand a seat table
+  // in front of it. The default is the real one.
+  seatFallbackImpl = fallbackSeatChoice,
   ...shared
 } = {}) {
   const tag = attemptTag(attempt);
   const results = {};
+  const seatMoves = [];
+  const ran = new Set();
+  // The choices actually in play. A seat that moves writes its move back here,
+  // so a partner the family guard moved is dispatched on the entry it moved to.
+  let inPlay = choices;
+
+  const startSeat = (seat, choice, suffix) => runWorkerStep({
+    seat,
+    card,
+    step,
+    choice,
+    // A second start for the same seat must collide with nothing the refused
+    // one asked for -- the same rule `attemptTag` states for a second attempt.
+    worktreeName: `${card.identifier.toLowerCase()}-${step.key ?? 'step'}${seat === 'reviewer' ? '-review' : ''}-${tag}${suffix}`,
+    requestId: `${suiteKey}:${seat}:${tag}${suffix}`,
+    suiteRunner,
+    suiteKey,
+    // The reviewer never re-runs the suite: it is handed the builder's run.
+    runSuite: true,
+    ...shared,
+  });
+
+  // A seat that could not be started at all, reported as that rather than as a
+  // blank cost line. The never-started line carries the same sentence.
+  const stopped = (base, seat, reason) => ({
+    ...base, ok: false, reason, cost: neverStartedCostLine({ seat, reason }),
+  });
+
+  // ITEM 3 (JUL-98 step 5, round 2): WHAT "IT RAN ON THE BACKUP" IS ALLOWED TO
+  // MEAN. The move comment below tells the card the seat RAN on its backup, so
+  // it may only be written when the backup's worker actually got going.
+  //
+  // `launchRefused` is NOT that test. It marks only the one case where nothing
+  // at all was created -- ./dispatch.mjs's own comment says so, and says that a
+  // `worker-start` that FAILED deliberately keeps `ok: false` WITHOUT the mark.
+  // Both of those come back from `runWorkerStep` with `stage: 'dispatch'` and a
+  // never-started cost line (line 81 and line 86 above). A worker that was
+  // created but whose turn was never proven is the same kind of thing again:
+  // `stage: 'turn-start'`, `turnStarted: false`, a never-started cost line, and
+  // no work done (line 138).
+  //
+  // Before this, only `launchRefused` took the stop path, so a backup that
+  // failed at `agent_readiness` or the trust screen -- the 19-20 September
+  // failure -- put three contradictory things on one card: "it ran on codex",
+  // "worker-start failed at agent_readiness", and a cost line reading "never
+  // started". So the gate is the stage, which covers all three.
+  const neverGotGoing = (result) => result.stage === 'dispatch' || result.stage === 'turn-start';
+
   for (const seat of seats) {
-    results[seat] = await runWorkerStep({
-      seat,
-      card,
-      step,
-      choice: choices[seat],
-      worktreeName: `${card.identifier.toLowerCase()}-${step.key ?? 'step'}${seat === 'reviewer' ? '-review' : ''}-${tag}`,
-      requestId: `${suiteKey}:${seat}:${tag}`,
-      suiteRunner,
-      suiteKey,
-      // The reviewer never re-runs the suite: it is handed the builder's run.
-      runSuite: true,
-      ...shared,
-    });
+    const first = inPlay[seat];
+    let result = await startSeat(seat, first, '');
+
+    if (result.launchRefused) {
+      const fromEntry = first?.entry ?? null;
+      const fromReason = result.reason;
+      // The partner may only be moved while nothing has run yet; once the
+      // builder is finished its entry is a fact, not a choice.
+      const fallback = seatFallbackImpl(inPlay, seat, { movePartner: ran.size === 0 });
+
+      if (!fallback.ok) {
+        result = stopped(result, seat, `the ${seat} seat could not be started on ${fromEntry}: ${fromReason} -- and its backup was refused too: ${fallback.reason}`);
+      } else {
+        const backup = fallback.choices[seat];
+        const second = await startSeat(seat, backup, '-bk');
+        if (neverGotGoing(second)) {
+          result = stopped(second, seat, `the ${seat} seat could not be started on ${fromEntry}: ${fromReason} -- and its backup ${backup.entry} could not be started either: ${second.reason}`);
+        } else {
+          inPlay = fallback.choices;
+          seatMoves.push({
+            seat,
+            from: fromEntry,
+            to: backup.entry,
+            modelLabel: backup.modelLabel,
+            reason: fromReason,
+            partnerMoved: fallback.partnerMoved ?? null,
+            comment: seatMoveComment({
+              seat,
+              from: fromEntry,
+              to: backup.entry,
+              modelLabel: backup.modelLabel,
+              reason: fromReason,
+              partnerMovedReason: fallback.partnerMovedReason ?? null,
+            }),
+          });
+          result = { ...second, movedFrom: fromEntry, movedTo: backup.entry };
+        }
+      }
+    }
+
+    ran.add(seat);
+    results[seat] = result;
   }
 
   const costLines = seats.map((seat) => results[seat].cost).filter(Boolean);
@@ -246,5 +391,5 @@ export async function runBuildAndReview({
     reason = error.message;
   }
 
-  return { ...results, ok, reason, costLines, costText, testRun: suiteRunner?.resultFor(suiteKey) ?? null, suiteKey };
+  return { ...results, ok, reason, costLines, costText, seatMoves, seatChoices: inPlay, testRun: suiteRunner?.resultFor(suiteKey) ?? null, suiteKey };
 }

@@ -1680,6 +1680,69 @@ commits.
 (`requestIdFor` in `graph/controller/core.mjs`), which carries no attempt, so a second attempt on a
 card replays the first attempt's Orca run rather than taking a new one.
 
+### A seat that cannot be launched falls back to its backup, and the card is told why (JUL-98 step 5, 2026-09-21)
+
+**The reviewer seat's first choice cannot be started by the controller at all, on any card.**
+`graph/seat-table.mjs` gives `adversarial-reviewer` the primary entry `pi-deepseek`, and
+`launchForChoice` in `graph/controller/dispatch.mjs` refuses that entry outright: a DeepSeek (Pi)
+seat started with a new worktree cannot report to the mailbox, so the only route JUL-109 section 4
+recorded as reporting `worker_done` is an *interactive* Pi adopted with `worker-start --terminal`
+once it has fully started — and that route carries no model and no effort. The refusal is
+deliberate and is unchanged by this section. What it meant in practice is that the controller could
+never run a review of any kind; in the live JUL-92 run of 2026-09-21 it built the card, ran the
+suite, costed the builder, and then stopped with `no cost line for the reviewer seat` — true, and
+not the reason.
+
+**What now happens.** A seat whose entry cannot be launched takes exactly the route a **capped**
+seat already takes. `runBuildAndReview` in `graph/controller/step-runner.mjs` branches on
+`launchRefused` (set by `dispatchWorker` only when nothing at all was created) and calls
+`fallbackSeatChoice` in `scripts/seat-labels.mjs` — the same function, the same seat table and the
+same `validateFamilyChoice` family guard the capped case uses. There is no second fallback
+mechanism. The step is then started again on the backup, under a worktree name and a request key
+suffixed `-bk`, so it collides with nothing the refused start asked for. For a card carrying no
+model labels that is `pi-deepseek` → `codex` (`adversary-codex`), which the seat table has named as
+that seat's backup all along. **No seat's preferred entry changed**, and `graph/seat-table.mjs` was
+not edited.
+
+**One comment, on the card.** `seatMoveComment` composes it and `carryCard` in
+`graph/controller/main.mjs` posts it once, keyed `seat-move:<seat>:<from>-><to>` through the same
+duplicate guard every other controller comment uses, before anything else is said about the step —
+so a card shows the move whether the step then passed or failed. The same sentence goes to the
+journal. When the family guard also had to move the *partner* seat out of the way, seat-labels'
+own `partnerMovedReason` is appended to that same comment verbatim, so the board and the code
+cannot tell two different stories.
+
+**Three things it will not do.** It never tries a third entry and never invents one — the backup
+comes from the seat table or the step stops. It never runs a same-family pair: if
+`fallbackSeatChoice` refuses the backup, the step stops and the reason names both entries and the
+guard's own words. And it never moves a seat that has already run: the partner move is offered only
+while no seat has run yet (`movePartner: ran.size === 0`), so a reviewer falling back can never
+rewrite a builder that is already finished.
+
+**And it only says a seat *ran* on its backup when the backup actually got going.** `launchRefused`
+is the right test for *starting* a fallback — it marks the one case where nothing at all was
+created — but it is the wrong test for whether the fallback then worked. A `worker-start` that
+*failed* (the `agent_readiness` / folder-trust case of 19-20 September) comes back without the
+mark, and so does a worker whose turn was never proven. Both come back from `runWorkerStep` with a
+never-started cost line and a `stage` of `dispatch` or `turn-start`, and it is that `stage` the
+backup branch gates on (`neverGotGoing` in `graph/controller/step-runner.mjs`). A backup that was
+refused, that failed to start, or whose turn never began therefore takes the stop path that names
+both entries and both reasons, and `seatMoveComment` is not written at all — so a card can no
+longer be told "it ran on `codex`", "worker-start failed at agent_readiness" and "never started"
+in one step.
+
+**A refusal is no longer reported as a blank.** A seat refused before dispatch has no session file
+to read, so it gets the explicit never-started line `neverStartedCostLine` in
+`graph/controller/cost.mjs` already produces for a worker whose turn never began — 0 tokens, $0,
+`neverStarted: true` — carrying the refusal as its reason. Because the seat now *has* a line,
+`assertEverySeatCosted` no longer fires, and the step stops with the refusal as its reason instead
+of with "no cost line for the <seat> seat". **An unmarked blank cost line still fails the step**,
+exactly as before: the never-started mark is explicit, never an absence.
+
+**Still open, and not fixed here:** the Pi refusal itself stands, so no card can actually be
+reviewed by DeepSeek through the controller — every review runs on the Codex backup until an
+adopted-terminal Pi route exists.
+
 ### The controller writes to Linear as the app, and only `orchestrator-svc` can run it (JUL-98 step 2)
 
 `graph/controller/board.mjs` (`createControllerBoard`) is the board `runControllerCheck` actually

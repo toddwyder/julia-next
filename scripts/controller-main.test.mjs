@@ -615,3 +615,71 @@ test('carryCard hands the attempt number down to the step, so the names the work
   });
   assert.equal(seen, 4);
 });
+
+// JUL-98 step 5, fifth fix: the card is told about a seat that moved, exactly
+// once, whether or not the step then passed. A move that is only in the
+// controller's own head is a silent move, which is the thing the card forbids.
+test('carryCard writes ONE comment for a seat that moved to its backup, and says the same thing in the journal', async () => {
+  const posted = [];
+  const logged = [];
+  const moved = {
+    seat: 'reviewer',
+    from: 'pi-deepseek',
+    to: 'codex',
+    modelLabel: 'adversary-codex',
+    reason: 'a DeepSeek (Pi) seat cannot be started with a new worktree',
+    partnerMoved: null,
+    comment: '**The reviewer seat moved to its backup.** ...',
+  };
+
+  const carried = await carryCard({
+    card: { id: 'i1', identifier: 'JUL-92', title: 'a card walks the board by itself' },
+    runId: 'run_1',
+    from: 'term_controller',
+    boundaries: {},
+    board: { async comment() { return { id: 'c1' }; }, async moveCard() {} },
+    publisher: {},
+    readSeatCost: async () => ({}),
+    comments: {
+      async postOnce({ key, body }) { posted.push({ key, body }); return { posted: true }; },
+    },
+    log: (line) => logged.push(line),
+    runBuildAndReviewImpl: async () => ({
+      ok: false,
+      reason: 'the reviewer seat could not be started on pi-deepseek: ...',
+      costText: [],
+      testRun: null,
+      seatMoves: [moved],
+    }),
+  });
+
+  const moveComments = posted.filter((entry) => entry.key.startsWith('seat-move:'));
+  assert.equal(moveComments.length, 1, 'one comment for one move');
+  assert.equal(moveComments[0].key, 'seat-move:reviewer:pi-deepseek->codex', 'keyed by the move, so a replayed cycle writes it once');
+  assert.equal(moveComments[0].body, moved.comment, 'the comment step-runner.mjs composed, posted verbatim');
+  assert.equal(carried.ok, false);
+  assert.ok(
+    logged.some((line) => line.includes('the reviewer seat moved from pi-deepseek to codex')),
+    'and the journal says the same thing',
+  );
+});
+
+test('carryCard costs a seat as the vendor that ACTUALLY ran, not the one the card resolved to', async () => {
+  let seen = null;
+  await carryCard({
+    card: { id: 'i1', identifier: 'JUL-92', title: 'a card walks the board by itself' },
+    runId: 'run_1',
+    from: 'term_controller',
+    boundaries: {},
+    board: { async comment() { return { id: 'c1' }; }, async moveCard() {} },
+    publisher: {},
+    readSeatCost: async (options) => { seen = options; return {}; },
+    comments: { async postOnce() { return { posted: true }; } },
+    runBuildAndReviewImpl: async (options) => {
+      // The reviewer resolved to pi-deepseek (agent: null) but RAN on codex.
+      await options.readCostImpl({ seat: 'reviewer', dispatchId: 'ctx_1', worktree: 'w', agent: 'codex' });
+      return { ok: false, reason: 'stopped on purpose', costText: [], testRun: null, seatMoves: [] };
+    },
+  });
+  assert.equal(seen.agent, 'codex', 'the agent the dispatch actually launched wins over the card-resolved one');
+});
