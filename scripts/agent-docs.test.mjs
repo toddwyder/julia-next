@@ -32,7 +32,7 @@ test('CLAUDE.md carries the two card-hygiene rules for laptop sessions, word for
   assert.ok(laptopHeading >= 0, 'the laptop-sessions heading is missing');
   assert.ok(nextHeading >= 0, 'the heading after it is missing');
   assert.ok(laptopHeading < text.indexOf(tick));
-  assert.ok(text.indexOf(tick) + tick.length < text.indexOf(finish));
+  assert.equal(text.indexOf(finish), text.indexOf(tick) + tick.length + 1, '"Finish the card" must sit directly under "Tick as you go"');
   assert.ok(text.indexOf(finish) < nextHeading);
 });
 
