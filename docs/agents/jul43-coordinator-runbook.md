@@ -1304,9 +1304,14 @@ its identifier -- into the state file under `$XDG_STATE_HOME/julia-next/controll
 work starts, and the next process reads it back from there. A loop with no card in flight still shouts
 in the journal; it simply has nowhere to comment.
 
-The same state file carries the **request-id ledger** (`requests`), so a controller killed between
-starting a worker and recording it replays that worker on the way back up instead of starting a second
-one. Both of those are only true because `normalize()` in `graph/controller/state.mjs` round-trips
+The same state file carries the **request-id ledger** (`requests`) -- the Orca request id the
+controller was issued for each action -- and that ledger survives a restart, so if the same action is
+issued again it is recognised as a replay and no second worker is started. What the controller does
+*not* do today is re-issue an interrupted action on the way back up: a card killed mid-flight is not
+picked back up by itself, and nothing in the controller notices it was dropped. That resume is the
+next card, **JUL-99** ("The card shows its plan, and a crash picks up from it"); the ledger here is
+only what stops the resume, once JUL-99 builds it, from starting a second worker. Both of those are
+only true because `normalize()` in `graph/controller/state.mjs` round-trips
 every field the controller keeps: a field that serializer forgets is silently dropped on read, with no
 error anywhere, so anything added to the controller's state must be added there too.
 

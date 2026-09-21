@@ -32,10 +32,12 @@
 //                     comment is posted once per episode rather than every
 //                     5 seconds for ever.
 //   requests          the request-id ledger (wiring.mjs's createRequestLedger):
-//                     action -> the id Orca issued for it. A controller killed
-//                     between starting a worker and recording it REPLAYS that
-//                     worker on the way back up instead of starting a second,
-//                     which it can only do if this survives the restart.
+//                     action -> the id Orca issued for it. It survives a
+//                     restart, so if the same action is issued again it is
+//                     recognised as a replay and no second worker is started.
+//                     Nothing here re-issues an interrupted action: a card
+//                     killed mid-flight is NOT picked back up by itself. That
+//                     resume is JUL-99.
 //   lastError         the last cycle error, so a crash-loop comment can name
 //                     what caused the loop.
 //
@@ -77,16 +79,24 @@ export function assertStatePathIsWritable(statePath, { checkout = ORCHESTRATOR_C
   return full;
 }
 
+// `typeof [] === 'object'`, so a guard that asks only for an object lets a JSON
+// ARRAY through, and the controller then holds an array where it reads keys --
+// every lookup undefined, no error anywhere. An array is not a map: it falls
+// back to the empty default exactly as a string or a number already does.
+function isMap(value) {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
 function normalize(parsed) {
   const base = emptyControllerState();
   if (!parsed || typeof parsed !== 'object') return base;
   return {
-    ready: parsed.ready && typeof parsed.ready === 'object' ? parsed.ready : base.ready,
-    commented: parsed.commented && typeof parsed.commented === 'object' ? parsed.commented : base.commented,
+    ready: isMap(parsed.ready) ? parsed.ready : base.ready,
+    commented: isMap(parsed.commented) ? parsed.commented : base.commented,
     starts: Array.isArray(parsed.starts) ? parsed.starts : base.starts,
     carrying: parsed.carrying ?? null,
     crashReported: parsed.crashReported ?? null,
-    requests: parsed.requests && typeof parsed.requests === 'object' ? parsed.requests : base.requests,
+    requests: isMap(parsed.requests) ? parsed.requests : base.requests,
     lastError: typeof parsed.lastError === 'string' ? parsed.lastError : base.lastError,
   };
 }

@@ -76,6 +76,25 @@ test('state round-trips, and a missing or corrupt file is an EMPTY state rather 
   }
 });
 
+test('a JSON ARRAY where a map belongs falls back to the empty default, the way a non-object already does', () => {
+  // `typeof [] === 'object'`, so the plainest guard lets an array straight
+  // through and the controller ends up holding an array where it reads keys:
+  // `state.ready[id]` is then always undefined and every card is sighted for
+  // the first time, every cycle, for ever. An array is not a map; it reads back
+  // as no map at all.
+  const dir = mkdtempSync(join(tmpdir(), 'controller-state-array-'));
+  try {
+    const statePath = join(dir, 'controller.json');
+    writeFileSync(statePath, JSON.stringify({ ready: [], commented: ['JUL-92'], requests: [['k', 'req_1']] }));
+    const back = readControllerState({ statePath });
+    assert.deepEqual(back.ready, {}, 'an array ready is no ready');
+    assert.deepEqual(back.commented, {}, 'an array commented is no commented');
+    assert.deepEqual(back.requests, {}, 'an array ledger is no ledger -- and a replay flag built off one would be nonsense');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('the request ledger and the last error SURVIVE a restart, through the real write-and-read path', () => {
   // Why this matters, in money: a controller killed between starting a worker
   // and recording it replays that worker on the way back up. A ledger that is
