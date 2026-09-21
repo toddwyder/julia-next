@@ -90,6 +90,19 @@ async function defaultExecImpl(bin, args) {
   return execFileAsync(resolvedBin, args, { maxBuffer: 10 * 1024 * 1024 });
 }
 
+// JUL-98 step 4: the generic entry point, for the commands the controller
+// needs that have no named wrapper above (`orchestration check --wait`,
+// `worker-release`, `worktree rm`, `worktree ps`) and for the ones that need
+// `--retry-request`, Orca's own idempotency flag.
+//
+// It is exported rather than copied into graph/controller/wiring.mjs so that
+// the envelope unwrapping, the `.code` on a structured failure, and the
+// ORCA_BIN rule all keep exactly one home. Callers build the argv; everything
+// about how an answer or a refusal is read stays here.
+export async function orcaCall(args, { execImpl } = {}) {
+  return run(args, { execImpl });
+}
+
 export async function runCreate({ environment, from, objective, execImpl } = {}) {
   return run(['orchestration', 'run-create', '--environment', environment, '--from', from, '--objective', objective, '--json'], { execImpl });
 }

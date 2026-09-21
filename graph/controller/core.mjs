@@ -186,6 +186,12 @@ export async function runControllerCheck({
   return {
     status: 'started',
     issue: chosen.identifier,
+    // THE CARD ITSELF, not just its identifier. The move above has taken it
+    // OUT of Ready, so a caller that tried to find it again by listing Ready
+    // would always miss -- and carry a card with no Linear id, which makes
+    // every write for it fail and leaves a crash-loop comment nowhere to go.
+    // The chosen card is right here; it travels with the result.
+    card: chosen,
     runId: claim.runId,
     replayed: claim.replayed,
     movedTo: move.to,
