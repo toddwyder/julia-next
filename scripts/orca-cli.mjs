@@ -59,7 +59,13 @@ async function run(args, { execImpl = defaultExecImpl, bin = 'orca' } = {}) {
   } catch (error) {
     const structured = parseStructuredFailure(error.stdout);
     if (structured) {
-      throw new Error(`orca ${args.join(' ')} failed (${structured.code}): ${structured.message}`);
+      // JUL-98 step 2: the code travels ON the error, not only inside the
+      // message. The controller branches on it (consumer_fenced -> stand down,
+      // terminal_handle_stale -> replay with the request id the error names),
+      // and parsing a sentence to find that out would be a guess.
+      const failure = new Error(`orca ${args.join(' ')} failed (${structured.code}): ${structured.message}`);
+      failure.code = structured.code;
+      throw failure;
     }
     const detail = String(error.stderr || error.message || '').trim();
     throw new Error(`orca ${args.join(' ')} failed: ${detail}`);
@@ -72,7 +78,9 @@ async function run(args, { execImpl = defaultExecImpl, bin = 'orca' } = {}) {
   }
   if (parsed.ok === false) {
     const { code, message } = parsed.error ?? {};
-    throw new Error(`orca ${args.join(' ')} failed (${code ?? 'unknown_error'}): ${message ?? 'no error message'}`);
+    const failure = new Error(`orca ${args.join(' ')} failed (${code ?? 'unknown_error'}): ${message ?? 'no error message'}`);
+    failure.code = code ?? 'unknown_error';
+    throw failure;
   }
   return parsed.result;
 }

@@ -95,6 +95,24 @@ function choiceFor(choices, agentKey) {
   return (alias ? choices?.[alias] : undefined) ?? choices?.[agentKey];
 }
 
+// Write one agent's choice under BOTH its agent key and its dispatch name, so
+// no reader can see a stale one. Mutates and returns the object it is given.
+function writeChoice(choices, agentKey, choice) {
+  choices[agentKey] = choice;
+  const alias = ALIAS_FOR_AGENT[agentKey];
+  if (alias) choices[alias] = choice;
+  return choices;
+}
+
+// The seat the family rule pairs this one with: the feature builder and the
+// adversarial reviewer are each other's partner, and no other seat has one
+// (the rule is only about those two).
+function partnerSeatOf(agentKey) {
+  if (agentKey === DISPATCH_SEATS.builder) return DISPATCH_SEATS.reviewer;
+  if (agentKey === DISPATCH_SEATS.reviewer) return DISPATCH_SEATS.builder;
+  return null;
+}
+
 // The catalogue of vendor models each seat may be pointed at. `entry` is the
 // SEAT_TABLE entry (the launch route and model family); `model` is the
 // vendor's own model id where that route needs one (null where the route
@@ -306,7 +324,7 @@ export function validateFamilyChoice(choices) {
 // `{ ok: false, reason }` naming the refused backup and why. `seat` may be an
 // agent key or a dispatch name; the moved choice is written under BOTH so no
 // reader sees a stale one.
-export function fallbackSeatChoice(choices, seat, { table = SEAT_TABLE } = {}) {
+export function fallbackSeatChoice(choices, seat, { table = SEAT_TABLE, movePartner = true } = {}) {
   const agent = canonicalAgent(seat);
   const code = AGENT_CODES[agent];
   if (!code) {
@@ -321,16 +339,64 @@ export function fallbackSeatChoice(choices, seat, { table = SEAT_TABLE } = {}) {
     entry: backupEntry,
     modelLabel: `${code}-${defaultModelSuffix(agent, backupEntry)}`,
   };
-  const fallbackChoices = { ...choices, [agent]: moved };
-  if (ALIAS_FOR_AGENT[agent]) fallbackChoices[ALIAS_FOR_AGENT[agent]] = moved;
+  const fallbackChoices = writeChoice({ ...choices }, agent, moved);
   const valid = validateFamilyChoice(fallbackChoices);
-  if (!valid.ok) {
-    return {
-      ok: false,
-      reason: `refusing the ${seat} backup (${backupEntry}): ${valid.reason}`,
-    };
+  if (valid.ok) {
+    return { ok: true, choices: fallbackChoices, partnerMoved: null, partnerMovedReason: null };
   }
-  return { ok: true, choices: fallbackChoices };
+
+  // JUL-98 step 2, item 6: the capped-builder family fix.
+  //
+  // Until now this returned a refusal here, and the card stalled: the builder's
+  // Claude seat hits its weekly cap, its backup is DeepSeek, the reviewer is
+  // already DeepSeek (Todd's 2026-09-21 11:57Z Decision made it the reviewer's
+  // FIRST choice), and the family rule -- rightly -- will not let one family
+  // review its own work. The runbook's answer was a by-hand step, done at the
+  // keyboard, which is exactly the Friday risk the card names.
+  //
+  // The right answer is the same move, made automatically: the OTHER dispatched
+  // seat goes to its own backup (the reviewer's is Codex) so the pair is legal
+  // again. It is reported rather than done quietly -- `partnerMoved` and
+  // `partnerMovedReason` are what the controller puts in its one comment, so
+  // the card still shows exactly what ran.
+  //
+  // Two things it deliberately does NOT do: it never invents an entry (the
+  // partner's backup comes from the same seat table), and it never launches a
+  // same-family pair -- if the partner's backup does not fix the collision the
+  // original refusal stands.
+  const partnerAgent = partnerSeatOf(agent);
+  if (movePartner && partnerAgent) {
+    const partnerBackup = table?.[partnerAgent]?.backup;
+    const before = choiceFor(fallbackChoices, partnerAgent);
+    if (partnerBackup && partnerBackup !== before?.entry) {
+      const partnerCode = AGENT_CODES[partnerAgent];
+      const partnerChoice = {
+        ...before,
+        entry: partnerBackup,
+        modelLabel: `${partnerCode}-${defaultModelSuffix(partnerAgent, partnerBackup)}`,
+      };
+      const cascaded = writeChoice({ ...fallbackChoices }, partnerAgent, partnerChoice);
+      if (validateFamilyChoice(cascaded).ok) {
+        const partnerSeat = ALIAS_FOR_AGENT[partnerAgent] ?? partnerAgent;
+        return {
+          ok: true,
+          choices: cascaded,
+          partnerMoved: {
+            seat: partnerSeat,
+            from: before?.entry ?? null,
+            to: partnerBackup,
+            modelLabel: partnerChoice.modelLabel,
+          },
+          partnerMovedReason: `the ${seat} fell back to ${backupEntry}, so the ${partnerSeat} moved to its own backup ${partnerChoice.modelLabel} to keep builder and reviewer in different families`,
+        };
+      }
+    }
+  }
+
+  return {
+    ok: false,
+    reason: `refusing the ${seat} backup (${backupEntry}): ${valid.reason}`,
+  };
 }
 
 // Read-only helper for the coordinator: takes an issue object as
@@ -432,7 +498,15 @@ export function main({
       return;
     }
     const choice = choiceFor(result.choices, canonicalAgent(flags.seat));
-    stdout.write(`${JSON.stringify({ seat: flags.seat, entry: choice.entry, modelLabel: choice.modelLabel }, null, 2)}\n`);
+    // `partnerMoved` is printed even when it is null: a caller reading this
+    // must be able to see that nothing else changed, rather than infer it from
+    // a missing field.
+    stdout.write(`${JSON.stringify({
+      seat: flags.seat,
+      entry: choice.entry,
+      modelLabel: choice.modelLabel,
+      partnerMoved: result.partnerMoved ?? null,
+    }, null, 2)}\n`);
     setExitCode(0);
   } catch (error) {
     // A usage error and a refused fallback both go to stderr as one line;

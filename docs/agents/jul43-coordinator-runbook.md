@@ -831,9 +831,19 @@ hand-maintained list. No live label name was renamed — cards already carry the
   builder stays Claude. A card that names no reviewer model resolves to `adversary-deepseek-pro`
   (`defaultModelSuffix` in `scripts/seat-labels.mjs`, and the team template's default label), which is
   the model the `reviewer-backup` route in `run-pi-seat.mjs` really runs. The evidence reviewer is not
-  part of this decision and is still Codex first. *A stall to know about:* if the builder's Claude
-  seat hits its cap, its DeepSeek backup is refused while the reviewer is also on DeepSeek (same
-  family). Move the reviewer to `adversary-codex` on the card first, then fall back the builder.
+  part of this decision and is still Codex first.
+- **A capped builder no longer stalls the card, and there is nothing to do by hand** (JUL-98 step 2,
+  2026-09-21). When the builder falls back to its DeepSeek backup while the reviewer is also on
+  DeepSeek, `fallbackSeatChoice` in `scripts/seat-labels.mjs` now moves the **reviewer** to its own
+  backup (`adversary-codex`) automatically and reports the move in `partnerMoved` /
+  `partnerMovedReason`, which the controller posts as one comment on the card. The same move happens
+  symmetrically for a capped reviewer whose backup would collide. It never invents an entry (the
+  partner's backup comes from the same seat table) and never launches a same-family pair: if the
+  partner's backup does not resolve the collision, the fallback is still refused. Pass
+  `{ movePartner: false }` for the old strict answer. `seat-labels.mjs fallback --seat builder
+  --reviewer pi-deepseek` now prints the pair to dispatch and the seat it moved, instead of exiting
+  non-zero. *(The by-hand step that used to live here -- "move the reviewer to `adversary-codex` on
+  the card first, then fall back the builder" -- is gone: it is done automatically.)*
 - **The old three-seat vocabulary is gone**: there is no `Orchestrator`/`Builder`/`Reviewer` model
   or effort group and no `orch-` prefix. The two Orchestrator groups are retired on the board
   (`RETIRED_LABEL_GROUPS` in `graph/board-spec.mjs`), which keeps them on the cards that carry

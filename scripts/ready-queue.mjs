@@ -194,20 +194,62 @@ export function ineligibleCommentBody(issue, reasons) {
 // Width-1 slot check
 // ---------------------------------------------------------------------------
 
+// JUL-98 step 2, item 7 (gap 1): the 100-run cap is gone.
+//
+// This used to call `runListImpl({ environment, limit: 100 })` and read the one
+// page it got back. Orca's run-list is paginated and answers with `nextCursor`
+// (scripts/orca-cli.mjs runList; shape confirmed live on JUL-63), so once the
+// runner had more than a page of runs an ACTIVE run on a later page was
+// invisible and the width-1 gate opened while a card was still in flight --
+// the double-start the gate exists to prevent. The walk now follows the cursor
+// to the end, stops the moment it finds an active run, and treats a cursor that
+// does not advance as an error rather than looping for ever (the same
+// discipline createLinearClient.findLabels uses).
+const MAX_RUN_PAGES = 1000;
+
 export async function isSlotBusy({
   runListImpl = runList,
   isRunFinishedImpl = isRunFinished,
   taskListImpl = taskList,
   now = () => Date.now(),
   environment = ORCHESTRATOR_ENVIRONMENT,
-  limit = 100,
 } = {}) {
-  const { runs } = await runListImpl({ environment, limit });
-  for (const run of runs ?? []) {
-    const finished = await isRunFinishedImpl(run, { taskListImpl, now });
-    if (!finished) return true;
+  let cursor;
+  for (let page = 0; page < MAX_RUN_PAGES; page += 1) {
+    const answer = await runListImpl(cursor === undefined ? { environment } : { environment, cursor });
+    for (const run of answer?.runs ?? []) {
+      const finished = await isRunFinishedImpl(run, { taskListImpl, now });
+      if (!finished) return true;
+    }
+    const next = answer?.nextCursor;
+    if (!next) return false;
+    if (next === cursor) {
+      throw new Error(`ready-queue: Orca reported another page of runs but returned the same cursor (${next}) -- refusing to walk it for ever`);
+    }
+    cursor = next;
   }
-  return false;
+  throw new Error(`ready-queue: reading the run list did not terminate after ${MAX_RUN_PAGES} pages`);
+}
+
+// JUL-98 step 2, item 7 (gap 2): check the ticket id before use.
+//
+// The identifier comes off the board and is INTERPOLATED into the command
+// string handed to `orca terminal create` below, and it names the card in every
+// comment and run objective. A Linear identifier is `<TEAM>-<number>` and
+// nothing else, so anything carrying a space, a newline, a shell metacharacter,
+// a path segment or a leading dash is refused before it is used rather than
+// sanitised into something plausible.
+const TICKET_ID_PATTERN = /^[A-Z][A-Z0-9]*-[0-9]+$/;
+
+export function isValidTicketId(identifier) {
+  return typeof identifier === 'string' && TICKET_ID_PATTERN.test(identifier);
+}
+
+export function assertTicketId(identifier) {
+  if (!isValidTicketId(identifier)) {
+    throw new Error(`ready-queue: refusing to use ${JSON.stringify(identifier)} as a ticket id -- a Linear ticket id looks like JUL-92`);
+  }
+  return identifier;
 }
 
 // ---------------------------------------------------------------------------
@@ -638,6 +680,15 @@ export async function readyQueueCheck(options = {}) {
   for (const issue of ordered) {
     const fingerprint = issueFingerprint(issue);
 
+    // (c0) The identifier is used to build a command string and to name the
+    // run; a card whose identifier is not a Linear ticket id is passed over and
+    // logged, never started and never interpolated into anything.
+    if (!isValidTicketId(issue.identifier)) {
+      logErrorImpl(`ready-queue: skipping a Ready card whose ticket id is unusable: ${JSON.stringify(issue.identifier)} (a Linear ticket id looks like JUL-92)`);
+      passOver({ status: 'bad-ticket-id', issue: issue.identifier });
+      continue;
+    }
+
     // (d0) The restart-after-finish guard (JUL-79 step 5, D4 belt 2). A card
     // the queue already started is never started again while its fingerprint
     // is unchanged -- but ONLY as the fallback for belt 1 having failed. Belt
@@ -725,7 +776,7 @@ export async function readyQueueCheck(options = {}) {
   const created = await terminalCreateImpl({
     environment: ORCHESTRATOR_ENVIRONMENT,
     worktree: `path:${ORCHESTRATOR_CHECKOUT}`,
-    command: `node ${ORCHESTRATOR_CHECKOUT}/scripts/julia-run.mjs ${chosen.identifier}`,
+    command: `node ${ORCHESTRATOR_CHECKOUT}/scripts/julia-run.mjs ${assertTicketId(chosen.identifier)}`,
     title: `ready-queue-${chosen.identifier}`,
   });
 
@@ -832,6 +883,8 @@ export function describeResult(result) {
       return 'Ready is empty -- no action';
     case 'first-sighting':
       return `${result.issue} is newly in Ready -- waiting one full check before it can start`;
+    case 'bad-ticket-id':
+      return `a Ready card carries an unusable ticket id (${JSON.stringify(result.issue)}) -- passed over, nothing started`;
     case 'cooldown':
       return `${result.issue} was already started by this queue and has not changed since -- not starting it again`;
     case 'ineligible':

@@ -22,7 +22,16 @@ export async function linearGraphQL(query, variables, { apiKey, fetchImpl = fetc
   });
   const body = await res.json();
   if (!res.ok || body.errors) {
-    throw new Error(`Linear API error: ${res.status} ${JSON.stringify(body.errors ?? body)}`);
+    // JUL-98 step 2: the controller has to tell an EXPIRED TOKEN (renew and
+    // retry once) from a scope error, a rate limit or a bad query (do not).
+    // A message string cannot carry that, so the status and the parsed body
+    // travel on the error itself; graph/controller/token.mjs isAuthRefusal is
+    // the one place that reads them. The message is unchanged, so every
+    // existing caller and test still matches on it.
+    const error = new Error(`Linear API error: ${res.status} ${JSON.stringify(body.errors ?? body)}`);
+    error.status = res.status;
+    error.body = body;
+    throw error;
   }
   return body.data;
 }
