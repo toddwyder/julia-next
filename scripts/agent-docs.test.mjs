@@ -27,9 +27,13 @@ test('CLAUDE.md carries the two card-hygiene rules for laptop sessions, word for
   assert.ok(text.includes(tick), 'the "Tick as you go" rule is missing or reworded');
   assert.ok(text.includes(finish), 'the "Finish the card" rule is missing or reworded');
   // Both sit under the laptop-sessions section, "Finish the card" directly after "Tick as you go".
-  assert.ok(text.indexOf('## Laptop sessions are the exception') < text.indexOf(tick));
+  const laptopHeading = text.indexOf('## Laptop sessions are the exception');
+  const nextHeading = text.indexOf('## Reaching the server');
+  assert.ok(laptopHeading >= 0, 'the laptop-sessions heading is missing');
+  assert.ok(nextHeading >= 0, 'the heading after it is missing');
+  assert.ok(laptopHeading < text.indexOf(tick));
   assert.ok(text.indexOf(tick) + tick.length < text.indexOf(finish));
-  assert.ok(text.indexOf(finish) < text.indexOf('## Reaching the server'));
+  assert.ok(text.indexOf(finish) < nextHeading);
 });
 
 test('the coordinator skill states the same standing cleanup rule in its own voice', () => {
