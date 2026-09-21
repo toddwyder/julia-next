@@ -186,16 +186,6 @@ export async function terminalCreate({
   ], { execImpl });
 }
 
-// The liveness check for a terminal handle. Recorded live against 1.4.205
-// (graph/fixtures/orca-1.4.205/terminal-show.plain-diagnostic-live.json): a
-// handle Orca still knows answers `result.terminal` with `connected` and
-// `orphaned`; a handle it no longer knows is refused with
-// `terminal_handle_stale` (terminal-show.unknown-handle.error.json), which
-// run() above turns into an Error carrying `.code`.
-export async function terminalShow({ environment, terminal, execImpl } = {}) {
-  return run(['terminal', 'show', '--environment', environment, '--terminal', terminal, '--json'], { execImpl });
-}
-
 export async function terminalRead({ environment, terminal, execImpl } = {}) {
   return run(['terminal', 'read', '--environment', environment, '--terminal', terminal, '--json'], { execImpl });
 }

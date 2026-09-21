@@ -266,9 +266,13 @@ export function createOrcaBoundaries({
 // The controller's own sender terminal
 // ---------------------------------------------------------------------------
 
-// WHY THIS EXISTS. Every Orca orchestration call the controller makes carries
-// `--from <terminal handle>`: `run-create` is refused outright without one
-// (graph/fixtures/orca-1.4.205/run-create.no-sender-terminal.error.json). Until
+// WHY THIS EXISTS. The controller cannot make its two dispatch calls without a
+// sender terminal handle: `runCreateImpl` and `workerStartImpl` above both pass
+// it as `--from`, and `run-create` is refused outright without one
+// (graph/fixtures/orca-1.4.205/run-create.no-sender-terminal.error.json). The
+// mailbox wait (`checkWaitImpl`) carries the same handle under a different
+// flag, `--terminal`. The remaining calls -- `worker-release`, `worktree ps`,
+// `worktree rm` -- do not carry it at all. Until
 // JUL-98 step 5 that handle came only from $JULIA_CONTROLLER_TERMINAL, which
 // NOTHING set -- not ops/controller/julia-controller.service, not the runbook --
 // so the controller printed its banner, refused and exited 1 on every start.
@@ -314,7 +318,26 @@ export async function resolveSenderTerminal({
       const terminal = answer?.terminal ?? null;
       return Boolean(terminal?.handle) && terminal.orphaned !== true;
     } catch (error) {
-      warn(`[controller] terminal ${handle} is not usable (${error.code ?? 'no code'}): ${error.message}`);
+      // ONLY Orca saying it no longer knows this handle counts as "dead".
+      // scripts/orca-cli.mjs run() throws three different things and only one
+      // of them is that answer: the structured refusal carries Orca's own code
+      // on the error (`failure.code = code`, orca-cli.mjs line 82), while a
+      // daemon that is down or an exec that fails throws a plain
+      // `orca ... failed: <detail>` with NO `.code` (line 71) and malformed
+      // output throws `did not return valid JSON`, also with no `.code`
+      // (line 77). Reading all three as "dead" would skip the configured
+      // handle, skip the recorded handle for the same wrong reason, and fall
+      // through to `terminal create` -- one new terminal per start, which under
+      // RestartSec=5 is one every five seconds: exactly the leak the recorded
+      // branch exists to prevent, wearing a different hat.
+      //
+      // WHAT THIS TRADES. A daemon blip now makes the controller refuse and be
+      // restarted by systemd every five seconds, which the crash-loop detector
+      // makes visible on the board. The alternative was silently leaking a
+      // terminal every five seconds, which nothing anywhere would show.
+      // Visible and stopped beats invisible and spreading.
+      if (error?.code !== 'terminal_handle_stale') throw error;
+      warn(`[controller] terminal ${handle} is not usable (${error.code}): ${error.message}`);
       return false;
     }
   };

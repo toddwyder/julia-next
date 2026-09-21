@@ -472,9 +472,10 @@ export async function main({
     // has already cost two workers.
     warn(`[controller] publishing is not configured: ${missing.join(' and ')} are not set (EnvironmentFile=-/etc/orchestrator-svc/.env.publisher). Cards will build and review but cannot be published.`);
   }
-  // THE SENDER TERMINAL. Every orchestration call carries `--from <handle>`,
-  // and `run-create` is refused outright without one
-  // (run-create.no-sender-terminal.error.json). The controller finds or makes
+  // THE SENDER TERMINAL. `run-create` and `worker-start` carry the handle as
+  // `--from`, and `run-create` is refused outright without one
+  // (run-create.no-sender-terminal.error.json); the mailbox wait carries the
+  // same handle as `--terminal`. The controller finds or makes
   // its own (wiring.mjs's resolveSenderTerminal): an operator's
   // $JULIA_CONTROLLER_TERMINAL if Orca still knows it, else the handle this
   // controller recorded on a previous start if Orca still knows THAT, else a

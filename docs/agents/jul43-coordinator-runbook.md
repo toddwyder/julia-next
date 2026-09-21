@@ -1315,9 +1315,14 @@ only true because `normalize()` in `graph/controller/state.mjs` round-trips
 every field the controller keeps: a field that serializer forgets is silently dropped on read, with no
 error anywhere, so anything added to the controller's state must be added there too.
 
-**The controller finds or makes its own Orca sender terminal (JUL-98 step 5).** Every Orca
-orchestration call carries `--from <terminal handle>`, and `orchestration run-create` is refused
-outright without one (`graph/fixtures/orca-1.4.205/run-create.no-sender-terminal.error.json`).
+**The controller finds or makes its own Orca sender terminal (JUL-98 step 5).** The controller's two
+dispatch calls carry the handle as `--from` -- `orchestration run-create` (`runCreateImpl`) and
+`orchestration worker-start` (`workerStartImpl`), both in `graph/controller/wiring.mjs` -- and
+`run-create` is refused outright without one
+(`graph/fixtures/orca-1.4.205/run-create.no-sender-terminal.error.json`). The mailbox wait
+(`orchestration check`, `checkWaitImpl`) carries the same handle under a different flag,
+`--terminal`. The rest -- `orchestration worker-release`, `worktree ps`, `worktree rm` -- do not
+carry it at all.
 **Neither the unit nor an operator has to supply that handle.** At startup `main()` resolves it in
 this order (`resolveSenderTerminal` in `graph/controller/wiring.mjs`):
 

@@ -480,6 +480,57 @@ test('a create Orca could not accept is raised, with its own code, rather than b
   );
 });
 
+// THE DEFECT THESE TWO PIN (step 5 round 2, reviewer finding 1). A `terminal
+// show` that fails for ANY reason other than Orca saying the handle is unknown
+// used to be read as "this handle is dead": the configured handle was skipped,
+// the recorded handle was skipped the same way, and the code fell through to
+// `terminal create`. A daemon that is down (`orca ... failed: <detail>`, no
+// `.code`) or output that will not parse (`did not return valid JSON`, no
+// `.code`) would then leak one terminal per start -- one every five seconds
+// under RestartSec=5, which is the very leak the recorded-handle branch exists
+// to prevent. Only `terminal_handle_stale` means dead; everything else is
+// re-thrown so main() refuses loudly.
+test('a terminal show that fails with NO code at all is re-thrown, not read as a dead handle', async () => {
+  // Mutation check: put `return false` back in place of the re-throw and this
+  // test fails on `impl.creates()` -- a terminal is created instead.
+  const daemonDown = new Error('orca terminal show --environment orchestrator-local --terminal term_x failed: connect ECONNREFUSED');
+  const impl = terminalOrca();
+  const boundaries = boundariesFor(async (args) => {
+    if (args[1] === 'show') throw daemonDown;
+    return impl(args);
+  });
+  await assert.rejects(
+    resolveSenderTerminal({
+      env: {},
+      state: { ...emptyControllerState(), senderTerminal: 'term_recorded' },
+      boundaries,
+      warn: () => {},
+    }),
+    /ECONNREFUSED/,
+  );
+  assert.equal(impl.creates(), 0, 'a daemon blip must not quietly create a replacement terminal');
+});
+
+test('a terminal show that fails with a DIFFERENT code is re-thrown too -- only terminal_handle_stale means dead', async () => {
+  const otherCode = new Error('orca terminal show failed (consumer_fenced): a newer consumer holds this run');
+  otherCode.code = 'consumer_fenced';
+  const impl = terminalOrca();
+  const boundaries = boundariesFor(async (args) => {
+    if (args[1] === 'show') throw otherCode;
+    return impl(args);
+  });
+  await assert.rejects(
+    resolveSenderTerminal({
+      env: { JULIA_CONTROLLER_TERMINAL: 'term_configured' },
+      state: emptyControllerState(),
+      boundaries,
+      warn: () => {},
+    }),
+    /consumer_fenced/,
+  );
+  assert.equal(impl.creates(), 0, 'any code but terminal_handle_stale is a refusal, not a verdict on the handle');
+});
+
 test('a create that answers no handle at all is refused rather than carried forward as null', async () => {
   await assert.rejects(
     resolveSenderTerminal({
