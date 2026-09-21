@@ -1,0 +1,10 @@
+# Line endings: LF in the repository and in every checkout, on every platform.
+# Without this, Windows checkouts (autocrlf) show hundreds of files as changed
+# when only their line endings differ, hiding real changes and inviting a
+# commit made entirely of line-ending churn.
+* text=auto eol=lf
+
+# Files installed onto the Linux server must never gain a CR: a CR after
+# `#!/bin/sh` breaks the script, and sudo rejects a rule that carries one.
+*.sh text eol=lf
+ops/sudoers/* text eol=lf
