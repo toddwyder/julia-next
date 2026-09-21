@@ -1543,7 +1543,8 @@ else: the Claude transcript at `/home/runner/.claude/projects/<the worktree path
 non-alphanumeric character replaced by a dash>/`, the Codex rollout under
 `/home/runner/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`.
 
-`createSeatCostReader` in `graph/controller/wiring.mjs` took `os.homedir()` as its default, which
+`createSeatCostReader` (then in `graph/controller/wiring.mjs`, now in `graph/controller/cost-read.mjs`
+and re-exported from `wiring.mjs`) took `os.homedir()` as its default, which
 under the unit is `/home/orchestrator-svc` — a directory no worker has ever written into, and one
 `runner` cannot even open (`ls -a /home/orchestrator-svc` as `runner`: "Permission denied"). The
 read found nothing, the reader refused, the seat got no cost line, and `assertEverySeatCosted`
@@ -1553,10 +1554,100 @@ real all along, at
 `/home/runner/.claude/projects/-home-runner-orca-workspaces-julia-next-jul-92-work`.
 
 The reader now takes `workerHome`, defaulting to the exported `WORKER_HOME` (`/home/runner`),
-named in the same constant block as `WORKER_CHECKOUT` and `WORKER_ENVIRONMENT` and for the same
-reason. **The rule, three defects in:** anything in `graph/controller/` that touches worker files,
+which lives in `graph/controller/cost-read.mjs` beside the reader that uses it and is re-exported
+from `wiring.mjs` for every caller that already imported it from there. **The rule, three defects
+in:** anything in `graph/controller/` that touches worker files,
 worker processes or the worker account must name the worker side explicitly. The controller's own
 daemon, checkout and home are never the default for something the worker made.
+
+### And the cost is read **as the worker, through Orca** — never off the controller's disk (JUL-98 step 5, 2026-09-21)
+
+Pointing the reader at `/home/runner` (the section above) was necessary and not sufficient. The
+transcript directory is **private to the worker account**. Measured on the box as
+`orchestrator-svc`:
+
+```
+$ whoami
+orchestrator-svc
+$ ls -ld /home/runner /home/runner/.claude /home/runner/.claude/projects
+drwxr-xr-x 21 runner runner /home/runner
+drwxrwxr-x 11 runner runner /home/runner/.claude
+drwxr-xr-x 56 runner runner /home/runner/.claude/projects
+$ ls -l /home/runner/.claude/projects/-home-runner-orca-workspaces-julia-next-jul-92-work-a1
+ls: cannot open directory ...: Permission denied
+```
+
+Every hop down to the project directory is world-executable; the **per-project directory itself**
+is mode 0700 and owned by `runner`. Claude Code creates it that way — re-confirmed from the other
+side the same day, as `runner`: `ls -ld
+/home/runner/.claude/projects/-home-runner-orca-workspaces-julia-next-jul98-step-5e` → `drwx------
+2 runner runner`. So the controller could see
+that the directory existed and could never open it, and JUL-92 kept stopping with the same line:
+*"stopped at build-and-review -- no cost line for the builder seat"*.
+
+**The two routes that are closed, so nobody re-opens them.**
+
+- **Widening the permission.** `acl` is not installed on this host (`getfacl` as `runner` on
+  2026-09-21: `command not found`), installing it needs root, and a root change
+  is not a graph action. Making transcripts world-readable would widen the trust boundary far
+  past the problem.
+- **Orca's own transcript.** `orca orchestration worker-read --source transcript` returns the
+  messages and carries **no** usage, token or cost field — checked against a real dispatch on
+  2026-09-21 and handed over with this step; the verb exists (`orca orchestration worker-read
+  --dispatch <id> --source <auto|transcript|terminal>`) and its own `--help` describes it as
+  "bounded output", not usage. It is not a cost source.
+
+**What runs instead.** A terminal Orca creates on the **worker** daemon runs as the **worker
+account**, so it can read the worker's own files. That is the route by which every worker cost
+figure posted on JUL-98 was obtained by hand, and it is now the code path:
+
+1. `graph/controller/wiring.mjs`, `createOrcaSeatCostReader` → `workerTerminalCreateImpl`:
+   `orca terminal create --environment ovh-local --worktree path:<candidate worktree> --title
+   julia-cost-<seat> --command "node '<worktree>/scripts/read-seat-cost.mjs' --seat … --agent …
+   --worktree …; echo \"__JULIA_COST_READ_DONE__:$?\""`.
+2. `scripts/read-seat-cost.mjs` runs in that worktree **as the worker**, calls
+   `createSeatCostReader` from `graph/controller/cost-read.mjs`, and prints **exactly one line**
+   of JSON — the seat cost line — on stdout. Any failure goes to stderr and exits non-zero. It
+   computes nothing: the totals, the peak and the dollars are `graph/controller/cost.mjs` and
+   `graph/rate-table.mjs`, and `tokenTotal()` is still the only place a token total is worked out.
+3. The controller polls `terminal read` and parses the one JSON line, then closes the terminal.
+
+**How the controller knows the command has finished, and why it is not `terminal wait`.** A plain
+terminal is not finished when `terminal wait` says so: `--for tui-idle` answered `satisfied: true`
+after 2.5 s on a terminal still running `sleep 90`, and `--for exit --timeout-ms 8000` held 8.4 s
+and then returned `timeout` with the shell still open (the table under "Orca is pinned at 1.4.205",
+row 3). The documented way is to poll `terminal read` until the shell prompt is back. The reader
+does exactly that, with the prompt's return made machine-readable instead of matched by shape:
+the shell prints `__JULIA_COST_READ_DONE__:$?` only once it has the command's exit status, i.e.
+only once the prompt is back, and that status travels out with it. The **echo** of the command
+contains the same text, so the match is anchored (`^__JULIA_COST_READ_DONE__:(\d+)$`) and the echo
+can never be read as the answer.
+
+**The two `terminal read` traps this path lives with.** A read with no cursor returns the
+**oldest** retained window, not the newest — so the first read is deliberately cursorless (this
+terminal's output starts at its oldest line) and each later read passes the previous read's
+`nextCursor`. And `--screen` is not used: a screen read is the current frame only, cannot be
+paged, and the one JSON line can have scrolled off it.
+
+**Closing.** `orca terminal close --terminal <handle>` — one pane. Not `--tab`, and never
+`--worktree … --all`, which would stop every terminal in the candidate worktree including the
+worker's own agent terminal. The close is in a `finally`, so a failed read does not leak a
+terminal on the worker daemon; a close that itself fails is warned about and does not replace the
+real reason the read failed.
+
+**Nothing about the guard moved.** A missing JSON line, an unparseable one, a non-zero exit and a
+timeout are each a refusal: `finishWorker` leaves the worker and its worktree in place and the
+step stops naming the seat and the reason, exactly as before. No blank or guessed figure can
+reach a card. A worker that never began a turn still takes the never-started path in
+`graph/controller/release.mjs` — no terminal is created for it, and it gets its explicit
+never-started line.
+
+**What breaks if someone "simplifies" this back to a direct file read.** `readdir` on the
+per-project directory throws `EACCES` for `orchestrator-svc`, the reader refuses, the seat gets no
+cost line, `assertCostLineComplete` fails it, and the controller stops at `build-and-review` with
+"no cost line for the builder seat" on every card — which is the JUL-92 stop, the only thing the
+controller did for a whole evening. It cannot be fixed by changing a path; it needs root, and root
+is not a graph action.
 
 ### A repeated `--name` is not refused by Orca — it is silently suffixed (JUL-98 step 5, 2026-09-21)
 

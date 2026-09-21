@@ -42,7 +42,7 @@ import { seatChoicesForIssue } from '../../scripts/seat-labels.mjs';
 import {
   createOrcaBoundaries,
   createRequestLedger,
-  createSeatCostReader,
+  createOrcaSeatCostReader,
   createPublisher,
   resolveSenderTerminal,
   worktreePathOf,
@@ -489,9 +489,11 @@ export async function main({
   const boundaries = createOrcaBoundaries({ ledger });
   const board = createControllerBoard();
   const publisher = createPublisher({ env });
-  // No home is passed: the reader's default is the WORKER's home, and this
-  // process's own home is never the right place to look (wiring.mjs, WORKER_HOME).
-  const readSeatCost = createSeatCostReader();
+  // READ AS THE WORKER, THROUGH ORCA. The worker's transcript directory is
+  // mode 0700 and owned by the worker, so this process cannot read it off disk
+  // at all -- see the header of wiring.mjs's cost-read section for the measured
+  // permissions and for what breaks if someone puts the file read back here.
+  const readSeatCost = createOrcaSeatCostReader({ boundaries });
 
   const saveState = (next) => {
     writeControllerState({ ...next, requests: ledger.entries() }, { statePath: path });
