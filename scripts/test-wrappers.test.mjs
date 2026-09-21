@@ -32,15 +32,22 @@ export function testFilesOutsideScripts(repoRoot = REPO_ROOT, scriptsDir = SCRIP
   return walk(repoRoot).filter((file) => dirname(file) !== scriptsDir);
 }
 
-const IMPORT_SPECIFIER = /\bimport\s+(?:[^'";]*?\s+from\s+)?['"]([^'"]+)['"]/g;
+// Only a real import statement at the start of a line counts. Comments are
+// stripped first, so `// import '../x.test.mjs'` in a header comment (or a block
+// comment) can never make an unwrapped file look wrapped.
+const IMPORT_STATEMENT = /^[ \t]*import\s+(?:[^'";]*?\s+from\s+)?['"]([^'"]+)['"][ \t]*;?[ \t]*$/gm;
+
+function withoutComments(text) {
+  return text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+}
 
 // Every file a wrapper directly under scripts/ imports, resolved to an absolute path.
 export function importedByWrappers(scriptsDir = SCRIPTS_DIR) {
   const imported = new Set();
   for (const name of readdirSync(scriptsDir)) {
     if (!name.endsWith('.test.mjs')) continue;
-    const text = readFileSync(join(scriptsDir, name), 'utf8');
-    for (const match of text.matchAll(IMPORT_SPECIFIER)) {
+    const text = withoutComments(readFileSync(join(scriptsDir, name), 'utf8'));
+    for (const match of text.matchAll(IMPORT_STATEMENT)) {
       if (match[1].startsWith('.')) imported.add(resolve(scriptsDir, match[1]));
     }
   }
@@ -64,7 +71,7 @@ test('every *.test.mjs outside scripts/ is imported by a scripts/*.test.mjs wrap
   assert.ok(testFilesOutsideScripts().length > 0, 'the walk found the test files it is meant to guard');
 });
 
-test('the guard names a test file that has no wrapper (a scratch tree with one wrapped and one unwrapped file)', async () => {
+test('the guard names a test file that has no wrapper, and a commented-out import does not count as one (scratch tree)', async () => {
   const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import('node:fs');
   const { tmpdir } = await import('node:os');
   const root = mkdtempSync(join(tmpdir(), 'wrappers-'));
@@ -73,8 +80,21 @@ test('the guard names a test file that has no wrapper (a scratch tree with one w
     mkdirSync(join(root, 'graph'));
     writeFileSync(join(root, 'graph', 'wrapped.test.mjs'), '');
     writeFileSync(join(root, 'graph', 'lonely.test.mjs'), '');
+    writeFileSync(join(root, 'graph', 'line-comment.test.mjs'), '');
+    writeFileSync(join(root, 'graph', 'block-comment.test.mjs'), '');
     writeFileSync(join(root, 'scripts', 'wrapped.test.mjs'), "import '../graph/wrapped.test.mjs';\n");
-    assert.deepEqual(unwrappedTestFiles(root, join(root, 'scripts')), ['graph/lonely.test.mjs']);
+    // Decoys: the import is only mentioned in a comment, so nothing is wrapped.
+    writeFileSync(join(root, 'scripts', 'decoy.test.mjs'), [
+      "// import '../graph/line-comment.test.mjs';",
+      "/*",
+      " * import '../graph/block-comment.test.mjs';",
+      " */",
+      '',
+    ].join('\n'));
+    assert.deepEqual(
+      unwrappedTestFiles(root, join(root, 'scripts')).sort(),
+      ['graph/block-comment.test.mjs', 'graph/line-comment.test.mjs', 'graph/lonely.test.mjs'],
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
