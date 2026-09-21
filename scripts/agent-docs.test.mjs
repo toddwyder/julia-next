@@ -17,6 +17,25 @@ test('CLAUDE.md states the standing cleanup rule for agent-created test/throwawa
   assert.match(text, /before its ticket counts as\s+done/i);
 });
 
+// Laptop sessions do not load the coordinator skill, so the card-hygiene rules
+// live here, where every session reads them (Todd, 2026-09-21): tick as you go,
+// and finish the card (UAT, assigned to Todd, never Complete).
+test('CLAUDE.md carries the two card-hygiene rules for laptop sessions, word for word: tick as you go, and finish the card', () => {
+  const text = read('CLAUDE.md').replace(/\s+/g, ' ');
+  const tick = "**Tick as you go.** Tick each checkbox on the card you're working the moment its evidence is posted, in the same step. Never tick at the end, and never tick before the evidence exists. The checkbox count is Todd's only view of progress.";
+  const finish = "**Finish the card.** When the work is done and the report is posted, move the card to UAT and assign it to Todd. Never leave a finished card in Backlog, and never move it to Complete; acceptance is Todd's.";
+  assert.ok(text.includes(tick), 'the "Tick as you go" rule is missing or reworded');
+  assert.ok(text.includes(finish), 'the "Finish the card" rule is missing or reworded');
+  // Both sit under the laptop-sessions section, "Finish the card" directly after "Tick as you go".
+  const laptopHeading = text.indexOf('## Laptop sessions are the exception');
+  const nextHeading = text.indexOf('## Reaching the server');
+  assert.ok(laptopHeading >= 0, 'the laptop-sessions heading is missing');
+  assert.ok(nextHeading >= 0, 'the heading after it is missing');
+  assert.ok(laptopHeading < text.indexOf(tick));
+  assert.equal(text.indexOf(finish), text.indexOf(tick) + tick.length + 1, '"Finish the card" must sit directly under "Tick as you go"');
+  assert.ok(text.indexOf(finish) < nextHeading);
+});
+
 test('the coordinator skill states the same standing cleanup rule in its own voice', () => {
   const text = read('.claude/skills/julia-coordinator/SKILL.md');
   assert.match(text, /test\s+or\s+throwaway/i);
