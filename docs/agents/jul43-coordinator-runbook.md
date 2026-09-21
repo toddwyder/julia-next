@@ -1295,7 +1295,11 @@ It should also set `StartLimitIntervalSec=0`: by default a few quick crashes mak
 leave the controller down with nothing moving on the board. The trade-off is that a bad build then
 crash-loops forever instead of stopping, bounded to one restart every 5 seconds by `RestartSec`; the
 controller's build must make a crash loop visible (a journal line and a card comment) rather than
-rely on systemd to stop it.
+rely on systemd to stop it. **That is built** (`graph/controller/crash-loop.mjs`, JUL-98 step 4):
+every start writes one journal line naming the build, the pid and the mode, and once five starts land
+inside ten minutes the controller writes ONE comment -- once per episode, not once per restart -- on
+the card it was carrying, saying how many starts, on which build, and that systemd will not stop it.
+A loop with no card in flight still shouts in the journal; it simply has nowhere to comment.
 
 **The trade-off, stated plainly.** A merged change to that unit file becomes code running as
 `orchestrator-svc`. That is not root, and it is the account that already merges its own PRs and holds
@@ -1350,6 +1354,40 @@ running, no card ever moves, and nobody learns until someone notices the board h
 for hours — by which time the session that ran the step is long gone. Never treat a silent
 `systemctl --user` as success: check the exit status, and then check `is-active` and
 `is-enabled` by name.
+
+### `--retry-request` takes the id **Orca** issued, not one you invent (JUL-98 step 4, 2026-09-21)
+
+Orca's idempotency is not a caller-chosen key. The first mutating call answers
+`result.mutation.requestId` with `replayed: false`; re-running the *same* command with
+`--retry-request <that id>` answers the same object with `replayed: true` and starts nothing
+(`graph/fixtures/orca-1.4.205/run-create.ok.json` and `run-create.replayed.json`, and that fixture
+directory's README records the exact command pair). There is no `--request-id` flag on any verb.
+
+So a caller that wants a repeat to replay has to keep a ledger: *its own* logical key for an action
+-> the request id Orca issued for it. `graph/controller/wiring.mjs` (`createRequestLedger`) does
+that, and the ledger is plain JSON kept in the controller's state file, so a controller killed
+between starting a worker and recording it replays that worker on the way back up instead of
+starting a second one. Anything written against a caller-invented request id is wrong and will
+silently start a duplicate.
+
+### `orca worktree ps --json`: the real shape, and the `truncated` trap (JUL-98 step 4, 2026-09-21)
+
+Confirmed live by running it in a julia-next worktree on the runner:
+
+```
+result.worktrees[] -- each row keyed worktreeId ("<repoId>::<path>"), NOT id,
+                      carrying agents[] with { paneKey, state, agentType, prompt }
+result.hostScope, result.totalCount, result.truncated
+```
+
+`agents[].state === "working"` is still the one recorded answer in which Orca says an agent is
+really running, which is what `graph/controller/turn-start.mjs` classifies.
+
+**The trap.** `worktree ps` has a row cap and that cap is **shared across hosts**, so a busy machine
+can answer a page that simply does not contain the worktree you asked about, with `truncated: true`.
+Reading that absence as "no turn started" would release a perfectly healthy worker as never-started.
+`createOrcaBoundaries` asks for `--limit 200` and treats *absent on a truncated page* as an error,
+never as a verdict.
 
 ### The controller writes to Linear as the app, and only `orchestrator-svc` can run it (JUL-98 step 2)
 

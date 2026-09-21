@@ -207,7 +207,12 @@ export function ineligibleCommentBody(issue, reasons) {
 // discipline createLinearClient.findLabels uses).
 const MAX_RUN_PAGES = 1000;
 
-export async function isSlotBusy({
+// JUL-98 step 4: the SAME walk, returning the run it found rather than only a
+// boolean. The controller's own width-1 gate (graph/controller/core.mjs's
+// `activeRunImpl`) has to name the card that is in flight, not just say that
+// one is; `isSlotBusy` keeps its boolean answer and its callers by delegating
+// here, so there is still exactly one walk of Orca's run list in the repo.
+export async function findActiveRun({
   runListImpl = runList,
   isRunFinishedImpl = isRunFinished,
   taskListImpl = taskList,
@@ -219,16 +224,20 @@ export async function isSlotBusy({
     const answer = await runListImpl(cursor === undefined ? { environment } : { environment, cursor });
     for (const run of answer?.runs ?? []) {
       const finished = await isRunFinishedImpl(run, { taskListImpl, now });
-      if (!finished) return true;
+      if (!finished) return run;
     }
     const next = answer?.nextCursor;
-    if (!next) return false;
+    if (!next) return null;
     if (next === cursor) {
       throw new Error(`ready-queue: Orca reported another page of runs but returned the same cursor (${next}) -- refusing to walk it for ever`);
     }
     cursor = next;
   }
   throw new Error(`ready-queue: reading the run list did not terminate after ${MAX_RUN_PAGES} pages`);
+}
+
+export async function isSlotBusy(options = {}) {
+  return Boolean(await findActiveRun(options));
 }
 
 // JUL-98 step 2, item 7 (gap 2): check the ticket id before use.
