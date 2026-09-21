@@ -20,14 +20,16 @@ test('CLAUDE.md states the standing cleanup rule for agent-created test/throwawa
 // Laptop sessions do not load the coordinator skill, so the card-hygiene rules
 // live here, where every session reads them (Todd, 2026-09-21): tick as you go,
 // and finish the card (UAT, assigned to Todd, never Complete).
-test('CLAUDE.md carries the two card-hygiene rules for laptop sessions: tick as you go, and finish the card', () => {
-  const text = read('CLAUDE.md');
-  assert.match(text, /\*\*Tick as you go\.\*\*/);
-  assert.match(text, /the\s+moment\s+its\s+evidence\s+is\s+posted,\s+in\s+the\s+same\s+step/i);
-  assert.match(text, /never\s+tick\s+at\s+the\s+end,\s+and\s+never\s+tick\s+before\s+the\s+evidence\s+exists/i);
-  assert.match(text, /\*\*Finish the card\.\*\*/);
-  assert.match(text, /move\s+the\s+card\s+to\s+UAT\s+and\s+assign\s+it\s+to\s+Todd/i);
-  assert.match(text, /never\s+move\s+it\s+to\s+Complete;\s+acceptance\s+is\s+Todd's/i);
+test('CLAUDE.md carries the two card-hygiene rules for laptop sessions, word for word: tick as you go, and finish the card', () => {
+  const text = read('CLAUDE.md').replace(/\s+/g, ' ');
+  const tick = "**Tick as you go.** Tick each checkbox on the card you're working the moment its evidence is posted, in the same step. Never tick at the end, and never tick before the evidence exists. The checkbox count is Todd's only view of progress.";
+  const finish = "**Finish the card.** When the work is done and the report is posted, move the card to UAT and assign it to Todd. Never leave a finished card in Backlog, and never move it to Complete; acceptance is Todd's.";
+  assert.ok(text.includes(tick), 'the "Tick as you go" rule is missing or reworded');
+  assert.ok(text.includes(finish), 'the "Finish the card" rule is missing or reworded');
+  // Both sit under the laptop-sessions section, "Finish the card" directly after "Tick as you go".
+  assert.ok(text.indexOf('## Laptop sessions are the exception') < text.indexOf(tick));
+  assert.ok(text.indexOf(tick) + tick.length < text.indexOf(finish));
+  assert.ok(text.indexOf(finish) < text.indexOf('## Reaching the server'));
 });
 
 test('the coordinator skill states the same standing cleanup rule in its own voice', () => {
