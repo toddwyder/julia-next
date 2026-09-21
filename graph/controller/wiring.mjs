@@ -79,6 +79,9 @@ export const PUBLISH_BASE = 'main';
 // `entries` is plain JSON so it can live in the controller's state file and
 // survive a restart: a controller killed between starting a worker and
 // recording it must replay that worker on the way back up, not start a second.
+// What makes that true rather than merely intended is `normalize()` in
+// ./state.mjs, which round-trips `requests` -- a field it did not list would be
+// dropped on read, silently, and the replay would become a second worker.
 export function createRequestLedger(entries = {}) {
   const book = { ...entries };
   return {

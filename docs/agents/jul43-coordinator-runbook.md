@@ -1272,8 +1272,8 @@ exists, `loginctl show-user orchestrator-svc` says `Linger=yes State=lingering`,
 controller with **no sudo**, from an Orca terminal on `orchestrator-local` (the terminal's
 environment has no `XDG_RUNTIME_DIR`, so set both variables yourself, or every `systemctl --user`
 command fails silently -- see "`systemctl --user` fails silently in an Orca terminal" below; the user
-id is 1002 on this host, and `$(id -u)` gives it inside the terminal). `ops/controller/julia-controller.service` does not exist
-yet: the controller's own card writes it, and these commands are for then.
+id is 1002 on this host, and `$(id -u)` gives it inside the terminal). `ops/controller/julia-controller.service` now exists
+(JUL-98 step 4), so these commands are the switch-on itself, not a plan for later.
 
 ```sh
 export XDG_RUNTIME_DIR=/run/user/$(id -u) DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u)/bus
@@ -1299,7 +1299,16 @@ rely on systemd to stop it. **That is built** (`graph/controller/crash-loop.mjs`
 every start writes one journal line naming the build, the pid and the mode, and once five starts land
 inside ten minutes the controller writes ONE comment -- once per episode, not once per restart -- on
 the card it was carrying, saying how many starts, on which build, and that systemd will not stop it.
-A loop with no card in flight still shouts in the journal; it simply has nowhere to comment.
+It knows which card that is because `runOnce` writes the carry -- the card's real Linear id, not just
+its identifier -- into the state file under `$XDG_STATE_HOME/julia-next/controller.json` BEFORE the
+work starts, and the next process reads it back from there. A loop with no card in flight still shouts
+in the journal; it simply has nowhere to comment.
+
+The same state file carries the **request-id ledger** (`requests`), so a controller killed between
+starting a worker and recording it replays that worker on the way back up instead of starting a second
+one. Both of those are only true because `normalize()` in `graph/controller/state.mjs` round-trips
+every field the controller keeps: a field that serializer forgets is silently dropped on read, with no
+error anywhere, so anything added to the controller's state must be added there too.
 
 **The trade-off, stated plainly.** A merged change to that unit file becomes code running as
 `orchestrator-svc`. That is not root, and it is the account that already merges its own PRs and holds

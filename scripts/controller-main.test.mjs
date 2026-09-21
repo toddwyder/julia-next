@@ -19,6 +19,9 @@ import {
   readControllerState, writeControllerState, emptyControllerState, assertStatePathIsWritable, defaultStatePath,
 } from '../graph/controller/state.mjs';
 import { recordStart, CRASH_STARTS_THRESHOLD } from '../graph/controller/crash-loop.mjs';
+import { createRequestLedger } from '../graph/controller/wiring.mjs';
+import { controllerFingerprint } from '../graph/controller/eligibility.mjs';
+import { createFixtureOrca } from '../graph/controller/fixture-orca.mjs';
 
 // ---------------------------------------------------------------------------
 // argv
@@ -68,6 +71,42 @@ test('state round-trips, and a missing or corrupt file is an EMPTY state rather 
 
     writeFileSync(statePath, '{not json');
     assert.deepEqual(readControllerState({ statePath }), emptyControllerState(), 'a corrupt file costs one sighting, not a crash loop');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('the request ledger and the last error SURVIVE a restart, through the real write-and-read path', () => {
+  // Why this matters, in money: a controller killed between starting a worker
+  // and recording it replays that worker on the way back up. A ledger that is
+  // dropped on read starts a SECOND worker instead -- two workers on one step,
+  // and the width-1 rule broken by the program that enforces it.
+  const dir = mkdtempSync(join(tmpdir(), 'controller-ledger-'));
+  try {
+    const statePath = join(dir, 'controller.json');
+    const ledger = createRequestLedger({});
+    ledger.record('worker-start:JUL-92:builder', { mutation: { requestId: 'req_orca_1' } });
+
+    // Through writeControllerState, not a stand-in that bypasses the serializer.
+    writeControllerState(
+      { ...emptyControllerState(), requests: ledger.entries(), lastError: 'Linear said 500' },
+      { statePath },
+    );
+    const back = readControllerState({ statePath });
+    assert.deepEqual(back.requests, { 'worker-start:JUL-92:builder': 'req_orca_1' });
+    assert.equal(back.lastError, 'Linear said 500', 'the crash-loop comment names the error that caused the loop');
+
+    // And the ledger rebuilt from it really does replay rather than start again.
+    assert.deepEqual(
+      createRequestLedger(back.requests).flagsFor('worker-start:JUL-92:builder'),
+      ['--retry-request', 'req_orca_1'],
+    );
+
+    // A field of the wrong type falls back, the way the other five do.
+    writeFileSync(statePath, JSON.stringify({ requests: 'not an object', lastError: 42 }));
+    const bad = readControllerState({ statePath });
+    assert.deepEqual(bad.requests, {});
+    assert.equal(bad.lastError, null);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -184,13 +223,97 @@ test('an admitted card is recorded as "carrying" BEFORE the work starts, so a cr
     from: 'term_a',
     log: () => {},
     now: () => '2026-09-21T14:00:00.000Z',
-    runControllerCheckImpl: async () => ({ status: 'started', issue: 'JUL-98', runId: 'run_1', nextReady: {}, nextCommented: {} }),
+    // The check hands the chosen card back WITH the result -- it has already
+    // moved it out of Ready, so there is nowhere left to look it up.
+    runControllerCheckImpl: async () => ({ status: 'started', issue: 'JUL-98', card, runId: 'run_1', nextReady: {}, nextCommented: {} }),
     carryCardImpl: async ({ card: given }) => {
       seenWhileCarrying = given.identifier;
       return { ok: true, column: 'UAT' };
     },
   });
   assert.equal(seenWhileCarrying, 'JUL-98');
+});
+
+// A card fixture the eligibility rules really admit: in Ready, no coordinate
+// label, no open blocker, and a `## UAT plan` section.
+const readyCard = () => ({
+  id: 'uuid-JUL-92',
+  identifier: 'JUL-92',
+  title: 'a card walks the board by itself',
+  sortOrder: -2889,
+  state: { name: 'Ready', type: 'unstarted' },
+  labels: [],
+  blockers: [],
+  description: '## UAT plan\n\n1. I look at it.\n',
+});
+
+// The board as it really behaves: moveCard takes the card OUT of Ready. Round
+// 1's stand-in kept it there, so a lookup that can only ever miss in production
+// passed in the suite.
+const drainingBoard = (cards) => ({
+  ready: [...cards],
+  comments: [],
+  moves: [],
+  async listReadyCards() { return [...this.ready]; },
+  async comment(entry) { this.comments.push(entry); return { id: `c${this.comments.length}` }; },
+  async moveCard(entry) {
+    this.moves.push(entry);
+    this.ready = this.ready.filter((issue) => issue.id !== entry.issueId);
+  },
+});
+
+test('the admitted card reaches the carry with its REAL id, from a board that no longer has it in Ready', async () => {
+  const jul92 = readyCard();
+  const board = drainingBoard([jul92]);
+  const orca = createFixtureOrca();
+  const saved = [];
+  let carriedCard = null;
+  let savedBeforeCarry = null;
+
+  // The REAL runControllerCheck, not a stand-in: the move out of Ready that
+  // breaks the lookup is the one it makes itself.
+  const result = await runOnce({
+    state: { ...emptyControllerState(), ready: { 'uuid-JUL-92': controllerFingerprint(jul92) } },
+    board,
+    boundaries: { runCreateImpl: orca.runCreate, activeRunImpl: async () => null },
+    from: 'term_controller',
+    log: () => {},
+    now: () => '2026-09-21T14:00:00.000Z',
+    saveState: (next) => { saved.push(next); },
+    carryCardImpl: async ({ card }) => {
+      carriedCard = card;
+      savedBeforeCarry = saved[saved.length - 1] ?? null;
+      return { ok: true, column: 'UAT' };
+    },
+  });
+
+  assert.equal(result.check.status, 'started');
+  assert.deepEqual(board.ready, [], 'the card really did leave Ready, exactly as it does in production');
+  assert.ok(carriedCard, 'a card was carried');
+  assert.equal(carriedCard.id, 'uuid-JUL-92', 'a null id here means every Linear write for this card fails');
+  assert.equal(carriedCard.identifier, 'JUL-92');
+  assert.equal(carriedCard.title, jul92.title, 'the whole card, not a stub rebuilt from the identifier');
+
+  // And the crash-loop comment has somewhere to go: the carry is on disk,
+  // with the real id, BEFORE the work that might kill the process starts.
+  assert.ok(savedBeforeCarry, 'the carry was written down before the work started');
+  assert.equal(savedBeforeCarry.carrying.id, 'uuid-JUL-92');
+  assert.equal(savedBeforeCarry.carrying.identifier, 'JUL-92');
+});
+
+test('a check that admits a card but hands back no card is an ERROR, never a null-id card carried in silence', async () => {
+  await assert.rejects(
+    () => runOnce({
+      state: emptyControllerState(),
+      board: drainingBoard([]),
+      boundaries: {},
+      from: 'term_controller',
+      log: () => {},
+      runControllerCheckImpl: async () => ({ status: 'started', issue: 'JUL-98', runId: 'run_1', nextReady: {}, nextCommented: {} }),
+      carryCardImpl: async () => { throw new Error('the carry must never be reached'); },
+    }),
+    /JUL-98/,
+  );
 });
 
 test('a cycle that THROWS does not exit the process -- exiting is what makes systemd restart, and a restart loop is the thing being avoided', async () => {

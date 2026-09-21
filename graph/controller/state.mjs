@@ -22,11 +22,26 @@
 //                     a restart or every restart would re-sight every card.
 //   starts            one record per process start: Task C's crash-loop
 //                     evidence.
-//   carrying          the card the controller was carrying when it last wrote,
-//                     so a crash loop knows which card to comment on.
+//   carrying          the card the controller was carrying when it last wrote
+//                     -- its real Linear id and identifier -- so a crash loop
+//                     knows which card to comment on. Written to disk BEFORE
+//                     the work starts (main.mjs's runOnce), because a carry
+//                     recorded only in memory is a carry the next process
+//                     cannot see.
 //   crashReported     the last crash-loop episode already commented on, so the
 //                     comment is posted once per episode rather than every
 //                     5 seconds for ever.
+//   requests          the request-id ledger (wiring.mjs's createRequestLedger):
+//                     action -> the id Orca issued for it. A controller killed
+//                     between starting a worker and recording it REPLAYS that
+//                     worker on the way back up instead of starting a second,
+//                     which it can only do if this survives the restart.
+//   lastError         the last cycle error, so a crash-loop comment can name
+//                     what caused the loop.
+//
+// EVERY ONE OF THOSE ROUND-TRIPS. `normalize` below is the serializer for both
+// directions, so a field it forgets is a field that is silently dropped on read
+// -- there is no other place a reader could pick it up.
 
 import os from 'node:os';
 import { join, resolve } from 'node:path';
@@ -46,7 +61,7 @@ export function defaultStatePath(options = {}) {
 }
 
 export function emptyControllerState() {
-  return { ready: {}, commented: {}, starts: [], carrying: null, crashReported: null };
+  return { ready: {}, commented: {}, starts: [], carrying: null, crashReported: null, requests: {}, lastError: null };
 }
 
 // A state path inside the read-only checkout is refused OUTRIGHT rather than
@@ -71,6 +86,8 @@ function normalize(parsed) {
     starts: Array.isArray(parsed.starts) ? parsed.starts : base.starts,
     carrying: parsed.carrying ?? null,
     crashReported: parsed.crashReported ?? null,
+    requests: parsed.requests && typeof parsed.requests === 'object' ? parsed.requests : base.requests,
+    lastError: typeof parsed.lastError === 'string' ? parsed.lastError : base.lastError,
   };
 }
 

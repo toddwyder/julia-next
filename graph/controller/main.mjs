@@ -258,6 +258,9 @@ export async function runOnce({
   log = console.log,
   carryCardImpl = carryCard,
   runControllerCheckImpl = runControllerCheck,
+  // The same saver runLoop uses. A no-op default keeps runOnce callable on its
+  // own, but the loop always passes the real one.
+  saveState = () => {},
   now = () => new Date().toISOString(),
 } = {}) {
   const commentsSeen = new Map();
@@ -284,11 +287,22 @@ export async function runOnce({
     return { check, state: nextState, carried: null };
   }
 
-  const card = (await board.listReadyCards()).find((issue) => issue.identifier === check.issue)
-    ?? { id: null, identifier: check.issue, title: check.issue };
-  // Recorded BEFORE the work starts: if the controller dies carrying this card,
-  // the crash-loop comment has to know where to go.
+  // The card comes back WITH the check. It must not be looked up again: the
+  // check has already moved it out of Ready, so a second lookup can only miss.
+  // A check that says "started" and hands back no usable card is a bug in the
+  // check, and it says so out loud rather than carrying a null id in silence --
+  // runLoop catches this, records it as lastError, and the next cycle runs.
+  const card = check.card;
+  if (!card?.id) {
+    throw new Error(
+      `controller: the check admitted ${check.issue} but handed back no card id, so it cannot be carried (every Linear write for it would fail and a crash loop would have nowhere to comment)`,
+    );
+  }
+  // Recorded BEFORE the work starts, and written to DISK before it: if the
+  // controller dies carrying this card, the crash-loop comment has to know
+  // where to go, and it reads that from the state file, not from this process.
   nextState = { ...nextState, carrying: { identifier: card.identifier, id: card.id, at: now() } };
+  saveState(nextState);
 
   const comments = {
     async postOnce({ issueId, key, body }) {
