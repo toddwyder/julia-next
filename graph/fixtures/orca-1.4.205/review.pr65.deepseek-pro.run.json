@@ -1,0 +1,163 @@
+{
+  "what": "The independent review of PR #65, run on the DeepSeek Pro reviewer seat started the way the controller starts it: a plain Orca terminal on the runner daemon in a fresh worktree of merged main, prompt piped into node ops/service-dropbox/run-pi-seat.mjs reviewer-backup.",
+  "seat": "reviewer-backup",
+  "provider": "deepseek",
+  "model": "deepseek-v4-pro",
+  "terminalId": "uid=1001(runner) gid=1001(runner) groups=1001(runner),1003(zai-readers),1004(deepseek-readers)",
+  "startedUtc": "2026-09-21T00:57:39.095Z",
+  "exitedUtc": "2026-09-21T01:02:54.638Z",
+  "wallSeconds": 315.543,
+  "exitCode": 0,
+  "toolCalls": 33,
+  "assistantCalls": 17,
+  "calls": [
+    {
+      "ts": 1789952259962,
+      "input": 2446,
+      "output": 220,
+      "cacheRead": 640,
+      "cacheWrite": 0,
+      "piCost": 0.00412808
+    },
+    {
+      "ts": 1789952262404,
+      "input": 4976,
+      "output": 141,
+      "cacheRead": 3200,
+      "cacheWrite": 0,
+      "piCost": 0.007267480000000001
+    },
+    {
+      "ts": 1789952264143,
+      "input": 5026,
+      "output": 368,
+      "cacheRead": 8192,
+      "cacheWrite": 0,
+      "piCost": 0.008452048
+    },
+    {
+      "ts": 1789952267892,
+      "input": 1657,
+      "output": 289,
+      "cacheRead": 13568,
+      "cacheWrite": 0,
+      "piCost": 0.003928672
+    },
+    {
+      "ts": 1789952270670,
+      "input": 5257,
+      "output": 161,
+      "cacheRead": 15488,
+      "cacheWrite": 0,
+      "piCost": 0.008258272
+    },
+    {
+      "ts": 1789952272787,
+      "input": 10200,
+      "output": 6562,
+      "cacheRead": 20864,
+      "cacheWrite": 0,
+      "piCost": 0.040367536
+    },
+    {
+      "ts": 1789952326901,
+      "input": 935,
+      "output": 515,
+      "cacheRead": 37504,
+      "cacheWrite": 0,
+      "piCost": 0.004923776
+    },
+    {
+      "ts": 1789952332237,
+      "input": 1491,
+      "output": 1685,
+      "cacheRead": 38912,
+      "cacheWrite": 0,
+      "piCost": 0.010352848000000001
+    },
+    {
+      "ts": 1789952345911,
+      "input": 7070,
+      "output": 1182,
+      "cacheRead": 41984,
+      "cacheWrite": 0,
+      "piCost": 0.015860416
+    },
+    {
+      "ts": 1789952357867,
+      "input": 159,
+      "output": 6129,
+      "cacheRead": 50176,
+      "cacheWrite": 0,
+      "piCost": 0.026688464000000002
+    },
+    {
+      "ts": 1789952412337,
+      "input": 2930,
+      "output": 296,
+      "cacheRead": 56448,
+      "cacheWrite": 0,
+      "piCost": 0.007523472
+    },
+    {
+      "ts": 1789952416956,
+      "input": 460,
+      "output": 7630,
+      "cacheRead": 59648,
+      "cacheWrite": 0,
+      "piCost": 0.033446512
+    },
+    {
+      "ts": 1789952492366,
+      "input": 273,
+      "output": 237,
+      "cacheRead": 67712,
+      "cacheWrite": 0,
+      "piCost": 0.004278208
+    },
+    {
+      "ts": 1789952495652,
+      "input": 1339,
+      "output": 98,
+      "cacheRead": 68096,
+      "cacheWrite": 0,
+      "piCost": 0.0051517839999999995
+    },
+    {
+      "ts": 1789952497480,
+      "input": 489,
+      "output": 4323,
+      "cacheRead": 69504,
+      "cacheWrite": 0,
+      "piCost": 0.020822736
+    },
+    {
+      "ts": 1789952544017,
+      "input": 175,
+      "output": 908,
+      "cacheRead": 74240,
+      "cacheWrite": 0,
+      "piCost": 0.00709324
+    },
+    {
+      "ts": 1789952553805,
+      "input": 348,
+      "output": 1986,
+      "cacheRead": 75264,
+      "cacheWrite": 0,
+      "piCost": 0.011635536
+    }
+  ],
+  "totalsAsPrintedByPi": {
+    "input": 45231,
+    "output": 32730,
+    "cacheRead": 701440,
+    "cacheWrite": 0,
+    "cost": 0.22017908000000003
+  },
+  "deepseekBalanceUsd": {
+    "beforeRun": "3.07",
+    "afterRun": "2.98",
+    "note": "read from DeepSeek's balance API, which reports to the cent. No other DeepSeek run happened between the two readings. The run therefore cost about 0.08 to 0.10 dollars."
+  }
+}

@@ -1464,8 +1464,7 @@ Orca's own `failureCount` stays 0 for a reported failure, so the two-rounds rule
 **Cost sources and rates** are in `docs/research/jul109-orca-1.4.205-findings.md` section 5 and
 `graph/rate-table.mjs`. Two things to remember: a Claude transcript repeats each message once per content
 block (count each `message.id` once) and is still about 15% under Claude Code's own record; and Pi's
-printed dollars are lower than DeepSeek's published price, which of the two is the real charge is not
-settled.
+Pi's printed DeepSeek dollars, DeepSeek's published price and the account balance all differ (on one measured review the balance was lowest: about $0.09, against $0.155 published and $0.22 Pi-printed), so treat a DeepSeek cost line as an upper estimate until a controlled run settles it.
 
 **Standing rule for every finding: a gap is recorded with what breaks if it stays.** "No dollar figure for
 Claude" is not a note, it is "the cost line will be blank for the seat doing most of the work". A gap

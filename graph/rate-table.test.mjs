@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  RATE_TABLE, costOf, isDeepseekPeak, piReportedCostOf, peakPromptTokens,
+  RATE_TABLE, costOf, isDeepseekPeak, piReportedCostOf, peakPromptTokens, claudeUsageFromTranscript,
 } from './rate-table.mjs';
 
 const fx = (name) => new URL(`./fixtures/orca-1.4.205/${name}`, import.meta.url);
@@ -35,7 +35,7 @@ for (const file of ['cost.claude-vs-claude-code.session-1.json', 'cost.claude-vs
   });
 }
 
-test('a Claude transcript repeats a message once per content block: count each message id once', () => {
+test('fixture check: the recorded Claude transcript really does repeat messages (this reads data, it runs no code)', () => {
   const t = json('cost.claude-vs-claude-code.session-2.json').transcript;
   assert.ok(t.assistant_lines > t.distinct_messages, 'the fixture must show the duplication');
   const sonnet = t.totals_by_model['claude-sonnet-5'];
@@ -128,7 +128,7 @@ test('Pi: peak context comes from the per-call usage in the seat\'s own JSON out
   assert.equal(rpc.stats.data.contextUsage.contextWindow, RATE_TABLE.models['deepseek-v4-flash'].contextWindow);
 });
 
-test('Pi: duration is measured by whoever starts the process and sees it exit', () => {
+test('fixture check: Pi duration, by two clocks that agree (this reads data, it runs no code)', () => {
   const start = Date.parse(readFileSync(fx('pi.timing.start.txt'), 'utf8').trim());
   const exit = Date.parse(readFileSync(fx('pi.timing.exit.txt'), 'utf8').trim());
   const wrapper = Number(readFileSync(fx('pi.timing.wrapper-result.txt'), 'utf8').match(/wall_seconds=([\d.]+)/)[1]);
@@ -137,4 +137,70 @@ test('Pi: duration is measured by whoever starts the process and sees it exit', 
 
 test('costOf refuses a model it has no rate for, instead of returning zero', () => {
   assert.throws(() => costOf('no-such-model', { input: 1 }), /no rate for model/);
+});
+
+// ---- the code that does the counting (added after the PR #65 review found the tests above only read fixtures)
+const asstLine = (id, blocks, usage) => ({ type: 'assistant', message: { id, model: 'claude-sonnet-5', content: blocks, usage } });
+
+test('claudeUsageFromTranscript counts a message once even when its content blocks are written as two lines', () => {
+  const usage = { input_tokens: 2, output_tokens: 259, cache_read_input_tokens: 59988, cache_creation: { ephemeral_1h_input_tokens: 1072 }, cache_creation_input_tokens: 1072 };
+  const lines = [
+    asstLine('m1', [{ type: 'text' }], { input_tokens: 2, output_tokens: 80, cache_read_input_tokens: 47801, cache_creation: { ephemeral_1h_input_tokens: 12187 }, cache_creation_input_tokens: 12187 }),
+    asstLine('m2', [{ type: 'text' }], usage),
+    asstLine('m2', [{ type: 'tool_use' }], usage), // the SAME message, second content block, identical usage
+    { type: 'user', message: { id: 'u1' } },
+  ];
+  const t = claudeUsageFromTranscript(lines)['claude-sonnet-5'];
+  assert.equal(t.messages, 2);
+  assert.equal(t.output, 80 + 259, 'summing lines would give 598');
+  assert.equal(t.cacheRead, 47801 + 59988);
+  assert.equal(t.cacheWrite1h, 12187 + 1072);
+});
+
+test('claudeUsageFromTranscript: a cache write with no lifetime split is counted as 1-hour; synthetic messages are ignored', () => {
+  const lines = [
+    asstLine('a', [{ type: 'text' }], { input_tokens: 1, output_tokens: 1, cache_creation_input_tokens: 500 }),
+    { type: 'assistant', message: { id: 's', model: '<synthetic>', usage: { input_tokens: 9, output_tokens: 9 } } },
+  ];
+  const out = claudeUsageFromTranscript(lines);
+  assert.equal(out['claude-sonnet-5'].cacheWrite1h, 500);
+  assert.equal(out['<synthetic>'], undefined);
+});
+
+test('peakPromptTokens counts Claude cache writes under both of Claude\'s field names, and Pi\'s cacheWrite', () => {
+  assert.equal(peakPromptTokens([{ input: 10, cacheRead: 1000, cacheWrite1h: 500 }]), 1510);
+  assert.equal(peakPromptTokens([{ input: 10, cacheRead: 1000, cacheWrite5m: 200, cacheWrite1h: 300 }]), 1510);
+  assert.equal(peakPromptTokens([{ input: 10, cacheRead: 1000, cacheWrite: 500 }]), 1510);
+  assert.equal(peakPromptTokens([{ input: 10, cacheRead: 5, output: 99999 }, { input: 1, cacheRead: 1 }]), 15, 'output is never part of the prompt; the peak is one call, not a sum');
+});
+
+test('Codex cache writes are priced at the cache-write rate, not the input rate (synthetic; the placement inside input_tokens is unproven)', () => {
+  const usd = costOf('gpt-6-astra', { input: 1000, cachedInput: 200, cacheWrite: 300, output: 0 });
+  close(usd, (500 * 10 + 200 * 1 + 300 * 12.5) / 1e6, 'codex with cache writes');
+  assert.ok(RATE_TABLE.models['gpt-6-astra'].unconfirmed, 'the table must say this is unproven');
+});
+
+// ---- the PR #65 review run: what Pi printed, what the published price gives, what the account was charged
+test('the review run: Pi printed the fetched model-store prices (DeepSeek\'s peak price at every hour), not its built-in ones', () => {
+  const run = json('review.pr65.deepseek-pro.run.json');
+  assert.equal(run.model, 'deepseek-v4-pro');
+  assert.ok(run.calls.length >= 10 && run.toolCalls > 0, 'a real multi-call review');
+  for (const c of run.calls) {
+    close(piReportedCostOf(run.model, c, { source: 'store' }), c.piCost, 'each call priced at the store rates');
+  }
+  const store = json('pi-models-store.deepseek.json').deepseek.models.find((m) => m.id === 'deepseek-v4-pro');
+  assert.deepEqual(RATE_TABLE.models['deepseek-v4-pro'].piModelStore,
+    { input: store.cost.input, output: store.cost.output, cacheRead: store.cost.cacheRead });
+  const builtIn = run.calls.reduce((s, c) => s + piReportedCostOf(run.model, c, { source: 'registry' }), 0);
+  assert.ok(run.totalsAsPrintedByPi.cost > 3 * builtIn, 'the built-in list would have printed far less');
+});
+
+test('the review run: the published price is above what the account balance shows it cost', () => {
+  const run = json('review.pr65.deepseek-pro.run.json');
+  const published = run.calls.reduce((s, c) => s + costOf(run.model, c, { at: new Date(c.ts) }), 0);
+  const spent = Number(run.deepseekBalanceUsd.beforeRun) - Number(run.deepseekBalanceUsd.afterRun);
+  assert.ok(Math.abs(spent - 0.09) < 1e-9);
+  // Both readings are to the cent, so the real charge is 0.08 to 0.10 (one run, one measurement).
+  assert.ok(published > 0.10, `published-price estimate ${published} should exceed the charge`);
+  assert.ok(run.totalsAsPrintedByPi.cost > 2 * spent, 'Pi printed more than twice the charge');
 });
