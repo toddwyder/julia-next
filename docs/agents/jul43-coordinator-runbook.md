@@ -582,6 +582,10 @@ worktree/branch were removed after (`orca worktree rm --worktree name:<name> --f
 
 ### Long-running Orca daemons hold stale supplementary groups (JUL-44) — fixed 2026-09-18
 
+*(Historical: this finding was recorded against the `zai` key. GLM and the `zai-readers` group were
+removed in JUL-93, so read `zai` below as any reader group; the same trap applies to
+`deepseek-readers` today.)*
+
 `zai.env` is `root:zai-readers` mode `0440`, and `/etc/group` correctly lists
 `zai-readers:x:1003:runner,orchestrator-svc`. Both `id runner` and `id orchestrator-svc` (NSS
 lookups) show `1003(zai-readers)`. But inside a terminal spawned by either Orca daemon, the `id`
