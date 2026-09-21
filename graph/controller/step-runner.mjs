@@ -154,6 +154,53 @@ function worktreePathOf(worktreeId) {
   return marker < 0 ? worktreeId : worktreeId.slice(marker + 2);
 }
 
+// THE ATTEMPT TOKEN, and why every name a second attempt uses carries it.
+//
+// A stopped attempt leaves things behind. JUL-92 stopped at build-and-review on
+// 2026-09-21 with the cost read refusing, which is BEFORE
+// `finishWorker` releases the worker and removes its worktree -- so the
+// worktree `jul-92-work` is still registered with Orca (`orca worktree list
+// --json` on the host, 2026-09-21: path
+// /home/runner/orca/workspaces/julia-next/jul-92-work, displayName
+// `jul-92-work`, branch `refs/heads/jul-92-work`). Put the card back in Ready
+// and the next attempt asks for those same names again.
+//
+// WHAT ORCA ACTUALLY DOES WITH A REPEATED NAME -- measured, not assumed, by
+// creating the same `--name` three times on this host at 1.4.205 and recording
+// the answers (graph/fixtures/orca-1.4.205/worktree-create.duplicate-name-suffixed.json):
+// it does NOT refuse. It silently creates a DIFFERENT path and a DIFFERENT
+// branch -- `jul98-5d-probe-2`, then `-3` -- while keeping
+// `displayName: "jul98-5d-probe"` with `displayNameMode: "fixed"` on every one
+// of them. So two attempts on one card leave two rows sharing one display
+// name, and Orca's own `name:<displayName>` selector can then no longer address
+// either: `worktree rm --worktree name:jul98-5d-probe` answered
+// `selector_ambiguous`
+// (graph/fixtures/orca-1.4.205/worktree-rm.duplicate-name-ambiguous.error.json).
+// The controller removes by `id:`, so it survives that -- but the branch it
+// publishes stops being the branch the card is named after, and no operator can
+// clean up by name any more.
+//
+// AND THE HARDER HALF, which a unique name is the same fix for: the request
+// ledger. `requestId` below is the controller's logical key for a
+// `worker-start`, and ./wiring.mjs turns a key it has already seen into
+// `--retry-request <id>`, which Orca REPLAYS -- "no second worker" is the whole
+// point of it. A second attempt on the same card with the same key would
+// therefore not start a worker at all: it would be handed the stopped
+// attempt's dispatch back, whose terminal and worker are gone, and then wait on
+// a mailbox nothing will ever post to.
+//
+// So the attempt number goes into BOTH the worktree name and the request key.
+// It is not invented here: ./main.mjs counts it per card in the controller's
+// state file and hands it down, so it survives a restart and can only go
+// forwards. Nothing leftover is deleted to make room -- `worktree rm` "also
+// attempts to delete the checked-out local branch" (`orca worktree rm --help`),
+// which would destroy the stopped attempt's commits, and the coordinator reads
+// that worktree.
+export function attemptTag(attempt) {
+  const n = Number.isInteger(attempt) && attempt > 0 ? attempt : 1;
+  return `a${n}`;
+}
+
 // One step end to end: the builder, then the reviewer, on ONE test run, with a
 // cost line for each and no way to finish without both.
 export async function runBuildAndReview({
@@ -163,8 +210,12 @@ export async function runBuildAndReview({
   suiteRunner,
   suiteKey = `${card.identifier}:${step.key ?? step.title}`,
   seats = ['builder', 'reviewer'],
+  // Which attempt on this card this is. 1 on a card that has never been
+  // carried; ./main.mjs increments it before the work starts.
+  attempt = 1,
   ...shared
 } = {}) {
+  const tag = attemptTag(attempt);
   const results = {};
   for (const seat of seats) {
     results[seat] = await runWorkerStep({
@@ -172,8 +223,8 @@ export async function runBuildAndReview({
       card,
       step,
       choice: choices[seat],
-      worktreeName: `${card.identifier.toLowerCase()}-${step.key ?? 'step'}${seat === 'reviewer' ? '-review' : ''}`,
-      requestId: `${suiteKey}:${seat}`,
+      worktreeName: `${card.identifier.toLowerCase()}-${step.key ?? 'step'}${seat === 'reviewer' ? '-review' : ''}-${tag}`,
+      requestId: `${suiteKey}:${seat}:${tag}`,
       suiteRunner,
       suiteKey,
       // The reviewer never re-runs the suite: it is handed the builder's run.

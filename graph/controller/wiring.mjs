@@ -55,7 +55,6 @@
 // through Orca instead of starting a second run or a second worker.
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import os from 'node:os';
 import { join } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -120,6 +119,27 @@ export const REPO_SELECTOR = `path:${ORCHESTRATOR_CHECKOUT}`;
 export const WORKER_ENVIRONMENT = 'ovh-local';
 export const WORKER_CHECKOUT = '/home/runner/julia-next';
 export const WORKER_REPO_SELECTOR = `path:${WORKER_CHECKOUT}`;
+// AND THE WORKER'S HOME DIRECTORY, named here for the same reason the daemon
+// and the checkout are: it belongs to `runner`, not to the account this process
+// runs as. A worker's session files -- the Claude transcript under
+// `<home>/.claude/projects/` and the Codex rollout under
+// `<home>/.codex/sessions/` -- are written BY THE WORKER, so they land under
+// this home and nowhere else.
+//
+// THE CONTROLLER'S OWN HOME IS NEVER THE RIGHT PLACE TO LOOK, which is why the
+// cost reader below takes WORKER_HOME and not this process's `os.homedir()`.
+// The controller runs as `orchestrator-svc`, whose home is
+// /home/orchestrator-svc (its passwd entry: `echo ~orchestrator-svc`); no
+// worker has ever written a byte into it, and it is not even readable by
+// `runner` (`ls -a /home/orchestrator-svc` as `runner` on 2026-09-21:
+// "Permission denied"). Looking there finds no transcript, the reader refuses,
+// the seat gets no cost line, and `assertEverySeatCosted` stops the step --
+// which is exactly what happened to JUL-92 on 2026-09-21: "stopped at
+// build-and-review -- no cost line for the builder seat". That worker's
+// transcript is real and is at
+// /home/runner/.claude/projects/-home-runner-orca-workspaces-julia-next-jul-92-work
+// (listed on the host, 2026-09-21).
+export const WORKER_HOME = '/home/runner';
 export const PUBLISH_OWNER = 'toddwyder';
 export const PUBLISH_REPO = 'julia-next';
 export const PUBLISH_BASE = 'main';
@@ -509,13 +529,18 @@ function newestCodexRollout(root, { readdirImpl, statImpl }) {
 // One seat's figures, read while the worker's session files still exist --
 // which is why graph/controller/release.mjs reads BEFORE it releases.
 //
-// WHAT THIS CANNOT PROVE BY TEST, stated here rather than left implied: that
-// the real Claude/Codex worker Orca started on the server writes its session
-// file where this looks. The LAYOUT is recorded (findings section 5, and the
-// directory names on this host); that a controller-started worker lands in it
-// is only provable when the controller runs for real.
+// WHERE A CONTROLLER-STARTED WORKER REALLY WRITES, no longer a guess. The
+// controller ran for real against JUL-92 on 2026-09-21 and the builder it
+// started left its transcript at
+// /home/runner/.claude/projects/-home-runner-orca-workspaces-julia-next-jul-92-work
+// -- i.e. under the WORKER's home, with the directory named by
+// `claudeProjectDirName` of the worker's worktree path. The LAYOUT was already
+// recorded (JUL-109 findings, section 5); that run is what pinned the home.
 export function createSeatCostReader({
-  homedir = os.homedir(),
+  // THE WORKER'S HOME, never this process's own. See WORKER_HOME at the top of
+  // this file for what breaks when the two are confused -- it is the JUL-92
+  // blank-cost-line stop, not a hypothetical.
+  workerHome = WORKER_HOME,
   readFileImpl = readFileSync,
   readdirImpl = readdirSync,
   statImpl = statSync,
@@ -523,7 +548,7 @@ export function createSeatCostReader({
   return async function readSeatCost({ seat, worktree, agent, startedAt = null, endedAt = null }) {
     const worktreePath = worktreePathOf(worktree);
     if (agent === 'claude') {
-      const dir = join(homedir, '.claude', 'projects', claudeProjectDirName(worktreePath));
+      const dir = join(workerHome, '.claude', 'projects', claudeProjectDirName(worktreePath));
       const file = newestFile(dir, (name) => name.endsWith('.jsonl'), { readdirImpl, statImpl });
       if (!file) {
         throw new Error(`no Claude transcript for the ${seat} seat under ${dir} -- its cost cannot be read, so the worker and its worktree are left in place`);
@@ -534,7 +559,7 @@ export function createSeatCostReader({
       return seatCostLine({ seat, ...claudeExtractFromTranscript(splitJsonl(readFileImpl(file, 'utf8'))) });
     }
     if (agent === 'codex') {
-      const root = join(homedir, '.codex', 'sessions');
+      const root = join(workerHome, '.codex', 'sessions');
       const file = newestCodexRollout(root, { readdirImpl, statImpl });
       if (!file) {
         throw new Error(`no Codex rollout for the ${seat} seat under ${root} -- its cost cannot be read, so the worker and its worktree are left in place`);

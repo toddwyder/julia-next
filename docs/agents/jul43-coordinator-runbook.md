@@ -1535,6 +1535,60 @@ Reading that absence as "no turn started" would release a perfectly healthy work
 `createOrcaBoundaries` asks for `--limit 200` and treats *absent on a truncated page* as an error,
 never as a verdict.
 
+### A worker's cost figures are under the **worker's** home, never the controller's (JUL-98 step 5, 2026-09-21)
+
+The controller runs as `orchestrator-svc`; a worker runs as `runner`. The session files a cost
+line is read from are written **by the worker**, so they are under `runner`'s home and nowhere
+else: the Claude transcript at `/home/runner/.claude/projects/<the worktree path with every
+non-alphanumeric character replaced by a dash>/`, the Codex rollout under
+`/home/runner/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`.
+
+`createSeatCostReader` in `graph/controller/wiring.mjs` took `os.homedir()` as its default, which
+under the unit is `/home/orchestrator-svc` — a directory no worker has ever written into, and one
+`runner` cannot even open (`ls -a /home/orchestrator-svc` as `runner`: "Permission denied"). The
+read found nothing, the reader refused, the seat got no cost line, and `assertEverySeatCosted`
+stopped the step. That is exactly what happened to JUL-92 on 2026-09-21: *"stopped at
+build-and-review -- no cost line for the builder seat"*. The builder's transcript for that run was
+real all along, at
+`/home/runner/.claude/projects/-home-runner-orca-workspaces-julia-next-jul-92-work`.
+
+The reader now takes `workerHome`, defaulting to the exported `WORKER_HOME` (`/home/runner`),
+named in the same constant block as `WORKER_CHECKOUT` and `WORKER_ENVIRONMENT` and for the same
+reason. **The rule, three defects in:** anything in `graph/controller/` that touches worker files,
+worker processes or the worker account must name the worker side explicitly. The controller's own
+daemon, checkout and home are never the default for something the worker made.
+
+### A repeated `--name` is not refused by Orca — it is silently suffixed (JUL-98 step 5, 2026-09-21)
+
+A step that stops before `finishWorker` leaves the worker's worktree registered: JUL-92 stopped at
+the cost read, so `jul-92-work` is still in `orca worktree list`. Asking for that name again does
+**not** fail. Measured on this host at 1.4.205 by creating the same `--name` three times
+(recorded as `graph/fixtures/orca-1.4.205/worktree-create.duplicate-name-suffixed.json`): each
+repeat answers `ok: true` with a different `path` and a different `branch` — `…-2`, then `…-3` —
+while `displayName` stays the name asked for, with `displayNameMode: "fixed"`. Two worktrees then
+share one display name, and Orca's own `name:<displayName>` selector can address neither:
+`worktree rm --worktree name:<that name>` answers `selector_ambiguous`
+(`worktree-rm.duplicate-name-ambiguous.error.json`).
+
+So a second attempt would get a branch that is not the one the card is named after, and no operator
+could clean up by name. The **harder** half is the request ledger: `requestId` is the controller's
+logical key for a `worker-start`, and a key it has already seen becomes `--retry-request`, which
+Orca replays. With an unchanged key a second attempt would be handed the stopped attempt's dispatch
+— a worker that no longer exists — and would then wait on a mailbox nothing will ever post to.
+
+The fix is an **attempt number**, and it goes into both. `graph/controller/main.mjs` counts attempts
+per card in the controller's state file (`attempts`, round-tripped by `normalize` in `state.mjs`),
+increments it *before* the work starts, and hands it to `runBuildAndReview`, which appends
+`attemptTag(attempt)` — `a1`, `a2`, … — to the worktree name and to the request key. So the first
+attempt on JUL-92 asks for `jul-92-work-a1`, which collides with the leftover `jul-92-work` in no
+way at all. **Nothing leftover is deleted to make room:** `orca worktree rm --help` says removal
+"also attempts to delete the checked-out local branch", which would destroy the stopped attempt's
+commits.
+
+**Still open, and not fixed here:** the run-create request key is `<identifier>:run`
+(`requestIdFor` in `graph/controller/core.mjs`), which carries no attempt, so a second attempt on a
+card replays the first attempt's Orca run rather than taking a new one.
+
 ### The controller writes to Linear as the app, and only `orchestrator-svc` can run it (JUL-98 step 2)
 
 `graph/controller/board.mjs` (`createControllerBoard`) is the board `runControllerCheck` actually

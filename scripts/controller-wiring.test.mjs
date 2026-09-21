@@ -27,6 +27,7 @@ import {
   REPO_SELECTOR,
   WORKER_REPO_SELECTOR,
   WORKER_CHECKOUT,
+  WORKER_HOME,
   ORCHESTRATOR_CHECKOUT,
   ORCHESTRATOR_ENVIRONMENT,
   WORKER_ENVIRONMENT,
@@ -222,7 +223,7 @@ test("a Claude seat's cost is read from the transcript of its OWN worktree, newe
     const { utimesSync } = await import('node:fs');
     utimesSync(join(dir, 'old.jsonl'), new Date('2026-09-21T10:00:00Z'), new Date('2026-09-21T10:00:00Z'));
 
-    const read = createSeatCostReader({ homedir: home });
+    const read = createSeatCostReader({ workerHome: home });
     const cost = await read({ seat: 'builder', worktree, agent: 'claude' });
     assert.equal(cost.seat, 'builder');
     assert.equal(cost.model, 'claude-opus-5');
@@ -236,7 +237,7 @@ test("a Claude seat's cost is read from the transcript of its OWN worktree, newe
 test('a seat whose session file is missing REFUSES rather than returning a blank cost line', async () => {
   const home = mkdtempSync(join(tmpdir(), 'controller-cost-'));
   try {
-    const read = createSeatCostReader({ homedir: home });
+    const read = createSeatCostReader({ workerHome: home });
     await assert.rejects(
       () => read({ seat: 'builder', worktree: 'repo-1::/home/runner/w/gone', agent: 'claude' }),
       /no Claude transcript/,
@@ -253,6 +254,64 @@ test('a seat whose session file is missing REFUSES rather than returning a blank
     );
   } finally {
     rmSync(home, { recursive: true, force: true });
+  }
+});
+
+// JUL-98 step 5, third fix. The controller runs as `orchestrator-svc`; the
+// worker runs as `runner` and writes its session files under `runner`'s home.
+// A reader defaulted to THIS process's home looks somewhere no worker has ever
+// written, finds nothing, refuses, and the blank cost line stops the step --
+// the JUL-92 stop of 2026-09-21.
+//
+// `os.homedir()` on POSIX answers $HOME, so these two set $HOME to somewhere
+// that is definitely not the worker's home and then check where the reader
+// looked. Put `os.homedir()` back as the default and both fail.
+test("the Claude cost read looks under the WORKER's home, never the home of the process doing the reading", async () => {
+  const notTheWorkerHome = mkdtempSync(join(tmpdir(), 'controller-own-home-'));
+  const previousHome = process.env.HOME;
+  const asked = [];
+  try {
+    process.env.HOME = notTheWorkerHome;
+    const read = createSeatCostReader({
+      readdirImpl: (dir) => { asked.push(dir); throw new Error('ENOENT'); },
+      statImpl: () => { throw new Error('ENOENT'); },
+      readFileImpl: () => { throw new Error('ENOENT'); },
+    });
+    await assert.rejects(
+      () => read({ seat: 'builder', worktree: 'repo-1::/home/runner/orca/workspaces/julia-next/jul-92-work', agent: 'claude' }),
+      /no Claude transcript/,
+    );
+    assert.deepEqual(asked, [
+      '/home/runner/.claude/projects/-home-runner-orca-workspaces-julia-next-jul-92-work',
+    ], 'exactly the directory the JUL-92 worker really wrote to');
+    assert.ok(!asked[0].startsWith(notTheWorkerHome), "and nothing under the reading process's own home");
+    assert.equal(WORKER_HOME, '/home/runner');
+  } finally {
+    if (previousHome === undefined) delete process.env.HOME; else process.env.HOME = previousHome;
+    rmSync(notTheWorkerHome, { recursive: true, force: true });
+  }
+});
+
+test("the Codex cost read looks under the WORKER's home too -- the same bug, the same fix", async () => {
+  const notTheWorkerHome = mkdtempSync(join(tmpdir(), 'controller-own-home-'));
+  const previousHome = process.env.HOME;
+  const asked = [];
+  try {
+    process.env.HOME = notTheWorkerHome;
+    const read = createSeatCostReader({
+      readdirImpl: (dir) => { asked.push(dir); throw new Error('ENOENT'); },
+      statImpl: () => { throw new Error('ENOENT'); },
+      readFileImpl: () => { throw new Error('ENOENT'); },
+    });
+    await assert.rejects(
+      () => read({ seat: 'reviewer', worktree: 'repo-1::/home/runner/orca/workspaces/julia-next/jul-92-work-review', agent: 'codex' }),
+      /no Codex rollout/,
+    );
+    assert.deepEqual(asked, ['/home/runner/.codex/sessions'], "the worker's rollout root, walked from there");
+    assert.ok(!asked[0].startsWith(notTheWorkerHome));
+  } finally {
+    if (previousHome === undefined) delete process.env.HOME; else process.env.HOME = previousHome;
+    rmSync(notTheWorkerHome, { recursive: true, force: true });
   }
 });
 

@@ -15,7 +15,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { runWorkerStep, runBuildAndReview } from '../graph/controller/step-runner.mjs';
+import { runWorkerStep, runBuildAndReview, attemptTag } from '../graph/controller/step-runner.mjs';
 import { createSuiteRunner } from '../graph/controller/test-run.mjs';
 import { createFixtureWorkerOrca, loadOrcaFixture } from '../graph/controller/fixture-orca.mjs';
 import { turnStartedFromSend } from '../graph/controller/turn-start.mjs';
@@ -227,4 +227,58 @@ test('the step cannot be reported done while a seat has no cost line', async () 
   assert.equal(result.ok, false);
   assert.match(result.reason, /peakContext/);
   assert.ok(!h.order.includes('release:reviewer'), 'and the reviewer was not released with its figures unread');
+});
+
+// ---------------------------------------------------------------------------
+// A SECOND ATTEMPT ON THE SAME CARD (JUL-98 step 5, third fix)
+// ---------------------------------------------------------------------------
+
+// The live JUL-92 run stopped at build-and-review, which is before the worker
+// is released and its worktree removed -- so `jul-92-work` is still registered
+// with Orca. These pin what a second attempt asks for, and the recorded reason
+// it has to ask for something different.
+test('a repeated worktree name is not refused by Orca -- it is silently suffixed, and the shared display name then addresses nothing', () => {
+  const again = loadOrcaFixture('worktree-create.duplicate-name-suffixed.json').result.worktree;
+  assert.equal(again.displayName, 'jul98-5d-probe', 'the third create with that same --name');
+  assert.equal(again.path, '/home/runner/orca/workspaces/julia-next/jul98-5d-probe-3', 'a DIFFERENT path');
+  assert.equal(again.branch, 'refs/heads/jul98-5d-probe-3', 'and a DIFFERENT branch than the name asked for');
+
+  const rm = loadOrcaFixture('worktree-rm.duplicate-name-ambiguous.error.json');
+  assert.equal(rm.ok, false);
+  assert.equal(rm.error.code, 'selector_ambiguous', "and Orca's own name:<displayName> selector can then address neither");
+});
+
+test('a second attempt on the same card asks for a NEW worktree name and a NEW request key, so it collides with nothing a stopped attempt left behind', async () => {
+  const h = harness();
+  const runner = () => createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+
+  const first = await runBuildAndReview({ card: CARD, step: STEP, choices: CHOICES, suiteRunner: runner(), attempt: 1, ...h.deps });
+  const second = await runBuildAndReview({ card: CARD, step: STEP, choices: CHOICES, suiteRunner: runner(), attempt: 2, ...h.deps });
+
+  const calls = h.orca.workerStartCalls();
+  assert.equal(calls.length, 4, 'two seats, twice');
+  assert.deepEqual(calls.map((call) => call.name), [
+    'jul-92-step-1-a1', 'jul-92-step-1-review-a1',
+    'jul-92-step-1-a2', 'jul-92-step-1-review-a2',
+  ], 'every name carries its attempt, so no name is ever asked for twice');
+  assert.equal(new Set(calls.map((call) => call.requestId)).size, 4, 'and so does every request-ledger key');
+
+  // The request key is the half that would bite hardest: the ledger turns a
+  // repeated key into `--retry-request`, which Orca REPLAYS. Without the
+  // attempt in it, the second attempt would be handed the stopped attempt's
+  // dispatch -- a worker that no longer exists -- and would then wait on a
+  // mailbox nothing will ever post to.
+  const dispatchIds = [first.builder.dispatchId, first.reviewer.dispatchId, second.builder.dispatchId, second.reviewer.dispatchId];
+  assert.equal(new Set(dispatchIds).size, 4, 'four real workers, no replayed dispatch');
+  assert.equal(second.ok, true);
+});
+
+test('the attempt number defaults to the first attempt, and a nonsense one is still a usable name', async () => {
+  const h = harness();
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+  await runBuildAndReview({ card: CARD, step: STEP, choices: CHOICES, suiteRunner, ...h.deps });
+  assert.deepEqual(h.orca.workerStartCalls().map((call) => call.name), ['jul-92-step-1-a1', 'jul-92-step-1-review-a1']);
+  assert.equal(attemptTag(undefined), 'a1');
+  assert.equal(attemptTag(0), 'a1');
+  assert.equal(attemptTag(7), 'a7');
 });
