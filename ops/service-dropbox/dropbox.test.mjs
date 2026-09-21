@@ -355,6 +355,19 @@ test('the controller app boxes accept a plausible client ID and secret, and reje
   assert.equal(validateFieldShape('linear-app-secret', 'https://linear.app/settings/api').ok, false);
 });
 
+test('the form shows a labelled, hinted box for each controller app field, with matching for/id', async (t) => {
+  const statePath = tmpState();
+  await saveState(statePath, { armedAt: new Date().toISOString(), received: {}, usedAt: null });
+  await withServer(t, { statePath, writeSecret: async () => {}, now: () => Date.now() }, async (base) => {
+    const { body } = await request(`${base}/`);
+    for (const [id, label] of [['linear-app-id', 'Julia controller: client ID'], ['linear-app-secret', 'Julia controller: client secret']]) {
+      assert.match(body, new RegExp(`<label for="${id}">${label}`), `${id} has its label`);
+      assert.match(body, new RegExp(`<input type="text" id="${id}" name="${id}"`), `${id} has its input`);
+    }
+    assert.match(body, /client credentials tokens switched on/, 'the hint says to switch client credentials on');
+  });
+});
+
 test('the controller app boxes are readable by orchestrator-svc only, never a group runner is in', () => {
   assert.equal(FIELD_GROUPS['linear-app-id'], 'orchestrator-svc');
   assert.equal(FIELD_GROUPS['linear-app-secret'], 'orchestrator-svc');

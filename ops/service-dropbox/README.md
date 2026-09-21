@@ -105,8 +105,8 @@ sudo -u dropbox-svc node /opt/orca-runner/service-dropbox/dropbox.mjs --rearm
 ## Why a dedicated account, and why a sudo helper instead of direct writes
 
 Same reasoning as `ops/journey-relay/README.md`: same-UID processes can read each other's
-environment and open files via `/proc/<pid>/`. `dropbox-svc` briefly holds up to seven raw
-bearer tokens per request; if it also owned the destination files, any bug or compromise in
+environment and open files via `/proc/<pid>/`. `dropbox-svc` briefly holds up to eight raw
+tokens and secrets per request; if it also owned the destination files, any bug or compromise in
 this ~250-line HTTP handler would have direct write access to every one of those accounts'
 credential stores, not just `orchestrator-svc`'s.
 Routing every write through one fixed, root-owned, single-purpose helper script means the actual

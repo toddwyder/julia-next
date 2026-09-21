@@ -170,7 +170,7 @@ const HINTS = {
   axiom: 'From Axiom: Settings -> API tokens. A long string of letters/numbers, no spaces.',
   deepseek: 'From DeepSeek: Platform -> API keys. A long string of letters/numbers, no spaces.',
   linear: 'From Linear: Settings -> Security & access -> Personal API keys. A long string of letters/numbers, no spaces.',
-  'linear-app-id': 'From Linear: Settings -> API -> OAuth applications -> Julia controller -> Client ID. A long string of letters/numbers, no spaces.',
+  'linear-app-id': 'From Linear: Settings -> API -> OAuth applications -> Julia controller (created with client credentials tokens switched on) -> Client ID. A long string of letters/numbers, no spaces.',
   'linear-app-secret': 'From Linear: the same Julia controller page -> Client secret (shown once, right after you create the app). A long string of letters/numbers, no spaces.',
 };
 
