@@ -226,3 +226,43 @@ test('postComment still posts a body that passes the guard', async () => {
   const comment = await postComment('JUL-77', 'Progress.\n\nFor Todd: nothing', { apiKey: 'k', fetchImpl });
   assert.equal(comment.id, 'c1');
 });
+
+// ---------------------------------------------------------------------------
+// JUL-98 step 2, item 1: a refused call must be recognisable as an EXPIRED
+// TOKEN rather than as any other failure, so the controller can renew and retry
+// exactly once (graph/controller/token.mjs isAuthRefusal). A thrown Error whose
+// only content is a message string cannot carry that, so linearGraphQL attaches
+// the HTTP status and the parsed body to the error it throws.
+// ---------------------------------------------------------------------------
+
+test('a Linear failure carries its HTTP status and parsed body on the thrown error', async () => {
+  const body = {
+    errors: [{
+      message: 'Authentication required, but not passed',
+      extensions: { type: 'authentication', code: 'AUTHENTICATION_ERROR' },
+    }],
+  };
+  const fetchImpl = async () => ({ ok: false, status: 401, json: async () => body });
+  await assert.rejects(
+    () => linearGraphQL('query { viewer { id } }', {}, { apiKey: 'k', fetchImpl }),
+    (error) => {
+      assert.equal(error.status, 401);
+      assert.deepEqual(error.body, body);
+      assert.match(error.message, /Linear API error: 401/);
+      return true;
+    },
+  );
+});
+
+test('a 200 response carrying GraphQL errors also throws with its status and body attached', async () => {
+  const body = { errors: [{ message: 'Entity not found', extensions: { type: 'invalid_input' } }] };
+  const fetchImpl = async () => ({ ok: true, status: 200, json: async () => body });
+  await assert.rejects(
+    () => linearGraphQL('query { issue { id } }', {}, { apiKey: 'k', fetchImpl }),
+    (error) => {
+      assert.equal(error.status, 200);
+      assert.deepEqual(error.body, body);
+      return true;
+    },
+  );
+});

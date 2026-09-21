@@ -253,11 +253,15 @@ test('a builder fallback to DeepSeek is allowed only when the reviewer is not on
   assert.equal(result.choices.builder.modelLabel, 'builder-deepseek-flash');
   assert.equal(result.choices['feature-builder'].entry, 'pi-deepseek', 'the agent-keyed entry moves too');
   assert.equal(result.choices.reviewer.entry, 'codex');
-  // With the default reviewer (DeepSeek) the same fallback is refused, not silently used.
-  const refused = fallbackSeatChoice(resolveSeatChoices([]), 'builder');
-  assert.equal(refused.ok, false);
-  assert.match(refused.reason, /refusing the builder backup \(pi-deepseek\)/);
-  assert.match(refused.reason, /different families/);
+  assert.equal(result.partnerMoved, null, 'nothing else had to move');
+  // With the default reviewer (DeepSeek) the same fallback used to be REFUSED
+  // and the card stalled. Since JUL-98 step 2 item 6 the reviewer moves to its
+  // own backup instead; the strict answer is still available on request, and
+  // both are pinned by their own tests below.
+  const strict = fallbackSeatChoice(resolveSeatChoices([]), 'builder', { movePartner: false });
+  assert.equal(strict.ok, false);
+  assert.match(strict.reason, /refusing the builder backup \(pi-deepseek\)/);
+  assert.match(strict.reason, /different families/);
 });
 
 test('a DeepSeek reviewer failure falls back to Codex, against a claude builder (the default) -- JUL-98', () => {
@@ -271,16 +275,22 @@ test('a DeepSeek reviewer failure falls back to Codex, against a claude builder 
   assert.equal(result.choices.builder.entry, 'claude', 'the builder is untouched');
 });
 
-test('a fallback whose backup collides with the other seat is still refused, not silently used', () => {
+test('a fallback whose backup collides with the other seat is never silently used: it either moves the partner or refuses', () => {
   const choices = resolveSeatChoices([]); // builder claude, reviewer DeepSeek
-  // A table whose reviewer backup is claude (the builder's family): the guard
-  // must refuse it, not produce a same-family pair. The real table no longer
-  // has this backup (JUL-98), so the guard is exercised on a copy that does.
+  // A table whose reviewer backup is claude (the builder's family). The real
+  // table no longer has this backup (JUL-98), so the guard is exercised on a
+  // copy that does.
   const collidingTable = { ...SEAT_TABLE, 'adversarial-reviewer': { primary: 'pi-deepseek', backup: 'claude' } };
-  const result = fallbackSeatChoice(choices, 'reviewer', { table: collidingTable });
-  assert.equal(result.ok, false);
-  assert.match(result.reason, /refusing the reviewer backup/);
-  assert.match(result.reason, /different families/);
+  // With the partner move switched off, the old refusal stands unchanged.
+  const refused = fallbackSeatChoice(choices, 'reviewer', { table: collidingTable, movePartner: false });
+  assert.equal(refused.ok, false);
+  assert.match(refused.reason, /refusing the reviewer backup/);
+  assert.match(refused.reason, /different families/);
+  // With it on (the default, JUL-98 step 2 item 6) the partner moves and the
+  // resulting pair is still from two different families -- never the same one.
+  const moved = fallbackSeatChoice(choices, 'reviewer', { table: collidingTable });
+  assert.equal(moved.ok, true);
+  assert.equal(validateFamilyChoice(moved.choices).ok, true);
 });
 
 // GLM was removed (JUL-93). A card that still carries a GLM label is REFUSED
@@ -394,7 +404,7 @@ test('the fallback CLI allows reviewer -> codex while the builder is on claude, 
   assert.equal(err, '');
   // `--seat reviewer` keeps working and still names the adversarial reviewer;
   // the printed label carries that seat's live board prefix.
-  assert.deepEqual(JSON.parse(out), { seat: 'reviewer', entry: 'codex', modelLabel: 'adversary-codex' });
+  assert.deepEqual(JSON.parse(out), { seat: 'reviewer', entry: 'codex', modelLabel: 'adversary-codex', partnerMoved: null, partnerMovedReason: null });
   assert.match(out, /\n {2}"seat"/);
   // The agent key spells the same fallback.
   const byAgentKey = runCli(['fallback', '--seat', 'adversarial-reviewer', '--builder', 'claude']);
@@ -406,31 +416,47 @@ test('the fallback CLI allows reviewer -> codex while the builder is already on 
   const { out, code } = runCli(['fallback', '--seat', 'reviewer', '--builder', 'pi-deepseek']);
   assert.equal(code, 0);
   assert.equal(JSON.parse(out).entry, 'codex');
+  assert.equal(JSON.parse(out).partnerMoved, null, 'nothing else had to move');
 });
 
-test('the fallback CLI refuses builder -> pi-deepseek while the reviewer is on pi-deepseek, and exits non-zero', () => {
+test('the fallback CLI moves the reviewer out of the way for a capped builder, and says so (JUL-98 step 2)', () => {
+  // This used to exit non-zero with "refusing the builder backup", which is the
+  // stall the runbook worked around by hand. The CLI now answers with the pair
+  // to dispatch and names the seat it moved.
   const { out, err, code } = runCli(['fallback', '--seat', 'builder', '--reviewer', 'pi-deepseek']);
-  assert.notEqual(code, 0);
-  assert.equal(out, '');
-  assert.match(err, /refusing the builder backup \(pi-deepseek\)/);
-  assert.match(err, /different families/);
-  assert.equal(err.trim().split('\n').length, 1);
+  assert.equal(code, 0);
+  assert.equal(err, '');
+  const answer = JSON.parse(out);
+  assert.equal(answer.entry, 'pi-deepseek');
+  assert.deepEqual(answer.partnerMoved, {
+    seat: 'reviewer',
+    from: 'pi-deepseek',
+    to: 'codex',
+    modelLabel: 'adversary-codex',
+  });
+  // JUL-98 step 2 attempt 2: the reason travelled too. The CLI used to drop it,
+  // so the one sentence the controller posts on the card existed nowhere a
+  // caller of this command could see it.
+  assert.equal(
+    answer.partnerMovedReason,
+    'the builder fell back to pi-deepseek, so the reviewer moved to its own backup adversary-codex to keep builder and reviewer in different families',
+  );
 });
 
 test('the fallback CLI is a real entry point: the process itself allows the reviewer fallback off a claude builder (JUL-98)', async () => {
   const { stdout } = await execFileAsync(process.execPath, [SEAT_LABELS_CLI, 'fallback', '--seat', 'reviewer', '--builder', 'claude']);
-  assert.deepEqual(JSON.parse(stdout), { seat: 'reviewer', entry: 'codex', modelLabel: 'adversary-codex' });
+  assert.deepEqual(JSON.parse(stdout), { seat: 'reviewer', entry: 'codex', modelLabel: 'adversary-codex', partnerMoved: null, partnerMovedReason: null });
 });
 
-test('the fallback CLI is a real entry point: the process itself refuses the builder fallback onto the reviewer\'s family, non-zero', async () => {
-  await assert.rejects(
-    () => execFileAsync(process.execPath, [SEAT_LABELS_CLI, 'fallback', '--seat', 'builder', '--reviewer', 'pi-deepseek']),
-    (error) => {
-      assert.notEqual(error.code, 0);
-      assert.match(error.stderr, /refusing the builder backup \(pi-deepseek\)/);
-      return true;
-    },
-  );
+test('the fallback CLI is a real entry point: the process itself moves the reviewer for a capped builder (JUL-98 step 2)', async () => {
+  // The refusal path still exists and is pinned in-process above (a partner
+  // with no legal backup). It is no longer reachable through the CLI's own
+  // arguments, because the CLI always reads the real seat table, in which the
+  // reviewer's backup (Codex) always resolves the collision.
+  const { stdout } = await execFileAsync(process.execPath, [SEAT_LABELS_CLI, 'fallback', '--seat', 'builder', '--reviewer', 'pi-deepseek']);
+  const answer = JSON.parse(stdout);
+  assert.equal(answer.entry, 'pi-deepseek');
+  assert.equal(answer.partnerMoved.modelLabel, 'adversary-codex');
 });
 
 test('the fallback CLI treats a bad seat or an unknown builder entry as a one-line usage error, not a refusal', () => {
@@ -444,4 +470,111 @@ test('the fallback CLI treats a bad seat or an unknown builder entry as a one-li
   const retiredSeat = runCli(['fallback', '--seat', 'orchestrator']);
   assert.equal(retiredSeat.code, 2);
   assert.match(retiredSeat.err, /^usage: /);
+});
+
+// ---------------------------------------------------------------------------
+// JUL-98 step 2, item 6: the capped-builder family fix.
+//
+// Today, a builder that hits its Claude cap falls back to DeepSeek, the family
+// rule sees the reviewer is also DeepSeek, refuses the fallback, and the card
+// stalls. The runbook's answer was a by-hand step ("Move the reviewer to
+// `adversary-codex` on the card first, then fall back the builder"), which is
+// exactly the Friday risk this card names. The guard now does that move itself:
+// the PARTNER seat goes to its own backup, and the fallback reports it so the
+// controller can say so in one comment.
+// ---------------------------------------------------------------------------
+
+test('a capped builder no longer stalls the card: the reviewer moves to its own backup automatically', () => {
+  const choices = resolveSeatChoices([]); // the real default pair: builder claude, reviewer DeepSeek Pro
+  assert.equal(choices.builder.entry, 'claude');
+  assert.equal(choices.reviewer.entry, 'pi-deepseek');
+
+  const result = fallbackSeatChoice(choices, 'builder');
+  assert.equal(result.ok, true, 'the builder fallback must succeed instead of stalling the card');
+  assert.equal(result.choices.builder.entry, 'pi-deepseek');
+  assert.equal(result.choices.builder.modelLabel, 'builder-deepseek-flash');
+  assert.equal(result.choices['feature-builder'].entry, 'pi-deepseek', 'the agent-keyed entry moves too');
+
+  // The reviewer was moved out of the way, to ITS backup -- Codex, per the
+  // 2026-09-21 11:57Z Decision, not to anything invented.
+  assert.equal(result.choices.reviewer.entry, 'codex');
+  assert.equal(result.choices.reviewer.modelLabel, 'adversary-codex');
+  assert.equal(result.choices['adversarial-reviewer'].entry, 'codex');
+  assert.deepEqual(result.partnerMoved, {
+    seat: 'reviewer',
+    from: 'pi-deepseek',
+    to: 'codex',
+    modelLabel: 'adversary-codex',
+  });
+  // And the pair that comes out is still legal.
+  assert.equal(validateFamilyChoice(result.choices).ok, true);
+});
+
+test('the automatic partner move is reported in one plain sentence, for the controller\'s one comment', () => {
+  const result = fallbackSeatChoice(resolveSeatChoices([]), 'builder');
+  assert.match(result.partnerMovedReason, /builder/);
+  assert.match(result.partnerMovedReason, /reviewer/);
+  assert.match(result.partnerMovedReason, /adversary-codex/);
+  assert.match(result.partnerMovedReason, /different families/);
+  assert.equal(result.partnerMovedReason.trim().split('\n').length, 1, 'one sentence, not a paragraph');
+});
+
+test('the partner is moved ONLY when it has to be: a fallback that already works touches nothing else', () => {
+  // Reviewer already on Codex: the builder fallback is legal on its own.
+  const onCodex = resolveSeatChoices(['adversary-codex']);
+  const result = fallbackSeatChoice(onCodex, 'builder');
+  assert.equal(result.ok, true);
+  assert.equal(result.choices.reviewer.entry, 'codex', 'unchanged');
+  assert.equal(result.partnerMoved, null);
+  assert.equal(result.partnerMovedReason, null);
+
+  // A reviewer fallback against a Claude builder is legal too.
+  const reviewer = fallbackSeatChoice(resolveSeatChoices([]), 'reviewer');
+  assert.equal(reviewer.ok, true);
+  assert.equal(reviewer.choices.builder.entry, 'claude', 'the builder is untouched');
+  assert.equal(reviewer.partnerMoved, null);
+});
+
+test('the move is symmetric: a capped reviewer whose backup collides moves the builder instead', () => {
+  const choices = resolveSeatChoices([]);
+  // A table whose reviewer backup is claude -- the builder's family. The real
+  // table no longer has this (JUL-98), so the rule is exercised on a copy.
+  const colliding = { ...SEAT_TABLE, 'adversarial-reviewer': { primary: 'pi-deepseek', backup: 'claude' } };
+  const result = fallbackSeatChoice(choices, 'reviewer', { table: colliding });
+  assert.equal(result.ok, true);
+  assert.equal(result.choices.reviewer.entry, 'claude');
+  assert.equal(result.choices.builder.entry, 'pi-deepseek', 'the builder moved to its own backup');
+  assert.equal(result.partnerMoved.seat, 'builder');
+  assert.equal(validateFamilyChoice(result.choices).ok, true);
+});
+
+test('a fallback is STILL refused when the partner has no legal backup either -- the card is not launched into a same-family pair', () => {
+  const choices = resolveSeatChoices([]);
+  // Both seats back up into the same family: there is no legal pair left, and
+  // that must be a refusal, never a silent same-family launch.
+  const hopeless = {
+    ...SEAT_TABLE,
+    'feature-builder': { primary: 'claude', backup: 'pi-deepseek' },
+    'adversarial-reviewer': { primary: 'pi-deepseek', backup: 'pi-deepseek' },
+  };
+  const result = fallbackSeatChoice(choices, 'builder', { table: hopeless });
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /refusing the builder backup \(pi-deepseek\)/);
+  assert.match(result.reason, /different families/);
+  assert.equal(result.choices, undefined, 'a refusal hands back no choices to launch with');
+});
+
+test('a partner with no backup entry at all is a refusal, not a crash', () => {
+  const noBackup = { ...SEAT_TABLE, 'adversarial-reviewer': { primary: 'pi-deepseek' } };
+  const result = fallbackSeatChoice(resolveSeatChoices([]), 'builder', { table: noBackup });
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /refusing the builder backup/);
+});
+
+test('the partner move can be switched off, and then the old refusal stands', () => {
+  // Kept so a caller that must not change the other seat (a re-run pinned to a
+  // recorded pair, for instance) still gets the strict answer.
+  const result = fallbackSeatChoice(resolveSeatChoices([]), 'builder', { movePartner: false });
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /refusing the builder backup \(pi-deepseek\)/);
 });

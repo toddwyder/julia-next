@@ -17,6 +17,8 @@ import {
   issueFingerprint,
   isBlockerClosed,
   isSlotBusy,
+  isValidTicketId,
+  assertTicketId,
   readState,
   writeState,
   resolveLinearApiKey,
@@ -807,11 +809,14 @@ test('starting a later card does not erase an earlier card\'s cooldown (JUL-97 s
   // only thing holding it), B's succeeds. With a single `lastStarted` record,
   // starting B in cycle 2 overwrote A's cooldown and cycle 3 started A a second
   // time. The cooldown is per issue, so A must never start twice.
-  const a = makeIssue({ identifier: 'JUL-A', sortOrder: 1 });
-  const b = makeIssue({ identifier: 'JUL-B', sortOrder: 2 });
+  // (The two identifiers were JUL-A/JUL-B until JUL-98 step 2 added the ticket
+  // id check: a Linear identifier is <TEAM>-<number>, so a letter suffix is now
+  // refused before use. Nothing this test proves depends on the spelling.)
+  const a = makeIssue({ identifier: 'JUL-901', sortOrder: 1 });
+  const b = makeIssue({ identifier: 'JUL-902', sortOrder: 2 });
   const { linear } = fakeLinear({ issues: [a, b], teamLabels: DEFAULT_TEAM_LABELS });
   linear.setIssueState = async ({ issueId }) => {
-    if (issueId === a.id) throw new Error('Linear refused the state move for JUL-A');
+    if (issueId === a.id) throw new Error('Linear refused the state move for JUL-901');
     return { id: issueId };
   };
   const store = fakeStore();
@@ -826,18 +831,18 @@ test('starting a later card does not erase an earlier card\'s cooldown (JUL-97 s
   // in Ready with a cooldown.
   const cycle1 = await readyQueueCheck(d);
   assert.equal(cycle1.status, 'started');
-  assert.equal(cycle1.issue, 'JUL-A');
+  assert.equal(cycle1.issue, 'JUL-901');
   assert.equal(cycle1.stateMoved, false);
 
   // Cycle 2: A is passed over as cooldown and B -- still eligible and already
   // seen -- is started instead. B's state move succeeds.
   const cycle2 = await readyQueueCheck(d);
   assert.equal(cycle2.status, 'started');
-  assert.equal(cycle2.issue, 'JUL-B');
+  assert.equal(cycle2.issue, 'JUL-902');
   assert.equal(cycle2.stateMoved, true);
   assert.deepEqual(
     cycle2.skipped.map((entry) => [entry.issue, entry.status]),
-    [['JUL-A', 'cooldown']],
+    [['JUL-901', 'cooldown']],
     'A must be passed over as cooldown, not started',
   );
 
@@ -845,11 +850,11 @@ test('starting a later card does not erase an earlier card\'s cooldown (JUL-97 s
   // its cooldown must have survived B's start.
   const cycle3 = await readyQueueCheck(d);
   assert.equal(cycle3.status, 'cooldown');
-  assert.equal(cycle3.issue, 'JUL-A');
+  assert.equal(cycle3.issue, 'JUL-901');
   assert.deepEqual(
     orca.calls.terminalsCreated.map((call) => call.title),
-    ['ready-queue-JUL-A', 'ready-queue-JUL-B'],
-    'JUL-A must never start a second time',
+    ['ready-queue-JUL-901', 'ready-queue-JUL-902'],
+    'JUL-901 must never start a second time',
   );
   // Both cooldown records coexist in the state file.
   assert.equal(store.get().started[a.id].stateMoved, false);
@@ -1074,4 +1079,107 @@ test('resolveIntervalMinutes defaults to 5 and honors flag/env, rejecting junk',
   assert.equal(resolveIntervalMinutes({ flag: '7', env: {} }), 7);
   assert.equal(resolveIntervalMinutes({ env: { READY_QUEUE_INTERVAL_MINUTES: '3' } }), 3);
   assert.throws(() => resolveIntervalMinutes({ flag: 'zero', env: {} }), /positive/);
+});
+
+// ---------------------------------------------------------------------------
+// JUL-98 step 2, item 7: the two known Ready-queue gaps.
+// ---------------------------------------------------------------------------
+
+test('gap 1: isSlotBusy has no 100-run cap -- it walks every page Orca offers', async () => {
+  // The old call passed `limit: 100` and read one page. Orca's run-list is
+  // paginated and returns `nextCursor` (scripts/orca-cli.mjs runList, shape
+  // confirmed live on JUL-63), so an active run on page two was invisible and
+  // the queue would start a second card while one was already in flight --
+  // the exact double-start width 1 exists to prevent.
+  const pages = [
+    { runs: [{ id: 'r1' }, { id: 'r2' }], nextCursor: 'cursor-2' },
+    { runs: [{ id: 'r3' }], nextCursor: 'cursor-3' },
+    { runs: [{ id: 'r-active' }], nextCursor: null },
+  ];
+  const seen = [];
+  const runListImpl = async (opts) => {
+    seen.push(opts);
+    return pages[seen.length - 1];
+  };
+  const busy = await isSlotBusy({
+    runListImpl,
+    // Only the run on the LAST page is still going.
+    isRunFinishedImpl: async (run) => run.id !== 'r-active',
+    taskListImpl: async () => ({ tasks: [] }),
+    now: () => NOW,
+  });
+  assert.equal(busy, true, 'a run on a later page still makes the slot busy');
+  assert.equal(seen.length, 3, 'every page was read');
+  assert.deepEqual(seen.map((opts) => opts.cursor), [undefined, 'cursor-2', 'cursor-3']);
+  assert.ok(seen.every((opts) => opts.limit === undefined), 'no cap is imposed on the page size');
+});
+
+test('gap 1: the walk stops as soon as an active run is found -- it does not read pages it does not need', async () => {
+  let calls = 0;
+  const busy = await isSlotBusy({
+    runListImpl: async () => {
+      calls += 1;
+      return { runs: [{ id: `r${calls}` }], nextCursor: 'more' };
+    },
+    isRunFinishedImpl: async () => false,
+    taskListImpl: async () => ({ tasks: [] }),
+    now: () => NOW,
+  });
+  assert.equal(busy, true);
+  assert.equal(calls, 1);
+});
+
+test('gap 1: a cursor that never advances is an error, not an endless walk', async () => {
+  await assert.rejects(
+    () => isSlotBusy({
+      runListImpl: async () => ({ runs: [{ id: 'r' }], nextCursor: 'stuck' }),
+      isRunFinishedImpl: async () => true,
+      taskListImpl: async () => ({ tasks: [] }),
+      now: () => NOW,
+    }),
+    /cursor/,
+  );
+});
+
+test('gap 2: a ticket id is checked before it is used', () => {
+  assert.equal(isValidTicketId('JUL-92'), true);
+  assert.equal(isValidTicketId('JUL-109'), true);
+  assert.equal(isValidTicketId('ABC1-7'), true);
+  assert.equal(isValidTicketId('jul-92'), false, 'Linear identifiers are upper case');
+  assert.equal(isValidTicketId('JUL-92 '), false);
+  assert.equal(isValidTicketId('JUL-'), false);
+  assert.equal(isValidTicketId('-92'), false);
+  assert.equal(isValidTicketId(''), false);
+  assert.equal(isValidTicketId(null), false);
+  assert.equal(isValidTicketId(undefined), false);
+  assert.equal(isValidTicketId(92), false);
+  // The ones that matter: the identifier is interpolated into the shell command
+  // the queue hands to `orca terminal create`, so anything that could carry a
+  // second command, a path or a flag is refused.
+  for (const hostile of ['JUL-92; rm -rf /', 'JUL-92 && curl evil', '../../etc/passwd', '$(whoami)', 'JUL-92\nJUL-93', '--help']) {
+    assert.equal(isValidTicketId(hostile), false, `${JSON.stringify(hostile)} must be refused`);
+  }
+  assert.throws(() => assertTicketId('JUL-92; rm -rf /'), /ticket id/);
+  assert.equal(assertTicketId('JUL-92'), 'JUL-92');
+});
+
+test('gap 2: a card with an unusable identifier is passed over, not started, and is logged', async () => {
+  const hostile = makeIssue({ id: 'i-bad', identifier: 'JUL-92; rm -rf /', sortOrder: -100 });
+  const good = makeIssue({ id: 'i-good', identifier: 'JUL-93', sortOrder: 10 });
+  const { linear } = fakeLinear({ issues: [hostile, good] });
+  const orca = fakeOrca();
+  const store = fakeStore({ ready: { 'i-bad': issueFingerprint(hostile), 'i-good': issueFingerprint(good) } });
+  const logs = [];
+
+  const result = await readyQueueCheck(deps({ linear, store, orca, logs }));
+
+  assert.equal(result.status, 'started');
+  assert.equal(result.issue, 'JUL-93', 'the queue walks past the unusable card and starts the next one');
+  assert.equal(orca.calls.terminalsCreated.length, 1);
+  assert.match(orca.calls.terminalsCreated[0].command, /julia-run\.mjs JUL-93$/);
+  assert.ok(
+    orca.calls.terminalsCreated.every((created) => !created.command.includes('rm -rf')),
+    'the unusable identifier never reaches a command string',
+  );
+  assert.ok(logs.some((line) => /ticket id/.test(line)), 'and the refusal is logged, not silent');
 });

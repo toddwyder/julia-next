@@ -244,3 +244,39 @@ test('runList unwraps the real {runs: [...], nextCursor} shape (JUL-63, captured
   assert.equal(result.runs[0].id, 'run_2bb857704f4d');
   assert.equal(result.nextCursor, 'cursor123');
 });
+
+// ---------------------------------------------------------------------------
+// JUL-98 step 2, item 5: the controller has to branch on Orca's own error CODE
+// (consumer_fenced -> stand down; terminal_handle_stale -> replay the request).
+// Reading that out of a message string would be a guess, so the code travels on
+// the thrown error. The message is unchanged, so every existing caller and test
+// still matches on it.
+// ---------------------------------------------------------------------------
+
+test('an Orca failure carries its error code on the thrown error, for both failure routes', async () => {
+  // Route 1: a nonzero exit whose structured body is on stdout (the real shape,
+  // JUL-43 PR #3 finding C1).
+  const rejecting = async () => {
+    const error = new Error('Command failed');
+    error.stdout = JSON.stringify({
+      id: 'x',
+      ok: false,
+      error: { code: 'consumer_fenced', message: 'This coordinator terminal is no longer bound to Run run_1bf570ce5660.' },
+    });
+    throw error;
+  };
+  await assert.rejects(() => runList({ environment: 'orchestrator-local', execImpl: rejecting }), (error) => {
+    assert.equal(error.code, 'consumer_fenced');
+    assert.match(error.message, /consumer_fenced/);
+    return true;
+  });
+
+  // Route 2: a zero exit whose body is {ok: false}.
+  const okExit = async () => ({
+    stdout: JSON.stringify({ id: 'x', ok: false, error: { code: 'repo_not_found', message: 'no such repo' } }),
+  });
+  await assert.rejects(() => runList({ environment: 'orchestrator-local', execImpl: okExit }), (error) => {
+    assert.equal(error.code, 'repo_not_found');
+    return true;
+  });
+});
