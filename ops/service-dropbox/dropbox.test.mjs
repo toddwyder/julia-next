@@ -32,13 +32,13 @@ test('isArmed: true when freshly armed, false once all four received, false afte
   const complete = {
     armedAt,
     received: {
-      sentry: true, supabase: true, powersync: true, axiom: true, deepseek: true, zai: true, linear: true,
+      sentry: true, supabase: true, powersync: true, axiom: true, deepseek: true, linear: true,
     },
     usedAt: null,
   };
   assert.equal(isArmed(fresh, Date.parse('2026-09-17T01:00:00.000Z')), true);
   assert.equal(isArmed(partial, Date.parse('2026-09-17T01:00:00.000Z')), true, 'a partial round stays armed');
-  assert.equal(isArmed(complete, Date.parse('2026-09-17T01:00:00.000Z')), false, 'all seven received disarms regardless of time');
+  assert.equal(isArmed(complete, Date.parse('2026-09-17T01:00:00.000Z')), false, 'all six received disarms regardless of time');
   assert.equal(isArmed(fresh, Date.parse('2026-09-18T00:00:01.000Z')), false, '24h + 1s later is expired');
 });
 
@@ -47,12 +47,12 @@ test('allReceived is true only when every field in FIELDS has been received', ()
   assert.equal(allReceived({ received: { sentry: true, supabase: true, powersync: true } }), false, 'axiom missing');
   assert.equal(allReceived({
     received: {
-      sentry: true, supabase: true, powersync: true, axiom: true, deepseek: true, zai: true, linear: true,
+      sentry: true, supabase: true, powersync: true, axiom: true, deepseek: true, linear: true,
     },
   }), true);
   assert.equal(allReceived({
     received: {
-      sentry: true, supabase: true, powersync: true, axiom: true, deepseek: true, zai: true,
+      sentry: true, supabase: true, powersync: true, axiom: true, deepseek: true,
     },
   }), false, 'linear missing');
 });
@@ -141,7 +141,7 @@ test('a partial round (one box filled) stays armed, and a later round can save t
     });
     const firstParsed = JSON.parse(first.body);
     assert.equal(firstParsed.sentry.ok, true);
-    assert.equal(firstParsed.allReceived, false, 'six fields still missing');
+    assert.equal(firstParsed.allReceived, false, 'five fields still missing');
 
     const stillOpen = await request(`${base}/`);
     assert.doesNotMatch(stillOpen.body, /page is off/i, 'a partial round must not turn the page off');
@@ -154,20 +154,19 @@ test('a partial round (one box filled) stays armed, and a later round can save t
         powersync: 'c'.repeat(40),
         axiom: 'd'.repeat(40),
         deepseek: 'e'.repeat(40),
-        zai: 'f'.repeat(40),
         linear: 'g'.repeat(40),
       }),
     });
     const secondParsed = JSON.parse(second.body);
-    assert.equal(secondParsed.allReceived, true, 'the seventh field completes the sitting');
-    assert.equal(written.length, 7);
+    assert.equal(secondParsed.allReceived, true, 'the sixth field completes the sitting');
+    assert.equal(written.length, 6);
 
     const now403 = await request(`${base}/save`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ sentry: 'e'.repeat(40) }),
     });
-    assert.equal(now403.status, 403, 'the box is off once all seven are received');
+    assert.equal(now403.status, 403, 'the box is off once all six are received');
   });
 });
 
@@ -327,20 +326,25 @@ test('GET / never contains any field value from a prior save', async (t) => {
   });
 });
 
-test('FIELDS is exactly the seven services this drop box now names (JUL-72 + JUL-77)', () => {
+test('FIELDS is exactly the six services this drop box now names (JUL-72 + JUL-77, GLM removed in JUL-93)', () => {
   assert.deepEqual(
     [...FIELDS].sort(),
-    ['axiom', 'deepseek', 'linear', 'powersync', 'sentry', 'supabase', 'zai'],
+    ['axiom', 'deepseek', 'linear', 'powersync', 'sentry', 'supabase'],
   );
 });
 
-test('a plausible new-field value (deepseek/zai/linear) is accepted the same as any other field', () => {
+test('GLM (zai) is not a drop-box field: no box, no reader group, no hint (JUL-93)', () => {
+  assert.ok(!FIELDS.includes('zai'));
+  assert.ok(!Object.hasOwn(FIELD_GROUPS, 'zai'));
+  assert.ok(!Object.values(FIELD_GROUPS).includes('zai-readers'));
+});
+
+test('a plausible new-field value (deepseek/linear) is accepted the same as any other field', () => {
   assert.equal(validateFieldShape('deepseek', 'd'.repeat(40)).ok, true);
-  assert.equal(validateFieldShape('zai', 'z'.repeat(40)).ok, true);
   assert.equal(validateFieldShape('linear', 'lin_api_'.padEnd(40, '1')).ok, true);
 });
 
-// JUL-77: three model/service keys land in different readers than the
+// JUL-77: two model/service keys land in different readers than the
 // original four (which are all orchestrator-svc-only). This mapping is the
 // single source of truth both this file and write-secret.sh's own test
 // assert against, so the two can never silently drift apart.
@@ -350,13 +354,11 @@ test('FIELD_GROUPS routes each field to the exact reader(s) JUL-77 specifies', (
     supabase: 'orchestrator-svc',
     powersync: 'orchestrator-svc',
     axiom: 'orchestrator-svc',
-    // Pi builder (runner) AND the orchestrator-deepseek route -- a dedicated
-    // group with both accounts as members, same shape as zai-readers.
+    // Pi builder and reviewer (runner) AND the orchestrator-deepseek route --
+    // a dedicated group with both accounts as members, never
+    // orchestrator-svc's own group directly (that would let runner read the
+    // orchestrator-only fields too).
     deepseek: 'deepseek-readers',
-    // Pi reviewer (runner) AND the orchestrator backup -- a dedicated group
-    // with both accounts as members, never orchestrator-svc's own group
-    // directly (that would let runner read the orchestrator-only fields too).
-    zai: 'zai-readers',
     // Orchestrator-svc only, same as the original four.
     linear: 'orchestrator-svc',
   });

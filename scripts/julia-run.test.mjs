@@ -223,17 +223,23 @@ test('orchestratorLaunchCommandFor: claude is the table primary, unchanged shape
   assert.match(command, /claude --permission-mode acceptEdits/);
 });
 
-test('orchestratorLaunchCommandFor: pi-glm (still a selectable entry, no longer a seat backup) pipes the skill into run-pi-seat.mjs, orchestrator-backup seat, no secret in the string', () => {
-  const command = orchestratorLaunchCommandFor('pi-glm', 'JUL-63');
+test('orchestratorLaunchCommandFor: pi-deepseek pipes the skill into run-pi-seat.mjs, orchestrator-deepseek seat, no secret in the string', () => {
+  const command = orchestratorLaunchCommandFor('pi-deepseek', 'JUL-63');
   assert.match(command, /export ORCA_BIN=\/opt\/Orca\/orca-ide ORCA_ENVIRONMENT=ovh-local/);
   assert.match(command, /set -a; \. \/etc\/orchestrator-svc\/\.env\.publisher; set \+a/);
   assert.match(command, /cat \.claude\/skills\/julia-coordinator\/SKILL\.md/);
-  assert.match(command, /\| node ops\/service-dropbox\/run-pi-seat\.mjs orchestrator-backup --effort medium/);
+  assert.match(command, /\| node ops\/service-dropbox\/run-pi-seat\.mjs orchestrator-deepseek --effort medium/);
   assert.match(command, /JUL-63/);
   assert.doesNotMatch(command, /claude --permission-mode/);
   assert.doesNotMatch(command, /codex exec/);
-  // No API key, no ZAI/DeepSeek-shaped literal anywhere in the launch string.
+  // No API key literal anywhere in the launch string.
   assert.doesNotMatch(command, /ZAI_PAYG_API_KEY|DEEPSEEK_API_KEY/);
+});
+
+// GLM was removed (JUL-93). Its old entry must be refused, never launched or
+// quietly mapped to another vendor.
+test('orchestratorLaunchCommandFor refuses the removed GLM entry (pi-glm)', () => {
+  assert.throws(() => orchestratorLaunchCommandFor('pi-glm', 'JUL-63'), /unknown orchestrator seat-table entry: pi-glm/);
 });
 
 test('orchestratorLaunchCommandFor refuses an unknown table entry', () => {
@@ -264,7 +270,7 @@ test('orchestratorLaunchCommandFor: pi-deepseek pipes the skill + issue id to th
 });
 
 test('orchestratorLaunchCommandFor: an omitted effort is exactly Medium on every entry', () => {
-  for (const entry of ['claude', 'codex', 'pi-deepseek', 'pi-glm']) {
+  for (const entry of ['claude', 'codex', 'pi-deepseek']) {
     assert.equal(
       orchestratorLaunchCommandFor(entry, 'JUL-79'),
       orchestratorLaunchCommandFor(entry, 'JUL-79', { effort: 'medium' }),
@@ -312,18 +318,18 @@ test('orchestratorLaunchCommandFor: the allow-list stays narrow -- no blanket Ba
   assert.doesNotMatch(command, /--dangerously-skip-permissions/);
 });
 
-test('orchestratorLaunchCommandFor: pi-glm passes the effort label to its seat, and never a vendor flag or a secret', () => {
-  const command = orchestratorLaunchCommandFor('pi-glm', 'JUL-79', { effort: 'low' });
+test('orchestratorLaunchCommandFor: pi-deepseek passes the effort label to its seat, and never a vendor flag or a secret', () => {
+  const command = orchestratorLaunchCommandFor('pi-deepseek', 'JUL-79', { effort: 'low' });
   assert.equal(
     command,
-    `${ENV_PREFIX_EXPECTED} ${PIPED_PROMPT_EXPECTED('JUL-79')} | node ops/service-dropbox/run-pi-seat.mjs orchestrator-backup --effort low`,
+    `${ENV_PREFIX_EXPECTED} ${PIPED_PROMPT_EXPECTED('JUL-79')} | node ops/service-dropbox/run-pi-seat.mjs orchestrator-deepseek --effort low`,
   );
   assert.doesNotMatch(command, /--thinking|model_reasoning_effort/);
   assert.doesNotMatch(command, /ZAI_PAYG_API_KEY|DEEPSEEK_API_KEY/);
 });
 
 test('an unknown seat-table entry fails before a run is created, so retrying after fixing it never blocks on an orphan run (JUL-73 review finding, preserved under the seat table)', async () => {
-  const { impls, calls } = fakeImpls({ seatTable: { orchestrator: { primary: 'gemini', backup: 'pi-glm' } } });
+  const { impls, calls } = fakeImpls({ seatTable: { orchestrator: { primary: 'gemini', backup: 'pi-deepseek' } } });
   await assert.rejects(() => juliaRun('JUL-63', impls), /unknown orchestrator seat-table entry: gemini/);
   assert.deepEqual(calls.runsCreated, []);
   assert.equal(calls.terminalsCreated.length, 0);

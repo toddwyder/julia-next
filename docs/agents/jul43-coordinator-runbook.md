@@ -494,12 +494,12 @@ skill's own procedure grows to need another script or tool, its `--allowedTools`
 ## Second vendor on the orchestrator seat (JUL-73, superseded by JUL-77)
 
 **`ORCHESTRATOR_VENDOR` is retired.** `julia-run.mjs`'s `startOrchestrator` now reads
-`graph/seat-table.mjs`'s `orchestrator` entry instead: `claude` (primary) or `pi-glm` (backup),
+`graph/seat-table.mjs`'s `orchestrator` entry instead: `claude` (primary) or `pi-deepseek` (backup),
 tried automatically on a detected usage-cap error rather than hand-edited. See "Seat-table
 backups: Pi (JUL-77)" below for the table itself and the cap-detection/fail-over mechanism.
 `codex` is no longer a valid orchestrator entry — the table reserves it for the **reviewer**
 seat instead, so this section's Codex login/MCP-approval knowledge stays relevant, just for a
-different seat. Both orchestrator launch branches (`claude`, `pi-glm`) share the same env prefix
+different seat. Both orchestrator launch branches (`claude`, `pi-deepseek`) share the same env prefix
 (`ORCA_BIN`/`ORCA_ENVIRONMENT` export, then the publisher env file sourced with `set -a`/`set
 +a`). Neither has a slash-command equivalent to Claude's, so each pipes the checkout's own
 `.claude/skills/julia-coordinator/SKILL.md` text plus the issue id in on stdin — `codex exec -`
@@ -561,24 +561,10 @@ worktree/branch were removed after (`orca worktree rm --worktree name:<name> --f
   `DEEPSEEK_API_KEY` set only in the child process's env (never argv) — see
   `ops/service-dropbox/run-pi-seat.mjs`. Live-verified real reply + real cost
   (`$0.00025844`, `deepseek-v4-flash`).
-- **Orchestrator backup — GLM-5.3, custom provider (pay-per-use, not the ZAI Coding
-  Plan).** This was also the reviewer backup until JUL-89; the reviewer backup is now DeepSeek
-  Pro on the native provider (see "The reviewer backup is DeepSeek Pro, not GLM"), and only
-  `orchestrator-backup` still launches GLM. `ZAI_API_KEY` is the *native* env var name for ZAI's own Coding Plan integration
-  (`docs/providers.md` table) — using it for a pay-per-use custom provider would be confusing, so
-  the drop-box/launcher env var is named `ZAI_PAYG_API_KEY` instead, kept out of the native
-  name entirely. `~/.pi/agent/models.json` for `orchestrator-svc` (**the public pi.dev docs site
-  describe an older/different `providers: [ {id, type, ...} ]` array shape — wrong for this
-  installed version; confirmed live against the bundled `models.md`**, correct shape is an
-  object keyed by provider id, field `api` not `type`):
-  ```json
-  { "providers": { "glm-5-3": {
-      "baseUrl": "https://api.z.ai/api/paas/v4/", "api": "openai-completions",
-      "apiKey": "$ZAI_PAYG_API_KEY", "models": [ { "id": "glm-5.3", "name": "GLM-5.3" } ]
-  } } }
-  ```
-  Launch: `pi --provider glm-5-3 --model glm-5.3 -p "<prompt>" --mode json`. Live-verified real
-  reply from `api.z.ai`.
+- **GLM was the orchestrator backup, and is removed (JUL-93, 2026-09-21).** It ran as a
+  pay-per-use custom provider (`glm-5-3`, key in `ZAI_PAYG_API_KEY`). The seat, the drop-box
+  field, the `zai-readers` group and the label are gone from the repo; the server side was removed
+  by a laptop session and is recorded on JUL-93.
 - **`pi`'s default provider is `google`** when `--provider`/`--model` are omitted — the first
   attempt at the DeepSeek proof hung (no output, no error) for exactly this reason; always pass
   both explicitly.
@@ -589,20 +575,16 @@ worktree/branch were removed after (`orca worktree rm --worktree name:<name> --f
   `cat` (rather than `readSecret()`) echoes the full value into whatever captured the command's
   output. Hit live during this same session; caught before it left this session's own scrollback,
   but treat it as a real near-miss, not a hypothetical.
-- Cost is reported per response (`usage.cost.total`) for DeepSeek; GLM-5.3 via the custom
-  `openai-completions` provider reported `cost: 0` on the one live call made — likely the
-  endpoint doesn't return usage-based pricing in the response for this route, not that the call
-  was actually free. Unresolved: get a real per-session cost figure for the GLM backup seat
-  before relying on the "cost per session recorded for each backup seat" acceptance line.
-- **The `glm-5-3` `models.json` entry is per-identity, not shared** — it was only written for
-  `orchestrator-svc` initially (which is all `julia-run.mjs`'s orchestrator-backup path needs),
-  but the reviewer-backup seat then dispatched as `runner` (PR #36 review finding), so `runner`
-  needed the identical `~/.pi/agent/models.json` entry added separately; live-verified working
-  (real `pong` reply) only after that. (Historical for the reviewer since JUL-89: that seat is
-  DeepSeek now and needs no `glm-5-3` entry.) Any *new* identity that ever runs a `pi-glm` seat
-  needs this file written for it too — it does not follow from `orchestrator-svc`'s copy existing.
+- Cost is reported per response (`usage.cost.total`) for DeepSeek.
+- **Pi's `models.json` is per-identity, not shared.** A provider entry written for
+  `orchestrator-svc` does not exist for `runner`; any new Pi provider must be written for each
+  identity that runs it. (The old `glm-5-3` entries were removed from both, JUL-93.)
 
 ### Long-running Orca daemons hold stale supplementary groups (JUL-44) — fixed 2026-09-18
+
+*(Historical: this finding was recorded against the `zai` key. GLM and the `zai-readers` group were
+removed in JUL-93, so read `zai` below as any reader group; the same trap applies to
+`deepseek-readers` today.)*
 
 `zai.env` is `root:zai-readers` mode `0440`, and `/etc/group` correctly lists
 `zai-readers:x:1003:runner,orchestrator-svc`. Both `id runner` and `id orchestrator-svc` (NSS
@@ -641,7 +623,7 @@ a seat by reading it FROM INSIDE an Orca-spawned terminal, never from an SSH log
 ### Vercel auth is CLI login state, not a drop-box field (JUL-44)
 
 There is no `vercel.env` in `/etc/orca-runner/dropbox-secrets/`. The fields actually present
-there are `axiom`, `deepseek`, `linear`, `powersync`, `sentry`, `supabase`, and `zai`. Vercel is
+there are `axiom`, `deepseek`, `linear`, `powersync`, `sentry`, and `supabase` (a `zai` file existed until JUL-93 removed it). Vercel is
 authenticated instead through the stored credential of the CLI itself at
 `/home/orchestrator-svc/.local/share/com.vercel.cli/auth.json` (mode `600`, owner
 `orchestrator-svc`). Verified live 2026-09-18: `npx --yes vercel@latest whoami` as
@@ -781,7 +763,7 @@ vendor's own CLI:
 | --- | --- | --- |
 | `claude` | `--effort low` | `--effort medium` / `--effort high` |
 | `codex` | `-c model_reasoning_effort=low` | `-c model_reasoning_effort=medium` / `...=high` |
-| `pi-deepseek`, `pi-glm` | `--thinking off` | `--thinking medium` / `--thinking high` |
+| `pi-deepseek` | `--thinking off` | `--thinking medium` / `--thinking high` |
 
 `pi --thinking` REQUIRES a level (`off|minimal|low|medium|high|xhigh|max`). Low is `off`; Medium/High
 pass `medium`/`high`. **A bare `--thinking` is a bug** (fixed 2026-09-19, JUL-79 relaunch): Pi reads the next
@@ -792,7 +774,7 @@ separator, so it can never be read as an option. A one-word test prompt hides th
 seat launch with the real skill text.
 
 **Launcher (`scripts/julia-run.mjs`, `orchestratorLaunchCommandFor(entry, issueId, { effort })`).**
-Two entries are new alongside `claude`/`pi-glm`:
+Two entries are new alongside `claude`:
 
 - `codex` — stdin-pipe shape, same preamble as the Pi route: `{ cat
   .claude/skills/julia-coordinator/SKILL.md; printf ...; } | codex exec - -s danger-full-access
@@ -800,7 +782,7 @@ Two entries are new alongside `claude`/`pi-glm`:
   level under which Codex's per-write MCP approval gate lets Linear write-classified tool calls
   through (live-verified JUL-73; Codex has no per-tool allowlist). Note `orchestrator-svc`'s Codex
   login is usage-capped until Sep 19, 2026, so don't attempt a live Codex orchestrator run yet.
-- `pi-deepseek` — identical to `pi-glm` but invoking the new `orchestrator-deepseek` seat.
+- `pi-deepseek` — the Pi route: the same stdin-pipe shape, invoking the `orchestrator-deepseek` seat.
 
 Both existing entries gained effort too: `claude` inserts `--effort <level>` right after
 `--permission-mode acceptEdits` (the `--allowedTools` grant list is untouched), and the Pi routes
@@ -836,8 +818,8 @@ hand-maintained list.
 
 - Model labels: `<agent>-<vendor>-<model>`, with `<agent>` one of `orch`/`builder`/`reviewer`.
   Initial catalogue: `claude-opus`, `claude-sonnet`, `claude-haiku`, `codex`, `deepseek-pro`,
-  `deepseek-flash`, `glm-5.3` — e.g. `orch-claude-opus`, `builder-deepseek-flash`,
-  `reviewer-glm-5.3`.
+  `deepseek-flash` — e.g. `orch-claude-opus`, `builder-deepseek-flash`,
+  `reviewer-deepseek-pro`. (`glm-5.3` was removed in JUL-93.)
 - Effort labels: `<agent>-effort-low` / `-medium` / `-high`, e.g. `reviewer-effort-medium`.
 
 `scripts/seat-labels.mjs` is pure (no I/O) and exports the group names, the label-name constants,
@@ -846,7 +828,7 @@ id where the route needs one). A later coordinator/launch step extends `MODEL_SP
 vendor ships a new model. `resolveSeatChoices(labels)` returns each seat's `{ entry, effort,
 modelLabel }`: a present model/effort label wins, an absent model falls back to the seat table's
 `primary` and its default model (`claude`→`claude-opus`, `codex`→`codex`,
-`pi-deepseek`→`deepseek-flash`, `pi-glm`→`glm-5.3`), and an absent effort is Medium.
+`pi-deepseek`→`deepseek-flash`), and an absent effort is Medium.
 `validateFamilyChoice` enforces builder family ≠ reviewer family (via `FAMILY_OF`) and that every
 resolved entry is a real seat-table entry. `seatChoicesForIssue(issue)` is the read-only helper
 the coordinator calls on a card it fetched through `linear-cli.mjs` (whose `getIssue` now requests
@@ -1148,7 +1130,7 @@ it, then `sudo install -m 0440 -o root -g root`). Rules, as `orchestrator-svc` v
 | `systemctl enable --now julia-ready-queue.timer` | Turns the queue on — JUL-79's own final step. |
 | `systemctl start` / `stop` / `restart julia-ready-queue.timer` | Control the timer. |
 | `systemctl start` / `stop` / `restart julia-ready-queue.service` | Run, stop or restart one check on demand (the service is a oneshot). |
-| `usermod -aG <group> <account>` for `{deepseek-readers, zai-readers} × {runner, orchestrator-svc}` | Adds a service account to a key-reader group the drop box already uses. Four exact pairs, not a pattern. |
+| `usermod -aG <group> <account>` for `{deepseek-readers} × {runner, orchestrator-svc}` | Adds a service account to a key-reader group the drop box already uses. Two exact pairs, not a pattern. |
 
 **There is no rule that installs, copies or edits a file** (removed after the PR #44 review; the
 test fails if one comes back, and on the server it also tries an `install` as `orchestrator-svc`
@@ -1212,7 +1194,7 @@ gate to consider.
 ### `deepseek-readers` (was: `deepseek` readable by `runner` only)
 
 `deepseek.env` is now `root:deepseek-readers` mode 0440; both `runner` and `orchestrator-svc` are
-members (same shape as `zai-readers`). `FIELD_GROUPS.deepseek`, `write-secret.sh`, its installed copy
+members. `FIELD_GROUPS.deepseek`, `write-secret.sh`, its installed copy
 in `/opt/orca-runner/service-dropbox/`, and the drop-box README all say `deepseek-readers` now, so
 re-pasting the key through the drop box keeps that ownership. Both Orca daemons were restarted after
 the `usermod` (a daemon's supplementary groups are fixed at start — see the stale-groups section
@@ -1328,11 +1310,10 @@ reading the `deepseek` drop-box field into `DEEPSEEK_API_KEY` in the child's env
 never argv, never a shell string (JUL-72). `deepseek-v4-pro` works through the native `deepseek`
 provider; a full review on it cost about three cents. There is no fifth seat beside it.
 
-- **GLM stays defined and selectable** as the `glm-5.3` model label, so a card can still choose it
-  on purpose. It is never a default or a fallback. Its one remaining launch route is
-  `orchestrator-backup`. **A GLM builder or reviewer has no seat** -- the coordinator parks that
-  item Blocked rather than send it to a DeepSeek seat (see the Pi paragraph in the coordinator
-  skill).
+- **GLM is removed (JUL-93, 2026-09-21).** It is no longer a selectable label, a seat, a
+  drop-box field or a reader group. A card that still carries an old GLM label is refused by the Ready
+  queue with a comment saying the label is retired; it is never re-mapped to another vendor (see
+  the Pi paragraph in the coordinator skill).
 - **The label names an entry, not the model.** `builder-backup` runs `deepseek-v4-flash` and
   `reviewer-backup` runs `deepseek-v4-pro`, each fixed in `run-pi-seat.mjs`. A
   `reviewer-deepseek-flash` or `builder-deepseek-pro` label is not honoured until JUL-102 wires the

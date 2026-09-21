@@ -13,7 +13,7 @@
 // The three spellings, each live-verified against the vendor's own CLI:
 //   - claude      : `claude --effort low|medium|high` (live --help check).
 //   - codex       : `codex -c model_reasoning_effort=low|medium|high`.
-//   - pi (DeepSeek/GLM): `pi --thinking <level>` (the level is required); Low is
+//   - pi (DeepSeek): `pi --thinking <level>` (the level is required); Low is
 //     `off`, Medium/High pass `medium`/`high`. Pi's own models.json
 //     `thinkingLevelMap` turns the level into the model's internal setting.
 export const EFFORT_LEVELS = ['low', 'medium', 'high'];
@@ -37,7 +37,7 @@ export function translateEffort(entry, effort) {
   const level = normalizeEffort(effort);
   if (entry === 'claude') return ['--effort', level];
   if (entry === 'codex') return ['-c', `model_reasoning_effort=${level}`];
-  if (entry === 'pi-deepseek' || entry === 'pi-glm') {
+  if (entry === 'pi-deepseek') {
     // `--thinking` needs its level or Pi swallows the next argument.
     return ['--thinking', level === 'low' ? 'off' : level];
   }

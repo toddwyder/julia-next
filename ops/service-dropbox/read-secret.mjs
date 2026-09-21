@@ -16,7 +16,7 @@
 // the static guard in read-secret.test.mjs).
 import { readFileSync } from 'node:fs';
 
-export const KNOWN_FIELDS = ['sentry', 'supabase', 'powersync', 'axiom', 'deepseek', 'zai', 'linear'];
+export const KNOWN_FIELDS = ['sentry', 'supabase', 'powersync', 'axiom', 'deepseek', 'linear'];
 
 const DEFAULT_DIR = '/etc/orca-runner/dropbox-secrets';
 

@@ -117,8 +117,10 @@ test('modelLabelsFor derives one label per MODEL_SPECS entry, with the agent cod
     'builder-codex',
     'builder-deepseek-pro',
     'builder-deepseek-flash',
-    'builder-glm-5.3',
   ]);
+  for (const agent of GRAPH_AGENTS) {
+    assert.ok(!modelLabelsFor(agent.key).some((label) => label.includes('glm')), `${agent.key} must offer no GLM label (JUL-93)`);
+  }
 });
 
 test('effortLabelsFor derives Low/Medium/High for every agent', () => {

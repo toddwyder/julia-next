@@ -1,5 +1,5 @@
 // run-pi-seat.mjs -- launches Pi for a backup seat (builder-on-DeepSeek,
-// reviewer-on-DeepSeek-Pro, orchestrator-on-GLM, orchestrator-on-DeepSeek) with the seat's
+// reviewer-on-DeepSeek-Pro, orchestrator-on-DeepSeek) with the seat's
 // secret injected into the child process's environment only -- never as an
 // argv entry, never interpolated into a shell string. See read-secret.mjs for
 // why: JUL-72's incident was exactly a secret reaching a shell/argv position.
@@ -29,17 +29,11 @@ export const SEATS = {
   // The reviewer backup is DeepSeek Pro on the native provider (JUL-89). It
   // used to be GLM, which the cost rule bars (about $10 on one issue); a
   // DeepSeek Pro review costs about three cents (proven live 2026-09-20).
-  // GLM is still a selectable model label (scripts/seat-labels.mjs) but no
-  // reviewer or builder seat launches it -- only `orchestrator-backup` below.
+  // GLM has since been removed everywhere (JUL-93): no seat launches it.
   'reviewer-backup': {
     envVar: 'DEEPSEEK_API_KEY',
     secretField: 'deepseek',
     piArgs: (mode) => ['--provider', 'deepseek', '--model', 'deepseek-v4-pro', '-p', '--mode', mode],
-  },
-  'orchestrator-backup': {
-    envVar: 'ZAI_PAYG_API_KEY',
-    secretField: 'zai',
-    piArgs: (mode) => ['--provider', 'glm-5-3', '--model', 'glm-5.3', '-p', '--mode', mode],
   },
   // The orchestrator's DeepSeek route (JUL-79 step 3, `pi-deepseek` in
   // graph/seat-table.mjs). Its config is byte-for-byte builder-backup's --

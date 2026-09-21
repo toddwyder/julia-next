@@ -214,15 +214,14 @@ function codexLaunchCommand(issueId, effort) {
   return `${ENV_PREFIX} ${pipedCoordinatorPrompt(issueId)} | codex exec - -s danger-full-access ${effortArgs}`;
 }
 
-// Pi (DeepSeek or GLM), the orchestrator's Pi routes: no slash-command
+// Pi (DeepSeek), the orchestrator's Pi route: no slash-command
 // or exec-subcommand equivalent, so the coordinator skill body is piped in
 // on stdin (see pipedCoordinatorPrompt above), read by run-pi-seat.mjs's own
 // CLI entry (`readAllStdin`) and passed to Pi as its `-p` prompt. The secret
 // never appears in this string -- run-pi-seat.mjs reads it in-process via
 // read-secret.mjs, keyed only by the seat name (which *is* safe to put in a
 // shell string). JUL-79 step 8 sets the orchestrator's table backup to
-// `pi-deepseek` and leaves `pi-glm` selectable as a card label, never a seat
-// default or backup -- both still launch through this helper.
+// `pi-deepseek`; GLM was removed (JUL-93), so this is the only Pi route.
 //
 // The effort travels as the neutral `--effort <level>` label, not as a Pi
 // flag: run-pi-seat.mjs owns Pi's actual on/off spelling (`--thinking`), so
@@ -236,7 +235,6 @@ function piLaunchCommand(issueId, seat, effort) {
 export function orchestratorLaunchCommandFor(entry, issueId, { effort } = {}) {
   if (entry === 'claude') return claudeLaunchCommand(issueId, effort);
   if (entry === 'codex') return codexLaunchCommand(issueId, effort);
-  if (entry === 'pi-glm') return piLaunchCommand(issueId, 'orchestrator-backup', effort);
   if (entry === 'pi-deepseek') return piLaunchCommand(issueId, 'orchestrator-deepseek', effort);
   throw new Error(`unknown orchestrator seat-table entry: ${entry}`);
 }

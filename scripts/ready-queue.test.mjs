@@ -434,6 +434,20 @@ test('only the top card is ever a candidate; a lower ineligible card cannot bloc
 // Real model-choice validation (D2)
 // ---------------------------------------------------------------------------
 
+test('a card still carrying the retired GLM label is ineligible, gets one comment saying so, and never starts (JUL-93)', async () => {
+  const issue = makeIssue({
+    labels: [READY_FOR_AGENT_LABEL, 'builder-glm-5.3', 'reviewer-codex'],
+  });
+  const { linear } = fakeLinear({ issues: [issue] });
+  const store = fakeStore({ ready: { [issue.id]: issueFingerprint(issue) } });
+  const orca = fakeOrca();
+  const result = await readyQueueCheck(deps({ linear, store, orca }));
+  assert.equal(result.status, 'ineligible');
+  assert.equal(result.commented, true);
+  assert.match(result.reasons.join(' '), /builder carries the retired label builder-glm-5\.3/);
+  assert.equal(orca.calls.terminalsCreated.length, 0);
+});
+
 test('a same-family builder/reviewer label pair is ineligible, gets one comment with the reason, and never starts', async () => {
   const issue = makeIssue({
     labels: [READY_FOR_AGENT_LABEL, 'builder-claude-opus', 'reviewer-claude-sonnet'],
@@ -453,7 +467,7 @@ test('a same-family builder/reviewer label pair is ineligible, gets one comment 
 
 test('a differing-family explicit pair is eligible and starts', async () => {
   const issue = makeIssue({
-    labels: [READY_FOR_AGENT_LABEL, 'builder-deepseek-flash', 'reviewer-glm-5.3'],
+    labels: [READY_FOR_AGENT_LABEL, 'builder-deepseek-flash', 'reviewer-codex'],
   });
   const { linear } = fakeLinear({ issues: [issue] });
   const store = fakeStore({ ready: { [issue.id]: issueFingerprint(issue) } });
@@ -585,7 +599,7 @@ test('a card that changed after it was started is allowed through the cooldown',
   // fingerprint, so it is a fresh request -- first sighting, then a start.
   issue = makeIssue({
     identifier: 'JUL-99',
-    labels: [READY_FOR_AGENT_LABEL, 'builder-deepseek-flash', 'reviewer-glm-5.3'],
+    labels: [READY_FOR_AGENT_LABEL, 'builder-deepseek-flash', 'reviewer-codex'],
   });
   assert.equal((await readyQueueCheck(d)).status, 'first-sighting');
   assert.equal((await readyQueueCheck(d)).status, 'started');

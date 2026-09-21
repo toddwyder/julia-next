@@ -139,7 +139,7 @@ For the current step of the current item:
      exist there (JUL-70 preflight miss 4; runbook, "The coordinator's `ORCA_ENVIRONMENT` is the
      wrong daemon for orchestration"). `orca-cli.mjs`'s `workerStart` wrapper sends no `--on`
      yet, so make the worker start by calling `orca orchestration worker-start` directly.
-   - **`pi-deepseek`/`pi-glm` entries cannot go through `workerStart --agent pi`.**
+   - **The `pi-deepseek` entry cannot go through `workerStart --agent pi`.**
      `workerStart`'s `--agent <id>` launches a known TUI agent with no way to pass Pi's own
      `--provider`/`--model` selection or seat-specific secret through it, and `runner` (the one
      identity both builder and reviewer dispatch as) can't hold two different default
@@ -152,12 +152,10 @@ For the current step of the current item:
      <seat>"` where `<seat>` is `builder-backup` (DeepSeek Flash) for a builder or
      `reviewer-backup` (DeepSeek Pro) for a reviewer (`ops/service-dropbox/run-pi-seat.mjs`
      resolves the right provider/model/secret from the seat name alone -- never pass a secret in
-     this command string). **`pi-glm` has no builder or reviewer seat.** GLM is barred as a
-     default or a fallback on cost (about $10 on one issue); only the orchestrator route launches
-     it. If a card deliberately picks a GLM builder or reviewer, park the item **Blocked** and say
-     so -- never send it to `builder-backup`/`reviewer-backup`, which are DeepSeek and would
-     silently run a different vendor from the one the card named (before JUL-89 it was the
-     reverse: a Pi reviewer silently launched GLM). A card's model label picks the *entry*, not
+     this command string). **GLM was removed (JUL-93):** there is no `pi-glm` entry, no `glm-5.3` label
+     and no GLM seat. A card that still carries an old GLM label is refused by the Ready queue with a
+     comment saying the label is retired -- never re-map it yourself. Never route a Pi item to a
+     vendor the card did not name. A card's model label picks the *entry*, not
      the exact model: each seat runs the one model fixed in `run-pi-seat.mjs`, so a
      `reviewer-deepseek-flash` or `builder-deepseek-pro` label is not honoured until JUL-102 --
      say on the card which model actually ran. This path has no `worker-show`/`workerAbandon` supervision, so step 3

@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 
 const FILE = fileURLToPath(new URL('./orchestrator-svc-ops', import.meta.url));
 const ACCOUNTS = ['runner', 'orchestrator-svc'];
-const KEY_GROUPS = ['deepseek-readers', 'zai-readers'];
+const KEY_GROUPS = ['deepseek-readers'];
 
 const raw = readFileSync(FILE, 'utf8');
 const rules = raw
@@ -78,6 +78,10 @@ test('usermod may only append a named account to a named *-readers group, one ex
   const expected = KEY_GROUPS.flatMap((group) => ACCOUNTS.map((account) => ['-aG', group, account]));
   assert.deepEqual(usermods.map((a) => a.join(' ')).sort(), expected.map((a) => a.join(' ')).sort());
   for (const [, group] of usermods) assert.match(group, /^[a-z]+-readers$/);
+});
+
+test('GLM is gone: no rule mentions the removed zai-readers group (JUL-93)', () => {
+  assert.doesNotMatch(raw, /zai/i);
 });
 
 test('no rule lets orchestrator-svc touch sudo itself, the secrets, or any path outside the named ones', () => {

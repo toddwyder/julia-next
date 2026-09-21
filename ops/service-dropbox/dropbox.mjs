@@ -16,10 +16,10 @@
 // over stdin, never argv (argv is visible to any other process via /proc or
 // `ps`; stdin to a short-lived child process is not).
 //
-// Not every field lands with the same reader (JUL-77 added three: DeepSeek
-// and Z.ai are read by the runner/builder account, not just
-// orchestrator-svc) -- see FIELD_GROUPS below, which write-secret.sh's case
-// statement must match exactly (write-secret.test.mjs asserts this).
+// Not every field lands with the same reader (JUL-77 added DeepSeek, which
+// the runner/builder account reads, not just orchestrator-svc) -- see
+// FIELD_GROUPS below, which write-secret.sh's case statement must match
+// exactly (write-secret.test.mjs asserts this).
 //
 // Values are never logged, echoed back in any response, or held longer
 // than the single request that carries them -- see logField() below, which
@@ -30,7 +30,7 @@ import { execFile } from 'node:child_process';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
-export const FIELDS = ['sentry', 'supabase', 'powersync', 'axiom', 'deepseek', 'zai', 'linear'];
+export const FIELDS = ['sentry', 'supabase', 'powersync', 'axiom', 'deepseek', 'linear'];
 
 // Which group write-secret.sh chowns each field's file to on the server --
 // the single source of truth for "who can read this key" (JUL-77). The
@@ -42,14 +42,12 @@ export const FIELD_GROUPS = {
   supabase: 'orchestrator-svc',
   powersync: 'orchestrator-svc',
   axiom: 'orchestrator-svc',
-  // Pi builder (runner) AND the orchestrator-deepseek route -- a dedicated
-  // group with both accounts as members, same shape as zai-readers.
+  // Pi builder and reviewer (runner) AND the orchestrator-deepseek route -- a
+  // dedicated group with both accounts as members (see README.md's one-time
+  // setup), never orchestrator-svc's own group directly -- that would let
+  // runner read the orchestrator-only fields
+  // (sentry/supabase/powersync/axiom/linear) too.
   deepseek: 'deepseek-readers',
-  // Pi reviewer (runner) AND the orchestrator backup -- a dedicated group
-  // with both accounts as members (see README.md's one-time setup), never
-  // orchestrator-svc's own group directly -- that would let runner read the
-  // orchestrator-only fields (sentry/supabase/powersync/axiom/linear) too.
-  zai: 'zai-readers',
   // Orchestrator-svc only, same as the original four.
   linear: 'orchestrator-svc',
 };
@@ -162,7 +160,6 @@ const HINTS = {
   powersync: 'From PowerSync: Account -> Access Tokens. A long string of letters/numbers, no spaces.',
   axiom: 'From Axiom: Settings -> API tokens. A long string of letters/numbers, no spaces.',
   deepseek: 'From DeepSeek: Platform -> API keys. A long string of letters/numbers, no spaces.',
-  zai: 'From Z.ai: Console -> API keys. A long string of letters/numbers, no spaces.',
   linear: 'From Linear: Settings -> Security & access -> Personal API keys. A long string of letters/numbers, no spaces.',
 };
 

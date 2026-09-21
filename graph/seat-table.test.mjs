@@ -43,8 +43,9 @@ test('the six JUL-97 graph-agent seats have a primary and a backup, and the orig
   assert.deepEqual(SEAT_TABLE.reviewer, { primary: 'codex', backup: 'claude' });
 });
 
-test('GLM stays defined in FAMILY_OF and selectable, but is never a seat default or backup', () => {
-  assert.equal(FAMILY_OF['pi-glm'], 'zhipu');
+test('GLM is gone: no family, and never a seat default or backup (JUL-93)', () => {
+  assert.ok(!Object.hasOwn(FAMILY_OF, 'pi-glm'));
+  assert.ok(!Object.values(FAMILY_OF).includes('zhipu'));
   for (const [name, seat] of Object.entries(SEAT_TABLE)) {
     assert.notEqual(seat.primary, 'pi-glm', `${name} primary must not be GLM`);
     assert.notEqual(seat.backup, 'pi-glm', `${name} backup must not be GLM`);
