@@ -1225,6 +1225,7 @@ it, then `sudo install -m 0440 -o root -g root`). Rules, as `orchestrator-svc` v
 | Rule | Why |
 | --- | --- |
 | `systemctl enable --now julia-ready-queue.timer` | Turns the queue on — JUL-79's own final step. |
+| `systemctl disable --now julia-ready-queue.timer` | Switches the old five-minute queue off **for good** (JUL-98): stops it and removes it from the boot-time timer set. `stop` alone only lasts until the next restart, which would bring the old queue back beside the controller and let two things pick from Ready. The one exact command, no `mask`. |
 | `systemctl start` / `stop` / `restart julia-ready-queue.timer` | Control the timer. |
 | `systemctl start` / `stop` / `restart julia-ready-queue.service` | Run, stop or restart one check on demand (the service is a oneshot). |
 | `usermod -aG <group> <account>` for `{deepseek-readers} × {runner, orchestrator-svc}` | Adds a service account to a key-reader group the drop box already uses. Two exact pairs, not a pattern. |

@@ -14,6 +14,11 @@
 # units are root-owned files that run as orchestrator-svc; these rules cannot
 # change what they run, only whether they run.
 orchestrator-svc ALL=(root) NOPASSWD: /usr/bin/systemctl enable --now julia-ready-queue.timer
+# Switch that timer off for good (JUL-98): stops it AND removes it from the
+# boot-time timer set, so a reboot does not bring the old five-minute queue back
+# beside the controller. `stop` alone only lasts until the next restart. This is
+# the one exact command; there is no `mask`, no `disable` of anything else.
+orchestrator-svc ALL=(root) NOPASSWD: /usr/bin/systemctl disable --now julia-ready-queue.timer
 orchestrator-svc ALL=(root) NOPASSWD: /usr/bin/systemctl start julia-ready-queue.timer
 orchestrator-svc ALL=(root) NOPASSWD: /usr/bin/systemctl stop julia-ready-queue.timer
 orchestrator-svc ALL=(root) NOPASSWD: /usr/bin/systemctl restart julia-ready-queue.timer

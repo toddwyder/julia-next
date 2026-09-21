@@ -11,6 +11,7 @@ the group named in `dropbox.mjs`'s `FIELD_GROUPS`:
 | Field | Readable by |
 | --- | --- |
 | sentry, supabase, powersync, axiom, linear | `orchestrator-svc` only |
+| linear-app-id, linear-app-secret (the controller's own Linear identity, JUL-98) | `orchestrator-svc` only |
 | deepseek | `runner` AND `orchestrator-svc`, via a dedicated `deepseek-readers` group (builder backup + `orchestrator-deepseek` route) |
 
 `runner` is never added to the `orchestrator-svc` group itself -- that would let it read every
