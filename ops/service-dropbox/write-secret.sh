@@ -27,10 +27,9 @@ case "$FIELD" in
   powersync) DEST="$DEST_DIR/powersync.env";    GROUP=orchestrator-svc ;;
   axiom)     DEST="$DEST_DIR/axiom.env";        GROUP=orchestrator-svc ;;
   deepseek)  DEST="$DEST_DIR/deepseek.env";     GROUP=deepseek-readers ;;
-  zai)       DEST="$DEST_DIR/zai.env";          GROUP=zai-readers ;;
   linear)    DEST="$DEST_DIR/linear.env";       GROUP=orchestrator-svc ;;
   *)
-    echo "write-secret.sh: unknown field '$FIELD' -- must be one of sentry|supabase|powersync|axiom|deepseek|zai|linear" >&2
+    echo "write-secret.sh: unknown field '$FIELD' -- must be one of sentry|supabase|powersync|axiom|deepseek|linear" >&2
     exit 1
     ;;
 esac

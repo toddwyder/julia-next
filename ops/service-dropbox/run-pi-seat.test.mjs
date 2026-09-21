@@ -61,29 +61,18 @@ test('reviewer-backup routes to Pi + DeepSeek Pro on the native provider, secret
   assert.ok(!spec.args.some((arg) => arg.includes('super-secret-deepseek-token')));
 });
 
-test('orchestrator-backup still routes to Pi + GLM-5.3 as a custom provider (the only GLM seat left)', () => {
-  const spec = buildPiSpawnSpec('orchestrator-backup', 'wake up', {
-    mode: 'rpc',
-    readSecretImpl: (field) => {
-      assert.equal(field, 'zai');
-      return 'super-secret-zai-token';
-    },
-  });
-  assert.deepEqual(spec.args, ['--provider', 'glm-5-3', '--model', 'glm-5.3', '--thinking', 'medium', '-p', '--mode', 'rpc', '--', 'wake up']);
-  assert.equal(spec.env.ZAI_PAYG_API_KEY, 'super-secret-zai-token');
-  assert.ok(!spec.args.includes('super-secret-zai-token'));
-});
-
-// The cost rule (JUL-89): GLM is never a default or a fallback. Only the
-// orchestrator seat that a card selects on purpose (`pi-glm`) may launch it;
-// no builder or reviewer seat may, so a reviewer wake can never silently fall
-// onto the barred vendor again.
-test('no builder or reviewer seat launches GLM', () => {
-  for (const seat of Object.keys(SEATS).filter((name) => name.startsWith('builder') || name.startsWith('reviewer'))) {
-    const args = SEATS[seat].piArgs('json');
-    assert.ok(!args.includes('glm-5-3'), `${seat} must not use the GLM provider`);
-    assert.notEqual(SEATS[seat].secretField, 'zai', `${seat} must not read the Z.ai secret`);
+// The cost rule (JUL-89, finished by JUL-93): GLM is barred and removed. No seat
+// of any kind launches it, and the old `orchestrator-backup` seat that did is
+// gone, so a wake can never fall onto the barred vendor. A seat name that no
+// longer exists is refused, not defaulted.
+test('no seat launches GLM, and the old GLM orchestrator-backup seat is refused as unknown', () => {
+  for (const [seat, def] of Object.entries(SEATS)) {
+    assert.ok(!def.piArgs('json').includes('glm-5-3'), `${seat} must not use the GLM provider`);
+    assert.notEqual(def.secretField, 'zai', `${seat} must not read the Z.ai secret`);
+    assert.notEqual(def.envVar, 'ZAI_PAYG_API_KEY', `${seat} must not use the Z.ai key variable`);
   }
+  assert.ok(!Object.hasOwn(SEATS, 'orchestrator-backup'));
+  assert.throws(() => buildPiSpawnSpec('orchestrator-backup', 'wake up'), /unknown seat/);
 });
 
 test('buildPiSpawnSpec refuses an unknown seat', () => {

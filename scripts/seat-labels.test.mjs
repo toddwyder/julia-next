@@ -60,8 +60,9 @@ test('the six label groups are exactly the ticket\'s, in the ticket\'s order and
 test('the label-name convention produces the exact names the ticket gives', () => {
   assert.equal(MODEL_LABELS.ORCH_CLAUDE_OPUS, 'orch-claude-opus');
   assert.equal(MODEL_LABELS.BUILDER_DEEPSEEK_FLASH, 'builder-deepseek-flash');
-  assert.equal(MODEL_LABELS.REVIEWER_GLM_5_3, 'reviewer-glm-5.3');
+  assert.equal(MODEL_LABELS.REVIEWER_DEEPSEEK_PRO, 'reviewer-deepseek-pro');
   assert.equal(MODEL_LABELS.REVIEWER_CODEX, 'reviewer-codex');
+  assert.ok(!Object.values(MODEL_LABELS).some((name) => name.includes('glm')), 'no GLM label exists (JUL-93)');
   assert.equal(EFFORT_LABELS.REVIEWER_EFFORT_MEDIUM, 'reviewer-effort-medium');
   assert.equal(EFFORT_LABELS.ORCH_EFFORT_LOW, 'orch-effort-low');
 
@@ -87,7 +88,7 @@ test('over the whole catalogue, Claude models resolve only to claude and Codex o
     if (label.includes('claude-')) assert.equal(spec.entry, 'claude', `${label} must be the claude entry`);
     if (/-codex$/.test(label)) assert.equal(spec.entry, 'codex', `${label} must be the codex entry`);
     if (label.includes('deepseek-')) assert.equal(spec.entry, 'pi-deepseek', label);
-    if (label.includes('glm-')) assert.equal(spec.entry, 'pi-glm', label);
+    assert.ok(!label.includes('glm'), `${label} must not exist: GLM was removed (JUL-93)`);
   }
 });
 
@@ -111,11 +112,11 @@ test('every agent has a default for all three choices', () => {
 });
 
 test('a present model label wins over the default, for each agent', () => {
-  const choices = resolveSeatChoices(['orch-codex', 'builder-glm-5.3', 'reviewer-claude-haiku']);
+  const choices = resolveSeatChoices(['orch-codex', 'builder-deepseek-pro', 'reviewer-claude-haiku']);
   assert.equal(choices.orchestrator.entry, 'codex');
   assert.equal(choices.orchestrator.modelLabel, 'orch-codex');
-  assert.equal(choices.builder.entry, 'pi-glm');
-  assert.equal(choices.builder.modelLabel, 'builder-glm-5.3');
+  assert.equal(choices.builder.entry, 'pi-deepseek');
+  assert.equal(choices.builder.modelLabel, 'builder-deepseek-pro');
   assert.equal(choices.reviewer.entry, 'claude');
   assert.equal(choices.reviewer.modelLabel, 'reviewer-claude-haiku');
 });
@@ -148,7 +149,7 @@ test('the family rule accepts the default table and an explicitly differing pair
     { ok: true },
   );
   assert.deepEqual(
-    validateFamilyChoice(resolveSeatChoices(['builder-deepseek-flash', 'reviewer-glm-5.3'])),
+    validateFamilyChoice(resolveSeatChoices(['builder-deepseek-flash', 'reviewer-claude-sonnet'])),
     { ok: true },
   );
 });
@@ -180,10 +181,14 @@ test('a fallback whose backup collides with the other seat is refused, not silen
   assert.match(result.reason, /different families/);
 });
 
-test('GLM is still a selectable seat-label model even though it is no seat default or backup', () => {
+// GLM was removed (JUL-93). A leftover GLM label on an old card is an unknown
+// label like any other: ignored, so the seat runs its table default -- it can
+// never resolve to a GLM launch route.
+test('a leftover GLM label is ignored and the builder falls back to its table default, never a GLM entry', () => {
   const choices = resolveSeatChoices(['builder-glm-5.3']);
-  assert.equal(choices.builder.entry, 'pi-glm');
-  assert.equal(choices.builder.modelLabel, 'builder-glm-5.3');
+  assert.equal(choices.builder.entry, SEAT_TABLE.builder.primary);
+  assert.equal(choices.builder.modelLabel, 'builder-claude-opus');
+  assert.ok(!Object.values(choices).some((choice) => choice.entry === 'pi-glm'));
 });
 
 test('the family rule rejects an unknown seat-table entry', () => {
@@ -213,7 +218,7 @@ test('missingSeatLabels returns exactly the default model and effort labels not 
     'reviewer-effort-medium',
   ]);
   assert.deepEqual(
-    missingSeatLabels(['orch-codex', 'builder-glm-5.3', 'reviewer-claude-haiku', 'orch-effort-low', 'builder-effort-high', 'reviewer-effort-medium']),
+    missingSeatLabels(['orch-codex', 'builder-deepseek-pro', 'reviewer-claude-haiku','orch-effort-low', 'builder-effort-high', 'reviewer-effort-medium']),
     [],
   );
 });

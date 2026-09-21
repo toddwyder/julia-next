@@ -13,8 +13,9 @@
 //
 // This is deliberately weaker than the old "no shared family across every
 // primary/backup combination" check, which the table below cannot satisfy:
-// Todd's instruction bars GLM (zhipu) as any seat default or backup, and
-// reviewer's backup is claude (anthropic) like the builder's primary.
+// reviewer's backup is claude (anthropic) like the builder's primary. (GLM was
+// once barred here as a seat default or backup; it has since been removed
+// entirely, JUL-93.)
 // JUL-97 step 1 adds the six agent seats the board's labels and template
 // describe. The three original seats are unchanged -- the coordinator's own
 // launch path still reads `orchestrator`, and the builder/reviewer pair the
@@ -34,13 +35,10 @@ export const SEAT_TABLE = {
 // Model family behind each table entry -- not the vendor/tool name, the
 // underlying model maker, since two different tools can front the same
 // family (e.g. a Claude Code pointed elsewhere would still be 'anthropic').
-// pi-glm stays defined and stays a selectable model label; it is simply
-// never a seat default or backup.
 export const FAMILY_OF = {
   claude: 'anthropic',
   codex: 'openai',
   'pi-deepseek': 'deepseek',
-  'pi-glm': 'zhipu',
 };
 
 // The invariant the ticket states: for every builder entry there is at least

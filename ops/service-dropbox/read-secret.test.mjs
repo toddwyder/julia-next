@@ -36,14 +36,23 @@ test('secretAuthHeader wraps the value as a Bearer header, built in-process', ()
   assert.equal(secretAuthHeader('supabase', { dir }), 'Bearer sbp_token_value_1234567890');
 });
 
-test('KNOWN_FIELDS is exactly the seven services this drop box now names (JUL-72 + JUL-77)', () => {
+test('KNOWN_FIELDS is exactly the six services this drop box now names (JUL-72 + JUL-77, GLM removed in JUL-93)', () => {
   assert.deepEqual(
     [...KNOWN_FIELDS].sort(),
-    ['axiom', 'deepseek', 'linear', 'powersync', 'sentry', 'supabase', 'zai'],
+    ['axiom', 'deepseek', 'linear', 'powersync', 'sentry', 'supabase'],
   );
 });
 
-test('readSecret reads a JUL-77 field (deepseek/zai/linear) the same as any other field', () => {
+test('readSecret refuses the removed GLM field (zai) as an unknown field, without touching a file', () => {
+  let touched = false;
+  assert.throws(
+    () => readSecret('zai', { readFileImpl: () => { touched = true; return 'x'; } }),
+    /unknown field 'zai'/,
+  );
+  assert.equal(touched, false, 'an unknown field must be refused before any file is read');
+});
+
+test('readSecret reads a JUL-77 field (deepseek/linear) the same as any other field', () => {
   const dir = tmpDir();
   writeFileSync(join(dir, 'deepseek.env'), 'sk-deepseek-1234567890abcdef\n');
   assert.equal(readSecret('deepseek', { dir }), 'sk-deepseek-1234567890abcdef');

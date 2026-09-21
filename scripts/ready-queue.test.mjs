@@ -453,7 +453,7 @@ test('a same-family builder/reviewer label pair is ineligible, gets one comment 
 
 test('a differing-family explicit pair is eligible and starts', async () => {
   const issue = makeIssue({
-    labels: [READY_FOR_AGENT_LABEL, 'builder-deepseek-flash', 'reviewer-glm-5.3'],
+    labels: [READY_FOR_AGENT_LABEL, 'builder-deepseek-flash', 'reviewer-codex'],
   });
   const { linear } = fakeLinear({ issues: [issue] });
   const store = fakeStore({ ready: { [issue.id]: issueFingerprint(issue) } });
@@ -585,7 +585,7 @@ test('a card that changed after it was started is allowed through the cooldown',
   // fingerprint, so it is a fresh request -- first sighting, then a start.
   issue = makeIssue({
     identifier: 'JUL-99',
-    labels: [READY_FOR_AGENT_LABEL, 'builder-deepseek-flash', 'reviewer-glm-5.3'],
+    labels: [READY_FOR_AGENT_LABEL, 'builder-deepseek-flash', 'reviewer-codex'],
   });
   assert.equal((await readyQueueCheck(d)).status, 'first-sighting');
   assert.equal((await readyQueueCheck(d)).status, 'started');

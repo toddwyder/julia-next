@@ -25,5 +25,3 @@ orchestrator-svc ALL=(root) NOPASSWD: /usr/bin/systemctl restart julia-ready-que
 # chowns each key file to one of these groups). Only these pairs.
 orchestrator-svc ALL=(root) NOPASSWD: /usr/sbin/usermod -aG deepseek-readers runner
 orchestrator-svc ALL=(root) NOPASSWD: /usr/sbin/usermod -aG deepseek-readers orchestrator-svc
-orchestrator-svc ALL=(root) NOPASSWD: /usr/sbin/usermod -aG zai-readers runner
-orchestrator-svc ALL=(root) NOPASSWD: /usr/sbin/usermod -aG zai-readers orchestrator-svc

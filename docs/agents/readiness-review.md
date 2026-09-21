@@ -86,7 +86,7 @@ steps, and the ticket does not close until it has.
        readiness review proved the Linear key works as `orchestrator-svc` and passed, but the key
        file is `orchestrator-svc`-only by design (`FIELD_GROUPS.linear` in
        `ops/service-dropbox/dropbox.mjs`), and builders run as `runner`, which is in
-       `deepseek-readers` and `zai-readers` but not `orchestrator-svc`. A builder told to call
+       `deepseek-readers` but not `orchestrator-svc`. A builder told to call
        the Linear API would have stopped dead. The resolution — also the better design — is that
        the builder writes the program and the coordinator runs it with the key. A review that
        probes only as itself has not tested the caller, and the access stop that follows is a

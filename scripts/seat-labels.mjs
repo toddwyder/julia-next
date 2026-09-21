@@ -66,7 +66,6 @@ export const MODEL_SPECS = Object.freeze({
   codex: { entry: 'codex', model: null },
   'deepseek-pro': { entry: 'pi-deepseek', model: 'deepseek-v4-pro' },
   'deepseek-flash': { entry: 'pi-deepseek', model: 'deepseek-v4-flash' },
-  'glm-5.3': { entry: 'pi-glm', model: 'glm-5.3' },
 });
 
 // The model each seat-table entry runs when the card names none (the
@@ -76,7 +75,6 @@ export const DEFAULT_MODEL_SUFFIX_BY_ENTRY = Object.freeze({
   claude: 'claude-opus',
   codex: 'codex',
   'pi-deepseek': 'deepseek-flash',
-  'pi-glm': 'glm-5.3',
 });
 
 function suffixKey(suffix) {

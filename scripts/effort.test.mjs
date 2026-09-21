@@ -2,7 +2,7 @@
 // one Low/Medium/High choice to each seat-table entry's own CLI spelling.
 // This is the whole point of keeping it pure: label parsing (a later,
 // Linear-writing step) and the launch commands both call the same function,
-// and its full 4-entry matrix is pinned here rather than discovered live.
+// and its full 3-entry matrix is pinned here rather than discovered live.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -28,7 +28,6 @@ test('translateEffort maps every seat-table entry x every level to its vendor sp
     // Pi has no graded effort setting: Low means thinking off (no flag --
     // Pi's own thinkingLevelMap supplies the level), Medium/High mean on.
     'pi-deepseek': { low: ['--thinking', 'off'], medium: ['--thinking', 'medium'], high: ['--thinking', 'high'] },
-    'pi-glm': { low: ['--thinking', 'off'], medium: ['--thinking', 'medium'], high: ['--thinking', 'high'] },
   };
   for (const [entry, byLevel] of Object.entries(expected)) {
     for (const level of EFFORT_LEVELS) {
@@ -38,14 +37,14 @@ test('translateEffort maps every seat-table entry x every level to its vendor sp
 });
 
 test('an omitted effort is Medium for every entry -- never throws, never implied-empty', () => {
-  for (const entry of Object.keys({ claude: 1, codex: 1, 'pi-deepseek': 1, 'pi-glm': 1 })) {
+  for (const entry of Object.keys({ claude: 1, codex: 1, 'pi-deepseek': 1 })) {
     assert.deepEqual(translateEffort(entry), translateEffort(entry, 'medium'), `${entry} default`);
   }
 });
 
 test('an unrecognized effort value also falls back to Medium rather than throwing or guessing a vendor default', () => {
   assert.deepEqual(translateEffort('claude', 'turbo'), ['--effort', 'medium']);
-  assert.deepEqual(translateEffort('pi-glm', 'LOW'), ['--thinking', 'medium']);
+  assert.deepEqual(translateEffort('pi-deepseek', 'LOW'), ['--thinking', 'medium']);
   assert.equal(normalizeEffort('turbo'), 'medium');
   assert.equal(normalizeEffort(undefined), 'medium');
   assert.equal(normalizeEffort('high'), 'high');
@@ -54,6 +53,8 @@ test('an unrecognized effort value also falls back to Medium rather than throwin
 test('an unknown ENTRY throws (same discipline as orchestratorLaunchCommandFor) -- a typo must never silently launch the wrong vendor', () => {
   assert.throws(() => translateEffort('gemini', 'low'), /unknown orchestrator seat-table entry: gemini/);
   assert.throws(() => translateEffort(undefined), /unknown orchestrator seat-table entry: undefined/);
+  // GLM was removed (JUL-93): its old entry is now just another unknown one.
+  assert.throws(() => translateEffort('pi-glm', 'low'), /unknown orchestrator seat-table entry: pi-glm/);
 });
 
 test('translateEffort returns a fresh array each call, so a caller appending to it cannot corrupt the next launch', () => {
