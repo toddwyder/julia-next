@@ -787,3 +787,132 @@ test('a builder whose turn is never proven, with nothing behind it, takes its se
   assert.equal(result.builder.outcome, 'succeeded');
   assert.ok(adopted >= 2, 'the adopt route really ran and really went idle twice');
 });
+
+// ---------------------------------------------------------------------------
+// JUL-98 step 6 ROUND 3: A DELIVERY THAT CARRIES NOTHING FOR THIS WORKER IS
+// NOT A VERDICT.
+//
+// Round 2's finding 2 was fixed by asking the mailbox before declaring a seat
+// never-started -- but it asked for exactly ONE delivery (`maxWaits: 1`). The
+// mailbox is the CONTROLLER'S, not this worker's: every card in flight, every
+// earlier dispatch and every replayed delivery wakes the same wait. So one
+// unrelated message consumed the single look, nothing in it belonged to this
+// worker, and the code fell straight through to the never-started path -- zero
+// cost line, resources released, fallback allowed, a finished worker's real
+// allowance thrown away. Finding 2's own failure mode, reached through a
+// narrower door.
+//
+// The rule: the reconciliation reads ON until it finds THIS worker's own
+// report, or until the wait truly runs out of time.
+// ---------------------------------------------------------------------------
+
+test('a delivery belonging to another dispatch does not consume the reconciliation: it reads on and finds this worker\'s own report', async () => {
+  const h = harness();
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+  // The busy-window blind spot again: adopted, idle at both readings, but the
+  // turn really ran and finished inside the window.
+  h.deps.adoptBoundaries = { ...h.deps.adoptBoundaries, terminalWaitImpl: async () => ({ wait: { satisfied: true } }) };
+  h.deps.observeStartImpl = async () => { throw new Error('worktree ps must not be asked'); };
+
+  let call = 0;
+  h.deps.checkWaitImpl = async () => {
+    call += 1;
+    const mine = `ctx_937abab903ae-${h.orca.workersStarted()}`;
+    return {
+      runId: ALL.runId,
+      deliveryId: `delivery_${call}`,
+      // The first delivery is another card's worker finishing, plus a replay of
+      // a dispatch that ended long ago. Neither says anything about this one.
+      messages: call === 1
+        ? [doneMessage('ctx_another_card_entirely', 'succeeded'), doneMessage('ctx_937abab903ae-old', 'failed')]
+        : [doneMessage(mine, 'succeeded')],
+      count: call === 1 ? 2 : 1,
+      timedOut: false,
+    };
+  };
+
+  const result = await runWorkerStep({
+    seat: 'builder', card: CARD, step: STEP, choice: resolveSeatChoices([]).builder,
+    worktreeName: 'jul98-6', requestId: 'JUL-98:step-6:builder',
+    suiteRunner, suiteKey: 'JUL-98:step-6', runSuite: false, ...h.deps,
+  });
+
+  assert.equal(call >= 2, true, 'the foreign delivery is read past, not treated as the answer');
+  assert.equal(result.ok, true, result.reason);
+  assert.equal(result.outcome, 'succeeded', 'this worker\'s own report is the verdict');
+  assert.notEqual(result.cost.neverStarted, true, 'a worker that reported is never costed as never-started');
+  assert.equal(result.cost.totalTokens, COST.totalTokens, 'its real allowance is kept, not thrown away');
+  assert.equal(result.released, true);
+  assert.notEqual(result.launchRefused, true, 'and no backup is started beside a seat that already did the work');
+});
+
+test('a foreign delivery that arrives while this worker is silent does not extend the look past its budget: the seat is still declared never-started, once the time is truly spent', async () => {
+  const h = harness();
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+  h.deps.adoptBoundaries = { ...h.deps.adoptBoundaries, terminalWaitImpl: async () => ({ wait: { satisfied: true } }) };
+  h.deps.observeStartImpl = async () => { throw new Error('worktree ps must not be asked'); };
+
+  // A controller mailbox with other traffic on it and nothing from this worker.
+  // Each delivery really costs time, so the budget is what ends it -- and the
+  // stop this whole step exists to prevent (the eight-hour sleep of 19-20
+  // September) cannot come back through a busy mailbox.
+  const clock = { now: 0 };
+  h.deps.monotonicNow = () => clock.now;
+  const waits = [];
+  h.deps.checkWaitImpl = async (options) => {
+    waits.push(options);
+    clock.now += 10000;
+    return {
+      runId: ALL.runId,
+      deliveryId: `delivery_${waits.length}`,
+      messages: [doneMessage('ctx_another_card_entirely', 'succeeded')],
+      count: 1,
+      timedOut: false,
+    };
+  };
+
+  const result = await runWorkerStep({
+    seat: 'builder', card: CARD, step: STEP, choice: resolveSeatChoices([]).builder,
+    worktreeName: 'jul98-6', requestId: 'JUL-98:step-6:builder',
+    suiteRunner, suiteKey: 'JUL-98:step-6', runSuite: false, ...h.deps,
+  });
+
+  assert.equal(waits.length, 3, 'it read on while the budget lasted, and stopped when it was spent');
+  assert.equal(waits[1].timeoutMs, 20000, 'each read is given only the time the budget has left, so the whole look stays bounded');
+  assert.equal(clock.now, DEFAULT_RECONCILE_WAIT_MS, 'and the whole reconciliation cost exactly its budget, not a wait per delivery');
+  assert.equal(result.ok, false);
+  assert.equal(result.stage, 'turn-start');
+  assert.equal(result.cost.neverStarted, true);
+  assert.equal(result.launchRefused, true, 'nothing survives it, so the seat table\'s backup takes the seat');
+});
+
+test('each foreign delivery is acknowledged, so the same one cannot wake the reconciliation for ever', async () => {
+  const h = harness();
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+  h.deps.adoptBoundaries = { ...h.deps.adoptBoundaries, terminalWaitImpl: async () => ({ wait: { satisfied: true } }) };
+  h.deps.observeStartImpl = async () => { throw new Error('worktree ps must not be asked'); };
+
+  let call = 0;
+  const acks = [];
+  h.deps.checkWaitImpl = async ({ ack }) => {
+    call += 1;
+    acks.push(ack ?? null);
+    const mine = `ctx_937abab903ae-${h.orca.workersStarted()}`;
+    return {
+      runId: ALL.runId,
+      deliveryId: `delivery_${call}`,
+      messages: call === 1 ? [doneMessage('ctx_another_card_entirely', 'succeeded')] : [doneMessage(mine, 'succeeded')],
+      count: 1,
+      timedOut: false,
+    };
+  };
+
+  const result = await runWorkerStep({
+    seat: 'builder', card: CARD, step: STEP, choice: resolveSeatChoices([]).builder,
+    worktreeName: 'jul98-6', requestId: 'JUL-98:step-6:builder',
+    suiteRunner, suiteKey: 'JUL-98:step-6', runSuite: false, ...h.deps,
+  });
+
+  assert.equal(result.outcome, 'succeeded', result.reason);
+  assert.deepEqual(acks, [null, 'delivery_1'], 'the second read acknowledges the delivery the first one consumed');
+});
