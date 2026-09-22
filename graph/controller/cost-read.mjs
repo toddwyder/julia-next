@@ -67,6 +67,42 @@ const execFileAsync = promisify(execFile);
 export const WORKER_HOME = '/home/runner';
 
 // ---------------------------------------------------------------------------
+// WHAT THIS READER CAN ACTUALLY READ -- declared once, and read by the
+// dispatcher before it launches anything
+// ---------------------------------------------------------------------------
+//
+// JUL-98 step 6, round 2, finding 1. A seat whose agent has no reader here is
+// not a seat with a cosmetic gap: ./release.mjs reads the cost FIRST and stops
+// before the release when the read fails, so such a worker fails its step with
+// no cost line AND keeps its worker and its worktree -- even when it did the
+// work perfectly and reported through the mailbox. Round 1 sent the DeepSeek
+// seat down the shared adopt route with `agent: 'pi'` while `readSeatCost`
+// below still refused `pi`, and in doing so made the OLD pre-dispatch refusal
+// unreachable, so no backup could take the seat either.
+//
+// So the list is exported and ./dispatch.mjs refuses a seat whose agent is not
+// on it, before anything is created. The gate is the cost source itself rather
+// than an agent name repeated in two files: implement the reader, add the agent
+// here, and the seat launches with no other change.
+//
+// WHY `pi` IS NOT ON IT. ../cost.mjs HAS a DeepSeek extractor
+// (`deepseekExtractFromSeatStream`), but it reads the JSON event stream that
+// `ops/service-dropbox/run-pi-seat.mjs` emits in its NON-interactive mode. The
+// adopt route runs Pi INTERACTIVELY, in a TUI, and that session writes no such
+// stream anywhere this reader can find: there is no measured worker-side record
+// to read, and DeepSeek is out of balance (402) with Todd's Decision of
+// 2026-09-22 04:07Z that it stays that way, so no paid interactive run can be
+// made to find one. A figure invented in its place is the blank cost line in
+// another costume, which is the one thing this whole module exists to stop.
+export const COST_READABLE_AGENTS = Object.freeze(['claude', 'codex', 'agy']);
+
+// Is there a worker-side record this reader can turn into a cost line for this
+// agent? ./dispatch.mjs asks BEFORE it starts anything.
+export function hasWorkerCostSource(agent) {
+  return COST_READABLE_AGENTS.includes(agent);
+}
+
+// ---------------------------------------------------------------------------
 // The cost read -- NOT an Orca call, because Orca has no such figure
 // ---------------------------------------------------------------------------
 
@@ -224,7 +260,7 @@ export function createSeatCostReader({
       const after = geminiAllowanceFromUsage(await readAllowanceImpl(), { buckets: geminiAllowanceBuckets() });
       return seatCostLine({ seat, ...geminiExtractFromAllowance({ model, before: allowanceBefore, after, startedAt, endedAt }) });
     }
-    throw new Error(`no cost source is known for a ${JSON.stringify(agent)} seat (${seat}) -- refusing to guess a figure${startedAt && endedAt ? ` for ${startedAt}..${endedAt}` : ''}`);
+    throw new Error(`no cost source is known for a ${JSON.stringify(agent)} seat (${seat}) -- refusing to guess a figure${startedAt && endedAt ? ` for ${startedAt}..${endedAt}` : ''}. The agents this reader can read are ${COST_READABLE_AGENTS.join(', ')}, and ./dispatch.mjs refuses to start any other, so reaching this line means the two have drifted apart`);
   };
 }
 

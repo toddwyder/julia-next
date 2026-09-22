@@ -1810,6 +1810,42 @@ that reports to the mailbox, built once in `graph/controller/adopt.mjs` and take
   dispatch is not permitted at depth 2 (max 1)". Any live proof of dispatch has to be run from a
   plain Orca terminal (depth 0), which is where the controller itself sits.
 
+### Three things this route gets wrong if you build it the obvious way (JUL-98 step 6 round 2, 2026-09-22)
+
+An independent review of the first round found three defects in the route above. All three are
+fixed; they are recorded here because each one is the kind of thing that reads as safe and is not.
+
+- **A seat that can be started but cannot be COSTED strands its worker.**
+  `graph/controller/release.mjs` reads the cost first and stops before the release when the read
+  fails, so a seat whose agent has no reader in `graph/controller/cost-read.mjs` fails its step with
+  no cost line *and* keeps its worker and its worktree — even when it did the work perfectly and
+  reported through the mailbox. Round 1 sent the DeepSeek seat down this route with `agent: 'pi'`
+  while the reader still implemented only `claude`, `codex` and `agy`. The reader now exports
+  `COST_READABLE_AGENTS` and `graph/controller/dispatch.mjs` refuses a seat whose agent is not on
+  it, before anything is created, so the seat table's backup takes the seat. **The Pi seat is
+  therefore refused again today**, and lifting that refusal is exactly one thing: a worker-side cost
+  source for an *interactive* Pi session. The existing DeepSeek extractor reads the JSON event
+  stream `run-pi-seat.mjs` emits in its non-interactive mode; an interactive TUI writes no such
+  stream anywhere that has been found, and DeepSeek is out of balance (402) with the 2026-09-22
+  04:07Z Decision that it stays that way, so no paid run can be made to look for one.
+- **"The terminal was idle" is evidence, not a verdict.** A turn that begins and ends inside the
+  8 s busy window reads exactly like a turn that never began. Round 1 classified that as
+  never-started: it skipped the mailbox, replaced the real allowance with a zero-cost never-started
+  line, and released the seat — and because that exit carries no `launchRefused`, no backup ran
+  either, so a *finished* step and its cost were simply lost. `graph/controller/step-runner.mjs`
+  now takes ONE bounded look at the mailbox (30 s, `DEFAULT_RECONCILE_WAIT_MS`) before concluding
+  anything: a `worker_done` means the turn ran and the real cost is read; any other message from
+  that dispatch means it is alive and the ordinary wait follows; nothing at all, with a clean
+  teardown, is the never-started case and now carries `launchRefused` so the seat's backup runs.
+- **An error after a successful adoption is not a launch refusal.** Once `worker-start --terminal`
+  has answered, a worker exists, holds the brief and may already be spending. Round 1's single
+  catch treated a throw from the busy reading like a pre-dispatch failure: close the terminal,
+  remove the worktree, discard the dispatch identity, answer "refused" — which then invented a zero
+  cost and could start a backup beside a worker that was still running. `graph/controller/adopt.mjs`
+  now preserves the dispatch identity and carries the error out as `observationError`; the step
+  reports such a seat as `possiblyRunning`, releases nothing, deletes nothing, costs nothing and
+  starts no backup. The step stops on the missing cost line, which is what keeps the card still.
+
 ### agy's folder-trust list, and the gap it leaves (JUL-98 step 6, 2026-09-22)
 
 `agy` asks "Do you trust the contents of this project?" in a folder it has not seen, and does

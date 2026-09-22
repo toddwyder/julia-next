@@ -129,6 +129,11 @@ export const WORKER_REPO_SELECTOR = `path:${WORKER_CHECKOUT}`;
 // never to the account this process runs as, and ./cost-read.mjs's header
 // records the measured 0700 permission that makes it unreadable from here.
 export { createSeatCostReader, claudeProjectDirName, worktreePathOf, geminiAllowanceFromUsage, WORKER_HOME };
+// And what that reader can read at all (JUL-98 step 6 round 2, finding 1),
+// re-exported the same way: ./dispatch.mjs refuses to launch a seat whose agent
+// is not on the list, because a worker that cannot be costed cannot be released
+// either.
+export { COST_READABLE_AGENTS, hasWorkerCostSource } from './cost-read.mjs';
 export const PUBLISH_OWNER = 'toddwyder';
 export const PUBLISH_REPO = 'julia-next';
 export const PUBLISH_BASE = 'main';

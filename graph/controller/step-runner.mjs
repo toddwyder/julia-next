@@ -5,10 +5,15 @@
 // they happen in, which is itself a rule:
 //
 //   1. dispatch a FRESH worker (./dispatch.mjs)
-//   2. prove its turn really started (./turn-start.mjs) -- and if it did not,
-//      stop HERE. The mailbox is not opened at all: a prompt typed into a
-//      login or folder-trust screen is caught in seconds instead of being
-//      waited on for eight hours, which is what happened on 19-20 September.
+//   2. prove its turn really started (./turn-start.mjs). If nothing was
+//      observed, take ONE bounded look at the mailbox before concluding
+//      anything: it is the only authoritative record of what a worker did, and
+//      a turn that began and ended between two terminal readings looks exactly
+//      like a turn that never began (round 2, finding 2). A worker that
+//      reported is costed for real; one that is alive is waited on; one that
+//      answered nothing at all, and whose observation itself did not fail, is
+//      the never-started case and stops HERE. That stop is still seconds, not
+//      the eight hours of 19-20 September.
 //   3. sleep on the mailbox until that worker's own worker_done arrives
 //      (./mailbox.mjs), mirroring every message to Axiom on the way
 //   4. run the test suite ONCE, as the controller, in the candidate worktree
@@ -29,6 +34,14 @@ import { formatCostLine, neverStartedCostLine } from './cost.mjs';
 // takes (JUL-98 step 2, item 6): the same `fallbackSeatChoice`, the same seat
 // table, the same family guard. There is no second fallback machine here.
 import { fallbackSeatChoice } from '../../scripts/seat-labels.mjs';
+
+// How long the ONE reconciliation look at the mailbox may block for before a
+// seat is declared never-started. A worker that has already reported is in the
+// mailbox now and answers immediately; this is the margin for one that reported
+// a moment ago or is slow to pick the brief up. Short, because the alternative
+// failure -- sleeping on a worker that is going nowhere -- is the eight-hour
+// stall of 19-20 September.
+export const DEFAULT_RECONCILE_WAIT_MS = 30000;
 
 // One seat, one step.
 export async function runWorkerStep({
@@ -62,6 +75,11 @@ export async function runWorkerStep({
   mirrorImpl = null,
   runSuite = true,
   waitOptions = {},
+  // The BOUNDED look at the mailbox taken before a seat is declared
+  // never-started (item 2 below). Separate from `waitOptions` on purpose: this
+  // one must stay short, because it happens on the path that exists to catch a
+  // worker that is going nowhere.
+  reconcileOptions = {},
   // The controller's own clock, for a seat whose vendor records no duration.
   now = () => new Date().toISOString(),
 } = {}) {
@@ -158,27 +176,112 @@ export async function runWorkerStep({
   // by the same rules as every other seat's.
   const observed = dispatched.observed ?? await observeStartImpl({ seat, dispatch: dispatched });
   const proof = proveTurnStarted(observed ?? {});
+
+  let heard = null;
+  let initialAck = waitOptions.initialAck ?? null;
+
   if (!proof.started) {
-    return close({
-      ok: false,
-      stage: 'turn-start',
-      reason: proof.reason,
-      retryRequestId: proof.retryRequestId ?? null,
-      warnings: proof.warnings,
-      outcome: null,
-      testRun: null,
-    }, { turnStarted: false });
+    // THE RECONCILIATION (JUL-98 step 6, round 2, finding 2), and why a
+    // not-started reading is no longer a verdict on its own.
+    //
+    // Every turn-start proof this controller has is an OBSERVATION OF A
+    // TERMINAL, and each one has the same hole: a turn that begins and ends
+    // between two readings looks exactly like a turn that never began. The
+    // adopt route's window is seconds wide (./adopt.mjs DEFAULT_BUSY_WINDOW_MS)
+    // and a short step can fit inside it. Round 1 called that never-started,
+    // skipped the mailbox entirely, threw away the real allowance in favour of
+    // a zero-cost never-started line, and released the seat -- and because that
+    // exit carries no `launchRefused`, no backup ran either. A finished step
+    // and its cost were simply lost.
+    //
+    // The mailbox is the one AUTHORITATIVE record of what a worker did: a
+    // worker that reported demonstrably ran, and so did one that sent a
+    // heartbeat. So it is asked FIRST, ONCE, and briefly -- a bounded look, not
+    // the long sleep this whole step exists to avoid (the 19-20 September
+    // eight-hour stall). Three answers, three different truths:
+    //
+    //   * a worker_done  -- the turn ran and finished. Keep the REAL cost.
+    //   * any other message from this dispatch -- it is alive and still
+    //     working, so fall through to the ordinary wait.
+    //   * nothing at all -- combined with the idle reading, that is the
+    //     never-started case, and it is now a fact rather than an inference.
+    const reconciled = await waitForWorkerDone({
+      checkWaitImpl,
+      terminal: from,
+      runId,
+      dispatchId: dispatched.dispatchId,
+      mirrorImpl,
+      initialAck,
+      maxWaits: 1,
+      timeoutMs: DEFAULT_RECONCILE_WAIT_MS,
+      ...reconcileOptions,
+    });
+    const fromThisWorker = (reconciled.messages ?? []).filter((message) => message.dispatchId === dispatched.dispatchId);
+
+    if (reconciled.outcome != null) {
+      heard = reconciled;
+    } else if (fromThisWorker.length > 0) {
+      initialAck = reconciled.acknowledged;
+    } else if (dispatched.observationError) {
+      // A FAILED OBSERVATION IS NOT A VERDICT (round 2, finding 5). The worker
+      // was really adopted -- Orca issued its ids and it holds the brief -- and
+      // the thing that failed is the reading, not the worker. It may be running
+      // and spending right now, so nothing here may release it, delete its
+      // worktree, assign it a cost or let a backup start beside it. The step
+      // stops with NO cost line, which is precisely what `assertEverySeatCosted`
+      // stops the card on, and the worker and its worktree are left for the
+      // recovery path to reconcile and release.
+      return {
+        ok: false,
+        seat,
+        stage: 'turn-start',
+        possiblyRunning: true,
+        launchRefused: false,
+        dispatchId: dispatched.dispatchId,
+        taskId: dispatched.taskId,
+        terminal: dispatched.terminal,
+        worktree: dispatched.worktree,
+        cost: null,
+        released: false,
+        worktreeRemoved: false,
+        outcome: null,
+        testRun: null,
+        warnings: proof.warnings,
+        reason: `the ${seat} seat was adopted (dispatch ${dispatched.dispatchId}) but could not be observed (${dispatched.observationError}), and nothing has come from it through the mailbox yet -- it may still be running, so it is neither released nor costed and no backup is started beside it`,
+      };
+    } else {
+      const closed = await close({
+        ok: false,
+        stage: 'turn-start',
+        reason: proof.reason,
+        retryRequestId: proof.retryRequestId ?? null,
+        warnings: proof.warnings,
+        outcome: null,
+        testRun: null,
+      }, { turnStarted: false });
+      // AND THE SEAT FALLS BACK. Nothing was observed, nothing was heard, and
+      // cleanup took back everything this dispatch made -- so this is the same
+      // thing a refused launch is, and it takes the same road out:
+      // `runBuildAndReview` below resolves the seat's backup through the seat
+      // table. Only a CLEAN teardown may say so: a release or a removal that
+      // failed leaves something behind, and a seat with residue is not a seat
+      // nothing was created for.
+      return { ...closed, launchRefused: closed.released === true && closed.worktreeRemoved === true };
+    }
   }
 
   // 3. Sleep on the mailbox.
-  const heard = await waitForWorkerDone({
-    checkWaitImpl,
-    terminal: from,
-    runId,
-    dispatchId: dispatched.dispatchId,
-    mirrorImpl,
-    ...waitOptions,
-  });
+  if (!heard) {
+    heard = await waitForWorkerDone({
+      checkWaitImpl,
+      terminal: from,
+      runId,
+      dispatchId: dispatched.dispatchId,
+      mirrorImpl,
+      ...waitOptions,
+      initialAck,
+    });
+  }
 
   // 4. The test suite: once, by the controller, in the candidate worktree.
   let testRun = null;
@@ -357,7 +460,13 @@ export async function runBuildAndReview({
   // failure -- put three contradictory things on one card: "it ran on codex",
   // "worker-start failed at agent_readiness", and a cost line reading "never
   // started". So the gate is the stage, which covers all three.
-  const neverGotGoing = (result) => result.stage === 'dispatch' || result.stage === 'turn-start';
+  //
+  // AND THE ONE EXCEPTION (round 2, finding 5): a seat whose OBSERVATION failed
+  // after it was really adopted is `possiblyRunning`. Nothing is known about it
+  // either way, so it is neither "it ran on the backup" nor "it never got
+  // going": it must keep its own reason and its absent cost line, and it must
+  // never be given the zero-cost never-started line `stopped` below writes.
+  const neverGotGoing = (result) => (result.stage === 'dispatch' || result.stage === 'turn-start') && result.possiblyRunning !== true;
 
   for (const seat of seats) {
     const first = inPlay[seat];
@@ -375,7 +484,12 @@ export async function runBuildAndReview({
       } else {
         const backup = fallback.choices[seat];
         const second = await startSeat(seat, backup, '-bk');
-        if (neverGotGoing(second)) {
+        if (second.possiblyRunning) {
+          // Its cost is unknown, not zero, so the step stops on the missing
+          // cost line rather than on an invented one, and the card is told no
+          // seat ran on the backup.
+          result = second;
+        } else if (neverGotGoing(second)) {
           result = stopped(second, seat, `the ${seat} seat could not be started on ${fromEntry}: ${fromReason} -- and its backup ${backup.entry} could not be started either: ${second.reason}`);
         } else {
           inPlay = fallback.choices;

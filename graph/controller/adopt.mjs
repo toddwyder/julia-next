@@ -33,12 +33,18 @@
 //     of a sleep; `wait.satisfied` is read, because a timed-out wait still
 //     prints a normal result (orca-cli skill).
 //
-//  4. A ROUTE THAT CANNOT FINISH TAKES BACK WHAT IT MADE. The terminal is
+//  4. A ROUTE THAT CANNOT FINISH TAKES BACK WHAT IT MADE -- BUT ONLY WHILE
+//     NOTHING IS RUNNING YET. The terminal is
 //     closed and the worktree removed, so the refusal that goes back to
 //     ./dispatch.mjs is honestly `launchRefused` -- nothing created -- and
 //     ./step-runner.mjs's EXISTING seat-backup path (JUL-98 step 5, fifth fix)
 //     catches it with no second fallback machine. Anything the teardown itself
 //     could not remove is reported as a residual resource rather than hidden.
+//     ONCE `worker-start` HAS SUCCEEDED that stops being true: a worker exists,
+//     it holds the brief, and it may already be spending. From that point a
+//     failure here is the OBSERVATION failing, never the worker -- the dispatch
+//     identity is preserved, nothing is destroyed, and ./step-runner.mjs
+//     reconciles the worker through the mailbox (round 2, finding 5).
 //
 // Every boundary is injected; nothing here calls Orca directly. ./wiring.mjs
 // supplies the real ones.
@@ -96,6 +102,10 @@ export async function startAdoptedWorker({
   let worktree = null;
   let worktreePath = null;
   let terminal = null;
+  // The `worker-start` answer, once it has succeeded. Its presence is the line
+  // between "nothing was created" and "a worker exists and may be running":
+  // past it, no failure here may close a terminal or remove a worktree.
+  let adopted = null;
   const residualResources = [];
 
   // The one teardown, used by every failure below and in the one order that
@@ -173,10 +183,35 @@ export async function startAdoptedWorker({
       return stop(`worker-start failed at ${result.failedStage ?? result.stage ?? 'an unnamed stage'} (${result.lastError ?? 'no error given'})`);
     }
 
+    // FROM HERE ON THE WORKER EXISTS. Orca has issued its task and dispatch
+    // ids, the brief has been delivered, and the agent may already be running
+    // tools and spending allowance. Nothing below may tear any of that down --
+    // see `adopted` and the outer catch.
+    adopted = result;
+
     // (5) The turn-start reading. It never fails the START -- the adoption
     // itself succeeded -- it travels out and ./turn-start.mjs judges it, the
     // same way every other seat's observation does.
-    const busy = await terminalWaitImpl({ terminal, timeoutMs: busyWindowMs });
+    //
+    // AND IT MAY ITSELF FAIL (JUL-98 step 6, round 2, finding 5). A throw here
+    // is the OBSERVATION failing, not the worker: a stale terminal handle, a
+    // daemon that did not answer. Round 1 let it fall into the catch below,
+    // which closed the terminal, removed the worktree, discarded the dispatch
+    // identity and answered "refused" -- so ./dispatch.mjs marked it
+    // `launchRefused`, ./step-runner.mjs invented a zero cost, and a backup
+    // could be started beside a worker that was still running. An unread
+    // terminal is not an idle one, so nothing is claimed about the turn:
+    // `busy` travels out as null with the error beside it, and
+    // ./step-runner.mjs reconciles it through the mailbox.
+    let busy = null;
+    let observationError = null;
+    try {
+      const reading = await terminalWaitImpl({ terminal, timeoutMs: busyWindowMs });
+      busy = { terminal, satisfied: reading?.wait?.satisfied === true };
+    } catch (error) {
+      observationError = error.message;
+    }
+
     return {
       ok: true,
       seat,
@@ -186,9 +221,27 @@ export async function startAdoptedWorker({
       worktreePath,
       terminal,
       allowanceBefore: prepared.allowance ?? null,
-      observed: { busy: { terminal, satisfied: busy?.wait?.satisfied === true } },
+      observed: { busy },
+      observationError,
     };
   } catch (error) {
+    // A failure AFTER the adoption succeeded is never a refusal: there is a
+    // real worker behind it, so its identity is preserved and the caller
+    // reconciles it rather than destroying it.
+    if (adopted) {
+      return {
+        ok: true,
+        seat,
+        entry,
+        result: adopted,
+        worktree,
+        worktreePath,
+        terminal,
+        allowanceBefore: null,
+        observed: { busy: null },
+        observationError: error.message,
+      };
+    }
     return stop(error.message);
   }
 }

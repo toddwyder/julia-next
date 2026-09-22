@@ -33,19 +33,31 @@
 // sitting on a trust or login screen -- the 19-20 September failure -- is idle
 // at both readings and is caught.
 //
-// ITS BLIND SPOTS, both of them, stated rather than hidden. The busy reading is
+// ITS BLIND SPOTS, both of them, and WHO ANSWERS THEM. The busy reading is
 // taken once, inside a short window (./adopt.mjs DEFAULT_BUSY_WINDOW_MS), so:
 //
-//   * a turn that BEGINS AND ENDS inside that window reads as idle and is
-//     reported as never started. The live run of 2026-09-22 took 26 s against
-//     an 8 s window, and a real step takes minutes, so the margin is wide --
-//     but it is a margin, not a guarantee;
+//   * a turn that BEGINS AND ENDS inside that window reads as idle and looks,
+//     here, exactly like one that never began. The live run of 2026-09-22 took
+//     26 s against an 8 s window, and a real step takes minutes, so the margin
+//     is wide -- but it is a margin, not a guarantee;
 //   * a turn that has not BEGUN inside the window -- an agent slower to pick
 //     the brief up than the window is long -- reads the same way.
 //
-// Both fail the same, safe way: the seat is reported never-started, falls back
-// through the seat table, and nothing is waited on for hours. The cost is a
-// wasted worker, which is what the 19-20 September failure cost eight hours of.
+// ROUND 2, FINDING 2: THIS FILE'S "not started" IS NOT A VERDICT, and round 1
+// treated it as one. A seat classified never-started here had its real cost
+// thrown away for a zero-cost line and its worker released, and because that
+// exit carried no `launchRefused`, no backup ran either -- so a completed step
+// AND its cost were lost, which is the opposite of the "wasted worker, safe
+// fallback" this comment used to claim. What closes both blind spots is not a
+// longer window but a different source: ../controller/step-runner.mjs now takes
+// one bounded look at THE MAILBOX before it concludes anything, and the mailbox
+// is the only authoritative record of what a worker did. A worker that reported
+// is costed for real; one that sent anything at all is waited on; only one that
+// answered nothing, and whose observation did not itself fail, is the
+// never-started case -- and that one falls back through the seat table.
+//
+// So what this file returns is evidence, and it is honest about being one
+// reading of one terminal. The verdict is reached where all the evidence is.
 //
 // TWO RECORDED PROOFS, AND NO THIRD, for a seat Orca DOES observe. There is
 // exactly one other recording in

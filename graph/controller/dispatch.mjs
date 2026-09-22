@@ -33,6 +33,13 @@
 import { MODEL_CATALOG } from '../../scripts/seat-labels.mjs';
 import { wasReplayed } from './inflight.mjs';
 import { startAdoptedWorker } from './adopt.mjs';
+// WHAT THE COST READER CAN ACTUALLY READ. A seat whose agent has no reader
+// cannot be released at all -- ./release.mjs reads the cost BEFORE it releases
+// and stops there when the read fails -- so such a seat is refused HERE, before
+// anything is created, and its seat-table backup takes it. The list lives with
+// the reader (./cost-read.mjs), never repeated here, so lifting the refusal is
+// exactly one implemented reader.
+import { hasWorkerCostSource, COST_READABLE_AGENTS } from './cost-read.mjs';
 
 // The two worker skills, and only two (the card is explicit that there are no
 // others until there is work for one). Paths, not contents: the worker reads
@@ -136,15 +143,42 @@ export function launchForChoice(choice) {
     return { ok: false, reason: `no launch model id for model label ${JSON.stringify(choice.modelLabel)}` };
   }
   const effort = choice.effort;
-  if (agent) return { route: 'agent', agent, model, effort };
+  if (agent) return costable({ route: 'agent', agent, model, effort }, entry);
   const command = adopted.command({ model, effort });
   if (!command) {
     // The same refusal shape, for the same reason as a missing launch model id:
     // a seat that cannot be launched must say so, not be launched into a shape
     // nothing supports.
-    return { ok: false, reason: `no ${adopted.agent} launch command is known for model ${JSON.stringify(model)} (model label ${JSON.stringify(choice.modelLabel)})` };
+    return { ok: false, entry: entry ?? null, reason: `no ${adopted.agent} launch command is known for model ${JSON.stringify(model)} (model label ${JSON.stringify(choice.modelLabel)})` };
   }
-  return { route: 'adopt', agent: adopted.agent, command, model, effort };
+  return costable({ route: 'adopt', agent: adopted.agent, command, model, effort }, entry);
+}
+
+// THE LAST GATE ON BOTH ROUTES (JUL-98 step 6, round 2, finding 1): a seat is
+// only launched if the figures it will be judged on can be READ afterwards.
+//
+// This is not tidiness. ./release.mjs reads the cost first and stops before the
+// release when the read fails, so a worker whose agent has no reader fails its
+// step with no cost line AND keeps its worker and its worktree -- even when it
+// did the work perfectly and reported through the mailbox. Round 1 sent the
+// DeepSeek seat down the adopt route with `agent: 'pi'` while the reader still
+// refused `pi`, and made the old pre-dispatch refusal unreachable at the same
+// time, so nothing could take the seat instead.
+//
+// Refusing here instead puts the seat back on the ONE road out that already
+// exists: `launchRefused` in `dispatchWorker` below, and the seat table's own
+// backup in ./step-runner.mjs. The launch that WOULD have run travels on the
+// refusal, so what is missing is one reader and nothing else.
+function costable(launch, entry) {
+  if (hasWorkerCostSource(launch.agent)) return launch;
+  return {
+    ok: false,
+    entry: entry ?? null,
+    agent: launch.agent,
+    command: launch.command,
+    model: launch.model,
+    reason: `the ${entry} seat runs ${launch.agent}, and no worker-side cost source is implemented for a ${launch.agent} seat (the reader in ./cost-read.mjs reads ${COST_READABLE_AGENTS.join(', ')}) -- a worker whose cost cannot be read cannot be released either, so it is not started at all`,
+  };
 }
 
 function bullets(items) {
@@ -272,6 +306,11 @@ export async function dispatchWorker({
       // the ONLY observation the --agent route has -- would answer nothing at
       // all here. See ./turn-start.mjs for the measurement.
       observed: adopted.observed ?? null,
+      // AND WHETHER THAT READING ITSELF FAILED (round 2, finding 5). An unread
+      // terminal is not an idle one: ./step-runner.mjs must never conclude
+      // "never started" -- and must never release or delete anything -- from an
+      // observation that threw. It reconciles such a worker instead.
+      observationError: adopted.observationError ?? null,
       // The allowance reading taken BEFORE the agent ran. ./step-runner.mjs
       // hands it to the cost read, which differences it against a second
       // reading -- the only figure an allowance-billed seat has.
