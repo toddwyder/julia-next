@@ -111,6 +111,37 @@ Once used (or after 24 hours), the box is off. To use it again for a future roun
 sudo -u dropbox-svc node /opt/orca-runner/service-dropbox/dropbox.mjs --rearm
 ```
 
+## Command Code as the reviewer's Pi provider (JUL-98, Todd's 15:01:54Z Decision)
+
+`run-pi-seat.mjs`'s `reviewer-backup` and `reviewer-shadow-flash` seats route through Command
+Code's OpenAI-completions-compatible endpoint, not DeepSeek's native API -- the GOAT reviewer
+trial (13:43Z Decision), moved off Codex-as-primary-reviewer as soon as the probe on JUL-98
+proved Command Code returns real token counts, not after step 6 merges.
+
+This needs a provider entry in `runner`'s own Pi config, **not tracked by `~/.pi/agent/`** (that
+directory is Pi's own state, per-account and per-host, the same reason `dropbox.env` isn't
+committed). The canonical shape lives in this repo instead, so it survives a fresh `runner`
+account or a rebuilt box:
+
+```
+sudo -u runner mkdir -p /home/runner/.pi/agent
+sudo -u runner cp ops/service-dropbox/pi-models.commandcode.json /home/runner/.pi/agent/models.json
+```
+
+(If `runner` ever needs another custom provider beside this one, merge the two files' `providers`
+objects by hand -- this command overwrites, it doesn't merge.)
+
+The `apiKey` field is `"$COMMANDCODE_API_KEY"` -- an environment-variable reference Pi resolves
+at request time, never a literal secret, so this file carries nothing sensitive and is safe to
+commit. `run-pi-seat.mjs` supplies that variable from the drop box's `commandcode` field the same
+way every other seat's secret reaches its child process: in `env`, never argv (see
+`buildPiSpawnSpec`).
+
+**The model ids are namespaced**, confirmed live against Command Code's own `/models` listing:
+`deepseek/deepseek-v4-pro` and `deepseek/deepseek-v4-flash`. The bare `deepseek-v4-pro` id (the
+native-DeepSeek spelling `builder-backup` still uses) fails on this endpoint with `400
+unsupported_model` -- the two providers are not interchangeable by model id.
+
 ## Why a dedicated account, and why a sudo helper instead of direct writes
 
 Same reasoning as `ops/journey-relay/README.md`: same-UID processes can read each other's
