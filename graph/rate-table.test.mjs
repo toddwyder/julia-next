@@ -240,3 +240,33 @@ test('the real transcript repeats messages and carries a user line with output_t
   assert.equal(parsed.filter((l) => l.type === 'user' && JSON.stringify(l).includes('output_tokens')).length, 1);
   assert.equal(claudeUsageFromTranscript(parsed)['claude-opus-5'].messages, 3, 'eight assistant lines, three distinct messages');
 });
+
+// ---------------------------------------------------------------------------
+// JUL-98 step 6: Gemini, which is not priced per token at all.
+//
+// The Antigravity CLI signs in to a Google AI Pro subscription and spends a
+// WEEKLY and a FIVE-HOUR allowance, proportionally to token cost -- its own
+// words, read off `agy -p "/usage" --output-format json` on this host on
+// 2026-09-22. There is no per-token charge to look up and no vendor token
+// record to price, so this table states the billing rather than inventing a
+// dollar figure, and costOf refuses instead of returning a plausible zero.
+// ---------------------------------------------------------------------------
+
+test('the dispatched Gemini model is in the table, declared as allowance-billed', () => {
+  for (const id of ['gemini-3.8-flash']) {
+    const entry = RATE_TABLE.models[id];
+    assert.ok(entry, `graph/rate-table.mjs has no entry for the dispatched model id ${id}`);
+    assert.equal(entry.vendor, 'gemini');
+    assert.equal(entry.billing, 'allowance');
+    assert.deepEqual(entry.allowanceBuckets, ['gemini-weekly', 'gemini-5h']);
+    assert.ok(entry.source, `${id} does not say where its figures came from`);
+    assert.ok(entry.checkedOn, `${id} does not say when it was checked`);
+  }
+});
+
+test('costOf refuses a Gemini model rather than returning a dollar figure nobody is billed', () => {
+  assert.throws(
+    () => costOf('gemini-3.8-flash', { input: 1000, output: 1000 }),
+    /allowance/,
+  );
+});

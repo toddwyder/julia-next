@@ -12,20 +12,23 @@
 // imply more than they showed; this header is the limit, stated up front.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   createOrcaBoundaries,
   createRequestLedger,
   createSeatCostReader,
+  COST_READABLE_AGENTS,
+  hasWorkerCostSource,
   createOrcaSeatCostReader,
   costReadCommand,
-  costReadExitCode,
-  COST_READ_END_MARKER,
+  workerScriptExitCode,
+  WORKER_SCRIPT_END_MARKER,
   COST_TERMINAL_TITLE_PREFIX,
   createPublisher,
   claudeProjectDirName,
+  geminiAllowanceFromUsage,
   worktreePathOf,
   resolveSenderTerminal,
   headShaOf,
@@ -41,6 +44,8 @@ import {
 import { gitSafeDirectoryEnv, createSuiteRunner } from '../graph/controller/test-run.mjs';
 import { seatCostLine, assertCostLineComplete } from '../graph/controller/cost.mjs';
 import { main as readSeatCostMain } from './read-seat-cost.mjs';
+import { main as prepareMain } from './prepare-seat-worktree.mjs';
+import { formatCostLine } from '../graph/controller/cost.mjs';
 
 // Temp worker homes the two script tests make, removed when the file is done.
 const t_cleanup = [];
@@ -268,6 +273,39 @@ test('a seat whose session file is missing REFUSES rather than returning a blank
   }
 });
 
+// JUL-98 step 6 ROUND 2, finding 1. THE READER'S OWN LIST OF WHAT IT CAN READ,
+// exported because ../graph/controller/dispatch.mjs refuses to launch a seat
+// whose agent is not on it. That refusal is not belt-and-braces: a cost read
+// that fails stops ../graph/controller/release.mjs BEFORE the release, so a
+// worker whose agent has no reader is stranded with its worktree retained even
+// when it did the work perfectly. The list and the reader must therefore never
+// drift apart -- an agent added to the list with no branch behind it is exactly
+// the defect this pins, and `pi` is the agent that has no reader today.
+test('every agent declared cost-readable really has a reader behind it, and pi is not one of them', async () => {
+  assert.ok(!COST_READABLE_AGENTS.includes('pi'), 'no worker-side interactive Pi cost source exists, so pi must not be declared readable');
+  assert.equal(hasWorkerCostSource('pi'), false);
+  assert.equal(hasWorkerCostSource('agy'), true);
+
+  const read = createSeatCostReader({
+    readdirImpl: () => { throw new Error('ENOENT'); },
+    statImpl: () => { throw new Error('ENOENT'); },
+    readFileImpl: () => { throw new Error('ENOENT'); },
+    readAllowanceImpl: async () => { throw new Error('agy is not installed here'); },
+  });
+  for (const agent of COST_READABLE_AGENTS) {
+    assert.equal(hasWorkerCostSource(agent), true);
+    // Every one of them REACHES a reader: it may then fail on a missing file,
+    // but it never falls through to "no cost source is known".
+    await assert.rejects(
+      () => read({ seat: 'builder', worktree: 'repo-1::/home/runner/w/gone', agent }),
+      (error) => {
+        assert.doesNotMatch(error.message, /no cost source is known/, `${agent} is declared cost-readable but the reader has no branch for it`);
+        return true;
+      },
+    );
+  }
+});
+
 // JUL-98 step 5, third fix. The controller runs as `orchestrator-svc`; the
 // worker runs as `runner` and writes its session files under `runner`'s home.
 // A reader defaulted to THIS process's home looks somewhere no worker has ever
@@ -376,7 +414,7 @@ function costTerminal({ screens, created = CREATED_TERMINAL, closeThrows = null 
 }
 
 const PROMPT = 'runner@vps-ce27cb55:~/orca/workspaces/julia-next/jul-92-work$';
-const done = (code) => `${COST_READ_END_MARKER}:${code}`;
+const done = (code) => `${WORKER_SCRIPT_END_MARKER}:${code}`;
 // A real seat cost line, as scripts/read-seat-cost.mjs prints it: one line,
 // JSON, nothing else. Built through the same seatCostLine() the script uses.
 const GOOD_LINE = JSON.stringify(seatCostLine({
@@ -401,7 +439,7 @@ test('the cost read is an orca terminal on the WORKER daemon, in the candidate w
   assert.match(create.command, /--seat 'builder'/);
   assert.match(create.command, /--agent 'claude'/);
   assert.match(create.command, /--worktree '\/home\/runner\/orca\/workspaces\/julia-next\/jul-92-work'/);
-  assert.ok(create.command.endsWith(`; echo "${COST_READ_END_MARKER}:$?"`), 'and the end marker that carries the exit status out');
+  assert.ok(create.command.endsWith(`; echo "${WORKER_SCRIPT_END_MARKER}:$?"`), 'and the end marker that carries the exit status out');
 });
 
 test('the three worker-terminal boundaries name the RUNNER daemon, and close closes ONE pane', async () => {
@@ -471,7 +509,7 @@ test('a NON-ZERO exit REFUSES, carries the worker\'s own reason, and closes the 
   await assert.rejects(
     () => read({ seat: 'builder', worktree: 'repo-1::/home/runner/w/jul-92', agent: 'claude' }),
     (error) => {
-      assert.match(error.message, /the builder seat's cost read failed on the worker: scripts\/read-seat-cost\.mjs exited 1/);
+      assert.match(error.message, /the builder seat's cost read failed on the worker: the script exited 1/);
       assert.match(error.message, /no Claude transcript/, "the worker's own stderr, so the card says what actually broke");
       return true;
     },
@@ -499,6 +537,62 @@ test('a seat with no known cost source is refused BEFORE any terminal is created
   );
   assert.equal(boundaries.calls.create.length, 0);
 });
+// JUL-98 step 6 round 2, the code-review finding: THERE MUST BE ONE LIST, AND
+// THE PRODUCTION READER MUST BE GATED BY IT.
+//
+// The round-2 fix for finding 1 turns the cost reader's own list into the gate
+// on dispatch, and says so in ../graph/controller/dispatch.mjs: "The list lives
+// with the reader (./cost-read.mjs), never repeated here, so lifting the
+// refusal is exactly one implemented reader." The test above it in
+// ../scripts/controller-dispatch.test.mjs promises the same thing in the same
+// words: "implement the reader, add the agent to COST_READABLE_AGENTS, and the
+// seat launches with no further change."
+//
+// That promise was FALSE for the reader the controller actually runs.
+// `createOrcaSeatCostReader` above -- the production path, the one
+// ../graph/controller/release.mjs calls -- kept its own second copy of the
+// agent list and gated on that. Both copies happen to read the same three
+// agents today, so nothing is broken today; the defect is what happens to the
+// NEXT person. Add `pi` to COST_READABLE_AGENTS with a real worker-side reader
+// behind it, exactly as the comment invites, and dispatch would launch the Pi
+// seat while THIS reader still refused it -- and a refusal here stops
+// release.mjs BEFORE the release, so that worker would fail its step with no
+// cost line and keep its worker and its worktree. That is finding 1's failure
+// mode, reintroduced by the fix for finding 1 at the moment the fix is used.
+//
+// So the gate is asserted to BE the shared list, in both directions: every
+// agent the list declares reaches a reader here, and the refusal for one it
+// does not declare enumerates the list it consulted -- which a private copy
+// cannot do.
+test('the production cost reader is gated by the READER\'s own list, not a second copy of it', async () => {
+  // Every declared agent gets past the gate and on to a real terminal. A
+  // private list that drifts one entry behind fails here.
+  for (const agent of COST_READABLE_AGENTS) {
+    const boundaries = costTerminal({ screens: [[PROMPT, GOOD_LINE, done(0)]] });
+    const read = createOrcaSeatCostReader({ boundaries, pollMs: 0 });
+    await read({ seat: 'builder', worktree: 'repo-1::/home/runner/w/jul-92', agent, model: 'gemini-2.5-flash', allowanceBefore: {} })
+      .catch(() => {});
+    assert.equal(boundaries.calls.create.length, 1, `${agent} is declared cost-readable but this reader refused it before it made a terminal`);
+  }
+
+  // And the refusal names the one list it consulted. Only a reader that asks
+  // ./cost-read.mjs can enumerate ./cost-read.mjs's list.
+  const boundaries = costTerminal({ screens: [[done(0)]] });
+  const read = createOrcaSeatCostReader({ boundaries, pollMs: 0 });
+  await assert.rejects(
+    () => read({ seat: 'reviewer', worktree: 'x', agent: 'pi' }),
+    (error) => {
+      assert.match(error.message, /refusing to guess a figure/);
+      assert.ok(
+        error.message.includes(COST_READABLE_AGENTS.join(', ')),
+        `the refusal must enumerate the reader's own list (${COST_READABLE_AGENTS.join(', ')}), so the two cannot drift: got ${error.message}`,
+      );
+      return true;
+    },
+  );
+  assert.equal(boundaries.calls.create.length, 0);
+  assert.equal(hasWorkerCostSource('pi'), false, 'and pi is still the agent with no reader');
+});
 
 test('a close that itself fails does not hide the real reason the read failed', async () => {
   const boundaries = costTerminal({ screens: [[PROMPT, done(0)]], closeThrows: 'terminal_handle_stale' });
@@ -512,10 +606,10 @@ test('a close that itself fails does not hide the real reason the read failed', 
 });
 
 test('the end marker is read from the shell, never from the echo of the command that contains it', () => {
-  const echoed = `${PROMPT} node scripts/read-seat-cost.mjs --seat 'builder' --agent 'claude' --worktree '/w'; echo "${COST_READ_END_MARKER}:$?"`;
-  assert.equal(costReadExitCode([echoed]), null, 'the echoed command line is not an answer');
-  assert.equal(costReadExitCode([echoed, done(0)]), 0);
-  assert.equal(costReadExitCode([echoed, done(0), done(7)]), 7, 'the last marker wins');
+  const echoed = `${PROMPT} node scripts/read-seat-cost.mjs --seat 'builder' --agent 'claude' --worktree '/w'; echo "${WORKER_SCRIPT_END_MARKER}:$?"`;
+  assert.equal(workerScriptExitCode([echoed]), null, 'the echoed command line is not an answer');
+  assert.equal(workerScriptExitCode([echoed, done(0)]), 0);
+  assert.equal(workerScriptExitCode([echoed, done(0), done(7)]), 7, 'the last marker wins');
   assert.match(costReadCommand({ seat: 'builder', agent: 'claude', worktreePath: '/w' }), /^node '\/w\/scripts\/read-seat-cost\.mjs'/);
   assert.throws(() => costReadCommand({ seat: "b'; rm -rf /; #", agent: 'claude', worktreePath: '/w' }), /refusing to build a shell command with a quote/);
 });
@@ -1000,4 +1094,274 @@ test('an inherited GIT_CONFIG_COUNT is appended to, not overwritten, so an outer
   assert.equal(env.GIT_CONFIG_KEY_0, 'core.hooksPath', 'the inherited entry survives');
   assert.equal(env.GIT_CONFIG_KEY_1, 'safe.directory');
   assert.equal(env.GIT_CONFIG_VALUE_1, CANDIDATE);
+});
+
+// ---------------------------------------------------------------------------
+// JUL-98 step 6: the START-THEN-ADOPT route's own boundaries, and the Gemini
+// seat's allowance.
+//
+// Same limit as this file's header: these prove the argv and the reading, not
+// that the live services answer. The one thing that is REAL here is the agy
+// `/usage` payload -- graph/fixtures/orca-1.4.205/cost.gemini-agy-usage.json is
+// the recorded answer of the command run on this host on 2026-09-22.
+// ---------------------------------------------------------------------------
+
+const AGY_USAGE = loadOrcaFixture('cost.gemini-agy-usage.json');
+const GEMINI_BUCKETS = ['gemini-weekly', 'gemini-5h'];
+
+test('the Gemini allowance is read out of agy\'s own /usage answer, by bucket id', () => {
+  const allowance = geminiAllowanceFromUsage(AGY_USAGE, { buckets: GEMINI_BUCKETS });
+  assert.deepEqual(Object.keys(allowance).sort(), ['gemini-5h', 'gemini-weekly']);
+  assert.deepEqual(allowance['gemini-weekly'], { remaining: 0.9935215711593628, resetTime: '2026-09-28T20:01:29Z' });
+  assert.deepEqual(allowance['gemini-5h'], { remaining: 0.9634851813316345, resetTime: '2026-09-22T07:59:45Z' });
+  // The Claude/GPT group agy also reports is NOT ours to spend or to report.
+  assert.ok(!('3p-weekly' in allowance));
+});
+
+test('an answer with none of the wanted buckets is refused, not read as a full allowance', () => {
+  assert.throws(
+    () => geminiAllowanceFromUsage({ command: { data: { groups: [] } } }, { buckets: GEMINI_BUCKETS }),
+    /gemini-weekly/,
+  );
+});
+
+test('a Gemini seat\'s cost is the allowance it drew down, differenced against the reading taken at dispatch', async () => {
+  const after = JSON.parse(JSON.stringify(AGY_USAGE));
+  const [gemini] = after.command.data.groups;
+  gemini.buckets[0].remaining_fraction = 0.9870215711593628;
+  gemini.buckets[1].remaining_fraction = 0.9269851813316345;
+
+  const read = createSeatCostReader({ readAllowanceImpl: async () => after });
+  const line = await read({
+    seat: 'builder',
+    agent: 'agy',
+    model: 'gemini-3.8-flash',
+    worktree: 'repo-1::/home/runner/orca/workspaces/julia-next/jul98-6',
+    allowanceBefore: geminiAllowanceFromUsage(AGY_USAGE, { buckets: GEMINI_BUCKETS }),
+    startedAt: '2026-09-22T06:00:00Z',
+    endedAt: '2026-09-22T06:12:24Z',
+  });
+
+  assert.equal(line.billing, 'allowance');
+  assert.equal(line.model, 'gemini-3.8-flash');
+  assert.equal(Number(line.allowanceUsed['gemini-weekly'].toFixed(6)), 0.0065);
+  assert.equal(Number(line.allowanceUsed['gemini-5h'].toFixed(6)), 0.0365);
+  assert.match(formatCostLine(line), /allowance used: weekly 0\.65%, 5h 3\.65%/);
+});
+
+test('a Gemini seat with no reading from before it started is refused rather than costed against nothing', async () => {
+  const read = createSeatCostReader({ readAllowanceImpl: async () => AGY_USAGE });
+  await assert.rejects(
+    () => read({ seat: 'builder', agent: 'agy', model: 'gemini-3.8-flash', worktree: 'r::/w', allowanceBefore: null, startedAt: '2026-09-22T06:00:00Z', endedAt: '2026-09-22T06:01:00Z' }),
+    /before the worker started/,
+  );
+});
+
+test('scripts/prepare-seat-worktree.mjs writes the trust entry and prints EXACTLY one JSON line', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'jul98-prepare-'));
+  const out = [];
+  try {
+    await prepareMain(['--seat', 'builder', '--agent', 'agy', '--worktree', '/home/runner/orca/workspaces/julia-next/jul98-6'], {
+      out: (text) => out.push(text),
+      err: () => {},
+      setExitCode: () => {},
+      workerHome: home,
+      readAllowanceImpl: async () => AGY_USAGE,
+    });
+    assert.equal(out.length, 1, 'one write');
+    assert.equal(out[0].trim().split('\n').length, 1, 'and one line in it');
+    const answer = JSON.parse(out[0]);
+    assert.equal(answer.trusted, true);
+    assert.equal(answer.added, true);
+    assert.equal(answer.allowance['gemini-weekly'].remaining, 0.9935215711593628);
+    // The file it wrote is agy's own, at agy's own path.
+    const written = JSON.parse(readFileSync(join(home, '.gemini/antigravity-cli/settings.json'), 'utf8'));
+    assert.deepEqual(written.trustedWorkspaces, ['/home/runner/orca/workspaces/julia-next/jul98-6']);
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('an agent with no trust list is prepared too, and says it has none rather than failing', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'jul98-prepare-pi-'));
+  const out = [];
+  try {
+    await prepareMain(['--seat', 'reviewer', '--agent', 'pi', '--worktree', '/home/runner/orca/workspaces/julia-next/jul98-6'], {
+      out: (text) => out.push(text), err: () => {}, setExitCode: () => {}, workerHome: home,
+    });
+    const answer = JSON.parse(out[0]);
+    assert.equal(answer.trusted, true, 'pi asks no folder-trust question, so nothing stops it here');
+    assert.equal(answer.trustStore, null);
+    assert.equal(answer.allowance, null, 'and it is not billed against an agy allowance');
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('the adopt route\'s Orca calls go to the WORKER daemon, with the worktree the step asked for', async () => {
+  const calls = [];
+  const boundaries = createOrcaBoundaries({
+    orcaCallImpl: async (args) => { calls.push(args); return { worktree: { id: 'repo-1::/w/jul98-6', path: '/w/jul98-6' }, terminal: { handle: 'term_seat' }, wait: { satisfied: true } }; },
+  });
+
+  await boundaries.worktreeCreateImpl({ name: 'jul98-6' });
+  await boundaries.agentTerminalCreateImpl({ seat: 'builder', worktreePath: '/w/jul98-6', title: 'julia-seat-builder', command: 'agy --model gemini-3.8-flash --effort medium --dangerously-skip-permissions' });
+  await boundaries.terminalWaitImpl({ terminal: 'term_seat', timeoutMs: 180000 });
+
+  const [create, terminal, wait] = calls;
+  assert.deepEqual(create.slice(0, 2), ['worktree', 'create']);
+  assert.ok(create.includes('--environment') && create[create.indexOf('--environment') + 1] === WORKER_ENVIRONMENT, 'the runner\'s daemon, which is where a worker worktree can be created at all');
+  assert.equal(create[create.indexOf('--name') + 1], 'jul98-6');
+  assert.equal(create[create.indexOf('--repo') + 1], WORKER_REPO_SELECTOR);
+  assert.ok(create.includes('--no-parent'), 'a top-level worktree, like the --agent route\'s new-top-level');
+
+  assert.deepEqual(terminal.slice(0, 2), ['terminal', 'create']);
+  assert.equal(terminal[terminal.indexOf('--environment') + 1], WORKER_ENVIRONMENT);
+  assert.equal(terminal[terminal.indexOf('--worktree') + 1], 'path:/w/jul98-6');
+  assert.match(terminal[terminal.indexOf('--command') + 1], /^agy --model gemini-3\.8-flash/);
+
+  assert.deepEqual(wait.slice(0, 2), ['terminal', 'wait']);
+  assert.equal(wait[wait.indexOf('--terminal') + 1], 'term_seat');
+  assert.equal(wait[wait.indexOf('--for') + 1], 'tui-idle');
+  assert.equal(wait[wait.indexOf('--environment') + 1], WORKER_ENVIRONMENT);
+});
+
+test('an ADOPTED worker-start carries --terminal and the existing worktree, and none of the creation flags', async () => {
+  const calls = [];
+  const boundaries = createOrcaBoundaries({
+    orcaCallImpl: async (args) => { calls.push(args); return { state: 'ready', mutation: { requestId: 'r1' } }; },
+  });
+
+  await boundaries.workerStartImpl({
+    run: 'run_1',
+    from: 'term_controller',
+    spec: 'the real brief',
+    worktree: 'path:/home/runner/orca/workspaces/julia-next/jul98-6',
+    terminal: 'term_seat',
+    requestId: 'JUL-98:step-6:builder',
+  });
+
+  const [args] = calls;
+  assert.equal(flag(args, '--terminal'), 'term_seat');
+  assert.equal(flag(args, '--worktree'), 'path:/home/runner/orca/workspaces/julia-next/jul98-6');
+  assert.equal(flag(args, '--spec'), 'the real brief');
+  // LIVE, 2026-09-22: passing any of these with an existing worktree is refused
+  // outright -- "Creation and setup options apply only to new-child or
+  // new-top-level worktrees" (invalid_argument). And `worker-start --help`:
+  // neither --model nor --effort can combine with --terminal.
+  for (const rejected of ['--name', '--repo', '--setup', '--agent', '--model', '--effort', '--base-branch']) {
+    assert.ok(!args.includes(rejected), `an adopted start must not carry ${rejected}`);
+  }
+});
+
+test('an --agent worker-start is unchanged: the creation flags are exactly what it always sent', async () => {
+  const calls = [];
+  const boundaries = createOrcaBoundaries({
+    orcaCallImpl: async (args) => { calls.push(args); return { state: 'ready', mutation: { requestId: 'r1' } }; },
+  });
+  await boundaries.workerStartImpl({
+    run: 'run_1', from: 'term_controller', spec: 's', worktree: 'new-top-level',
+    name: 'jul98-6', agent: 'claude', model: 'claude-opus-5', effort: 'medium', requestId: 'k',
+  });
+  const [args] = calls;
+  assert.equal(flag(args, '--agent'), 'claude');
+  assert.equal(flag(args, '--name'), 'jul98-6');
+  assert.equal(flag(args, '--setup'), 'skip');
+  assert.equal(flag(args, '--model'), 'claude-opus-5');
+  assert.ok(!args.includes('--terminal'));
+});
+
+test('a terminal wait that TIMES OUT is a normal unsatisfied answer, not a thrown error', async () => {
+  const boundaries = createOrcaBoundaries({
+    orcaCallImpl: async () => {
+      // Orca's own shape, measured live on 2026-09-22 when the busy check ran
+      // against a working agy: `ok: false`, `error.code: "timeout"`.
+      const error = new Error('orca terminal wait ... failed (timeout): timeout');
+      error.code = 'timeout';
+      throw error;
+    },
+  });
+
+  const answer = await boundaries.terminalWaitImpl({ terminal: 'term_seat', timeoutMs: 8000 });
+  assert.equal(answer.wait.satisfied, false);
+  assert.equal(answer.wait.timedOut, true);
+});
+
+test('a terminal wait that fails for any OTHER reason still throws, so a real fault is not read as "busy"', async () => {
+  const boundaries = createOrcaBoundaries({
+    orcaCallImpl: async () => { throw new Error('orca terminal wait ... failed (terminal_handle_stale): gone'); },
+  });
+  await assert.rejects(() => boundaries.terminalWaitImpl({ terminal: 'term_seat', timeoutMs: 8000 }), /terminal_handle_stale/);
+});
+
+test('a worktree the trust write did NOT actually land in is reported untrusted, not assumed trusted', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'jul98-prepare-bad-'));
+  const out = [];
+  const err = [];
+  let exit = 0;
+  try {
+    await prepareMain(['--seat', 'builder', '--agent', 'agy', '--worktree', '/home/runner/orca/workspaces/julia-next/jul98-6'], {
+      out: (text) => out.push(text),
+      err: (text) => err.push(text),
+      setExitCode: (code) => { exit = code; },
+      workerHome: home,
+      readAllowanceImpl: async () => AGY_USAGE,
+      // The write silently does nothing -- a read-only home, a full disk.
+      writeFileImpl: () => {},
+    });
+    assert.equal(out.length, 0, 'nothing is printed that could be read as prepared');
+    assert.equal(exit, 1);
+    assert.match(err.join(''), /trust/i);
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// JUL-98 step 6 round 4: the START RULE'S OWN PRODUCTION SOURCE.
+//
+// `hasFailedAgentReadinessSignature` and `hasLiveLivenessVerdict` in
+// graph/controller/step-runner.mjs read an Orca INSPECT structure --
+// `worker.state`, `worker.stage`, `worker.agentTerminalHandle`,
+// `dispatch.status`, `dispatch.lastFailure`, `projection.liveness.verdict`,
+// `observation.status`. Round 4 shipped the rule with no production boundary
+// that answers one: `observeStartImpl` above calls `worktree ps`, whose rows
+// carry `worktreeId`, `status` and `agents[]` and none of those fields
+// (graph/fixtures/orca-1.4.205/worktree-ps.agent-working.json), and
+// `worker-start` answers a FLAT `{dispatchId, state, stage, lastError}` with
+// no `worker`/`dispatch`/`projection` keys at all
+// (worker-start.failed-agent-readiness.json). So both detectors were dead in
+// the running controller and the three-way rule silently degraded to one
+// outcome: possibly-running, always.
+//
+// `orchestration worker-show` is the verb that DOES answer that structure --
+// every `worker-show.*.json` fixture in graph/fixtures/orca-1.4.205 has it --
+// and this is the boundary that asks it.
+// ---------------------------------------------------------------------------
+
+test('worker-show is one orca command, by dispatch, on the CONTROLLER\'s own daemon -- the Dispatch belongs to the Run and the Run lives there', async () => {
+  const orcaCallImpl = recorder([loadOrcaFixture('worker-show.failed-agent-readiness.json').result]);
+  const boundaries = createOrcaBoundaries({ orcaCallImpl });
+  const shown = await boundaries.workerShowImpl({ dispatchId: 'ctx_b93c24cc4e31' });
+
+  const [args] = orcaCallImpl.calls;
+  assert.deepEqual(args.slice(0, 2), ['orchestration', 'worker-show']);
+  assert.equal(flag(args, '--dispatch'), 'ctx_b93c24cc4e31');
+  // The same daemon `releaseImpl` uses, and for the same reason.
+  assert.equal(flag(args, '--environment'), 'orchestrator-local');
+  assert.ok(args.includes('--json'));
+
+  // And it hands back the structure the detectors read, unwrapped no further
+  // than Orca's own `result`.
+  assert.equal(shown.worker.stage, 'agent_readiness');
+  assert.equal(shown.worker.agentTerminalHandle, null);
+  assert.equal(shown.dispatch.lastFailure, 'timeout');
+});
+
+test('a dispatch with no id asks Orca nothing rather than sending "--dispatch undefined"', async () => {
+  const orcaCallImpl = recorder([{}]);
+  const boundaries = createOrcaBoundaries({ orcaCallImpl });
+  const shown = await boundaries.workerShowImpl({ dispatchId: null });
+  assert.equal(shown, null);
+  assert.equal(orcaCallImpl.calls.length, 0);
 });

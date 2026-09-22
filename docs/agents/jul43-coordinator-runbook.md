@@ -1971,6 +1971,173 @@ deliberate. If git will not answer, the state is recorded as unknown and said to
 test result is still a real result. The one refusal that is unchanged is the old one: output with no
 TAP summary at all still throws, and is never reported as a silent pass.
 
+### Starting an agent Orca has no launcher for: start it, then adopt it (JUL-98 step 6, 2026-09-22)
+
+**`worker-start --agent` knows `claude`, `codex` and `cursor`, and no flag teaches it another TUI.**
+A Gemini seat (`agy`, the Antigravity CLI) and a DeepSeek seat (`pi`) are both started the one way
+that reports to the mailbox, built once in `graph/controller/adopt.mjs` and taken by both:
+
+1. `orca worktree create --repo path:/home/runner/julia-next --name <n> --no-parent` — the route
+   makes the worktree itself, because the agent has to be **running in it** before there is a
+   terminal to adopt.
+2. `node scripts/prepare-seat-worktree.mjs --seat <s> --agent <a> --worktree <path>`, run **as the
+   worker** through an Orca terminal on the worker daemon (the same route the cost read takes, and
+   for the same reason): it writes the worktree into the agent's folder-trust list and takes the
+   allowance reading.
+3. `orca terminal create --worktree path:<w> --command "agy --model <id> --effort <e> --dangerously-skip-permissions"`.
+4. `orca terminal wait --terminal <h> --for tui-idle` — Orca's own "it has finished starting", never
+   a sleep. JUL-109 lost a Pi worker's task text twice by adopting a still-starting agent.
+5. `orca orchestration worker-start --run <r> --from <c> --terminal <h> --worktree path:<w> --spec <THE REAL BRIEF>`.
+
+**Four traps, each met live on 2026-09-22:**
+
+- **`ORCA_BIN` must be set** for any process that shells out to `orca` (`/opt/Orca/orca-ide` on this
+  server). Without it every boundary fails on the first call with "ORCA_BIN is not set".
+- **An adopted `worker-start` must carry NO creation flag.** `--name`, `--repo`, `--agent`,
+  `--setup`, `--base-branch` are refused outright with `invalid_argument`, "Creation and setup
+  options apply only to new-child or new-top-level worktrees"; and `worker-start --help` says
+  neither `--model` nor `--effort` can combine with `--terminal`. The model therefore travels on the
+  launch command, which is what keeps the card showing exactly what runs.
+- **Orca cannot observe a turn for these agents, and says so.** The adopted `worker-start` answers
+  `prompt: { stages: ["input_accepted"], provider: "unsupported", observation: "unsupported" }`, and
+  `orca worktree ps` answers `agents: []` for a worktree whose agy worker is visibly working (it
+  does show `agentIdentity: "antigravity"` in `terminal show`). So neither recorded turn-start proof
+  can ever exist for such a seat. The proof used instead is the **transition**: the terminal was
+  idle before the brief was delivered and is busy straight after —
+  `orca terminal wait --for tui-idle --timeout-ms 8000` answering `timeout`. A TUI on a trust or
+  login screen is idle at both readings.
+- **A dispatched worker cannot start a worker.** `nested_worker_depth_exceeded`: "Sub-worker
+  dispatch is not permitted at depth 2 (max 1)". Any live proof of dispatch has to be run from a
+  plain Orca terminal (depth 0), which is where the controller itself sits.
+
+### The two ways the adopt route itself failed on 2026-09-22, and what each looks like (JUL-98 step 6 round 4)
+
+Measured this wake, not inferred. The route above is the one that works when it works; these are
+the two shapes it failed in on the day, recorded so the next session recognises them instead of
+rediscovering them. Neither is a bug in the controller code — both are Orca failing to bring an
+agent up — and in both the seat could not be started at all, so the work moved to the other seat.
+
+**Shape 1 — the agy seat never reaches agent readiness.** Three dispatches this wake, two of them
+onto **fresh, fully-started** `agy` sessions, all ended the same way:
+
+```
+state      failed
+stage      agent_readiness
+lastError  timeout
+```
+
+The important part is what Orca has already done by then: **the terminal and the worktree were
+reused before the failure**, so a retry that assumes a clean slate is assuming wrongly. Three
+start-then-adopt attempts and two fresh `agy` sessions all failed here; the Gemini seat could not be
+started at all, and round 4b was built on the Claude seat instead. This is exactly the recorded
+signature `graph/controller/step-runner.mjs` concludes never-started on (`worker.state: failed`,
+`worker.stage: agent_readiness`, `worker.agentTerminalHandle: null`, `dispatch.status: failed`,
+a non-empty `dispatch.lastFailure`) — the fixture is
+`graph/fixtures/orca-1.4.205/worker-show.failed-agent-readiness.json`.
+
+**Shape 2 — the cross-daemon route stalls earlier, and never reaches a verdict at all.** Two
+earlier dispatches today, on the cross-daemon route rather than the local one, did not fail: they
+**stalled**, at
+
+```
+stage        remote_attach_requested
+observation  status: identity_changed
+```
+
+`identity_changed` means the worker Orca found is not the worker it dispatched (`exactWorker:
+false` travels with it — see the same fixture's `observation` block). A stall at
+`remote_attach_requested` is **not** the never-started signature and must never be read as one:
+nothing says the agent did not start, only that Orca can no longer identify it. That is the
+`possiblyRunning` case — keep the worktree, read the cost, release nothing, start no backup beside
+it — and the controller now treats it that way.
+
+**Telling them apart is the whole point.** Shape 1 is a verdict and its seat's backup should run.
+Shape 2 is an absence of a verdict and its seat's worker may still be spending. The one command
+that distinguishes them is `orca orchestration worker-show --dispatch <id> --json`, which is why
+`workerShowImpl` exists in `graph/controller/wiring.mjs`: `worktree ps` answers neither.
+
+**And this CORRECTS one line in the JUL-109 section below.** That section records the failure
+signature as `worker.state: failed` with `failedStage: agent_readiness`, `lastError: timeout`,
+**and** `observation.status: identity_changed`, as though the four travelled together. They do not.
+`identity_changed` appears in BOTH shapes — it is right there in
+`graph/fixtures/orca-1.4.205/worker-show.failed-agent-readiness.json`, whose `observation` block
+reads `identity_changed` alongside a genuine `agent_readiness` failure — so it distinguishes
+nothing. What separates the two is the **stage**: `agent_readiness` with a failed dispatch is the
+never-started verdict; `remote_attach_requested` is a stall with no verdict in it. That is why
+`hasFailedAgentReadinessSignature` in `graph/controller/step-runner.mjs` reads the five fields it
+reads and does **not** look at `observation.status` at all.
+
+### Three things this route gets wrong if you build it the obvious way (JUL-98 step 6 round 2, 2026-09-22)
+
+An independent review of the first round found three defects in the route above. All three are
+fixed; they are recorded here because each one is the kind of thing that reads as safe and is not.
+
+- **A seat that can be started but cannot be COSTED strands its worker.**
+  `graph/controller/release.mjs` reads the cost first and stops before the release when the read
+  fails, so a seat whose agent has no reader in `graph/controller/cost-read.mjs` fails its step with
+  no cost line *and* keeps its worker and its worktree — even when it did the work perfectly and
+  reported through the mailbox. Round 1 sent the DeepSeek seat down this route with `agent: 'pi'`
+  while the reader still implemented only `claude`, `codex` and `agy`. The reader now exports
+  `COST_READABLE_AGENTS` and `graph/controller/dispatch.mjs` refuses a seat whose agent is not on
+  it, before anything is created, so the seat table's backup takes the seat. **The Pi seat is
+  therefore refused again today**, and lifting that refusal is exactly one thing: a worker-side cost
+  source for an *interactive* Pi session. The existing DeepSeek extractor reads the JSON event
+  stream `run-pi-seat.mjs` emits in its non-interactive mode; an interactive TUI writes no such
+  stream anywhere that has been found, and DeepSeek is out of balance (402) with the 2026-09-22
+  04:07Z Decision that it stays that way, so no paid run can be made to look for one.
+- **"The terminal was idle" is evidence, not a verdict.** A turn that begins and ends inside the
+  8 s busy window reads exactly like a turn that never began. Round 1 classified that as
+  never-started: it skipped the mailbox, replaced the real allowance with a zero-cost never-started
+  line, and released the seat — and because that exit carries no `launchRefused`, no backup ran
+  either, so a *finished* step and its cost were simply lost. `graph/controller/step-runner.mjs`
+  now takes ONE bounded look at the mailbox (30 s, `DEFAULT_RECONCILE_WAIT_MS`) before concluding
+  anything: a `worker_done` means the turn ran and the real cost is read; any other message from
+  that dispatch means it is alive and the ordinary wait follows; nothing at all, with a clean
+  teardown, is the never-started case and now carries `launchRefused` so the seat's backup runs.
+- **An error after a successful adoption is not a launch refusal.** Once `worker-start --terminal`
+  has answered, a worker exists, holds the brief and may already be spending. Round 1's single
+  catch treated a throw from the busy reading like a pre-dispatch failure: close the terminal,
+  remove the worktree, discard the dispatch identity, answer "refused" — which then invented a zero
+  cost and could start a backup beside a worker that was still running. `graph/controller/adopt.mjs`
+  now preserves the dispatch identity and carries the error out as `observationError`; the step
+  reports such a seat as `possiblyRunning`, releases nothing, deletes nothing, costs nothing and
+  starts no backup. The step stops on the missing cost line, which is what keeps the card still.
+
+### agy's folder-trust list, and the gap it leaves (JUL-98 step 6, 2026-09-22)
+
+`agy` asks "Do you trust the contents of this project?" in a folder it has not seen, and does
+nothing until it is answered — the same stall Claude Code's trust screen caused on 19–20 September.
+Answering yes writes exactly one file, and nothing else in `~/.gemini` changes:
+
+```
+~/.gemini/antigravity-cli/settings.json   (mode 0600, owned by runner)
+{"trustedWorkspaces":["<the folder's exact absolute path>"]}
+```
+
+The entry is per exact path, so every new worktree needs its own; `graph/controller/agent-trust.mjs`
+writes it and `scripts/prepare-seat-worktree.mjs` is what runs as the worker to put it there.
+
+**Not fixed here, and worth knowing:** nothing prunes the list. Every worker adds an entry, the
+worktree is then removed, and the entry stays — an unbounded list of dead paths, each of which is a
+standing permission for agy to read, edit and execute in a path that could one day be reused. Six
+live runs on 2026-09-22 left six entries; they were removed by hand afterwards.
+
+### The Gemini seat is billed against an allowance, not per token (JUL-98 step 6, 2026-09-22)
+
+`agy -p "/usage" --output-format json` is the only per-seat figure that exists for it:
+`command.data.groups[].buckets[]` with `id`, `window`, `remaining_fraction` and `reset_time`; the
+two buckets a Gemini seat spends are `gemini-weekly` and `gemini-5h`, and Flash and Pro share them
+("Models within this group: Gemini Flash, Gemini Pro"). It is a slash command — `num_turns: 0`,
+`usage.total_tokens: 0` — so reading the allowance spends none of it.
+
+**There is no token record to read for an interactive session.** Searched on 2026-09-22: the
+conversation store (`~/.gemini/antigravity-cli/conversations/<id>.db`) is protobuf blobs with no
+usage table; the brain transcript's every key is
+`{source,status,tool_calls,thinking,step_index,type,content,created_at}`; the CLI log has no token
+line. Only `agy -p` (print mode) reports usage, and a seat worker is interactive. So the cost line
+for this seat carries the allowance it drew down — the reading taken at dispatch differenced against
+one taken when it reports — and says in words that no token count exists, rather than posting a zero.
+
 ### The controller writes to Linear as the app, and only `orchestrator-svc` can run it (JUL-98 step 2)
 
 `graph/controller/board.mjs` (`createControllerBoard`) is the board `runControllerCheck` actually

@@ -31,9 +31,11 @@ import {
   claudeExtractFromTranscript,
   codexExtractFromRollout,
   deepseekExtractFromSeatStream,
+  geminiExtractFromAllowance,
   seatCostLine,
   tokenTotal,
   neverStartedCostLine,
+  readFailedCostLine,
   assertCostLineComplete,
   formatCostLine,
 } from '../graph/controller/cost.mjs';
@@ -44,11 +46,13 @@ const json = (name) => JSON.parse(readFileSync(join(ORCA_FIXTURE_DIR, name), 'ut
 const jsonl = (name) => readFileSync(join(ORCA_FIXTURE_DIR, name), 'utf8')
   .split('\n').filter((line) => line.startsWith('{')).map((line) => JSON.parse(line));
 
-test('every seat names where its figures come from, and the three are the proven ones', () => {
-  assert.deepEqual(Object.keys(COST_SOURCES).sort(), ['claude', 'codex', 'pi-deepseek']);
+test('every seat names where its figures come from, and each one is proven somewhere nameable', () => {
+  assert.deepEqual(Object.keys(COST_SOURCES).sort(), ['claude', 'codex', 'gemini', 'pi-deepseek']);
   for (const [vendor, source] of Object.entries(COST_SOURCES)) {
     assert.ok(source.where.length > 0, `${vendor} must say where its figures are read from`);
-    assert.match(source.provenOn, /JUL-109/);
+    // JUL-109 proved the first three; the Gemini seat is JUL-98 step 6's own
+    // measurement on this host, and says so.
+    assert.match(source.provenOn, /JUL-109|JUL-98 step 6/);
   }
 });
 
@@ -294,6 +298,17 @@ test("a worker that never started yields an explicit never-started cost line, no
   assert.throws(() => assertCostLineComplete({ seat: 'builder', model: null, totalTokens: null, peakContext: null, minutes: null }), /blank/);
 });
 
+test("a worker whose cost read failed yields an explicit read-failed cost line, not a blank one", () => {
+  const line = readFailedCostLine({ seat: 'builder', model: 'claude-opus-5', reason: 'session file missing' });
+  assert.equal(line.readFailed, true);
+  assert.equal(line.seat, 'builder');
+  assert.equal(line.reason, 'session file missing');
+  assert.doesNotThrow(() => assertCostLineComplete(line), 'it is complete BECAUSE it is marked read-failed, not because it is blank');
+  assert.match(formatCostLine(line), /cost read failed: session file missing/i);
+  // And a line that merely LOOKS empty, without the mark, still fails.
+  assert.throws(() => assertCostLineComplete({ seat: 'builder', model: null, totalTokens: null, peakContext: null, minutes: null }), /blank/);
+});
+
 test('the Claude seat extract works on the real transcript as it is read off disk, and its peak and duration are not lost', () => {
   const text = readFileSync(join(ORCA_FIXTURE_DIR, 'cost.claude-transcript.real-builder-lines.jsonl'), 'utf8').split('\n').filter(Boolean);
   const extract = claudeExtractFromTranscript(text);
@@ -302,4 +317,139 @@ test('the Claude seat extract works on the real transcript as it is read off dis
   assert.ok(extract.peakContext > 0, 'the peak must survive the raw-text form too, not silently read 0');
   assert.ok(extract.startedAt && extract.endedAt, 'the duration comes off the same lines');
   assert.ok(extract.usd > 0);
+});
+
+// ---------------------------------------------------------------------------
+// JUL-98 step 6: the Gemini seat's cost line.
+//
+// A Gemini seat on the Antigravity CLI (`agy`) is billed against a SUBSCRIPTION
+// ALLOWANCE, not per token, and -- searched on 2026-09-22 -- it records no
+// per-session token count anywhere on disk: the conversation store is protobuf
+// blobs with no usage table, the brain transcript's keys are
+// {source,status,tool_calls,thinking,step_index,type,content,created_at}, and
+// the CLI log has no token line. What it DOES expose is the allowance itself:
+//
+//   agy -p "/usage" --output-format json
+//   -> command.data.groups[].buckets[] { id, window, remaining_fraction, reset_time }
+//
+// (0 turns, 0 tokens: it is a slash command, so reading it costs nothing.)
+//
+// So the honest line for this seat carries the allowance it used -- the
+// difference between a reading taken before the worker started and one taken
+// after -- and says plainly that there is no token count. A line with NEITHER
+// is still blank and still fails the step.
+// ---------------------------------------------------------------------------
+
+// Each reading carries its bucket's reset time, so a window that rolled over
+// between the two is a fact rather than a guess (see the rollover test below).
+const WEEKLY_RESET = '2026-09-28T20:01:29Z';
+const FIVE_HOUR_RESET = '2026-09-22T07:59:45Z';
+const BEFORE = {
+  'gemini-weekly': { remaining: 0.9935215711593628, resetTime: WEEKLY_RESET },
+  'gemini-5h': { remaining: 0.9634851813316345, resetTime: FIVE_HOUR_RESET },
+};
+const AFTER = {
+  'gemini-weekly': { remaining: 0.9870215711593628, resetTime: WEEKLY_RESET },
+  'gemini-5h': { remaining: 0.9269851813316345, resetTime: FIVE_HOUR_RESET },
+};
+
+test('a Gemini seat is costed in the allowance it used, read before and after its own run', () => {
+  const extract = geminiExtractFromAllowance({
+    model: 'gemini-3.8-flash',
+    before: BEFORE,
+    after: AFTER,
+    startedAt: '2026-09-22T06:00:00Z',
+    endedAt: '2026-09-22T06:12:24Z',
+  });
+
+  assert.equal(extract.vendor, 'gemini');
+  assert.equal(extract.billing, 'allowance');
+  assert.equal(extract.minutes, 12.4);
+  // Fractions of the allowance, to the precision agy reports them.
+  assert.equal(Number(extract.allowanceUsed['gemini-weekly'].toFixed(6)), 0.0065);
+  assert.equal(Number(extract.allowanceUsed['gemini-5h'].toFixed(6)), 0.0365);
+  // There is no token record for this vendor, and that is said rather than
+  // guessed at with a zero.
+  assert.equal(extract.totalTokens, null);
+  assert.equal(extract.peakContext, null);
+  assert.equal(extract.usd, null);
+});
+
+test('an allowance reading that did not move is zero used, not a missing line', () => {
+  const extract = geminiExtractFromAllowance({
+    model: 'gemini-3.8-flash', before: BEFORE, after: BEFORE,
+    startedAt: '2026-09-22T06:00:00Z', endedAt: '2026-09-22T06:00:30Z',
+  });
+  assert.deepEqual(Object.values(extract.allowanceUsed), [0, 0]);
+  // Zero used is a complete line: the figure is present and it is zero.
+  const line = seatCostLine({ seat: 'builder', ...extract });
+  assert.equal(assertCostLineComplete(line), line);
+});
+
+test('a bucket the after-reading does not have is refused rather than differenced against nothing', () => {
+  assert.throws(
+    () => geminiExtractFromAllowance({
+      model: 'gemini-3.8-flash', before: BEFORE, after: { 'gemini-weekly': { remaining: 0.98, resetTime: WEEKLY_RESET } },
+      startedAt: '2026-09-22T06:00:00Z', endedAt: '2026-09-22T06:01:00Z',
+    }),
+    /gemini-5h/,
+  );
+});
+
+test('an allowance-billed line with no allowance figure is blank and fails the step', () => {
+  const line = seatCostLine({
+    seat: 'builder', vendor: 'gemini', model: 'gemini-3.8-flash', billing: 'allowance',
+    startedAt: '2026-09-22T06:00:00Z', endedAt: '2026-09-22T06:12:24Z',
+  });
+  assert.throws(() => assertCostLineComplete(line), /allowanceUsed/);
+});
+
+test('the Gemini line the card gets says the allowance used and that no token count exists', () => {
+  const line = seatCostLine({
+    seat: 'builder',
+    ...geminiExtractFromAllowance({
+      model: 'gemini-3.8-flash', before: BEFORE, after: AFTER,
+      startedAt: '2026-09-22T06:00:00Z', endedAt: '2026-09-22T06:12:24Z',
+    }),
+  });
+  const text = formatCostLine(line);
+  assert.match(text, /\*\*Builder\*\*/);
+  assert.match(text, /gemini-3\.8-flash/);
+  assert.match(text, /allowance used/i);
+  assert.match(text, /weekly 0\.65%/);
+  assert.match(text, /5h 3\.65%/);
+  assert.match(text, /12\.4 min/);
+  assert.match(text, /no token count is recorded/i);
+});
+
+// A bucket whose window ROLLS OVER between the two readings. agy's own answer
+// carries `reset_time`, so this is detectable rather than guessable -- and the
+// difference is then meaningless: `Math.max(0, before - after)` would print
+// "5h 0.00%", which is the blank cost line in a plausible costume.
+const BEFORE_STAMPED = {
+  'gemini-weekly': { remaining: 0.9935215711593628, resetTime: '2026-09-28T20:01:29Z' },
+  'gemini-5h': { remaining: 0.2, resetTime: '2026-09-22T07:59:45Z' },
+};
+const AFTER_ROLLED = {
+  'gemini-weekly': { remaining: 0.9870215711593628, resetTime: '2026-09-28T20:01:29Z' },
+  'gemini-5h': { remaining: 0.99, resetTime: '2026-09-22T12:59:45Z' },
+};
+
+test('a bucket whose window reset mid-run is reported as not measurable, never as zero spend', () => {
+  const extract = geminiExtractFromAllowance({
+    model: 'gemini-3.8-flash', before: BEFORE_STAMPED, after: AFTER_ROLLED,
+    startedAt: '2026-09-22T07:50:00Z', endedAt: '2026-09-22T08:05:00Z',
+  });
+  assert.equal(Number(extract.allowanceUsed['gemini-weekly'].toFixed(6)), 0.0065);
+  assert.equal(extract.allowanceUsed['gemini-5h'], null, 'not a zero');
+  assert.match(formatCostLine(seatCostLine({ seat: 'builder', ...extract })), /5h not measurable/);
+  assert.match(formatCostLine(seatCostLine({ seat: 'builder', ...extract })), /weekly 0\.65%/);
+});
+
+test('a line whose EVERY bucket rolled over has no figure at all, so it is blank and fails the step', () => {
+  const line = seatCostLine({
+    seat: 'builder', vendor: 'gemini', model: 'gemini-3.8-flash', billing: 'allowance',
+    minutes: 15, allowanceUsed: { 'gemini-weekly': null, 'gemini-5h': null },
+  });
+  assert.throws(() => assertCostLineComplete(line), /allowanceUsed/);
 });

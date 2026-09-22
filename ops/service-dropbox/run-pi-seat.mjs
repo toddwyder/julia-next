@@ -90,7 +90,26 @@ function withThinking(args, effort) {
   return [...args.slice(0, at), ...extra, ...args.slice(at)];
 }
 
-export function buildPiSpawnSpec(seat, prompt, { mode = 'json', effort, readSecretImpl = readSecret } = {}) {
+// The one-shot's args, minus the one-shot: `-p --mode <mode>` and the prompt.
+//
+// WHY THIS EXISTS (JUL-98 step 6). A `-p --mode json` run is a one-shot with no
+// worker contract, so a Pi seat started that way cannot report to the mailbox
+// at all (JUL-109 findings, section 4). The route that CAN report starts Pi
+// INTERACTIVELY and lets Orca adopt the terminal with
+// `worker-start --terminal`, which is what types the contract and the brief in.
+// So there is no prompt here: the brief arrives as that one dispatch, never as
+// argv (graph/controller/adopt.mjs).
+//
+// Everything that makes this a SEAT rather than a bare `pi` is kept: the
+// provider, the model, the thinking level, and the secret read in-process into
+// the child's environment and nowhere else.
+function interactiveArgs(def, effort) {
+  const args = def.piArgs('json');
+  const pIndex = args.indexOf('-p');
+  return [...(pIndex === -1 ? args : args.slice(0, pIndex)), ...thinkingArgs(effort)];
+}
+
+export function buildPiSpawnSpec(seat, prompt, { mode = 'json', effort, interactive = false, readSecretImpl = readSecret } = {}) {
   const def = SEATS[seat];
   if (!def) {
     throw new Error(`buildPiSpawnSpec: unknown seat '${seat}' -- must be one of ${Object.keys(SEATS).join('|')}`);
@@ -100,7 +119,7 @@ export function buildPiSpawnSpec(seat, prompt, { mode = 'json', effort, readSecr
     // The prompt (which can be the whole coordinator skill, and starts with
     // `---`) is always the LAST entry, after a `--` separator, so Pi can
     // never read its leading dashes as an option.
-    args: [...withThinking(def.piArgs(mode), effort), '--', prompt],
+    args: interactive ? interactiveArgs(def, effort) : [...withThinking(def.piArgs(mode), effort), '--', prompt],
     env: { ...process.env, [def.envVar]: readSecretImpl(def.secretField) },
   };
 }
@@ -225,13 +244,17 @@ export function readAllStdin({ readFileSyncImpl = readFileSync } = {}) {
 export function parseSeatArgs(argv) {
   const seat = argv[0];
   let effort = DEFAULT_EFFORT;
+  // JUL-98 step 6: the start-then-adopt route's launch. Off by default, so
+  // every existing caller keeps the one-shot it has always had.
+  let interactive = false;
   for (let i = 1; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--effort') effort = argv[++i];
     else if (arg.startsWith('--effort=')) effort = arg.slice('--effort='.length);
+    else if (arg === '--interactive') interactive = true;
     else throw new Error(`unknown argument: ${arg}`);
   }
-  return { seat, effort };
+  return { seat, effort, interactive };
 }
 
 async function main() {
@@ -243,10 +266,19 @@ async function main() {
     process.exitCode = 2;
     return;
   }
-  const { seat, effort } = parsed;
+  const { seat, effort, interactive } = parsed;
   if (!seat) {
-    console.error(`usage: <prompt on stdin> | node run-pi-seat.mjs <seat> [--effort ${EFFORT_LEVELS.join('|')}] -- seat must be one of ${Object.keys(SEATS).join('|')}`);
+    console.error(`usage: <prompt on stdin> | node run-pi-seat.mjs <seat> [--effort ${EFFORT_LEVELS.join('|')}] [--interactive] -- seat must be one of ${Object.keys(SEATS).join('|')}`);
     process.exitCode = 2;
+    return;
+  }
+  if (interactive) {
+    // The start-then-adopt route: Pi replaces this process and owns the
+    // terminal, so Orca can adopt it. No prompt is read -- the brief arrives as
+    // the one dispatch, when Orca adopts the terminal.
+    const spec = buildPiSpawnSpec(seat, null, { interactive: true, effort });
+    const child = spawn(spec.command, spec.args, { env: spec.env, stdio: 'inherit' });
+    process.exitCode = await new Promise((resolve) => child.on('exit', (code) => resolve(code ?? 1)));
     return;
   }
   const prompt = readAllStdin();

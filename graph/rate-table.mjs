@@ -88,6 +88,40 @@ export const RATE_TABLE = {
       source: 'https://api-docs.deepseek.com/quick_start/pricing; Pi registry: pi-ai providers/data/deepseek.json',
       checkedOn: '2026-09-20',
     },
+    // GEMINI, THROUGH THE ANTIGRAVITY CLI (`agy`), IS NOT PRICED PER TOKEN AT
+    // ALL, and this table says so rather than inventing a dollar figure.
+    //
+    // The seat signs in to a Google AI Pro subscription and spends a WEEKLY and
+    // a FIVE-HOUR allowance. agy's own words, read off
+    // `agy -p "/usage" --output-format json` on this host on 2026-09-22:
+    // "Within each group, models share a weekly limit and a 5-hour limit. Quota
+    // is consumed proportionally to the cost of the tokens." The answer carries
+    // `groups[].buckets[]` with `id`, `window`, `remaining_fraction` and
+    // `reset_time`; the two Gemini buckets are `gemini-weekly` and `gemini-5h`.
+    // That call is a slash command -- 0 turns, 0 tokens -- so reading the
+    // allowance costs none of it.
+    //
+    // AND THERE IS NO TOKEN RECORD TO PRICE EVEN IF THERE WERE A PRICE.
+    // Searched on 2026-09-22 for an interactive agy session: the conversation
+    // store (~/.gemini/antigravity-cli/conversations/<id>.db) is protobuf blobs
+    // with no usage table; the brain transcript's every key is
+    // {source,status,tool_calls,thinking,step_index,type,content,created_at};
+    // the CLI log has no token line. Only `agy -p` (print mode) reports usage,
+    // and a seat worker is interactive. So the allowance IS the figure, and
+    // graph/controller/cost.mjs's Gemini line carries it instead of tokens.
+    'gemini-3.8-flash': {
+      vendor: 'gemini',
+      billing: 'allowance',
+      allowanceGroup: 'Gemini Models',
+      allowanceBuckets: ['gemini-weekly', 'gemini-5h'],
+      plan: 'Google AI Pro',
+      // Flash and Pro share this group -- agy's own /usage answer says so
+      // ("Models within this group: Gemini Flash, Gemini Pro") -- so a Pro seat
+      // would draw down the same two buckets. Only the model a seat actually
+      // runs is listed: a rate with no seat behind it is a price nobody checks.
+      source: 'agy -p "/usage" --output-format json on this host (agy 1.2.7/1.2.8); model id from `agy models`',
+      checkedOn: '2026-09-22',
+    },
     // Command Code's GOAT plan (JUL-98, Todd's 13:43Z + 15:01:54Z Decisions):
     // the reviewer's DeepSeek route, both the real review (Pro) and the
     // Flash shadow. Own entries, own vendor -- Command Code is a distinct
@@ -155,6 +189,14 @@ export function costOf(model, usage = {}, { at = new Date() } = {}) {
   if (r.vendor === 'pi-deepseek' || r.vendor === 'commandcode') {
     const t = isDeepseekPeak(at) ? r.peak : r.offPeak;
     return (n('input') * t.input + n('output') * t.output + n('cacheRead') * t.cacheRead) / PER;
+  }
+  if (r.billing === 'allowance') {
+    // A refusal, never a plausible zero. Nobody is billed a dollar for this
+    // model, so any number here would be an invention; the figure that IS real
+    // is the allowance the run drew down, which
+    // graph/controller/cost.mjs's geminiExtractFromAllowance computes from two
+    // `/usage` readings and puts on the seat's line.
+    throw new Error(`costOf: '${model}' is billed against a ${r.plan ?? 'subscription'} allowance (buckets: ${(r.allowanceBuckets ?? []).join(', ')}), not per token -- use the allowance used, which graph/controller/cost.mjs puts on the cost line`);
   }
   throw new Error(`costOf: unknown vendor '${r.vendor}' for model '${model}'`);
 }

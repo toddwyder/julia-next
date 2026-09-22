@@ -5,10 +5,23 @@
 // they happen in, which is itself a rule:
 //
 //   1. dispatch a FRESH worker (./dispatch.mjs)
-//   2. prove its turn really started (./turn-start.mjs) -- and if it did not,
-//      stop HERE. The mailbox is not opened at all: a prompt typed into a
-//      login or folder-trust screen is caught in seconds instead of being
-//      waited on for eight hours, which is what happened on 19-20 September.
+//   2. prove its turn really started (./turn-start.mjs). If nothing was
+//      observed, take ONE bounded look at the mailbox before concluding
+//      anything: it is the only authoritative record of what a worker did, and
+//      a turn that began and ended between two terminal readings looks exactly
+//      like a turn that never began (round 2, finding 2). A worker that
+//      reported is costed for real; one that sent anything of its own is
+//      waited on. Only when the mailbox says NOTHING is Orca asked what it
+//      recorded, once, through `worker-show` -- and that answer decides
+//      between the three outcomes (round 4b):
+//
+//        live verdict, seen at any point  -> it ran; keep it, cost it
+//        recorded failure signature       -> it never started; stop HERE
+//        anything else, including a
+//          reading that could not be taken -> POSSIBLY RUNNING: keep the
+//          worktree, read the cost, release nothing, start no backup
+//
+//      That stop is still seconds, not the eight hours of 19-20 September.
 //   3. sleep on the mailbox until that worker's own worker_done arrives
 //      (./mailbox.mjs), mirroring every message to Axiom on the way
 //   4. run the test suite ONCE, as the controller, in the candidate worktree
@@ -23,12 +36,85 @@ import { dispatchWorker } from './dispatch.mjs';
 import { proveTurnStarted } from './turn-start.mjs';
 import { waitForWorkerDone } from './mailbox.mjs';
 import { finishWorker, assertEverySeatCosted } from './release.mjs';
-import { formatCostLine, neverStartedCostLine } from './cost.mjs';
+import { formatCostLine, neverStartedCostLine, readFailedCostLine, assertCostLineComplete } from './cost.mjs';
 // The seat rules are scripts/seat-labels.mjs's, imported rather than repeated.
 // A seat that CANNOT BE LAUNCHED takes exactly the route a CAPPED seat already
 // takes (JUL-98 step 2, item 6): the same `fallbackSeatChoice`, the same seat
 // table, the same family guard. There is no second fallback machine here.
 import { fallbackSeatChoice } from '../../scripts/seat-labels.mjs';
+
+// How long the ONE reconciliation look at the mailbox may block for before a
+// seat is declared never-started. A worker that has already reported is in the
+// mailbox now and answers immediately; this is the margin for one that reported
+// a moment ago or is slow to pick the brief up. Short, because the alternative
+// failure -- sleeping on a worker that is going nowhere -- is the eight-hour
+// stall of 19-20 September.
+export const DEFAULT_RECONCILE_WAIT_MS = 30000;
+
+// How many deliveries that reconciliation may read before it gives up, whatever
+// the clock says. The budget above bounds TIME, and a mailbox that answers
+// instantly -- a replay storm, or a long poll that returns without consuming
+// its timeout -- barely spends any, so time alone bounds nothing. Round 2's
+// `maxWaits: 1` was a hard cap on reads and removing it removed that bound:
+// this replaces it. Eight is well past what a controller carrying one card at a
+// time puts on its own mailbox in half a minute, and far short of a spin.
+export const DEFAULT_RECONCILE_MAX_READS = 8;
+
+// Both detectors below read ONE shape, and there is no unwrapping left to do:
+// the `result` of an `orchestration worker-show` answer, exactly as
+// ./wiring.mjs's `workerShowImpl` hands it over. That boundary goes through
+// `orcaCall`, which already returns `parsed.result` (scripts/orca-cli.mjs), so
+// no producer passes anything else.
+//
+// ROUND 4b REMOVED THREE LEGS THAT ENCODED SHAPES NOTHING PRODUCES: `.show`,
+// which only ever came from a test stand-in; `.observed`, which in production
+// is the adopt route's `{ busy: {...} }` (scripts/controller-adopt.test.mjs)
+// and carries no verdict; and `.result`, kept at first for "a caller that
+// forgot to unwrap", which is a caller that does not exist. The first two made
+// the detectors look like they could read a turn-start reading. They cannot;
+// see `workerShowImpl` in ./wiring.mjs.
+
+// THE RECORDED FAILURE SIGNATURE (JUL-98 step 6, round 4; Todd Decision 2026-09-22 15:01:01Z).
+// Orca recorded failure signature (failed at agent readiness, no agent terminal)
+// means the worker never started. Concluded ONLY on these exact five fields:
+//   1. worker.state === 'failed'
+//   2. worker.stage === 'agent_readiness'
+//   3. worker.agentTerminalHandle === null
+//   4. dispatch.status === 'failed'
+//   5. typeof dispatch.lastFailure === 'string' && dispatch.lastFailure.length > 0
+// Read from:
+//   - graph/fixtures/orca-1.4.205/worker-show.failed-agent-readiness.json
+//   - graph/fixtures/orca-1.4.205/base-checkout.new-path-untrusted.worker-show.json
+//   - docs/research/jul109-orca-1.4.205-findings.md (section 2 fact 3, section 4a)
+//   - coordinator live measurement at 15:53:09Z (agent-trust-workspace blocked)
+export function hasFailedAgentReadinessSignature(candidate) {
+  if (!candidate) return false;
+  const worker = candidate.worker ?? null;
+  const dispatch = candidate.dispatch ?? null;
+
+  return (
+    worker?.state === 'failed' &&
+    worker?.stage === 'agent_readiness' &&
+    worker?.agentTerminalHandle === null &&
+    dispatch?.status === 'failed' &&
+    typeof dispatch?.lastFailure === 'string' &&
+    dispatch.lastFailure.length > 0
+  );
+}
+
+// POSITIVE LIVENESS VERDICT (JUL-98 step 6, round 4; Todd Decision 2026-09-22 15:01:01Z).
+// "Orca liveness verdict live, seen at any point, means the worker ran."
+// If live is seen in projection.liveness.verdict, worker.liveness.verdict,
+// or observation.status at any point, seenLive is recorded true, preventing
+// any never-started conclusion even if the mailbox is silent.
+export function hasLiveLivenessVerdict(candidate) {
+  if (!candidate) return false;
+  if (candidate.liveness?.verdict === 'live') return true;
+  if (candidate.projection?.liveness?.verdict === 'live') return true;
+  if (candidate.worker?.liveness?.verdict === 'live') return true;
+  if (candidate.observation?.status === 'live') return true;
+  return false;
+}
 
 // One seat, one step.
 export async function runWorkerStep({
@@ -45,10 +131,20 @@ export async function runWorkerStep({
   requestId,
 
   workerStartImpl,
+  // The Orca boundaries the START-THEN-ADOPT route needs (JUL-98 step 6), for
+  // the seats `worker-start --agent` has no launcher for. Passed straight
+  // through: ./dispatch.mjs decides whether they are used at all.
+  adoptBoundaries = {},
   // Returns whatever the controller has observed about the start: a
   // `terminal send --wait-submit` answer, a `worktree ps` worktree, or both.
   // It is the only thing allowed to look at the worker before it reports.
   observeStartImpl,
+  // THE START RULE'S PRODUCTION SOURCE (JUL-98 step 6 round 4b). Answers Orca's
+  // worker-show INSPECT structure for one dispatch -- the only reading that
+  // carries the rule's fields; `observeStartImpl` above cannot (./wiring.mjs).
+  // Asked ONCE, below, and only where the alternative is to conclude
+  // never-started. Absent or throwing, the step keeps the worker.
+  workerShowImpl = null,
   checkWaitImpl,
   suiteRunner,
   suiteKey,
@@ -58,11 +154,22 @@ export async function runWorkerStep({
   mirrorImpl = null,
   runSuite = true,
   waitOptions = {},
+  // The BOUNDED look at the mailbox taken before a seat is declared
+  // never-started (item 2 below). Separate from `waitOptions` on purpose: this
+  // one must stay short, because it happens on the path that exists to catch a
+  // worker that is going nowhere.
+  reconcileOptions = {},
+  // The controller's own clock, for a seat whose vendor records no duration.
+  now = () => new Date().toISOString(),
+  // The clock the reconciliation's budget is measured on, in milliseconds.
+  // Defaults to `performance.now()`, which is monotonic and unaffected by wall
+  // clock steps. Injected so a test can spend the budget without sleeping.
+  clockMs = () => performance.now(),
 } = {}) {
   // 1. A fresh worker.
   const dispatched = await dispatchWorker({
-    workerStartImpl, environment, runId, from, repo,
-    seat, card, step, choice, files, worktreeName, requestId,
+    workerStartImpl, adoptBoundaries, environment, runId, from, repo,
+    seat, card, step, choice, files, worktreeName, requestId, now,
   });
   if (!dispatched.ok) {
     // ITEM 2 (JUL-98 step 5, fifth fix): A SEAT THAT NEVER STARTED IS COSTED AS
@@ -107,7 +214,19 @@ export async function runWorkerStep({
       // moved to its backup is a different vendor from the one the card's label
       // resolved to, and the cost reader has to read the session file of the
       // vendor that ran -- not the one that was refused.
-      readCostImpl: (args) => readCostImpl({ ...args, agent: dispatched.launch?.agent ?? null }),
+      readCostImpl: (args) => readCostImpl({
+        ...args,
+        agent: dispatched.launch?.agent ?? null,
+        model: dispatched.launch?.model ?? null,
+        // An allowance-billed seat has no session file: its only figure is the
+        // difference between the reading taken before it started and one taken
+        // now (./cost.mjs geminiExtractFromAllowance).
+        allowanceBefore: dispatched.allowanceBefore ?? null,
+        // The controller started it and has now seen it report: that IS the
+        // duration for a vendor that records none.
+        startedAt: dispatched.startedAt ?? null,
+        endedAt: dispatched.startedAt ? now() : null,
+      }),
       releaseImpl,
       removeWorktreeImpl,
       turnStarted,
@@ -130,29 +249,288 @@ export async function runWorkerStep({
   }
 
   // 2. Proof the turn started. Nothing is waited on until this holds.
-  const observed = await observeStartImpl({ seat, dispatch: dispatched });
+  //
+  // A dispatch that carries its OWN observation is believed and nothing else is
+  // asked. That is the start-then-adopt route (JUL-98 step 6): Orca reports the
+  // agent's provider as `unsupported` for turn observation and tracks no agent
+  // for it, so `worktree ps` -- the only thing `observeStartImpl` can look at --
+  // would answer `agents: []` for a worker that is visibly working. The route
+  // takes the one reading Orca can still give, and ./turn-start.mjs judges it
+  // by the same rules as every other seat's.
+  const observed = dispatched.observed ?? await observeStartImpl({ seat, dispatch: dispatched });
   const proof = proveTurnStarted(observed ?? {});
+
+  // SEEN LIVE HAS EXACTLY ONE SOURCE, AND IT IS worker-show (round 4b). Round 4
+  // seeded this from `dispatched` and `observed`; neither can carry a verdict,
+  // so the seed was always false and the rule had no live branch at all. Why
+  // neither can: ./wiring.mjs, above `workerShowImpl`. It is taken below.
+  let seenLive = false;
+  let heard = null;
+  let initialAck = waitOptions.initialAck ?? null;
+
   if (!proof.started) {
-    return close({
-      ok: false,
-      stage: 'turn-start',
-      reason: proof.reason,
-      retryRequestId: proof.retryRequestId ?? null,
-      warnings: proof.warnings,
-      outcome: null,
-      testRun: null,
-    }, { turnStarted: false });
+    // THE RECONCILIATION (JUL-98 step 6, round 2, finding 2), and why a
+    // not-started reading is no longer a verdict on its own.
+    //
+    // Every turn-start proof this controller has is an OBSERVATION OF A
+    // TERMINAL, and each one has the same hole: a turn that begins and ends
+    // between two readings looks exactly like a turn that never began. The
+    // adopt route's window is seconds wide (./adopt.mjs DEFAULT_BUSY_WINDOW_MS)
+    // and a short step can fit inside it. Round 1 called that never-started,
+    // skipped the mailbox entirely, threw away the real allowance in favour of
+    // a zero-cost never-started line, and released the seat -- and because that
+    // exit carries no `launchRefused`, no backup ran either. A finished step
+    // and its cost were simply lost.
+    //
+    // The mailbox is the one AUTHORITATIVE record of what a worker did: a
+    // worker that reported demonstrably ran, and so did one that sent a
+    // heartbeat. So it is asked FIRST, and briefly -- a bounded look, not the
+    // long sleep this whole step exists to avoid (the 19-20 September
+    // eight-hour stall). Three answers, three different truths:
+    //
+    //   * a worker_done  -- the turn ran and finished. Keep the REAL cost.
+    //   * any other message from this dispatch -- it is alive and still
+    //     working, so fall through to the ordinary wait.
+    //   * nothing at all -- combined with the idle reading, that is the
+    //     never-started case, and it is now a fact rather than an inference.
+    //
+    // AND WHY IT IS A BUDGET, NOT ONE DELIVERY (round 3). Round 2 asked for
+    // exactly one delivery (`maxWaits: 1`). But this mailbox belongs to the
+    // CONTROLLER, not to this worker: every card in flight, every earlier
+    // dispatch and every replayed delivery wakes the same wait. So a single
+    // unrelated or replayed message consumed the one look, nothing in it
+    // belonged to this worker, and the code fell through to the never-started
+    // path anyway -- zero cost line, resources released, a backup started
+    // beside a seat that had already finished, and its real allowance thrown
+    // away. That is finding 2's own failure mode through a narrower door.
+    //
+    // A DELIVERY THAT CARRIES NO MESSAGE FOR THIS WORKER IS NOT A VERDICT. So
+    // the look reads ON past it, and what bounds it is TIME, not deliveries:
+    // one budget, shared across however many deliveries arrive, with each read
+    // given only what is left of it. The never-started case is unchanged --
+    // an expired wait that carried nothing at all still answers at once, in one
+    // read -- and the busy-mailbox case can now cost the budget and no more.
+    const {
+      timeoutMs: reconcileBudgetMs = DEFAULT_RECONCILE_WAIT_MS,
+      maxReads: reconcileMaxReads = DEFAULT_RECONCILE_MAX_READS,
+      ...reconcileRest
+    } = reconcileOptions;
+    const reconcileDeadline = clockMs() + reconcileBudgetMs;
+    const reconciledMessages = [];
+    let reconciled = null;
+    let fromThisWorker = [];
+    let reads = 0;
+    let mirrorFailures = 0;
+    let remainingMs = reconcileBudgetMs;
+
+    for (;;) {
+      reconciled = await waitForWorkerDone({
+        checkWaitImpl,
+        terminal: from,
+        runId,
+        dispatchId: dispatched.dispatchId,
+        mirrorImpl,
+        initialAck,
+        maxWaits: 1,
+        ...reconcileRest,
+        timeoutMs: remainingMs,
+      });
+      reads += 1;
+      // NO LIVENESS DETECTOR HERE (round 4b, and this is TASK 3 of round 4b).
+      // Round 4 asked `hasLiveLivenessVerdict(reconciled)` of every batch. A
+      // batch is `{runId, deliveryId, messages[], count, timedOut}` -- a
+      // mailbox delivery, never an Orca inspect structure -- so the call had no
+      // `liveness`, `projection`, `worker` or `observation` key to find and
+      // could not fire whatever the mailbox said. What a message from this
+      // worker DOES prove is handled where it is proof: `fromThisWorker` below
+      // breaks the loop, and a `worker_done` is the real cost.
+      mirrorFailures += reconciled.mirrorFailures ?? 0;
+      reconciledMessages.push(...(reconciled.messages ?? []));
+      fromThisWorker = reconciledMessages.filter((message) => message.dispatchId === dispatched.dispatchId);
+      // CARRY THE ACKNOWLEDGEMENT FORWARD on every exit path that has one
+      // (round 3 P2a): if a message from this worker breaks the loop, the
+      // ordinary wait that follows must not re-read this delivery.
+      if (reconciled.acknowledged != null) {
+        initialAck = reconciled.acknowledged;
+      }
+      if (reconciled.outcome != null || fromThisWorker.length > 0) break;
+      // A wait that expired carrying NOTHING AT ALL is the answer, not a step
+      // towards one: there is no traffic to read past. It is the never-started
+      // reading, and it is given at once rather than after the budget.
+      if ((reconciled.messages ?? []).length === 0) break;
+      // READING ON IS ONLY POSSIBLE WHILE A DELIVERY CAN BE ACKNOWLEDGED.
+      // ./mailbox.mjs takes its ack from the delivery's own id, and JUL-109
+      // section 4a is that an unacknowledged delivery "will keep waking the
+      // next check --wait". A delivery carrying messages but no id to
+      // acknowledge therefore comes back identical however often it is asked
+      // for, so asking again learns nothing and merely spins for the budget.
+      if (reconciled.acknowledged == null) break;
+      // TWO BOUNDS, because one is not enough. The budget bounds a mailbox that
+      // makes this look WAIT; the read cap bounds one that answers INSTANTLY,
+      // where the clock barely moves and the budget alone would allow a spin.
+      if (reads >= reconcileMaxReads) break;
+      remainingMs = reconcileDeadline - clockMs();
+      if (remainingMs <= 0) break;
+    }
+
+    if (reconciled?.outcome != null) {
+      // EVERYTHING HEARD ON THE WAY, not just the delivery that carried the
+      // verdict: the foreign ones were mirrored too, and a mirror that failed
+      // while hearing one is part of this step's record as much as any other.
+      heard = { ...reconciled, messages: reconciledMessages, mirrorFailures, waits: reads };
+    } else if (fromThisWorker.length > 0) {
+      // `initialAck` is already chained to the last delivery read above, so the
+      // ordinary wait below starts where this look stopped.
+    } else {
+      // THE VERDICT IS ASKED FOR HERE, AND ONLY HERE (JUL-98 step 6 round 4b).
+      //
+      // Nothing has come from this worker: no outcome, no message of its own.
+      // That is the ONE point at which the three-way start rule has to choose,
+      // so it is the one point at which Orca is asked what it recorded about
+      // this dispatch -- one `worker-show`, on the path that would otherwise
+      // conclude never-started, and never on the ordinary path where a worker
+      // answered for itself.
+      //
+      // WHY IT IS ASKED AT ALL. Round 4 read the rule's five fields off
+      // `observed` and `dispatched`, neither of which carries them, so the
+      // failure-signature branch could not fire in the running controller and
+      // the rule silently degraded to one outcome. The shapes, and which verb
+      // does answer: ./wiring.mjs, above `workerShowImpl`.
+      let shown = null;
+      let showError = null;
+      try {
+        // `seat` travels for the same reason it travels to `observeStartImpl`
+        // above: the production boundary ignores it (./wiring.mjs), and a
+        // boundary that wants to say WHICH seat it is answering about -- a
+        // fixture Orca, a diagnostic -- has it without a second signature.
+        shown = workerShowImpl ? await workerShowImpl({ seat, dispatchId: dispatched.dispatchId }) : null;
+      } catch (error) {
+        showError = error.message;
+      }
+      if (hasLiveLivenessVerdict(shown)) seenLive = true;
+
+      // AN OBSERVATION THAT ITSELF FAILED IS NOT A VERDICT, and neither is one
+      // that was never taken. `showError != null` is a controller that could
+      // not ask; `shown == null` is a controller with no boundary to ask
+      // through. Both fall to possibly-running below: absence is not proof, and
+      // the cost of being wrong here is releasing a worker that is still
+      // spending and starting a second one beside it.
+      if (!seenLive && showError == null && hasFailedAgentReadinessSignature(shown)) {
+        // THE RECORDED FAILURE SIGNATURE (JUL-98 step 6, round 4; Todd Decision 2026-09-22 15:01:01Z):
+        // "Orca recorded failure signature (failed at agent readiness, no agent terminal)
+        // means it never started."
+        // Concluded ONLY on this exact recorded signature.
+        // THE CARD SAYS WHAT DECIDED IT. `proof.reason` describes the
+        // turn-start READING ("nothing was observed at all"), which on its own
+        // is exactly the ambiguous sentence round 2 found: a turn that began
+        // and ended between two readings says the same. What makes this a
+        // never-started VERDICT is Orca's own record, so the record is quoted.
+        const closed = await close({
+          ok: false,
+          stage: 'turn-start',
+          reason: `${proof.reason} -- and Orca's own record for dispatch ${dispatched.dispatchId} is the recorded never-started signature: the worker failed at stage agent_readiness with no agent terminal (${shown?.dispatch?.lastFailure})`,
+          retryRequestId: proof.retryRequestId ?? null,
+          warnings: proof.warnings,
+          outcome: null,
+          testRun: null,
+        }, { turnStarted: false });
+        return { ...closed, launchRefused: closed.released === true && closed.worktreeRemoved === true };
+      }
+
+      // EVERYTHING ELSE IS TREATED AS POSSIBLY RUNNING (Todd Decision 2026-09-22 15:01:01Z):
+      // "Everything else is treated as possibly running: its worktree is kept,
+      // its cost is read, no backup starts beside it. Not seeing live is never
+      // proof of never-started."
+      //
+      // Covers: budget exhausted, cap exhausted, observation failed, nothing heard at all.
+      let cost = null;
+      try {
+        cost = await readCostImpl({
+          seat,
+          dispatchId: dispatched.dispatchId,
+          worktree: dispatched.worktree,
+          agent: dispatched.launch?.agent ?? null,
+          model: dispatched.launch?.model ?? null,
+          allowanceBefore: dispatched.allowanceBefore ?? null,
+          startedAt: dispatched.startedAt ?? null,
+          endedAt: dispatched.startedAt ? now() : null,
+        });
+        assertCostLineComplete(cost);
+      } catch (error) {
+        cost = readFailedCostLine({
+          seat,
+          model: dispatched.launch?.model ?? null,
+          reason: error.message,
+        });
+      }
+
+      // WHAT THE CARD IS TOLD. Every branch below ends in the same outcome --
+      // possibly running -- so what differs is the EVIDENCE, and the card gets
+      // whatever of it there is. The kept/read/not-released/no-backup clause is
+      // written once, at the end, because it is true of all of them.
+      //
+      // A SEAT ORCA CALLS LIVE COMES FIRST, and it is the finding that put this
+      // cascade in order (round 4b review, spec axis). `proof.reason` says
+      // "nothing was observed at all", which for a worker Orca reports LIVE is
+      // simply false: the turn-start reading saw nothing, but Orca did. Said
+      // plainly, the card was reporting a demonstrably running worker as though
+      // nothing had been seen of it, with only the `seenLive` flag to say
+      // otherwise.
+      //
+      // AND THE TWO FAILURES ARE NAMED TOGETHER, not one instead of the other:
+      // a seat can be adopted-but-unobservable AND have a worker-show that
+      // failed, and both are facts about the same stuck seat.
+      const failures = [
+        dispatched.observationError ? `the adopt route could not observe it (${dispatched.observationError})` : null,
+        showError ? `Orca could not be asked what it recorded (worker-show failed: ${showError})` : null,
+      ].filter(Boolean);
+
+      let evidence;
+      if (seenLive) {
+        evidence = `Orca reports it LIVE, but nothing has come from it through the mailbox yet`;
+      } else if (failures.length > 0) {
+        evidence = `${failures.join(', and ')} -- a reading that could not be taken is not a verdict`;
+      } else if (proof.started === false) {
+        evidence = `${proof.reason}, and Orca's record shows no never-started signature`;
+      } else {
+        evidence = `it did not report within the reconciliation budget and did not exhibit the recorded failure signature`;
+      }
+      const reason = `the ${seat} seat (dispatch ${dispatched.dispatchId}): ${evidence} -- it may still be running, so its worktree is kept, its cost is read, it is neither released nor removed, and no backup is started beside it`;
+
+      return {
+        ok: false,
+        seat,
+        stage: 'turn-start',
+        possiblyRunning: true,
+        launchRefused: false,
+        dispatchId: dispatched.dispatchId,
+        taskId: dispatched.taskId,
+        terminal: dispatched.terminal,
+        worktree: dispatched.worktree,
+        cost,
+        released: false,
+        worktreeRemoved: false,
+        outcome: null,
+        testRun: null,
+        ...(seenLive ? { seenLive: true } : {}),
+        warnings: proof.warnings,
+        reason,
+      };
+    }
   }
 
   // 3. Sleep on the mailbox.
-  const heard = await waitForWorkerDone({
-    checkWaitImpl,
-    terminal: from,
-    runId,
-    dispatchId: dispatched.dispatchId,
-    mirrorImpl,
-    ...waitOptions,
-  });
+  if (!heard) {
+    heard = await waitForWorkerDone({
+      checkWaitImpl,
+      terminal: from,
+      runId,
+      dispatchId: dispatched.dispatchId,
+      mirrorImpl,
+      ...waitOptions,
+      initialAck,
+    });
+  }
 
   // 4. The test suite: once, by the controller, in the candidate worktree.
   let testRun = null;
@@ -331,7 +709,13 @@ export async function runBuildAndReview({
   // failure -- put three contradictory things on one card: "it ran on codex",
   // "worker-start failed at agent_readiness", and a cost line reading "never
   // started". So the gate is the stage, which covers all three.
-  const neverGotGoing = (result) => result.stage === 'dispatch' || result.stage === 'turn-start';
+  //
+  // AND THE ONE EXCEPTION (round 2, finding 5): a seat whose OBSERVATION failed
+  // after it was really adopted is `possiblyRunning`. Nothing is known about it
+  // either way, so it is neither "it ran on the backup" nor "it never got
+  // going": it must keep its own reason and its absent cost line, and it must
+  // never be given the zero-cost never-started line `stopped` below writes.
+  const neverGotGoing = (result) => (result.stage === 'dispatch' || result.stage === 'turn-start') && result.possiblyRunning !== true;
 
   for (const seat of seats) {
     const first = inPlay[seat];
@@ -349,7 +733,12 @@ export async function runBuildAndReview({
       } else {
         const backup = fallback.choices[seat];
         const second = await startSeat(seat, backup, '-bk');
-        if (neverGotGoing(second)) {
+        if (second.possiblyRunning) {
+          // Its cost is unknown, not zero, so the step stops on the missing
+          // cost line rather than on an invented one, and the card is told no
+          // seat ran on the backup.
+          result = second;
+        } else if (neverGotGoing(second)) {
           result = stopped(second, seat, `the ${seat} seat could not be started on ${fromEntry}: ${fromReason} -- and its backup ${backup.entry} could not be started either: ${second.reason}`);
         } else {
           inPlay = fallback.choices;

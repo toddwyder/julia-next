@@ -13,7 +13,54 @@
 //                                                     warning naming the
 //                                                     request id to replay with
 //
-// TWO RECORDED PROOFS, AND NO THIRD. There is exactly one other recording in
+// AND A THIRD, FOR AN AGENT ORCA CANNOT OBSERVE AT ALL (JUL-98 step 6).
+// Measured live on 2026-09-22 against a real adopted `agy` (Antigravity)
+// worker, which is how a Gemini seat is started:
+//
+//   worker-start --terminal ->  prompt: { stages: ["input_accepted"],
+//                                         provider: "unsupported",
+//                                         observation: "unsupported" }
+//   worktree ps             ->  agents: []   (no agent tracked for it)
+//   terminal wait --for tui-idle --timeout-ms 4000  ->  timeout
+//
+// Orca says, in its own field, that it cannot observe a turn for this provider,
+// and it tracks no agent for it, so neither of the two proofs below can ever
+// exist for such a seat. What it CAN still answer is whether the terminal is
+// idle -- and the TRANSITION is the proof, not the single reading:
+// ./adopt.mjs waits for the terminal to go IDLE before it delivers the brief
+// (that is how it knows the agent finished starting), and then asks again
+// immediately after. Busy means the agent took the brief and began. A TUI
+// sitting on a trust or login screen -- the 19-20 September failure -- is idle
+// at both readings and is caught.
+//
+// ITS BLIND SPOTS, both of them, and WHO ANSWERS THEM. The busy reading is
+// taken once, inside a short window (./adopt.mjs DEFAULT_BUSY_WINDOW_MS), so:
+//
+//   * a turn that BEGINS AND ENDS inside that window reads as idle and looks,
+//     here, exactly like one that never began. The live run of 2026-09-22 took
+//     26 s against an 8 s window, and a real step takes minutes, so the margin
+//     is wide -- but it is a margin, not a guarantee;
+//   * a turn that has not BEGUN inside the window -- an agent slower to pick
+//     the brief up than the window is long -- reads the same way.
+//
+// ROUND 2, FINDING 2: THIS FILE'S "not started" IS NOT A VERDICT, and round 1
+// treated it as one. A seat classified never-started here had its real cost
+// thrown away for a zero-cost line and its worker released, and because that
+// exit carried no `launchRefused`, no backup ran either -- so a completed step
+// AND its cost were lost, which is the opposite of the "wasted worker, safe
+// fallback" this comment used to claim. What closes both blind spots is not a
+// longer window but a different source: ../controller/step-runner.mjs now takes
+// one bounded look at THE MAILBOX before it concludes anything, and the mailbox
+// is the only authoritative record of what a worker did. A worker that reported
+// is costed for real; one that sent anything at all is waited on; only one that
+// answered nothing, and whose observation did not itself fail, is the
+// never-started case -- and that one falls back through the seat table.
+//
+// So what this file returns is evidence, and it is honest about being one
+// reading of one terminal. The verdict is reached where all the evidence is.
+//
+// TWO RECORDED PROOFS, AND NO THIRD, for a seat Orca DOES observe. There is
+// exactly one other recording in
 // which Orca says an agent is really running: `worktree ps`, where
 // `agents[].state` is `"working"` (worktree-ps.agent-working.json; the fixture
 // README is explicit that `projection.stage.activity` is `"unknown"` for a
@@ -48,6 +95,14 @@ export function turnStartedFromSend(send) {
   return stagesOf(send).includes(TURN_STARTED);
 }
 
+// The second `terminal wait --for tui-idle` ./adopt.mjs takes, immediately
+// after the brief was delivered: NOT satisfied means the terminal is busy,
+// which -- given it was idle a moment earlier -- means the agent took the brief
+// and began.
+export function turnStartedFromBusyTerminal(busy) {
+  return Boolean(busy) && busy.satisfied === false;
+}
+
 // A `worktree ps` worktree (the `worktree` object, as recorded): is an agent in
 // it actually running?
 export function turnStartedFromWorktreePs(worktree) {
@@ -71,12 +126,25 @@ export function observedStage(answer) {
 // `retryRequestId` is Orca's own advice, carried rather than re-derived: the
 // warning on a no-turn-started send names the request id to reissue with, so
 // the confirmation costs nothing and sends nothing twice.
-export function proveTurnStarted({ send = null, worktree = null, start = null, show = null } = {}) {
+export function proveTurnStarted({ send = null, worktree = null, busy = null, start = null, show = null } = {}) {
   if (send && turnStartedFromSend(send)) {
     return { started: true, source: 'terminal-send', stages: stagesOf(send), warnings: [] };
   }
   if (worktree && turnStartedFromWorktreePs(worktree)) {
     return { started: true, source: 'worktree-ps', stages: [], warnings: [] };
+  }
+  if (turnStartedFromBusyTerminal(busy)) {
+    return { started: true, source: 'terminal-busy', stages: [], warnings: [] };
+  }
+  if (busy) {
+    return {
+      started: false,
+      source: 'terminal-busy',
+      stages: [],
+      warnings: [],
+      retryRequestId: null,
+      reason: 'the terminal was idle again the moment the brief was delivered, and it was idle before: nothing took the brief, which is what a trust or login screen looks like',
+    };
   }
 
   const warnings = Array.isArray(send?.warnings) ? send.warnings : [];

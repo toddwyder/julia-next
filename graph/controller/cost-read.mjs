@@ -1,7 +1,13 @@
-// cost-read.mjs -- JUL-98 step 5, fourth fix: reading one seat's figures OFF
-// DISK. Nothing in here calls Orca, Linear or git, and that is the point: this
-// module is what RUNS AS THE WORKER, inside the worker-side terminal that
-// scripts/read-seat-cost.mjs is started in.
+// cost-read.mjs -- JUL-98 step 5, fourth fix: reading one seat's figures FROM
+// THE WORKER'S OWN RECORDS. Nothing in here calls Orca, Linear or git, and that
+// is the point: this module is what RUNS AS THE WORKER, inside the worker-side
+// terminal that scripts/read-seat-cost.mjs is started in.
+//
+// TWO OF THE THREE RECORDS ARE FILES the worker left behind -- Claude's
+// transcript, Codex's rollout. The third is not a file at all: a Gemini seat
+// records no per-session usage anywhere (the search is in ../rate-table.mjs),
+// so its figure comes from ASKING agy for the allowance, which means this module
+// runs one process. That is still the worker's own record, read as the worker.
 //
 // WHY IT IS ITS OWN FILE NOW. It used to live in ./wiring.mjs and be called by
 // the controller process directly. That cannot work, and the reason is a
@@ -24,12 +30,19 @@
 //
 // Nothing here computes a new figure. Every total, peak and dollar comes from
 // ./cost.mjs and ../rate-table.mjs, and `tokenTotal()` stays the one place a
-// token total is worked out.
+// token total is worked out. Preparing a worktree for an agent -- the trust
+// entry and the reading taken BEFORE it runs -- is ./seat-worktree.mjs's, so
+// that this file changes only when a cost source does.
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { execFile } from 'node:child_process';
 import { join } from 'node:path';
+import { promisify } from 'node:util';
 
-import { claudeExtractFromTranscript, codexExtractFromRollout, seatCostLine } from './cost.mjs';
+import { claudeExtractFromTranscript, codexExtractFromRollout, geminiExtractFromAllowance, seatCostLine } from './cost.mjs';
+import { RATE_TABLE } from '../rate-table.mjs';
+
+const execFileAsync = promisify(execFile);
 
 // AND THE WORKER'S HOME DIRECTORY, named here for the same reason the daemon
 // and the checkout are: it belongs to `runner`, not to the account this process
@@ -52,6 +65,42 @@ import { claudeExtractFromTranscript, codexExtractFromRollout, seatCostLine } fr
 // /home/runner/.claude/projects/-home-runner-orca-workspaces-julia-next-jul-92-work
 // (listed on the host, 2026-09-21).
 export const WORKER_HOME = '/home/runner';
+
+// ---------------------------------------------------------------------------
+// WHAT THIS READER CAN ACTUALLY READ -- declared once, and read by the
+// dispatcher before it launches anything
+// ---------------------------------------------------------------------------
+//
+// JUL-98 step 6, round 2, finding 1. A seat whose agent has no reader here is
+// not a seat with a cosmetic gap: ./release.mjs reads the cost FIRST and stops
+// before the release when the read fails, so such a worker fails its step with
+// no cost line AND keeps its worker and its worktree -- even when it did the
+// work perfectly and reported through the mailbox. Round 1 sent the DeepSeek
+// seat down the shared adopt route with `agent: 'pi'` while `readSeatCost`
+// below still refused `pi`, and in doing so made the OLD pre-dispatch refusal
+// unreachable, so no backup could take the seat either.
+//
+// So the list is exported and ./dispatch.mjs refuses a seat whose agent is not
+// on it, before anything is created. The gate is the cost source itself rather
+// than an agent name repeated in two files: implement the reader, add the agent
+// here, and the seat launches with no other change.
+//
+// WHY `pi` IS NOT ON IT. ../cost.mjs HAS a DeepSeek extractor
+// (`deepseekExtractFromSeatStream`), but it reads the JSON event stream that
+// `ops/service-dropbox/run-pi-seat.mjs` emits in its NON-interactive mode. The
+// adopt route runs Pi INTERACTIVELY, in a TUI, and that session writes no such
+// stream anywhere this reader can find: there is no measured worker-side record
+// to read, and DeepSeek is out of balance (402) with Todd's Decision of
+// 2026-09-22 04:07Z that it stays that way, so no paid interactive run can be
+// made to find one. A figure invented in its place is the blank cost line in
+// another costume, which is the one thing this whole module exists to stop.
+export const COST_READABLE_AGENTS = Object.freeze(['claude', 'codex', 'agy']);
+
+// Is there a worker-side record this reader can turn into a cost line for this
+// agent? ./dispatch.mjs asks BEFORE it starts anything.
+export function hasWorkerCostSource(agent) {
+  return COST_READABLE_AGENTS.includes(agent);
+}
 
 // ---------------------------------------------------------------------------
 // The cost read -- NOT an Orca call, because Orca has no such figure
@@ -109,6 +158,58 @@ function newestCodexRollout(root, { readdirImpl, statImpl }) {
   return descend(root, 3);
 }
 
+// ---------------------------------------------------------------------------
+// The Gemini seat: an allowance, read from agy itself
+// ---------------------------------------------------------------------------
+
+// `agy -p "/usage" --output-format json`, as the worker. A SLASH COMMAND, so it
+// costs none of the allowance it reports (`num_turns: 0`, `usage.total_tokens:
+// 0` in the recorded answer, graph/fixtures/orca-1.4.205/cost.gemini-agy-usage.json).
+export const AGY_USAGE_ARGS = Object.freeze(['-p', '/usage', '--output-format', 'json']);
+
+export async function readAgyAllowance({ execImpl = execFileAsync, cwd = undefined } = {}) {
+  const { stdout } = await execImpl('agy', [...AGY_USAGE_ARGS], { cwd, maxBuffer: 4 * 1024 * 1024 });
+  return JSON.parse(stdout);
+}
+
+// The buckets we are billed in, out of agy's own answer, BY ID. agy reports two
+// groups -- Gemini, and Claude/GPT -- and only the first is this seat's to
+// spend or to report; taking "the first group" would silently follow agy if it
+// ever reorders them.
+// THE RESET TIME TRAVELS WITH THE FRACTION, because a bucket's window can roll
+// over between the two readings a cost line is differenced from -- agy's
+// 5-hour limit does so every five hours -- and the difference is then
+// meaningless. ./cost.mjs's geminiExtractFromAllowance compares the two reset
+// times and says "not measurable" rather than printing a clamped zero.
+export function geminiAllowanceFromUsage(answer, { buckets } = {}) {
+  const groups = answer?.command?.data?.groups ?? [];
+  const found = {};
+  for (const group of groups) {
+    for (const bucket of group?.buckets ?? []) {
+      if (buckets.includes(bucket?.id) && Number.isFinite(bucket.remaining_fraction)) {
+        found[bucket.id] = { remaining: bucket.remaining_fraction, resetTime: bucket.reset_time ?? null };
+      }
+    }
+  }
+  const missing = buckets.filter((id) => !(id in found));
+  if (missing.length > 0) {
+    // A refusal, never a default: a missing bucket read as 1.0 would say the
+    // seat spent nothing, which is the blank cost line in another costume.
+    throw new Error(`geminiAllowanceFromUsage: agy's /usage answer has no ${missing.join(', ')} bucket, so the allowance cannot be read -- refusing to guess one`);
+  }
+  return found;
+}
+
+// The buckets an agy seat spends, taken from the rate table rather than
+// repeated here -- every Gemini model shares one group, which is agy's own
+// statement ("Models within this group: Gemini Flash, Gemini Pro").
+export function geminiAllowanceBuckets() {
+  for (const entry of Object.values(RATE_TABLE.models)) {
+    if (entry.vendor === 'gemini' && entry.allowanceBuckets) return entry.allowanceBuckets;
+  }
+  throw new Error('no Gemini allowance buckets are declared in graph/rate-table.mjs');
+}
+
 // One seat's figures, read while the worker's session files still exist --
 // which is why graph/controller/release.mjs reads BEFORE it releases.
 //
@@ -127,8 +228,9 @@ export function createSeatCostReader({
   readFileImpl = readFileSync,
   readdirImpl = readdirSync,
   statImpl = statSync,
+  readAllowanceImpl = readAgyAllowance,
 } = {}) {
-  return async function readSeatCost({ seat, worktree, agent, startedAt = null, endedAt = null }) {
+  return async function readSeatCost({ seat, worktree, agent, model = null, allowanceBefore = null, startedAt = null, endedAt = null }) {
     const worktreePath = worktreePathOf(worktree);
     if (agent === 'claude') {
       const dir = join(workerHome, '.claude', 'projects', claudeProjectDirName(worktreePath));
@@ -150,9 +252,15 @@ export function createSeatCostReader({
       const lines = splitJsonl(readFileImpl(file, 'utf8')).map((line) => JSON.parse(line));
       return seatCostLine({ seat, ...codexExtractFromRollout(lines) });
     }
-    // A DeepSeek seat never reaches here: graph/controller/dispatch.mjs refuses
-    // to start one with a new worktree at all (JUL-109 section 4).
-    throw new Error(`no cost source is known for a ${JSON.stringify(agent)} seat (${seat}) -- refusing to guess a figure${startedAt && endedAt ? ` for ${startedAt}..${endedAt}` : ''}`);
+    if (agent === 'agy') {
+      // No session file to find: agy writes no per-session token record at all
+      // (the search is in graph/rate-table.mjs). The figure is the allowance it
+      // drew down, so the reading taken at dispatch is differenced against one
+      // taken now, and a missing first reading is a refusal.
+      const after = geminiAllowanceFromUsage(await readAllowanceImpl(), { buckets: geminiAllowanceBuckets() });
+      return seatCostLine({ seat, ...geminiExtractFromAllowance({ model, before: allowanceBefore, after, startedAt, endedAt }) });
+    }
+    throw new Error(`no cost source is known for a ${JSON.stringify(agent)} seat (${seat}) -- refusing to guess a figure${startedAt && endedAt ? ` for ${startedAt}..${endedAt}` : ''}. The agents this reader can read are ${COST_READABLE_AGENTS.join(', ')}, and ./dispatch.mjs refuses to start any other, so reaching this line means the two have drifted apart`);
   };
 }
 

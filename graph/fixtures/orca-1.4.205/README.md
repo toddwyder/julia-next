@@ -90,3 +90,12 @@ Times are UTC. "probe N" is a real worker in its own brand-new worktree, all rem
   usage. Any code reading these files must count each `message.id` once.
 - DeepSeek's published price, Pi's built-in price, Pi's fetched model-store price and the account balance all
   differ (`graph/rate-table.mjs` and its tests record each). On the one measured run the balance was lowest.
+
+### `cost.gemini-agy-usage.json` (JUL-98 step 6, 2026-09-22)
+
+`agy -p "/usage" --output-format json`, run as `runner` on this host (Antigravity CLI 1.2.7/1.2.8,
+signed in as toddwyder@gmail.com, Google AI Pro). It is the allowance reading a Gemini seat's cost
+line is differenced from: `command.data.groups[].buckets[]` carries `id`, `window`,
+`remaining_fraction` and `reset_time`, and the two the Gemini seat spends are `gemini-weekly` and
+`gemini-5h`. `num_turns: 0` and `usage.total_tokens: 0`: it is a slash command, so taking the
+reading spends none of the allowance it reports.

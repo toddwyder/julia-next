@@ -57,6 +57,11 @@ export const COST_SOURCES = Object.freeze({
     provenOn: 'JUL-109 findings section 5; graph/fixtures/orca-1.4.205/cost.pi.seat-json-stream.multi-turn.jsonl and pi.timing.*.txt',
     lowerBound: false,
   }),
+  gemini: Object.freeze({
+    where: 'the ALLOWANCE, not tokens: `agy -p "/usage" --output-format json` read once before the worker starts and once after it reports, differenced per bucket (gemini-weekly, gemini-5h). agy records no per-session token count anywhere on disk for an interactive session',
+    provenOn: 'JUL-98 step 6, measured on this host 2026-09-22 (agy 1.2.7/1.2.8); graph/rate-table.mjs records the search that found no token record',
+    lowerBound: false,
+  }),
 });
 
 function minutesBetween(startedAt, endedAt) {
@@ -244,6 +249,64 @@ export function deepseekExtractFromSeatStream(events, { startedAt, endedAt } = {
 }
 
 // ---------------------------------------------------------------------------
+// Gemini, through the Antigravity CLI -- an ALLOWANCE, not a token bill
+// ---------------------------------------------------------------------------
+
+// Two `/usage` readings, one taken before the worker was started and one after
+// it reported, differenced per bucket. `before`/`after` are
+// `{ <bucket id>: { remaining, resetTime } }` -- which is what ./cost-read.mjs's
+// `geminiAllowanceFromUsage` pulls out of agy's own answer.
+//
+// THE RESET TIME IS THERE FOR ONE REASON. A bucket's window can roll over in
+// the middle of a run -- agy's 5-hour limit does so every five hours -- and the
+// two readings then measure different windows, so their difference is not what
+// the seat spent. Subtracting anyway gives a NEGATIVE number, which clamped at
+// zero reads as "this seat spent nothing": a blank cost line in a plausible
+// costume, which is the one failure this whole module exists to stop. agy
+// reports `reset_time` per bucket, so the rollover is a FACT, not a guess: a
+// bucket whose reset time moved is reported as not measurable (`null`), and
+// `assertCostLineComplete` below then requires at least one bucket that IS.
+//
+// WHY THERE ARE NO TOKENS ON THIS LINE. There is no token record to read: see
+// graph/rate-table.mjs's `gemini-3.8-flash` entry for the search. The line says
+// so in words rather than posting a zero that would read as "this seat did
+// nothing"; `assertCostLineComplete` below then requires the allowance figure
+// in their place, so an allowance line with NOTHING on it is still blank and
+// still fails the step.
+export function geminiExtractFromAllowance({ model, before, after, startedAt, endedAt } = {}) {
+  if (!startedAt || !endedAt) {
+    throw new Error('geminiExtractFromAllowance: a Gemini seat is timed by the controller, which starts it and sees it report -- there is no duration in anything agy writes');
+  }
+  if (!before || Object.keys(before).length === 0) {
+    throw new Error('geminiExtractFromAllowance: no allowance reading was taken before the worker started, so nothing can be differenced -- the reading is taken at dispatch, before the agent runs');
+  }
+  const allowanceUsed = {};
+  for (const [bucket, readingBefore] of Object.entries(before)) {
+    const readingAfter = after?.[bucket];
+    if (!Number.isFinite(readingAfter?.remaining)) {
+      throw new Error(`geminiExtractFromAllowance: the after reading has no '${bucket}' bucket, so its allowance cannot be differenced -- refusing to guess`);
+    }
+    allowanceUsed[bucket] = readingAfter.resetTime === readingBefore.resetTime
+      ? readingBefore.remaining - readingAfter.remaining
+      : null;
+  }
+  return {
+    vendor: 'gemini',
+    billing: 'allowance',
+    model,
+    tokens: null,
+    totalTokens: null,
+    peakContext: null,
+    startedAt,
+    endedAt,
+    minutes: minutesBetween(startedAt, endedAt),
+    usd: null,
+    allowanceUsed,
+    lowerBound: false,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // The line
 // ---------------------------------------------------------------------------
 
@@ -261,10 +324,33 @@ export function seatCostLine({
   minutes,
   usd,
   totalTokens,
+  billing = null,
+  allowanceUsed = null,
   capped = false,
   failedOverTo = null,
 } = {}) {
   const resolvedMinutes = minutes ?? (startedAt && endedAt ? minutesBetween(startedAt, endedAt) : null);
+  if (billing === 'allowance') {
+    // An allowance seat has no token record at all, so nothing here may invent
+    // one -- not even by letting `usd` fall through to costOf, which refuses
+    // this vendor on purpose (graph/rate-table.mjs).
+    return {
+      seat,
+      vendor: vendor ?? RATE_TABLE.models[model]?.vendor ?? null,
+      model,
+      billing,
+      allowanceUsed,
+      tokens: null,
+      totalTokens: null,
+      peakContext: null,
+      startedAt: startedAt ?? null,
+      endedAt: endedAt ?? null,
+      minutes: resolvedMinutes,
+      usd: null,
+      capped,
+      failedOverTo,
+    };
+  }
   return {
     seat,
     vendor: vendor ?? RATE_TABLE.models[model]?.vendor ?? null,
@@ -307,21 +393,60 @@ export function neverStartedCostLine({ seat, model = null, reason = 'no turn was
   };
 }
 
+// A WORKER WHOSE COST READ FAILED (JUL-98 step 6, round 4). For a worker that
+// is possibly running, or where reading figures threw an error, this explicit
+// line names the failure reason rather than substituting a zero never-started line.
+export function readFailedCostLine({ seat, model = null, reason = 'cost read failed' } = {}) {
+  return {
+    seat,
+    readFailed: true,
+    reason,
+    vendor: null,
+    model,
+    tokens: null,
+    totalTokens: null,
+    peakContext: null,
+    minutes: null,
+    usd: null,
+    capped: false,
+    failedOverTo: null,
+  };
+}
+
 const REQUIRED_FIELDS = ['seat', 'model', 'totalTokens', 'peakContext', 'minutes'];
+// The same rule for a seat billed against an allowance: the same "no blank
+// line" gate, on the figures that seat actually has. The allowance replaces the
+// token fields; it does not excuse them.
+const REQUIRED_ALLOWANCE_FIELDS = ['seat', 'model', 'minutes'];
 
 // A blank cost line for any seat FAILS the step. This is the check that makes
 // that true rather than hoped for.
 export function assertCostLineComplete(line) {
-  // The one exception, and it is an explicit mark rather than an absence: a
-  // worker that never started spent nothing and has no session to read.
+  // The two explicit exceptions: a worker that never started spent nothing,
+  // and a possibly-running worker whose figures could not be read carries an
+  // explicit read-failure reason. Neither is an uncosted blank line.
   if (line?.neverStarted === true) {
     if (!line.seat) throw new Error('a never-started cost line must still name its seat');
     return line;
   }
-  const blank = REQUIRED_FIELDS.filter((field) => {
+  if (line?.readFailed === true) {
+    if (!line.seat) throw new Error('a read-failed cost line must still name its seat');
+    return line;
+  }
+  const required = line?.billing === 'allowance' ? REQUIRED_ALLOWANCE_FIELDS : REQUIRED_FIELDS;
+  const blank = required.filter((field) => {
     const value = line?.[field];
     return value === null || value === undefined || value === '' || (typeof value === 'number' && !Number.isFinite(value));
   });
+  if (line?.billing === 'allowance') {
+    // At least one bucket has to carry a real figure. A bucket whose window
+    // rolled over mid-run is honestly `null` and says so on the line; a line on
+    // which EVERY bucket is null has measured nothing and is blank.
+    const used = Object.values(line.allowanceUsed ?? {});
+    if (used.length === 0 || !used.some((value) => Number.isFinite(value))) {
+      blank.push('allowanceUsed');
+    }
+  }
   if (blank.length > 0) {
     throw new Error(`the ${line?.seat ?? 'unnamed'} seat's cost line is blank in: ${blank.join(', ')} -- a blank cost line fails the step (JUL-98, 21 Sep: step 1's builder line came back blank because cleanup ran first)`);
   }
@@ -330,15 +455,34 @@ export function assertCostLineComplete(line) {
 
 const number = (value) => Number(value).toLocaleString('en-US');
 
+// The one place the cap/failover note is worded, so the allowance line and the
+// token line cannot drift apart.
+function capNoteOf(line) {
+  if (line.capped) return `hit its usage cap${line.failedOverTo ? `, failed over to ${line.failedOverTo}` : ''}`;
+  return line.failedOverTo ? `failed over to ${line.failedOverTo}` : 'no cap, no failover';
+}
+
 export function formatCostLine(line) {
   assertCostLineComplete(line);
   const seat = line.seat.charAt(0).toUpperCase() + line.seat.slice(1);
   if (line.neverStarted === true) {
     return `- **${seat}** -- never started -- no turn began, so there is no session to read a cost from: 0 tokens, $0.0000 (${line.reason ?? 'no turn was ever observed to start'})`;
   }
-  const capNote = line.capped
-    ? `hit its usage cap${line.failedOverTo ? `, failed over to ${line.failedOverTo}` : ''}`
-    : (line.failedOverTo ? `failed over to ${line.failedOverTo}` : 'no cap, no failover');
+  if (line.readFailed === true) {
+    return `- **${seat}** -- cost read failed: ${line.reason ?? 'cost could not be read'}`;
+  }
+  if (line.billing === 'allowance') {
+    const used = Object.entries(line.allowanceUsed)
+      .map(([bucket, fraction]) => {
+        const name = bucket.replace(/^gemini-/, '');
+        return Number.isFinite(fraction)
+          ? `${name} ${(fraction * 100).toFixed(2)}%`
+          : `${name} not measurable (the window reset mid-run)`;
+      })
+      .join(', ');
+    return `- **${seat}** -- ${line.model} -- allowance used: ${used} -- no token count is recorded for a ${line.vendor} seat -- ${line.minutes} min -- ${capNoteOf(line)}`;
+  }
+  const capNote = capNoteOf(line);
   const dollars = line.usd === null || line.usd === undefined ? 'not priced' : `$${Number(line.usd).toFixed(4)}`;
   return `- **${seat}** -- ${line.model} -- ${number(line.totalTokens)} tokens -- peak context ${number(line.peakContext)} -- ${line.minutes} min -- ${dollars} -- ${capNote}`;
 }

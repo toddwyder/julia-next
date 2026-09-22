@@ -149,6 +149,7 @@ test('modelLabelsFor derives one label per MODEL_SPECS entry, with the agent cod
     'builder-codex',
     'builder-deepseek-pro',
     'builder-deepseek-flash',
+    'builder-gemini-flash',
   ]);
   for (const agent of GRAPH_AGENTS) {
     assert.ok(!modelLabelsFor(agent.key).some((label) => label.includes('glm')), `${agent.key} must offer no GLM label (JUL-93)`);
@@ -181,11 +182,15 @@ test('each agent resolves to exactly one default model label and one Medium effo
   }
 });
 
-test('the team template names the DeepSeek Pro model the reviewer actually runs (JUL-98)', () => {
+test('the team template names the models the dispatched pair actually runs (JUL-98 step 6, amended 15:01:54Z)', () => {
+  // Gemini builds, DeepSeek (Command Code) reviews -- the seat table's own
+  // reading, carried into the labels the template pre-applies, so a card
+  // shows the pair that will run.
+  assert.deepEqual(defaultLabelsFor('feature-builder'), ['builder-gemini-flash', 'builder-effort-medium']);
   assert.deepEqual(defaultLabelsFor('adversarial-reviewer'), ['adversary-deepseek-pro', 'adversary-effort-medium']);
-  // The builders keep Claude; the evidence reviewer is not part of this decision.
-  assert.equal(defaultLabelsFor('feature-builder')[0], 'builder-claude-opus');
+  // The four seats the coordinator does not dispatch yet are untouched.
   assert.equal(defaultLabelsFor('evidence-reviewer')[0], 'evidence-codex');
+  assert.equal(defaultLabelsFor('defect-fixer')[0], 'fixer-claude-opus');
 });
 
 test('defaultLabelsFor rejects an unknown agent instead of silently returning nothing', () => {

@@ -13,12 +13,12 @@ test('the default seat table has the three seats this ticket names, each with a 
   }
 });
 
-test("the default table is exactly Todd's instruction: GLM is no seat default or backup", () => {
+test("the default table is exactly Todd's instruction, as amended 15:01:54Z: GLM is no seat default or backup, and the reviewer runs on DeepSeek through Command Code", () => {
   assert.deepEqual(SEAT_TABLE, {
     orchestrator: { primary: 'claude', backup: 'pi-deepseek' },
-    builder: { primary: 'claude', backup: 'pi-deepseek' },
+    builder: { primary: 'gemini', backup: 'claude' },
     reviewer: { primary: 'pi-deepseek', backup: 'codex' },
-    'feature-builder': { primary: 'claude', backup: 'pi-deepseek' },
+    'feature-builder': { primary: 'gemini', backup: 'claude' },
     'defect-fixer': { primary: 'claude', backup: 'pi-deepseek' },
     refactor: { primary: 'claude', backup: 'pi-deepseek' },
     'adversarial-reviewer': { primary: 'pi-deepseek', backup: 'codex' },
@@ -39,8 +39,11 @@ test('the six JUL-97 graph-agent seats have a primary and a backup, and the orig
   // The original three remain exactly what the coordinator and the
   // builder/reviewer family rule already depended on.
   assert.deepEqual(SEAT_TABLE.orchestrator, { primary: 'claude', backup: 'pi-deepseek' });
-  assert.deepEqual(SEAT_TABLE.builder, { primary: 'claude', backup: 'pi-deepseek' });
-  assert.deepEqual(SEAT_TABLE.reviewer, { primary: 'pi-deepseek', backup: 'codex' });
+  // The two DISPATCHED seats are what JUL-98 step 6 moved; the dispatch name
+  // and its agent key must never disagree, or a card would show one seat and
+  // run another.
+  assert.deepEqual(SEAT_TABLE.builder, SEAT_TABLE['feature-builder']);
+  assert.deepEqual(SEAT_TABLE.reviewer, SEAT_TABLE['adversarial-reviewer']);
 });
 
 test('GLM is gone: no family, and never a seat default or backup (JUL-93)', () => {
@@ -90,14 +93,35 @@ test('every table entry used by builder or reviewer has a known model family', (
   }
 });
 
-// JUL-98 (Todd's 21 Sep decision): DeepSeek is the reviewer's first choice and
-// Codex its backup, to protect the weekly Codex and Claude quotas. Neither is
-// the builder's default family, so a resolved pair always obeys the family rule.
-test('the reviewer seats default to DeepSeek and back up to Codex, never to the builder family', () => {
+// JUL-98 step 6, amended 15:01:54Z: THE READING OF THE TABLE, in one test.
+// Gemini builds; DeepSeek (through Command Code) reviews; Codex is the
+// reviewer's own backup. Four distinct families now sit on these two seats
+// (google, deepseek, anthropic, openai), so -- unlike the superseded
+// Claude-reviews reading this test used to pin -- EVERY combination of a
+// builder entry and a reviewer entry is already a different family. There is
+// no same-family collision left for this specific pair to fall back from;
+// the family guard's fallback machinery is still real (seat-table.test.mjs's
+// own synthetic-table tests above exercise it directly), it simply never
+// fires for builder/reviewer today.
+test('the seat table reads Gemini builds, DeepSeek (Command Code) reviews -- every builder/reviewer combination is already a different family', () => {
+  for (const seat of ['builder', 'feature-builder']) {
+    assert.deepEqual(SEAT_TABLE[seat], { primary: 'gemini', backup: 'claude' }, seat);
+  }
   for (const seat of ['reviewer', 'adversarial-reviewer']) {
     assert.deepEqual(SEAT_TABLE[seat], { primary: 'pi-deepseek', backup: 'codex' }, seat);
-    assert.notEqual(FAMILY_OF[SEAT_TABLE[seat].primary], FAMILY_OF[SEAT_TABLE.builder.primary], `${seat} primary`);
-    assert.notEqual(FAMILY_OF[SEAT_TABLE[seat].backup], FAMILY_OF[SEAT_TABLE.builder.primary], `${seat} backup`);
   }
-  assert.equal(SEAT_TABLE.builder.primary, 'claude', 'the builder stays Claude');
+  const builderFamilies = [FAMILY_OF[SEAT_TABLE.builder.primary], FAMILY_OF[SEAT_TABLE.builder.backup]];
+  const reviewerFamilies = [FAMILY_OF[SEAT_TABLE.reviewer.primary], FAMILY_OF[SEAT_TABLE.reviewer.backup]];
+  for (const b of builderFamilies) {
+    for (const r of reviewerFamilies) {
+      assert.notEqual(b, r, `builder family '${b}' must differ from reviewer family '${r}'`);
+    }
+  }
+});
+
+test('Gemini is a model family of its own, so it can never review its own work', () => {
+  assert.equal(FAMILY_OF.gemini, 'google');
+  for (const [entry, family] of Object.entries(FAMILY_OF)) {
+    if (entry !== 'gemini') assert.notEqual(family, 'google', `${entry} must not share Gemini's family`);
+  }
 });

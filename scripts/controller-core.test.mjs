@@ -234,10 +234,12 @@ test('an empty Ready column is a quiet no-op', async () => {
 const CAPPED_BUILDER = { cappedSeat: 'builder' };
 
 test('a capped builder moves its partner and the controller posts that reason as exactly ONE comment on the card', async () => {
-  // No model labels on the card, so the seat table answers: builder Claude,
-  // reviewer pi-deepseek. The builder's backup IS pi-deepseek, so the pair
-  // would collide and the reviewer moves to its own backup, Codex.
-  const jul92 = card({ identifier: 'JUL-92' });
+  // An explicit Claude reviewer label: the real default (DeepSeek, 15:01:54Z
+  // Decision) never collides with a Claude builder fallback on its own, so an
+  // explicit label is what still reaches the collision this test exercises.
+  // The builder's backup IS claude, so the pair would collide and the reviewer
+  // moves to its own backup, Codex (JUL-98 step 6).
+  const jul92 = card({ identifier: 'JUL-92', labels: ['adversary-claude-opus'] });
   const { board, comments, moves } = fakeBoard({ issues: [jul92] });
 
   const result = await runControllerCheck(deps({
@@ -249,11 +251,11 @@ test('a capped builder moves its partner and the controller posts that reason as
   assert.equal(result.status, 'started');
   assert.deepEqual(result.partnerMoved, {
     seat: 'reviewer',
-    from: 'pi-deepseek',
+    from: 'claude',
     to: 'codex',
     modelLabel: 'adversary-codex',
   });
-  assert.equal(result.seatChoices.builder.entry, 'pi-deepseek', 'the capped seat really did fall back');
+  assert.equal(result.seatChoices.builder.entry, 'claude', 'the capped seat really did fall back');
   assert.equal(result.seatChoices.reviewer.entry, 'codex');
 
   // Two comments in all: the column move, and the seat move. The seat one is
@@ -264,7 +266,7 @@ test('a capped builder moves its partner and the controller posts that reason as
   assert.equal(seatComments[0].issueId, jul92.id, 'posted on the card that was started');
   assert.equal(
     seatComments[0].body,
-    'the builder fell back to pi-deepseek, so the reviewer moved to its own backup adversary-codex to keep builder and reviewer in different families',
+    'the builder fell back to claude, so the reviewer moved to its own backup adversary-codex to keep builder and reviewer in different families',
   );
   assert.equal(comments.length, 2, 'the column move comment and this one, and nothing else');
   assert.deepEqual(moves, [{ issueId: jul92.id, to: 'Implementation' }]);
@@ -282,7 +284,7 @@ test('no partner move, no comment: a capped builder whose reviewer is already on
 
   assert.equal(result.status, 'started');
   assert.equal(result.partnerMoved, null, 'nothing else had to move');
-  assert.equal(result.seatChoices.builder.entry, 'pi-deepseek');
+  assert.equal(result.seatChoices.builder.entry, 'claude');
   assert.equal(comments.length, 1, 'only the column-move comment');
   assert.ok(!/moved to its own backup/.test(comments[0].body));
 });
@@ -300,7 +302,8 @@ test('a cycle with no capped seat resolves no fallback and posts no seat comment
 });
 
 test('the partner-move comment is written once even when the same cycle is replayed', async () => {
-  const jul92 = card({ identifier: 'JUL-92' });
+  // An explicit Claude reviewer, same reason as the test above.
+  const jul92 = card({ identifier: 'JUL-92', labels: ['adversary-claude-opus'] });
   const { board, comments } = fakeBoard({ issues: [jul92] });
   const orca = createFixtureOrca();
   const seen = new Map();
