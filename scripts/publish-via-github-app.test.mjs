@@ -1,8 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, createVerify } from 'node:crypto';
+import { writeFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
-import { base64url, getPublisherInstallationToken, mintAppJwt } from './publish-via-github-app.mjs';
+import {
+  base64url, getPublisherInstallationToken, mintAppJwt, loadPublisherCredentialFile,
+} from './publish-via-github-app.mjs';
 
 const { publicKey, privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
 const privateKeyPem = privateKey.export({ type: 'pkcs1', format: 'pem' }).toString();
@@ -101,6 +106,47 @@ test('a repo the App is not installed on fails clearly instead of falling back t
     ),
     /not installed on toddwyder\/julia-next/,
   );
+});
+
+// JUL-98 step 6 round 3, 13:0xZ: the coordinator's own session invoked
+// `node scripts/publish-pr.mjs push ...` without the `--env-file=...`
+// prefix the CLI grant requires, so the Bash permission matcher refused
+// the call outright and nothing could reach main() at all -- there was no
+// error message for this helper to improve on, because the process never
+// started. This loader is the structural fix: publish-pr.mjs/merge-pr.mjs
+// call it before doing anything else, so the credential is present
+// whether or not the invoking command remembered the flag.
+test('loadPublisherCredentialFile loads JULIA_PUBLISHER_* vars from a dotenv-style file into the given env object', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'publisher-env-'));
+  const filePath = join(dir, '.env.publisher');
+  writeFileSync(filePath, 'JULIA_PUBLISHER_APP_ID=4948330\nJULIA_PUBLISHER_APP_PRIVATE_KEY="fake-key"\n');
+  try {
+    const env = {};
+    loadPublisherCredentialFile(filePath, env);
+    assert.equal(env.JULIA_PUBLISHER_APP_ID, '4948330');
+    assert.equal(env.JULIA_PUBLISHER_APP_PRIVATE_KEY, 'fake-key');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('loadPublisherCredentialFile never overwrites a credential already present in env (an explicit --env-file wins)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'publisher-env-'));
+  const filePath = join(dir, '.env.publisher');
+  writeFileSync(filePath, 'JULIA_PUBLISHER_APP_ID=from-file\n');
+  try {
+    const env = { JULIA_PUBLISHER_APP_ID: 'from-explicit-flag' };
+    loadPublisherCredentialFile(filePath, env);
+    assert.equal(env.JULIA_PUBLISHER_APP_ID, 'from-explicit-flag');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('loadPublisherCredentialFile is a silent no-op when the file does not exist, so a dev machine or CI box is unaffected', () => {
+  const env = {};
+  assert.doesNotThrow(() => loadPublisherCredentialFile('/no/such/file/.env.publisher', env));
+  assert.equal(env.JULIA_PUBLISHER_APP_ID, undefined);
 });
 
 test('base64url encodes without padding or unsafe characters', () => {

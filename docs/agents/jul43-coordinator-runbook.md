@@ -460,15 +460,24 @@ the board work proved, and 9 about the coordinator's own tool grants.
    Bash(node scripts/check-readiness.mjs:*), Bash(node scripts/collect-worker-result.mjs:*),
    Bash(node scripts/verify-reviewer-worktree.mjs:*), Bash(node scripts/coordinator-events.mjs:*),
    Bash(node --env-file=/etc/orchestrator-svc/.env.publisher scripts/publish-pr.mjs:*),
+   Bash(node scripts/publish-pr.mjs:*),
    Bash(node --env-file=/etc/orchestrator-svc/.env.publisher scripts/merge-pr.mjs:*),
+   Bash(node scripts/merge-pr.mjs:*),
    Bash(orca *)
    ```
 
-   `publish-pr.mjs` and `merge-pr.mjs` sit behind the publisher env-file prefix. A script with no
-   grant cannot be run even though it sits in the checkout -- `scripts/board-setup.mjs`, for
-   example, has no grant yet. Adding a script to the skill's procedure means adding its grant in
-   `startOrchestrator` in the same PR (see "The headless launch needs its own tool grants"
-   below). `node -e` is NOT granted, and neither is `env`, `base64` or a `sudo` command. A
+   `publish-pr.mjs` and `merge-pr.mjs` are granted **both** with and without the publisher
+   env-file prefix (fixed 2026-09-22, "Seven findings" item 5 below has the incident) --
+   a session calling either the plain relative-path form (matching every other script on this
+   list) or the `--env-file` form reaches the script either way, and the script itself
+   self-loads the credential file when it isn't already in the environment
+   (`loadPublisherCredentialFile`), so neither form is missing the credential either. A script
+   with no grant at all still cannot be run even though it sits in the checkout --
+   `scripts/board-setup.mjs`, for example, has no grant yet. Adding a script to the skill's
+   procedure means adding its grant in `startOrchestrator` in the same PR (see "The headless
+   launch needs its own tool grants" below), **granted in the exact shape every session actually
+   calls it** -- when in doubt, grant the plain relative-path form alongside any credential-
+   prefixed form. `node -e` is NOT granted, and neither is `env`, `base64` or a `sudo` command. A
    coordinator that needs a one-off computation must use a granted script or an Orca terminal,
    not an inline node expression.
 
@@ -1056,8 +1065,46 @@ but **not** the `node --env-file=/etc/orchestrator-svc/.env.publisher scripts/ch
 form this runbook's own Bootstrap section shows. The `--env-file` prefix makes it a different
 command, so in an unattended run the documented invocation is refused. **Use the plain form**
 (`node scripts/check-readiness.mjs`) in a coordinator run; the `--env-file` prefix is for a
-laptop or interactive session, where it is granted by hand. Only `publish-pr.mjs` and
-`merge-pr.mjs` are granted with their `--env-file` prefix.
+laptop or interactive session, where it is granted by hand.
+
+**`publish-pr.mjs` and `merge-pr.mjs` are now granted in both forms (JUL-98 step 6, fixed
+2026-09-22 ~13:2xZ).** They used to be granted with the `--env-file` prefix only, which is the
+same trap as `check-readiness.mjs` above, pointed the other way: the JUL-98 step 6 round 3
+coordinator (13:0xZ) called `node scripts/publish-pr.mjs push ...` -- the plain form, matching
+the pattern every *other* granted script uses -- and the Bash permission matcher refused it
+outright, because that exact literal prefix had no grant. The push never ran; the round's work
+sat on the runner's disk, parked, until a laptop session diagnosed it (compare the transcript
+`"command":"node scripts/publish-pr.mjs push ..."` against the grant list of the session before
+it, which used the `--env-file` form and pushed fine). The **root cause was the same shape as
+the 04:37Z brace-group finding below ("Laptop session: relaunched twice...")**: an exact-literal-
+prefix permission grant refuses any invocation shape it wasn't written for, and nothing forces a session
+to remember which shape a given script needs.
+
+The fix has two parts, both merged in the same PR as this runbook entry -- fixing only the grant
+list would have left the credential itself still silently absent for the plain form, and fixing
+only the credential loading would have left the plain form refused before it ever reached that
+code:
+
+1. **The grant list now allows both invocation shapes** for `publish-pr.mjs` and `merge-pr.mjs`:
+   `Bash(node --env-file=/etc/orchestrator-svc/.env.publisher scripts/publish-pr.mjs:*)` AND
+   `Bash(node scripts/publish-pr.mjs:*)` (same pair for `merge-pr.mjs`) -- see
+   `orchestratorLaunchCommandFor` in `scripts/julia-run.mjs`.
+2. **Both scripts now self-load the credential file** (`loadPublisherCredentialFile` in
+   `scripts/publish-via-github-app.mjs`, called before `main()`) when it is not already in the
+   process's environment, using `node:util`'s `parseEnv` -- the same parser Node's own
+   `--env-file` flag uses, so a value it reads matches what `--env-file` would have produced,
+   including a PEM private key's embedded newlines. An explicit `--env-file` or a pre-set env var
+   still wins; this only fills a gap, never overwrites. In practice `julia-run.mjs`'s own
+   `ENV_PREFIX` already sources `/etc/orchestrator-svc/.env.publisher` into the coordinator's
+   shell before `claude` starts (`set -a; . <file>; set +a`), so the plain form already worked at
+   the process-environment level once the grant itself stopped refusing it -- the self-load is
+   belt-and-suspenders for any future invocation shape that does not inherit that shell (a bare
+   `node scripts/publish-pr.mjs ...` run some other way).
+
+Both `publish-pr.mjs`/`merge-pr.mjs` and any future script added to the grant list should be
+granted in the exact form every session actually calls it -- when in doubt, grant the plain
+relative-path form (matching the majority of the list) alongside any credential-prefixed form,
+rather than assuming a session will remember to type the longer one.
 
 ### 6. "The board already matches the spec" could be true while the board offered a removed model
 
@@ -1994,6 +2041,46 @@ provider; a full review on it cost about three cents. There is no fifth seat bes
 - A DeepSeek builder paired with this DeepSeek reviewer is the same model family; the family guard
   in `scripts/seat-labels.mjs` (`fallback`), not this file, is what refuses that pair.
 
+## Builders run on Gemini, started by hand (JUL-98, Todd's 13:51Z Decision, 2026-09-22)
+
+Claude's weekly allowance was forecast to run out Thursday morning, before Friday's reset. Until
+the controller can start a Gemini worker itself (JUL-98 step 6, in progress), **the coordinator
+starts Gemini (Antigravity, `agy`) builders by hand**, from the next dispatch, through the same
+start-then-adopt route step 6's own build brief describes for the controller:
+
+1. Start `agy` in the worker's fresh worktree and **wait until it has fully started** before
+   doing anything else with it -- the same wait step 6's round-1 review (JUL-98 card, finding 3,
+   2026-09-22 06:2xZ) named for the controller's own route: adopting a Pi/Gemini terminal too
+   early loses the task text while still reporting `input_accepted` (also recorded above under
+   "Adopting a Pi terminal with `worker-start --terminal` while Pi is still starting loses the
+   task text").
+2. **Pre-trust the new worktree in `agy`'s trust list before starting it** -- not after. An
+   untrusted worktree blocks on a trust prompt no headless session can answer.
+3. **Hand it over to Orca with `worker-start --terminal <handle>`** once started, not
+   `worker-start --agent`, the same distinction the Pi/DeepSeek paragraph above draws for that
+   seat's own launch shape.
+4. **Never deliver the handover's own placeholder text as the task.** The real brief -- the step's
+   concrete acceptance criteria -- is the one thing sent, not boilerplate left over from adopting
+   the terminal.
+5. **One report through the mailbox**, exactly as every other seat -- no polling a screen to guess
+   whether Gemini is done.
+6. **The cost line is read the same way as any other seat's**, not skipped or estimated: model,
+   tokens, peak context, minutes, and Gemini's allowance used goes on the line like every other
+   worker's.
+
+**Reviews stay on Codex, not Claude**, until the GOAT reviewer trial (Todd's 13:43Z Decision,
+same day) is live -- reviewing a Gemini builder's work with Claude would burn the very allowance
+this Decision exists to protect. **The coordinator itself stays Claude** -- this Decision is about
+the builder seat only, not the orchestrator seat in `SEAT_TABLE.orchestrator`. **The family rule
+is unchanged**: Codex (`openai`) reviewing a Gemini builder is a different family either way, so
+the existing `assertCanPickDifferentFamilies` guard in `graph/seat-table.mjs` is not violated by
+this by-hand override -- it is not itself a seat-table code change, since `SEAT_TABLE.builder`
+still names `claude`/`pi-deepseek`; Gemini is chosen by the coordinator at dispatch time until
+step 6 gives the controller its own Gemini entry to read.
+
+**Boundaries carried over unchanged from the 04:07Z Decision:** no new spend, the firewall rule
+stays runner-only, the family rule is unchanged.
+
 ## Seven findings carried from the cancelled JUL-106 (recorded 2026-09-20)
 
 JUL-106 (the watchdog) was cancelled after three rejected rounds; its detection code had been
@@ -2024,8 +2111,9 @@ and 5 on the pinned version before relying on them.**
 4. **What a queue-launched coordinator may actually run.** `scripts/julia-run.mjs` grants
    `Bash(orca *)` plus a fixed list of `node scripts/<name>.mjs` (`orca-cli`, `ready-queue`,
    `seat-labels`, `linear-cli`, `check-readiness`, `collect-worker-result`,
-   `verify-reviewer-worktree`, `coordinator-events`, and the two publisher scripts under
-   `--env-file=/etc/orchestrator-svc/.env.publisher`). So no `node -e`, no bare binary path, no
+   `verify-reviewer-worktree`, `coordinator-events`, and the two publisher scripts, each granted
+   both plainly and under `--env-file=/etc/orchestrator-svc/.env.publisher` (JUL-98 step 6, fixed
+   2026-09-22 -- see "The coordinator's granted command list refuses..." above). So no `node -e`, no bare binary path, no
    `base64`, `printenv`, `ls`, or `git` outside its own checkout. `scripts/orca-cli.mjs` exposes
    only `run-list`, `task-list` and `worker-show` on the command line. **Every dispatch action goes
    through the `orca` binary on PATH.** The coordinator skill's examples are written as

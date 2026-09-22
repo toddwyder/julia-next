@@ -17,7 +17,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { getPublisherInstallationToken } from './publish-via-github-app.mjs';
+import { getPublisherInstallationToken, loadPublisherCredentialFile } from './publish-via-github-app.mjs';
 
 // A fresh Codex review of PR #3 (2026-09-16) found that spreading the
 // caller's full environment into the git subprocess handed the App's own
@@ -236,5 +236,12 @@ async function main() {
 
 import { pathToFileURL } from 'node:url';
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  // JUL-98 step 6 round 3 (13:0xZ): a coordinator session called this
+  // script without the CLI grant's documented --env-file prefix, so
+  // JULIA_PUBLISHER_APP_ID/_PRIVATE_KEY were simply unset. Loading the
+  // well-known credential file here -- before anything else runs, and
+  // only when the caller hasn't already set the vars -- means a session
+  // that forgets the flag still works, not just one that remembers it.
+  loadPublisherCredentialFile();
   main();
 }
