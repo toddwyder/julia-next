@@ -678,6 +678,21 @@ depends on, restart both daemons before the next dispatch that needs it — a pr
 supplementary groups are fixed at daemon start, not re-read live. Always verify secret access for
 a seat by reading it FROM INSIDE an Orca-spawned terminal, never from an SSH login.
 
+**This pattern recurred for real, three real controller-started dispatches in a row (JUL-98,
+2026-09-22): `commandcode-readers` was created at 14:18:06Z, both Orca daemons had
+`ActiveEnterTimestamp: 12:25:04Z` — 1h53m earlier — so every terminal either daemon spawned since
+then lacked the group, and `run-pi-seat.mjs`'s `readSecret('commandcode')` threw an uncaught
+`EACCES` before `pi` ever launched. `pi` never drew a TUI, so `terminal wait --for tui-idle`
+correctly waited out its full timeout and reported `agent_readiness`/`timeout` — the exact shape
+of "never starts from the controller" while the identical command typed by hand (a fresh login,
+current groups) worked every time.** `check-readiness.mjs`'s `worker terminal groups match
+/etc/group` check (`defaultGroupDriftCheckImpl`, added the same day) now catches exactly this,
+inside a single Orca-spawned terminal: `id -Gn` (this process's own groups, frozen at the owning
+daemon's start) compared against a fresh `getent group` read (what `/etc/group` says right now,
+independent of this process's frozen credentials). A group present in the second reading and
+absent from the first names the daemon to restart, before a real dispatch pays for it with a
+timed-out reviewer.
+
 ### Gemini (agy): Orca's adopt route hit a broken `agent_readiness` gate, and the fix drops the adopt route entirely (JUL-98/JUL-100, 2026-09-22)
 
 **Symptom.** The by-hand "start agy, wait until fully started, hand over with `worker-start

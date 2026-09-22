@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { checkReadiness, defaultRelayCheckImpl, getEnvironment } from './check-readiness.mjs';
+import { checkReadiness, defaultRelayCheckImpl, defaultGroupDriftCheckImpl, getEnvironment } from './check-readiness.mjs';
 
 function fakes({
   runtimeReachable = true,
@@ -9,6 +9,7 @@ function fakes({
   projectRegistered = true,
   publisherInstalled = true,
   relayReachable = true,
+  groupsMatch = true,
 } = {}) {
   return {
     orcaStatusImpl: async () => ({
@@ -27,6 +28,9 @@ function fakes({
     relayCheckImpl: async () => (relayReachable
       ? { reachable: true, detail: 'sent:true' }
       : { reachable: false, detail: 'curl on the OVH runner could not reach 127.0.0.1:8943' }),
+    groupDriftCheckImpl: async () => (groupsMatch
+      ? { ok: true, detail: 'this terminal\'s groups match /etc/group (ACTUAL:runner,deepseek-readers,commandcode-readers,)' }
+      : { ok: false, detail: 'this terminal is missing commandcode-readers, though /etc/group lists them for this account right now -- the Orca daemon ... was very likely started before that group existed' }),
   };
 }
 
@@ -37,7 +41,20 @@ test('all checks pass -> ok: true', async () => {
   assert.ok(result.checks.some((c) => c.name === 'julia-next project registered'));
   assert.ok(result.checks.some((c) => c.name === 'julia-graph-publisher installed on julia-next'));
   assert.ok(result.checks.some((c) => c.name === 'journey-relay reachable'));
+  assert.ok(result.checks.some((c) => c.name === 'worker terminal groups match /etc/group'));
   assert.ok(result.checks.every((c) => c.ok));
+});
+
+test('a stale-supplementary-groups daemon fails clearly and by name, not silently (JUL-44/JUL-98)', async () => {
+  const result = await checkReadiness({ ...fakes({ groupsMatch: false }) });
+  assert.equal(result.ok, false);
+  const groups = result.checks.find((c) => c.name === 'worker terminal groups match /etc/group');
+  assert.equal(groups.ok, false);
+  assert.match(groups.detail, /commandcode-readers/);
+  assert.match(groups.detail, /started before that group existed/);
+  // Every other check still passes -- one drifted daemon is not read as the
+  // whole environment being down.
+  assert.equal(result.checks.find((c) => c.name === 'OVH runner reachable').ok, true);
 });
 
 test('OVH runner unreachable fails clearly and by name', async () => {
@@ -101,6 +118,59 @@ test('an Orca CLI failure (not installed, environment not paired) is its own fai
   });
   assert.equal(result.ok, false);
   assert.ok(result.checks.some((c) => !c.ok && /not paired/.test(c.detail)));
+});
+
+test('defaultGroupDriftCheckImpl passes when the probe reports no missing groups', async () => {
+  const result = await defaultGroupDriftCheckImpl({
+    terminalCreateImpl: async () => ({ terminal: { handle: 'term_abc' } }),
+    terminalReadImpl: async ({ terminal }) => {
+      assert.equal(terminal, 'term_abc');
+      return {
+        terminal: {
+          handle: 'term_abc',
+          tail: [
+            '$ u=$(id -un); ...',
+            'ACTUAL:commandcode-readers,deepseek-readers,runner,',
+            'EXPECTED:commandcode-readers,deepseek-readers,runner,',
+            'MISSING:',
+            '$',
+          ],
+        },
+      };
+    },
+  });
+  assert.equal(result.ok, true);
+  assert.match(result.detail, /ACTUAL:/);
+});
+
+test('defaultGroupDriftCheckImpl fails, naming exactly the missing group, when the daemon is stale (JUL-44/JUL-98)', async () => {
+  const result = await defaultGroupDriftCheckImpl({
+    terminalCreateImpl: async () => ({ terminal: { handle: 'term_abc' } }),
+    terminalReadImpl: async () => ({
+      terminal: {
+        handle: 'term_abc',
+        tail: [
+          '$ u=$(id -un); ...',
+          'ACTUAL:deepseek-readers,runner,',
+          'EXPECTED:commandcode-readers,deepseek-readers,runner,',
+          'MISSING:commandcode-readers,',
+          '$',
+        ],
+      },
+    }),
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.detail, /commandcode-readers/);
+  assert.match(result.detail, /restart/i);
+});
+
+test('defaultGroupDriftCheckImpl refuses to guess when the probe printed no MISSING line at all', async () => {
+  const result = await defaultGroupDriftCheckImpl({
+    terminalCreateImpl: async () => ({ terminal: { handle: 'term_abc' } }),
+    terminalReadImpl: async () => ({ terminal: { handle: 'term_abc', tail: ['$ some unrelated crash', '$'] } }),
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.detail, /no MISSING line/);
 });
 
 test('getEnvironment() defaults to "OVH runner" but ORCA_ENVIRONMENT overrides it, so this check can target a different Orca pairing (e.g. orchestrator-svc\'s own local "ovh-local" pairing, JUL-61 step 7)', () => {

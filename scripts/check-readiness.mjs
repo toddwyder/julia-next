@@ -103,11 +103,64 @@ export async function defaultRelayCheckImpl({
   return { reachable: false, detail: `journey-relay at 127.0.0.1:8943 did not confirm delivery: ${output || '(no output)'}` };
 }
 
+// THE STALE-SUPPLEMENTARY-GROUPS CHECK (JUL-44's pattern, recurred for real
+// on JUL-98: a `commandcode-readers` group created after both Orca daemons
+// had already started left every terminal either daemon spawned unable to
+// read the `commandcode` secret -- three real controller-started reviewer
+// dispatches died on it, each timing out at `agent_readiness` because `pi`
+// crashed on an uncaught EACCES before ever drawing its TUI. A person typing
+// the same command by hand always got a FRESH login, with the group already
+// applied, so it worked for them every time and never for the controller.
+// This check catches that class of drift before a real dispatch pays for it.
+//
+// THE COMPARISON, done inside ONE Orca-spawned terminal so both sides are
+// read the same way the bug actually bites: `id -Gn` is this PROCESS's own
+// supplementary groups, fixed at the moment the Orca daemon that owns this
+// terminal itself started (never re-read live, no matter how long the
+// daemon has been up since). `getent group` is a fresh NSS/file lookup that
+// costs nothing to run and reflects `/etc/group` as it stands RIGHT NOW,
+// independent of this process's own frozen credential set. A group present
+// in the second reading but absent from the first is exactly a daemon that
+// needs restarting -- and this check finds it before a run, not after three
+// failed attempts.
+export async function defaultGroupDriftCheckImpl({
+  terminalCreateImpl = terminalCreate,
+  terminalReadImpl = terminalRead,
+} = {}) {
+  const command = 'u=$(id -un); actual=$(id -Gn | tr " " "\\n" | sort -u); '
+    + 'expected=$(getent group | awk -F: -v u="$u" \'{n=split($4,a,","); for(i=1;i<=n;i++) if(a[i]==u) print $1}\' | sort -u); '
+    + 'missing=$(comm -13 <(echo "$actual") <(echo "$expected")); '
+    + 'echo "ACTUAL:$(echo $actual | tr "\\n" ",")"; '
+    + 'echo "EXPECTED:$(echo $expected | tr "\\n" ",")"; '
+    + 'echo "MISSING:$(echo $missing | tr "\\n" ",")"';
+  const created = await terminalCreateImpl({
+    environment: getEnvironment(),
+    worktree: 'path:/home/runner/julia-next',
+    command,
+    title: 'readiness-group-drift-check',
+  });
+  const read = await terminalReadImpl({ environment: getEnvironment(), terminal: created.terminal.handle });
+  const output = (read.terminal.tail ?? []).join('\n');
+  const missingLine = /MISSING:([^\n]*)/.exec(output);
+  if (!missingLine) {
+    return { ok: false, detail: `the group-drift probe printed no MISSING line -- nothing to read and nothing is guessed: ${output || '(no output)'}` };
+  }
+  const missing = missingLine[1].split(',').map((s) => s.trim()).filter(Boolean);
+  if (missing.length === 0) {
+    return { ok: true, detail: `this terminal's groups match /etc/group (${(/ACTUAL:[^\n]*/.exec(output) ?? [''])[0]})` };
+  }
+  return {
+    ok: false,
+    detail: `this terminal is missing ${missing.join(', ')}, though /etc/group lists them for this account right now -- the Orca daemon that spawned this terminal was very likely started before that group existed (the JUL-44/JUL-98 stale-supplementary-groups pattern). Restart the daemon that owns the "${getEnvironment()}" environment (checking first that no worker is mid-run) and re-check. Raw: ${output}`,
+  };
+}
+
 export async function checkReadiness({
   orcaStatusImpl = defaultOrcaStatusImpl,
   orcaProjectSetupsImpl = defaultOrcaProjectSetupsImpl,
   publisherCheckImpl = defaultPublisherCheckImpl,
   relayCheckImpl = defaultRelayCheckImpl,
+  groupDriftCheckImpl = defaultGroupDriftCheckImpl,
 } = {}) {
   const checks = [];
 
@@ -147,6 +200,13 @@ export async function checkReadiness({
     checks.push(check('journey-relay reachable', reachable, detail));
   } catch (error) {
     checks.push(check('journey-relay reachable', false, error.message));
+  }
+
+  try {
+    const { ok: groupsOk, detail } = await groupDriftCheckImpl();
+    checks.push(check('worker terminal groups match /etc/group', groupsOk, detail));
+  } catch (error) {
+    checks.push(check('worker terminal groups match /etc/group', false, error.message));
   }
 
   return { ok: checks.every((c) => c.ok), checks };
