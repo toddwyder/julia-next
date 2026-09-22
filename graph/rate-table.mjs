@@ -115,18 +115,10 @@ export const RATE_TABLE = {
       allowanceGroup: 'Gemini Models',
       allowanceBuckets: ['gemini-weekly', 'gemini-5h'],
       plan: 'Google AI Pro',
-      source: 'agy -p "/usage" --output-format json on this host (agy 1.2.7/1.2.8); model id from `agy models`',
-      checkedOn: '2026-09-22',
-    },
-    'gemini-3.1-pro': {
-      vendor: 'gemini',
-      billing: 'allowance',
-      allowanceGroup: 'Gemini Models',
-      allowanceBuckets: ['gemini-weekly', 'gemini-5h'],
-      plan: 'Google AI Pro',
-      // Same two buckets: agy's own /usage answer says Flash and Pro share one
-      // group ("Models within this group: Gemini Flash, Gemini Pro"), so a Pro
-      // seat draws down the same weekly and 5-hour limits a Flash seat does.
+      // Flash and Pro share this group -- agy's own /usage answer says so
+      // ("Models within this group: Gemini Flash, Gemini Pro") -- so a Pro seat
+      // would draw down the same two buckets. Only the model a seat actually
+      // runs is listed: a rate with no seat behind it is a price nobody checks.
       source: 'agy -p "/usage" --output-format json on this host (agy 1.2.7/1.2.8); model id from `agy models`',
       checkedOn: '2026-09-22',
     },

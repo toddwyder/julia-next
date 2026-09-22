@@ -239,8 +239,18 @@ export function deepseekExtractFromSeatStream(events, { startedAt, endedAt } = {
 
 // Two `/usage` readings, one taken before the worker was started and one after
 // it reported, differenced per bucket. `before`/`after` are
-// `{ <bucket id>: remaining_fraction }` -- which is what ./cost-read.mjs's
+// `{ <bucket id>: { remaining, resetTime } }` -- which is what ./cost-read.mjs's
 // `geminiAllowanceFromUsage` pulls out of agy's own answer.
+//
+// THE RESET TIME IS THERE FOR ONE REASON. A bucket's window can roll over in
+// the middle of a run -- agy's 5-hour limit does so every five hours -- and the
+// two readings then measure different windows, so their difference is not what
+// the seat spent. Subtracting anyway gives a NEGATIVE number, which clamped at
+// zero reads as "this seat spent nothing": a blank cost line in a plausible
+// costume, which is the one failure this whole module exists to stop. agy
+// reports `reset_time` per bucket, so the rollover is a FACT, not a guess: a
+// bucket whose reset time moved is reported as not measurable (`null`), and
+// `assertCostLineComplete` below then requires at least one bucket that IS.
 //
 // WHY THERE ARE NO TOKENS ON THIS LINE. There is no token record to read: see
 // graph/rate-table.mjs's `gemini-3.8-flash` entry for the search. The line says
@@ -256,14 +266,14 @@ export function geminiExtractFromAllowance({ model, before, after, startedAt, en
     throw new Error('geminiExtractFromAllowance: no allowance reading was taken before the worker started, so nothing can be differenced -- the reading is taken at dispatch, before the agent runs');
   }
   const allowanceUsed = {};
-  for (const [bucket, remainingBefore] of Object.entries(before)) {
-    const remainingAfter = after?.[bucket];
-    if (!Number.isFinite(remainingAfter)) {
+  for (const [bucket, readingBefore] of Object.entries(before)) {
+    const readingAfter = after?.[bucket];
+    if (!Number.isFinite(readingAfter?.remaining)) {
       throw new Error(`geminiExtractFromAllowance: the after reading has no '${bucket}' bucket, so its allowance cannot be differenced -- refusing to guess`);
     }
-    // Clamped at zero: a bucket that RESET between the two readings (agy's
-    // 5-hour window rolls over) would otherwise show as negative spend.
-    allowanceUsed[bucket] = Math.max(0, remainingBefore - remainingAfter);
+    allowanceUsed[bucket] = readingAfter.resetTime === readingBefore.resetTime
+      ? readingBefore.remaining - readingAfter.remaining
+      : null;
   }
   return {
     vendor: 'gemini',
@@ -389,8 +399,11 @@ export function assertCostLineComplete(line) {
     return value === null || value === undefined || value === '' || (typeof value === 'number' && !Number.isFinite(value));
   });
   if (line?.billing === 'allowance') {
-    const buckets = Object.entries(line.allowanceUsed ?? {});
-    if (buckets.length === 0 || buckets.some(([, used]) => !Number.isFinite(used))) {
+    // At least one bucket has to carry a real figure. A bucket whose window
+    // rolled over mid-run is honestly `null` and says so on the line; a line on
+    // which EVERY bucket is null has measured nothing and is blank.
+    const used = Object.values(line.allowanceUsed ?? {});
+    if (used.length === 0 || !used.some((value) => Number.isFinite(value))) {
       blank.push('allowanceUsed');
     }
   }
@@ -417,7 +430,12 @@ export function formatCostLine(line) {
   }
   if (line.billing === 'allowance') {
     const used = Object.entries(line.allowanceUsed)
-      .map(([bucket, fraction]) => `${bucket.replace(/^gemini-/, '')} ${(fraction * 100).toFixed(2)}%`)
+      .map(([bucket, fraction]) => {
+        const name = bucket.replace(/^gemini-/, '');
+        return Number.isFinite(fraction)
+          ? `${name} ${(fraction * 100).toFixed(2)}%`
+          : `${name} not measurable (the window reset mid-run)`;
+      })
       .join(', ');
     return `- **${seat}** -- ${line.model} -- allowance used: ${used} -- no token count is recorded for a ${line.vendor} seat -- ${line.minutes} min -- ${capNoteOf(line)}`;
   }

@@ -22,7 +22,7 @@
 
 import { pathToFileURL } from 'node:url';
 
-import { prepareSeatWorktree } from '../graph/controller/cost-read.mjs';
+import { prepareSeatWorktree } from '../graph/controller/seat-worktree.mjs';
 
 export const USAGE = 'usage: node scripts/prepare-seat-worktree.mjs --seat <seat> --agent <agy|pi> --worktree <path>';
 

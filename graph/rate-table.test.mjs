@@ -252,8 +252,8 @@ test('the real transcript repeats messages and carries a user line with output_t
 // dollar figure, and costOf refuses instead of returning a plausible zero.
 // ---------------------------------------------------------------------------
 
-test('the dispatched Gemini models are in the table, declared as allowance-billed', () => {
-  for (const id of ['gemini-3.8-flash', 'gemini-3.1-pro']) {
+test('the dispatched Gemini model is in the table, declared as allowance-billed', () => {
+  for (const id of ['gemini-3.8-flash']) {
     const entry = RATE_TABLE.models[id];
     assert.ok(entry, `graph/rate-table.mjs has no entry for the dispatched model id ${id}`);
     assert.equal(entry.vendor, 'gemini');

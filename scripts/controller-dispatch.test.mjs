@@ -436,3 +436,15 @@ test('a terminal still busy after the brief was delivered is proof; one that wen
   assert.match(idle.reason, /idle/);
   assert.match(idle.reason, /trust|login/i, 'and it names what an idle terminal looks like');
 });
+
+test('an adopt entry whose launch command cannot be built is REFUSED, never interpolated as undefined', () => {
+  // The Pi route picks its seat launcher from the model, and `run-pi-seat.mjs`
+  // knows three seats. A model outside that map used to interpolate `undefined`
+  // into a shell command that would then have run.
+  const refusal = launchForChoice({ entry: 'pi-deepseek', modelLabel: 'builder-deepseek-turbo', effort: 'medium' });
+  assert.equal(refusal.ok, false);
+  assert.match(refusal.reason, /deepseek-turbo/);
+  // And the two real ones still build.
+  assert.match(launchForChoice({ entry: 'pi-deepseek', modelLabel: 'adversary-deepseek-pro', effort: 'medium' }).command, /reviewer-backup/);
+  assert.match(launchForChoice({ entry: 'pi-deepseek', modelLabel: 'builder-deepseek-flash', effort: 'medium' }).command, /builder-backup/);
+});

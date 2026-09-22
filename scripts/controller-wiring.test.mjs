@@ -21,8 +21,8 @@ import {
   createSeatCostReader,
   createOrcaSeatCostReader,
   costReadCommand,
-  costReadExitCode,
-  COST_READ_END_MARKER,
+  workerScriptExitCode,
+  WORKER_SCRIPT_END_MARKER,
   COST_TERMINAL_TITLE_PREFIX,
   createPublisher,
   claudeProjectDirName,
@@ -379,7 +379,7 @@ function costTerminal({ screens, created = CREATED_TERMINAL, closeThrows = null 
 }
 
 const PROMPT = 'runner@vps-ce27cb55:~/orca/workspaces/julia-next/jul-92-work$';
-const done = (code) => `${COST_READ_END_MARKER}:${code}`;
+const done = (code) => `${WORKER_SCRIPT_END_MARKER}:${code}`;
 // A real seat cost line, as scripts/read-seat-cost.mjs prints it: one line,
 // JSON, nothing else. Built through the same seatCostLine() the script uses.
 const GOOD_LINE = JSON.stringify(seatCostLine({
@@ -404,7 +404,7 @@ test('the cost read is an orca terminal on the WORKER daemon, in the candidate w
   assert.match(create.command, /--seat 'builder'/);
   assert.match(create.command, /--agent 'claude'/);
   assert.match(create.command, /--worktree '\/home\/runner\/orca\/workspaces\/julia-next\/jul-92-work'/);
-  assert.ok(create.command.endsWith(`; echo "${COST_READ_END_MARKER}:$?"`), 'and the end marker that carries the exit status out');
+  assert.ok(create.command.endsWith(`; echo "${WORKER_SCRIPT_END_MARKER}:$?"`), 'and the end marker that carries the exit status out');
 });
 
 test('the three worker-terminal boundaries name the RUNNER daemon, and close closes ONE pane', async () => {
@@ -515,10 +515,10 @@ test('a close that itself fails does not hide the real reason the read failed', 
 });
 
 test('the end marker is read from the shell, never from the echo of the command that contains it', () => {
-  const echoed = `${PROMPT} node scripts/read-seat-cost.mjs --seat 'builder' --agent 'claude' --worktree '/w'; echo "${COST_READ_END_MARKER}:$?"`;
-  assert.equal(costReadExitCode([echoed]), null, 'the echoed command line is not an answer');
-  assert.equal(costReadExitCode([echoed, done(0)]), 0);
-  assert.equal(costReadExitCode([echoed, done(0), done(7)]), 7, 'the last marker wins');
+  const echoed = `${PROMPT} node scripts/read-seat-cost.mjs --seat 'builder' --agent 'claude' --worktree '/w'; echo "${WORKER_SCRIPT_END_MARKER}:$?"`;
+  assert.equal(workerScriptExitCode([echoed]), null, 'the echoed command line is not an answer');
+  assert.equal(workerScriptExitCode([echoed, done(0)]), 0);
+  assert.equal(workerScriptExitCode([echoed, done(0), done(7)]), 7, 'the last marker wins');
   assert.match(costReadCommand({ seat: 'builder', agent: 'claude', worktreePath: '/w' }), /^node '\/w\/scripts\/read-seat-cost\.mjs'/);
   assert.throws(() => costReadCommand({ seat: "b'; rm -rf /; #", agent: 'claude', worktreePath: '/w' }), /refusing to build a shell command with a quote/);
 });
@@ -1021,8 +1021,8 @@ const GEMINI_BUCKETS = ['gemini-weekly', 'gemini-5h'];
 test('the Gemini allowance is read out of agy\'s own /usage answer, by bucket id', () => {
   const allowance = geminiAllowanceFromUsage(AGY_USAGE, { buckets: GEMINI_BUCKETS });
   assert.deepEqual(Object.keys(allowance).sort(), ['gemini-5h', 'gemini-weekly']);
-  assert.equal(allowance['gemini-weekly'], 0.9935215711593628);
-  assert.equal(allowance['gemini-5h'], 0.9634851813316345);
+  assert.deepEqual(allowance['gemini-weekly'], { remaining: 0.9935215711593628, resetTime: '2026-09-28T20:01:29Z' });
+  assert.deepEqual(allowance['gemini-5h'], { remaining: 0.9634851813316345, resetTime: '2026-09-22T07:59:45Z' });
   // The Claude/GPT group agy also reports is NOT ours to spend or to report.
   assert.ok(!('3p-weekly' in allowance));
 });
@@ -1082,7 +1082,7 @@ test('scripts/prepare-seat-worktree.mjs writes the trust entry and prints EXACTL
     const answer = JSON.parse(out[0]);
     assert.equal(answer.trusted, true);
     assert.equal(answer.added, true);
-    assert.equal(answer.allowance['gemini-weekly'], 0.9935215711593628);
+    assert.equal(answer.allowance['gemini-weekly'].remaining, 0.9935215711593628);
     // The file it wrote is agy's own, at agy's own path.
     const written = JSON.parse(readFileSync(join(home, '.gemini/antigravity-cli/settings.json'), 'utf8'));
     assert.deepEqual(written.trustedWorkspaces, ['/home/runner/orca/workspaces/julia-next/jul98-6']);
@@ -1201,4 +1201,27 @@ test('a terminal wait that fails for any OTHER reason still throws, so a real fa
     orcaCallImpl: async () => { throw new Error('orca terminal wait ... failed (terminal_handle_stale): gone'); },
   });
   await assert.rejects(() => boundaries.terminalWaitImpl({ terminal: 'term_seat', timeoutMs: 8000 }), /terminal_handle_stale/);
+});
+
+test('a worktree the trust write did NOT actually land in is reported untrusted, not assumed trusted', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'jul98-prepare-bad-'));
+  const out = [];
+  const err = [];
+  let exit = 0;
+  try {
+    await prepareMain(['--seat', 'builder', '--agent', 'agy', '--worktree', '/home/runner/orca/workspaces/julia-next/jul98-6'], {
+      out: (text) => out.push(text),
+      err: (text) => err.push(text),
+      setExitCode: (code) => { exit = code; },
+      workerHome: home,
+      readAllowanceImpl: async () => AGY_USAGE,
+      // The write silently does nothing -- a read-only home, a full disk.
+      writeFileImpl: () => {},
+    });
+    assert.equal(out.length, 0, 'nothing is printed that could be read as prepared');
+    assert.equal(exit, 1);
+    assert.match(err.join(''), /trust/i);
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
 });

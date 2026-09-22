@@ -33,10 +33,19 @@
 // sitting on a trust or login screen -- the 19-20 September failure -- is idle
 // at both readings and is caught.
 //
-// ITS ONE BLIND SPOT, stated rather than hidden: a turn that BEGINS AND ENDS
-// inside the short busy window reads as idle, and is then reported as never
-// started. That is the safe direction (a seat falls back; nothing is waited on
-// for hours) and it cannot happen for a real step, which takes minutes.
+// ITS BLIND SPOTS, both of them, stated rather than hidden. The busy reading is
+// taken once, inside a short window (./adopt.mjs DEFAULT_BUSY_WINDOW_MS), so:
+//
+//   * a turn that BEGINS AND ENDS inside that window reads as idle and is
+//     reported as never started. The live run of 2026-09-22 took 26 s against
+//     an 8 s window, and a real step takes minutes, so the margin is wide --
+//     but it is a margin, not a guarantee;
+//   * a turn that has not BEGUN inside the window -- an agent slower to pick
+//     the brief up than the window is long -- reads the same way.
+//
+// Both fail the same, safe way: the seat is reported never-started, falls back
+// through the seat table, and nothing is waited on for hours. The cost is a
+// wasted worker, which is what the 19-20 September failure cost eight hours of.
 //
 // TWO RECORDED PROOFS, AND NO THIRD, for a seat Orca DOES observe. There is
 // exactly one other recording in

@@ -132,7 +132,6 @@ export const MODEL_SPECS = Object.freeze({
   // CLI takes `--model gemini-3.8-flash --effort high`, so the effort label
   // stays the one place effort is chosen (checked on this host, agy 1.2.7).
   'gemini-flash': { entry: 'gemini', model: 'gemini-3.8-flash' },
-  'gemini-pro': { entry: 'gemini', model: 'gemini-3.1-pro' },
 });
 
 // The model each seat-table entry runs when the card names none (the

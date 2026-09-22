@@ -656,7 +656,8 @@ export const COST_TERMINAL_TITLE_PREFIX = 'julia-cost-';
 // same reason -- a human looking at Orca's terminal list can tell what it is.
 export const PREPARE_TERMINAL_TITLE_PREFIX = 'julia-prepare-';
 
-// THE END MARKER, and why completion is not `terminal wait`. A plain terminal
+// THE END MARKER for BOTH worker-side scripts (the cost read and the worktree
+// preparation), and why completion is not `terminal wait`. A plain terminal
 // is NOT finished when `terminal wait` says so: `--for tui-idle` answers
 // `satisfied: true` at once even mid-run (recorded live: satisfied after 2.5 s
 // on a terminal still running `sleep 90`), and `--for exit` only ever times out
@@ -667,7 +668,7 @@ export const PREPARE_TERMINAL_TITLE_PREFIX = 'julia-prepare-';
 // shape the prompt happens to have: the shell prints the marker only once it
 // has the command's exit status in `$?`, i.e. only once the prompt is back, and
 // it carries that status out with it.
-export const COST_READ_END_MARKER = '__JULIA_COST_READ_DONE__';
+export const WORKER_SCRIPT_END_MARKER = '__JULIA_WORKER_SCRIPT_DONE__';
 
 // Single-quoted for the shell, and a value that could break out of the quoting
 // is refused rather than interpolated.
@@ -677,34 +678,44 @@ function shellArg(value, what) {
   return `'${text}'`;
 }
 
-export function costReadCommand({ seat, agent, worktreePath, model = null, allowanceBefore = null, startedAt = null, endedAt = null }) {
-  let script = `node ${shellArg(`${worktreePath}/scripts/read-seat-cost.mjs`, 'the worktree path')}`
+// ONE builder for both worker-side scripts, because they are the same shape:
+// a node call out of the candidate worktree, carrying the seat, the agent and
+// the worktree, then the marker carrying its exit status. `extra` is whatever
+// one of them needs on top; every value goes through `shellArg`, which refuses
+// anything that could break out of the quoting rather than interpolating it.
+export function workerScriptCommand({ script, seat, agent, worktreePath, extra = {} }) {
+  let line = `node ${shellArg(`${worktreePath}/scripts/${script}`, 'the worktree path')}`
     + ` --seat ${shellArg(seat, 'the seat')} --agent ${shellArg(agent, 'the agent')} --worktree ${shellArg(worktreePath, 'the worktree path')}`;
-  // An allowance-billed seat (agy) has no session file, so its figure is the
-  // difference between the reading taken at dispatch and one taken now. The
-  // first reading travels here; shellArg refuses anything that could break out
-  // of the quoting rather than interpolating it.
-  if (model) script += ` --model ${shellArg(model, 'the model')}`;
-  if (allowanceBefore) script += ` --allowance-before ${shellArg(JSON.stringify(allowanceBefore), 'the allowance reading')}`;
-  if (startedAt) script += ` --started-at ${shellArg(startedAt, 'the start time')}`;
-  if (endedAt) script += ` --ended-at ${shellArg(endedAt, 'the end time')}`;
-  return `${script}; echo "${COST_READ_END_MARKER}:$?"`;
+  for (const [flag, value] of Object.entries(extra)) {
+    if (value === null || value === undefined) continue;
+    line += ` --${flag} ${shellArg(typeof value === 'string' ? value : JSON.stringify(value), `the ${flag}`)}`;
+  }
+  return `${line}; echo "${WORKER_SCRIPT_END_MARKER}:$?"`;
 }
 
-// The same shape for the worktree-preparation script: one node call out of the
-// candidate worktree, then the marker carrying its exit status.
+// An allowance-billed seat (agy) has no session file, so its figure is the
+// difference between the reading taken at dispatch and one taken now: that
+// first reading, and the controller's own clock around the worker, travel here.
+export function costReadCommand({ seat, agent, worktreePath, model = null, allowanceBefore = null, startedAt = null, endedAt = null }) {
+  return workerScriptCommand({
+    script: 'read-seat-cost.mjs',
+    seat,
+    agent,
+    worktreePath,
+    extra: { model, 'allowance-before': allowanceBefore, 'started-at': startedAt, 'ended-at': endedAt },
+  });
+}
+
 export function prepareCommand({ seat, agent, worktreePath }) {
-  const script = `node ${shellArg(`${worktreePath}/scripts/prepare-seat-worktree.mjs`, 'the worktree path')}`
-    + ` --seat ${shellArg(seat, 'the seat')} --agent ${shellArg(agent, 'the agent')} --worktree ${shellArg(worktreePath, 'the worktree path')}`;
-  return `${script}; echo "${COST_READ_END_MARKER}:$?"`;
+  return workerScriptCommand({ script: 'prepare-seat-worktree.mjs', seat, agent, worktreePath });
 }
 
 // The marker as the shell printed it, anchored, so the ECHO of the command --
 // which also contains the marker text, inside quotes, after the node call --
 // can never be mistaken for the answer.
-const END_MARKER_LINE = new RegExp(`^${COST_READ_END_MARKER}:(\\d+)$`);
+const END_MARKER_LINE = new RegExp(`^${WORKER_SCRIPT_END_MARKER}:(\\d+)$`);
 
-export function costReadExitCode(lines) {
+export function workerScriptExitCode(lines) {
   for (let i = lines.length - 1; i >= 0; i -= 1) {
     const match = END_MARKER_LINE.exec(String(lines[i]).trim());
     if (match) return Number(match[1]);
@@ -717,7 +728,7 @@ export function costReadExitCode(lines) {
 // is a prompt, the echoed command or (on failure) stderr. A line that opens
 // like JSON and will not parse is a REFUSAL, never a skip -- skipping it would
 // walk on to "no line at all", which says the wrong thing about what broke.
-export function costLineFromTerminalLines(lines, { seat, what = 'cost read' }) {
+export function jsonLineFromTerminalLines(lines, { seat, what = 'cost read' }) {
   const candidates = lines.map((line) => String(line).trim()).filter((line) => line.startsWith('{'));
   if (candidates.length === 0) {
     throw new Error(`the ${seat} seat's ${what} printed no JSON line -- the worker-side script prints exactly one on success, so there is nothing to read and nothing is guessed`);
@@ -797,10 +808,10 @@ export async function runWorkerScript({
       const read = answer?.terminal ?? {};
       for (const line of read.tail ?? []) lines.push(String(line));
       if (read.nextCursor !== null && read.nextCursor !== undefined) cursor = read.nextCursor;
-      exitCode = costReadExitCode(lines);
+      exitCode = workerScriptExitCode(lines);
       if (exitCode !== null) break;
       if (now() >= deadline) {
-        throw new Error(`the ${seat} seat's ${what} did not finish within ${timeoutMs} ms -- no "${COST_READ_END_MARKER}" line came back from the worker terminal, so nothing was read and nothing is guessed`);
+        throw new Error(`the ${seat} seat's ${what} did not finish within ${timeoutMs} ms -- no "${WORKER_SCRIPT_END_MARKER}" line came back from the worker terminal, so nothing was read and nothing is guessed`);
       }
       await sleepImpl(pollMs);
     }
@@ -808,7 +819,7 @@ export async function runWorkerScript({
       const tail = lines.filter((line) => !END_MARKER_LINE.test(line.trim())).slice(-5).join(' | ');
       throw new Error(`the ${seat} seat's ${what} failed on the worker: the script exited ${exitCode} -- ${tail || 'it printed nothing'}`);
     }
-    return costLineFromTerminalLines(lines, { seat, what });
+    return jsonLineFromTerminalLines(lines, { seat, what });
   } finally {
     // Even on the failure path. A close that itself fails is said out loud and
     // does not replace the real reason.

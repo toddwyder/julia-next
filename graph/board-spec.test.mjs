@@ -150,7 +150,6 @@ test('modelLabelsFor derives one label per MODEL_SPECS entry, with the agent cod
     'builder-deepseek-pro',
     'builder-deepseek-flash',
     'builder-gemini-flash',
-    'builder-gemini-pro',
   ]);
   for (const agent of GRAPH_AGENTS) {
     assert.ok(!modelLabelsFor(agent.key).some((label) => label.includes('glm')), `${agent.key} must offer no GLM label (JUL-93)`);

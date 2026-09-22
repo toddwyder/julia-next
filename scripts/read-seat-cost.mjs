@@ -50,14 +50,15 @@ export function parseArgs(argv) {
 // The whole script as a function, so the test drives it without a subprocess
 // and still proves the one-line contract: `out` is called once, with one line.
 export async function readSeatCostToJsonLine(argv, { readSeatCostImpl = createSeatCostReader() } = {}) {
-  const { seat, agent, worktree, model = null } = parseArgs(argv);
+  const args = parseArgs(argv);
+  const { seat, agent, worktree, model = null } = args;
   if (!seat || !agent || !worktree) throw new Error(`read-seat-cost: --seat, --agent and --worktree are all required. ${USAGE}`);
   // An allowance-billed seat (agy) has no session file: its figure is the
   // difference between the reading taken at dispatch -- handed in here -- and
   // one taken now. A malformed reading is a refusal, never an empty object,
   // which would say the seat spent nothing.
   let allowanceBefore = null;
-  const raw = parseArgs(argv)['allowance-before'];
+  const raw = args['allowance-before'];
   if (raw !== undefined) {
     try {
       allowanceBefore = JSON.parse(raw);
@@ -71,8 +72,8 @@ export async function readSeatCostToJsonLine(argv, { readSeatCostImpl = createSe
     agent,
     model,
     allowanceBefore,
-    startedAt: parseArgs(argv)['started-at'] ?? null,
-    endedAt: parseArgs(argv)['ended-at'] ?? null,
+    startedAt: args['started-at'] ?? null,
+    endedAt: args['ended-at'] ?? null,
   });
   return JSON.stringify(line);
 }

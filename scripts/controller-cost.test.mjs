@@ -315,8 +315,18 @@ test('the Claude seat extract works on the real transcript as it is read off dis
 // is still blank and still fails the step.
 // ---------------------------------------------------------------------------
 
-const BEFORE = { 'gemini-weekly': 0.9935215711593628, 'gemini-5h': 0.9634851813316345 };
-const AFTER = { 'gemini-weekly': 0.9870215711593628, 'gemini-5h': 0.9269851813316345 };
+// Each reading carries its bucket's reset time, so a window that rolled over
+// between the two is a fact rather than a guess (see the rollover test below).
+const WEEKLY_RESET = '2026-09-28T20:01:29Z';
+const FIVE_HOUR_RESET = '2026-09-22T07:59:45Z';
+const BEFORE = {
+  'gemini-weekly': { remaining: 0.9935215711593628, resetTime: WEEKLY_RESET },
+  'gemini-5h': { remaining: 0.9634851813316345, resetTime: FIVE_HOUR_RESET },
+};
+const AFTER = {
+  'gemini-weekly': { remaining: 0.9870215711593628, resetTime: WEEKLY_RESET },
+  'gemini-5h': { remaining: 0.9269851813316345, resetTime: FIVE_HOUR_RESET },
+};
 
 test('a Gemini seat is costed in the allowance it used, read before and after its own run', () => {
   const extract = geminiExtractFromAllowance({
@@ -354,7 +364,7 @@ test('an allowance reading that did not move is zero used, not a missing line', 
 test('a bucket the after-reading does not have is refused rather than differenced against nothing', () => {
   assert.throws(
     () => geminiExtractFromAllowance({
-      model: 'gemini-3.8-flash', before: BEFORE, after: { 'gemini-weekly': 0.98 },
+      model: 'gemini-3.8-flash', before: BEFORE, after: { 'gemini-weekly': { remaining: 0.98, resetTime: WEEKLY_RESET } },
       startedAt: '2026-09-22T06:00:00Z', endedAt: '2026-09-22T06:01:00Z',
     }),
     /gemini-5h/,
@@ -385,4 +395,36 @@ test('the Gemini line the card gets says the allowance used and that no token co
   assert.match(text, /5h 3\.65%/);
   assert.match(text, /12\.4 min/);
   assert.match(text, /no token count is recorded/i);
+});
+
+// A bucket whose window ROLLS OVER between the two readings. agy's own answer
+// carries `reset_time`, so this is detectable rather than guessable -- and the
+// difference is then meaningless: `Math.max(0, before - after)` would print
+// "5h 0.00%", which is the blank cost line in a plausible costume.
+const BEFORE_STAMPED = {
+  'gemini-weekly': { remaining: 0.9935215711593628, resetTime: '2026-09-28T20:01:29Z' },
+  'gemini-5h': { remaining: 0.2, resetTime: '2026-09-22T07:59:45Z' },
+};
+const AFTER_ROLLED = {
+  'gemini-weekly': { remaining: 0.9870215711593628, resetTime: '2026-09-28T20:01:29Z' },
+  'gemini-5h': { remaining: 0.99, resetTime: '2026-09-22T12:59:45Z' },
+};
+
+test('a bucket whose window reset mid-run is reported as not measurable, never as zero spend', () => {
+  const extract = geminiExtractFromAllowance({
+    model: 'gemini-3.8-flash', before: BEFORE_STAMPED, after: AFTER_ROLLED,
+    startedAt: '2026-09-22T07:50:00Z', endedAt: '2026-09-22T08:05:00Z',
+  });
+  assert.equal(Number(extract.allowanceUsed['gemini-weekly'].toFixed(6)), 0.0065);
+  assert.equal(extract.allowanceUsed['gemini-5h'], null, 'not a zero');
+  assert.match(formatCostLine(seatCostLine({ seat: 'builder', ...extract })), /5h not measurable/);
+  assert.match(formatCostLine(seatCostLine({ seat: 'builder', ...extract })), /weekly 0\.65%/);
+});
+
+test('a line whose EVERY bucket rolled over has no figure at all, so it is blank and fails the step', () => {
+  const line = seatCostLine({
+    seat: 'builder', vendor: 'gemini', model: 'gemini-3.8-flash', billing: 'allowance',
+    minutes: 15, allowanceUsed: { 'gemini-weekly': null, 'gemini-5h': null },
+  });
+  assert.throws(() => assertCostLineComplete(line), /allowanceUsed/);
 });

@@ -23,9 +23,12 @@
 // The standing orders themselves live in those files and are not repeated here;
 // a second copy would drift.
 //
-// WHAT THIS MODULE DOES NOT DO. It does not decide that the worker started.
+// WHAT THIS MODULE DOES NOT DO. It does not JUDGE whether the worker started.
 // `worker-start` answers `stage: "input_accepted"` even for a start that went
-// on to succeed, so proof is ./turn-start.mjs's job and the caller's.
+// on to succeed, so the verdict is ./turn-start.mjs's job and the caller's.
+// On the adopt route the dispatch does CARRY an observation (`observed`),
+// because Orca can answer nothing about such a worker afterwards -- but it is
+// a reading passed along, not a verdict reached here.
 
 import { MODEL_CATALOG } from '../../scripts/seat-labels.mjs';
 import { wasReplayed } from './inflight.mjs';
@@ -51,11 +54,11 @@ export const LAUNCH_MODEL_IDS = Object.freeze({
   codex: 'gpt-6-astra',
   'deepseek-v4-pro': 'deepseek-v4-pro',
   'deepseek-v4-flash': 'deepseek-v4-flash',
-  // JUL-98 step 6. These are `agy models`' own ids, and graph/rate-table.mjs
-  // holds an entry for each -- an allowance entry rather than a per-token
-  // price, because that is how the seat is actually billed.
+  // JUL-98 step 6. `agy models`' own id, and graph/rate-table.mjs holds an
+  // entry for it -- an allowance entry rather than a per-token price, because
+  // that is how the seat is actually billed. ONE Gemini model, which is what
+  // the step asked for: a second would be a label nothing resolves to.
   'gemini-3.8-flash': 'gemini-3.8-flash',
-  'gemini-3.1-pro': 'gemini-3.1-pro',
 });
 
 // The seat-table entry -> the `--agent` name Orca launches. It is a short list
@@ -96,7 +99,12 @@ const ADOPTED_ENTRIES = Object.freeze({
     // The repo's own seat launcher, in its interactive mode: it is what reads
     // the DeepSeek key in-process, and reusing it keeps ONE place that knows
     // how a Pi seat authenticates.
-    command: ({ model, effort }) => `node ops/service-dropbox/run-pi-seat.mjs ${PI_SEAT_ROUTE[model]} --interactive --effort ${effort}`,
+    // A model outside `PI_SEAT_ROUTE` has no seat to launch, so this returns
+    // NOTHING and `launchForChoice` refuses. It used to interpolate
+    // `undefined` into a shell command that would then have run.
+    command: ({ model, effort }) => (PI_SEAT_ROUTE[model]
+      ? `node ops/service-dropbox/run-pi-seat.mjs ${PI_SEAT_ROUTE[model]} --interactive --effort ${effort}`
+      : null),
   }),
 });
 
@@ -129,13 +137,14 @@ export function launchForChoice(choice) {
   }
   const effort = choice.effort;
   if (agent) return { route: 'agent', agent, model, effort };
-  return {
-    route: 'adopt',
-    agent: adopted.agent,
-    command: adopted.command({ model, effort }),
-    model,
-    effort,
-  };
+  const command = adopted.command({ model, effort });
+  if (!command) {
+    // The same refusal shape, for the same reason as a missing launch model id:
+    // a seat that cannot be launched must say so, not be launched into a shape
+    // nothing supports.
+    return { ok: false, reason: `no ${adopted.agent} launch command is known for model ${JSON.stringify(model)} (model label ${JSON.stringify(choice.modelLabel)})` };
+  }
+  return { route: 'adopt', agent: adopted.agent, command, model, effort };
 }
 
 function bullets(items) {

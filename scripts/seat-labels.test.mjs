@@ -590,7 +590,9 @@ test('the partner move can be switched off, and then the old refusal stands', ()
 
 test('Gemini is in the model catalogue, with a vendor model id agy can actually be launched on', () => {
   assert.deepEqual(MODEL_SPECS['gemini-flash'], { entry: 'gemini', model: 'gemini-3.8-flash' });
-  assert.deepEqual(MODEL_SPECS['gemini-pro'], { entry: 'gemini', model: 'gemini-3.1-pro' });
+  // ONE Gemini model, and only one: the step asked for a Gemini entry, and a
+  // second label nothing resolves to would be a rate nobody checks.
+  assert.deepEqual(Object.keys(MODEL_SPECS).filter((s) => s.startsWith('gemini-')), ['gemini-flash']);
   // Derived, so every agent offers it.
   assert.deepEqual(MODEL_CATALOG['builder-gemini-flash'], { entry: 'gemini', model: 'gemini-3.8-flash' });
   assert.equal(MODEL_LABELS.BUILDER_GEMINI_FLASH, 'builder-gemini-flash');
