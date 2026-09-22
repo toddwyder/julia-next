@@ -43,6 +43,15 @@ import { fallbackSeatChoice } from '../../scripts/seat-labels.mjs';
 // stall of 19-20 September.
 export const DEFAULT_RECONCILE_WAIT_MS = 30000;
 
+// How many deliveries that reconciliation may read before it gives up, whatever
+// the clock says. The budget above bounds TIME, and a mailbox that answers
+// instantly -- a replay storm, or a long poll that returns without consuming
+// its timeout -- barely spends any, so time alone bounds nothing. Round 2's
+// `maxWaits: 1` was a hard cap on reads and removing it removed that bound:
+// this replaces it. Eight is well past what a controller carrying one card at a
+// time puts on its own mailbox in half a minute, and far short of a spin.
+export const DEFAULT_RECONCILE_MAX_READS = 8;
+
 // One seat, one step.
 export async function runWorkerStep({
   seat,
@@ -82,10 +91,12 @@ export async function runWorkerStep({
   reconcileOptions = {},
   // The controller's own clock, for a seat whose vendor records no duration.
   now = () => new Date().toISOString(),
-  // The elapsed-time clock the reconciliation's budget is measured on, in
-  // milliseconds. Injected only so a test can spend that budget without
-  // sleeping through it; nothing else reads it.
-  monotonicNow = () => Date.now(),
+  // The clock the reconciliation's budget is measured on, in milliseconds.
+  // `Date.now()` is the wall clock, so a clock step could lengthen or shorten
+  // the look -- which is why the budget is not the only bound on it
+  // (DEFAULT_RECONCILE_MAX_READS above). Injected only so a test can spend the
+  // budget without sleeping through it; nothing else reads it.
+  clockMs = () => Date.now(),
 } = {}) {
   // 1. A fresh worker.
   const dispatched = await dispatchWorker({
@@ -226,11 +237,17 @@ export async function runWorkerStep({
     // given only what is left of it. The never-started case is unchanged --
     // an expired wait that carried nothing at all still answers at once, in one
     // read -- and the busy-mailbox case can now cost the budget and no more.
-    const { timeoutMs: reconcileBudgetMs = DEFAULT_RECONCILE_WAIT_MS, ...reconcileRest } = reconcileOptions;
-    const reconcileDeadline = monotonicNow() + reconcileBudgetMs;
+    const {
+      timeoutMs: reconcileBudgetMs = DEFAULT_RECONCILE_WAIT_MS,
+      maxReads: reconcileMaxReads = DEFAULT_RECONCILE_MAX_READS,
+      ...reconcileRest
+    } = reconcileOptions;
+    const reconcileDeadline = clockMs() + reconcileBudgetMs;
     const reconciledMessages = [];
     let reconciled = null;
     let fromThisWorker = [];
+    let reads = 0;
+    let mirrorFailures = 0;
     let remainingMs = reconcileBudgetMs;
 
     for (;;) {
@@ -243,13 +260,10 @@ export async function runWorkerStep({
         initialAck,
         maxWaits: 1,
         ...reconcileRest,
-        timeoutMs: Math.min(reconcileBudgetMs, Math.max(remainingMs, 0)),
+        timeoutMs: remainingMs,
       });
-      // Each delivery is acknowledged by the NEXT read (JUL-109 section 4a:
-      // "a waiter that does not ack will keep waking on old news"), so a
-      // foreign delivery wakes this look once and never again -- which is also
-      // what stops it spinning on the same message until the budget is gone.
-      initialAck = reconciled.acknowledged;
+      reads += 1;
+      mirrorFailures += reconciled.mirrorFailures ?? 0;
       reconciledMessages.push(...(reconciled.messages ?? []));
       fromThisWorker = reconciledMessages.filter((message) => message.dispatchId === dispatched.dispatchId);
       if (reconciled.outcome != null || fromThisWorker.length > 0) break;
@@ -257,14 +271,29 @@ export async function runWorkerStep({
       // towards one: there is no traffic to read past. It is the never-started
       // reading, and it is given at once rather than after the budget.
       if ((reconciled.messages ?? []).length === 0) break;
-      remainingMs = reconcileDeadline - monotonicNow();
+      // READING ON IS ONLY POSSIBLE WHILE A DELIVERY CAN BE ACKNOWLEDGED.
+      // ./mailbox.mjs takes its ack from the delivery's own id, and JUL-109
+      // section 4a is that an unacknowledged delivery "will keep waking the
+      // next check --wait". A delivery carrying messages but no id to
+      // acknowledge therefore comes back identical however often it is asked
+      // for, so asking again learns nothing and merely spins for the budget.
+      if (reconciled.acknowledged == null) break;
+      // Each delivery is acknowledged by the NEXT read, so a foreign delivery
+      // wakes this look once and not again.
+      initialAck = reconciled.acknowledged;
+      // TWO BOUNDS, because one is not enough. The budget bounds a mailbox that
+      // makes this look WAIT; the read cap bounds one that answers INSTANTLY,
+      // where the clock barely moves and the budget alone would allow a spin.
+      if (reads >= reconcileMaxReads) break;
+      remainingMs = reconcileDeadline - clockMs();
       if (remainingMs <= 0) break;
     }
 
     if (reconciled?.outcome != null) {
-      // Everything heard on the way, not just the delivery that carried the
-      // verdict: the foreign ones were mirrored and they belong in the record.
-      heard = { ...reconciled, messages: reconciledMessages };
+      // EVERYTHING HEARD ON THE WAY, not just the delivery that carried the
+      // verdict: the foreign ones were mirrored too, and a mirror that failed
+      // while hearing one is part of this step's record as much as any other.
+      heard = { ...reconciled, messages: reconciledMessages, mirrorFailures, waits: reads };
     } else if (fromThisWorker.length > 0) {
       // `initialAck` is already chained to the last delivery read above, so the
       // ordinary wait below starts where this look stopped.

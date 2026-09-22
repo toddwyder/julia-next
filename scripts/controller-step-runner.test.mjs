@@ -15,7 +15,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { runWorkerStep, runBuildAndReview, attemptTag, DEFAULT_RECONCILE_WAIT_MS } from '../graph/controller/step-runner.mjs';
+import { runWorkerStep, runBuildAndReview, attemptTag, DEFAULT_RECONCILE_WAIT_MS, DEFAULT_RECONCILE_MAX_READS } from '../graph/controller/step-runner.mjs';
 import { createSuiteRunner } from '../graph/controller/test-run.mjs';
 import { createFixtureWorkerOrca, loadOrcaFixture } from '../graph/controller/fixture-orca.mjs';
 import { turnStartedFromSend } from '../graph/controller/turn-start.mjs';
@@ -857,7 +857,7 @@ test('a foreign delivery that arrives while this worker is silent does not exten
   // stop this whole step exists to prevent (the eight-hour sleep of 19-20
   // September) cannot come back through a busy mailbox.
   const clock = { now: 0 };
-  h.deps.monotonicNow = () => clock.now;
+  h.deps.clockMs = () => clock.now;
   const waits = [];
   h.deps.checkWaitImpl = async (options) => {
     waits.push(options);
@@ -878,7 +878,7 @@ test('a foreign delivery that arrives while this worker is silent does not exten
   });
 
   assert.equal(waits.length, 3, 'it read on while the budget lasted, and stopped when it was spent');
-  assert.equal(waits[1].timeoutMs, 20000, 'each read is given only the time the budget has left, so the whole look stays bounded');
+  assert.equal(waits[1].timeoutMs, DEFAULT_RECONCILE_WAIT_MS - 10000, 'each read is given only the time the budget has left, so the whole look stays bounded');
   assert.equal(clock.now, DEFAULT_RECONCILE_WAIT_MS, 'and the whole reconciliation cost exactly its budget, not a wait per delivery');
   assert.equal(result.ok, false);
   assert.equal(result.stage, 'turn-start');
@@ -915,4 +915,123 @@ test('each foreign delivery is acknowledged, so the same one cannot wake the rec
 
   assert.equal(result.outcome, 'succeeded', result.reason);
   assert.deepEqual(acks, [null, 'delivery_1'], 'the second read acknowledges the delivery the first one consumed');
+});
+
+// Round 3, found by /code-review on this very change: reading ON past a
+// foreign delivery is only possible while each delivery can be ACKNOWLEDGED.
+// `waitForWorkerDone` takes its ack from `batch.deliveryId` (mailbox.mjs), and
+// Orca's own recorded answers do carry a null one
+// (graph/fixtures/orca-1.4.205/check-wait.empty-inbox-timeout.json). A delivery
+// that carries messages but no id to acknowledge comes back identical on the
+// next read -- so reading again learns nothing and simply spins `orca
+// orchestration check --wait` for the whole budget. The look stops on it
+// instead: the verdict is the same one round 2 reached on that input, without
+// the hot loop.
+test('a foreign delivery that cannot be acknowledged is read once, not spun on for the whole budget', async () => {
+  const h = harness();
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+  h.deps.adoptBoundaries = { ...h.deps.adoptBoundaries, terminalWaitImpl: async () => ({ wait: { satisfied: true } }) };
+  h.deps.observeStartImpl = async () => { throw new Error('worktree ps must not be asked'); };
+  // A clock that does not move, so the time budget cannot be what stops this:
+  // only refusing to re-read an unacknowledgeable delivery can.
+  h.deps.clockMs = () => 0;
+
+  let call = 0;
+  h.deps.checkWaitImpl = async () => {
+    call += 1;
+    if (call > 20) throw new Error(`the same unacknowledgeable delivery was read ${call} times: the reconciliation is spinning`);
+    return {
+      runId: ALL.runId,
+      deliveryId: null,
+      messages: [doneMessage('ctx_another_card_entirely', 'succeeded')],
+      count: 1,
+      timedOut: false,
+    };
+  };
+
+  const result = await runWorkerStep({
+    seat: 'builder', card: CARD, step: STEP, choice: resolveSeatChoices([]).builder,
+    worktreeName: 'jul98-6', requestId: 'JUL-98:step-6:builder',
+    suiteRunner, suiteKey: 'JUL-98:step-6', runSuite: false, ...h.deps,
+  });
+
+  assert.equal(call, 1, 'it is read once; re-reading it can only return the same news');
+  assert.equal(result.ok, false);
+  assert.equal(result.stage, 'turn-start');
+  assert.equal(result.cost.neverStarted, true);
+});
+
+// Round 3, the other half of the same /code-review finding: a delivery that
+// CAN be acknowledged but arrives instantly -- a replay storm, or a long poll
+// that returns without consuming its timeout -- barely moves the clock, so the
+// time budget alone bounds nothing. Round 2's `maxWaits: 1` was a hard cap on
+// reads and this change removed it; a cap on reads replaces it.
+test('a storm of foreign deliveries that costs no time is still bounded: the look reads at most its cap', async () => {
+  const h = harness();
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+  h.deps.adoptBoundaries = { ...h.deps.adoptBoundaries, terminalWaitImpl: async () => ({ wait: { satisfied: true } }) };
+  h.deps.observeStartImpl = async () => { throw new Error('worktree ps must not be asked'); };
+  // The clock never moves, so the budget can never be what stops this.
+  h.deps.clockMs = () => 0;
+
+  let call = 0;
+  h.deps.checkWaitImpl = async () => {
+    call += 1;
+    if (call > DEFAULT_RECONCILE_MAX_READS + 20) throw new Error(`the reconciliation read ${call} deliveries: it is spinning, not bounded`);
+    return {
+      runId: ALL.runId,
+      // Acknowledgeable, and different every time: the ack rule cannot stop it.
+      deliveryId: `delivery_${call}`,
+      messages: [doneMessage(`ctx_another_card_${call}`, 'succeeded')],
+      count: 1,
+      timedOut: false,
+    };
+  };
+
+  const result = await runWorkerStep({
+    seat: 'builder', card: CARD, step: STEP, choice: resolveSeatChoices([]).builder,
+    worktreeName: 'jul98-6', requestId: 'JUL-98:step-6:builder',
+    suiteRunner, suiteKey: 'JUL-98:step-6', runSuite: false, ...h.deps,
+  });
+
+  assert.equal(call, DEFAULT_RECONCILE_MAX_READS, 'the cap, not the clock, is what ends a look that costs no time');
+  assert.equal(result.ok, false);
+  assert.equal(result.stage, 'turn-start');
+  assert.equal(result.cost.neverStarted, true);
+});
+
+// Round 3, spec half: every message heard on the way belongs in the step's
+// record, and so does every mirror that failed while hearing it. Round 3's
+// first cut carried only the LAST delivery's counts.
+test('what the reconciliation heard on the way is all reported: every message, every failed mirror, every read', async () => {
+  const h = harness();
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+  h.deps.adoptBoundaries = { ...h.deps.adoptBoundaries, terminalWaitImpl: async () => ({ wait: { satisfied: true } }) };
+  h.deps.observeStartImpl = async () => { throw new Error('worktree ps must not be asked'); };
+  // The relay is down for the foreign delivery and back for this worker's own.
+  let mirrored = 0;
+  h.deps.mirrorImpl = async () => { mirrored += 1; if (mirrored === 1) throw new Error('relay refused'); };
+
+  let call = 0;
+  h.deps.checkWaitImpl = async () => {
+    call += 1;
+    const mine = `ctx_937abab903ae-${h.orca.workersStarted()}`;
+    return {
+      runId: ALL.runId,
+      deliveryId: `delivery_${call}`,
+      messages: call === 1 ? [doneMessage('ctx_another_card_entirely', 'succeeded')] : [doneMessage(mine, 'succeeded')],
+      count: 1,
+      timedOut: false,
+    };
+  };
+
+  const result = await runWorkerStep({
+    seat: 'builder', card: CARD, step: STEP, choice: resolveSeatChoices([]).builder,
+    worktreeName: 'jul98-6', requestId: 'JUL-98:step-6:builder',
+    suiteRunner, suiteKey: 'JUL-98:step-6', runSuite: false, ...h.deps,
+  });
+
+  assert.equal(result.outcome, 'succeeded', result.reason);
+  assert.equal(result.messages.length, 2, 'the foreign delivery was heard and is in the record, not dropped');
+  assert.equal(result.mirrorFailures, 1, 'the relay failure on the foreign delivery is counted, not lost with the delivery that carried it');
 });
