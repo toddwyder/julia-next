@@ -61,7 +61,7 @@ import { orcaCall } from '../../scripts/orca-cli.mjs';
 import { findActiveRun } from '../../scripts/ready-queue.mjs';
 import { pushBranch, openPullRequest } from '../../scripts/publish-pr.mjs';
 import { mergePullRequest } from '../../scripts/merge-pr.mjs';
-import { createSeatCostReader, claudeProjectDirName, worktreePathOf, geminiAllowanceFromUsage, WORKER_HOME } from './cost-read.mjs';
+import { createSeatCostReader, claudeProjectDirName, worktreePathOf, geminiAllowanceFromUsage, WORKER_HOME, COST_READABLE_AGENTS, hasWorkerCostSource } from './cost-read.mjs';
 import { WORKER_MESSAGE_TYPES } from './mailbox.mjs';
 
 const execFileAsync = promisify(execFile);
@@ -133,7 +133,7 @@ export { createSeatCostReader, claudeProjectDirName, worktreePathOf, geminiAllow
 // re-exported the same way: ./dispatch.mjs refuses to launch a seat whose agent
 // is not on the list, because a worker that cannot be costed cannot be released
 // either.
-export { COST_READABLE_AGENTS, hasWorkerCostSource } from './cost-read.mjs';
+export { COST_READABLE_AGENTS, hasWorkerCostSource };
 export const PUBLISH_OWNER = 'toddwyder';
 export const PUBLISH_REPO = 'julia-next';
 export const PUBLISH_BASE = 'main';
@@ -841,8 +841,16 @@ export async function runWorkerScript({
 export function createOrcaSeatCostReader({ boundaries, ...options } = {}) {
   return async function readSeatCost({ seat, worktree, agent, model = null, allowanceBefore = null, startedAt = null, endedAt = null }) {
     // Refused before a terminal is made, so an unknown vendor costs nothing.
-    if (!COSTABLE_AGENTS.has(agent)) {
-      throw new Error(`no cost source is known for a ${JSON.stringify(agent)} seat (${seat}) -- refusing to guess a figure`);
+    //
+    // THROUGH THE READER'S OWN LIST, never a copy of it (JUL-98 step 6 round 2,
+    // the code-review finding). ./dispatch.mjs refuses to launch an agent that
+    // is not on `COST_READABLE_AGENTS`, and its comment invites the next person
+    // to lift that refusal with "one implemented reader" -- which is only true
+    // if THIS gate, the one ./release.mjs actually runs against, moves with the
+    // list. A second copy here reads the same three agents today and strands
+    // the first worker of the fourth.
+    if (!hasWorkerCostSource(agent)) {
+      throw new Error(`no cost source is known for a ${JSON.stringify(agent)} seat (${seat}) -- refusing to guess a figure. The agents there is a reader for are ${COST_READABLE_AGENTS.join(', ')}`);
     }
     const worktreePath = worktreePathOf(worktree);
     return runWorkerScript({
@@ -856,11 +864,6 @@ export function createOrcaSeatCostReader({ boundaries, ...options } = {}) {
     });
   };
 }
-
-// The agents whose figures there is a recorded source for. `agy` is
-// allowance-billed rather than token-billed; graph/controller/cost-read.mjs
-// holds all three readers.
-const COSTABLE_AGENTS = new Set(['claude', 'codex', 'agy']);
 
 // ---------------------------------------------------------------------------
 // Publishing -- the App, never a personal git identity
