@@ -38,6 +38,7 @@ import {
   readFailedCostLine,
   assertCostLineComplete,
   formatCostLine,
+  sumCostLines,
 } from '../graph/controller/cost.mjs';
 import { ORCA_FIXTURE_DIR } from '../graph/controller/fixture-orca.mjs';
 import { join } from 'node:path';
@@ -307,6 +308,33 @@ test("a worker whose cost read failed yields an explicit read-failed cost line, 
   assert.match(formatCostLine(line), /cost read failed: session file missing/i);
   // And a line that merely LOOKS empty, without the mark, still fails.
   assert.throws(() => assertCostLineComplete({ seat: 'builder', model: null, totalTokens: null, peakContext: null, minutes: null }), /blank/);
+});
+
+// --- Two real cost lines for one seat (JUL-98 step 5, PR #96 review finding 1) ---
+
+test('sumCostLines: two real lines add tokens and dollars, and take the larger peak', () => {
+  const a = { seat: 'reviewer', vendor: 'commandcode', model: 'deepseek/deepseek-v4-pro', tokens: { input: 100, output: 20, cacheRead: 5 }, totalTokens: 125, peakContext: 900, startedAt: '2026-09-22T10:00:00Z', endedAt: '2026-09-22T10:05:00Z', minutes: 5, usd: 0.01, capped: false, failedOverTo: null };
+  const b = { seat: 'reviewer', vendor: 'commandcode', model: 'deepseek/deepseek-v4-pro', tokens: { input: 200, output: 40, cacheRead: 10 }, totalTokens: 250, peakContext: 1200, startedAt: '2026-09-22T10:10:00Z', endedAt: '2026-09-22T10:20:00Z', minutes: 10, usd: 0.02, capped: false, failedOverTo: null };
+  const sum = sumCostLines(a, b, 'reviewer');
+  assert.equal(sum.totalTokens, 375);
+  assert.equal(sum.tokens.input, 300);
+  assert.equal(sum.peakContext, 1200, 'the LARGER of the two, not the sum -- a peak is a peak, not a total');
+  assert.equal(sum.minutes, 15);
+  assert.ok(Math.abs(sum.usd - 0.03) < 1e-9);
+  assert.equal(sum.startedAt, a.startedAt, 'the earlier start');
+  assert.equal(sum.endedAt, b.endedAt, 'the later end');
+  assert.doesNotThrow(() => assertCostLineComplete(sum));
+});
+
+test('sumCostLines: a never-started or read-failed line never pollutes a real one -- the real figure passes through untouched', () => {
+  const real = { seat: 'reviewer', vendor: 'commandcode', model: 'deepseek/deepseek-v4-pro', tokens: { input: 100, output: 20, cacheRead: 5 }, totalTokens: 125, peakContext: 900, startedAt: '2026-09-22T10:00:00Z', endedAt: '2026-09-22T10:05:00Z', minutes: 5, usd: 0.01, capped: false, failedOverTo: null };
+  const neverStarted = neverStartedCostLine({ seat: 'reviewer', reason: 'the retry could not be launched' });
+  const readFailed = readFailedCostLine({ seat: 'reviewer', model: null, reason: 'no session file' });
+
+  assert.deepEqual(sumCostLines(real, neverStarted, 'reviewer'), real, 'the real line, untouched -- a $0 never-started line must not zero it out');
+  assert.deepEqual(sumCostLines(neverStarted, real, 'reviewer'), real, 'order does not matter');
+  assert.deepEqual(sumCostLines(real, readFailed, 'reviewer'), real);
+  assert.deepEqual(sumCostLines(null, real, 'reviewer'), real, 'a missing line on one side is the same as an unreal one');
 });
 
 test('the Claude seat extract works on the real transcript as it is read off disk, and its peak and duration are not lost', () => {

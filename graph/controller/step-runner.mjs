@@ -36,7 +36,7 @@ import { dispatchWorker } from './dispatch.mjs';
 import { proveTurnStarted } from './turn-start.mjs';
 import { waitForWorkerDone } from './mailbox.mjs';
 import { finishWorker, assertEverySeatCosted } from './release.mjs';
-import { formatCostLine, neverStartedCostLine, readFailedCostLine, assertCostLineComplete } from './cost.mjs';
+import { formatCostLine, neverStartedCostLine, readFailedCostLine, assertCostLineComplete, sumCostLines } from './cost.mjs';
 // The seat rules are scripts/seat-labels.mjs's, imported rather than repeated.
 // A seat that CANNOT BE LAUNCHED takes exactly the route a CAPPED seat already
 // takes (JUL-98 step 2, item 6): the same `fallbackSeatChoice`, the same seat
@@ -758,22 +758,56 @@ export async function runBuildAndReview({
     // reviewer that genuinely cannot produce a verdict still stops the card,
     // just with both attempts named on it.
     if (result.reviewGaveNoVerdict) {
-      const firstDispatchId = result.dispatchId;
+      const first_ = result; // the seat's own first attempt: it genuinely ran and genuinely spent
       const retry = await startSeat(seat, first, '-noverdict-retry');
+      // EVERY BRANCH BELOW SUMS THE TWO REAL COST LINES (PR #96 review
+      // finding 1): the first attempt spent real money before it gave no
+      // verdict, and `costLines` is one line per seat -- so its figure has
+      // nowhere to go except folded into the one line this seat keeps.
+      // `sumCostLines` passes a never-started/read-failed line through
+      // untouched, so a retry that itself never ran still leaves the first
+      // attempt's real spend intact.
+      const combinedCost = sumCostLines(first_.cost, retry.cost, seat);
+
       if (retry.reviewGaveNoVerdict) {
         // Both attempts really ran and really spent -- unlike `stopped()`'s
-        // other callers, there is nothing "never started" about this seat, so
-        // its real cost line (already read by `close()` inside `startSeat`)
-        // travels on the stop rather than being replaced with an invented
-        // zero. Only `ok` and `reason` change.
+        // other callers, there is nothing "never started" about this seat.
+        // PR #96 review finding 3: the retry's OWN reason (set when ITS cost
+        // read, release or worktree removal itself failed, a real problem
+        // distinct from "gave no verdict") is appended rather than replaced,
+        // so a cost-read failure on the retry is never hidden behind the
+        // no-verdict framing.
         result = {
           ...retry,
           ok: false,
-          reason: `the ${seat} seat reported failed with no findings or reason, twice in a row (dispatch ${firstDispatchId}, then retry dispatch ${retry.dispatchId}) -- treated as the review itself being unusable, not a verdict on the change`,
+          cost: combinedCost,
+          reason: `the ${seat} seat reported failed with no findings or reason, twice in a row (dispatch ${first_.dispatchId}, then retry dispatch ${retry.dispatchId}) -- treated as the review itself being unusable, not a verdict on the change`
+            + (retry.reason ? ` (the retry itself also reported: ${retry.reason})` : ''),
+        };
+      } else if (neverGotGoing(retry) || retry.possiblyRunning) {
+        // PR #96 review finding 2: the RETRY itself never produced a verdict
+        // either way -- it could not be launched (refused before dispatch, OR
+        // a worker-start that genuinely failed, `neverGotGoing`'s own two
+        // stages), or nothing is known about it (`possiblyRunning`). This is
+        // deliberately NOT handed to the launchRefused fallback below: that
+        // machinery's whole premise is "nothing was created yet for this
+        // seat", which is false here (the first attempt ran a real turn on
+        // `first.entry`) -- falling through would tell the card the entry
+        // itself could not be started, when it already proved it could, and
+        // would try to move a seat that already spent real money to a backup
+        // as though it never ran at all. Handled here instead, self-contained,
+        // naming both attempts and neither `noVerdictRetries` (the retry gave
+        // no verdict) nor the seat-fallback machinery.
+        result = {
+          ...retry,
+          ok: false,
+          cost: combinedCost,
+          reason: `the ${seat} seat's first attempt reported failed with no findings or reason (dispatch ${first_.dispatchId}); the retry dispatched for a real verdict could not run either: ${retry.reason}`,
         };
       } else {
-        noVerdictRetries.push({ seat, firstDispatchId, retryDispatchId: retry.dispatchId });
-        result = retry;
+        // A real verdict this time -- succeeded, or failed WITH findings.
+        noVerdictRetries.push({ seat, firstDispatchId: first_.dispatchId, retryDispatchId: retry.dispatchId });
+        result = { ...retry, cost: combinedCost };
       }
     }
 

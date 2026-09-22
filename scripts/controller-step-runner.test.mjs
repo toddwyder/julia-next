@@ -1557,7 +1557,7 @@ test('a reviewer that reports failed with no findings is retried once, and the r
   assert.doesNotThrow(() => assert.ok(result.reviewer.cost.totalTokens > 0), 'the retry that actually ran has a real, nonzero cost line');
 });
 
-test('a reviewer that reports failed with no findings TWICE stops the card, naming both dispatches, with the real (nonzero) cost of the attempt that actually ran -- never an invented zero', async () => {
+test('a reviewer that reports failed with no findings TWICE stops the card, naming both dispatches, with BOTH real costs summed -- never an invented zero and never a dropped figure', async () => {
   const h = harnessWithReviewerSequence([{ noVerdict: true }, { noVerdict: true }]);
   const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
 
@@ -1570,7 +1570,54 @@ test('a reviewer that reports failed with no findings TWICE stops the card, nami
   // Both attempts really ran (the harness's readCostImpl gives a real,
   // nonzero cost for a turn that started) -- unlike a launch refusal, there
   // is nothing "never started" about this seat, so `neverStartedCostLine`'s
-  // zero must never appear here.
+  // zero must never appear here. PR #96 review finding 1: the FIRST
+  // attempt's real spend must not be dropped just because it gave no
+  // verdict -- both are folded into the one line this seat keeps.
+  assert.equal(result.reviewer.cost.neverStarted, undefined);
+  assert.equal(result.reviewer.cost.totalTokens, COST.totalTokens * 2, 'both real attempts, summed, not just the last one');
+});
+
+test('the successful-retry case also carries the first (no-verdict) attempt\'s real spend, not just the retry\'s', async () => {
+  const h = harnessWithReviewerSequence([{ noVerdict: true }, { outcome: 'succeeded' }]);
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+
+  const result = await runBuildAndReview({ card: CARD, step: STEP, choices: CHOICES, suiteRunner, ...h.deps });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.reviewer.cost.totalTokens, COST.totalTokens * 2, 'the no-verdict first attempt spent real money too, and it must not vanish');
+});
+
+// PR #96 review finding 2: the RETRY can itself fail to launch -- a
+// different failure from "gave no verdict again". The card must say so
+// honestly (the FIRST attempt ran; the RETRY is what could not start), never
+// fall into the seat-fallback machinery (whose whole premise -- nothing was
+// created yet -- is false here), and never lose the first attempt's real
+// cost either.
+test('a retry that itself cannot be launched is reported as that, honestly -- not folded into the seat-fallback machinery, and the first attempt\'s real cost survives', async () => {
+  const h = harnessWithReviewerSequence([{ noVerdict: true }]);
+  const failed = loadOrcaFixture('worker-start.failed-agent-readiness.json').result;
+  const realWorkerStart = h.orca.workerStart;
+  let calls = 0;
+  h.deps.workerStartImpl = async (options) => {
+    calls += 1;
+    // call 1: builder. call 2: reviewer's first (no-verdict) attempt. call 3:
+    // the reviewer's retry -- fails to launch entirely.
+    if (calls === 3) return { ...failed };
+    return realWorkerStart(options);
+  };
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+
+  const result = await runBuildAndReview({ card: CARD, step: STEP, choices: CHOICES, suiteRunner, ...h.deps });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.noVerdictRetries.length, 0, 'the retry never produced a verdict, so this is not a successful retry');
+  assert.equal(result.seatMoves.length, 0, 'never the seat-fallback machinery -- the entry already proved it could run');
+  assert.match(result.reviewer.reason, /first attempt reported failed with no findings or reason/);
+  assert.match(result.reviewer.reason, /the retry dispatched for a real verdict could not run either/);
+  assert.match(result.reviewer.reason, /agent_readiness/, 'the retry\'s own real failure is named, not swallowed');
+  // The first attempt genuinely ran and genuinely spent; the retry that
+  // failed to launch spent nothing. sumCostLines passes the real line
+  // through untouched rather than zeroing it out.
   assert.equal(result.reviewer.cost.neverStarted, undefined);
   assert.equal(result.reviewer.cost.totalTokens, COST.totalTokens);
 });
