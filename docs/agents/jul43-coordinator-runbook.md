@@ -1262,6 +1262,27 @@ the units below are installed **by a laptop session only**; the graph can turn t
 but cannot change what it runs. A new unit, a changed unit, a new group or a new rule is a
 laptop-session edit and install, never a graph action — park it, don't work around it.
 
+### `runner` skips IPv6 for its own internet egress (JUL-99, 2026-09-22)
+
+Google Antigravity (`agy`, the Gemini builder trial) refuses every call from this server over
+IPv6 — `FAILED_PRECONDITION (code 400): User location is not supported for the API use` — while
+the same account and CLI build work over IPv4 here and from an unrelated network. Proven
+2026-09-22: 5/5 runs failed over IPv6 on the server, 5/5 succeeded over IPv4 on the server, 5/5
+succeeded from a different network.
+
+Fix: one persistent `ufw6-before-output` rule forces `runner`'s own traffic out the server's
+normal internet interface (`ens3`) onto IPv4 only — `ubuntu`, root and `orchestrator-svc` are
+untouched, and Tailscale's own interface is untouched too (`runner`'s Tailscale access is already
+IPv4). Source of truth, verification and rollback: `ops/firewall/README.md`. Like the sudo rules
+above, this is edited **by hand from a laptop session, never by the graph**, and does not survive
+a server rebuild on its own — reapply it from `ops/firewall/` if the server is ever rebuilt.
+Proven to survive `sudo ufw reload` (twice, live) with no reboot needed.
+
+One trap found while setting this up: a `ip6tables -I OUTPUT ...` rule added directly (not through
+a ufw rules file) does **not** reliably get cleared by `ufw reload` — it was still sitting at the
+top of the `OUTPUT` chain, duplicating the persisted rule, until removed by hand. Always add a
+rule meant to last through the file UFW itself reapplies, not a raw `ip6tables` insert.
+
 ### The controller runs as a user service of `orchestrator-svc` (JUL-98, gap 1, 2026-09-21)
 
 **The design: root once, never again.** The controller is a systemd *user* service of

@@ -1,0 +1,21 @@
+# Source of truth for one rule inserted into /etc/ufw/before6.rules on the
+# server, inside the ufw6-before-output chain, immediately after the existing
+# loopback line:
+#
+#   -A ufw6-before-output -o lo -j ACCEPT
+#
+# This is a snippet to diff or reapply by hand from a laptop session (see
+# docs/agents/jul43-coordinator-runbook.md), not a file installed automatically
+# -- there is no sudo rule that installs or edits a file (see the sudoers
+# section of the runbook), and this is a ufw config file, not a systemd unit.
+
+# JUL-99, 2026-09-22: Google Antigravity (agy/Gemini) refuses calls from this
+# server over IPv6 ("User location is not supported for the API use"), proven
+# on 5 runs; the same account and CLI worked 5/5 over IPv4 and 5/5 from an
+# unrelated network. Force the runner account onto IPv4 for its normal
+# internet egress (interface ens3) -- every service it talks to is dual-stack
+# and falls back to IPv4 on its own. Scoped to runner only (ubuntu, root and
+# orchestrator-svc are unaffected) and to ens3 only (leaves tailscale0's own
+# IPv6 alone, unused by runner in practice -- its Tailscale access is the
+# IPv4 100.x address). See docs/agents/jul43-coordinator-runbook.md.
+-A ufw6-before-output -o ens3 -m owner --uid-owner runner -m comment --comment jul99-runner-v4-only -j REJECT --reject-with icmp6-port-unreachable
