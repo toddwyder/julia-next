@@ -1406,6 +1406,59 @@ test('round 4b: the two detectors are FALSE for every shape the production bound
   // And what DOES answer: worker-show, both ways round.
   assert.equal(hasFailedAgentReadinessSignature(FAILED_READINESS), true);
   assert.equal(hasLiveLivenessVerdict(LIVE_SHOW), true);
-  // Including through Orca's own envelope, for a caller that forgot to unwrap.
-  assert.equal(hasFailedAgentReadinessSignature(loadOrcaFixture('worker-show.failed-agent-readiness.json')), true);
+  // And ONLY that shape. Orca's outer envelope is not accepted, because
+  // `orcaCall` already strips it (scripts/orca-cli.mjs) and so no producer
+  // hands one over -- the same reason the `.show` and `.observed` legs went.
+  assert.equal(hasFailedAgentReadinessSignature(loadOrcaFixture('worker-show.failed-agent-readiness.json')), false, 'the envelope is unwrapped by orcaCall, never here');
+});
+
+test('round 4b review, spec axis: a seat Orca calls LIVE is not reported on the card as though nothing was seen of it', async () => {
+  const h = productionHarness({ workerShowImpl: async () => LIVE_SHOW });
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+
+  const result = await runWorkerStep({
+    seat: 'builder', card: CARD, step: STEP, choice: CHOICES.builder,
+    worktreeName: 'jul98-6', requestId: 'JUL-98:step-6:r4b-live-reason',
+    suiteRunner, suiteKey: 'JUL-98:step-6', runSuite: false, ...h.deps,
+  });
+
+  // The turn-start reading saw nothing; Orca did. Reporting the first and not
+  // the second is how a demonstrably running worker came to be described as
+  // "nothing was observed at all", with only a flag to say otherwise.
+  assert.match(result.reason, /LIVE/, 'the card says Orca reports it live');
+  assert.equal(/nothing was observed at all/.test(result.reason), false);
+  assert.match(result.reason, /may still be running/);
+  assert.match(result.reason, /no backup is started beside it/);
+});
+
+test('round 4b review, standards axis: an adopted-but-unobservable seat whose worker-show ALSO failed has BOTH failures named, not one instead of the other', async () => {
+  const h = harness({ send: NO_TURN });
+  // The adopt route ADOPTS the worker -- the first wait is satisfied, so the
+  // agent finished starting -- and then fails on the busy reading. That is an
+  // `observationError`, not a launch refusal: a worker exists and may be
+  // spending (round 2, finding 3).
+  let waits = 0;
+  h.deps.adoptBoundaries = {
+    ...h.deps.adoptBoundaries,
+    terminalWaitImpl: async () => {
+      waits += 1;
+      if (waits === 1) return { wait: { satisfied: true } };
+      throw new Error('terminal_handle_stale');
+    },
+  };
+  h.deps.observeStartImpl = productionObserveStart;
+  h.deps.checkWaitImpl = async () => ({ runId: ALL.runId, deliveryId: null, messages: [], count: 0, timedOut: true });
+  // ...and the verdict cannot be taken either.
+  h.deps.workerShowImpl = async () => { throw new Error('host_indeterminate'); };
+
+  const result = await runWorkerStep({
+    seat: 'builder', card: CARD, step: STEP, choice: resolveSeatChoices([]).builder,
+    worktreeName: 'jul98-6', requestId: 'JUL-98:step-6:r4b-both',
+    suiteRunner: createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' }),
+    suiteKey: 'JUL-98:step-6', runSuite: false, ...h.deps,
+  });
+
+  assert.equal(result.possiblyRunning, true);
+  assert.match(result.reason, /host_indeterminate/, 'the verdict that could not be taken');
+  assert.match(result.reason, /terminal_handle_stale/, 'AND the observation that failed -- both are facts about the same stuck seat');
 });

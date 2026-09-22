@@ -60,21 +60,19 @@ export const DEFAULT_RECONCILE_WAIT_MS = 30000;
 // time puts on its own mailbox in half a minute, and far short of a spin.
 export const DEFAULT_RECONCILE_MAX_READS = 8;
 
-// Both detectors below read ONE shape: the `result` of an
-// `orchestration worker-show` answer. ./wiring.mjs's `workerShowImpl` goes
-// through `orcaCall`, which already returns `parsed.result`
-// (scripts/orca-cli.mjs), so the bare object is the ordinary case and the
-// envelope leg is here only for a caller that forgot to unwrap one.
+// Both detectors below read ONE shape, and there is no unwrapping left to do:
+// the `result` of an `orchestration worker-show` answer, exactly as
+// ./wiring.mjs's `workerShowImpl` hands it over. That boundary goes through
+// `orcaCall`, which already returns `parsed.result` (scripts/orca-cli.mjs), so
+// no producer passes anything else.
 //
-// ROUND 4b REMOVED TWO LEGS THAT ENCODED A SHAPE NOTHING PRODUCES: `.show`,
-// which only ever came from a test stand-in, and `.observed`, which in
-// production is the adopt route's `{ busy: {...} }` (scripts/controller-adopt.test.mjs)
-// and carries no verdict. Both made the detectors look like they could read a
-// turn-start reading. They cannot; see `workerShowImpl` in ./wiring.mjs.
-function unwrapOrcaPayload(source) {
-  if (!source) return null;
-  return source.result ?? source;
-}
+// ROUND 4b REMOVED THREE LEGS THAT ENCODED SHAPES NOTHING PRODUCES: `.show`,
+// which only ever came from a test stand-in; `.observed`, which in production
+// is the adopt route's `{ busy: {...} }` (scripts/controller-adopt.test.mjs)
+// and carries no verdict; and `.result`, kept at first for "a caller that
+// forgot to unwrap", which is a caller that does not exist. The first two made
+// the detectors look like they could read a turn-start reading. They cannot;
+// see `workerShowImpl` in ./wiring.mjs.
 
 // THE RECORDED FAILURE SIGNATURE (JUL-98 step 6, round 4; Todd Decision 2026-09-22 15:01:01Z).
 // Orca recorded failure signature (failed at agent readiness, no agent terminal)
@@ -89,8 +87,7 @@ function unwrapOrcaPayload(source) {
 //   - graph/fixtures/orca-1.4.205/base-checkout.new-path-untrusted.worker-show.json
 //   - docs/research/jul109-orca-1.4.205-findings.md (section 2 fact 3, section 4a)
 //   - coordinator live measurement at 15:53:09Z (agent-trust-workspace blocked)
-export function hasFailedAgentReadinessSignature(source) {
-  const candidate = unwrapOrcaPayload(source);
+export function hasFailedAgentReadinessSignature(candidate) {
   if (!candidate) return false;
   const worker = candidate.worker ?? null;
   const dispatch = candidate.dispatch ?? null;
@@ -110,8 +107,7 @@ export function hasFailedAgentReadinessSignature(source) {
 // If live is seen in projection.liveness.verdict, worker.liveness.verdict,
 // or observation.status at any point, seenLive is recorded true, preventing
 // any never-started conclusion even if the mailbox is silent.
-export function hasLiveLivenessVerdict(source) {
-  const candidate = unwrapOrcaPayload(source);
+export function hasLiveLivenessVerdict(candidate) {
   if (!candidate) return false;
   if (candidate.liveness?.verdict === 'live') return true;
   if (candidate.projection?.liveness?.verdict === 'live') return true;
@@ -145,10 +141,8 @@ export async function runWorkerStep({
   observeStartImpl,
   // THE START RULE'S PRODUCTION SOURCE (JUL-98 step 6 round 4b). Answers Orca's
   // worker-show INSPECT structure for one dispatch -- the only reading that
-  // carries `worker.state`/`stage`/`agentTerminalHandle`,
-  // `dispatch.status`/`lastFailure` and `projection.liveness.verdict`.
-  // `observeStartImpl` above cannot: it is `worktree ps`, whose rows carry none
-  // of them. Asked ONCE, below, and only where the alternative is to conclude
+  // carries the rule's fields; `observeStartImpl` above cannot (./wiring.mjs).
+  // Asked ONCE, below, and only where the alternative is to conclude
   // never-started. Absent or throwing, the step keeps the worker.
   workerShowImpl = null,
   checkWaitImpl,
@@ -266,14 +260,10 @@ export async function runWorkerStep({
   const observed = dispatched.observed ?? await observeStartImpl({ seat, dispatch: dispatched });
   const proof = proveTurnStarted(observed ?? {});
 
-  // SEEN LIVE HAS EXACTLY ONE SOURCE, AND IT IS worker-show (round 4b).
-  // Round 4 seeded this from `dispatched` and `observed`. Neither can ever
-  // carry a verdict: `dispatched` is a `worker-start` answer, which is flat
-  // `{dispatchId, state, stage, lastError}` with no `projection` or
-  // `observation` key (worker-start.failed-agent-readiness.json), and
-  // `observed` is either a `worktree ps` row or the adopt route's `{ busy }`.
-  // So the seed was always false and the rule had no live branch at all. It is
-  // taken below, from the one boundary that answers an inspect structure.
+  // SEEN LIVE HAS EXACTLY ONE SOURCE, AND IT IS worker-show (round 4b). Round 4
+  // seeded this from `dispatched` and `observed`; neither can carry a verdict,
+  // so the seed was always false and the rule had no live branch at all. Why
+  // neither can: ./wiring.mjs, above `workerShowImpl`. It is taken below.
   let seenLive = false;
   let heard = null;
   let initialAck = waitOptions.initialAck ?? null;
@@ -402,17 +392,17 @@ export async function runWorkerStep({
       // answered for itself.
       //
       // WHY IT IS ASKED AT ALL. Round 4 read the rule's five fields off
-      // `observed` and `dispatched`, and neither can carry them: `observed` is
-      // a `worktree ps` row (`worktreeId`, `status`, `agents[]`) or the adopt
-      // route's `{ busy }`, and `dispatched` is a flat `worker-start` answer
-      // (`{dispatchId, state, stage, lastError}`). So the failure-signature
-      // branch could not fire in the running controller and the rule silently
-      // degraded to one outcome. `worker-show` is the verb that answers the
-      // inspect structure -- see graph/controller/wiring.mjs's
-      // `workerShowImpl` and every `worker-show.*.json` fixture.
+      // `observed` and `dispatched`, neither of which carries them, so the
+      // failure-signature branch could not fire in the running controller and
+      // the rule silently degraded to one outcome. The shapes, and which verb
+      // does answer: ./wiring.mjs, above `workerShowImpl`.
       let shown = null;
       let showError = null;
       try {
+        // `seat` travels for the same reason it travels to `observeStartImpl`
+        // above: the production boundary ignores it (./wiring.mjs), and a
+        // boundary that wants to say WHICH seat it is answering about -- a
+        // fixture Orca, a diagnostic -- has it without a second signature.
         shown = workerShowImpl ? await workerShowImpl({ seat, dispatchId: dispatched.dispatchId }) : null;
       } catch (error) {
         showError = error.message;
@@ -435,11 +425,10 @@ export async function runWorkerStep({
         // is exactly the ambiguous sentence round 2 found: a turn that began
         // and ended between two readings says the same. What makes this a
         // never-started VERDICT is Orca's own record, so the record is quoted.
-        const signature = unwrapOrcaPayload(shown);
         const closed = await close({
           ok: false,
           stage: 'turn-start',
-          reason: `${proof.reason} -- and Orca's own record for dispatch ${dispatched.dispatchId} is the recorded never-started signature: the worker failed at stage agent_readiness with no agent terminal (${signature?.dispatch?.lastFailure})`,
+          reason: `${proof.reason} -- and Orca's own record for dispatch ${dispatched.dispatchId} is the recorded never-started signature: the worker failed at stage agent_readiness with no agent terminal (${shown?.dispatch?.lastFailure})`,
           retryRequestId: proof.retryRequestId ?? null,
           warnings: proof.warnings,
           outcome: null,
@@ -475,16 +464,38 @@ export async function runWorkerStep({
         });
       }
 
-      let reason;
-      if (showError) {
-        reason = `the ${seat} seat reported nothing, and Orca could not be asked what it recorded about dispatch ${dispatched.dispatchId} (worker-show failed: ${showError}) -- a reading that could not be taken is not a verdict, so it may still be running and is neither released nor removed and no backup is started beside it`;
-      } else if (dispatched.observationError) {
-        reason = `the ${seat} seat was adopted (dispatch ${dispatched.dispatchId}) but could not be observed (${dispatched.observationError}), and nothing has come from it through the mailbox yet -- it may still be running, so it is neither released nor removed and no backup is started beside it`;
+      // WHAT THE CARD IS TOLD. Every branch below ends in the same outcome --
+      // possibly running -- so what differs is the EVIDENCE, and the card gets
+      // whatever of it there is. The kept/read/not-released/no-backup clause is
+      // written once, at the end, because it is true of all of them.
+      //
+      // A SEAT ORCA CALLS LIVE COMES FIRST, and it is the finding that put this
+      // cascade in order (round 4b review, spec axis). `proof.reason` says
+      // "nothing was observed at all", which for a worker Orca reports LIVE is
+      // simply false: the turn-start reading saw nothing, but Orca did. Said
+      // plainly, the card was reporting a demonstrably running worker as though
+      // nothing had been seen of it, with only the `seenLive` flag to say
+      // otherwise.
+      //
+      // AND THE TWO FAILURES ARE NAMED TOGETHER, not one instead of the other:
+      // a seat can be adopted-but-unobservable AND have a worker-show that
+      // failed, and both are facts about the same stuck seat.
+      const failures = [
+        dispatched.observationError ? `the adopt route could not observe it (${dispatched.observationError})` : null,
+        showError ? `Orca could not be asked what it recorded (worker-show failed: ${showError})` : null,
+      ].filter(Boolean);
+
+      let evidence;
+      if (seenLive) {
+        evidence = `Orca reports it LIVE, but nothing has come from it through the mailbox yet`;
+      } else if (failures.length > 0) {
+        evidence = `${failures.join(', and ')} -- a reading that could not be taken is not a verdict`;
       } else if (proof.started === false) {
-        reason = proof.reason;
+        evidence = `${proof.reason}, and Orca's record shows no never-started signature`;
       } else {
-        reason = `the ${seat} seat did not report within the reconciliation budget and did not exhibit the recorded failure signature -- it may still be running, so it is neither released nor removed and no backup is started beside it`;
+        evidence = `it did not report within the reconciliation budget and did not exhibit the recorded failure signature`;
       }
+      const reason = `the ${seat} seat (dispatch ${dispatched.dispatchId}): ${evidence} -- it may still be running, so its worktree is kept, its cost is read, it is neither released nor removed, and no backup is started beside it`;
 
       return {
         ok: false,
