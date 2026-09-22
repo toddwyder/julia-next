@@ -82,6 +82,10 @@ export async function runWorkerStep({
   reconcileOptions = {},
   // The controller's own clock, for a seat whose vendor records no duration.
   now = () => new Date().toISOString(),
+  // The elapsed-time clock the reconciliation's budget is measured on, in
+  // milliseconds. Injected only so a test can spend that budget without
+  // sleeping through it; nothing else reads it.
+  monotonicNow = () => Date.now(),
 } = {}) {
   // 1. A fresh worker.
   const dispatched = await dispatchWorker({
@@ -196,8 +200,8 @@ export async function runWorkerStep({
     //
     // The mailbox is the one AUTHORITATIVE record of what a worker did: a
     // worker that reported demonstrably ran, and so did one that sent a
-    // heartbeat. So it is asked FIRST, ONCE, and briefly -- a bounded look, not
-    // the long sleep this whole step exists to avoid (the 19-20 September
+    // heartbeat. So it is asked FIRST, and briefly -- a bounded look, not the
+    // long sleep this whole step exists to avoid (the 19-20 September
     // eight-hour stall). Three answers, three different truths:
     //
     //   * a worker_done  -- the turn ran and finished. Keep the REAL cost.
@@ -205,23 +209,65 @@ export async function runWorkerStep({
     //     working, so fall through to the ordinary wait.
     //   * nothing at all -- combined with the idle reading, that is the
     //     never-started case, and it is now a fact rather than an inference.
-    const reconciled = await waitForWorkerDone({
-      checkWaitImpl,
-      terminal: from,
-      runId,
-      dispatchId: dispatched.dispatchId,
-      mirrorImpl,
-      initialAck,
-      maxWaits: 1,
-      timeoutMs: DEFAULT_RECONCILE_WAIT_MS,
-      ...reconcileOptions,
-    });
-    const fromThisWorker = (reconciled.messages ?? []).filter((message) => message.dispatchId === dispatched.dispatchId);
+    //
+    // AND WHY IT IS A BUDGET, NOT ONE DELIVERY (round 3). Round 2 asked for
+    // exactly one delivery (`maxWaits: 1`). But this mailbox belongs to the
+    // CONTROLLER, not to this worker: every card in flight, every earlier
+    // dispatch and every replayed delivery wakes the same wait. So a single
+    // unrelated or replayed message consumed the one look, nothing in it
+    // belonged to this worker, and the code fell through to the never-started
+    // path anyway -- zero cost line, resources released, a backup started
+    // beside a seat that had already finished, and its real allowance thrown
+    // away. That is finding 2's own failure mode through a narrower door.
+    //
+    // A DELIVERY THAT CARRIES NO MESSAGE FOR THIS WORKER IS NOT A VERDICT. So
+    // the look reads ON past it, and what bounds it is TIME, not deliveries:
+    // one budget, shared across however many deliveries arrive, with each read
+    // given only what is left of it. The never-started case is unchanged --
+    // an expired wait that carried nothing at all still answers at once, in one
+    // read -- and the busy-mailbox case can now cost the budget and no more.
+    const { timeoutMs: reconcileBudgetMs = DEFAULT_RECONCILE_WAIT_MS, ...reconcileRest } = reconcileOptions;
+    const reconcileDeadline = monotonicNow() + reconcileBudgetMs;
+    const reconciledMessages = [];
+    let reconciled = null;
+    let fromThisWorker = [];
+    let remainingMs = reconcileBudgetMs;
 
-    if (reconciled.outcome != null) {
-      heard = reconciled;
-    } else if (fromThisWorker.length > 0) {
+    for (;;) {
+      reconciled = await waitForWorkerDone({
+        checkWaitImpl,
+        terminal: from,
+        runId,
+        dispatchId: dispatched.dispatchId,
+        mirrorImpl,
+        initialAck,
+        maxWaits: 1,
+        ...reconcileRest,
+        timeoutMs: Math.min(reconcileBudgetMs, Math.max(remainingMs, 0)),
+      });
+      // Each delivery is acknowledged by the NEXT read (JUL-109 section 4a:
+      // "a waiter that does not ack will keep waking on old news"), so a
+      // foreign delivery wakes this look once and never again -- which is also
+      // what stops it spinning on the same message until the budget is gone.
       initialAck = reconciled.acknowledged;
+      reconciledMessages.push(...(reconciled.messages ?? []));
+      fromThisWorker = reconciledMessages.filter((message) => message.dispatchId === dispatched.dispatchId);
+      if (reconciled.outcome != null || fromThisWorker.length > 0) break;
+      // A wait that expired carrying NOTHING AT ALL is the answer, not a step
+      // towards one: there is no traffic to read past. It is the never-started
+      // reading, and it is given at once rather than after the budget.
+      if ((reconciled.messages ?? []).length === 0) break;
+      remainingMs = reconcileDeadline - monotonicNow();
+      if (remainingMs <= 0) break;
+    }
+
+    if (reconciled?.outcome != null) {
+      // Everything heard on the way, not just the delivery that carried the
+      // verdict: the foreign ones were mirrored and they belong in the record.
+      heard = { ...reconciled, messages: reconciledMessages };
+    } else if (fromThisWorker.length > 0) {
+      // `initialAck` is already chained to the last delivery read above, so the
+      // ordinary wait below starts where this look stopped.
     } else if (dispatched.observationError) {
       // A FAILED OBSERVATION IS NOT A VERDICT (round 2, finding 5). The worker
       // was really adopted -- Orca issued its ids and it holds the brief -- and
