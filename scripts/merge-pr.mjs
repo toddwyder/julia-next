@@ -8,7 +8,7 @@
 // The installation token is never included in this module's return value,
 // a thrown error's message, or anything main() prints -- only the merge
 // API's own {merged, sha, message} response.
-import { getPublisherInstallationToken } from './publish-via-github-app.mjs';
+import { getPublisherInstallationToken, loadPublisherCredentialFile } from './publish-via-github-app.mjs';
 
 // Fixed allow-list, not a caller-supplied value -- this script exists so a
 // Bash permission rule can name it once instead of granting an open-ended
@@ -84,5 +84,9 @@ async function main() {
 
 import { pathToFileURL } from 'node:url';
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  // See publish-pr.mjs's matching comment: JUL-98 step 6 round 3 found a
+  // session can omit the CLI grant's --env-file prefix and lose the
+  // credential silently. This self-load makes that omission harmless.
+  loadPublisherCredentialFile();
   main();
 }

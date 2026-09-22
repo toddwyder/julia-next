@@ -215,6 +215,11 @@ test('happy path: readiness, synced checkout, no existing run -> orchestrator st
   assert.match(calls.terminalsCreated[0].command, /mcp__claude_ai_Linear__\*/);
   assert.match(calls.terminalsCreated[0].command, /Bash\(node --env-file=\/etc\/orchestrator-svc\/\.env\.publisher scripts\/publish-pr\.mjs:\*\)/);
   assert.match(calls.terminalsCreated[0].command, /Bash\(node --env-file=\/etc\/orchestrator-svc\/\.env\.publisher scripts\/merge-pr\.mjs:\*\)/);
+  // JUL-98 step 6 round 3: the bare relative-path form must be granted
+  // too, so a session that omits --env-file is not refused outright --
+  // the scripts self-load the credential file either way.
+  assert.match(calls.terminalsCreated[0].command, /Bash\(node scripts\/publish-pr\.mjs:\*\)/);
+  assert.match(calls.terminalsCreated[0].command, /Bash\(node scripts\/merge-pr\.mjs:\*\)/);
   assert.match(calls.terminalsCreated[0].command, /Bash\(node scripts\/coordinator-events\.mjs:\*\)/);
 });
 
@@ -285,6 +290,7 @@ test('orchestratorLaunchCommandFor: claude still gets its full tool grant list, 
   assert.match(command, /mcp__linear__\*/);
   assert.match(command, /mcp__claude_ai_Linear__\*/);
   assert.match(command, /Bash\(node --env-file=\/etc\/orchestrator-svc\/\.env\.publisher scripts\/publish-pr\.mjs:\*\)/);
+  assert.match(command, /Bash\(node scripts\/publish-pr\.mjs:\*\)/);
   assert.match(command, /Bash\(orca \*\)/);
   assert.match(command, /-p "\/julia-coordinator JUL-79"$/);
 });
