@@ -537,6 +537,62 @@ test('a seat with no known cost source is refused BEFORE any terminal is created
   );
   assert.equal(boundaries.calls.create.length, 0);
 });
+// JUL-98 step 6 round 2, the code-review finding: THERE MUST BE ONE LIST, AND
+// THE PRODUCTION READER MUST BE GATED BY IT.
+//
+// The round-2 fix for finding 1 turns the cost reader's own list into the gate
+// on dispatch, and says so in ../graph/controller/dispatch.mjs: "The list lives
+// with the reader (./cost-read.mjs), never repeated here, so lifting the
+// refusal is exactly one implemented reader." The test above it in
+// ../scripts/controller-dispatch.test.mjs promises the same thing in the same
+// words: "implement the reader, add the agent to COST_READABLE_AGENTS, and the
+// seat launches with no further change."
+//
+// That promise was FALSE for the reader the controller actually runs.
+// `createOrcaSeatCostReader` above -- the production path, the one
+// ../graph/controller/release.mjs calls -- kept its own second copy of the
+// agent list and gated on that. Both copies happen to read the same three
+// agents today, so nothing is broken today; the defect is what happens to the
+// NEXT person. Add `pi` to COST_READABLE_AGENTS with a real worker-side reader
+// behind it, exactly as the comment invites, and dispatch would launch the Pi
+// seat while THIS reader still refused it -- and a refusal here stops
+// release.mjs BEFORE the release, so that worker would fail its step with no
+// cost line and keep its worker and its worktree. That is finding 1's failure
+// mode, reintroduced by the fix for finding 1 at the moment the fix is used.
+//
+// So the gate is asserted to BE the shared list, in both directions: every
+// agent the list declares reaches a reader here, and the refusal for one it
+// does not declare enumerates the list it consulted -- which a private copy
+// cannot do.
+test('the production cost reader is gated by the READER\'s own list, not a second copy of it', async () => {
+  // Every declared agent gets past the gate and on to a real terminal. A
+  // private list that drifts one entry behind fails here.
+  for (const agent of COST_READABLE_AGENTS) {
+    const boundaries = costTerminal({ screens: [[PROMPT, GOOD_LINE, done(0)]] });
+    const read = createOrcaSeatCostReader({ boundaries, pollMs: 0 });
+    await read({ seat: 'builder', worktree: 'repo-1::/home/runner/w/jul-92', agent, model: 'gemini-2.5-flash', allowanceBefore: {} })
+      .catch(() => {});
+    assert.equal(boundaries.calls.create.length, 1, `${agent} is declared cost-readable but this reader refused it before it made a terminal`);
+  }
+
+  // And the refusal names the one list it consulted. Only a reader that asks
+  // ./cost-read.mjs can enumerate ./cost-read.mjs's list.
+  const boundaries = costTerminal({ screens: [[done(0)]] });
+  const read = createOrcaSeatCostReader({ boundaries, pollMs: 0 });
+  await assert.rejects(
+    () => read({ seat: 'reviewer', worktree: 'x', agent: 'pi' }),
+    (error) => {
+      assert.match(error.message, /refusing to guess a figure/);
+      assert.ok(
+        error.message.includes(COST_READABLE_AGENTS.join(', ')),
+        `the refusal must enumerate the reader's own list (${COST_READABLE_AGENTS.join(', ')}), so the two cannot drift: got ${error.message}`,
+      );
+      return true;
+    },
+  );
+  assert.equal(boundaries.calls.create.length, 0);
+  assert.equal(hasWorkerCostSource('pi'), false, 'and pi is still the agent with no reader');
+});
 
 test('a close that itself fails does not hide the real reason the read failed', async () => {
   const boundaries = costTerminal({ screens: [[PROMPT, done(0)]], closeThrows: 'terminal_handle_stale' });
