@@ -780,6 +780,13 @@ export async function runBuildAndReview({
         result = {
           ...retry,
           ok: false,
+          // Explicitly false, never inherited from `retry` (PR #96 review,
+          // round 2): a retry that GAVE a (blank) verdict was never refused,
+          // but the field is cleared here too rather than trusted, for the
+          // same reason as the branch below -- this result must never be
+          // read by the `if (result.launchRefused)` guard right after this
+          // block, on either path.
+          launchRefused: false,
           cost: combinedCost,
           reason: `the ${seat} seat reported failed with no findings or reason, twice in a row (dispatch ${first_.dispatchId}, then retry dispatch ${retry.dispatchId}) -- treated as the review itself being unusable, not a verdict on the change`
             + (retry.reason ? ` (the retry itself also reported: ${retry.reason})` : ''),
@@ -801,6 +808,19 @@ export async function runBuildAndReview({
         result = {
           ...retry,
           ok: false,
+          // PR #96 review, round 2: the defect that shipped in the first fix.
+          // `...retry` above still carries `launchRefused: true` whenever the
+          // retry was refused BEFORE dispatch (as opposed to a worker-start
+          // that started and then failed), and the very next `if
+          // (result.launchRefused)` check below reads that field -- so
+          // without clearing it here, a pre-dispatch-refused retry fell
+          // straight into the seat-fallback machinery this branch exists to
+          // avoid: a third worker on the backup, a seat-move comment falsely
+          // claiming the ORIGINAL entry "could not be started" (it already
+          // ran once), and the first attempt's real cost dropped again. The
+          // fix from round 1 was tested only against a worker-start FAILURE
+          // (`launchRefused: false` already), which never exercised this.
+          launchRefused: false,
           cost: combinedCost,
           reason: `the ${seat} seat's first attempt reported failed with no findings or reason (dispatch ${first_.dispatchId}); the retry dispatched for a real verdict could not run either: ${retry.reason}`,
         };

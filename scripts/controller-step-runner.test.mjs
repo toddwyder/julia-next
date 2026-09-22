@@ -1621,3 +1621,70 @@ test('a retry that itself cannot be launched is reported as that, honestly -- no
   assert.equal(result.reviewer.cost.neverStarted, undefined);
   assert.equal(result.reviewer.cost.totalTokens, COST.totalTokens);
 });
+
+// PR #96 review, round 2: the ORIGINAL scenario finding 2 described (a retry
+// REFUSED before dispatch, e.g. an adopt-route timeout -- `launchRefused:
+// true`, not a worker-start that started and then failed) was not what the
+// first fix's own test exercised, and the first fix did not actually cover
+// it: `...retry` in the self-contained branch still carried the retry's own
+// `launchRefused: true` through to `result`, so the very next
+// `if (result.launchRefused)` guard still caught it and ran the seat-fallback
+// machinery -- a third worker on the backup, a seat-move comment falsely
+// claiming the ORIGINAL entry never started, and the first attempt's real
+// cost dropped a second time. Reviewer is pi-deepseek here (the real adopt
+// route this scenario actually happens on): the first dispatch reaches an
+// idle prompt and runs for real (reporting blank-failed); the retry never
+// reaches idle within the wait and is refused before adoption, same as a
+// live adopt-route timeout.
+test('a retry REFUSED before dispatch (the adopt-route timeout shape) is still handled self-contained -- never the seat-fallback machinery, and the first attempt\'s real cost survives', async () => {
+  const h = harness();
+  let adoptWaits = 0;
+  h.deps.adoptBoundaries = {
+    ...h.deps.adoptBoundaries,
+    terminalWaitImpl: async () => {
+      adoptWaits += 1;
+      // Calls 1-2: the reviewer's first dispatch -- reaches idle, then goes
+      // busy with the brief (proceeds to a real, blank-failed turn).
+      // Calls 3+: the retry -- never reaches idle at all (refused).
+      if (adoptWaits === 1) return { wait: { satisfied: true } };
+      if (adoptWaits === 2) return { wait: { satisfied: false } };
+      return { wait: { satisfied: false } };
+    },
+  };
+  let reviewerCalls = 0;
+  h.deps.checkWaitImpl = async ({ ack }) => {
+    const dispatchId = h.orca.workerStartCalls().length > 0 ? lastDispatchId(h.orca) : 'ctx_unknown';
+    const isBuilder = h.orca.workersStarted() === 1;
+    let message;
+    if (isBuilder) {
+      message = doneMessage(dispatchId, 'succeeded');
+    } else {
+      reviewerCalls += 1;
+      const recorded = ALL.messages.find((m) => m.type === 'worker_done');
+      message = { ...recorded, subject: '', body: '', payload: JSON.stringify({ taskId: 'task_x', dispatchId, outcome: 'failed' }) };
+    }
+    return { runId: ALL.runId, deliveryId: `delivery_${dispatchId}`, messages: ack ? [message] : [ALL.messages[4], message], count: 2, timedOut: false };
+  };
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+  const choices = { builder: CHOICES.builder, reviewer: resolveSeatChoices([]).reviewer };
+  assert.equal(choices.reviewer.entry, 'pi-deepseek');
+  assert.equal(launchForChoice(choices.reviewer).route, 'adopt');
+
+  const result = await runBuildAndReview({ card: CARD, step: STEP, choices, suiteRunner, ...h.deps });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.noVerdictRetries.length, 0);
+  assert.equal(result.seatMoves.length, 0, 'never the seat-fallback machinery -- the first attempt already proved pi-deepseek could run');
+  assert.equal(result.reviewer.launchRefused, false, 'cleared -- this result must never be misread as a pre-dispatch refusal by anything downstream');
+  assert.match(result.reviewer.reason, /first attempt reported failed with no findings or reason/);
+  assert.match(result.reviewer.reason, /idle prompt/i, 'the retry\'s own real (adopt-route) failure is named');
+  // Exactly two adopt attempts (the first, and the one retry) -- never a
+  // third worker started on the backup entry.
+  assert.equal(h.order.filter((step) => step === 'adopt-worktree-create').length, 2, 'exactly two adopt attempts: the first attempt and the one retry, no more');
+  assert.equal(h.orca.workerStartCalls().filter((call) => call.agent === 'codex').length, 0, 'never falls over to the backup entry');
+  // The first attempt genuinely ran and genuinely spent; the refused retry
+  // spent nothing -- the real figure must survive, not be replaced by the
+  // backup machinery's own accounting (which never even ran here).
+  assert.equal(result.reviewer.cost.neverStarted, undefined);
+  assert.equal(result.reviewer.cost.totalTokens, COST.totalTokens);
+});
