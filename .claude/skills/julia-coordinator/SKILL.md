@@ -169,6 +169,56 @@ For the current step of the current item:
      say on the card which model actually ran. This path has no `worker-show`/`workerAbandon` supervision, so step 3
      below (Verify) is the only place its evidence gets checked -- read the worktree's actual git
      commit yourself; there is no `collectWorkerResult`-equivalent for this path yet.
+   - **The reviewer moves to Command Code, with a Flash shadow (Todd's 15:01:54Z Decision,
+     2026-09-22).** `reviewer-backup` now launches DeepSeek Pro through Command Code's GOAT plan,
+     not native DeepSeek -- same dispatch shape as above (`run-pi-seat.mjs reviewer-backup`), the
+     seat resolves its own provider, model and secret field, nothing else about the dispatch
+     changes. **Beside every real `reviewer-backup` review, also dispatch
+     `run-pi-seat.mjs reviewer-shadow-flash`** on the same candidate, the same way -- its own
+     worktree, its own terminal, waited on the same way. **The shadow never decides anything**:
+     record its verdict and cost line next to the real review's, but the real review's verdict is
+     the one the step's pass/fail turns on. After ten paired reviews, report on the card whether
+     Flash caught every serious finding Pro caught and where they disagreed, per the 13:43Z
+     Decision -- that comparison is the trial's actual deliverable, not a one-off curiosity.
+     **The cost line is computed from token counts and `graph/rate-table.mjs`'s
+     `commandcode/deepseek-v4-pro` / `commandcode/deepseek-v4-flash` entries** (`costOf`), not
+     read from Pi's own `usage.cost` -- Pi's built-in price list does not know this provider and
+     prints zero. **The first real review's rate-table figure gets checked against the Command
+     Code dashboard** before being trusted as accurate, per the same Decision -- report the
+     comparison on the card. **Codex is the backup reviewer only now** (`seat-labels.mjs
+     fallback` still resolves it the same way, on a cap or a same-family clash) -- it is never the
+     primary again unless a future Decision says so. A review already in flight when this Decision
+     landed finishes on whatever provider it started on; only the *next* dispatch moves. Full
+     detail and the model-id gotcha (Command Code's ids are namespaced,
+     `deepseek/deepseek-v4-pro`/`deepseek/deepseek-v4-flash` -- the bare native-DeepSeek spelling
+     400s there): `ops/service-dropbox/README.md`'s "Command Code as the reviewer's Pi provider"
+     section.
+   - **Builder seat: Gemini (Antigravity, `agy`), started by hand, until step 6 gives the
+     controller its own route (Todd's 13:51Z Decision, 2026-09-22).** Claude's weekly allowance
+     was forecast to run out before Friday's reset, so from this dispatch on, resolve the builder
+     seat to Gemini rather than `SEAT_TABLE.builder`'s `claude`/`pi-deepseek` pair, and dispatch it
+     yourself the same way step 6's own build brief has the controller do it: start `agy` in the
+     worker's fresh worktree and wait until it has **fully** started before touching it further
+     (adopting too early loses the task text while still reporting `input_accepted` -- the same
+     trap the Pi route above and step 6 round 1's finding 3 both hit); pre-trust that worktree in
+     `agy`'s trust list *before* starting it, not after; once started, hand it to Orca with `orca
+     orchestration worker-start --terminal <handle>` (never `--agent`); send the real acceptance
+     criteria as the one dispatch, never the handover's own placeholder text; wait for its one
+     report through the mailbox like every other seat, no screen-polling; and read its cost line
+     the same way as any other worker's -- model, tokens, peak context, minutes, and Gemini's
+     allowance used, never blank or estimated. **Reviews for a Gemini-built step go to the
+     `reviewer-backup` seat (DeepSeek Pro, through Command Code), not Claude and not Codex as
+     primary** (Todd's 15:01:54Z Decision, superseding the 13:51Z interim "stay on Codex" -- the
+     GOAT trial went live the same day, so the reviewer moved off Codex immediately rather than
+     waiting for step 6 to merge). **Codex is the backup reviewer only** now, exactly as
+     `SEAT_TABLE.reviewer`'s own `{ primary: 'pi-deepseek', backup: 'codex' }` already read before
+     this Decision -- the change is what `pi-deepseek` launches through, not the table shape.
+     **The coordinator (orchestrator seat) itself stays Claude** -- this Decision is the
+     builder/reviewer seats only. The family rule is unchanged: DeepSeek reviewing a Gemini
+     (Google) build is a different family regardless, so nothing about
+     `assertCanPickDifferentFamilies` changes. No new spend, and the firewall rule stays
+     runner-only (04:07Z boundaries, carried over). Full detail: runbook, "Builders run on Gemini,
+     started by hand", and "The reviewer moves to Command Code, with a Flash shadow" just below.
 
    Either way, the worktree is fresh and top-level -- **not** the shared registered
    `/home/runner/julia-next` checkout. Two reasons, not one: criterion 2 requires an *isolated*

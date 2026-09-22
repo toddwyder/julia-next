@@ -26,14 +26,34 @@ export const SEATS = {
     secretField: 'deepseek',
     piArgs: (mode) => ['--provider', 'deepseek', '--model', 'deepseek-v4-flash', '-p', '--mode', mode],
   },
-  // The reviewer backup is DeepSeek Pro on the native provider (JUL-89). It
-  // used to be GLM, which the cost rule bars (about $10 on one issue); a
-  // DeepSeek Pro review costs about three cents (proven live 2026-09-20).
+  // The reviewer backup is DeepSeek Pro, through Command Code's GOAT plan
+  // (JUL-98, Todd's 15:01:54Z Decision), not the native DeepSeek provider --
+  // moved off Codex-as-primary-reviewer immediately, not after step 6
+  // merges, once the 13:43Z probe on this card proved Command Code returns
+  // real token counts for both DeepSeek models. The model id is namespaced
+  // (`deepseek/deepseek-v4-pro`), confirmed live against Command Code's own
+  // `/models` listing -- the bare `deepseek-v4-pro` id 400s with
+  // `unsupported_model` on this endpoint. Routing needs the `commandcode`
+  // provider entry in `runner`'s `~/.pi/agent/models.json` (canonical copy:
+  // `ops/service-dropbox/pi-models.commandcode.json`) installed first.
+  // It used to be GLM, which the cost rule bars (about $10 on one issue);
   // GLM has since been removed everywhere (JUL-93): no seat launches it.
   'reviewer-backup': {
-    envVar: 'DEEPSEEK_API_KEY',
-    secretField: 'deepseek',
-    piArgs: (mode) => ['--provider', 'deepseek', '--model', 'deepseek-v4-pro', '-p', '--mode', mode],
+    envVar: 'COMMANDCODE_API_KEY',
+    secretField: 'commandcode',
+    piArgs: (mode) => ['--provider', 'commandcode', '--model', 'deepseek/deepseek-v4-pro', '-p', '--mode', mode],
+  },
+  // The V4 Flash shadow (JUL-98, Todd's 13:43Z + 15:01:54Z Decisions):
+  // dispatched by the coordinator alongside every real reviewer-backup
+  // review, on the same candidate. It never decides anything -- its verdict
+  // and cost line are recorded next to the real review's, nothing more --
+  // and is what the 13:43Z Decision's Flash-vs-Pro comparison is built from
+  // after ten paired reviews. Same provider and secret as reviewer-backup;
+  // only the model differs.
+  'reviewer-shadow-flash': {
+    envVar: 'COMMANDCODE_API_KEY',
+    secretField: 'commandcode',
+    piArgs: (mode) => ['--provider', 'commandcode', '--model', 'deepseek/deepseek-v4-flash', '-p', '--mode', mode],
   },
   // The orchestrator's DeepSeek route (JUL-79 step 3, `pi-deepseek` in
   // graph/seat-table.mjs). Its config is byte-for-byte builder-backup's --

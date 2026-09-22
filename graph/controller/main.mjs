@@ -33,7 +33,7 @@ import { runControllerCheck, READY_COLUMN } from './core.mjs';
 import { createControllerBoard } from './board.mjs';
 import { runBuildAndReview } from './step-runner.mjs';
 import { createSuiteRunner } from './test-run.mjs';
-import { testRunLine } from './test-run.mjs';
+import { testRunLine, testRunJournalLine } from './test-run.mjs';
 import { createAxiomMirror } from './mailbox.mjs';
 import { nextColumnFor, CONTROLLER_LAST_COLUMN } from './columns.mjs';
 import { stepReportComment } from './card-steps.mjs';
@@ -233,6 +233,11 @@ export async function carryCard({
   }
 
   const testRun = outcome.testRun;
+  // The journal carries the same test result the card does -- which tests
+  // failed, and whether the worktree it was measured in matched the commit --
+  // so `journalctl --user -u julia-controller` can answer both without the
+  // worktree, which is gone by the time anyone asks (JUL-98 step 5, sixth fix).
+  if (testRun) log(`[controller] ${card.identifier}: ${testRunJournalLine(testRun)}`);
   if (!outcome.ok) {
     // The card stays where it is. It is TOLD why, once, with whatever figures
     // were read -- a step that failed still spent money, and the card is where

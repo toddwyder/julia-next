@@ -47,19 +47,50 @@ test('builder-backup spawns pi with DEEPSEEK_API_KEY in env, never in argv', () 
   assert.ok(!spec.args.includes('super-secret-deepseek-token'));
 });
 
-test('reviewer-backup routes to Pi + DeepSeek Pro on the native provider, secret in env only (JUL-89)', () => {
+test('reviewer-backup routes to Pi + DeepSeek Pro through Command Code, secret in env only (JUL-98, 15:01:54Z Decision)', () => {
   const spec = buildPiSpawnSpec('reviewer-backup', 'review this', {
     mode: 'rpc',
     readSecretImpl: (field) => {
-      assert.equal(field, 'deepseek');
-      return 'super-secret-deepseek-token';
+      assert.equal(field, 'commandcode');
+      return 'super-secret-commandcode-token';
     },
   });
   assert.equal(spec.command, 'pi');
-  assert.deepEqual(spec.args, ['--provider', 'deepseek', '--model', 'deepseek-v4-pro', '--thinking', 'medium', '-p', '--mode', 'rpc', '--', 'review this']);
-  assert.equal(spec.env.DEEPSEEK_API_KEY, 'super-secret-deepseek-token');
+  assert.deepEqual(spec.args, ['--provider', 'commandcode', '--model', 'deepseek/deepseek-v4-pro', '--thinking', 'medium', '-p', '--mode', 'rpc', '--', 'review this']);
+  assert.equal(spec.env.COMMANDCODE_API_KEY, 'super-secret-commandcode-token');
   // Never argv, never a shell string.
-  assert.ok(!spec.args.some((arg) => arg.includes('super-secret-deepseek-token')));
+  assert.ok(!spec.args.some((arg) => arg.includes('super-secret-commandcode-token')));
+});
+
+test('reviewer-shadow-flash routes to Pi + DeepSeek Flash through Command Code, same secret field as reviewer-backup (JUL-98, 13:43Z + 15:01:54Z Decisions)', () => {
+  const spec = buildPiSpawnSpec('reviewer-shadow-flash', 'review this', {
+    mode: 'rpc',
+    readSecretImpl: (field) => {
+      assert.equal(field, 'commandcode');
+      return 'super-secret-commandcode-token';
+    },
+  });
+  assert.equal(spec.command, 'pi');
+  assert.deepEqual(spec.args, ['--provider', 'commandcode', '--model', 'deepseek/deepseek-v4-flash', '--thinking', 'medium', '-p', '--mode', 'rpc', '--', 'review this']);
+  assert.equal(spec.env.COMMANDCODE_API_KEY, 'super-secret-commandcode-token');
+  assert.ok(!spec.args.some((arg) => arg.includes('super-secret-commandcode-token')));
+});
+
+// The two model ids reviewer-backup/reviewer-shadow-flash pass to `pi
+// --model` must be exactly the ids the committed models.json fragment
+// declares (installed at runner's ~/.pi/agent/models.json, README.md) --
+// otherwise Pi has a provider entry with no matching model, or a launch
+// asks for a model Pi was never told about. Both fail the same way: a 400
+// `unsupported_model` no test in this file would otherwise catch.
+test('the committed Command Code models.json fragment declares exactly the model ids reviewer-backup and reviewer-shadow-flash actually launch', () => {
+  const fragment = JSON.parse(readFileSync(new URL('./pi-models.commandcode.json', import.meta.url), 'utf8'));
+  const declaredIds = fragment.providers.commandcode.models.map((m) => m.id).sort();
+  const launchedIds = ['reviewer-backup', 'reviewer-shadow-flash']
+    .map((seat) => SEATS[seat].piArgs('json')[SEATS[seat].piArgs('json').indexOf('--model') + 1])
+    .sort();
+  assert.deepEqual(declaredIds, launchedIds);
+  assert.equal(fragment.providers.commandcode.baseUrl, 'https://api.commandcode.ai/provider/v1');
+  assert.equal(fragment.providers.commandcode.apiKey, '$COMMANDCODE_API_KEY', 'a literal secret must never be committed here');
 });
 
 // The cost rule (JUL-89, finished by JUL-93): GLM is barred and removed. No seat
@@ -260,11 +291,14 @@ test('supervisePiSeat: a normal successful turn exits 0 and prints nothing to st
 test('the interactive launch drops -p and the json mode, and keeps the seat\'s provider, model, thinking and secret', () => {
   const spec = buildPiSpawnSpec('reviewer-backup', null, { interactive: true, effort: 'high', readSecretImpl: () => 'SECRET' });
   assert.equal(spec.command, 'pi');
-  assert.deepEqual(spec.args, ['--provider', 'deepseek', '--model', 'deepseek-v4-pro', '--thinking', 'high']);
+  // The reviewer backup moved to Command Code's GOAT plan on main (PR 90,
+  // Todd's 15:01:54Z Decision): the interactive launch carries whatever the
+  // SEAT DEFINITION says, which is now the namespaced Command Code model id.
+  assert.deepEqual(spec.args, ['--provider', 'commandcode', '--model', 'deepseek/deepseek-v4-pro', '--thinking', 'high']);
   assert.ok(!spec.args.includes('-p'), 'a one-shot cannot report to the mailbox');
   assert.ok(!spec.args.includes('--mode'));
   assert.ok(!spec.args.includes('--'), 'there is no prompt: Orca types the brief in when it adopts the terminal');
-  assert.equal(spec.env.DEEPSEEK_API_KEY, 'SECRET', 'the secret still reaches the child, and only the child');
+  assert.equal(spec.env.COMMANDCODE_API_KEY, 'SECRET', 'the secret still reaches the child, and only the child');
 });
 
 test('the one-shot launch is unchanged by the interactive one', () => {

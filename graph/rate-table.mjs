@@ -122,6 +122,36 @@ export const RATE_TABLE = {
       source: 'agy -p "/usage" --output-format json on this host (agy 1.2.7/1.2.8); model id from `agy models`',
       checkedOn: '2026-09-22',
     },
+    // Command Code's GOAT plan (JUL-98, Todd's 13:43Z + 15:01:54Z Decisions):
+    // the reviewer's DeepSeek route, both the real review (Pro) and the
+    // Flash shadow. Own entries, own vendor -- Command Code is a distinct
+    // gateway from native DeepSeek (its own `/models` listing uses the
+    // namespaced id `deepseek/deepseek-v4-pro`, and the bare native-spelled
+    // id 400s there), so a price divergence between the two providers must
+    // never silently blend into one number. As of this check the published
+    // numbers are IDENTICAL to native DeepSeek's own list price and share
+    // the same peak/off-peak schedule -- Command Code passes the underlying
+    // vendor's price straight through rather than adding its own markup, at
+    // least for these two models. Costed the same way as `pi-deepseek`
+    // (see `costOf`'s `commandcode` branch) until the first real review's
+    // figure is checked against the Command Code dashboard, per the
+    // 15:01:54Z Decision.
+    'commandcode/deepseek-v4-pro': {
+      vendor: 'commandcode',
+      offPeak: { input: 0.66, output: 1.98, cacheRead: 0.02 },
+      peak: { input: 1.32, output: 3.96, cacheRead: 0.04 },
+      contextWindow: 1000000,
+      source: 'https://commandcode.ai/models/deepseek-v4-pro',
+      checkedOn: '2026-09-22',
+    },
+    'commandcode/deepseek-v4-flash': {
+      vendor: 'commandcode',
+      offPeak: { input: 0.15, output: 0.6, cacheRead: 0.003 },
+      peak: { input: 0.3, output: 1.2, cacheRead: 0.006 },
+      contextWindow: 1000000,
+      source: 'https://commandcode.ai/models/deepseek-v4-flash',
+      checkedOn: '2026-09-22',
+    },
   },
 };
 
@@ -156,7 +186,7 @@ export function costOf(model, usage = {}, { at = new Date() } = {}) {
     return (uncached * r.input * inMul + n('cachedInput') * r.cachedInput * inMul
       + n('cacheWrite') * r.cacheWrite * inMul + n('output') * r.output * outMul) / PER;
   }
-  if (r.vendor === 'pi-deepseek') {
+  if (r.vendor === 'pi-deepseek' || r.vendor === 'commandcode') {
     const t = isDeepseekPeak(at) ? r.peak : r.offPeak;
     return (n('input') * t.input + n('output') * t.output + n('cacheRead') * t.cacheRead) / PER;
   }

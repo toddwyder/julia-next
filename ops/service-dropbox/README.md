@@ -13,9 +13,10 @@ the group named in `dropbox.mjs`'s `FIELD_GROUPS`:
 | sentry, supabase, powersync, axiom, linear | `orchestrator-svc` only |
 | linear-app-id, linear-app-secret (the controller's own Linear identity, JUL-98) | `orchestrator-svc` only |
 | deepseek | `runner` AND `orchestrator-svc`, via a dedicated `deepseek-readers` group (builder backup + `orchestrator-deepseek` route) |
+| commandcode | `runner` AND `orchestrator-svc`, via a dedicated `commandcode-readers` group (Pi route, same shape as deepseek, plus a coordinator-run probe) -- JUL-98, Todd's 13:43Z Decision (Command Code GOAT reviewer trial) |
 
 `runner` is never added to the `orchestrator-svc` group itself -- that would let it read every
-orchestrator-only field (including `linear`), not just the two it's meant to hold.
+orchestrator-only field (including `linear`), not just the fields it's meant to hold.
 
 ## Architecture
 
@@ -44,15 +45,23 @@ of the old value is kept), and a blank box leaves the saved value alone. Re-armi
    the builder that reads `deepseek` (JUL-77).
 3. **JUL-77 / JUL-79:** create the `deepseek-readers` group and add both accounts to it -- this
    is a field two different accounts must read, so it gets its own group rather than widening
-   either account's existing one. (A `zai-readers` group existed for GLM until JUL-93 removed it.) After adding members, restart both
+   either account's existing one. (A `zai-readers` group existed for GLM until JUL-93 removed it.)
+   **JUL-98, 13:43Z Decision:** the same reasoning gives Command Code its own `commandcode-readers`
+   group -- do both in the same pass. After adding members, restart both
    Orca daemons (a daemon's supplementary groups are fixed at start):
    ```
-   for g in deepseek-readers; do
+   for g in deepseek-readers commandcode-readers; do
      groupadd "$g"
      usermod -aG "$g" runner
      usermod -aG "$g" orchestrator-svc
    done
    ```
+   **Do not restart either Orca daemon while any worker is running** (Todd, 2026-09-22) -- a
+   daemon restart tears down every terminal it owns mid-work, the same way the 06:41Z GPU crash
+   did (see the coordinator runbook's account of that incident). Check `orca orchestration
+   worker-list` / `orca terminal list` on both environments first, and if `commandcode-readers`
+   is the only thing waiting on a restart, hold it until the run in progress (JUL-98 step 6 round
+   4, as of this Decision) has landed its review.
 4. Create the secrets directory. Every field's *file* is chmod 0440 to its own owning group
    (see the table above), but the *directory* itself needs `+x` (traverse, not list) for every
    account that reads anything inside it -- `runner` included, since JUL-77 added fields it
@@ -101,6 +110,37 @@ Once used (or after 24 hours), the box is off. To use it again for a future roun
 ```
 sudo -u dropbox-svc node /opt/orca-runner/service-dropbox/dropbox.mjs --rearm
 ```
+
+## Command Code as the reviewer's Pi provider (JUL-98, Todd's 15:01:54Z Decision)
+
+`run-pi-seat.mjs`'s `reviewer-backup` and `reviewer-shadow-flash` seats route through Command
+Code's OpenAI-completions-compatible endpoint, not DeepSeek's native API -- the GOAT reviewer
+trial (13:43Z Decision), moved off Codex-as-primary-reviewer as soon as the probe on JUL-98
+proved Command Code returns real token counts, not after step 6 merges.
+
+This needs a provider entry in `runner`'s own Pi config, **not tracked by `~/.pi/agent/`** (that
+directory is Pi's own state, per-account and per-host, the same reason `dropbox.env` isn't
+committed). The canonical shape lives in this repo instead, so it survives a fresh `runner`
+account or a rebuilt box:
+
+```
+sudo -u runner mkdir -p /home/runner/.pi/agent
+sudo -u runner cp ops/service-dropbox/pi-models.commandcode.json /home/runner/.pi/agent/models.json
+```
+
+(If `runner` ever needs another custom provider beside this one, merge the two files' `providers`
+objects by hand -- this command overwrites, it doesn't merge.)
+
+The `apiKey` field is `"$COMMANDCODE_API_KEY"` -- an environment-variable reference Pi resolves
+at request time, never a literal secret, so this file carries nothing sensitive and is safe to
+commit. `run-pi-seat.mjs` supplies that variable from the drop box's `commandcode` field the same
+way every other seat's secret reaches its child process: in `env`, never argv (see
+`buildPiSpawnSpec`).
+
+**The model ids are namespaced**, confirmed live against Command Code's own `/models` listing:
+`deepseek/deepseek-v4-pro` and `deepseek/deepseek-v4-flash`. The bare `deepseek-v4-pro` id (the
+native-DeepSeek spelling `builder-backup` still uses) fails on this endpoint with `400
+unsupported_model` -- the two providers are not interchangeable by model id.
 
 ## Why a dedicated account, and why a sudo helper instead of direct writes
 

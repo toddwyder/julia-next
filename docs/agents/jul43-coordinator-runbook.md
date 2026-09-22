@@ -181,6 +181,27 @@ in JUL-61). `-J` joins wrapped lines back into one before you read it out:
 tmux capture-pane -t <session> -p -J
 ```
 
+**Both Orca daemons crash under Xvfb without `LIBGL_ALWAYS_SOFTWARE=1` (JUL-98, 2026-09-22),
+fixed.** Each daemon runs headless under Xvfb, a virtual X server with no real GPU/DRI device
+behind it. Electron's GPU process still tries to initialize hardware acceleration there, fails,
+and brings the whole process down: `FATAL:.../gpu_data_manager_impl_private.cc:416] GPU process
+isn't usable. Goodbye.` followed by `Orca serve exited via SIGILL.`. `Restart=on-failure` brings
+the daemon back within ~5-20 seconds, but the restart **kills every terminal that daemon owns**,
+mid-work, with no chance for a running coordinator or builder to report anything -- found live
+when it killed a coordinator and a builder at the same instant. `journalctl` back to server boot
+showed the identical signature had already fired at least six times before that, unrecorded,
+since 2026-09-17 -- it had been happening for almost a week and nothing was watching for it.
+**A first attempt (`--disable-gpu` in `ORCA_SERVE_ARGS`) crash-looped the daemon outright**
+(`Unknown flag --disable-gpu for command: serve`): the systemd `ExecStart` runs `/usr/bin/orca-ide`,
+a wrapper script that runs `serve` in Node-only mode (`ELECTRON_RUN_AS_NODE=1`) and validates argv
+against a strict whitelist -- the actual crashing Electron instance is spawned internally as a
+subprocess `serve` never exposes to a CLI flag. **Real fix:** `LIBGL_ALWAYS_SOFTWARE=1` added as
+a plain env var (not a CLI flag) to both daemons' env files, forcing Mesa's software GL renderer
+so Chromium's GPU process gets a working context under Xvfb instead of failing to find hardware.
+Source of truth, verification and reapply-on-rebuild steps: `ops/orca-daemons/README.md`. Proven
+live: both daemons restarted clean (`NRestarts=0`, stable), and the crash signature does not
+recur in `journalctl` after the fix.
+
 ---
 
 ## Current roles (JUL-61)
@@ -439,15 +460,24 @@ the board work proved, and 9 about the coordinator's own tool grants.
    Bash(node scripts/check-readiness.mjs:*), Bash(node scripts/collect-worker-result.mjs:*),
    Bash(node scripts/verify-reviewer-worktree.mjs:*), Bash(node scripts/coordinator-events.mjs:*),
    Bash(node --env-file=/etc/orchestrator-svc/.env.publisher scripts/publish-pr.mjs:*),
+   Bash(node scripts/publish-pr.mjs:*),
    Bash(node --env-file=/etc/orchestrator-svc/.env.publisher scripts/merge-pr.mjs:*),
+   Bash(node scripts/merge-pr.mjs:*),
    Bash(orca *)
    ```
 
-   `publish-pr.mjs` and `merge-pr.mjs` sit behind the publisher env-file prefix. A script with no
-   grant cannot be run even though it sits in the checkout -- `scripts/board-setup.mjs`, for
-   example, has no grant yet. Adding a script to the skill's procedure means adding its grant in
-   `startOrchestrator` in the same PR (see "The headless launch needs its own tool grants"
-   below). `node -e` is NOT granted, and neither is `env`, `base64` or a `sudo` command. A
+   `publish-pr.mjs` and `merge-pr.mjs` are granted **both** with and without the publisher
+   env-file prefix (fixed 2026-09-22, "Seven findings" item 5 below has the incident) --
+   a session calling either the plain relative-path form (matching every other script on this
+   list) or the `--env-file` form reaches the script either way, and the script itself
+   self-loads the credential file when it isn't already in the environment
+   (`loadPublisherCredentialFile`), so neither form is missing the credential either. A script
+   with no grant at all still cannot be run even though it sits in the checkout --
+   `scripts/board-setup.mjs`, for example, has no grant yet. Adding a script to the skill's
+   procedure means adding its grant in `startOrchestrator` in the same PR (see "The headless
+   launch needs its own tool grants" below), **granted in the exact shape every session actually
+   calls it** -- when in doubt, grant the plain relative-path form alongside any credential-
+   prefixed form. `node -e` is NOT granted, and neither is `env`, `base64` or a `sudo` command. A
    coordinator that needs a one-off computation must use a granted script or an Orca terminal,
    not an inline node expression.
 
@@ -1035,8 +1065,46 @@ but **not** the `node --env-file=/etc/orchestrator-svc/.env.publisher scripts/ch
 form this runbook's own Bootstrap section shows. The `--env-file` prefix makes it a different
 command, so in an unattended run the documented invocation is refused. **Use the plain form**
 (`node scripts/check-readiness.mjs`) in a coordinator run; the `--env-file` prefix is for a
-laptop or interactive session, where it is granted by hand. Only `publish-pr.mjs` and
-`merge-pr.mjs` are granted with their `--env-file` prefix.
+laptop or interactive session, where it is granted by hand.
+
+**`publish-pr.mjs` and `merge-pr.mjs` are now granted in both forms (JUL-98 step 6, fixed
+2026-09-22 ~13:2xZ).** They used to be granted with the `--env-file` prefix only, which is the
+same trap as `check-readiness.mjs` above, pointed the other way: the JUL-98 step 6 round 3
+coordinator (13:0xZ) called `node scripts/publish-pr.mjs push ...` -- the plain form, matching
+the pattern every *other* granted script uses -- and the Bash permission matcher refused it
+outright, because that exact literal prefix had no grant. The push never ran; the round's work
+sat on the runner's disk, parked, until a laptop session diagnosed it (compare the transcript
+`"command":"node scripts/publish-pr.mjs push ..."` against the grant list of the session before
+it, which used the `--env-file` form and pushed fine). The **root cause was the same shape as
+the 04:37Z brace-group finding below ("Laptop session: relaunched twice...")**: an exact-literal-
+prefix permission grant refuses any invocation shape it wasn't written for, and nothing forces a session
+to remember which shape a given script needs.
+
+The fix has two parts, both merged in the same PR as this runbook entry -- fixing only the grant
+list would have left the credential itself still silently absent for the plain form, and fixing
+only the credential loading would have left the plain form refused before it ever reached that
+code:
+
+1. **The grant list now allows both invocation shapes** for `publish-pr.mjs` and `merge-pr.mjs`:
+   `Bash(node --env-file=/etc/orchestrator-svc/.env.publisher scripts/publish-pr.mjs:*)` AND
+   `Bash(node scripts/publish-pr.mjs:*)` (same pair for `merge-pr.mjs`) -- see
+   `orchestratorLaunchCommandFor` in `scripts/julia-run.mjs`.
+2. **Both scripts now self-load the credential file** (`loadPublisherCredentialFile` in
+   `scripts/publish-via-github-app.mjs`, called before `main()`) when it is not already in the
+   process's environment, using `node:util`'s `parseEnv` -- the same parser Node's own
+   `--env-file` flag uses, so a value it reads matches what `--env-file` would have produced,
+   including a PEM private key's embedded newlines. An explicit `--env-file` or a pre-set env var
+   still wins; this only fills a gap, never overwrites. In practice `julia-run.mjs`'s own
+   `ENV_PREFIX` already sources `/etc/orchestrator-svc/.env.publisher` into the coordinator's
+   shell before `claude` starts (`set -a; . <file>; set +a`), so the plain form already worked at
+   the process-environment level once the grant itself stopped refusing it -- the self-load is
+   belt-and-suspenders for any future invocation shape that does not inherit that shell (a bare
+   `node scripts/publish-pr.mjs ...` run some other way).
+
+Both `publish-pr.mjs`/`merge-pr.mjs` and any future script added to the grant list should be
+granted in the exact form every session actually calls it -- when in doubt, grant the plain
+relative-path form (matching the majority of the list) alongside any credential-prefixed form,
+rather than assuming a session will remember to type the longer one.
 
 ### 6. "The board already matches the spec" could be true while the board offered a removed model
 
@@ -1280,7 +1348,7 @@ it, then `sudo install -m 0440 -o root -g root`). Rules, as `orchestrator-svc` v
 | `systemctl disable --now julia-ready-queue.timer` | Switches the old five-minute queue off **for good** (JUL-98): stops it and removes it from the boot-time timer set. `stop` alone only lasts until the next restart, which would bring the old queue back beside the controller and let two things pick from Ready. The one exact command, no `mask`. |
 | `systemctl start` / `stop` / `restart julia-ready-queue.timer` | Control the timer. |
 | `systemctl start` / `stop` / `restart julia-ready-queue.service` | Run, stop or restart one check on demand (the service is a oneshot). |
-| `usermod -aG <group> <account>` for `{deepseek-readers} × {runner, orchestrator-svc}` | Adds a service account to a key-reader group the drop box already uses. Two exact pairs, not a pattern. |
+| `usermod -aG <group> <account>` for `{deepseek-readers, commandcode-readers} × {runner, orchestrator-svc}` | Adds a service account to a key-reader group the drop box already uses. Four exact pairs, not a pattern (`commandcode-readers` added JUL-98, Todd's 13:43Z Decision, same shape as `deepseek-readers`). |
 
 **There is no rule that installs, copies or edits a file** (removed after the PR #44 review; the
 test fails if one comes back, and on the server it also tries an `install` as `orchestrator-svc`
@@ -1771,6 +1839,73 @@ exactly as before: the never-started mark is explicit, never an absence.
 reviewed by DeepSeek through the controller — every review runs on the Codex backup until an
 adopted-terminal Pi route exists.
 
+### The test line names the failing tests, and says whether the worktree matched the commit (JUL-98 step 5, 2026-09-21)
+
+**The incident.** In the live JUL-92 run of 2026-09-21 the controller carried the card the whole
+way — builder, suite, builder cost, a reviewer seat moved to its backup, an independent review, a
+cost line for each. The step did not pass because the reviewer reported failed, and the reviewer had
+been handed `720 pass, 1 fail, 0 skipped of 721` — counts and nothing else. Nobody could tell which
+test had failed. The coordinator afterwards re-ran the suite at the very commit the builder
+produced, with the controller's own suite environment reproduced, and got 721 of 721 green; the
+worktree the controller had actually measured was already cleaned up, so the difference can never
+now be recovered.
+
+**What the test line carries now.** `testRunLine` in `graph/controller/test-run.mjs` still opens
+with exactly the sentence it always did — times, duration, `pass / fail / skipped of total`, the
+command and the worktree — and then adds:
+
+- **A worktree sentence, on every run.** `Worktree clean at <short sha>, so this result describes
+  that commit.`, or `Worktree NOT clean at <short sha>: <n> uncommitted or untracked entries (...)
+  -- this result describes the WORKTREE, not the commit.`, or, when git would not answer,
+  `Worktree state unknown (<git's first line>) ...`.
+- **A `**Failing tests**` block, only when the run failed.** One bullet per failing test carrying
+  its TAP `not ok` line and, in a fenced block, the error text node printed under it. A passing run
+  gets no block and stays exactly one line, unchanged from before this fix.
+
+`carryCard` in `graph/controller/main.mjs` writes the same facts to the journal through
+`testRunJournalLine`, which folds the block onto one physical line separated by ` | ` — a
+`journalctl --user -u julia-controller | grep` that matches a multi-line message shows only the line
+it matched.
+
+**The cap, and why.** At most **5** failing tests (`MAX_REPORTED_FAILURES`), each with at most
+**200** characters of test name (`MAX_FAILURE_NAME`) and **500** characters of error text
+(`MAX_FAILURE_TEXT`). Five is an operational display limit to keep card comments readable; further
+failures may have independent causes, and the omitted detail needs the full output on
+`result.output`. Displayed test names and error text are capped with explicit `... [cut]` markers,
+in characters (UTF-16 code units), not bytes. When cuts happen the header line describes them (`5
+of 9 shown`, `names cut at 200 characters`, `error text cut at 500 characters`), and the whole
+output stays on `result.output` for anyone who needs it. A file-level `failureType: subtestFailed`
+entry is dropped when any named failure exists, so the cap is spent on failures that name a cause.
+
+**There is deliberately no stated maximum on the rendered failure section or the total card line**
+(removed 2026-09-22, Todd's Decision, JUL-98 step 7). Two earlier attempts each claimed one derived
+from a "measured worst case" — first an estimate (`~2.5KB`), then a number measured against the
+per-entry cost alone (`6332` / `6474` characters) — and both times an independent review found a
+real, reachable case larger than the claimed bound: per-line Markdown-fence indentation multiplies
+cost in a way a per-entry measurement does not capture, so a number that looked measured was still
+effectively an estimate. The per-field caps above (5 failures, 200/500 characters, with honest cut
+notices) are the real, enforced fixes and stay. If report length ever causes a real problem, the fix
+is a cap on the *final rendered report*, measured against its own real worst case and added then —
+not a number promised in advance about pieces that compose in a way arithmetic on them alone
+doesn't predict.
+
+**Why the worktree note exists.** The controller runs the suite in the candidate **worktree**, which
+can hold files the candidate **commit** does not — anything the worker left uncommitted or
+untracked. A result measured on a dirty worktree is therefore a different claim from one measured on
+the commit, and in the incident above nothing said which one the reviewer had been given. The state
+is read with `git status --porcelain` and `git rev-parse HEAD` in the worktree, through the same
+`gitSafeDirectoryEnv` (git's `GIT_CONFIG_COUNT`/`KEY_n`/`VALUE_n` env form of `-c
+safe.directory=<path>`) the suite itself runs under — one entry, exactly that one worktree — because
+the controller runs as `orchestrator-svc` and the worktree belongs to `runner`. It is read **before**
+the suite starts, so it describes the worktree as handed to the run rather than as the run's own
+temporary files left it.
+
+**A dirty worktree does NOT refuse the step, and neither does git failing.** Saying so is this
+change's whole job; deciding what to do about a dirty worktree is a later card's, and the omission is
+deliberate. If git will not answer, the state is recorded as unknown and said to be unknown — the
+test result is still a real result. The one refusal that is unchanged is the old one: output with no
+TAP summary at all still throws, and is never reported as a silent pass.
+
 ### Starting an agent Orca has no launcher for: start it, then adopt it (JUL-98 step 6, 2026-09-22)
 
 **`worker-start --agent` knows `claude`, `codex` and `cursor`, and no flag teaches it another TUI.**
@@ -2083,6 +2218,125 @@ provider; a full review on it cost about three cents. There is no fifth seat bes
 - A DeepSeek builder paired with this DeepSeek reviewer is the same model family; the family guard
   in `scripts/seat-labels.mjs` (`fallback`), not this file, is what refuses that pair.
 
+## Builders run on Gemini, started by hand (JUL-98, Todd's 13:51Z Decision, 2026-09-22)
+
+Claude's weekly allowance was forecast to run out Thursday morning, before Friday's reset. Until
+the controller can start a Gemini worker itself (JUL-98 step 6, in progress), **the coordinator
+starts Gemini (Antigravity, `agy`) builders by hand**, from the next dispatch, through the same
+start-then-adopt route step 6's own build brief describes for the controller:
+
+1. Start `agy` in the worker's fresh worktree and **wait until it has fully started** before
+   doing anything else with it -- the same wait step 6's round-1 review (JUL-98 card, finding 3,
+   2026-09-22 06:2xZ) named for the controller's own route: adopting a Pi/Gemini terminal too
+   early loses the task text while still reporting `input_accepted` (also recorded above under
+   "Adopting a Pi terminal with `worker-start --terminal` while Pi is still starting loses the
+   task text").
+2. **Pre-trust the new worktree in `agy`'s trust list before starting it** -- not after. An
+   untrusted worktree blocks on a trust prompt no headless session can answer.
+3. **Hand it over to Orca with `worker-start --terminal <handle>`** once started, not
+   `worker-start --agent`, the same distinction the Pi/DeepSeek paragraph above draws for that
+   seat's own launch shape.
+4. **Never deliver the handover's own placeholder text as the task.** The real brief -- the step's
+   concrete acceptance criteria -- is the one thing sent, not boilerplate left over from adopting
+   the terminal.
+5. **One report through the mailbox**, exactly as every other seat -- no polling a screen to guess
+   whether Gemini is done.
+6. **The cost line is read the same way as any other seat's**, not skipped or estimated: model,
+   tokens, peak context, minutes, and Gemini's allowance used goes on the line like every other
+   worker's.
+
+**Reviews for a Gemini-built step go to the `reviewer-backup` seat (DeepSeek Pro, through Command
+Code), not Codex, as of Todd's 15:01:54Z Decision the same day** -- the interim rule below this
+paragraph ("stay on Codex, not Claude, until the GOAT reviewer trial is live") held for about
+twenty minutes: the trial went live the same day, so the reviewer moved off Codex immediately
+rather than waiting for step 6 to merge. See "The reviewer moves to Command Code, with a Flash
+shadow" below for the detail. **The coordinator itself stays Claude** -- this Decision is about
+the builder/reviewer seats only, not the orchestrator seat in `SEAT_TABLE.orchestrator`. **The
+family rule is unchanged**: DeepSeek reviewing a Gemini (Google) builder is a different family
+either way, so the existing `assertCanPickDifferentFamilies` guard in `graph/seat-table.mjs` is
+not violated by this by-hand override -- it is not itself a seat-table code change, since
+`SEAT_TABLE.builder` still names `claude`/`pi-deepseek`; Gemini is chosen by the coordinator at
+dispatch time until step 6 gives the controller its own Gemini entry to read.
+
+**Boundaries carried over unchanged from the 04:07Z Decision:** no new spend, the firewall rule
+stays runner-only, the family rule is unchanged.
+
+## The reviewer moves to Command Code, with a Flash shadow (JUL-98, Todd's 15:01:54Z Decision, 2026-09-22)
+
+The 13:43Z Decision's GOAT trial (see "Command Code as the reviewer's Pi provider" in
+`ops/service-dropbox/README.md` for the install and model-id detail) was scoped to start "after
+step 6 merges." The probe run on this card the same day (real, non-zero token counts for both
+`deepseek/deepseek-v4-pro` and `deepseek/deepseek-v4-flash`) cleared that trial's own pass bar
+early, so Todd moved the date up: **reviews move off Codex to Command Code immediately, not after
+step 6.**
+
+- **`reviewer-backup` (`ops/service-dropbox/run-pi-seat.mjs`) now launches DeepSeek Pro through
+  Command Code**, not native DeepSeek -- same dispatch shape, same secret-handling rule (env only,
+  never argv), only the provider/model strings and the secret field (`commandcode`, not
+  `deepseek`) changed. `SEAT_TABLE.reviewer`'s shape (`{ primary: 'pi-deepseek', backup: 'codex'
+  }`) did not need to change -- it already read DeepSeek-primary, Codex-backup before this
+  Decision; what changed is what `pi-deepseek` launches *through*.
+- **A new seat, `reviewer-shadow-flash`**, launches DeepSeek Flash through the same provider. The
+  coordinator dispatches it **beside every real `reviewer-backup` review**, on the same candidate,
+  the same way (its own worktree, its own terminal). **It never decides anything** -- record its
+  verdict and cost line next to the real review's; the step's pass/fail still turns on the real
+  review alone. After ten paired reviews, the 13:43Z Decision's own deliverable is due: report on
+  the card whether Flash caught every serious finding Pro caught, and where they disagreed.
+- **The cost line is computed, not read from Pi.** Pi's own `usage.cost` prints zero for this
+  provider (confirmed live on the probe: `commandcode` has no entry in Pi's built-in price list).
+  `graph/rate-table.mjs`'s `costOf` now has `commandcode/deepseek-v4-pro` and
+  `commandcode/deepseek-v4-flash` entries, same shape as `pi-deepseek`'s (peak/off-peak, same
+  published numbers as native DeepSeek -- Command Code passes the underlying vendor's list price
+  straight through, at least for these two models, confirmed against Command Code's own
+  `/models/deepseek-v4-pro` and `/models/deepseek-v4-flash` pages, not assumed identical). **The
+  first real review's rate-table figure must be checked against the Command Code dashboard**
+  before it is trusted, per the Decision -- that check is still owed as of this PR; report it on
+  the card once done.
+- **Codex is the backup reviewer only now.** `seat-labels.mjs fallback` still resolves it on a cap
+  or a same-family clash, unchanged code path. It is not the primary again unless a future
+  Decision says so.
+- **A review already running when this Decision landed finishes on whatever it started on** --
+  only the next dispatch moves. Nothing about an in-flight review is interrupted or re-run.
+
+**Not done in this PR:** the first real review's cost-line-vs-dashboard check (needs a live
+review to check it against), and the ten-paired-reviews Flash-vs-Pro report (needs ten real
+reviews to exist first). Both are owed, tracked on JUL-98, not silently dropped.
+
+## The DeepSeek (Pi) cost reader summed only the last turn, undercounting every multi-turn seat (JUL-98, found 2026-09-22)
+
+**Found live, on step 7's first real Command Code review.** The coordinator computed the
+review's token total by hand off the seat's own JSON stream and got a number (55,616 total, 535
+output) that could not have produced the 10.6KB review file that same session wrote. Reading
+`graph/controller/cost.mjs`'s `deepseekExtractFromSeatStream` found why: it took `usage` off only
+the **last** assistant `message_end` event, on the same assumption Codex's reader correctly makes
+for Codex (`codexExtractFromRollout`'s "the last `token_count` is the total" -- Codex's own
+`total_token_usage` really is cumulative) -- but DeepSeek/Pi's `usage.*` on each `message_end` is
+that **one turn's own figures**, not a running total. The existing multi-turn fixture
+(`graph/fixtures/orca-1.4.205/cost.pi.seat-json-stream.multi-turn.jsonl`) already proved this and
+nobody had read it that way: turn 2's `usage.input` (226) is smaller than turn 1's (1975), which a
+cumulative counter cannot do.
+
+**Every DeepSeek/Pi seat's cost line has been undercounted since this reader was written** --
+`builder-backup`, `reviewer-backup` (native and now Command Code), `orchestrator-deepseek`, and
+the new `reviewer-shadow-flash` -- down to whatever the last turn alone reported, on any review or
+build that took more than one turn. A short single-turn call (like the original probe on this
+card) was never wrong; a real multi-tool-call session always was.
+
+**Fixed:** `deepseekExtractFromSeatStream` now sums `input`/`output`/`cacheRead` and
+`usage.totalTokens` across every assistant `message_end`, the same summing shape
+`claudeExtractFromTranscript` already uses for Claude (which has the analogous per-message-not-
+cumulative shape). Peak context was already correct -- `peakPromptTokens` already took the max
+over every turn, not just the last -- so only the summed totals needed the fix. Two tests in
+`scripts/controller-cost.test.mjs` previously asserted the old, now-disproven behavior ("the last
+assistant message_end's own usage", "not a re-sum of its usage fields") against the same fixture;
+both are corrected to assert the summed values the fixture's real numbers support.
+
+**No cost-line shape changed** -- `tokens`, `totalTokens`, `usd` are still exactly the fields
+`seatCostLine`/`assertCostLineComplete`/`formatCostLine` expect. Every already-posted DeepSeek/Pi
+cost line on this card from before this fix understates the true figure for any seat that ran more
+than one turn; not retroactively corrected, but this is why a small final message and a large real
+session's cost can look mismatched in the earlier retro lines.
+
 ## Seven findings carried from the cancelled JUL-106 (recorded 2026-09-20)
 
 JUL-106 (the watchdog) was cancelled after three rejected rounds; its detection code had been
@@ -2113,8 +2367,9 @@ and 5 on the pinned version before relying on them.**
 4. **What a queue-launched coordinator may actually run.** `scripts/julia-run.mjs` grants
    `Bash(orca *)` plus a fixed list of `node scripts/<name>.mjs` (`orca-cli`, `ready-queue`,
    `seat-labels`, `linear-cli`, `check-readiness`, `collect-worker-result`,
-   `verify-reviewer-worktree`, `coordinator-events`, and the two publisher scripts under
-   `--env-file=/etc/orchestrator-svc/.env.publisher`). So no `node -e`, no bare binary path, no
+   `verify-reviewer-worktree`, `coordinator-events`, and the two publisher scripts, each granted
+   both plainly and under `--env-file=/etc/orchestrator-svc/.env.publisher` (JUL-98 step 6, fixed
+   2026-09-22 -- see "The coordinator's granted command list refuses..." above). So no `node -e`, no bare binary path, no
    `base64`, `printenv`, `ls`, or `git` outside its own checkout. `scripts/orca-cli.mjs` exposes
    only `run-list`, `task-list` and `worker-show` on the command line. **Every dispatch action goes
    through the `orca` binary on PATH.** The coordinator skill's examples are written as
