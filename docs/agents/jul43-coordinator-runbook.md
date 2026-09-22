@@ -357,21 +357,49 @@ the board work proved, and 9 about the coordinator's own tool grants.
    ```sh
    claude -p --permission-mode acceptEdits --effort high --allowedTools Bash Read Grep Glob Write < promptfile
    ```
-4. **The Pi builder dispatch that works, end to end:**
+4. **The Pi builder dispatch that works, end to end** -- corrected 2026-09-22 (JUL-98): the
+   original form below used a `{ ...; } | consumer` brace-group, which is no longer usable (see
+   the finding right after it) and never actually ran a real dispatch as documented; a brace-free
+   heredoc piped straight into the consumer replaces it and is live-verified under the
+   coordinator's real `Bash(orca *)` grant:
 
    ```sh
    orca worktree create --environment ovh-local --repo path:/home/runner/julia-next --name NAME --base-branch BRANCH --no-parent --setup skip
 
-   orca terminal create --environment ovh-local --worktree path:THATPATH --command "{ cat > BRIEF.md <<'BRIEF'
+   orca terminal create --environment ovh-local --worktree path:THATPATH --command "cat <<'BRIEF' | node ops/service-dropbox/run-pi-seat.mjs builder-backup --effort high
    <the step brief: ticket id, step, acceptance criteria, candidate branch>
-   BRIEF
-   cat BRIEF.md; rm -f BRIEF.md; } | node ops/service-dropbox/run-pi-seat.mjs builder-backup --effort high"
+   BRIEF"
    ```
 
-   The heredoc writes the brief into the candidate worktree (the terminal's own CWD), and the
-   brief is fed to `builder-backup` and deleted **inside the same pipeline**, so no file the
-   builder could commit ever outlives the dispatch. The environment names on the box are
-   `ovh-local` (`runner`) and `orchestrator-local` (`orchestrator-svc`), not the display names.
+   The heredoc feeds the brief straight to `builder-backup`'s stdin; it is never written to a
+   `BRIEF.md` file in the candidate worktree at all, so there is nothing for the worktree's own
+   `git status` to see and nothing to `rm` afterward -- simpler than the original two-step
+   write-then-cat-then-delete it replaces. The environment names on the box are `ovh-local`
+   (`runner`) and `orchestrator-local` (`orchestrator-svc`), not the display names.
+
+   **Claude Code's Bash permission layer refuses any brace-group compound statement outright,
+   even nested inside a quoted `--command` argument to `orca` (found 2026-09-22, JUL-98).** Two
+   independent JUL-98 coordinator launches, each carrying the exact documented
+   `--allowedTools` grant list, could do nothing beyond reads and Linear writes -- verified live
+   with three throwaway diagnostic sessions (no card touched, terminals closed after) rather than
+   guessed at:
+   - `orca --help` and `orca --help && echo DONE` -- both approved under `Bash(orca *)`.
+   - A plain `;`-separated chain and a redirect outside the working directory each fail for their
+     own ordinary reasons (the latter: "Output redirection ... blocked ... only ... allowed
+     working directories"), neither is about compound statements.
+   - A heredoc alone, and a heredoc piped straight into a consumer, are both approved.
+   - `{ echo hi; orca --help; } | cat` -- a brace-group -- is declined outright, verbatim reason
+     `Contains compound_statement`, before anything inside it runs. Nothing about `orca`, the
+     pipe, or what the braces contain: the `{ ...; ...; }` syntax itself is refused, apparently
+     scanned for anywhere in the full command string regardless of quoting context.
+   The installed Claude Code CLI (`2.1.269`) had not changed since before that evening's working
+   coordinator sessions (package install directory's mtime: 2026-09-12, untouched) -- so this is
+   either a behavior this CLI version always had that the brace-group dispatch pattern never
+   actually exercised live before, or a permission-classifier change bundled with a Claude model
+   update rather than a CLI version bump; either way, pinning the CLI version is not the fix here.
+   The brace-free heredoc-pipe form above and in the coordinator skill's own dispatch step
+   (`.claude/skills/julia-coordinator/SKILL.md`, "Running a step") is the corrected pattern going
+   forward -- never reintroduce a `{ ...; }` block in a dispatch command.
 5. **`orca terminal wait --for` accepts only `exit` and `tui-idle`.** `tui-idle` is not completion
    for a Pi or Codex agent, and even `--for exit` times out while a shell stays open after the
    agent has finished. The reliable completion signals are `pgrep -f` for the agent process and
