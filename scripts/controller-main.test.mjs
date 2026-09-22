@@ -19,7 +19,7 @@ import {
   readControllerState, writeControllerState, emptyControllerState, assertStatePathIsWritable, defaultStatePath,
 } from '../graph/controller/state.mjs';
 import { recordStart, CRASH_STARTS_THRESHOLD } from '../graph/controller/crash-loop.mjs';
-import { createRequestLedger } from '../graph/controller/wiring.mjs';
+import { createRequestLedger, ORCHESTRATOR_ENVIRONMENT } from '../graph/controller/wiring.mjs';
 import { controllerFingerprint } from '../graph/controller/eligibility.mjs';
 import { createFixtureOrca } from '../graph/controller/fixture-orca.mjs';
 
@@ -682,4 +682,54 @@ test('carryCard costs a seat as the vendor that ACTUALLY ran, not the one the ca
     },
   });
   assert.equal(seen.agent, 'codex', 'the agent the dispatch actually launched wins over the card-resolved one');
+});
+
+
+// ---------------------------------------------------------------------------
+// JUL-98 step 6 ROUND 2, finding 3 (the half a builder can own). The live proof
+// of round 1 drove `runWorkerStep` directly and stripped every `--environment`
+// and `--on`, collapsing the two-daemon boundary the real controller runs
+// across. The coordinator supplies the controller-driven card evidence; what is
+// pinned here is that the production path it will take is wired at all -- every
+// adopt boundary reaching the route, and the controller's own daemon named.
+// Drop one of these six and a live Gemini card fails at the first call the
+// route makes, which is a worktree create on the wrong daemon.
+// ---------------------------------------------------------------------------
+
+test('carryCard hands the START-THEN-ADOPT route every Orca boundary it needs, and the controller\'s own environment', async () => {
+  const boundaries = {
+    workerStartImpl: async () => ({}),
+    worktreeCreateImpl: async () => ({}),
+    prepareWorktreeImpl: async () => ({}),
+    agentTerminalCreateImpl: async () => ({}),
+    terminalWaitImpl: async () => ({}),
+    terminalCloseImpl: async () => ({}),
+    removeWorktreeImpl: async () => ({}),
+    observeStartImpl: async () => ({}),
+    checkWaitImpl: async () => ({}),
+    releaseImpl: async () => ({}),
+  };
+  let seen = null;
+  await carryCard({
+    card: { id: 'i1', identifier: 'JUL-92', title: 'a card walks the board by itself' },
+    runId: 'run_1',
+    from: 'term_controller',
+    boundaries,
+    board: { async comment() { return { id: 'c1' }; }, async moveCard() {} },
+    publisher: {},
+    readSeatCost: async () => ({}),
+    comments: { async postOnce() { return { posted: true }; } },
+    runBuildAndReviewImpl: async (options) => {
+      seen = options;
+      return { ok: false, reason: 'stopped on purpose', costText: [], testRun: null, seatMoves: [] };
+    },
+  });
+
+  assert.equal(seen.environment, ORCHESTRATOR_ENVIRONMENT, "the controller's own daemon, which is where its Run lives");
+  // Each boundary is the REAL one, by identity: a route handed a boundary the
+  // wiring did not build is a route that will fail live and nowhere else.
+  for (const name of ['worktreeCreateImpl', 'prepareWorktreeImpl', 'agentTerminalCreateImpl', 'terminalWaitImpl', 'terminalCloseImpl', 'removeWorktreeImpl']) {
+    assert.equal(seen.adoptBoundaries[name], boundaries[name], `the adopt route was handed no ${name}`);
+  }
+  assert.equal(seen.workerStartImpl, boundaries.workerStartImpl, 'and the adoption itself still goes through the one worker-start');
 });

@@ -15,7 +15,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { runWorkerStep, runBuildAndReview, attemptTag } from '../graph/controller/step-runner.mjs';
+import { runWorkerStep, runBuildAndReview, attemptTag, DEFAULT_RECONCILE_WAIT_MS } from '../graph/controller/step-runner.mjs';
 import { createSuiteRunner } from '../graph/controller/test-run.mjs';
 import { createFixtureWorkerOrca, loadOrcaFixture } from '../graph/controller/fixture-orca.mjs';
 import { turnStartedFromSend } from '../graph/controller/turn-start.mjs';
@@ -158,9 +158,18 @@ test('one step, in one order: dispatch, prove the turn started, sleep on the mai
   ]);
 });
 
-test('a worker that never started is caught at once: the mailbox is never opened and nothing is waited on', async () => {
+test('a worker that never started is caught at once: ONE bounded reconciliation, never the full sleep', async () => {
   const h = harness({ send: NO_TURN });
-  h.deps.checkWaitImpl = async () => { throw new Error('the mailbox must not be opened for a worker that never started'); };
+  // JUL-98 step 6 round 2, finding 2: the mailbox is the only authoritative
+  // record of work done, so it is asked ONCE, briefly, before the seat is
+  // declared never-started. It answers nothing here -- no completion, not even
+  // a heartbeat -- which is what a worker sitting on a trust screen looks like.
+  const waits = [];
+  h.deps.checkWaitImpl = async (options) => {
+    waits.push(options);
+    h.order.push('mailbox-reconcile');
+    return { runId: ALL.runId, deliveryId: null, messages: [], count: 0, timedOut: true };
+  };
   const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
 
   const result = await runWorkerStep({
@@ -183,8 +192,15 @@ test('a worker that never started is caught at once: the mailbox is never opened
   assert.equal(result.cost.totalTokens, 0);
   assert.equal(result.released, true);
   assert.equal(result.worktreeRemoved, true, 'the workspace of a worker that never started is still removed');
+  assert.equal(waits.length, 1, 'one reconciliation, not the eight-hour sleep this step exists to prevent');
+  assert.ok(waits[0].timeoutMs <= DEFAULT_RECONCILE_WAIT_MS, 'and it is a bounded look, not the mailbox wait');
+  // AND THE SEAT FALLS BACK. Nothing was created that survives -- the worker is
+  // released and its worktree removed -- and no work was done, so this is the
+  // same thing a refused launch is, and it takes the same road out. Without the
+  // mark the completion was simply lost and no backup ever ran.
+  assert.equal(result.launchRefused, true);
   const withoutMirrors = h.order.filter((entry) => entry !== 'mirror');
-  assert.deepEqual(withoutMirrors, ['dispatch', 'prove-start', 'release:builder', 'remove-worktree:builder']);
+  assert.deepEqual(withoutMirrors, ['dispatch', 'prove-start', 'mailbox-reconcile', 'release:builder', 'remove-worktree:builder']);
 });
 
 test('a worker that reports outcome failed is reported as failed, and is still costed and cleaned up', async () => {
@@ -523,8 +539,12 @@ test('a backup whose TURN is never proven stops the step too -- the same claim, 
     return { send: seat === 'builder' ? NO_TURN : TURN_STARTED };
   };
   const waitFor = h.deps.checkWaitImpl;
+  let builderWaits = 0;
   h.deps.checkWaitImpl = async (options) => {
-    if (waitingFor === 'builder') throw new Error('the mailbox must not be opened for a backup whose turn never started');
+    if (waitingFor === 'builder') {
+      builderWaits += 1;
+      return { runId: ALL.runId, deliveryId: null, messages: [], count: 0, timedOut: true };
+    }
     return waitFor(options);
   };
 
@@ -541,6 +561,7 @@ test('a backup whose TURN is never proven stops the step too -- the same claim, 
   assert.ok(h.order.includes('release:builder'));
   assert.ok(h.order.includes('remove-worktree:builder'));
   assert.ok(!h.order.includes('read-cost:builder'), 'and its non-existent session file is not read');
+  assert.equal(builderWaits, 1, 'the mailbox is reconciled once before the verdict, and never slept on');
 });
 
 // ---------------------------------------------------------------------------
@@ -606,13 +627,16 @@ test('a dispatch that carries its own turn-start observation is believed, and wo
   assert.equal(result.outcome, 'succeeded');
 });
 
-test('and an adopted worker whose terminal went idle again is still caught as never started', async () => {
+test('and an adopted worker whose terminal went idle again, with an empty mailbox, is still caught as never started', async () => {
   const h = harness();
   const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
-  // The TUI is idle for BOTH readings: it took the brief nowhere.
+  // The TUI is idle for BOTH readings: it took the brief nowhere. And the
+  // mailbox holds nothing from it either -- not a completion, not a heartbeat
+  // -- which is the only combination that makes "it never started" a fact
+  // rather than an inference.
   h.deps.adoptBoundaries = { ...h.deps.adoptBoundaries, terminalWaitImpl: async () => ({ wait: { satisfied: true } }) };
   h.deps.observeStartImpl = async () => { throw new Error('worktree ps must not be asked'); };
-  h.deps.checkWaitImpl = async () => { throw new Error('the mailbox must not be opened for a worker whose turn never started'); };
+  h.deps.checkWaitImpl = async () => ({ runId: ALL.runId, deliveryId: null, messages: [], count: 0, timedOut: true });
 
   const result = await runWorkerStep({
     seat: 'builder', card: CARD, step: STEP, choice: resolveSeatChoices([]).builder,
@@ -624,4 +648,142 @@ test('and an adopted worker whose terminal went idle again is still caught as ne
   assert.equal(result.stage, 'turn-start');
   assert.match(result.reason, /idle/);
   assert.equal(result.cost.neverStarted, true);
+  assert.equal(result.launchRefused, true, 'nothing survives it, so the seat table\'s backup takes the seat');
+});
+
+// ---------------------------------------------------------------------------
+// JUL-98 step 6 ROUND 2, finding 2: THE BUSY-WINDOW BLIND SPOT DESTROYED REAL
+// WORK.
+//
+// The busy reading is taken once, in a window of seconds. A turn that BEGINS
+// AND ENDS inside it reads idle-then-idle, exactly like a turn that never
+// began. Round 1 classified that as never-started, skipped the mailbox
+// entirely, substituted a zero-cost never-started line for the real allowance,
+// and released the seat -- and because that exit carries no `launchRefused`, no
+// backup ran either. A finished step and its cost were simply lost.
+//
+// The fix is not a longer window. It is that the MAILBOX IS ASKED FIRST: it is
+// the one authoritative record of what a worker did, and a worker that reported
+// done demonstrably ran.
+// ---------------------------------------------------------------------------
+
+test('a turn that finished inside the busy window is found in the mailbox and costed for real', async () => {
+  const h = harness();
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+  // Idle at both readings -- but the agent took the brief, did the step and was
+  // back at its prompt before the window expired. The harness mailbox holds its
+  // worker_done, which is the proof no terminal reading can give.
+  h.deps.adoptBoundaries = { ...h.deps.adoptBoundaries, terminalWaitImpl: async () => ({ wait: { satisfied: true } }) };
+  h.deps.observeStartImpl = async () => { throw new Error('worktree ps must not be asked'); };
+
+  const result = await runWorkerStep({
+    seat: 'builder', card: CARD, step: STEP, choice: resolveSeatChoices([]).builder,
+    worktreeName: 'jul98-6', requestId: 'JUL-98:step-6:builder',
+    suiteRunner, suiteKey: 'JUL-98:step-6', runSuite: false, ...h.deps,
+  });
+
+  assert.equal(result.ok, true, result.reason);
+  assert.equal(result.outcome, 'succeeded', 'the completion is the verdict, not the terminal reading');
+  assert.notEqual(result.cost.neverStarted, true, 'a turn that ran is never costed as never-started');
+  assert.equal(result.cost.totalTokens, COST.totalTokens, 'the REAL figures, read from the worker that really ran');
+  assert.equal(result.released, true);
+  assert.equal(result.worktreeRemoved, true);
+  assert.ok(h.order.includes('read-cost:builder'), 'the cost is read, not invented');
+  assert.notEqual(result.launchRefused, true, 'nothing fell back: the work is done');
+});
+
+test('a worker that is alive but slow -- a heartbeat and no completion yet -- is waited for, not destroyed', async () => {
+  const h = harness();
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+  h.deps.adoptBoundaries = { ...h.deps.adoptBoundaries, terminalWaitImpl: async () => ({ wait: { satisfied: true } }) };
+  h.deps.observeStartImpl = async () => { throw new Error('worktree ps must not be asked'); };
+
+  let call = 0;
+  const heartbeat = (dispatchId) => ({ id: 'm_hb', type: 'heartbeat', subject: 'alive', body: '', payload: JSON.stringify({ taskId: 'task_x', dispatchId, phase: 'implementing' }) });
+  h.deps.checkWaitImpl = async () => {
+    call += 1;
+    const dispatchId = `ctx_937abab903ae-${h.orca.workersStarted()}`;
+    // First look: it is alive and working, but has not finished. Second: done.
+    return {
+      runId: ALL.runId,
+      deliveryId: `delivery_${call}`,
+      messages: call === 1 ? [heartbeat(dispatchId)] : [doneMessage(dispatchId, 'succeeded')],
+      count: 1,
+      timedOut: false,
+    };
+  };
+
+  const result = await runWorkerStep({
+    seat: 'builder', card: CARD, step: STEP, choice: resolveSeatChoices([]).builder,
+    worktreeName: 'jul98-6', requestId: 'JUL-98:step-6:builder',
+    suiteRunner, suiteKey: 'JUL-98:step-6', runSuite: false, ...h.deps,
+  });
+
+  assert.equal(result.ok, true, result.reason);
+  assert.equal(result.outcome, 'succeeded');
+  assert.equal(call, 2, 'the reconciliation found it alive, so the ordinary mailbox wait followed');
+  assert.notEqual(result.cost.neverStarted, true);
+});
+
+// ---------------------------------------------------------------------------
+// JUL-98 step 6 ROUND 2, finding 5: A FAILED OBSERVATION IS NOT A VERDICT.
+// ---------------------------------------------------------------------------
+
+test('a worker whose observation FAILED is treated as possibly running: nothing is destroyed, nothing is costed, nothing falls back', async () => {
+  const h = harness();
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+  let waits = 0;
+  h.deps.adoptBoundaries = {
+    ...h.deps.adoptBoundaries,
+    terminalWaitImpl: async () => {
+      waits += 1;
+      if (waits === 1) return { wait: { satisfied: true } };
+      throw new Error('terminal_handle_stale');
+    },
+  };
+  h.deps.observeStartImpl = async () => { throw new Error('worktree ps must not be asked'); };
+  h.deps.checkWaitImpl = async () => ({ runId: ALL.runId, deliveryId: null, messages: [], count: 0, timedOut: true });
+
+  const result = await runWorkerStep({
+    seat: 'builder', card: CARD, step: STEP, choice: resolveSeatChoices([]).builder,
+    worktreeName: 'jul98-6', requestId: 'JUL-98:step-6:builder',
+    suiteRunner, suiteKey: 'JUL-98:step-6', runSuite: false, ...h.deps,
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.stage, 'turn-start');
+  assert.equal(result.possiblyRunning, true, 'the reading failed; the worker may be running and spending right now');
+  assert.notEqual(result.launchRefused, true, 'so no backup may be started beside it');
+  assert.equal(result.cost, null, 'and no figure is invented for it -- the step stops with no cost line, which is what stops the card');
+  assert.equal(result.released, false);
+  assert.equal(result.worktreeRemoved, false);
+  assert.equal(result.dispatchId, `ctx_937abab903ae-${h.orca.workersStarted()}`, 'the dispatch identity is kept, which is what reconciling it later needs');
+  assert.match(result.reason, /terminal_handle_stale/);
+  assert.ok(!h.order.includes('release:builder'), 'a possibly-running worker is never released on a guess');
+  assert.ok(!h.order.includes('remove-worktree:builder'), 'and work that may exist is never deleted');
+});
+
+test('a builder whose turn is never proven, with nothing behind it, takes its seat-table backup', async () => {
+  const h = harness();
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+  // The Gemini builder is adopted, goes idle-then-idle, and its mailbox is
+  // empty: it never started. Round 1 lost the seat here -- no fallback, no
+  // work. It now takes exactly the road a refused launch takes.
+  let adopted = 0;
+  h.deps.adoptBoundaries = { ...h.deps.adoptBoundaries, terminalWaitImpl: async () => { adopted += 1; return { wait: { satisfied: true } }; } };
+  const waitFor = h.deps.checkWaitImpl;
+  let seatBeingWaitedOn = null;
+  h.deps.observeStartImpl = async ({ seat }) => { seatBeingWaitedOn = seat; return { send: TURN_STARTED }; };
+  h.deps.checkWaitImpl = async (options) => {
+    if (seatBeingWaitedOn === null) return { runId: ALL.runId, deliveryId: null, messages: [], count: 0, timedOut: true };
+    return waitFor(options);
+  };
+
+  const result = await runBuildAndReview({ card: CARD, step: STEP, choices: resolveSeatChoices([]), suiteRunner, ...h.deps });
+
+  assert.equal(result.ok, true, result.reason);
+  assert.equal(result.builder.movedFrom, 'gemini');
+  assert.equal(result.builder.movedTo, 'claude', 'the backup the seat table already names');
+  assert.equal(result.builder.outcome, 'succeeded');
+  assert.ok(adopted >= 2, 'the adopt route really ran and really went idle twice');
 });

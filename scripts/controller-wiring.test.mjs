@@ -19,6 +19,8 @@ import {
   createOrcaBoundaries,
   createRequestLedger,
   createSeatCostReader,
+  COST_READABLE_AGENTS,
+  hasWorkerCostSource,
   createOrcaSeatCostReader,
   costReadCommand,
   workerScriptExitCode,
@@ -268,6 +270,39 @@ test('a seat whose session file is missing REFUSES rather than returning a blank
     );
   } finally {
     rmSync(home, { recursive: true, force: true });
+  }
+});
+
+// JUL-98 step 6 ROUND 2, finding 1. THE READER'S OWN LIST OF WHAT IT CAN READ,
+// exported because ../graph/controller/dispatch.mjs refuses to launch a seat
+// whose agent is not on it. That refusal is not belt-and-braces: a cost read
+// that fails stops ../graph/controller/release.mjs BEFORE the release, so a
+// worker whose agent has no reader is stranded with its worktree retained even
+// when it did the work perfectly. The list and the reader must therefore never
+// drift apart -- an agent added to the list with no branch behind it is exactly
+// the defect this pins, and `pi` is the agent that has no reader today.
+test('every agent declared cost-readable really has a reader behind it, and pi is not one of them', async () => {
+  assert.ok(!COST_READABLE_AGENTS.includes('pi'), 'no worker-side interactive Pi cost source exists, so pi must not be declared readable');
+  assert.equal(hasWorkerCostSource('pi'), false);
+  assert.equal(hasWorkerCostSource('agy'), true);
+
+  const read = createSeatCostReader({
+    readdirImpl: () => { throw new Error('ENOENT'); },
+    statImpl: () => { throw new Error('ENOENT'); },
+    readFileImpl: () => { throw new Error('ENOENT'); },
+    readAllowanceImpl: async () => { throw new Error('agy is not installed here'); },
+  });
+  for (const agent of COST_READABLE_AGENTS) {
+    assert.equal(hasWorkerCostSource(agent), true);
+    // Every one of them REACHES a reader: it may then fail on a missing file,
+    // but it never falls through to "no cost source is known".
+    await assert.rejects(
+      () => read({ seat: 'builder', worktree: 'repo-1::/home/runner/w/gone', agent }),
+      (error) => {
+        assert.doesNotMatch(error.message, /no cost source is known/, `${agent} is declared cost-readable but the reader has no branch for it`);
+        return true;
+      },
+    );
   }
 });
 

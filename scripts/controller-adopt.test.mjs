@@ -213,3 +213,59 @@ test('the busy check never fails the start: an idle answer travels out and turn-
   assert.equal(started.ok, true, 'the adoption itself succeeded; whether a turn began is a separate verdict');
   assert.equal(started.observed.busy.satisfied, true);
 });
+
+// ---------------------------------------------------------------------------
+// JUL-98 step 6 ROUND 2, finding 5: AN ERROR AFTER A SUCCESSFUL ADOPTION IS NOT
+// A LAUNCH REFUSAL.
+//
+// Round 1 had one catch around the whole route. Once `worker-start` has
+// succeeded the worker EXISTS: Orca has issued its task and dispatch ids, the
+// brief has been delivered, and the agent may already be running tools and
+// spending allowance. A throw from the busy reading after that point then hit
+// the same `stop()` as a pre-dispatch failure -- close the terminal, remove the
+// worktree, discard the dispatch identity, answer "refused" -- and the step
+// then invented a zero cost and could start a backup beside a worker that was
+// still running. The observation is the thing that failed, not the worker.
+// ---------------------------------------------------------------------------
+
+test('an observation that throws AFTER the adoption succeeded never destroys the worker', async () => {
+  let waits = 0;
+  const b = boundaries({
+    async terminalWaitImpl(args) {
+      waits += 1;
+      if (waits === 1) return { wait: { satisfied: true } };
+      throw new Error('terminal_handle_stale: the terminal handle is no longer readable');
+    },
+  });
+  const started = await startAdoptedWorker({
+    seat: 'builder', entry: 'gemini', launch: launchForChoice(GEMINI), spec: SPEC,
+    worktreeName: 'jul98-step-6-a1', runId: 'run_1', from: 'term_controller', requestId: 'k',
+    ...b,
+  });
+
+  assert.equal(started.ok, true, 'the adoption itself succeeded, and a failed reading cannot un-succeed it');
+  assert.equal(started.result.dispatchId, 'ctx_1', 'the dispatch identity is preserved, so the worker can be reconciled and released');
+  assert.equal(started.terminal, 'term_seat');
+  assert.match(started.observationError, /terminal_handle_stale/, 'what failed is carried out by name');
+  assert.equal(started.observed.busy, null, 'and nothing is claimed about the turn: an unread terminal is not an idle one');
+
+  const kinds = b.calls.map(([name]) => name);
+  assert.ok(!kinds.includes('terminal-close'), 'a possibly-running worker\'s terminal is never closed on a failed reading');
+  assert.ok(!kinds.includes('worktree-rm'), 'and its worktree -- which may hold finished work -- is never removed');
+});
+
+test('a throw BEFORE the adoption is still a refusal that takes back what it made', async () => {
+  const b = boundaries({
+    async workerStartImpl(args) { b.calls.push(['worker-start', args]); throw new Error('run_not_found'); },
+  });
+  const started = await startAdoptedWorker({
+    seat: 'builder', entry: 'gemini', launch: launchForChoice(GEMINI), spec: SPEC,
+    worktreeName: 'jul98-step-6-a1', runId: 'run_1', from: 'term_controller', requestId: 'k',
+    ...b,
+  });
+
+  assert.equal(started.ok, false, 'nothing was adopted, so nothing is running');
+  assert.match(started.reason, /run_not_found/);
+  const kinds = b.calls.map(([name]) => name);
+  assert.ok(kinds.includes('terminal-close') && kinds.includes('worktree-rm'), 'and everything it made is taken back');
+});

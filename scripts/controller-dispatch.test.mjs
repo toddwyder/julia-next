@@ -32,6 +32,7 @@ import {
   buildStepBrief,
   dispatchWorker,
 } from '../graph/controller/dispatch.mjs';
+import { hasWorkerCostSource } from '../graph/controller/cost-read.mjs';
 import {
   TURN_STARTED,
   INPUT_ACCEPTED,
@@ -105,23 +106,52 @@ test('a seat choice becomes the launch Orca actually records: agent, a real mode
 // JUL-98 step 6. Until now this seat was REFUSED outright, and the refusal's
 // own wording said what had to be built instead: "an interactive session
 // started first and adopted with worker-start --terminal once it has fully
-// started". That route now exists, so the DeepSeek seat takes it -- the same
-// route the Gemini seat takes, because it is the same problem.
+// started". That route now exists, so a seat Orca has no launcher for takes it.
 test('a seat whose agent Orca cannot launch takes the start-then-adopt route, not a refusal', () => {
-  const pi = launchForChoice({ entry: 'pi-deepseek', modelLabel: 'adversary-deepseek-pro', effort: 'medium' });
-  assert.equal(pi.route, 'adopt', 'the route, not an --agent name, is what keeps it away from worker-start --agent');
-  assert.equal(pi.agent, 'pi', 'the agent that actually runs, which is what the cost read has to know');
-  assert.equal(pi.model, LAUNCH_MODEL_IDS['deepseek-v4-pro'], 'the model is still resolved, so the cost line can be accounted for');
-
   const gemini = launchForChoice({ entry: 'gemini', modelLabel: 'builder-gemini-flash', effort: 'high' });
-  assert.equal(gemini.route, 'adopt');
-  assert.equal(gemini.agent, 'agy');
+  assert.equal(gemini.route, 'adopt', 'the route, not an --agent name, is what keeps it away from worker-start --agent');
+  assert.equal(gemini.agent, 'agy', 'the agent that actually runs, which is what the cost read has to know');
   assert.equal(gemini.model, LAUNCH_MODEL_IDS['gemini-3.8-flash']);
   assert.equal(gemini.effort, 'high');
   assert.match(gemini.command, /^agy .*gemini-3\.8-flash/);
+});
 
-  // ONE route, not two: both seats come back in the same shape.
-  assert.deepEqual(Object.keys(pi).sort(), Object.keys(gemini).sort());
+// JUL-98 step 6 ROUND 2, finding 1. THE SEAT THAT CAN BE STARTED BUT NEVER
+// FINISHED. Round 1 sent the DeepSeek seat down the shared adopt route with
+// `agent: 'pi'`. There is no worker-side interactive Pi cost source: the reader
+// in ../graph/controller/cost-read.mjs implements claude, codex and agy and
+// refuses everything else. A refusal there is not a cosmetic gap --
+// ../graph/controller/release.mjs stops BEFORE the release when the read fails,
+// so a Pi worker that succeeded through the mailbox would fail the step with no
+// cost line AND keep its worker and its worktree. Round 1 also made the old
+// pre-dispatch refusal unreachable, so no backup could take the seat either.
+//
+// So the seat is refused HERE, before anything is created, through the same
+// `launchRefused` path the seat table's backup already hangs off. The gate is
+// the cost source itself, not a hard-coded agent name: implement the reader,
+// add the agent to COST_READABLE_AGENTS, and the seat launches with no further
+// change.
+test('a seat whose agent has no worker-side cost source is refused before anything is created', () => {
+  const pi = launchForChoice({ entry: 'pi-deepseek', modelLabel: 'adversary-deepseek-pro', effort: 'medium' });
+  assert.equal(pi.ok, false, 'a worker that cannot be costed cannot be released either, so it is never started');
+  assert.match(pi.reason, /pi/, 'the agent that has no reader is named');
+  assert.match(pi.reason, /cost/i, 'and so is what is missing');
+  assert.equal(pi.entry, 'pi-deepseek', 'the seat-table entry, so the card can say which seat moved');
+  // The command the route WOULD run is still built and carried on the refusal:
+  // the capability is one reader away, not a rewrite.
+  assert.match(pi.command, /reviewer-backup/);
+
+  // And the seat that DOES have a reader is not caught by the same gate.
+  assert.equal(launchForChoice({ entry: 'gemini', modelLabel: 'builder-gemini-flash', effort: 'high' }).ok, undefined);
+});
+
+test('every agent the dispatcher will launch is one the cost reader can actually read', () => {
+  for (const entry of ['claude', 'codex', 'gemini']) {
+    const label = { claude: 'builder-claude-opus', codex: 'adversary-codex', gemini: 'builder-gemini-flash' }[entry];
+    const launch = launchForChoice({ entry, modelLabel: label, effort: 'medium' });
+    assert.notEqual(launch.ok, false, `${entry} should still launch`);
+    assert.equal(hasWorkerCostSource(launch.agent), true, `the ${entry} seat launches ${launch.agent}, which no cost reader implements`);
+  }
 });
 
 test('an entry with no Orca agent and no adopt route is still refused by name', () => {
@@ -444,7 +474,10 @@ test('an adopt entry whose launch command cannot be built is REFUSED, never inte
   const refusal = launchForChoice({ entry: 'pi-deepseek', modelLabel: 'builder-deepseek-turbo', effort: 'medium' });
   assert.equal(refusal.ok, false);
   assert.match(refusal.reason, /deepseek-turbo/);
-  // And the two real ones still build.
+  assert.equal(refusal.command, undefined, 'there is no command to carry: that is what this refusal is about');
+  // And the two real ones still BUILD -- they are refused for the missing cost
+  // source above, not for a command that could not be made, and the command
+  // travels on the refusal so the gap is one reader wide and no wider.
   assert.match(launchForChoice({ entry: 'pi-deepseek', modelLabel: 'adversary-deepseek-pro', effort: 'medium' }).command, /reviewer-backup/);
   assert.match(launchForChoice({ entry: 'pi-deepseek', modelLabel: 'builder-deepseek-flash', effort: 'medium' }).command, /builder-backup/);
 });
