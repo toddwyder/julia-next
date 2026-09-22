@@ -1867,13 +1867,17 @@ command and the worktree — and then adds:
 `journalctl --user -u julia-controller | grep` that matches a multi-line message shows only the line
 it matched.
 
-**The cap, and why.** At most **5** failing tests, each with at most **500** characters of error
-text (`MAX_REPORTED_FAILURES` / `MAX_FAILURE_TEXT`). A suite with more than five distinct failures
-has one cause, not five, and the first few names are enough to find it; 500 characters is about one
-assertion's diff with its header. Worst case on the card is therefore roughly 2.5KB. When anything
-is cut the line says so (`5 of 9 shown, error text cut at 500 characters`), and the whole output
-stays on `result.output` for anyone who needs it. A file-level `failureType: subtestFailed` entry is
-dropped when any named failure exists, so the cap is spent on failures that name a cause.
+**The cap, and why.** At most **5** failing tests (`MAX_REPORTED_FAILURES`), each with at most
+**200** characters of test name (`MAX_FAILURE_NAME`) and **500** characters of error text
+(`MAX_FAILURE_TEXT`). Five is an operational display limit to keep card comments readable; further
+failures may have independent causes, and the omitted detail needs the full output on
+`result.output`. Displayed test names and error text are capped with explicit `... [cut]` markers.
+With formatting and fences, each failure contributes at most ~800 characters, bounding the entire
+failure detail section to ~4.1KB characters (~4.3KB total card worst case; all limits in
+characters, not bytes). When cuts happen the header line describes them (`5 of 9 shown`, `names cut
+at 200 characters`, `error text cut at 500 characters`), and the whole output stays on
+`result.output` for anyone who needs it. A file-level `failureType: subtestFailed` entry is dropped
+when any named failure exists, so the cap is spent on failures that name a cause.
 
 **Why the worktree note exists.** The controller runs the suite in the candidate **worktree**, which
 can hold files the candidate **commit** does not — anything the worker left uncommitted or

@@ -8,6 +8,10 @@
 // today -- the counts at the end of this very file's run.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import {
   SUITE_COMMAND,
@@ -18,6 +22,7 @@ import {
   parseTapFailures,
   MAX_REPORTED_FAILURES,
   MAX_FAILURE_TEXT,
+  MAX_FAILURE_NAME,
 } from '../graph/controller/test-run.mjs';
 
 const GREEN_TAP = [
@@ -322,16 +327,27 @@ test('a run on a dirty worktree says so plainly, and the result is still a resul
 });
 
 test('the worktree is read through the same safe.directory env the suite runs under, for exactly that worktree', async () => {
+  const order = [];
   const seen = [];
   const runner = createSuiteRunner({
     env: {},
-    execImpl: async () => ({ stdout: GREEN_TAP }),
-    gitImpl: async (options) => { seen.push(options); return { stdout: options.args[0] === 'rev-parse' ? 'abc1234567890\n' : '' }; },
+    execImpl: async () => {
+      order.push('exec');
+      return { stdout: GREEN_TAP };
+    },
+    gitImpl: async (options) => {
+      order.push(`git:${options.args[0]}`);
+      seen.push(options);
+      return { stdout: options.args[0] === 'rev-parse' ? 'abc1234567890\n' : '' };
+    },
     now: () => '2026-09-21T14:00:00.000Z',
   });
   await runner.runOnce({ key: 'JUL-92:step-1', worktree: '/w' });
 
+  assert.deepEqual(order, ['git:status', 'git:rev-parse', 'exec'], 'worktree state is read before the suite runs');
   assert.equal(seen.length, 2, 'status and rev-parse, nothing else');
+  assert.deepEqual(seen[0].args, ['status', '--porcelain'], 'exact git status argv');
+  assert.deepEqual(seen[1].args, ['rev-parse', 'HEAD'], 'exact git rev-parse argv');
   for (const call of seen) {
     assert.equal(call.cwd, '/w');
     assert.equal(call.env.GIT_CONFIG_COUNT, '1');
@@ -362,4 +378,183 @@ test('the journal line carries the same facts on one physical line, so journalct
   assert.match(line, /3 !== 4/);
   assert.match(line, /not clean/i);
   assert.match(line, /a1b2c3d/);
+});
+
+function runNodeTestTap(code) {
+  const dir = mkdtempSync(join(tmpdir(), 'tap-test-'));
+  const file = join(dir, 'sample.test.mjs');
+  try {
+    writeFileSync(file, code);
+    const env = { ...process.env };
+    delete env.NODE_TEST_CONTEXT;
+    const { stdout } = spawnSync(process.execPath, ['--test', '--test-reporter=tap', file], { encoding: 'utf8', env });
+    return stdout;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test('literal three-dot error line in a YAML diagnostic block does not prematurely end the diagnostic (real node output)', () => {
+  const tap = runNodeTestTap(`
+import test from 'node:test';
+test('literal three-dot error', () => {
+  throw new Error(['before', '...', 'after important cause'].join('\\n'));
+});
+`);
+  const failures = parseTapFailures(tap);
+  assert.equal(failures.total, 1);
+  assert.equal(failures.shown.length, 1);
+  assert.match(failures.shown[0].error, /before/);
+  assert.match(failures.shown[0].error, /\.\.\./);
+  assert.match(failures.shown[0].error, /after important cause/);
+});
+
+test('expected TODO and SKIP outcomes are excluded from actionable failures and do not displace genuine failures (real node output)', () => {
+  const tap = runNodeTestTap(`
+import test from 'node:test';
+test('skip pass', { skip: 'not needed' }, () => {});
+for (let i = 1; i <= 5; i++) {
+  test('expected ' + i, { todo: 'not ready' }, () => { throw new Error('todo ' + i); });
+}
+test('ACTUAL CAUSE', () => { throw new Error('genuine failure'); });
+`);
+  const failures = parseTapFailures(tap);
+  assert.equal(failures.total, 1, 'only the genuine failure is counted as actionable');
+  assert.equal(failures.shown.length, 1);
+  assert.equal(failures.shown[0].name, 'ACTUAL CAUSE');
+  assert.match(failures.shown[0].error, /genuine failure/);
+
+  const line = testRunLine({
+    ...PASSING_RESULT,
+    total: 7, pass: 0, fail: 1, todo: 5, skipped: 1, ok: false,
+    output: tap,
+    worktreeState: CLEAN_STATE,
+  });
+  assert.match(line, /ACTUAL CAUSE/, 'the card names the genuine failure, not the TODO tests');
+  assert.doesNotMatch(line, /expected 1/);
+  assert.doesNotMatch(line, /skip pass/);
+});
+
+test('test names containing hash characters are preserved when not a TAP directive', () => {
+  const tap = [
+    'TAP version 13',
+    'not ok 1 - issue #123: fix widget',
+    '  ---',
+    '  failureType: "testCodeFailure"',
+    '  error: "failed"',
+    '  ...',
+    '# tests 1', '# pass 0', '# fail 1', '# skipped 0', '',
+  ].join('\n');
+  const failures = parseTapFailures(tap);
+  assert.equal(failures.shown[0].name, 'issue #123: fix widget');
+  assert.equal(failures.shown[0].tapLine, 'not ok 1 - issue #123: fix widget');
+});
+
+test('long test names are capped and disclose truncation explicitly', () => {
+  const longName = 'long_test_name_'.repeat(20);
+  const tap = [
+    'TAP version 13',
+    `not ok 1 - ${longName}`,
+    '  ---',
+    '  failureType: "testCodeFailure"',
+    '  error: "something failed"',
+    '  ...',
+    '# tests 1', '# pass 0', '# fail 1', '# skipped 0', '',
+  ].join('\n');
+
+  const failures = parseTapFailures(tap);
+  assert.equal(failures.total, 1);
+  assert.equal(failures.shown.length, 1);
+  assert.equal(failures.nameTruncated, true);
+  assert.equal(failures.shown[0].nameTruncated, true);
+  assert.ok(failures.shown[0].name.length <= MAX_FAILURE_NAME + 15);
+  assert.match(failures.shown[0].name, /\.\.\. \[cut\]$/);
+  assert.match(failures.shown[0].tapLine, /\.\.\. \[cut\]$/);
+
+  const line = testRunLine({
+    ...PASSING_RESULT, total: 1, pass: 0, fail: 1, skipped: 0, ok: false, output: tap, worktreeState: CLEAN_STATE,
+  });
+  assert.match(line, new RegExp(`names cut at ${MAX_FAILURE_NAME} characters`));
+  assert.match(line, /\.\.\. \[cut\]/);
+  assert.ok(line.length < 2000, `line length should be bounded, got ${line.length}`);
+});
+
+test('header reports count truncation without falsely claiming error text was cut when errors are short', () => {
+  const tap = [
+    'TAP version 13',
+    ...Array.from({ length: 6 }, (_, i) => [
+      `not ok ${i + 1} - short failure ${i + 1}`,
+      '  ---',
+      '  failureType: "testCodeFailure"',
+      '  error: "short error"',
+      '  ...',
+    ]).flat(),
+    '# tests 6', '# pass 0', '# fail 6', '# skipped 0', '',
+  ].join('\n');
+
+  const failures = parseTapFailures(tap);
+  assert.equal(failures.countTruncated, true);
+  assert.equal(failures.textTruncated, false);
+
+  const line = testRunLine({
+    ...PASSING_RESULT, total: 6, pass: 0, fail: 6, skipped: 0, ok: false, output: tap, worktreeState: CLEAN_STATE,
+  });
+  assert.match(line, /\*\*Failing tests\*\* \(5 of 6 shown\):/);
+  assert.doesNotMatch(line, /error text cut/);
+});
+
+test('header reports error text truncation when error is long even when failure count is not truncated', () => {
+  const longError = 'e'.repeat(1000);
+  const tap = [
+    'TAP version 13',
+    'not ok 1 - single failure',
+    '  ---',
+    '  failureType: "testCodeFailure"',
+    '  error: |-',
+    `    ${longError}`,
+    '  ...',
+    '# tests 1', '# pass 0', '# fail 1', '# skipped 0', '',
+  ].join('\n');
+
+  const failures = parseTapFailures(tap);
+  assert.equal(failures.countTruncated, false);
+  assert.equal(failures.textTruncated, true);
+
+  const line = testRunLine({
+    ...PASSING_RESULT, total: 1, pass: 0, fail: 1, skipped: 0, ok: false, output: tap, worktreeState: CLEAN_STATE,
+  });
+  assert.match(line, new RegExp(`\\*\\*Failing tests\\*\\* \\(1, error text cut at ${MAX_FAILURE_TEXT} characters\\):`));
+  assert.doesNotMatch(line, /shown/);
+});
+
+test('a single overlong failure pins exact retained content and explicit cut disclosure on card and journal lines', () => {
+  const head = 'a'.repeat(MAX_FAILURE_TEXT);
+  const tail = 'z'.repeat(500);
+  const fullError = head + tail;
+  const tap = [
+    'TAP version 13',
+    'not ok 1 - overlong test',
+    '  ---',
+    '  failureType: "testCodeFailure"',
+    '  error: |-',
+    `    ${fullError}`,
+    '  ...',
+    '# tests 1', '# pass 0', '# fail 1', '# skipped 0', '',
+  ].join('\n');
+
+  const failures = parseTapFailures(tap);
+  assert.equal(failures.shown[0].error, `${head}... [cut]`);
+
+  const result = {
+    ...PASSING_RESULT, total: 1, pass: 0, fail: 1, skipped: 0, ok: false, output: tap, worktreeState: CLEAN_STATE,
+  };
+  const cardLine = testRunLine(result);
+  assert.match(cardLine, new RegExp(`error text cut at ${MAX_FAILURE_TEXT} characters`));
+  assert.ok(cardLine.includes(`${head}... [cut]`), 'card line contains exact retained content and cut disclosure');
+  assert.ok(!cardLine.includes(tail), 'card line does not contain cut tail');
+
+  const journalLine = testRunJournalLine(result);
+  assert.match(journalLine, new RegExp(`error text cut at ${MAX_FAILURE_TEXT} characters`));
+  assert.ok(journalLine.includes(`${head}... [cut]`), 'journal line contains exact retained content and cut disclosure');
+  assert.ok(!journalLine.includes(tail), 'journal line does not contain cut tail');
 });

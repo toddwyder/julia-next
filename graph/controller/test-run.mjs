@@ -63,17 +63,28 @@ function shortStamp(iso) {
 // reader can act on; a name and the error text is.
 //
 // The cap: at most MAX_REPORTED_FAILURES failures, each with at most
-// MAX_FAILURE_TEXT characters of error text. Five is chosen because a suite with
-// more than five distinct failures has a cause, not five causes -- the first few
-// names are enough to find it -- and 500 characters is about one assertion
-// failure's diff with its header, which is the unit a reader actually reads.
-// Worst case on the card is therefore ~2.5KB, a paragraph, not a novel. What was
-// cut is always stated, so nobody mistakes the cap for the whole story; the full
-// output stays on `result.output` for anyone who needs it.
+// MAX_FAILURE_NAME characters of test name and MAX_FAILURE_TEXT characters of
+// error text. Five is an operational display limit to keep card comments
+// readable; further failures may have independent causes, and omitted detail
+// needs the full output on `result.output`. Displayed test names are capped at
+// 200 characters and error text at 500 characters, with explicit cut markers
+// when truncated. With Markdown and TAP formatting (~90 characters per entry
+// plus block fences), each failing test contributes at most ~800 characters,
+// bounding the entire failure section to ~4.1KB characters (~4.3KB total card
+// worst case). All limits are in characters (UTF-16 code units), not bytes.
+// What was cut is always stated, so nobody mistakes the cap for the whole story.
 export const MAX_REPORTED_FAILURES = 5;
 export const MAX_FAILURE_TEXT = 500;
+export const MAX_FAILURE_NAME = 200;
 
 const NOT_OK_LINE = /^(\s*)not ok (\d+)\s*-\s*(.*)$/;
+const DIRECTIVE_PATTERN = /(?<!\\)#\s*(TODO|SKIP)\b/i;
+
+function truncate(text, limit) {
+  const str = String(text ?? '');
+  if (str.length <= limit) return { text: str, truncated: false };
+  return { text: `${str.slice(0, limit)}... [cut]`, truncated: true };
+}
 
 // One failing test out of a run's TAP: the `not ok` line, the test's name, and
 // the error node's test runner prints under it in the YAML diagnostic block.
@@ -82,9 +93,16 @@ function readFailureBlock(lines, from) {
   let at = from;
   while (at < lines.length && lines[at].trim() === '') at += 1;
   if (at >= lines.length || lines[at].trim() !== '---') return { error: '', failureType: null, next: from };
+  const openIndentMatch = /^(\s*)---/.exec(lines[at]);
+  const openIndent = openIndentMatch ? openIndentMatch[1] : '';
   at += 1;
   const body = [];
-  while (at < lines.length && lines[at].trim() !== '...') { body.push(lines[at]); at += 1; }
+  while (at < lines.length) {
+    if (lines[at].trimEnd() === `${openIndent}...`) break;
+    body.push(lines[at]);
+    at += 1;
+  }
+  const next = at < lines.length ? at + 1 : at;
 
   let failureType = null;
   let error = '';
@@ -107,25 +125,33 @@ function readFailureBlock(lines, from) {
       error = head.trim().replace(/^['"]|['"]$/g, '');
     }
   }
-  return { error, failureType, next: at + 1 };
+  return { error, failureType, next };
 }
 
 // Every failing test in a run's TAP, with the text each one printed, capped.
-export function parseTapFailures(output, { maxFailures = MAX_REPORTED_FAILURES, maxText = MAX_FAILURE_TEXT } = {}) {
+export function parseTapFailures(
+  output,
+  {
+    maxFailures = MAX_REPORTED_FAILURES,
+    maxText = MAX_FAILURE_TEXT,
+    maxName = MAX_FAILURE_NAME,
+  } = {},
+) {
   const lines = String(output ?? '').split('\n');
   const all = [];
   for (let at = 0; at < lines.length; at += 1) {
     const match = NOT_OK_LINE.exec(lines[at]);
     if (!match) continue;
-    const [, , number, rawName] = match;
+    const [, , number, rawRest] = match;
     const { error, failureType, next } = readFailureBlock(lines, at + 1);
+    at = Math.max(at, next - 1);
+    if (DIRECTIVE_PATTERN.test(rawRest)) continue;
     all.push({
-      name: rawName.replace(/\s+#\s.*$/, '').trim(),
-      tapLine: `not ok ${number} - ${rawName.trim()}`,
+      number,
+      rawName: rawRest.trim(),
       error,
       failureType,
     });
-    at = Math.max(at, next - 1);
   }
 
   // A file whose only complaint is that something inside it failed says nothing
@@ -135,11 +161,31 @@ export function parseTapFailures(output, { maxFailures = MAX_REPORTED_FAILURES, 
   const named = all.filter((one) => one.failureType !== 'subtestFailed');
   const interesting = named.length ? named : all;
 
-  const shown = interesting.slice(0, maxFailures).map((one) => ({
-    ...one,
-    error: one.error.length > maxText ? `${one.error.slice(0, maxText)}... [cut]` : one.error,
-  }));
-  return { total: interesting.length, shown, truncated: interesting.length > shown.length };
+  const shown = interesting.slice(0, maxFailures).map((one) => {
+    const { text: displayedName, truncated: nameTruncated } = truncate(one.rawName, maxName);
+    const { text: displayedError, truncated: errorTruncated } = truncate(one.error, maxText);
+    return {
+      name: displayedName,
+      tapLine: `not ok ${one.number} - ${displayedName}`,
+      error: displayedError,
+      failureType: one.failureType,
+      nameTruncated,
+      errorTruncated,
+    };
+  });
+
+  const countTruncated = interesting.length > shown.length;
+  const textTruncated = shown.some((one) => one.errorTruncated);
+  const nameTruncated = shown.some((one) => one.nameTruncated);
+
+  return {
+    total: interesting.length,
+    shown,
+    truncated: countTruncated,
+    countTruncated,
+    textTruncated,
+    nameTruncated,
+  };
 }
 
 // WHETHER THE RESULT DESCRIBES THE COMMIT -- JUL-98 step 5, sixth fix, item 2.
@@ -194,13 +240,23 @@ function worktreeNote(state) {
 // passed, so a passing run keeps exactly the one-line form it has always had.
 function failureLines(result) {
   if (result.ok !== false && !(result.fail > 0)) return [];
-  const { total, shown, truncated } = parseTapFailures(result.output);
+  const { total, shown, countTruncated, textTruncated, nameTruncated } = parseTapFailures(result.output);
   if (!shown.length) {
     return ['', `**Failing tests:** the run reported ${result.fail} failing, but its output carried no "not ok" line to name them.`];
   }
-  const head = truncated
-    ? `**Failing tests** (${shown.length} of ${total} shown, error text cut at ${MAX_FAILURE_TEXT} characters):`
-    : `**Failing tests** (${total}):`;
+  const notes = [];
+  if (countTruncated) {
+    notes.push(`${shown.length} of ${total} shown`);
+  } else {
+    notes.push(`${total}`);
+  }
+  if (nameTruncated) {
+    notes.push(`names cut at ${MAX_FAILURE_NAME} characters`);
+  }
+  if (textTruncated) {
+    notes.push(`error text cut at ${MAX_FAILURE_TEXT} characters`);
+  }
+  const head = `**Failing tests** (${notes.join(', ')}):`;
   const body = shown.flatMap((one) => [
     `- \`${one.tapLine}\``,
     ...(one.error ? ['  ```', ...one.error.split('\n').map((line) => `  ${line}`), '  ```'] : []),
