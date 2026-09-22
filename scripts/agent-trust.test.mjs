@@ -14,7 +14,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { TRUST_STORES, trustStoreFor, addTrustedWorkspace } from '../graph/controller/agent-trust.mjs';
+import { TRUST_STORES, trustStoreFor, hasTrustStore, addTrustedWorkspace } from '../graph/controller/agent-trust.mjs';
 
 const WORKTREE = '/home/runner/orca/workspaces/julia-next/jul98-step-6-a1';
 
@@ -25,6 +25,15 @@ test('the agy trust store is the file and key the live probe wrote', () => {
 
 test('an agent with no known trust store is refused by name, never silently skipped', () => {
   assert.throws(() => trustStoreFor('potato'), /potato/);
+});
+
+// Pi ran in fresh worktrees throughout JUL-109 and never asked a folder-trust
+// question, so it has no trust list -- and "no list" is a fact to be asked for,
+// not a throw to be caught.
+test('an agent that asks no folder-trust question is said to have no store, rather than throwing', () => {
+  assert.equal(hasTrustStore('agy'), true);
+  assert.equal(hasTrustStore('pi'), false);
+  assert.equal(hasTrustStore('potato'), false);
 });
 
 test('a worktree is added to an empty store', () => {

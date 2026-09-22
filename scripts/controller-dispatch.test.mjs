@@ -109,15 +109,15 @@ test('a seat choice becomes the launch Orca actually records: agent, a real mode
 // route the Gemini seat takes, because it is the same problem.
 test('a seat whose agent Orca cannot launch takes the start-then-adopt route, not a refusal', () => {
   const pi = launchForChoice({ entry: 'pi-deepseek', modelLabel: 'adversary-deepseek-pro', effort: 'medium' });
-  assert.equal(pi.route, 'adopt');
-  assert.equal(pi.agent, undefined, 'there is no --agent to pass: Orca has no launcher for it');
-  assert.equal(pi.model, LAUNCH_MODEL_IDS['deepseek-v4-pro'], 'the model is still resolved, so the cost line can be priced');
+  assert.equal(pi.route, 'adopt', 'the route, not an --agent name, is what keeps it away from worker-start --agent');
+  assert.equal(pi.agent, 'pi', 'the agent that actually runs, which is what the cost read has to know');
+  assert.equal(pi.model, LAUNCH_MODEL_IDS['deepseek-v4-pro'], 'the model is still resolved, so the cost line can be accounted for');
 
   const gemini = launchForChoice({ entry: 'gemini', modelLabel: 'builder-gemini-flash', effort: 'high' });
   assert.equal(gemini.route, 'adopt');
+  assert.equal(gemini.agent, 'agy');
   assert.equal(gemini.model, LAUNCH_MODEL_IDS['gemini-3.8-flash']);
   assert.equal(gemini.effort, 'high');
-  assert.equal(gemini.trustAgent, 'agy', 'the worktree is pre-trusted in agy\'s own trust list');
   assert.match(gemini.command, /^agy .*gemini-3\.8-flash/);
 
   // ONE route, not two: both seats come back in the same shape.

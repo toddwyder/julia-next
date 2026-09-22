@@ -12,7 +12,7 @@
 // imply more than they showed; this header is the limit, stated up front.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -26,6 +26,7 @@ import {
   COST_TERMINAL_TITLE_PREFIX,
   createPublisher,
   claudeProjectDirName,
+  geminiAllowanceFromUsage,
   worktreePathOf,
   resolveSenderTerminal,
   headShaOf,
@@ -41,6 +42,8 @@ import {
 import { gitSafeDirectoryEnv, createSuiteRunner } from '../graph/controller/test-run.mjs';
 import { seatCostLine, assertCostLineComplete } from '../graph/controller/cost.mjs';
 import { main as readSeatCostMain } from './read-seat-cost.mjs';
+import { main as prepareMain } from './prepare-seat-worktree.mjs';
+import { formatCostLine } from '../graph/controller/cost.mjs';
 
 // Temp worker homes the two script tests make, removed when the file is done.
 const t_cleanup = [];
@@ -471,7 +474,7 @@ test('a NON-ZERO exit REFUSES, carries the worker\'s own reason, and closes the 
   await assert.rejects(
     () => read({ seat: 'builder', worktree: 'repo-1::/home/runner/w/jul-92', agent: 'claude' }),
     (error) => {
-      assert.match(error.message, /the builder seat's cost read failed on the worker: scripts\/read-seat-cost\.mjs exited 1/);
+      assert.match(error.message, /the builder seat's cost read failed on the worker: the script exited 1/);
       assert.match(error.message, /no Claude transcript/, "the worker's own stderr, so the card says what actually broke");
       return true;
     },
@@ -1000,4 +1003,134 @@ test('an inherited GIT_CONFIG_COUNT is appended to, not overwritten, so an outer
   assert.equal(env.GIT_CONFIG_KEY_0, 'core.hooksPath', 'the inherited entry survives');
   assert.equal(env.GIT_CONFIG_KEY_1, 'safe.directory');
   assert.equal(env.GIT_CONFIG_VALUE_1, CANDIDATE);
+});
+
+// ---------------------------------------------------------------------------
+// JUL-98 step 6: the START-THEN-ADOPT route's own boundaries, and the Gemini
+// seat's allowance.
+//
+// Same limit as this file's header: these prove the argv and the reading, not
+// that the live services answer. The one thing that is REAL here is the agy
+// `/usage` payload -- graph/fixtures/orca-1.4.205/cost.gemini-agy-usage.json is
+// the recorded answer of the command run on this host on 2026-09-22.
+// ---------------------------------------------------------------------------
+
+const AGY_USAGE = loadOrcaFixture('cost.gemini-agy-usage.json');
+const GEMINI_BUCKETS = ['gemini-weekly', 'gemini-5h'];
+
+test('the Gemini allowance is read out of agy\'s own /usage answer, by bucket id', () => {
+  const allowance = geminiAllowanceFromUsage(AGY_USAGE, { buckets: GEMINI_BUCKETS });
+  assert.deepEqual(Object.keys(allowance).sort(), ['gemini-5h', 'gemini-weekly']);
+  assert.equal(allowance['gemini-weekly'], 0.9935215711593628);
+  assert.equal(allowance['gemini-5h'], 0.9634851813316345);
+  // The Claude/GPT group agy also reports is NOT ours to spend or to report.
+  assert.ok(!('3p-weekly' in allowance));
+});
+
+test('an answer with none of the wanted buckets is refused, not read as a full allowance', () => {
+  assert.throws(
+    () => geminiAllowanceFromUsage({ command: { data: { groups: [] } } }, { buckets: GEMINI_BUCKETS }),
+    /gemini-weekly/,
+  );
+});
+
+test('a Gemini seat\'s cost is the allowance it drew down, differenced against the reading taken at dispatch', async () => {
+  const after = JSON.parse(JSON.stringify(AGY_USAGE));
+  const [gemini] = after.command.data.groups;
+  gemini.buckets[0].remaining_fraction = 0.9870215711593628;
+  gemini.buckets[1].remaining_fraction = 0.9269851813316345;
+
+  const read = createSeatCostReader({ readAllowanceImpl: async () => after });
+  const line = await read({
+    seat: 'builder',
+    agent: 'agy',
+    model: 'gemini-3.8-flash',
+    worktree: 'repo-1::/home/runner/orca/workspaces/julia-next/jul98-6',
+    allowanceBefore: geminiAllowanceFromUsage(AGY_USAGE, { buckets: GEMINI_BUCKETS }),
+    startedAt: '2026-09-22T06:00:00Z',
+    endedAt: '2026-09-22T06:12:24Z',
+  });
+
+  assert.equal(line.billing, 'allowance');
+  assert.equal(line.model, 'gemini-3.8-flash');
+  assert.equal(Number(line.allowanceUsed['gemini-weekly'].toFixed(6)), 0.0065);
+  assert.equal(Number(line.allowanceUsed['gemini-5h'].toFixed(6)), 0.0365);
+  assert.match(formatCostLine(line), /allowance used: weekly 0\.65%, 5h 3\.65%/);
+});
+
+test('a Gemini seat with no reading from before it started is refused rather than costed against nothing', async () => {
+  const read = createSeatCostReader({ readAllowanceImpl: async () => AGY_USAGE });
+  await assert.rejects(
+    () => read({ seat: 'builder', agent: 'agy', model: 'gemini-3.8-flash', worktree: 'r::/w', allowanceBefore: null, startedAt: '2026-09-22T06:00:00Z', endedAt: '2026-09-22T06:01:00Z' }),
+    /before the worker started/,
+  );
+});
+
+test('scripts/prepare-seat-worktree.mjs writes the trust entry and prints EXACTLY one JSON line', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'jul98-prepare-'));
+  const out = [];
+  try {
+    await prepareMain(['--seat', 'builder', '--agent', 'agy', '--worktree', '/home/runner/orca/workspaces/julia-next/jul98-6'], {
+      out: (text) => out.push(text),
+      err: () => {},
+      setExitCode: () => {},
+      workerHome: home,
+      readAllowanceImpl: async () => AGY_USAGE,
+    });
+    assert.equal(out.length, 1, 'one write');
+    assert.equal(out[0].trim().split('\n').length, 1, 'and one line in it');
+    const answer = JSON.parse(out[0]);
+    assert.equal(answer.trusted, true);
+    assert.equal(answer.added, true);
+    assert.equal(answer.allowance['gemini-weekly'], 0.9935215711593628);
+    // The file it wrote is agy's own, at agy's own path.
+    const written = JSON.parse(readFileSync(join(home, '.gemini/antigravity-cli/settings.json'), 'utf8'));
+    assert.deepEqual(written.trustedWorkspaces, ['/home/runner/orca/workspaces/julia-next/jul98-6']);
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('an agent with no trust list is prepared too, and says it has none rather than failing', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'jul98-prepare-pi-'));
+  const out = [];
+  try {
+    await prepareMain(['--seat', 'reviewer', '--agent', 'pi', '--worktree', '/home/runner/orca/workspaces/julia-next/jul98-6'], {
+      out: (text) => out.push(text), err: () => {}, setExitCode: () => {}, workerHome: home,
+    });
+    const answer = JSON.parse(out[0]);
+    assert.equal(answer.trusted, true, 'pi asks no folder-trust question, so nothing stops it here');
+    assert.equal(answer.trustStore, null);
+    assert.equal(answer.allowance, null, 'and it is not billed against an agy allowance');
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('the adopt route\'s Orca calls go to the WORKER daemon, with the worktree the step asked for', async () => {
+  const calls = [];
+  const boundaries = createOrcaBoundaries({
+    orcaCallImpl: async (args) => { calls.push(args); return { worktree: { id: 'repo-1::/w/jul98-6', path: '/w/jul98-6' }, terminal: { handle: 'term_seat' }, wait: { satisfied: true } }; },
+  });
+
+  await boundaries.worktreeCreateImpl({ name: 'jul98-6' });
+  await boundaries.agentTerminalCreateImpl({ seat: 'builder', worktreePath: '/w/jul98-6', title: 'julia-seat-builder', command: 'agy --model gemini-3.8-flash --effort medium --dangerously-skip-permissions' });
+  await boundaries.terminalWaitImpl({ terminal: 'term_seat', timeoutMs: 180000 });
+
+  const [create, terminal, wait] = calls;
+  assert.deepEqual(create.slice(0, 2), ['worktree', 'create']);
+  assert.ok(create.includes('--environment') && create[create.indexOf('--environment') + 1] === WORKER_ENVIRONMENT, 'the runner\'s daemon, which is where a worker worktree can be created at all');
+  assert.equal(create[create.indexOf('--name') + 1], 'jul98-6');
+  assert.equal(create[create.indexOf('--repo') + 1], WORKER_REPO_SELECTOR);
+  assert.ok(create.includes('--no-parent'), 'a top-level worktree, like the --agent route\'s new-top-level');
+
+  assert.deepEqual(terminal.slice(0, 2), ['terminal', 'create']);
+  assert.equal(terminal[terminal.indexOf('--environment') + 1], WORKER_ENVIRONMENT);
+  assert.equal(terminal[terminal.indexOf('--worktree') + 1], 'path:/w/jul98-6');
+  assert.match(terminal[terminal.indexOf('--command') + 1], /^agy --model gemini-3\.8-flash/);
+
+  assert.deepEqual(wait.slice(0, 2), ['terminal', 'wait']);
+  assert.equal(wait[wait.indexOf('--terminal') + 1], 'term_seat');
+  assert.equal(wait[wait.indexOf('--for') + 1], 'tui-idle');
+  assert.equal(wait[wait.indexOf('--environment') + 1], WORKER_ENVIRONMENT);
 });

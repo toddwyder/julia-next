@@ -125,9 +125,12 @@ export async function startAdoptedWorker({
     }
 
     // (1) Trust, BEFORE anything is started into the folder.
-    const prepared = await prepareWorktreeImpl({ seat, agent: launch.trustAgent, worktreePath });
+    // `trusted` means "this agent will not stop on a folder-trust question
+    // here": either an entry was written, or this agent has no trust list at
+    // all (Pi). Either way it is ASKED, never assumed.
+    const prepared = await prepareWorktreeImpl({ seat, agent: launch.agent, worktreePath });
     if (prepared?.trusted !== true) {
-      return stop(`the worktree could not be trusted for ${launch.trustAgent} (${prepared?.reason ?? 'no reason given'}), and an untrusted folder is exactly what a TUI stops dead on`);
+      return stop(`the worktree could not be trusted for ${launch.agent} (${prepared?.reason ?? 'no reason given'}), and an untrusted folder is exactly what a TUI stops dead on`);
     }
 
     // (2) The agent, interactively, on its own model and effort.
@@ -145,7 +148,7 @@ export async function startAdoptedWorker({
     // (3) Fully started, per Orca, not per a sleep.
     const waited = await terminalWaitImpl({ terminal, timeoutMs: tuiWaitMs });
     if (waited?.wait?.satisfied !== true) {
-      return stop(`${launch.command.split(' ')[0]} never reached an idle prompt within ${tuiWaitMs} ms, so adopting it now would lose the brief the way JUL-109's Pi lost it twice`);
+      return stop(`${launch.agent} never reached an idle prompt within ${tuiWaitMs} ms, so adopting it now would lose the brief the way JUL-109's Pi lost it twice`);
     }
 
     // (4) The adoption, carrying the real brief and nothing else. No --agent,

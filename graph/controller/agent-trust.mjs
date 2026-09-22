@@ -38,6 +38,13 @@ export const TRUST_STORES = Object.freeze({
   agy: Object.freeze({ file: '.gemini/antigravity-cli/settings.json', key: 'trustedWorkspaces' }),
 });
 
+// Whether this agent has a folder-trust list at all. Pi does not (it ran in
+// fresh worktrees throughout JUL-109 and never asked), so "no store" is an
+// answer the caller asks for rather than an exception it catches.
+export function hasTrustStore(agent) {
+  return Object.hasOwn(TRUST_STORES, agent);
+}
+
 export function trustStoreFor(agent) {
   const store = TRUST_STORES[agent];
   if (!store) {

@@ -190,6 +190,16 @@ export async function carryCard({
     suiteRunner,
     mirrorImpl,
     workerStartImpl: boundaries.workerStartImpl,
+    // The START-THEN-ADOPT route's own boundaries (JUL-98 step 6), used only by
+    // a seat whose agent `worker-start --agent` has no launcher for.
+    adoptBoundaries: {
+      worktreeCreateImpl: boundaries.worktreeCreateImpl,
+      prepareWorktreeImpl: boundaries.prepareWorktreeImpl,
+      agentTerminalCreateImpl: boundaries.agentTerminalCreateImpl,
+      terminalWaitImpl: boundaries.terminalWaitImpl,
+      terminalCloseImpl: boundaries.terminalCloseImpl,
+      removeWorktreeImpl: boundaries.removeWorktreeImpl,
+    },
     observeStartImpl: boundaries.observeStartImpl,
     checkWaitImpl: boundaries.checkWaitImpl,
     releaseImpl: boundaries.releaseImpl,
@@ -197,7 +207,16 @@ export async function carryCard({
     // `agent` comes back from the dispatch that actually happened, so a seat
     // that moved to its backup is costed as the vendor that RAN. The map below
     // is the fallback for a caller that hands back none.
-    readCostImpl: ({ seat, dispatchId, worktree, agent }) => readSeatCost({ seat, dispatchId, worktree, agent: agent ?? agentForSeat[seat] }),
+    readCostImpl: ({ seat, dispatchId, worktree, agent, model, allowanceBefore, startedAt, endedAt }) => readSeatCost({
+      seat, dispatchId, worktree,
+      agent: agent ?? agentForSeat[seat],
+      // An allowance-billed seat is costed from two readings, not a session
+      // file; the first one was taken at dispatch and travels with the result.
+      model: model ?? null,
+      allowanceBefore: allowanceBefore ?? null,
+      startedAt: startedAt ?? null,
+      endedAt: endedAt ?? null,
+    }),
   });
 
   // ONE comment per seat that moved to its backup, before anything else is

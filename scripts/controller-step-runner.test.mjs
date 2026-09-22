@@ -535,3 +535,44 @@ test('a backup whose TURN is never proven stops the step too -- the same claim, 
   assert.ok(h.order.includes('remove-worktree:builder'));
   assert.ok(!h.order.includes('read-cost:builder'), 'and its non-existent session file is not read');
 });
+
+// ---------------------------------------------------------------------------
+// JUL-98 step 6: an allowance-billed seat is TIMED BY THE CONTROLLER.
+//
+// agy writes no session file, so there is no first and last line timestamp to
+// take a duration from -- the same hole JUL-109 found for Pi, and the same
+// answer: the controller starts the worker and sees it report. The reading
+// taken before the agent ran travels the same way, because differencing it is
+// the only cost figure this seat has.
+// ---------------------------------------------------------------------------
+
+test('a Gemini seat is costed from the reading taken at dispatch and the controller\'s own clock', async () => {
+  const h = harness();
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+  const seen = [];
+  h.deps.readCostImpl = async (args) => {
+    seen.push(args);
+    return { seat: args.seat, model: args.model, billing: 'allowance', allowanceUsed: { 'gemini-weekly': 0.0065 }, minutes: 12.4 };
+  };
+  let tick = 0;
+  h.deps.now = () => ['2026-09-22T06:00:00.000Z', '2026-09-22T06:12:24.000Z'][tick++] ?? '2026-09-22T06:12:24.000Z';
+
+  await runWorkerStep({
+    seat: 'builder',
+    card: CARD,
+    step: STEP,
+    choice: resolveSeatChoices([]).builder,
+    worktreeName: 'jul98-6',
+    requestId: 'JUL-98:step-6:builder',
+    suiteRunner,
+    suiteKey: 'JUL-98:step-6',
+    ...h.deps,
+  });
+
+  const [read] = seen;
+  assert.equal(read.agent, 'agy', 'costed as the agent that actually ran');
+  assert.equal(read.model, 'gemini-3.8-flash');
+  assert.deepEqual(read.allowanceBefore, { 'gemini-weekly': 0.9935, 'gemini-5h': 0.9635 }, 'the reading taken before the agent ran');
+  assert.equal(read.startedAt, '2026-09-22T06:00:00.000Z', 'when the controller started it');
+  assert.equal(read.endedAt, '2026-09-22T06:12:24.000Z', 'and when it saw it report');
+});

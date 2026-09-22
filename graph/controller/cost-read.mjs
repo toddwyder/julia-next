@@ -26,10 +26,16 @@
 // ./cost.mjs and ../rate-table.mjs, and `tokenTotal()` stays the one place a
 // token total is worked out.
 
-import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, readdirSync, statSync, writeFileSync, mkdirSync } from 'node:fs';
+import { execFile } from 'node:child_process';
+import { dirname, join } from 'node:path';
+import { promisify } from 'node:util';
 
-import { claudeExtractFromTranscript, codexExtractFromRollout, seatCostLine } from './cost.mjs';
+import { claudeExtractFromTranscript, codexExtractFromRollout, geminiExtractFromAllowance, seatCostLine } from './cost.mjs';
+import { addTrustedWorkspace, hasTrustStore, trustStoreFor } from './agent-trust.mjs';
+import { RATE_TABLE } from '../rate-table.mjs';
+
+const execFileAsync = promisify(execFile);
 
 // AND THE WORKER'S HOME DIRECTORY, named here for the same reason the daemon
 // and the checkout are: it belongs to `runner`, not to the account this process
@@ -109,6 +115,102 @@ function newestCodexRollout(root, { readdirImpl, statImpl }) {
   return descend(root, 3);
 }
 
+// ---------------------------------------------------------------------------
+// The Gemini seat: an allowance, read from agy itself
+// ---------------------------------------------------------------------------
+
+// `agy -p "/usage" --output-format json`, as the worker. A SLASH COMMAND, so it
+// costs none of the allowance it reports (`num_turns: 0`, `usage.total_tokens:
+// 0` in the recorded answer, graph/fixtures/orca-1.4.205/cost.gemini-agy-usage.json).
+export const AGY_USAGE_ARGS = Object.freeze(['-p', '/usage', '--output-format', 'json']);
+
+export async function readAgyAllowance({ execImpl = execFileAsync, cwd = undefined } = {}) {
+  const { stdout } = await execImpl('agy', [...AGY_USAGE_ARGS], { cwd, maxBuffer: 4 * 1024 * 1024 });
+  return JSON.parse(stdout);
+}
+
+// The buckets we are billed in, out of agy's own answer, BY ID. agy reports two
+// groups -- Gemini, and Claude/GPT -- and only the first is this seat's to
+// spend or to report; taking "the first group" would silently follow agy if it
+// ever reorders them.
+export function geminiAllowanceFromUsage(answer, { buckets } = {}) {
+  const groups = answer?.command?.data?.groups ?? [];
+  const found = {};
+  for (const group of groups) {
+    for (const bucket of group?.buckets ?? []) {
+      if (buckets.includes(bucket?.id) && Number.isFinite(bucket.remaining_fraction)) {
+        found[bucket.id] = bucket.remaining_fraction;
+      }
+    }
+  }
+  const missing = buckets.filter((id) => !(id in found));
+  if (missing.length > 0) {
+    // A refusal, never a default: a missing bucket read as 1.0 would say the
+    // seat spent nothing, which is the blank cost line in another costume.
+    throw new Error(`geminiAllowanceFromUsage: agy's /usage answer has no ${missing.join(', ')} bucket, so the allowance cannot be read -- refusing to guess one`);
+  }
+  return found;
+}
+
+// ---------------------------------------------------------------------------
+// Preparing one worktree for one agent, as the worker
+// ---------------------------------------------------------------------------
+
+// Two things, both of which only the WORKER can do, and both of which have to
+// happen BEFORE the agent is started:
+//
+//   * the worktree goes into the agent's own folder-trust list, if it has one
+//     (./agent-trust.mjs records the measurement that says agy does and Pi does
+//     not). `trusted: true` means "this agent will not stop on a trust question
+//     in this folder" -- an entry was written, or there is no list to write to.
+//   * the allowance is read, for an agent billed against one, so the cost line
+//     has something to difference against when the worker reports.
+export async function prepareSeatWorktree({
+  agent,
+  worktreePath,
+  workerHome = WORKER_HOME,
+  readFileImpl = readFileSync,
+  writeFileImpl = writeFileSync,
+  mkdirImpl = mkdirSync,
+  readAllowanceImpl = readAgyAllowance,
+} = {}) {
+  let trustStore = null;
+  let added = false;
+  if (hasTrustStore(agent)) {
+    const store = trustStoreFor(agent);
+    const file = join(workerHome, store.file);
+    let existing = '';
+    try {
+      existing = readFileImpl(file, 'utf8');
+    } catch {
+      // No settings file yet: the first run of the agent has not happened here.
+      // An empty store is a real starting point; an unreadable one is not, and
+      // addTrustedWorkspace refuses that separately.
+      existing = '';
+    }
+    const next = addTrustedWorkspace({ agent, text: existing, worktreePath });
+    mkdirImpl(dirname(file), { recursive: true });
+    writeFileImpl(file, next.text);
+    trustStore = file;
+    added = next.added;
+  }
+  const allowance = agent === 'agy'
+    ? geminiAllowanceFromUsage(await readAllowanceImpl(), { buckets: geminiBucketsOf(agent) })
+    : null;
+  return { agent, worktreePath, trusted: true, trustStore, added, allowance };
+}
+
+// The buckets an agy seat spends, taken from the rate table rather than
+// repeated here -- the two Gemini models share one group, which is agy's own
+// statement ("Models within this group: Gemini Flash, Gemini Pro").
+function geminiBucketsOf(agent) {
+  if (agent !== 'agy') return [];
+  for (const entry of Object.values(RATE_TABLE.models)) {
+    if (entry.vendor === 'gemini' && entry.allowanceBuckets) return entry.allowanceBuckets;
+  }
+  throw new Error('no Gemini allowance buckets are declared in graph/rate-table.mjs');
+}
+
 // One seat's figures, read while the worker's session files still exist --
 // which is why graph/controller/release.mjs reads BEFORE it releases.
 //
@@ -127,8 +229,9 @@ export function createSeatCostReader({
   readFileImpl = readFileSync,
   readdirImpl = readdirSync,
   statImpl = statSync,
+  readAllowanceImpl = readAgyAllowance,
 } = {}) {
-  return async function readSeatCost({ seat, worktree, agent, startedAt = null, endedAt = null }) {
+  return async function readSeatCost({ seat, worktree, agent, model = null, allowanceBefore = null, startedAt = null, endedAt = null }) {
     const worktreePath = worktreePathOf(worktree);
     if (agent === 'claude') {
       const dir = join(workerHome, '.claude', 'projects', claudeProjectDirName(worktreePath));
@@ -150,8 +253,14 @@ export function createSeatCostReader({
       const lines = splitJsonl(readFileImpl(file, 'utf8')).map((line) => JSON.parse(line));
       return seatCostLine({ seat, ...codexExtractFromRollout(lines) });
     }
-    // A DeepSeek seat never reaches here: graph/controller/dispatch.mjs refuses
-    // to start one with a new worktree at all (JUL-109 section 4).
+    if (agent === 'agy') {
+      // No session file to find: agy writes no per-session token record at all
+      // (the search is in graph/rate-table.mjs). The figure is the allowance it
+      // drew down, so the reading taken at dispatch is differenced against one
+      // taken now, and a missing first reading is a refusal.
+      const after = geminiAllowanceFromUsage(await readAllowanceImpl(), { buckets: geminiBucketsOf(agent) });
+      return seatCostLine({ seat, ...geminiExtractFromAllowance({ model, before: allowanceBefore, after, startedAt, endedAt }) });
+    }
     throw new Error(`no cost source is known for a ${JSON.stringify(agent)} seat (${seat}) -- refusing to guess a figure${startedAt && endedAt ? ` for ${startedAt}..${endedAt}` : ''}`);
   };
 }

@@ -8,6 +8,7 @@ import {
   buildPiSpawnSpec, runPiSeat, SEATS, readAllStdin, thinkingArgs, parseSeatArgs,
   parsePiJsonStream, supervisePiSeat,
 } from './run-pi-seat.mjs';
+import { DEFAULT_EFFORT } from '../../scripts/effort.mjs';
 
 // A stand-in for a spawned `pi` process: an EventEmitter with pipe-able
 // stdout/stderr, so the JSON-stream detection can be exercised without a
@@ -163,9 +164,9 @@ test('runPiSeat forwards the effort through to the spawn spec (no separate path 
 });
 
 test('parseSeatArgs: seat plus an optional --effort (both spellings), defaulting to medium', () => {
-  assert.deepEqual(parseSeatArgs(['orchestrator-deepseek']), { seat: 'orchestrator-deepseek', effort: 'medium' });
-  assert.deepEqual(parseSeatArgs(['builder-backup', '--effort', 'low']), { seat: 'builder-backup', effort: 'low' });
-  assert.deepEqual(parseSeatArgs(['builder-backup', '--effort=high']), { seat: 'builder-backup', effort: 'high' });
+  assert.deepEqual(parseSeatArgs(['orchestrator-deepseek']), { seat: 'orchestrator-deepseek', effort: 'medium', interactive: false });
+  assert.deepEqual(parseSeatArgs(['builder-backup', '--effort', 'low']), { seat: 'builder-backup', effort: 'low', interactive: false });
+  assert.deepEqual(parseSeatArgs(['builder-backup', '--effort=high']), { seat: 'builder-backup', effort: 'high', interactive: false });
   assert.throws(() => parseSeatArgs(['builder-backup', '--wat']), /unknown argument: --wat/);
 });
 
@@ -243,4 +244,35 @@ test('supervisePiSeat: a normal successful turn exits 0 and prints nothing to st
   assert.equal(code, 0);
   assert.equal(out.stderrText, '');
   assert.match(out.stdoutText, /agent_settled/);
+});
+
+// ---------------------------------------------------------------------------
+// JUL-98 step 6: the INTERACTIVE launch, for the start-then-adopt route.
+//
+// `-p --mode json` is a one-shot with no worker contract, so a Pi seat started
+// that way cannot report to the mailbox at all (JUL-109 findings, section 4).
+// The route that CAN report starts Pi interactively and lets Orca adopt the
+// terminal -- so this file, which is the one place that knows how a Pi seat
+// authenticates, gains that launch rather than a second launcher being written
+// beside it.
+// ---------------------------------------------------------------------------
+
+test('the interactive launch drops -p and the json mode, and keeps the seat\'s provider, model, thinking and secret', () => {
+  const spec = buildPiSpawnSpec('reviewer-backup', null, { interactive: true, effort: 'high', readSecretImpl: () => 'SECRET' });
+  assert.equal(spec.command, 'pi');
+  assert.deepEqual(spec.args, ['--provider', 'deepseek', '--model', 'deepseek-v4-pro', '--thinking', 'high']);
+  assert.ok(!spec.args.includes('-p'), 'a one-shot cannot report to the mailbox');
+  assert.ok(!spec.args.includes('--mode'));
+  assert.ok(!spec.args.includes('--'), 'there is no prompt: Orca types the brief in when it adopts the terminal');
+  assert.equal(spec.env.DEEPSEEK_API_KEY, 'SECRET', 'the secret still reaches the child, and only the child');
+});
+
+test('the one-shot launch is unchanged by the interactive one', () => {
+  const spec = buildPiSpawnSpec('builder-backup', 'do the thing', { effort: 'low', readSecretImpl: () => 'SECRET' });
+  assert.deepEqual(spec.args, ['--provider', 'deepseek', '--model', 'deepseek-v4-flash', '--thinking', 'off', '-p', '--mode', 'json', '--', 'do the thing']);
+});
+
+test('--interactive is a recognized argument, and is off by default', () => {
+  assert.deepEqual(parseSeatArgs(['reviewer-backup', '--interactive', '--effort', 'high']), { seat: 'reviewer-backup', effort: 'high', interactive: true });
+  assert.deepEqual(parseSeatArgs(['reviewer-backup']), { seat: 'reviewer-backup', effort: DEFAULT_EFFORT, interactive: false });
 });

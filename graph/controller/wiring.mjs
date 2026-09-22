@@ -61,7 +61,7 @@ import { orcaCall } from '../../scripts/orca-cli.mjs';
 import { findActiveRun } from '../../scripts/ready-queue.mjs';
 import { pushBranch, openPullRequest } from '../../scripts/publish-pr.mjs';
 import { mergePullRequest } from '../../scripts/merge-pr.mjs';
-import { createSeatCostReader, claudeProjectDirName, worktreePathOf, WORKER_HOME } from './cost-read.mjs';
+import { createSeatCostReader, claudeProjectDirName, worktreePathOf, geminiAllowanceFromUsage, WORKER_HOME } from './cost-read.mjs';
 import { WORKER_MESSAGE_TYPES } from './mailbox.mjs';
 
 const execFileAsync = promisify(execFile);
@@ -122,7 +122,7 @@ export const WORKER_REPO_SELECTOR = `path:${WORKER_CHECKOUT}`;
 // that already imports it from this file still does. It belongs to `runner`,
 // never to the account this process runs as, and ./cost-read.mjs's header
 // records the measured 0700 permission that makes it unreadable from here.
-export { createSeatCostReader, claudeProjectDirName, worktreePathOf, WORKER_HOME };
+export { createSeatCostReader, claudeProjectDirName, worktreePathOf, geminiAllowanceFromUsage, WORKER_HOME };
 export const PUBLISH_OWNER = 'toddwyder';
 export const PUBLISH_REPO = 'julia-next';
 export const PUBLISH_BASE = 'main';
@@ -183,7 +183,11 @@ export function createOrcaBoundaries({
 } = {}) {
   const call = (args) => orcaCallImpl([...args, '--json']);
 
-  return {
+  // A named object, not an anonymous literal: one boundary below is composed
+  // from others (`prepareWorktreeImpl` runs a script through the worker-side
+  // terminal helper), and a bare `this` would be undefined the moment a caller
+  // destructured it -- which every caller does.
+  const boundaries = {
     ledger,
 
     // (1) The card's in-flight record IS its Orca run.
@@ -393,6 +397,76 @@ export function createOrcaBoundaries({
       return call(['terminal', 'close', '--environment', workerEnvironment, '--terminal', terminal]);
     },
 
+    // (13) THE START-THEN-ADOPT ROUTE'S OWN THREE CALLS (JUL-98 step 6), for
+    // the seats `worker-start --agent` has no launcher for. All three are on
+    // the RUNNER'S daemon, for the same reason `worker-start --on` is: that is
+    // where the worker runs, and the only checkout a worktree can be created
+    // from.
+    //
+    // `worktree create --no-parent` is the adopt route's `new-top-level`: the
+    // `--agent` route gets that worktree from `worker-start` itself, and this
+    // route has to make it first, because the agent has to be RUNNING IN IT
+    // before there is a terminal to adopt. No `--agent` and no `--prompt`: the
+    // agent is started by (14) below, on its own model and effort, and the
+    // brief is delivered once, by the adoption.
+    async worktreeCreateImpl({ name } = {}) {
+      const answer = await call([
+        'worktree', 'create',
+        '--environment', workerEnvironment,
+        '--repo', workerRepo,
+        '--name', name,
+        '--no-parent',
+      ]);
+      return answer;
+    },
+
+    // (14) The agent itself, interactive, in that worktree. `terminal create`
+    // and not `worker-start --agent`: Orca has no launcher for this agent, and
+    // its own help says "Use this, not worktree create, for a fresh agent in
+    // the current checkout". The command carries the model and the effort, so
+    // the card still shows exactly what runs.
+    async agentTerminalCreateImpl({ worktreePath, title, command } = {}) {
+      return call([
+        'terminal', 'create',
+        '--environment', workerEnvironment,
+        '--worktree', `path:${worktreePath}`,
+        '--title', title,
+        '--command', command,
+      ]);
+    },
+
+    // (15) Orca's own "it has fully started". NOT a sleep: JUL-109 lost a Pi
+    // worker's task text twice by adopting a terminal while the agent was still
+    // coming up, and `terminal wait --for tui-idle` is the verb that answers
+    // the question. A timed-out wait still prints a normal result, so the
+    // caller reads `wait.satisfied` rather than the fact that something
+    // printed (orca-cli skill).
+    async terminalWaitImpl({ terminal, timeoutMs } = {}) {
+      return call([
+        'terminal', 'wait',
+        '--environment', workerEnvironment,
+        '--terminal', terminal,
+        '--for', 'tui-idle',
+        '--timeout-ms', String(timeoutMs),
+      ]);
+    },
+
+    // (16) The worktree made ready for the agent, BEFORE the agent is started:
+    // its folder-trust entry written, and (for an allowance-billed agent) the
+    // allowance read. Both are the worker's own files, so this is the same
+    // worker-side-terminal route the cost read already takes -- the one helper,
+    // not a second copy of it.
+    async prepareWorktreeImpl({ seat, agent, worktreePath } = {}) {
+      return runWorkerScript({
+        boundaries,
+        seat,
+        what: 'worktree preparation',
+        title: `${PREPARE_TERMINAL_TITLE_PREFIX}${seat}`,
+        command: prepareCommand({ seat, agent, worktreePath }),
+        worktreePath,
+      });
+    },
+
     // (7) The worktree. Orca names one `<repoId>::<path>`, which is exactly the
     // `id:` selector `worktree rm` documents. THE RUNNER'S daemon, for the same
     // reason as `worktree ps`: that is the daemon that has the worktree, and a
@@ -403,6 +477,7 @@ export function createOrcaBoundaries({
       return call(['worktree', 'rm', '--environment', workerEnvironment, '--worktree', `id:${worktree}`]);
     },
   };
+  return boundaries;
 }
 
 // ---------------------------------------------------------------------------
@@ -542,6 +617,9 @@ export async function resolveSenderTerminal({
 // Named so a human reading Orca's terminal list can see what it is and that it
 // is short-lived.
 export const COST_TERMINAL_TITLE_PREFIX = 'julia-cost-';
+// JUL-98 step 6: the worktree-preparation terminal, named the same way for the
+// same reason -- a human looking at Orca's terminal list can tell what it is.
+export const PREPARE_TERMINAL_TITLE_PREFIX = 'julia-prepare-';
 
 // THE END MARKER, and why completion is not `terminal wait`. A plain terminal
 // is NOT finished when `terminal wait` says so: `--for tui-idle` answers
@@ -564,8 +642,24 @@ function shellArg(value, what) {
   return `'${text}'`;
 }
 
-export function costReadCommand({ seat, agent, worktreePath }) {
-  const script = `node ${shellArg(`${worktreePath}/scripts/read-seat-cost.mjs`, 'the worktree path')}`
+export function costReadCommand({ seat, agent, worktreePath, model = null, allowanceBefore = null, startedAt = null, endedAt = null }) {
+  let script = `node ${shellArg(`${worktreePath}/scripts/read-seat-cost.mjs`, 'the worktree path')}`
+    + ` --seat ${shellArg(seat, 'the seat')} --agent ${shellArg(agent, 'the agent')} --worktree ${shellArg(worktreePath, 'the worktree path')}`;
+  // An allowance-billed seat (agy) has no session file, so its figure is the
+  // difference between the reading taken at dispatch and one taken now. The
+  // first reading travels here; shellArg refuses anything that could break out
+  // of the quoting rather than interpolating it.
+  if (model) script += ` --model ${shellArg(model, 'the model')}`;
+  if (allowanceBefore) script += ` --allowance-before ${shellArg(JSON.stringify(allowanceBefore), 'the allowance reading')}`;
+  if (startedAt) script += ` --started-at ${shellArg(startedAt, 'the start time')}`;
+  if (endedAt) script += ` --ended-at ${shellArg(endedAt, 'the end time')}`;
+  return `${script}; echo "${COST_READ_END_MARKER}:$?"`;
+}
+
+// The same shape for the worktree-preparation script: one node call out of the
+// candidate worktree, then the marker carrying its exit status.
+export function prepareCommand({ seat, agent, worktreePath }) {
+  const script = `node ${shellArg(`${worktreePath}/scripts/prepare-seat-worktree.mjs`, 'the worktree path')}`
     + ` --seat ${shellArg(seat, 'the seat')} --agent ${shellArg(agent, 'the agent')} --worktree ${shellArg(worktreePath, 'the worktree path')}`;
   return `${script}; echo "${COST_READ_END_MARKER}:$?"`;
 }
@@ -588,20 +682,20 @@ export function costReadExitCode(lines) {
 // is a prompt, the echoed command or (on failure) stderr. A line that opens
 // like JSON and will not parse is a REFUSAL, never a skip -- skipping it would
 // walk on to "no line at all", which says the wrong thing about what broke.
-export function costLineFromTerminalLines(lines, { seat }) {
+export function costLineFromTerminalLines(lines, { seat, what = 'cost read' }) {
   const candidates = lines.map((line) => String(line).trim()).filter((line) => line.startsWith('{'));
   if (candidates.length === 0) {
-    throw new Error(`the ${seat} seat's cost read printed no JSON line -- scripts/read-seat-cost.mjs prints exactly one on success, so there is no figure to post and nothing is guessed`);
+    throw new Error(`the ${seat} seat's ${what} printed no JSON line -- the worker-side script prints exactly one on success, so there is nothing to read and nothing is guessed`);
   }
   const text = candidates[candidates.length - 1];
   let parsed;
   try {
     parsed = JSON.parse(text);
   } catch (error) {
-    throw new Error(`the ${seat} seat's cost read printed a line that is not valid JSON (${error.message}): ${text.slice(0, 200)}`);
+    throw new Error(`the ${seat} seat's ${what} printed a line that is not valid JSON (${error.message}): ${text.slice(0, 200)}`);
   }
   if (!parsed || typeof parsed !== 'object') {
-    throw new Error(`the ${seat} seat's cost read printed JSON that is not a cost line: ${text.slice(0, 200)}`);
+    throw new Error(`the ${seat} seat's ${what} printed JSON that is not an answer: ${text.slice(0, 200)}`);
   }
   return parsed;
 }
@@ -617,8 +711,30 @@ export function costLineFromTerminalLines(lines, { seat }) {
 // AND THE TERMINAL IS ALWAYS CLOSED. The close is in a `finally`, so a refusal
 // does not leak a terminal on the worker daemon -- one per failed cost read,
 // for ever, is exactly the leak this had to avoid.
-export function createOrcaSeatCostReader({
+// THE ONE WAY A SCRIPT IS RUN AS THE WORKER, and read back.
+//
+// Two things the controller cannot do itself both need it: reading a seat's
+// cost figures, and preparing a worktree for an agent (its folder-trust entry,
+// and the allowance reading). Both are the WORKER'S files -- 0700 transcript
+// directories, a 0600 settings file -- and the controller runs as a different
+// account. So both take the same route: an Orca terminal on the worker daemon,
+// which runs as the worker, running one node script out of the candidate
+// worktree, printing ONE line of JSON.
+//
+// EVERY FAILURE IS A REFUSAL. No marker inside the timeout, a non-zero exit, no
+// JSON line, an unparseable one: each throws, and the caller stops and says
+// which seat and why. Nothing here can produce a blank or guessed figure.
+//
+// AND THE TERMINAL IS ALWAYS CLOSED, in a `finally`, so a refusal does not leak
+// a terminal on the worker daemon -- one per failure, for ever, is exactly the
+// leak this had to avoid.
+export async function runWorkerScript({
   boundaries,
+  seat,
+  what,
+  title,
+  command,
+  worktreePath,
   timeoutMs = 120000,
   pollMs = 1000,
   readLimit = 2000,
@@ -626,61 +742,74 @@ export function createOrcaSeatCostReader({
   now = () => Date.now(),
   warn = console.error,
 } = {}) {
-  return async function readSeatCost({ seat, worktree, agent }) {
-    // A DeepSeek seat never reaches here: graph/controller/dispatch.mjs refuses
-    // to start one with a new worktree at all (JUL-109 section 4). Refused
-    // before a terminal is made, so an unknown vendor costs nothing.
-    if (agent !== 'claude' && agent !== 'codex') {
+  const created = await boundaries.workerTerminalCreateImpl({ worktreePath, title, command });
+  const terminal = created?.terminal?.handle ?? null;
+  if (!terminal) {
+    throw new Error(`the ${seat} seat's ${what} could not start: orca terminal create on the worker daemon answered no terminal handle (${JSON.stringify(created ?? null).slice(0, 200)})`);
+  }
+  // A create Orca could not make visible still gives a working handle and says
+  // so in `warning` (recorded: terminal-create.plain-diagnostic.json). A note,
+  // not a failure -- nothing is ever typed into this terminal.
+  if (created.terminal.warning) warn(`[controller] ${created.terminal.warning}`);
+
+  try {
+    const lines = [];
+    let cursor = null;
+    let exitCode = null;
+    const deadline = now() + timeoutMs;
+    for (;;) {
+      const answer = await boundaries.terminalReadImpl({ terminal, cursor, limit: readLimit });
+      const read = answer?.terminal ?? {};
+      for (const line of read.tail ?? []) lines.push(String(line));
+      if (read.nextCursor !== null && read.nextCursor !== undefined) cursor = read.nextCursor;
+      exitCode = costReadExitCode(lines);
+      if (exitCode !== null) break;
+      if (now() >= deadline) {
+        throw new Error(`the ${seat} seat's ${what} did not finish within ${timeoutMs} ms -- no "${COST_READ_END_MARKER}" line came back from the worker terminal, so nothing was read and nothing is guessed`);
+      }
+      await sleepImpl(pollMs);
+    }
+    if (exitCode !== 0) {
+      const tail = lines.filter((line) => !END_MARKER_LINE.test(line.trim())).slice(-5).join(' | ');
+      throw new Error(`the ${seat} seat's ${what} failed on the worker: the script exited ${exitCode} -- ${tail || 'it printed nothing'}`);
+    }
+    return costLineFromTerminalLines(lines, { seat, what });
+  } finally {
+    // Even on the failure path. A close that itself fails is said out loud and
+    // does not replace the real reason.
+    try {
+      await boundaries.terminalCloseImpl({ terminal });
+    } catch (error) {
+      warn(`[controller] could not close the ${seat} seat's ${what} terminal ${terminal}: ${error.message}`);
+    }
+  }
+}
+
+// One seat's figures, read while the worker's session files still exist --
+// which is why graph/controller/release.mjs reads BEFORE it releases.
+export function createOrcaSeatCostReader({ boundaries, ...options } = {}) {
+  return async function readSeatCost({ seat, worktree, agent, model = null, allowanceBefore = null, startedAt = null, endedAt = null }) {
+    // Refused before a terminal is made, so an unknown vendor costs nothing.
+    if (!COSTABLE_AGENTS.has(agent)) {
       throw new Error(`no cost source is known for a ${JSON.stringify(agent)} seat (${seat}) -- refusing to guess a figure`);
     }
     const worktreePath = worktreePathOf(worktree);
-    const created = await boundaries.workerTerminalCreateImpl({
-      worktreePath,
+    return runWorkerScript({
+      ...options,
+      boundaries,
+      seat,
+      what: 'cost read',
       title: `${COST_TERMINAL_TITLE_PREFIX}${seat}`,
-      command: costReadCommand({ seat, agent, worktreePath }),
+      command: costReadCommand({ seat, agent, worktreePath, model, allowanceBefore, startedAt, endedAt }),
+      worktreePath,
     });
-    const terminal = created?.terminal?.handle ?? null;
-    if (!terminal) {
-      throw new Error(`the ${seat} seat's cost read could not start: orca terminal create on the worker daemon answered no terminal handle (${JSON.stringify(created ?? null).slice(0, 200)})`);
-    }
-    // A create Orca could not make visible still gives a working handle and
-    // says so in `warning` (recorded: terminal-create.plain-diagnostic.json).
-    // A note, not a failure -- nothing is ever typed into this terminal.
-    if (created.terminal.warning) warn(`[controller] ${created.terminal.warning}`);
-
-    try {
-      const lines = [];
-      let cursor = null;
-      let exitCode = null;
-      const deadline = now() + timeoutMs;
-      for (;;) {
-        const answer = await boundaries.terminalReadImpl({ terminal, cursor, limit: readLimit });
-        const read = answer?.terminal ?? {};
-        for (const line of read.tail ?? []) lines.push(String(line));
-        if (read.nextCursor !== null && read.nextCursor !== undefined) cursor = read.nextCursor;
-        exitCode = costReadExitCode(lines);
-        if (exitCode !== null) break;
-        if (now() >= deadline) {
-          throw new Error(`the ${seat} seat's cost read did not finish within ${timeoutMs} ms -- no "${COST_READ_END_MARKER}" line came back from the worker terminal, so the figures were not read and nothing is guessed`);
-        }
-        await sleepImpl(pollMs);
-      }
-      if (exitCode !== 0) {
-        const tail = lines.filter((line) => !END_MARKER_LINE.test(line.trim())).slice(-5).join(' | ');
-        throw new Error(`the ${seat} seat's cost read failed on the worker: scripts/read-seat-cost.mjs exited ${exitCode} -- ${tail || 'it printed nothing'}`);
-      }
-      return costLineFromTerminalLines(lines, { seat });
-    } finally {
-      // Even on the failure path. A close that itself fails is said out loud
-      // and does not replace the real reason the read failed.
-      try {
-        await boundaries.terminalCloseImpl({ terminal });
-      } catch (error) {
-        warn(`[controller] could not close the ${seat} seat's cost terminal ${terminal}: ${error.message}`);
-      }
-    }
   };
 }
+
+// The agents whose figures there is a recorded source for. `agy` is
+// allowance-billed rather than token-billed; graph/controller/cost-read.mjs
+// holds all three readers.
+const COSTABLE_AGENTS = new Set(['claude', 'codex', 'agy']);
 
 // ---------------------------------------------------------------------------
 // Publishing -- the App, never a personal git identity

@@ -79,10 +79,12 @@ const AGENT_FOR_ENTRY = Object.freeze({ claude: 'claude', codex: 'codex' });
 // `--model`/`--effort` cannot be passed with `--terminal`.
 const ADOPTED_ENTRIES = Object.freeze({
   gemini: Object.freeze({
-    // agy asks a folder-trust question on a folder it has not seen, so the
-    // worktree is written into ITS trust list before it is started
-    // (./agent-trust.mjs).
-    trustAgent: 'agy',
+    // The command the agent really is. It is NOT passed to `worker-start
+    // --agent` (`route: 'adopt'` is what keeps it away from there): it is the
+    // name the trust list (./agent-trust.mjs) and the cost read
+    // (./cost-read.mjs) are both keyed by, so the seat that ran and the figures
+    // read for it can never be two different agents.
+    agent: 'agy',
     // `--dangerously-skip-permissions` is the same posture Todd accepted for
     // `runner`'s Claude Code on 2026-09-20 (`skipDangerousModePermissionPrompt`,
     // JUL-109 findings section 6): without it agy stops on every tool call and
@@ -90,9 +92,7 @@ const ADOPTED_ENTRIES = Object.freeze({
     command: ({ model, effort }) => `agy --model ${model} --effort ${effort} --dangerously-skip-permissions`,
   }),
   'pi-deepseek': Object.freeze({
-    // Pi asks no folder-trust question (it ran in fresh worktrees throughout
-    // JUL-109 without one), so there is no trust list to write.
-    trustAgent: null,
+    agent: 'pi',
     // The repo's own seat launcher, in its interactive mode: it is what reads
     // the DeepSeek key in-process, and reusing it keeps ONE place that knows
     // how a Pi seat authenticates.
@@ -131,7 +131,7 @@ export function launchForChoice(choice) {
   if (agent) return { route: 'agent', agent, model, effort };
   return {
     route: 'adopt',
-    trustAgent: adopted.trustAgent,
+    agent: adopted.agent,
     command: adopted.command({ model, effort }),
     model,
     effort,
@@ -197,6 +197,11 @@ export async function dispatchWorker({
   files = [],
   worktreeName,
   requestId,
+  // The controller's own clock. An allowance-billed seat writes no session
+  // file, so there is no first/last line timestamp to take a duration from --
+  // the controller starts it and sees it report, which is exactly what JUL-109
+  // concluded for Pi (findings section 5).
+  now = () => new Date().toISOString(),
 }) {
   const launch = launchForChoice(choice);
   if (launch.ok === false) {
@@ -252,6 +257,7 @@ export async function dispatchWorker({
       stage: adopted.result.stage ?? null,
       state: adopted.result.state ?? null,
       launch: { ...launch },
+      startedAt: now(),
       // The allowance reading taken BEFORE the agent ran. ./step-runner.mjs
       // hands it to the cost read, which differences it against a second
       // reading -- the only figure an allowance-billed seat has.

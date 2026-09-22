@@ -62,11 +62,13 @@ export async function runWorkerStep({
   mirrorImpl = null,
   runSuite = true,
   waitOptions = {},
+  // The controller's own clock, for a seat whose vendor records no duration.
+  now = () => new Date().toISOString(),
 } = {}) {
   // 1. A fresh worker.
   const dispatched = await dispatchWorker({
     workerStartImpl, adoptBoundaries, environment, runId, from, repo,
-    seat, card, step, choice, files, worktreeName, requestId,
+    seat, card, step, choice, files, worktreeName, requestId, now,
   });
   if (!dispatched.ok) {
     // ITEM 2 (JUL-98 step 5, fifth fix): A SEAT THAT NEVER STARTED IS COSTED AS
@@ -119,6 +121,10 @@ export async function runWorkerStep({
         // difference between the reading taken before it started and one taken
         // now (./cost.mjs geminiExtractFromAllowance).
         allowanceBefore: dispatched.allowanceBefore ?? null,
+        // The controller started it and has now seen it report: that IS the
+        // duration for a vendor that records none.
+        startedAt: dispatched.startedAt ?? null,
+        endedAt: dispatched.startedAt ? now() : null,
       }),
       releaseImpl,
       removeWorktreeImpl,
