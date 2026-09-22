@@ -181,21 +181,26 @@ in JUL-61). `-J` joins wrapped lines back into one before you read it out:
 tmux capture-pane -t <session> -p -J
 ```
 
-**Both Orca daemons crash under Xvfb without `--disable-gpu` (JUL-98, 2026-09-22), fixed.**
-Each daemon runs headless under Xvfb, a virtual X server with no real GPU/DRI device behind it.
-Electron's GPU process still tries to initialize hardware acceleration there, fails, and brings
-the whole process down: `FATAL:.../gpu_data_manager_impl_private.cc:416] GPU process isn't
-usable. Goodbye.` followed by `Orca serve exited via SIGILL.`. `Restart=on-failure` brings the
-daemon back within ~5-20 seconds, but the restart **kills every terminal that daemon owns**,
+**Both Orca daemons crash under Xvfb without `LIBGL_ALWAYS_SOFTWARE=1` (JUL-98, 2026-09-22),
+fixed.** Each daemon runs headless under Xvfb, a virtual X server with no real GPU/DRI device
+behind it. Electron's GPU process still tries to initialize hardware acceleration there, fails,
+and brings the whole process down: `FATAL:.../gpu_data_manager_impl_private.cc:416] GPU process
+isn't usable. Goodbye.` followed by `Orca serve exited via SIGILL.`. `Restart=on-failure` brings
+the daemon back within ~5-20 seconds, but the restart **kills every terminal that daemon owns**,
 mid-work, with no chance for a running coordinator or builder to report anything -- found live
 when it killed a coordinator and a builder at the same instant. `journalctl` back to server boot
 showed the identical signature had already fired at least six times before that, unrecorded,
 since 2026-09-17 -- it had been happening for almost a week and nothing was watching for it.
-**Fix:** `--disable-gpu` added to `ORCA_SERVE_ARGS` in both daemons' env files -- a standard
-Chromium/Electron switch, not listed in `orca serve --help` but accepted silently (Electron
-parses it before handing the rest of argv to the app). Source of truth, verification and
-reapply-on-rebuild steps: `ops/orca-daemons/README.md`. Proven live: both daemons restarted
-clean, and the crash signature does not recur in `journalctl` after the fix.
+**A first attempt (`--disable-gpu` in `ORCA_SERVE_ARGS`) crash-looped the daemon outright**
+(`Unknown flag --disable-gpu for command: serve`): the systemd `ExecStart` runs `/usr/bin/orca-ide`,
+a wrapper script that runs `serve` in Node-only mode (`ELECTRON_RUN_AS_NODE=1`) and validates argv
+against a strict whitelist -- the actual crashing Electron instance is spawned internally as a
+subprocess `serve` never exposes to a CLI flag. **Real fix:** `LIBGL_ALWAYS_SOFTWARE=1` added as
+a plain env var (not a CLI flag) to both daemons' env files, forcing Mesa's software GL renderer
+so Chromium's GPU process gets a working context under Xvfb instead of failing to find hardware.
+Source of truth, verification and reapply-on-rebuild steps: `ops/orca-daemons/README.md`. Proven
+live: both daemons restarted clean (`NRestarts=0`, stable), and the crash signature does not
+recur in `journalctl` after the fix.
 
 ---
 
