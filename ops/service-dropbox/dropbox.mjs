@@ -32,7 +32,7 @@ import { dirname } from 'node:path';
 
 export const FIELDS = [
   'sentry', 'supabase', 'powersync', 'axiom', 'deepseek', 'linear',
-  'linear-app-id', 'linear-app-secret',
+  'linear-app-id', 'linear-app-secret', 'commandcode',
 ];
 
 // Which group write-secret.sh chowns each field's file to on the server --
@@ -59,6 +59,12 @@ export const FIELD_GROUPS = {
   // controller on the board.
   'linear-app-id': 'orchestrator-svc',
   'linear-app-secret': 'orchestrator-svc',
+  // Command Code GOAT reviewer trial (JUL-98, Todd's 13:43Z Decision):
+  // read by the Pi route (runner) the same way deepseek is, AND by
+  // orchestrator-svc for a coordinator-run probe -- a dedicated group,
+  // same reasoning as deepseek-readers above, not either account's
+  // existing group.
+  commandcode: 'commandcode-readers',
 };
 
 // Shape checks are deliberately loose -- the point is to catch an obviously
@@ -169,6 +175,7 @@ const HINTS = {
   powersync: 'From PowerSync: Account -> Access Tokens. A long string of letters/numbers, no spaces.',
   axiom: 'From Axiom: Settings -> API tokens. A long string of letters/numbers, no spaces.',
   deepseek: 'From DeepSeek: Platform -> API keys. A long string of letters/numbers, no spaces.',
+  commandcode: 'From Command Code: your account -> API keys. A long string of letters/numbers, no spaces.',
   linear: 'From Linear: Settings -> Security & access -> Personal API keys. A long string of letters/numbers, no spaces.',
   'linear-app-id': 'From Linear: Settings -> API -> OAuth applications -> Julia controller (created with client credentials tokens switched on) -> Client ID. A long string of letters/numbers, no spaces.',
   'linear-app-secret': 'From Linear: the same Julia controller page -> Client secret (shown once, right after you create the app). A long string of letters/numbers, no spaces.',

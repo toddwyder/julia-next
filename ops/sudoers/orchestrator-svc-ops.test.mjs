@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 
 const FILE = fileURLToPath(new URL('./orchestrator-svc-ops', import.meta.url));
 const ACCOUNTS = ['runner', 'orchestrator-svc'];
-const KEY_GROUPS = ['deepseek-readers'];
+const KEY_GROUPS = ['deepseek-readers', 'commandcode-readers'];
 
 const raw = readFileSync(FILE, 'utf8');
 const rules = raw

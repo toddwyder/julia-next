@@ -30,10 +30,11 @@ case "$FIELD" in
   linear)    DEST="$DEST_DIR/linear.env";       GROUP=orchestrator-svc ;;
   linear-app-id)     DEST="$DEST_DIR/linear-app-id.env";     GROUP=orchestrator-svc ;;
   linear-app-secret) DEST="$DEST_DIR/linear-app-secret.env"; GROUP=orchestrator-svc ;;
+  commandcode) DEST="$DEST_DIR/commandcode.env"; GROUP=commandcode-readers ;;
   # The refusal below deliberately does NOT echo the argument: sudo lets the
   # caller pass any argument, so a mistyped one could be a secret in stderr.
   *)
-    echo "write-secret.sh: unknown field -- must be one of sentry|supabase|powersync|axiom|deepseek|linear|linear-app-id|linear-app-secret" >&2
+    echo "write-secret.sh: unknown field -- must be one of sentry|supabase|powersync|axiom|deepseek|linear|linear-app-id|linear-app-secret|commandcode" >&2
     exit 1
     ;;
 esac
