@@ -61,7 +61,7 @@ import { orcaCall } from '../../scripts/orca-cli.mjs';
 import { findActiveRun } from '../../scripts/ready-queue.mjs';
 import { pushBranch, openPullRequest } from '../../scripts/publish-pr.mjs';
 import { mergePullRequest } from '../../scripts/merge-pr.mjs';
-import { createSeatCostReader, claudeProjectDirName, worktreePathOf, geminiAllowanceFromUsage, WORKER_HOME, COST_READABLE_AGENTS, hasWorkerCostSource } from './cost-read.mjs';
+import { createSeatCostReader, claudeProjectDirName, piSessionDirName, piSessionEventsFromLines, worktreePathOf, geminiAllowanceFromUsage, WORKER_HOME, COST_READABLE_AGENTS, hasWorkerCostSource } from './cost-read.mjs';
 import { WORKER_MESSAGE_TYPES } from './mailbox.mjs';
 
 const execFileAsync = promisify(execFile);
@@ -128,7 +128,7 @@ export const WORKER_REPO_SELECTOR = `path:${WORKER_CHECKOUT}`;
 // that already imports it from this file still does. It belongs to `runner`,
 // never to the account this process runs as, and ./cost-read.mjs's header
 // records the measured 0700 permission that makes it unreadable from here.
-export { createSeatCostReader, claudeProjectDirName, worktreePathOf, geminiAllowanceFromUsage, WORKER_HOME };
+export { createSeatCostReader, claudeProjectDirName, piSessionDirName, piSessionEventsFromLines, worktreePathOf, geminiAllowanceFromUsage, WORKER_HOME };
 // And what that reader can read at all (JUL-98 step 6 round 2, finding 1),
 // re-exported the same way: ./dispatch.mjs refuses to launch a seat whose agent
 // is not on the list, because a worker that cannot be costed cannot be released

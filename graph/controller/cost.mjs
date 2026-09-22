@@ -53,8 +53,8 @@ export const COST_SOURCES = Object.freeze({
     lowerBound: false,
   }),
   'pi-deepseek': Object.freeze({
-    where: "the seat's own JSON output -- provider/model off the last assistant message_end, usage SUMMED across every assistant message_end (each is that one turn's figures, not a running total -- JUL-98, fixed 2026-09-22); duration timed by the controller, which starts the process and sees it exit",
-    provenOn: 'JUL-109 findings section 5; graph/fixtures/orca-1.4.205/cost.pi.seat-json-stream.multi-turn.jsonl and pi.timing.*.txt',
+    where: "the seat's own JSON output -- provider/model off the last assistant message_end, usage SUMMED across every assistant message_end (each is that one turn's figures, not a running total -- JUL-98, fixed 2026-09-22); duration timed by the controller, which starts the process and sees it exit. TWO shapes read this way now (JUL-98/JUL-100 follow-up): the one-shot `--mode json` stream directly, and an ADOPT-route interactive session's own `.jsonl` under `~/.pi/agent/sessions/`, re-tagged from `message` to `message_end` first (cost-read.mjs's `piSessionEventsFromLines`) so this is still the one place that sums a DeepSeek seat's usage. A Command Code run (provider `commandcode`) is priced under the rate table's OWN namespaced id, not the bare one Pi echoes -- see `deepseekExtractFromSeatStream`'s own comment",
+    provenOn: 'JUL-109 findings section 5; graph/fixtures/orca-1.4.205/cost.pi.seat-json-stream.multi-turn.jsonl, pi.timing.*.txt, and cost.pi.interactive-session.jsonl (a real adopted-route session)',
     lowerBound: false,
   }),
   gemini: Object.freeze({
@@ -231,8 +231,27 @@ export function deepseekExtractFromSeatStream(events, { startedAt, endedAt } = {
   // undercount here too, since `tokens` excludes cacheWrite/reasoning.
   const totalTokens = assistants.reduce((sum, event) => sum + (Number(event.message.usage.totalTokens) || 0), 0);
 
+  // Pi's own `--model` argv is the API-facing id: `deepseek-v4-flash` (native
+  // DeepSeek), or `deepseek/deepseek-v4-pro`/`-flash` (Command Code --
+  // namespaced, confirmed live against its own `/models` listing,
+  // ops/service-dropbox/README.md "Command Code as the reviewer's Pi
+  // provider"). Pi echoes that same id back on `message.model`/`message_end.
+  // model` (confirmed live in a real adopted-route reviewer session,
+  // graph/fixtures/orca-1.4.205/cost.pi.interactive-session.jsonl:
+  // `provider: "commandcode"`, `model: "deepseek/deepseek-v4-pro"`), but
+  // graph/rate-table.mjs prices the Command Code pair under its OWN id,
+  // `commandcode/deepseek-v4-pro`/`-flash` (pricing is per PROVIDER endpoint,
+  // not per underlying model -- that file's own header). Unremapped,
+  // `costOf(last.model, ...)` throws `no rate for model
+  // 'deepseek/deepseek-v4-pro'` on every real Command Code review.
+  const pricedModel = last.provider === 'commandcode' ? `commandcode/${last.model.replace(/^deepseek\//, '')}` : last.model;
+
   return {
-    vendor: 'pi-deepseek',
+    // Command Code and native DeepSeek are different billing relationships
+    // (README, same section) even when the underlying model is identical, so
+    // the vendor the rate table actually priced against travels with the
+    // line -- never a fixed 'pi-deepseek' regardless of which one ran.
+    vendor: RATE_TABLE.models[pricedModel]?.vendor ?? 'pi-deepseek',
     provider: last.provider ?? null,
     model: last.model,
     tokens,
@@ -243,7 +262,7 @@ export function deepseekExtractFromSeatStream(events, { startedAt, endedAt } = {
     minutes: minutesBetween(startedAt, endedAt),
     // Priced at DeepSeek's published rate for the hour the run started, which
     // is the cautious figure: see the rate table's own header.
-    usd: costOf(last.model, tokens, { at: new Date(startedAt) }),
+    usd: costOf(pricedModel, tokens, { at: new Date(startedAt) }),
     lowerBound: false,
   };
 }

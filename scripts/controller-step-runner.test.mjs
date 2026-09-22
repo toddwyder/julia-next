@@ -391,11 +391,12 @@ test('exactly ONE comment is written for the move, naming the seat, both entries
   const h = harness({ adoptStarts: false });
   const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
   // An explicit Claude reviewer: the real default is now DeepSeek (pi-deepseek,
-  // 15:01:54Z Decision), whose worker-side cost source is not implemented yet
-  // (COST_READABLE_AGENTS in cost-read.mjs has no 'pi' entry), so dispatch.mjs's
-  // own cost gate refuses it before anything is created -- a synchronous refusal
-  // this harness's async adopt/worker-start stand-ins never even reach. Claude
-  // keeps the reviewer on the plain agent route this test is actually about.
+  // 15:01:54Z Decision), which now resolves through a real worker-side cost
+  // reader (pi is on COST_READABLE_AGENTS, JUL-98/JUL-100 follow-up) and so
+  // reaches the adopt route rather than being refused before anything is
+  // created. This test is about the plain agent route's own move mechanics,
+  // not the adopt route, so it pins that route directly with an explicit
+  // Claude reviewer instead.
   const result = await runBuildAndReview({ card: CARD, step: STEP, choices: resolveSeatChoices(['adversary-claude-opus']), suiteRunner, ...h.deps });
 
   assert.equal(result.seatMoves.length, 1, 'one move, one comment -- not one per attempt and not one per seat');
@@ -418,11 +419,12 @@ test('a backup that ALSO cannot be launched stops the step, with both entries an
   const h = harness({ adoptStarts: false });
   const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
   // An explicit Claude reviewer: the real default is now DeepSeek (pi-deepseek,
-  // 15:01:54Z Decision), whose worker-side cost source is not implemented yet
-  // (COST_READABLE_AGENTS in cost-read.mjs has no 'pi' entry), so dispatch.mjs's
-  // own cost gate refuses it before anything is created -- a synchronous refusal
-  // this harness's async adopt/worker-start stand-ins never even reach. Claude
-  // keeps the reviewer on the plain agent route this test is actually about.
+  // 15:01:54Z Decision), which now resolves through a real worker-side cost
+  // reader (pi is on COST_READABLE_AGENTS, JUL-98/JUL-100 follow-up) and so
+  // reaches the adopt route rather than being refused before anything is
+  // created. This test is about the plain agent route's own move mechanics,
+  // not the adopt route, so it pins that route directly with an explicit
+  // Claude reviewer instead.
   const choices = resolveSeatChoices(['adversary-claude-opus']);
 
   // Today's table has no seat whose backup the launcher also refuses, and this
@@ -538,11 +540,12 @@ test('a backup whose worker-start FAILS stops the step -- the card is never told
   );
 
   // An explicit Claude reviewer: the real default is now DeepSeek (pi-deepseek,
-  // 15:01:54Z Decision), whose worker-side cost source is not implemented yet
-  // (COST_READABLE_AGENTS in cost-read.mjs has no 'pi' entry), so dispatch.mjs's
-  // own cost gate refuses it before anything is created -- a synchronous refusal
-  // this harness's async adopt/worker-start stand-ins never even reach. Claude
-  // keeps the reviewer on the plain agent route this test is actually about.
+  // 15:01:54Z Decision), which now resolves through a real worker-side cost
+  // reader (pi is on COST_READABLE_AGENTS, JUL-98/JUL-100 follow-up) and so
+  // reaches the adopt route rather than being refused before anything is
+  // created. This test is about the plain agent route's own move mechanics,
+  // not the adopt route, so it pins that route directly with an explicit
+  // Claude reviewer instead.
   const result = await runBuildAndReview({ card: CARD, step: STEP, choices: resolveSeatChoices(['adversary-claude-opus']), suiteRunner, ...h.deps });
 
   assert.equal(result.ok, false);
@@ -581,11 +584,12 @@ test('a backup whose TURN has the recorded failure signature stops the step too 
   };
 
   // An explicit Claude reviewer: the real default is now DeepSeek (pi-deepseek,
-  // 15:01:54Z Decision), whose worker-side cost source is not implemented yet
-  // (COST_READABLE_AGENTS in cost-read.mjs has no 'pi' entry), so dispatch.mjs's
-  // own cost gate refuses it before anything is created -- a synchronous refusal
-  // this harness's async adopt/worker-start stand-ins never even reach. Claude
-  // keeps the reviewer on the plain agent route this test is actually about.
+  // 15:01:54Z Decision), which now resolves through a real worker-side cost
+  // reader (pi is on COST_READABLE_AGENTS, JUL-98/JUL-100 follow-up) and so
+  // reaches the adopt route rather than being refused before anything is
+  // created. This test is about the plain agent route's own move mechanics,
+  // not the adopt route, so it pins that route directly with an explicit
+  // Claude reviewer instead.
   const result = await runBuildAndReview({ card: CARD, step: STEP, choices: resolveSeatChoices(['adversary-claude-opus']), suiteRunner, ...h.deps });
 
   assert.equal(result.ok, false);
@@ -817,11 +821,12 @@ test('a builder whose turn is never proven and nothing heard through mailbox is 
   h.deps.checkWaitImpl = async () => ({ runId: ALL.runId, deliveryId: null, messages: [], count: 0, timedOut: true });
 
   // An explicit Claude reviewer: the real default is now DeepSeek (pi-deepseek,
-  // 15:01:54Z Decision), whose worker-side cost source is not implemented yet
-  // (COST_READABLE_AGENTS in cost-read.mjs has no 'pi' entry), so dispatch.mjs's
-  // own cost gate refuses it before anything is created -- a synchronous refusal
-  // this harness's async adopt/worker-start stand-ins never even reach. Claude
-  // keeps the reviewer on the plain agent route this test is actually about.
+  // 15:01:54Z Decision), which now resolves through a real worker-side cost
+  // reader (pi is on COST_READABLE_AGENTS, JUL-98/JUL-100 follow-up) and so
+  // reaches the adopt route rather than being refused before anything is
+  // created. This test is about the plain agent route's own move mechanics,
+  // not the adopt route, so it pins that route directly with an explicit
+  // Claude reviewer instead.
   const result = await runBuildAndReview({ card: CARD, step: STEP, choices: resolveSeatChoices(['adversary-claude-opus']), suiteRunner, ...h.deps });
 
   assert.equal(result.ok, false);

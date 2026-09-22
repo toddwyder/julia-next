@@ -36,7 +36,7 @@ import { pathToFileURL } from 'node:url';
 
 import { createSeatCostReader } from '../graph/controller/cost-read.mjs';
 
-export const USAGE = 'usage: node scripts/read-seat-cost.mjs --seat <seat> --agent <claude|codex|agy> --worktree <path> [--model <id>] [--allowance-before <json>] [--started-at <iso>] [--ended-at <iso>]';
+export const USAGE = 'usage: node scripts/read-seat-cost.mjs --seat <seat> --agent <claude|codex|agy|pi> --worktree <path> [--model <id>] [--allowance-before <json>] [--started-at <iso>] [--ended-at <iso>]';
 
 export function parseArgs(argv) {
   const args = {};

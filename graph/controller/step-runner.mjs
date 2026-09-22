@@ -631,11 +631,16 @@ export function seatMoveComment({ seat, from, to, modelLabel, reason, partnerMov
 // the step is started again on it, and the card is told once.
 //
 // Why this is not a new policy: the reviewer seat's first choice is
-// `pi-deepseek`, and ./dispatch.mjs refuses to start a DeepSeek seat with a new
-// worktree at all (it cannot report to the mailbox; JUL-109 section 4). Until
-// this change the controller could therefore never run a review of any kind, on
-// any card -- and the only thing it said about it was that a cost line was
-// blank. The seat table has named `codex` as that seat's backup all along.
+// `pi-deepseek`. At the time this fallback was built, ./dispatch.mjs refused
+// to start a DeepSeek seat with a new worktree at all (it could not report to
+// the mailbox; JUL-109 section 4), so the controller could never run a review
+// of any kind, on any card -- and the only thing it said about it was that a
+// cost line was blank. That refusal is gone (the adopt route, then the
+// JUL-98/JUL-100 follow-up's interactive-session cost reader), but this
+// fallback mechanism stays: any seat whose entry cannot be launched -- for
+// whatever reason, on whatever route exists at the time -- still takes its
+// seat-table backup rather than stalling. The seat table has named `codex`
+// as the reviewer's backup all along.
 //
 // THREE THINGS IT DELIBERATELY DOES NOT DO:
 //   * it never tries a third entry, and never guesses one -- the backup comes
