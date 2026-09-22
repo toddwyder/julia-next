@@ -678,6 +678,71 @@ depends on, restart both daemons before the next dispatch that needs it — a pr
 supplementary groups are fixed at daemon start, not re-read live. Always verify secret access for
 a seat by reading it FROM INSIDE an Orca-spawned terminal, never from an SSH login.
 
+### Gemini (agy): Orca's adopt route hit a broken `agent_readiness` gate, and the fix drops the adopt route entirely (JUL-98/JUL-100, 2026-09-22)
+
+**Symptom.** The by-hand "start agy, wait until fully started, hand over with `worker-start
+--terminal`" route (the 13:51Z Decision's proven route at the time) worked at 14:13Z and 15:25Z,
+then failed identically three times from 17:03Z: cross-daemon adopt stalled at
+`remote_attach_requested`/`identity_changed`; same-daemon adopt of the same terminal and a second,
+fresh agy session both came back `state: failed, stage: agent_readiness, lastError: timeout`, with
+no text ever delivered to the screen.
+
+**What was ruled out, each checked live rather than guessed:** no Orca daemon restart (`orca-
+server.service` uptime spanned both the working and failing dispatches, `NRestarts=0`); no OOM or
+resource exhaustion in the system journal; the JUL-99 IPv6 firewall fix was already installed and
+active hours before 14:13Z, so it isn't what changed; the worktree trust list (`~/.gemini/
+antigravity-cli/settings.json`) was intact and had each new worktree added; agy's own OAuth
+token was present and fresh; and Orca's local agent-hook HTTP listener (the one
+`~/.orca/agent-hooks/antigravity-hook.sh` posts to) answered a direct probe in 11ms — not the
+bottleneck.
+
+**Root cause: the gate itself, live-reproduced on demand.** A fresh agy session, pre-trusted,
+confirmed fully started by its rendered prompt box, adopted the same way — `state: failed, stage:
+agent_readiness, lastError: timeout`, every time, hours after the original failures, with nothing
+in this repo's control changed in between. Meanwhile a direct, non-adopted `agy --print` call
+against the same account succeeded in under 2 seconds. So the gate itself, inside Orca 1.4.205's
+own closed-source binary, is what's broken for this provider — not agy, not the network, not
+trust, not the daemon. This repo cannot patch Orca's binary, so the fix is to stop depending on
+the gate.
+
+**The fix: `ops/service-dropbox/run-agy-seat.mjs`, the same shape as `run-pi-seat.mjs`.** A plain
+Orca terminal runs `agy --output-format json --print-timeout <n> --dangerously-skip-permissions
+--effort <level> --print <brief>` directly — no `worker-start`, no terminal adopt, therefore no
+`agent_readiness` gate, because that gate only exists on the interactive-adopt orchestration path.
+Verified live 2026-09-22, immediately after reproducing the adopt-route failure on the very same
+box: the plain-terminal route works. agy authenticates from its own stored OAuth subscription
+token (Google AI Pro — the CLI's own banner reads "toddwyder@gmail.com (Google AI Pro)"), so this
+still draws on the subscription, not a metered key; no new spend, and no drop-box secret to
+inject.
+
+**A bonus this fix produces:** `agy --output-format json --print` prints one real JSON result
+carrying actual `usage` (input/output/thinking/cache-read/total tokens). The adopt route never
+had this at all (`cost-read.mjs`: "No session file to find: agy writes no per-session token
+record"); this closes that gap as a side effect, the same way `run-pi-seat.mjs` gives every
+DeepSeek seat a real cost line.
+
+**`--print` is variadic, like Pi's `-p`.** It reads the very next argv entry as its value, so a
+flag placed after it is swallowed as the prompt instead (live-reproduced: `--print` followed by
+`--output-format` produced `Error: --print took "--output-format" as its prompt`). `--print` must
+always be the LAST flag, immediately followed by the prompt — `buildAgySpawnSpec` enforces this
+by construction, pinned by `run-agy-seat.test.mjs`. Unlike Pi, no `--`-separator dance is needed
+for a prompt beginning with `---` (a coordinator skill's own front matter): `spawn`'s argv array
+is exec-level, not shell-parsed, so there is no flag-reinterpretation trap there — verified live
+with exactly such a prompt.
+
+**Checked separately and ruled out: Gemini cannot run this same plain-terminal way on the Google
+AI Pro subscription without new spend, via Pi instead of agy.** Pi's own bundled provider docs
+list its OAuth "Subscriptions" (the free-of-metered-billing `/login` route) as exactly: ChatGPT
+Plus/Pro, Claude Pro/Max, GitHub Copilot, xAI subscription, OpenRouter, Radius — no Google entry
+at all. Pi's only two Google routes, `google` (`GEMINI_API_KEY`, billed per token) and Google
+Vertex AI (GCP project billing via `gcloud auth application-default login`), are both metered.
+So `run-agy-seat.mjs` (this section), not Pi, is the DeepSeek-shaped route for Gemini.
+
+**Not yet done, and worth its own card:** wiring this into `graph/seat-table.mjs`/the controller's
+own dispatch path the way DeepSeek's seats are wired — this fix proves the plain-terminal route
+works and removes the adopt-route dependency, but the coordinator's by-hand procedure (the 13:51Z
+Decision's route) still needs updating to call this script instead of adopting a terminal.
+
 ### Vercel auth is CLI login state, not a drop-box field (JUL-44)
 
 There is no `vercel.env` in `/etc/orca-runner/dropbox-secrets/`. The fields actually present
@@ -2042,6 +2107,17 @@ provider; a full review on it cost about three cents. There is no fifth seat bes
   in `scripts/seat-labels.mjs` (`fallback`), not this file, is what refuses that pair.
 
 ## Builders run on Gemini, started by hand (JUL-98, Todd's 13:51Z Decision, 2026-09-22)
+
+**Superseded 2026-09-22 (JUL-98/JUL-100): the start-then-adopt route below is broken.** Orca's
+`worker-start --terminal` adopt step (step 3 below) hits a deterministic `agent_readiness`/timeout
+gate inside Orca's own binary — see "Gemini (agy): Orca's adopt route hit a broken
+`agent_readiness` gate" earlier in this file for the live reproduction. **Do not follow steps 1-3
+below.** Use `ops/service-dropbox/run-agy-seat.mjs` instead: a plain Orca terminal running `agy
+--print` directly, no adopt, no gate. Steps 4-6 (never send the placeholder text, one report
+through the mailbox, read the real cost line — now with real token usage from `--output-format
+json`) still apply. This section is kept for its still-true context (why Gemini, the reviewer
+seat, the family rule) and is not yet rewritten around the new launch step — that rewrite is
+follow-up work, tracked alongside wiring `run-agy-seat.mjs` into `graph/seat-table.mjs`.
 
 Claude's weekly allowance was forecast to run out Thursday morning, before Friday's reset. Until
 the controller can start a Gemini worker itself (JUL-98 step 6, in progress), **the coordinator

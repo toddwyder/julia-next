@@ -193,20 +193,20 @@ For the current step of the current item:
      `deepseek/deepseek-v4-pro`/`deepseek/deepseek-v4-flash` -- the bare native-DeepSeek spelling
      400s there): `ops/service-dropbox/README.md`'s "Command Code as the reviewer's Pi provider"
      section.
-   - **Builder seat: Gemini (Antigravity, `agy`), started by hand, until step 6 gives the
-     controller its own route (Todd's 13:51Z Decision, 2026-09-22).** Claude's weekly allowance
-     was forecast to run out before Friday's reset, so from this dispatch on, resolve the builder
-     seat to Gemini rather than `SEAT_TABLE.builder`'s `claude`/`pi-deepseek` pair, and dispatch it
-     yourself the same way step 6's own build brief has the controller do it: start `agy` in the
-     worker's fresh worktree and wait until it has **fully** started before touching it further
-     (adopting too early loses the task text while still reporting `input_accepted` -- the same
-     trap the Pi route above and step 6 round 1's finding 3 both hit); pre-trust that worktree in
-     `agy`'s trust list *before* starting it, not after; once started, hand it to Orca with `orca
-     orchestration worker-start --terminal <handle>` (never `--agent`); send the real acceptance
-     criteria as the one dispatch, never the handover's own placeholder text; wait for its one
-     report through the mailbox like every other seat, no screen-polling; and read its cost line
-     the same way as any other worker's -- model, tokens, peak context, minutes, and Gemini's
-     allowance used, never blank or estimated. **Reviews for a Gemini-built step go to the
+   - **Builder seat: Gemini (Antigravity, `agy`) -- via `run-agy-seat.mjs`, NOT the adopt route
+     below (superseded 2026-09-22, JUL-98/JUL-100).** The start-then-adopt procedure this
+     paragraph used to describe (`orca orchestration worker-start --terminal <handle>`) hits a
+     deterministic `agent_readiness`/timeout gate inside Orca's own binary -- live-reproduced on
+     demand, worktree pre-trusted, agy itself confirmed healthy both by its rendered screen and by
+     a direct `agy --print` call. **Do not adopt an agy terminal with `worker-start`.** Instead run
+     `ops/service-dropbox/run-agy-seat.mjs` in a plain Orca terminal in the worker's fresh worktree
+     (the same shape the Pi/DeepSeek route above already uses): pipe the real acceptance criteria
+     to its stdin, pass `--effort <level>`; it prints one JSON result with a real `status`,
+     `response`, and token `usage` when it finishes -- no adopt, no mailbox polling needed, no
+     screen-reading. Pre-trust the worktree in `agy`'s trust list before running it, same as
+     before. Read its cost line straight from that JSON `usage` -- real tokens now, not an
+     allowance estimate. Full detail and the live reproduction: runbook, "Gemini (agy): Orca's
+     adopt route hit a broken `agent_readiness` gate". **Reviews for a Gemini-built step go to the
      `reviewer-backup` seat (DeepSeek Pro, through Command Code), not Claude and not Codex as
      primary** (Todd's 15:01:54Z Decision, superseding the 13:51Z interim "stay on Codex" -- the
      GOAT trial went live the same day, so the reviewer moved off Codex immediately rather than
