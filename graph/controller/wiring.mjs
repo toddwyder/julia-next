@@ -226,7 +226,19 @@ export function createOrcaBoundaries({
     // Before JUL-98 step 5's fix there was no `--on` at all and `--repo` was
     // the controller's own read-only checkout, so every dispatch died in
     // `stage: worktree_create` with "Permission denied" (top of this file).
-    async workerStartImpl({ run, from, spec, worktree, name, agent, model, effort, requestId } = {}) {
+    // AND THE SECOND SHAPE IT TAKES (JUL-98 step 6): ADOPTING a terminal the
+    // dispatch has just started itself, for a seat Orca has no `--agent`
+    // launcher for (./adopt.mjs). The worktree already exists, so EVERY
+    // creation flag has to go -- measured live on 2026-09-22, where sending
+    // them was refused outright:
+    //
+    //   invalid_argument: Creation and setup options apply only to new-child
+    //   or new-top-level worktrees.
+    //
+    // and `worker-start --help` says neither `--model` nor `--effort` can
+    // combine with `--terminal`. The model is on the launch command instead, so
+    // the card still shows what runs.
+    async workerStartImpl({ run, from, spec, worktree, name, agent, model, effort, terminal, requestId } = {}) {
       const args = [
         'orchestration', 'worker-start',
         '--environment', environment,
@@ -235,15 +247,16 @@ export function createOrcaBoundaries({
         '--from', from,
         '--spec', spec,
         '--worktree', worktree,
-        '--name', name,
-        '--repo', workerRepo,
-        '--agent', agent,
-        '--setup', 'skip',
       ];
-      // `--effort requires --model` (worker-start --help), so they travel
-      // together or not at all.
-      if (model) args.push('--model', model);
-      if (model && effort) args.push('--effort', effort);
+      if (terminal) {
+        args.push('--terminal', terminal);
+      } else {
+        args.push('--name', name, '--repo', workerRepo, '--agent', agent, '--setup', 'skip');
+        // `--effort requires --model` (worker-start --help), so they travel
+        // together or not at all.
+        if (model) args.push('--model', model);
+        if (model && effort) args.push('--effort', effort);
+      }
       args.push(...ledger.flagsFor(requestId));
       const result = await call(args);
       return ledger.record(requestId, result);

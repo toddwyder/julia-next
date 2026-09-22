@@ -1134,3 +1134,48 @@ test('the adopt route\'s Orca calls go to the WORKER daemon, with the worktree t
   assert.equal(wait[wait.indexOf('--for') + 1], 'tui-idle');
   assert.equal(wait[wait.indexOf('--environment') + 1], WORKER_ENVIRONMENT);
 });
+
+test('an ADOPTED worker-start carries --terminal and the existing worktree, and none of the creation flags', async () => {
+  const calls = [];
+  const boundaries = createOrcaBoundaries({
+    orcaCallImpl: async (args) => { calls.push(args); return { state: 'ready', mutation: { requestId: 'r1' } }; },
+  });
+
+  await boundaries.workerStartImpl({
+    run: 'run_1',
+    from: 'term_controller',
+    spec: 'the real brief',
+    worktree: 'path:/home/runner/orca/workspaces/julia-next/jul98-6',
+    terminal: 'term_seat',
+    requestId: 'JUL-98:step-6:builder',
+  });
+
+  const [args] = calls;
+  assert.equal(flag(args, '--terminal'), 'term_seat');
+  assert.equal(flag(args, '--worktree'), 'path:/home/runner/orca/workspaces/julia-next/jul98-6');
+  assert.equal(flag(args, '--spec'), 'the real brief');
+  // LIVE, 2026-09-22: passing any of these with an existing worktree is refused
+  // outright -- "Creation and setup options apply only to new-child or
+  // new-top-level worktrees" (invalid_argument). And `worker-start --help`:
+  // neither --model nor --effort can combine with --terminal.
+  for (const rejected of ['--name', '--repo', '--setup', '--agent', '--model', '--effort', '--base-branch']) {
+    assert.ok(!args.includes(rejected), `an adopted start must not carry ${rejected}`);
+  }
+});
+
+test('an --agent worker-start is unchanged: the creation flags are exactly what it always sent', async () => {
+  const calls = [];
+  const boundaries = createOrcaBoundaries({
+    orcaCallImpl: async (args) => { calls.push(args); return { state: 'ready', mutation: { requestId: 'r1' } }; },
+  });
+  await boundaries.workerStartImpl({
+    run: 'run_1', from: 'term_controller', spec: 's', worktree: 'new-top-level',
+    name: 'jul98-6', agent: 'claude', model: 'claude-opus-5', effort: 'medium', requestId: 'k',
+  });
+  const [args] = calls;
+  assert.equal(flag(args, '--agent'), 'claude');
+  assert.equal(flag(args, '--name'), 'jul98-6');
+  assert.equal(flag(args, '--setup'), 'skip');
+  assert.equal(flag(args, '--model'), 'claude-opus-5');
+  assert.ok(!args.includes('--terminal'));
+});
