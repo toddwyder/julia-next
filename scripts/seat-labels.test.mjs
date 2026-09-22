@@ -265,8 +265,8 @@ test('a builder fallback to Claude is allowed only when the reviewer is not on C
   assert.match(strict.reason, /different families/);
 });
 
-test('a Claude reviewer failure falls back to Codex, against a Gemini builder (the default) -- JUL-98 step 6', () => {
-  const choices = resolveSeatChoices([]); // builder gemini, reviewer claude
+test("the default reviewer's failure falls back to Codex, against a Gemini builder (the default) -- JUL-98 step 6, amended 15:01:54Z", () => {
+  const choices = resolveSeatChoices([]); // builder gemini, reviewer pi-deepseek
   assert.equal(choices.builder.entry, 'gemini');
   const result = fallbackSeatChoice(choices, 'reviewer');
   assert.equal(result.ok, true, 'the reviewer fallback must succeed against a claude builder');
@@ -277,7 +277,7 @@ test('a Claude reviewer failure falls back to Codex, against a Gemini builder (t
 });
 
 test('a fallback whose backup collides with the other seat is never silently used: it either moves the partner or refuses', () => {
-  const choices = resolveSeatChoices([]); // builder gemini, reviewer claude
+  const choices = resolveSeatChoices([]); // builder gemini, reviewer pi-deepseek
   // A table whose reviewer backup is gemini (the builder's family). The real
   // table no longer has this backup (JUL-98), so the guard is exercised on a
   // copy that does.

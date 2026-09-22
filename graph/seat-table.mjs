@@ -12,27 +12,36 @@
 // scripts/seat-labels.mjs's validateFamilyChoice enforces on an actual card).
 //
 // This is deliberately weaker than the old "no shared family across every
-// primary/backup combination" check, and the current table is exactly why it
-// has to be: the builder's backup and the reviewer's first choice are BOTH
-// claude, which the weaker rule permits and the runtime guard then resolves by
-// moving the reviewer to its own backup. Under the stricter rule this table
-// could not exist at all.
+// primary/backup combination" check, because a table CAN legitimately have a
+// builder/reviewer combination that shares a family -- the runtime guard
+// (scripts/seat-labels.mjs fallbackSeatChoice, JUL-98 step 2 item 6) resolves
+// that by moving the colliding seat to its own backup, and it is this weaker
+// rule that lets such a table exist at all. Today's table happens not to hit
+// that case for builder/reviewer (see the JUL-98 step 6 reading below), but
+// the rule stays the weaker one so a future table change is not forced to
+// avoid every possible collision by construction.
 // (JUL-98, Todd's 21 Sep decision, made DeepSeek the reviewer's first choice
-// and Codex its backup to protect the weekly Codex and Claude quotas; step 6
-// moved the reviewer to claude/codex when the builder moved to Gemini, so the
-// quota the reviewer protects is now Claude's rather than DeepSeek's balance.
+// and Codex its backup to protect the weekly Codex and Claude quotas.
+// Step 6, 22 Sep, moved the reviewer to claude/codex when the builder moved to
+// Gemini -- superseded the same day by Todd's 15:01:54Z Decision, which moved
+// the reviewer back to DeepSeek through Command Code and made Codex the
+// backup only, protecting the DeepSeek balance again. That is the table below.
 // GLM was once barred here as a seat default or backup; it has since been
 // removed entirely, JUL-93.)
 // JUL-97 step 1 adds the six agent seats the board's labels and template
 // describe. The three original seats are unchanged -- the coordinator's own
 // launch path still reads `orchestrator`, and the builder/reviewer pair the
 // family rule below is about is still `builder`/`reviewer`.
-// JUL-98 step 6 moves the two DISPATCHED seats, and only those two. The
-// reading is: GEMINI BUILDS, CLAUDE REVIEWS, AND CODEX REVIEWS WHENEVER CLAUDE
-// BUILDS. The third clause is not a third rule -- it is what the family guard
-// below already does when the builder takes its Claude backup and collides with
-// the Claude reviewer, so the reviewer moves to its own backup, Codex
-// (scripts/seat-labels.mjs fallbackSeatChoice, JUL-98 step 2 item 6).
+// JUL-98 step 6 moves the builder seat, and Todd's 15:01:54Z Decision moves
+// the reviewer seat -- the two DISPATCHED seats, and only those two. The
+// reading is: GEMINI BUILDS, DEEPSEEK (THROUGH COMMAND CODE) REVIEWS. Every
+// combination of a builder entry (gemini/claude) and a reviewer entry
+// (pi-deepseek/codex) is already a different family (google/anthropic vs
+// deepseek/openai), so -- unlike the superseded Claude-reviews reading this
+// comment used to state -- there is today no same-family collision left for
+// the family guard's fallback machinery to resolve on this pair. That
+// machinery is still real (seat-table.test.mjs's own synthetic-table tests
+// exercise it directly); it simply never fires for builder/reviewer today.
 //
 // The dispatch names (`builder`/`reviewer`) and their agent keys
 // (`feature-builder`/`adversarial-reviewer`) MOVE TOGETHER. They are two names
