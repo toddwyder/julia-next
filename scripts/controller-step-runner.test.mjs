@@ -26,6 +26,7 @@ import { SEAT_TABLE } from '../graph/seat-table.mjs';
 const ALL = loadOrcaFixture('mailbox.check-all.status-heartbeat-escalation-done.json').result;
 const TURN_STARTED = loadOrcaFixture('terminal-send.wait-submit.turn-started.json').result;
 const NO_TURN = loadOrcaFixture('terminal-send.wait-submit.no-turn-started.json').result;
+const FAILED_READINESS = loadOrcaFixture('worker-show.failed-agent-readiness.json').result;
 
 const GREEN_TAP = '# tests 522\n# pass 521\n# fail 0\n# skipped 1\n# todo 0\n';
 
@@ -159,7 +160,11 @@ test('one step, in one order: dispatch, prove the turn started, sleep on the mai
 });
 
 test('a worker that never started is caught at once: ONE bounded reconciliation, never the full sleep', async () => {
-  const h = harness({ send: NO_TURN });
+  const h = harness();
+  h.deps.observeStartImpl = async () => {
+    h.order.push('prove-start');
+    return { show: FAILED_READINESS };
+  };
   // JUL-98 step 6 round 2, finding 2: the mailbox is the only authoritative
   // record of work done, so it is asked ONCE, briefly, before the seat is
   // declared never-started. It answers nothing here -- no completion, not even
@@ -180,8 +185,8 @@ test('a worker that never started is caught at once: ONE bounded reconciliation,
 
   assert.equal(result.ok, false);
   assert.equal(result.stage, 'turn-start');
-  assert.match(result.reason, /input.accepted/i);
-  assert.equal(result.retryRequestId, NO_TURN.send.prompt.requestId, 'Orca\'s own replay advice is carried, so confirming costs nothing');
+  assert.match(result.reason, /agent_readiness/i);
+  assert.equal(result.retryRequestId, null);
 
   // AND IT IS CLEANED UP AS A NEVER-STARTED WORKER. There is no session to
   // read, so the read is not attempted at all: the seat gets an explicit
@@ -526,17 +531,17 @@ test('a backup whose worker-start FAILS stops the step -- the card is never told
   assert.equal(line.neverStarted, true, 'the seat is costed as never started -- which is what it was');
 });
 
-test('a backup whose TURN is never proven stops the step too -- the same claim, the same gate', async () => {
+test('a backup whose TURN has the recorded failure signature stops the step too -- the same claim, the same gate', async () => {
   const h = harness({ adoptStarts: false });
   const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
 
   // The backup's worker IS created -- so there is no `launchRefused` and no
-  // failed start -- but its turn never begins. That worker wrote no session
-  // file, so it did no work: it cannot be reported as having run.
+  // failed start -- but its turn never begins and carries the recorded failure
+  // signature. That worker wrote no session file, so it did no work.
   let waitingFor = null;
   h.deps.observeStartImpl = async ({ seat }) => {
     waitingFor = seat;
-    return { send: seat === 'builder' ? NO_TURN : TURN_STARTED };
+    return seat === 'builder' ? { show: FAILED_READINESS } : { send: TURN_STARTED };
   };
   const waitFor = h.deps.checkWaitImpl;
   let builderWaits = 0;
@@ -554,7 +559,7 @@ test('a backup whose TURN is never proven stops the step too -- the same claim, 
   assert.equal(result.seatMoves.length, 0, 'no work was done on the backup, so the card is told of no move');
   assert.match(result.reason, /the builder seat could not be started on gemini/);
   assert.match(result.reason, /its backup claude could not be started either/);
-  assert.match(result.reason, /input.accepted/i, "the turn-start proof's own words");
+  assert.match(result.reason, /agent_readiness/i);
   assert.equal(result.builder.movedTo, undefined);
   // The worker that WAS created is still cleaned up, the way every
   // never-started worker is.
@@ -627,13 +632,12 @@ test('a dispatch that carries its own turn-start observation is believed, and wo
   assert.equal(result.outcome, 'succeeded');
 });
 
-test('and an adopted worker whose terminal went idle again, with an empty mailbox, is still caught as never started', async () => {
+test('and an adopted worker whose terminal went idle again, with an empty mailbox, is treated as possibly running', async () => {
   const h = harness();
   const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
-  // The TUI is idle for BOTH readings: it took the brief nowhere. And the
-  // mailbox holds nothing from it either -- not a completion, not a heartbeat
-  // -- which is the only combination that makes "it never started" a fact
-  // rather than an inference.
+  // Todd Decision 2026-09-22 15:01:01Z: Not seeing live is never proof of
+  // never-started. Without the recorded failure signature, the worker is
+  // treated as possibly running: worktree kept, cost read, no backup starts.
   h.deps.adoptBoundaries = { ...h.deps.adoptBoundaries, terminalWaitImpl: async () => ({ wait: { satisfied: true } }) };
   h.deps.observeStartImpl = async () => { throw new Error('worktree ps must not be asked'); };
   h.deps.checkWaitImpl = async () => ({ runId: ALL.runId, deliveryId: null, messages: [], count: 0, timedOut: true });
@@ -646,9 +650,12 @@ test('and an adopted worker whose terminal went idle again, with an empty mailbo
 
   assert.equal(result.ok, false);
   assert.equal(result.stage, 'turn-start');
+  assert.equal(result.possiblyRunning, true);
+  assert.notEqual(result.launchRefused, true);
+  assert.equal(result.released, false);
+  assert.equal(result.worktreeRemoved, false);
+  assert.equal(result.cost.seat, 'builder');
   assert.match(result.reason, /idle/);
-  assert.equal(result.cost.neverStarted, true);
-  assert.equal(result.launchRefused, true, 'nothing survives it, so the seat table\'s backup takes the seat');
 });
 
 // ---------------------------------------------------------------------------
@@ -729,7 +736,7 @@ test('a worker that is alive but slow -- a heartbeat and no completion yet -- is
 // JUL-98 step 6 ROUND 2, finding 5: A FAILED OBSERVATION IS NOT A VERDICT.
 // ---------------------------------------------------------------------------
 
-test('a worker whose observation FAILED is treated as possibly running: nothing is destroyed, nothing is costed, nothing falls back', async () => {
+test('a worker whose observation FAILED is treated as possibly running: nothing is destroyed, cost IS read, nothing falls back', async () => {
   const h = harness();
   const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
   let waits = 0;
@@ -754,37 +761,35 @@ test('a worker whose observation FAILED is treated as possibly running: nothing 
   assert.equal(result.stage, 'turn-start');
   assert.equal(result.possiblyRunning, true, 'the reading failed; the worker may be running and spending right now');
   assert.notEqual(result.launchRefused, true, 'so no backup may be started beside it');
-  assert.equal(result.cost, null, 'and no figure is invented for it -- the step stops with no cost line, which is what stops the card');
+  assert.equal(result.cost.seat, 'builder', 'its cost IS read per Todd Decision of 15:01:01Z');
+  assert.equal(result.cost.totalTokens, COST.totalTokens);
   assert.equal(result.released, false);
   assert.equal(result.worktreeRemoved, false);
   assert.equal(result.dispatchId, `ctx_937abab903ae-${h.orca.workersStarted()}`, 'the dispatch identity is kept, which is what reconciling it later needs');
   assert.match(result.reason, /terminal_handle_stale/);
   assert.ok(!h.order.includes('release:builder'), 'a possibly-running worker is never released on a guess');
   assert.ok(!h.order.includes('remove-worktree:builder'), 'and work that may exist is never deleted');
+  assert.ok(h.order.includes('read-cost:builder'), 'and figures are read');
 });
 
-test('a builder whose turn is never proven, with nothing behind it, takes its seat-table backup', async () => {
+test('a builder whose turn is never proven and nothing heard through mailbox is treated as possibly running: no backup starts beside it', async () => {
   const h = harness();
   const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
   // The Gemini builder is adopted, goes idle-then-idle, and its mailbox is
-  // empty: it never started. Round 1 lost the seat here -- no fallback, no
-  // work. It now takes exactly the road a refused launch takes.
+  // empty. Under Todd Decision, that is possibly running, not never started:
+  // no backup starts beside it.
   let adopted = 0;
   h.deps.adoptBoundaries = { ...h.deps.adoptBoundaries, terminalWaitImpl: async () => { adopted += 1; return { wait: { satisfied: true } }; } };
-  const waitFor = h.deps.checkWaitImpl;
-  let seatBeingWaitedOn = null;
-  h.deps.observeStartImpl = async ({ seat }) => { seatBeingWaitedOn = seat; return { send: TURN_STARTED }; };
-  h.deps.checkWaitImpl = async (options) => {
-    if (seatBeingWaitedOn === null) return { runId: ALL.runId, deliveryId: null, messages: [], count: 0, timedOut: true };
-    return waitFor(options);
-  };
+  h.deps.observeStartImpl = async () => ({ send: TURN_STARTED });
+  h.deps.checkWaitImpl = async () => ({ runId: ALL.runId, deliveryId: null, messages: [], count: 0, timedOut: true });
 
   const result = await runBuildAndReview({ card: CARD, step: STEP, choices: resolveSeatChoices([]), suiteRunner, ...h.deps });
 
-  assert.equal(result.ok, true, result.reason);
-  assert.equal(result.builder.movedFrom, 'gemini');
-  assert.equal(result.builder.movedTo, 'claude', 'the backup the seat table already names');
-  assert.equal(result.builder.outcome, 'succeeded');
+  assert.equal(result.ok, false);
+  assert.equal(result.builder.possiblyRunning, true);
+  assert.notEqual(result.builder.launchRefused, true);
+  assert.equal(result.builder.movedTo, undefined, 'no backup starts beside a possibly-running worker');
+  assert.equal(result.seatMoves.length, 0);
   assert.ok(adopted >= 2, 'the adopt route really ran and really went idle twice');
 });
 
@@ -846,7 +851,7 @@ test('a delivery belonging to another dispatch does not consume the reconciliati
   assert.notEqual(result.launchRefused, true, 'and no backup is started beside a seat that already did the work');
 });
 
-test('a foreign delivery that arrives while this worker is silent does not extend the look past its budget: the seat is still declared never-started, once the time is truly spent', async () => {
+test('a foreign delivery that arrives while this worker is silent does not extend the look past its budget: the seat is treated as possibly running, once the time is truly spent', async () => {
   const h = harness();
   const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
   h.deps.adoptBoundaries = { ...h.deps.adoptBoundaries, terminalWaitImpl: async () => ({ wait: { satisfied: true } }) };
@@ -882,8 +887,11 @@ test('a foreign delivery that arrives while this worker is silent does not exten
   assert.equal(clock.now, DEFAULT_RECONCILE_WAIT_MS, 'and the whole reconciliation cost exactly its budget, not a wait per delivery');
   assert.equal(result.ok, false);
   assert.equal(result.stage, 'turn-start');
-  assert.equal(result.cost.neverStarted, true);
-  assert.equal(result.launchRefused, true, 'nothing survives it, so the seat table\'s backup takes the seat');
+  assert.equal(result.possiblyRunning, true);
+  assert.notEqual(result.launchRefused, true);
+  assert.equal(result.cost.seat, 'builder');
+  assert.equal(result.released, false);
+  assert.equal(result.worktreeRemoved, false);
 });
 
 test('each foreign delivery is acknowledged, so the same one cannot wake the reconciliation for ever', async () => {
@@ -958,7 +966,10 @@ test('a foreign delivery that cannot be acknowledged is read once, not spun on f
   assert.equal(call, 1, 'it is read once; re-reading it can only return the same news');
   assert.equal(result.ok, false);
   assert.equal(result.stage, 'turn-start');
-  assert.equal(result.cost.neverStarted, true);
+  assert.equal(result.possiblyRunning, true);
+  assert.equal(result.cost.seat, 'builder');
+  assert.equal(result.released, false);
+  assert.equal(result.worktreeRemoved, false);
 });
 
 // Round 3, the other half of the same /code-review finding: a delivery that
@@ -997,7 +1008,11 @@ test('a storm of foreign deliveries that costs no time is still bounded: the loo
   assert.equal(call, DEFAULT_RECONCILE_MAX_READS, 'the cap, not the clock, is what ends a look that costs no time');
   assert.equal(result.ok, false);
   assert.equal(result.stage, 'turn-start');
-  assert.equal(result.cost.neverStarted, true);
+  assert.equal(result.possiblyRunning, true);
+  assert.notEqual(result.launchRefused, true);
+  assert.equal(result.cost.seat, 'builder');
+  assert.equal(result.released, false);
+  assert.equal(result.worktreeRemoved, false);
 });
 
 // Round 3, spec half: every message heard on the way belongs in the step's
@@ -1035,3 +1050,191 @@ test('what the reconciliation heard on the way is all reported: every message, e
   assert.equal(result.messages.length, 2, 'the foreign delivery was heard and is in the record, not dropped');
   assert.equal(result.mirrorFailures, 1, 'the relay failure on the foreign delivery is counted, not lost with the delivery that carried it');
 });
+
+test('reconciliation clock source defaults to monotonic performance.now, not Date.now', async () => {
+  const h = harness();
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+  h.deps.adoptBoundaries = { ...h.deps.adoptBoundaries, terminalWaitImpl: async () => ({ wait: { satisfied: true } }) };
+  h.deps.observeStartImpl = async () => { throw new Error('worktree ps must not be asked'); };
+
+  delete h.deps.clockMs;
+
+  const originalDateNow = Date.now;
+  try {
+    let reads = 0;
+    h.deps.checkWaitImpl = async () => {
+      reads += 1;
+      Date.now = () => originalDateNow() + 3600000;
+      const mine = `ctx_937abab903ae-${h.orca.workersStarted()}`;
+      return {
+        runId: ALL.runId,
+        deliveryId: `delivery_${reads}`,
+        messages: reads === 1 ? [doneMessage('ctx_foreign', 'succeeded')] : [doneMessage(mine, 'succeeded')],
+        count: 1,
+        timedOut: false,
+      };
+    };
+
+    const result = await runWorkerStep({
+      seat: 'builder', card: CARD, step: STEP, choice: resolveSeatChoices([]).builder,
+      worktreeName: 'jul98-6', requestId: 'JUL-98:step-6:builder',
+      suiteRunner, suiteKey: 'JUL-98:step-6', runSuite: false, ...h.deps,
+    });
+
+    assert.equal(reads, 2, 'a wall clock step does not expire the monotonic budget');
+    assert.equal(result.outcome, 'succeeded');
+  } finally {
+    Date.now = originalDateNow;
+  }
+});
+
+test('when a non-done message from this worker arrives in reconciliation, initialAck is advanced for the ordinary wait', async () => {
+  const h = harness();
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+  h.deps.adoptBoundaries = { ...h.deps.adoptBoundaries, terminalWaitImpl: async () => ({ wait: { satisfied: true } }) };
+  h.deps.observeStartImpl = async () => { throw new Error('worktree ps must not be asked'); };
+
+  let call = 0;
+  const acks = [];
+  h.deps.checkWaitImpl = async ({ ack }) => {
+    call += 1;
+    acks.push(ack ?? null);
+    const mine = `ctx_937abab903ae-${h.orca.workersStarted()}`;
+    if (call === 1) {
+      const heartbeat = {
+        type: 'heartbeat',
+        payload: JSON.stringify({ taskId: 'task_x', dispatchId: mine, phase: 'working' }),
+        dispatchId: mine,
+      };
+      return {
+        runId: ALL.runId,
+        deliveryId: 'delivery_hb',
+        messages: [heartbeat],
+        count: 1,
+        timedOut: false,
+      };
+    }
+    return {
+      runId: ALL.runId,
+      deliveryId: 'delivery_done',
+      messages: [doneMessage(mine, 'succeeded')],
+      count: 1,
+      timedOut: false,
+    };
+  };
+
+  const result = await runWorkerStep({
+    seat: 'builder', card: CARD, step: STEP, choice: resolveSeatChoices([]).builder,
+    worktreeName: 'jul98-6', requestId: 'JUL-98:step-6:builder',
+    suiteRunner, suiteKey: 'JUL-98:step-6', runSuite: false, ...h.deps,
+  });
+
+  assert.equal(result.outcome, 'succeeded', result.reason);
+  assert.equal(call, 2);
+  assert.equal(acks[1], 'delivery_hb', 'the ordinary wait acknowledges the delivery the reconciliation consumed');
+});
+
+test('item 1: never-started is concluded ONLY on the exact Orca recorded failure signature; missing any of the five fields falls through to possibly running', async () => {
+  const h = harness();
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+  h.deps.checkWaitImpl = async () => ({ runId: ALL.runId, deliveryId: null, messages: [], count: 0, timedOut: true });
+
+  // 1. With the complete recorded failure signature -> concludes never-started
+  h.deps.observeStartImpl = async () => ({ show: FAILED_READINESS });
+  const neverStartedResult = await runWorkerStep({
+    seat: 'builder', card: CARD, step: STEP, choice: CHOICES.builder,
+    worktreeName: 'jul98-6', requestId: 'JUL-98:step-6:builder-failed',
+    suiteRunner, suiteKey: 'JUL-98:step-6', runSuite: false, ...h.deps,
+  });
+  assert.equal(neverStartedResult.ok, false);
+  assert.equal(neverStartedResult.cost.neverStarted, true);
+  assert.equal(neverStartedResult.released, true);
+  assert.equal(neverStartedResult.worktreeRemoved, true);
+  assert.equal(neverStartedResult.launchRefused, true);
+
+  // 2. Missing agentTerminalHandle: null (has a terminal handle) -> falls through to possiblyRunning
+  const withTerminal = structuredClone(FAILED_READINESS);
+  withTerminal.worker.agentTerminalHandle = 'term_recovered';
+  h.deps.observeStartImpl = async () => ({ show: withTerminal });
+  const possiblyRunningResult = await runWorkerStep({
+    seat: 'builder', card: CARD, step: STEP, choice: CHOICES.builder,
+    worktreeName: 'jul98-6', requestId: 'JUL-98:step-6:builder-terminal',
+    suiteRunner, suiteKey: 'JUL-98:step-6', runSuite: false, ...h.deps,
+  });
+  assert.equal(possiblyRunningResult.ok, false);
+  assert.equal(possiblyRunningResult.possiblyRunning, true);
+  assert.notEqual(possiblyRunningResult.launchRefused, true);
+  assert.equal(possiblyRunningResult.released, false);
+  assert.equal(possiblyRunningResult.worktreeRemoved, false);
+});
+
+test('item 2: a positive liveness verdict live, seen at any point, prevents a never-started conclusion even if the mailbox is silent', async () => {
+  const h = harness();
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+  h.deps.checkWaitImpl = async () => ({ runId: ALL.runId, deliveryId: null, messages: [], count: 0, timedOut: true });
+
+  // Observed carries observation.status: 'live' and projection.liveness.verdict: 'live'
+  const liveObserved = structuredClone(FAILED_READINESS);
+  liveObserved.projection.liveness = { verdict: 'live' };
+  liveObserved.observation = { status: 'live' };
+  h.deps.observeStartImpl = async () => ({ show: liveObserved });
+
+  const result = await runWorkerStep({
+    seat: 'builder', card: CARD, step: STEP, choice: CHOICES.builder,
+    worktreeName: 'jul98-6', requestId: 'JUL-98:step-6:builder-live',
+    suiteRunner, suiteKey: 'JUL-98:step-6', runSuite: false, ...h.deps,
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.possiblyRunning, true);
+  assert.equal(result.seenLive, true);
+  assert.notEqual(result.launchRefused, true);
+  assert.equal(result.released, false);
+  assert.equal(result.worktreeRemoved, false);
+});
+
+test('item 3: every other outcome (budget/cap exhausted, observation failed, silent mailbox) is possibly running; cost is read, and readFailedCostLine is emitted if reading throws', async () => {
+  const h = harness();
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+  let waits = 0;
+  h.deps.adoptBoundaries = {
+    ...h.deps.adoptBoundaries,
+    terminalWaitImpl: async () => {
+      waits += 1;
+      if (waits === 1) return { wait: { satisfied: true } };
+      throw new Error('terminal_handle_stale');
+    },
+  };
+  h.deps.observeStartImpl = async () => { throw new Error('worktree ps failed'); };
+  h.deps.checkWaitImpl = async () => ({ runId: ALL.runId, deliveryId: null, messages: [], count: 0, timedOut: true });
+
+  // When readCostImpl succeeds:
+  const resultWithCost = await runWorkerStep({
+    seat: 'builder', card: CARD, step: STEP, choice: resolveSeatChoices([]).builder,
+    worktreeName: 'jul98-6', requestId: 'JUL-98:step-6:builder-cost',
+    suiteRunner, suiteKey: 'JUL-98:step-6', runSuite: false, ...h.deps,
+  });
+  assert.equal(resultWithCost.possiblyRunning, true);
+  assert.equal(resultWithCost.cost.seat, 'builder');
+  assert.equal(resultWithCost.cost.totalTokens, COST.totalTokens);
+  assert.equal(resultWithCost.released, false);
+  assert.equal(resultWithCost.worktreeRemoved, false);
+
+  // When readCostImpl throws:
+  waits = 0;
+  h.deps.readCostImpl = async () => { throw new Error('session file missing'); };
+  const resultReadFailed = await runWorkerStep({
+    seat: 'builder', card: CARD, step: STEP, choice: resolveSeatChoices([]).builder,
+    worktreeName: 'jul98-6', requestId: 'JUL-98:step-6:builder-throw',
+    suiteRunner, suiteKey: 'JUL-98:step-6', runSuite: false, ...h.deps,
+  });
+  assert.equal(resultReadFailed.possiblyRunning, true);
+  assert.equal(resultReadFailed.cost.seat, 'builder');
+  assert.equal(resultReadFailed.cost.readFailed, true);
+  assert.match(resultReadFailed.cost.reason, /session file missing/);
+  assert.equal(resultReadFailed.released, false);
+  assert.equal(resultReadFailed.worktreeRemoved, false);
+});
+
+
+

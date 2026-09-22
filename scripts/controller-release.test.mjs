@@ -9,6 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { finishWorker, assertEverySeatCosted } from '../graph/controller/release.mjs';
+import { readFailedCostLine } from '../graph/controller/cost.mjs';
 import { createOrcaSeatCostReader } from '../graph/controller/wiring.mjs';
 
 const COST = {
@@ -204,3 +205,13 @@ test('a never-started seat passes the gate before the card moves, and an ordinar
     /blank/,
   );
 });
+
+test('a possibly-running seat with a read-failed cost line passes the gate before the card moves, while an ordinary blank line still does not', () => {
+  const line = readFailedCostLine({ seat: 'builder', model: 'claude-opus-5', reason: 'transcript missing' });
+  assert.doesNotThrow(() => assertEverySeatCosted({ seats: ['builder'], costLines: [line] }));
+  assert.throws(
+    () => assertEverySeatCosted({ seats: ['builder'], costLines: [{ seat: 'builder', model: null, totalTokens: null, peakContext: null, minutes: null }] }),
+    /blank/,
+  );
+});
+

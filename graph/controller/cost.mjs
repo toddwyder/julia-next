@@ -378,6 +378,26 @@ export function neverStartedCostLine({ seat, model = null, reason = 'no turn was
   };
 }
 
+// A WORKER WHOSE COST READ FAILED (JUL-98 step 6, round 4). For a worker that
+// is possibly running, or where reading figures threw an error, this explicit
+// line names the failure reason rather than substituting a zero never-started line.
+export function readFailedCostLine({ seat, model = null, reason = 'cost read failed' } = {}) {
+  return {
+    seat,
+    readFailed: true,
+    reason,
+    vendor: null,
+    model,
+    tokens: null,
+    totalTokens: null,
+    peakContext: null,
+    minutes: null,
+    usd: null,
+    capped: false,
+    failedOverTo: null,
+  };
+}
+
 const REQUIRED_FIELDS = ['seat', 'model', 'totalTokens', 'peakContext', 'minutes'];
 // The same rule for a seat billed against an allowance: the same "no blank
 // line" gate, on the figures that seat actually has. The allowance replaces the
@@ -387,10 +407,15 @@ const REQUIRED_ALLOWANCE_FIELDS = ['seat', 'model', 'minutes'];
 // A blank cost line for any seat FAILS the step. This is the check that makes
 // that true rather than hoped for.
 export function assertCostLineComplete(line) {
-  // The one exception, and it is an explicit mark rather than an absence: a
-  // worker that never started spent nothing and has no session to read.
+  // The two explicit exceptions: a worker that never started spent nothing,
+  // and a possibly-running worker whose figures could not be read carries an
+  // explicit read-failure reason. Neither is an uncosted blank line.
   if (line?.neverStarted === true) {
     if (!line.seat) throw new Error('a never-started cost line must still name its seat');
+    return line;
+  }
+  if (line?.readFailed === true) {
+    if (!line.seat) throw new Error('a read-failed cost line must still name its seat');
     return line;
   }
   const required = line?.billing === 'allowance' ? REQUIRED_ALLOWANCE_FIELDS : REQUIRED_FIELDS;
@@ -427,6 +452,9 @@ export function formatCostLine(line) {
   const seat = line.seat.charAt(0).toUpperCase() + line.seat.slice(1);
   if (line.neverStarted === true) {
     return `- **${seat}** -- never started -- no turn began, so there is no session to read a cost from: 0 tokens, $0.0000 (${line.reason ?? 'no turn was ever observed to start'})`;
+  }
+  if (line.readFailed === true) {
+    return `- **${seat}** -- cost read failed: ${line.reason ?? 'cost could not be read'}`;
   }
   if (line.billing === 'allowance') {
     const used = Object.entries(line.allowanceUsed)

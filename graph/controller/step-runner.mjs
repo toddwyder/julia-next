@@ -28,7 +28,7 @@ import { dispatchWorker } from './dispatch.mjs';
 import { proveTurnStarted } from './turn-start.mjs';
 import { waitForWorkerDone } from './mailbox.mjs';
 import { finishWorker, assertEverySeatCosted } from './release.mjs';
-import { formatCostLine, neverStartedCostLine } from './cost.mjs';
+import { formatCostLine, neverStartedCostLine, readFailedCostLine, assertCostLineComplete } from './cost.mjs';
 // The seat rules are scripts/seat-labels.mjs's, imported rather than repeated.
 // A seat that CANNOT BE LAUNCHED takes exactly the route a CAPPED seat already
 // takes (JUL-98 step 2, item 6): the same `fallbackSeatChoice`, the same seat
@@ -51,6 +51,56 @@ export const DEFAULT_RECONCILE_WAIT_MS = 30000;
 // this replaces it. Eight is well past what a controller carrying one card at a
 // time puts on its own mailbox in half a minute, and far short of a spin.
 export const DEFAULT_RECONCILE_MAX_READS = 8;
+
+function unwrapOrcaPayload(source) {
+  if (!source) return null;
+  return source.show?.result ?? source.show ?? source.result ?? source;
+}
+
+// THE RECORDED FAILURE SIGNATURE (JUL-98 step 6, round 4; Todd Decision 2026-09-22 15:01:01Z).
+// Orca recorded failure signature (failed at agent readiness, no agent terminal)
+// means the worker never started. Concluded ONLY on these exact five fields:
+//   1. worker.state === 'failed'
+//   2. worker.stage === 'agent_readiness'
+//   3. worker.agentTerminalHandle === null
+//   4. dispatch.status === 'failed'
+//   5. typeof dispatch.lastFailure === 'string' && dispatch.lastFailure.length > 0
+// Read from:
+//   - graph/fixtures/orca-1.4.205/worker-show.failed-agent-readiness.json
+//   - graph/fixtures/orca-1.4.205/base-checkout.new-path-untrusted.worker-show.json
+//   - docs/research/jul109-orca-1.4.205-findings.md (section 2 fact 3, section 4a)
+//   - coordinator live measurement at 15:53:09Z (agent-trust-workspace blocked)
+export function hasFailedAgentReadinessSignature(source) {
+  const candidate = unwrapOrcaPayload(source);
+  if (!candidate) return false;
+  const worker = candidate.worker ?? null;
+  const dispatch = candidate.dispatch ?? null;
+
+  return (
+    worker?.state === 'failed' &&
+    worker?.stage === 'agent_readiness' &&
+    worker?.agentTerminalHandle === null &&
+    dispatch?.status === 'failed' &&
+    typeof dispatch?.lastFailure === 'string' &&
+    dispatch.lastFailure.length > 0
+  );
+}
+
+// POSITIVE LIVENESS VERDICT (JUL-98 step 6, round 4; Todd Decision 2026-09-22 15:01:01Z).
+// "Orca liveness verdict live, seen at any point, means the worker ran."
+// If live is seen in projection.liveness.verdict, worker.liveness.verdict,
+// or observation.status at any point, seenLive is recorded true, preventing
+// any never-started conclusion even if the mailbox is silent.
+export function hasLiveLivenessVerdict(source) {
+  const candidate = unwrapOrcaPayload(source);
+  if (!candidate) return false;
+  if (candidate.liveness?.verdict === 'live') return true;
+  if (candidate.projection?.liveness?.verdict === 'live') return true;
+  if (candidate.worker?.liveness?.verdict === 'live') return true;
+  if (candidate.observation?.status === 'live') return true;
+  if (source.observed && hasLiveLivenessVerdict(source.observed)) return true;
+  return false;
+}
 
 // One seat, one step.
 export async function runWorkerStep({
@@ -92,11 +142,9 @@ export async function runWorkerStep({
   // The controller's own clock, for a seat whose vendor records no duration.
   now = () => new Date().toISOString(),
   // The clock the reconciliation's budget is measured on, in milliseconds.
-  // `Date.now()` is the wall clock, so a clock step could lengthen or shorten
-  // the look -- which is why the budget is not the only bound on it
-  // (DEFAULT_RECONCILE_MAX_READS above). Injected only so a test can spend the
-  // budget without sleeping through it; nothing else reads it.
-  clockMs = () => Date.now(),
+  // Defaults to `performance.now()`, which is monotonic and unaffected by wall
+  // clock steps. Injected so a test can spend the budget without sleeping.
+  clockMs = () => performance.now(),
 } = {}) {
   // 1. A fresh worker.
   const dispatched = await dispatchWorker({
@@ -192,6 +240,7 @@ export async function runWorkerStep({
   const observed = dispatched.observed ?? await observeStartImpl({ seat, dispatch: dispatched });
   const proof = proveTurnStarted(observed ?? {});
 
+  let seenLive = hasLiveLivenessVerdict(dispatched) || hasLiveLivenessVerdict(observed);
   let heard = null;
   let initialAck = waitOptions.initialAck ?? null;
 
@@ -263,9 +312,18 @@ export async function runWorkerStep({
         timeoutMs: remainingMs,
       });
       reads += 1;
+      if (hasLiveLivenessVerdict(reconciled)) {
+        seenLive = true;
+      }
       mirrorFailures += reconciled.mirrorFailures ?? 0;
       reconciledMessages.push(...(reconciled.messages ?? []));
       fromThisWorker = reconciledMessages.filter((message) => message.dispatchId === dispatched.dispatchId);
+      // CARRY THE ACKNOWLEDGEMENT FORWARD on every exit path that has one
+      // (round 3 P2a): if a message from this worker breaks the loop, the
+      // ordinary wait that follows must not re-read this delivery.
+      if (reconciled.acknowledged != null) {
+        initialAck = reconciled.acknowledged;
+      }
       if (reconciled.outcome != null || fromThisWorker.length > 0) break;
       // A wait that expired carrying NOTHING AT ALL is the answer, not a step
       // towards one: there is no traffic to read past. It is the never-started
@@ -278,9 +336,6 @@ export async function runWorkerStep({
       // acknowledge therefore comes back identical however often it is asked
       // for, so asking again learns nothing and merely spins for the budget.
       if (reconciled.acknowledged == null) break;
-      // Each delivery is acknowledged by the NEXT read, so a foreign delivery
-      // wakes this look once and not again.
-      initialAck = reconciled.acknowledged;
       // TWO BOUNDS, because one is not enough. The budget bounds a mailbox that
       // makes this look WAIT; the read cap bounds one that answers INSTANTLY,
       // where the clock barely moves and the budget alone would allow a spin.
@@ -297,15 +352,58 @@ export async function runWorkerStep({
     } else if (fromThisWorker.length > 0) {
       // `initialAck` is already chained to the last delivery read above, so the
       // ordinary wait below starts where this look stopped.
-    } else if (dispatched.observationError) {
-      // A FAILED OBSERVATION IS NOT A VERDICT (round 2, finding 5). The worker
-      // was really adopted -- Orca issued its ids and it holds the brief -- and
-      // the thing that failed is the reading, not the worker. It may be running
-      // and spending right now, so nothing here may release it, delete its
-      // worktree, assign it a cost or let a backup start beside it. The step
-      // stops with NO cost line, which is precisely what `assertEverySeatCosted`
-      // stops the card on, and the worker and its worktree are left for the
-      // recovery path to reconcile and release.
+    } else if (!seenLive && (hasFailedAgentReadinessSignature(observed) || hasFailedAgentReadinessSignature(dispatched))) {
+      // THE RECORDED FAILURE SIGNATURE (JUL-98 step 6, round 4; Todd Decision 2026-09-22 15:01:01Z):
+      // "Orca recorded failure signature (failed at agent readiness, no agent terminal)
+      // means it never started."
+      // Concluded ONLY on this exact recorded signature.
+      const closed = await close({
+        ok: false,
+        stage: 'turn-start',
+        reason: proof.reason,
+        retryRequestId: proof.retryRequestId ?? null,
+        warnings: proof.warnings,
+        outcome: null,
+        testRun: null,
+      }, { turnStarted: false });
+      return { ...closed, launchRefused: closed.released === true && closed.worktreeRemoved === true };
+    } else {
+      // EVERYTHING ELSE IS TREATED AS POSSIBLY RUNNING (Todd Decision 2026-09-22 15:01:01Z):
+      // "Everything else is treated as possibly running: its worktree is kept,
+      // its cost is read, no backup starts beside it. Not seeing live is never
+      // proof of never-started."
+      //
+      // Covers: budget exhausted, cap exhausted, observation failed, nothing heard at all.
+      let cost = null;
+      try {
+        cost = await readCostImpl({
+          seat,
+          dispatchId: dispatched.dispatchId,
+          worktree: dispatched.worktree,
+          agent: dispatched.launch?.agent ?? null,
+          model: dispatched.launch?.model ?? null,
+          allowanceBefore: dispatched.allowanceBefore ?? null,
+          startedAt: dispatched.startedAt ?? null,
+          endedAt: dispatched.startedAt ? now() : null,
+        });
+        assertCostLineComplete(cost);
+      } catch (error) {
+        cost = readFailedCostLine({
+          seat,
+          model: dispatched.launch?.model ?? null,
+          reason: error.message,
+        });
+      }
+
+      let reason;
+      if (dispatched.observationError) {
+        reason = `the ${seat} seat was adopted (dispatch ${dispatched.dispatchId}) but could not be observed (${dispatched.observationError}), and nothing has come from it through the mailbox yet -- it may still be running, so it is neither released nor removed and no backup is started beside it`;
+      } else if (proof.started === false) {
+        reason = proof.reason;
+      } else {
+        reason = `the ${seat} seat did not report within the reconciliation budget and did not exhibit the recorded failure signature -- it may still be running, so it is neither released nor removed and no backup is started beside it`;
+      }
+
       return {
         ok: false,
         seat,
@@ -316,32 +414,15 @@ export async function runWorkerStep({
         taskId: dispatched.taskId,
         terminal: dispatched.terminal,
         worktree: dispatched.worktree,
-        cost: null,
+        cost,
         released: false,
         worktreeRemoved: false,
         outcome: null,
         testRun: null,
+        ...(seenLive ? { seenLive: true } : {}),
         warnings: proof.warnings,
-        reason: `the ${seat} seat was adopted (dispatch ${dispatched.dispatchId}) but could not be observed (${dispatched.observationError}), and nothing has come from it through the mailbox yet -- it may still be running, so it is neither released nor costed and no backup is started beside it`,
+        reason,
       };
-    } else {
-      const closed = await close({
-        ok: false,
-        stage: 'turn-start',
-        reason: proof.reason,
-        retryRequestId: proof.retryRequestId ?? null,
-        warnings: proof.warnings,
-        outcome: null,
-        testRun: null,
-      }, { turnStarted: false });
-      // AND THE SEAT FALLS BACK. Nothing was observed, nothing was heard, and
-      // cleanup took back everything this dispatch made -- so this is the same
-      // thing a refused launch is, and it takes the same road out:
-      // `runBuildAndReview` below resolves the seat's backup through the seat
-      // table. Only a CLEAN teardown may say so: a release or a removal that
-      // failed leaves something behind, and a seat with residue is not a seat
-      // nothing was created for.
-      return { ...closed, launchRefused: closed.released === true && closed.worktreeRemoved === true };
     }
   }
 

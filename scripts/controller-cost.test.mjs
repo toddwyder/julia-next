@@ -30,6 +30,7 @@ import {
   seatCostLine,
   tokenTotal,
   neverStartedCostLine,
+  readFailedCostLine,
   assertCostLineComplete,
   formatCostLine,
 } from '../graph/controller/cost.mjs';
@@ -280,6 +281,17 @@ test("a worker that never started yields an explicit never-started cost line, no
   assert.equal(line.usd, 0);
   assert.doesNotThrow(() => assertCostLineComplete(line), 'it is complete BECAUSE it is marked never-started, not because it is blank');
   assert.match(formatCostLine(line), /never started/i);
+  // And a line that merely LOOKS empty, without the mark, still fails.
+  assert.throws(() => assertCostLineComplete({ seat: 'builder', model: null, totalTokens: null, peakContext: null, minutes: null }), /blank/);
+});
+
+test("a worker whose cost read failed yields an explicit read-failed cost line, not a blank one", () => {
+  const line = readFailedCostLine({ seat: 'builder', model: 'claude-opus-5', reason: 'session file missing' });
+  assert.equal(line.readFailed, true);
+  assert.equal(line.seat, 'builder');
+  assert.equal(line.reason, 'session file missing');
+  assert.doesNotThrow(() => assertCostLineComplete(line), 'it is complete BECAUSE it is marked read-failed, not because it is blank');
+  assert.match(formatCostLine(line), /cost read failed: session file missing/i);
   // And a line that merely LOOKS empty, without the mark, still fails.
   assert.throws(() => assertCostLineComplete({ seat: 'builder', model: null, totalTokens: null, peakContext: null, minutes: null }), /blank/);
 });
