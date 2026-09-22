@@ -2125,6 +2125,41 @@ step 6.**
 review to check it against), and the ten-paired-reviews Flash-vs-Pro report (needs ten real
 reviews to exist first). Both are owed, tracked on JUL-98, not silently dropped.
 
+## The DeepSeek (Pi) cost reader summed only the last turn, undercounting every multi-turn seat (JUL-98, found 2026-09-22)
+
+**Found live, on step 7's first real Command Code review.** The coordinator computed the
+review's token total by hand off the seat's own JSON stream and got a number (55,616 total, 535
+output) that could not have produced the 10.6KB review file that same session wrote. Reading
+`graph/controller/cost.mjs`'s `deepseekExtractFromSeatStream` found why: it took `usage` off only
+the **last** assistant `message_end` event, on the same assumption Codex's reader correctly makes
+for Codex (`codexExtractFromRollout`'s "the last `token_count` is the total" -- Codex's own
+`total_token_usage` really is cumulative) -- but DeepSeek/Pi's `usage.*` on each `message_end` is
+that **one turn's own figures**, not a running total. The existing multi-turn fixture
+(`graph/fixtures/orca-1.4.205/cost.pi.seat-json-stream.multi-turn.jsonl`) already proved this and
+nobody had read it that way: turn 2's `usage.input` (226) is smaller than turn 1's (1975), which a
+cumulative counter cannot do.
+
+**Every DeepSeek/Pi seat's cost line has been undercounted since this reader was written** --
+`builder-backup`, `reviewer-backup` (native and now Command Code), `orchestrator-deepseek`, and
+the new `reviewer-shadow-flash` -- down to whatever the last turn alone reported, on any review or
+build that took more than one turn. A short single-turn call (like the original probe on this
+card) was never wrong; a real multi-tool-call session always was.
+
+**Fixed:** `deepseekExtractFromSeatStream` now sums `input`/`output`/`cacheRead` and
+`usage.totalTokens` across every assistant `message_end`, the same summing shape
+`claudeExtractFromTranscript` already uses for Claude (which has the analogous per-message-not-
+cumulative shape). Peak context was already correct -- `peakPromptTokens` already took the max
+over every turn, not just the last -- so only the summed totals needed the fix. Two tests in
+`scripts/controller-cost.test.mjs` previously asserted the old, now-disproven behavior ("the last
+assistant message_end's own usage", "not a re-sum of its usage fields") against the same fixture;
+both are corrected to assert the summed values the fixture's real numbers support.
+
+**No cost-line shape changed** -- `tokens`, `totalTokens`, `usd` are still exactly the fields
+`seatCostLine`/`assertCostLineComplete`/`formatCostLine` expect. Every already-posted DeepSeek/Pi
+cost line on this card from before this fix understates the true figure for any seat that ran more
+than one turn; not retroactively corrected, but this is why a small final message and a large real
+session's cost can look mismatched in the earlier retro lines.
+
 ## Seven findings carried from the cancelled JUL-106 (recorded 2026-09-20)
 
 JUL-106 (the watchdog) was cancelled after three rejected rounds; its detection code had been
