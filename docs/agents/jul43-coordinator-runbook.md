@@ -1991,6 +1991,17 @@ Shape 2 is an absence of a verdict and its seat's worker may still be spending. 
 that distinguishes them is `orca orchestration worker-show --dispatch <id> --json`, which is why
 `workerShowImpl` exists in `graph/controller/wiring.mjs`: `worktree ps` answers neither.
 
+**And this CORRECTS one line in the JUL-109 section below.** That section records the failure
+signature as `worker.state: failed` with `failedStage: agent_readiness`, `lastError: timeout`,
+**and** `observation.status: identity_changed`, as though the four travelled together. They do not.
+`identity_changed` appears in BOTH shapes — it is right there in
+`graph/fixtures/orca-1.4.205/worker-show.failed-agent-readiness.json`, whose `observation` block
+reads `identity_changed` alongside a genuine `agent_readiness` failure — so it distinguishes
+nothing. What separates the two is the **stage**: `agent_readiness` with a failed dispatch is the
+never-started verdict; `remote_attach_requested` is a stall with no verdict in it. That is why
+`hasFailedAgentReadinessSignature` in `graph/controller/step-runner.mjs` reads the five fields it
+reads and does **not** look at `observation.status` at all.
+
 ### Three things this route gets wrong if you build it the obvious way (JUL-98 step 6 round 2, 2026-09-22)
 
 An independent review of the first round found three defects in the route above. All three are
