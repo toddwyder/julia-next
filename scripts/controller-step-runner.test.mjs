@@ -15,7 +15,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { runWorkerStep, runBuildAndReview, attemptTag, hasLiveLivenessVerdict, hasFailedAgentReadinessSignature, DEFAULT_RECONCILE_WAIT_MS, DEFAULT_RECONCILE_MAX_READS } from '../graph/controller/step-runner.mjs';
+import { runWorkerStep, runBuildAndReview, attemptTag, hasLiveLivenessVerdict, hasFailedAgentReadinessSignature, reviewGaveNoVerdict, DEFAULT_RECONCILE_WAIT_MS, DEFAULT_RECONCILE_MAX_READS } from '../graph/controller/step-runner.mjs';
 import { readFile } from 'node:fs/promises';
 import { createSuiteRunner } from '../graph/controller/test-run.mjs';
 import { createFixtureWorkerOrca, loadOrcaFixture } from '../graph/controller/fixture-orca.mjs';
@@ -1496,4 +1496,195 @@ test('round 4b review, standards axis: an adopted-but-unobservable seat whose wo
   assert.equal(result.possiblyRunning, true);
   assert.match(result.reason, /host_indeterminate/, 'the verdict that could not be taken');
   assert.match(result.reason, /terminal_handle_stale/, 'AND the observation that failed -- both are facts about the same stuck seat');
+});
+
+// ---------------------------------------------------------------------------
+// Todd's Decision, 2026-09-22: a reviewer's failed outcome with no findings or
+// reason at all is the review itself being unusable, not a verdict -- JUL-92
+// attempts 3 and 4 both stopped exactly this way, on a review with nothing
+// anyone could act on.
+// ---------------------------------------------------------------------------
+
+test('reviewGaveNoVerdict: only the reviewer seat, only a failed outcome, only when BOTH subject and body are blank', () => {
+  assert.equal(reviewGaveNoVerdict({ seat: 'reviewer', outcome: 'failed', message: { subject: '', body: '' } }), true);
+  assert.equal(reviewGaveNoVerdict({ seat: 'reviewer', outcome: 'failed', message: { subject: '  ', body: '\n' } }), true, 'whitespace-only counts as blank');
+  assert.equal(reviewGaveNoVerdict({ seat: 'reviewer', outcome: 'failed', message: { subject: 'Findings', body: '' } }), false, 'a subject alone is something to act on');
+  assert.equal(reviewGaveNoVerdict({ seat: 'reviewer', outcome: 'failed', message: { subject: '', body: 'one real finding' } }), false);
+  assert.equal(reviewGaveNoVerdict({ seat: 'builder', outcome: 'failed', message: { subject: '', body: '' } }), false, 'a builder is a different failure -- not this rule');
+  assert.equal(reviewGaveNoVerdict({ seat: 'reviewer', outcome: 'succeeded', message: { subject: '', body: '' } }), false, 'a pass never needs a reason');
+  assert.equal(reviewGaveNoVerdict({ seat: 'reviewer', outcome: 'failed', message: null }), true, 'no message at all is the same as a blank one');
+});
+
+// The same harness as the file's other tests, but with a `checkWaitImpl` that
+// varies by which dispatch (builder, reviewer, reviewer retry) is being
+// waited on, so the reviewer's FIRST attempt can report blank-failed while
+// its retry reports for real.
+function harnessWithReviewerSequence(reviewerOutcomes) {
+  const h = harness();
+  let reviewerCalls = 0;
+  h.deps.checkWaitImpl = async ({ ack }) => {
+    const dispatchId = h.orca.workerStartCalls().length > 0 ? lastDispatchId(h.orca) : 'ctx_unknown';
+    const isBuilder = h.orca.workersStarted() === 1;
+    let message;
+    if (isBuilder) {
+      message = doneMessage(dispatchId, 'succeeded');
+    } else {
+      const spec = reviewerOutcomes[reviewerCalls] ?? reviewerOutcomes[reviewerOutcomes.length - 1];
+      reviewerCalls += 1;
+      const recorded = ALL.messages.find((m) => m.type === 'worker_done');
+      message = spec.noVerdict
+        ? { ...recorded, subject: '', body: '', payload: JSON.stringify({ taskId: 'task_x', dispatchId, outcome: 'failed' }) }
+        : doneMessage(dispatchId, spec.outcome ?? 'succeeded');
+    }
+    return { runId: ALL.runId, deliveryId: `delivery_${dispatchId}`, messages: ack ? [message] : [ALL.messages[4], message], count: 2, timedOut: false };
+  };
+  return h;
+}
+
+test('a reviewer that reports failed with no findings is retried once, and the retry\'s real verdict decides the step', async () => {
+  const h = harnessWithReviewerSequence([{ noVerdict: true }, { outcome: 'succeeded' }]);
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+
+  const result = await runBuildAndReview({ card: CARD, step: STEP, choices: CHOICES, suiteRunner, ...h.deps });
+
+  assert.equal(result.ok, true, 'the retry succeeded, so the step passes');
+  assert.equal(result.noVerdictRetries.length, 1);
+  assert.equal(result.noVerdictRetries[0].seat, 'reviewer');
+  assert.notEqual(result.noVerdictRetries[0].firstDispatchId, result.noVerdictRetries[0].retryDispatchId, 'a fresh worker, not the same one asked again');
+  // The retry ran on the SAME entry, never the backup: the entry itself did
+  // nothing wrong.
+  assert.equal(result.reviewer.reason, null);
+  assert.doesNotThrow(() => assert.ok(result.reviewer.cost.totalTokens > 0), 'the retry that actually ran has a real, nonzero cost line');
+});
+
+test('a reviewer that reports failed with no findings TWICE stops the card, naming both dispatches, with BOTH real costs summed -- never an invented zero and never a dropped figure', async () => {
+  const h = harnessWithReviewerSequence([{ noVerdict: true }, { noVerdict: true }]);
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+
+  const result = await runBuildAndReview({ card: CARD, step: STEP, choices: CHOICES, suiteRunner, ...h.deps });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.noVerdictRetries.length, 0, 'a retry that ALSO gave no verdict is not recorded as a successful retry');
+  assert.match(result.reviewer.reason, /reported failed with no findings or reason, twice in a row/);
+  assert.match(result.reviewer.reason, /retry dispatch/);
+  // Both attempts really ran (the harness's readCostImpl gives a real,
+  // nonzero cost for a turn that started) -- unlike a launch refusal, there
+  // is nothing "never started" about this seat, so `neverStartedCostLine`'s
+  // zero must never appear here. PR #96 review finding 1: the FIRST
+  // attempt's real spend must not be dropped just because it gave no
+  // verdict -- both are folded into the one line this seat keeps.
+  assert.equal(result.reviewer.cost.neverStarted, undefined);
+  assert.equal(result.reviewer.cost.totalTokens, COST.totalTokens * 2, 'both real attempts, summed, not just the last one');
+});
+
+test('the successful-retry case also carries the first (no-verdict) attempt\'s real spend, not just the retry\'s', async () => {
+  const h = harnessWithReviewerSequence([{ noVerdict: true }, { outcome: 'succeeded' }]);
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+
+  const result = await runBuildAndReview({ card: CARD, step: STEP, choices: CHOICES, suiteRunner, ...h.deps });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.reviewer.cost.totalTokens, COST.totalTokens * 2, 'the no-verdict first attempt spent real money too, and it must not vanish');
+});
+
+// PR #96 review finding 2: the RETRY can itself fail to launch -- a
+// different failure from "gave no verdict again". The card must say so
+// honestly (the FIRST attempt ran; the RETRY is what could not start), never
+// fall into the seat-fallback machinery (whose whole premise -- nothing was
+// created yet -- is false here), and never lose the first attempt's real
+// cost either.
+test('a retry that itself cannot be launched is reported as that, honestly -- not folded into the seat-fallback machinery, and the first attempt\'s real cost survives', async () => {
+  const h = harnessWithReviewerSequence([{ noVerdict: true }]);
+  const failed = loadOrcaFixture('worker-start.failed-agent-readiness.json').result;
+  const realWorkerStart = h.orca.workerStart;
+  let calls = 0;
+  h.deps.workerStartImpl = async (options) => {
+    calls += 1;
+    // call 1: builder. call 2: reviewer's first (no-verdict) attempt. call 3:
+    // the reviewer's retry -- fails to launch entirely.
+    if (calls === 3) return { ...failed };
+    return realWorkerStart(options);
+  };
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+
+  const result = await runBuildAndReview({ card: CARD, step: STEP, choices: CHOICES, suiteRunner, ...h.deps });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.noVerdictRetries.length, 0, 'the retry never produced a verdict, so this is not a successful retry');
+  assert.equal(result.seatMoves.length, 0, 'never the seat-fallback machinery -- the entry already proved it could run');
+  assert.match(result.reviewer.reason, /first attempt reported failed with no findings or reason/);
+  assert.match(result.reviewer.reason, /the retry dispatched for a real verdict could not run either/);
+  assert.match(result.reviewer.reason, /agent_readiness/, 'the retry\'s own real failure is named, not swallowed');
+  // The first attempt genuinely ran and genuinely spent; the retry that
+  // failed to launch spent nothing. sumCostLines passes the real line
+  // through untouched rather than zeroing it out.
+  assert.equal(result.reviewer.cost.neverStarted, undefined);
+  assert.equal(result.reviewer.cost.totalTokens, COST.totalTokens);
+});
+
+// PR #96 review, round 2: the ORIGINAL scenario finding 2 described (a retry
+// REFUSED before dispatch, e.g. an adopt-route timeout -- `launchRefused:
+// true`, not a worker-start that started and then failed) was not what the
+// first fix's own test exercised, and the first fix did not actually cover
+// it: `...retry` in the self-contained branch still carried the retry's own
+// `launchRefused: true` through to `result`, so the very next
+// `if (result.launchRefused)` guard still caught it and ran the seat-fallback
+// machinery -- a third worker on the backup, a seat-move comment falsely
+// claiming the ORIGINAL entry never started, and the first attempt's real
+// cost dropped a second time. Reviewer is pi-deepseek here (the real adopt
+// route this scenario actually happens on): the first dispatch reaches an
+// idle prompt and runs for real (reporting blank-failed); the retry never
+// reaches idle within the wait and is refused before adoption, same as a
+// live adopt-route timeout.
+test('a retry REFUSED before dispatch (the adopt-route timeout shape) is still handled self-contained -- never the seat-fallback machinery, and the first attempt\'s real cost survives', async () => {
+  const h = harness();
+  let adoptWaits = 0;
+  h.deps.adoptBoundaries = {
+    ...h.deps.adoptBoundaries,
+    terminalWaitImpl: async () => {
+      adoptWaits += 1;
+      // Calls 1-2: the reviewer's first dispatch -- reaches idle, then goes
+      // busy with the brief (proceeds to a real, blank-failed turn).
+      // Calls 3+: the retry -- never reaches idle at all (refused).
+      if (adoptWaits === 1) return { wait: { satisfied: true } };
+      if (adoptWaits === 2) return { wait: { satisfied: false } };
+      return { wait: { satisfied: false } };
+    },
+  };
+  let reviewerCalls = 0;
+  h.deps.checkWaitImpl = async ({ ack }) => {
+    const dispatchId = h.orca.workerStartCalls().length > 0 ? lastDispatchId(h.orca) : 'ctx_unknown';
+    const isBuilder = h.orca.workersStarted() === 1;
+    let message;
+    if (isBuilder) {
+      message = doneMessage(dispatchId, 'succeeded');
+    } else {
+      reviewerCalls += 1;
+      const recorded = ALL.messages.find((m) => m.type === 'worker_done');
+      message = { ...recorded, subject: '', body: '', payload: JSON.stringify({ taskId: 'task_x', dispatchId, outcome: 'failed' }) };
+    }
+    return { runId: ALL.runId, deliveryId: `delivery_${dispatchId}`, messages: ack ? [message] : [ALL.messages[4], message], count: 2, timedOut: false };
+  };
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+  const choices = { builder: CHOICES.builder, reviewer: resolveSeatChoices([]).reviewer };
+  assert.equal(choices.reviewer.entry, 'pi-deepseek');
+  assert.equal(launchForChoice(choices.reviewer).route, 'adopt');
+
+  const result = await runBuildAndReview({ card: CARD, step: STEP, choices, suiteRunner, ...h.deps });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.noVerdictRetries.length, 0);
+  assert.equal(result.seatMoves.length, 0, 'never the seat-fallback machinery -- the first attempt already proved pi-deepseek could run');
+  assert.equal(result.reviewer.launchRefused, false, 'cleared -- this result must never be misread as a pre-dispatch refusal by anything downstream');
+  assert.match(result.reviewer.reason, /first attempt reported failed with no findings or reason/);
+  assert.match(result.reviewer.reason, /idle prompt/i, 'the retry\'s own real (adopt-route) failure is named');
+  // Exactly two adopt attempts (the first, and the one retry) -- never a
+  // third worker started on the backup entry.
+  assert.equal(h.order.filter((step) => step === 'adopt-worktree-create').length, 2, 'exactly two adopt attempts: the first attempt and the one retry, no more');
+  assert.equal(h.orca.workerStartCalls().filter((call) => call.agent === 'codex').length, 0, 'never falls over to the backup entry');
+  // The first attempt genuinely ran and genuinely spent; the refused retry
+  // spent nothing -- the real figure must survive, not be replaced by the
+  // backup machinery's own accounting (which never even ran here).
+  assert.equal(result.reviewer.cost.neverStarted, undefined);
+  assert.equal(result.reviewer.cost.totalTokens, COST.totalTokens);
 });

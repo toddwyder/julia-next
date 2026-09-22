@@ -236,6 +236,20 @@ export async function carryCard({
     });
   }
 
+  // ONE comment per reviewer retried after a no-verdict outcome (Todd's
+  // Decision, 2026-09-22): the card must show that a reviewer reported
+  // failed with nothing said, and that a fresh attempt was given rather than
+  // the card being stopped on a verdict that named no defect.
+  for (const retried of outcome.noVerdictRetries ?? []) {
+    const body = `**The ${retried.seat} seat's first attempt reported failed with no findings or reason.** Treated as the review itself being unusable, not a verdict on the change (dispatch ${retried.firstDispatchId}). A fresh ${retried.seat} was dispatched instead of stopping the card (dispatch ${retried.retryDispatchId}), and its verdict is what the rest of this step is judged on.`;
+    log(`[controller] ${card.identifier}: the ${retried.seat} seat's no-verdict first attempt (${retried.firstDispatchId}) was retried as ${retried.retryDispatchId}`);
+    await comments.postOnce({
+      issueId: card.id,
+      key: `no-verdict-retry:${retried.seat}:${retried.firstDispatchId}`,
+      body,
+    });
+  }
+
   const testRun = outcome.testRun;
   // The journal carries the same test result the card does -- which tests
   // failed, and whether the worktree it was measured in matched the commit --

@@ -432,6 +432,43 @@ export function readFailedCostLine({ seat, model = null, reason = 'cost read fai
   };
 }
 
+// Two real cost lines for the SAME seat, on the SAME step, combined into one
+// (JUL-98 step 5, PR #96 review finding 1). The no-verdict retry in
+// ./step-runner.mjs dispatches a SECOND worker on the same seat after the
+// first one genuinely ran and genuinely spent -- ordinary `costLines` is one
+// line per seat, so the first attempt's real spend has nowhere to go unless
+// it is folded into the one line the seat keeps. "Both attempts really ran
+// and really spent" (the retry's own comment) must stay true of the figure
+// posted, not just of the prose.
+//
+// A line that never really spent -- `neverStarted`/`readFailed` -- is not
+// summed in: it would silently zero out or blank the real figure sitting
+// beside it, which is the exact failure this file's other guards exist to
+// stop. In that case the OTHER (real) line passes through unchanged.
+export function sumCostLines(a, b, seat) {
+  const real = (line) => line && line.neverStarted !== true && line.readFailed !== true;
+  if (!real(a)) return b ?? a ?? null;
+  if (!real(b)) return a;
+  return {
+    seat,
+    vendor: b.vendor ?? a.vendor ?? null,
+    model: b.model ?? a.model ?? null,
+    tokens: a.tokens && b.tokens ? {
+      input: (a.tokens.input ?? 0) + (b.tokens.input ?? 0),
+      output: (a.tokens.output ?? 0) + (b.tokens.output ?? 0),
+      cacheRead: (a.tokens.cacheRead ?? 0) + (b.tokens.cacheRead ?? 0),
+    } : (b.tokens ?? a.tokens ?? null),
+    totalTokens: (a.totalTokens ?? 0) + (b.totalTokens ?? 0),
+    peakContext: Math.max(a.peakContext ?? 0, b.peakContext ?? 0),
+    startedAt: a.startedAt ?? b.startedAt ?? null,
+    endedAt: b.endedAt ?? a.endedAt ?? null,
+    minutes: Number(((a.minutes ?? 0) + (b.minutes ?? 0)).toFixed(2)),
+    usd: (a.usd ?? 0) + (b.usd ?? 0),
+    capped: Boolean(a.capped) || Boolean(b.capped),
+    failedOverTo: b.failedOverTo ?? a.failedOverTo ?? null,
+  };
+}
+
 const REQUIRED_FIELDS = ['seat', 'model', 'totalTokens', 'peakContext', 'minutes'];
 // The same rule for a seat billed against an allowance: the same "no blank
 // line" gate, on the figures that seat actually has. The allowance replaces the

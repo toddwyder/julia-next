@@ -36,7 +36,7 @@ import { dispatchWorker } from './dispatch.mjs';
 import { proveTurnStarted } from './turn-start.mjs';
 import { waitForWorkerDone } from './mailbox.mjs';
 import { finishWorker, assertEverySeatCosted } from './release.mjs';
-import { formatCostLine, neverStartedCostLine, readFailedCostLine, assertCostLineComplete } from './cost.mjs';
+import { formatCostLine, neverStartedCostLine, readFailedCostLine, assertCostLineComplete, sumCostLines } from './cost.mjs';
 // The seat rules are scripts/seat-labels.mjs's, imported rather than repeated.
 // A seat that CANNOT BE LAUNCHED takes exactly the route a CAPPED seat already
 // takes (JUL-98 step 2, item 6): the same `fallbackSeatChoice`, the same seat
@@ -550,7 +550,26 @@ export async function runWorkerStep({
     messages: heard.messages,
     mirrorFailures: heard.mirrorFailures,
     acknowledged: heard.acknowledged,
+    // Todd's Decision, 2026-09-22 (JUL-92 attempt 3 and 4 both stopped this
+    // exact way): a reviewer's worker_done with outcome 'failed' and no
+    // findings text at all is not a verdict about the CODE -- it is the
+    // reviewer's own turn producing nothing usable. runBuildAndReview below
+    // reads this mark to retry the review once, rather than stopping the
+    // card on a verdict that names no defect.
+    reviewGaveNoVerdict: reviewGaveNoVerdict({ seat, outcome: heard.outcome, message: heard.message }),
   });
+}
+
+// Pure: does this worker_done carry anything a human or the next reviewer
+// could act on? Checked only for the reviewer seat's own 'failed' outcome --
+// a builder reporting failed with nothing said is a different problem
+// (openScope's own existing stop already covers it) and 'succeeded' never
+// needs this at all.
+export function reviewGaveNoVerdict({ seat, outcome, message } = {}) {
+  if (seat !== 'reviewer' || outcome !== 'failed') return false;
+  const subject = String(message?.subject ?? '').trim();
+  const body = String(message?.body ?? '').trim();
+  return subject === '' && body === '';
 }
 
 // Orca names a worktree `<repoId>::<path>`; the suite runs in the path.
@@ -722,9 +741,95 @@ export async function runBuildAndReview({
   // never be given the zero-cost never-started line `stopped` below writes.
   const neverGotGoing = (result) => (result.stage === 'dispatch' || result.stage === 'turn-start') && result.possiblyRunning !== true;
 
+  const noVerdictRetries = [];
+
   for (const seat of seats) {
     const first = inPlay[seat];
     let result = await startSeat(seat, first, '');
+
+    // TODD'S DECISION, 2026-09-22 (JUL-92 attempts 3 and 4 both stopped this
+    // exact way): a reviewer's `worker_done` with outcome 'failed' and no
+    // findings text at all is not a verdict about the candidate -- it is the
+    // review itself coming back unusable. That is a different failure from
+    // "the reviewer found something wrong", and treating it as a stop-the-card
+    // verdict is what made both attempts park on nothing anyone could act on.
+    // So it gets ONE retry, same entry, a fresh worker (never the backup: the
+    // entry itself is not what failed) -- never an unbounded loop, so a
+    // reviewer that genuinely cannot produce a verdict still stops the card,
+    // just with both attempts named on it.
+    if (result.reviewGaveNoVerdict) {
+      const first_ = result; // the seat's own first attempt: it genuinely ran and genuinely spent
+      const retry = await startSeat(seat, first, '-noverdict-retry');
+      // EVERY BRANCH BELOW SUMS THE TWO REAL COST LINES (PR #96 review
+      // finding 1): the first attempt spent real money before it gave no
+      // verdict, and `costLines` is one line per seat -- so its figure has
+      // nowhere to go except folded into the one line this seat keeps.
+      // `sumCostLines` passes a never-started/read-failed line through
+      // untouched, so a retry that itself never ran still leaves the first
+      // attempt's real spend intact.
+      const combinedCost = sumCostLines(first_.cost, retry.cost, seat);
+
+      if (retry.reviewGaveNoVerdict) {
+        // Both attempts really ran and really spent -- unlike `stopped()`'s
+        // other callers, there is nothing "never started" about this seat.
+        // PR #96 review finding 3: the retry's OWN reason (set when ITS cost
+        // read, release or worktree removal itself failed, a real problem
+        // distinct from "gave no verdict") is appended rather than replaced,
+        // so a cost-read failure on the retry is never hidden behind the
+        // no-verdict framing.
+        result = {
+          ...retry,
+          ok: false,
+          // Explicitly false, never inherited from `retry` (PR #96 review,
+          // round 2): a retry that GAVE a (blank) verdict was never refused,
+          // but the field is cleared here too rather than trusted, for the
+          // same reason as the branch below -- this result must never be
+          // read by the `if (result.launchRefused)` guard right after this
+          // block, on either path.
+          launchRefused: false,
+          cost: combinedCost,
+          reason: `the ${seat} seat reported failed with no findings or reason, twice in a row (dispatch ${first_.dispatchId}, then retry dispatch ${retry.dispatchId}) -- treated as the review itself being unusable, not a verdict on the change`
+            + (retry.reason ? ` (the retry itself also reported: ${retry.reason})` : ''),
+        };
+      } else if (neverGotGoing(retry) || retry.possiblyRunning) {
+        // PR #96 review finding 2: the RETRY itself never produced a verdict
+        // either way -- it could not be launched (refused before dispatch, OR
+        // a worker-start that genuinely failed, `neverGotGoing`'s own two
+        // stages), or nothing is known about it (`possiblyRunning`). This is
+        // deliberately NOT handed to the launchRefused fallback below: that
+        // machinery's whole premise is "nothing was created yet for this
+        // seat", which is false here (the first attempt ran a real turn on
+        // `first.entry`) -- falling through would tell the card the entry
+        // itself could not be started, when it already proved it could, and
+        // would try to move a seat that already spent real money to a backup
+        // as though it never ran at all. Handled here instead, self-contained,
+        // naming both attempts and neither `noVerdictRetries` (the retry gave
+        // no verdict) nor the seat-fallback machinery.
+        result = {
+          ...retry,
+          ok: false,
+          // PR #96 review, round 2: the defect that shipped in the first fix.
+          // `...retry` above still carries `launchRefused: true` whenever the
+          // retry was refused BEFORE dispatch (as opposed to a worker-start
+          // that started and then failed), and the very next `if
+          // (result.launchRefused)` check below reads that field -- so
+          // without clearing it here, a pre-dispatch-refused retry fell
+          // straight into the seat-fallback machinery this branch exists to
+          // avoid: a third worker on the backup, a seat-move comment falsely
+          // claiming the ORIGINAL entry "could not be started" (it already
+          // ran once), and the first attempt's real cost dropped again. The
+          // fix from round 1 was tested only against a worker-start FAILURE
+          // (`launchRefused: false` already), which never exercised this.
+          launchRefused: false,
+          cost: combinedCost,
+          reason: `the ${seat} seat's first attempt reported failed with no findings or reason (dispatch ${first_.dispatchId}); the retry dispatched for a real verdict could not run either: ${retry.reason}`,
+        };
+      } else {
+        // A real verdict this time -- succeeded, or failed WITH findings.
+        noVerdictRetries.push({ seat, firstDispatchId: first_.dispatchId, retryDispatchId: retry.dispatchId });
+        result = { ...retry, cost: combinedCost };
+      }
+    }
 
     if (result.launchRefused) {
       const fromEntry = first?.entry ?? null;
@@ -785,5 +890,5 @@ export async function runBuildAndReview({
     reason = error.message;
   }
 
-  return { ...results, ok, reason, costLines, costText, seatMoves, seatChoices: inPlay, testRun: suiteRunner?.resultFor(suiteKey) ?? null, suiteKey };
+  return { ...results, ok, reason, costLines, costText, seatMoves, noVerdictRetries, seatChoices: inPlay, testRun: suiteRunner?.resultFor(suiteKey) ?? null, suiteKey };
 }
