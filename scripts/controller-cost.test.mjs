@@ -26,6 +26,7 @@ import {
   claudeExtractFromTranscript,
   codexExtractFromRollout,
   deepseekExtractFromSeatStream,
+  geminiExtractFromAllowance,
   seatCostLine,
   tokenTotal,
   neverStartedCostLine,
@@ -289,4 +290,97 @@ test('the Claude seat extract works on the real transcript as it is read off dis
   assert.ok(extract.peakContext > 0, 'the peak must survive the raw-text form too, not silently read 0');
   assert.ok(extract.startedAt && extract.endedAt, 'the duration comes off the same lines');
   assert.ok(extract.usd > 0);
+});
+
+// ---------------------------------------------------------------------------
+// JUL-98 step 6: the Gemini seat's cost line.
+//
+// A Gemini seat on the Antigravity CLI (`agy`) is billed against a SUBSCRIPTION
+// ALLOWANCE, not per token, and -- searched on 2026-09-22 -- it records no
+// per-session token count anywhere on disk: the conversation store is protobuf
+// blobs with no usage table, the brain transcript's keys are
+// {source,status,tool_calls,thinking,step_index,type,content,created_at}, and
+// the CLI log has no token line. What it DOES expose is the allowance itself:
+//
+//   agy -p "/usage" --output-format json
+//   -> command.data.groups[].buckets[] { id, window, remaining_fraction, reset_time }
+//
+// (0 turns, 0 tokens: it is a slash command, so reading it costs nothing.)
+//
+// So the honest line for this seat carries the allowance it used -- the
+// difference between a reading taken before the worker started and one taken
+// after -- and says plainly that there is no token count. A line with NEITHER
+// is still blank and still fails the step.
+// ---------------------------------------------------------------------------
+
+const BEFORE = { 'gemini-weekly': 0.9935215711593628, 'gemini-5h': 0.9634851813316345 };
+const AFTER = { 'gemini-weekly': 0.9870215711593628, 'gemini-5h': 0.9269851813316345 };
+
+test('a Gemini seat is costed in the allowance it used, read before and after its own run', () => {
+  const extract = geminiExtractFromAllowance({
+    model: 'gemini-3.8-flash',
+    before: BEFORE,
+    after: AFTER,
+    startedAt: '2026-09-22T06:00:00Z',
+    endedAt: '2026-09-22T06:12:24Z',
+  });
+
+  assert.equal(extract.vendor, 'gemini');
+  assert.equal(extract.billing, 'allowance');
+  assert.equal(extract.minutes, 12.4);
+  // Fractions of the allowance, to the precision agy reports them.
+  assert.equal(Number(extract.allowanceUsed['gemini-weekly'].toFixed(6)), 0.0065);
+  assert.equal(Number(extract.allowanceUsed['gemini-5h'].toFixed(6)), 0.0365);
+  // There is no token record for this vendor, and that is said rather than
+  // guessed at with a zero.
+  assert.equal(extract.totalTokens, null);
+  assert.equal(extract.peakContext, null);
+  assert.equal(extract.usd, null);
+});
+
+test('an allowance reading that did not move is zero used, not a missing line', () => {
+  const extract = geminiExtractFromAllowance({
+    model: 'gemini-3.8-flash', before: BEFORE, after: BEFORE,
+    startedAt: '2026-09-22T06:00:00Z', endedAt: '2026-09-22T06:00:30Z',
+  });
+  assert.deepEqual(Object.values(extract.allowanceUsed), [0, 0]);
+  // Zero used is a complete line: the figure is present and it is zero.
+  const line = seatCostLine({ seat: 'builder', ...extract });
+  assert.equal(assertCostLineComplete(line), line);
+});
+
+test('a bucket the after-reading does not have is refused rather than differenced against nothing', () => {
+  assert.throws(
+    () => geminiExtractFromAllowance({
+      model: 'gemini-3.8-flash', before: BEFORE, after: { 'gemini-weekly': 0.98 },
+      startedAt: '2026-09-22T06:00:00Z', endedAt: '2026-09-22T06:01:00Z',
+    }),
+    /gemini-5h/,
+  );
+});
+
+test('an allowance-billed line with no allowance figure is blank and fails the step', () => {
+  const line = seatCostLine({
+    seat: 'builder', vendor: 'gemini', model: 'gemini-3.8-flash', billing: 'allowance',
+    startedAt: '2026-09-22T06:00:00Z', endedAt: '2026-09-22T06:12:24Z',
+  });
+  assert.throws(() => assertCostLineComplete(line), /allowanceUsed/);
+});
+
+test('the Gemini line the card gets says the allowance used and that no token count exists', () => {
+  const line = seatCostLine({
+    seat: 'builder',
+    ...geminiExtractFromAllowance({
+      model: 'gemini-3.8-flash', before: BEFORE, after: AFTER,
+      startedAt: '2026-09-22T06:00:00Z', endedAt: '2026-09-22T06:12:24Z',
+    }),
+  });
+  const text = formatCostLine(line);
+  assert.match(text, /\*\*Builder\*\*/);
+  assert.match(text, /gemini-3\.8-flash/);
+  assert.match(text, /allowance used/i);
+  assert.match(text, /weekly 0\.65%/);
+  assert.match(text, /5h 3\.65%/);
+  assert.match(text, /12\.4 min/);
+  assert.match(text, /no token count is recorded/i);
 });

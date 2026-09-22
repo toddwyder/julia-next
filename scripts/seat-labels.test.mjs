@@ -578,3 +578,42 @@ test('the partner move can be switched off, and then the old refusal stands', ()
   assert.equal(result.ok, false);
   assert.match(result.reason, /refusing the builder backup \(pi-deepseek\)/);
 });
+
+// ---------------------------------------------------------------------------
+// JUL-98 step 6: the Gemini seat.
+//
+// The card's labels are still the single source of what runs, so a Gemini seat
+// needs a model label, a catalogue entry and a default -- otherwise "what the
+// card shows is exactly what runs" stops being checkable for the seat that now
+// does the building.
+// ---------------------------------------------------------------------------
+
+test('Gemini is in the model catalogue, with a vendor model id agy can actually be launched on', () => {
+  assert.deepEqual(MODEL_SPECS['gemini-flash'], { entry: 'gemini', model: 'gemini-3.8-flash' });
+  assert.deepEqual(MODEL_SPECS['gemini-pro'], { entry: 'gemini', model: 'gemini-3.1-pro' });
+  // Derived, so every agent offers it.
+  assert.deepEqual(MODEL_CATALOG['builder-gemini-flash'], { entry: 'gemini', model: 'gemini-3.8-flash' });
+  assert.equal(MODEL_LABELS.BUILDER_GEMINI_FLASH, 'builder-gemini-flash');
+});
+
+test('a card that names no model gets the Gemini builder and the Claude reviewer the seat table now says', () => {
+  const choices = resolveSeatChoices([]);
+  assert.equal(choices.builder.entry, 'gemini');
+  assert.equal(choices.builder.modelLabel, 'builder-gemini-flash');
+  assert.equal(choices.reviewer.entry, 'claude');
+  assert.equal(choices.reviewer.modelLabel, 'adversary-claude-opus');
+  assert.equal(validateFamilyChoice(choices).ok, true, 'Gemini building and Claude reviewing is a legal pair');
+});
+
+test('Codex reviews whenever Claude builds: a Gemini builder falling back to Claude moves the reviewer to Codex', () => {
+  const choices = resolveSeatChoices([]);
+  const result = fallbackSeatChoice(choices, 'builder');
+
+  assert.equal(result.ok, true);
+  assert.equal(result.choices.builder.entry, 'claude', 'the builder takes its own seat-table backup');
+  assert.equal(result.choices.builder.modelLabel, 'builder-claude-opus');
+  assert.equal(result.choices.reviewer.entry, 'codex', 'and the Claude reviewer must get out of its own family');
+  assert.equal(result.choices.reviewer.modelLabel, 'adversary-codex');
+  assert.equal(validateFamilyChoice(result.choices).ok, true);
+  assert.match(result.partnerMovedReason, /different families/);
+});

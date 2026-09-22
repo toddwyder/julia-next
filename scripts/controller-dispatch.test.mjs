@@ -92,8 +92,8 @@ test('a review step gets the reviewer skill, not the builder one', () => {
 });
 
 test('a seat choice becomes the launch Orca actually records: agent, a real model id, effort', () => {
-  assert.deepEqual(launchForChoice(CHOICES.builder), { agent: 'claude', model: LAUNCH_MODEL_IDS.opus, effort: 'medium' });
-  assert.deepEqual(launchForChoice(CHOICES.reviewer), { agent: 'codex', model: LAUNCH_MODEL_IDS.codex, effort: 'medium' });
+  assert.deepEqual(launchForChoice(CHOICES.builder), { route: 'agent', agent: 'claude', model: LAUNCH_MODEL_IDS.opus, effort: 'medium' });
+  assert.deepEqual(launchForChoice(CHOICES.reviewer), { route: 'agent', agent: 'codex', model: LAUNCH_MODEL_IDS.codex, effort: 'medium' });
 
   // Every model id dispatched is one the cost table can price -- otherwise the
   // cost line for that seat could only ever be blank, which fails the step.
@@ -102,11 +102,32 @@ test('a seat choice becomes the launch Orca actually records: agent, a real mode
   }
 });
 
-test('a DeepSeek seat is refused a new-worktree start, and says what the recording showed instead', () => {
-  const refusal = launchForChoice({ entry: 'pi-deepseek', modelLabel: 'adversary-deepseek-pro', effort: 'medium' });
-  assert.equal(refusal.agent, undefined);
-  assert.match(refusal.reason, /interactive/i);
-  assert.match(refusal.reason, /terminal/i);
+// JUL-98 step 6. Until now this seat was REFUSED outright, and the refusal's
+// own wording said what had to be built instead: "an interactive session
+// started first and adopted with worker-start --terminal once it has fully
+// started". That route now exists, so the DeepSeek seat takes it -- the same
+// route the Gemini seat takes, because it is the same problem.
+test('a seat whose agent Orca cannot launch takes the start-then-adopt route, not a refusal', () => {
+  const pi = launchForChoice({ entry: 'pi-deepseek', modelLabel: 'adversary-deepseek-pro', effort: 'medium' });
+  assert.equal(pi.route, 'adopt');
+  assert.equal(pi.agent, undefined, 'there is no --agent to pass: Orca has no launcher for it');
+  assert.equal(pi.model, LAUNCH_MODEL_IDS['deepseek-v4-pro'], 'the model is still resolved, so the cost line can be priced');
+
+  const gemini = launchForChoice({ entry: 'gemini', modelLabel: 'builder-gemini-flash', effort: 'high' });
+  assert.equal(gemini.route, 'adopt');
+  assert.equal(gemini.model, LAUNCH_MODEL_IDS['gemini-3.8-flash']);
+  assert.equal(gemini.effort, 'high');
+  assert.equal(gemini.trustAgent, 'agy', 'the worktree is pre-trusted in agy\'s own trust list');
+  assert.match(gemini.command, /^agy .*gemini-3\.8-flash/);
+
+  // ONE route, not two: both seats come back in the same shape.
+  assert.deepEqual(Object.keys(pi).sort(), Object.keys(gemini).sort());
+});
+
+test('an entry with no Orca agent and no adopt route is still refused by name', () => {
+  const refusal = launchForChoice({ entry: 'potato', modelLabel: 'builder-claude-opus', effort: 'medium' });
+  assert.equal(refusal.ok, false);
+  assert.match(refusal.reason, /potato/);
 });
 
 test('each step is a separate worker-start: a new task, a new dispatch, a new worktree, and no terminal reuse', async () => {
@@ -290,4 +311,70 @@ test('the stand-in gives every effect exactly the keys its recorded effect has -
   const worktree = started.effects.find((effect) => effect.kind === 'worktree');
   assert.ok(worktree.id.startsWith(recorded.find((e) => e.kind === 'worktree').id), 'the shape stays the recorded shape');
   assert.ok(!worktree.id.includes('undefined'));
+});
+
+// ---------------------------------------------------------------------------
+// JUL-98 step 6: dispatchWorker sends an adopt-route seat down the adopt route,
+// and a route that cannot be completed comes back as the SAME refusal a seat
+// with no agent at all comes back as -- so step-runner.mjs's existing seat
+// fallback catches it with no new machinery.
+// ---------------------------------------------------------------------------
+
+const GEMINI_CHOICE = { entry: 'gemini', modelLabel: 'builder-gemini-flash', effort: 'medium' };
+
+test('a Gemini seat is dispatched through the start-then-adopt route, carrying its own brief', async () => {
+  let adopted = null;
+  const result = await dispatchWorker({
+    workerStartImpl: async () => { throw new Error('the adopt route must not use worker-start --agent'); },
+    startAdoptedWorkerImpl: async (args) => {
+      adopted = args;
+      return { ok: true, result: { state: 'ready', stage: 'input_accepted', taskId: 'task_g', dispatchId: 'ctx_g', runId: 'run_1', effects: [] }, worktree: 'repo-1::/w/jul98-6', terminal: 'term_seat', allowanceBefore: { 'gemini-weekly': 0.99 } };
+    },
+    environment: 'ovh-local',
+    runId: 'run_1',
+    from: 'term_controller',
+    repo: 'path:/home/runner/julia-next',
+    seat: 'builder',
+    card: CARD,
+    step: PLAN[0],
+    choice: GEMINI_CHOICE,
+    worktreeName: 'jul98-6',
+    requestId: 'JUL-98:step-6:builder',
+  });
+
+  assert.equal(result.ok, true, result.reason);
+  assert.equal(result.terminal, 'term_seat');
+  assert.equal(result.worktree, 'repo-1::/w/jul98-6');
+  assert.deepEqual(result.allowanceBefore, { 'gemini-weekly': 0.99 });
+  assert.equal(adopted.spec, result.spec, 'the one dispatch carries this step\'s own brief');
+  assert.match(adopted.spec, /fix the stale runbook lines/);
+  assert.equal(adopted.launch.route, 'adopt');
+});
+
+test('a start-then-adopt route that could not be completed is the refusal the seat fallback already knows', async () => {
+  const result = await dispatchWorker({
+    workerStartImpl: async () => { throw new Error('not reached'); },
+    startAdoptedWorkerImpl: async () => ({
+      ok: false,
+      reason: "the builder seat's gemini start-then-adopt route could not be completed: agy never reached an idle prompt",
+      residualResources: [],
+    }),
+    environment: 'ovh-local',
+    runId: 'run_1',
+    from: 'term_controller',
+    repo: 'path:/home/runner/julia-next',
+    seat: 'builder',
+    card: CARD,
+    step: PLAN[0],
+    choice: GEMINI_CHOICE,
+    worktreeName: 'jul98-6',
+    requestId: 'JUL-98:step-6:builder',
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.launchRefused, true, 'the route took back everything it made, so nothing was left behind');
+  assert.equal(result.entry, 'gemini');
+  assert.match(result.reason, /builder/);
+  assert.match(result.reason, /agy never reached an idle prompt/);
+  assert.deepEqual(result.residualResources, []);
 });
