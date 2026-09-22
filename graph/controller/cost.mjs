@@ -53,8 +53,8 @@ export const COST_SOURCES = Object.freeze({
     lowerBound: false,
   }),
   'pi-deepseek': Object.freeze({
-    where: "the seat's own JSON output -- provider/model off the last assistant message_end, usage SUMMED across every assistant message_end (each is that one turn's figures, not a running total -- JUL-98, fixed 2026-09-22); duration timed by the controller, which starts the process and sees it exit",
-    provenOn: 'JUL-109 findings section 5; graph/fixtures/orca-1.4.205/cost.pi.seat-json-stream.multi-turn.jsonl and pi.timing.*.txt',
+    where: "the seat's own JSON output -- provider/model off the last assistant message_end, usage SUMMED across every assistant message_end (each is that one turn's figures, not a running total -- JUL-98, fixed 2026-09-22); duration timed by the controller, which starts the process and sees it exit. TWO shapes read this way now (JUL-98/JUL-100 follow-up): the one-shot `--mode json` stream directly, and an ADOPT-route interactive session's own `.jsonl` under `~/.pi/agent/sessions/`, re-tagged from `message` to `message_end` first (cost-read.mjs's `piSessionEventsFromLines`) so this is still the one place that sums a DeepSeek seat's usage. A Command Code run (provider `commandcode`) is priced under the rate table's OWN namespaced id, not the bare one Pi echoes -- see `deepseekExtractFromSeatStream`'s own comment",
+    provenOn: 'JUL-109 findings section 5; graph/fixtures/orca-1.4.205/cost.pi.seat-json-stream.multi-turn.jsonl, pi.timing.*.txt, and cost.pi.interactive-session.jsonl (a real adopted-route session)',
     lowerBound: false,
   }),
   gemini: Object.freeze({

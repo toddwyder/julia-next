@@ -2117,9 +2117,11 @@ fixed; they are recorded here because each one is the kind of thing that reads a
   reported through the mailbox. Round 1 sent the DeepSeek seat down this route with `agent: 'pi'`
   while the reader still implemented only `claude`, `codex` and `agy`. The reader now exports
   `COST_READABLE_AGENTS` and `graph/controller/dispatch.mjs` refuses a seat whose agent is not on
-  it, before anything is created, so the seat table's backup takes the seat. **The Pi seat is
-  therefore refused again today**, and lifting that refusal is exactly one thing: a worker-side cost
-  source for an *interactive* Pi session. The existing DeepSeek extractor reads the JSON event
+  it, before anything is created, so the seat table's backup takes the seat. **This was true when
+  written (22 Sep) and is SUPERSEDED as of the JUL-98/JUL-100 follow-up section above: `pi` is on
+  `COST_READABLE_AGENTS` now, so the Pi seat is no longer refused here.** The paragraph below is
+  kept verbatim as the historical record of what was tried and why it was believed to be a dead
+  end at the time. The existing DeepSeek extractor reads the JSON event
   stream `run-pi-seat.mjs` emits in its non-interactive mode; an interactive TUI writes no such
   stream anywhere that has been found, and DeepSeek is out of balance (402) with the 2026-09-22
   04:07Z Decision that it stays that way, so no paid run can be made to look for one.
