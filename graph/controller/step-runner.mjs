@@ -550,7 +550,26 @@ export async function runWorkerStep({
     messages: heard.messages,
     mirrorFailures: heard.mirrorFailures,
     acknowledged: heard.acknowledged,
+    // Todd's Decision, 2026-09-22 (JUL-92 attempt 3 and 4 both stopped this
+    // exact way): a reviewer's worker_done with outcome 'failed' and no
+    // findings text at all is not a verdict about the CODE -- it is the
+    // reviewer's own turn producing nothing usable. runBuildAndReview below
+    // reads this mark to retry the review once, rather than stopping the
+    // card on a verdict that names no defect.
+    reviewGaveNoVerdict: reviewGaveNoVerdict({ seat, outcome: heard.outcome, message: heard.message }),
   });
+}
+
+// Pure: does this worker_done carry anything a human or the next reviewer
+// could act on? Checked only for the reviewer seat's own 'failed' outcome --
+// a builder reporting failed with nothing said is a different problem
+// (openScope's own existing stop already covers it) and 'succeeded' never
+// needs this at all.
+export function reviewGaveNoVerdict({ seat, outcome, message } = {}) {
+  if (seat !== 'reviewer' || outcome !== 'failed') return false;
+  const subject = String(message?.subject ?? '').trim();
+  const body = String(message?.body ?? '').trim();
+  return subject === '' && body === '';
 }
 
 // Orca names a worktree `<repoId>::<path>`; the suite runs in the path.
@@ -722,9 +741,41 @@ export async function runBuildAndReview({
   // never be given the zero-cost never-started line `stopped` below writes.
   const neverGotGoing = (result) => (result.stage === 'dispatch' || result.stage === 'turn-start') && result.possiblyRunning !== true;
 
+  const noVerdictRetries = [];
+
   for (const seat of seats) {
     const first = inPlay[seat];
     let result = await startSeat(seat, first, '');
+
+    // TODD'S DECISION, 2026-09-22 (JUL-92 attempts 3 and 4 both stopped this
+    // exact way): a reviewer's `worker_done` with outcome 'failed' and no
+    // findings text at all is not a verdict about the candidate -- it is the
+    // review itself coming back unusable. That is a different failure from
+    // "the reviewer found something wrong", and treating it as a stop-the-card
+    // verdict is what made both attempts park on nothing anyone could act on.
+    // So it gets ONE retry, same entry, a fresh worker (never the backup: the
+    // entry itself is not what failed) -- never an unbounded loop, so a
+    // reviewer that genuinely cannot produce a verdict still stops the card,
+    // just with both attempts named on it.
+    if (result.reviewGaveNoVerdict) {
+      const firstDispatchId = result.dispatchId;
+      const retry = await startSeat(seat, first, '-noverdict-retry');
+      if (retry.reviewGaveNoVerdict) {
+        // Both attempts really ran and really spent -- unlike `stopped()`'s
+        // other callers, there is nothing "never started" about this seat, so
+        // its real cost line (already read by `close()` inside `startSeat`)
+        // travels on the stop rather than being replaced with an invented
+        // zero. Only `ok` and `reason` change.
+        result = {
+          ...retry,
+          ok: false,
+          reason: `the ${seat} seat reported failed with no findings or reason, twice in a row (dispatch ${firstDispatchId}, then retry dispatch ${retry.dispatchId}) -- treated as the review itself being unusable, not a verdict on the change`,
+        };
+      } else {
+        noVerdictRetries.push({ seat, firstDispatchId, retryDispatchId: retry.dispatchId });
+        result = retry;
+      }
+    }
 
     if (result.launchRefused) {
       const fromEntry = first?.entry ?? null;
@@ -785,5 +836,5 @@ export async function runBuildAndReview({
     reason = error.message;
   }
 
-  return { ...results, ok, reason, costLines, costText, seatMoves, seatChoices: inPlay, testRun: suiteRunner?.resultFor(suiteKey) ?? null, suiteKey };
+  return { ...results, ok, reason, costLines, costText, seatMoves, noVerdictRetries, seatChoices: inPlay, testRun: suiteRunner?.resultFor(suiteKey) ?? null, suiteKey };
 }

@@ -15,7 +15,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { runWorkerStep, runBuildAndReview, attemptTag, hasLiveLivenessVerdict, hasFailedAgentReadinessSignature, DEFAULT_RECONCILE_WAIT_MS, DEFAULT_RECONCILE_MAX_READS } from '../graph/controller/step-runner.mjs';
+import { runWorkerStep, runBuildAndReview, attemptTag, hasLiveLivenessVerdict, hasFailedAgentReadinessSignature, reviewGaveNoVerdict, DEFAULT_RECONCILE_WAIT_MS, DEFAULT_RECONCILE_MAX_READS } from '../graph/controller/step-runner.mjs';
 import { readFile } from 'node:fs/promises';
 import { createSuiteRunner } from '../graph/controller/test-run.mjs';
 import { createFixtureWorkerOrca, loadOrcaFixture } from '../graph/controller/fixture-orca.mjs';
@@ -1496,4 +1496,81 @@ test('round 4b review, standards axis: an adopted-but-unobservable seat whose wo
   assert.equal(result.possiblyRunning, true);
   assert.match(result.reason, /host_indeterminate/, 'the verdict that could not be taken');
   assert.match(result.reason, /terminal_handle_stale/, 'AND the observation that failed -- both are facts about the same stuck seat');
+});
+
+// ---------------------------------------------------------------------------
+// Todd's Decision, 2026-09-22: a reviewer's failed outcome with no findings or
+// reason at all is the review itself being unusable, not a verdict -- JUL-92
+// attempts 3 and 4 both stopped exactly this way, on a review with nothing
+// anyone could act on.
+// ---------------------------------------------------------------------------
+
+test('reviewGaveNoVerdict: only the reviewer seat, only a failed outcome, only when BOTH subject and body are blank', () => {
+  assert.equal(reviewGaveNoVerdict({ seat: 'reviewer', outcome: 'failed', message: { subject: '', body: '' } }), true);
+  assert.equal(reviewGaveNoVerdict({ seat: 'reviewer', outcome: 'failed', message: { subject: '  ', body: '\n' } }), true, 'whitespace-only counts as blank');
+  assert.equal(reviewGaveNoVerdict({ seat: 'reviewer', outcome: 'failed', message: { subject: 'Findings', body: '' } }), false, 'a subject alone is something to act on');
+  assert.equal(reviewGaveNoVerdict({ seat: 'reviewer', outcome: 'failed', message: { subject: '', body: 'one real finding' } }), false);
+  assert.equal(reviewGaveNoVerdict({ seat: 'builder', outcome: 'failed', message: { subject: '', body: '' } }), false, 'a builder is a different failure -- not this rule');
+  assert.equal(reviewGaveNoVerdict({ seat: 'reviewer', outcome: 'succeeded', message: { subject: '', body: '' } }), false, 'a pass never needs a reason');
+  assert.equal(reviewGaveNoVerdict({ seat: 'reviewer', outcome: 'failed', message: null }), true, 'no message at all is the same as a blank one');
+});
+
+// The same harness as the file's other tests, but with a `checkWaitImpl` that
+// varies by which dispatch (builder, reviewer, reviewer retry) is being
+// waited on, so the reviewer's FIRST attempt can report blank-failed while
+// its retry reports for real.
+function harnessWithReviewerSequence(reviewerOutcomes) {
+  const h = harness();
+  let reviewerCalls = 0;
+  h.deps.checkWaitImpl = async ({ ack }) => {
+    const dispatchId = h.orca.workerStartCalls().length > 0 ? lastDispatchId(h.orca) : 'ctx_unknown';
+    const isBuilder = h.orca.workersStarted() === 1;
+    let message;
+    if (isBuilder) {
+      message = doneMessage(dispatchId, 'succeeded');
+    } else {
+      const spec = reviewerOutcomes[reviewerCalls] ?? reviewerOutcomes[reviewerOutcomes.length - 1];
+      reviewerCalls += 1;
+      const recorded = ALL.messages.find((m) => m.type === 'worker_done');
+      message = spec.noVerdict
+        ? { ...recorded, subject: '', body: '', payload: JSON.stringify({ taskId: 'task_x', dispatchId, outcome: 'failed' }) }
+        : doneMessage(dispatchId, spec.outcome ?? 'succeeded');
+    }
+    return { runId: ALL.runId, deliveryId: `delivery_${dispatchId}`, messages: ack ? [message] : [ALL.messages[4], message], count: 2, timedOut: false };
+  };
+  return h;
+}
+
+test('a reviewer that reports failed with no findings is retried once, and the retry\'s real verdict decides the step', async () => {
+  const h = harnessWithReviewerSequence([{ noVerdict: true }, { outcome: 'succeeded' }]);
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+
+  const result = await runBuildAndReview({ card: CARD, step: STEP, choices: CHOICES, suiteRunner, ...h.deps });
+
+  assert.equal(result.ok, true, 'the retry succeeded, so the step passes');
+  assert.equal(result.noVerdictRetries.length, 1);
+  assert.equal(result.noVerdictRetries[0].seat, 'reviewer');
+  assert.notEqual(result.noVerdictRetries[0].firstDispatchId, result.noVerdictRetries[0].retryDispatchId, 'a fresh worker, not the same one asked again');
+  // The retry ran on the SAME entry, never the backup: the entry itself did
+  // nothing wrong.
+  assert.equal(result.reviewer.reason, null);
+  assert.doesNotThrow(() => assert.ok(result.reviewer.cost.totalTokens > 0), 'the retry that actually ran has a real, nonzero cost line');
+});
+
+test('a reviewer that reports failed with no findings TWICE stops the card, naming both dispatches, with the real (nonzero) cost of the attempt that actually ran -- never an invented zero', async () => {
+  const h = harnessWithReviewerSequence([{ noVerdict: true }, { noVerdict: true }]);
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+
+  const result = await runBuildAndReview({ card: CARD, step: STEP, choices: CHOICES, suiteRunner, ...h.deps });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.noVerdictRetries.length, 0, 'a retry that ALSO gave no verdict is not recorded as a successful retry');
+  assert.match(result.reviewer.reason, /reported failed with no findings or reason, twice in a row/);
+  assert.match(result.reviewer.reason, /retry dispatch/);
+  // Both attempts really ran (the harness's readCostImpl gives a real,
+  // nonzero cost for a turn that started) -- unlike a launch refusal, there
+  // is nothing "never started" about this seat, so `neverStartedCostLine`'s
+  // zero must never appear here.
+  assert.equal(result.reviewer.cost.neverStarted, undefined);
+  assert.equal(result.reviewer.cost.totalTokens, COST.totalTokens);
 });

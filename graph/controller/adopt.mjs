@@ -51,10 +51,15 @@
 
 export const SEAT_TERMINAL_TITLE_PREFIX = 'julia-seat-';
 
-// Long enough for a cold agy start (it downloads its own helpers on first run,
-// which is what caught JUL-109's Pi), short enough that a stuck TUI is a
-// refusal in minutes rather than the eight hours the unguarded version took.
-export const DEFAULT_TUI_WAIT_MS = 180000;
+// Long enough for a cold agy/pi start under real load, short enough that a
+// stuck TUI is a refusal in minutes rather than the eight hours the unguarded
+// version took. Raised from 180000 (Todd's Decision, 2026-09-22, after JUL-92
+// attempt 4 live-timed-out here): a real pi-deepseek reviewer's own review
+// turn already runs 10-12 minutes on this box (JUL-92's own recorded reviewer
+// cost lines: 11.76min, 11.97min), and a busy host can make even the START
+// (reaching an idle prompt, before any work begins) slower than 180s was
+// budgeting for.
+export const DEFAULT_TUI_WAIT_MS = 600000;
 
 // The SECOND look, immediately after the brief is delivered: is the terminal
 // still busy? Short on purpose -- this is a reading, not a wait. See

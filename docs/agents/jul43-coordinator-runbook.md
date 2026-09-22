@@ -2067,6 +2067,35 @@ never-started verdict; `remote_attach_requested` is a stall with no verdict in i
 `hasFailedAgentReadinessSignature` in `graph/controller/step-runner.mjs` reads the five fields it
 reads and does **not** look at `observation.status` at all.
 
+### A live carry found two real gaps: the adopt-route timeout, and a reviewer's blank "failed" (JUL-98 step 5, attempt 4, 2026-09-22)
+
+The first real JUL-92 carry run after the Pi cost reader above (attempt 4, same day): the pi-deepseek
+reviewer route was ATTEMPTED for the first time ever (the cost gate no longer refused it before
+dispatch), and found two more things live, neither reachable from a fixture:
+
+- **`DEFAULT_TUI_WAIT_MS` (180000, `graph/controller/adopt.mjs`) was too short.** Pi never reached
+  an idle prompt within 180s on this box, so the route lost the brief the way JUL-109's Pi lost it
+  twice and fell back to Codex -- correctly, by design, but the family-safety net running every time
+  defeats the point of the reviewer being pi-deepseek at all. Raised to 600000 (10 minutes): a real
+  pi-deepseek review's own turn already runs 10-12 minutes on this box (JUL-92's own recorded
+  reviewer cost lines: 11.76min, 11.97min), so 180s was never generous even before counting a busy
+  host's startup overhead.
+- **A reviewer's `worker_done` with `outcome: failed` and no findings text at all was read as a
+  verdict on the code.** Attempts 3 and 4 both stopped exactly this way -- Codex (the family-safety
+  backup, since pi-deepseek's own start timed out) reported failed with nothing in `subject` or
+  `body`, and the card read "the reviewer reported failed" with no defect anyone could act on. Todd's
+  Decision, 2026-09-22: that is the REVIEW being unusable, not a verdict about the change.
+  `graph/controller/step-runner.mjs`'s `reviewGaveNoVerdict()` detects exactly this (reviewer seat,
+  failed outcome, blank subject AND blank body) and `runBuildAndReview` gives it ONE retry -- a fresh
+  worker on the SAME entry, never the backup, since the entry itself did nothing wrong -- before
+  stopping the card for real if the retry also comes back with nothing said. The retry's real cost
+  (it really ran) travels on a stop; it is never replaced with an invented zero the way a genuine
+  launch refusal's cost line is.
+
+Not done here: confirming the raised timeout is actually enough on a live run (JUL-92 attempt 5 is
+what tests it), and confirming the no-verdict retry actually fires live rather than only in the
+unit tests built for it.
+
 ### The Pi seat's cost gap is closed: an interactive session writes its own record (JUL-98/JUL-100 follow-up, 2026-09-22)
 
 Round 2's own note (below) said an interactive TUI session "writes no such stream anywhere that
