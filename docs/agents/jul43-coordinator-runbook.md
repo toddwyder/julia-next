@@ -1872,9 +1872,10 @@ it matched.
 (`MAX_FAILURE_TEXT`). Five is an operational display limit to keep card comments readable; further
 failures may have independent causes, and the omitted detail needs the full output on
 `result.output`. Displayed test names and error text are capped with explicit `... [cut]` markers.
-With formatting and fences, each failure contributes at most ~800 characters, bounding the entire
-failure detail section to ~4.1KB characters (~4.3KB total card worst case; all limits in
-characters, not bytes). When cuts happen the header line describes them (`5 of 9 shown`, `names cut
+In the measured worst case (with per-line indentation inside code fences and cut markers), each
+failure contributes at most 1248 characters, bounding the entire failure detail section to 6332
+characters (~6.4KB characters, or ~6.5KB total card worst case; all limits in characters, not
+bytes; derived from measured worst-case rendering rather than estimated per-entry arithmetic). When cuts happen the header line describes them (`5 of 9 shown`, `names cut
 at 200 characters`, `error text cut at 500 characters`), and the whole output stays on
 `result.output` for anyone who needs it. A file-level `failureType: subtestFailed` entry is dropped
 when any named failure exists, so the cap is spent on failures that name a cause.

@@ -23,6 +23,9 @@ import {
   MAX_REPORTED_FAILURES,
   MAX_FAILURE_TEXT,
   MAX_FAILURE_NAME,
+  MAX_FAILURE_DETAIL_LENGTH,
+  MAX_FAILURE_SECTION_LENGTH,
+  MAX_CARD_LINE_LENGTH,
 } from '../graph/controller/test-run.mjs';
 
 const GREEN_TAP = [
@@ -558,3 +561,48 @@ test('a single overlong failure pins exact retained content and explicit cut dis
   assert.ok(journalLine.includes(`${head}... [cut]`), 'journal line contains exact retained content and cut disclosure');
   assert.ok(!journalLine.includes(tail), 'journal line does not contain cut tail');
 });
+
+test('the worst-case failure detail is measured, bounded, and pinned against drift', () => {
+  const base = {
+    startedAt: '2026-09-22T14:00:00Z',
+    endedAt: '2026-09-22T14:00:01Z',
+    durationMs: 1000,
+    command: SUITE_COMMAND,
+    worktree: '/w',
+  };
+  const tap = [
+    'TAP version 13',
+    ...Array.from({ length: MAX_REPORTED_FAILURES }, (_, i) => [
+      `not ok ${i + 1} - ${'n'.repeat(MAX_FAILURE_NAME + 50)}`,
+      '  ---',
+      '  failureType: "testCodeFailure"',
+      '  error: |-',
+      ...'x\n'.repeat(MAX_FAILURE_TEXT).trimEnd().split('\n').map((l) => `    ${l}`),
+      '  ...',
+    ]).flat(),
+    `# tests ${MAX_REPORTED_FAILURES}`,
+    '# pass 0',
+    `# fail ${MAX_REPORTED_FAILURES}`,
+    '# skipped 0',
+    '',
+  ].join('\n');
+
+  const failures = parseTapFailures(tap);
+  assert.equal(failures.shown.length, MAX_REPORTED_FAILURES);
+  assert.equal(failures.nameTruncated, true);
+  assert.equal(failures.textTruncated, true);
+
+  const card = testRunLine({
+    ...base,
+    ...parseTapSummary(tap),
+    output: tap,
+  });
+
+  const detail = card.slice(card.indexOf('\n'));
+  assert.equal(detail.length, 6332, 'exact measured worst-case failure detail');
+  assert.ok(detail.length <= MAX_FAILURE_DETAIL_LENGTH, `failure detail bounded by ${MAX_FAILURE_DETAIL_LENGTH}`);
+  assert.ok(detail.length <= MAX_FAILURE_SECTION_LENGTH, `failure section bounded by ${MAX_FAILURE_SECTION_LENGTH}`);
+  assert.equal(card.length, 6474, 'exact measured worst-case card line');
+  assert.ok(card.length <= MAX_CARD_LINE_LENGTH, `total card line bounded by ${MAX_CARD_LINE_LENGTH}`);
+});
+
