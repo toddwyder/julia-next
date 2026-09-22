@@ -1,0 +1,170 @@
+// adopt.mjs -- JUL-98 step 6: the START-THEN-ADOPT route, built ONCE and taken
+// by every seat whose agent Orca has no launcher for.
+//
+// WHY A SECOND ROUTE EXISTS AT ALL. `worker-start --agent` knows claude, codex
+// and cursor. It does not know `agy` (Gemini) or `pi` (DeepSeek), and there is
+// no flag that teaches it one. The only recorded way either of those reports to
+// the coordinator's mailbox is the one JUL-109 found for Pi (findings, section
+// 4) and ./dispatch.mjs's old refusal spelled out in full: start the agent
+// INTERACTIVELY in an Orca terminal, wait until it has fully started, then
+// `worker-start --terminal <handle>` -- at which point Orca types its worker
+// contract and the task into the running agent, and the agent answers
+// `worker_done` like any other worker.
+//
+// FOUR THINGS THIS FILE IS CAREFUL ABOUT, each one a recorded failure:
+//
+//  1. THE FOLDER IS TRUSTED FIRST. A TUI on a folder it has not seen asks
+//     whether it is trusted and then does nothing. Orca still says
+//     `input_accepted`. That is the 19-20 September eight-hour stall, and agy
+//     asks the same question (./agent-trust.mjs records the measurement). So
+//     the trust entry is written before the agent is started, not after it
+//     hangs.
+//
+//  2. THE REAL BRIEF IS THE ONE DISPATCH. The probe of this route on 2026-09-22
+//     passed the placeholder `adopted-only` as `--spec` and then typed the real
+//     brief into the terminal afterwards (the runner's own agy history holds
+//     both, as separate entries). Two deliveries is two chances to lose one --
+//     and the first one is what the agent is told to do. Here the brief IS the
+//     spec, and nothing is typed in afterwards.
+//
+//  3. THE STARTUP RACE IS WAITED OUT, BY ORCA. JUL-109 lost a Pi worker's task
+//     text twice by adopting a terminal while the agent was still starting.
+//     `terminal wait --for tui-idle` is Orca's own answer and is used instead
+//     of a sleep; `wait.satisfied` is read, because a timed-out wait still
+//     prints a normal result (orca-cli skill).
+//
+//  4. A ROUTE THAT CANNOT FINISH TAKES BACK WHAT IT MADE. The terminal is
+//     closed and the worktree removed, so the refusal that goes back to
+//     ./dispatch.mjs is honestly `launchRefused` -- nothing created -- and
+//     ./step-runner.mjs's EXISTING seat-backup path (JUL-98 step 5, fifth fix)
+//     catches it with no second fallback machine. Anything the teardown itself
+//     could not remove is reported as a residual resource rather than hidden.
+//
+// Every boundary is injected; nothing here calls Orca directly. ./wiring.mjs
+// supplies the real ones.
+
+export const SEAT_TERMINAL_TITLE_PREFIX = 'julia-seat-';
+
+// Long enough for a cold agy start (it downloads its own helpers on first run,
+// which is what caught JUL-109's Pi), short enough that a stuck TUI is a
+// refusal in minutes rather than the eight hours the unguarded version took.
+export const DEFAULT_TUI_WAIT_MS = 180000;
+
+function refusal({ seat, entry, detail, residualResources }) {
+  return {
+    ok: false,
+    seat,
+    entry,
+    reason: `the ${seat} seat's ${entry} start-then-adopt route could not be completed: ${detail}`,
+    residualResources,
+  };
+}
+
+export async function startAdoptedWorker({
+  seat,
+  entry,
+  launch,
+  // THE REAL BRIEF. ./dispatch.mjs builds it from one step and hands it here.
+  spec,
+  worktreeName,
+  runId,
+  from,
+  requestId,
+  tuiWaitMs = DEFAULT_TUI_WAIT_MS,
+
+  worktreeCreateImpl,
+  prepareWorktreeImpl,
+  agentTerminalCreateImpl,
+  terminalWaitImpl,
+  terminalCloseImpl,
+  removeWorktreeImpl,
+  workerStartImpl,
+} = {}) {
+  if (typeof spec !== 'string' || spec.trim() === '') {
+    // Never a placeholder, and never an empty one either: the spec is the whole
+    // of what the worker is told.
+    throw new Error(`startAdoptedWorker: the ${seat} seat was given no brief to dispatch -- the real brief is the one dispatch on this route`);
+  }
+
+  let worktree = null;
+  let worktreePath = null;
+  let terminal = null;
+  const residualResources = [];
+
+  // The one teardown, used by every failure below and in the one order that
+  // works: the terminal first (Orca refuses to remove a worktree whose terminal
+  // is still open), then the worktree.
+  async function takeBack() {
+    if (terminal) {
+      try {
+        await terminalCloseImpl({ terminal });
+      } catch (error) {
+        residualResources.push({ kind: 'terminal', id: terminal, error: error.message });
+      }
+    }
+    if (worktree) {
+      try {
+        await removeWorktreeImpl({ worktree });
+      } catch (error) {
+        residualResources.push({ kind: 'worktree', id: worktree, error: error.message });
+      }
+    }
+  }
+
+  async function stop(detail) {
+    await takeBack();
+    return refusal({ seat, entry, detail, residualResources });
+  }
+
+  try {
+    const created = await worktreeCreateImpl({ name: worktreeName });
+    worktree = created?.worktree?.id ?? null;
+    worktreePath = created?.worktree?.path ?? null;
+    if (!worktree || !worktreePath) {
+      return refusal({ seat, entry, detail: `orca worktree create answered no worktree id or path (${JSON.stringify(created ?? null).slice(0, 200)})`, residualResources });
+    }
+
+    // (1) Trust, BEFORE anything is started into the folder.
+    const prepared = await prepareWorktreeImpl({ seat, agent: launch.trustAgent, worktreePath });
+    if (prepared?.trusted !== true) {
+      return stop(`the worktree could not be trusted for ${launch.trustAgent} (${prepared?.reason ?? 'no reason given'}), and an untrusted folder is exactly what a TUI stops dead on`);
+    }
+
+    // (2) The agent, interactively, on its own model and effort.
+    const terminalCreated = await agentTerminalCreateImpl({
+      seat,
+      worktreePath,
+      title: `${SEAT_TERMINAL_TITLE_PREFIX}${seat}`,
+      command: launch.command,
+    });
+    terminal = terminalCreated?.terminal?.handle ?? null;
+    if (!terminal) {
+      return stop(`orca terminal create answered no terminal handle (${JSON.stringify(terminalCreated ?? null).slice(0, 200)})`);
+    }
+
+    // (3) Fully started, per Orca, not per a sleep.
+    const waited = await terminalWaitImpl({ terminal, timeoutMs: tuiWaitMs });
+    if (waited?.wait?.satisfied !== true) {
+      return stop(`${launch.command.split(' ')[0]} never reached an idle prompt within ${tuiWaitMs} ms, so adopting it now would lose the brief the way JUL-109's Pi lost it twice`);
+    }
+
+    // (4) The adoption, carrying the real brief and nothing else. No --agent,
+    // no --model, no --effort: `worker-start --help` says neither can combine
+    // with --terminal, and the model is already on the launch command above.
+    const result = await workerStartImpl({
+      run: runId,
+      from,
+      spec,
+      worktree: `path:${worktreePath}`,
+      terminal,
+      requestId,
+    });
+    if (result?.state === 'failed') {
+      return stop(`worker-start failed at ${result.failedStage ?? result.stage ?? 'an unnamed stage'} (${result.lastError ?? 'no error given'})`);
+    }
+
+    return { ok: true, seat, entry, result, worktree, worktreePath, terminal, allowanceBefore: prepared.allowance ?? null };
+  } catch (error) {
+    return stop(error.message);
+  }
+}

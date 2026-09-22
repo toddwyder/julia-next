@@ -40,11 +40,13 @@ const json = (name) => JSON.parse(readFileSync(join(ORCA_FIXTURE_DIR, name), 'ut
 const jsonl = (name) => readFileSync(join(ORCA_FIXTURE_DIR, name), 'utf8')
   .split('\n').filter((line) => line.startsWith('{')).map((line) => JSON.parse(line));
 
-test('every seat names where its figures come from, and the three are the proven ones', () => {
-  assert.deepEqual(Object.keys(COST_SOURCES).sort(), ['claude', 'codex', 'pi-deepseek']);
+test('every seat names where its figures come from, and each one is proven somewhere nameable', () => {
+  assert.deepEqual(Object.keys(COST_SOURCES).sort(), ['claude', 'codex', 'gemini', 'pi-deepseek']);
   for (const [vendor, source] of Object.entries(COST_SOURCES)) {
     assert.ok(source.where.length > 0, `${vendor} must say where its figures are read from`);
-    assert.match(source.provenOn, /JUL-109/);
+    // JUL-109 proved the first three; the Gemini seat is JUL-98 step 6's own
+    // measurement on this host, and says so.
+    assert.match(source.provenOn, /JUL-109|JUL-98 step 6/);
   }
 });
 

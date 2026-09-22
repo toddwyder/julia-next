@@ -231,12 +231,12 @@ test('the family rule rejects a same-family builder/reviewer pair, in one senten
   assert.match(result.reason, /different families/);
 });
 
-test('the reviewer resolves to DeepSeek Pro by default, and never to the builder family (JUL-98)', () => {
+test('the reviewer resolves to Claude by default, and never to the builder family (JUL-98 step 6)', () => {
   const choices = resolveSeatChoices([]);
-  assert.equal(choices.reviewer.entry, 'pi-deepseek');
-  assert.equal(choices.reviewer.modelLabel, 'adversary-deepseek-pro', 'the label names the model that actually runs (Pro, not Flash)');
-  assert.equal(choices['adversarial-reviewer'].entry, 'pi-deepseek');
-  assert.equal(choices.builder.entry, 'claude', 'the builder stays Claude');
+  assert.equal(choices.reviewer.entry, 'claude');
+  assert.equal(choices.reviewer.modelLabel, 'adversary-claude-opus');
+  assert.equal(choices['adversarial-reviewer'].entry, 'claude');
+  assert.equal(choices.builder.entry, 'gemini', 'the builder is Gemini');
   assert.notEqual(FAMILY_OF[choices.reviewer.entry], FAMILY_OF[choices.builder.entry]);
   assert.equal(validateFamilyChoice(choices).ok, true);
   // Builders that fall back to DeepSeek keep the Flash default: only the reviewer seat runs Pro.
@@ -244,43 +244,43 @@ test('the reviewer resolves to DeepSeek Pro by default, and never to the builder
   assert.equal(defaultModelSuffix('reviewer', 'pi-deepseek'), 'deepseek-pro', 'a dispatch name resolves like its agent');
 });
 
-test('a builder fallback to DeepSeek is allowed only when the reviewer is not on DeepSeek', () => {
-  // Reviewer moved to Codex on the card: builder claude -> pi-deepseek keeps two different families.
+test('a builder fallback to Claude is allowed only when the reviewer is not on Claude', () => {
+  // Reviewer moved to Codex on the card: builder gemini -> claude keeps two different families.
   const onCodex = resolveSeatChoices(['adversary-codex']);
   const result = fallbackSeatChoice(onCodex, 'builder');
   assert.equal(result.ok, true);
-  assert.equal(result.choices.builder.entry, 'pi-deepseek');
-  assert.equal(result.choices.builder.modelLabel, 'builder-deepseek-flash');
-  assert.equal(result.choices['feature-builder'].entry, 'pi-deepseek', 'the agent-keyed entry moves too');
+  assert.equal(result.choices.builder.entry, 'claude');
+  assert.equal(result.choices.builder.modelLabel, 'builder-claude-opus');
+  assert.equal(result.choices['feature-builder'].entry, 'claude', 'the agent-keyed entry moves too');
   assert.equal(result.choices.reviewer.entry, 'codex');
   assert.equal(result.partnerMoved, null, 'nothing else had to move');
-  // With the default reviewer (DeepSeek) the same fallback used to be REFUSED
-  // and the card stalled. Since JUL-98 step 2 item 6 the reviewer moves to its
+  // With the default reviewer (Claude) the same fallback would be REFUSED and
+  // the card would stall. Since JUL-98 step 2 item 6 the reviewer moves to its
   // own backup instead; the strict answer is still available on request, and
   // both are pinned by their own tests below.
   const strict = fallbackSeatChoice(resolveSeatChoices([]), 'builder', { movePartner: false });
   assert.equal(strict.ok, false);
-  assert.match(strict.reason, /refusing the builder backup \(pi-deepseek\)/);
+  assert.match(strict.reason, /refusing the builder backup \(claude\)/);
   assert.match(strict.reason, /different families/);
 });
 
-test('a DeepSeek reviewer failure falls back to Codex, against a claude builder (the default) -- JUL-98', () => {
-  const choices = resolveSeatChoices([]); // builder claude, reviewer DeepSeek
-  assert.equal(choices.builder.entry, 'claude');
+test('a Claude reviewer failure falls back to Codex, against a Gemini builder (the default) -- JUL-98 step 6', () => {
+  const choices = resolveSeatChoices([]); // builder gemini, reviewer claude
+  assert.equal(choices.builder.entry, 'gemini');
   const result = fallbackSeatChoice(choices, 'reviewer');
   assert.equal(result.ok, true, 'the reviewer fallback must succeed against a claude builder');
   assert.equal(result.choices.reviewer.entry, 'codex');
   assert.equal(result.choices.reviewer.modelLabel, 'adversary-codex');
   assert.equal(result.choices['adversarial-reviewer'].entry, 'codex', 'the agent-keyed entry moves too');
-  assert.equal(result.choices.builder.entry, 'claude', 'the builder is untouched');
+  assert.equal(result.choices.builder.entry, 'gemini', 'the builder is untouched');
 });
 
 test('a fallback whose backup collides with the other seat is never silently used: it either moves the partner or refuses', () => {
-  const choices = resolveSeatChoices([]); // builder claude, reviewer DeepSeek
-  // A table whose reviewer backup is claude (the builder's family). The real
+  const choices = resolveSeatChoices([]); // builder gemini, reviewer claude
+  // A table whose reviewer backup is gemini (the builder's family). The real
   // table no longer has this backup (JUL-98), so the guard is exercised on a
   // copy that does.
-  const collidingTable = { ...SEAT_TABLE, 'adversarial-reviewer': { primary: 'pi-deepseek', backup: 'claude' } };
+  const collidingTable = { ...SEAT_TABLE, 'adversarial-reviewer': { primary: 'claude', backup: 'gemini' } };
   // With the partner move switched off, the old refusal stands unchanged.
   const refused = fallbackSeatChoice(choices, 'reviewer', { table: collidingTable, movePartner: false });
   assert.equal(refused.ok, false);
@@ -315,13 +315,13 @@ test('a leftover GLM label is refused with a plain reason: no launch entry, no s
 });
 
 test('the family rule rejects an unknown seat-table entry', () => {
-  const result = validateFamilyChoice({ ...resolveSeatChoices([]), builder: { entry: 'gemini' } });
+  const result = validateFamilyChoice({ ...resolveSeatChoices([]), builder: { entry: 'potato' } });
   assert.equal(result.ok, false);
   assert.match(result.reason, /feature-builder/);
-  assert.match(result.reason, /unknown seat-table entry \(gemini\)/);
+  assert.match(result.reason, /unknown seat-table entry \(potato\)/);
   // And an unknown entry on a seat that is NOT dispatched is caught too: all
   // six agents are checked, not only the builder/reviewer pair.
-  const consultant = validateFamilyChoice({ ...resolveSeatChoices([]), consultant: { entry: 'gemini' } });
+  const consultant = validateFamilyChoice({ ...resolveSeatChoices([]), consultant: { entry: 'potato' } });
   assert.equal(consultant.ok, false);
   assert.match(consultant.reason, /consultant resolved to an unknown seat-table entry/);
 });
@@ -330,13 +330,13 @@ test('the family rule rejects an unknown seat-table entry', () => {
 // exactly the names the live board holds.
 test('missingSeatLabels returns exactly the twelve default model and effort labels not already present', () => {
   assert.deepEqual(missingSeatLabels([]), [
-    'builder-claude-opus',
+    'builder-gemini-flash',
     'builder-effort-medium',
     'fixer-claude-opus',
     'fixer-effort-medium',
     'refactor-claude-opus',
     'refactor-effort-medium',
-    'adversary-deepseek-pro',
+    'adversary-claude-opus',
     'adversary-effort-medium',
     'evidence-codex',
     'evidence-effort-medium',
@@ -347,12 +347,12 @@ test('missingSeatLabels returns exactly the twelve default model and effort labe
   // Twelve, not fourteen: the two dispatch aliases name agents already in the
   // list and must not duplicate their labels.
   assert.equal(new Set(missingSeatLabels([])).size, 12);
-  assert.deepEqual(missingSeatLabels(['builder-claude-opus', 'builder-effort-high']), [
+  assert.deepEqual(missingSeatLabels(['builder-gemini-flash', 'builder-effort-high']), [
     'fixer-claude-opus',
     'fixer-effort-medium',
     'refactor-claude-opus',
     'refactor-effort-medium',
-    'adversary-deepseek-pro',
+    'adversary-claude-opus',
     'adversary-effort-medium',
     'evidence-codex',
     'evidence-effort-medium',
@@ -379,11 +379,11 @@ test('seatChoicesForIssue resolves the exact shape linear-cli getIssue returns',
 // exact real combination the table puts on a card. ---
 
 test('neither reviewer choice is the builder default family, and the guard still refuses a claude reviewer against a claude builder', () => {
-  // The real table's reviewer primary (deepseek) and backup (codex) both differ
-  // from the builder's primary (claude), which is what lets the default pair and
-  // the fallback succeed (JUL-98). The guard itself is unchanged: an explicit
-  // claude-vs-claude pair is refused.
-  assert.equal(SEAT_TABLE['feature-builder'].primary, 'claude');
+  // The real table's reviewer primary (claude) and backup (codex) both differ
+  // from the builder's primary (gemini), which is what lets the default pair and
+  // the reviewer fallback succeed (JUL-98 step 6). The guard itself is
+  // unchanged: an explicit claude-vs-claude pair is refused.
+  assert.equal(SEAT_TABLE['feature-builder'].primary, 'gemini');
   for (const seat of ['adversarial-reviewer', 'reviewer']) {
     assert.notEqual(FAMILY_OF[SEAT_TABLE[seat].primary], FAMILY_OF[SEAT_TABLE['feature-builder'].primary], `${seat} primary`);
     assert.notEqual(FAMILY_OF[SEAT_TABLE[seat].backup], FAMILY_OF[SEAT_TABLE['feature-builder'].primary], `${seat} backup`);
@@ -423,14 +423,14 @@ test('the fallback CLI moves the reviewer out of the way for a capped builder, a
   // This used to exit non-zero with "refusing the builder backup", which is the
   // stall the runbook worked around by hand. The CLI now answers with the pair
   // to dispatch and names the seat it moved.
-  const { out, err, code } = runCli(['fallback', '--seat', 'builder', '--reviewer', 'pi-deepseek']);
+  const { out, err, code } = runCli(['fallback', '--seat', 'builder', '--reviewer', 'claude']);
   assert.equal(code, 0);
   assert.equal(err, '');
   const answer = JSON.parse(out);
-  assert.equal(answer.entry, 'pi-deepseek');
+  assert.equal(answer.entry, 'claude');
   assert.deepEqual(answer.partnerMoved, {
     seat: 'reviewer',
-    from: 'pi-deepseek',
+    from: 'claude',
     to: 'codex',
     modelLabel: 'adversary-codex',
   });
@@ -439,12 +439,12 @@ test('the fallback CLI moves the reviewer out of the way for a capped builder, a
   // caller of this command could see it.
   assert.equal(
     answer.partnerMovedReason,
-    'the builder fell back to pi-deepseek, so the reviewer moved to its own backup adversary-codex to keep builder and reviewer in different families',
+    'the builder fell back to claude, so the reviewer moved to its own backup adversary-codex to keep builder and reviewer in different families',
   );
 });
 
 test('the fallback CLI is a real entry point: the process itself allows the reviewer fallback off a claude builder (JUL-98)', async () => {
-  const { stdout } = await execFileAsync(process.execPath, [SEAT_LABELS_CLI, 'fallback', '--seat', 'reviewer', '--builder', 'claude']);
+  const { stdout } = await execFileAsync(process.execPath, [SEAT_LABELS_CLI, 'fallback', '--seat', 'reviewer', '--builder', 'gemini']);
   assert.deepEqual(JSON.parse(stdout), { seat: 'reviewer', entry: 'codex', modelLabel: 'adversary-codex', partnerMoved: null, partnerMovedReason: null });
 });
 
@@ -453,9 +453,9 @@ test('the fallback CLI is a real entry point: the process itself moves the revie
   // with no legal backup). It is no longer reachable through the CLI's own
   // arguments, because the CLI always reads the real seat table, in which the
   // reviewer's backup (Codex) always resolves the collision.
-  const { stdout } = await execFileAsync(process.execPath, [SEAT_LABELS_CLI, 'fallback', '--seat', 'builder', '--reviewer', 'pi-deepseek']);
+  const { stdout } = await execFileAsync(process.execPath, [SEAT_LABELS_CLI, 'fallback', '--seat', 'builder', '--reviewer', 'claude']);
   const answer = JSON.parse(stdout);
-  assert.equal(answer.entry, 'pi-deepseek');
+  assert.equal(answer.entry, 'claude');
   assert.equal(answer.partnerMoved.modelLabel, 'adversary-codex');
 });
 
@@ -463,7 +463,7 @@ test('the fallback CLI treats a bad seat or an unknown builder entry as a one-li
   const badSeat = runCli(['fallback', '--seat', 'potato', '--builder', 'claude']);
   assert.equal(badSeat.code, 2);
   assert.match(badSeat.err, /^usage: /);
-  const unknownBuilder = runCli(['fallback', '--seat', 'reviewer', '--builder', 'gemini']);
+  const unknownBuilder = runCli(['fallback', '--seat', 'reviewer', '--builder', 'potato']);
   assert.equal(unknownBuilder.code, 2);
   assert.match(unknownBuilder.err, /^usage: /);
   // `orchestrator` is no longer a seat: the vocabulary is the board's six.
@@ -485,15 +485,15 @@ test('the fallback CLI treats a bad seat or an unknown builder entry as a one-li
 // ---------------------------------------------------------------------------
 
 test('a capped builder no longer stalls the card: the reviewer moves to its own backup automatically', () => {
-  const choices = resolveSeatChoices([]); // the real default pair: builder claude, reviewer DeepSeek Pro
-  assert.equal(choices.builder.entry, 'claude');
-  assert.equal(choices.reviewer.entry, 'pi-deepseek');
+  const choices = resolveSeatChoices([]); // the real default pair: builder Gemini, reviewer Claude Opus
+  assert.equal(choices.builder.entry, 'gemini');
+  assert.equal(choices.reviewer.entry, 'claude');
 
   const result = fallbackSeatChoice(choices, 'builder');
   assert.equal(result.ok, true, 'the builder fallback must succeed instead of stalling the card');
-  assert.equal(result.choices.builder.entry, 'pi-deepseek');
-  assert.equal(result.choices.builder.modelLabel, 'builder-deepseek-flash');
-  assert.equal(result.choices['feature-builder'].entry, 'pi-deepseek', 'the agent-keyed entry moves too');
+  assert.equal(result.choices.builder.entry, 'claude');
+  assert.equal(result.choices.builder.modelLabel, 'builder-claude-opus');
+  assert.equal(result.choices['feature-builder'].entry, 'claude', 'the agent-keyed entry moves too');
 
   // The reviewer was moved out of the way, to ITS backup -- Codex, per the
   // 2026-09-21 11:57Z Decision, not to anything invented.
@@ -502,7 +502,7 @@ test('a capped builder no longer stalls the card: the reviewer moves to its own 
   assert.equal(result.choices['adversarial-reviewer'].entry, 'codex');
   assert.deepEqual(result.partnerMoved, {
     seat: 'reviewer',
-    from: 'pi-deepseek',
+    from: 'claude',
     to: 'codex',
     modelLabel: 'adversary-codex',
   });
@@ -528,22 +528,22 @@ test('the partner is moved ONLY when it has to be: a fallback that already works
   assert.equal(result.partnerMoved, null);
   assert.equal(result.partnerMovedReason, null);
 
-  // A reviewer fallback against a Claude builder is legal too.
+  // A reviewer fallback against a Gemini builder is legal too.
   const reviewer = fallbackSeatChoice(resolveSeatChoices([]), 'reviewer');
   assert.equal(reviewer.ok, true);
-  assert.equal(reviewer.choices.builder.entry, 'claude', 'the builder is untouched');
+  assert.equal(reviewer.choices.builder.entry, 'gemini', 'the builder is untouched');
   assert.equal(reviewer.partnerMoved, null);
 });
 
 test('the move is symmetric: a capped reviewer whose backup collides moves the builder instead', () => {
   const choices = resolveSeatChoices([]);
-  // A table whose reviewer backup is claude -- the builder's family. The real
+  // A table whose reviewer backup is gemini -- the builder's family. The real
   // table no longer has this (JUL-98), so the rule is exercised on a copy.
-  const colliding = { ...SEAT_TABLE, 'adversarial-reviewer': { primary: 'pi-deepseek', backup: 'claude' } };
+  const colliding = { ...SEAT_TABLE, 'adversarial-reviewer': { primary: 'claude', backup: 'gemini' } };
   const result = fallbackSeatChoice(choices, 'reviewer', { table: colliding });
   assert.equal(result.ok, true);
-  assert.equal(result.choices.reviewer.entry, 'claude');
-  assert.equal(result.choices.builder.entry, 'pi-deepseek', 'the builder moved to its own backup');
+  assert.equal(result.choices.reviewer.entry, 'gemini');
+  assert.equal(result.choices.builder.entry, 'claude', 'the builder moved to its own backup');
   assert.equal(result.partnerMoved.seat, 'builder');
   assert.equal(validateFamilyChoice(result.choices).ok, true);
 });
@@ -554,12 +554,12 @@ test('a fallback is STILL refused when the partner has no legal backup either --
   // that must be a refusal, never a silent same-family launch.
   const hopeless = {
     ...SEAT_TABLE,
-    'feature-builder': { primary: 'claude', backup: 'pi-deepseek' },
-    'adversarial-reviewer': { primary: 'pi-deepseek', backup: 'pi-deepseek' },
+    'feature-builder': { primary: 'gemini', backup: 'claude' },
+    'adversarial-reviewer': { primary: 'claude', backup: 'claude' },
   };
   const result = fallbackSeatChoice(choices, 'builder', { table: hopeless });
   assert.equal(result.ok, false);
-  assert.match(result.reason, /refusing the builder backup \(pi-deepseek\)/);
+  assert.match(result.reason, /refusing the builder backup \(claude\)/);
   assert.match(result.reason, /different families/);
   assert.equal(result.choices, undefined, 'a refusal hands back no choices to launch with');
 });
@@ -576,7 +576,7 @@ test('the partner move can be switched off, and then the old refusal stands', ()
   // recorded pair, for instance) still gets the strict answer.
   const result = fallbackSeatChoice(resolveSeatChoices([]), 'builder', { movePartner: false });
   assert.equal(result.ok, false);
-  assert.match(result.reason, /refusing the builder backup \(pi-deepseek\)/);
+  assert.match(result.reason, /refusing the builder backup \(claude\)/);
 });
 
 // ---------------------------------------------------------------------------

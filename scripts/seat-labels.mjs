@@ -127,6 +127,12 @@ export const MODEL_SPECS = Object.freeze({
   codex: { entry: 'codex', model: null },
   'deepseek-pro': { entry: 'pi-deepseek', model: 'deepseek-v4-pro' },
   'deepseek-flash': { entry: 'pi-deepseek', model: 'deepseek-v4-flash' },
+  // JUL-98 step 6: Gemini through the Antigravity CLI (`agy`). The model ids
+  // are `agy models`' own, minus the effort suffix agy appends there -- the
+  // CLI takes `--model gemini-3.8-flash --effort high`, so the effort label
+  // stays the one place effort is chosen (checked on this host, agy 1.2.7).
+  'gemini-flash': { entry: 'gemini', model: 'gemini-3.8-flash' },
+  'gemini-pro': { entry: 'gemini', model: 'gemini-3.1-pro' },
 });
 
 // The model each seat-table entry runs when the card names none (the
@@ -136,6 +142,7 @@ export const DEFAULT_MODEL_SUFFIX_BY_ENTRY = Object.freeze({
   claude: 'claude-opus',
   codex: 'codex',
   'pi-deepseek': 'deepseek-flash',
+  gemini: 'gemini-flash',
 });
 
 // The one place an agent's default model differs from its entry's default: the

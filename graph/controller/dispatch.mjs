@@ -5,11 +5,14 @@
 //
 //   * one `worker-start` per step, so Orca issues a new task id and a new
 //     dispatch id (recorded: worker-start.claude-model-effort.json);
-//   * `--worktree new-top-level`, never a reused worktree;
-//   * NEVER `--terminal <handle>`. Adopting a terminal is a real Orca route
-//     (worker-start.adopt-terminal-pi.json) but it hands the new step whatever
-//     session is already in that terminal -- which is the one thing a fresh
-//     worker must not have;
+//   * a worktree made for THIS step and no other -- `--worktree new-top-level`
+//     on the `--agent` route, and a worktree ./adopt.mjs creates for this step
+//     alone on the adopt route;
+//   * NEVER a terminal that was already in use. Adopting a terminal is a real
+//     Orca route (worker-start.adopt-terminal-pi.json) and JUL-98 step 6 uses
+//     it -- but only for a terminal this dispatch started itself, seconds
+//     earlier, in its own new worktree. What a fresh worker must not have is
+//     somebody else's session, and it does not have one;
 //   * the brief is built from ONE step. `buildStepBrief` takes a single step
 //     object and has no way to reach the rest of the plan, so another step's
 //     words cannot travel by accident.
@@ -26,6 +29,7 @@
 
 import { MODEL_CATALOG } from '../../scripts/seat-labels.mjs';
 import { wasReplayed } from './inflight.mjs';
+import { startAdoptedWorker } from './adopt.mjs';
 
 // The two worker skills, and only two (the card is explicit that there are no
 // others until there is work for one). Paths, not contents: the worker reads
@@ -47,38 +51,91 @@ export const LAUNCH_MODEL_IDS = Object.freeze({
   codex: 'gpt-6-astra',
   'deepseek-v4-pro': 'deepseek-v4-pro',
   'deepseek-v4-flash': 'deepseek-v4-flash',
+  // JUL-98 step 6. These are `agy models`' own ids, and graph/rate-table.mjs
+  // holds an entry for each -- an allowance entry rather than a per-token
+  // price, because that is how the seat is actually billed.
+  'gemini-3.8-flash': 'gemini-3.8-flash',
+  'gemini-3.1-pro': 'gemini-3.1-pro',
 });
 
-// The seat-table entry -> the `--agent` name Orca launches. `pi-deepseek` is
-// absent on purpose: see below.
+// The seat-table entry -> the `--agent` name Orca launches. It is a short list
+// because Orca's is: `worker-start --agent` knows claude, codex and cursor, and
+// there is no flag that teaches it another TUI.
 const AGENT_FOR_ENTRY = Object.freeze({ claude: 'claude', codex: 'codex' });
 
-// JUL-109, section 4: `run-pi-seat.mjs` runs Pi as a one-shot with no contract,
-// so a Pi seat started that way cannot report to the mailbox at all; the only
-// route that reported `worker_done` was an INTERACTIVE Pi, started first and
-// adopted with `worker-start --terminal` once it had fully started. That route
-// carries no model and no effort and needs the startup wait. So a DeepSeek seat
-// is refused a new-worktree dispatch here rather than being launched into a
-// shape no recording supports.
-const PI_REFUSAL =
-  'a DeepSeek (Pi) seat cannot be started with a new worktree: the only recorded route that reports to the mailbox is an interactive Pi adopted with worker-start --terminal once it has fully started (JUL-109 findings, section 4), and it carries no model or effort';
+// THE OTHER ROUTE, and why there is exactly one of it.
+//
+// Until JUL-98 step 6 a DeepSeek seat was REFUSED here, and the refusal's own
+// words said what had to be built instead: "the only recorded route that
+// reports to the mailbox is an interactive Pi adopted with worker-start
+// --terminal once it has fully started (JUL-109 findings, section 4)". Gemini,
+// through the Antigravity CLI (`agy`), needs that same route for exactly the
+// same reason -- Orca has no launcher for it either. So the route is built once
+// (./adopt.mjs) and both seats take it; a second copy would drift.
+//
+// `command` is what the interactive terminal runs, in the worktree's own
+// directory (so a relative path is the checkout's). It carries the MODEL AND
+// EFFORT, which is how the card keeps showing exactly what runs even though
+// `--model`/`--effort` cannot be passed with `--terminal`.
+const ADOPTED_ENTRIES = Object.freeze({
+  gemini: Object.freeze({
+    // agy asks a folder-trust question on a folder it has not seen, so the
+    // worktree is written into ITS trust list before it is started
+    // (./agent-trust.mjs).
+    trustAgent: 'agy',
+    // `--dangerously-skip-permissions` is the same posture Todd accepted for
+    // `runner`'s Claude Code on 2026-09-20 (`skipDangerousModePermissionPrompt`,
+    // JUL-109 findings section 6): without it agy stops on every tool call and
+    // the worker cannot do the step it was dispatched for.
+    command: ({ model, effort }) => `agy --model ${model} --effort ${effort} --dangerously-skip-permissions`,
+  }),
+  'pi-deepseek': Object.freeze({
+    // Pi asks no folder-trust question (it ran in fresh worktrees throughout
+    // JUL-109 without one), so there is no trust list to write.
+    trustAgent: null,
+    // The repo's own seat launcher, in its interactive mode: it is what reads
+    // the DeepSeek key in-process, and reusing it keeps ONE place that knows
+    // how a Pi seat authenticates.
+    command: ({ model, effort }) => `node ops/service-dropbox/run-pi-seat.mjs ${PI_SEAT_ROUTE[model]} --interactive --effort ${effort}`,
+  }),
+});
+
+// Which `run-pi-seat.mjs` seat route runs which model. The routes are that
+// file's own (`SEATS`), and the model is what picks one -- never the other way
+// round, so the card's label still decides.
+const PI_SEAT_ROUTE = Object.freeze({
+  'deepseek-v4-pro': 'reviewer-backup',
+  'deepseek-v4-flash': 'builder-backup',
+});
 
 // `choice` is one seat's entry from scripts/seat-labels.mjs
-// (`{ entry, modelLabel, effort }`). Returns what worker-start is given, or a
-// refusal with a reason.
+// (`{ entry, modelLabel, effort }`). Returns what the launch actually is --
+// `route: 'agent'` for a `worker-start --agent` seat, `route: 'adopt'` for one
+// that has to be started and then adopted -- or a refusal with a reason.
 export function launchForChoice(choice) {
-  const agent = AGENT_FOR_ENTRY[choice?.entry];
-  if (!agent) {
-    if (choice?.entry === 'pi-deepseek') return { ok: false, reason: PI_REFUSAL };
-    return { ok: false, reason: `no Orca agent is known for seat-table entry ${JSON.stringify(choice?.entry ?? null)}` };
+  const entry = choice?.entry;
+  const agent = AGENT_FOR_ENTRY[entry];
+  const adopted = ADOPTED_ENTRIES[entry];
+  if (!agent && !adopted) {
+    return { ok: false, reason: `no Orca agent and no adopt route is known for seat-table entry ${JSON.stringify(entry ?? null)}` };
   }
   const spec = MODEL_CATALOG[choice.modelLabel];
-  const modelName = spec?.model ?? (choice.entry === 'codex' ? 'codex' : null);
+  const modelName = spec?.model ?? (entry === 'codex' ? 'codex' : null);
   const model = LAUNCH_MODEL_IDS[modelName];
   if (!model) {
+    // The same gate on BOTH routes: a seat dispatched on a model the cost table
+    // cannot account for could only ever produce a blank cost line.
     return { ok: false, reason: `no launch model id for model label ${JSON.stringify(choice.modelLabel)}` };
   }
-  return { agent, model, effort: choice.effort };
+  const effort = choice.effort;
+  if (agent) return { route: 'agent', agent, model, effort };
+  return {
+    route: 'adopt',
+    trustAgent: adopted.trustAgent,
+    command: adopted.command({ model, effort }),
+    model,
+    effort,
+  };
 }
 
 function bullets(items) {
@@ -125,6 +182,10 @@ export function buildStepBrief({ seat, card, step, files = [] }) {
 // `residualResources` list naming the worktree and terminal left behind).
 export async function dispatchWorker({
   workerStartImpl,
+  // The other route, injected so a test can stand in front of it. The default
+  // is the real one; ./wiring.mjs supplies its Orca boundaries.
+  startAdoptedWorkerImpl = startAdoptedWorker,
+  adoptBoundaries = {},
   environment,
   runId,
   from,
@@ -148,6 +209,57 @@ export async function dispatchWorker({
     return { ok: false, seat, launchRefused: true, entry: choice?.entry ?? null, reason: launch.reason, residualResources: [] };
   }
   const spec = buildStepBrief({ seat, card, step, files });
+
+  // THE ADOPT ROUTE. The brief above is handed to it unchanged: the real brief
+  // is the one dispatch, never a placeholder followed by a second delivery.
+  if (launch.route === 'adopt') {
+    const adopted = await startAdoptedWorkerImpl({
+      seat,
+      entry: choice.entry,
+      launch,
+      spec,
+      worktreeName,
+      runId,
+      from,
+      requestId,
+      ...adoptBoundaries,
+      workerStartImpl,
+    });
+    if (!adopted.ok) {
+      // The route takes back everything it made before it answers, so this is
+      // the SAME refusal a seat with no launch route at all gives, and
+      // ./step-runner.mjs's existing seat-backup path (JUL-98 step 5, fifth
+      // fix) catches it with nothing new. `residualResources` is non-empty only
+      // when the teardown ITSELF failed, and then it is not empty and says so.
+      return {
+        ok: false,
+        seat,
+        launchRefused: true,
+        entry: choice.entry,
+        reason: adopted.reason,
+        residualResources: adopted.residualResources ?? [],
+      };
+    }
+    return {
+      ok: true,
+      seat,
+      stepKey: step.key ?? step.title,
+      taskId: adopted.result.taskId,
+      dispatchId: adopted.result.dispatchId,
+      runId: adopted.result.runId,
+      terminal: adopted.terminal,
+      worktree: adopted.worktree,
+      stage: adopted.result.stage ?? null,
+      state: adopted.result.state ?? null,
+      launch: { ...launch },
+      // The allowance reading taken BEFORE the agent ran. ./step-runner.mjs
+      // hands it to the cost read, which differences it against a second
+      // reading -- the only figure an allowance-billed seat has.
+      allowanceBefore: adopted.allowanceBefore ?? null,
+      replayed: wasReplayed(adopted.result),
+      spec,
+    };
+  }
 
   const result = await workerStartImpl({
     environment,

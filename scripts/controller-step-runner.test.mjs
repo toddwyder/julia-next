@@ -45,13 +45,30 @@ function doneMessage(dispatchId, outcome = 'succeeded') {
   return { ...recorded, payload: JSON.stringify({ taskId: 'task_x', dispatchId, outcome }) };
 }
 
-function harness({ send = TURN_STARTED, outcome = 'succeeded', cost = COST } = {}) {
+// The adopt route's own boundaries (JUL-98 step 6). `adoptStarts` is the one
+// knob: false is a TUI that never reached an idle prompt, which is the seat
+// that CANNOT BE LAUNCHED in the new table -- the builder's own Gemini entry.
+function harness({ send = TURN_STARTED, outcome = 'succeeded', cost = COST, adoptStarts = true } = {}) {
   const order = [];
   const orca = createFixtureWorkerOrca();
   return {
     order,
     orca,
     deps: {
+      adoptBoundaries: {
+        worktreeCreateImpl: async ({ name }) => {
+          order.push('adopt-worktree-create');
+          return { worktree: { id: `repo-1::/home/runner/orca/workspaces/julia-next/${name}`, path: `/home/runner/orca/workspaces/julia-next/${name}` } };
+        },
+        prepareWorktreeImpl: async () => {
+          order.push('adopt-prepare');
+          return { trusted: true, allowance: { 'gemini-weekly': 0.9935, 'gemini-5h': 0.9635 } };
+        },
+        agentTerminalCreateImpl: async () => { order.push('adopt-terminal-create'); return { terminal: { handle: 'term_seat' } }; },
+        terminalWaitImpl: async () => ({ wait: { satisfied: adoptStarts } }),
+        terminalCloseImpl: async () => { order.push('adopt-terminal-close'); },
+        removeWorktreeImpl: async () => { order.push('adopt-worktree-rm'); },
+      },
       environment: 'ovh-local',
       runId: 'run_1bf570ce5660',
       from: 'term_controller',
@@ -303,53 +320,62 @@ test('the attempt number defaults to the first attempt, and a nonsense one is st
 // that it is now USED -- through the very same `fallbackSeatChoice` a capped
 // seat uses, with the same family guard -- and that a stop says the refusal.
 
-test('a reviewer seat whose entry cannot be launched runs on its seat-table backup instead, and the step continues', async () => {
-  const h = harness();
+test('a builder seat whose start-then-adopt route cannot be completed runs on its seat-table backup instead, and the step continues', async () => {
+  // agy never reaches an idle prompt, so the Gemini builder cannot be started
+  // at all. This is the JUL-98 step 6 shape of the same failure the fifth fix
+  // of step 5 was written for, and it takes the SAME road out.
+  const h = harness({ adoptStarts: false });
   const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
 
-  // The card's OWN resolution, with no model labels at all: builder `claude`,
-  // reviewer `pi-deepseek` -- which is exactly what the live run had.
+  // The card's OWN resolution, with no model labels at all: builder `gemini`,
+  // reviewer `claude`.
   const choices = resolveSeatChoices([]);
-  assert.equal(choices.reviewer.entry, 'pi-deepseek', 'the reviewer first choice is unchanged by this fix');
-  assert.equal(launchForChoice(choices.reviewer).ok, false, 'and it still cannot be launched');
+  assert.equal(choices.builder.entry, 'gemini');
+  assert.equal(launchForChoice(choices.builder).route, 'adopt', 'and it is started the only way Orca can start it');
 
   const result = await runBuildAndReview({ card: CARD, step: STEP, choices, suiteRunner, ...h.deps });
 
   assert.equal(result.ok, true, 'the step ran to the end instead of stopping on a seat that could not start');
-  assert.equal(result.reviewer.movedFrom, 'pi-deepseek');
-  assert.equal(result.reviewer.movedTo, 'codex', 'the backup the seat table already names');
-  assert.equal(result.reviewer.outcome, 'succeeded');
+  assert.equal(result.builder.movedFrom, 'gemini');
+  assert.equal(result.builder.movedTo, 'claude', 'the backup the seat table already names');
+  assert.equal(result.builder.outcome, 'succeeded');
+  // And the family guard moved the Claude reviewer out of the way: Codex
+  // reviews whenever Claude builds.
+  assert.equal(result.seatChoices.reviewer.entry, 'codex');
 
   const started = h.orca.workerStartCalls();
   assert.deepEqual(started.map((call) => call.agent), ['claude', 'codex'], 'only two workers: the refused entry never reached worker-start');
-  assert.equal(started[1].name, 'jul-92-step-1-review-a1-bk', 'the second start asks for a name the refused one did not');
+  assert.equal(started[0].name, 'jul-92-step-1-a1-bk', 'the second start asks for a name the refused one did not');
   assert.notEqual(started[0].requestId, started[1].requestId);
   assert.equal(result.costLines.length, 2);
+  // Everything the refused route made was taken back before the fallback ran.
+  assert.ok(h.order.includes('adopt-terminal-close'));
+  assert.ok(h.order.includes('adopt-worktree-rm'));
 });
 
-test('exactly ONE comment is written for the move, naming both entries and the reason', async () => {
-  const h = harness();
+test('exactly ONE comment is written for the move, naming the seat, both entries and the real reason', async () => {
+  const h = harness({ adoptStarts: false });
   const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
   const result = await runBuildAndReview({ card: CARD, step: STEP, choices: resolveSeatChoices([]), suiteRunner, ...h.deps });
 
   assert.equal(result.seatMoves.length, 1, 'one move, one comment -- not one per attempt and not one per seat');
   const [moved] = result.seatMoves;
-  assert.equal(moved.seat, 'reviewer');
-  assert.equal(moved.from, 'pi-deepseek');
-  assert.equal(moved.to, 'codex');
-  assert.equal(moved.partnerMoved, null, 'nothing else had to move: claude and codex are already different families');
-  assert.equal(
-    moved.comment,
-    '**The reviewer seat moved to its backup.** It was going to run on `pi-deepseek`, which could not be started: '
-    + 'a DeepSeek (Pi) seat cannot be started with a new worktree: the only recorded route that reports to the mailbox '
-    + 'is an interactive Pi adopted with worker-start --terminal once it has fully started (JUL-109 findings, section 4), '
-    + 'and it carries no model or effort. So it ran on the backup the seat table already names for it, `codex` '
-    + '(adversary-codex).',
-  );
+  assert.equal(moved.seat, 'builder');
+  assert.equal(moved.from, 'gemini');
+  assert.equal(moved.to, 'claude');
+  // The partner had to move too, and it is in the SAME comment.
+  assert.equal(moved.partnerMoved.seat, 'reviewer');
+  assert.equal(moved.partnerMoved.to, 'codex');
+  assert.match(moved.comment, /\*\*The builder seat moved to its backup\.\*\*/);
+  assert.match(moved.comment, /going to run on `gemini`/);
+  assert.match(moved.comment, /start-then-adopt route could not be completed/, 'the real reason, not a generic one');
+  assert.match(moved.comment, /never reached an idle prompt/);
+  assert.match(moved.comment, /the backup the seat table already names for it, `claude`/);
+  assert.match(moved.comment, /the reviewer moved to its own backup adversary-codex/);
 });
 
 test('a backup that ALSO cannot be launched stops the step, with both entries and both reasons named', async () => {
-  const h = harness();
+  const h = harness({ adoptStarts: false });
   const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
   const choices = resolveSeatChoices([]);
 
@@ -361,31 +387,33 @@ test('a backup that ALSO cannot be launched stops the step, with both entries an
     ok: true,
     partnerMoved: null,
     partnerMovedReason: null,
-    choices: { ...given, [seat]: { entry: 'claude', modelLabel: 'adversary-claude-turbo', effort: 'medium' } },
+    choices: { ...given, [seat]: { entry: 'claude', modelLabel: 'builder-claude-turbo', effort: 'medium' } },
   });
 
   const result = await runBuildAndReview({ card: CARD, step: STEP, choices, suiteRunner, seatFallbackImpl, ...h.deps });
 
   assert.equal(result.ok, false);
-  assert.match(result.reason, /the reviewer seat could not be started on pi-deepseek/);
-  assert.match(result.reason, /DeepSeek \(Pi\) seat cannot be started with a new worktree/, 'the first reason');
+  assert.match(result.reason, /the builder seat could not be started on gemini/);
+  assert.match(result.reason, /start-then-adopt route could not be completed/, 'the first reason');
   assert.match(result.reason, /its backup claude could not be started either/);
-  assert.match(result.reason, /no launch model id for model label "adversary-claude-turbo"/, 'the second reason');
+  assert.match(result.reason, /no launch model id for model label "builder-claude-turbo"/, 'the second reason');
   assert.equal(result.seatMoves.length, 0, 'nothing moved, so the card is told of no move');
-  assert.equal(h.orca.workerStartCalls().length, 1, 'only the builder ever reached worker-start; no third entry was tried');
+  assert.equal(h.orca.workerStartCalls().length, 1, 'only the reviewer ever reached worker-start; the builder\'s third entry was never tried');
 });
 
 test('the family guard still refuses a same-family pair, and that refusal stops the step rather than running it', async () => {
-  const h = harness();
+  const h = harness({ adoptStarts: false });
   const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
 
-  // A card that names Codex for the feature builder. The reviewer's first
-  // choice is refused, and its seat-table backup is Codex TOO -- so the backup
-  // would put builder and reviewer in the same (openai) family. The builder has
-  // already run by then, so it cannot be moved out of the way, and the real
-  // `fallbackSeatChoice` refuses. Nothing here overrides the seat table.
-  const choices = resolveSeatChoices(['builder-codex']);
+  // A card that names Codex for the feature builder and Gemini for the
+  // reviewer. The reviewer's Gemini start cannot be completed, and its
+  // seat-table backup is Codex TOO -- so the backup would put builder and
+  // reviewer in the same (openai) family. The builder has already run by then,
+  // so it cannot be moved out of the way, and the real `fallbackSeatChoice`
+  // refuses. Nothing here overrides the seat table.
+  const choices = resolveSeatChoices(['builder-codex', 'adversary-gemini-flash']);
   assert.equal(choices.builder.entry, 'codex');
+  assert.equal(choices.reviewer.entry, 'gemini');
   assert.equal(SEAT_TABLE['adversarial-reviewer'].backup, 'codex');
 
   const result = await runBuildAndReview({ card: CARD, step: STEP, choices, suiteRunner, ...h.deps });
@@ -398,15 +426,15 @@ test('the family guard still refuses a same-family pair, and that refusal stops 
 });
 
 test('a seat refused before dispatch gets an explicit never-started cost line naming the refusal, and the stop names the refusal rather than a blank cost line', async () => {
-  const h = harness();
+  const h = harness({ adoptStarts: false });
   const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
-  const result = await runBuildAndReview({ card: CARD, step: STEP, choices: resolveSeatChoices(['builder-codex']), suiteRunner, ...h.deps });
+  const result = await runBuildAndReview({ card: CARD, step: STEP, choices: resolveSeatChoices(['builder-codex', 'adversary-gemini-flash']), suiteRunner, ...h.deps });
 
   const line = result.costLines.find((entry) => entry.seat === 'reviewer');
   assert.equal(line.neverStarted, true, 'the seat is costed as never started, the way a worker whose turn never began already is');
   assert.equal(line.totalTokens, 0);
   assert.equal(line.usd, 0);
-  assert.match(line.reason, /DeepSeek \(Pi\) seat cannot be started/);
+  assert.match(line.reason, /start-then-adopt route could not be completed/);
 
   // THE LIVE FAILURE, gone: the card was told the cost line was blank and was
   // never told the seat had been refused.
@@ -415,7 +443,7 @@ test('a seat refused before dispatch gets an explicit never-started cost line na
   assert.match(result.reason, /could not be started/);
   const reviewerText = result.costText.find((text) => text.startsWith('- **Reviewer**'));
   assert.match(reviewerText, /never started/);
-  assert.match(reviewerText, /DeepSeek \(Pi\) seat cannot be started/);
+  assert.match(reviewerText, /start-then-adopt route could not be completed/);
 });
 
 test('an ordinary blank cost line still fails the step, and the never-started mark does not excuse it', async () => {
@@ -451,59 +479,59 @@ test('an ordinary blank cost line still fails the step, and the never-started ma
 // begins are the 19-20 September failures this whole step exists for.
 
 test('a backup whose worker-start FAILS stops the step -- the card is never told the seat ran on it', async () => {
-  const h = harness();
+  const h = harness({ adoptStarts: false });
   const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
   const failedStart = loadOrcaFixture('worker-start.failed-agent-readiness.json').result;
 
-  // The builder starts as usual; the reviewer's backup -- the only reviewer
-  // start there is, since `pi-deepseek` never reaches worker-start -- fails at
-  // the trust screen, exactly as the recording has it.
+  // The builder's Gemini start-then-adopt route cannot be completed, and its
+  // backup -- the only builder start that reaches worker-start at all -- then
+  // fails at the trust screen, exactly as the recording has it.
   const healthyStart = h.deps.workerStartImpl;
   h.deps.workerStartImpl = async (options) => (
-    options.agent === 'codex' ? { ...failedStart } : healthyStart(options)
+    options.agent === 'claude' ? { ...failedStart } : healthyStart(options)
   );
 
   const result = await runBuildAndReview({ card: CARD, step: STEP, choices: resolveSeatChoices([]), suiteRunner, ...h.deps });
 
   assert.equal(result.ok, false);
   assert.equal(result.seatMoves.length, 0, 'the seat never ran on the backup, so no move comment is written');
-  assert.match(result.reason, /the reviewer seat could not be started on pi-deepseek/);
-  assert.match(result.reason, /its backup codex could not be started either/);
+  assert.match(result.reason, /the builder seat could not be started on gemini/);
+  assert.match(result.reason, /its backup claude could not be started either/);
   assert.match(result.reason, /worker-start failed at agent_readiness \(timeout\)/, "Orca's own failure, carried through");
-  assert.equal(result.reviewer.movedTo, undefined, 'and the result does not claim a move either');
-  const line = result.costLines.find((entry) => entry.seat === 'reviewer');
+  assert.equal(result.builder.movedTo, undefined, 'and the result does not claim a move either');
+  const line = result.costLines.find((entry) => entry.seat === 'builder');
   assert.equal(line.neverStarted, true, 'the seat is costed as never started -- which is what it was');
 });
 
 test('a backup whose TURN is never proven stops the step too -- the same claim, the same gate', async () => {
-  const h = harness();
+  const h = harness({ adoptStarts: false });
   const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
 
   // The backup's worker IS created -- so there is no `launchRefused` and no
   // failed start -- but its turn never begins. That worker wrote no session
   // file, so it did no work: it cannot be reported as having run.
-  let reviewerStarted = false;
+  let waitingFor = null;
   h.deps.observeStartImpl = async ({ seat }) => {
-    if (seat === 'reviewer') reviewerStarted = true;
-    return { send: seat === 'reviewer' ? NO_TURN : TURN_STARTED };
+    waitingFor = seat;
+    return { send: seat === 'builder' ? NO_TURN : TURN_STARTED };
   };
-  const waitForBuilder = h.deps.checkWaitImpl;
+  const waitFor = h.deps.checkWaitImpl;
   h.deps.checkWaitImpl = async (options) => {
-    if (reviewerStarted) throw new Error('the mailbox must not be opened for a backup whose turn never started');
-    return waitForBuilder(options);
+    if (waitingFor === 'builder') throw new Error('the mailbox must not be opened for a backup whose turn never started');
+    return waitFor(options);
   };
 
   const result = await runBuildAndReview({ card: CARD, step: STEP, choices: resolveSeatChoices([]), suiteRunner, ...h.deps });
 
   assert.equal(result.ok, false);
   assert.equal(result.seatMoves.length, 0, 'no work was done on the backup, so the card is told of no move');
-  assert.match(result.reason, /the reviewer seat could not be started on pi-deepseek/);
-  assert.match(result.reason, /its backup codex could not be started either/);
+  assert.match(result.reason, /the builder seat could not be started on gemini/);
+  assert.match(result.reason, /its backup claude could not be started either/);
   assert.match(result.reason, /input.accepted/i, "the turn-start proof's own words");
-  assert.equal(result.reviewer.movedTo, undefined);
+  assert.equal(result.builder.movedTo, undefined);
   // The worker that WAS created is still cleaned up, the way every
   // never-started worker is.
-  assert.ok(h.order.includes('release:reviewer'));
-  assert.ok(h.order.includes('remove-worktree:reviewer'));
-  assert.ok(!h.order.includes('read-cost:reviewer'), 'and its non-existent session file is not read');
+  assert.ok(h.order.includes('release:builder'));
+  assert.ok(h.order.includes('remove-worktree:builder'));
+  assert.ok(!h.order.includes('read-cost:builder'), 'and its non-existent session file is not read');
 });

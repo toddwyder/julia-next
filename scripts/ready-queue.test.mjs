@@ -537,13 +537,13 @@ test('a differing-family explicit pair is eligible and starts', async () => {
 
 // The twelve the team template applies, with the names the live board holds.
 const DEFAULT_TEAM_LABELS = [
-  { id: 'l-builder-model', name: 'builder-claude-opus' },
+  { id: 'l-builder-model', name: 'builder-gemini-flash' },
   { id: 'l-builder-effort', name: 'builder-effort-medium' },
   { id: 'l-fixer-model', name: 'fixer-claude-opus' },
   { id: 'l-fixer-effort', name: 'fixer-effort-medium' },
   { id: 'l-refactor-model', name: 'refactor-claude-opus' },
   { id: 'l-refactor-effort', name: 'refactor-effort-medium' },
-  { id: 'l-adversary-model', name: 'adversary-deepseek-pro' },
+  { id: 'l-adversary-model', name: 'adversary-claude-opus' },
   { id: 'l-adversary-effort', name: 'adversary-effort-medium' },
   { id: 'l-evidence-model', name: 'evidence-codex' },
   { id: 'l-evidence-effort', name: 'evidence-effort-medium' },
@@ -572,7 +572,7 @@ test('a default label that is not on the team yet is skipped and logged, never a
   const issue = makeIssue({ labels: [READY_FOR_AGENT_LABEL] });
   const { linear, calls } = fakeLinear({
     issues: [issue],
-    teamLabels: [{ id: 'l-builder-model', name: 'builder-claude-opus' }],
+    teamLabels: [{ id: 'l-builder-model', name: 'builder-gemini-flash' }],
   });
   const store = fakeStore({ ready: { [issue.id]: issueFingerprint(issue) } });
   const orca = fakeOrca();

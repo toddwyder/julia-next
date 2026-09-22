@@ -45,6 +45,10 @@ export async function runWorkerStep({
   requestId,
 
   workerStartImpl,
+  // The Orca boundaries the START-THEN-ADOPT route needs (JUL-98 step 6), for
+  // the seats `worker-start --agent` has no launcher for. Passed straight
+  // through: ./dispatch.mjs decides whether they are used at all.
+  adoptBoundaries = {},
   // Returns whatever the controller has observed about the start: a
   // `terminal send --wait-submit` answer, a `worktree ps` worktree, or both.
   // It is the only thing allowed to look at the worker before it reports.
@@ -61,7 +65,7 @@ export async function runWorkerStep({
 } = {}) {
   // 1. A fresh worker.
   const dispatched = await dispatchWorker({
-    workerStartImpl, environment, runId, from, repo,
+    workerStartImpl, adoptBoundaries, environment, runId, from, repo,
     seat, card, step, choice, files, worktreeName, requestId,
   });
   if (!dispatched.ok) {
@@ -107,7 +111,15 @@ export async function runWorkerStep({
       // moved to its backup is a different vendor from the one the card's label
       // resolved to, and the cost reader has to read the session file of the
       // vendor that ran -- not the one that was refused.
-      readCostImpl: (args) => readCostImpl({ ...args, agent: dispatched.launch?.agent ?? null }),
+      readCostImpl: (args) => readCostImpl({
+        ...args,
+        agent: dispatched.launch?.agent ?? null,
+        model: dispatched.launch?.model ?? null,
+        // An allowance-billed seat has no session file: its only figure is the
+        // difference between the reading taken before it started and one taken
+        // now (./cost.mjs geminiExtractFromAllowance).
+        allowanceBefore: dispatched.allowanceBefore ?? null,
+      }),
       releaseImpl,
       removeWorktreeImpl,
       turnStarted,
