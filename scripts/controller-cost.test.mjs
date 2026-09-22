@@ -10,10 +10,15 @@
 //            from the LAST token_count info.total_token_usage, peak from max
 //            info.last_token_usage.input_tokens, window from
 //            info.model_context_window)
-//   DeepSeek the seat's own JSON output (provider/model/usage on the last
-//            assistant message_end; peak = max over assistant messages of
-//            input + cacheRead + cacheWrite), with the duration timed by the
-//            CONTROLLER, which starts the process and sees it exit
+//   DeepSeek the seat's own JSON output (provider/model off the last
+//            assistant message_end; usage SUMMED across every assistant
+//            message_end -- each is that one turn's own figures, not a
+//            running cumulative total (JUL-98, fixed 2026-09-22: a real
+//            Command Code review's last turn alone could not account for
+//            its own review file's size); peak = max over assistant
+//            messages of input + cacheRead + cacheWrite), with the
+//            duration timed by the CONTROLLER, which starts the process
+//            and sees it exit
 //
 // Dollars come from graph/rate-table.mjs, which is itself proven against these
 // same recordings in graph/rate-table.test.mjs. Nothing here re-prices anything.
@@ -130,7 +135,7 @@ test('Codex: the rollout\'s last token_count is the total, and the peak is the l
 
 // --- DeepSeek (Pi) ----------------------------------------------------------
 
-test('DeepSeek: model, tokens and peak context come off the seat\'s own JSON output', () => {
+test('DeepSeek: model, tokens and peak context come off the seat\'s own JSON output, SUMMED across every turn (JUL-98, 2026-09-22 fix: a real Command Code review showed usage.* is per-turn, not cumulative -- summing only the last turn undercounted a whole multi-turn session down to its final message)', () => {
   const events = jsonl('cost.pi.seat-json-stream.multi-turn.jsonl');
   const extract = deepseekExtractFromSeatStream(events, {
     // The controller times the process: it starts it and sees it exit. These
@@ -143,7 +148,13 @@ test('DeepSeek: model, tokens and peak context come off the seat\'s own JSON out
   assert.equal(extract.model, 'deepseek-v4-flash');
   assert.equal(extract.provider, 'deepseek');
   assert.equal(extract.peakContext, 2530, 'the recorded peak: 226 + 2,304 on the second turn');
-  assert.equal(extract.tokens.input, 226, 'the last assistant message_end\'s own usage');
+  // Turn 1: input 1975, output 38, cacheRead 384, total 2397. Turn 2: input
+  // 226, output 4, cacheRead 2304, total 2534. If usage.totalTokens were
+  // cumulative, turn 2's input (226) would be >= turn 1's (1975) -- it is
+  // not, which is the proof these are per-turn figures, not a running total.
+  assert.equal(extract.tokens.input, 1975 + 226, 'summed across both turns, not just the last');
+  assert.equal(extract.tokens.output, 38 + 4, 'summed across both turns, not just the last');
+  assert.equal(extract.tokens.cacheRead, 384 + 2304, 'summed across both turns, not just the last');
   assert.equal(extract.minutes, Number((2.416 / 60).toFixed(2)), 'timed by the controller, as the wrapper stamps prove');
   assert.ok(extract.usd > 0);
 });
@@ -257,15 +268,17 @@ test("a record with no total of its own -- Claude's transcript -- still totals b
   assert.equal(line.totalTokens, 369994);
 });
 
-test("the DeepSeek seat's own totalTokens is used, not a re-sum of its usage fields", () => {
+test("the DeepSeek seat's totalTokens is the SUM of every turn's own usage.totalTokens, not just the last turn's (JUL-98, 2026-09-22 fix)", () => {
   const events = jsonl('cost.pi.seat-json-stream.multi-turn.jsonl');
   const extract = deepseekExtractFromSeatStream(events, {
     startedAt: readFileSync(join(ORCA_FIXTURE_DIR, 'pi.timing.start.txt'), 'utf8').trim(),
     endedAt: readFileSync(join(ORCA_FIXTURE_DIR, 'pi.timing.exit.txt'), 'utf8').trim(),
   });
-  // The recorded last assistant message_end carries usage.totalTokens 2534.
-  assert.equal(extract.totalTokens, 2534);
-  assert.equal(seatCostLine({ seat: 'reviewer', ...extract }).totalTokens, 2534, 'the line does not re-derive what the record already states');
+  // Turn 1's message_end carries usage.totalTokens 2397; turn 2's carries
+  // 2534. Neither is cumulative (see the previous test's proof), so the
+  // seat's real total is the sum of both, 4931 -- not turn 2's 2534 alone.
+  assert.equal(extract.totalTokens, 2397 + 2534);
+  assert.equal(seatCostLine({ seat: 'reviewer', ...extract }).totalTokens, 2397 + 2534, 'the line carries the summed total through unchanged');
 });
 
 // --- A worker that never started ---------------------------------------------

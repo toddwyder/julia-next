@@ -53,7 +53,7 @@ export const COST_SOURCES = Object.freeze({
     lowerBound: false,
   }),
   'pi-deepseek': Object.freeze({
-    where: "the seat's own JSON output -- provider/model/usage on the last assistant message_end; duration timed by the controller, which starts the process and sees it exit",
+    where: "the seat's own JSON output -- provider/model off the last assistant message_end, usage SUMMED across every assistant message_end (each is that one turn's figures, not a running total -- JUL-98, fixed 2026-09-22); duration timed by the controller, which starts the process and sees it exit",
     provenOn: 'JUL-109 findings section 5; graph/fixtures/orca-1.4.205/cost.pi.seat-json-stream.multi-turn.jsonl and pi.timing.*.txt',
     lowerBound: false,
   }),
@@ -200,23 +200,38 @@ export function deepseekExtractFromSeatStream(events, { startedAt, endedAt } = {
     throw new Error('deepseekExtractFromSeatStream: the seat output holds no assistant message_end, so this seat has no cost figures');
   }
   const last = assistants[assistants.length - 1].message;
-  const tokens = {
-    input: last.usage.input ?? 0,
-    output: last.usage.output ?? 0,
-    cacheRead: last.usage.cacheRead ?? 0,
-  };
+  // SUMMED across every turn, not just the last one (JUL-98, fixed
+  // 2026-09-22). Found live: a real Command Code review's last message_end
+  // carried 535 output tokens, which cannot have produced its 10.6KB review
+  // file. Each assistant message_end's usage.* is that ONE turn's figures,
+  // not a running cumulative total the way Codex's token_count events are
+  // (codexExtractFromRollout's "last is the total" is correct for Codex
+  // specifically; it was wrongly assumed to hold here too). Proof in the
+  // fixture itself: turn 2's usage.input (226) is smaller than turn 1's
+  // (1975) -- a cumulative counter cannot go down.
+  const tokens = assistants.reduce((sum, event) => ({
+    input: sum.input + (event.message.usage.input ?? 0),
+    output: sum.output + (event.message.usage.output ?? 0),
+    cacheRead: sum.cacheRead + (event.message.usage.cacheRead ?? 0),
+  }), { input: 0, output: 0, cacheRead: 0 });
   const peakContext = peakPromptTokens(assistants.map((event) => ({
     input: event.message.usage.input ?? 0,
     cacheRead: event.message.usage.cacheRead ?? 0,
     cacheWrite: event.message.usage.cacheWrite ?? 0,
   })));
+  // totalTokens is likewise summed across every turn's own usage.totalTokens
+  // -- each one is that turn's total, same per-turn shape as the other
+  // fields, so summing them (rather than trusting one recorded field) is the
+  // real session total. tokenTotal's own fallback (summing `tokens`) would
+  // undercount here too, since `tokens` excludes cacheWrite/reasoning.
+  const totalTokens = assistants.reduce((sum, event) => sum + (Number(event.message.usage.totalTokens) || 0), 0);
 
   return {
     vendor: 'pi-deepseek',
     provider: last.provider ?? null,
     model: last.model,
     tokens,
-    totalTokens: tokenTotal(tokens, last.usage.totalTokens),
+    totalTokens: tokenTotal(tokens, totalTokens),
     peakContext,
     startedAt,
     endedAt,

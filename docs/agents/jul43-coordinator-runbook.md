@@ -2126,18 +2126,97 @@ start-then-adopt route step 6's own build brief describes for the controller:
    tokens, peak context, minutes, and Gemini's allowance used goes on the line like every other
    worker's.
 
-**Reviews stay on Codex, not Claude**, until the GOAT reviewer trial (Todd's 13:43Z Decision,
-same day) is live -- reviewing a Gemini builder's work with Claude would burn the very allowance
-this Decision exists to protect. **The coordinator itself stays Claude** -- this Decision is about
-the builder seat only, not the orchestrator seat in `SEAT_TABLE.orchestrator`. **The family rule
-is unchanged**: Codex (`openai`) reviewing a Gemini builder is a different family either way, so
-the existing `assertCanPickDifferentFamilies` guard in `graph/seat-table.mjs` is not violated by
-this by-hand override -- it is not itself a seat-table code change, since `SEAT_TABLE.builder`
-still names `claude`/`pi-deepseek`; Gemini is chosen by the coordinator at dispatch time until
-step 6 gives the controller its own Gemini entry to read.
+**Reviews for a Gemini-built step go to the `reviewer-backup` seat (DeepSeek Pro, through Command
+Code), not Codex, as of Todd's 15:01:54Z Decision the same day** -- the interim rule below this
+paragraph ("stay on Codex, not Claude, until the GOAT reviewer trial is live") held for about
+twenty minutes: the trial went live the same day, so the reviewer moved off Codex immediately
+rather than waiting for step 6 to merge. See "The reviewer moves to Command Code, with a Flash
+shadow" below for the detail. **The coordinator itself stays Claude** -- this Decision is about
+the builder/reviewer seats only, not the orchestrator seat in `SEAT_TABLE.orchestrator`. **The
+family rule is unchanged**: DeepSeek reviewing a Gemini (Google) builder is a different family
+either way, so the existing `assertCanPickDifferentFamilies` guard in `graph/seat-table.mjs` is
+not violated by this by-hand override -- it is not itself a seat-table code change, since
+`SEAT_TABLE.builder` still names `claude`/`pi-deepseek`; Gemini is chosen by the coordinator at
+dispatch time until step 6 gives the controller its own Gemini entry to read.
 
 **Boundaries carried over unchanged from the 04:07Z Decision:** no new spend, the firewall rule
 stays runner-only, the family rule is unchanged.
+
+## The reviewer moves to Command Code, with a Flash shadow (JUL-98, Todd's 15:01:54Z Decision, 2026-09-22)
+
+The 13:43Z Decision's GOAT trial (see "Command Code as the reviewer's Pi provider" in
+`ops/service-dropbox/README.md` for the install and model-id detail) was scoped to start "after
+step 6 merges." The probe run on this card the same day (real, non-zero token counts for both
+`deepseek/deepseek-v4-pro` and `deepseek/deepseek-v4-flash`) cleared that trial's own pass bar
+early, so Todd moved the date up: **reviews move off Codex to Command Code immediately, not after
+step 6.**
+
+- **`reviewer-backup` (`ops/service-dropbox/run-pi-seat.mjs`) now launches DeepSeek Pro through
+  Command Code**, not native DeepSeek -- same dispatch shape, same secret-handling rule (env only,
+  never argv), only the provider/model strings and the secret field (`commandcode`, not
+  `deepseek`) changed. `SEAT_TABLE.reviewer`'s shape (`{ primary: 'pi-deepseek', backup: 'codex'
+  }`) did not need to change -- it already read DeepSeek-primary, Codex-backup before this
+  Decision; what changed is what `pi-deepseek` launches *through*.
+- **A new seat, `reviewer-shadow-flash`**, launches DeepSeek Flash through the same provider. The
+  coordinator dispatches it **beside every real `reviewer-backup` review**, on the same candidate,
+  the same way (its own worktree, its own terminal). **It never decides anything** -- record its
+  verdict and cost line next to the real review's; the step's pass/fail still turns on the real
+  review alone. After ten paired reviews, the 13:43Z Decision's own deliverable is due: report on
+  the card whether Flash caught every serious finding Pro caught, and where they disagreed.
+- **The cost line is computed, not read from Pi.** Pi's own `usage.cost` prints zero for this
+  provider (confirmed live on the probe: `commandcode` has no entry in Pi's built-in price list).
+  `graph/rate-table.mjs`'s `costOf` now has `commandcode/deepseek-v4-pro` and
+  `commandcode/deepseek-v4-flash` entries, same shape as `pi-deepseek`'s (peak/off-peak, same
+  published numbers as native DeepSeek -- Command Code passes the underlying vendor's list price
+  straight through, at least for these two models, confirmed against Command Code's own
+  `/models/deepseek-v4-pro` and `/models/deepseek-v4-flash` pages, not assumed identical). **The
+  first real review's rate-table figure must be checked against the Command Code dashboard**
+  before it is trusted, per the Decision -- that check is still owed as of this PR; report it on
+  the card once done.
+- **Codex is the backup reviewer only now.** `seat-labels.mjs fallback` still resolves it on a cap
+  or a same-family clash, unchanged code path. It is not the primary again unless a future
+  Decision says so.
+- **A review already running when this Decision landed finishes on whatever it started on** --
+  only the next dispatch moves. Nothing about an in-flight review is interrupted or re-run.
+
+**Not done in this PR:** the first real review's cost-line-vs-dashboard check (needs a live
+review to check it against), and the ten-paired-reviews Flash-vs-Pro report (needs ten real
+reviews to exist first). Both are owed, tracked on JUL-98, not silently dropped.
+
+## The DeepSeek (Pi) cost reader summed only the last turn, undercounting every multi-turn seat (JUL-98, found 2026-09-22)
+
+**Found live, on step 7's first real Command Code review.** The coordinator computed the
+review's token total by hand off the seat's own JSON stream and got a number (55,616 total, 535
+output) that could not have produced the 10.6KB review file that same session wrote. Reading
+`graph/controller/cost.mjs`'s `deepseekExtractFromSeatStream` found why: it took `usage` off only
+the **last** assistant `message_end` event, on the same assumption Codex's reader correctly makes
+for Codex (`codexExtractFromRollout`'s "the last `token_count` is the total" -- Codex's own
+`total_token_usage` really is cumulative) -- but DeepSeek/Pi's `usage.*` on each `message_end` is
+that **one turn's own figures**, not a running total. The existing multi-turn fixture
+(`graph/fixtures/orca-1.4.205/cost.pi.seat-json-stream.multi-turn.jsonl`) already proved this and
+nobody had read it that way: turn 2's `usage.input` (226) is smaller than turn 1's (1975), which a
+cumulative counter cannot do.
+
+**Every DeepSeek/Pi seat's cost line has been undercounted since this reader was written** --
+`builder-backup`, `reviewer-backup` (native and now Command Code), `orchestrator-deepseek`, and
+the new `reviewer-shadow-flash` -- down to whatever the last turn alone reported, on any review or
+build that took more than one turn. A short single-turn call (like the original probe on this
+card) was never wrong; a real multi-tool-call session always was.
+
+**Fixed:** `deepseekExtractFromSeatStream` now sums `input`/`output`/`cacheRead` and
+`usage.totalTokens` across every assistant `message_end`, the same summing shape
+`claudeExtractFromTranscript` already uses for Claude (which has the analogous per-message-not-
+cumulative shape). Peak context was already correct -- `peakPromptTokens` already took the max
+over every turn, not just the last -- so only the summed totals needed the fix. Two tests in
+`scripts/controller-cost.test.mjs` previously asserted the old, now-disproven behavior ("the last
+assistant message_end's own usage", "not a re-sum of its usage fields") against the same fixture;
+both are corrected to assert the summed values the fixture's real numbers support.
+
+**No cost-line shape changed** -- `tokens`, `totalTokens`, `usd` are still exactly the fields
+`seatCostLine`/`assertCostLineComplete`/`formatCostLine` expect. Every already-posted DeepSeek/Pi
+cost line on this card from before this fix understates the true figure for any seat that ran more
+than one turn; not retroactively corrected, but this is why a small final message and a large real
+session's cost can look mismatched in the earlier retro lines.
 
 ## Seven findings carried from the cancelled JUL-106 (recorded 2026-09-20)
 
