@@ -148,7 +148,15 @@ export async function runWorkerStep({
   }
 
   // 2. Proof the turn started. Nothing is waited on until this holds.
-  const observed = await observeStartImpl({ seat, dispatch: dispatched });
+  //
+  // A dispatch that carries its OWN observation is believed and nothing else is
+  // asked. That is the start-then-adopt route (JUL-98 step 6): Orca reports the
+  // agent's provider as `unsupported` for turn observation and tracks no agent
+  // for it, so `worktree ps` -- the only thing `observeStartImpl` can look at --
+  // would answer `agents: []` for a worker that is visibly working. The route
+  // takes the one reading Orca can still give, and ./turn-start.mjs judges it
+  // by the same rules as every other seat's.
+  const observed = dispatched.observed ?? await observeStartImpl({ seat, dispatch: dispatched });
   const proof = proveTurnStarted(observed ?? {});
   if (!proof.started) {
     return close({

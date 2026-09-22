@@ -378,3 +378,61 @@ test('a start-then-adopt route that could not be completed is the refusal the se
   assert.match(result.reason, /agy never reached an idle prompt/);
   assert.deepEqual(result.residualResources, []);
 });
+
+// ---------------------------------------------------------------------------
+// JUL-98 step 6: PROOF THAT AN ADOPTED WORKER'S TURN STARTED.
+//
+// Measured live on this host on 2026-09-22, adopting a real agy terminal:
+//
+//   worker-start --terminal ... ->
+//     prompt: { stages: ["input_accepted"], provider: "unsupported",
+//               observation: "unsupported" }
+//   worktree ps                 ->  agents: []
+//   terminal wait --for tui-idle --timeout-ms 4000  ->  timeout
+//   terminal show               ->  agentIdentity: "antigravity", and the
+//                                   preview holds the brief
+//
+// So Orca says in as many words that it CANNOT observe a turn for this
+// provider, and it tracks no agent for it either. The one thing it can still
+// answer is whether the terminal is idle -- and the transition is the proof:
+// the route waited for idle BEFORE delivering the brief (that is how it knew
+// the agent had started), and the terminal is busy immediately after. A TUI
+// sitting on a trust or login screen stays idle through both.
+// ---------------------------------------------------------------------------
+
+test('an adopted worker carries its own turn-start observation, because Orca can observe nothing else for it', async () => {
+  const result = await dispatchWorker({
+    workerStartImpl: async () => { throw new Error('not reached'); },
+    startAdoptedWorkerImpl: async () => ({
+      ok: true,
+      result: { state: 'ready', stage: 'input_accepted', taskId: 't', dispatchId: 'c', runId: 'r', effects: [] },
+      worktree: 'repo-1::/w/jul98-6',
+      terminal: 'term_seat',
+      allowanceBefore: { 'gemini-weekly': 0.99 },
+      observed: { busy: { terminal: 'term_seat', satisfied: false, timedOut: true } },
+    }),
+    environment: 'ovh-local',
+    runId: 'run_1',
+    from: 'term_controller',
+    repo: 'path:/home/runner/julia-next',
+    seat: 'builder',
+    card: CARD,
+    step: PLAN[0],
+    choice: GEMINI_CHOICE,
+    worktreeName: 'jul98-6',
+    requestId: 'JUL-98:step-6:builder',
+  });
+
+  assert.deepEqual(result.observed, { busy: { terminal: 'term_seat', satisfied: false, timedOut: true } });
+});
+
+test('a terminal still busy after the brief was delivered is proof; one that went idle is not', () => {
+  const busy = proveTurnStarted({ busy: { satisfied: false, timedOut: true } });
+  assert.equal(busy.started, true);
+  assert.equal(busy.source, 'terminal-busy');
+
+  const idle = proveTurnStarted({ busy: { satisfied: true } });
+  assert.equal(idle.started, false);
+  assert.match(idle.reason, /idle/);
+  assert.match(idle.reason, /trust|login/i, 'and it names what an idle terminal looks like');
+});

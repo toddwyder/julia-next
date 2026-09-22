@@ -1179,3 +1179,26 @@ test('an --agent worker-start is unchanged: the creation flags are exactly what 
   assert.equal(flag(args, '--model'), 'claude-opus-5');
   assert.ok(!args.includes('--terminal'));
 });
+
+test('a terminal wait that TIMES OUT is a normal unsatisfied answer, not a thrown error', async () => {
+  const boundaries = createOrcaBoundaries({
+    orcaCallImpl: async () => {
+      // Orca's own shape, measured live on 2026-09-22 when the busy check ran
+      // against a working agy: `ok: false`, `error.code: "timeout"`.
+      const error = new Error('orca terminal wait ... failed (timeout): timeout');
+      error.code = 'timeout';
+      throw error;
+    },
+  });
+
+  const answer = await boundaries.terminalWaitImpl({ terminal: 'term_seat', timeoutMs: 8000 });
+  assert.equal(answer.wait.satisfied, false);
+  assert.equal(answer.wait.timedOut, true);
+});
+
+test('a terminal wait that fails for any OTHER reason still throws, so a real fault is not read as "busy"', async () => {
+  const boundaries = createOrcaBoundaries({
+    orcaCallImpl: async () => { throw new Error('orca terminal wait ... failed (terminal_handle_stale): gone'); },
+  });
+  await assert.rejects(() => boundaries.terminalWaitImpl({ terminal: 'term_seat', timeoutMs: 8000 }), /terminal_handle_stale/);
+});

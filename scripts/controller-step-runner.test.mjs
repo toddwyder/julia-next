@@ -50,6 +50,7 @@ function doneMessage(dispatchId, outcome = 'succeeded') {
 // that CANNOT BE LAUNCHED in the new table -- the builder's own Gemini entry.
 function harness({ send = TURN_STARTED, outcome = 'succeeded', cost = COST, adoptStarts = true } = {}) {
   const order = [];
+  let adoptWaits = 0;
   const orca = createFixtureWorkerOrca();
   return {
     order,
@@ -65,7 +66,13 @@ function harness({ send = TURN_STARTED, outcome = 'succeeded', cost = COST, adop
           return { trusted: true, allowance: { 'gemini-weekly': 0.9935, 'gemini-5h': 0.9635 } };
         },
         agentTerminalCreateImpl: async () => { order.push('adopt-terminal-create'); return { terminal: { handle: 'term_seat' } }; },
-        terminalWaitImpl: async () => ({ wait: { satisfied: adoptStarts } }),
+        // Two readings, and they mean opposite things (JUL-98 step 6): the
+        // first must be SATISFIED (the agent finished starting), the second
+        // must NOT be (it took the brief and is working).
+        terminalWaitImpl: async () => {
+          adoptWaits += 1;
+          return { wait: { satisfied: adoptWaits === 1 ? adoptStarts : false } };
+        },
         terminalCloseImpl: async () => { order.push('adopt-terminal-close'); },
         removeWorktreeImpl: async () => { order.push('adopt-worktree-rm'); },
       },
@@ -575,4 +582,46 @@ test('a Gemini seat is costed from the reading taken at dispatch and the control
   assert.deepEqual(read.allowanceBefore, { 'gemini-weekly': 0.9935, 'gemini-5h': 0.9635 }, 'the reading taken before the agent ran');
   assert.equal(read.startedAt, '2026-09-22T06:00:00.000Z', 'when the controller started it');
   assert.equal(read.endedAt, '2026-09-22T06:12:24.000Z', 'and when it saw it report');
+});
+
+test('a dispatch that carries its own turn-start observation is believed, and worktree ps is not asked', async () => {
+  const h = harness();
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+  h.deps.observeStartImpl = async () => { throw new Error('worktree ps must not be asked about an agent Orca does not track'); };
+
+  const result = await runWorkerStep({
+    seat: 'builder',
+    card: CARD,
+    step: STEP,
+    choice: resolveSeatChoices([]).builder,
+    worktreeName: 'jul98-6',
+    requestId: 'JUL-98:step-6:builder',
+    suiteRunner,
+    suiteKey: 'JUL-98:step-6',
+    runSuite: false,
+    ...h.deps,
+  });
+
+  assert.equal(result.ok, true, result.reason);
+  assert.equal(result.outcome, 'succeeded');
+});
+
+test('and an adopted worker whose terminal went idle again is still caught as never started', async () => {
+  const h = harness();
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+  // The TUI is idle for BOTH readings: it took the brief nowhere.
+  h.deps.adoptBoundaries = { ...h.deps.adoptBoundaries, terminalWaitImpl: async () => ({ wait: { satisfied: true } }) };
+  h.deps.observeStartImpl = async () => { throw new Error('worktree ps must not be asked'); };
+  h.deps.checkWaitImpl = async () => { throw new Error('the mailbox must not be opened for a worker whose turn never started'); };
+
+  const result = await runWorkerStep({
+    seat: 'builder', card: CARD, step: STEP, choice: resolveSeatChoices([]).builder,
+    worktreeName: 'jul98-6', requestId: 'JUL-98:step-6:builder',
+    suiteRunner, suiteKey: 'JUL-98:step-6', runSuite: false, ...h.deps,
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.stage, 'turn-start');
+  assert.match(result.reason, /idle/);
+  assert.equal(result.cost.neverStarted, true);
 });

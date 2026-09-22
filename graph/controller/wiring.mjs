@@ -66,6 +66,12 @@ import { WORKER_MESSAGE_TYPES } from './mailbox.mjs';
 
 const execFileAsync = promisify(execFile);
 
+// Orca reports a wait that ran out as `ok: false` with `error.code: "timeout"`;
+// scripts/orca-cli.mjs raises that as an Error whose message carries the code.
+function isTimeout(error) {
+  return error?.code === 'timeout' || /\(timeout\)/.test(error?.message ?? '');
+}
+
 // TWO DAEMONS AND TWO CHECKOUTS, AND THEY ARE NOT INTERCHANGEABLE. Read this
 // before you "simplify" one pair into the other, because JUL-98 step 5 already
 // shipped that bug once and it stopped the controller dead.
@@ -455,13 +461,29 @@ export function createOrcaBoundaries({
     // caller reads `wait.satisfied` rather than the fact that something
     // printed (orca-cli skill).
     async terminalWaitImpl({ terminal, timeoutMs } = {}) {
-      return call([
-        'terminal', 'wait',
-        '--environment', workerEnvironment,
-        '--terminal', terminal,
-        '--for', 'tui-idle',
-        '--timeout-ms', String(timeoutMs),
-      ]);
+      try {
+        return await call([
+          'terminal', 'wait',
+          '--environment', workerEnvironment,
+          '--terminal', terminal,
+          '--for', 'tui-idle',
+          '--timeout-ms', String(timeoutMs),
+        ]);
+      } catch (error) {
+        // A TIMED-OUT wait is an ANSWER, not a fault. Measured live on
+        // 2026-09-22: `orca terminal wait --for tui-idle` on a terminal whose
+        // agent was working answered `ok: false, error.code: "timeout"`, which
+        // orca-cli.mjs raises. That is the busy reading the adopt route's
+        // turn-start proof is built on (./turn-start.mjs), so it is normalized
+        // to the shape the orca-cli skill documents -- read `wait.satisfied`,
+        // never the fact that something printed.
+        //
+        // EVERY OTHER FAILURE STILL THROWS. A stale handle or a dead daemon is
+        // not "the agent is busy", and reading it as one would report a worker
+        // that does not exist as working.
+        if (isTimeout(error)) return { wait: { satisfied: false, timedOut: true } };
+        throw error;
+      }
     },
 
     // (16) The worktree made ready for the agent, BEFORE the agent is started:

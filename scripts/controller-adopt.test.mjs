@@ -84,7 +84,7 @@ test('the worktree is trusted BEFORE the agent terminal is created, and for that
 
   assert.equal(started.ok, true, started.reason);
   const order = b.calls.map(([name]) => name);
-  assert.deepEqual(order, ['worktree-create', 'prepare', 'terminal-create', 'terminal-wait', 'worker-start']);
+  assert.deepEqual(order, ['worktree-create', 'prepare', 'terminal-create', 'terminal-wait', 'worker-start', 'terminal-wait']);
 
   const [, prepare] = b.calls.find(([name]) => name === 'prepare');
   assert.equal(prepare.worktreePath, '/home/runner/orca/workspaces/julia-next/jul98-step-6-a1');
@@ -184,4 +184,32 @@ test('a worker-start that Orca itself failed is reported with Orcas own detail, 
   assert.equal(started.ok, false);
   assert.match(started.reason, /agent_readiness/);
   assert.match(started.reason, /timeout/);
+});
+
+test('after the brief is delivered the route asks Orca whether the terminal is still busy, and carries the answer out', async () => {
+  const waits = [];
+  const b = boundaries({
+    async terminalWaitImpl(args) { waits.push(args); return { wait: { satisfied: waits.length === 1 } }; },
+  });
+  const started = await startAdoptedWorker({
+    seat: 'builder', entry: 'gemini', launch: launchForChoice(GEMINI), spec: SPEC,
+    worktreeName: 'jul98-step-6-a1', runId: 'run_1', from: 'term_controller', requestId: 'k',
+    ...b,
+  });
+
+  assert.equal(started.ok, true, started.reason);
+  assert.equal(waits.length, 2, 'once for "it has started", once for "it took the brief"');
+  assert.ok(waits[1].timeoutMs < waits[0].timeoutMs, 'the busy check is a short look, not another long wait');
+  assert.deepEqual(started.observed, { busy: { terminal: 'term_seat', satisfied: false } });
+});
+
+test('the busy check never fails the start: an idle answer travels out and turn-start.mjs judges it', async () => {
+  const b = boundaries({ async terminalWaitImpl() { return { wait: { satisfied: true } }; } });
+  const started = await startAdoptedWorker({
+    seat: 'builder', entry: 'gemini', launch: launchForChoice(GEMINI), spec: SPEC,
+    worktreeName: 'jul98-step-6-a1', runId: 'run_1', from: 'term_controller', requestId: 'k',
+    ...b,
+  });
+  assert.equal(started.ok, true, 'the adoption itself succeeded; whether a turn began is a separate verdict');
+  assert.equal(started.observed.busy.satisfied, true);
 });

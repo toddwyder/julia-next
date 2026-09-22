@@ -258,6 +258,11 @@ export async function dispatchWorker({
       state: adopted.result.state ?? null,
       launch: { ...launch },
       startedAt: now(),
+      // The turn-start reading the route took for itself. Orca can observe no
+      // turn for this provider and tracks no agent for it, so `worktree ps` --
+      // the ONLY observation the --agent route has -- would answer nothing at
+      // all here. See ./turn-start.mjs for the measurement.
+      observed: adopted.observed ?? null,
       // The allowance reading taken BEFORE the agent ran. ./step-runner.mjs
       // hands it to the cost read, which differences it against a second
       // reading -- the only figure an allowance-billed seat has.

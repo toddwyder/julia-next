@@ -50,6 +50,12 @@ export const SEAT_TERMINAL_TITLE_PREFIX = 'julia-seat-';
 // refusal in minutes rather than the eight hours the unguarded version took.
 export const DEFAULT_TUI_WAIT_MS = 180000;
 
+// The SECOND look, immediately after the brief is delivered: is the terminal
+// still busy? Short on purpose -- this is a reading, not a wait. See
+// ./turn-start.mjs for why the transition idle -> busy is the only turn-start
+// proof available for an agent whose provider Orca reports as `unsupported`.
+export const DEFAULT_BUSY_WINDOW_MS = 8000;
+
 function refusal({ seat, entry, detail, residualResources }) {
   return {
     ok: false,
@@ -71,6 +77,7 @@ export async function startAdoptedWorker({
   from,
   requestId,
   tuiWaitMs = DEFAULT_TUI_WAIT_MS,
+  busyWindowMs = DEFAULT_BUSY_WINDOW_MS,
 
   worktreeCreateImpl,
   prepareWorktreeImpl,
@@ -166,7 +173,21 @@ export async function startAdoptedWorker({
       return stop(`worker-start failed at ${result.failedStage ?? result.stage ?? 'an unnamed stage'} (${result.lastError ?? 'no error given'})`);
     }
 
-    return { ok: true, seat, entry, result, worktree, worktreePath, terminal, allowanceBefore: prepared.allowance ?? null };
+    // (5) The turn-start reading. It never fails the START -- the adoption
+    // itself succeeded -- it travels out and ./turn-start.mjs judges it, the
+    // same way every other seat's observation does.
+    const busy = await terminalWaitImpl({ terminal, timeoutMs: busyWindowMs });
+    return {
+      ok: true,
+      seat,
+      entry,
+      result,
+      worktree,
+      worktreePath,
+      terminal,
+      allowanceBefore: prepared.allowance ?? null,
+      observed: { busy: { terminal, satisfied: busy?.wait?.satisfied === true } },
+    };
   } catch (error) {
     return stop(error.message);
   }
