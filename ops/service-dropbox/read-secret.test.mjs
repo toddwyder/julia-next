@@ -36,10 +36,10 @@ test('secretAuthHeader wraps the value as a Bearer header, built in-process', ()
   assert.equal(secretAuthHeader('supabase', { dir }), 'Bearer sbp_token_value_1234567890');
 });
 
-test('KNOWN_FIELDS is exactly the eight boxes this drop box now names (JUL-72 + JUL-77, GLM removed in JUL-93, controller app added for JUL-98)', () => {
+test('KNOWN_FIELDS is exactly the nine boxes this drop box now names (JUL-72 + JUL-77, GLM removed in JUL-93, controller app + Command Code added for JUL-98)', () => {
   assert.deepEqual(
     [...KNOWN_FIELDS].sort(),
-    ['axiom', 'deepseek', 'linear', 'linear-app-id', 'linear-app-secret', 'powersync', 'sentry', 'supabase'],
+    ['axiom', 'commandcode', 'deepseek', 'linear', 'linear-app-id', 'linear-app-secret', 'powersync', 'sentry', 'supabase'],
   );
 });
 

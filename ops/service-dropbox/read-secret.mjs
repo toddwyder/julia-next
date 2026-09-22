@@ -18,7 +18,7 @@ import { readFileSync } from 'node:fs';
 
 export const KNOWN_FIELDS = [
   'sentry', 'supabase', 'powersync', 'axiom', 'deepseek', 'linear',
-  'linear-app-id', 'linear-app-secret',
+  'linear-app-id', 'linear-app-secret', 'commandcode',
 ];
 
 const DEFAULT_DIR = '/etc/orca-runner/dropbox-secrets';

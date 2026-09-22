@@ -30,3 +30,7 @@ orchestrator-svc ALL=(root) NOPASSWD: /usr/bin/systemctl restart julia-ready-que
 # chowns each key file to one of these groups). Only these pairs.
 orchestrator-svc ALL=(root) NOPASSWD: /usr/sbin/usermod -aG deepseek-readers runner
 orchestrator-svc ALL=(root) NOPASSWD: /usr/sbin/usermod -aG deepseek-readers orchestrator-svc
+# Command Code GOAT reviewer trial (JUL-98, Todd's 13:43Z Decision): same
+# shape as deepseek-readers above.
+orchestrator-svc ALL=(root) NOPASSWD: /usr/sbin/usermod -aG commandcode-readers runner
+orchestrator-svc ALL=(root) NOPASSWD: /usr/sbin/usermod -aG commandcode-readers orchestrator-svc
