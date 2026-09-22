@@ -13,15 +13,15 @@ test('the default seat table has the three seats this ticket names, each with a 
   }
 });
 
-test("the default table is exactly Todd's instruction: GLM is no seat default or backup", () => {
+test("the default table is exactly Todd's instruction, as amended 15:01:54Z: GLM is no seat default or backup, and the reviewer runs on DeepSeek through Command Code", () => {
   assert.deepEqual(SEAT_TABLE, {
     orchestrator: { primary: 'claude', backup: 'pi-deepseek' },
     builder: { primary: 'gemini', backup: 'claude' },
-    reviewer: { primary: 'claude', backup: 'codex' },
+    reviewer: { primary: 'pi-deepseek', backup: 'codex' },
     'feature-builder': { primary: 'gemini', backup: 'claude' },
     'defect-fixer': { primary: 'claude', backup: 'pi-deepseek' },
     refactor: { primary: 'claude', backup: 'pi-deepseek' },
-    'adversarial-reviewer': { primary: 'claude', backup: 'codex' },
+    'adversarial-reviewer': { primary: 'pi-deepseek', backup: 'codex' },
     'evidence-reviewer': { primary: 'codex', backup: 'claude' },
     consultant: { primary: 'claude', backup: 'pi-deepseek' },
   });
@@ -93,23 +93,30 @@ test('every table entry used by builder or reviewer has a known model family', (
   }
 });
 
-// JUL-98 step 6: THE READING OF THE TABLE, in one test. Gemini builds; Claude
-// reviews; and Codex reviews whenever Claude builds -- which is not a fourth
-// rule but what the family guard already does when the builder falls back to
-// its Claude backup and collides with the Claude reviewer.
-test('the seat table reads Gemini builds, Claude reviews, Codex reviews whenever Claude builds', () => {
+// JUL-98 step 6, amended 15:01:54Z: THE READING OF THE TABLE, in one test.
+// Gemini builds; DeepSeek (through Command Code) reviews; Codex is the
+// reviewer's own backup. Four distinct families now sit on these two seats
+// (google, deepseek, anthropic, openai), so -- unlike the superseded
+// Claude-reviews reading this test used to pin -- EVERY combination of a
+// builder entry and a reviewer entry is already a different family. There is
+// no same-family collision left for this specific pair to fall back from;
+// the family guard's fallback machinery is still real (seat-table.test.mjs's
+// own synthetic-table tests above exercise it directly), it simply never
+// fires for builder/reviewer today.
+test('the seat table reads Gemini builds, DeepSeek (Command Code) reviews -- every builder/reviewer combination is already a different family', () => {
   for (const seat of ['builder', 'feature-builder']) {
     assert.deepEqual(SEAT_TABLE[seat], { primary: 'gemini', backup: 'claude' }, seat);
   }
   for (const seat of ['reviewer', 'adversarial-reviewer']) {
-    assert.deepEqual(SEAT_TABLE[seat], { primary: 'claude', backup: 'codex' }, seat);
+    assert.deepEqual(SEAT_TABLE[seat], { primary: 'pi-deepseek', backup: 'codex' }, seat);
   }
-  // Gemini builds and Claude reviews: a legal pair with no move at all.
-  assert.notEqual(FAMILY_OF[SEAT_TABLE.builder.primary], FAMILY_OF[SEAT_TABLE.reviewer.primary]);
-  // Claude builds (the builder's backup): the Claude reviewer is then the same
-  // family, so the reviewer's own backup, Codex, is the only legal partner.
-  assert.equal(FAMILY_OF[SEAT_TABLE.builder.backup], FAMILY_OF[SEAT_TABLE.reviewer.primary]);
-  assert.notEqual(FAMILY_OF[SEAT_TABLE.builder.backup], FAMILY_OF[SEAT_TABLE.reviewer.backup]);
+  const builderFamilies = [FAMILY_OF[SEAT_TABLE.builder.primary], FAMILY_OF[SEAT_TABLE.builder.backup]];
+  const reviewerFamilies = [FAMILY_OF[SEAT_TABLE.reviewer.primary], FAMILY_OF[SEAT_TABLE.reviewer.backup]];
+  for (const b of builderFamilies) {
+    for (const r of reviewerFamilies) {
+      assert.notEqual(b, r, `builder family '${b}' must differ from reviewer family '${r}'`);
+    }
+  }
 });
 
 test('Gemini is a model family of its own, so it can never review its own work', () => {

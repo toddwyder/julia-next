@@ -182,11 +182,12 @@ test('each agent resolves to exactly one default model label and one Medium effo
   }
 });
 
-test('the team template names the models the dispatched pair actually runs (JUL-98 step 6)', () => {
-  // Gemini builds, Claude reviews -- the seat table's own reading, carried into
-  // the labels the template pre-applies, so a card shows the pair that will run.
+test('the team template names the models the dispatched pair actually runs (JUL-98 step 6, amended 15:01:54Z)', () => {
+  // Gemini builds, DeepSeek (Command Code) reviews -- the seat table's own
+  // reading, carried into the labels the template pre-applies, so a card
+  // shows the pair that will run.
   assert.deepEqual(defaultLabelsFor('feature-builder'), ['builder-gemini-flash', 'builder-effort-medium']);
-  assert.deepEqual(defaultLabelsFor('adversarial-reviewer'), ['adversary-claude-opus', 'adversary-effort-medium']);
+  assert.deepEqual(defaultLabelsFor('adversarial-reviewer'), ['adversary-deepseek-pro', 'adversary-effort-medium']);
   // The four seats the coordinator does not dispatch yet are untouched.
   assert.equal(defaultLabelsFor('evidence-reviewer')[0], 'evidence-codex');
   assert.equal(defaultLabelsFor('defect-fixer')[0], 'fixer-claude-opus');

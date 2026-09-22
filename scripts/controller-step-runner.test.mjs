@@ -390,7 +390,12 @@ test('a builder seat whose start-then-adopt route cannot be completed runs on it
 test('exactly ONE comment is written for the move, naming the seat, both entries and the real reason', async () => {
   const h = harness({ adoptStarts: false });
   const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
-  const result = await runBuildAndReview({ card: CARD, step: STEP, choices: resolveSeatChoices([]), suiteRunner, ...h.deps });
+  // An explicit Claude reviewer: the real default is now DeepSeek (pi-deepseek,
+  // 15:01:54Z Decision), which -- like Gemini -- is an ADOPTED_ENTRIES route, so
+  // this harness's adoptStarts/adopt-boundary stand-ins would otherwise apply
+  // to the reviewer too. Claude keeps the reviewer on the plain agent route this
+  // test is actually about.
+  const result = await runBuildAndReview({ card: CARD, step: STEP, choices: resolveSeatChoices(['adversary-claude-opus']), suiteRunner, ...h.deps });
 
   assert.equal(result.seatMoves.length, 1, 'one move, one comment -- not one per attempt and not one per seat');
   const [moved] = result.seatMoves;
@@ -411,7 +416,12 @@ test('exactly ONE comment is written for the move, naming the seat, both entries
 test('a backup that ALSO cannot be launched stops the step, with both entries and both reasons named', async () => {
   const h = harness({ adoptStarts: false });
   const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
-  const choices = resolveSeatChoices([]);
+  // An explicit Claude reviewer: the real default is now DeepSeek (pi-deepseek,
+  // 15:01:54Z Decision), which -- like Gemini -- is an ADOPTED_ENTRIES route, so
+  // this harness's adoptStarts/adopt-boundary stand-ins would otherwise apply
+  // to the reviewer too. Claude keeps the reviewer on the plain agent route this
+  // test is actually about.
+  const choices = resolveSeatChoices(['adversary-claude-opus']);
 
   // Today's table has no seat whose backup the launcher also refuses, and this
   // code must not depend on that staying true. The real resolver is stood in
@@ -525,7 +535,12 @@ test('a backup whose worker-start FAILS stops the step -- the card is never told
     options.agent === 'claude' ? { ...failedStart } : healthyStart(options)
   );
 
-  const result = await runBuildAndReview({ card: CARD, step: STEP, choices: resolveSeatChoices([]), suiteRunner, ...h.deps });
+  // An explicit Claude reviewer: the real default is now DeepSeek (pi-deepseek,
+  // 15:01:54Z Decision), which -- like Gemini -- is an ADOPTED_ENTRIES route, so
+  // this harness's adoptStarts/adopt-boundary stand-ins would otherwise apply
+  // to the reviewer too. Claude keeps the reviewer on the plain agent route this
+  // test is actually about.
+  const result = await runBuildAndReview({ card: CARD, step: STEP, choices: resolveSeatChoices(['adversary-claude-opus']), suiteRunner, ...h.deps });
 
   assert.equal(result.ok, false);
   assert.equal(result.seatMoves.length, 0, 'the seat never ran on the backup, so no move comment is written');
@@ -562,7 +577,12 @@ test('a backup whose TURN has the recorded failure signature stops the step too 
     return waitFor(options);
   };
 
-  const result = await runBuildAndReview({ card: CARD, step: STEP, choices: resolveSeatChoices([]), suiteRunner, ...h.deps });
+  // An explicit Claude reviewer: the real default is now DeepSeek (pi-deepseek,
+  // 15:01:54Z Decision), which -- like Gemini -- is an ADOPTED_ENTRIES route, so
+  // this harness's adoptStarts/adopt-boundary stand-ins would otherwise apply
+  // to the reviewer too. Claude keeps the reviewer on the plain agent route this
+  // test is actually about.
+  const result = await runBuildAndReview({ card: CARD, step: STEP, choices: resolveSeatChoices(['adversary-claude-opus']), suiteRunner, ...h.deps });
 
   assert.equal(result.ok, false);
   assert.equal(result.seatMoves.length, 0, 'no work was done on the backup, so the card is told of no move');
@@ -792,7 +812,12 @@ test('a builder whose turn is never proven and nothing heard through mailbox is 
   h.deps.observeStartImpl = async () => ({ send: TURN_STARTED });
   h.deps.checkWaitImpl = async () => ({ runId: ALL.runId, deliveryId: null, messages: [], count: 0, timedOut: true });
 
-  const result = await runBuildAndReview({ card: CARD, step: STEP, choices: resolveSeatChoices([]), suiteRunner, ...h.deps });
+  // An explicit Claude reviewer: the real default is now DeepSeek (pi-deepseek,
+  // 15:01:54Z Decision), which -- like Gemini -- is an ADOPTED_ENTRIES route, so
+  // this harness's adoptStarts/adopt-boundary stand-ins would otherwise apply
+  // to the reviewer too. Claude keeps the reviewer on the plain agent route this
+  // test is actually about.
+  const result = await runBuildAndReview({ card: CARD, step: STEP, choices: resolveSeatChoices(['adversary-claude-opus']), suiteRunner, ...h.deps });
 
   assert.equal(result.ok, false);
   assert.equal(result.builder.possiblyRunning, true);

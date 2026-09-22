@@ -234,10 +234,12 @@ test('an empty Ready column is a quiet no-op', async () => {
 const CAPPED_BUILDER = { cappedSeat: 'builder' };
 
 test('a capped builder moves its partner and the controller posts that reason as exactly ONE comment on the card', async () => {
-  // No model labels on the card, so the seat table answers: builder Gemini,
-  // reviewer Claude. The builder's backup IS claude, so the pair would collide
-  // and the reviewer moves to its own backup, Codex (JUL-98 step 6).
-  const jul92 = card({ identifier: 'JUL-92' });
+  // An explicit Claude reviewer label: the real default (DeepSeek, 15:01:54Z
+  // Decision) never collides with a Claude builder fallback on its own, so an
+  // explicit label is what still reaches the collision this test exercises.
+  // The builder's backup IS claude, so the pair would collide and the reviewer
+  // moves to its own backup, Codex (JUL-98 step 6).
+  const jul92 = card({ identifier: 'JUL-92', labels: ['adversary-claude-opus'] });
   const { board, comments, moves } = fakeBoard({ issues: [jul92] });
 
   const result = await runControllerCheck(deps({
@@ -300,7 +302,8 @@ test('a cycle with no capped seat resolves no fallback and posts no seat comment
 });
 
 test('the partner-move comment is written once even when the same cycle is replayed', async () => {
-  const jul92 = card({ identifier: 'JUL-92' });
+  // An explicit Claude reviewer, same reason as the test above.
+  const jul92 = card({ identifier: 'JUL-92', labels: ['adversary-claude-opus'] });
   const { board, comments } = fakeBoard({ issues: [jul92] });
   const orca = createFixtureOrca();
   const seen = new Map();

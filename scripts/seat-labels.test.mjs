@@ -231,11 +231,11 @@ test('the family rule rejects a same-family builder/reviewer pair, in one senten
   assert.match(result.reason, /different families/);
 });
 
-test('the reviewer resolves to Claude by default, and never to the builder family (JUL-98 step 6)', () => {
+test('the reviewer resolves to DeepSeek (Command Code) by default, and never to the builder family (JUL-98 step 6, amended 15:01:54Z)', () => {
   const choices = resolveSeatChoices([]);
-  assert.equal(choices.reviewer.entry, 'claude');
-  assert.equal(choices.reviewer.modelLabel, 'adversary-claude-opus');
-  assert.equal(choices['adversarial-reviewer'].entry, 'claude');
+  assert.equal(choices.reviewer.entry, 'pi-deepseek');
+  assert.equal(choices.reviewer.modelLabel, 'adversary-deepseek-pro');
+  assert.equal(choices['adversarial-reviewer'].entry, 'pi-deepseek');
   assert.equal(choices.builder.entry, 'gemini', 'the builder is Gemini');
   assert.notEqual(FAMILY_OF[choices.reviewer.entry], FAMILY_OF[choices.builder.entry]);
   assert.equal(validateFamilyChoice(choices).ok, true);
@@ -254,11 +254,12 @@ test('a builder fallback to Claude is allowed only when the reviewer is not on C
   assert.equal(result.choices['feature-builder'].entry, 'claude', 'the agent-keyed entry moves too');
   assert.equal(result.choices.reviewer.entry, 'codex');
   assert.equal(result.partnerMoved, null, 'nothing else had to move');
-  // With the default reviewer (Claude) the same fallback would be REFUSED and
-  // the card would stall. Since JUL-98 step 2 item 6 the reviewer moves to its
-  // own backup instead; the strict answer is still available on request, and
-  // both are pinned by their own tests below.
-  const strict = fallbackSeatChoice(resolveSeatChoices([]), 'builder', { movePartner: false });
+  // The real default reviewer is now DeepSeek (15:01:54Z Decision), which never
+  // collides with a Claude builder on its own -- pinned separately below. With
+  // an EXPLICIT Claude reviewer on the card, the same fallback is still
+  // REFUSED with the partner move switched off; the strict answer stays
+  // available on request, and both are pinned by their own tests below.
+  const strict = fallbackSeatChoice(resolveSeatChoices(['adversary-claude-opus']), 'builder', { movePartner: false });
   assert.equal(strict.ok, false);
   assert.match(strict.reason, /refusing the builder backup \(claude\)/);
   assert.match(strict.reason, /different families/);
@@ -336,7 +337,7 @@ test('missingSeatLabels returns exactly the twelve default model and effort labe
     'fixer-effort-medium',
     'refactor-claude-opus',
     'refactor-effort-medium',
-    'adversary-claude-opus',
+    'adversary-deepseek-pro',
     'adversary-effort-medium',
     'evidence-codex',
     'evidence-effort-medium',
@@ -352,7 +353,7 @@ test('missingSeatLabels returns exactly the twelve default model and effort labe
     'fixer-effort-medium',
     'refactor-claude-opus',
     'refactor-effort-medium',
-    'adversary-claude-opus',
+    'adversary-deepseek-pro',
     'adversary-effort-medium',
     'evidence-codex',
     'evidence-effort-medium',
@@ -485,7 +486,11 @@ test('the fallback CLI treats a bad seat or an unknown builder entry as a one-li
 // ---------------------------------------------------------------------------
 
 test('a capped builder no longer stalls the card: the reviewer moves to its own backup automatically', () => {
-  const choices = resolveSeatChoices([]); // the real default pair: builder Gemini, reviewer Claude Opus
+  // The real default reviewer is now DeepSeek (15:01:54Z Decision), which never
+  // collides with a Claude builder fallback on its own (deepseek != anthropic)
+  // -- pinned separately above. An EXPLICIT Claude reviewer on the card is what
+  // still reaches this collision, so that is what this test puts there.
+  const choices = resolveSeatChoices(['adversary-claude-opus']); // builder Gemini, reviewer Claude Opus
   assert.equal(choices.builder.entry, 'gemini');
   assert.equal(choices.reviewer.entry, 'claude');
 
@@ -511,7 +516,8 @@ test('a capped builder no longer stalls the card: the reviewer moves to its own 
 });
 
 test('the automatic partner move is reported in one plain sentence, for the controller\'s one comment', () => {
-  const result = fallbackSeatChoice(resolveSeatChoices([]), 'builder');
+  // An explicit Claude reviewer, same reason as the test above.
+  const result = fallbackSeatChoice(resolveSeatChoices(['adversary-claude-opus']), 'builder');
   assert.match(result.partnerMovedReason, /builder/);
   assert.match(result.partnerMovedReason, /reviewer/);
   assert.match(result.partnerMovedReason, /adversary-codex/);
@@ -549,7 +555,9 @@ test('the move is symmetric: a capped reviewer whose backup collides moves the b
 });
 
 test('a fallback is STILL refused when the partner has no legal backup either -- the card is not launched into a same-family pair', () => {
-  const choices = resolveSeatChoices([]);
+  // An explicit Claude reviewer, matching the synthetic table below -- the
+  // real default (DeepSeek) never collides with the builder's own backup.
+  const choices = resolveSeatChoices(['adversary-claude-opus']);
   // Both seats back up into the same family: there is no legal pair left, and
   // that must be a refusal, never a silent same-family launch.
   const hopeless = {
@@ -565,16 +573,19 @@ test('a fallback is STILL refused when the partner has no legal backup either --
 });
 
 test('a partner with no backup entry at all is a refusal, not a crash', () => {
-  const noBackup = { ...SEAT_TABLE, 'adversarial-reviewer': { primary: 'pi-deepseek' } };
-  const result = fallbackSeatChoice(resolveSeatChoices([]), 'builder', { table: noBackup });
+  // An explicit Claude reviewer so the builder's fallback to Claude collides
+  // in the first place -- the real default (DeepSeek) would not.
+  const noBackup = { ...SEAT_TABLE, 'adversarial-reviewer': { primary: 'claude' } };
+  const result = fallbackSeatChoice(resolveSeatChoices(['adversary-claude-opus']), 'builder', { table: noBackup });
   assert.equal(result.ok, false);
   assert.match(result.reason, /refusing the builder backup/);
 });
 
 test('the partner move can be switched off, and then the old refusal stands', () => {
   // Kept so a caller that must not change the other seat (a re-run pinned to a
-  // recorded pair, for instance) still gets the strict answer.
-  const result = fallbackSeatChoice(resolveSeatChoices([]), 'builder', { movePartner: false });
+  // recorded pair, for instance) still gets the strict answer. An explicit
+  // Claude reviewer, same reason as the tests above.
+  const result = fallbackSeatChoice(resolveSeatChoices(['adversary-claude-opus']), 'builder', { movePartner: false });
   assert.equal(result.ok, false);
   assert.match(result.reason, /refusing the builder backup \(claude\)/);
 });
@@ -598,17 +609,20 @@ test('Gemini is in the model catalogue, with a vendor model id agy can actually 
   assert.equal(MODEL_LABELS.BUILDER_GEMINI_FLASH, 'builder-gemini-flash');
 });
 
-test('a card that names no model gets the Gemini builder and the Claude reviewer the seat table now says', () => {
+test('a card that names no model gets the Gemini builder and the DeepSeek (Command Code) reviewer the seat table now says', () => {
   const choices = resolveSeatChoices([]);
   assert.equal(choices.builder.entry, 'gemini');
   assert.equal(choices.builder.modelLabel, 'builder-gemini-flash');
-  assert.equal(choices.reviewer.entry, 'claude');
-  assert.equal(choices.reviewer.modelLabel, 'adversary-claude-opus');
-  assert.equal(validateFamilyChoice(choices).ok, true, 'Gemini building and Claude reviewing is a legal pair');
+  assert.equal(choices.reviewer.entry, 'pi-deepseek');
+  assert.equal(choices.reviewer.modelLabel, 'adversary-deepseek-pro');
+  assert.equal(validateFamilyChoice(choices).ok, true, 'Gemini building and DeepSeek reviewing is a legal pair');
 });
 
-test('Codex reviews whenever Claude builds: a Gemini builder falling back to Claude moves the reviewer to Codex', () => {
-  const choices = resolveSeatChoices([]);
+test('Codex reviews whenever an explicit Claude reviewer collides with a Gemini builder falling back to Claude', () => {
+  // The real default reviewer (DeepSeek) never collides with a Claude builder
+  // on its own -- pinned above. An explicit Claude reviewer on the card is
+  // what still exercises this partner-move.
+  const choices = resolveSeatChoices(['adversary-claude-opus']);
   const result = fallbackSeatChoice(choices, 'builder');
 
   assert.equal(result.ok, true);

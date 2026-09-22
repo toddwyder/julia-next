@@ -42,11 +42,11 @@
 export const SEAT_TABLE = {
   orchestrator: { primary: 'claude', backup: 'pi-deepseek' },
   builder: { primary: 'gemini', backup: 'claude' },
-  reviewer: { primary: 'claude', backup: 'codex' },
+  reviewer: { primary: 'pi-deepseek', backup: 'codex' },
   'feature-builder': { primary: 'gemini', backup: 'claude' },
   'defect-fixer': { primary: 'claude', backup: 'pi-deepseek' },
   refactor: { primary: 'claude', backup: 'pi-deepseek' },
-  'adversarial-reviewer': { primary: 'claude', backup: 'codex' },
+  'adversarial-reviewer': { primary: 'pi-deepseek', backup: 'codex' },
   'evidence-reviewer': { primary: 'codex', backup: 'claude' },
   consultant: { primary: 'claude', backup: 'pi-deepseek' },
 };
