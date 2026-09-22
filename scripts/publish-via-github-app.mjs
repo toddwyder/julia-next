@@ -15,6 +15,64 @@
 // JULIA_PUBLISHER_REPO defaults to 'julia-next' (this repo); set it explicitly
 // to publish elsewhere.
 import { createSign } from 'node:crypto';
+import { readFileSync, existsSync } from 'node:fs';
+import { parseEnv } from 'node:util';
+
+// JUL-98 step 6 round 3 (2026-09-22 13:0xZ): a coordinator session ran
+// `node scripts/publish-pr.mjs push ...` without the CLI's documented
+// `--env-file=/etc/orchestrator-svc/.env.publisher` prefix. That prefix is
+// how Node loads the App's credentials into process.env -- omit it and
+// JULIA_PUBLISHER_APP_ID/_PRIVATE_KEY are simply unset, which is also
+// exactly what the Bash *permission grant* requires verbatim to allow the
+// call at all (`julia-run.mjs`'s startOrchestrator allowlist), so the
+// command was refused before main() ever ran. This mirrors the same
+// morning's absolute-vs-relative-path mismatch on the other granted
+// scripts: a session forgetting one exact invocation detail loses the
+// whole call, silently from the credential's point of view.
+//
+// The fix is structural, not "remember the flag next time": publish-pr.mjs
+// and merge-pr.mjs now call loadPublisherCredentialFile() themselves,
+// before doing anything else, so the credential is present in
+// process.env whether or not the invoking command included --env-file.
+// An explicit --env-file (or any pre-set env var) still wins -- this only
+// fills a gap, never overwrites.
+const DEFAULT_PUBLISHER_CREDENTIAL_FILE = '/etc/orchestrator-svc/.env.publisher';
+
+/**
+ * Parse a dotenv-style file (`KEY=value` or `KEY="value\nwith\nnewlines"`
+ * per line, matching how Node's own `--env-file` parses this file) and
+ * copy any `JULIA_PUBLISHER_*` key into `env` that isn't already set
+ * there. Never throws: a missing file is exactly the case a dev machine
+ * or CI box hits, and existing callers already produce a clear error
+ * later when the credential is genuinely absent.
+ * @param {string} filePath
+ * @param {Record<string, string | undefined>} env
+ */
+function loadPublisherCredentialFile(filePath = DEFAULT_PUBLISHER_CREDENTIAL_FILE, env = process.env) {
+  if (!existsSync(filePath)) return;
+  let contents;
+  try {
+    contents = readFileSync(filePath, 'utf8');
+  } catch {
+    return;
+  }
+  // node:util's parseEnv is the same parser Node's own `--env-file` flag
+  // uses, so a value this loader reads is guaranteed to match what an
+  // explicit `--env-file=<path>` on the command line would have produced
+  // -- including a PEM private key's literal embedded newlines inside a
+  // double-quoted value.
+  let parsed;
+  try {
+    parsed = parseEnv(contents);
+  } catch {
+    return;
+  }
+  for (const [key, value] of Object.entries(parsed)) {
+    if (!key.startsWith('JULIA_PUBLISHER_')) continue;
+    if (env[key] !== undefined) continue; // an explicit --env-file or pre-set var wins
+    env[key] = value;
+  }
+}
 
 function base64url(input) {
   return Buffer.from(input).toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
@@ -71,4 +129,6 @@ export async function getPublisherInstallationToken(env = process.env, fetchImpl
   return token;
 }
 
-export { mintAppJwt, base64url };
+export {
+  mintAppJwt, base64url, loadPublisherCredentialFile, DEFAULT_PUBLISHER_CREDENTIAL_FILE,
+};

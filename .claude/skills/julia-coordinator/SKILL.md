@@ -147,12 +147,20 @@ For the current step of the current item:
      documentation (`defaultProvider`/`defaultModel` are process-wide, not per-invocation, and
      `workerStart` has no flag-passthrough). Instead: create a plain worktree (`orca worktree
      create --repo path:/home/runner/julia-next --name <step-name> --base-branch main
-     --no-parent`, no `--agent`), then `orca terminal create --worktree <that path> --command "{
-     cat <the acceptance criteria as a prompt file>; } | node ops/service-dropbox/run-pi-seat.mjs
-     <seat>"` where `<seat>` is `builder-backup` (DeepSeek Flash) for a builder or
+     --no-parent`, no `--agent`), then `orca terminal create --worktree <that path> --command
+     "cat <<'BRIEF' | node ops/service-dropbox/run-pi-seat.mjs <seat>
+     <the acceptance criteria as a prompt file>
+     BRIEF"` where `<seat>` is `builder-backup` (DeepSeek Flash) for a builder or
      `reviewer-backup` (DeepSeek Pro) for a reviewer (`ops/service-dropbox/run-pi-seat.mjs`
      resolves the right provider/model/secret from the seat name alone -- never pass a secret in
-     this command string). **GLM was removed (JUL-93):** there is no `pi-glm` entry, no `glm-5.3` label
+     this command string). **No `{ ...; }` block form (found 2026-09-22).** Claude Code's own Bash
+     permission layer refuses any command containing a brace-group compound statement outright --
+     verbatim reason `Contains compound_statement` -- even one nested inside a quoted `--command`
+     argument to `orca`, so the coordinator can never actually issue the bygone `{ cat ...; } |
+     node ...` form under its `Bash(orca *)` grant. A heredoc piped straight into the consumer
+     needs no braces, is still approved under the same grant (live-verified), and is simpler besides:
+     nothing is ever written to a `BRIEF.md` file for the worktree's own `git status` to see, so
+     there's nothing to `rm` afterward either. **GLM was removed (JUL-93):** there is no `pi-glm` entry, no `glm-5.3` label
      and no GLM seat. A card that still carries an old GLM label is refused by the Ready queue with a
      comment saying the label is retired -- never re-map it yourself. Never route a Pi item to a
      vendor the card did not name. A card's model label picks the *entry*, not
@@ -161,6 +169,27 @@ For the current step of the current item:
      say on the card which model actually ran. This path has no `worker-show`/`workerAbandon` supervision, so step 3
      below (Verify) is the only place its evidence gets checked -- read the worktree's actual git
      commit yourself; there is no `collectWorkerResult`-equivalent for this path yet.
+   - **Builder seat: Gemini (Antigravity, `agy`), started by hand, until step 6 gives the
+     controller its own route (Todd's 13:51Z Decision, 2026-09-22).** Claude's weekly allowance
+     was forecast to run out before Friday's reset, so from this dispatch on, resolve the builder
+     seat to Gemini rather than `SEAT_TABLE.builder`'s `claude`/`pi-deepseek` pair, and dispatch it
+     yourself the same way step 6's own build brief has the controller do it: start `agy` in the
+     worker's fresh worktree and wait until it has **fully** started before touching it further
+     (adopting too early loses the task text while still reporting `input_accepted` -- the same
+     trap the Pi route above and step 6 round 1's finding 3 both hit); pre-trust that worktree in
+     `agy`'s trust list *before* starting it, not after; once started, hand it to Orca with `orca
+     orchestration worker-start --terminal <handle>` (never `--agent`); send the real acceptance
+     criteria as the one dispatch, never the handover's own placeholder text; wait for its one
+     report through the mailbox like every other seat, no screen-polling; and read its cost line
+     the same way as any other worker's -- model, tokens, peak context, minutes, and Gemini's
+     allowance used, never blank or estimated. **Reviews for a Gemini-built step stay on Codex**,
+     not Claude, until the GOAT reviewer trial (Todd's 13:43Z Decision) is live -- reviewing with
+     Claude would spend the very allowance this Decision protects. **The coordinator (orchestrator
+     seat) itself stays Claude** -- this Decision is the builder seat only. The family rule is
+     unchanged: Codex reviewing a Gemini build is a different family regardless, so nothing about
+     `assertCanPickDifferentFamilies` changes. No new spend, and the firewall rule stays
+     runner-only (04:07Z boundaries, carried over). Full detail: runbook, "Builders run on Gemini,
+     started by hand".
 
    Either way, the worktree is fresh and top-level -- **not** the shared registered
    `/home/runner/julia-next` checkout. Two reasons, not one: criterion 2 requires an *isolated*

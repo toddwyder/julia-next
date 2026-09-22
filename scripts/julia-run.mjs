@@ -190,8 +190,20 @@ function claudeLaunchCommand(issueId, effort) {
   // --help check); translateEffort supplies the level, Medium by default.
   // Everything after it is unchanged -- the grant list is not an effort
   // concern and must not be disturbed here.
+  //
+  // JUL-98 step 6 round 3 (13:0xZ): a coordinator session called
+  // publish-pr.mjs as `node scripts/publish-pr.mjs push ...`, without the
+  // --env-file prefix below -- the Bash permission matcher requires an
+  // exact literal prefix, so that command matched no grant at all and was
+  // refused before it ran, the same failure shape as the morning's
+  // absolute-vs-relative-path mismatch on the other scripts. The 12:12Z
+  // session that pushed fine used the --env-file form; nothing forces a
+  // session to remember which form is granted. Both scripts now also
+  // self-load the credential file (publish-via-github-app.mjs's
+  // loadPublisherCredentialFile), so the plain relative-path form works
+  // too -- grant both forms here so neither invocation shape is refused.
   const effortArgs = translateEffort('claude', effort).join(' ');
-  return `${ENV_PREFIX} claude --permission-mode acceptEdits ${effortArgs} --allowedTools "mcp__linear__*,mcp__claude_ai_Linear__*,Bash(node scripts/orca-cli.mjs:*),Bash(node scripts/ready-queue.mjs:*),Bash(node scripts/seat-labels.mjs:*),Bash(node scripts/linear-cli.mjs:*),Bash(node scripts/check-readiness.mjs:*),Bash(node scripts/collect-worker-result.mjs:*),Bash(node scripts/verify-reviewer-worktree.mjs:*),Bash(node scripts/coordinator-events.mjs:*),Bash(node --env-file=/etc/orchestrator-svc/.env.publisher scripts/publish-pr.mjs:*),Bash(node --env-file=/etc/orchestrator-svc/.env.publisher scripts/merge-pr.mjs:*),Bash(orca *)" -p "/julia-coordinator ${issueId}"`;
+  return `${ENV_PREFIX} claude --permission-mode acceptEdits ${effortArgs} --allowedTools "mcp__linear__*,mcp__claude_ai_Linear__*,Bash(node scripts/orca-cli.mjs:*),Bash(node scripts/ready-queue.mjs:*),Bash(node scripts/seat-labels.mjs:*),Bash(node scripts/linear-cli.mjs:*),Bash(node scripts/check-readiness.mjs:*),Bash(node scripts/collect-worker-result.mjs:*),Bash(node scripts/verify-reviewer-worktree.mjs:*),Bash(node scripts/coordinator-events.mjs:*),Bash(node --env-file=/etc/orchestrator-svc/.env.publisher scripts/publish-pr.mjs:*),Bash(node scripts/publish-pr.mjs:*),Bash(node --env-file=/etc/orchestrator-svc/.env.publisher scripts/merge-pr.mjs:*),Bash(node scripts/merge-pr.mjs:*),Bash(orca *)" -p "/julia-coordinator ${issueId}"`;
 }
 
 // The stdin-pipe preamble every non-Claude entry shares: the checkout's own

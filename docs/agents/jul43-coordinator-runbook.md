@@ -181,6 +181,27 @@ in JUL-61). `-J` joins wrapped lines back into one before you read it out:
 tmux capture-pane -t <session> -p -J
 ```
 
+**Both Orca daemons crash under Xvfb without `LIBGL_ALWAYS_SOFTWARE=1` (JUL-98, 2026-09-22),
+fixed.** Each daemon runs headless under Xvfb, a virtual X server with no real GPU/DRI device
+behind it. Electron's GPU process still tries to initialize hardware acceleration there, fails,
+and brings the whole process down: `FATAL:.../gpu_data_manager_impl_private.cc:416] GPU process
+isn't usable. Goodbye.` followed by `Orca serve exited via SIGILL.`. `Restart=on-failure` brings
+the daemon back within ~5-20 seconds, but the restart **kills every terminal that daemon owns**,
+mid-work, with no chance for a running coordinator or builder to report anything -- found live
+when it killed a coordinator and a builder at the same instant. `journalctl` back to server boot
+showed the identical signature had already fired at least six times before that, unrecorded,
+since 2026-09-17 -- it had been happening for almost a week and nothing was watching for it.
+**A first attempt (`--disable-gpu` in `ORCA_SERVE_ARGS`) crash-looped the daemon outright**
+(`Unknown flag --disable-gpu for command: serve`): the systemd `ExecStart` runs `/usr/bin/orca-ide`,
+a wrapper script that runs `serve` in Node-only mode (`ELECTRON_RUN_AS_NODE=1`) and validates argv
+against a strict whitelist -- the actual crashing Electron instance is spawned internally as a
+subprocess `serve` never exposes to a CLI flag. **Real fix:** `LIBGL_ALWAYS_SOFTWARE=1` added as
+a plain env var (not a CLI flag) to both daemons' env files, forcing Mesa's software GL renderer
+so Chromium's GPU process gets a working context under Xvfb instead of failing to find hardware.
+Source of truth, verification and reapply-on-rebuild steps: `ops/orca-daemons/README.md`. Proven
+live: both daemons restarted clean (`NRestarts=0`, stable), and the crash signature does not
+recur in `journalctl` after the fix.
+
 ---
 
 ## Current roles (JUL-61)
@@ -357,21 +378,49 @@ the board work proved, and 9 about the coordinator's own tool grants.
    ```sh
    claude -p --permission-mode acceptEdits --effort high --allowedTools Bash Read Grep Glob Write < promptfile
    ```
-4. **The Pi builder dispatch that works, end to end:**
+4. **The Pi builder dispatch that works, end to end** -- corrected 2026-09-22 (JUL-98): the
+   original form below used a `{ ...; } | consumer` brace-group, which is no longer usable (see
+   the finding right after it) and never actually ran a real dispatch as documented; a brace-free
+   heredoc piped straight into the consumer replaces it and is live-verified under the
+   coordinator's real `Bash(orca *)` grant:
 
    ```sh
    orca worktree create --environment ovh-local --repo path:/home/runner/julia-next --name NAME --base-branch BRANCH --no-parent --setup skip
 
-   orca terminal create --environment ovh-local --worktree path:THATPATH --command "{ cat > BRIEF.md <<'BRIEF'
+   orca terminal create --environment ovh-local --worktree path:THATPATH --command "cat <<'BRIEF' | node ops/service-dropbox/run-pi-seat.mjs builder-backup --effort high
    <the step brief: ticket id, step, acceptance criteria, candidate branch>
-   BRIEF
-   cat BRIEF.md; rm -f BRIEF.md; } | node ops/service-dropbox/run-pi-seat.mjs builder-backup --effort high"
+   BRIEF"
    ```
 
-   The heredoc writes the brief into the candidate worktree (the terminal's own CWD), and the
-   brief is fed to `builder-backup` and deleted **inside the same pipeline**, so no file the
-   builder could commit ever outlives the dispatch. The environment names on the box are
-   `ovh-local` (`runner`) and `orchestrator-local` (`orchestrator-svc`), not the display names.
+   The heredoc feeds the brief straight to `builder-backup`'s stdin; it is never written to a
+   `BRIEF.md` file in the candidate worktree at all, so there is nothing for the worktree's own
+   `git status` to see and nothing to `rm` afterward -- simpler than the original two-step
+   write-then-cat-then-delete it replaces. The environment names on the box are `ovh-local`
+   (`runner`) and `orchestrator-local` (`orchestrator-svc`), not the display names.
+
+   **Claude Code's Bash permission layer refuses any brace-group compound statement outright,
+   even nested inside a quoted `--command` argument to `orca` (found 2026-09-22, JUL-98).** Two
+   independent JUL-98 coordinator launches, each carrying the exact documented
+   `--allowedTools` grant list, could do nothing beyond reads and Linear writes -- verified live
+   with three throwaway diagnostic sessions (no card touched, terminals closed after) rather than
+   guessed at:
+   - `orca --help` and `orca --help && echo DONE` -- both approved under `Bash(orca *)`.
+   - A plain `;`-separated chain and a redirect outside the working directory each fail for their
+     own ordinary reasons (the latter: "Output redirection ... blocked ... only ... allowed
+     working directories"), neither is about compound statements.
+   - A heredoc alone, and a heredoc piped straight into a consumer, are both approved.
+   - `{ echo hi; orca --help; } | cat` -- a brace-group -- is declined outright, verbatim reason
+     `Contains compound_statement`, before anything inside it runs. Nothing about `orca`, the
+     pipe, or what the braces contain: the `{ ...; ...; }` syntax itself is refused, apparently
+     scanned for anywhere in the full command string regardless of quoting context.
+   The installed Claude Code CLI (`2.1.269`) had not changed since before that evening's working
+   coordinator sessions (package install directory's mtime: 2026-09-12, untouched) -- so this is
+   either a behavior this CLI version always had that the brace-group dispatch pattern never
+   actually exercised live before, or a permission-classifier change bundled with a Claude model
+   update rather than a CLI version bump; either way, pinning the CLI version is not the fix here.
+   The brace-free heredoc-pipe form above and in the coordinator skill's own dispatch step
+   (`.claude/skills/julia-coordinator/SKILL.md`, "Running a step") is the corrected pattern going
+   forward -- never reintroduce a `{ ...; }` block in a dispatch command.
 5. **`orca terminal wait --for` accepts only `exit` and `tui-idle`.** `tui-idle` is not completion
    for a Pi or Codex agent, and even `--for exit` times out while a shell stays open after the
    agent has finished. The reliable completion signals are `pgrep -f` for the agent process and
@@ -411,15 +460,24 @@ the board work proved, and 9 about the coordinator's own tool grants.
    Bash(node scripts/check-readiness.mjs:*), Bash(node scripts/collect-worker-result.mjs:*),
    Bash(node scripts/verify-reviewer-worktree.mjs:*), Bash(node scripts/coordinator-events.mjs:*),
    Bash(node --env-file=/etc/orchestrator-svc/.env.publisher scripts/publish-pr.mjs:*),
+   Bash(node scripts/publish-pr.mjs:*),
    Bash(node --env-file=/etc/orchestrator-svc/.env.publisher scripts/merge-pr.mjs:*),
+   Bash(node scripts/merge-pr.mjs:*),
    Bash(orca *)
    ```
 
-   `publish-pr.mjs` and `merge-pr.mjs` sit behind the publisher env-file prefix. A script with no
-   grant cannot be run even though it sits in the checkout -- `scripts/board-setup.mjs`, for
-   example, has no grant yet. Adding a script to the skill's procedure means adding its grant in
-   `startOrchestrator` in the same PR (see "The headless launch needs its own tool grants"
-   below). `node -e` is NOT granted, and neither is `env`, `base64` or a `sudo` command. A
+   `publish-pr.mjs` and `merge-pr.mjs` are granted **both** with and without the publisher
+   env-file prefix (fixed 2026-09-22, "Seven findings" item 5 below has the incident) --
+   a session calling either the plain relative-path form (matching every other script on this
+   list) or the `--env-file` form reaches the script either way, and the script itself
+   self-loads the credential file when it isn't already in the environment
+   (`loadPublisherCredentialFile`), so neither form is missing the credential either. A script
+   with no grant at all still cannot be run even though it sits in the checkout --
+   `scripts/board-setup.mjs`, for example, has no grant yet. Adding a script to the skill's
+   procedure means adding its grant in `startOrchestrator` in the same PR (see "The headless
+   launch needs its own tool grants" below), **granted in the exact shape every session actually
+   calls it** -- when in doubt, grant the plain relative-path form alongside any credential-
+   prefixed form. `node -e` is NOT granted, and neither is `env`, `base64` or a `sudo` command. A
    coordinator that needs a one-off computation must use a granted script or an Orca terminal,
    not an inline node expression.
 
@@ -1007,8 +1065,46 @@ but **not** the `node --env-file=/etc/orchestrator-svc/.env.publisher scripts/ch
 form this runbook's own Bootstrap section shows. The `--env-file` prefix makes it a different
 command, so in an unattended run the documented invocation is refused. **Use the plain form**
 (`node scripts/check-readiness.mjs`) in a coordinator run; the `--env-file` prefix is for a
-laptop or interactive session, where it is granted by hand. Only `publish-pr.mjs` and
-`merge-pr.mjs` are granted with their `--env-file` prefix.
+laptop or interactive session, where it is granted by hand.
+
+**`publish-pr.mjs` and `merge-pr.mjs` are now granted in both forms (JUL-98 step 6, fixed
+2026-09-22 ~13:2xZ).** They used to be granted with the `--env-file` prefix only, which is the
+same trap as `check-readiness.mjs` above, pointed the other way: the JUL-98 step 6 round 3
+coordinator (13:0xZ) called `node scripts/publish-pr.mjs push ...` -- the plain form, matching
+the pattern every *other* granted script uses -- and the Bash permission matcher refused it
+outright, because that exact literal prefix had no grant. The push never ran; the round's work
+sat on the runner's disk, parked, until a laptop session diagnosed it (compare the transcript
+`"command":"node scripts/publish-pr.mjs push ..."` against the grant list of the session before
+it, which used the `--env-file` form and pushed fine). The **root cause was the same shape as
+the 04:37Z brace-group finding below ("Laptop session: relaunched twice...")**: an exact-literal-
+prefix permission grant refuses any invocation shape it wasn't written for, and nothing forces a session
+to remember which shape a given script needs.
+
+The fix has two parts, both merged in the same PR as this runbook entry -- fixing only the grant
+list would have left the credential itself still silently absent for the plain form, and fixing
+only the credential loading would have left the plain form refused before it ever reached that
+code:
+
+1. **The grant list now allows both invocation shapes** for `publish-pr.mjs` and `merge-pr.mjs`:
+   `Bash(node --env-file=/etc/orchestrator-svc/.env.publisher scripts/publish-pr.mjs:*)` AND
+   `Bash(node scripts/publish-pr.mjs:*)` (same pair for `merge-pr.mjs`) -- see
+   `orchestratorLaunchCommandFor` in `scripts/julia-run.mjs`.
+2. **Both scripts now self-load the credential file** (`loadPublisherCredentialFile` in
+   `scripts/publish-via-github-app.mjs`, called before `main()`) when it is not already in the
+   process's environment, using `node:util`'s `parseEnv` -- the same parser Node's own
+   `--env-file` flag uses, so a value it reads matches what `--env-file` would have produced,
+   including a PEM private key's embedded newlines. An explicit `--env-file` or a pre-set env var
+   still wins; this only fills a gap, never overwrites. In practice `julia-run.mjs`'s own
+   `ENV_PREFIX` already sources `/etc/orchestrator-svc/.env.publisher` into the coordinator's
+   shell before `claude` starts (`set -a; . <file>; set +a`), so the plain form already worked at
+   the process-environment level once the grant itself stopped refusing it -- the self-load is
+   belt-and-suspenders for any future invocation shape that does not inherit that shell (a bare
+   `node scripts/publish-pr.mjs ...` run some other way).
+
+Both `publish-pr.mjs`/`merge-pr.mjs` and any future script added to the grant list should be
+granted in the exact form every session actually calls it -- when in doubt, grant the plain
+relative-path form (matching the majority of the list) alongside any credential-prefixed form,
+rather than assuming a session will remember to type the longer one.
 
 ### 6. "The board already matches the spec" could be true while the board offered a removed model
 
@@ -1252,7 +1348,7 @@ it, then `sudo install -m 0440 -o root -g root`). Rules, as `orchestrator-svc` v
 | `systemctl disable --now julia-ready-queue.timer` | Switches the old five-minute queue off **for good** (JUL-98): stops it and removes it from the boot-time timer set. `stop` alone only lasts until the next restart, which would bring the old queue back beside the controller and let two things pick from Ready. The one exact command, no `mask`. |
 | `systemctl start` / `stop` / `restart julia-ready-queue.timer` | Control the timer. |
 | `systemctl start` / `stop` / `restart julia-ready-queue.service` | Run, stop or restart one check on demand (the service is a oneshot). |
-| `usermod -aG <group> <account>` for `{deepseek-readers} × {runner, orchestrator-svc}` | Adds a service account to a key-reader group the drop box already uses. Two exact pairs, not a pattern. |
+| `usermod -aG <group> <account>` for `{deepseek-readers, commandcode-readers} × {runner, orchestrator-svc}` | Adds a service account to a key-reader group the drop box already uses. Four exact pairs, not a pattern (`commandcode-readers` added JUL-98, Todd's 13:43Z Decision, same shape as `deepseek-readers`). |
 
 **There is no rule that installs, copies or edits a file** (removed after the PR #44 review; the
 test fails if one comes back, and on the server it also tries an `install` as `orchestrator-svc`
@@ -1998,6 +2094,46 @@ provider; a full review on it cost about three cents. There is no fifth seat bes
 - A DeepSeek builder paired with this DeepSeek reviewer is the same model family; the family guard
   in `scripts/seat-labels.mjs` (`fallback`), not this file, is what refuses that pair.
 
+## Builders run on Gemini, started by hand (JUL-98, Todd's 13:51Z Decision, 2026-09-22)
+
+Claude's weekly allowance was forecast to run out Thursday morning, before Friday's reset. Until
+the controller can start a Gemini worker itself (JUL-98 step 6, in progress), **the coordinator
+starts Gemini (Antigravity, `agy`) builders by hand**, from the next dispatch, through the same
+start-then-adopt route step 6's own build brief describes for the controller:
+
+1. Start `agy` in the worker's fresh worktree and **wait until it has fully started** before
+   doing anything else with it -- the same wait step 6's round-1 review (JUL-98 card, finding 3,
+   2026-09-22 06:2xZ) named for the controller's own route: adopting a Pi/Gemini terminal too
+   early loses the task text while still reporting `input_accepted` (also recorded above under
+   "Adopting a Pi terminal with `worker-start --terminal` while Pi is still starting loses the
+   task text").
+2. **Pre-trust the new worktree in `agy`'s trust list before starting it** -- not after. An
+   untrusted worktree blocks on a trust prompt no headless session can answer.
+3. **Hand it over to Orca with `worker-start --terminal <handle>`** once started, not
+   `worker-start --agent`, the same distinction the Pi/DeepSeek paragraph above draws for that
+   seat's own launch shape.
+4. **Never deliver the handover's own placeholder text as the task.** The real brief -- the step's
+   concrete acceptance criteria -- is the one thing sent, not boilerplate left over from adopting
+   the terminal.
+5. **One report through the mailbox**, exactly as every other seat -- no polling a screen to guess
+   whether Gemini is done.
+6. **The cost line is read the same way as any other seat's**, not skipped or estimated: model,
+   tokens, peak context, minutes, and Gemini's allowance used goes on the line like every other
+   worker's.
+
+**Reviews stay on Codex, not Claude**, until the GOAT reviewer trial (Todd's 13:43Z Decision,
+same day) is live -- reviewing a Gemini builder's work with Claude would burn the very allowance
+this Decision exists to protect. **The coordinator itself stays Claude** -- this Decision is about
+the builder seat only, not the orchestrator seat in `SEAT_TABLE.orchestrator`. **The family rule
+is unchanged**: Codex (`openai`) reviewing a Gemini builder is a different family either way, so
+the existing `assertCanPickDifferentFamilies` guard in `graph/seat-table.mjs` is not violated by
+this by-hand override -- it is not itself a seat-table code change, since `SEAT_TABLE.builder`
+still names `claude`/`pi-deepseek`; Gemini is chosen by the coordinator at dispatch time until
+step 6 gives the controller its own Gemini entry to read.
+
+**Boundaries carried over unchanged from the 04:07Z Decision:** no new spend, the firewall rule
+stays runner-only, the family rule is unchanged.
+
 ## Seven findings carried from the cancelled JUL-106 (recorded 2026-09-20)
 
 JUL-106 (the watchdog) was cancelled after three rejected rounds; its detection code had been
@@ -2028,8 +2164,9 @@ and 5 on the pinned version before relying on them.**
 4. **What a queue-launched coordinator may actually run.** `scripts/julia-run.mjs` grants
    `Bash(orca *)` plus a fixed list of `node scripts/<name>.mjs` (`orca-cli`, `ready-queue`,
    `seat-labels`, `linear-cli`, `check-readiness`, `collect-worker-result`,
-   `verify-reviewer-worktree`, `coordinator-events`, and the two publisher scripts under
-   `--env-file=/etc/orchestrator-svc/.env.publisher`). So no `node -e`, no bare binary path, no
+   `verify-reviewer-worktree`, `coordinator-events`, and the two publisher scripts, each granted
+   both plainly and under `--env-file=/etc/orchestrator-svc/.env.publisher` (JUL-98 step 6, fixed
+   2026-09-22 -- see "The coordinator's granted command list refuses..." above). So no `node -e`, no bare binary path, no
    `base64`, `printenv`, `ls`, or `git` outside its own checkout. `scripts/orca-cli.mjs` exposes
    only `run-list`, `task-list` and `worker-show` on the command line. **Every dispatch action goes
    through the `orca` binary on PATH.** The coordinator skill's examples are written as
