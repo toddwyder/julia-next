@@ -1871,14 +1871,23 @@ it matched.
 **200** characters of test name (`MAX_FAILURE_NAME`) and **500** characters of error text
 (`MAX_FAILURE_TEXT`). Five is an operational display limit to keep card comments readable; further
 failures may have independent causes, and the omitted detail needs the full output on
-`result.output`. Displayed test names and error text are capped with explicit `... [cut]` markers.
-In the measured worst case (with per-line indentation inside code fences and cut markers), each
-failure contributes at most 1248 characters, bounding the entire failure detail section to 6332
-characters (~6.4KB characters, or ~6.5KB total card worst case; all limits in characters, not
-bytes; derived from measured worst-case rendering rather than estimated per-entry arithmetic). When cuts happen the header line describes them (`5 of 9 shown`, `names cut
-at 200 characters`, `error text cut at 500 characters`), and the whole output stays on
-`result.output` for anyone who needs it. A file-level `failureType: subtestFailed` entry is dropped
-when any named failure exists, so the cap is spent on failures that name a cause.
+`result.output`. Displayed test names and error text are capped with explicit `... [cut]` markers,
+in characters (UTF-16 code units), not bytes. When cuts happen the header line describes them (`5
+of 9 shown`, `names cut at 200 characters`, `error text cut at 500 characters`), and the whole
+output stays on `result.output` for anyone who needs it. A file-level `failureType: subtestFailed`
+entry is dropped when any named failure exists, so the cap is spent on failures that name a cause.
+
+**There is deliberately no stated maximum on the rendered failure section or the total card line**
+(removed 2026-09-22, Todd's Decision, JUL-98 step 7). Two earlier attempts each claimed one derived
+from a "measured worst case" — first an estimate (`~2.5KB`), then a number measured against the
+per-entry cost alone (`6332` / `6474` characters) — and both times an independent review found a
+real, reachable case larger than the claimed bound: per-line Markdown-fence indentation multiplies
+cost in a way a per-entry measurement does not capture, so a number that looked measured was still
+effectively an estimate. The per-field caps above (5 failures, 200/500 characters, with honest cut
+notices) are the real, enforced fixes and stay. If report length ever causes a real problem, the fix
+is a cap on the *final rendered report*, measured against its own real worst case and added then —
+not a number promised in advance about pieces that compose in a way arithmetic on them alone
+doesn't predict.
 
 **Why the worktree note exists.** The controller runs the suite in the candidate **worktree**, which
 can hold files the candidate **commit** does not — anything the worker left uncommitted or

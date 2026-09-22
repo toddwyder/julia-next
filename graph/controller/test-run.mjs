@@ -68,20 +68,21 @@ function shortStamp(iso) {
 // readable; further failures may have independent causes, and omitted detail
 // needs the full output on `result.output`. Displayed test names are capped at
 // 200 characters and error text at 500 characters, with explicit cut markers
-// when truncated. In the measured worst case (with per-line indentation inside
-// Markdown code fences and cut markers), each failing test contributes at most
-// 1248 characters, bounding the entire failure section to 6332 characters
-// (~6.4KB characters, or ~6.5KB total card worst case, bounded by
-// MAX_FAILURE_DETAIL_LENGTH and MAX_CARD_LINE_LENGTH). The bound is derived
-// from the measured worst case rather than estimated per-entry arithmetic. All
-// limits are in characters (UTF-16 code units), not bytes. What was cut is
-// always stated, so nobody mistakes the cap for the whole story.
+// when truncated. All limits are in characters (UTF-16 code units), not
+// bytes. What was cut is always stated, so nobody mistakes the cap for the
+// whole story.
+//
+// There is deliberately no stated maximum on the rendered failure section or
+// card line as a whole (removed 2026-09-22, Todd's Decision): a prior version
+// of this comment claimed one, twice, and both times a real worst case turned
+// out larger than the claimed number -- a per-entry cap does not compose into
+// a section cap the way per-line Markdown-fence indentation multiplies cost.
+// If report length ever causes a real problem, a cap on the FINAL RENDERED
+// report is the fix, added then, measured against its own real worst case
+// rather than promised in advance.
 export const MAX_REPORTED_FAILURES = 5;
 export const MAX_FAILURE_TEXT = 500;
 export const MAX_FAILURE_NAME = 200;
-export const MAX_FAILURE_DETAIL_LENGTH = 6332;
-export const MAX_FAILURE_SECTION_LENGTH = 6332;
-export const MAX_CARD_LINE_LENGTH = 6474;
 
 const NOT_OK_LINE = /^(\s*)not ok (\d+)\s*-\s*(.*)$/;
 const DIRECTIVE_PATTERN = /(?<!\\)#\s*(TODO|SKIP)\b/i;
