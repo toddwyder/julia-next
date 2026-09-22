@@ -1771,6 +1771,80 @@ exactly as before: the never-started mark is explicit, never an absence.
 reviewed by DeepSeek through the controller — every review runs on the Codex backup until an
 adopted-terminal Pi route exists.
 
+### Starting an agent Orca has no launcher for: start it, then adopt it (JUL-98 step 6, 2026-09-22)
+
+**`worker-start --agent` knows `claude`, `codex` and `cursor`, and no flag teaches it another TUI.**
+A Gemini seat (`agy`, the Antigravity CLI) and a DeepSeek seat (`pi`) are both started the one way
+that reports to the mailbox, built once in `graph/controller/adopt.mjs` and taken by both:
+
+1. `orca worktree create --repo path:/home/runner/julia-next --name <n> --no-parent` — the route
+   makes the worktree itself, because the agent has to be **running in it** before there is a
+   terminal to adopt.
+2. `node scripts/prepare-seat-worktree.mjs --seat <s> --agent <a> --worktree <path>`, run **as the
+   worker** through an Orca terminal on the worker daemon (the same route the cost read takes, and
+   for the same reason): it writes the worktree into the agent's folder-trust list and takes the
+   allowance reading.
+3. `orca terminal create --worktree path:<w> --command "agy --model <id> --effort <e> --dangerously-skip-permissions"`.
+4. `orca terminal wait --terminal <h> --for tui-idle` — Orca's own "it has finished starting", never
+   a sleep. JUL-109 lost a Pi worker's task text twice by adopting a still-starting agent.
+5. `orca orchestration worker-start --run <r> --from <c> --terminal <h> --worktree path:<w> --spec <THE REAL BRIEF>`.
+
+**Four traps, each met live on 2026-09-22:**
+
+- **`ORCA_BIN` must be set** for any process that shells out to `orca` (`/opt/Orca/orca-ide` on this
+  server). Without it every boundary fails on the first call with "ORCA_BIN is not set".
+- **An adopted `worker-start` must carry NO creation flag.** `--name`, `--repo`, `--agent`,
+  `--setup`, `--base-branch` are refused outright with `invalid_argument`, "Creation and setup
+  options apply only to new-child or new-top-level worktrees"; and `worker-start --help` says
+  neither `--model` nor `--effort` can combine with `--terminal`. The model therefore travels on the
+  launch command, which is what keeps the card showing exactly what runs.
+- **Orca cannot observe a turn for these agents, and says so.** The adopted `worker-start` answers
+  `prompt: { stages: ["input_accepted"], provider: "unsupported", observation: "unsupported" }`, and
+  `orca worktree ps` answers `agents: []` for a worktree whose agy worker is visibly working (it
+  does show `agentIdentity: "antigravity"` in `terminal show`). So neither recorded turn-start proof
+  can ever exist for such a seat. The proof used instead is the **transition**: the terminal was
+  idle before the brief was delivered and is busy straight after —
+  `orca terminal wait --for tui-idle --timeout-ms 8000` answering `timeout`. A TUI on a trust or
+  login screen is idle at both readings.
+- **A dispatched worker cannot start a worker.** `nested_worker_depth_exceeded`: "Sub-worker
+  dispatch is not permitted at depth 2 (max 1)". Any live proof of dispatch has to be run from a
+  plain Orca terminal (depth 0), which is where the controller itself sits.
+
+### agy's folder-trust list, and the gap it leaves (JUL-98 step 6, 2026-09-22)
+
+`agy` asks "Do you trust the contents of this project?" in a folder it has not seen, and does
+nothing until it is answered — the same stall Claude Code's trust screen caused on 19–20 September.
+Answering yes writes exactly one file, and nothing else in `~/.gemini` changes:
+
+```
+~/.gemini/antigravity-cli/settings.json   (mode 0600, owned by runner)
+{"trustedWorkspaces":["<the folder's exact absolute path>"]}
+```
+
+The entry is per exact path, so every new worktree needs its own; `graph/controller/agent-trust.mjs`
+writes it and `scripts/prepare-seat-worktree.mjs` is what runs as the worker to put it there.
+
+**Not fixed here, and worth knowing:** nothing prunes the list. Every worker adds an entry, the
+worktree is then removed, and the entry stays — an unbounded list of dead paths, each of which is a
+standing permission for agy to read, edit and execute in a path that could one day be reused. Six
+live runs on 2026-09-22 left six entries; they were removed by hand afterwards.
+
+### The Gemini seat is billed against an allowance, not per token (JUL-98 step 6, 2026-09-22)
+
+`agy -p "/usage" --output-format json` is the only per-seat figure that exists for it:
+`command.data.groups[].buckets[]` with `id`, `window`, `remaining_fraction` and `reset_time`; the
+two buckets a Gemini seat spends are `gemini-weekly` and `gemini-5h`, and Flash and Pro share them
+("Models within this group: Gemini Flash, Gemini Pro"). It is a slash command — `num_turns: 0`,
+`usage.total_tokens: 0` — so reading the allowance spends none of it.
+
+**There is no token record to read for an interactive session.** Searched on 2026-09-22: the
+conversation store (`~/.gemini/antigravity-cli/conversations/<id>.db`) is protobuf blobs with no
+usage table; the brain transcript's every key is
+`{source,status,tool_calls,thinking,step_index,type,content,created_at}`; the CLI log has no token
+line. Only `agy -p` (print mode) reports usage, and a seat worker is interactive. So the cost line
+for this seat carries the allowance it drew down — the reading taken at dispatch differenced against
+one taken when it reports — and says in words that no token count exists, rather than posting a zero.
+
 ### The controller writes to Linear as the app, and only `orchestrator-svc` can run it (JUL-98 step 2)
 
 `graph/controller/board.mjs` (`createControllerBoard`) is the board `runControllerCheck` actually
