@@ -201,6 +201,10 @@ export async function carryCard({
       removeWorktreeImpl: boundaries.removeWorktreeImpl,
     },
     observeStartImpl: boundaries.observeStartImpl,
+    // The start rule's production source (JUL-98 step 6 round 4b). Without it
+    // the three-way rule has no Orca inspect structure to read and degrades to
+    // possibly-running for every seat, however it ended.
+    workerShowImpl: boundaries.workerShowImpl,
     checkWaitImpl: boundaries.checkWaitImpl,
     releaseImpl: boundaries.releaseImpl,
     removeWorktreeImpl: boundaries.removeWorktreeImpl,

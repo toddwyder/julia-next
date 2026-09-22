@@ -10,10 +10,18 @@
 //      anything: it is the only authoritative record of what a worker did, and
 //      a turn that began and ended between two terminal readings looks exactly
 //      like a turn that never began (round 2, finding 2). A worker that
-//      reported is costed for real; one that is alive is waited on; one that
-//      answered nothing at all, and whose observation itself did not fail, is
-//      the never-started case and stops HERE. That stop is still seconds, not
-//      the eight hours of 19-20 September.
+//      reported is costed for real; one that sent anything of its own is
+//      waited on. Only when the mailbox says NOTHING is Orca asked what it
+//      recorded, once, through `worker-show` -- and that answer decides
+//      between the three outcomes (round 4b):
+//
+//        live verdict, seen at any point  -> it ran; keep it, cost it
+//        recorded failure signature       -> it never started; stop HERE
+//        anything else, including a
+//          reading that could not be taken -> POSSIBLY RUNNING: keep the
+//          worktree, read the cost, release nothing, start no backup
+//
+//      That stop is still seconds, not the eight hours of 19-20 September.
 //   3. sleep on the mailbox until that worker's own worker_done arrives
 //      (./mailbox.mjs), mirroring every message to Axiom on the way
 //   4. run the test suite ONCE, as the controller, in the candidate worktree
@@ -52,9 +60,20 @@ export const DEFAULT_RECONCILE_WAIT_MS = 30000;
 // time puts on its own mailbox in half a minute, and far short of a spin.
 export const DEFAULT_RECONCILE_MAX_READS = 8;
 
+// Both detectors below read ONE shape: the `result` of an
+// `orchestration worker-show` answer. ./wiring.mjs's `workerShowImpl` goes
+// through `orcaCall`, which already returns `parsed.result`
+// (scripts/orca-cli.mjs), so the bare object is the ordinary case and the
+// envelope leg is here only for a caller that forgot to unwrap one.
+//
+// ROUND 4b REMOVED TWO LEGS THAT ENCODED A SHAPE NOTHING PRODUCES: `.show`,
+// which only ever came from a test stand-in, and `.observed`, which in
+// production is the adopt route's `{ busy: {...} }` (scripts/controller-adopt.test.mjs)
+// and carries no verdict. Both made the detectors look like they could read a
+// turn-start reading. They cannot; see `workerShowImpl` in ./wiring.mjs.
 function unwrapOrcaPayload(source) {
   if (!source) return null;
-  return source.show?.result ?? source.show ?? source.result ?? source;
+  return source.result ?? source;
 }
 
 // THE RECORDED FAILURE SIGNATURE (JUL-98 step 6, round 4; Todd Decision 2026-09-22 15:01:01Z).
@@ -98,7 +117,6 @@ export function hasLiveLivenessVerdict(source) {
   if (candidate.projection?.liveness?.verdict === 'live') return true;
   if (candidate.worker?.liveness?.verdict === 'live') return true;
   if (candidate.observation?.status === 'live') return true;
-  if (source.observed && hasLiveLivenessVerdict(source.observed)) return true;
   return false;
 }
 
@@ -125,6 +143,14 @@ export async function runWorkerStep({
   // `terminal send --wait-submit` answer, a `worktree ps` worktree, or both.
   // It is the only thing allowed to look at the worker before it reports.
   observeStartImpl,
+  // THE START RULE'S PRODUCTION SOURCE (JUL-98 step 6 round 4b). Answers Orca's
+  // worker-show INSPECT structure for one dispatch -- the only reading that
+  // carries `worker.state`/`stage`/`agentTerminalHandle`,
+  // `dispatch.status`/`lastFailure` and `projection.liveness.verdict`.
+  // `observeStartImpl` above cannot: it is `worktree ps`, whose rows carry none
+  // of them. Asked ONCE, below, and only where the alternative is to conclude
+  // never-started. Absent or throwing, the step keeps the worker.
+  workerShowImpl = null,
   checkWaitImpl,
   suiteRunner,
   suiteKey,
@@ -240,7 +266,15 @@ export async function runWorkerStep({
   const observed = dispatched.observed ?? await observeStartImpl({ seat, dispatch: dispatched });
   const proof = proveTurnStarted(observed ?? {});
 
-  let seenLive = hasLiveLivenessVerdict(dispatched) || hasLiveLivenessVerdict(observed);
+  // SEEN LIVE HAS EXACTLY ONE SOURCE, AND IT IS worker-show (round 4b).
+  // Round 4 seeded this from `dispatched` and `observed`. Neither can ever
+  // carry a verdict: `dispatched` is a `worker-start` answer, which is flat
+  // `{dispatchId, state, stage, lastError}` with no `projection` or
+  // `observation` key (worker-start.failed-agent-readiness.json), and
+  // `observed` is either a `worktree ps` row or the adopt route's `{ busy }`.
+  // So the seed was always false and the rule had no live branch at all. It is
+  // taken below, from the one boundary that answers an inspect structure.
+  let seenLive = false;
   let heard = null;
   let initialAck = waitOptions.initialAck ?? null;
 
@@ -312,9 +346,14 @@ export async function runWorkerStep({
         timeoutMs: remainingMs,
       });
       reads += 1;
-      if (hasLiveLivenessVerdict(reconciled)) {
-        seenLive = true;
-      }
+      // NO LIVENESS DETECTOR HERE (round 4b, and this is TASK 3 of round 4b).
+      // Round 4 asked `hasLiveLivenessVerdict(reconciled)` of every batch. A
+      // batch is `{runId, deliveryId, messages[], count, timedOut}` -- a
+      // mailbox delivery, never an Orca inspect structure -- so the call had no
+      // `liveness`, `projection`, `worker` or `observation` key to find and
+      // could not fire whatever the mailbox said. What a message from this
+      // worker DOES prove is handled where it is proof: `fromThisWorker` below
+      // breaks the loop, and a `worker_done` is the real cost.
       mirrorFailures += reconciled.mirrorFailures ?? 0;
       reconciledMessages.push(...(reconciled.messages ?? []));
       fromThisWorker = reconciledMessages.filter((message) => message.dispatchId === dispatched.dispatchId);
@@ -352,22 +391,63 @@ export async function runWorkerStep({
     } else if (fromThisWorker.length > 0) {
       // `initialAck` is already chained to the last delivery read above, so the
       // ordinary wait below starts where this look stopped.
-    } else if (!seenLive && (hasFailedAgentReadinessSignature(observed) || hasFailedAgentReadinessSignature(dispatched))) {
-      // THE RECORDED FAILURE SIGNATURE (JUL-98 step 6, round 4; Todd Decision 2026-09-22 15:01:01Z):
-      // "Orca recorded failure signature (failed at agent readiness, no agent terminal)
-      // means it never started."
-      // Concluded ONLY on this exact recorded signature.
-      const closed = await close({
-        ok: false,
-        stage: 'turn-start',
-        reason: proof.reason,
-        retryRequestId: proof.retryRequestId ?? null,
-        warnings: proof.warnings,
-        outcome: null,
-        testRun: null,
-      }, { turnStarted: false });
-      return { ...closed, launchRefused: closed.released === true && closed.worktreeRemoved === true };
     } else {
+      // THE VERDICT IS ASKED FOR HERE, AND ONLY HERE (JUL-98 step 6 round 4b).
+      //
+      // Nothing has come from this worker: no outcome, no message of its own.
+      // That is the ONE point at which the three-way start rule has to choose,
+      // so it is the one point at which Orca is asked what it recorded about
+      // this dispatch -- one `worker-show`, on the path that would otherwise
+      // conclude never-started, and never on the ordinary path where a worker
+      // answered for itself.
+      //
+      // WHY IT IS ASKED AT ALL. Round 4 read the rule's five fields off
+      // `observed` and `dispatched`, and neither can carry them: `observed` is
+      // a `worktree ps` row (`worktreeId`, `status`, `agents[]`) or the adopt
+      // route's `{ busy }`, and `dispatched` is a flat `worker-start` answer
+      // (`{dispatchId, state, stage, lastError}`). So the failure-signature
+      // branch could not fire in the running controller and the rule silently
+      // degraded to one outcome. `worker-show` is the verb that answers the
+      // inspect structure -- see graph/controller/wiring.mjs's
+      // `workerShowImpl` and every `worker-show.*.json` fixture.
+      let shown = null;
+      let showError = null;
+      try {
+        shown = workerShowImpl ? await workerShowImpl({ seat, dispatchId: dispatched.dispatchId }) : null;
+      } catch (error) {
+        showError = error.message;
+      }
+      if (hasLiveLivenessVerdict(shown)) seenLive = true;
+
+      // AN OBSERVATION THAT ITSELF FAILED IS NOT A VERDICT, and neither is one
+      // that was never taken. `showError != null` is a controller that could
+      // not ask; `shown == null` is a controller with no boundary to ask
+      // through. Both fall to possibly-running below: absence is not proof, and
+      // the cost of being wrong here is releasing a worker that is still
+      // spending and starting a second one beside it.
+      if (!seenLive && showError == null && hasFailedAgentReadinessSignature(shown)) {
+        // THE RECORDED FAILURE SIGNATURE (JUL-98 step 6, round 4; Todd Decision 2026-09-22 15:01:01Z):
+        // "Orca recorded failure signature (failed at agent readiness, no agent terminal)
+        // means it never started."
+        // Concluded ONLY on this exact recorded signature.
+        // THE CARD SAYS WHAT DECIDED IT. `proof.reason` describes the
+        // turn-start READING ("nothing was observed at all"), which on its own
+        // is exactly the ambiguous sentence round 2 found: a turn that began
+        // and ended between two readings says the same. What makes this a
+        // never-started VERDICT is Orca's own record, so the record is quoted.
+        const signature = unwrapOrcaPayload(shown);
+        const closed = await close({
+          ok: false,
+          stage: 'turn-start',
+          reason: `${proof.reason} -- and Orca's own record for dispatch ${dispatched.dispatchId} is the recorded never-started signature: the worker failed at stage agent_readiness with no agent terminal (${signature?.dispatch?.lastFailure})`,
+          retryRequestId: proof.retryRequestId ?? null,
+          warnings: proof.warnings,
+          outcome: null,
+          testRun: null,
+        }, { turnStarted: false });
+        return { ...closed, launchRefused: closed.released === true && closed.worktreeRemoved === true };
+      }
+
       // EVERYTHING ELSE IS TREATED AS POSSIBLY RUNNING (Todd Decision 2026-09-22 15:01:01Z):
       // "Everything else is treated as possibly running: its worktree is kept,
       // its cost is read, no backup starts beside it. Not seeing live is never
@@ -396,7 +476,9 @@ export async function runWorkerStep({
       }
 
       let reason;
-      if (dispatched.observationError) {
+      if (showError) {
+        reason = `the ${seat} seat reported nothing, and Orca could not be asked what it recorded about dispatch ${dispatched.dispatchId} (worker-show failed: ${showError}) -- a reading that could not be taken is not a verdict, so it may still be running and is neither released nor removed and no backup is started beside it`;
+      } else if (dispatched.observationError) {
         reason = `the ${seat} seat was adopted (dispatch ${dispatched.dispatchId}) but could not be observed (${dispatched.observationError}), and nothing has come from it through the mailbox yet -- it may still be running, so it is neither released nor removed and no backup is started beside it`;
       } else if (proof.started === false) {
         reason = proof.reason;

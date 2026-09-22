@@ -706,6 +706,7 @@ test('carryCard hands the START-THEN-ADOPT route every Orca boundary it needs, a
     terminalCloseImpl: async () => ({}),
     removeWorktreeImpl: async () => ({}),
     observeStartImpl: async () => ({}),
+    workerShowImpl: async () => ({}),
     checkWaitImpl: async () => ({}),
     releaseImpl: async () => ({}),
   };
@@ -732,6 +733,12 @@ test('carryCard hands the START-THEN-ADOPT route every Orca boundary it needs, a
     assert.equal(seen.adoptBoundaries[name], boundaries[name], `the adopt route was handed no ${name}`);
   }
   assert.equal(seen.workerStartImpl, boundaries.workerStartImpl, 'and the adoption itself still goes through the one worker-start');
+  // JUL-98 step 6 round 4b: the start rule's OWN production source. Without
+  // this boundary the three-way rule has no Orca inspect structure to read and
+  // silently degrades to one outcome -- possibly-running, always -- so a seat
+  // that failed at agent readiness is never recognised and its backup never
+  // runs. Identity, like the six above: a stand-in here is a live-only failure.
+  assert.equal(seen.workerShowImpl, boundaries.workerShowImpl, 'the start rule was handed no worker-show');
 });
 
 // JUL-98 step 5, sixth fix: the journal carries the same test result the card

@@ -1316,3 +1316,52 @@ test('a worktree the trust write did NOT actually land in is reported untrusted,
     rmSync(home, { recursive: true, force: true });
   }
 });
+
+// ---------------------------------------------------------------------------
+// JUL-98 step 6 round 4: the START RULE'S OWN PRODUCTION SOURCE.
+//
+// `hasFailedAgentReadinessSignature` and `hasLiveLivenessVerdict` in
+// graph/controller/step-runner.mjs read an Orca INSPECT structure --
+// `worker.state`, `worker.stage`, `worker.agentTerminalHandle`,
+// `dispatch.status`, `dispatch.lastFailure`, `projection.liveness.verdict`,
+// `observation.status`. Round 4 shipped the rule with no production boundary
+// that answers one: `observeStartImpl` above calls `worktree ps`, whose rows
+// carry `worktreeId`, `status` and `agents[]` and none of those fields
+// (graph/fixtures/orca-1.4.205/worktree-ps.agent-working.json), and
+// `worker-start` answers a FLAT `{dispatchId, state, stage, lastError}` with
+// no `worker`/`dispatch`/`projection` keys at all
+// (worker-start.failed-agent-readiness.json). So both detectors were dead in
+// the running controller and the three-way rule silently degraded to one
+// outcome: possibly-running, always.
+//
+// `orchestration worker-show` is the verb that DOES answer that structure --
+// every `worker-show.*.json` fixture in graph/fixtures/orca-1.4.205 has it --
+// and this is the boundary that asks it.
+// ---------------------------------------------------------------------------
+
+test('worker-show is one orca command, by dispatch, on the CONTROLLER\'s own daemon -- the Dispatch belongs to the Run and the Run lives there', async () => {
+  const orcaCallImpl = recorder([loadOrcaFixture('worker-show.failed-agent-readiness.json').result]);
+  const boundaries = createOrcaBoundaries({ orcaCallImpl });
+  const shown = await boundaries.workerShowImpl({ dispatchId: 'ctx_b93c24cc4e31' });
+
+  const [args] = orcaCallImpl.calls;
+  assert.deepEqual(args.slice(0, 2), ['orchestration', 'worker-show']);
+  assert.equal(flag(args, '--dispatch'), 'ctx_b93c24cc4e31');
+  // The same daemon `releaseImpl` uses, and for the same reason.
+  assert.equal(flag(args, '--environment'), 'orchestrator-local');
+  assert.ok(args.includes('--json'));
+
+  // And it hands back the structure the detectors read, unwrapped no further
+  // than Orca's own `result`.
+  assert.equal(shown.worker.stage, 'agent_readiness');
+  assert.equal(shown.worker.agentTerminalHandle, null);
+  assert.equal(shown.dispatch.lastFailure, 'timeout');
+});
+
+test('a dispatch with no id asks Orca nothing rather than sending "--dispatch undefined"', async () => {
+  const orcaCallImpl = recorder([{}]);
+  const boundaries = createOrcaBoundaries({ orcaCallImpl });
+  const shown = await boundaries.workerShowImpl({ dispatchId: null });
+  assert.equal(shown, null);
+  assert.equal(orcaCallImpl.calls.length, 0);
+});

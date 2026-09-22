@@ -1945,6 +1945,52 @@ that reports to the mailbox, built once in `graph/controller/adopt.mjs` and take
   dispatch is not permitted at depth 2 (max 1)". Any live proof of dispatch has to be run from a
   plain Orca terminal (depth 0), which is where the controller itself sits.
 
+### The two ways the adopt route itself failed on 2026-09-22, and what each looks like (JUL-98 step 6 round 4)
+
+Measured this wake, not inferred. The route above is the one that works when it works; these are
+the two shapes it failed in on the day, recorded so the next session recognises them instead of
+rediscovering them. Neither is a bug in the controller code — both are Orca failing to bring an
+agent up — and in both the seat could not be started at all, so the work moved to the other seat.
+
+**Shape 1 — the agy seat never reaches agent readiness.** Three dispatches this wake, two of them
+onto **fresh, fully-started** `agy` sessions, all ended the same way:
+
+```
+state      failed
+stage      agent_readiness
+lastError  timeout
+```
+
+The important part is what Orca has already done by then: **the terminal and the worktree were
+reused before the failure**, so a retry that assumes a clean slate is assuming wrongly. Three
+start-then-adopt attempts and two fresh `agy` sessions all failed here; the Gemini seat could not be
+started at all, and round 4b was built on the Claude seat instead. This is exactly the recorded
+signature `graph/controller/step-runner.mjs` concludes never-started on (`worker.state: failed`,
+`worker.stage: agent_readiness`, `worker.agentTerminalHandle: null`, `dispatch.status: failed`,
+a non-empty `dispatch.lastFailure`) — the fixture is
+`graph/fixtures/orca-1.4.205/worker-show.failed-agent-readiness.json`.
+
+**Shape 2 — the cross-daemon route stalls earlier, and never reaches a verdict at all.** Two
+earlier dispatches today, on the cross-daemon route rather than the local one, did not fail: they
+**stalled**, at
+
+```
+stage        remote_attach_requested
+observation  status: identity_changed
+```
+
+`identity_changed` means the worker Orca found is not the worker it dispatched (`exactWorker:
+false` travels with it — see the same fixture's `observation` block). A stall at
+`remote_attach_requested` is **not** the never-started signature and must never be read as one:
+nothing says the agent did not start, only that Orca can no longer identify it. That is the
+`possiblyRunning` case — keep the worktree, read the cost, release nothing, start no backup beside
+it — and the controller now treats it that way.
+
+**Telling them apart is the whole point.** Shape 1 is a verdict and its seat's backup should run.
+Shape 2 is an absence of a verdict and its seat's worker may still be spending. The one command
+that distinguishes them is `orca orchestration worker-show --dispatch <id> --json`, which is why
+`workerShowImpl` exists in `graph/controller/wiring.mjs`: `worktree ps` answers neither.
+
 ### Three things this route gets wrong if you build it the obvious way (JUL-98 step 6 round 2, 2026-09-22)
 
 An independent review of the first round found three defects in the route above. All three are

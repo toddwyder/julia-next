@@ -15,7 +15,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { runWorkerStep, runBuildAndReview, attemptTag, DEFAULT_RECONCILE_WAIT_MS, DEFAULT_RECONCILE_MAX_READS } from '../graph/controller/step-runner.mjs';
+import { runWorkerStep, runBuildAndReview, attemptTag, hasLiveLivenessVerdict, hasFailedAgentReadinessSignature, DEFAULT_RECONCILE_WAIT_MS, DEFAULT_RECONCILE_MAX_READS } from '../graph/controller/step-runner.mjs';
+import { readFile } from 'node:fs/promises';
 import { createSuiteRunner } from '../graph/controller/test-run.mjs';
 import { createFixtureWorkerOrca, loadOrcaFixture } from '../graph/controller/fixture-orca.mjs';
 import { turnStartedFromSend } from '../graph/controller/turn-start.mjs';
@@ -160,11 +161,16 @@ test('one step, in one order: dispatch, prove the turn started, sleep on the mai
 });
 
 test('a worker that never started is caught at once: ONE bounded reconciliation, never the full sleep', async () => {
-  const h = harness();
+  const h = harness({ send: NO_TURN });
+  // ROUND 4b: the signature comes from `worker-show`, not from the turn-start
+  // reading. `observeStartImpl` is `worktree ps` in production and its rows
+  // carry none of the rule's five fields, so handing the signature to it here
+  // proved the rule through a door production does not have.
   h.deps.observeStartImpl = async () => {
     h.order.push('prove-start');
-    return { show: FAILED_READINESS };
+    return { worktree: null, start: null };
   };
+  h.deps.workerShowImpl = async () => FAILED_READINESS;
   // JUL-98 step 6 round 2, finding 2: the mailbox is the only authoritative
   // record of work done, so it is asked ONCE, briefly, before the seat is
   // declared never-started. It answers nothing here -- no completion, not even
@@ -541,8 +547,11 @@ test('a backup whose TURN has the recorded failure signature stops the step too 
   let waitingFor = null;
   h.deps.observeStartImpl = async ({ seat }) => {
     waitingFor = seat;
-    return seat === 'builder' ? { show: FAILED_READINESS } : { send: TURN_STARTED };
+    // ROUND 4b: `worktree ps` shape for the seat that did not start -- the
+    // signature itself is Orca's recorded one, read through worker-show.
+    return seat === 'builder' ? { worktree: null, start: null } : { send: TURN_STARTED };
   };
+  h.deps.workerShowImpl = async ({ seat }) => (seat === 'builder' ? FAILED_READINESS : null);
   const waitFor = h.deps.checkWaitImpl;
   let builderWaits = 0;
   h.deps.checkWaitImpl = async (options) => {
@@ -1139,8 +1148,13 @@ test('item 1: never-started is concluded ONLY on the exact Orca recorded failure
   const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
   h.deps.checkWaitImpl = async () => ({ runId: ALL.runId, deliveryId: null, messages: [], count: 0, timedOut: true });
 
+  // ROUND 4b: every reading below goes through `workerShowImpl`, which is the
+  // only production boundary that answers an Orca inspect structure. The
+  // turn-start reading stays the `worktree ps` shape it really is.
+  h.deps.observeStartImpl = async () => ({ worktree: null, start: null });
+
   // 1. With the complete recorded failure signature -> concludes never-started
-  h.deps.observeStartImpl = async () => ({ show: FAILED_READINESS });
+  h.deps.workerShowImpl = async () => FAILED_READINESS;
   const neverStartedResult = await runWorkerStep({
     seat: 'builder', card: CARD, step: STEP, choice: CHOICES.builder,
     worktreeName: 'jul98-6', requestId: 'JUL-98:step-6:builder-failed',
@@ -1155,7 +1169,7 @@ test('item 1: never-started is concluded ONLY on the exact Orca recorded failure
   // 2. Missing agentTerminalHandle: null (has a terminal handle) -> falls through to possiblyRunning
   const withTerminal = structuredClone(FAILED_READINESS);
   withTerminal.worker.agentTerminalHandle = 'term_recovered';
-  h.deps.observeStartImpl = async () => ({ show: withTerminal });
+  h.deps.workerShowImpl = async () => withTerminal;
   const possiblyRunningResult = await runWorkerStep({
     seat: 'builder', card: CARD, step: STEP, choice: CHOICES.builder,
     worktreeName: 'jul98-6', requestId: 'JUL-98:step-6:builder-terminal',
@@ -1173,11 +1187,14 @@ test('item 2: a positive liveness verdict live, seen at any point, prevents a ne
   const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
   h.deps.checkWaitImpl = async () => ({ runId: ALL.runId, deliveryId: null, messages: [], count: 0, timedOut: true });
 
-  // Observed carries observation.status: 'live' and projection.liveness.verdict: 'live'
-  const liveObserved = structuredClone(FAILED_READINESS);
-  liveObserved.projection.liveness = { verdict: 'live' };
-  liveObserved.observation = { status: 'live' };
-  h.deps.observeStartImpl = async () => ({ show: liveObserved });
+  // ROUND 4b: worker-show carries observation.status 'live' and
+  // projection.liveness.verdict 'live' -- ON TOP OF the full failure signature,
+  // which is the point: live outranks the signature.
+  const liveShow = structuredClone(FAILED_READINESS);
+  liveShow.projection.liveness = { verdict: 'live' };
+  liveShow.observation = { status: 'live' };
+  h.deps.observeStartImpl = async () => ({ worktree: null, start: null });
+  h.deps.workerShowImpl = async () => liveShow;
 
   const result = await runWorkerStep({
     seat: 'builder', card: CARD, step: STEP, choice: CHOICES.builder,
@@ -1238,3 +1255,157 @@ test('item 3: every other outcome (budget/cap exhausted, observation failed, sil
 
 
 
+
+// ---------------------------------------------------------------------------
+// JUL-98 step 6 ROUND 4b: THE START RULE, DRIVEN THROUGH THE SHAPES PRODUCTION
+// ACTUALLY PRODUCES.
+//
+// The three tests above ("item 1/2/3") drive the rule by handing
+// `observeStartImpl` an Orca INSPECT structure -- `{ show: FAILED_READINESS }`.
+// The production boundary never produces one. `observeStartImpl` in
+// graph/controller/wiring.mjs:296 calls `worktree ps`, whose rows carry
+// `worktreeId`, `status` and `agents[]` and none of `worker.state`,
+// `worker.stage`, `worker.agentTerminalHandle`, `dispatch.status`,
+// `dispatch.lastFailure`, `projection.liveness.verdict` or `observation.status`
+// (graph/fixtures/orca-1.4.205/worktree-ps.agent-working.json). So in the
+// running controller `seenLive` was always false and the failure-signature
+// branch could never fire: the three-way rule degraded to one outcome.
+//
+// These tests hand `observeStartImpl` the REAL `worktree ps` answer and make
+// the verdict come from `workerShowImpl` -- the boundary that does answer an
+// inspect structure. All three outcomes have to be reachable from here or the
+// rule is not wired.
+//
+// The worktree-ps row is the recorded one, with a worktree id that is NOT this
+// dispatch's, which is the production "nothing observed" reading.
+// ---------------------------------------------------------------------------
+
+const PS_ROW = loadOrcaFixture('worktree-ps.agent-working.json').worktree;
+const LIVE_SHOW = loadOrcaFixture('worker-show.in-flight-input-accepted.json').result;
+
+// The production-shaped observation: exactly what wiring.mjs's observeStartImpl
+// returns when the page is complete and this dispatch's row is not on it.
+const productionObserveStart = async () => ({ worktree: null, start: null });
+
+function productionHarness({ workerShowImpl } = {}) {
+  const h = harness({ send: NO_TURN });
+  h.deps.observeStartImpl = productionObserveStart;
+  h.deps.checkWaitImpl = async () => ({ runId: ALL.runId, deliveryId: null, messages: [], count: 0, timedOut: true });
+  h.deps.workerShowImpl = workerShowImpl;
+  return h;
+}
+
+test('round 4b, outcome NEVER STARTED: with only a worktree ps reading, the recorded failure signature reaches the rule through worker-show', async () => {
+  const shown = [];
+  const h = productionHarness({
+    workerShowImpl: async ({ dispatchId }) => { shown.push(dispatchId); return FAILED_READINESS; },
+  });
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+
+  const result = await runWorkerStep({
+    seat: 'builder', card: CARD, step: STEP, choice: CHOICES.builder,
+    worktreeName: 'jul98-6', requestId: 'JUL-98:step-6:r4b-never',
+    suiteRunner, suiteKey: 'JUL-98:step-6', runSuite: false, ...h.deps,
+  });
+
+  assert.equal(shown.length, 1, 'worker-show is asked ONCE, and only on the path that would otherwise conclude never-started');
+  assert.equal(shown[0], result.dispatchId, 'and it is asked about THIS dispatch');
+  assert.equal(result.ok, false);
+  assert.equal(result.launchRefused, true, 'the seat never started, so its backup runs');
+  assert.equal(result.cost.neverStarted, true);
+  assert.equal(result.released, true);
+  assert.equal(result.worktreeRemoved, true);
+});
+
+test('round 4b, outcome IT RAN: a live liveness verdict from worker-show prevents never-started, with only a worktree ps reading', async () => {
+  const h = productionHarness({ workerShowImpl: async () => LIVE_SHOW });
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+
+  const result = await runWorkerStep({
+    seat: 'builder', card: CARD, step: STEP, choice: CHOICES.builder,
+    worktreeName: 'jul98-6', requestId: 'JUL-98:step-6:r4b-live',
+    suiteRunner, suiteKey: 'JUL-98:step-6', runSuite: false, ...h.deps,
+  });
+
+  assert.equal(result.seenLive, true, 'projection.liveness.verdict is live in worker-show.in-flight-input-accepted.json');
+  assert.equal(result.possiblyRunning, true);
+  assert.notEqual(result.launchRefused, true);
+  assert.equal(result.released, false, 'a worker that demonstrably ran is never released out from under itself');
+  assert.equal(result.worktreeRemoved, false);
+});
+
+test('round 4b, outcome POSSIBLY RUNNING: an observation call that itself FAILS is never read as never-started -- absence is not proof', async () => {
+  const h = productionHarness({
+    workerShowImpl: async () => { throw new Error('worker-show failed: host_indeterminate'); },
+  });
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+
+  const result = await runWorkerStep({
+    seat: 'builder', card: CARD, step: STEP, choice: CHOICES.builder,
+    worktreeName: 'jul98-6', requestId: 'JUL-98:step-6:r4b-showfail',
+    suiteRunner, suiteKey: 'JUL-98:step-6', runSuite: false, ...h.deps,
+  });
+
+  assert.equal(result.possiblyRunning, true);
+  assert.notEqual(result.launchRefused, true);
+  assert.equal(result.released, false);
+  assert.equal(result.worktreeRemoved, false);
+  assert.match(result.reason, /worker-show failed/, 'the card says WHY the verdict could not be taken');
+});
+
+test('round 4b: a controller with NO worker-show boundary at all keeps the worker rather than concluding never-started', async () => {
+  const h = productionHarness({ workerShowImpl: undefined });
+  const suiteRunner = createSuiteRunner({ execImpl: async () => ({ stdout: GREEN_TAP }), now: () => '2026-09-21T14:00:00.000Z' });
+
+  const result = await runWorkerStep({
+    seat: 'builder', card: CARD, step: STEP, choice: CHOICES.builder,
+    worktreeName: 'jul98-6', requestId: 'JUL-98:step-6:r4b-noboundary',
+    suiteRunner, suiteKey: 'JUL-98:step-6', runSuite: false, ...h.deps,
+  });
+
+  assert.equal(result.possiblyRunning, true);
+  assert.equal(result.released, false);
+  assert.equal(result.worktreeRemoved, false);
+});
+
+test('round 4b, TASK 3: a mailbox batch is never asked for a liveness verdict -- it is not an Orca inspect structure and the call could never match', async () => {
+  // The delivery carries a message for ANOTHER dispatch, so the reconciliation
+  // reads on. If the loop asked `hasLiveLivenessVerdict` of the batch, this is
+  // the shape it would be asking -- and the answer could only ever be false.
+  const batch = { runId: ALL.runId, deliveryId: 'del_foreign', acknowledged: 'del_foreign', messages: [ALL.messages[4]], count: 1, timedOut: false };
+  assert.equal(hasLiveLivenessVerdict(batch), false, 'a mailbox batch has no liveness, projection, worker or observation key');
+  assert.equal(hasLiveLivenessVerdict({ ...batch, messages: [] }), false);
+  // And the module no longer exposes the no-op: the verdict has exactly one
+  // source, which is worker-show.
+  const source = await readFile(new URL('../graph/controller/step-runner.mjs', import.meta.url), 'utf8');
+  const loopBody = source
+    .slice(source.indexOf('for (;;) {'), source.indexOf('if (reconciled?.outcome != null)'))
+    .split('\n')
+    .filter((line) => !line.trim().startsWith('//'))   // the comment says WHY it is gone
+    .join('\n');
+  assert.equal(/hasLiveLivenessVerdict/.test(loopBody), false, 'the reconciliation loop must not call a detector that cannot fire on a mailbox batch');
+});
+
+test('round 4b: the two detectors are FALSE for every shape the production boundaries actually produce, and TRUE only for worker-show', () => {
+  // The turn-start reading, as `worktree ps` really answers it. This row is a
+  // worker that is VISIBLY WORKING, and neither detector can say anything
+  // about it: that is the whole defect round 4b fixes.
+  const psObservation = { worktree: PS_ROW, start: null };
+  assert.equal(hasLiveLivenessVerdict(psObservation), false);
+  assert.equal(hasFailedAgentReadinessSignature(psObservation), false);
+
+  // The dispatch, as `worker-start` really answers it -- flat, no `worker`,
+  // `dispatch` or `projection` key. Even the FAILED one.
+  const startAnswer = loadOrcaFixture('worker-start.failed-agent-readiness.json').result;
+  assert.equal(hasFailedAgentReadinessSignature(startAnswer), false, 'a worker-start answer has no dispatch.status at all');
+  assert.equal(hasLiveLivenessVerdict(startAnswer), false);
+
+  // The adopt route's own observation (scripts/controller-adopt.test.mjs:203).
+  assert.equal(hasLiveLivenessVerdict({ busy: { terminal: 'term_seat', satisfied: false } }), false);
+
+  // And what DOES answer: worker-show, both ways round.
+  assert.equal(hasFailedAgentReadinessSignature(FAILED_READINESS), true);
+  assert.equal(hasLiveLivenessVerdict(LIVE_SHOW), true);
+  // Including through Orca's own envelope, for a caller that forgot to unwrap.
+  assert.equal(hasFailedAgentReadinessSignature(loadOrcaFixture('worker-show.failed-agent-readiness.json')), true);
+});

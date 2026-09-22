@@ -309,6 +309,44 @@ export function createOrcaBoundaries({
       return { worktree, start: dispatch?.raw ?? null };
     },
 
+    // (4b) THE START RULE'S OWN SOURCE (JUL-98 step 6 round 4b).
+    //
+    // `worktree ps` above answers "is an agent working in this worktree right
+    // now". That is a turn-start proof and nothing more: its rows carry
+    // `worktreeId`, `status` and `agents[]`
+    // (graph/fixtures/orca-1.4.205/worktree-ps.agent-working.json) and none of
+    // the fields the three-way start rule in ./step-runner.mjs reads --
+    // `worker.state`, `worker.stage`, `worker.agentTerminalHandle`,
+    // `dispatch.status`, `dispatch.lastFailure`, `projection.liveness.verdict`,
+    // `observation.status`. Nor does `worker-start`, whose answer is a FLAT
+    // `{dispatchId, state, stage, lastError}` with no `worker`, `dispatch` or
+    // `projection` key at all (worker-start.failed-agent-readiness.json).
+    //
+    // Round 4 shipped that rule against those two readings, so BOTH its
+    // detectors were dead in the running controller: `seenLive` could never
+    // become true and the failure signature could never be recognised. The
+    // rule degraded, silently, to its one remaining outcome -- possibly
+    // running, always -- which keeps every worktree and starts no backup for a
+    // seat that genuinely never started.
+    //
+    // `orchestration worker-show` is the verb that answers that structure, and
+    // it is where every `worker-show.*.json` fixture in
+    // graph/fixtures/orca-1.4.205 came from. Asked of THE CONTROLLER'S daemon,
+    // like `releaseImpl` and for the same reason: a Dispatch belongs to the
+    // Run, and the Run is there.
+    //
+    // It is asked ONCE per step, and only on the path that would otherwise
+    // conclude never-started -- see ./step-runner.mjs. A call that THROWS is
+    // never a verdict there: absence is not proof.
+    async workerShowImpl({ dispatchId } = {}) {
+      // No dispatch, nothing to inspect. Orca would be sent the literal string
+      // "undefined" and answer about no worker at all, which is worse than not
+      // asking: ./step-runner.mjs would read that answer as "no signature" and
+      // the boundary would have invented a reading.
+      if (!dispatchId) return null;
+      return call(['orchestration', 'worker-show', '--environment', environment, '--dispatch', dispatchId]);
+    },
+
     // (5) The mailbox. `--wait` blocks in Orca; nothing here sleeps or polls.
     async checkWaitImpl({ terminal, runId, types = WORKER_MESSAGE_TYPES, timeoutMs, ack } = {}) {
       const args = [
