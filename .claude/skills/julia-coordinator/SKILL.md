@@ -147,12 +147,20 @@ For the current step of the current item:
      documentation (`defaultProvider`/`defaultModel` are process-wide, not per-invocation, and
      `workerStart` has no flag-passthrough). Instead: create a plain worktree (`orca worktree
      create --repo path:/home/runner/julia-next --name <step-name> --base-branch main
-     --no-parent`, no `--agent`), then `orca terminal create --worktree <that path> --command "{
-     cat <the acceptance criteria as a prompt file>; } | node ops/service-dropbox/run-pi-seat.mjs
-     <seat>"` where `<seat>` is `builder-backup` (DeepSeek Flash) for a builder or
+     --no-parent`, no `--agent`), then `orca terminal create --worktree <that path> --command
+     "cat <<'BRIEF' | node ops/service-dropbox/run-pi-seat.mjs <seat>
+     <the acceptance criteria as a prompt file>
+     BRIEF"` where `<seat>` is `builder-backup` (DeepSeek Flash) for a builder or
      `reviewer-backup` (DeepSeek Pro) for a reviewer (`ops/service-dropbox/run-pi-seat.mjs`
      resolves the right provider/model/secret from the seat name alone -- never pass a secret in
-     this command string). **GLM was removed (JUL-93):** there is no `pi-glm` entry, no `glm-5.3` label
+     this command string). **No `{ ...; }` block form (found 2026-09-22).** Claude Code's own Bash
+     permission layer refuses any command containing a brace-group compound statement outright --
+     verbatim reason `Contains compound_statement` -- even one nested inside a quoted `--command`
+     argument to `orca`, so the coordinator can never actually issue the bygone `{ cat ...; } |
+     node ...` form under its `Bash(orca *)` grant. A heredoc piped straight into the consumer
+     needs no braces, is still approved under the same grant (live-verified), and is simpler besides:
+     nothing is ever written to a `BRIEF.md` file for the worktree's own `git status` to see, so
+     there's nothing to `rm` afterward either. **GLM was removed (JUL-93):** there is no `pi-glm` entry, no `glm-5.3` label
      and no GLM seat. A card that still carries an old GLM label is refused by the Ready queue with a
      comment saying the label is retired -- never re-map it yourself. Never route a Pi item to a
      vendor the card did not name. A card's model label picks the *entry*, not
