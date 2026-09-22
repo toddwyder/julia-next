@@ -117,37 +117,43 @@ test('a seat whose agent Orca cannot launch takes the start-then-adopt route, no
 });
 
 // JUL-98 step 6 ROUND 2, finding 1. THE SEAT THAT CAN BE STARTED BUT NEVER
-// FINISHED. Round 1 sent the DeepSeek seat down the shared adopt route with
-// `agent: 'pi'`. There is no worker-side interactive Pi cost source: the reader
-// in ../graph/controller/cost-read.mjs implements claude, codex and agy and
-// refuses everything else. A refusal there is not a cosmetic gap --
-// ../graph/controller/release.mjs stops BEFORE the release when the read fails,
-// so a Pi worker that succeeded through the mailbox would fail the step with no
-// cost line AND keep its worker and its worktree. Round 1 also made the old
-// pre-dispatch refusal unreachable, so no backup could take the seat either.
+// FINISHED (JUL-98/JUL-100 follow-up). Round 1 sent the DeepSeek seat down the
+// shared adopt route with `agent: 'pi'` while no worker-side interactive Pi
+// cost source existed: the reader in ../graph/controller/cost-read.mjs
+// implemented claude, codex and agy and refused everything else. A refusal
+// there is not a cosmetic gap -- ../graph/controller/release.mjs stops BEFORE
+// the release when the read fails, so a Pi worker that succeeded through the
+// mailbox would fail the step with no cost line AND keep its worker and its
+// worktree. Round 1 also made the old pre-dispatch refusal unreachable, so no
+// backup could take the seat either.
 //
-// So the seat is refused HERE, before anything is created, through the same
-// `launchRefused` path the seat table's backup already hangs off. The gate is
-// the cost source itself, not a hard-coded agent name: implement the reader,
-// add the agent to COST_READABLE_AGENTS, and the seat launches with no further
-// change.
-test('a seat whose agent has no worker-side cost source is refused before anything is created', () => {
+// That gap is closed: an interactive Pi session writes its own `.jsonl` under
+// `~/.pi/agent/sessions/`, same as a Claude/Codex worker's transcript/rollout
+// (cost-read.mjs's own `piSessionDirName`), so `pi` is on
+// `COST_READABLE_AGENTS` now and reaches the adopt route below rather than
+// being refused before dispatch.
+test('a pi-deepseek seat reaches the adopt route now that its interactive session has a cost reader', () => {
   const pi = launchForChoice({ entry: 'pi-deepseek', modelLabel: 'adversary-deepseek-pro', effort: 'medium' });
-  assert.equal(pi.ok, false, 'a worker that cannot be costed cannot be released either, so it is never started');
-  assert.match(pi.reason, /pi/, 'the agent that has no reader is named');
-  assert.match(pi.reason, /cost/i, 'and so is what is missing');
-  assert.equal(pi.entry, 'pi-deepseek', 'the seat-table entry, so the card can say which seat moved');
-  // The command the route WOULD run is still built and carried on the refusal:
-  // the capability is one reader away, not a rewrite.
+  assert.notEqual(pi.ok, false, 'the interactive-session reader makes this seat costable, so it is no longer refused before dispatch');
+  assert.equal(pi.route, 'adopt');
+  assert.equal(pi.agent, 'pi');
   assert.match(pi.command, /reviewer-backup/);
+  assert.equal(hasWorkerCostSource(pi.agent), true);
 
-  // And the seat that DOES have a reader is not caught by the same gate.
+  // And the Gemini seat, on the same route, is unaffected.
   assert.equal(launchForChoice({ entry: 'gemini', modelLabel: 'builder-gemini-flash', effort: 'high' }).ok, undefined);
 });
 
+// The gate itself (`costable`, unexported -- reached only through
+// `launchForChoice`) is still real, checked here for EVERY entry the seat
+// table names today, `pi-deepseek` included now that its interactive-session
+// reader exists (JUL-98/JUL-100 follow-up) -- there is no seat-table entry
+// left to construct a "still refused" example through the public API.
 test('every agent the dispatcher will launch is one the cost reader can actually read', () => {
-  for (const entry of ['claude', 'codex', 'gemini']) {
-    const label = { claude: 'builder-claude-opus', codex: 'adversary-codex', gemini: 'builder-gemini-flash' }[entry];
+  for (const entry of ['claude', 'codex', 'gemini', 'pi-deepseek']) {
+    const label = {
+      claude: 'builder-claude-opus', codex: 'adversary-codex', gemini: 'builder-gemini-flash', 'pi-deepseek': 'adversary-deepseek-pro',
+    }[entry];
     const launch = launchForChoice({ entry, modelLabel: label, effort: 'medium' });
     assert.notEqual(launch.ok, false, `${entry} should still launch`);
     assert.equal(hasWorkerCostSource(launch.agent), true, `the ${entry} seat launches ${launch.agent}, which no cost reader implements`);

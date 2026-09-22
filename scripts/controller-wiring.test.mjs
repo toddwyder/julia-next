@@ -28,6 +28,8 @@ import {
   COST_TERMINAL_TITLE_PREFIX,
   createPublisher,
   claudeProjectDirName,
+  piSessionDirName,
+  piSessionEventsFromLines,
   geminiAllowanceFromUsage,
   worktreePathOf,
   resolveSenderTerminal,
@@ -52,7 +54,7 @@ const t_cleanup = [];
 test.after(() => { for (const dir of t_cleanup) rmSync(dir, { recursive: true, force: true }); });
 import { currentBranch } from '../graph/controller/main.mjs';
 import { proveTurnStarted } from '../graph/controller/turn-start.mjs';
-import { loadOrcaFixture, orcaErrorFromFixture } from '../graph/controller/fixture-orca.mjs';
+import { loadOrcaFixture, orcaErrorFromFixture, ORCA_FIXTURE_DIR } from '../graph/controller/fixture-orca.mjs';
 import { emptyControllerState } from '../graph/controller/state.mjs';
 
 // A recorder standing where the `orca` binary does. It NEVER spawns anything.
@@ -265,7 +267,7 @@ test('a seat whose session file is missing REFUSES rather than returning a blank
     // A vendor with no known source is refused too: a guessed figure is worse
     // than a refusal, and release.mjs leaves the worktree in place for it.
     await assert.rejects(
-      () => read({ seat: 'reviewer', worktree: 'x', agent: 'pi' }),
+      () => read({ seat: 'reviewer', worktree: 'x', agent: 'cursor' }),
       /refusing to guess a figure/,
     );
   } finally {
@@ -279,11 +281,17 @@ test('a seat whose session file is missing REFUSES rather than returning a blank
 // that fails stops ../graph/controller/release.mjs BEFORE the release, so a
 // worker whose agent has no reader is stranded with its worktree retained even
 // when it did the work perfectly. The list and the reader must therefore never
-// drift apart -- an agent added to the list with no branch behind it is exactly
-// the defect this pins, and `pi` is the agent that has no reader today.
-test('every agent declared cost-readable really has a reader behind it, and pi is not one of them', async () => {
-  assert.ok(!COST_READABLE_AGENTS.includes('pi'), 'no worker-side interactive Pi cost source exists, so pi must not be declared readable');
-  assert.equal(hasWorkerCostSource('pi'), false);
+// drift apart -- an agent added to the list with no branch behind it is
+// exactly the defect this pins. `pi` USED to be that example (round 2: no
+// worker-side interactive-session cost source existed); it now has one
+// (JUL-98/JUL-100 follow-up, `~/.pi/agent/sessions/`), so `cursor` -- a real
+// `--agent` Orca's own worker-start knows (dispatch.mjs's own comment) that
+// this reader has never covered -- takes its place as the still-unsupported
+// example.
+test('every agent declared cost-readable really has a reader behind it, and cursor is not one of them', async () => {
+  assert.ok(!COST_READABLE_AGENTS.includes('cursor'), 'no cost source is implemented for cursor, so it must not be declared readable');
+  assert.equal(hasWorkerCostSource('cursor'), false);
+  assert.equal(hasWorkerCostSource('pi'), true, 'the interactive-session reader (JUL-98/JUL-100 follow-up) makes pi readable now');
   assert.equal(hasWorkerCostSource('agy'), true);
 
   const read = createSeatCostReader({
@@ -361,6 +369,93 @@ test("the Codex cost read looks under the WORKER's home too -- the same bug, the
   } finally {
     if (previousHome === undefined) delete process.env.HOME; else process.env.HOME = previousHome;
     rmSync(notTheWorkerHome, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// The Pi (DeepSeek/Command Code) adopt-route seat: an INTERACTIVE session's
+// own `.jsonl`, not the one-shot `--mode json` stream (JUL-98/JUL-100
+// follow-up)
+// ---------------------------------------------------------------------------
+
+// Confirmed live, 22 Sep, against a real adopted-route reviewer session:
+// worktree `/home/runner/orca/workspaces/julia-next/jul98-step-6f-review4`
+// left its session file under
+// `~/.pi/agent/sessions/--home-runner-orca-workspaces-julia-next-jul98-step-6f-review4--/`.
+test("Pi's own session directory name for a worktree, confirmed against a real live session", () => {
+  assert.equal(
+    piSessionDirName('/home/runner/orca/workspaces/julia-next/jul98-step-6f-review4'),
+    '--home-runner-orca-workspaces-julia-next-jul98-step-6f-review4--',
+  );
+  // Not claudeProjectDirName's shape: one leading dash there, two here, and a
+  // trailing pair only Pi's own naming adds.
+  assert.notEqual(
+    piSessionDirName('/home/runner/orca/workspaces/julia-next/x'),
+    claudeProjectDirName('/home/runner/orca/workspaces/julia-next/x'),
+  );
+});
+
+test("the Pi cost read looks under the WORKER's home too, in Pi's own session directory", async () => {
+  const notTheWorkerHome = mkdtempSync(join(tmpdir(), 'controller-own-home-'));
+  const previousHome = process.env.HOME;
+  const asked = [];
+  try {
+    process.env.HOME = notTheWorkerHome;
+    const read = createSeatCostReader({
+      readdirImpl: (dir) => { asked.push(dir); throw new Error('ENOENT'); },
+      statImpl: () => { throw new Error('ENOENT'); },
+      readFileImpl: () => { throw new Error('ENOENT'); },
+    });
+    await assert.rejects(
+      () => read({ seat: 'reviewer', worktree: 'repo-1::/home/runner/orca/workspaces/julia-next/jul98-step-6f-review4', agent: 'pi' }),
+      /no Pi session file/,
+    );
+    assert.deepEqual(asked, [
+      '/home/runner/.pi/agent/sessions/--home-runner-orca-workspaces-julia-next-jul98-step-6f-review4--',
+    ]);
+    assert.ok(!asked[0].startsWith(notTheWorkerHome));
+  } finally {
+    if (previousHome === undefined) delete process.env.HOME; else process.env.HOME = previousHome;
+    rmSync(notTheWorkerHome, { recursive: true, force: true });
+  }
+});
+
+test('the adapter re-tags an interactive session\'s "message" lines as "message_end", the shape the DeepSeek extractor already reads -- and drops everything else', () => {
+  const lines = [
+    JSON.stringify({ type: 'message', message: { role: 'user', content: [] } }),
+    'not json at all',
+    JSON.stringify({ type: 'message', message: { role: 'assistant', usage: { input: 10, output: 5, totalTokens: 15 }, provider: 'commandcode', model: 'deepseek/deepseek-v4-pro' } }),
+  ];
+  const events = piSessionEventsFromLines(lines);
+  assert.equal(events.length, 2, 'the unparseable line is dropped, not thrown on');
+  assert.deepEqual(events.map((e) => e.type), ['message_end', 'message_end']);
+  assert.equal(events[1].message.usage.input, 10);
+});
+
+test('a real interactive-session recording produces a real cost line -- the same per-turn summing the one-shot stream already proved (PR #91), and Command Code priced under its own rate-table id', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'controller-pi-session-'));
+  try {
+    // A realistic POSIX worktree path, independent of this OS's own temp
+    // path shape (which can carry a drive letter and backslashes that
+    // `piSessionDirName` -- written for Orca's real POSIX worker -- does not
+    // expect). Only `workerHome` below needs to be a real local directory.
+    const worktreePath = '/home/runner/orca/workspaces/julia-next/jul98-step-6f-review4';
+    const sessionDir = join(dir, '.pi', 'agent', 'sessions', piSessionDirName(worktreePath));
+    mkdirSync(sessionDir, { recursive: true });
+    writeFileSync(join(sessionDir, '2026-09-22T18-39-44-945Z_01a0ca6a.jsonl'), readFileSync(join(ORCA_FIXTURE_DIR, 'cost.pi.interactive-session.jsonl'), 'utf8'));
+
+    const read = createSeatCostReader({ workerHome: dir });
+    const line = await read({
+      seat: 'reviewer', worktree: `repo-1::${worktreePath}`, agent: 'pi', startedAt: '2026-09-22T18:39:44.000Z', endedAt: '2026-09-22T18:48:30.000Z',
+    });
+
+    assert.equal(line.model, 'deepseek/deepseek-v4-pro', 'the id Command Code actually echoed back');
+    assert.equal(line.vendor, 'commandcode', 'priced against the rate table\'s OWN id (commandcode/deepseek-v4-pro), not the bare one Pi echoed');
+    assert.equal(line.totalTokens, 5027 + 31798, 'summed across both turns, not just the last one');
+    assert.ok(line.usd > 0, 'a real Command Code review is now priced, not left to throw on an unknown model id');
+    assert.doesNotThrow(() => assertCostLineComplete(line));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 
@@ -532,7 +627,7 @@ test('a seat with no known cost source is refused BEFORE any terminal is created
   const boundaries = costTerminal({ screens: [[done(0)]] });
   const read = createOrcaSeatCostReader({ boundaries, pollMs: 0 });
   await assert.rejects(
-    () => read({ seat: 'reviewer', worktree: 'x', agent: 'pi' }),
+    () => read({ seat: 'reviewer', worktree: 'x', agent: 'cursor' }),
     /refusing to guess a figure/,
   );
   assert.equal(boundaries.calls.create.length, 0);
@@ -580,7 +675,7 @@ test('the production cost reader is gated by the READER\'s own list, not a secon
   const boundaries = costTerminal({ screens: [[done(0)]] });
   const read = createOrcaSeatCostReader({ boundaries, pollMs: 0 });
   await assert.rejects(
-    () => read({ seat: 'reviewer', worktree: 'x', agent: 'pi' }),
+    () => read({ seat: 'reviewer', worktree: 'x', agent: 'cursor' }),
     (error) => {
       assert.match(error.message, /refusing to guess a figure/);
       assert.ok(
@@ -591,7 +686,7 @@ test('the production cost reader is gated by the READER\'s own list, not a secon
     },
   );
   assert.equal(boundaries.calls.create.length, 0);
-  assert.equal(hasWorkerCostSource('pi'), false, 'and pi is still the agent with no reader');
+  assert.equal(hasWorkerCostSource('cursor'), false, 'and cursor is still an agent with no reader');
 });
 
 test('a close that itself fails does not hide the real reason the read failed', async () => {

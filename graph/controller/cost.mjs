@@ -231,8 +231,27 @@ export function deepseekExtractFromSeatStream(events, { startedAt, endedAt } = {
   // undercount here too, since `tokens` excludes cacheWrite/reasoning.
   const totalTokens = assistants.reduce((sum, event) => sum + (Number(event.message.usage.totalTokens) || 0), 0);
 
+  // Pi's own `--model` argv is the API-facing id: `deepseek-v4-flash` (native
+  // DeepSeek), or `deepseek/deepseek-v4-pro`/`-flash` (Command Code --
+  // namespaced, confirmed live against its own `/models` listing,
+  // ops/service-dropbox/README.md "Command Code as the reviewer's Pi
+  // provider"). Pi echoes that same id back on `message.model`/`message_end.
+  // model` (confirmed live in a real adopted-route reviewer session,
+  // graph/fixtures/orca-1.4.205/cost.pi.interactive-session.jsonl:
+  // `provider: "commandcode"`, `model: "deepseek/deepseek-v4-pro"`), but
+  // graph/rate-table.mjs prices the Command Code pair under its OWN id,
+  // `commandcode/deepseek-v4-pro`/`-flash` (pricing is per PROVIDER endpoint,
+  // not per underlying model -- that file's own header). Unremapped,
+  // `costOf(last.model, ...)` throws `no rate for model
+  // 'deepseek/deepseek-v4-pro'` on every real Command Code review.
+  const pricedModel = last.provider === 'commandcode' ? `commandcode/${last.model.replace(/^deepseek\//, '')}` : last.model;
+
   return {
-    vendor: 'pi-deepseek',
+    // Command Code and native DeepSeek are different billing relationships
+    // (README, same section) even when the underlying model is identical, so
+    // the vendor the rate table actually priced against travels with the
+    // line -- never a fixed 'pi-deepseek' regardless of which one ran.
+    vendor: RATE_TABLE.models[pricedModel]?.vendor ?? 'pi-deepseek',
     provider: last.provider ?? null,
     model: last.model,
     tokens,
@@ -243,7 +262,7 @@ export function deepseekExtractFromSeatStream(events, { startedAt, endedAt } = {
     minutes: minutesBetween(startedAt, endedAt),
     // Priced at DeepSeek's published rate for the hour the run started, which
     // is the cautious figure: see the rate table's own header.
-    usd: costOf(last.model, tokens, { at: new Date(startedAt) }),
+    usd: costOf(pricedModel, tokens, { at: new Date(startedAt) }),
     lowerBound: false,
   };
 }

@@ -39,7 +39,7 @@ import { execFile } from 'node:child_process';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
-import { claudeExtractFromTranscript, codexExtractFromRollout, geminiExtractFromAllowance, seatCostLine } from './cost.mjs';
+import { claudeExtractFromTranscript, codexExtractFromRollout, deepseekExtractFromSeatStream, geminiExtractFromAllowance, seatCostLine } from './cost.mjs';
 import { RATE_TABLE } from '../rate-table.mjs';
 
 const execFileAsync = promisify(execFile);
@@ -85,16 +85,23 @@ export const WORKER_HOME = '/home/runner';
 // than an agent name repeated in two files: implement the reader, add the agent
 // here, and the seat launches with no other change.
 //
-// WHY `pi` IS NOT ON IT. ../cost.mjs HAS a DeepSeek extractor
-// (`deepseekExtractFromSeatStream`), but it reads the JSON event stream that
-// `ops/service-dropbox/run-pi-seat.mjs` emits in its NON-interactive mode. The
-// adopt route runs Pi INTERACTIVELY, in a TUI, and that session writes no such
-// stream anywhere this reader can find: there is no measured worker-side record
-// to read, and DeepSeek is out of balance (402) with Todd's Decision of
-// 2026-09-22 04:07Z that it stays that way, so no paid interactive run can be
-// made to find one. A figure invented in its place is the blank cost line in
-// another costume, which is the one thing this whole module exists to stop.
-export const COST_READABLE_AGENTS = Object.freeze(['claude', 'codex', 'agy']);
+// `pi` IS ON IT NOW (JUL-98/JUL-100 follow-up). Round 2's own note said an
+// interactive TUI session "writes no such stream anywhere that has been
+// found" -- it does: `~/.pi/agent/sessions/<worktree, encoded>/<ts>_<id>.jsonl`,
+// confirmed live against a real adopted-route reviewer session on 22 Sep
+// (graph/fixtures/orca-1.4.205/cost.pi.interactive-session.jsonl). Each
+// `type: "message"` assistant line there carries the SAME `usage`/`provider`/
+// `model` shape ../cost.mjs's `deepseekExtractFromSeatStream` already reads
+// off the one-shot `--mode json` stream, just wrapped as `message` instead of
+// `message_end` -- `piSessionEventsFromLines` below is the one-line adapter
+// between the two, so there is still only one place that sums a DeepSeek
+// seat's usage. The 04:07Z Decision (no new spend on NATIVE DeepSeek) is
+// unaffected: the reviewer runs through Command Code, a separately funded
+// account (the 15:01:54Z Decision), and this reader changes nothing about
+// which provider a seat is dispatched to -- only whether its real spend can
+// be read back, which is what decides whether the seat is refused before it
+// ever runs.
+export const COST_READABLE_AGENTS = Object.freeze(['claude', 'codex', 'agy', 'pi']);
 
 // Is there a worker-side record this reader can turn into a cost line for this
 // agent? ./dispatch.mjs asks BEFORE it starts anything.
@@ -117,6 +124,34 @@ export function claudeProjectDirName(worktreePath) {
 // A .jsonl file as the list of its lines, with the blank last line dropped.
 function splitJsonl(text) {
   return String(text).split('\n').filter((line) => line.trim() !== '');
+}
+
+// Pi's own session directory name for a worktree, confirmed live (22 Sep)
+// against a real adopted-route reviewer session:
+// `/home/runner/orca/workspaces/julia-next/jul98-step-6f-review4` really left
+// its session file under
+// `~/.pi/agent/sessions/--home-runner-orca-workspaces-julia-next-jul98-step-6f-review4--/`.
+// Not `claudeProjectDirName`'s shape (a single leading dash, no trailing
+// one): Pi strips the path's own leading `/` first, turns every remaining
+// `/` into `-`, then wraps the whole thing in a literal `--` at both ends.
+export function piSessionDirName(worktreePath) {
+  return `--${String(worktreePath).replace(/^\//, '').replace(/\//g, '-')}--`;
+}
+
+// The adapter between Pi's two JSON shapes -- both hold the same `usage`/
+// `provider`/`model` fields on an assistant message, but the one-shot
+// `--mode json` stream's event is `{type:"message_end", message}` while an
+// interactive session file's own line is `{type:"message", message}`.
+// ../cost.mjs's `deepseekExtractFromSeatStream` already reads the first
+// shape and sums correctly across every turn (JUL-98, PR #91) -- this is the
+// one place that re-tags the second shape as the first, so there is still
+// only one place that sums a DeepSeek seat's tokens, not two copies that can
+// drift.
+export function piSessionEventsFromLines(lines) {
+  return lines
+    .map((line) => { try { return JSON.parse(line); } catch { return null; } })
+    .filter((event) => event?.type === 'message')
+    .map((event) => ({ ...event, type: 'message_end' }));
 }
 
 function newestFile(dir, matches, { readdirImpl, statImpl }) {
@@ -251,6 +286,19 @@ export function createSeatCostReader({
       }
       const lines = splitJsonl(readFileImpl(file, 'utf8')).map((line) => JSON.parse(line));
       return seatCostLine({ seat, ...codexExtractFromRollout(lines) });
+    }
+    if (agent === 'pi') {
+      // The adopt route's own interactive session -- see `piSessionDirName`'s
+      // own comment for the confirmed live naming. `startedAt`/`endedAt` are
+      // the controller's clock around the dispatch, same requirement
+      // `deepseekExtractFromSeatStream` already states for the one-shot route.
+      const dir = join(workerHome, '.pi', 'agent', 'sessions', piSessionDirName(worktreePath));
+      const file = newestFile(dir, (name) => name.endsWith('.jsonl'), { readdirImpl, statImpl });
+      if (!file) {
+        throw new Error(`no Pi session file for the ${seat} seat under ${dir} -- its cost cannot be read, so the worker and its worktree are left in place`);
+      }
+      const events = piSessionEventsFromLines(splitJsonl(readFileImpl(file, 'utf8')));
+      return seatCostLine({ seat, ...deepseekExtractFromSeatStream(events, { startedAt, endedAt }) });
     }
     if (agent === 'agy') {
       // No session file to find: agy writes no per-session token record at all

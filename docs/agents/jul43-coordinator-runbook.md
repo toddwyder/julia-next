@@ -2067,6 +2067,44 @@ never-started verdict; `remote_attach_requested` is a stall with no verdict in i
 `hasFailedAgentReadinessSignature` in `graph/controller/step-runner.mjs` reads the five fields it
 reads and does **not** look at `observation.status` at all.
 
+### The Pi seat's cost gap is closed: an interactive session writes its own record (JUL-98/JUL-100 follow-up, 2026-09-22)
+
+Round 2's own note (below) said an interactive TUI session "writes no such stream anywhere that
+has been found." It does. Found live, the same day, by listing `runner`'s own `~/.pi/agent/
+sessions/`: Pi writes one `.jsonl` per worktree there, same shape (per project) as Claude's
+transcript directory and Codex's rollout tree, keyed by
+`--<worktree path, leading '/' stripped, every remaining '/' turned into '-'>--` (NOT
+`claudeProjectDirName`'s shape -- one leading dash there, two here, plus a trailing pair). Each
+`type: "message"` assistant line inside it carries the exact same `usage`/`provider`/`model`
+fields the one-shot `--mode json` stream's `message_end` event does.
+
+`graph/controller/cost-read.mjs`'s `piSessionDirName` + `piSessionEventsFromLines` read that file
+and hand its events to the SAME `deepseekExtractFromSeatStream` the one-shot route already used
+(including PR #91's per-turn summing, proven again here) -- one extractor, two sources, never two
+copies that can drift. `pi` is on `COST_READABLE_AGENTS` now, so `dispatch.mjs`'s cost gate no
+longer refuses it: a pi-deepseek seat reaches the adopt route instead of falling back to Codex
+before it ever runs.
+
+**Fixed alongside it, found while wiring this in:** `deepseekExtractFromSeatStream` priced every
+DeepSeek seat under the bare model id Pi echoes back (`deepseek/deepseek-v4-pro`), but
+`graph/rate-table.mjs` prices Command Code's pair under its OWN namespaced id
+(`commandcode/deepseek-v4-pro`) -- unremapped, `costOf` throws `no rate for model
+'deepseek/deepseek-v4-pro'` on every real Command Code review, which a real recorded session
+(`graph/fixtures/orca-1.4.205/cost.pi.interactive-session.jsonl`) confirms is exactly what Command
+Code echoes. Fixed the same place: `provider === 'commandcode'` remaps to the rate table's own id
+before `costOf` is called.
+
+**The 04:07Z Decision (no new spend on native DeepSeek) is unaffected.** This reader changes
+nothing about which provider a seat is dispatched to -- Command Code is a separately funded
+account (the 15:01:54Z Decision) -- only whether a seat's real spend can be read back afterward,
+which is what decided whether it was refused before it ever ran.
+
+**Not done here: a live controller dispatch that actually reaches this reader.** Every shape used
+(the session directory name, the per-line event shape, the Command Code model-id echo) is read off
+a real recorded session, not invented, and the full suite passes -- but no fresh live dispatch has
+exercised this reader end to end yet. The next real pi-deepseek reviewer dispatch is what confirms
+it, the same way step 6's own five live rounds confirmed the adopt route itself.
+
 ### Three things this route gets wrong if you build it the obvious way (JUL-98 step 6 round 2, 2026-09-22)
 
 An independent review of the first round found three defects in the route above. All three are
