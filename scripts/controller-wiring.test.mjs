@@ -222,6 +222,24 @@ test('a wait budget that is not a finite number is refused by name, never sent t
   assert.equal(orcaCallImpl.calls.length, 0);
 });
 
+test('the Pi brief is read from Orca on the controller daemon and typed on the runner daemon, with Enter', async () => {
+  const orcaCallImpl = recorder([{ dispatch: { id: 'ctx_1' }, preamble: 'PREAMBLE' }, { send: { accepted: true } }]);
+  const boundaries = createOrcaBoundaries({ orcaCallImpl });
+  assert.equal(await boundaries.dispatchPreambleImpl({ taskId: 'task_1', from: 'term_controller' }), 'PREAMBLE');
+  await boundaries.terminalSendImpl({ terminal: 'term_seat', text: 'line one\nline two' });
+  const [show, send] = orcaCallImpl.calls;
+  assert.deepEqual(show.slice(0, 2), ['orchestration', 'dispatch-show']);
+  assert.equal(flag(show, '--environment'), ORCHESTRATOR_ENVIRONMENT);
+  assert.equal(flag(show, '--task'), 'task_1');
+  assert.equal(flag(show, '--from'), 'term_controller');
+  assert.ok(show.includes('--preamble'));
+  assert.deepEqual(send.slice(0, 2), ['terminal', 'send']);
+  assert.equal(flag(send, '--environment'), WORKER_ENVIRONMENT);
+  assert.equal(flag(send, '--terminal'), 'term_seat');
+  assert.equal(flag(send, '--text'), 'line one\nline two');
+  assert.ok(send.includes('--enter'));
+});
+
 test('release and worktree removal are the two Orca cleanup verbs, by dispatch and by worktree id', async () => {
   const orcaCallImpl = recorder([{}]);
   const boundaries = createOrcaBoundaries({ orcaCallImpl });

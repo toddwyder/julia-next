@@ -269,3 +269,73 @@ test('a throw BEFORE the adoption is still a refusal that takes back what it mad
   const kinds = b.calls.map(([name]) => name);
   assert.ok(kinds.includes('terminal-close') && kinds.includes('worktree-rm'), 'and everything it made is taken back');
 });
+
+// JUL-92 attempts 6-8: Orca's worker-start --terminal never reaches a Pi
+// started through node run-pi-seat.mjs, so the controller types Orca's own
+// preamble (which carries the brief) itself. Gemini keeps Orca's delivery.
+const DEEPSEEK = { entry: 'pi-deepseek', modelLabel: 'adversary-deepseek-pro', effort: 'medium' };
+const PREAMBLE = `You are working inside Orca, a multi-agent IDE. You are a dispatched worker.\nYour task ID is: task_1\n\n${SPEC}`;
+
+function piBoundaries(overrides = {}) {
+  return {
+    async dispatchPreambleImpl(args) { this.calls.push(['dispatch-show', args]); return PREAMBLE; },
+    async terminalSendImpl(args) { this.calls.push(['terminal-send', args]); return { send: { accepted: true } }; },
+    ...overrides,
+  };
+}
+
+function runPi(overrides = {}) {
+  const b = boundaries();
+  const pi = piBoundaries(overrides);
+  for (const key of Object.keys(pi)) b[key] = pi[key].bind(b);
+  return {
+    b,
+    promise: startAdoptedWorker({
+      seat: 'reviewer',
+      entry: 'pi-deepseek',
+      launch: launchForChoice(DEEPSEEK),
+      spec: SPEC,
+      worktreeName: 'jul-92-work-review-a9',
+      runId: 'run_1',
+      from: 'term_controller',
+      requestId: 'JUL-92:work:reviewer:a9',
+      ...b,
+    }),
+  };
+}
+
+test('a Pi seat is typed Orca\'s own preamble, brief included, into its terminal right after the adoption', async () => {
+  const { b, promise } = runPi();
+  const answer = await promise;
+  assert.equal(answer.ok, true);
+  const names = b.calls.map(([name]) => name);
+  const started = names.indexOf('worker-start');
+  assert.deepEqual(names.slice(started, started + 3), ['worker-start', 'dispatch-show', 'terminal-send']);
+  const [, show] = b.calls.find(([name]) => name === 'dispatch-show');
+  assert.deepEqual(show, { taskId: 'task_1', from: 'term_controller' });
+  const [, send] = b.calls.find(([name]) => name === 'terminal-send');
+  assert.deepEqual(send, { terminal: 'term_seat', text: PREAMBLE });
+});
+
+test('a Gemini seat is never typed into: Orca\'s own delivery works there', async () => {
+  const { b, promise } = run();
+  await promise;
+  assert.ok(!b.calls.some(([name]) => name === 'terminal-send' || name === 'dispatch-show'));
+});
+
+test('a Pi preamble that does not carry the brief is not typed, and the adopted worker is kept, not torn down', async () => {
+  const { b, promise } = runPi({ async dispatchPreambleImpl() { return 'You are a dispatched worker.'; } });
+  const answer = await promise;
+  assert.equal(answer.ok, true, 'the worker exists; it is reconciled, never refused');
+  assert.match(answer.observationError, /no preamble carrying this brief/);
+  assert.ok(!b.calls.some(([name]) => name === 'terminal-send'));
+  assert.ok(!b.calls.some(([name]) => name === 'terminal-close' || name === 'worktree-rm'));
+});
+
+test('a Pi brief that terminal send does not accept is reported, and the adopted worker is kept', async () => {
+  const { b, promise } = runPi({ async terminalSendImpl() { return { send: { accepted: false } }; } });
+  const answer = await promise;
+  assert.equal(answer.ok, true);
+  assert.match(answer.observationError, /did not accept Pi's brief for task task_1/);
+  assert.ok(!b.calls.some(([name]) => name === 'terminal-close' || name === 'worktree-rm'));
+});
