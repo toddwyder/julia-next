@@ -27,7 +27,7 @@ not publish.
    the candidate worktree and hands the same result to you and to the builder. Tests are not run
    twice, and the result never rests on the builder's word.
 4. **The repo's own standing instructions** — `CLAUDE.md`, `CONTEXT.md`, `docs/adr/`, and
-   `docs/agents/jul43-coordinator-runbook.md`.
+   `docs/agents/server-runbook.md`.
 
 ## What you attack
 

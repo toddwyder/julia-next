@@ -26,7 +26,7 @@ session standing in for the coordinator.
 **A discovery about the server or its tools is not recorded until it's in the runbook.** Any
 new fact about the OVH box or the tooling on it -- a binary's real path, a socket location, a
 pairing mechanism, a systemd unit's behavior -- goes into
-`docs/agents/jul43-coordinator-runbook.md` **in the same PR** that used the discovery, not only
+`docs/agents/server-runbook.md` **in the same PR** that used the discovery, not only
 narrated in a Linear comment. A Linear comment documents what happened *this session*; the
 runbook is what a fresh session with no memory of this conversation reads instead. Treat
 "discovered it, used it, moved on without updating the runbook" as an incomplete step.
@@ -99,7 +99,7 @@ wait --timeout-ms 580000`), and read the worker's actual terminal output and git
 waits. End the wake only when the item is complete, or parked with the reason posted on its
 card. If you cannot keep waiting (a tool refused, out of budget), say so on the card before you
 stop, so the next launch does not find a silent run. The next explicit launch continues from
-Orca's and Linear's recorded state (see `docs/agents/jul43-coordinator-runbook.md`).
+Orca's and Linear's recorded state (see `docs/agents/server-runbook.md`).
 
 ---
 
@@ -377,8 +377,12 @@ the record.
 (Adjust the join condition to however the APL parser resolves nested `context.runId` in the
 live dataset -- verify against a real query before trusting the exact syntax above.)
 
-**Readiness check** (`node --env-file=<publisher credential file> scripts/check-readiness.mjs`):
-before starting any run, confirm Orca reports the OVH runner `reachable`/`connected`, the
+**Readiness check** (`node scripts/check-readiness.mjs`): the plain form, with no `--env-file`
+prefix. Your granted command list allows `Bash(node scripts/check-readiness.mjs:*)` and nothing
+with that prefix, so a `node --env-file=... scripts/check-readiness.mjs` invocation is refused
+before it runs; the publisher credential is already in your shell, sourced by `julia-run.mjs`'s
+own launch prefix (runbook, "The coordinator's granted command list refuses the documented
+`check-readiness` invocation"). Before starting any run, confirm Orca reports the OVH runner `reachable`/`connected`, the
 `julia-next` project is registered there, the publisher App is installed on `julia-next`, and
 the journey-relay is reachable (checked the same terminal-on-runner way, not assumed from
 wherever the check itself runs). No `LINEAR_API_KEY` check -- the coordinator is a live agent

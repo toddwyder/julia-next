@@ -1,12 +1,16 @@
-# JUL-43 / JUL-61 coordinator runbook
+# Julia-next server runbook
 
-**This file's own procedure is current as of 2026-09-17 (JUL-61).** JUL-43 is closed; its
-history is preserved at the bottom under "JUL-43 history — not the current procedure." Read
-top to bottom for the live operating procedure — you should never need the original chat that
-produced this file.
+**The general operating runbook for the OVH server and the tooling on it** — the account table,
+the routes in, the graph's own launcher and dispatch, the publisher, and every trap a session
+has hit and recorded. It is not the record of one ticket: it was filed under a ticket-specific
+name when JUL-43 created it, and renamed to this general one on 2026-09-23 (JUL-92) once it had
+long outgrown that. Read top to bottom for the live operating procedure — you should never
+need the original chat that produced any part of it.
 
-The Linear issue ([JUL-61](https://linear.app/julia-next/issue/JUL-61)) owns the work
-definition and its evidence trail; this file owns the verified operating procedure only.
+**Currency.** Sections carry the date they were verified live; the oldest live procedure here
+was re-verified 2026-09-17 (JUL-61). JUL-43 is closed and its history is preserved at the bottom
+under "JUL-43 history — not the current procedure." A Linear issue owns its own work definition
+and evidence trail; this file owns the verified operating procedure only.
 
 ---
 
@@ -100,13 +104,22 @@ export ORCA_ENVIRONMENT=ovh-local
 ```
 `scripts/orca-cli.mjs` already reads `ORCA_BIN` from the environment; `scripts/check-readiness.mjs`
 reads `ORCA_ENVIRONMENT` the same way (defaulting to `"OVH runner"` for laptop use, unchanged) --
-`getEnvironment()` in that file is exported for exactly this. When invoking `check-readiness.mjs`
-directly, also load the publisher credential (see "Publishing" below):
+`getEnvironment()` in that file is exported for exactly this. Invoke it in the **plain** form,
+with the publisher credential already in the environment:
 ```sh
-ORCA_BIN=/opt/Orca/orca-ide ORCA_ENVIRONMENT=ovh-local \
-  node --env-file=/etc/orchestrator-svc/.env.publisher scripts/check-readiness.mjs
+set -a; . /etc/orchestrator-svc/.env.publisher; set +a
+ORCA_BIN=/opt/Orca/orca-ide ORCA_ENVIRONMENT=ovh-local node scripts/check-readiness.mjs
 ```
 Verified live, all four checks green, entirely server-local, no laptop involved.
+
+**Do not reach for the `node --env-file=/etc/orchestrator-svc/.env.publisher
+scripts/check-readiness.mjs` form in a coordinator run.** The coordinator's granted command list
+allows `Bash(node scripts/check-readiness.mjs:*)` and nothing with that prefix, so the prefixed
+invocation matches no grant and is refused before it runs — see "The coordinator's granted
+command list refuses the documented `check-readiness` invocation" below. A coordinator started by
+`julia-run.mjs` needs no prefix anyway: its `ENV_PREFIX` already sources that same file into the
+shell (`set -a; . <file>; set +a`) before `claude` starts. The `--env-file` prefix is for a laptop
+or interactive session, where it is granted by hand.
 
 **A second Orca daemon runs as `orchestrator-svc` itself (JUL-63).** `ovh-local` above is
 `orchestrator-svc` pairing to the *existing* daemon (`orca-server.service`, `User=runner`) --
@@ -222,10 +235,14 @@ fresh-session acceptance run hit exactly this before the timer existed: the chec
 at an old commit and reported stale readiness results). Automated 2026-09-17 (JUL-61 closing
 pass):
 
-- `/usr/local/sbin/julia-next-checkout-sync.sh` (root:root, mode `700`) fetches `origin/main`,
-  resets the checkout to it, then re-applies `root:orchestrator-svc` ownership and `550`/`440`
-  permissions — the same sequence the manual procedure used, now scripted.
-- `julia-next-checkout-sync.service` (oneshot, runs as root) executes it;
+- **The sync body is `scripts/checkout-sync.mjs` in this repo** (corrected 2026-09-23, JUL-92).
+  It fetches `origin/main`, resets the checkout to it, then re-applies `root:orchestrator-svc`
+  ownership and `550`/`440` permissions — the same sequence the manual procedure used, now
+  scripted. The original `/usr/local/sbin/julia-next-checkout-sync.sh` was replaced by it and is
+  **gone** (`/usr/local/sbin/` is empty on the box; see "The old shell script was removed" below)
+  — do not go looking for it, and do not re-create it.
+- `julia-next-checkout-sync.service` (oneshot, runs as root) executes it
+  (`ExecStart=/usr/bin/node /srv/orchestrator-svc/julia-next/scripts/checkout-sync.mjs`);
   `julia-next-checkout-sync.timer` fires it 30s after boot/enable and every 15 minutes after
   that (`OnBootSec=1min`, `OnActiveSec=30s`, `OnUnitActiveSec=15min`, `Persistent=true` so a
   missed run while the box was down catches up on the next boot).
@@ -301,6 +318,18 @@ session must not have to rediscover:
   must therefore be self-contained in the terminal command itself (e.g. base64-embedded) or live
   inside the repo — never a `/tmp` path, which silently reads as an empty/missing file to the
   other side rather than failing loudly.
+- **A long multi-line prompt passed inline to `orca terminal create --command` is mangled
+  (verified 2026-09-19, JUL-79 step 8).** The sibling of the `/tmp` trap above, and the other
+  half of the same incident: two reviewer launches produced nothing and exited silently before a
+  real review came back. The terminal **echoed the command twice and truncated it** before its
+  closing quote and redirect, so `claude` ran malformed and wrote a **zero-byte** output file —
+  no error anywhere, just an empty result. **The workaround: write the prompt to a file the
+  target identity can read (under `/home/orchestrator-svc/` for an `orchestrator-svc` terminal,
+  never `/tmp`), and pass `-p "$(cat <file>)"`.** A heredoc works only when it is the *entire*
+  command — chaining one behind `&&` mangles it the same way. This is a different failure from
+  the `--allowedTools` swallow ("Launching Claude from an Orca terminal command with the prompt
+  in an argument does not work" below): that one dies loudly with `Input must be provided...`,
+  this one dies silently with an empty file.
 
 ## Six JUL-94 dispatch and publish discoveries (verified 2026-09-19)
 
@@ -372,12 +401,19 @@ the board work proved, and 9 about the coordinator's own tool grants.
    another tool rule; the prompt argument is swallowed and the run dies with `Error: Input must be
    provided either through stdin or as a prompt argument when using --print`. The rule that
    follows: nothing that isn't a flag may follow `--allowedTools`; the prompt belongs on stdin.
-   A quoted, comma-separated tool list followed by more flags is fine — that is exactly what
-   `julia-run.mjs`'s own launch command does:
+   A quoted, comma-separated tool list followed by more flags is fine. **The example this
+   paragraph used to show was wrong on both counts (corrected 2026-09-23, JUL-92): it put five
+   bare words after `--allowedTools`, the very anti-pattern the rule forbids, and it was not the
+   launcher's command.** What `julia-run.mjs` actually builds (`scripts/julia-run.mjs`,
+   `orchestratorLaunchCommandFor`) is a quoted comma list with the prompt flag *after* it:
 
    ```sh
-   claude -p --permission-mode acceptEdits --effort high --allowedTools Bash Read Grep Glob Write < promptfile
+   claude --permission-mode acceptEdits --effort high \
+     --allowedTools "mcp__linear__*,…,Bash(orca *)" -p "/julia-coordinator <ISSUE-ID>"
    ```
+
+   The prompt is safe there because `-p` is a flag, not a bare word. If you build the prompt on
+   stdin instead (the Codex and Pi routes do), nothing but flags may follow `--allowedTools`.
 4. **The Pi builder dispatch that works, end to end** -- corrected 2026-09-22 (JUL-98): the
    original form below used a `{ ...; } | consumer` brace-group, which is no longer usable (see
    the finding right after it) and never actually ran a real dispatch as documented; a brace-free
@@ -483,7 +519,23 @@ the board work proved, and 9 about the coordinator's own tool grants.
 
 ## Start
 
-There is no scheduled trigger — explicit launch only. From inside an Orca terminal on the
+**Cards start themselves. The controller is the live route (corrected 2026-09-23, JUL-92).**
+`graph/controller/main.mjs --loop` runs continuously as `orchestrator-svc` under
+`julia-controller.service` (`Restart=always`, `WantedBy=default.target`, `orchestrator-svc`
+lingering enabled), picks cards off the board and dispatches their steps. Confirmed live
+2026-09-23: `ps -eo user,pid,etime,cmd` shows
+`orchest+ … /usr/bin/node /srv/orchestrator-svc/julia-next/graph/controller/main.mjs --loop`,
+up for hours, and it is what dispatched that day's builder worktrees. Work reaches it by moving
+a card to the Ready queue, not by hand — see CLAUDE.md's "Laptop sessions are the exception".
+
+Everything below is the **manual `julia-run.mjs` route**: the break-glass launch a laptop session
+uses when the controller itself is down, and the route JUL-43 through JUL-98 were built on. It
+still works, and the grants, environments and traps it documents are shared with the controller's
+own dispatch — but "there is no scheduled trigger" stopped being true when the controller landed.
+Read the rest of this section with that correction in mind; where it says a run only ever starts
+by explicit launch, it means this route only ever starts that way.
+
+From inside an Orca terminal on the
 `orchestrator-local` runtime (as `orchestrator-svc`), run:
 ```sh
 node /srv/orchestrator-svc/julia-next/scripts/julia-run.mjs <ISSUE-ID>
@@ -520,8 +572,8 @@ since the coordinator's own first wake already posts admission to Linear.
 **The coordinator is a one-shot headless session, so it has to stay until its card is complete
 or parked (found on JUL-106, 2026-09-20).** `julia-run.mjs` launches `claude -p
 "/julia-coordinator <card>"`; that process exits as soon as the model's reply ends, and nothing
-launches it again (there is no scheduled trigger, and the Ready queue only starts cards that are
-not already in flight). The JUL-96 and JUL-106 coordinators each dispatched their builder and then
+launches it again (nothing re-launches a coordinator mid-card: the controller and the
+Ready queue both start only cards that are not already in flight). The JUL-96 and JUL-106 coordinators each dispatched their builder and then
 ended the reply, saying a background watcher would wake them ("a watcher will wake me when it
 lands"; "I've armed a background wait ... so I get woken"). That wake-up exists only in an
 interactive Claude Code window, so both left a card marked in flight with nobody supervising it,
@@ -543,11 +595,18 @@ instead of silently doing nothing:
 (both Linear tool namespaces — from this checkout's CWD, the coordinator sometimes reaches for
 the hosted `mcp__claude_ai_Linear__*` connector instead of the standalone `mcp__linear__*`
 server, so both are allowed); `Bash` access to the exact scripts the skill's "Each wake"/"Running
-a step"/"After verification" procedures name (`orca-cli.mjs`, `check-readiness.mjs`, `collect-worker-result.mjs`,
-`verify-reviewer-worktree.mjs`, `coordinator-events.mjs`); the publisher credential file for the
-two scripts that need it (`publish-pr.mjs`, `merge-pr.mjs`); and the bare `orca` CLI. If the
-skill's own procedure grows to need another script or tool, its `--allowedTools` list in
-`scripts/julia-run.mjs`'s `startOrchestrator` needs the matching grant added in the same PR.
+a step"/"After verification" procedures name — **all eight of them**: `orca-cli.mjs`,
+`ready-queue.mjs`, `seat-labels.mjs`, `linear-cli.mjs`, `check-readiness.mjs`,
+`collect-worker-result.mjs`, `verify-reviewer-worktree.mjs` and `coordinator-events.mjs`
+(`ready-queue.mjs` and `linear-cli.mjs` were added in JUL-79 step 6 after a real unattended wake
+stalled without them; `seat-labels.mjs` in step 8, when the fallback guard turned out to be dead
+code nothing ran); the two publisher scripts in both invocation shapes (`publish-pr.mjs`,
+`merge-pr.mjs`); and the bare `orca` CLI. The block above is the whole list, in order, and
+`scripts/agent-docs.test.mjs` compares it against `orchestratorLaunchCommandFor`'s real
+`--allowedTools` string entry for entry — so this passage cannot go stale again without CI
+saying so (JUL-92). If the skill's own procedure grows to need another script or tool, its
+`--allowedTools` list in `scripts/julia-run.mjs`'s `startOrchestrator` needs the matching grant
+added in the same PR.
 
 ## Second vendor on the orchestrator seat (JUL-73, superseded by JUL-77)
 
@@ -761,7 +820,12 @@ Decision's route) still needs updating to call this script instead of adopting a
 ### Vercel auth is CLI login state, not a drop-box field (JUL-44)
 
 There is no `vercel.env` in `/etc/orca-runner/dropbox-secrets/`. The fields actually present
-there are `axiom`, `deepseek`, `linear`, `powersync`, `sentry`, and `supabase` (a `zai` file existed until JUL-93 removed it). Vercel is
+there are the ones `FIELDS` in `ops/service-dropbox/dropbox.mjs` names -- read that constant,
+never a list copied out of here. As of 2026-09-23 (JUL-92) it is `sentry`, `supabase`,
+`powersync`, `axiom`, `deepseek`, `linear`, `linear-app-id`, `linear-app-secret` and
+`commandcode`; this paragraph listed only the first six until then, which mattered because
+`commandcode` is the field the live reviewer seat reads (and `commandcode-readers`, gid 1005,
+exists on the box for exactly that). A `zai` file existed until JUL-93 removed it. Vercel is
 authenticated instead through the stored credential of the CLI itself at
 `/home/orchestrator-svc/.local/share/com.vercel.cli/auth.json` (mode `600`, owner
 `orchestrator-svc`). Verified live 2026-09-18: `npx --yes vercel@latest whoami` as
@@ -1125,7 +1189,10 @@ split to remember: **orchestration** commands need an explicit `--environment or
 
 ### 3. `worker-stop` and `worker-list` reject `--from`
 
-Unlike `worker-start` and `run-use`, which require it, `orca orchestration worker-stop` and
+Unlike `worker-start` and `run-use`, which take it (`[--from <handle>]` -- optional to the CLI's
+own argument parser, but in practice needed, since without a sender terminal `run-create` fails
+`no_active_sender_terminal`; wording corrected 2026-09-23, JUL-92), `orca orchestration
+worker-stop` and
 `orca orchestration worker-list` **reject** `--from` outright. `worker-list` takes `--run`. Passing
 the flag out of habit turns a recovery step into an argument error in the middle of an incident.
 
@@ -1142,10 +1209,12 @@ dispatched as a supervised worker.
 
 `scripts/julia-run.mjs`'s `--allowedTools` list allows `Bash(node scripts/check-readiness.mjs:*)`
 but **not** the `node --env-file=/etc/orchestrator-svc/.env.publisher scripts/check-readiness.mjs`
-form this runbook's own Bootstrap section shows. The `--env-file` prefix makes it a different
-command, so in an unattended run the documented invocation is refused. **Use the plain form**
-(`node scripts/check-readiness.mjs`) in a coordinator run; the `--env-file` prefix is for a
-laptop or interactive session, where it is granted by hand.
+form. The `--env-file` prefix makes it a different command, so in an unattended run that
+invocation is refused. **Use the plain form** (`node scripts/check-readiness.mjs`) in a
+coordinator run; the `--env-file` prefix is for a laptop or interactive session, where it is
+granted by hand. This runbook's Bootstrap section and the coordinator skill's "Readiness check"
+line both used to show the prefixed form, which is exactly the contradiction a fresh session
+would have walked into; both now show the plain one (fixed 2026-09-23, JUL-92).
 
 **`publish-pr.mjs` and `merge-pr.mjs` are now granted in both forms (JUL-98 step 6, fixed
 2026-09-22 ~13:2xZ).** They used to be granted with the `--env-file` prefix only, which is the
@@ -1233,7 +1302,10 @@ the run is over.
 ```sh
 orca orchestration run-list                      # find the run id
 orca orchestration task-list --run <run id>      # see every worker it dispatched and their status
-orca worker-show <worker id>                     # read the worker's own final state/output
+orca orchestration worker-show --dispatch <dispatch id>   # the worker's own final state/output
+# NOT `orca worker-show <worker id>`, which this recipe showed until 2026-09-23 (JUL-92):
+# `worker-show` is an `orchestration` subcommand, it takes a --dispatch FLAG, and the id is the
+# DISPATCH id from task-list above, not a worker id. `orca worker-show` prints "Unknown command".
 ```
 
 Then reconcile: a worker whose work is done and verified but whose outcome never got reported is
@@ -1409,7 +1481,7 @@ the acting instruction: the agent decides, does and logs this itself (merges, gi
 installs, free-tier resources in approved services are all the agent's). It must not reword the
 comment to slip past the guard. If the thing really is Todd-only and outside the three kinds,
 that is a **design defect**: log it on the ticket and/or here in the runbook (the error names
-`docs/agents/jul43-coordinator-runbook.md`), rather than forcing the post through.
+`docs/agents/server-runbook.md`), rather than forcing the post through.
 
 ## Narrow root for orchestrator-svc, `deepseek-readers`, and the second Orca window (JUL-79 laptop session)
 
@@ -2321,14 +2393,19 @@ stale, repeat with a fresh URL. The pairing code is a credential for a daemon th
 node scripts/check-readiness.mjs
 ```
 
-Checks, each its own pass/fail line:
-1. OVH runner reachable (`orca status --environment "OVH runner" --json`).
-2. `julia-next` project registered there.
-3. `julia-graph-publisher` App installed on `julia-next` (needs
+**Five** checks, each its own pass/fail line — the fifth was added later and this list said
+four until 2026-09-23 (JUL-92); the labels below are the strings `scripts/check-readiness.mjs`
+actually pushes:
+1. `OVH runner reachable` (`orca status --environment "OVH runner" --json`).
+2. `julia-next project registered`.
+3. `julia-graph-publisher installed on julia-next` (needs
    `JULIA_PUBLISHER_APP_ID`/`JULIA_PUBLISHER_APP_PRIVATE_KEY` in the caller's process
    environment — see "Publishing" below for where those now live).
-4. journey-relay reachable, run from inside a terminal on the OVH runner itself (it binds
+4. `journey-relay reachable`, run from inside a terminal on the OVH runner itself (it binds
    `127.0.0.1:8943` there only).
+5. `worker terminal groups match /etc/group` — the stale-supplementary-groups check: a daemon
+   started before a `groupadd`/`usermod` still carries the old group set, so its terminals cannot
+   read a key that /etc/group says they can (see "restart both daemons" below).
 
 No `LINEAR_API_KEY` check — the coordinator is a live agent session using Linear's MCP tools
 directly.
@@ -2408,10 +2485,19 @@ a real commit out of `/home/runner/julia-next` through the publisher successfull
 ## The reviewer backup is DeepSeek Pro, not GLM (JUL-89, 2026-09-20)
 
 `reviewer-backup` in `ops/service-dropbox/run-pi-seat.mjs` used to launch GLM-5.3, which the cost
-rule bars (about $10 on a single issue). It is now `--provider deepseek --model deepseek-v4-pro`,
-reading the `deepseek` drop-box field into `DEEPSEEK_API_KEY` in the child's environment only --
-never argv, never a shell string (JUL-72). `deepseek-v4-pro` works through the native `deepseek`
-provider; a full review on it cost about three cents. There is no fifth seat beside it.
+rule bars (about $10 on a single issue). It became `--provider deepseek --model
+deepseek-v4-pro`, reading the `deepseek` drop-box field into `DEEPSEEK_API_KEY` in the child's
+environment only -- never argv, never a shell string (JUL-72). `deepseek-v4-pro` worked through
+the native `deepseek` provider; a full review on it cost about three cents.
+
+**Superseded 2026-09-22, recorded here 2026-09-23 (JUL-92) -- do not act on the paragraph above.**
+`reviewer-backup` in `ops/service-dropbox/run-pi-seat.mjs` now reads `secretField: 'commandcode'`
+into `COMMANDCODE_API_KEY` and launches `--provider commandcode --model
+deepseek/deepseek-v4-pro`: same model, but through Command Code's GOAT plan, with a namespaced
+model id (the bare native spelling 400s there). And there **is** a fifth seat --
+`reviewer-shadow-flash`, dispatched beside every real `reviewer-backup` review and deciding
+nothing. Both are detailed in "The reviewer moves to Command Code, with a Flash shadow" below,
+which is the live account; this section is the JUL-89 history that got there.
 
 - **GLM is removed (JUL-93, 2026-09-21).** It is no longer a selectable label, a seat, a
   drop-box field or a reader group. A card that still carries an old GLM label is refused by the Ready
@@ -2471,9 +2557,12 @@ shadow" below for the detail. **The coordinator itself stays Claude** -- this De
 the builder/reviewer seats only, not the orchestrator seat in `SEAT_TABLE.orchestrator`. **The
 family rule is unchanged**: DeepSeek reviewing a Gemini (Google) builder is a different family
 either way, so the existing `assertCanPickDifferentFamilies` guard in `graph/seat-table.mjs` is
-not violated by this by-hand override -- it is not itself a seat-table code change, since
-`SEAT_TABLE.builder` still names `claude`/`pi-deepseek`; Gemini is chosen by the coordinator at
-dispatch time until step 6 gives the controller its own Gemini entry to read.
+not violated by this by-hand override -- it was not itself a seat-table code change: at the time
+of the Decision `SEAT_TABLE.builder` still named `claude`/`pi-deepseek`, and Gemini was chosen by
+the coordinator at dispatch time. **Superseded 2026-09-23 (JUL-92): step 6 landed, and the table
+now reads `builder: { primary: 'gemini', backup: 'claude' }` (and the same pair for
+`feature-builder`) in `graph/seat-table.mjs`.** Gemini is no longer a by-hand override; read the
+table, never this paragraph, for who builds.
 
 **Boundaries carried over unchanged from the 04:07Z Decision:** no new spend, the firewall rule
 stays runner-only, the family rule is unchanged.

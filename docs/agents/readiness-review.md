@@ -8,7 +8,7 @@ JUL-71 for why this exists and for a worked example of running it across a whole
 tickets.
 
 Sits next to the coordinator skill (`.claude/skills/julia-coordinator/SKILL.md`) and the
-runbook (`docs/agents/jul43-coordinator-runbook.md`) — read both before running a review, since
+runbook (`docs/agents/server-runbook.md`) — read both before running a review, since
 this procedure only adds the pre-flight check those two don't already cover.
 
 ## When to run it

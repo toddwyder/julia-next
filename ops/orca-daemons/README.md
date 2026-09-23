@@ -1,7 +1,7 @@
 # Orca daemon GPU crash
 
 One persistent fix so far, added by hand from a laptop session (see
-`docs/agents/jul43-coordinator-runbook.md`). Not installed by any sudo rule
+`docs/agents/server-runbook.md`). Not installed by any sudo rule
 or graph action — an env-file/unit change is always a laptop-session edit,
 never something the controller or a coordinator does.
 

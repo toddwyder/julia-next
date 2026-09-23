@@ -6,10 +6,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 
 import { TEMPLATE_NAME } from '../graph/board-spec.mjs';
+import { orchestratorLaunchCommandFor } from './julia-run.mjs';
 
 const read = (relativePath) => readFileSync(new URL(`../${relativePath}`, import.meta.url), 'utf8');
+
+// The general server runbook. Named once here so the rename cannot leave a
+// half-updated test file behind (JUL-92).
+const RUNBOOK = 'docs/agents/server-runbook.md';
 
 test('CLAUDE.md states the standing cleanup rule for agent-created test/throwaway Linear cards', () => {
   const text = read('CLAUDE.md');
@@ -47,7 +53,7 @@ test('the coordinator skill states the same standing cleanup rule in its own voi
 });
 
 test('the runbook records the JUL-79 step 8 live-verified facts, each dated 2026-09-19', () => {
-  const text = read('docs/agents/jul43-coordinator-runbook.md');
+  const text = read('docs/agents/server-runbook.md');
   // (a) the silent Z.ai exhaustion
   assert.match(text, /Insufficient balance or no resource package/);
   // (b) the relay is reachable directly from an on-box coordinator
@@ -89,7 +95,7 @@ test('the coordinator skill and the runbook say the headless coordinator is one-
   assert.match(skill, /End the wake only when the item is complete, or parked with the reason posted/);
   // The old step-2 wording counted a still-running worker as done, which invited the early exit.
   assert.doesNotMatch(skill, /every in-flight item is running, verified-and-advanced/);
-  const runbook = read('docs/agents/jul43-coordinator-runbook.md').replace(/\s+/g, ' ');
+  const runbook = read('docs/agents/server-runbook.md').replace(/\s+/g, ' ');
   assert.match(runbook, /one-shot headless session, so it has to stay until its card is complete or parked/);
 });
 
@@ -161,7 +167,7 @@ test('every document and skill that creates a Linear card names the team templat
 // them from the code, and two of the six were already partly recorded and are
 // extended in place rather than duplicated.
 test('the runbook records the six JUL-97 step 2 facts, dated 2026-09-21', () => {
-  const text = read('docs/agents/jul43-coordinator-runbook.md');
+  const text = read('docs/agents/server-runbook.md');
   const start = text.indexOf('## Six JUL-97 step 2 discoveries (verified 2026-09-21)');
   assert.ok(start >= 0, 'the JUL-97 step 2 section is missing');
   const section = text.slice(start, text.indexOf('\n## ', start + 1));
@@ -197,4 +203,208 @@ test('the runbook records the six JUL-97 step 2 facts, dated 2026-09-21', () => 
 
   const dated = text.match(/2026-09-21/g) ?? [];
   assert.ok(dated.length >= 3, `expected the 2026-09-21 facts to be dated, found ${dated.length}`);
+});
+
+// ---------------------------------------------------------------------------
+// JUL-92: the docs have to match how things actually run now. Four guards, one
+// per stale item the card names. Each pins the CORRECTED fact, so the doc
+// cannot quietly drift back.
+// ---------------------------------------------------------------------------
+
+// JUL-92, item 2: the runbook is the general server runbook, not the record of
+// one closed ticket, and the old filename is gone from the whole tree --
+// CLAUDE.md, the three julia-* skills, the ops unit files, the sudoers header
+// and the scripts that cite it. The needle is assembled from pieces so this
+// test file is not itself a hit.
+test('no file in the repo still refers to the old runbook filename', () => {
+  const stale = ['jul43', 'coordinator', 'runbook'].join('-');
+  const tracked = execFileSync('git', ['ls-files', '-z'], {
+    cwd: new URL('..', import.meta.url),
+    encoding: 'utf8',
+  })
+    .split('\0')
+    .filter(Boolean);
+  const offenders = tracked.filter((path) => {
+    if (path.includes(stale)) return true;
+    let text;
+    try {
+      text = read(path);
+    } catch {
+      return false; // a binary or unreadable file cannot name it in prose
+    }
+    return text.includes(stale);
+  });
+  assert.deepEqual(offenders, [], `these files still name the old runbook: ${offenders.join(', ')}`);
+  // And the new one is really there, under a name that is about the server
+  // rather than about a ticket.
+  assert.ok(existsSync(new URL(`../${RUNBOOK}`, import.meta.url)), `${RUNBOOK} is missing`);
+  assert.match(read(RUNBOOK).split('\n')[0], /^# .*[Ss]erver runbook/);
+});
+
+// JUL-92, item 1: the runbook printed a copy of the coordinator's granted
+// command list, and a copy goes stale the moment the launcher changes. This
+// compares the printed block against `orchestratorLaunchCommandFor`'s real
+// --allowedTools string, entry for entry, so a grant added or removed in
+// scripts/julia-run.mjs fails here until the runbook is updated in the same PR.
+test('the runbook\'s granted-command block is exactly the launcher\'s live --allowedTools list', () => {
+  const live = orchestratorLaunchCommandFor('claude', 'JUL-92')
+    .match(/--allowedTools "([^"]*)"/)[1]
+    .split(',')
+    .map((grant) => grant.trim())
+    .filter(Boolean);
+  const runbook = read(RUNBOOK);
+  const fence = runbook.match(/```\n\s*(mcp__linear__\*[\s\S]*?)\n\s*```/);
+  assert.ok(fence, 'the runbook no longer prints the granted-command block');
+  const documented = fence[1]
+    .split(',')
+    .map((grant) => grant.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+  assert.deepEqual(documented, live);
+});
+
+// JUL-92, item 1 (second half): the same section's prose used to name only
+// five of the granted scripts, so a reader who trusted the sentence rather
+// than the block would think ready-queue, seat-labels and linear-cli were
+// ungranted. Every script on the live list has to appear in that prose too.
+test('the runbook prose that explains the grants names every granted script', () => {
+  const text = read(RUNBOOK);
+  const start = text.indexOf('The headless launch needs its own tool grants');
+  assert.ok(start >= 0, 'the headless-launch grants passage is missing');
+  const section = text.slice(start, text.indexOf('\n## ', start));
+  for (const script of [
+    'orca-cli.mjs',
+    'ready-queue.mjs',
+    'seat-labels.mjs',
+    'linear-cli.mjs',
+    'check-readiness.mjs',
+    'collect-worker-result.mjs',
+    'verify-reviewer-worktree.mjs',
+    'coordinator-events.mjs',
+  ]) {
+    assert.ok(section.includes(script), `the grants passage does not name ${script}`);
+  }
+});
+
+// JUL-92, item 1 (third half) and the runbook's own finding 5: the granted
+// list has `Bash(node scripts/check-readiness.mjs:*)` and nothing with the
+// --env-file prefix, so a coordinator that copies a documented --env-file
+// invocation is refused before the command runs. No runnable shell block in
+// either document may show that form.
+test('no runnable example tells a coordinator to run check-readiness behind the publisher --env-file prefix', () => {
+  const refused = '--env-file=/etc/orchestrator-svc/.env.publisher scripts/check-readiness.mjs';
+  for (const path of [RUNBOOK, '.claude/skills/julia-coordinator/SKILL.md']) {
+    const text = read(path);
+    for (const [, block] of text.matchAll(/```sh\n([\s\S]*?)```/g)) {
+      assert.ok(!block.includes(refused), `${path} has a shell block running the refused form`);
+    }
+  }
+  // The skill's readiness-check line names the granted plain form, and says
+  // why the prefixed one is not it.
+  const skill = read('.claude/skills/julia-coordinator/SKILL.md');
+  assert.match(skill, /\*\*Readiness check\*\* \(`node scripts\/check-readiness\.mjs`\)/);
+  assert.match(skill, /--env-file/);
+  assert.match(skill, /refused|not granted/);
+});
+
+// JUL-92, item 4: a long multi-line prompt handed straight to
+// `orca terminal create --command` is mangled (JUL-79, 2026-09-19 13:31Z) --
+// two reviewer launches died silently on it. The workaround was never written
+// down anywhere; a fresh coordinator would hit it again.
+test('the runbook records the terminal-create long-prompt mangling and its workaround', () => {
+  const text = read(RUNBOOK);
+  const start = text.indexOf('A long multi-line prompt passed inline to `orca terminal create --command` is mangled');
+  assert.ok(start >= 0, 'the long-prompt mangling fact is missing');
+  const fact = text.slice(start, start + 1400).replace(/\s+/g, ' ');
+  // The symptom, so it is recognisable when it happens again.
+  assert.match(fact, /echoed the command twice and truncated it/);
+  assert.match(fact, /zero-byte/);
+  // The workaround, and the one form that does NOT work.
+  assert.match(fact, /-p "\$\(cat <file>\)"/);
+  assert.match(fact, /heredoc works only when it is the \*entire\* command/);
+  assert.match(fact, /&&/);
+  assert.match(fact, /2026-09-19/);
+});
+
+// JUL-92, item 3: the journey-accounting snippet used to tell the coordinator
+// to wait on a plain diagnostic terminal with Orca's own wait. Neither mode is
+// a completion signal there (tui-idle returns mid-run; exit only times out
+// because the shell stays open), and a JUL-76 wake proved tui-idle can ALSO
+// time out on a terminal that had already finished. The snippet now polls the
+// read for the shell prompt; it must not go back.
+test('the journey-accounting snippet waits by polling the terminal read, never with an Orca wait', () => {
+  const skill = read('.claude/skills/julia-coordinator/SKILL.md');
+  const start = skill.indexOf('## Journey accounting');
+  assert.ok(start >= 0, 'the journey-accounting section is missing');
+  const section = skill.slice(start, skill.indexOf('\n## ', start + 1));
+  // The snippet itself polls terminalRead until the shell prompt returns.
+  assert.match(section, /for \(let attempt = 0; attempt < 15; attempt \+= 1\)/);
+  assert.match(section, /terminalRead\(\{ environment: 'ovh-local'/);
+  assert.match(section, /poll the read until the\s*\/\/ last line is the shell prompt again/);
+  // And it says, in the snippet, that neither wait mode is that signal.
+  assert.match(section, /neither `terminalWait`\s*\/\/ mode is that signal/);
+  // No live recommendation to wait on this terminal.
+  assert.doesNotMatch(section, /await terminalWait\(/);
+  assert.doesNotMatch(section, /orca terminal wait/);
+});
+
+// JUL-92, acceptance criterion 1 (the cold-reader check). A fresh session read
+// the runbook alone against this live server and found eleven instructions the
+// box contradicts. Eight were the runbook's own text and are corrected; these
+// guards pin the ones a machine can check, because every one of them is the
+// same failure as the granted-command list above -- a constant copied out of
+// code into prose, where nothing makes it follow the code.
+test('the runbook does not claim the builder seat is Claude -- the seat table names it', async () => {
+  const { SEAT_TABLE } = await import('../graph/seat-table.mjs');
+  const text = read(RUNBOOK);
+  // Whatever the table says today, the runbook must not contradict it.
+  assert.equal(SEAT_TABLE.builder.primary, 'gemini');
+  assert.doesNotMatch(text, /`SEAT_TABLE\.builder` still names `claude`/);
+  assert.match(text, /builder: \{ primary: 'gemini', backup: 'claude' \}/);
+});
+
+test('the runbook lists every readiness check the script actually runs, by its real label', () => {
+  const script = read('scripts/check-readiness.mjs');
+  const labels = [...script.matchAll(/check\('([^']+)'/g)].map(([, label]) => label);
+  const unique = [...new Set(labels)];
+  assert.ok(unique.length >= 5, `expected at least five checks, found ${unique.length}`);
+  const start = read(RUNBOOK).indexOf('## Readiness');
+  assert.ok(start >= 0, 'the Readiness section is missing');
+  const section = read(RUNBOOK).slice(start, read(RUNBOOK).indexOf('\n## ', start + 1));
+  for (const label of unique) {
+    assert.ok(section.includes(label), `the Readiness section does not list "${label}"`);
+  }
+  // And it must not go back to promising four.
+  assert.doesNotMatch(section, /^Checks, each its own pass\/fail line:$/m);
+});
+
+test('the runbook does not carry a hand-copied drop-box field list that the code can outgrow', () => {
+  const text = read(RUNBOOK);
+  const start = text.indexOf('There is no `vercel.env`');
+  assert.ok(start >= 0, 'the drop-box fields passage is missing');
+  const passage = text.slice(start, start + 900).replace(/\s+/g, ' ');
+  // It points at the constant...
+  assert.match(passage, /`FIELDS` in `ops\/service-dropbox\/dropbox\.mjs`/);
+  assert.match(passage, /read that constant,? never a list copied out of here/);
+  // ...and the snapshot it does print is the real one, commandcode included.
+  assert.match(passage, /`commandcode`/);
+});
+
+test('the runbook does not tell a recovering session to run `orca worker-show`, which is not a command', () => {
+  const text = read(RUNBOOK);
+  // The recovery recipe uses the real form.
+  assert.match(text, /orca orchestration worker-show --dispatch <dispatch id>/);
+  // The bare form survives only where the runbook explicitly calls it out as wrong.
+  for (const [, line] of text.matchAll(/^(.*\borca worker-show\b.*)$/gm)) {
+    assert.match(line, /NOT `orca worker-show|prints "Unknown command"/, `stale command in: ${line.trim()}`);
+  }
+});
+
+test('the runbook does not still say a card can only start by explicit launch -- the controller loop starts them', () => {
+  const text = read(RUNBOOK);
+  const start = text.indexOf('## Start');
+  const section = text.slice(start, text.indexOf('\n## ', start + 1));
+  assert.match(section, /Cards start themselves\. The controller is the live route/);
+  assert.match(section, /graph\/controller\/main\.mjs --loop/);
+  // The old absolute claim may remain only as the manual route's own scope.
+  assert.doesNotMatch(section, /^There is no scheduled trigger — explicit launch only\./m);
 });

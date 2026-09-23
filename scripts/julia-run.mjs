@@ -111,7 +111,7 @@ const TERMINAL_TASK_STATUSES = new Set(['completed', 'failed', 'stopped', 'cance
 // generous grace window past any real preflight pass. This is a
 // deliberately conservative heuristic (favors "still blocks") given no
 // queryable run-level status field or Axiom read access exists yet (see
-// docs/agents/jul43-coordinator-runbook.md).
+// docs/agents/server-runbook.md).
 //
 // Live-verified 2026-09-17 (JUL-70): every real run on orchestrator-local
 // (run_c404a384fb43 included, plus six other journey-zero runs) has zero

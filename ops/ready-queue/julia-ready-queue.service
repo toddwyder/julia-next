@@ -3,11 +3,11 @@
 # julia-ready-queue.timer. Runs as orchestrator-svc, never root: it executes
 # only node on the queue script in the root-owned, read-only checkout, so it
 # can read and run that code but never change it. Installed by a laptop
-# session (see docs/agents/jul43-coordinator-runbook.md); the graph has no
+# session (see docs/agents/server-runbook.md); the graph has no
 # rule that can install or edit this file.
 [Unit]
 Description=Run one julia-next Ready-queue check cycle
-Documentation=file:///srv/orchestrator-svc/julia-next/docs/agents/jul43-coordinator-runbook.md
+Documentation=file:///srv/orchestrator-svc/julia-next/docs/agents/server-runbook.md
 
 [Service]
 Type=oneshot

@@ -3,7 +3,7 @@
 # What orchestrator-svc may do as root, and nothing more. Every rule is one
 # exact command line (sudo matches the arguments literally -- no wildcards
 # anywhere; ops/sudoers/orchestrator-svc-ops.test.mjs enforces that).
-# Documented rule by rule in docs/agents/jul43-coordinator-runbook.md.
+# Documented rule by rule in docs/agents/server-runbook.md.
 #
 # There is deliberately NO rule that installs, copies or edits a file. The
 # ready-queue units (ops/ready-queue/) are installed from a laptop session,
