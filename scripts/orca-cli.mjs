@@ -164,7 +164,9 @@ export async function taskList({ environment, runId, execImpl } = {}) {
 // number, or too big to be exact, is a caller bug: it throws here, naming
 // itself, rather than reaching Orca as a vaguer refusal.
 export function wholeTimeoutMs(ms) {
-  const whole = Math.max(1, Math.ceil(Number(ms)));
+  // Checked BEFORE the clamp: Math.max(1, -Infinity) would otherwise pass as 1.
+  const asNumber = typeof ms === 'string' && ms.trim() !== '' ? Number(ms) : ms;
+  const whole = typeof asNumber === 'number' && Number.isFinite(asNumber) ? Math.max(1, Math.ceil(asNumber)) : Number.NaN;
   if (!Number.isSafeInteger(whole)) {
     throw new Error(`orca-cli: --timeout-ms must be a finite number of milliseconds, got ${String(ms)}`);
   }

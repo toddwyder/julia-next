@@ -213,7 +213,7 @@ test('a fractional wait budget reaches Orca as a whole, positive number of milli
 test('a wait budget that is not a finite number is refused by name, never sent to Orca', async () => {
   const orcaCallImpl = recorder([]);
   const boundaries = createOrcaBoundaries({ orcaCallImpl });
-  for (const timeoutMs of [Number.NaN, Number.POSITIVE_INFINITY, undefined, Number.MAX_SAFE_INTEGER * 2]) {
+  for (const timeoutMs of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, undefined, null, '', Number.MAX_SAFE_INTEGER * 2]) {
     await assert.rejects(
       () => boundaries.checkWaitImpl({ terminal: 'term_a', runId: 'run_1', timeoutMs }),
       /--timeout-ms must be a finite number/,
