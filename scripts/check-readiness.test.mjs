@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { checkReadiness, defaultRelayCheckImpl, getEnvironment } from './check-readiness.mjs';
+import { checkReadiness, defaultRelayCheckImpl, defaultGroupDriftCheckImpl, getEnvironment } from './check-readiness.mjs';
 
 function fakes({
   runtimeReachable = true,
@@ -9,6 +9,7 @@ function fakes({
   projectRegistered = true,
   publisherInstalled = true,
   relayReachable = true,
+  groupsMatch = true,
 } = {}) {
   return {
     orcaStatusImpl: async () => ({
@@ -27,6 +28,9 @@ function fakes({
     relayCheckImpl: async () => (relayReachable
       ? { reachable: true, detail: 'sent:true' }
       : { reachable: false, detail: 'curl on the OVH runner could not reach 127.0.0.1:8943' }),
+    groupDriftCheckImpl: async () => (groupsMatch
+      ? { ok: true, detail: 'this terminal\'s groups match /etc/group (ACTUAL:deepseek-readers,commandcode-readers,)' }
+      : { ok: false, detail: 'this terminal is missing commandcode-readers, though /etc/group lists them for this account right now -- the Orca daemon ... was very likely started before that group existed' }),
   };
 }
 
@@ -37,7 +41,20 @@ test('all checks pass -> ok: true', async () => {
   assert.ok(result.checks.some((c) => c.name === 'julia-next project registered'));
   assert.ok(result.checks.some((c) => c.name === 'julia-graph-publisher installed on julia-next'));
   assert.ok(result.checks.some((c) => c.name === 'journey-relay reachable'));
+  assert.ok(result.checks.some((c) => c.name === 'worker terminal groups match /etc/group'));
   assert.ok(result.checks.every((c) => c.ok));
+});
+
+test('a stale-supplementary-groups daemon fails clearly and by name, not silently (JUL-44/JUL-98)', async () => {
+  const result = await checkReadiness({ ...fakes({ groupsMatch: false }) });
+  assert.equal(result.ok, false);
+  const groups = result.checks.find((c) => c.name === 'worker terminal groups match /etc/group');
+  assert.equal(groups.ok, false);
+  assert.match(groups.detail, /commandcode-readers/);
+  assert.match(groups.detail, /started before that group existed/);
+  // Every other check still passes -- one drifted daemon is not read as the
+  // whole environment being down.
+  assert.equal(result.checks.find((c) => c.name === 'OVH runner reachable').ok, true);
 });
 
 test('OVH runner unreachable fails clearly and by name', async () => {
@@ -101,6 +118,137 @@ test('an Orca CLI failure (not installed, environment not paired) is its own fai
   });
   assert.equal(result.ok, false);
   assert.ok(result.checks.some((c) => !c.ok && /not paired/.test(c.detail)));
+});
+
+// Realistic tail shape after the quoting fix (JUL-98 review round 1, finding
+// 2): the primary group (`runner`) never appears in ACTUAL/EXTRA/MISSING --
+// it is stripped before comparison (finding 1) -- and multiple names are
+// genuinely comma-separated because every expansion in the real shell
+// command is now double-quoted.
+test('defaultGroupDriftCheckImpl passes when the probe reports no missing or extra groups', async () => {
+  const result = await defaultGroupDriftCheckImpl({
+    terminalCreateImpl: async () => ({ terminal: { handle: 'term_abc' } }),
+    terminalReadImpl: async ({ terminal }) => {
+      assert.equal(terminal, 'term_abc');
+      return {
+        terminal: {
+          handle: 'term_abc',
+          tail: [
+            '$ u=$(id -un); ...',
+            'ACTUAL:commandcode-readers,deepseek-readers,',
+            'EXPECTED:commandcode-readers,deepseek-readers,',
+            'MISSING:',
+            'EXTRA:',
+            '$',
+          ],
+        },
+      };
+    },
+  });
+  assert.equal(result.ok, true);
+  assert.match(result.detail, /ACTUAL:/);
+});
+
+test('defaultGroupDriftCheckImpl fails, naming exactly the missing group, when the daemon is stale (JUL-44/JUL-98)', async () => {
+  const result = await defaultGroupDriftCheckImpl({
+    terminalCreateImpl: async () => ({ terminal: { handle: 'term_abc' } }),
+    terminalReadImpl: async () => ({
+      terminal: {
+        handle: 'term_abc',
+        tail: [
+          '$ u=$(id -un); ...',
+          'ACTUAL:deepseek-readers,',
+          'EXPECTED:commandcode-readers,deepseek-readers,',
+          'MISSING:commandcode-readers,',
+          'EXTRA:',
+          '$',
+        ],
+      },
+    }),
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.detail, /commandcode-readers/);
+  assert.match(result.detail, /restart/i);
+});
+
+test('defaultGroupDriftCheckImpl names every missing group, comma-separated, when there is more than one', async () => {
+  const result = await defaultGroupDriftCheckImpl({
+    terminalCreateImpl: async () => ({ terminal: { handle: 'term_abc' } }),
+    terminalReadImpl: async () => ({
+      terminal: {
+        handle: 'term_abc',
+        tail: [
+          '$ u=$(id -un); ...',
+          'ACTUAL:',
+          'EXPECTED:commandcode-readers,deepseek-readers,',
+          'MISSING:commandcode-readers,deepseek-readers,',
+          'EXTRA:',
+          '$',
+        ],
+      },
+    }),
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.detail, /commandcode-readers, deepseek-readers/);
+});
+
+test('defaultGroupDriftCheckImpl also fails, and says so, when the terminal holds a group /etc/group no longer lists (the reverse drift a one-directional compare would miss)', async () => {
+  const result = await defaultGroupDriftCheckImpl({
+    terminalCreateImpl: async () => ({ terminal: { handle: 'term_abc' } }),
+    terminalReadImpl: async () => ({
+      terminal: {
+        handle: 'term_abc',
+        tail: [
+          '$ u=$(id -un); ...',
+          'ACTUAL:zai-readers,',
+          'EXPECTED:',
+          'MISSING:',
+          'EXTRA:zai-readers,',
+          '$',
+        ],
+      },
+    }),
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.detail, /zai-readers/);
+  assert.match(result.detail, /no longer lists/);
+});
+
+// Regression for a real bug found by live-testing the fix on the server
+// (JUL-98, round 2): the terminal ECHOES the command line before running it,
+// and that echoed text contains the literal substrings "MISSING:" and
+// "EXTRA:" inside the command's own `printf` format strings -- a first-match
+// regex read the echoed source as the answer and reported a phantom
+// "missing" value built from the command text itself, on every real run,
+// including the clean case.
+test('defaultGroupDriftCheckImpl is not fooled by the echoed command line containing the literal field names', async () => {
+  const result = await defaultGroupDriftCheckImpl({
+    terminalCreateImpl: async () => ({ terminal: { handle: 'term_abc' } }),
+    terminalReadImpl: async () => ({
+      terminal: {
+        handle: 'term_abc',
+        tail: [
+          'runner@host:~/julia-next$u=$(id -un); primary=$(id -gn); actual=$(id -Gn | tr " " "\\n" | grep -v -x "$primary" | sort -u); '
+            + 'printf "MISSING:%s\\n" "$(printf "%s" "$missing" | tr "\\n" ",")"; printf "EXTRA:%s\\n" "$(printf "%s" "$extra" | tr "\\n" ",")"',
+          'ACTUAL:commandcode-readers,deepseek-readers,',
+          'EXPECTED:commandcode-readers,deepseek-readers,',
+          'MISSING:',
+          'EXTRA:',
+          'runner@host:~/julia-next$',
+        ],
+      },
+    }),
+  });
+  assert.equal(result.ok, true);
+});
+
+test('defaultGroupDriftCheckImpl refuses to guess when the probe printed no MISSING/EXTRA line at all', async () => {
+  const result = await defaultGroupDriftCheckImpl({
+    terminalCreateImpl: async () => ({ terminal: { handle: 'term_abc' } }),
+    terminalReadImpl: async () => ({ terminal: { handle: 'term_abc', tail: ['$ some unrelated crash', '$'] } }),
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.detail, /no MISSING\/EXTRA line/);
 });
 
 test('getEnvironment() defaults to "OVH runner" but ORCA_ENVIRONMENT overrides it, so this check can target a different Orca pairing (e.g. orchestrator-svc\'s own local "ovh-local" pairing, JUL-61 step 7)', () => {
