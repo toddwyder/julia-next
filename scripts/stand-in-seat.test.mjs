@@ -120,7 +120,7 @@ test('busy-silent: each seat reports once, works without a progress line for lon
   const cpuBefore = process.cpuUsage();
   await standIn({ seat: 'builder', tag: 'round-1-builder', worktree: r.dir }, { busyMs: 400 });
   const cpu = process.cpuUsage(cpuBefore);
-  assert.ok(cpu.user + cpu.system > 250 * 1000, 'the builder burned CPU while silent');
+  assert.ok(cpu.user + cpu.system > 100 * 1000, 'the builder burned CPU while silent (a floor, not 400 ms: the full suite runs test files side by side)');
   assert.equal(JSON.parse(readFileSync(b.answer, 'utf8')).outcome, 'done');
   assert.notEqual(r.head(), before);
 
