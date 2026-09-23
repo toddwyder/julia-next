@@ -1,0 +1,4 @@
+{
+  "refusedBy": "tests",
+  "reason": "The smoke-walk test fails because the module does not report the failing step name."
+}

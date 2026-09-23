@@ -1,0 +1,4 @@
+{
+  "refusedBy": "acceptance-check",
+  "reason": "The builder evidence is missing entries for AC5 and UAT3."
+}

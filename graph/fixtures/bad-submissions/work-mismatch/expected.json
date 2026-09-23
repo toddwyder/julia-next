@@ -1,0 +1,4 @@
+{
+  "refusedBy": "reviewer",
+  "reason": "The module performs a page-load check instead of walking the main path and reporting per-step results as required by AC4."
+}
