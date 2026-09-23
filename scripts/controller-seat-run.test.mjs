@@ -4,7 +4,7 @@
 // is proven on the server by scripts/controller-stand-in.mjs.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync, appendFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync, appendFileSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -60,7 +60,8 @@ test('the reporting instructions name the exact two files, the five-minute stuck
   const text = reportingInstructions({ seat: 'reviewer', tag: 'round-2-reviewer', timeLimitMs: 20 * 60000 });
   assert.match(text, /\.julia\/round-2-reviewer\.progress\.jsonl/);
   assert.match(text, /\.julia\/round-2-reviewer\.answer\.json/);
-  assert.match(text, /five minutes, you are treated as stuck/);
+  assert.match(text, /for five minutes this file does not change and you show no other sign of work, you are treated as stuck/);
+  assert.match(text, /Your times are not trusted/);
   assert.match(text, /20 minutes/);
   assert.match(text, /"verdict":"changes_needed"/);
   assert.match(reportingInstructions({ seat: 'builder', tag: 'round-1-builder', timeLimitMs: 60000 }), /"outcome":"done"/);
@@ -225,20 +226,27 @@ test('a seat that finishes: the answer is read from its FILE, the progress step 
   assert.equal(result.costLine.seat, 'builder');
 });
 
-test('STUCK: a running seat whose progress file has not changed for five minutes is stopped, and the card is told what it last said', async () => {
+test('STUCK: a running seat that shows no sign of work for five minutes is stopped, and the card is told what it last said -- with the FILE\'s change time, never the time the worker wrote', async () => {
   const worktreePath = tempDir();
   const paths = seatDir(worktreePath, 'round-1-builder');
   const h = harness({
     worktreePath,
     script: (read) => {
-      if (read === 1) appendFileSync(paths.progress, `${JSON.stringify({ type: 'status', subject: 'thinking', payload: { phase: 'plan' }, created_at: 'T0' })}\n`);
+      if (read === 1) {
+        // JUL-92, 23 Sep: the reviewer stamped this line 06:04Z; the file
+        // really changed at 06:55:34Z.
+        appendFileSync(paths.progress, `${JSON.stringify({ type: 'status', subject: 'thinking', payload: { phase: 'plan' }, created_at: '2026-09-23T06:04:00Z' })}\n`);
+        const real = new Date('2026-09-23T06:55:34Z');
+        utimesSync(paths.progress, real, real);
+      }
       return ['...'];
     },
   });
   const result = await runSeat({ ...h.options, seat: 'builder', round: 1, launch: standInLaunch, brief: 'b', timeLimitMs: 60 * 60000 });
   assert.equal(result.ok, false);
   assert.equal(result.stuck, true);
-  assert.match(result.reason, /stopped as stuck: its progress file had not changed for 5 minutes \(last report: status "thinking" at T0\)/);
+  assert.match(result.reason, /stopped as stuck: it showed no sign of work for 5 minutes -- its progress file last changed at 2026-09-23T06:55:34Z, its output last changed never, its CPU or Pi session log last changed never \(last report: status "thinking"\)/);
+  assert.doesNotMatch(result.reason, /06:04/, 'the time the worker wrote is not reported');
   assert.equal(h.stops.length, 1, 'the stop was run');
   assert.deepEqual(h.closed.map((c) => c.terminal).sort(), ['term_seat', 'term_stop']);
   assert.equal(STUCK_AFTER_MS, 5 * 60000);
@@ -252,6 +260,52 @@ test('STUCK counts from the start when a seat never reports at all', async () =>
   const result = await runSeat({ ...h.options, seat: 'reviewer', round: 1, launch: standInLaunch, brief: 'b' });
   assert.equal(result.stuck, true);
   assert.match(result.reason, /it never reported at all/);
+});
+
+// JUL-92, 23 Sep 07:01Z: a DeepSeek reviewer 30 tool calls into a review wrote
+// no progress line for 5 minutes and was stopped as stuck. Busy but silent is
+// not stuck.
+test('BUSY BUT SILENT: a seat whose progress file is quiet but whose CPU or Pi session log keeps moving (the activity file) is NOT stuck, and finishes', async () => {
+  const worktreePath = tempDir();
+  const paths = seatDir(worktreePath, 'round-1-reviewer');
+  const h = harness({
+    worktreePath,
+    script: (read, { clock }) => {
+      if (read === 1) appendFileSync(paths.progress, `${JSON.stringify({ type: 'status', subject: 'reviewing' })}\n`);
+      // run-seat.mjs rewrites the activity file only when the seat did something.
+      if (read % 12 === 0) writeFileSync(paths.activity, `${JSON.stringify({ at: clock(), moved: ['cpu +3.1s', 'Pi session log 40000 bytes'] })}\n`);
+      if (clock() >= 15 * 60000) {
+        writeFileSync(paths.answer, JSON.stringify({ verdict: 'approve', summary: 'checked' }));
+        writeFileSync(paths.run, runRecord());
+        return [`${WORKER_SCRIPT_END_MARKER}:0`];
+      }
+      return ['...'];
+    },
+  });
+  const result = await runSeat({ ...h.options, seat: 'reviewer', round: 1, launch: standInLaunch, brief: 'b', timeLimitMs: 20 * 60000 });
+  assert.equal(result.stuck, undefined, result.reason);
+  assert.equal(result.ok, true, result.reason);
+  assert.equal(result.progress.entries.length, 1, 'one progress line in 15 minutes, and still not stuck');
+  assert.equal(h.stops.length, 0, 'nothing was stopped');
+});
+
+test('BUSY BUT SILENT: a seat whose own output keeps growing is NOT stuck either', async () => {
+  const worktreePath = tempDir();
+  const paths = seatDir(worktreePath, 'round-1-reviewer');
+  const h = harness({
+    worktreePath,
+    script: (read, { clock }) => {
+      if (read % 12 === 0) appendFileSync(paths.out, `${JSON.stringify({ type: 'message_update' })}\n`);
+      if (clock() >= 12 * 60000) {
+        writeFileSync(paths.answer, JSON.stringify({ verdict: 'approve', summary: 'checked' }));
+        writeFileSync(paths.run, runRecord());
+        return [`${WORKER_SCRIPT_END_MARKER}:0`];
+      }
+      return ['...'];
+    },
+  });
+  const result = await runSeat({ ...h.options, seat: 'reviewer', round: 1, launch: standInLaunch, brief: 'b', timeLimitMs: 20 * 60000 });
+  assert.equal(result.ok, true, result.reason);
 });
 
 test('a seat that keeps reporting is NOT stuck, however long it takes -- until its time limit', async () => {

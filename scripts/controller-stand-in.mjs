@@ -15,9 +15,9 @@
 // comment and move is printed instead of posted), and publishing (printed,
 // never pushed: nothing a stand-in commits may reach GitHub).
 //
-// Scenarios: pass | changes-then-pass | timeout | stuck | cut-off. `timeout` and `stuck`
-// run on short limits (below) so the proof takes minutes, not an hour; the
-// rule and the code path are the production ones.
+// Scenarios: pass | changes-then-pass | timeout | stuck | busy-silent | cut-off.
+// `timeout`, `stuck` and `busy-silent` run on short limits (below) so the proof
+// takes minutes, not an hour; the rule and the code path are the production ones.
 
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
@@ -31,6 +31,9 @@ import { SCENARIOS } from './stand-in-seat.mjs';
 export const STAND_IN_LIMITS = Object.freeze({
   timeout: { timeLimits: { builder: 90 * 1000, reviewer: 90 * 1000 }, seatOptions: { stuckAfterMs: 10 * 60 * 1000, progressReadMs: 20 * 1000 } },
   stuck: { timeLimits: { builder: 10 * 60 * 1000, reviewer: 10 * 60 * 1000 }, seatOptions: { stuckAfterMs: 60 * 1000, progressReadMs: 15 * 1000 } },
+  // The same 60-second stuck rule as `stuck`, against seats that are working
+  // but silent for 150 s: they must NOT be stopped.
+  'busy-silent': { timeLimits: { builder: 10 * 60 * 1000, reviewer: 10 * 60 * 1000 }, seatOptions: { stuckAfterMs: 60 * 1000, progressReadMs: 15 * 1000 } },
 });
 
 export function standInCard(scenario, run = Date.now().toString(36)) {

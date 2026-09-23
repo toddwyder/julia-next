@@ -18,6 +18,12 @@
 //                      so its time limit stops it
 //   stuck              the builder reports once, then goes silent, so the
 //                      controller's five-minute progress rule stops it
+//   busy-silent        both seats report once, then work for BUSY_SILENT_MS -- longer
+//                      than the stand-in stuck limit -- WITHOUT a progress line: the
+//                      builder burns CPU, the reviewer prints a Pi-shaped stream to
+//                      its output. Neither may be stopped as stuck; the carry must
+//                      reach UAT (JUL-92, 23 Sep 07:01Z: a DeepSeek reviewer 30 tool
+//                      calls into a review was stopped as stuck for exactly this)
 //   cut-off            the reviewer's reply stops at its output limit before it
 //                      writes a verdict -- the same Pi stream shape a real
 //                      DeepSeek review produced on 23 Sep, at a 16,384 cap -- so the
@@ -30,7 +36,10 @@ import { fileURLToPath } from 'node:url';
 
 import { seatFiles } from './run-seat.mjs';
 
-export const SCENARIOS = Object.freeze(['pass', 'changes-then-pass', 'timeout', 'stuck', 'cut-off']);
+export const SCENARIOS = Object.freeze(['pass', 'changes-then-pass', 'timeout', 'stuck', 'busy-silent', 'cut-off']);
+// Longer than the stand-in stuck limit (60 s, scripts/controller-stand-in.mjs)
+// by more than two reads of it.
+export const BUSY_SILENT_MS = 150 * 1000;
 export const STAND_IN_FINDING = 'Stand-in finding: round 2 must add stand-in/round-2-fix.txt';
 
 export function scenarioOf(brief) {
@@ -52,7 +61,23 @@ function git(worktree, args) {
   return execFileSync('git', ['-C', worktree, '-c', 'user.name=Julia stand-in', '-c', 'user.email=stand-in@julia.invalid', ...args], { encoding: 'utf8' }).trim();
 }
 
-export async function standIn({ seat, tag, worktree }, { heartbeatMs = 5000 } = {}) {
+// Work with no progress line: CPU (the builder, like Gemini, prints nothing
+// until it ends) or a growing output stream (the reviewer, like Pi).
+async function busySilently(seat, busyMs) {
+  const end = Date.now() + busyMs;
+  while (Date.now() < end) {
+    if (seat === 'builder') {
+      const slice = Date.now() + 200;
+      while (Date.now() < slice) { /* burning CPU is the work */ }
+      await sleep(0);
+    } else {
+      process.stdout.write(`${JSON.stringify({ type: 'message_update', message: { role: 'assistant' } })}\n`);
+      await sleep(5000);
+    }
+  }
+}
+
+export async function standIn({ seat, tag, worktree }, { heartbeatMs = 5000, busyMs = BUSY_SILENT_MS } = {}) {
   const files = seatFiles(worktree, tag);
   const brief = readFileSync(files.brief, 'utf8');
   const scenario = scenarioOf(brief);
@@ -74,6 +99,7 @@ export async function standIn({ seat, tag, worktree }, { heartbeatMs = 5000 } = 
       // One report, then silence: only the progress rule stops this.
       for (;;) await sleep(60000);
     }
+    if (scenario === 'busy-silent') await busySilently(seat, busyMs);
     if (scenario === 'changes-then-pass' && round === 2 && !brief.includes(STAND_IN_FINDING)) {
       answer({ outcome: 'blocked', summary: 'round 2 was not given the round-1 finding to fix' });
       return;
@@ -90,6 +116,7 @@ export async function standIn({ seat, tag, worktree }, { heartbeatMs = 5000 } = 
   }
 
   say('status', 'reviewing', 'reading the change');
+  if (scenario === 'busy-silent') await busySilently(seat, busyMs);
   if (scenario === 'cut-off') {
     // Exactly what `pi -p --mode json` prints when a reply hits its limit, on
     // stdout, which run-seat.mjs saves as this seat's `.out`. No answer file.
