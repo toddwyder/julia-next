@@ -199,6 +199,8 @@ export async function carryCard({
       terminalWaitImpl: boundaries.terminalWaitImpl,
       terminalCloseImpl: boundaries.terminalCloseImpl,
       removeWorktreeImpl: boundaries.removeWorktreeImpl,
+      dispatchPreambleImpl: boundaries.dispatchPreambleImpl,
+      terminalSendImpl: boundaries.terminalSendImpl,
     },
     observeStartImpl: boundaries.observeStartImpl,
     // The start rule's production source (JUL-98 step 6 round 4b). Without it

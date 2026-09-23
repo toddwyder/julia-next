@@ -443,6 +443,24 @@ export function createOrcaBoundaries({
     // OLDEST retained window, not the newest (runbook, "Seven findings carried
     // from the cancelled JUL-106", item 6). So: one cursorless read to start
     // at the oldest line, then cursor-advanced reads to the end.
+    // (11b) What Orca would have typed into a dispatched worker: its preamble,
+    // which carries the brief. Asked of THE CONTROLLER'S daemon, where the
+    // Run and its tasks live, and `--from` the controller's own terminal (the
+    // verb refuses with no_active_sender_terminal otherwise). Only the Pi
+    // adopt route uses it -- ./adopt.mjs (4b) says why.
+    async dispatchPreambleImpl({ taskId, from } = {}) {
+      if (!taskId || !from) return null;
+      const answer = await call(['orchestration', 'dispatch-show', '--environment', environment, '--task', taskId, '--preamble', '--from', from]);
+      return answer?.preamble ?? null;
+    },
+
+    // (11c) Typing into a worker's agent terminal, Enter included. THE
+    // RUNNER'S daemon, where the agent terminal is. One multi-line text is one
+    // prompt to Pi (measured live, JUL-92 attempt 8).
+    async terminalSendImpl({ terminal, text } = {}) {
+      return call(['terminal', 'send', '--environment', workerEnvironment, '--terminal', terminal, '--text', text, '--enter']);
+    },
+
     async terminalReadImpl({ terminal, cursor = null, limit = 2000 } = {}) {
       const args = ['terminal', 'read', '--environment', workerEnvironment, '--terminal', terminal, '--limit', String(limit)];
       if (cursor !== null && cursor !== undefined) args.push('--cursor', String(cursor));

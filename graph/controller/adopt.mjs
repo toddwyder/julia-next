@@ -97,6 +97,9 @@ export async function startAdoptedWorker({
   terminalCloseImpl,
   removeWorktreeImpl,
   workerStartImpl,
+  // Only the Pi seat uses these two -- see (4b) below.
+  dispatchPreambleImpl,
+  terminalSendImpl,
 } = {}) {
   if (typeof spec !== 'string' || spec.trim() === '') {
     // Never a placeholder, and never an empty one either: the spec is the whole
@@ -193,6 +196,29 @@ export async function startAdoptedWorker({
     // tools and spending allowance. Nothing below may tear any of that down --
     // see `adopted` and the outer catch.
     adopted = result;
+
+    // (4b) PI IS TYPED ITS BRIEF BY THE CONTROLLER, not by Orca. JUL-92
+    // attempts 6, 7 and 8 (23 Sep) and the 22 Sep 23:45Z probe: for a Pi
+    // started through `node run-pi-seat.mjs`, `worker-start --terminal`
+    // answers `input_accepted` and nothing reaches Pi -- empty editor, no
+    // session file, for as long as anyone waited. Orca's own `terminal send`
+    // into the same Pi calls its input provider "unsupported" (it cannot see
+    // an agent behind the node wrapper), yet the text it types DOES arrive and
+    // a multi-line text arrives as ONE prompt (measured live on attempt 8's
+    // terminal, 03:24Z and 03:28Z). So the text Orca meant to deliver -- its
+    // own preamble, which already carries the brief -- is fetched and typed.
+    // Gemini is untouched: Orca's delivery works there.
+    // A throw here lands in the catch below AFTER `adopted` is set, so the
+    // worker keeps its identity and is reconciled, never torn down.
+    // TODO(technical-debt): no screen check before typing; if a later Orca
+    // does deliver to this Pi, it would receive the brief twice.
+    if (launch.agent === 'pi') {
+      const preamble = await dispatchPreambleImpl({ taskId: result?.taskId, from });
+      if (typeof preamble !== 'string' || !preamble.includes(spec.trim().split('\n')[0])) {
+        throw new Error(`orca dispatch-show gave no preamble carrying this brief for task ${result?.taskId ?? '(none)'}, so nothing was typed into Pi`);
+      }
+      await terminalSendImpl({ terminal, text: preamble });
+    }
 
     // (5) The turn-start reading. It never fails the START -- the adoption
     // itself succeeded -- it travels out and ./turn-start.mjs judges it, the
