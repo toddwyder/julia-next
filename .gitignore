@@ -2,3 +2,8 @@ node_modules/
 .next/
 .env
 .env.local
+
+# JUL-98 step 8: each seat's brief, progress, answer and run record, written in the
+# card's working copy. Ignored so the working copy still removes cleanly (Orca
+# refuses to remove one holding an untracked file, measured 23 Sep).
+.julia/

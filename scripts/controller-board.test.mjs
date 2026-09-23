@@ -212,3 +212,25 @@ test('a failed commentCreate is an error: the controller never reports a comment
   const board = createControllerBoard({ tokenProvider: appTokenProvider(), fetchImpl });
   await assert.rejects(() => board.comment({ issueId: 'uuid-JUL-92', body: 'hello' }), /commentCreate did not report success/);
 });
+
+// JUL-98 step 8: the worker-progress comment is ONE comment, edited in place.
+test('updateComment edits one comment by id, as the app, and a failed edit is an error rather than a silent no-op', async () => {
+  const sent = [];
+  const answer = (success) => async (url, opts) => {
+    const { query, variables } = JSON.parse(opts.body);
+    if (/ReadyQueueCommentUpdate/.test(query)) {
+      sent.push({ authorization: opts.headers.Authorization, variables, query });
+      return { ok: true, status: 200, json: async () => ({ data: { commentUpdate: success ? { success: true, comment: { id: variables.id, url: 'u' } } : { success: false } } }) };
+    }
+    return graphqlFetch()(url, opts);
+  };
+  const board = createControllerBoard({ tokenProvider: appTokenProvider(), fetchImpl: answer(true) });
+  const edited = await board.updateComment({ commentId: 'c7', body: 'now working -- the builder, round 1' });
+  assert.equal(edited.id, 'c7');
+  assert.deepEqual(sent[0].variables, { id: 'c7', body: 'now working -- the builder, round 1' });
+  assert.equal(sent[0].authorization, `Bearer ${APP_TOKEN}`);
+  assert.match(sent[0].query, /commentUpdate\(id: \$id, input: \{ body: \$body \}\)/);
+
+  const refusing = createControllerBoard({ tokenProvider: appTokenProvider(), fetchImpl: answer(false) });
+  await assert.rejects(() => refusing.updateComment({ commentId: 'c7', body: 'x' }), /commentUpdate did not report success for comment c7/);
+});

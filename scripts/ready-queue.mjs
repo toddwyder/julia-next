@@ -390,6 +390,18 @@ const READY_ISSUES_QUERY = `
   }
 `;
 
+// JUL-98 step 8: the controller keeps ONE progress comment per worker run and
+// edits it in place as the worker reports, rather than adding a comment per
+// report.
+const COMMENT_UPDATE_MUTATION = `
+  mutation ReadyQueueCommentUpdate($id: String!, $body: String!) {
+    commentUpdate(id: $id, input: { body: $body }) {
+      success
+      comment { id url }
+    }
+  }
+`;
+
 const COMMENT_CREATE_MUTATION = `
   mutation ReadyQueueComment($issueId: String!, $body: String!) {
     commentCreate(input: { issueId: $issueId, body: $body }) {
@@ -514,6 +526,14 @@ export function createLinearClient({ apiKey, linearGraphQLImpl = linearGraphQL, 
         throw new Error(`ready-queue: Linear commentCreate did not report success for ${issueId}`);
       }
       return data.commentCreate.comment;
+    },
+
+    async updateComment({ commentId, body }) {
+      const data = await linearGraphQLImpl(COMMENT_UPDATE_MUTATION, { id: commentId, body }, callOpts);
+      if (!data?.commentUpdate?.success) {
+        throw new Error(`ready-queue: Linear commentUpdate did not report success for comment ${commentId}`);
+      }
+      return data.commentUpdate.comment;
     },
 
     // Look up the requested label names on the team. Returns
