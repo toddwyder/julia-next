@@ -15,7 +15,7 @@
 // comment and move is printed instead of posted), and publishing (printed,
 // never pushed: nothing a stand-in commits may reach GitHub).
 //
-// Scenarios: pass | changes-then-pass | timeout | stuck | busy-silent | cut-off.
+// Scenarios: pass | changes-then-pass | timeout | stuck | busy-silent | missing-evidence | cut-off.
 // `timeout`, `stuck` and `busy-silent` run on short limits (below) so the proof
 // takes minutes, not an hour; the rule and the code path are the production ones.
 

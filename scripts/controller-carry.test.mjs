@@ -80,7 +80,7 @@ test('a passing step: working copy from origin/main, build-and-review, PUBLISH F
   assert.equal(result.ok, true);
   assert.equal(result.column, 'UAT');
   const names = f.order.map(([name]) => name);
-  assert.deepEqual(names.slice(0, 4), ['worktree-create', 'branch', 'build-and-review', 'publish']);
+  assert.deepEqual(names.slice(0, 5), ['worktree-create', 'branch', 'build-and-review', 'read-card', 'publish'], 'the live card is re-checked right before publishing');
   assert.equal(names.at(-1), 'worktree-rm', 'the working copy is removed last');
   assert.ok(names.indexOf('publish') < names.indexOf('worktree-rm'), 'publishing always sees the working copy');
   assert.deepEqual(f.order[0][1], { name: 'jul-92-work-a3', baseBranch: BASE_BRANCH });
@@ -206,3 +206,12 @@ test('THE GUARD: a passed step that carries no evidence is NOT moved to UAT', as
   assert.ok(!f.order.some(([name, to]) => name === 'move' && to === 'UAT'));
 });
 
+
+test('finding 6: a criterion added to the card during the carry stops the MERGE, not only the UAT move', async () => {
+  const f = fixture({ outcome: passed, liveCard: { description: DESCRIPTION.replace('- [ ] No reference', '- [ ] A new criterion added mid-carry.\n- [ ] No reference') } });
+  const result = await f.run();
+  assert.equal(result.ok, false);
+  assert.equal(result.stage, 'acceptance');
+  assert.ok(!f.order.some(([name]) => name === 'publish'), 'nothing was published');
+  assert.ok(f.comments.some((body) => /not merged: the acceptance check on the card as it is now refused it/.test(body)));
+});

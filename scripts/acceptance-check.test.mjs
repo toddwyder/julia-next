@@ -138,3 +138,39 @@ test('the CLI: PASS and exit 0, or one MISSING line per gap and exit 1', () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// PR #106 review, round 1 (DeepSeek): each finding pinned.
+test('finding 1: a criterion after a bold sub-label, or a UAT item after a deeper heading, is still required', () => {
+  const card = '**Acceptance criteria:**\n\n- [ ] Criterion one.\n\n**Security:**\n\n- [ ] Criterion two.\n\n## UAT plan\n\n1. **X:** y\n\n### More\n\n2. **Z:** w\n\n## Next\n\n- [ ] not a criterion\n3. not an item\n';
+  assert.deepEqual(parseAcceptanceCriteria(card).map((c) => c.text), ['Criterion one.', 'Criterion two.']);
+  assert.deepEqual(parseUatPlan(card).map((u) => u.name), ['X', 'Z']);
+  const heading = '## Acceptance criteria\n\n- [ ] A.\n\n### Detail\n\n- [ ] B.\n\n## Boundaries\n\n- [ ] not one\n';
+  assert.deepEqual(parseAcceptanceCriteria(heading).map((c) => c.text), ['A.', 'B.'], 'a deeper heading does not end a ## section; the next ## does');
+});
+
+test('finding 2: two criteria that start alike cannot stand in for each other', () => {
+  const stem = 'The controller posts every column move as exactly one comment on the card, written by the controller';
+  const a = { id: 'AC1', text: `${stem}, and nothing else.` };
+  const b = { id: 'AC2', text: `${stem}, and it is the only writer.` };
+  assert.equal(namesCriterion({ id: 'AC2', criterion: a.text }, b), false);
+  assert.equal(namesCriterion({ id: 'AC2', criterion: b.text }, b), true);
+});
+
+test('finding 3: the guard judges the NEWEST evidence comment', () => {
+  const check = checkEvidence({ description: JUL_92, builder: fullBuilder, reviewer: fullReviewer });
+  const fresh = evidenceCommentBody({ card: { identifier: 'JUL-92' }, check, builder: fullBuilder, reviewer: fullReviewer });
+  const stale = fresh.replace('**UAT3. The rename**', '');
+  assert.equal(checkCardForUat({ description: tickCriteria(JUL_92), comments: [{ body: stale }, { body: fresh }] }).ok, true);
+  assert.equal(checkCardForUat({ description: tickCriteria(JUL_92), comments: [{ body: fresh }, { body: stale }] }).ok, false);
+});
+
+test('finding 4: a same-worded box in another section is not ticked; CRLF is kept', () => {
+  const card = '## Acceptance criteria\r\n\r\n- [ ] It works.\r\n\r\n## Steps\r\n\r\n- [ ] It works.\r\n';
+  const ticked = tickCriteria(card);
+  assert.equal(ticked, '## Acceptance criteria\r\n\r\n- [x] It works.\r\n\r\n## Steps\r\n\r\n- [ ] It works.\r\n');
+});
+
+test('finding 5: nested or repeated numbers cannot hide a UAT item', () => {
+  const card = '## UAT plan\n\n1. **First:** a\n   1. a sub-step\n1. **Second:** b\n';
+  assert.deepEqual(parseUatPlan(card).map((u) => [u.id, u.name]), [['UAT1', 'First'], ['UAT2', 'Second']]);
+});

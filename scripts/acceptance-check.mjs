@@ -32,11 +32,19 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const CHECKBOX = /^\s*[-*]\s+\[( |x|X)\]\s+(.*)$/;
-const ACCEPTANCE_HEADING = /^\s*(?:#{1,6}\s*)?\**\s*acceptance criteria\s*:?\s*\**\s*:?\s*$/i;
+const ACCEPTANCE_HEADING = /^\s*(#{1,6})?\s*\**\s*acceptance criteria\s*:?\s*\**\s*:?\s*$/i;
 const UAT_HEADING = /^[ \t]*##[ \t]+UAT plan[ \t]*$/i;
-const ANY_HEADING = /^\s*#{1,6}\s/;
-// A bold-only line such as `**Out of scope:**` starts the next part of a brief.
-const BOLD_LABEL = /^\s*\*\*[^*]+\*\*\s*$/;
+const HEADING = /^\s*(#{1,6})\s/;
+
+// A section ends only at a heading of its own level or higher. A bold label or
+// a deeper heading inside it (`**Security:**`, `### More`) does NOT end it: an
+// item after one must still be required (PR #106 review, finding 1). A section
+// opened by a bold label ends at any heading. Erring this way can only require
+// more, never less.
+function endsSection(line, level) {
+  const heading = HEADING.exec(line);
+  return Boolean(heading) && heading[1].length <= level;
+}
 
 // Markdown, links and punctuation out; words kept. Used only to compare.
 export function normalize(text) {
@@ -50,19 +58,21 @@ export function normalize(text) {
 }
 
 export function parseAcceptanceCriteria(description) {
-  const lines = String(description ?? '').split(/\r?\n/);
+  const lines = String(description ?? '').split(/\n/);
   const criteria = [];
-  let inside = false;
-  for (const line of lines) {
-    if (ACCEPTANCE_HEADING.test(line)) { inside = true; continue; }
-    if (!inside) continue;
-    if (ANY_HEADING.test(line) || BOLD_LABEL.test(line)) { inside = false; continue; }
+  let level = null; // null: outside the section
+  lines.forEach((raw, index) => {
+    const line = raw.replace(/\r$/, '');
+    const opening = ACCEPTANCE_HEADING.exec(line);
+    if (opening) { level = opening[1] ? opening[1].length : 6; return; }
+    if (level === null) return;
+    if (endsSection(line, level)) { level = null; return; }
     const box = CHECKBOX.exec(line);
-    if (!box) continue;
+    if (!box) return;
     const text = box[2].trim();
-    if (text.startsWith('~~')) continue;
-    criteria.push({ id: `AC${criteria.length + 1}`, text, ticked: box[1] !== ' ', line });
-  }
+    if (text.startsWith('~~')) return;
+    criteria.push({ id: `AC${criteria.length + 1}`, text, ticked: box[1] !== ' ', index });
+  });
   return criteria;
 }
 
@@ -73,12 +83,15 @@ export function parseUatPlan(description) {
   for (const line of lines) {
     if (UAT_HEADING.test(line)) { inside = true; continue; }
     if (!inside) continue;
-    if (ANY_HEADING.test(line)) break;
-    const numbered = /^\s*(\d+)\.\s+(.*)$/.exec(line);
+    if (endsSection(line, 2)) break;
+    // Top-level numbered items only (an indented sub-step is part of its item),
+    // numbered in order, so a repeated number cannot hide an item (PR #106
+    // review, finding 5).
+    const numbered = /^(\d+)\.\s+(.*)$/.exec(line.replace(/\r$/, ''));
     if (!numbered) continue;
     const text = numbered[2].trim();
     const bold = /^\*\*([^*]+?)\s*:?\s*\*\*/.exec(text);
-    items.push({ id: `UAT${numbered[1]}`, name: (bold ? bold[1] : text).replace(/:$/, '').trim(), text });
+    items.push({ id: `UAT${items.length + 1}`, name: (bold ? bold[1] : text).replace(/:$/, '').trim(), text });
   }
   return items;
 }
@@ -99,13 +112,13 @@ export function evidenceListsForBrief(description) {
   ].join('\n');
 }
 
-// Does an answer entry name this criterion? By id, and by its words: the
-// entry's `criterion` must carry the criterion's first words (up to 60
-// characters of it, normalized), so a copy that drops a trailing clause still
-// counts and an answer about a different criterion does not.
+// Does an answer entry name this criterion? By id, and by ALL its words: the
+// entry's `criterion` must carry the criterion's whole text (markdown, case and
+// punctuation aside), so two criteria that start alike cannot stand in for each
+// other (PR #106 review, finding 2).
 export function namesCriterion(entry, criterion) {
   if (!entry || String(entry.id ?? '').toUpperCase() !== criterion.id) return false;
-  const want = normalize(criterion.text).slice(0, 60).trim();
+  const want = normalize(criterion.text);
   return Boolean(want) && normalize(entry.criterion).includes(want);
 }
 
@@ -161,11 +174,12 @@ export function evidenceCommentBody({ card, check, builder, reviewer }) {
 }
 
 // Tick every open criterion box in the description, and nothing else.
+// By line position, never by text, so a same-worded box in another section is
+// left alone (PR #106 review, finding 4).
 export function tickCriteria(description) {
-  const criteria = parseAcceptanceCriteria(description);
-  const open = new Set(criteria.filter((c) => !c.ticked).map((c) => c.line));
-  return String(description ?? '').split(/\n/).map((line) => (
-    open.has(line.replace(/\r$/, '')) ? line.replace(/\[ \]/, '[x]') : line
+  const open = new Set(parseAcceptanceCriteria(description).filter((c) => !c.ticked).map((c) => c.index));
+  return String(description ?? '').split(/\n/).map((line, index) => (
+    open.has(index) ? line.replace(/\[ \]/, '[x]') : line
   )).join('\n');
 }
 
@@ -177,7 +191,9 @@ export function checkCardForUat({ description, comments = [] }) {
   if (!criteria.length) missing.push('the card lists no acceptance criteria');
   if (!uat.length) missing.push('the card\'s UAT plan lists no numbered items');
   for (const criterion of criteria.filter((c) => !c.ticked)) missing.push(`${criterion.id} ("${criterion.text.slice(0, 80)}") is not ticked`);
-  const evidence = comments.map((c) => String(c?.body ?? '')).find((body) => body.includes(EVIDENCE_MARKER));
+  // The NEWEST evidence comment: a card carried twice is judged on this carry's
+  // evidence, not an older one (PR #106 review, finding 3).
+  const evidence = comments.map((c) => String(c?.body ?? '')).filter((body) => body.includes(EVIDENCE_MARKER)).at(-1);
   if (!evidence) missing.push('no evidence comment is on the card');
   else {
     for (const item of uat) {
