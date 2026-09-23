@@ -131,7 +131,7 @@ export async function pushBranch({
   try {
     // JUL-71: the publisher runs as orchestrator-svc, but a coordinator's
     // worker commits live in runner-owned worktrees (by design -- see the
-    // role table in docs/agents/jul43-coordinator-runbook.md). Git's own
+    // role table in docs/agents/server-runbook.md). Git's own
     // dubious-ownership guard then refuses to operate in `cwd` at all
     // ("detected dubious ownership in repository at ..."), confirmed live
     // this session -- this was the runbook's own disclosed, unverified gap

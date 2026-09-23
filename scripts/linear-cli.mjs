@@ -177,7 +177,7 @@ export function checkForToddGuard(body) {
 // Every refusal ends with this: the agent must act, not ask. A genuine
 // Todd-only thing outside the three kinds is a design defect to log, not a
 // post to force through.
-const GUARD_ACTING_INSTRUCTION = 'Act instead of asking: the agent decides, does and logs this itself; a genuinely Todd-only thing outside those three kinds is a design defect -- log it on the ticket or in docs/agents/jul43-coordinator-runbook.md, never force this comment through.';
+const GUARD_ACTING_INSTRUCTION = 'Act instead of asking: the agent decides, does and logs this itself; a genuinely Todd-only thing outside those three kinds is a design defect -- log it on the ticket or in docs/agents/server-runbook.md, never force this comment through.';
 
 function guardRefusalError(result) {
   return new Error(`postComment refused by the For-Todd guard (rule: ${result.rule}): ${result.reason}. ${GUARD_ACTING_INSTRUCTION}`);

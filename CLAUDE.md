@@ -29,7 +29,7 @@ Do not stop and ask whether you can reach the server. The route is set up and us
   `sudo -u orchestrator-svc`, with the App's key loaded from `/etc/orchestrator-svc/.env.publisher`.
   Merging needs `--sha <reviewed-head-commit>`.
 
-Details, the account table and the known traps are in `docs/agents/jul43-coordinator-runbook.md`.
+Details, the account table and the known traps are in `docs/agents/server-runbook.md`.
 
 ## Project Overview
 

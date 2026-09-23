@@ -28,7 +28,7 @@ whether the work is accepted.
 3. **`.claude/skills/tdd`** — red, green, refactor. Follow it. A test is written before the code
    it pins, and you see it fail for the right reason before you make it pass.
 4. **The repo's own standing instructions** — `CLAUDE.md`, `CONTEXT.md`, `docs/adr/`, and
-   `docs/agents/jul43-coordinator-runbook.md` for anything about the server or the tooling on it.
+   `docs/agents/server-runbook.md` for anything about the server or the tooling on it.
 5. **The one test result the controller gives you.** The controller runs the full suite once in
    your worktree and hands you that result. You may run tests yourself while building; the
    controller's run is the one that counts.

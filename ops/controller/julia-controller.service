@@ -10,7 +10,7 @@
 #
 # Without those two exports every `systemctl --user` command fails SILENTLY --
 # no output, exit 1 -- which reads exactly like success. See
-# docs/agents/jul43-coordinator-runbook.md, "systemctl --user fails silently in
+# docs/agents/server-runbook.md, "systemctl --user fails silently in
 # an Orca terminal".
 #
 # There is no User= or Group= here on purpose: a user unit cannot set them, and
@@ -21,7 +21,7 @@
 # cannot quietly drop one.
 [Unit]
 Description=Julia controller -- carries one Ready card across the board at a time
-Documentation=file:///srv/orchestrator-svc/julia-next/docs/agents/jul43-coordinator-runbook.md
+Documentation=file:///srv/orchestrator-svc/julia-next/docs/agents/server-runbook.md
 # systemd never gives up on this service. The cost is that a bad build restarts
 # every 5 seconds for ever instead of stopping; graph/controller/crash-loop.mjs
 # is what makes that visible (a journal line on every start, and one comment on
