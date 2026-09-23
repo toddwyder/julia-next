@@ -16,8 +16,12 @@ export const frameworkRules = {
   'no-restricted-syntax': [
     'error',
     {
-      selector: 'WhileStatement[test.type="Literal"][test.value=true]',
-      message: 'Do not use while (true) loops. Use framework retry or wait loops.',
+      selector: 'WhileStatement[test.type="Literal"]',
+      message: 'Do not use while loops with literal conditions. Use framework retry or wait loops.',
+    },
+    {
+      selector: 'DoWhileStatement[test.type="Literal"]',
+      message: 'Do not use do...while loops with literal conditions. Use framework retry or wait loops.',
     },
     {
       selector: 'ForStatement[test=null]',
@@ -48,6 +52,26 @@ export const frameworkRules = {
           importNames: ['writeFile', 'appendFile'],
           message: 'Do not use hand-built progress files or direct file writes. Use framework features.',
         },
+        {
+          name: 'node:timers/promises',
+          importNames: ['setTimeout', 'setInterval'],
+          message: 'Do not use setTimeout or setInterval. Use framework waiting or retry mechanisms.',
+        },
+        {
+          name: 'timers/promises',
+          importNames: ['setTimeout', 'setInterval'],
+          message: 'Do not use setTimeout or setInterval. Use framework waiting or retry mechanisms.',
+        },
+        {
+          name: 'timers',
+          importNames: ['setTimeout', 'setInterval'],
+          message: 'Do not use setTimeout or setInterval. Use framework waiting or retry mechanisms.',
+        },
+        {
+          name: 'node:timers',
+          importNames: ['setTimeout', 'setInterval'],
+          message: 'Do not use setTimeout or setInterval. Use framework waiting or retry mechanisms.',
+        },
       ],
     },
   ],
@@ -72,6 +96,36 @@ export const frameworkRules = {
     {
       property: 'createWriteStream',
       message: 'Do not use hand-built progress files or direct file writes. Use framework features.',
+    },
+    {
+      object: 'globalThis',
+      property: 'setTimeout',
+      message: 'Do not use setTimeout. Use framework waiting or retry mechanisms.',
+    },
+    {
+      object: 'globalThis',
+      property: 'setInterval',
+      message: 'Do not use setInterval. Use framework waiting or retry mechanisms.',
+    },
+    {
+      object: 'global',
+      property: 'setTimeout',
+      message: 'Do not use setTimeout. Use framework waiting or retry mechanisms.',
+    },
+    {
+      object: 'global',
+      property: 'setInterval',
+      message: 'Do not use setInterval. Use framework waiting or retry mechanisms.',
+    },
+    {
+      object: 'window',
+      property: 'setTimeout',
+      message: 'Do not use setTimeout. Use framework waiting or retry mechanisms.',
+    },
+    {
+      object: 'window',
+      property: 'setInterval',
+      message: 'Do not use setInterval. Use framework waiting or retry mechanisms.',
     },
   ],
   'eslint-comments/require-description': 'error',

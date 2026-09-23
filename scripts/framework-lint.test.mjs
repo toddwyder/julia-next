@@ -21,7 +21,11 @@ export function countFolderCodeLines(dirPath) {
       const isTest = /\.(test|spec)\.[cm]?[jt]sx?$/.test(entry.name);
       const isCode = /\.[cm]?[jt]sx?$/.test(entry.name);
       if (isCode && !isTest) {
-        const lines = readFileSync(fullPath, 'utf8').split('\n');
+        const content = readFileSync(fullPath, 'utf8');
+        const lines = content.split(/\r\n|\r|\n/);
+        if (lines.length > 1 && lines.at(-1) === '') {
+          lines.pop();
+        }
         total += lines.length;
       }
     }
@@ -86,6 +90,22 @@ test('no-restricted-syntax: fails with rule name no-restricted-syntax when while
   assert.ok(errors.length >= 2, 'expected errors for while(true) and for(;;) under ruleId "no-restricted-syntax"');
 });
 
+// 3a. no-restricted-syntax bypass: while (1) and literal while loops
+test('no-restricted-syntax: fails with rule name no-restricted-syntax when while (1) is used', { skip: skipMessage }, async () => {
+  const result = await lintFixture('graph/fixtures/framework-first/bad-while-literal/controller.mjs');
+  assert.ok(result.errorCount > 0, 'bad-while-literal fixture should produce errors');
+  const errors = result.messages.filter((m) => m.ruleId === 'no-restricted-syntax');
+  assert.ok(errors.length >= 1, 'expected error for while (1) under ruleId "no-restricted-syntax"');
+});
+
+// 3b. no-restricted-syntax bypass: do ... while (true) loops
+test('no-restricted-syntax: fails with rule name no-restricted-syntax when do { } while (true) is used', { skip: skipMessage }, async () => {
+  const result = await lintFixture('graph/fixtures/framework-first/bad-do-while/controller.mjs');
+  assert.ok(result.errorCount > 0, 'bad-do-while fixture should produce errors');
+  const errors = result.messages.filter((m) => m.ruleId === 'no-restricted-syntax');
+  assert.ok(errors.length >= 1, 'expected error for do { } while (true) under ruleId "no-restricted-syntax"');
+});
+
 // 4. no-restricted-imports rule test
 test('no-restricted-imports: fails with rule name no-restricted-imports when file write functions are imported', { skip: skipMessage }, async () => {
   const result = await lintFixture('graph/fixtures/framework-first/bad-restricted-imports/controller.mjs');
@@ -94,12 +114,28 @@ test('no-restricted-imports: fails with rule name no-restricted-imports when fil
   assert.ok(errors.length >= 2, 'expected errors for writeFile and appendFile imports under ruleId "no-restricted-imports"');
 });
 
+// 4a. no-restricted-imports bypass: timer module imports
+test('no-restricted-imports: fails with rule name no-restricted-imports when timer functions are imported from node:timers/promises, timers/promises, timers, node:timers', { skip: skipMessage }, async () => {
+  const result = await lintFixture('graph/fixtures/framework-first/bad-timer-imports/controller.mjs');
+  assert.ok(result.errorCount > 0, 'bad-timer-imports fixture should produce errors');
+  const errors = result.messages.filter((m) => m.ruleId === 'no-restricted-imports');
+  assert.ok(errors.length >= 4, 'expected errors for timer imports under ruleId "no-restricted-imports"');
+});
+
 // 5. no-restricted-properties rule test
 test('no-restricted-properties: fails with rule name no-restricted-properties when fs write methods are called', { skip: skipMessage }, async () => {
   const result = await lintFixture('graph/fixtures/framework-first/bad-restricted-properties/controller.mjs');
   assert.ok(result.errorCount > 0, 'bad-restricted-properties fixture should produce errors');
   const errors = result.messages.filter((m) => m.ruleId === 'no-restricted-properties');
   assert.ok(errors.length >= 2, 'expected errors for writeFileSync and createWriteStream calls under ruleId "no-restricted-properties"');
+});
+
+// 5a. no-restricted-properties bypass: globalThis/global/window timers
+test('no-restricted-properties: fails with rule name no-restricted-properties when setTimeout/setInterval are called on globalThis, global, or window', { skip: skipMessage }, async () => {
+  const result = await lintFixture('graph/fixtures/framework-first/bad-global-timers/controller.mjs');
+  assert.ok(result.errorCount > 0, 'bad-global-timers fixture should produce errors');
+  const errors = result.messages.filter((m) => m.ruleId === 'no-restricted-properties');
+  assert.ok(errors.length >= 6, 'expected errors for globalThis/global/window setTimeout/setInterval under ruleId "no-restricted-properties"');
 });
 
 // 6. eslint-comments/no-unlimited-disable rule test
@@ -118,15 +154,17 @@ test('eslint-comments/require-description: fails with rule name eslint-comments/
   assert.ok(error, 'expected error with ruleId "eslint-comments/require-description"');
 });
 
-// 8. clean fixture passes using ordinary LangGraph code (checkpointer, interrupt, retryPolicy)
-test('clean LangGraph fixture: passes lint with checkpointer, interrupt(), and retryPolicy', { skip: skipMessage }, async () => {
+// 8. clean fixture passes using ordinary LangGraph code (checkpointer, interrupt, Command resume, retryPolicy, recursionLimit)
+test('clean LangGraph fixture: passes lint with checkpointer, interrupt(), new Command({ resume }), retryPolicy, and recursionLimit', { skip: skipMessage }, async () => {
   const fixturePath = 'graph/fixtures/framework-first/clean/controller.mjs';
   const content = readFileSync(join(REPO_ROOT, fixturePath), 'utf8');
 
   // Verify it contains ordinary LangGraph code constructs
   assert.match(content, /checkpointer/i, 'clean fixture should use a checkpointer');
   assert.match(content, /interrupt\s*\(/, 'clean fixture should use interrupt()');
+  assert.match(content, /new\s+Command\(\s*\{\s*resume/, 'clean fixture should use new Command({ resume })');
   assert.match(content, /retryPolicy/, 'clean fixture should use retryPolicy');
+  assert.match(content, /recursionLimit/, 'clean fixture should use recursionLimit');
 
   const result = await lintFixture(fixturePath);
   assert.equal(result.errorCount, 0, `clean fixture must have 0 errors, got: ${JSON.stringify(result.messages)}`);
@@ -165,6 +203,24 @@ test('countFolderCodeLines: excludes test files and correctly sums non-test line
   const badLinesDir = join(REPO_ROOT, 'graph/fixtures/framework-first/bad-max-lines');
   const badLines = countFolderCodeLines(badLinesDir);
   assert.ok(badLines > 400, `bad-max-lines fixture should exceed 400 lines, got ${badLines}`);
+});
+
+// 11b. Folder code line counter: 400 passes, 401 fails, matches max-lines without trailing newline discrepancy
+test('countFolderCodeLines: a folder of exactly 400 lines passes, 401 fails', () => {
+  const dir400 = join(REPO_ROOT, 'graph/fixtures/framework-first/folder-400-lines');
+  const lines400 = countFolderCodeLines(dir400);
+  assert.equal(lines400, 400, `expected exactly 400 lines for folder-400-lines, got ${lines400}`);
+  assert.ok(lines400 <= 400, 'folder of exactly 400 lines must pass <= 400 limit');
+
+  const dir401 = join(REPO_ROOT, 'graph/fixtures/framework-first/folder-401-lines');
+  const lines401 = countFolderCodeLines(dir401);
+  assert.equal(lines401, 401, `expected exactly 401 lines for folder-401-lines, got ${lines401}`);
+  assert.ok(lines401 > 400, 'folder of 401 lines must fail <= 400 limit');
+
+  // Verify that the 406-line fixture is counted as 406 (matching max-lines), not 407
+  const badLinesDir = join(REPO_ROOT, 'graph/fixtures/framework-first/bad-max-lines');
+  const badLines = countFolderCodeLines(badLinesDir);
+  assert.equal(badLines, 406, `bad-max-lines fixture should count as 406 lines matching max-lines, got ${badLines}`);
 });
 
 // 12. Normal use: eslint.config.mjs applies only to graph/langgraph/** and ignores everything else
