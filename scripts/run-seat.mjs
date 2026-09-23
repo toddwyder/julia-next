@@ -45,6 +45,16 @@ export const ANSWER_DIR = '.julia';
 export const TAG_PATTERN = /^round-[1-9]-(builder|reviewer)$/;
 // How long a seat that has been told to stop gets before it is killed outright.
 export const KILL_GRACE_MS = 10000;
+// THE SEAT TOKEN. The controller makes one per seat run and passes it here;
+// this script hands it to the agent as an environment variable, which every
+// process the agent starts inherits. A stop from outside finds the seat's
+// processes BY that token (graph/controller/seat-run.mjs `stopSeatCommand`),
+// so nothing the agent can write -- no pid file -- decides what is killed.
+// Closing the Orca terminal is not a stop: measured 2026-09-23, it kills what
+// runs in the terminal outright (no signal a handler can catch) and a detached
+// agent survives it.
+export const SEAT_TOKEN_ENV = 'JULIA_SEAT_TOKEN';
+export const SEAT_TOKEN_PATTERN = /^[0-9a-f]{32}$/;
 
 // Which run-pi-seat.mjs route runs which DeepSeek model. The route owns the
 // provider, the key and the env var; this only picks it.
@@ -77,7 +87,7 @@ export function parseArgs(argv) {
     opts[name] = value;
     i += 1;
   }
-  const missing = ['seat', 'agent', 'model', 'effort', 'tag', 'timeout-seconds', 'worktree', 'brief-b64'].filter((key) => !opts[key]);
+  const missing = ['seat', 'agent', 'model', 'effort', 'tag', 'timeout-seconds', 'worktree', 'seat-token', 'brief-b64'].filter((key) => !opts[key]);
   if (missing.length) throw new Error(`run-seat: missing --${missing.join(', --')}`);
   if (!SEATS.includes(opts.seat)) throw new Error(`run-seat: --seat must be one of ${SEATS.join('|')}`);
   if (!AGENTS.includes(opts.agent)) throw new Error(`run-seat: --agent must be one of ${AGENTS.join('|')}`);
@@ -89,6 +99,7 @@ export function parseArgs(argv) {
   if (!Number.isInteger(timeoutSeconds) || timeoutSeconds <= 0) {
     throw new Error(`run-seat: --timeout-seconds must be a positive whole number, got ${JSON.stringify(opts['timeout-seconds'])}`);
   }
+  if (!SEAT_TOKEN_PATTERN.test(opts['seat-token'])) throw new Error('run-seat: --seat-token must be 32 lowercase hex characters');
   const brief = Buffer.from(opts['brief-b64'], 'base64').toString('utf8');
   if (!brief.trim()) throw new Error('run-seat: the brief decoded to nothing');
   return {
@@ -99,6 +110,7 @@ export function parseArgs(argv) {
     tag: opts.tag,
     timeoutSeconds,
     worktree: resolve(opts.worktree),
+    seatToken: opts['seat-token'],
     brief,
   };
 }
@@ -149,11 +161,6 @@ export async function runSeat(opts, {
   now = () => new Date().toISOString(),
   killGraceMs = KILL_GRACE_MS,
   killImpl = (pid, signal) => process.kill(pid, signal),
-  // Where a stop from OUTSIDE arrives. The controller stops a stuck or
-  // over-time seat by closing its terminal, which sends this script SIGHUP --
-  // but the agent is in its own process group, so it would outlive the
-  // terminal unless this script passes the stop on. Injected for the tests.
-  signalSource = process,
 } = {}) {
   const files = seatFiles(opts.worktree, opts.tag);
   mkdirSync(files.dir, { recursive: true });
@@ -164,6 +171,7 @@ export async function runSeat(opts, {
 
   const before = opts.agent === 'agy' ? await allowanceReading(readAllowanceImpl, opts.worktree) : null;
   const spec = agentSpawnSpec(opts, { readSecretImpl });
+  const env = opts.seatToken ? { ...spec.env, [SEAT_TOKEN_ENV]: opts.seatToken } : spec.env;
   const startedAt = now();
   // The first progress line is this script's own, at the moment the agent is
   // started, so the controller's five-minute stuck rule counts from a real
@@ -175,36 +183,22 @@ export async function runSeat(opts, {
 
   const result = await new Promise((resolveRun) => {
     // Its own process group, so the stop reaches everything the agent started.
-    const child = spawnImpl(spec.command, spec.args, { cwd: opts.worktree, env: spec.env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+    const child = spawnImpl(spec.command, spec.args, { cwd: opts.worktree, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
     let timedOut = false;
-    let stoppedBy = null;
     let killTimer = null;
     child.stdout?.pipe(out);
     child.stderr?.pipe(err);
-    const stopGroup = () => {
+    const stopTimer = setTimeout(() => {
+      timedOut = true;
       try { killImpl(-child.pid, 'SIGTERM'); } catch { /* already gone */ }
       killTimer = setTimeout(() => {
         try { killImpl(-child.pid, 'SIGKILL'); } catch { /* already gone */ }
       }, killGraceMs);
-    };
-    const stopTimer = setTimeout(() => {
-      timedOut = true;
-      stopGroup();
     }, opts.timeoutSeconds * 1000);
-    const onOutsideStop = (signal) => {
-      stoppedBy = signal;
-      clearTimeout(stopTimer);
-      // The record is still written: the kill grace is short, and this
-      // process is kept alive by the child until the child closes.
-      try { killImpl(-child.pid, 'SIGKILL'); } catch { /* already gone */ }
-    };
-    const signals = ['SIGHUP', 'SIGTERM', 'SIGINT'];
-    for (const signal of signals) signalSource.on?.(signal, onOutsideStop);
     const finish = (value) => {
       clearTimeout(stopTimer);
       clearTimeout(killTimer);
-      for (const signal of signals) signalSource.off?.(signal, onOutsideStop);
-      resolveRun({ ...value, timedOut, stoppedBy });
+      resolveRun({ ...value, timedOut });
     };
     child.on('error', (error) => finish({ exitCode: null, signal: null, spawnError: error.message }));
     child.on('close', (exitCode, signal) => finish({ exitCode, signal, spawnError: null }));
@@ -225,7 +219,6 @@ export async function runSeat(opts, {
     exitCode: result.exitCode,
     signal: result.signal,
     timedOut: result.timedOut,
-    stoppedBy: result.stoppedBy,
     spawnError: result.spawnError,
     answerWritten: existsSync(files.answer),
     allowanceBefore: before?.reading ?? null,

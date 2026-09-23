@@ -18,8 +18,15 @@
 //      and a seat whose progress file has not changed for five minutes is
 //      treated as stuck and stopped.
 //   3. It ends when run-seat.mjs prints its end marker, or is stopped at its
-//      time limit, or is stopped as stuck. Closing its terminal is the stop:
-//      run-seat.mjs passes it on to the agent's whole process group.
+//      time limit, or is stopped as stuck. THE STOP finds the seat's
+//      processes by their SEAT TOKEN -- a random value the controller makes
+//      per run, which run-seat.mjs hands the agent as JULIA_SEAT_TOKEN and
+//      every process it starts inherits -- and kills them, as the worker,
+//      through a second short terminal (`stopSeatCommand`). Nothing the agent
+//      can write decides what is killed (PR #103 review). It is NOT closing
+//      the seat's terminal: measured 2026-09-23, closing an Orca terminal kills
+//      what runs in it outright, with no signal a handler can catch, and the
+//      detached agent survives it (the first stand-in `stuck` run did).
 //   4. The answer, the run record and the agent's own output are read from
 //      `.julia/` in the working copy, directly, as `orchestrator-svc` -- which
 //      can read them (proven on the server, 23 Sep 05:00Z). Never the screen.
@@ -29,6 +36,7 @@
 // rather than started on something it did not ask for.
 
 import { readFileSync, statSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 
 import { MODEL_CATALOG } from '../../scripts/seat-labels.mjs';
@@ -102,6 +110,76 @@ export function seatFilePaths(worktreePath, tag) {
     run: join(dir, `${tag}.run.json`),
     out: join(dir, `${tag}.out`),
   };
+}
+
+// A limit in words: "90-second" rather than a rounded-up "2-minute".
+export function limitInWords(ms) {
+  return ms < 120000 ? `${Math.round(ms / 1000)}-second` : `${Math.round(ms / 60000)}-minute`;
+}
+
+export const STOP_MARKER_GONE = 'JULIA_STOP:gone';
+export const STOP_MARKER_ALIVE = 'JULIA_STOP:alive';
+export const STOP_TERMINAL_TITLE_PREFIX = 'julia-stop-';
+
+export const SEAT_TOKEN_ENV = 'JULIA_SEAT_TOKEN';
+export const SEAT_TOKEN_PATTERN = /^[0-9a-f]{32}$/;
+
+export function newSeatToken() {
+  return randomBytes(16).toString('hex');
+}
+
+// The stop, as ONE shell line run by the WORKER (only it may signal its own
+// processes). It finds every process whose environment carries this seat's
+// exact token -- read from /proc/<pid>/environ, which only the processes' own
+// account can read -- sends TERM, then KILL, then looks again. `gone` means no
+// process with the token is left. Why the token and not a process group:
+//   * nothing the agent can write decides what is killed (a pid file in the
+//     working copy could be forged to redirect the kill or fake "gone");
+//   * a recycled pid does not carry the token;
+//   * a grandchild that moved to a new process group still does.
+// The token must be exactly 32 lowercase hex characters -- anything else is
+// refused, never interpolated.
+export function stopSeatCommand(token, { graceSeconds = 5 } = {}) {
+  if (typeof token !== 'string' || !SEAT_TOKEN_PATTERN.test(token)) throw new Error('refusing to build a stop for a seat token that is not 32 lowercase hex characters');
+  if (!Number.isInteger(graceSeconds) || graceSeconds < 0) throw new Error('refusing a stop grace that is not a whole number of seconds');
+  const find = `julia_seat() { for d in /proc/[0-9]*; do [ "$d" = "/proc/$$" ] && continue; tr '\\0' '\\n' < "$d/environ" 2>/dev/null | grep -qx "${SEAT_TOKEN_ENV}=${token}" && echo "\${d#/proc/}"; done; }`;
+  return `${find}; P=$(julia_seat); [ -n "$P" ] && kill -TERM $P 2>/dev/null; sleep ${graceSeconds}; `
+    + `P=$(julia_seat); [ -n "$P" ] && kill -KILL $P 2>/dev/null; sleep 1; `
+    + `P=$(julia_seat); if [ -n "$P" ]; then echo ${STOP_MARKER_ALIVE} $P; else echo ${STOP_MARKER_GONE}; fi; echo "${WORKER_SCRIPT_END_MARKER}:$?"`;
+}
+
+// Run the stop and read its answer. Never throws: what it could or could not
+// do is the answer, and the caller reports it.
+export async function stopSeatGroup({ boundaries, worktreePath, tag, token, sleepImpl, nowMs, pollMs = 1000, timeoutMs = 60000, warn = () => {} }) {
+  let command;
+  try { command = stopSeatCommand(token); } catch (error) { return { gone: false, reason: error.message }; }
+  let terminal = null;
+  try {
+    const created = await boundaries.workerTerminalCreateImpl({ worktreePath, title: `${STOP_TERMINAL_TITLE_PREFIX}${tag}`, command });
+    terminal = created?.terminal?.handle ?? null;
+    if (!terminal) return { gone: false, reason: 'orca terminal create answered no handle for the stop' };
+    const lines = [];
+    let cursor = null;
+    const giveUpAt = nowMs() + timeoutMs;
+    for (;;) {
+      const answer = await boundaries.terminalReadImpl({ terminal, cursor, limit: 200 });
+      const read = answer?.terminal ?? {};
+      for (const line of read.tail ?? []) lines.push(String(line).trim());
+      if (read.nextCursor !== null && read.nextCursor !== undefined) cursor = read.nextCursor;
+      if (workerScriptExitCode(lines) !== null) break;
+      if (nowMs() >= giveUpAt) return { gone: false, reason: `the stop did not finish within ${Math.round(timeoutMs / 1000)} s` };
+      await sleepImpl(pollMs);
+    }
+    if (lines.includes(STOP_MARKER_GONE)) return { gone: true, reason: null };
+    const alive = lines.find((line) => line.startsWith(`${STOP_MARKER_ALIVE} `));
+    return { gone: false, reason: alive ? `processes still carrying the seat token after TERM and KILL: ${alive.slice(STOP_MARKER_ALIVE.length + 1)}` : 'the stop gave no answer' };
+  } catch (error) {
+    return { gone: false, reason: `the stop could not be run: ${error.message}` };
+  } finally {
+    if (terminal) {
+      try { await boundaries.terminalCloseImpl({ terminal }); } catch (error) { warn(`[controller] could not close the stop terminal ${terminal}: ${error.message}`); }
+    }
+  }
 }
 
 // What a seat runs as. `choice` is one seat's entry from scripts/seat-labels.mjs.
@@ -189,7 +267,8 @@ function shellArg(value, what) {
   return `'${text}'`;
 }
 
-export function seatCommand({ worktreePath, seat, launch, tag, timeLimitMs, brief }) {
+export function seatCommand({ worktreePath, seat, launch, tag, timeLimitMs, brief, token }) {
+  if (!SEAT_TOKEN_PATTERN.test(String(token))) throw new Error('seatCommand: a seat needs a 32-hex-character seat token');
   const b64 = Buffer.from(brief, 'utf8').toString('base64');
   if (b64.length > MAX_BRIEF_B64) {
     throw new Error(`the ${seat} brief is ${b64.length} characters encoded, over the ${MAX_BRIEF_B64} a command carries safely -- refusing to start a seat on a brief that may arrive cut`);
@@ -203,6 +282,7 @@ export function seatCommand({ worktreePath, seat, launch, tag, timeLimitMs, brie
     `--tag ${shellArg(tag, 'the tag')}`,
     `--timeout-seconds ${Math.ceil(timeLimitMs / 1000)}`,
     `--worktree ${shellArg(worktreePath, 'the working copy path')}`,
+    `--seat-token ${token}`,
     `--brief-b64 ${b64}`,
   ].join(' ');
   return `${line}; echo "${WORKER_SCRIPT_END_MARKER}:$?"`;
@@ -341,6 +421,7 @@ export async function runSeat({
   endPollMs = END_POLL_MS,
   endMarkerGraceMs = END_MARKER_GRACE_MS,
   stopConfirmMs = STOP_CONFIRM_MS,
+  seatTokenImpl = newSeatToken,
   onProgress = async () => {},
   readFileImpl = readFileSync,
   statImpl = statSync,
@@ -351,7 +432,8 @@ export async function runSeat({
   const tag = seatTag(round, seat);
   const paths = seatFilePaths(worktreePath, tag);
   const fullBrief = `${brief}\n${reportingInstructions({ seat, tag, timeLimitMs })}`;
-  const command = seatCommand({ worktreePath, seat, launch, tag, timeLimitMs, brief: fullBrief });
+  const token = seatTokenImpl();
+  const command = seatCommand({ worktreePath, seat, launch, tag, timeLimitMs, brief: fullBrief, token });
 
   const created = await boundaries.workerTerminalCreateImpl({ worktreePath, title: `${SEAT_TERMINAL_TITLE_PREFIX}${tag}`, command });
   const terminal = created?.terminal?.handle ?? null;
@@ -370,7 +452,7 @@ export async function runSeat({
   const lines = [];
   let cursor = null;
   let exitCode = null;
-  let closeError = null;
+  let stop = null;
 
   const readProgressNow = async () => {
     const fingerprint = fingerprintOf(paths.progress, statImpl);
@@ -407,32 +489,41 @@ export async function runSeat({
       if (now - startedMs >= timeLimitMs + endMarkerGraceMs) { stoppedAs = 'overtime'; break; }
       await sleepImpl(endPollMs);
     }
+
+    if (stoppedAs) {
+      // THE STOP: the agent's group, killed as the worker. Then run-seat.mjs
+      // sees its agent exit, writes its run record and prints its end marker,
+      // which is read here as usual -- polled, not slept on, because the
+      // Gemini seat's second allowance reading comes before the record.
+      stop = await stopSeatGroup({ boundaries, worktreePath, tag, token, sleepImpl, nowMs, warn });
+      const giveUpAt = nowMs() + stopConfirmMs;
+      for (;;) {
+        const answer = await boundaries.terminalReadImpl({ terminal, cursor, limit: 2000 });
+        const read = answer?.terminal ?? {};
+        for (const line of read.tail ?? []) lines.push(String(line));
+        if (read.nextCursor !== null && read.nextCursor !== undefined) cursor = read.nextCursor;
+        if (workerScriptExitCode(lines) !== null || fingerprintOf(paths.run, statImpl) !== null) break;
+        if (nowMs() >= giveUpAt) break;
+        await sleepImpl(endPollMs);
+      }
+    }
   } finally {
-    // The stop, and the cleanup: closing the terminal hangs up run-seat.mjs,
-    // which kills the agent's process group and still writes its run record.
+    // Cleanup only. Closing it is NOT a stop (see the header), so nothing
+    // below reads the close as one.
     try {
       await boundaries.terminalCloseImpl({ terminal });
     } catch (error) {
-      closeError = error.message;
       warn(`[controller] could not close the ${tag} terminal ${terminal}: ${error.message}`);
     }
   }
   const endedMs = nowMs();
-  // A STOP IS CONFIRMED, NOT ASSUMED. run-seat.mjs writes its run record only
-  // once the agent's whole group has exited, so the record appearing is the
-  // proof the seat is gone. Polled, not slept on: the Gemini seat's second
-  // allowance reading comes before the record, and can take a while.
-  let stopConfirmed = !stoppedAs;
-  if (stoppedAs) {
-    const giveUpAt = nowMs() + stopConfirmMs;
-    for (;;) {
-      if (fingerprintOf(paths.run, statImpl) !== null) { stopConfirmed = true; break; }
-      if (nowMs() >= giveUpAt) break;
-      await sleepImpl(endPollMs);
-    }
-  }
+  // A STOP IS CONFIRMED, NOT ASSUMED: only the worker-side check finding no
+  // process with the seat token left confirms it. run-seat.mjs's record is
+  // written when its direct child exits, which says nothing about processes
+  // the agent started (PR #103 review, finding 4).
+  const stopConfirmed = !stoppedAs || stop?.gone === true;
   const unconfirmed = stoppedAs && !stopConfirmed
-    ? ` -- and the stop is NOT confirmed: no run record appeared within ${Math.round(stopConfirmMs / 1000)} s of ${closeError ? `a terminal close that failed (${closeError})` : 'closing its terminal'}, so the seat may still be running`
+    ? ` -- and the stop is NOT confirmed (${stop?.reason ?? 'no answer from the stop'}), so the seat may still be running`
     : '';
   // One last read, so the card and the result carry the final report.
   try { await readProgressNow(); } catch { /* reported below if it matters */ }
@@ -442,15 +533,15 @@ export async function runSeat({
   try { outText = readFileImpl(paths.out, 'utf8'); } catch { /* no output is a cost-read reason, below */ }
   const costLine = run.value ? costLineFor({ seat, launch, run: run.value, outText }) : readFailedCostLine({ seat, model: launch.model, reason: run.reason });
   const base = {
-    seat, round, tag, launch, terminal, run: run.value, progress, costLine, stopConfirmed,
+    seat, round, tag, launch, terminal, run: run.value, progress, costLine, stopConfirmed, stop,
     minutes: Math.round(((endedMs - startedMs) / 60000) * 10) / 10,
   };
 
   if (stoppedAs === 'stuck') {
-    return { ...base, ok: false, stuck: true, reason: `the ${seat} (round ${round}) was stopped as stuck: its progress file had not changed for ${Math.round(stuckAfterMs / 60000)} minutes${progress.last ? ` (last report: ${progress.last.type} "${progress.last.subject}" at ${progress.last.createdAt ?? 'an unknown time'})` : ' (it never reported at all)'}${unconfirmed}` };
+    return { ...base, ok: false, stuck: true, reason: `the ${seat} (round ${round}) was stopped as stuck: its progress file had not changed for ${limitInWords(stuckAfterMs).replace('-', ' ')}s${progress.last ? ` (last report: ${progress.last.type} "${progress.last.subject}" at ${progress.last.createdAt ?? 'an unknown time'})` : ' (it never reported at all)'}${unconfirmed}` };
   }
   if (stoppedAs === 'overtime' || run.value?.timedOut) {
-    return { ...base, ok: false, timedOut: true, reason: `the ${seat} (round ${round}) ran past its ${Math.round(timeLimitMs / 60000)}-minute limit and was stopped${unconfirmed}` };
+    return { ...base, ok: false, timedOut: true, reason: `the ${seat} (round ${round}) ran past its ${limitInWords(timeLimitMs)} limit and was stopped${unconfirmed}` };
   }
   if (exitCode !== 0) {
     const tail = lines.slice(-5).join(' | ');

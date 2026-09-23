@@ -24,7 +24,7 @@ const b64 = (text) => Buffer.from(text, 'utf8').toString('base64');
 const args = (overrides = {}) => {
   const base = {
     seat: 'builder', agent: 'agy', model: 'gemini-3.8-flash', effort: 'low', tag: 'round-1-builder',
-    'timeout-seconds': '60', worktree: '/w', 'brief-b64': b64('# brief\nwith "quotes" and \'apostrophes\''),
+    'timeout-seconds': '60', worktree: '/w', 'seat-token': '0123456789abcdef0123456789abcdef', 'brief-b64': b64('# brief\nwith "quotes" and \'apostrophes\''),
     ...overrides,
   };
   return Object.entries(base).flatMap(([k, v]) => [`--${k}`, v]);
@@ -108,7 +108,7 @@ test('a seat that finishes: its own group, the brief on disk, stale files from a
       child.exit(0);
     }, 10),
   });
-  const record = await runSeat(optsFor(worktree), { spawnImpl, signalSource: new EventEmitter() });
+  const record = await runSeat(optsFor(worktree), { spawnImpl });
   const [call] = spawnImpl.calls;
   assert.equal(call.options.detached, true, 'its own process group, so a stop reaches everything it started');
   assert.equal(call.options.cwd, worktree);
@@ -133,7 +133,6 @@ test('a seat that runs past its limit is told to stop, then killed, as a GROUP -
   const record = await runSeat(optsFor(worktree, { timeoutSeconds: 0.05 }), {
     spawnImpl,
     killGraceMs: 30,
-    signalSource: new EventEmitter(),
     killImpl: (pid, signal) => {
       kills.push([pid, signal]);
       if (signal === 'SIGKILL') child.exit(null, 'SIGKILL');
@@ -144,22 +143,12 @@ test('a seat that runs past its limit is told to stop, then killed, as a GROUP -
   assert.equal(record.answerWritten, false);
 });
 
-test('a stop from OUTSIDE (the controller closing the terminal) kills the agent group and still writes the record', async () => {
+test('the seat token reaches the agent (and so everything it starts) as JULIA_SEAT_TOKEN, and a bad token is refused', async () => {
   const worktree = tempWorktree();
-  const kills = [];
-  const signals = new EventEmitter();
-  let child;
-  const spawnImpl = fakeSpawn({ onSpawn: (c) => { child = c; setTimeout(() => signals.emit('SIGHUP', 'SIGHUP'), 10); } });
-  const record = await runSeat(optsFor(worktree), {
-    spawnImpl,
-    signalSource: signals,
-    killImpl: (pid, signal) => { kills.push([pid, signal]); child.exit(null, signal); },
-  });
-  assert.deepEqual(kills, [[-4242, 'SIGKILL']]);
-  assert.equal(record.stoppedBy, 'SIGHUP');
-  assert.equal(record.timedOut, false);
-  assert.ok(existsSync(seatFiles(worktree, 'round-1-builder').run));
-  assert.equal(signals.listenerCount('SIGHUP'), 0, 'the handlers are removed once the seat is done');
+  const spawnImpl = fakeSpawn({ exitAfterMs: 5 });
+  await runSeat(optsFor(worktree, { seatToken: 'a'.repeat(32) }), { spawnImpl });
+  assert.equal(spawnImpl.calls[0].options.env.JULIA_SEAT_TOKEN, 'a'.repeat(32));
+  assert.throws(() => parseArgs(args({ 'seat-token': 'not-hex' })), /--seat-token must be 32 lowercase hex/);
 });
 
 test('a Gemini seat has its allowance read before and after, and a failed reading is recorded rather than thrown', async () => {
@@ -168,7 +157,6 @@ test('a Gemini seat has its allowance read before and after, and a failed readin
   const readings = [usage(0.9), usage(0.89)];
   const record = await runSeat(optsFor(worktree, { agent: 'agy', model: 'gemini-3.8-flash' }), {
     spawnImpl: fakeSpawn({ exitAfterMs: 5 }),
-    signalSource: new EventEmitter(),
     readAllowanceImpl: async () => readings.shift(),
   });
   assert.equal(record.allowanceBefore['gemini-weekly'].remaining, 0.9);
@@ -177,7 +165,6 @@ test('a Gemini seat has its allowance read before and after, and a failed readin
 
   const failed = await runSeat(optsFor(tempWorktree(), { agent: 'agy', model: 'gemini-3.8-flash' }), {
     spawnImpl: fakeSpawn({ exitAfterMs: 5 }),
-    signalSource: new EventEmitter(),
     readAllowanceImpl: async () => { throw new Error('agy not signed in'); },
   });
   assert.equal(failed.allowanceBefore, null);
@@ -192,6 +179,6 @@ test('an agent that cannot be started at all is recorded as such, not left hangi
     setImmediate(() => child.emit('error', new Error('spawn agy ENOENT')));
     return child;
   };
-  const record = await runSeat(optsFor(worktree), { spawnImpl, signalSource: new EventEmitter() });
+  const record = await runSeat(optsFor(worktree), { spawnImpl });
   assert.match(record.spawnError, /ENOENT/);
 });
