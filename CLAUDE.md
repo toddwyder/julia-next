@@ -15,6 +15,13 @@ honest answer is anything else, stop: put the work in the Ready queue instead an
 
 **Finish the card.** When the work is done and the report is posted, move the card to UAT and assign it to Todd. Never leave a finished card in Backlog, and never move it to Complete; acceptance is Todd's.
 
+## Framework-first rules (JUL-116)
+
+1. Read the framework's official docs before writing code, and post a framework map (need → framework feature → docs link) on the card.
+2. Start from the framework's own example and change as little as possible.
+3. `npm run lint:framework` must pass. Hand-built progress files, retry or wait loops, and controller code over 400 lines are refused unless skipped with an ESLint comment that gives a reason and a docs link, and listed on JUL-115.
+4. Before proposing to build anything, name the existing tools checked and why they don't fit.
+
 ## Reaching the server
 
 Do not stop and ask whether you can reach the server. The route is set up and used every day:
