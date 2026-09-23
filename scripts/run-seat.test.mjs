@@ -9,8 +9,12 @@ import { PassThrough } from 'node:stream';
 import { mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { spawn } from 'node:child_process';
 
-import { parseArgs, agentSpawnSpec, runSeat, seatFiles, PI_ROUTE } from './run-seat.mjs';
+import {
+  parseArgs, agentSpawnSpec, runSeat, seatFiles, PI_ROUTE,
+  activityTracker, seatCpuByPid, piSessionDirFor, CPU_ACTIVE_SECONDS, ACTIVITY_SAMPLE_MS,
+} from './run-seat.mjs';
 
 const dirs = [];
 test.after(() => { for (const dir of dirs) rmSync(dir, { recursive: true, force: true }); });
@@ -181,4 +185,108 @@ test('an agent that cannot be started at all is recorded as such, not left hangi
   };
   const record = await runSeat(optsFor(worktree), { spawnImpl });
   assert.match(record.spawnError, /ENOENT/);
+});
+
+// ---------------------------------------------------------------------------
+// Busy but silent (JUL-92, 23 Sep 07:01Z): a DeepSeek reviewer 30 tool calls
+// into a review was stopped as stuck because it wrote no progress line for 5
+// minutes. The activity file is how the controller sees such a seat working.
+// ---------------------------------------------------------------------------
+
+test('Pi\'s session log folder is found where Pi keeps it for a working copy', () => {
+  assert.equal(
+    piSessionDirFor('/home/runner/orca/workspaces/julia-next/jul-92-work-a11', '/home/runner').replaceAll('\\', '/'),
+    '/home/runner/.pi/agent/sessions/--home-runner-orca-workspaces-julia-next-jul-92-work-a11--',
+  );
+});
+
+test('the activity look counts CPU only past its threshold, and output or Pi session log growth; nothing moving is nothing', () => {
+  const worktree = tempWorktree();
+  const files = seatFiles(worktree, 'round-1-reviewer');
+  const sessionDir = join(worktree, 'sessions');
+  mkdirSync(files.dir, { recursive: true });
+  mkdirSync(sessionDir);
+  let cpu = new Map([['100', 1.0]]);
+  const look = activityTracker({ token: 'a'.repeat(32), files, sessionDir, cpuImpl: () => cpu });
+  assert.deepEqual(look(), ['cpu +1.0s'], 'the first look counts what the seat used so far');
+  assert.deepEqual(look(), [], 'nothing moved');
+  cpu = new Map([['100', 1.0 + CPU_ACTIVE_SECONDS / 2]]);
+  assert.deepEqual(look(), [], 'idling on a network wait is not work');
+  cpu = new Map([['100', 3.25], ['101', 0.5]]);
+  assert.deepEqual(look(), ['cpu +2.5s'], 'a new process counts too');
+  writeFileSync(files.out, '{"type":"message_update"}\n');
+  writeFileSync(join(sessionDir, 's.jsonl'), '{"type":"message"}\n');
+  assert.deepEqual(look(), ['output 26 bytes', 'Pi session log 19 bytes']);
+  assert.deepEqual(look(), []);
+  writeFileSync(files.err, 'Error: retrying\n'.repeat(50));
+  assert.deepEqual(look(), [], 'stderr chatter is not work (DeepSeek review of PR #104)');
+  cpu = new Map();
+  assert.deepEqual(look(), [], 'finished processes are not counted as negative work');
+});
+
+test('the seat CPU is read only from processes carrying THIS seat\'s token, children included', () => {
+  const token = 'b'.repeat(32);
+  const proc = {
+    '/proc/10/environ': `PATH=/bin\0JULIA_SEAT_TOKEN=${token}\0`,
+    '/proc/10/stat': '10 (node (x)) S 1 10 10 0 -1 0 0 0 0 0 150 50 30 20 20 0',
+    '/proc/11/environ': `JULIA_SEAT_TOKEN=${'c'.repeat(32)}\0`,
+    '/proc/11/stat': '11 (pi) S 1 11 11 0 -1 0 0 0 0 0 9999 9999 0 0 20 0',
+  };
+  const cpu = seatCpuByPid(token, {
+    readdirImpl: () => ['10', '11', '12', 'self'],
+    readFileImpl: (path) => { if (!(path in proc)) throw Object.assign(new Error('EACCES'), { code: 'EACCES' }); return proc[path]; },
+  });
+  assert.deepEqual([...cpu], [['10', 2.5]], '(150+50+30+20) ticks at 100 a second; a comm with ") " in it is read right');
+  assert.equal(seatCpuByPid(token, { readdirImpl: () => { throw new Error('no /proc'); } }).size, 0);
+});
+
+test('while the seat runs, the activity file is rewritten only when the seat did something', async () => {
+  const worktree = tempWorktree();
+  const files = seatFiles(worktree, 'round-1-builder');
+  let cpu = 0;
+  const spawnImpl = fakeSpawn({
+    onSpawn: (child) => {
+      setTimeout(() => { cpu = 5; }, 30);
+      setTimeout(() => {
+        assert.ok(existsSync(files.activity), 'busy: the activity file was written');
+        const before = readFileSync(files.activity, 'utf8');
+        setTimeout(() => {
+          assert.equal(readFileSync(files.activity, 'utf8'), before, 'idle: it was not rewritten');
+          child.exit(0);
+        }, 60);
+      }, 80);
+    },
+  });
+  let n = 0;
+  await runSeat(optsFor(worktree), {
+    spawnImpl, activitySampleMs: 10, cpuImpl: () => new Map([['1', cpu]]), now: () => `T${(n += 1)}`,
+  });
+  assert.deepEqual(JSON.parse(readFileSync(files.activity, 'utf8')).moved, ['cpu +5.0s']);
+  assert.equal(ACTIVITY_SAMPLE_MS, 20000);
+});
+
+test('a stale activity file from an earlier run is cleared before the seat starts', async () => {
+  const worktree = tempWorktree();
+  const files = seatFiles(worktree, 'round-1-builder');
+  mkdirSync(files.dir, { recursive: true });
+  writeFileSync(files.activity, '{"at":"STALE"}\n');
+  await runSeat(optsFor(worktree), { spawnImpl: fakeSpawn({ exitAfterMs: 5 }), cpuImpl: () => new Map() });
+  assert.equal(existsSync(files.activity), false);
+});
+
+test('a REAL busy process carrying the token shows up as CPU use; one carrying another token does not', { skip: process.platform === 'win32' ? 'reads /proc, Linux only' : false }, async () => {
+  const token = 'd'.repeat(32);
+  const busy = spawn(process.execPath, ['-e', 'const end = Date.now() + 1500; while (Date.now() < end) {}'], { env: { ...process.env, JULIA_SEAT_TOKEN: token }, stdio: 'ignore' });
+  const other = spawn(process.execPath, ['-e', 'const end = Date.now() + 1500; while (Date.now() < end) {}'], { env: { ...process.env, JULIA_SEAT_TOKEN: 'e'.repeat(32) }, stdio: 'ignore' });
+  try {
+    const look = activityTracker({ token, files: seatFiles(tempWorktree(), 'round-1-builder') });
+    await new Promise((r) => { setTimeout(r, 1000); });
+    const moved = look();
+    assert.equal(moved.length, 1, JSON.stringify(moved));
+    assert.match(moved[0], /^cpu \+0\.[5-9]s|^cpu \+1\.\ds/);
+    assert.ok(!seatCpuByPid(token).has(String(other.pid)));
+  } finally {
+    busy.kill('SIGKILL');
+    other.kill('SIGKILL');
+  }
 });

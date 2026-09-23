@@ -2737,8 +2737,14 @@ coordinator skill's own Orca usage is a separate thing and is unchanged.)
    the end. `run-seat.mjs` adds `.brief.md`, `.out`, `.err` and `.run.json` (times, exit, timed out,
    Gemini allowance before/after).
 5. The controller reads the progress file **every minute**, edits one progress comment on the card
-   when the reported step changes, and **stops a seat whose progress file has not changed for five
-   minutes**. **The stop is run as `runner` through a second short terminal, and finds the seat's
+   when the reported step changes, and **stops a seat that has shown no sign of work for five
+   minutes**: its progress file, its output (`.out`) and `.activity.json` all unchanged. `run-seat.mjs`
+   rewrites `.activity.json` every 20 s that the seat's token-carrying processes used over 0.5 s of
+   CPU, or its output or Pi's session log (`~/.pi/agent/sessions/--<working copy path>--/`) grew. A
+   seat busy without writing progress lines is not stuck (JUL-92, 2026-09-23 07:01Z: a DeepSeek
+   reviewer 30 tool calls into a review was stopped as stuck for exactly that). The stuck reason gives
+   each file's own change time; a time a worker writes into a progress line is never reported (that
+   reviewer stamped its lines 06:00-06:04Z, before it had started). **The stop is run as `runner` through a second short terminal, and finds the seat's
    processes by their SEAT TOKEN**: a random 32-hex value the controller makes per seat run, which
    `run-seat.mjs` hands the agent as `JULIA_SEAT_TOKEN` and every process it starts inherits. The stop
    line reads `/proc/<pid>/environ`, sends TERM, then KILL, then looks again; the stop is confirmed only
@@ -2785,7 +2791,7 @@ leaves the agent running (above).
 
 ```
 cd /tmp; sudo -u orchestrator-svc env ORCA_BIN=/opt/Orca/orca-ide node /srv/orchestrator-svc/julia-next/scripts/controller-stand-in.mjs --scenario pass
-# also: changes-then-pass | timeout | stuck | cut-off
+# also: changes-then-pass | timeout | stuck | busy-silent | cut-off
 ```
 
 It runs the real carry with `scripts/stand-in-seat.mjs` in both seats, prints every board comment and

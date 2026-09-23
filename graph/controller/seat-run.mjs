@@ -14,9 +14,16 @@
 //      in the card's working copy, running scripts/run-seat.mjs with the brief
 //      carried in the command, base64-encoded. Nothing is typed into it.
 //   2. While it runs, the controller reads the seat's progress file every
-//      minute (Todd, 23 Sep: "no black box"): the current step goes on the card,
-//      and a seat whose progress file has not changed for five minutes is
-//      treated as stuck and stopped.
+//      minute (Todd, 23 Sep: "no black box"): the current step goes on the card.
+//      A seat is treated as stuck and stopped only when NOTHING it does has
+//      changed for five minutes: not its progress file, not its output, and
+//      not the activity file run-seat.mjs rewrites whenever the seat's
+//      processes use CPU or Pi's session log grows. Progress lines alone were
+//      not enough: on 23 Sep 07:01Z a DeepSeek reviewer 30 tool calls into a
+//      review was stopped as stuck because it had not written one for 5 min.
+//      Times are the files' own change times, never a time the worker wrote
+//      into a line (that reviewer stamped its lines 06:00-06:04Z, before it
+//      had started).
 //   3. It ends when run-seat.mjs prints its end marker, or is stopped at its
 //      time limit, or is stopped as stuck. THE STOP finds the seat's
 //      processes by their SEAT TOKEN -- a random value the controller makes
@@ -72,8 +79,8 @@ export const DEFAULT_TIME_LIMITS_MS = Object.freeze({
   builder: 30 * 60 * 1000,
   reviewer: 20 * 60 * 1000,
 });
-// Todd, 23 Sep: a running worker whose progress file has not changed in five
-// minutes is stuck.
+// Todd, 23 Sep: a running worker that has shown no sign of work -- no progress
+// line, no output, no CPU, no Pi session log growth -- in five minutes is stuck.
 export const STUCK_AFTER_MS = 5 * 60 * 1000;
 // Todd, 23 Sep: the controller reads the progress file every minute.
 export const PROGRESS_READ_MS = 60 * 1000;
@@ -107,6 +114,7 @@ export function seatFilePaths(worktreePath, tag) {
     dir,
     answer: join(dir, `${tag}.answer.json`),
     progress: join(dir, `${tag}.progress.jsonl`),
+    activity: join(dir, `${tag}.activity.json`),
     run: join(dir, `${tag}.run.json`),
     out: join(dir, `${tag}.out`),
   };
@@ -251,7 +259,7 @@ export function reportingInstructions({ seat, tag, timeLimitMs }) {
     '',
     `1. **Progress, as you work.** Append one JSON line to \`${ANSWER_DIR}/${tag}.progress.jsonl\` each time you start a new part of the job (\`"type":"status"\`), and at least every two minutes while you work (\`"type":"heartbeat"\`). One line looks like:`,
     `   \`{"type":"status","subject":"writing the failing test","body":"","payload":{"phase":"red"},"created_at":"2026-09-23T05:00:00Z"}\``,
-    '   **If this file does not change for five minutes, you are treated as stuck and stopped.** Before any command that may run long, write a heartbeat first.',
+    '   **If for five minutes this file does not change and you show no other sign of work, you are treated as stuck and stopped.** Before any command that may run long, write a heartbeat first. Your times are not trusted; the controller reads when the file changed.',
     `2. **Your answer, once, at the end.** Write \`${ANSWER_DIR}/${tag}.answer.json\`: ${answerShape}.`,
     '',
     `\`${ANSWER_DIR}/\` is ignored by git; never commit it. You have ${minutes} minutes in all; after that you are stopped and the step fails.`,
@@ -340,13 +348,32 @@ export function cutOffOf(outText) {
 
 // A file's "has it changed" fingerprint, or null when it does not exist yet.
 function fingerprintOf(path, statImpl) {
+  return fileStateOf(path, statImpl)?.fingerprint ?? null;
+}
+
+// The same, with the file's own change time -- the only time the stuck rule
+// reports, since a time a worker writes into a line can be anything.
+function fileStateOf(path, statImpl) {
   try {
     const stat = statImpl(path);
-    return `${stat.size}:${stat.mtimeMs}`;
+    return { fingerprint: `${stat.size}:${stat.mtimeMs}`, changedMs: stat.mtimeMs };
   } catch (error) {
     if (error?.code === 'ENOENT') return null;
     throw error;
   }
+}
+
+// What the stuck rule watches: any one of these changing is a sign of work.
+export const SIGNS_OF_WORK = Object.freeze({
+  progress: 'its progress file',
+  out: 'its output',
+  activity: 'its CPU or Pi session log',
+});
+
+// An empty file (run-seat.mjs creates `.out` before the agent writes to it)
+// has not changed in any way that counts.
+function changedWhen(state) {
+  return state && !state.fingerprint.startsWith('0:') ? `at ${new Date(state.changedMs).toISOString().replace(/\.\d+Z$/, 'Z')}` : 'never';
 }
 
 function readJson(path, readFileImpl, what) {
@@ -444,7 +471,8 @@ export async function runSeat({
 
   const startedMs = nowMs();
   let lastChangeMs = startedMs;
-  let lastFingerprint = null;
+  const lastSeen = {}; // SIGNS_OF_WORK key -> { fingerprint, changedMs }
+  let seenAtStop = null;
   let lastProgressReadMs = -Infinity;
   let lastPhaseShown = null;
   let progress = parseProgress('');
@@ -454,11 +482,19 @@ export async function runSeat({
   let exitCode = null;
   let stop = null;
 
+  // Any sign of work resets the stuck clock; the progress file is also read
+  // for the card when it changed.
   const readProgressNow = async () => {
-    const fingerprint = fingerprintOf(paths.progress, statImpl);
-    if (fingerprint !== null && fingerprint !== lastFingerprint) {
-      lastFingerprint = fingerprint;
-      lastChangeMs = nowMs();
+    let progressChanged = false;
+    for (const key of Object.keys(SIGNS_OF_WORK)) {
+      const state = fileStateOf(paths[key], statImpl);
+      if (state && state.fingerprint !== lastSeen[key]?.fingerprint) {
+        lastSeen[key] = state;
+        lastChangeMs = nowMs();
+        if (key === 'progress') progressChanged = true;
+      }
+    }
+    if (progressChanged) {
       try { progress = parseProgress(readFileImpl(paths.progress, 'utf8')); } catch (error) { warn(`[controller] could not read ${paths.progress}: ${error.message}`); }
       const shown = progress.lastStatus ? `${progress.lastStatus.subject}${progress.lastStatus.phase ? ` (${progress.lastStatus.phase})` : ''}` : null;
       if (shown && shown !== lastPhaseShown) {
@@ -484,7 +520,7 @@ export async function runSeat({
       if (now - lastProgressReadMs >= progressReadMs) {
         lastProgressReadMs = now;
         await readProgressNow();
-        if (nowMs() - lastChangeMs >= stuckAfterMs) { stoppedAs = 'stuck'; break; }
+        if (nowMs() - lastChangeMs >= stuckAfterMs) { stoppedAs = 'stuck'; seenAtStop = { ...lastSeen }; break; }
       }
       if (now - startedMs >= timeLimitMs + endMarkerGraceMs) { stoppedAs = 'overtime'; break; }
       await sleepImpl(endPollMs);
@@ -538,7 +574,7 @@ export async function runSeat({
   };
 
   if (stoppedAs === 'stuck') {
-    return { ...base, ok: false, stuck: true, reason: `the ${seat} (round ${round}) was stopped as stuck: its progress file had not changed for ${limitInWords(stuckAfterMs).replace('-', ' ')}s${progress.last ? ` (last report: ${progress.last.type} "${progress.last.subject}" at ${progress.last.createdAt ?? 'an unknown time'})` : ' (it never reported at all)'}${unconfirmed}` };
+    return { ...base, ok: false, stuck: true, reason: `the ${seat} (round ${round}) was stopped as stuck: it showed no sign of work for ${limitInWords(stuckAfterMs).replace('-', ' ')}s -- ${Object.entries(SIGNS_OF_WORK).map(([key, what]) => `${what} last changed ${changedWhen(seenAtStop?.[key])}`).join(', ')}${progress.last ? ` (last report: ${progress.last.type} "${progress.last.subject}")` : ' (it never reported at all)'}${unconfirmed}` };
   }
   if (stoppedAs === 'overtime' || run.value?.timedOut) {
     return { ...base, ok: false, timedOut: true, reason: `the ${seat} (round ${round}) ran past its ${limitInWords(timeLimitMs)} limit and was stopped${unconfirmed}` };

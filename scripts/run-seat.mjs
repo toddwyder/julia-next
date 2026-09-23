@@ -16,6 +16,13 @@
 //   <tag>.err          the agent's stderr
 //   <tag>.run.json     this run's record: times, exit, whether it was stopped at the limit,
 //                      and (Gemini) the allowance read before and after
+//   <tag>.activity.json  rewritten ONLY when the seat did something since the last look
+//                      (its processes used CPU, its output grew, Pi's session log grew --
+//                      stderr does not count: an agent looping on an error is not working);
+//                      the controller reads the file's own change time, so a seat that is
+//                      busy but not writing progress lines is not taken for stuck (JUL-92,
+//                      23 Sep 07:01Z: a DeepSeek reviewer 30 tool calls into a review was
+//                      stopped as stuck because its progress file had been quiet 5 minutes)
 // and the SEAT writes two files itself, as its brief tells it to:
 //   <tag>.progress.jsonl  one JSON line per `status` or `heartbeat`, in the old mailbox
 //                         message shape, appended as it works (Todd, 23 Sep: "no black box")
@@ -29,7 +36,8 @@
 // the run record and the answer file, where the controller reads it.
 
 import { spawn } from 'node:child_process';
-import { createWriteStream, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { createWriteStream, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -56,6 +64,79 @@ export const KILL_GRACE_MS = 10000;
 export const SEAT_TOKEN_ENV = 'JULIA_SEAT_TOKEN';
 export const SEAT_TOKEN_PATTERN = /^[0-9a-f]{32}$/;
 
+// THE ACTIVITY LOOK. Every ACTIVITY_SAMPLE_MS this script checks whether the
+// seat is doing anything, and rewrites `<tag>.activity.json` only when it is.
+// CPU counts only past CPU_ACTIVE_SECONDS per look, so an agent idling on a
+// network wait does not look busy. CLOCK_TICKS_PER_SECOND is the server's
+// `getconf CLK_TCK` (100, read 23 Sep).
+export const ACTIVITY_SAMPLE_MS = 20000;
+export const CPU_ACTIVE_SECONDS = 0.5;
+export const CLOCK_TICKS_PER_SECOND = 100;
+
+// Where Pi keeps a session's log when it is not told otherwise: one folder per
+// working directory, named from its path (`/home/runner/x` -> `--home-runner-x--`),
+// as found on the server for every JUL-92 attempt.
+export function piSessionDirFor(worktree, home = homedir()) {
+  return join(home, '.pi', 'agent', 'sessions', `--${String(worktree).replace(/^\/+/, '').replace(/\//g, '-')}--`);
+}
+
+// CPU seconds used so far by each live process carrying this seat's token, by
+// pid -- including what its finished children used (cutime, cstime), so a test
+// run that ends still counts. Read from /proc, which only the processes' own
+// account can read; anywhere without /proc the answer is simply empty.
+export function seatCpuByPid(token, { procDir = '/proc', readdirImpl = readdirSync, readFileImpl = readFileSync } = {}) {
+  const byPid = new Map();
+  let names;
+  try { names = readdirImpl(procDir); } catch { return byPid; }
+  const wanted = `${SEAT_TOKEN_ENV}=${token}`;
+  for (const name of names) {
+    if (!/^\d+$/.test(name)) continue;
+    try {
+      if (!readFileImpl(`${procDir}/${name}/environ`, 'latin1').split('\0').includes(wanted)) continue;
+      const stat = readFileImpl(`${procDir}/${name}/stat`, 'latin1');
+      // After "pid (comm) ", fields 3.. : utime, stime, cutime, cstime are 14..17.
+      const fields = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
+      const ticks = [11, 12, 13, 14].reduce((sum, i) => sum + Number(fields[i] ?? 0), 0);
+      byPid.set(name, ticks / CLOCK_TICKS_PER_SECOND);
+    } catch { /* gone, or not ours */ }
+  }
+  return byPid;
+}
+
+function sizeOf(path, statImpl) {
+  try { return statImpl(path).size; } catch { return null; }
+}
+
+function folderSize(dir, { readdirImpl, statImpl }) {
+  let names;
+  try { names = readdirImpl(dir); } catch { return null; }
+  return names.reduce((sum, name) => sum + (sizeOf(join(dir, name), statImpl) ?? 0), 0);
+}
+
+// One look at the seat, remembering the last. Returns what moved since the
+// last look -- empty when nothing did.
+export function activityTracker({ token, files, sessionDir = null, cpuImpl = seatCpuByPid, readdirImpl = readdirSync, statImpl = statSync }) {
+  let lastCpu = new Map();
+  let lastSizes = {};
+  return () => {
+    const moved = [];
+    const cpu = cpuImpl(token);
+    let used = 0;
+    for (const [pid, seconds] of cpu) used += Math.max(0, seconds - (lastCpu.get(pid) ?? 0));
+    lastCpu = cpu;
+    if (used >= CPU_ACTIVE_SECONDS) moved.push(`cpu +${used.toFixed(1)}s`);
+    const sizes = {
+      output: sizeOf(files.out, statImpl),
+      ...(sessionDir ? { 'Pi session log': folderSize(sessionDir, { readdirImpl, statImpl }) } : {}),
+    };
+    for (const [what, size] of Object.entries(sizes)) {
+      if (size !== null && size !== (lastSizes[what] ?? 0)) moved.push(`${what} ${size} bytes`);
+    }
+    lastSizes = sizes;
+    return moved;
+  };
+}
+
 // Which run-pi-seat.mjs route runs which DeepSeek model. The route owns the
 // provider, the key and the env var; this only picks it.
 export const PI_ROUTE = Object.freeze({
@@ -73,6 +154,7 @@ export function seatFiles(worktree, tag) {
     run: join(dir, `${tag}.run.json`),
     answer: join(dir, `${tag}.answer.json`),
     progress: join(dir, `${tag}.progress.jsonl`),
+    activity: join(dir, `${tag}.activity.json`),
   };
 }
 
@@ -161,12 +243,15 @@ export async function runSeat(opts, {
   now = () => new Date().toISOString(),
   killGraceMs = KILL_GRACE_MS,
   killImpl = (pid, signal) => process.kill(pid, signal),
+  activitySampleMs = ACTIVITY_SAMPLE_MS,
+  cpuImpl = seatCpuByPid,
+  home = homedir(),
 } = {}) {
   const files = seatFiles(opts.worktree, opts.tag);
   mkdirSync(files.dir, { recursive: true });
   // A leftover from an earlier run of the same tag must never be read as this
   // run's answer.
-  for (const path of [files.out, files.err, files.run, files.answer, files.progress]) rmSync(path, { force: true });
+  for (const path of [files.out, files.err, files.run, files.answer, files.progress, files.activity]) rmSync(path, { force: true });
   writeFileSync(files.brief, opts.brief);
 
   const before = opts.agent === 'agy' ? await allowanceReading(readAllowanceImpl, opts.worktree) : null;
@@ -184,6 +269,14 @@ export async function runSeat(opts, {
   const result = await new Promise((resolveRun) => {
     // Its own process group, so the stop reaches everything the agent started.
     const child = spawnImpl(spec.command, spec.args, { cwd: opts.worktree, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+    const look = activityTracker({ token: opts.seatToken, files, sessionDir: opts.agent === 'pi' ? piSessionDirFor(opts.worktree, home) : null, cpuImpl });
+    const activityTimer = setInterval(() => {
+      try {
+        const moved = look();
+        if (moved.length) writeFileSync(files.activity, `${JSON.stringify({ at: now(), moved })}\n`);
+      } catch { /* a missed look never stops the seat; the progress file still counts */ }
+    }, activitySampleMs);
+    activityTimer.unref?.();
     let timedOut = false;
     let killTimer = null;
     child.stdout?.pipe(out);
@@ -196,6 +289,7 @@ export async function runSeat(opts, {
       }, killGraceMs);
     }, opts.timeoutSeconds * 1000);
     const finish = (value) => {
+      clearInterval(activityTimer);
       clearTimeout(stopTimer);
       clearTimeout(killTimer);
       resolveRun({ ...value, timedOut });

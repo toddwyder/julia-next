@@ -10,7 +10,7 @@ import { mkdtempSync, rmSync, readFileSync, writeFileSync, mkdirSync, existsSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { standIn, scenarioOf, progressLine, STAND_IN_FINDING } from './stand-in-seat.mjs';
+import { standIn, scenarioOf, progressLine, STAND_IN_FINDING, BUSY_SILENT_MS } from './stand-in-seat.mjs';
 import { seatFiles } from './run-seat.mjs';
 import { parseProgress, validateAnswer, cutOffOf } from '../graph/controller/seat-run.mjs';
 
@@ -110,4 +110,30 @@ test('changes-then-pass: round 1 asks for changes; round 2 must be GIVEN that fi
   const v2 = brief(r.dir, 'round-2-reviewer', 'Stand-in scenario: changes-then-pass\n');
   await standIn({ seat: 'reviewer', tag: 'round-2-reviewer', worktree: r.dir });
   assert.equal(JSON.parse(readFileSync(v2.answer, 'utf8')).verdict, 'approve');
+});
+
+test('busy-silent: each seat reports once, works without a progress line for longer than the stand-in stuck limit, then finishes normally', async () => {
+  assert.ok(BUSY_SILENT_MS > 2 * 60 * 1000, 'longer than the 60 s stand-in stuck rule by more than two reads');
+  const r = repo();
+  const before = r.head();
+  const b = brief(r.dir, 'round-1-builder', 'Stand-in scenario: busy-silent\n');
+  const cpuBefore = process.cpuUsage();
+  await standIn({ seat: 'builder', tag: 'round-1-builder', worktree: r.dir }, { busyMs: 400 });
+  const cpu = process.cpuUsage(cpuBefore);
+  assert.ok(cpu.user + cpu.system > 250 * 1000, 'the builder burned CPU while silent');
+  assert.equal(JSON.parse(readFileSync(b.answer, 'utf8')).outcome, 'done');
+  assert.notEqual(r.head(), before);
+
+  const v = brief(r.dir, 'round-1-reviewer', 'Stand-in scenario: busy-silent\n');
+  const written = [];
+  const write = process.stdout.write;
+  process.stdout.write = (chunk) => { written.push(String(chunk)); return true; };
+  try {
+    await standIn({ seat: 'reviewer', tag: 'round-1-reviewer', worktree: r.dir }, { busyMs: 50 });
+  } finally {
+    process.stdout.write = write;
+  }
+  assert.ok(written.some((line) => line.includes('"message_update"')), 'the reviewer printed a Pi-shaped stream while silent');
+  assert.equal(JSON.parse(readFileSync(v.answer, 'utf8')).verdict, 'approve');
+  assert.equal(parseProgress(readFileSync(v.progress, 'utf8')).entries.length, 2, 'started + reviewing, and nothing while busy');
 });
