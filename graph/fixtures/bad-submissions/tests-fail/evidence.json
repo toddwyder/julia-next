@@ -1,0 +1,105 @@
+{
+  "builder": {
+    "acceptance": [
+      {
+        "id": "AC1",
+        "criterion": "A temporary rehearsal address opens, carrying the reviewed candidate.",
+        "evidence": "deployed rehearsal URL: https://rehearsal.julia.test"
+      },
+      {
+        "id": "AC2",
+        "criterion": "The change is visible there and is not on Real Julia.",
+        "evidence": "verified change at rehearsal URL; production URL unchanged"
+      },
+      {
+        "id": "AC3",
+        "criterion": "The controller, not the builder, does the deploying. The builder never holds GitHub write access or deploy credentials.",
+        "evidence": "controller executed deployment via deploy script; builder had no credentials"
+      },
+      {
+        "id": "AC4",
+        "criterion": "A script walks the main path through the app on that address and reports each step's result. It is not a page-load check, and a test proves a site that merely answers does not pass.",
+        "evidence": "smokeWalk executed 3 steps and reported results for each step; all tests pass"
+      },
+      {
+        "id": "AC5",
+        "criterion": "A failed walk moves the card back as unfinished work, naming the step that failed.",
+        "evidence": "failure handling returns failedStep name; smoke-walk test passes"
+      },
+      {
+        "id": "AC6",
+        "criterion": "A card whose work has nothing a person could look at skips this column, and the card records why.",
+        "evidence": "documents-only card skipped column with explanation recorded"
+      },
+      {
+        "id": "AC7",
+        "criterion": "Proven on real work, not on a change made for the purpose.",
+        "evidence": "verified on actual staging run for feature branch"
+      }
+    ],
+    "uat": [
+      {
+        "id": "UAT1",
+        "text": "Rehearsal URL opens with change visible, Real Julia unchanged."
+      },
+      {
+        "id": "UAT2",
+        "text": "Card displays step-by-step walk results: home: ok, recipes: ok, planner: ok."
+      },
+      {
+        "id": "UAT3",
+        "text": "Walk failed on step 2; card returned to builder naming \"recipes\" step."
+      },
+      {
+        "id": "UAT4",
+        "text": "Doc-only card skipped column with reason \"no user-visible changes\"."
+      }
+    ]
+  },
+  "reviewer": {
+    "criteria": [
+      {
+        "id": "AC1",
+        "criterion": "A temporary rehearsal address opens, carrying the reviewed candidate.",
+        "verdict": "met",
+        "how": "opened rehearsal URL and verified candidate commit"
+      },
+      {
+        "id": "AC2",
+        "criterion": "The change is visible there and is not on Real Julia.",
+        "verdict": "met",
+        "how": "compared rehearsal against production Julia"
+      },
+      {
+        "id": "AC3",
+        "criterion": "The controller, not the builder, does the deploying. The builder never holds GitHub write access or deploy credentials.",
+        "verdict": "met",
+        "how": "inspected permissions and workflow dispatch logs"
+      },
+      {
+        "id": "AC4",
+        "criterion": "A script walks the main path through the app on that address and reports each step's result. It is not a page-load check, and a test proves a site that merely answers does not pass.",
+        "verdict": "met",
+        "how": "reviewed smoke-walk code and verified step-by-step reporting"
+      },
+      {
+        "id": "AC5",
+        "criterion": "A failed walk moves the card back as unfinished work, naming the step that failed.",
+        "verdict": "met",
+        "how": "inspected failed walk handler and card state transition"
+      },
+      {
+        "id": "AC6",
+        "criterion": "A card whose work has nothing a person could look at skips this column, and the card records why.",
+        "verdict": "met",
+        "how": "checked skip condition and card audit log entry"
+      },
+      {
+        "id": "AC7",
+        "criterion": "Proven on real work, not on a change made for the purpose.",
+        "verdict": "met",
+        "how": "verified work was performed on real feature card"
+      }
+    ]
+  }
+}
