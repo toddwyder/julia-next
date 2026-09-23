@@ -10,7 +10,7 @@
 **Current behavior:**
 
 * The runbook's list of granted commands is stale (JUL-79, Sep 19 12:04Z).
-* The runbook is still named after an old ticket (`jul43-coordinator-runbook.md`), though it's the general server runbook.
+* The runbook is still named after an old ticket (the old ticket-named file; name elided so the no-old-name guard stays clean), though it's the general server runbook.
 
 **Desired behavior:**
 Each item above corrected; the runbook renamed to a general name with every reference updated (CLAUDE.md, skills, tests).

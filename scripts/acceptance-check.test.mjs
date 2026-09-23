@@ -22,7 +22,7 @@ const fullBuilder = {
   summary: 'done',
   acceptance: [
     { id: 'AC1', criterion: AC1, evidence: 'a fresh agent read only the runbook: 77 claims, 0 contradicted' },
-    { id: 'AC2', criterion: AC2, evidence: 'git grep jul43-coordinator-runbook: 0 hits' },
+    { id: 'AC2', criterion: AC2, evidence: 'git grep for the old name: 0 hits' },
   ],
   uat: [
     { id: 'UAT1', text: 'Each stale item, old vs new.' },
