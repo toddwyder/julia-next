@@ -57,7 +57,8 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
-import { orcaCall } from '../../scripts/orca-cli.mjs';
+// wholeTimeoutMs: Orca refuses a fractional --timeout-ms (JUL-92 attempt 6).
+import { orcaCall, wholeTimeoutMs } from '../../scripts/orca-cli.mjs';
 import { findActiveRun } from '../../scripts/ready-queue.mjs';
 import { pushBranch, openPullRequest } from '../../scripts/publish-pr.mjs';
 import { mergePullRequest } from '../../scripts/merge-pr.mjs';
@@ -354,7 +355,7 @@ export function createOrcaBoundaries({
         '--environment', environment,
         '--terminal', terminal,
         '--wait',
-        '--timeout-ms', String(timeoutMs),
+        '--timeout-ms', wholeTimeoutMs(timeoutMs),
         '--types', types.join(','),
       ];
       if (runId) args.push('--run', runId);
@@ -510,7 +511,7 @@ export function createOrcaBoundaries({
           '--environment', workerEnvironment,
           '--terminal', terminal,
           '--for', 'tui-idle',
-          '--timeout-ms', String(timeoutMs),
+          '--timeout-ms', wholeTimeoutMs(timeoutMs),
         ]);
       } catch (error) {
         // A TIMED-OUT wait is an ANSWER, not a fault. Measured live on

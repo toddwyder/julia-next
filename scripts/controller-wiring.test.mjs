@@ -189,6 +189,39 @@ test('the mailbox wait is Orca blocking, with the types, the timeout and the pre
   assert.equal(flag(args, '--run'), 'run_1');
 });
 
+// JUL-92 attempt 6, 2026-09-23 00:59:19Z: the reconcile look in
+// ./step-runner.mjs hands on what is left of a performance.now() budget, so the
+// timeout arrived as 28247.46015900001 and Orca refused it ("Invalid positive
+// safe integer"). The cycle crashed mid-review and the card's run stayed open,
+// so the controller answered slot-busy from then on. Orca takes whole
+// milliseconds; the boundary is where that is guaranteed, for every caller.
+test('a fractional wait budget reaches Orca as a whole, positive number of milliseconds', async () => {
+  const orcaCallImpl = recorder([
+    { messages: [], timedOut: true, deliveryId: null },
+    { messages: [], timedOut: true, deliveryId: null },
+    { ok: true },
+  ]);
+  const boundaries = createOrcaBoundaries({ orcaCallImpl });
+  await boundaries.checkWaitImpl({ terminal: 'term_a', runId: 'run_1', timeoutMs: 28247.46015900001 });
+  await boundaries.checkWaitImpl({ terminal: 'term_a', runId: 'run_1', timeoutMs: 0.2 });
+  await boundaries.terminalWaitImpl({ terminal: 'term_seat', timeoutMs: 1799.5 });
+  assert.equal(flag(orcaCallImpl.calls[0], '--timeout-ms'), '28248');
+  assert.equal(flag(orcaCallImpl.calls[1], '--timeout-ms'), '1', 'never 0: Orca wants a POSITIVE integer');
+  assert.equal(flag(orcaCallImpl.calls[2], '--timeout-ms'), '1800');
+});
+
+test('a wait budget that is not a finite number is refused by name, never sent to Orca', async () => {
+  const orcaCallImpl = recorder([]);
+  const boundaries = createOrcaBoundaries({ orcaCallImpl });
+  for (const timeoutMs of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, undefined, null, '', Number.MAX_SAFE_INTEGER * 2]) {
+    await assert.rejects(
+      () => boundaries.checkWaitImpl({ terminal: 'term_a', runId: 'run_1', timeoutMs }),
+      /--timeout-ms must be a finite number/,
+    );
+  }
+  assert.equal(orcaCallImpl.calls.length, 0);
+});
+
 test('release and worktree removal are the two Orca cleanup verbs, by dispatch and by worktree id', async () => {
   const orcaCallImpl = recorder([{}]);
   const boundaries = createOrcaBoundaries({ orcaCallImpl });

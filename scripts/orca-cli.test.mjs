@@ -280,3 +280,12 @@ test('an Orca failure carries its error code on the thrown error, for both failu
     return true;
   });
 });
+
+test('terminalWait sends a fractional budget as whole milliseconds, rounded up (JUL-92 attempt 6)', async () => {
+  const { calls, execImpl } = fakeExec({ id: 'p', ok: true, result: { state: 'tui-idle' }, _meta: {} });
+  await terminalWait({ environment: 'OVH runner', terminal: 'term-2', timeoutMs: 28247.46015900001, execImpl });
+  const { args } = calls[0];
+  assert.equal(args[args.indexOf('--timeout-ms') + 1], '28248');
+  await assert.rejects(() => terminalWait({ environment: 'OVH runner', terminal: 'term-2', timeoutMs: Number.NaN, execImpl }), /finite number/);
+  assert.equal(calls.length, 1);
+});
