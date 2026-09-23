@@ -75,10 +75,19 @@ export const END_POLL_MS = 5000;
 // controller waits for the end marker before it stops the terminal itself.
 export const END_MARKER_GRACE_MS = 2 * 60 * 1000;
 // The brief rides in the command. 40,000 characters was measured arriving
-// intact (23 Sep); the cap keeps well inside that.
+// intact (23 Sep); the cap keeps well inside that. It is also well inside the
+// second limit on the way: run-seat.mjs hands the decoded brief to the agent
+// as ONE argument, and Linux refuses a single argument over 128 KB with E2BIG
+// (hit for real on 23 Sep, handing a 205 KB review brief to `pi`). 36,000
+// base64 characters decode to about 27 KB.
 export const MAX_BRIEF_B64 = 36000;
 
 export const SEAT_TERMINAL_TITLE_PREFIX = 'julia-seat-';
+// After a stop, how long the controller waits for run-seat.mjs's run record --
+// which it writes only once the agent's process group has exited -- before it
+// reports the stop as NOT confirmed (PR #102 review, findings 1 and 3).
+export const STOP_CONFIRM_MS = 60 * 1000;
+export const EFFORTS = Object.freeze(['low', 'medium', 'high']);
 
 export function seatTag(round, seat) {
   return `round-${round}-${seat}`;
@@ -110,7 +119,11 @@ export function launchFor(seat, choice, { standIn = false } = {}) {
   }
   const model = LAUNCH_MODEL_IDS[MODEL_CATALOG[choice.modelLabel]?.model];
   if (!model) return { ok: false, reason: `no launch model id for model label ${JSON.stringify(choice.modelLabel)}` };
-  return { ok: true, seat, entry: route.entry, agent: route.agent, model, effort: choice.effort ?? 'medium', modelLabel: choice.modelLabel };
+  // Card-label data, so checked here and refused in words, never passed on to
+  // throw somewhere mid-carry (PR #102 review, finding 5).
+  const effort = choice.effort ?? 'medium';
+  if (!EFFORTS.includes(effort)) return { ok: false, reason: `the ${seat} seat's effort ${JSON.stringify(effort)} is not one of ${EFFORTS.join(', ')}` };
+  return { ok: true, seat, entry: route.entry, agent: route.agent, model, effort, modelLabel: choice.modelLabel };
 }
 
 function bullets(items) {
@@ -224,6 +237,27 @@ export function parseProgress(text) {
   return { entries, invalid, last: entries[entries.length - 1] ?? null, lastStatus };
 }
 
+// Was the seat's reply CUT OFF at its output limit? Read from the agent's own
+// saved JSON stream: the last assistant `message_end` names why it stopped, and
+// `length` means the reply hit the limit before it finished. A seat that stops
+// there usually never writes its answer, and the card must say THAT -- not
+// "no verdict", which reads as the seat having nothing to say (Todd, 23 Sep).
+// Pi's stream shape (`--mode json`); the stand-in writes the same shape. Gemini's
+// `agy -p --output-format json` records no such reason that has been seen yet.
+export function cutOffOf(outText) {
+  let last = null;
+  for (const raw of String(outText ?? '').split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line.startsWith('{')) continue;
+    try {
+      const event = JSON.parse(line);
+      if (event?.type === 'message_end' && event.message?.role === 'assistant') last = event.message;
+    } catch { /* not an event line */ }
+  }
+  if (last?.stopReason !== 'length') return null;
+  return { stopReason: 'length', outputTokens: last.usage?.output ?? null, reasoningTokens: last.usage?.reasoning ?? null };
+}
+
 // A file's "has it changed" fingerprint, or null when it does not exist yet.
 function fingerprintOf(path, statImpl) {
   try {
@@ -306,6 +340,7 @@ export async function runSeat({
   progressReadMs = PROGRESS_READ_MS,
   endPollMs = END_POLL_MS,
   endMarkerGraceMs = END_MARKER_GRACE_MS,
+  stopConfirmMs = STOP_CONFIRM_MS,
   onProgress = async () => {},
   readFileImpl = readFileSync,
   statImpl = statSync,
@@ -335,6 +370,7 @@ export async function runSeat({
   const lines = [];
   let cursor = null;
   let exitCode = null;
+  let closeError = null;
 
   const readProgressNow = async () => {
     const fingerprint = fingerprintOf(paths.progress, statImpl);
@@ -377,14 +413,27 @@ export async function runSeat({
     try {
       await boundaries.terminalCloseImpl({ terminal });
     } catch (error) {
+      closeError = error.message;
       warn(`[controller] could not close the ${tag} terminal ${terminal}: ${error.message}`);
     }
   }
   const endedMs = nowMs();
+  // A STOP IS CONFIRMED, NOT ASSUMED. run-seat.mjs writes its run record only
+  // once the agent's whole group has exited, so the record appearing is the
+  // proof the seat is gone. Polled, not slept on: the Gemini seat's second
+  // allowance reading comes before the record, and can take a while.
+  let stopConfirmed = !stoppedAs;
   if (stoppedAs) {
-    // Give run-seat.mjs the moment it needs to write its record after the stop.
-    await sleepImpl(Math.min(15000, endPollMs * 3));
+    const giveUpAt = nowMs() + stopConfirmMs;
+    for (;;) {
+      if (fingerprintOf(paths.run, statImpl) !== null) { stopConfirmed = true; break; }
+      if (nowMs() >= giveUpAt) break;
+      await sleepImpl(endPollMs);
+    }
   }
+  const unconfirmed = stoppedAs && !stopConfirmed
+    ? ` -- and the stop is NOT confirmed: no run record appeared within ${Math.round(stopConfirmMs / 1000)} s of ${closeError ? `a terminal close that failed (${closeError})` : 'closing its terminal'}, so the seat may still be running`
+    : '';
   // One last read, so the card and the result carry the final report.
   try { await readProgressNow(); } catch { /* reported below if it matters */ }
 
@@ -393,15 +442,15 @@ export async function runSeat({
   try { outText = readFileImpl(paths.out, 'utf8'); } catch { /* no output is a cost-read reason, below */ }
   const costLine = run.value ? costLineFor({ seat, launch, run: run.value, outText }) : readFailedCostLine({ seat, model: launch.model, reason: run.reason });
   const base = {
-    seat, round, tag, launch, terminal, run: run.value, progress, costLine,
+    seat, round, tag, launch, terminal, run: run.value, progress, costLine, stopConfirmed,
     minutes: Math.round(((endedMs - startedMs) / 60000) * 10) / 10,
   };
 
   if (stoppedAs === 'stuck') {
-    return { ...base, ok: false, stuck: true, reason: `the ${seat} (round ${round}) was stopped as stuck: its progress file had not changed for ${Math.round(stuckAfterMs / 60000)} minutes${progress.last ? ` (last report: ${progress.last.type} "${progress.last.subject}" at ${progress.last.createdAt ?? 'an unknown time'})` : ' (it never reported at all)'}` };
+    return { ...base, ok: false, stuck: true, reason: `the ${seat} (round ${round}) was stopped as stuck: its progress file had not changed for ${Math.round(stuckAfterMs / 60000)} minutes${progress.last ? ` (last report: ${progress.last.type} "${progress.last.subject}" at ${progress.last.createdAt ?? 'an unknown time'})` : ' (it never reported at all)'}${unconfirmed}` };
   }
   if (stoppedAs === 'overtime' || run.value?.timedOut) {
-    return { ...base, ok: false, timedOut: true, reason: `the ${seat} (round ${round}) ran past its ${Math.round(timeLimitMs / 60000)}-minute limit and was stopped` };
+    return { ...base, ok: false, timedOut: true, reason: `the ${seat} (round ${round}) ran past its ${Math.round(timeLimitMs / 60000)}-minute limit and was stopped${unconfirmed}` };
   }
   if (exitCode !== 0) {
     const tail = lines.slice(-5).join(' | ');
@@ -411,6 +460,13 @@ export async function runSeat({
   if (run.value.spawnError) return { ...base, ok: false, reason: `the ${seat} (round ${round}) could not start its agent: ${run.value.spawnError}` };
 
   const answer = readJson(paths.answer, readFileImpl, 'answer file');
+  const cutOff = cutOffOf(outText);
+  if (!answer.value && cutOff) {
+    return {
+      ...base, ok: false, cutOff,
+      reason: `the ${seat} (round ${round})'s reply was CUT OFF at its output limit (stop reason "length"${cutOff.outputTokens !== null ? `, ${cutOff.outputTokens} output tokens${cutOff.reasoningTokens !== null ? `, ${cutOff.reasoningTokens} of them thinking` : ''}` : ''}) before it wrote its answer`,
+    };
+  }
   if (!answer.value) {
     return { ...base, ok: false, reason: `the ${seat} (round ${round}) finished (exit ${run.value.exitCode}) without a usable answer: ${answer.reason}` };
   }

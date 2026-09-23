@@ -165,6 +165,11 @@ export async function runSeat(opts, {
   const before = opts.agent === 'agy' ? await allowanceReading(readAllowanceImpl, opts.worktree) : null;
   const spec = agentSpawnSpec(opts, { readSecretImpl });
   const startedAt = now();
+  // The first progress line is this script's own, at the moment the agent is
+  // started, so the controller's five-minute stuck rule counts from a real
+  // report of the seat starting, not from the terminal opening (PR #102
+  // review, finding 2). Every line after it is the seat's.
+  writeFileSync(files.progress, `${JSON.stringify({ type: 'status', subject: `${opts.seat} started (${opts.agent}, ${opts.model}, effort ${opts.effort})`, body: '', payload: { phase: 'starting', from: 'run-seat' }, created_at: startedAt })}\n`);
   const out = createWriteStream(files.out);
   const err = createWriteStream(files.err);
 

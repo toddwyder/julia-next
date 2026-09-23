@@ -113,9 +113,10 @@ test('the worker\'s progress goes on the card as ONE comment, created once and t
   });
   await f.run();
   assert.match(f.comments[0], /now working -- the builder, round 1: writing the test \(red\)/);
-  assert.equal(f.edits.length, 1);
-  assert.equal(f.edits[0].commentId, 'c1');
+  assert.equal(f.edits.length, 2, 'one edit for the second step, one for the finish');
+  assert.deepEqual(f.edits.map((edit) => edit.commentId), ['c1', 'c1']);
   assert.match(f.edits[0].body, /making it pass \(green\)/);
+  assert.match(f.edits[1].body, /finished working -- the step passed review and tests/);
   assert.match(progressCommentBody({ card, seat: 'reviewer', round: 2, status: { subject: 's', phase: null }, count: 1, at: 'T' }), /1 report so far/);
 });
 
@@ -125,4 +126,20 @@ test('a working copy that cannot be removed is said out loud, and does not turn 
   const result = await f.run({ log: (line) => logs.push(line) });
   assert.equal(result.ok, true);
   assert.ok(logs.some((line) => /could not remove the working copy \/w\/jul-92-work-a3: Failed to delete worktree/.test(line)));
+});
+
+test('the progress comment ends on "finished", never left saying "now working" about a step that has ended', async () => {
+  const f = fixture({ outcome: { ok: false, parked: true, reason: 'two rounds', rounds: [], costText: [], testRun: null }, progress: [{ seat: 'builder', round: 1, status: { subject: 'building', phase: null }, count: 1 }] });
+  await f.run();
+  assert.equal(f.edits.length, 1);
+  assert.match(f.edits[0].body, /JUL-92: finished working -- the step parked after two review rounds/);
+});
+
+test('the controller\'s OWN fault mid-step still ends in a comment on the card, and the working copy is still removed', async () => {
+  const f = fixture({ outcome: passed });
+  const result = await f.run({ runBuildAndReviewImpl: async () => { throw new Error('boom'); } });
+  assert.equal(result.ok, false);
+  assert.match(f.comments.at(-1), /did not pass\.\*\* the controller itself failed mid-step: boom/);
+  assert.equal(f.order.at(-1)[0], 'worktree-rm');
+  assert.ok(!f.order.some(([name]) => name === 'publish'));
 });

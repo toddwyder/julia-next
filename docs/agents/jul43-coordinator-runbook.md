@@ -2754,6 +2754,14 @@ removed it first. `.julia/` is in `.gitignore` because **Orca refuses to remove 
 an untracked file** (`Failed to delete worktree ... ?? .julia/answer.json`, measured 2026-09-23);
 `git worktree remove` does accept ignored files.
 
+**DeepSeek's output limit is set in `runner`'s Pi config, not by Pi's default.** With no `maxTokens`
+on the Command Code models, Pi capped every reply at 16,384 tokens, and a high-effort review spent it
+all thinking and stopped at `length` with no verdict (twice, 2026-09-23). The committed
+`ops/service-dropbox/pi-models.commandcode.json` now declares the models' own limits (`maxTokens`
+384000, `contextWindow` 1000000, from Pi's built-in DeepSeek registry); re-install it with the
+`sudo -u runner cp ...` in `ops/service-dropbox/README.md` after any change. Effort stays high. A reply
+that still stops at `length` is reported on the card as **cut off**, not as a missing verdict.
+
 **Seats today:** Gemini builds, DeepSeek reviews, no backups. A card labelled for anything else is
 refused with that reason before a working copy is made.
 
@@ -2765,7 +2773,7 @@ refused with that reason before a working copy is made.
 
 ```
 cd /tmp; sudo -u orchestrator-svc node /srv/orchestrator-svc/julia-next/scripts/controller-stand-in.mjs --scenario pass
-# also: changes-then-pass | timeout | stuck
+# also: changes-then-pass | timeout | stuck | cut-off
 ```
 
 It runs the real carry with `scripts/stand-in-seat.mjs` in both seats, prints every board comment and

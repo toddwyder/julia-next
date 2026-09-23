@@ -155,6 +155,14 @@ export function progressCommentBody({ card, seat, round, status, count, at }) {
   ].join('\n');
 }
 
+// The progress comment's final edit, once the step has ended either way.
+export function finishedCommentBody({ card, outcome, at }) {
+  const what = outcome.ok
+    ? 'the step passed review and tests; publishing follows below'
+    : `the step ${outcome.parked ? 'parked after two review rounds' : 'did not pass'} -- the reason is in the comment below`;
+  return `**${card.identifier}: finished working -- ${what}.**\n\nAs of ${at}. This comment followed the workers' own progress files while they ran.`;
+}
+
 export function roundsSummary(rounds = []) {
   return rounds.map((r) => {
     const parts = [`round ${r.round}:`];
@@ -229,10 +237,27 @@ export async function carryCard({
       }
     };
 
-    const outcome = await runBuildAndReviewImpl({
-      card, step, launches, worktreePath, branch, baseCommit: start.commit, suiteRunner, boundaries,
-      timeLimits, seatOptions, onProgress,
-    });
+    let outcome;
+    try {
+      outcome = await runBuildAndReviewImpl({
+        card, step, launches, worktreePath, branch, baseCommit: start.commit, suiteRunner, boundaries,
+        timeLimits, seatOptions, onProgress,
+      });
+    } catch (error) {
+      // The controller's OWN fault mid-step (PR #102 review, finding 5): the
+      // card is still told, below, rather than left with nothing but a journal
+      // line.
+      outcome = { ok: false, reason: `the controller itself failed mid-step: ${error.message}`, rounds: [], costLines: [], costText: [], testRun: null };
+    }
+    // The progress comment's last state, so it never says "now working" about
+    // a step that has ended (PR #102 review, finding 6).
+    if (progressCommentId && board.updateComment) {
+      try {
+        await board.updateComment({ commentId: progressCommentId, body: finishedCommentBody({ card, outcome, at: now() }) });
+      } catch (error) {
+        log(`[controller] ${card.identifier}: could not mark the progress comment finished: ${error.message}`);
+      }
+    }
     const testRun = outcome.testRun;
     if (testRun) log(`[controller] ${card.identifier}: ${testRunJournalLine(testRun)}`);
 

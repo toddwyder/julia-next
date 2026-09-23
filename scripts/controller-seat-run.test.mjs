@@ -10,7 +10,7 @@ import { join } from 'node:path';
 
 import {
   launchFor, buildStepBrief, reportingInstructions, seatCommand, parseProgress, validateAnswer, costLineFor,
-  runSeat, seatFilePaths, seatTag, MAX_BRIEF_B64, STUCK_AFTER_MS, PROGRESS_READ_MS, SEAT_ROUTES,
+  runSeat, seatFilePaths, seatTag, MAX_BRIEF_B64, STUCK_AFTER_MS, PROGRESS_READ_MS, SEAT_ROUTES, cutOffOf,
 } from '../graph/controller/seat-run.mjs';
 import { WORKER_SCRIPT_END_MARKER } from '../graph/controller/wiring.mjs';
 import { formatCostLine } from '../graph/controller/cost.mjs';
@@ -301,4 +301,67 @@ test('run-seat.mjs itself failing is reported with its exit status and last line
 test('the tag names the round and the seat, so round 2 can never read round 1\'s answer', () => {
   assert.equal(seatTag(2, 'reviewer'), 'round-2-reviewer');
   assert.notEqual(seatFilePaths('/w', seatTag(1, 'builder')).answer, seatFilePaths('/w', seatTag(2, 'builder')).answer);
+});
+
+// ---------------------------------------------------------------------------
+// PR #102 review fixes, and Todd's cut-off case (23 Sep)
+// ---------------------------------------------------------------------------
+
+test('a stop is CONFIRMED by run-seat.mjs\'s run record appearing -- it writes it only once the agent group has exited', async () => {
+  const worktreePath = tempDir();
+  const paths = seatDir(worktreePath, 'round-1-builder');
+  const h = harness({ worktreePath, script: () => ['...'] });
+  h.boundaries.terminalCloseImpl = async () => { writeFileSync(paths.run, runRecord({ exitCode: null, stoppedBy: 'SIGHUP' })); };
+  const result = await runSeat({ ...h.options, seat: 'builder', round: 1, launch: standInLaunch, brief: 'b' });
+  assert.equal(result.stuck, true);
+  assert.equal(result.stopConfirmed, true);
+  assert.doesNotMatch(result.reason, /NOT confirmed/);
+});
+
+test('a stop with no run record after a minute is reported as NOT confirmed -- the seat may still be running -- and a failed close is named', async () => {
+  const worktreePath = tempDir();
+  seatDir(worktreePath, 'round-1-builder');
+  let h = harness({ worktreePath, script: () => ['...'] });
+  let result = await runSeat({ ...h.options, seat: 'builder', round: 1, launch: standInLaunch, brief: 'b' });
+  assert.equal(result.stopConfirmed, false);
+  assert.match(result.reason, /the stop is NOT confirmed: no run record appeared within 60 s of closing its terminal, so the seat may still be running/);
+
+  h = harness({ worktreePath, script: () => ['...'] });
+  h.boundaries.terminalCloseImpl = async () => { throw new Error('terminal_handle_stale'); };
+  result = await runSeat({ ...h.options, seat: 'builder', round: 1, launch: standInLaunch, brief: 'b', timeLimitMs: 2 * 60000, stuckAfterMs: 60 * 60000 });
+  assert.equal(result.timedOut, true);
+  assert.match(result.reason, /NOT confirmed: .*a terminal close that failed \(terminal_handle_stale\)/);
+});
+
+const cutOffStream = [
+  JSON.stringify({ type: 'message_start', message: { role: 'assistant' } }),
+  JSON.stringify({ type: 'message_end', message: { role: 'assistant', stopReason: 'length', usage: { input: 125, output: 16384, reasoning: 16384, totalTokens: 39421 }, provider: 'commandcode', model: 'deepseek/deepseek-v4-pro' } }),
+].join('\n');
+
+test('a reply CUT OFF at its output limit is reported as exactly that, not as a missing verdict (Todd, 23 Sep)', async () => {
+  assert.deepEqual(cutOffOf(cutOffStream), { stopReason: 'length', outputTokens: 16384, reasoningTokens: 16384 });
+  assert.equal(cutOffOf(cutOffStream.replace('"length"', '"stop"')), null);
+  assert.equal(cutOffOf(''), null);
+
+  const worktreePath = tempDir();
+  const paths = seatDir(worktreePath, 'round-1-reviewer');
+  const h = harness({
+    worktreePath,
+    script: () => {
+      writeFileSync(paths.run, runRecord());
+      writeFileSync(paths.out, cutOffStream);
+      return [`${WORKER_SCRIPT_END_MARKER}:0`];
+    },
+  });
+  const result = await runSeat({ ...h.options, seat: 'reviewer', round: 1, launch: standInLaunch, brief: 'b' });
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.cutOff, { stopReason: 'length', outputTokens: 16384, reasoningTokens: 16384 });
+  assert.match(result.reason, /reply was CUT OFF at its output limit \(stop reason "length", 16384 output tokens, 16384 of them thinking\) before it wrote its answer/);
+  assert.doesNotMatch(result.reason, /without a usable answer/);
+});
+
+test('an effort label that is not low, medium or high is refused in words, never passed on to throw mid-carry', () => {
+  const refused = launchFor('reviewer', { ...DEEPSEEK, effort: "high'x" });
+  assert.equal(refused.ok, false);
+  assert.match(refused.reason, /effort "high'x" is not one of low, medium, high/);
 });

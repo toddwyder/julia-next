@@ -6,8 +6,8 @@
       "apiKey": "$COMMANDCODE_API_KEY",
       "authHeader": true,
       "models": [
-        { "id": "deepseek/deepseek-v4-pro" },
-        { "id": "deepseek/deepseek-v4-flash" }
+        { "id": "deepseek/deepseek-v4-pro", "contextWindow": 1000000, "maxTokens": 384000 },
+        { "id": "deepseek/deepseek-v4-flash", "contextWindow": 1000000, "maxTokens": 384000 }
       ]
     }
   }

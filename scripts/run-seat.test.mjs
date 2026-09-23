@@ -117,7 +117,11 @@ test('a seat that finishes: its own group, the brief on disk, stale files from a
   assert.equal(record.exitCode, 0);
   assert.equal(record.timedOut, false);
   assert.equal(record.answerWritten, true);
-  assert.ok(!existsSync(files.progress), 'the stale progress file was cleared too');
+  const progress = readFileSync(files.progress, 'utf8').trim().split('\n').map((line) => JSON.parse(line));
+  assert.equal(progress.length, 1, 'the stale progress was cleared; the one line is this run\'s own start');
+  assert.equal(progress[0].type, 'status');
+  assert.equal(progress[0].payload.phase, 'starting');
+  assert.match(progress[0].subject, /builder started \(stand-in, stand-in, effort low\)/);
   assert.deepEqual(JSON.parse(readFileSync(files.run, 'utf8')), record);
 });
 

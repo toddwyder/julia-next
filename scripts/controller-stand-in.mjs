@@ -15,7 +15,7 @@
 // comment and move is printed instead of posted), and publishing (printed,
 // never pushed: nothing a stand-in commits may reach GitHub).
 //
-// Scenarios: pass | changes-then-pass | timeout | stuck. `timeout` and `stuck`
+// Scenarios: pass | changes-then-pass | timeout | stuck | cut-off. `timeout` and `stuck`
 // run on short limits (below) so the proof takes minutes, not an hour; the
 // rule and the code path are the production ones.
 
@@ -106,8 +106,8 @@ export async function runStandIn({ scenario, print = console.log }) {
       candidate: r.candidate ?? null,
       tests: r.testRun ? `${r.testRun.pass} pass / ${r.testRun.fail} fail` : null,
       verdict: r.verdict ?? null,
-      builder: r.builder ? { ok: r.builder.ok, stuck: r.builder.stuck ?? false, timedOut: r.builder.timedOut ?? false, progressLines: r.builder.progress?.entries?.length ?? 0 } : null,
-      reviewer: r.reviewer ? { ok: r.reviewer.ok, progressLines: r.reviewer.progress?.entries?.length ?? 0 } : null,
+      builder: r.builder ? { ok: r.builder.ok, stuck: r.builder.stuck ?? false, timedOut: r.builder.timedOut ?? false, stopConfirmed: r.builder.stopConfirmed ?? null, progressLines: r.builder.progress?.entries?.length ?? 0 } : null,
+      reviewer: r.reviewer ? { ok: r.reviewer.ok, cutOff: r.reviewer.cutOff ?? null, progressLines: r.reviewer.progress?.entries?.length ?? 0 } : null,
     })),
     minutes: Math.round(((Date.now() - started) / 60000) * 10) / 10,
   };

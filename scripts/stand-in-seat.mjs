@@ -18,6 +18,10 @@
 //                      so its time limit stops it
 //   stuck              the builder reports once, then goes silent, so the
 //                      controller's five-minute progress rule stops it
+//   cut-off            the reviewer's reply stops at its output limit before it
+//                      writes a verdict -- the same Pi stream shape a real
+//                      DeepSeek review produced on 23 Sep, at a 16,384 cap -- so the
+//                      card must say "cut off", not "no verdict"
 
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -26,7 +30,7 @@ import { fileURLToPath } from 'node:url';
 
 import { seatFiles } from './run-seat.mjs';
 
-export const SCENARIOS = Object.freeze(['pass', 'changes-then-pass', 'timeout', 'stuck']);
+export const SCENARIOS = Object.freeze(['pass', 'changes-then-pass', 'timeout', 'stuck', 'cut-off']);
 export const STAND_IN_FINDING = 'Stand-in finding: round 2 must add stand-in/round-2-fix.txt';
 
 export function scenarioOf(brief) {
@@ -86,6 +90,13 @@ export async function standIn({ seat, tag, worktree }, { heartbeatMs = 5000 } = 
   }
 
   say('status', 'reviewing', 'reading the change');
+  if (scenario === 'cut-off') {
+    // Exactly what `pi -p --mode json` prints when a reply hits its limit, on
+    // stdout, which run-seat.mjs saves as this seat's `.out`. No answer file.
+    process.stdout.write(`${JSON.stringify({ type: 'message_start', message: { role: 'assistant' } })}\n`);
+    process.stdout.write(`${JSON.stringify({ type: 'message_end', message: { role: 'assistant', stopReason: 'length', usage: { input: 125, output: 16384, reasoning: 16384, totalTokens: 39421 }, provider: 'stand-in', model: 'stand-in' } })}\n`);
+    return;
+  }
   if (scenario === 'changes-then-pass' && round === 1) {
     answer({ verdict: 'changes_needed', findings: STAND_IN_FINDING });
     return;

@@ -93,6 +93,23 @@ test('the committed Command Code models.json fragment declares exactly the model
   assert.equal(fragment.providers.commandcode.apiKey, '$COMMANDCODE_API_KEY', 'a literal secret must never be committed here');
 });
 
+// JUL-98 step 8 (23 Sep): with no `maxTokens` here, Pi capped every Command
+// Code reply at its own 16,384-token default, and a high-effort DeepSeek review
+// spent the whole budget thinking and stopped at `length` with no verdict (twice,
+// on a real review). The limits are the models' own, as Pi's built-in DeepSeek
+// registry declares them (graph/fixtures/orca-1.4.205/pi-registry.deepseek.json).
+// Effort stays high; the seat's time limit and cost line are the guards.
+test('the Command Code models declare the models\' own output and context limits, not Pi\'s 16,384-token default', () => {
+  const fragment = JSON.parse(readFileSync(new URL('./pi-models.commandcode.json', import.meta.url), 'utf8'));
+  const registry = JSON.parse(readFileSync(new URL('../../graph/fixtures/orca-1.4.205/pi-registry.deepseek.json', import.meta.url), 'utf8'));
+  for (const model of fragment.providers.commandcode.models) {
+    const native = registry.models[model.id.replace(/^deepseek\//, '')];
+    assert.ok(native, `${model.id} has a native registry entry to take its limits from`);
+    assert.equal(model.maxTokens, native.maxTokens, `${model.id} output limit`);
+    assert.equal(model.contextWindow, native.contextWindow, `${model.id} context window`);
+  }
+});
+
 // The cost rule (JUL-89, finished by JUL-93): GLM is barred and removed. No seat
 // of any kind launches it, and the old `orchestrator-backup` seat that did is
 // gone, so a wake can never fall onto the barred vendor. A seat name that no

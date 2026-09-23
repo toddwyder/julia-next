@@ -12,7 +12,7 @@ import { join } from 'node:path';
 
 import { standIn, scenarioOf, progressLine, STAND_IN_FINDING } from './stand-in-seat.mjs';
 import { seatFiles } from './run-seat.mjs';
-import { parseProgress, validateAnswer } from '../graph/controller/seat-run.mjs';
+import { parseProgress, validateAnswer, cutOffOf } from '../graph/controller/seat-run.mjs';
 
 const dirs = [];
 test.after(() => { for (const dir of dirs) rmSync(dir, { recursive: true, force: true }); });
@@ -70,6 +70,21 @@ test('pass: the builder commits and answers done; the reviewer changes nothing a
   assert.equal(verdict.verdict, 'approve');
   assert.equal(r.head(), head);
   assert.equal(r.status(), '');
+});
+
+test('cut-off: the reviewer prints a reply stopped at "length" and writes NO answer, which the controller reads as cut off', async () => {
+  const r = repo();
+  const v = brief(r.dir, 'round-1-reviewer', 'Stand-in scenario: cut-off\n');
+  const printed = [];
+  const write = process.stdout.write;
+  process.stdout.write = (chunk) => { printed.push(String(chunk)); return true; };
+  try {
+    await standIn({ seat: 'reviewer', tag: 'round-1-reviewer', worktree: r.dir });
+  } finally {
+    process.stdout.write = write;
+  }
+  assert.ok(!existsSync(v.answer), 'no verdict was written');
+  assert.deepEqual(cutOffOf(printed.join('')), { stopReason: 'length', outputTokens: 16384, reasoningTokens: 16384 });
 });
 
 test('changes-then-pass: round 1 asks for changes; round 2 must be GIVEN that finding; then approves', async () => {
