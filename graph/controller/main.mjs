@@ -151,7 +151,7 @@ export function progressCommentBody({ card, seat, round, status, count, at }) {
   return [
     `**${card.identifier}: now working -- the ${seat}, round ${round}: ${what}.**`,
     '',
-    `As of ${at}, from the worker's own progress file (${count} ${count === 1 ? 'report' : 'reports'} so far this run). The controller edits this comment as the worker reports; a worker whose progress file stops changing for five minutes is stopped as stuck.`,
+    `As of ${at}, from the worker's own progress file (${count} ${count === 1 ? 'report' : 'reports'} so far this run). The controller edits this comment as the worker reports; a worker that shows no sign of work for five minutes (no progress line, no output, no CPU use, no growth in Pi's session log) is stopped as stuck.`,
   ].join('\n');
 }
 

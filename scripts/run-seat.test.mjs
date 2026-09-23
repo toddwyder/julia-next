@@ -218,6 +218,8 @@ test('the activity look counts CPU only past its threshold, and output or Pi ses
   writeFileSync(join(sessionDir, 's.jsonl'), '{"type":"message"}\n');
   assert.deepEqual(look(), ['output 26 bytes', 'Pi session log 19 bytes']);
   assert.deepEqual(look(), []);
+  writeFileSync(files.err, 'Error: retrying\n'.repeat(50));
+  assert.deepEqual(look(), [], 'stderr chatter is not work (DeepSeek review of PR #104)');
   cpu = new Map();
   assert.deepEqual(look(), [], 'finished processes are not counted as negative work');
 });

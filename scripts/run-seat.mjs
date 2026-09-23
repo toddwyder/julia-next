@@ -17,7 +17,8 @@
 //   <tag>.run.json     this run's record: times, exit, whether it was stopped at the limit,
 //                      and (Gemini) the allowance read before and after
 //   <tag>.activity.json  rewritten ONLY when the seat did something since the last look
-//                      (its processes used CPU, its output grew, Pi's session log grew);
+//                      (its processes used CPU, its output grew, Pi's session log grew --
+//                      stderr does not count: an agent looping on an error is not working);
 //                      the controller reads the file's own change time, so a seat that is
 //                      busy but not writing progress lines is not taken for stuck (JUL-92,
 //                      23 Sep 07:01Z: a DeepSeek reviewer 30 tool calls into a review was
@@ -126,7 +127,6 @@ export function activityTracker({ token, files, sessionDir = null, cpuImpl = sea
     if (used >= CPU_ACTIVE_SECONDS) moved.push(`cpu +${used.toFixed(1)}s`);
     const sizes = {
       output: sizeOf(files.out, statImpl),
-      errors: sizeOf(files.err, statImpl),
       ...(sessionDir ? { 'Pi session log': folderSize(sessionDir, { readdirImpl, statImpl }) } : {}),
     };
     for (const [what, size] of Object.entries(sizes)) {

@@ -370,8 +370,10 @@ export const SIGNS_OF_WORK = Object.freeze({
   activity: 'its CPU or Pi session log',
 });
 
+// An empty file (run-seat.mjs creates `.out` before the agent writes to it)
+// has not changed in any way that counts.
 function changedWhen(state) {
-  return state ? `at ${new Date(state.changedMs).toISOString().replace(/\.\d+Z$/, 'Z')}` : 'never';
+  return state && !state.fingerprint.startsWith('0:') ? `at ${new Date(state.changedMs).toISOString().replace(/\.\d+Z$/, 'Z')}` : 'never';
 }
 
 function readJson(path, readFileImpl, what) {

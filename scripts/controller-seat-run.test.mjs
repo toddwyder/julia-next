@@ -238,6 +238,8 @@ test('STUCK: a running seat that shows no sign of work for five minutes is stopp
         appendFileSync(paths.progress, `${JSON.stringify({ type: 'status', subject: 'thinking', payload: { phase: 'plan' }, created_at: '2026-09-23T06:04:00Z' })}\n`);
         const real = new Date('2026-09-23T06:55:34Z');
         utimesSync(paths.progress, real, real);
+        // run-seat.mjs creates the output file empty before the agent writes.
+        writeFileSync(paths.out, '');
       }
       return ['...'];
     },
