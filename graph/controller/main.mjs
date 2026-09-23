@@ -212,6 +212,11 @@ export async function carryCard({
     return { ok: false, stage: 'seat', reason: refused.reason };
   }
 
+  // A ref name only: it reaches git as an argument, so nothing that could be
+  // read as an option or a path trick (PR #103 review, finding 5).
+  if (!/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(baseBranch) || baseBranch.includes('..')) {
+    throw new Error(`carryCard: refusing base branch ${JSON.stringify(baseBranch)} -- a plain ref name is required`);
+  }
   const [step] = stepsForCard(card);
   const name = `${card.identifier.toLowerCase()}-work-${attemptTag(attempt)}`;
   const created = await boundaries.worktreeCreateImpl({ name, baseBranch });

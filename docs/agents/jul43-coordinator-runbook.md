@@ -2738,10 +2738,13 @@ coordinator skill's own Orca usage is a separate thing and is unchanged.)
    Gemini allowance before/after).
 5. The controller reads the progress file **every minute**, edits one progress comment on the card
    when the reported step changes, and **stops a seat whose progress file has not changed for five
-   minutes**. **The stop is a kill of the agent's process group, run as `runner` through a second
-   short terminal** (`kill -TERM`, then `kill -KILL`, then a check that the group is gone), using the
-   group id `run-seat.mjs` writes to `.julia/<tag>.pid.json` when it starts the agent. `run-seat.mjs`
-   then sees its agent exit and still writes its run record. **Closing the seat's terminal is NOT a
+   minutes**. **The stop is run as `runner` through a second short terminal, and finds the seat's
+   processes by their SEAT TOKEN**: a random 32-hex value the controller makes per seat run, which
+   `run-seat.mjs` hands the agent as `JULIA_SEAT_TOKEN` and every process it starts inherits. The stop
+   line reads `/proc/<pid>/environ`, sends TERM, then KILL, then looks again; the stop is confirmed only
+   when no process carrying the token is left. Nothing the agent can write (a pid file could be
+   forged) decides what is killed. `run-seat.mjs` then sees its agent exit and still writes its run
+   record. **Closing the seat's terminal is NOT a
    stop:** measured 2026-09-23, closing an Orca terminal kills what runs in it outright (a probe with
    handlers for HUP, TERM, INT and QUIT logged none of them and no exit), and the agent's own group
    survives it -- the first stand-in `stuck` run left its worker running exactly this way.
@@ -2770,9 +2773,12 @@ that still stops at `length` is reported on the card as **cut off**, not as a mi
 **Seats today:** Gemini builds, DeepSeek reviews, no backups. A card labelled for anything else is
 refused with that reason before a working copy is made.
 
-**Stopping a seat by hand:** as `runner`, kill its group: `kill -- -$(python3 -c "import json;
-print(json.load(open('<working copy>/.julia/<tag>.pid.json'))['pgid'])")`, then close its terminal
-(titles start `julia-seat-`). Closing the terminal alone leaves the agent running (above).
+**Stopping a seat by hand:** as `runner`, find the token in the seat's command line (`ps -ef | grep
+run-seat.mjs`, the `--seat-token` value), then kill every process carrying it:
+`for d in /proc/[0-9]*; do tr ' ' '
+' < $d/environ 2>/dev/null | grep -qx JULIA_SEAT_TOKEN=<token> && kill
+${d#/proc/}; done`. Then close its terminal (titles start `julia-seat-`). Closing the terminal alone
+leaves the agent running (above).
 
 **The free stand-in test** (no model, no card, nothing pushed), run on the server after the code is on
 `origin/main`:

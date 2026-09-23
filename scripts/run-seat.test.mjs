@@ -24,7 +24,7 @@ const b64 = (text) => Buffer.from(text, 'utf8').toString('base64');
 const args = (overrides = {}) => {
   const base = {
     seat: 'builder', agent: 'agy', model: 'gemini-3.8-flash', effort: 'low', tag: 'round-1-builder',
-    'timeout-seconds': '60', worktree: '/w', 'brief-b64': b64('# brief\nwith "quotes" and \'apostrophes\''),
+    'timeout-seconds': '60', worktree: '/w', 'seat-token': '0123456789abcdef0123456789abcdef', 'brief-b64': b64('# brief\nwith "quotes" and \'apostrophes\''),
     ...overrides,
   };
   return Object.entries(base).flatMap(([k, v]) => [`--${k}`, v]);
@@ -143,13 +143,12 @@ test('a seat that runs past its limit is told to stop, then killed, as a GROUP -
   assert.equal(record.answerWritten, false);
 });
 
-test('the agent\'s process group is written down the moment it starts, so the controller can stop it as the worker', async () => {
+test('the seat token reaches the agent (and so everything it starts) as JULIA_SEAT_TOKEN, and a bad token is refused', async () => {
   const worktree = tempWorktree();
-  const files = seatFiles(worktree, 'round-1-builder');
-  let seenPid = null;
-  const spawnImpl = fakeSpawn({ onSpawn: (child) => setTimeout(() => { seenPid = JSON.parse(readFileSync(files.pid, 'utf8')); child.exit(0); }, 5) });
-  await runSeat(optsFor(worktree), { spawnImpl });
-  assert.deepEqual({ pid: seenPid.pid, pgid: seenPid.pgid }, { pid: 4242, pgid: 4242 });
+  const spawnImpl = fakeSpawn({ exitAfterMs: 5 });
+  await runSeat(optsFor(worktree, { seatToken: 'a'.repeat(32) }), { spawnImpl });
+  assert.equal(spawnImpl.calls[0].options.env.JULIA_SEAT_TOKEN, 'a'.repeat(32));
+  assert.throws(() => parseArgs(args({ 'seat-token': 'not-hex' })), /--seat-token must be 32 lowercase hex/);
 });
 
 test('a Gemini seat has its allowance read before and after, and a failed reading is recorded rather than thrown', async () => {

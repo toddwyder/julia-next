@@ -10,12 +10,13 @@ import { join } from 'node:path';
 
 import {
   launchFor, buildStepBrief, reportingInstructions, seatCommand, parseProgress, validateAnswer, costLineFor,
-  runSeat, seatFilePaths, seatTag, MAX_BRIEF_B64, STUCK_AFTER_MS, PROGRESS_READ_MS, SEAT_ROUTES, cutOffOf, stopGroupCommand,
+  runSeat, seatFilePaths, seatTag, MAX_BRIEF_B64, STUCK_AFTER_MS, PROGRESS_READ_MS, SEAT_ROUTES, cutOffOf, stopSeatCommand, newSeatToken,
 } from '../graph/controller/seat-run.mjs';
 import { WORKER_SCRIPT_END_MARKER } from '../graph/controller/wiring.mjs';
 import { formatCostLine } from '../graph/controller/cost.mjs';
 import { ORCA_FIXTURE_DIR } from '../graph/controller/fixture-orca.mjs';
 import { parseArgs as parseRunSeatArgs } from './run-seat.mjs';
+import { spawn, execFileSync } from 'node:child_process';
 
 const dirs = [];
 test.after(() => { for (const dir of dirs) rmSync(dir, { recursive: true, force: true }); });
@@ -69,7 +70,7 @@ test('the command carries the brief as base64 that run-seat.mjs decodes back EXA
   const brief = `# JUL-92\nIt's "quoted" and $HOME and \`ticks\`\n`;
   const command = seatCommand({
     worktreePath: '/home/runner/orca/workspaces/julia-next/jul-92-work-a1', seat: 'builder',
-    launch: { agent: 'agy', model: 'gemini-3.8-flash', effort: 'medium' }, tag: 'round-1-builder', timeLimitMs: 30 * 60000, brief,
+    launch: { agent: 'agy', model: 'gemini-3.8-flash', effort: 'medium' }, tag: 'round-1-builder', timeLimitMs: 30 * 60000, brief, token: '0123456789abcdef0123456789abcdef',
   });
   assert.ok(command.endsWith(`; echo "${WORKER_SCRIPT_END_MARKER}:$?"`));
   // Round-trip through run-seat.mjs's own parser, with the shell quoting undone.
@@ -78,12 +79,13 @@ test('the command carries the brief as base64 that run-seat.mjs decodes back EXA
   assert.equal(parsed.brief, brief);
   assert.equal(parsed.timeoutSeconds, 1800);
   assert.equal(parsed.tag, 'round-1-builder');
-  assert.throws(() => seatCommand({ worktreePath: "/tmp/it's", seat: 'builder', launch: { agent: 'agy', model: 'm', effort: 'low' }, tag: 'round-1-builder', timeLimitMs: 1000, brief: 'b' }), /quote/);
+  assert.equal(parsed.seatToken, '0123456789abcdef0123456789abcdef');
+  assert.throws(() => seatCommand({ worktreePath: "/tmp/it's", seat: 'builder', launch: { agent: 'agy', model: 'm', effort: 'low' }, tag: 'round-1-builder', timeLimitMs: 1000, brief: 'b', token: '0123456789abcdef0123456789abcdef' }), /quote/);
 });
 
 test('a brief too big to carry safely in a command is refused, not sent cut', () => {
   const huge = 'x'.repeat(Math.ceil(MAX_BRIEF_B64 * 0.8));
-  assert.throws(() => seatCommand({ worktreePath: '/w', seat: 'builder', launch: { agent: 'agy', model: 'm', effort: 'low' }, tag: 'round-1-builder', timeLimitMs: 1000, brief: huge }), /over the 36000/);
+  assert.throws(() => seatCommand({ worktreePath: '/w', seat: 'builder', launch: { agent: 'agy', model: 'm', effort: 'low' }, tag: 'round-1-builder', timeLimitMs: 1000, brief: huge, token: '0123456789abcdef0123456789abcdef' }), /over the 36000/);
 });
 
 test('progress lines are read in the old mailbox shape -- payload as an object OR as Orca sent it, a JSON string -- and junk is counted, not guessed', () => {
@@ -174,6 +176,7 @@ function harness({ worktreePath, script }) {
       worktreePath,
       boundaries,
       nowMs: () => clock,
+      seatTokenImpl: () => '0123456789abcdef0123456789abcdef',
       sleepImpl: async (ms) => { clock += ms; },
       warn: () => {},
     },
@@ -236,7 +239,8 @@ test('STUCK: a running seat whose progress file has not changed for five minutes
   assert.equal(result.ok, false);
   assert.equal(result.stuck, true);
   assert.match(result.reason, /stopped as stuck: its progress file had not changed for 5 minutes \(last report: status "thinking" at T0\)/);
-  assert.deepEqual(h.closed.map((c) => c.terminal).sort(), ['term_seat'], 'with no pid file there is no stop terminal to close');
+  assert.equal(h.stops.length, 1, 'the stop was run');
+  assert.deepEqual(h.closed.map((c) => c.terminal).sort(), ['term_seat', 'term_stop']);
   assert.equal(STUCK_AFTER_MS, 5 * 60000);
   assert.equal(PROGRESS_READ_MS, 60000);
 });
@@ -318,50 +322,76 @@ test('the tag names the round and the seat, so round 2 can never read round 1\'s
 // PR #102 review fixes, and Todd's cut-off case (23 Sep)
 // ---------------------------------------------------------------------------
 
-test('THE STOP kills the agent\'s process group AS THE WORKER, from its pid file, and is confirmed when the group is gone', async () => {
+test('THE STOP finds the seat\'s processes by its token, AS THE WORKER, and is confirmed only when none are left', async () => {
   const worktreePath = tempDir();
   const paths = seatDir(worktreePath, 'round-1-builder');
-  writeFileSync(paths.pid, JSON.stringify({ pid: 4242, pgid: 4242 }));
   let killed = false;
   const h = harness({
     worktreePath,
-    // After the kill, run-seat.mjs sees its agent exit, writes its record and
-    // prints its end marker -- exactly what the real one does.
     script: () => (killed ? (writeFileSync(paths.run, runRecord({ exitCode: null, signal: 'SIGTERM' })), [`${WORKER_SCRIPT_END_MARKER}:0`]) : ['...']),
   });
   h.boundaries.stopAnswer = () => { killed = true; return ['JULIA_STOP:gone', `${WORKER_SCRIPT_END_MARKER}:0`]; };
   const result = await runSeat({ ...h.options, seat: 'builder', round: 1, launch: standInLaunch, brief: 'b' });
   assert.equal(result.stuck, true);
   assert.equal(result.stopConfirmed, true);
-  assert.equal(result.stop.gone, true);
   assert.doesNotMatch(result.reason, /NOT confirmed/);
-  assert.equal(h.stops.length, 1);
   assert.equal(h.stops[0].title, 'julia-stop-round-1-builder');
-  assert.equal(h.stops[0].command, stopGroupCommand(4242));
-  assert.deepEqual(h.closed.map((c) => c.terminal).sort(), ['term_seat', 'term_stop'], 'both terminals are closed afterwards');
+  assert.equal(h.stops[0].command, stopSeatCommand('0123456789abcdef0123456789abcdef'));
+  assert.match(h.created[0].command, /--seat-token 0123456789abcdef0123456789abcdef /, 'the seat was started with the same token the stop looks for');
+  assert.deepEqual(h.closed.map((c) => c.terminal).sort(), ['term_seat', 'term_stop']);
   assert.ok(result.run, 'the run record written after the kill is read');
 });
 
-test('a stop that cannot be confirmed says so and why -- no pid file, or a group that survives -- and closing the terminal alone never counts as a stop', async () => {
+test('a stop is NOT confirmed by a run record alone -- only by no token-carrying process being left -- and the card says why', async () => {
   const worktreePath = tempDir();
   const paths = seatDir(worktreePath, 'round-1-builder');
+  // The record appears (run-seat.mjs's direct child exited) but a process
+  // carrying the token is still alive: that is NOT a confirmed stop.
   let h = harness({ worktreePath, script: () => ['...'] });
-  let result = await runSeat({ ...h.options, seat: 'builder', round: 1, launch: standInLaunch, brief: 'b' });
-  assert.equal(result.stopConfirmed, false);
-  assert.match(result.reason, /the stop is NOT confirmed \(the agent's process group is not known \(no pid file was written\); no run record within 60 s\), so the seat may still be running/);
-
-  writeFileSync(paths.pid, JSON.stringify({ pid: 4242, pgid: 4242 }));
-  h = harness({ worktreePath, script: () => ['...'] });
-  h.boundaries.stopAnswer = ['JULIA_STOP:alive', `${WORKER_SCRIPT_END_MARKER}:0`];
-  result = await runSeat({ ...h.options, seat: 'builder', round: 1, launch: standInLaunch, brief: 'b', timeLimitMs: 90000, stuckAfterMs: 60 * 60000 });
+  h.boundaries.stopAnswer = () => { writeFileSync(paths.run, runRecord()); return ['JULIA_STOP:alive 777 778', `${WORKER_SCRIPT_END_MARKER}:0`]; };
+  let result = await runSeat({ ...h.options, seat: 'builder', round: 1, launch: standInLaunch, brief: 'b', timeLimitMs: 90000, stuckAfterMs: 60 * 60000 });
   assert.equal(result.timedOut, true);
+  assert.equal(result.stopConfirmed, false);
   assert.match(result.reason, /ran past its 90-second limit/);
-  assert.match(result.reason, /NOT confirmed \(process group 4242 is still alive after TERM and KILL/);
+  assert.match(result.reason, /NOT confirmed \(processes still carrying the seat token after TERM and KILL: 777 778\)/);
+
+  rmSync(paths.run, { force: true });
+  h = harness({ worktreePath, script: () => ['...'] });
+  h.boundaries.stopAnswer = [];
+  result = await runSeat({ ...h.options, seat: 'builder', round: 1, launch: standInLaunch, brief: 'b' });
+  assert.match(result.reason, /NOT confirmed \(the stop did not finish within 60 s\)/);
 });
 
-test('the stop line is refused for anything but a plain process group number', () => {
-  assert.match(stopGroupCommand(4242), /^kill -TERM -- -4242 .*kill -KILL -- -4242 .*JULIA_STOP:gone/);
-  for (const bad of [0, 1, -5, 1.5, '4242', '4242; rm -rf /', null]) assert.throws(() => stopGroupCommand(bad), /refusing to build a stop/);
+test('the stop line is refused for anything but a 32-hex seat token, and every seat run gets a fresh one', () => {
+  assert.match(stopSeatCommand('0123456789abcdef0123456789abcdef'), /grep -qx "JULIA_SEAT_TOKEN=0123456789abcdef0123456789abcdef"/);
+  for (const bad of ['', 'x'.repeat(32), '0123456789ABCDEF0123456789ABCDEF', '0123456789abcdef0123456789abcdef; rm -rf /', null, 42]) assert.throws(() => stopSeatCommand(bad), /refusing to build a stop/);
+  const a = newSeatToken();
+  assert.match(a, /^[0-9a-f]{32}$/);
+  assert.notEqual(a, newSeatToken());
+});
+
+// THE REAL THING, on Linux (the server suite and CI): a process carrying the
+// token dies; one that does not is left alone. Skipped on Windows only.
+test('the stop line really kills the token-carrying process and leaves every other one alone', { skip: process.platform === 'win32' ? 'the stop line reads /proc, Linux only' : false }, async () => {
+  const token = newSeatToken();
+  const other = newSeatToken();
+  const keep = ['-e', 'setInterval(() => {}, 1000)'];
+  const target = spawn(process.execPath, keep, { env: { ...process.env, JULIA_SEAT_TOKEN: token }, stdio: 'ignore', detached: true });
+  const bystander = spawn(process.execPath, keep, { env: { ...process.env, JULIA_SEAT_TOKEN: other }, stdio: 'ignore', detached: true });
+  const untokened = spawn(process.execPath, keep, { stdio: 'ignore', detached: true });
+  const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+  try {
+    await new Promise((r) => { setTimeout(r, 300); });
+    const out = execFileSync('bash', ['-c', stopSeatCommand(token, { graceSeconds: 1 })], { encoding: 'utf8' });
+    assert.match(out, /^JULIA_STOP:gone$/m);
+    assert.match(out, new RegExp(`^${WORKER_SCRIPT_END_MARKER}:0$`, 'm'));
+    await new Promise((r) => { setTimeout(r, 200); });
+    assert.equal(alive(target.pid), false, 'the token-carrying process is gone');
+    assert.equal(alive(bystander.pid), true, 'another seat\'s process is untouched');
+    assert.equal(alive(untokened.pid), true, 'a process with no token is untouched');
+  } finally {
+    for (const child of [target, bystander, untokened]) { try { process.kill(child.pid, 'SIGKILL'); } catch { /* gone */ } }
+  }
 });
 
 const cutOffStream = [

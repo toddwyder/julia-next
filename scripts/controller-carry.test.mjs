@@ -143,3 +143,14 @@ test('the controller\'s OWN fault mid-step still ends in a comment on the card, 
   assert.equal(f.order.at(-1)[0], 'worktree-rm');
   assert.ok(!f.order.some(([name]) => name === 'publish'));
 });
+
+test('a base branch that is not a plain ref name is refused before anything is created', async () => {
+  for (const bad of ['--upload-pack=x', '-b', 'main..evil', '', 'a b']) {
+    const f = fixture({ outcome: passed });
+    await assert.rejects(() => f.run({ baseBranch: bad }), /refusing base branch/);
+    assert.deepEqual(f.order, []);
+  }
+  const ok = fixture({ outcome: passed });
+  await ok.run({ baseBranch: 'jul98-step-8b' });
+  assert.equal(ok.order[0][1].baseBranch, 'jul98-step-8b');
+});

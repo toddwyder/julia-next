@@ -45,6 +45,16 @@ export const ANSWER_DIR = '.julia';
 export const TAG_PATTERN = /^round-[1-9]-(builder|reviewer)$/;
 // How long a seat that has been told to stop gets before it is killed outright.
 export const KILL_GRACE_MS = 10000;
+// THE SEAT TOKEN. The controller makes one per seat run and passes it here;
+// this script hands it to the agent as an environment variable, which every
+// process the agent starts inherits. A stop from outside finds the seat's
+// processes BY that token (graph/controller/seat-run.mjs `stopSeatCommand`),
+// so nothing the agent can write -- no pid file -- decides what is killed.
+// Closing the Orca terminal is not a stop: measured 2026-09-23, it kills what
+// runs in the terminal outright (no signal a handler can catch) and a detached
+// agent survives it.
+export const SEAT_TOKEN_ENV = 'JULIA_SEAT_TOKEN';
+export const SEAT_TOKEN_PATTERN = /^[0-9a-f]{32}$/;
 
 // Which run-pi-seat.mjs route runs which DeepSeek model. The route owns the
 // provider, the key and the env var; this only picks it.
@@ -63,7 +73,6 @@ export function seatFiles(worktree, tag) {
     run: join(dir, `${tag}.run.json`),
     answer: join(dir, `${tag}.answer.json`),
     progress: join(dir, `${tag}.progress.jsonl`),
-    pid: join(dir, `${tag}.pid.json`),
   };
 }
 
@@ -78,7 +87,7 @@ export function parseArgs(argv) {
     opts[name] = value;
     i += 1;
   }
-  const missing = ['seat', 'agent', 'model', 'effort', 'tag', 'timeout-seconds', 'worktree', 'brief-b64'].filter((key) => !opts[key]);
+  const missing = ['seat', 'agent', 'model', 'effort', 'tag', 'timeout-seconds', 'worktree', 'seat-token', 'brief-b64'].filter((key) => !opts[key]);
   if (missing.length) throw new Error(`run-seat: missing --${missing.join(', --')}`);
   if (!SEATS.includes(opts.seat)) throw new Error(`run-seat: --seat must be one of ${SEATS.join('|')}`);
   if (!AGENTS.includes(opts.agent)) throw new Error(`run-seat: --agent must be one of ${AGENTS.join('|')}`);
@@ -90,6 +99,7 @@ export function parseArgs(argv) {
   if (!Number.isInteger(timeoutSeconds) || timeoutSeconds <= 0) {
     throw new Error(`run-seat: --timeout-seconds must be a positive whole number, got ${JSON.stringify(opts['timeout-seconds'])}`);
   }
+  if (!SEAT_TOKEN_PATTERN.test(opts['seat-token'])) throw new Error('run-seat: --seat-token must be 32 lowercase hex characters');
   const brief = Buffer.from(opts['brief-b64'], 'base64').toString('utf8');
   if (!brief.trim()) throw new Error('run-seat: the brief decoded to nothing');
   return {
@@ -100,6 +110,7 @@ export function parseArgs(argv) {
     tag: opts.tag,
     timeoutSeconds,
     worktree: resolve(opts.worktree),
+    seatToken: opts['seat-token'],
     brief,
   };
 }
@@ -155,11 +166,12 @@ export async function runSeat(opts, {
   mkdirSync(files.dir, { recursive: true });
   // A leftover from an earlier run of the same tag must never be read as this
   // run's answer.
-  for (const path of [files.out, files.err, files.run, files.answer, files.progress, files.pid]) rmSync(path, { force: true });
+  for (const path of [files.out, files.err, files.run, files.answer, files.progress]) rmSync(path, { force: true });
   writeFileSync(files.brief, opts.brief);
 
   const before = opts.agent === 'agy' ? await allowanceReading(readAllowanceImpl, opts.worktree) : null;
   const spec = agentSpawnSpec(opts, { readSecretImpl });
+  const env = opts.seatToken ? { ...spec.env, [SEAT_TOKEN_ENV]: opts.seatToken } : spec.env;
   const startedAt = now();
   // The first progress line is this script's own, at the moment the agent is
   // started, so the controller's five-minute stuck rule counts from a real
@@ -171,19 +183,11 @@ export async function runSeat(opts, {
 
   const result = await new Promise((resolveRun) => {
     // Its own process group, so the stop reaches everything the agent started.
-    const child = spawnImpl(spec.command, spec.args, { cwd: opts.worktree, env: spec.env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+    const child = spawnImpl(spec.command, spec.args, { cwd: opts.worktree, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
     let timedOut = false;
     let killTimer = null;
     child.stdout?.pipe(out);
     child.stderr?.pipe(err);
-    // WHO THE AGENT IS, for a stop from outside. The agent runs in its own
-    // process group (`detached`), whose id is its pid. A stop from the
-    // controller cannot come through this script: closing an Orca terminal
-    // kills what runs in it outright -- measured 2026-09-23, a probe with a
-    // handler for SIGHUP, SIGTERM, SIGINT and SIGQUIT logged none of them and
-    // no exit -- and the agent's own group survives that. So the controller
-    // stops the GROUP itself, as the worker, and this file is how it finds it.
-    writeFileSync(files.pid, `${JSON.stringify({ pid: child.pid ?? null, pgid: child.pid ?? null, startedAt })}\n`);
     const stopTimer = setTimeout(() => {
       timedOut = true;
       try { killImpl(-child.pid, 'SIGTERM'); } catch { /* already gone */ }
