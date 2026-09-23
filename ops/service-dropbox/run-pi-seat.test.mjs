@@ -93,6 +93,23 @@ test('the committed Command Code models.json fragment declares exactly the model
   assert.equal(fragment.providers.commandcode.apiKey, '$COMMANDCODE_API_KEY', 'a literal secret must never be committed here');
 });
 
+// JUL-98 step 8 (23 Sep): with no `maxTokens` here, Pi capped every Command
+// Code reply at its own 16,384-token default, and a high-effort DeepSeek review
+// spent the whole budget thinking and stopped at `length` with no verdict (twice,
+// on a real review). The limits are the models' own, as Pi's built-in DeepSeek
+// registry declares them (graph/fixtures/orca-1.4.205/pi-registry.deepseek.json).
+// Effort stays high; the seat's time limit and cost line are the guards.
+test('the Command Code models declare the models\' own output and context limits, not Pi\'s 16,384-token default', () => {
+  const fragment = JSON.parse(readFileSync(new URL('./pi-models.commandcode.json', import.meta.url), 'utf8'));
+  const registry = JSON.parse(readFileSync(new URL('../../graph/fixtures/orca-1.4.205/pi-registry.deepseek.json', import.meta.url), 'utf8'));
+  for (const model of fragment.providers.commandcode.models) {
+    const native = registry.models[model.id.replace(/^deepseek\//, '')];
+    assert.ok(native, `${model.id} has a native registry entry to take its limits from`);
+    assert.equal(model.maxTokens, native.maxTokens, `${model.id} output limit`);
+    assert.equal(model.contextWindow, native.contextWindow, `${model.id} context window`);
+  }
+});
+
 // The cost rule (JUL-89, finished by JUL-93): GLM is barred and removed. No seat
 // of any kind launches it, and the old `orchestrator-backup` seat that did is
 // gone, so a wake can never fall onto the barred vendor. A seat name that no
@@ -195,9 +212,9 @@ test('runPiSeat forwards the effort through to the spawn spec (no separate path 
 });
 
 test('parseSeatArgs: seat plus an optional --effort (both spellings), defaulting to medium', () => {
-  assert.deepEqual(parseSeatArgs(['orchestrator-deepseek']), { seat: 'orchestrator-deepseek', effort: 'medium', interactive: false });
-  assert.deepEqual(parseSeatArgs(['builder-backup', '--effort', 'low']), { seat: 'builder-backup', effort: 'low', interactive: false });
-  assert.deepEqual(parseSeatArgs(['builder-backup', '--effort=high']), { seat: 'builder-backup', effort: 'high', interactive: false });
+  assert.deepEqual(parseSeatArgs(['orchestrator-deepseek']), { seat: 'orchestrator-deepseek', effort: 'medium' });
+  assert.deepEqual(parseSeatArgs(['builder-backup', '--effort', 'low']), { seat: 'builder-backup', effort: 'low' });
+  assert.deepEqual(parseSeatArgs(['builder-backup', '--effort=high']), { seat: 'builder-backup', effort: 'high' });
   assert.throws(() => parseSeatArgs(['builder-backup', '--wat']), /unknown argument: --wat/);
 });
 
@@ -277,36 +294,12 @@ test('supervisePiSeat: a normal successful turn exits 0 and prints nothing to st
   assert.match(out.stdoutText, /agent_settled/);
 });
 
-// ---------------------------------------------------------------------------
-// JUL-98 step 6: the INTERACTIVE launch, for the start-then-adopt route.
-//
-// `-p --mode json` is a one-shot with no worker contract, so a Pi seat started
-// that way cannot report to the mailbox at all (JUL-109 findings, section 4).
-// The route that CAN report starts Pi interactively and lets Orca adopt the
-// terminal -- so this file, which is the one place that knows how a Pi seat
-// authenticates, gains that launch rather than a second launcher being written
-// beside it.
-// ---------------------------------------------------------------------------
-
-test('the interactive launch drops -p and the json mode, and keeps the seat\'s provider, model, thinking and secret', () => {
-  const spec = buildPiSpawnSpec('reviewer-backup', null, { interactive: true, effort: 'high', readSecretImpl: () => 'SECRET' });
-  assert.equal(spec.command, 'pi');
-  // The reviewer backup moved to Command Code's GOAT plan on main (PR 90,
-  // Todd's 15:01:54Z Decision): the interactive launch carries whatever the
-  // SEAT DEFINITION says, which is now the namespaced Command Code model id.
-  assert.deepEqual(spec.args, ['--provider', 'commandcode', '--model', 'deepseek/deepseek-v4-pro', '--thinking', 'high']);
-  assert.ok(!spec.args.includes('-p'), 'a one-shot cannot report to the mailbox');
-  assert.ok(!spec.args.includes('--mode'));
-  assert.ok(!spec.args.includes('--'), 'there is no prompt: Orca types the brief in when it adopts the terminal');
-  assert.equal(spec.env.COMMANDCODE_API_KEY, 'SECRET', 'the secret still reaches the child, and only the child');
-});
-
-test('the one-shot launch is unchanged by the interactive one', () => {
+test('the one-shot launch carries the seat\'s provider, model, thinking, json mode and the prompt last', () => {
   const spec = buildPiSpawnSpec('builder-backup', 'do the thing', { effort: 'low', readSecretImpl: () => 'SECRET' });
   assert.deepEqual(spec.args, ['--provider', 'deepseek', '--model', 'deepseek-v4-flash', '--thinking', 'off', '-p', '--mode', 'json', '--', 'do the thing']);
 });
 
-test('--interactive is a recognized argument, and is off by default', () => {
-  assert.deepEqual(parseSeatArgs(['reviewer-backup', '--interactive', '--effort', 'high']), { seat: 'reviewer-backup', effort: 'high', interactive: true });
-  assert.deepEqual(parseSeatArgs(['reviewer-backup']), { seat: 'reviewer-backup', effort: DEFAULT_EFFORT, interactive: false });
+test('a seat with no --effort runs at the default effort, and --interactive is no longer an argument', () => {
+  assert.deepEqual(parseSeatArgs(['reviewer-backup']), { seat: 'reviewer-backup', effort: DEFAULT_EFFORT });
+  assert.throws(() => parseSeatArgs(['reviewer-backup', '--interactive']), /unknown argument: --interactive/);
 });

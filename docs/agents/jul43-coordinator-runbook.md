@@ -2713,6 +2713,73 @@ carries two things: what was not proven, and what breaks if it stays that way. T
 that nothing is written as "assumed" or "should work": both exist so a reader cannot mistake an unknown
 for a small thing.
 
+## The controller runs each seat as one command (JUL-98 step 8, Todd's Decision, 2026-09-23)
+
+**This replaces the controller's start-then-message route.** Every section above that describes the
+controller starting a worker with `worker-start`, adopting a terminal, typing a brief in, waiting on
+the `check --wait` mailbox, or reading cost through `read-seat-cost.mjs` /
+`prepare-seat-worktree.mjs` describes the **retired** route; that code was removed, not patched. (The
+coordinator skill's own Orca usage is a separate thing and is unchanged.)
+
+**How one seat runs now** (`graph/controller/seat-run.mjs`, `scripts/run-seat.mjs`):
+
+1. The controller makes the card's working copy with `orca worktree create --environment ovh-local
+   --repo path:/home/runner/julia-next --name <card>-work-a<N> --no-parent --base-branch origin/main`.
+2. For each seat it opens ONE plain terminal on `ovh-local` (so it runs as `runner`) in that working
+   copy, running `node scripts/run-seat.mjs ... --brief-b64 <brief>`. The brief rides in the command,
+   base64-encoded: a 40,000-character `--command` was measured arriving intact (2026-09-23 05:00Z).
+   Nothing is ever typed into the terminal.
+3. `run-seat.mjs` starts the agent as one command (`agy -p ... --output-format json` for the Gemini
+   builder, `pi -p --mode json` through `run-pi-seat.mjs reviewer-backup` for the DeepSeek reviewer)
+   in its own process group, with a hard time limit (builder 30 min, reviewer 20 min).
+4. The seat writes, under `.julia/` in the working copy: `round-N-<seat>.progress.jsonl` (status and
+   heartbeat lines, the old mailbox message shape) as it works, and `round-N-<seat>.answer.json` at
+   the end. `run-seat.mjs` adds `.brief.md`, `.out`, `.err` and `.run.json` (times, exit, timed out,
+   Gemini allowance before/after).
+5. The controller reads the progress file **every minute**, edits one progress comment on the card
+   when the reported step changes, and **stops a seat whose progress file has not changed for five
+   minutes** by closing its terminal. `run-seat.mjs` takes that hang-up and kills the agent's whole
+   group, then still writes its run record.
+6. When `run-seat.mjs` prints `__JULIA_WORKER_SCRIPT_DONE__:<status>`, the controller reads the answer
+   and run record **directly as `orchestrator-svc`** (proven readable 2026-09-23 05:00Z: worker umask
+   `0022`, every folder from `/home/runner/orca` down is `drwxr-xr-x`). Nothing is read off the screen.
+
+**Rounds.** Build, one test run, review in the same working copy (the controller then checks the
+commit is unchanged and `git status` clean). An approve over a passing suite ends the step; changes
+needed, or an approve over failing tests, go to a fresh builder as its finding. Two rounds, then the
+card parks with the reasons.
+
+**The working copy is removed last**, after publishing -- the send-back crash of JUL-92 attempt 10
+removed it first. `.julia/` is in `.gitignore` because **Orca refuses to remove a working copy holding
+an untracked file** (`Failed to delete worktree ... ?? .julia/answer.json`, measured 2026-09-23);
+`git worktree remove` does accept ignored files.
+
+**DeepSeek's output limit is set in `runner`'s Pi config, not by Pi's default.** With no `maxTokens`
+on the Command Code models, Pi capped every reply at 16,384 tokens, and a high-effort review spent it
+all thinking and stopped at `length` with no verdict (twice, 2026-09-23). The committed
+`ops/service-dropbox/pi-models.commandcode.json` now declares the models' own limits (`maxTokens`
+384000, `contextWindow` 1000000, from Pi's built-in DeepSeek registry); re-install it with the
+`sudo -u runner cp ...` in `ops/service-dropbox/README.md` after any change. Effort stays high. A reply
+that still stops at `length` is reported on the card as **cut off**, not as a missing verdict.
+
+**Seats today:** Gemini builds, DeepSeek reviews, no backups. A card labelled for anything else is
+refused with that reason before a working copy is made.
+
+**Stopping a seat by hand:** close its terminal (`orca terminal close --environment ovh-local --terminal
+<handle>`; titles start `julia-seat-`). That is the same stop the controller uses.
+
+**The free stand-in test** (no model, no card, nothing pushed), run on the server after the code is on
+`origin/main`:
+
+```
+cd /tmp; sudo -u orchestrator-svc node /srv/orchestrator-svc/julia-next/scripts/controller-stand-in.mjs --scenario pass
+# also: changes-then-pass | timeout | stuck | cut-off
+```
+
+It runs the real carry with `scripts/stand-in-seat.mjs` in both seats, prints every board comment and
+the would-be publish, and ends with one `[stand-in] RESULT {...}` line. Each scenario leaves one local
+branch `standin-<n>-work-a1` in `/home/runner/julia-next` (unmerged, never pushed); delete it after.
+
 ## Stop / resume
 
 - **Stopping a run in progress**: Orca's own recovery verbs (`worker-stop` for a proven

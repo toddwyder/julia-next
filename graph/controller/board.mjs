@@ -2,7 +2,7 @@
 // through, as the controller's own Linear identity.
 //
 // core.mjs takes a `board` with three methods -- `listReadyCards`, `comment`,
-// `moveCard`. Every test injects a stand-in for it. THIS is the implementation
+// `moveCard` (and the carry adds `updateComment`, JUL-98 step 8). Every test injects a stand-in for it. THIS is the implementation
 // that runs for real, and it exists so the app identity in ./token.mjs is
 // actually used: without it that token machinery had no caller at all.
 //
@@ -76,6 +76,10 @@ export function createControllerBoard({
     },
     async comment({ issueId, body }) {
       return client.comment({ issueId, body });
+    },
+    // JUL-98 step 8: the worker-progress comment is edited in place.
+    async updateComment({ commentId, body }) {
+      return client.updateComment({ commentId, body });
     },
     async moveCard({ issueId, to }) {
       return client.setIssueState({ issueId, stateId: await stateIdFor(to) });

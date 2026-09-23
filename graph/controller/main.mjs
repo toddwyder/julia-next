@@ -31,21 +31,17 @@ import { pathToFileURL } from 'node:url';
 
 import { runControllerCheck, READY_COLUMN } from './core.mjs';
 import { createControllerBoard } from './board.mjs';
-import { runBuildAndReview } from './step-runner.mjs';
-import { createSuiteRunner } from './test-run.mjs';
-import { testRunLine, testRunJournalLine } from './test-run.mjs';
-import { createAxiomMirror } from './mailbox.mjs';
+import { runBuildAndReview, attemptTag } from './step-runner.mjs';
+import { createSuiteRunner, readWorktreeState, testRunLine, testRunJournalLine } from './test-run.mjs';
 import { nextColumnFor, CONTROLLER_LAST_COLUMN } from './columns.mjs';
 import { stepReportComment } from './card-steps.mjs';
-import { launchForChoice } from './dispatch.mjs';
+import { launchFor } from './seat-run.mjs';
 import { seatChoicesForIssue } from '../../scripts/seat-labels.mjs';
 import {
   createOrcaBoundaries,
   createRequestLedger,
-  createOrcaSeatCostReader,
   createPublisher,
   resolveSenderTerminal,
-  worktreePathOf,
   ORCHESTRATOR_CHECKOUT,
   ORCHESTRATOR_ENVIRONMENT,
 } from './wiring.mjs';
@@ -145,180 +141,194 @@ export function stepsForCard(card) {
   }];
 }
 
-// The builder, the reviewer, one test run, the cost lines, then publish, then
-// the columns. Every boundary below is ./wiring.mjs's; the ORDER is
-// ./step-runner.mjs's and is not repeated here.
+// The working copy a card is built in is branched from here.
+export const BASE_BRANCH = 'origin/main';
+
+// The one progress comment a carry keeps on the card, edited in place as the
+// workers report (Todd, 23 Sep: "no black box").
+export function progressCommentBody({ card, seat, round, status, count, at }) {
+  const what = `${status.subject}${status.phase ? ` (${status.phase})` : ''}`;
+  return [
+    `**${card.identifier}: now working -- the ${seat}, round ${round}: ${what}.**`,
+    '',
+    `As of ${at}, from the worker's own progress file (${count} ${count === 1 ? 'report' : 'reports'} so far this run). The controller edits this comment as the worker reports; a worker whose progress file stops changing for five minutes is stopped as stuck.`,
+  ].join('\n');
+}
+
+// The progress comment's final edit, once the step has ended either way.
+export function finishedCommentBody({ card, outcome, at }) {
+  const what = outcome.ok
+    ? 'the step passed review and tests; publishing follows below'
+    : `the step ${outcome.parked ? 'parked after two review rounds' : 'did not pass'} -- the reason is in the comment below`;
+  return `**${card.identifier}: finished working -- ${what}.**\n\nAs of ${at}. This comment followed the workers' own progress files while they ran.`;
+}
+
+export function roundsSummary(rounds = []) {
+  return rounds.map((r) => {
+    const parts = [`round ${r.round}:`];
+    if (r.candidate) parts.push(`built \`${r.candidate.slice(0, 7)}\``);
+    if (r.testRun) parts.push(`tests ${r.testRun.pass} pass / ${r.testRun.fail} fail`);
+    if (r.verdict) parts.push(`review ${r.verdict === 'approve' ? 'APPROVE' : 'CHANGES NEEDED'}`);
+    return `- ${parts.join(' -- ')}`;
+  });
+}
+
+// One card, carried: its own working copy, the build-and-review rounds, then
+// publish, then the columns. JUL-98 step 8 rewrote this: each seat is one
+// command (./seat-run.mjs), and the working copy belongs to THIS function --
+// it is removed only after publishing, which is the fix for the send-back
+// crash (the old route removed it first, then tried to publish from it).
 export async function carryCard({
   card,
-  runId,
-  from,
-  // Which attempt on this card this is (1 the first time). It travels into the
-  // worktree name and the request-ledger key -- see `attemptTag` in
-  // ./step-runner.mjs for what a second attempt collides with without it.
   attempt = 1,
   boundaries,
   board,
   publisher,
-  readSeatCost,
   suiteRunner = createSuiteRunner(),
-  mirrorImpl,
   now = () => new Date().toISOString(),
   seatChoicesImpl = seatChoicesForIssue,
   runBuildAndReviewImpl = runBuildAndReview,
+  currentBranchImpl = currentBranch,
+  readWorktreeStateImpl = readWorktreeState,
   comments,
   log = () => {},
+  // The stand-in harness only (scripts/controller-stand-in.mjs): run both seats
+  // as the free stand-in, with its own limits. Never set from a card.
+  standIn = false,
+  timeLimits = {},
+  seatOptions = {},
 }) {
   const choices = seatChoicesImpl(card);
-  // Which vendor each seat is, so the cost reader knows which session file
-  // shape to read. It comes from the same function that builds the
-  // `worker-start` argv, so the seat cannot be launched as one vendor and
-  // costed as another.
-  const agentForSeat = Object.fromEntries(
-    Object.entries(choices).map(([seat, choice]) => [seat, launchForChoice(choice).agent ?? null]),
-  );
+  const launches = {
+    builder: launchFor('builder', choices.builder, { standIn }),
+    reviewer: launchFor('reviewer', choices.reviewer, { standIn }),
+  };
+  const refused = Object.values(launches).find((launch) => !launch.ok);
+  if (refused) {
+    await comments.postOnce({ issueId: card.id, key: `seat-refused:${refused.reason}`, body: `**${card.identifier}: not started.** ${refused.reason}` });
+    return { ok: false, stage: 'seat', reason: refused.reason };
+  }
 
   const [step] = stepsForCard(card);
-  const outcome = await runBuildAndReviewImpl({
-    card,
-    step,
-    choices,
-    attempt,
-    files: [],
-    environment: ORCHESTRATOR_ENVIRONMENT,
-    runId,
-    from,
-    suiteRunner,
-    mirrorImpl,
-    workerStartImpl: boundaries.workerStartImpl,
-    // The START-THEN-ADOPT route's own boundaries (JUL-98 step 6), used only by
-    // a seat whose agent `worker-start --agent` has no launcher for.
-    adoptBoundaries: {
-      worktreeCreateImpl: boundaries.worktreeCreateImpl,
-      prepareWorktreeImpl: boundaries.prepareWorktreeImpl,
-      agentTerminalCreateImpl: boundaries.agentTerminalCreateImpl,
-      terminalWaitImpl: boundaries.terminalWaitImpl,
-      terminalCloseImpl: boundaries.terminalCloseImpl,
-      removeWorktreeImpl: boundaries.removeWorktreeImpl,
-      dispatchPreambleImpl: boundaries.dispatchPreambleImpl,
-      terminalSendImpl: boundaries.terminalSendImpl,
-    },
-    observeStartImpl: boundaries.observeStartImpl,
-    // The start rule's production source (JUL-98 step 6 round 4b). Without it
-    // the three-way rule has no Orca inspect structure to read and degrades to
-    // possibly-running for every seat, however it ended.
-    workerShowImpl: boundaries.workerShowImpl,
-    checkWaitImpl: boundaries.checkWaitImpl,
-    releaseImpl: boundaries.releaseImpl,
-    removeWorktreeImpl: boundaries.removeWorktreeImpl,
-    // `agent` comes back from the dispatch that actually happened, so a seat
-    // that moved to its backup is costed as the vendor that RAN. The map below
-    // is the fallback for a caller that hands back none.
-    readCostImpl: ({ seat, dispatchId, worktree, agent, model, allowanceBefore, startedAt, endedAt }) => readSeatCost({
-      seat, dispatchId, worktree,
-      agent: agent ?? agentForSeat[seat],
-      // An allowance-billed seat is costed from two readings, not a session
-      // file; the first one was taken at dispatch and travels with the result.
-      model: model ?? null,
-      allowanceBefore: allowanceBefore ?? null,
-      startedAt: startedAt ?? null,
-      endedAt: endedAt ?? null,
-    }),
-  });
-
-  // ONE comment per seat that moved to its backup, before anything else is
-  // said about the step: the card must show which seat ran on what, whether or
-  // not the step then passed. Through the same guard as every other comment, so
-  // a replayed cycle does not write it twice.
-  for (const moved of outcome.seatMoves ?? []) {
-    log(`[controller] ${card.identifier}: the ${moved.seat} seat moved from ${moved.from} to ${moved.to} -- ${moved.reason}`);
-    await comments.postOnce({
-      issueId: card.id,
-      key: `seat-move:${moved.seat}:${moved.from}->${moved.to}`,
-      body: moved.comment,
-    });
+  const name = `${card.identifier.toLowerCase()}-work-${attemptTag(attempt)}`;
+  const created = await boundaries.worktreeCreateImpl({ name, baseBranch: BASE_BRANCH });
+  const worktreeId = created?.worktree?.id ?? null;
+  const worktreePath = created?.worktree?.path ?? null;
+  if (!worktreeId || !worktreePath) {
+    throw new Error(`orca worktree create answered no worktree id or path for ${name} (${JSON.stringify(created ?? null).slice(0, 200)})`);
   }
 
-  // ONE comment per reviewer retried after a no-verdict outcome (Todd's
-  // Decision, 2026-09-22): the card must show that a reviewer reported
-  // failed with nothing said, and that a fresh attempt was given rather than
-  // the card being stopped on a verdict that named no defect.
-  for (const retried of outcome.noVerdictRetries ?? []) {
-    const body = `**The ${retried.seat} seat's first attempt reported failed with no findings or reason.** Treated as the review itself being unusable, not a verdict on the change (dispatch ${retried.firstDispatchId}). A fresh ${retried.seat} was dispatched instead of stopping the card (dispatch ${retried.retryDispatchId}), and its verdict is what the rest of this step is judged on.`;
-    log(`[controller] ${card.identifier}: the ${retried.seat} seat's no-verdict first attempt (${retried.firstDispatchId}) was retried as ${retried.retryDispatchId}`);
-    await comments.postOnce({
-      issueId: card.id,
-      key: `no-verdict-retry:${retried.seat}:${retried.firstDispatchId}`,
-      body,
-    });
-  }
+  try {
+    // Read NOW, while the working copy certainly exists.
+    const branch = await currentBranchImpl(worktreePath);
+    const start = await readWorktreeStateImpl({ worktree: worktreePath });
+    if (!start.known) throw new Error(`the new working copy ${worktreePath} could not be read: ${start.reason}`);
+    log(`[controller] ${card.identifier}: working copy ${worktreePath} on ${branch} from ${BASE_BRANCH} at ${start.shortCommit}`);
 
-  const testRun = outcome.testRun;
-  // The journal carries the same test result the card does -- which tests
-  // failed, and whether the worktree it was measured in matched the commit --
-  // so `journalctl --user -u julia-controller` can answer both without the
-  // worktree, which is gone by the time anyone asks (JUL-98 step 5, sixth fix).
-  if (testRun) log(`[controller] ${card.identifier}: ${testRunJournalLine(testRun)}`);
-  if (!outcome.ok) {
-    // The card stays where it is. It is TOLD why, once, with whatever figures
-    // were read -- a step that failed still spent money, and the card is where
-    // that is recorded.
-    await comments.postOnce({
-      issueId: card.id,
-      key: `step-failed:${step.key}:${outcome.reason}`,
-      body: [
-        `**${card.identifier}: the ${step.title} step did not pass.** ${outcome.reason}`,
-        ...(testRun ? ['', testRunLine(testRun)] : []),
-        ...(outcome.costText.length ? ['', '**Cost, per worker:**', ...outcome.costText] : []),
-      ].join('\n'),
-    });
-    return { ok: false, stage: 'build-and-review', reason: outcome.reason, outcome };
-  }
+    let progressCommentId = null;
+    const onProgress = async ({ seat, round, status, count }) => {
+      const body = progressCommentBody({ card, seat, round, status, count, at: now() });
+      log(`[controller] ${card.identifier}: ${seat} round ${round}: ${status.subject}${status.phase ? ` (${status.phase})` : ''}`);
+      if (progressCommentId && board.updateComment) {
+        await board.updateComment({ commentId: progressCommentId, body });
+      } else {
+        const posted = await board.comment({ issueId: card.id, body });
+        progressCommentId = posted?.id ?? null;
+      }
+    };
 
-  // Publishing: the App, through scripts/publish-pr.mjs and merge-pr.mjs.
-  const worktreePath = worktreePathOf(outcome.builder.worktree);
-  const branch = await currentBranch(worktreePath);
-  const published = await publisher.publishAndMerge({
-    branch,
-    worktreePath,
-    title: `${card.identifier}: ${step.title}`,
-    body: `${card.url ?? card.identifier}\n\nCarried by the Julia controller.`,
-  });
-  if (!published.ok) {
-    await comments.postOnce({
-      issueId: card.id,
-      key: `publish-failed:${branch}`,
-      body: `**${card.identifier}: the work passed but publishing did not.** ${published.reason}`,
-    });
-    return { ok: false, stage: 'publish', reason: published.reason, outcome, published };
-  }
-
-  // The columns, one comment per move, the report on the first of them.
-  const moves = [];
-  let column = 'Implementation';
-  let first = true;
-  for (let guard = 0; guard < 9; guard += 1) {
-    if (column === CONTROLLER_LAST_COLUMN) break;
-    const move = nextColumnFor(column, { hasReviewableOutput: card.hasReviewableOutput !== false });
-    if (!move.ok) break;
-    const at = now();
-    const body = first
-      ? stepReportComment({
-        card, step, from: column, move, at,
-        testRunLine: testRun ? testRunLine(testRun) : null,
-        costText: outcome.costText,
-        extra: `Merged as ${published.merged.sha} (${published.pr.url}).`,
-      })
-      : stepReportComment({
-        card, step, from: column, move, at, testRunLine: null, costText: outcome.costText,
+    let outcome;
+    try {
+      outcome = await runBuildAndReviewImpl({
+        card, step, launches, worktreePath, branch, baseCommit: start.commit, suiteRunner, boundaries,
+        timeLimits, seatOptions, onProgress,
       });
-    await comments.postOnce({ issueId: card.id, key: `move:${column}->${move.to}`, body });
-    await board.moveCard({ issueId: card.id, to: move.to });
-    moves.push({ from: column, to: move.to });
-    column = move.to;
-    first = false;
-  }
+    } catch (error) {
+      // The controller's OWN fault mid-step (PR #102 review, finding 5): the
+      // card is still told, below, rather than left with nothing but a journal
+      // line.
+      outcome = { ok: false, reason: `the controller itself failed mid-step: ${error.message}`, rounds: [], costLines: [], costText: [], testRun: null };
+    }
+    // The progress comment's last state, so it never says "now working" about
+    // a step that has ended (PR #102 review, finding 6).
+    if (progressCommentId && board.updateComment) {
+      try {
+        await board.updateComment({ commentId: progressCommentId, body: finishedCommentBody({ card, outcome, at: now() }) });
+      } catch (error) {
+        log(`[controller] ${card.identifier}: could not mark the progress comment finished: ${error.message}`);
+      }
+    }
+    const testRun = outcome.testRun;
+    if (testRun) log(`[controller] ${card.identifier}: ${testRunJournalLine(testRun)}`);
 
-  return { ok: true, stage: 'carried', outcome, published, moves, column };
+    if (!outcome.ok) {
+      const headline = outcome.parked
+        ? `**${card.identifier}: parked after two review rounds.** ${outcome.reason}`
+        : `**${card.identifier}: the ${step.title} step did not pass.** ${outcome.reason}`;
+      await comments.postOnce({
+        issueId: card.id,
+        key: `step-failed:${step.key}:${outcome.reason}`,
+        body: [
+          headline,
+          ...(outcome.rounds?.length ? ['', ...roundsSummary(outcome.rounds)] : []),
+          ...(testRun ? ['', testRunLine(testRun)] : []),
+          ...(outcome.costText.length ? ['', '**Cost, per worker:**', ...outcome.costText] : []),
+          '',
+          `The work so far is on branch \`${branch}\`.`,
+        ].join('\n'),
+      });
+      return { ok: false, stage: 'build-and-review', reason: outcome.reason, outcome, branch };
+    }
+
+    // Publishing: the App, from the working copy this function still holds.
+    const published = await publisher.publishAndMerge({
+      branch,
+      worktreePath,
+      title: `${card.identifier}: ${step.title}`,
+      body: `${card.url ?? card.identifier}\n\nCarried by the Julia controller.`,
+    });
+    if (!published.ok) {
+      await comments.postOnce({
+        issueId: card.id,
+        key: `publish-failed:${branch}`,
+        body: `**${card.identifier}: the work passed but publishing did not.** ${published.reason}`,
+      });
+      return { ok: false, stage: 'publish', reason: published.reason, outcome, published, branch };
+    }
+
+    // The columns, one comment per move, the report on the first of them.
+    const moves = [];
+    let column = 'Implementation';
+    let first = true;
+    for (let guard = 0; guard < 9; guard += 1) {
+      if (column === CONTROLLER_LAST_COLUMN) break;
+      const move = nextColumnFor(column, { hasReviewableOutput: card.hasReviewableOutput !== false });
+      if (!move.ok) break;
+      const at = now();
+      const body = first
+        ? stepReportComment({
+          card, step, from: column, move, at,
+          testRunLine: testRun ? testRunLine(testRun) : null,
+          costText: outcome.costText,
+          extra: [`Merged as ${published.merged.sha} (${published.pr.url}).`, '', ...roundsSummary(outcome.rounds)].join('\n'),
+        })
+        : stepReportComment({
+          card, step, from: column, move, at, testRunLine: null, costText: outcome.costText,
+        });
+      await comments.postOnce({ issueId: card.id, key: `move:${column}->${move.to}`, body });
+      await board.moveCard({ issueId: card.id, to: move.to });
+      moves.push({ from: column, to: move.to });
+      column = move.to;
+      first = false;
+    }
+    return { ok: true, stage: 'carried', outcome, published, moves, column, branch };
+  } finally {
+    try {
+      await boundaries.removeWorktreeImpl({ worktree: worktreeId });
+    } catch (error) {
+      log(`[controller] ${card.identifier}: could not remove the working copy ${worktreePath}: ${error.message}`);
+    }
+  }
 }
 
 // The branch the builder committed on, read out of the candidate worktree so
@@ -347,8 +357,6 @@ export async function runOnce({
   boundaries,
   from,
   publisher,
-  readSeatCost,
-  mirrorImpl,
   log = console.log,
   carryCardImpl = carryCard,
   runControllerCheckImpl = runControllerCheck,
@@ -424,11 +432,7 @@ export async function runOnce({
   };
 
   const carried = await carryCardImpl({
-    card, runId: check.runId, from, attempt, boundaries, board, publisher, readSeatCost, comments, now, log,
-    // Every mailbox message this card's workers send is mirrored to Axiom on
-    // the way through, via the relay that already exists -- no new event
-    // vocabulary and no relay change (./mailbox.mjs's createAxiomMirror).
-    mirrorImpl: mirrorImpl ?? createAxiomMirror({ runId: check.runId }),
+    card, attempt, boundaries, board, publisher, comments, now, log,
   });
   log(`[controller] ${card.identifier}: ${carried.ok ? `carried to ${carried.column}` : `stopped at ${carried.stage} -- ${carried.reason}`}`);
   return { check, state: { ...nextState, carrying: null }, carried };
@@ -550,11 +554,6 @@ export async function main({
   const boundaries = createOrcaBoundaries({ ledger });
   const board = createControllerBoard();
   const publisher = createPublisher({ env });
-  // READ AS THE WORKER, THROUGH ORCA. The worker's transcript directory is
-  // mode 0700 and owned by the worker, so this process cannot read it off disk
-  // at all -- see the header of wiring.mjs's cost-read section for the measured
-  // permissions and for what breaks if someone puts the file read back here.
-  const readSeatCost = createOrcaSeatCostReader({ boundaries });
 
   const saveState = (next) => {
     writeControllerState({ ...next, requests: ledger.entries() }, { statePath: path });
@@ -617,8 +616,7 @@ export async function main({
   }
 
   const shared = {
-    state, board, boundaries, from, publisher, readSeatCost,
-    mirrorImpl: null, log, saveState, now,
+    state, board, boundaries, from, publisher, log, saveState, now,
   };
   const final = await runLoop({
     ...shared,
