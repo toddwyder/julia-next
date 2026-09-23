@@ -81,6 +81,14 @@ export function createControllerBoard({
     async updateComment({ commentId, body }) {
       return client.updateComment({ commentId, body });
     },
+    // The acceptance check's guard (Todd, 23 Sep): the live card, and ticking
+    // its criteria boxes once the evidence is posted.
+    async readCard({ issueId }) {
+      return client.readIssueForUat({ issueId });
+    },
+    async setDescription({ issueId, description }) {
+      return client.setDescription({ issueId, description });
+    },
     async moveCard({ issueId, to }) {
       return client.setIssueState({ issueId, stateId: await stateIdFor(to) });
     },

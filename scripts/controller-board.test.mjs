@@ -57,7 +57,7 @@ const RAW_CARD = {
   identifier: 'JUL-92',
   title: 'a card',
   sortOrder: -2889,
-  description: '## UAT plan\n\n1. I look at it.\n',
+  description: '## Acceptance criteria\n\n- [ ] It works.\n\n## UAT plan\n\n1. I look at it.\n',
   state: READY_STATE,
   labels: { nodes: [{ id: 'l1', name: 'builder-claude-opus' }] },
   relations: { nodes: [] },
@@ -146,7 +146,7 @@ test('listReadyCards resolves the Ready column by name and returns the cards the
   assert.deepEqual(cards[0].labels, ['builder-claude-opus']);
   // The third refusal (no `## UAT plan`) reads the description. A board that
   // does not carry it would refuse every real card.
-  assert.equal(cards[0].description, '## UAT plan\n\n1. I look at it.\n');
+  assert.equal(cards[0].description, '## Acceptance criteria\n\n- [ ] It works.\n\n## UAT plan\n\n1. I look at it.\n');
   const states = fetchImpl.calls.find((call) => /ReadyQueueTeamStates/.test(call.query));
   assert.equal(states.variables.teamName, 'Julia-next');
   const listed = fetchImpl.calls.find((call) => /ReadyQueueIssues/.test(call.query));

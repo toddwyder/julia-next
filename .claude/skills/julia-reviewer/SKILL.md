@@ -29,6 +29,22 @@ not publish.
 4. **The repo's own standing instructions** — `CLAUDE.md`, `CONTEXT.md`, `docs/adr/`, and
    `docs/agents/server-runbook.md`.
 
+## Every acceptance criterion, by name
+
+Your brief lists the card's acceptance criteria by id (`AC1`, `AC2`, ...), each with its exact
+words. **Check every one of them yourself, one at a time, by id and by those words**, and answer
+each in your answer file's `criteria` list: `"met"` only when you checked it and it holds, with
+how you checked it and the source. Otherwise `"not_met"` with the reason, and then your verdict
+is CHANGES NEEDED. Echo the criterion's exact words.
+
+The builder's evidence for a criterion is a claim to check, not a check. If the criterion asks
+for something to be done (a fresh-reader check, a live test), confirm it was really done, and
+done the way the criterion says. Don't accept a description of it.
+
+A plain script (the acceptance check, `scripts/acceptance-check.mjs`) reads your list after you
+approve. It refuses the step, and nothing merges, if any criterion is missing, answered without
+how, not `"met"`, or named under the wrong id. An approve that skips a criterion is not a pass.
+
 ## What you attack
 
 - **The criteria.** Does the change do what the step actually asked, all of it, and only it?
@@ -65,14 +81,17 @@ screen, and there is no message channel. Your brief names both files exactly.
 
 - **Progress, as you review:** one JSON line appended to your progress file each time you start a
   new part of the review (`"type":"status"`), and at least every two minutes (`"type":"heartbeat"`).
-  **If the file does not change for five minutes you are treated as stuck and stopped.**
-- **Your verdict, once, at the end:** `{"verdict":"approve","summary":"<what you checked>"}` or
-  `{"verdict":"changes_needed","findings":"<each finding, ranked, with its source>"}`. If you are
-  blocked, say so as a finding rather than guessing.
+  **If for five minutes this file does not change and you show no other sign of work (no output,
+  no CPU use), you are treated as stuck and stopped.**
+- **Your verdict, once, at the end:** `{"verdict":"approve","summary":"<what you checked>","criteria":[{"id":"AC1","criterion":"<its exact words>","verdict":"met","how":"<how you checked it, with the source>"}, ...]}`
+  or `{"verdict":"changes_needed","findings":"<each finding, ranked, with its source>","criteria":[...]}`.
+  One `criteria` entry for every criterion in your brief. If you are blocked, say so as a finding
+  rather than guessing.
 
 ## What you hand back
 
 - A verdict: **APPROVE**, or **CHANGES NEEDED**.
+- Every acceptance criterion, by id and name: met or not met, and how you checked it.
 - If changes are needed: each finding, ranked, with its source, and what breaks if it stays.
 - If you approve: what you actually checked to get there, named — not "looks good".
 - Anything you could not check, and why.

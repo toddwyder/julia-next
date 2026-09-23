@@ -24,6 +24,10 @@
 //                      its output. Neither may be stopped as stuck; the carry must
 //                      reach UAT (JUL-92, 23 Sep 07:01Z: a DeepSeek reviewer 30 tool
 //                      calls into a review was stopped as stuck for exactly this)
+//   missing-evidence   the builder answers every acceptance criterion but leaves
+//                      out the LAST UAT-plan item, both rounds: the acceptance
+//                      check must refuse it, and the card parks unmerged and never
+//                      reaches UAT (Todd, 23 Sep: JUL-92 reached UAT with none)
 //   cut-off            the reviewer's reply stops at its output limit before it
 //                      writes a verdict -- the same Pi stream shape a real
 //                      DeepSeek review produced on 23 Sep, at a 16,384 cap -- so the
@@ -36,7 +40,16 @@ import { fileURLToPath } from 'node:url';
 
 import { seatFiles } from './run-seat.mjs';
 
-export const SCENARIOS = Object.freeze(['pass', 'changes-then-pass', 'timeout', 'stuck', 'busy-silent', 'cut-off']);
+export const SCENARIOS = Object.freeze(['pass', 'changes-then-pass', 'timeout', 'stuck', 'busy-silent', 'missing-evidence', 'cut-off']);
+
+// The criteria and UAT items the brief lists by id (graph/controller/seat-run.mjs
+// `buildStepBrief`, from scripts/acceptance-check.mjs), read back the way a real
+// seat reads them: off the brief.
+export function briefLists(brief) {
+  const criteria = [...String(brief).matchAll(/^- (AC\d+): (.+)$/gm)].map((m) => ({ id: m[1], criterion: m[2].trim() }));
+  const uat = [...String(brief).matchAll(/^- (UAT\d+): (.+)$/gm)].map((m) => ({ id: m[1], name: m[2].trim() }));
+  return { criteria, uat };
+}
 // Longer than the stand-in stuck limit (60 s, scripts/controller-stand-in.mjs)
 // by more than two reads of it.
 export const BUSY_SILENT_MS = 150 * 1000;
@@ -111,7 +124,15 @@ export async function standIn({ seat, tag, worktree }, { heartbeatMs = 5000, bus
     git(worktree, ['add', file]);
     git(worktree, ['commit', '-q', '-m', `stand-in: ${scenario} ${tag}`]);
     say('status', 'done', 'handing back');
-    answer({ outcome: 'done', summary: `committed ${file} (${git(worktree, ['rev-parse', 'HEAD'])})` });
+    const head = git(worktree, ['rev-parse', 'HEAD']);
+    const lists = briefLists(brief);
+    const uat = scenario === 'missing-evidence' ? lists.uat.slice(0, -1) : lists.uat;
+    answer({
+      outcome: 'done',
+      summary: `committed ${file} (${head})`,
+      acceptance: lists.criteria.map((c) => ({ ...c, evidence: `stand-in: committed ${file} at ${head}` })),
+      uat: uat.map((u) => ({ id: u.id, text: `stand-in answer for ${u.name}: ${file}` })),
+    });
     return;
   }
 
@@ -128,7 +149,11 @@ export async function standIn({ seat, tag, worktree }, { heartbeatMs = 5000, bus
     answer({ verdict: 'changes_needed', findings: STAND_IN_FINDING });
     return;
   }
-  answer({ verdict: 'approve', summary: `stand-in approve (${scenario}, ${tag})` });
+  answer({
+    verdict: 'approve',
+    summary: `stand-in approve (${scenario}, ${tag})`,
+    criteria: briefLists(brief).criteria.map((c) => ({ ...c, verdict: 'met', how: 'stand-in: read the commit' })),
+  });
 }
 
 function parse(argv) {

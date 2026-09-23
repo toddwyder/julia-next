@@ -51,6 +51,7 @@ import {
   seatCostLine, readFailedCostLine, deepseekExtractFromSeatStream, geminiExtractFromAllowance,
 } from './cost.mjs';
 import { WORKER_SCRIPT_END_MARKER, workerScriptExitCode } from './wiring.mjs';
+import { evidenceListsForBrief } from '../../scripts/acceptance-check.mjs';
 
 export const ANSWER_DIR = '.julia';
 
@@ -234,6 +235,9 @@ export function buildStepBrief({ seat, card, step, files = [] }) {
   ];
   if (card.url) lines.push(card.url);
   lines.push('', '## This step', '', step.brief ?? '');
+  // The acceptance check (scripts/acceptance-check.mjs) reads these two lists
+  // off the card and refuses the step unless every one is answered by id.
+  lines.push('', evidenceListsForBrief(step.brief ?? ''));
   if (step.criteria?.length) lines.push('', '### What this step is judged on', '', bullets(step.criteria));
   if (files.length) lines.push('', '## The files this step is about', '', bullets(files));
   if (step.priorFinding) {
@@ -250,8 +254,11 @@ export function buildStepBrief({ seat, card, step, files = [] }) {
 export function reportingInstructions({ seat, tag, timeLimitMs }) {
   const minutes = Math.round(timeLimitMs / 60000);
   const answerShape = seat === 'builder'
-    ? '`{"outcome":"done","summary":"<your hand-in>"}` when the work is committed, or `{"outcome":"blocked","summary":"<why you stopped>"}`'
-    : '`{"verdict":"approve","summary":"<what you checked>"}` or `{"verdict":"changes_needed","findings":"<each finding, ranked, with its source>"}`';
+    ? '`{"outcome":"done","summary":"<your hand-in>","acceptance":[{"id":"AC1","criterion":"<its exact words>","evidence":"<what shows it is met, naming its source>"}, ...one per criterion],"uat":[{"id":"UAT1","text":"<the plain-English answer Todd reads for that item>"}, ...one per UAT-plan item]}` when the work is committed, or `{"outcome":"blocked","summary":"<why you stopped>"}`'
+    : '`{"verdict":"approve","summary":"<what you checked>","criteria":[{"id":"AC1","criterion":"<its exact words>","verdict":"met","how":"<how you checked it yourself, naming the source>"}, ...one per criterion]}` or `{"verdict":"changes_needed","findings":"<each finding, ranked, with its source>","criteria":[...the same, with "not_met" where it is not met]}`';
+  const evidenceRule = seat === 'builder'
+    ? '**Every acceptance criterion and every UAT-plan item listed above, by id, gets an entry.** A plain script (the acceptance check) refuses the step if one is missing, empty, or names a different criterion. Echo each criterion\'s exact words. Claim only what you did: if you could not do or check something, say so in its entry.'
+    : '**Check every acceptance criterion listed above yourself, by id and by its exact words** -- not the builder\'s word for it. Answer `"met"` only when you checked it and it holds; anything else is `"not_met"` with the reason, and then your verdict is `changes_needed`. A plain script (the acceptance check) refuses the step if any criterion is not answered `met` by name.';
   return [
     '## How you report -- the only two things the controller reads',
     '',
@@ -261,6 +268,7 @@ export function reportingInstructions({ seat, tag, timeLimitMs }) {
     `   \`{"type":"status","subject":"writing the failing test","body":"","payload":{"phase":"red"},"created_at":"2026-09-23T05:00:00Z"}\``,
     '   **If for five minutes this file does not change and you show no other sign of work, you are treated as stuck and stopped.** Before any command that may run long, write a heartbeat first. Your times are not trusted; the controller reads when the file changed.',
     `2. **Your answer, once, at the end.** Write \`${ANSWER_DIR}/${tag}.answer.json\`: ${answerShape}.`,
+    `   ${evidenceRule}`,
     '',
     `\`${ANSWER_DIR}/\` is ignored by git; never commit it. You have ${minutes} minutes in all; after that you are stopped and the step fails.`,
     '',

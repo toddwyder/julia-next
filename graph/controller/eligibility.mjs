@@ -28,6 +28,7 @@ import {
   issueFingerprint,
   sortCardsByBoardOrder,
 } from '../../scripts/ready-queue.mjs';
+import { parseAcceptanceCriteria, parseUatPlan } from '../../scripts/acceptance-check.mjs';
 
 // The exact heading. Not a phrase to be matched loosely: the whole point of the
 // refusal is that a card says, in a section a person can find, how it will be
@@ -41,6 +42,15 @@ const UAT_PLAN_PATTERN = /^[ \t]*##[ \t]+UAT plan[ \t]*$/m;
 export const NO_UAT_PLAN_REASON =
   `the card has no \`${UAT_PLAN_HEADING}\` section; a card the controller carries must say how it will be checked when it reaches UAT`;
 
+// The acceptance check (scripts/acceptance-check.mjs) refuses the step at the
+// end unless every acceptance criterion and every UAT-plan item is answered.
+// A card with none of either could never pass it, so it is refused before any
+// seat is paid for (Todd, 23 Sep).
+export const NO_ACCEPTANCE_CRITERIA_REASON =
+  'the card lists no acceptance criteria (checkbox lines under an "Acceptance criteria" heading); the acceptance check needs them to accept the work against';
+export const NO_UAT_ITEMS_REASON =
+  `the card's \`${'## UAT plan'}\` section has no numbered items; the acceptance check needs each item answered before the card reaches UAT`;
+
 export function hasUatPlanSection(description) {
   if (typeof description !== 'string') return false;
   return UAT_PLAN_PATTERN.test(description);
@@ -53,6 +63,8 @@ export function evaluateControllerEligibility(issue, options = {}) {
   const base = evaluateEligibility(issue, options);
   const reasons = [...base.reasons];
   if (!hasUatPlanSection(issue?.description)) reasons.push(NO_UAT_PLAN_REASON);
+  else if (!parseUatPlan(issue.description).length) reasons.push(NO_UAT_ITEMS_REASON);
+  if (!parseAcceptanceCriteria(issue?.description).length) reasons.push(NO_ACCEPTANCE_CRITERIA_REASON);
   return { eligible: reasons.length === 0, reasons };
 }
 
@@ -70,6 +82,8 @@ export function controllerFingerprint(issue) {
   return JSON.stringify({
     base: issueFingerprint(issue),
     uatPlan: hasUatPlanSection(issue?.description),
+    uatItems: parseUatPlan(issue?.description).length,
+    criteria: parseAcceptanceCriteria(issue?.description).length,
   });
 }
 

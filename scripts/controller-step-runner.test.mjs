@@ -8,7 +8,18 @@ import assert from 'node:assert/strict';
 import { runBuildAndReview, attemptTag, suitePassed, MAX_ROUNDS } from '../graph/controller/step-runner.mjs';
 
 const card = { identifier: 'JUL-92', title: 'Docs match' };
-const step = { key: 'work', title: 'Docs match', brief: 'Fix the docs.' };
+const step = {
+  key: 'work',
+  title: 'Docs match',
+  brief: 'Fix the docs.\n\n**Acceptance criteria:**\n\n- [ ] No reference to the old runbook name remains (test).\n\n## UAT plan\n\n1. **The rename:** the new name.\n',
+};
+// The evidence the acceptance check needs, as a real builder and reviewer give it.
+const builderEvidence = {
+  acceptance: [{ id: 'AC1', criterion: 'No reference to the old runbook name remains (test).', evidence: 'git grep finds nothing' }],
+  uat: [{ id: 'UAT1', text: 'It is server-runbook.md.' }],
+};
+const met = [{ id: 'AC1', criterion: 'No reference to the old runbook name remains (test).', verdict: 'met', how: 'ran git grep myself' }];
+const approve = (summary = 'checked') => ({ verdict: 'approve', summary, criteria: met });
 const launches = { builder: { agent: 'agy', model: 'gemini-3.8-flash' }, reviewer: { agent: 'pi', model: 'deepseek-v4-pro' } };
 const zeroCost = (seat) => ({ seat, vendor: 'stand-in', model: 'm', totalTokens: 0, peakContext: 0, minutes: 1, usd: 0, tokens: { input: 0, output: 0 } });
 
@@ -27,7 +38,7 @@ function world({ verdicts = [], tests = [], builder = () => ({}), afterReview = 
       if (override.result) return { costLine: zeroCost(seat), ...override.result };
       if (!override.noCommit) { commits += 1; head = `c${commits}`.padEnd(40, '0'); }
       if (override.dirty) clean = false;
-      return { ok: true, answer: { outcome: 'done', summary: `built round ${round}` }, costLine: zeroCost(seat) };
+      return { ok: true, answer: { outcome: 'done', summary: `built round ${round}`, ...(override.evidence ?? builderEvidence) }, costLine: zeroCost(seat) };
     }
     const verdict = verdicts.shift();
     if (afterReview) ({ head = head, clean = clean } = afterReview({ head, clean }) ?? {});
@@ -46,10 +57,14 @@ const run = (w, extra = {}) => runBuildAndReview({
 const failing = { pass: 9, fail: 1, skipped: 0, total: 10, startedAt: '2026-09-23T05:00:00Z', endedAt: '2026-09-23T05:00:05Z', durationMs: 5000, command: 'node --test', worktree: '/w' };
 
 test('round 1 approved over a passing suite: the step passes, with both seats costed and one test run', async () => {
-  const w = world({ verdicts: [{ verdict: 'approve', summary: 'checked' }] });
+  const w = world({ verdicts: [approve()] });
   const result = await run(w);
   assert.equal(result.ok, true, result.reason);
   assert.equal(result.rounds.length, 1);
+  assert.equal(result.rounds[0].acceptance.ok, true, 'the acceptance check ran and passed');
+  assert.deepEqual(result.evidence.builder.uat, builderEvidence.uat, 'the evidence travels on to be posted');
+  assert.match(w.briefs.builder[0], /- AC1: No reference to the old runbook name remains/, 'the builder is given each criterion by id');
+  assert.match(w.briefs.builder[0], /- UAT1: The rename/);
   assert.equal(result.candidate, 'c1'.padEnd(40, '0'));
   assert.equal(result.costText.length, 2);
   assert.deepEqual(w.suiteKeys, ['work:round-1']);
@@ -59,7 +74,7 @@ test('round 1 approved over a passing suite: the step passes, with both seats co
 });
 
 test('THE SEND-BACK: changes needed in round 1 go to a fresh round-2 builder AS ITS FINDING, and round 2\'s approve passes the step', async () => {
-  const w = world({ verdicts: [{ verdict: 'changes_needed', findings: 'F1: the rename missed CLAUDE.md' }, { verdict: 'approve', summary: 'ok' }] });
+  const w = world({ verdicts: [{ verdict: 'changes_needed', findings: 'F1: the rename missed CLAUDE.md' }, approve('ok')] });
   const result = await run(w);
   assert.equal(result.ok, true, result.reason);
   assert.equal(result.rounds.length, 2);
@@ -80,7 +95,7 @@ test('a CHANGES NEEDED verdict never passes the step -- the regression that woul
 });
 
 test('an approve over a FAILING suite is not a pass: the failing run goes back as the finding', async () => {
-  const w = world({ verdicts: [{ verdict: 'approve', summary: 'looks fine' }, { verdict: 'approve', summary: 'fixed' }], tests: [failing] });
+  const w = world({ verdicts: [approve('looks fine'), approve('fixed')], tests: [failing] });
   const result = await run(w);
   assert.equal(result.ok, true);
   assert.match(w.briefs.builder[1], /the controller's own test run did not pass, and nothing merges with failing tests/);
@@ -122,3 +137,31 @@ test('the attempt token goes forwards and never collides with the first attempt\
   assert.equal(attemptTag(0), 'a1');
   assert.equal(attemptTag(undefined), 'a1');
 });
+
+// ---------------------------------------------------------------------------
+// The acceptance check (Todd, 23 Sep: JUL-92 reached UAT with none of the
+// evidence its UAT plan promised)
+// ---------------------------------------------------------------------------
+
+test('THE ACCEPTANCE CHECK: an approve over passing tests with a UAT item missing is refused before merge, and the gap goes to round 2 as the finding', async () => {
+  const w = world({
+    verdicts: [approve(), approve()],
+    builder: (round) => (round === 1 ? { evidence: { acceptance: builderEvidence.acceptance, uat: [] } } : {}),
+  });
+  const result = await run(w);
+  assert.equal(result.ok, true, result.reason);
+  assert.equal(result.rounds.length, 2);
+  assert.equal(result.rounds[0].acceptance.ok, false);
+  assert.match(w.briefs.builder[1], /the acceptance check \(scripts\/acceptance-check\.mjs, a plain script\) refused the step/);
+  assert.match(w.briefs.builder[1], /UAT1 \("The rename"\): the UAT plan promises it and the builder wrote nothing for it/);
+});
+
+test('THE ACCEPTANCE CHECK: a criterion the reviewer did not check by name, twice, parks the step and nothing is passed to merge', async () => {
+  const w = world({ verdicts: [{ verdict: 'approve', summary: 'lgtm' }, { verdict: 'approve', summary: 'lgtm', criteria: [{ ...met[0], id: 'AC1', criterion: 'something else entirely' }] }] });
+  const result = await run(w);
+  assert.equal(result.ok, false);
+  assert.equal(result.parked, true);
+  assert.equal(result.evidence, undefined);
+  assert.match(result.reason, /AC1 \("No reference to the old runbook name remains \(test\)\."\): the reviewer did not check it by name/);
+});
+

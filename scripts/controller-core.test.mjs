@@ -29,7 +29,7 @@ function card(overrides = {}) {
     state: { name: 'Ready', type: 'unstarted' },
     labels: overrides.labels ?? [],
     blockers: overrides.blockers ?? [],
-    description: 'description' in overrides ? overrides.description : '## UAT plan\n\n1. I look at it.\n',
+    description: 'description' in overrides ? overrides.description : '## Acceptance criteria\n\n- [ ] It works.\n\n## UAT plan\n\n1. I look at it.\n',
   };
 }
 

@@ -36,6 +36,7 @@ import { createSuiteRunner, readWorktreeState, testRunLine, testRunJournalLine }
 import { nextColumnFor, CONTROLLER_LAST_COLUMN } from './columns.mjs';
 import { stepReportComment } from './card-steps.mjs';
 import { launchFor } from './seat-run.mjs';
+import { checkEvidence, evidenceCommentBody, tickCriteria, checkCardForUat } from '../../scripts/acceptance-check.mjs';
 import { seatChoicesForIssue } from '../../scripts/seat-labels.mjs';
 import {
   createOrcaBoundaries,
@@ -288,6 +289,25 @@ export async function carryCard({
       return { ok: false, stage: 'build-and-review', reason: outcome.reason, outcome, branch };
     }
 
+    // The acceptance check again, on the card as it is NOW, before anything is
+    // merged: a criterion or UAT item added during the carry must stop the
+    // merge, not only the UAT move (PR #106 review, finding 6).
+    if (outcome.evidence) {
+      let recheck;
+      try {
+        const live = await board.readCard({ issueId: card.id });
+        recheck = checkEvidence({ description: live.description, builder: outcome.evidence.builder, reviewer: outcome.evidence.reviewer });
+      } catch (error) {
+        recheck = { ok: false, missing: [`the card could not be read before merging: ${error.message}`] };
+      }
+      if (!recheck.ok) {
+        const reason = `not merged: the acceptance check on the card as it is now refused it -- ${recheck.missing.join('; ')}`;
+        await comments.postOnce({ issueId: card.id, key: `premerge-refused:${recheck.missing.join('|')}`, body: `**${card.identifier}: ${reason}.** The work is on branch \`${branch}\`.` });
+        return { ok: false, stage: 'acceptance', reason, outcome, branch };
+      }
+      outcome.evidence = { ...outcome.evidence, check: recheck };
+    }
+
     // Publishing: the App, from the working copy this function still holds.
     const published = await publisher.publishAndMerge({
       branch,
@@ -304,6 +324,28 @@ export async function carryCard({
       return { ok: false, stage: 'publish', reason: published.reason, outcome, published, branch };
     }
 
+    // THE EVIDENCE (Todd, 23 Sep: JUL-92 reached UAT with none). The step
+    // passed the acceptance check before it merged; its answers go on the card
+    // as one comment, and the criteria boxes are ticked -- on the description
+    // as it is NOW, so an edit made during the carry is kept.
+    let evidenceError = null;
+    if (!outcome.evidence) {
+      evidenceError = 'the step passed without the acceptance check\'s evidence, so there is nothing to post';
+    } else {
+      try {
+        await comments.postOnce({
+          issueId: card.id,
+          key: 'uat-evidence',
+          body: evidenceCommentBody({ card, check: outcome.evidence.check, builder: outcome.evidence.builder, reviewer: outcome.evidence.reviewer }),
+        });
+        const live = await board.readCard({ issueId: card.id });
+        const ticked = tickCriteria(live.description);
+        if (ticked !== live.description) await board.setDescription({ issueId: card.id, description: ticked });
+      } catch (error) {
+        evidenceError = `the evidence could not be written to the card: ${error.message}`;
+      }
+    }
+
     // The columns, one comment per move, the report on the first of them.
     const moves = [];
     let column = 'Implementation';
@@ -312,6 +354,28 @@ export async function carryCard({
       if (column === CONTROLLER_LAST_COLUMN) break;
       const move = nextColumnFor(column, { hasReviewableOutput: card.hasReviewableOutput !== false });
       if (!move.ok) break;
+      if (move.to === 'UAT') {
+        // THE GUARD: never UAT unless the LIVE card has every criterion ticked
+        // and the evidence comment answers every UAT-plan item.
+        let guard;
+        if (evidenceError) guard = { ok: false, missing: [evidenceError] };
+        else {
+          try {
+            guard = checkCardForUat(await board.readCard({ issueId: card.id }));
+          } catch (error) {
+            guard = { ok: false, missing: [`the card could not be read back: ${error.message}`] };
+          }
+        }
+        if (!guard.ok) {
+          const reason = `not moved to UAT: the acceptance check on the card refused it -- ${guard.missing.join('; ')}`;
+          await comments.postOnce({
+            issueId: card.id,
+            key: `uat-refused:${guard.missing.join('|')}`,
+            body: `**${card.identifier}: ${reason}.** The work is merged (${published.pr.url}); the card stays in ${column} until the evidence is complete.`,
+          });
+          return { ok: false, stage: 'acceptance-guard', reason, outcome, published, moves, column, branch };
+        }
+      }
       const at = now();
       const body = first
         ? stepReportComment({

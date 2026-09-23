@@ -62,11 +62,19 @@ and there is no message channel. Your brief names both files exactly.
 
 - **Progress, as you work:** one JSON line appended to your progress file each time you start a
   new part of the job (`"type":"status"`), and at least every two minutes while you work
-  (`"type":"heartbeat"`). **If the file does not change for five minutes you are treated as stuck
-  and stopped**, so write a heartbeat before any command that may run long.
-- **Your answer, once, at the end:** `{"outcome":"done","summary":"<your hand-in>"}` once your work
-  is committed, or `{"outcome":"blocked","summary":"<why you stopped>"}` the moment you are
-  blocked. Do not spend the step working around a stop.
+  (`"type":"heartbeat"`). **If for five minutes this file does not change and you show no other
+  sign of work (no output, no CPU use), you are treated as stuck and stopped**, so write a heartbeat
+  before any command that may run long.
+- **Your answer, once, at the end:** `{"outcome":"done","summary":"<your hand-in>","acceptance":[...],"uat":[...]}`
+  once your work is committed, or `{"outcome":"blocked","summary":"<why you stopped>"}` the moment
+  you are blocked. Do not spend the step working around a stop.
+- **`acceptance`: one entry per acceptance criterion in your brief, by id** (`AC1`, ...), echoing
+  its exact words, with the evidence that it is met and that evidence's source. **`uat`: one entry
+  per UAT-plan item, by id** (`UAT1`, ...): the plain-English answer Todd reads for that item.
+  A plain script (the acceptance check) refuses the step if any is missing or empty, and nothing
+  merges. **Claim only what you did.** If a criterion asks for something you couldn't do or
+  check (a fresh-reader check from your own session is not one; a change that was already in
+  place is not your change), say so in that entry.
 
 Both files live under `.julia/`, which git ignores. Never commit them.
 
@@ -76,7 +84,8 @@ In the `summary` of your answer file:
 
 - The branch name and the commit sha.
 - The exact pass and fail counts from the full test run, and the command that produced them.
-- One plain-English line per item of the step's criteria, saying what you changed.
+- One plain-English line per item of the step's criteria, saying what you changed (and the same,
+  by id, in `acceptance` and `uat`).
 - Every gap you left open, and what breaks if it stays open.
 - The evidence for each claim, named as above.
 

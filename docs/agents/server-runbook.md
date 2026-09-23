@@ -2852,6 +2852,27 @@ commit is unchanged and `git status` clean). An approve over a passing suite end
 needed, or an approve over failing tests, go to a fresh builder as its finding. Two rounds, then the
 card parks with the reasons.
 
+**The acceptance check (added 2026-09-23, after JUL-92 reached UAT with none of the evidence its
+UAT plan promised).** `scripts/acceptance-check.mjs` is a plain script, no AI (JUL-81's "acceptance
+check"). It reads the card's own description for its acceptance criteria (checkbox lines under an
+"Acceptance criteria" heading, ids `AC1`...; struck-through lines are not criteria) and its UAT-plan
+items (numbered items under `## UAT plan`, ids `UAT1`...). The brief lists both by id. The builder's
+answer carries `acceptance` and `uat` entries, and the reviewer's carries a `criteria` entry per
+criterion, by id and exact words, with `"met"` and how it checked.
+- **Before merge:** after an approve over a passing suite, the check refuses the step unless every
+  criterion has the builder's evidence and the reviewer's `met`, and every UAT item has an answer.
+  A refusal goes back to the builder as the finding; two rounds, then park, and nothing merges.
+- **Before UAT:** the controller posts one evidence comment (every UAT item, every criterion) and
+  ticks the criteria boxes on the description as it is then. It then reads the live card back, and
+  moves it to UAT only if every box is ticked and the comment answers every UAT item. Otherwise the
+  card stays where it is, with the reason posted.
+- **At the start:** a card with no acceptance criteria, or a UAT plan with no numbered items, is
+  refused before any seat is paid for.
+- **By hand:** `node scripts/acceptance-check.mjs --description <file> --evidence <file>`, where the
+  evidence file is `{"builder": <answer>, "reviewer": <answer>}`. It prints `PASS` (exit 0), or one
+  `MISSING:` line per gap (exit 1).
+- The stand-in scenario `missing-evidence` proves a refusal end to end.
+
 **The working copy is removed last**, after publishing -- the send-back crash of JUL-92 attempt 10
 removed it first. `.julia/` is in `.gitignore` because **Orca refuses to remove a working copy holding
 an untracked file** (`Failed to delete worktree ... ?? .julia/answer.json`, measured 2026-09-23);
@@ -2880,7 +2901,7 @@ leaves the agent running (above).
 
 ```
 cd /tmp; sudo -u orchestrator-svc env ORCA_BIN=/opt/Orca/orca-ide node /srv/orchestrator-svc/julia-next/scripts/controller-stand-in.mjs --scenario pass
-# also: changes-then-pass | timeout | stuck | busy-silent | cut-off
+# also: changes-then-pass | timeout | stuck | busy-silent | missing-evidence | cut-off
 ```
 
 It runs the real carry with `scripts/stand-in-seat.mjs` in both seats, prints every board comment and

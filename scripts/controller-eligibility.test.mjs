@@ -45,7 +45,7 @@ function card(overrides = {}) {
     state: { name: 'Ready', type: 'unstarted' },
     labels: overrides.labels ?? [],
     blockers: overrides.blockers ?? [],
-    description: 'description' in overrides ? overrides.description : '## What to build\n\nstuff\n\n## UAT plan\n\n1. I look at it.\n',
+    description: 'description' in overrides ? overrides.description : '## What to build\n\nstuff\n\n## Acceptance criteria\n\n- [ ] It works.\n\n## UAT plan\n\n1. I look at it.\n',
   };
 }
 
@@ -90,7 +90,7 @@ test('refusal 2: a Parent card is refused and nothing starts', () => {
 
 test('refusal 3 (the only new one): a card with no `## UAT plan` section is refused', () => {
   assert.equal(UAT_PLAN_HEADING, '## UAT plan');
-  const noPlan = card({ description: '## What to build\n\nstuff, and no plan at all\n' });
+  const noPlan = card({ description: '## What to build\n\nstuff, and no plan at all\n\n## Acceptance criteria\n\n- [ ] It works.\n' });
   const verdict = evaluateControllerEligibility(noPlan);
   assert.equal(verdict.eligible, false);
   assert.deepEqual(verdict.reasons, [NO_UAT_PLAN_REASON]);
@@ -114,11 +114,11 @@ test('the `## UAT plan` heading must be exact: a near-miss is not a plan', () =>
   assert.equal(hasUatPlanSection(undefined), false, 'a card whose description was not fetched is refused, never admitted');
 });
 
-test('a card with all three faults is refused once, with all three reasons in the one comment', () => {
+test('a card with every fault is refused once, with every reason in the one comment', () => {
   const bad = card({ labels: [DECISION_LABEL, PARENT_LABEL], description: 'nothing' });
   const { skipped } = selectStartableCard({ issues: [bad], previousReady: { 'uuid-1': 'seen' } });
-  assert.equal(skipped.length, 1, 'one refusal, not three');
-  assert.equal(skipped[0].reasons.length, 3);
+  assert.equal(skipped.length, 1, 'one refusal, not four');
+  assert.equal(skipped[0].reasons.length, 4, 'Decision, Parent, no UAT plan, no acceptance criteria');
   assert.equal(skipped[0].comment.split('Ready queue:').length - 1, 1, 'one comment body');
 });
 
@@ -203,3 +203,18 @@ test('an ineligible card is commented on once per distinct fingerprint, and then
   const third = selectStartableCard({ issues: [changed], previousReady: { bad: 'seen' }, previousCommented: second.nextCommented });
   assert.ok(third.skipped[0].comment, 'a card whose refusal changed is told about it once more');
 });
+
+// The acceptance check (Todd, 23 Sep) refuses a step at the end unless every
+// criterion and every UAT-plan item is answered, so a card with none of either
+// is refused before any seat is paid for.
+test('refusal 4: a card with a UAT plan but no numbered items, or no acceptance criteria, is refused', async () => {
+  const { NO_ACCEPTANCE_CRITERIA_REASON, NO_UAT_ITEMS_REASON } = await import('../graph/controller/eligibility.mjs');
+  const noItems = card({ description: '## Acceptance criteria\n\n- [ ] It works.\n\n## UAT plan\n\nTodd looks at it.\n' });
+  assert.deepEqual(evaluateControllerEligibility(noItems).reasons, [NO_UAT_ITEMS_REASON]);
+  const noCriteria = card({ description: '## What to build\n\nstuff\n\n## UAT plan\n\n1. I look at it.\n' });
+  assert.deepEqual(evaluateControllerEligibility(noCriteria).reasons, [NO_ACCEPTANCE_CRITERIA_REASON]);
+  const struckOnly = card({ description: '**Acceptance criteria:**\n\n- ~~moved off~~\n\n## UAT plan\n\n1. I look at it.\n' });
+  assert.deepEqual(evaluateControllerEligibility(struckOnly).reasons, [NO_ACCEPTANCE_CRITERIA_REASON], 'a struck-through line is not a criterion');
+  assert.equal(evaluateControllerEligibility(card()).eligible, true);
+});
+

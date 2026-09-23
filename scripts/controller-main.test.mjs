@@ -283,7 +283,7 @@ const readyCard = () => ({
   state: { name: 'Ready', type: 'unstarted' },
   labels: [],
   blockers: [],
-  description: '## UAT plan\n\n1. I look at it.\n',
+  description: '## Acceptance criteria\n\n- [ ] It works.\n\n## UAT plan\n\n1. I look at it.\n',
 });
 
 // The board as it really behaves: moveCard takes the card OUT of Ready. Round
