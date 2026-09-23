@@ -39,18 +39,18 @@ Before starting the review:
 - Check that the candidate commit exists, and that the working copy is clean and on the stated commit.
 - Check that the named skill files exist.
 
-If any of these checks fail, stop and say so immediately in your answer file.
+If any of these checks fail, stop and say so immediately in your final output.
 
 ## Execution
 
-Report progress after each step by appending a status line to your progress file under `.julia/`.
-When the review is complete, record your verdict and report "done" in your answer file.
+Report once, at the end, in your final output. When the review is complete, emit your verdict
+with every field the graph reads.
 
 ### Every acceptance criterion, by name
 
 Your brief lists the card's acceptance criteria by id (`AC1`, `AC2`, ...), each with its exact
 words. **Check every one of them yourself, one at a time, by id and by those words**, and answer
-each in your answer file's `criteria` list: `"met"` only when you checked it and it holds, with
+each in your final output's `criteria` list: `"met"` only when you checked it and it holds, with
 how you checked it and the source. Otherwise `"not_met"` with the reason, and then your verdict
 is CHANGES NEEDED. Echo the criterion's exact words.
 
@@ -88,15 +88,13 @@ how, not `"met"`, or named under the wrong id. An approve that skips a criterion
 - **Two rejection rounds, not three.** Your findings go back to a builder as unfinished work,
   and the card gets at most two such rounds before it parks with the reasons on it. So report
   the defects that matter, in the first round, with enough detail to be fixed without you.
-- **Your review goes only in your answer file**, under `.julia/`, which git ignores. It must never
-  become part of, or be mistaken for a change to, the thing it reviews.
+- **Your review goes only in your final output.** It must never become part of, or be mistaken for a change to, the thing it reviews.
 
 ## Boundaries
 
 - **Never edit the candidate.** Not one character, committed or uncommitted. After you finish,
   the controller checks that the commit is unchanged and `git status` is clean, and **any**
-  difference rejects the review outright. Fixing a typo costs the whole round. (Your `.julia/`
-  files are ignored by git and are the one exception.)
+  difference rejects the review outright. Fixing a typo costs the whole round.
 - **Never push, never open a pull request, never merge.**
 - **Never write to Linear** — no comment, no state change, no checkbox. The controller is the
   only writer to the card.
@@ -141,21 +139,11 @@ The controller verifies the review itself; the worker's own word never counts:
 
 ### When you report
 
-Through two files in the working copy, and nothing else — the controller does not read your
-screen, and there is no message channel. Your brief names both files exactly.
-
-- **Progress, as you review:** one JSON line appended to your progress file each time you start a
-  new part of the review (`"type":"status"`), and at least every two minutes (`"type":"heartbeat"`).
-  **If for five minutes this file does not change and you show no other sign of work (no output,
-  no CPU use), you are treated as stuck and stopped.**
-- **Your verdict, once, at the end:** `{"verdict":"approve","summary":"<what you checked>","criteria":[{"id":"AC1","criterion":"<its exact words>","verdict":"met","how":"<how you checked it, with the source>"}, ...]}`
-  or `{"verdict":"changes_needed","findings":"<each finding, ranked, with its source>","criteria":[...]}`.
-  One `criteria` entry for every criterion in your brief. If you are blocked, say so as a finding
-  rather than guessing.
-
-Both files live under `.julia/`, which git ignores. Never commit them.
+Report once, at the end of your run, in your final output: a single JSON object, either
+`{"verdict":"approve","summary":"<what you checked>","criteria":[{"id":"AC1","criterion":"<its exact words>","verdict":"met","how":"<how you checked it, with the source>"}, ...]}`
+or `{"verdict":"changes_needed","findings":"<each finding, ranked, with its source>","criteria":[{"id":"AC1","criterion":"<its exact words>","verdict":"met"|"not_met","how":"<how you checked it, or why not met>"}, ...]}`.
+Include one `criteria` entry for every criterion in your brief. If you are blocked, report that as a finding rather than guessing. The worker's final output is the report. A worker is stuck only when it passes its time limit, which the operating system enforces.
 
 ### Cleanup
 
-Never edit or touch any tracked file. Do not leave any uncommitted files, scratch files, or edits
-behind. The ignored `.julia/` progress and answer files are the only files written.
+Never edit or touch any tracked file. Do not leave any uncommitted files, scratch files, or edits behind.

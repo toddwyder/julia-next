@@ -184,5 +184,38 @@ for (const role of ROLE_NAMES) {
       }
     }
   });
+
+  test(`${role}: does not mention a progress file, heartbeats, or a five-minute stall rule (AC1)`, () => {
+    for (const root of ['.agents', '.claude']) {
+      const filePath = join(REPO_ROOT, root, 'skills', role, 'SKILL.md');
+      assert.ok(existsSync(filePath), `${filePath} must exist`);
+      const content = readFileSync(filePath, 'utf8');
+
+      assert.doesNotMatch(content, /progress[- ]file/i, `${role} in ${root} must not mention a progress file`);
+      assert.doesNotMatch(content, /heartbeat/i, `${role} in ${root} must not mention heartbeats`);
+      assert.doesNotMatch(content, /five[- ]minute|5[- ]minute/i, `${role} in ${root} must not mention a five-minute stall rule`);
+      assert.doesNotMatch(content, /\bstall\b/i, `${role} in ${root} must not mention stall`);
+    }
+  });
+
+  test(`${role}: states final-output report format with every field the graph reads (AC2)`, () => {
+    for (const root of ['.agents', '.claude']) {
+      const filePath = join(REPO_ROOT, root, 'skills', role, 'SKILL.md');
+      assert.ok(existsSync(filePath), `${filePath} must exist`);
+      const content = readFileSync(filePath, 'utf8');
+
+      assert.match(content, /final output/i, `${role} in ${root} must state reporting in final output`);
+
+      if (role === 'julia-builder') {
+        assert.match(content, /"outcome"/, `${role} in ${root} must name "outcome" field`);
+        assert.match(content, /"summary"/, `${role} in ${root} must name "summary" field`);
+        assert.match(content, /"acceptance"/, `${role} in ${root} must name "acceptance" field`);
+        assert.match(content, /"uat"/, `${role} in ${root} must name "uat" field`);
+      } else if (role === 'julia-reviewer') {
+        assert.match(content, /"verdict"/, `${role} in ${root} must name "verdict" field`);
+        assert.match(content, /"criteria"/, `${role} in ${root} must name "criteria" field`);
+      }
+    }
+  });
 }
 

@@ -12,7 +12,7 @@ You are a **fresh worker**. You were started by the controller on one step of on
 command with a time limit, and you have no memory of any earlier step. Everything you know comes
 from the brief you were handed and from the files in your own worktree. When you finish, or your
 time runs out, you are stopped — nothing you learn survives except what you commit and what you
-put in your answer file.
+report in your final output.
 
 ### Your job
 
@@ -46,7 +46,7 @@ Before starting any work:
 - Check that your working copy is clean and on the stated commit.
 - Check that the named skill files exist (`.agents/skills/implement/SKILL.md`, `.agents/skills/tdd/SKILL.md`, `.agents/skills/code-review/SKILL.md`).
 
-If any of these checks fail, stop and say so immediately in your answer file as blocked.
+If any of these checks fail, stop and say so immediately in your final output as blocked.
 
 ## Execution
 
@@ -56,8 +56,8 @@ If any of these checks fail, stop and say so immediately in your answer file as 
   cleans up or reports on workers or usage, check the framework's official docs first and use its
   feature rather than hand-building one. Name the feature on the card and use it, or say in one line
   why not. Building by hand what the framework already provides is a finding at review.
-- **Report as you go.** Report after each step by appending a progress line to your progress file
-  under `.julia/`. If work runs long, emit regular heartbeats.
+- **Report once, at the end.** Report once, in your final output: done or blocked, a summary,
+  and evidence per acceptance criterion and UAT item.
 - **Two rejection rounds, not three.** If your work comes back from review, you get one more
   round on it. After two rounds the card parks with the reasons on it. Build accordingly: fix
   the finding that was made, not the one you would rather have been given.
@@ -74,7 +74,7 @@ If any of these checks fail, stop and say so immediately in your answer file as 
   commit as the work that used it. A fact narrated only in a report is not recorded.
 - **Whatever you create, you remove**: scratch files, probe units, worktrees you made yourself,
   any throwaway card.
-- **Done at the end.** When all work is committed and verified, write your final answer file with
+- **Done at the end.** When all work is committed and verified, report in your final output with
   `outcome: "done"`.
 
 ## Boundaries
@@ -108,7 +108,7 @@ Stop, escalate, and wait — do not improvise around any of these:
 
 ## Output contract
 
-In the `summary` of your answer file:
+In the `summary` of your final output:
 
 - The branch name and the commit sha.
 - The exact pass and fail counts from the full test run, and the command that produced them.
@@ -133,28 +133,9 @@ The controller verifies the work itself; the worker's own word never counts:
 
 ### When you report
 
-Through two files in your worktree, and nothing else — the controller does not read your screen,
-and there is no message channel. Your brief names both files exactly.
-
-- **Progress, as you work:** one JSON line appended to your progress file each time you start a
-  new part of the job (`"type":"status"`), and at least every two minutes while you work
-  (`"type":"heartbeat"`). **If for five minutes this file does not change and you show no other
-  sign of work (no output, no CPU use), you are treated as stuck and stopped**, so write a heartbeat
-  before any command that may run long.
-- **Your answer, once, at the end:** `{"outcome":"done","summary":"<your hand-in>","acceptance":[...],"uat":[...]}`
-  once your work is committed, or `{"outcome":"blocked","summary":"<why you stopped>"}` the moment
-  you are blocked. Do not spend the step working around a stop.
-- **`acceptance`: one entry per acceptance criterion in your brief, by id** (`AC1`, ...), echoing
-  its exact words, with the evidence that it is met and that evidence's source. **`uat`: one entry
-  per UAT-plan item, by id** (`UAT1`, ...): the plain-English answer Todd reads for that item.
-  A plain script (the acceptance check) refuses the step if any is missing or empty, and nothing
-  merges. **Claim only what you did.** If a criterion asks for something you couldn't do or
-  check (a fresh-reader check from your own session is not one; a change that was already in
-  place is not your change), say so in that entry.
-
-Both files live under `.julia/`, which git ignores. Never commit them.
+Report once, at the end of your run, in your final output: a single JSON object with `"outcome"` (`"done"` once your work is committed and verified, or `"blocked"` the moment you cannot proceed), `"summary"` (detailing the branch, commit sha, exact test counts with the command that produced them, one plain-English line per criterion item, and any open gaps), `"acceptance"` (a list with one entry per acceptance criterion by `id`, echoing its exact words as `criterion` and the `evidence` showing it is met along with the evidence source), and `"uat"` (a list with one entry per UAT-plan item by `id` with the plain-English `answer` for Todd). For a blocked outcome, report `{"outcome":"blocked","summary":"<why you stopped>"}`. The worker's final output is the report. A worker is stuck only when it passes its time limit, which the operating system enforces.
 
 ### Cleanup
 
 Whatever you create, you remove: scratch files, probe units, worktrees you made yourself, any
-throwaway card. Leave the worktree clean except for the committed changes and ignored `.julia/` files.
+throwaway card. Leave the worktree clean except for the committed changes.
