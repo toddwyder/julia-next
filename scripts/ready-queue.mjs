@@ -462,7 +462,7 @@ const ISSUE_FOR_UAT_QUERY = `
       id
       description
       comments(first: 250) {
-        nodes { id body }
+        nodes { id body createdAt }
         pageInfo { hasNextPage }
       }
     }

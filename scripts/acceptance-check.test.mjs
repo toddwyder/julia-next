@@ -174,3 +174,17 @@ test('finding 5: nested or repeated numbers cannot hide a UAT item', () => {
   const card = '## UAT plan\n\n1. **First:** a\n   1. a sub-step\n1. **Second:** b\n';
   assert.deepEqual(parseUatPlan(card).map((u) => [u.id, u.name]), [['UAT1', 'First'], ['UAT2', 'Second']]);
 });
+
+// PR #106 review, round 2 (DeepSeek, non-blocking but in the fail-open direction).
+test('a UAT item indented 1-2 spaces is still a top-level item; 3 or more is a sub-step', () => {
+  const card = '## UAT plan\n\n1. **First:** a\n  2. **Second:** b\n   1. a sub-step of Second\n';
+  assert.deepEqual(parseUatPlan(card).map((u) => u.name), ['First', 'Second']);
+});
+
+test('the guard picks the newest evidence comment by its own time when Linear gives one, whatever the order', () => {
+  const check = checkEvidence({ description: JUL_92, builder: fullBuilder, reviewer: fullReviewer });
+  const fresh = evidenceCommentBody({ card: { identifier: 'JUL-92' }, check, builder: fullBuilder, reviewer: fullReviewer });
+  const stale = fresh.replace('**UAT3. The rename**', '');
+  const comments = [{ body: fresh, createdAt: '2026-09-23T14:00:00Z' }, { body: stale, createdAt: '2026-09-23T12:00:00Z' }];
+  assert.equal(checkCardForUat({ description: tickCriteria(JUL_92), comments }).ok, true);
+});

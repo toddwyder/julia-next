@@ -87,7 +87,9 @@ export function parseUatPlan(description) {
     // Top-level numbered items only (an indented sub-step is part of its item),
     // numbered in order, so a repeated number cannot hide an item (PR #106
     // review, finding 5).
-    const numbered = /^(\d+)\.\s+(.*)$/.exec(line.replace(/\r$/, ''));
+    // Markdown reads a marker indented 0-2 spaces as a top-level item; 3 or
+    // more is a sub-step of the item above (PR #106 review, round 2).
+    const numbered = /^ {0,2}(\d+)\.\s+(.*)$/.exec(line.replace(/\r$/, ''));
     if (!numbered) continue;
     const text = numbered[2].trim();
     const bold = /^\*\*([^*]+?)\s*:?\s*\*\*/.exec(text);
@@ -193,7 +195,9 @@ export function checkCardForUat({ description, comments = [] }) {
   for (const criterion of criteria.filter((c) => !c.ticked)) missing.push(`${criterion.id} ("${criterion.text.slice(0, 80)}") is not ticked`);
   // The NEWEST evidence comment: a card carried twice is judged on this carry's
   // evidence, not an older one (PR #106 review, finding 3).
-  const evidence = comments.map((c) => String(c?.body ?? '')).filter((body) => body.includes(EVIDENCE_MARKER)).at(-1);
+  const newestFirst = [...comments].sort((a, b) => String(b?.createdAt ?? '').localeCompare(String(a?.createdAt ?? '')));
+  const evidence = (comments.some((c) => c?.createdAt) ? newestFirst : [...comments].reverse())
+    .map((c) => String(c?.body ?? '')).find((body) => body.includes(EVIDENCE_MARKER));
   if (!evidence) missing.push('no evidence comment is on the card');
   else {
     for (const item of uat) {
