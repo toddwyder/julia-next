@@ -52,6 +52,22 @@ function parseStructuredFailure(stdoutText) {
   return null;
 }
 
+// What the process itself said about how it ended. JUL-92 attempt 5 (22 Sep
+// 22:55Z): a Codex `worker-start` failed with empty stderr, and execFile's
+// message is only "Command failed: <argv>", so the logged error ended with the
+// argv and named no cause at all. The exit code, the signal and whatever came
+// out on stdout are the facts that were thrown away; they are always
+// appended, stdout capped so a big answer cannot flood the log.
+export function processFacts(error) {
+  const facts = [];
+  if (error?.code !== undefined && error?.code !== null) facts.push(`exit ${error.code}`);
+  if (error?.signal) facts.push(`signal ${error.signal}`);
+  if (error?.killed) facts.push('killed');
+  const out = String(error?.stdout ?? '').trim();
+  facts.push(out ? `stdout: ${out.slice(0, 500)}` : 'stdout empty');
+  return ` [${facts.join('; ')}]`;
+}
+
 async function run(args, { execImpl = defaultExecImpl, bin = 'orca' } = {}) {
   let stdout;
   try {
@@ -68,7 +84,7 @@ async function run(args, { execImpl = defaultExecImpl, bin = 'orca' } = {}) {
       throw failure;
     }
     const detail = String(error.stderr || error.message || '').trim();
-    throw new Error(`orca ${args.join(' ')} failed: ${detail}`);
+    throw new Error(`orca ${args.join(' ')} failed: ${detail}${processFacts(error)}`);
   }
   let parsed;
   try {

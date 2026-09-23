@@ -164,6 +164,34 @@ test('a failing orca process (non-zero exit) surfaces stderr, not a silent empty
   );
 });
 
+test('a failure with EMPTY stderr still names how the process ended: exit code, signal and stdout (JUL-92 attempt 5)', async () => {
+  const execImpl = async () => {
+    const error = new Error('Command failed: /opt/Orca/orca-ide orchestration worker-start --agent codex --json\n');
+    error.stderr = '';
+    error.stdout = 'worker process crashed';
+    error.code = 1;
+    error.signal = null;
+    throw error;
+  };
+  await assert.rejects(
+    () => runCreate({ environment: 'OVH runner', from: 'term-1', objective: 'x', execImpl }),
+    /\[exit 1; stdout: worker process crashed\]$/,
+  );
+  const killed = async () => {
+    const error = new Error('Command failed: orca x');
+    error.stderr = '';
+    error.stdout = '';
+    error.code = null;
+    error.signal = 'SIGTERM';
+    error.killed = true;
+    throw error;
+  };
+  await assert.rejects(
+    () => runCreate({ environment: 'OVH runner', from: 'term-1', objective: 'x', execImpl: killed }),
+    /\[signal SIGTERM; killed; stdout empty\]$/,
+  );
+});
+
 test('terminalCreate runs a plain shell command in the given worktree, not an agent -- real nested terminal.handle shape', async () => {
   const { calls, execImpl } = fakeExec({
     id: '1a71987d-1d1d-4b2b-b68c-edeabe3b5f90',
