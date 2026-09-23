@@ -107,6 +107,23 @@ test('on the server: an install attempt as orchestrator-svc is refused by sudo',
   // The whole live rule set must be exactly this file's rules plus the one
   // pre-existing checkout-sync rule -- nothing older left installed.
   const listing = spawnSync('sudo', ['-n', '-l'], { encoding: 'utf8' });
+  // JUL-98, found live: `ops/controller/julia-controller.service` runs the
+  // controller (also as orchestrator-svc, also on this box) under
+  // `NoNewPrivileges=yes`, which stops `sudo` from executing AT ALL --
+  // distinct from sudo running and correctly refusing. Under the controller
+  // this same "sudo -n -l failed" text fired on every single card's suite
+  // run, forever, because it asks the wrong question: this check exists to
+  // verify the RULES sudo enforces are exactly the right ones, not whether
+  // sudo itself can run at all when a caller has deliberately disabled it.
+  // A username check alone can't tell those two orchestrator-svc contexts
+  // apart -- only asking sudo, and reading ITS OWN reason for refusing, can.
+  // sudo's `The "no new privileges" flag is set` message is the one signal
+  // that distinguishes "cannot run here by design" from "ran and refused
+  // correctly", so only that specific message skips; any other failure
+  // (a stale rule, a broken sudoers file) still fails the test loudly.
+  if (listing.status !== 0 && /no new privileges/i.test(listing.stderr)) {
+    return t.skip(`sudo cannot execute at all under this process (${listing.stderr.trim()}) -- this is NoNewPrivileges on the caller (e.g. the controller's own systemd unit), not a rule this test can check; the two earlier assertions in this test still ran and still enforce the install refusal`);
+  }
   assert.equal(listing.status, 0, `sudo -l failed: ${listing.stderr}`);
   const live = listing.stdout.split('\n')
     .filter((line) => line.includes('NOPASSWD:'))
