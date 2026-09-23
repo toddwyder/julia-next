@@ -57,7 +57,8 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
-import { orcaCall } from '../../scripts/orca-cli.mjs';
+// wholeTimeoutMs: Orca refuses a fractional --timeout-ms (JUL-92 attempt 6).
+import { orcaCall, wholeTimeoutMs } from '../../scripts/orca-cli.mjs';
 import { findActiveRun } from '../../scripts/ready-queue.mjs';
 import { pushBranch, openPullRequest } from '../../scripts/publish-pr.mjs';
 import { mergePullRequest } from '../../scripts/merge-pr.mjs';
@@ -193,12 +194,6 @@ export function createOrcaBoundaries({
   findActiveRunImpl = findActiveRun,
 } = {}) {
   const call = (args) => orcaCallImpl([...args, '--json']);
-  // Orca's --timeout-ms takes a POSITIVE WHOLE number and refuses anything
-  // else. Callers hand on what is left of a performance.now() budget, which is
-  // fractional (JUL-92 attempt 6, 2026-09-23: 28247.46015900001 was refused
-  // mid-review and the crashed cycle left the card's run open). Rounded up, so
-  // a budget is never cut short, and never below 1.
-  const wholeMs = (ms) => String(Math.max(1, Math.ceil(Number(ms))));
 
   // A named object, not an anonymous literal: one boundary below is composed
   // from others (`prepareWorktreeImpl` runs a script through the worker-side
@@ -360,7 +355,7 @@ export function createOrcaBoundaries({
         '--environment', environment,
         '--terminal', terminal,
         '--wait',
-        '--timeout-ms', wholeMs(timeoutMs),
+        '--timeout-ms', wholeTimeoutMs(timeoutMs),
         '--types', types.join(','),
       ];
       if (runId) args.push('--run', runId);
@@ -516,7 +511,7 @@ export function createOrcaBoundaries({
           '--environment', workerEnvironment,
           '--terminal', terminal,
           '--for', 'tui-idle',
-          '--timeout-ms', wholeMs(timeoutMs),
+          '--timeout-ms', wholeTimeoutMs(timeoutMs),
         ]);
       } catch (error) {
         // A TIMED-OUT wait is an ANSWER, not a fault. Measured live on

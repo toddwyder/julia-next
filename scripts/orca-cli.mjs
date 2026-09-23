@@ -156,8 +156,23 @@ export async function taskList({ environment, runId, execImpl } = {}) {
   return run(['orchestration', 'task-list', '--run', runId, '--environment', environment, '--json'], { execImpl });
 }
 
+// Orca's --timeout-ms takes a POSITIVE SAFE INTEGER and refuses anything else.
+// Callers hand on what is left of a performance.now() budget, which is
+// fractional (JUL-92 attempt 6, 2026-09-23: 28247.46015900001 was refused
+// mid-review, and the crashed cycle left the card's run open). Rounded UP, so a
+// budget is never cut short, and never below 1. A value that is not a finite
+// number, or too big to be exact, is a caller bug: it throws here, naming
+// itself, rather than reaching Orca as a vaguer refusal.
+export function wholeTimeoutMs(ms) {
+  const whole = Math.max(1, Math.ceil(Number(ms)));
+  if (!Number.isSafeInteger(whole)) {
+    throw new Error(`orca-cli: --timeout-ms must be a finite number of milliseconds, got ${String(ms)}`);
+  }
+  return String(whole);
+}
+
 export async function terminalWait({ environment, terminal, forState = 'tui-idle', timeoutMs, execImpl } = {}) {
-  return run(['terminal', 'wait', '--environment', environment, '--terminal', terminal, '--for', forState, '--timeout-ms', String(timeoutMs), '--json'], { execImpl });
+  return run(['terminal', 'wait', '--environment', environment, '--terminal', terminal, '--for', forState, '--timeout-ms', wholeTimeoutMs(timeoutMs), '--json'], { execImpl });
 }
 
 export async function workerShow({ environment, dispatch, execImpl } = {}) {

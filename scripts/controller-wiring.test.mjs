@@ -210,6 +210,18 @@ test('a fractional wait budget reaches Orca as a whole, positive number of milli
   assert.equal(flag(orcaCallImpl.calls[2], '--timeout-ms'), '1800');
 });
 
+test('a wait budget that is not a finite number is refused by name, never sent to Orca', async () => {
+  const orcaCallImpl = recorder([]);
+  const boundaries = createOrcaBoundaries({ orcaCallImpl });
+  for (const timeoutMs of [Number.NaN, Number.POSITIVE_INFINITY, undefined, Number.MAX_SAFE_INTEGER * 2]) {
+    await assert.rejects(
+      () => boundaries.checkWaitImpl({ terminal: 'term_a', runId: 'run_1', timeoutMs }),
+      /--timeout-ms must be a finite number/,
+    );
+  }
+  assert.equal(orcaCallImpl.calls.length, 0);
+});
+
 test('release and worktree removal are the two Orca cleanup verbs, by dispatch and by worktree id', async () => {
   const orcaCallImpl = recorder([{}]);
   const boundaries = createOrcaBoundaries({ orcaCallImpl });
