@@ -234,9 +234,10 @@ export function createOrcaBoundaries({
       return call(args);
     },
 
-    // (12) Closing it: the end of a finished seat, and THE STOP for a stuck or
-    // over-time one -- run-seat.mjs takes the hang-up and kills the agent's
-    // whole process group. One pane, never `--all`.
+    // (12) Closing it: cleanup, never the stop. Measured 2026-09-23: closing an
+    // Orca terminal kills what runs in it outright, with no signal a handler
+    // can catch, and a seat's agent -- in its own process group -- survives it.
+    // The stop is ./seat-run.mjs's `stopGroupCommand`. One pane, never `--all`.
     async terminalCloseImpl({ terminal } = {}) {
       return call(['terminal', 'close', '--environment', workerEnvironment, '--terminal', terminal]);
     },

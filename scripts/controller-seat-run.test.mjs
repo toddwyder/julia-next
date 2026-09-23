@@ -10,7 +10,7 @@ import { join } from 'node:path';
 
 import {
   launchFor, buildStepBrief, reportingInstructions, seatCommand, parseProgress, validateAnswer, costLineFor,
-  runSeat, seatFilePaths, seatTag, MAX_BRIEF_B64, STUCK_AFTER_MS, PROGRESS_READ_MS, SEAT_ROUTES, cutOffOf,
+  runSeat, seatFilePaths, seatTag, MAX_BRIEF_B64, STUCK_AFTER_MS, PROGRESS_READ_MS, SEAT_ROUTES, cutOffOf, stopGroupCommand,
 } from '../graph/controller/seat-run.mjs';
 import { WORKER_SCRIPT_END_MARKER } from '../graph/controller/wiring.mjs';
 import { formatCostLine } from '../graph/controller/cost.mjs';
@@ -146,9 +146,19 @@ function harness({ worktreePath, script }) {
   let reads = 0;
   const closed = [];
   const created = [];
+  const stops = [];
   const boundaries = {
-    async workerTerminalCreateImpl(args) { created.push(args); return { terminal: { handle: 'term_seat' } }; },
-    async terminalReadImpl() {
+    stopAnswer: null, // (lines) the stop terminal prints, or a function run when it is read
+    async workerTerminalCreateImpl(args) {
+      created.push(args);
+      if (args.title.startsWith('julia-stop-')) { stops.push(args); return { terminal: { handle: 'term_stop' } }; }
+      return { terminal: { handle: 'term_seat' } };
+    },
+    async terminalReadImpl({ terminal }) {
+      if (terminal === 'term_stop') {
+        const answer = typeof boundaries.stopAnswer === 'function' ? boundaries.stopAnswer() : boundaries.stopAnswer;
+        return { terminal: { tail: answer ?? [], nextCursor: 1 } };
+      }
       reads += 1;
       const lines = script(reads, { clock: () => clock }) ?? [];
       return { terminal: { tail: lines, nextCursor: reads } };
@@ -159,6 +169,7 @@ function harness({ worktreePath, script }) {
     boundaries,
     closed,
     created,
+    stops,
     options: {
       worktreePath,
       boundaries,
@@ -225,7 +236,7 @@ test('STUCK: a running seat whose progress file has not changed for five minutes
   assert.equal(result.ok, false);
   assert.equal(result.stuck, true);
   assert.match(result.reason, /stopped as stuck: its progress file had not changed for 5 minutes \(last report: status "thinking" at T0\)/);
-  assert.deepEqual(h.closed, [{ terminal: 'term_seat' }], 'the stop is the terminal close');
+  assert.deepEqual(h.closed.map((c) => c.terminal).sort(), ['term_seat'], 'with no pid file there is no stop terminal to close');
   assert.equal(STUCK_AFTER_MS, 5 * 60000);
   assert.equal(PROGRESS_READ_MS, 60000);
 });
@@ -307,30 +318,50 @@ test('the tag names the round and the seat, so round 2 can never read round 1\'s
 // PR #102 review fixes, and Todd's cut-off case (23 Sep)
 // ---------------------------------------------------------------------------
 
-test('a stop is CONFIRMED by run-seat.mjs\'s run record appearing -- it writes it only once the agent group has exited', async () => {
+test('THE STOP kills the agent\'s process group AS THE WORKER, from its pid file, and is confirmed when the group is gone', async () => {
   const worktreePath = tempDir();
   const paths = seatDir(worktreePath, 'round-1-builder');
-  const h = harness({ worktreePath, script: () => ['...'] });
-  h.boundaries.terminalCloseImpl = async () => { writeFileSync(paths.run, runRecord({ exitCode: null, stoppedBy: 'SIGHUP' })); };
+  writeFileSync(paths.pid, JSON.stringify({ pid: 4242, pgid: 4242 }));
+  let killed = false;
+  const h = harness({
+    worktreePath,
+    // After the kill, run-seat.mjs sees its agent exit, writes its record and
+    // prints its end marker -- exactly what the real one does.
+    script: () => (killed ? (writeFileSync(paths.run, runRecord({ exitCode: null, signal: 'SIGTERM' })), [`${WORKER_SCRIPT_END_MARKER}:0`]) : ['...']),
+  });
+  h.boundaries.stopAnswer = () => { killed = true; return ['JULIA_STOP:gone', `${WORKER_SCRIPT_END_MARKER}:0`]; };
   const result = await runSeat({ ...h.options, seat: 'builder', round: 1, launch: standInLaunch, brief: 'b' });
   assert.equal(result.stuck, true);
   assert.equal(result.stopConfirmed, true);
+  assert.equal(result.stop.gone, true);
   assert.doesNotMatch(result.reason, /NOT confirmed/);
+  assert.equal(h.stops.length, 1);
+  assert.equal(h.stops[0].title, 'julia-stop-round-1-builder');
+  assert.equal(h.stops[0].command, stopGroupCommand(4242));
+  assert.deepEqual(h.closed.map((c) => c.terminal).sort(), ['term_seat', 'term_stop'], 'both terminals are closed afterwards');
+  assert.ok(result.run, 'the run record written after the kill is read');
 });
 
-test('a stop with no run record after a minute is reported as NOT confirmed -- the seat may still be running -- and a failed close is named', async () => {
+test('a stop that cannot be confirmed says so and why -- no pid file, or a group that survives -- and closing the terminal alone never counts as a stop', async () => {
   const worktreePath = tempDir();
-  seatDir(worktreePath, 'round-1-builder');
+  const paths = seatDir(worktreePath, 'round-1-builder');
   let h = harness({ worktreePath, script: () => ['...'] });
   let result = await runSeat({ ...h.options, seat: 'builder', round: 1, launch: standInLaunch, brief: 'b' });
   assert.equal(result.stopConfirmed, false);
-  assert.match(result.reason, /the stop is NOT confirmed: no run record appeared within 60 s of closing its terminal, so the seat may still be running/);
+  assert.match(result.reason, /the stop is NOT confirmed \(the agent's process group is not known \(no pid file was written\); no run record within 60 s\), so the seat may still be running/);
 
+  writeFileSync(paths.pid, JSON.stringify({ pid: 4242, pgid: 4242 }));
   h = harness({ worktreePath, script: () => ['...'] });
-  h.boundaries.terminalCloseImpl = async () => { throw new Error('terminal_handle_stale'); };
-  result = await runSeat({ ...h.options, seat: 'builder', round: 1, launch: standInLaunch, brief: 'b', timeLimitMs: 2 * 60000, stuckAfterMs: 60 * 60000 });
+  h.boundaries.stopAnswer = ['JULIA_STOP:alive', `${WORKER_SCRIPT_END_MARKER}:0`];
+  result = await runSeat({ ...h.options, seat: 'builder', round: 1, launch: standInLaunch, brief: 'b', timeLimitMs: 90000, stuckAfterMs: 60 * 60000 });
   assert.equal(result.timedOut, true);
-  assert.match(result.reason, /NOT confirmed: .*a terminal close that failed \(terminal_handle_stale\)/);
+  assert.match(result.reason, /ran past its 90-second limit/);
+  assert.match(result.reason, /NOT confirmed \(process group 4242 is still alive after TERM and KILL/);
+});
+
+test('the stop line is refused for anything but a plain process group number', () => {
+  assert.match(stopGroupCommand(4242), /^kill -TERM -- -4242 .*kill -KILL -- -4242 .*JULIA_STOP:gone/);
+  for (const bad of [0, 1, -5, 1.5, '4242', '4242; rm -rf /', null]) assert.throws(() => stopGroupCommand(bad), /refusing to build a stop/);
 });
 
 const cutOffStream = [

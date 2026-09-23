@@ -63,6 +63,7 @@ export function seatFiles(worktree, tag) {
     run: join(dir, `${tag}.run.json`),
     answer: join(dir, `${tag}.answer.json`),
     progress: join(dir, `${tag}.progress.jsonl`),
+    pid: join(dir, `${tag}.pid.json`),
   };
 }
 
@@ -149,17 +150,12 @@ export async function runSeat(opts, {
   now = () => new Date().toISOString(),
   killGraceMs = KILL_GRACE_MS,
   killImpl = (pid, signal) => process.kill(pid, signal),
-  // Where a stop from OUTSIDE arrives. The controller stops a stuck or
-  // over-time seat by closing its terminal, which sends this script SIGHUP --
-  // but the agent is in its own process group, so it would outlive the
-  // terminal unless this script passes the stop on. Injected for the tests.
-  signalSource = process,
 } = {}) {
   const files = seatFiles(opts.worktree, opts.tag);
   mkdirSync(files.dir, { recursive: true });
   // A leftover from an earlier run of the same tag must never be read as this
   // run's answer.
-  for (const path of [files.out, files.err, files.run, files.answer, files.progress]) rmSync(path, { force: true });
+  for (const path of [files.out, files.err, files.run, files.answer, files.progress, files.pid]) rmSync(path, { force: true });
   writeFileSync(files.brief, opts.brief);
 
   const before = opts.agent === 'agy' ? await allowanceReading(readAllowanceImpl, opts.worktree) : null;
@@ -177,34 +173,28 @@ export async function runSeat(opts, {
     // Its own process group, so the stop reaches everything the agent started.
     const child = spawnImpl(spec.command, spec.args, { cwd: opts.worktree, env: spec.env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
     let timedOut = false;
-    let stoppedBy = null;
     let killTimer = null;
     child.stdout?.pipe(out);
     child.stderr?.pipe(err);
-    const stopGroup = () => {
+    // WHO THE AGENT IS, for a stop from outside. The agent runs in its own
+    // process group (`detached`), whose id is its pid. A stop from the
+    // controller cannot come through this script: closing an Orca terminal
+    // kills what runs in it outright -- measured 2026-09-23, a probe with a
+    // handler for SIGHUP, SIGTERM, SIGINT and SIGQUIT logged none of them and
+    // no exit -- and the agent's own group survives that. So the controller
+    // stops the GROUP itself, as the worker, and this file is how it finds it.
+    writeFileSync(files.pid, `${JSON.stringify({ pid: child.pid ?? null, pgid: child.pid ?? null, startedAt })}\n`);
+    const stopTimer = setTimeout(() => {
+      timedOut = true;
       try { killImpl(-child.pid, 'SIGTERM'); } catch { /* already gone */ }
       killTimer = setTimeout(() => {
         try { killImpl(-child.pid, 'SIGKILL'); } catch { /* already gone */ }
       }, killGraceMs);
-    };
-    const stopTimer = setTimeout(() => {
-      timedOut = true;
-      stopGroup();
     }, opts.timeoutSeconds * 1000);
-    const onOutsideStop = (signal) => {
-      stoppedBy = signal;
-      clearTimeout(stopTimer);
-      // The record is still written: the kill grace is short, and this
-      // process is kept alive by the child until the child closes.
-      try { killImpl(-child.pid, 'SIGKILL'); } catch { /* already gone */ }
-    };
-    const signals = ['SIGHUP', 'SIGTERM', 'SIGINT'];
-    for (const signal of signals) signalSource.on?.(signal, onOutsideStop);
     const finish = (value) => {
       clearTimeout(stopTimer);
       clearTimeout(killTimer);
-      for (const signal of signals) signalSource.off?.(signal, onOutsideStop);
-      resolveRun({ ...value, timedOut, stoppedBy });
+      resolveRun({ ...value, timedOut });
     };
     child.on('error', (error) => finish({ exitCode: null, signal: null, spawnError: error.message }));
     child.on('close', (exitCode, signal) => finish({ exitCode, signal, spawnError: null }));
@@ -225,7 +215,6 @@ export async function runSeat(opts, {
     exitCode: result.exitCode,
     signal: result.signal,
     timedOut: result.timedOut,
-    stoppedBy: result.stoppedBy,
     spawnError: result.spawnError,
     answerWritten: existsSync(files.answer),
     allowanceBefore: before?.reading ?? null,

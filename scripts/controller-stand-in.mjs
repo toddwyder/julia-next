@@ -1,7 +1,7 @@
 // controller-stand-in.mjs -- JUL-98 step 8: the FREE stand-in test, run on the
 // server through every real route except the thinking.
 //
-//   sudo -u orchestrator-svc node scripts/controller-stand-in.mjs --scenario <name>
+//   sudo -u orchestrator-svc node scripts/controller-stand-in.mjs --scenario <name> [--base origin/<branch>]
 //
 // What is REAL: the controller's own carry (graph/controller/main.mjs
 // `carryCard`), a real Orca working copy on the worker daemon, a real Orca
@@ -66,7 +66,7 @@ export function printingPublisher(print, { headShaImpl = headShaOf } = {}) {
   };
 }
 
-export async function runStandIn({ scenario, print = console.log }) {
+export async function runStandIn({ scenario, baseBranch, print = console.log }) {
   if (!SCENARIOS.includes(scenario)) throw new Error(`--scenario must be one of ${SCENARIOS.join(', ')}`);
   const card = standInCard(scenario);
   const seen = new Map();
@@ -92,6 +92,7 @@ export async function runStandIn({ scenario, print = console.log }) {
     seatChoicesImpl: () => ({ builder: null, reviewer: null }),
     timeLimits: limits.timeLimits ?? {},
     seatOptions: limits.seatOptions ?? {},
+    ...(baseBranch ? { baseBranch } : {}),
   });
   const summary = {
     scenario,
@@ -117,7 +118,8 @@ export async function runStandIn({ scenario, print = console.log }) {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const at = process.argv.indexOf('--scenario');
-  runStandIn({ scenario: at > -1 ? process.argv[at + 1] : null }).catch((error) => {
+  const base = process.argv.indexOf('--base');
+  runStandIn({ scenario: at > -1 ? process.argv[at + 1] : null, baseBranch: base > -1 ? process.argv[base + 1] : undefined }).catch((error) => {
     console.error(`[stand-in] ${error.stack ?? error.message}`);
     process.exitCode = 1;
   });

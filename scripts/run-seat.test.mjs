@@ -108,7 +108,7 @@ test('a seat that finishes: its own group, the brief on disk, stale files from a
       child.exit(0);
     }, 10),
   });
-  const record = await runSeat(optsFor(worktree), { spawnImpl, signalSource: new EventEmitter() });
+  const record = await runSeat(optsFor(worktree), { spawnImpl });
   const [call] = spawnImpl.calls;
   assert.equal(call.options.detached, true, 'its own process group, so a stop reaches everything it started');
   assert.equal(call.options.cwd, worktree);
@@ -133,7 +133,6 @@ test('a seat that runs past its limit is told to stop, then killed, as a GROUP -
   const record = await runSeat(optsFor(worktree, { timeoutSeconds: 0.05 }), {
     spawnImpl,
     killGraceMs: 30,
-    signalSource: new EventEmitter(),
     killImpl: (pid, signal) => {
       kills.push([pid, signal]);
       if (signal === 'SIGKILL') child.exit(null, 'SIGKILL');
@@ -144,22 +143,13 @@ test('a seat that runs past its limit is told to stop, then killed, as a GROUP -
   assert.equal(record.answerWritten, false);
 });
 
-test('a stop from OUTSIDE (the controller closing the terminal) kills the agent group and still writes the record', async () => {
+test('the agent\'s process group is written down the moment it starts, so the controller can stop it as the worker', async () => {
   const worktree = tempWorktree();
-  const kills = [];
-  const signals = new EventEmitter();
-  let child;
-  const spawnImpl = fakeSpawn({ onSpawn: (c) => { child = c; setTimeout(() => signals.emit('SIGHUP', 'SIGHUP'), 10); } });
-  const record = await runSeat(optsFor(worktree), {
-    spawnImpl,
-    signalSource: signals,
-    killImpl: (pid, signal) => { kills.push([pid, signal]); child.exit(null, signal); },
-  });
-  assert.deepEqual(kills, [[-4242, 'SIGKILL']]);
-  assert.equal(record.stoppedBy, 'SIGHUP');
-  assert.equal(record.timedOut, false);
-  assert.ok(existsSync(seatFiles(worktree, 'round-1-builder').run));
-  assert.equal(signals.listenerCount('SIGHUP'), 0, 'the handlers are removed once the seat is done');
+  const files = seatFiles(worktree, 'round-1-builder');
+  let seenPid = null;
+  const spawnImpl = fakeSpawn({ onSpawn: (child) => setTimeout(() => { seenPid = JSON.parse(readFileSync(files.pid, 'utf8')); child.exit(0); }, 5) });
+  await runSeat(optsFor(worktree), { spawnImpl });
+  assert.deepEqual({ pid: seenPid.pid, pgid: seenPid.pgid }, { pid: 4242, pgid: 4242 });
 });
 
 test('a Gemini seat has its allowance read before and after, and a failed reading is recorded rather than thrown', async () => {
@@ -168,7 +158,6 @@ test('a Gemini seat has its allowance read before and after, and a failed readin
   const readings = [usage(0.9), usage(0.89)];
   const record = await runSeat(optsFor(worktree, { agent: 'agy', model: 'gemini-3.8-flash' }), {
     spawnImpl: fakeSpawn({ exitAfterMs: 5 }),
-    signalSource: new EventEmitter(),
     readAllowanceImpl: async () => readings.shift(),
   });
   assert.equal(record.allowanceBefore['gemini-weekly'].remaining, 0.9);
@@ -177,7 +166,6 @@ test('a Gemini seat has its allowance read before and after, and a failed readin
 
   const failed = await runSeat(optsFor(tempWorktree(), { agent: 'agy', model: 'gemini-3.8-flash' }), {
     spawnImpl: fakeSpawn({ exitAfterMs: 5 }),
-    signalSource: new EventEmitter(),
     readAllowanceImpl: async () => { throw new Error('agy not signed in'); },
   });
   assert.equal(failed.allowanceBefore, null);
@@ -192,6 +180,6 @@ test('an agent that cannot be started at all is recorded as such, not left hangi
     setImmediate(() => child.emit('error', new Error('spawn agy ENOENT')));
     return child;
   };
-  const record = await runSeat(optsFor(worktree), { spawnImpl, signalSource: new EventEmitter() });
+  const record = await runSeat(optsFor(worktree), { spawnImpl });
   assert.match(record.spawnError, /ENOENT/);
 });
