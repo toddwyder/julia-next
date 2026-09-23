@@ -17,6 +17,27 @@ const FILE = fileURLToPath(new URL('./orchestrator-svc-ops', import.meta.url));
 const ACCOUNTS = ['runner', 'orchestrator-svc'];
 const KEY_GROUPS = ['deepseek-readers', 'commandcode-readers'];
 
+// Whether THIS process has the kernel's NoNewPrivs attribute set -- read
+// directly off /proc/self/status rather than inferred from a sudo error
+// message (round-1 review finding: message-matching sudo's own stderr
+// confused a genuinely broken sudoers file with this attribute, because a
+// sudoers parse error can echo the same words back). A process with this
+// bit set can never regain privileges through setuid execve, which is
+// exactly what stops `sudo` running at all under
+// `ops/controller/julia-controller.service`'s `NoNewPrivileges=yes`.
+// Missing or unparseable /proc/self/status (a non-Linux box, a sandboxed
+// environment without /proc) reads as false -- absence of evidence is not
+// evidence of the attribute, and the caller only uses this to WIDEN a skip,
+// never to silence a real failure.
+function hasNoNewPrivs() {
+  try {
+    const status = readFileSync('/proc/self/status', 'utf8');
+    return /^NoNewPrivs:\s*1\s*$/m.test(status);
+  } catch {
+    return false;
+  }
+}
+
 const raw = readFileSync(FILE, 'utf8');
 const rules = raw
   .split(/\r?\n/)
@@ -116,13 +137,22 @@ test('on the server: an install attempt as orchestrator-svc is refused by sudo',
   // verify the RULES sudo enforces are exactly the right ones, not whether
   // sudo itself can run at all when a caller has deliberately disabled it.
   // A username check alone can't tell those two orchestrator-svc contexts
-  // apart -- only asking sudo, and reading ITS OWN reason for refusing, can.
-  // sudo's `The "no new privileges" flag is set` message is the one signal
-  // that distinguishes "cannot run here by design" from "ran and refused
-  // correctly", so only that specific message skips; any other failure
-  // (a stale rule, a broken sudoers file) still fails the test loudly.
-  if (listing.status !== 0 && /no new privileges/i.test(listing.stderr)) {
-    return t.skip(`sudo cannot execute at all under this process (${listing.stderr.trim()}) -- this is NoNewPrivileges on the caller (e.g. the controller's own systemd unit), not a rule this test can check; the two earlier assertions in this test still ran and still enforce the install refusal`);
+  // apart.
+  //
+  // ROUND-1 REVIEW FINDING (Command Code DeepSeek V4 Pro, CHANGES NEEDED):
+  // an earlier version of this skip grepped `listing.stderr` for the text
+  // "no new privileges", live-reproduced as matching a genuinely BROKEN
+  // sudoers file too -- a parse error on a line like
+  // `Defaults "no new privileges"` echoes that same phrase back in sudo's
+  // syntax-error output, which would have silently skipped the real check
+  // this test exists to run. String-matching sudo's own (localizable)
+  // stderr was the wrong signal either way. `/proc/self/status`'s
+  // `NoNewPrivs` field is the kernel's own record of the attribute that
+  // actually blocks sudo's setuid execve, read directly rather than
+  // inferred from a message -- it cannot be confused with an unrelated
+  // sudo failure, and does not depend on sudo's output locale.
+  if (listing.status !== 0 && hasNoNewPrivs()) {
+    return t.skip(`this process has NoNewPrivs set (/proc/self/status), which stops sudo executing at all (${listing.stderr.trim()}) -- not a rule this test can check here; the install-refusal assertion above still ran, and NoNewPrivileges itself is what enforces the boundary in this context`);
   }
   assert.equal(listing.status, 0, `sudo -l failed: ${listing.stderr}`);
   const live = listing.stdout.split('\n')
