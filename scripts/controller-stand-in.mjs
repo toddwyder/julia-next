@@ -33,6 +33,9 @@ export const STAND_IN_LIMITS = Object.freeze({
   stuck: { timeLimits: { builder: 10 * 60 * 1000, reviewer: 10 * 60 * 1000 }, seatOptions: { stuckAfterMs: 60 * 1000, progressReadMs: 15 * 1000 } },
   // The same 60-second stuck rule as `stuck`, against seats that are working
   // but silent for 150 s: they must NOT be stopped.
+  // One UAT item missing, both rounds: the acceptance check must refuse it,
+  // and the card must park without merging or reaching UAT.
+  'missing-evidence': { timeLimits: { builder: 10 * 60 * 1000, reviewer: 10 * 60 * 1000 }, seatOptions: {} },
   'busy-silent': { timeLimits: { builder: 10 * 60 * 1000, reviewer: 10 * 60 * 1000 }, seatOptions: { stuckAfterMs: 60 * 1000, progressReadMs: 15 * 1000 } },
 });
 
@@ -42,15 +45,38 @@ export function standInCard(scenario, run = Date.now().toString(36)) {
     identifier: `STANDIN-${parseInt(run, 36) % 100000}`,
     title: `Stand-in carry (${scenario})`,
     url: null,
-    description: `A free stand-in carry. No card, no model, no spend.\n\nStand-in scenario: ${scenario}\n`,
+    // Criteria and a UAT plan, as every carried card must have: the acceptance
+    // check runs on the stand-in exactly as on a real card.
+    description: [
+      'A free stand-in carry. No card, no model, no spend.',
+      '',
+      `Stand-in scenario: ${scenario}`,
+      '',
+      '**Acceptance criteria:**',
+      '',
+      '- [ ] The stand-in commit is on the branch.',
+      '- [ ] The suite passes on that commit.',
+      '',
+      '## UAT plan',
+      '',
+      '1. **What changed:** one line naming the file the stand-in committed.',
+      '2. **The tests:** the suite result.',
+      '',
+    ].join('\n'),
     labels: [],
   };
 }
 
-export function printingBoard(print) {
+// Printed, never posted -- but it keeps the card's description and comments,
+// so the acceptance check's guard reads back what the carry wrote.
+export function printingBoard(print, card = null) {
   let next = 0;
+  const posted = [];
+  let description = card?.description ?? '';
   return {
-    async comment({ body }) { next += 1; print(`[board] comment c${next}:\n${body}\n`); return { id: `c${next}` }; },
+    async comment({ body }) { next += 1; posted.push({ id: `c${next}`, body }); print(`[board] comment c${next}:\n${body}\n`); return { id: `c${next}` }; },
+    async readCard() { return { description, comments: [...posted] }; },
+    async setDescription({ description: next2 }) { description = next2; print(`[board] description written (criteria ticked):\n${next2}\n`); },
     async updateComment({ commentId, body }) { print(`[board] comment ${commentId} edited:\n${body}\n`); return { id: commentId }; },
     async moveCard({ to }) { print(`[board] card moved to ${to}`); },
   };
@@ -73,7 +99,7 @@ export async function runStandIn({ scenario, baseBranch, print = console.log }) 
   if (!SCENARIOS.includes(scenario)) throw new Error(`--scenario must be one of ${SCENARIOS.join(', ')}`);
   const card = standInCard(scenario);
   const seen = new Map();
-  const board = printingBoard(print);
+  const board = printingBoard(print, card);
   const comments = {
     async postOnce({ issueId, key, body }) {
       if (seen.has(`${issueId}::${key}`)) return { posted: false };
@@ -110,6 +136,7 @@ export async function runStandIn({ scenario, baseBranch, print = console.log }) 
       candidate: r.candidate ?? null,
       tests: r.testRun ? `${r.testRun.pass} pass / ${r.testRun.fail} fail` : null,
       verdict: r.verdict ?? null,
+      acceptance: r.acceptance ? { ok: r.acceptance.ok, missing: r.acceptance.missing } : null,
       builder: r.builder ? { ok: r.builder.ok, stuck: r.builder.stuck ?? false, timedOut: r.builder.timedOut ?? false, stopConfirmed: r.builder.stopConfirmed ?? null, progressLines: r.builder.progress?.entries?.length ?? 0 } : null,
       reviewer: r.reviewer ? { ok: r.reviewer.ok, cutOff: r.reviewer.cutOff ?? null, progressLines: r.reviewer.progress?.entries?.length ?? 0 } : null,
     })),

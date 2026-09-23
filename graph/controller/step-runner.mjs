@@ -28,6 +28,7 @@
 // The verdict is now read from the answer file, and the working copy belongs to
 // the carry (./main.mjs), which removes it only after publishing.
 
+import { checkEvidence } from '../../scripts/acceptance-check.mjs';
 import { buildStepBrief, runSeat as defaultRunSeat } from './seat-run.mjs';
 import { readWorktreeState as defaultReadWorktreeState, testRunLine } from './test-run.mjs';
 import { formatCostLine } from './cost.mjs';
@@ -63,6 +64,14 @@ function reviewerBriefExtras({ branch, baseCommit, candidate, testRun, builderSu
     '',
     builderSummary,
     '',
+  ].join('\n');
+}
+
+function acceptanceFinding(acceptance) {
+  return [
+    'The reviewer approved and the tests passed, but the acceptance check (scripts/acceptance-check.mjs, a plain script) refused the step, so nothing merges. What is missing:',
+    '',
+    ...acceptance.missing.map((gap) => `- ${gap}`),
   ].join('\n');
 }
 
@@ -157,7 +166,18 @@ export async function runBuildAndReview({
     const { verdict } = reviewed.answer;
     record.verdict = verdict;
     if (verdict === 'approve' && suitePassed(testRun)) {
-      return finish({ ok: true, reason: null, candidate });
+      // 5. THE ACCEPTANCE CHECK (JUL-81; Todd, 23 Sep): a plain script, before
+      // anything is merged. Every criterion on the card needs the builder's
+      // evidence and the reviewer's "met", by name; every UAT-plan item needs
+      // the builder's answer. A gap goes back to the builder as the finding.
+      const acceptance = checkEvidence({ description: step.brief ?? '', builder: built.answer, reviewer: reviewed.answer });
+      record.acceptance = acceptance;
+      if (acceptance.ok) {
+        return finish({ ok: true, reason: null, candidate, evidence: { builder: built.answer, reviewer: reviewed.answer, check: acceptance } });
+      }
+      priorFinding = acceptanceFinding(acceptance);
+      record.finding = priorFinding;
+      continue;
     }
     priorFinding = verdict === 'approve' ? failingTestsFinding(testRun) : reviewed.answer.findings;
     record.finding = priorFinding;

@@ -453,6 +453,31 @@ const ISSUE_SET_STATE_MUTATION = `
   }
 `;
 
+// The acceptance check's guard reads the card as it is on Linear right before
+// the UAT move (Todd, 23 Sep): its description, and its comments. 250 is
+// Linear's page limit; a card with more is refused, never half-read.
+const ISSUE_FOR_UAT_QUERY = `
+  query ControllerIssueForUat($issueId: String!) {
+    issue(id: $issueId) {
+      id
+      description
+      comments(first: 250) {
+        nodes { id body }
+        pageInfo { hasNextPage }
+      }
+    }
+  }
+`;
+
+const ISSUE_SET_DESCRIPTION_MUTATION = `
+  mutation ControllerSetDescription($issueId: String!, $description: String!) {
+    issueUpdate(id: $issueId, input: { description: $description }) {
+      success
+      issue { id }
+    }
+  }
+`;
+
 function isBlocksRelation(type) {
   return /^blocks$/i.test(String(type ?? ''));
 }
@@ -574,6 +599,24 @@ export function createLinearClient({ apiKey, linearGraphQLImpl = linearGraphQL, 
         throw new Error(`ready-queue: Linear issueUpdate did not add labels to ${issueId}`);
       }
       return data?.issueUpdate?.issue ?? null;
+    },
+
+    async readIssueForUat({ issueId }) {
+      const data = await linearGraphQLImpl(ISSUE_FOR_UAT_QUERY, { issueId }, callOpts);
+      const issue = data?.issue;
+      if (!issue) throw new Error(`ready-queue: Linear returned no issue ${issueId}`);
+      if (issue.comments?.pageInfo?.hasNextPage) {
+        throw new Error(`ready-queue: ${issueId} has more than 250 comments -- paginate before trusting this read`);
+      }
+      return { id: issue.id, description: issue.description ?? '', comments: issue.comments?.nodes ?? [] };
+    },
+
+    async setDescription({ issueId, description }) {
+      const data = await linearGraphQLImpl(ISSUE_SET_DESCRIPTION_MUTATION, { issueId, description }, callOpts);
+      if (!data?.issueUpdate?.success) {
+        throw new Error(`ready-queue: Linear issueUpdate did not report success writing ${issueId}'s description`);
+      }
+      return data.issueUpdate.issue ?? null;
     },
 
     async setIssueState({ issueId, stateId }) {

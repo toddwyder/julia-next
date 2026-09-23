@@ -137,3 +137,35 @@ test('busy-silent: each seat reports once, works without a progress line for lon
   assert.equal(JSON.parse(readFileSync(v.answer, 'utf8')).verdict, 'approve');
   assert.equal(parseProgress(readFileSync(v.progress, 'utf8')).entries.length, 2, 'started + reviewing, and nothing while busy');
 });
+
+// The acceptance check (Todd, 23 Sep): the stand-in answers the criteria and
+// UAT items its brief lists by id -- except in missing-evidence, where the
+// builder leaves out the last UAT item and the check must refuse it.
+const LISTS = '\n## Acceptance criteria, by id\n\n- AC1: The stand-in commit is on the branch.\n\n## UAT plan items, by id\n\n- UAT1: What changed\n- UAT2: The tests\n';
+
+test('pass: the builder answers every criterion and UAT item by id, and the reviewer checks each criterion by name', async () => {
+  const r = repo();
+  const b = brief(r.dir, 'round-1-builder', `Stand-in scenario: pass\n${LISTS}`);
+  await standIn({ seat: 'builder', tag: 'round-1-builder', worktree: r.dir });
+  const built = JSON.parse(readFileSync(b.answer, 'utf8'));
+  assert.deepEqual(built.acceptance.map((a) => [a.id, a.criterion]), [['AC1', 'The stand-in commit is on the branch.']]);
+  assert.deepEqual(built.uat.map((u) => u.id), ['UAT1', 'UAT2']);
+  const v = brief(r.dir, 'round-1-reviewer', `Stand-in scenario: pass\n${LISTS}`);
+  await standIn({ seat: 'reviewer', tag: 'round-1-reviewer', worktree: r.dir });
+  const reviewed = JSON.parse(readFileSync(v.answer, 'utf8'));
+  assert.deepEqual(reviewed.criteria.map((c) => [c.id, c.verdict]), [['AC1', 'met']]);
+});
+
+test('missing-evidence: the builder leaves out the last UAT item, and the acceptance check refuses exactly that', async () => {
+  const r = repo();
+  const b = brief(r.dir, 'round-1-builder', `Stand-in scenario: missing-evidence\n${LISTS}`);
+  await standIn({ seat: 'builder', tag: 'round-1-builder', worktree: r.dir });
+  const built = JSON.parse(readFileSync(b.answer, 'utf8'));
+  assert.deepEqual(built.uat.map((u) => u.id), ['UAT1']);
+  const v = brief(r.dir, 'round-1-reviewer', `Stand-in scenario: missing-evidence\n${LISTS}`);
+  await standIn({ seat: 'reviewer', tag: 'round-1-reviewer', worktree: r.dir });
+  const reviewed = JSON.parse(readFileSync(v.answer, 'utf8'));
+  const description = '**Acceptance criteria:**\n\n- [ ] The stand-in commit is on the branch.\n\n## UAT plan\n\n1. **What changed:** x\n2. **The tests:** y\n';
+  const { checkEvidence } = await import('./acceptance-check.mjs');
+  assert.deepEqual(checkEvidence({ description, builder: built, reviewer: reviewed }).missing, ['UAT2 ("The tests"): the UAT plan promises it and the builder wrote nothing for it']);
+});

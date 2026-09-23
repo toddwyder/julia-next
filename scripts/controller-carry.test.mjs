@@ -7,12 +7,23 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { carryCard, BASE_BRANCH, progressCommentBody } from '../graph/controller/main.mjs';
+import { checkEvidence, EVIDENCE_MARKER } from './acceptance-check.mjs';
 
-const card = { id: 'uuid-92', identifier: 'JUL-92', title: 'Docs match', description: 'Fix the docs.', labels: [] };
+const DESCRIPTION = 'Fix the docs.\n\n**Acceptance criteria:**\n\n- [ ] No reference to the old runbook name remains (test).\n\n## UAT plan\n\n1. **The rename:** the new name.\n';
+const card = { id: 'uuid-92', identifier: 'JUL-92', title: 'Docs match', description: DESCRIPTION, labels: [] };
+const builderAnswer = {
+  outcome: 'done', summary: 'renamed',
+  acceptance: [{ id: 'AC1', criterion: 'No reference to the old runbook name remains (test).', evidence: 'git grep: 0 hits' }],
+  uat: [{ id: 'UAT1', text: 'It is now server-runbook.md.' }],
+};
+const reviewerAnswer = { verdict: 'approve', summary: 'ok', criteria: [{ id: 'AC1', criterion: 'No reference to the old runbook name remains (test).', verdict: 'met', how: 'ran git grep myself' }] };
+const evidence = { builder: builderAnswer, reviewer: reviewerAnswer, check: checkEvidence({ description: DESCRIPTION, builder: builderAnswer, reviewer: reviewerAnswer }) };
 
-function fixture({ outcome, publishOk = true, removeFails = false, progress = [] } = {}) {
+function fixture({ outcome, publishOk = true, removeFails = false, progress = [], liveCard = null } = {}) {
   const order = [];
   const comments = [];
+  // The card as Linear holds it: the guard reads it back before the UAT move.
+  const live = liveCard ?? { description: DESCRIPTION };
   const edits = [];
   const boundaries = {
     async worktreeCreateImpl(args) { order.push(['worktree-create', args]); return { worktree: { id: 'repo::/w/jul-92-work-a3', path: '/w/jul-92-work-a3' } }; },
@@ -22,6 +33,8 @@ function fixture({ outcome, publishOk = true, removeFails = false, progress = []
     async comment({ body }) { comments.push(body); return { id: `c${comments.length}` }; },
     async updateComment(args) { edits.push(args); return { id: args.commentId }; },
     async moveCard({ to }) { order.push(['move', to]); },
+    async readCard() { order.push(['read-card']); return { description: live.description, comments: comments.map((body) => ({ body })) }; },
+    async setDescription({ description }) { order.push(['tick']); if (!live.frozen) live.description = description; },
   };
   const publisher = {
     async publishAndMerge(args) {
@@ -38,7 +51,7 @@ function fixture({ outcome, publishOk = true, removeFails = false, progress = []
     return outcome;
   };
   return {
-    order, comments, edits,
+    order, comments, edits, live,
     run: (extra = {}) => carryCard({
       card, attempt: 3, boundaries, board, publisher, comments: { postOnce },
       runBuildAndReviewImpl,
@@ -50,7 +63,7 @@ function fixture({ outcome, publishOk = true, removeFails = false, progress = []
   };
 }
 
-const passed = { ok: true, reason: null, rounds: [{ round: 1, candidate: 'cand1234567', testRun: { pass: 10, fail: 0 }, verdict: 'approve' }], costText: ['- **Builder** -- x', '- **Reviewer** -- y'], testRun: null };
+const passed = { ok: true, reason: null, rounds: [{ round: 1, candidate: 'cand1234567', testRun: { pass: 10, fail: 0 }, verdict: 'approve' }], costText: ['- **Builder** -- x', '- **Reviewer** -- y'], testRun: null, evidence };
 
 test('a card that asks for a seat this route does not run is refused BEFORE any working copy is made, and told why', async () => {
   const f = fixture({ outcome: passed });
@@ -154,3 +167,42 @@ test('a base branch that is not a plain ref name is refused before anything is c
   await ok.run({ baseBranch: 'jul98-step-8b' });
   assert.equal(ok.order[0][1].baseBranch, 'jul98-step-8b');
 });
+
+// ---------------------------------------------------------------------------
+// The acceptance check on the card (Todd, 23 Sep: JUL-92 reached UAT with none
+// of the evidence its UAT plan promised)
+// ---------------------------------------------------------------------------
+
+test('before UAT: the evidence is posted item by item, the criteria boxes are ticked, and the LIVE card is read back before the move', async () => {
+  const f = fixture({ outcome: passed });
+  const result = await f.run();
+  assert.equal(result.ok, true, result.reason);
+  assert.equal(result.column, 'UAT');
+  const posted = f.comments.find((body) => body.includes(EVIDENCE_MARKER));
+  assert.ok(posted, 'the evidence comment is on the card');
+  assert.match(posted, /\*\*UAT1\. The rename\*\*\n\nIt is now server-runbook\.md\./);
+  assert.match(posted, /AC1: No reference to the old runbook name remains \(test\)\.\*\*\n  - Evidence \(builder\): git grep: 0 hits\n  - Checked \(reviewer\): met -- ran git grep myself/);
+  assert.match(f.live.description, /- \[x\] No reference to the old runbook name remains/);
+  const names = f.order.map(([name]) => name);
+  assert.ok(names.indexOf('tick') < names.lastIndexOf('read-card'), 'ticked, then read back');
+  assert.ok(names.lastIndexOf('read-card') < names.lastIndexOf('move'), 'read back before the last move');
+});
+
+test('THE GUARD: a live card with a box still open is NOT moved to UAT, and the card says why', async () => {
+  const f = fixture({ outcome: passed, liveCard: { description: DESCRIPTION, frozen: true } });
+  const result = await f.run();
+  assert.equal(result.ok, false);
+  assert.equal(result.stage, 'acceptance-guard');
+  assert.notEqual(result.column, 'UAT');
+  assert.ok(!f.order.some(([name, to]) => name === 'move' && to === 'UAT'), 'never moved to UAT');
+  assert.ok(f.comments.some((body) => /not moved to UAT: the acceptance check on the card refused it -- AC1 \("No reference to the old runbook name remains \(test\)\."\) is not ticked/.test(body)));
+});
+
+test('THE GUARD: a passed step that carries no evidence is NOT moved to UAT', async () => {
+  const f = fixture({ outcome: { ...passed, evidence: undefined } });
+  const result = await f.run();
+  assert.equal(result.stage, 'acceptance-guard');
+  assert.match(result.reason, /passed without the acceptance check's evidence/);
+  assert.ok(!f.order.some(([name, to]) => name === 'move' && to === 'UAT'));
+});
+

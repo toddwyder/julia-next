@@ -65,6 +65,13 @@ test('the reporting instructions name the exact two files, the five-minute stuck
   assert.match(text, /20 minutes/);
   assert.match(text, /"verdict":"changes_needed"/);
   assert.match(reportingInstructions({ seat: 'builder', tag: 'round-1-builder', timeLimitMs: 60000 }), /"outcome":"done"/);
+  // The acceptance check (Todd, 23 Sep): each criterion by name, both seats.
+  assert.match(text, /Check every acceptance criterion listed above yourself, by id and by its exact words/);
+  assert.match(text, /"criteria":\[\{"id":"AC1","criterion":"<its exact words>","verdict":"met"/);
+  const builderText = reportingInstructions({ seat: 'builder', tag: 'round-1-builder', timeLimitMs: 60000 });
+  assert.match(builderText, /"acceptance":\[\{"id":"AC1"/);
+  assert.match(builderText, /"uat":\[\{"id":"UAT1"/);
+  assert.match(builderText, /Every acceptance criterion and every UAT-plan item listed above, by id, gets an entry/);
 });
 
 test('the command carries the brief as base64 that run-seat.mjs decodes back EXACTLY, ends with the marker, and refuses a quote in a path', () => {
