@@ -211,9 +211,20 @@ for (const role of ROLE_NAMES) {
         assert.match(content, /"summary"/, `${role} in ${root} must name "summary" field`);
         assert.match(content, /"acceptance"/, `${role} in ${root} must name "acceptance" field`);
         assert.match(content, /"uat"/, `${role} in ${root} must name "uat" field`);
+        assert.doesNotMatch(content, /uat[^\n]*[`"]answer[`"]/i, `${role} in ${root} must not name "answer" as a UAT field`);
+        assert.match(content, /"id"/, `${role} in ${root} must name "id" field`);
+        assert.match(content, /"criterion"/, `${role} in ${root} must name "criterion" field`);
+        assert.match(content, /"evidence"/, `${role} in ${root} must name "evidence" field`);
+        assert.match(content, /"text"/, `${role} in ${root} must name "text" field for UAT entries`);
       } else if (role === 'julia-reviewer') {
         assert.match(content, /"verdict"/, `${role} in ${root} must name "verdict" field`);
+        assert.match(content, /"summary"/, `${role} in ${root} must name "summary" field`);
+        assert.match(content, /"findings"/, `${role} in ${root} must name "findings" field`);
         assert.match(content, /"criteria"/, `${role} in ${root} must name "criteria" field`);
+        assert.match(content, /"id"/, `${role} in ${root} must name "id" field in criteria`);
+        assert.match(content, /"criterion"/, `${role} in ${root} must name "criterion" field in criteria`);
+        assert.match(content, /"met"/, `${role} in ${root} must name "met" verdict value in criteria`);
+        assert.match(content, /"how"/, `${role} in ${root} must name "how" field in criteria`);
       }
     }
   });

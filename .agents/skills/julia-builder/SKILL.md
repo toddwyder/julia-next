@@ -133,7 +133,7 @@ The controller verifies the work itself; the worker's own word never counts:
 
 ### When you report
 
-Report once, at the end of your run, in your final output: a single JSON object with `"outcome"` (`"done"` once your work is committed and verified, or `"blocked"` the moment you cannot proceed), `"summary"` (detailing the branch, commit sha, exact test counts with the command that produced them, one plain-English line per criterion item, and any open gaps), `"acceptance"` (a list with one entry per acceptance criterion by `id`, echoing its exact words as `criterion` and the `evidence` showing it is met along with the evidence source), and `"uat"` (a list with one entry per UAT-plan item by `id` with the plain-English `answer` for Todd). For a blocked outcome, report `{"outcome":"blocked","summary":"<why you stopped>"}`. The worker's final output is the report. A worker is stuck only when it passes its time limit, which the operating system enforces.
+Report once, at the end of your run, in your final output: a single JSON object, either `{"outcome":"done","summary":"<branch, commit sha, test counts with command, one line per criterion and per finding fixed, gaps>","acceptance":[{"id":"AC1","criterion":"<exact words>","evidence":"<evidence and its source>"}, ...],"uat":[{"id":"UAT1","text":"<plain English for Todd>"}, ...]}` or `{"outcome":"blocked","summary":"<why you stopped>"}`. Include every field the graph reads: top-level `"outcome"` and `"summary"`, `"acceptance"` (entries with `"id"`, `"criterion"`, and `"evidence"`), and `"uat"` (entries with `"id"` and `"text"` for Todd). The worker's final output is the report. A worker is stuck only when it passes its time limit, which the operating system enforces.
 
 ### Cleanup
 
