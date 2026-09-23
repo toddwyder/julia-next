@@ -217,7 +217,12 @@ export async function startAdoptedWorker({
       if (typeof preamble !== 'string' || !preamble.includes(spec.trim().split('\n')[0])) {
         throw new Error(`orca dispatch-show gave no preamble carrying this brief for task ${result?.taskId ?? '(none)'}, so nothing was typed into Pi`);
       }
-      await terminalSendImpl({ terminal, text: preamble });
+      // Checked, not trusted: an unchecked "accepted" is the very silence
+      // this block exists to end (PR #101 review, finding 1).
+      const sent = await terminalSendImpl({ terminal, text: preamble });
+      if (sent?.send?.accepted !== true) {
+        throw new Error(`orca terminal send did not accept Pi's brief for task ${result?.taskId ?? '(none)'} (${JSON.stringify(sent ?? null).slice(0, 200)})`);
+      }
     }
 
     // (5) The turn-start reading. It never fails the START -- the adoption

@@ -331,3 +331,11 @@ test('a Pi preamble that does not carry the brief is not typed, and the adopted 
   assert.ok(!b.calls.some(([name]) => name === 'terminal-send'));
   assert.ok(!b.calls.some(([name]) => name === 'terminal-close' || name === 'worktree-rm'));
 });
+
+test('a Pi brief that terminal send does not accept is reported, and the adopted worker is kept', async () => {
+  const { b, promise } = runPi({ async terminalSendImpl() { return { send: { accepted: false } }; } });
+  const answer = await promise;
+  assert.equal(answer.ok, true);
+  assert.match(answer.observationError, /did not accept Pi's brief for task task_1/);
+  assert.ok(!b.calls.some(([name]) => name === 'terminal-close' || name === 'worktree-rm'));
+});
