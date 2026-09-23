@@ -24,10 +24,11 @@ Every session reads this before writing code:
    (`wayfinder`, `grilling`, `implement-spec`, `to-tickets` and friends from
    `mattpocock/skills`) come first for any nontrivial piece of work — not code first, process
    retrofitted after.
-2. **Every change to this repo comes from an agent dispatched through Orca on the OVH server**
+2. **Every change to this repo comes from an agent run by the graph on the OVH server**
    and published by the publisher GitHub App, enforced before any code exists in this repo. No
-   ad hoc local pushes standing in for the real delivery path. Orca is the agent runner and the
-   evidence gate, not where Julia is hosted; the app itself runs elsewhere (ADR 0005).
+   ad hoc local pushes standing in for the real delivery path. The graph (a LangGraph program)
+   is the agent runner and the evidence gate, not where Julia is hosted; the app itself runs
+   elsewhere (ADR 0005).
 3. **Observability (Sentry, Axiom) and the new architecture are in from the first line**, not
    bolted on after something breaks in production.
 4. **Small, complete user journeys, each accepted by Todd on evidence.** Todd is never the
@@ -65,6 +66,8 @@ Every session reads this before writing code:
   decided the same day that the v1 map covers all fifteen requirements, and sharing and the
   nutrition panel besides; all four moved into required behaviour. Rule 2 was reworded on
   2026-09-16 after research showed Orca is an agent runner, not app hosting.
+  Rule 2 was reworded again on 2026-09-23 (JUL-116): Orca and the hand-built controller were
+  replaced by a LangGraph graph on the same server, so changes are now run by the graph.
 
 ## Data
 
