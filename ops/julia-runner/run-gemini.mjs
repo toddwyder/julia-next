@@ -42,7 +42,9 @@ export function allowListProblem(settingsText) {
 // With the empty allow list, headless agy refuses file edits too; the
 // accept-edits mode lets Gemini edit inside the worktree only, while a write
 // outside it and any command stay refused (measured on the server, 24 Sep).
-export const agyArgs = (prompt, worktree) => ['--add-dir', worktree, '--mode', 'accept-edits', '--output-format', 'stream-json', '--disable-slash-commands', '--print', `Your working folder is ${worktree}.\n\n${prompt}`];
+// --print-timeout 0, as run-agy-seat passes: without it agy ends a headless
+// turn after five minutes (three live JUL-123 turns cut off at 5:02, 24 Sep).
+export const agyArgs = (prompt, worktree) => ['--add-dir', worktree, '--mode', 'accept-edits', '--print-timeout', '0', '--output-format', 'stream-json', '--disable-slash-commands', '--print', `Your working folder is ${worktree}.\n\n${prompt}`];
 
 function readSettings(home) {
   try { return readFileSync(join(home, '.gemini', 'antigravity-cli', 'settings.json'), 'utf8'); } catch (error) {

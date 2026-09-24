@@ -48,6 +48,7 @@ test('agy runs headless in the worktree, never with permissions skipped', () => 
   const args = agyArgs('the brief', '/srv/julia-runner/worktrees/card-9');
   for (const flag of ['--dangerously-skip-permissions', '--sandbox', '--project']) assert.ok(!args.includes(flag), flag);
   assert.deepEqual(args.slice(0, 4), ['--add-dir', '/srv/julia-runner/worktrees/card-9', '--mode', 'accept-edits'], 'edits allowed in the worktree only; commands stay refused');
+  assert.equal(args[args.indexOf('--print-timeout') + 1], '0', 'no five-minute cut-off on a turn');
   assert.equal(args.at(-2), '--print');
   assert.equal(args.at(-1), 'Your working folder is /srv/julia-runner/worktrees/card-9.\n\nthe brief');
 });
