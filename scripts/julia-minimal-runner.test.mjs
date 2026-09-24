@@ -474,3 +474,44 @@ test('a diff over a megabyte is refused with "split the card", not a crash, and 
   assert.match(comments.at(-1), /split the card/, 'the refusal is on the card');
   rmSync(fx.root, { recursive: true, force: true });
 });
+
+// -- From DeepSeek's round-1 review of c8a9fd6.
+
+test('the Standards axis also gets CONTRIBUTING.md and CODING_STANDARDS.md when the start commit has them', async () => {
+  const fx = makeRepo();
+  write(fx.repoRoot, 'CONTRIBUTING.md', 'STANDARD-MARKER-CONTRIBUTING\n');
+  git(fx.repoRoot, 'add', '.');
+  git(fx.repoRoot, 'commit', '-q', '-m', 'contributing guide');
+  git(fx.repoRoot, 'push', '-q', 'origin', 'main');
+  fx.base = git(fx.repoRoot, 'rev-parse', 'HEAD');
+  const { adapters, calls } = fakes();
+  const result = await run(fx, adapters);
+  assert.equal(result.outcome, 'pr', result.reason);
+  assert.ok(calls.deepseek[1].prompt.includes('STANDARD-MARKER-CONTRIBUTING'));
+  assert.ok(!calls.deepseek[1].prompt.includes('CODING_STANDARDS.md'), 'a file that does not exist is not named');
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+test('each review axis says on the card that it has started', async () => {
+  const fx = makeRepo();
+  const { adapters, comments } = fakes();
+  await run(fx, adapters);
+  assert.ok(comments.some((body) => /DeepSeek's Spec review of `[0-9a-f]{12}` started/.test(body)));
+  assert.ok(comments.some((body) => /DeepSeek's Standards review of `[0-9a-f]{12}` started/.test(body)));
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+test('a resume does not run checks again that already passed for this commit', async () => {
+  const fx = makeRepo();
+  const { adapters } = fakes();
+  const lines = [];
+  adapters.progress = (line) => lines.push(line);
+  const comment = adapters.linear.comment;
+  let armed = true;
+  adapters.linear.comment = async (id, body) => { if (armed && body.includes('runner: publishing')) { armed = false; throw new Error('crash before publishing'); } return comment(id, body); };
+  await assert.rejects(run(fx, adapters), /crash before publishing/);
+  const result = await run(fx, adapters);
+  assert.equal(result.outcome, 'pr', result.reason);
+  assert.equal(lines.filter((line) => line.includes('Red proof and checks')).length, 1, `checks ran more than once:\n${lines.join('\n')}`);
+  rmSync(fx.root, { recursive: true, force: true });
+});

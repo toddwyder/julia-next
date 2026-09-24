@@ -114,8 +114,10 @@ export function geminiAdapter() {
 
 const SERVER = { host: 'ubuntu@100.125.239.98', key: join(homedir(), '.ssh', 'ovh_runner_ed25519') };
 const SERVER_CHECKOUT = '/srv/orchestrator-svc/julia-next';
-const ssh = (script, options = {}) => spawnSync('ssh', ['-i', SERVER.key, '-o', 'BatchMode=yes', SERVER.host, script], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, ...options });
-const tail = (text) => String(text ?? '').trim().split('\n').slice(-5).join('\n');
+// The key and batch-mode options every ssh and scp call to the server shares.
+const SERVER_OPTIONS = ['-i', SERVER.key, '-o', 'BatchMode=yes'];
+const ssh = (script, options = {}) => spawnSync('ssh', [...SERVER_OPTIONS, SERVER.host, script], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, ...options });
+const lastLines = (text) => String(text ?? '').trim().split('\n').slice(-5).join('\n');
 
 // The last assistant message's text in Pi's JSON event stream.
 export function lastAssistantText(stream) {
@@ -146,17 +148,18 @@ export function deepseekAdapter() {
     'sudo -u runner timeout 1800 node "$D/run-pi-seat.mjs" reviewer-backup --effort high',
   ].join('\n');
   // A review is one long silent turn, so progress is the reply arriving: a
-  // line each time another 64 KB of Pi's event stream has come in.
+  // line each time another megabyte of Pi's event stream has come in (Pi
+  // resends the growing message, so smaller steps flood the terminal).
   return async (prompt, { onProgress = () => {} } = {}) => {
     let reported = 0;
     const onLine = (_line, received) => {
-      if (received - reported < 64 * 1024) return;
+      if (received - reported < 1024 * 1024) return;
       reported = received;
       onProgress(`${Math.round(received / 1024)} KB of the reply received`);
     };
-    const run = await runStreaming('ssh', ['-i', SERVER.key, '-o', 'BatchMode=yes', SERVER.host, script], { input: prompt, onLine });
+    const run = await runStreaming('ssh', [...SERVER_OPTIONS, SERVER.host, script], { input: prompt, onLine });
     if (run.error) return { ok: false, reason: `ssh did not start: ${run.error.message}` };
-    if (run.status !== 0) return { ok: false, reason: `the server review exited ${run.status}: ${tail(run.stderr)}` };
+    if (run.status !== 0) return { ok: false, reason: `the server review exited ${run.status}: ${lastLines(run.stderr)}` };
     const vendor = parsePiJsonStream(run.stdout);
     if (!vendor.ok) return { ok: false, reason: vendor.errorText };
     const text = lastAssistantText(run.stdout);
@@ -176,11 +179,11 @@ export function publishAdapter() {
     try {
       onProgress(`bundling ${branch} and copying it to the server`);
       const bundle = spawnSync('git', ['bundle', 'create', join(local, `${name}.bundle`), branch], { cwd: worktree, encoding: 'utf8' });
-      if (bundle.status !== 0) throw new Error(`git bundle failed: ${tail(bundle.stderr)}`);
+      if (bundle.status !== 0) throw new Error(`git bundle failed: ${lastLines(bundle.stderr)}`);
       writeFileSync(join(local, `${name}.title`), title);
       writeFileSync(join(local, `${name}.body`), body);
-      const copy = spawnSync('scp', ['-i', SERVER.key, '-o', 'BatchMode=yes', ...['bundle', 'title', 'body'].map((ext) => join(local, `${name}.${ext}`)), `${SERVER.host}:/tmp/`], { encoding: 'utf8' });
-      if (copy.status !== 0) throw new Error(`scp failed: ${tail(copy.stderr)}`);
+      const copy = spawnSync('scp', [...SERVER_OPTIONS, ...['bundle', 'title', 'body'].map((ext) => join(local, `${name}.${ext}`)), `${SERVER.host}:/tmp/`], { encoding: 'utf8' });
+      if (copy.status !== 0) throw new Error(`scp failed: ${lastLines(copy.stderr)}`);
       const publisher = `sudo -u orchestrator-svc node --env-file=/etc/orchestrator-svc/.env.publisher ${SERVER_CHECKOUT}/scripts/publish-pr.mjs`;
       const script = [
         'set -e',
@@ -195,7 +198,7 @@ export function publishAdapter() {
       ].join('\n');
       onProgress('checking the commit on the server, pushing and opening the PR');
       const run = ssh(script);
-      if (run.status !== 0) throw new Error(`publishing on the server failed: ${tail(run.stderr)}`);
+      if (run.status !== 0) throw new Error(`publishing on the server failed: ${lastLines(run.stderr)}`);
       return { url: JSON.parse(run.stdout.trim().split('\n').at(-1)).url };
     } finally {
       rmSync(local, { recursive: true, force: true });

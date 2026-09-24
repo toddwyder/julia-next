@@ -59,19 +59,19 @@ const { NODE_TEST_CONTEXT: _inherited, ...TEST_ENV } = process.env;
 // The suite is whatever package.json's `test` script says, the same command
 // Gemini is told to run, so the two can never drift apart.
 const SUITE = 'npm test';
-const sh = (command, cwd) => spawnSync(command, { cwd, encoding: 'utf8', shell: true, env: TEST_ENV });
+const runShell = (command, cwd) => spawnSync(command, { cwd, encoding: 'utf8', shell: true, env: TEST_ENV });
 const failedTests = (output) => new Set([...String(output).matchAll(/^✖ (.+?) \([\d.]+m?s\)\s*$/gm)].map((match) => match[1]));
 
 // The lint must pass. The suite may fail only in tests that already failed on
 // the start commit: on the Windows laptop two tests fail for path reasons
 // before any change (24 Sep), and a change is judged on what it breaks.
 function runChecks(cwd, onStartCommit) {
-  const lint = sh('npm run lint:framework', cwd);
+  const lint = runShell('npm run lint:framework', cwd);
   if (lint.status !== 0) return { pass: false, summary: 'lint failed (`npm run lint:framework`)', output: `${lint.stdout}${lint.stderr}`.slice(-4000) };
-  const suite = sh(SUITE, cwd);
+  const suite = runShell(SUITE, cwd);
   if (suite.status === 0) return { pass: true, summary: 'lint:framework and the full suite passed', output: '' };
   const failed = [...failedTests(suite.stdout)];
-  const before = failed.length ? onStartCommit(() => failedTests(sh(SUITE, cwd).stdout)) : new Set();
+  const before = failed.length ? onStartCommit(() => failedTests(runShell(SUITE, cwd).stdout)) : new Set();
   const fresh = failed.filter((name) => !before.has(name));
   if (!failed.length || fresh.length) {
     return { pass: false, summary: `tests failed (\`${SUITE}\`): ${fresh.join('; ') || 'the suite did not run'}`, output: `${suite.stdout}${suite.stderr}`.slice(-4000) };
@@ -153,7 +153,11 @@ function implementPrompt(card, skills, findings) {
 
 // One review is one prompt; above this size it is refused, never cut short.
 export const MAX_REVIEW_CHARS = 400_000;
+// The repo's documented standards: the three it has, plus the two files the
+// code-review skill names, whenever the start commit has them.
 const STANDARDS_FILES = ['CLAUDE.md', 'AGENTS.md', 'eslint.config.mjs'];
+const OPTIONAL_STANDARDS_FILES = ['CODING_STANDARDS.md', 'CONTRIBUTING.md'];
+const existsAt = (repoRoot, base, path) => spawnSync('git', ['cat-file', '-e', `${base}:${path}`], { cwd: repoRoot }).status === 0;
 const AXIS_NAMES = { spec: 'Spec', standards: 'Standards' };
 
 // The code-review skill's own method, with its step 4 sub-agent brief for one
@@ -251,7 +255,7 @@ export async function runIssue(issueId, { base, repoRoot, worktreeRoot, adapters
     const material = {
       card,
       skill: pinnedText(repoRoot, base, ['.agents/skills/code-review/SKILL.md']),
-      standards: pinnedText(repoRoot, base, STANDARDS_FILES),
+      standards: pinnedText(repoRoot, base, [...STANDARDS_FILES, ...OPTIONAL_STANDARDS_FILES.filter((path) => existsAt(repoRoot, base, path))]),
       commits: git(worktree, 'log', '--oneline', `${base}..${sha}`),
       diff: git(worktree, 'diff', `${base}...${sha}`),
     };
@@ -266,6 +270,7 @@ export async function runIssue(issueId, { base, repoRoot, worktreeRoot, adapters
     for (const axis of ['spec', 'standards']) {
       const moved = changed(sha);
       if (moved) return { failure: moved };
+      await sayOnce(`DeepSeek's ${AXIS_NAMES[axis]} review of \`${sha.slice(0, 12)}\` started.`, markerLine('review-started', { sha, axis }));
       progress(`DeepSeek ${AXIS_NAMES[axis]} review of ${sha.slice(0, 12)} started`);
       const reply = await deepseek(prompts[axis], { axis, onProgress: relay(`DeepSeek ${AXIS_NAMES[axis]}`) });
       if (!reply.ok) return { failure: `DeepSeek's ${AXIS_NAMES[axis]} review failed: ${reply.reason}` };
@@ -292,9 +297,14 @@ export async function runIssue(issueId, { base, repoRoot, worktreeRoot, adapters
 
     const beforeChecks = changed(sha);
     if (beforeChecks) return blocked(beforeChecks);
-    progress(`Red proof and checks on ${sha.slice(0, 12)} started`);
-    const proofFailure = redProof({ worktree, branch, base, sha, seams });
-    const checks = proofFailure ? { pass: false, summary: proofFailure, output: '' } : runChecks(worktree, (check) => onCommit({ worktree, branch, commit: base }, check));
+    // Checks that already passed for this exact commit are not run again.
+    const passedEarlier = recorded('checks', sha)?.includes(`${markerLine('checks', { sha })} result=pass`);
+    let checks = { pass: true, summary: 'passed earlier for this commit (recorded on the card)', output: '' };
+    if (!passedEarlier) {
+      progress(`Red proof and checks on ${sha.slice(0, 12)} started`);
+      const proofFailure = redProof({ worktree, branch, base, sha, seams });
+      checks = proofFailure ? { pass: false, summary: proofFailure, output: '' } : runChecks(worktree, (check) => onCommit({ worktree, branch, commit: base }, check));
+    }
     await sayOnce(`Checks on \`${sha.slice(0, 12)}\`: ${checks.summary}.`, markerLine('checks', { sha, result: checks.pass ? 'pass' : 'fail' }));
     if (!checks.pass) {
       findings = `The checks failed: ${checks.summary}\n\n${checks.output}`.trim();
