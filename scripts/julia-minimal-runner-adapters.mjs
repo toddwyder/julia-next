@@ -5,7 +5,7 @@
 // title or body placed inside a shell string.
 import { spawn, spawnSync } from 'node:child_process';
 // eslint-disable-next-line no-restricted-imports -- input files only, deleted after use, never a progress record: the PR title and body travel to the server as files so no card text is ever placed inside a shell string. https://man.openbsd.org/scp.1
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -67,10 +67,32 @@ export function agyOutcome(stdout, stderr = '') {
   const denied = final.denied_actions ?? [];
   if (denied.length) {
     const names = denied.map((d) => `${d.action} (${d.display_name})`).join(', ');
-    return { ok: false, reason: `agy denied ${names}: ${stderr.trim().split('\n').at(-1) ?? ''}` };
+    return { ok: false, reason: `agy denied ${names}: ${lastLine(stderr)}` };
   }
   if (!String(result.response ?? '').trim()) return { ok: false, reason: 'agy reported SUCCESS with an empty reply' };
   return { ok: true, reason: null };
+}
+
+// Headless agy obeys only the global allow list, so the runner reads it and
+// will not start Gemini while it allows more than these two (JUL-122, Safe
+// Gemini execution: Todd's open decision on the `npx` and `npm run` rules).
+const GLOBAL_SETTINGS = join(homedir(), '.gemini', 'antigravity-cli', 'settings.json');
+const NARROW_RULES = ['command(npm test)', 'command(git status)'];
+
+export function broadAllowRules(settingsText) {
+  if (settingsText == null) return [];
+  let settings;
+  try { settings = JSON.parse(settingsText); } catch { return ['the settings file could not be read']; }
+  return (settings?.permissions?.allow ?? []).filter((rule) => !NARROW_RULES.includes(rule));
+}
+
+function readGlobalSettings() {
+  try {
+    return readFileSync(GLOBAL_SETTINGS, 'utf8');
+  } catch (error) {
+    if (error.code === 'ENOENT') return null;
+    return '{ unreadable';
+  }
 }
 
 // Windows refuses a command line over 32,767 characters, and the brief is one argument.
@@ -100,8 +122,10 @@ function runStreaming(command, args, { input = '', onLine = () => {}, ...options
   });
 }
 
-export function geminiAdapter() {
+export function geminiAdapter({ readSettings = readGlobalSettings } = {}) {
   return async (prompt, { cwd, onProgress = () => {} }) => {
+    const broad = broadAllowRules(readSettings());
+    if (broad.length) return { ok: false, reason: `Gemini was not started: the global agy allow list (${GLOBAL_SETTINGS}) also allows ${broad.join(', ')}, and headless agy obeys only that list. Narrowing it is Todd's open decision on JUL-122 (Safe Gemini execution)` };
     if (prompt.length > MAX_BRIEF_CHARS) return { ok: false, reason: `the brief is ${prompt.length} characters, over the ${MAX_BRIEF_CHARS} a Windows command line can carry` };
     const onLine = (line) => { const step = agyStepLine(line); if (step) onProgress(step); };
     const run = await runStreaming('agy', agyArgs(prompt, cwd), { cwd, env: workerEnv(process.env), onLine });
@@ -118,6 +142,7 @@ const SERVER_CHECKOUT = '/srv/orchestrator-svc/julia-next';
 const SERVER_OPTIONS = ['-i', SERVER.key, '-o', 'BatchMode=yes'];
 const ssh = (script, options = {}) => spawnSync('ssh', [...SERVER_OPTIONS, SERVER.host, script], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, ...options });
 const lastLines = (text) => String(text ?? '').trim().split('\n').slice(-5).join('\n');
+const lastLine = (text) => String(text ?? '').trim().split('\n').at(-1) ?? '';
 
 // The last assistant message's text in Pi's JSON event stream.
 export function lastAssistantText(stream) {
@@ -199,7 +224,7 @@ export function publishAdapter() {
       onProgress('checking the commit on the server, pushing and opening the PR');
       const run = ssh(script);
       if (run.status !== 0) throw new Error(`publishing on the server failed: ${lastLines(run.stderr)}`);
-      return { url: JSON.parse(run.stdout.trim().split('\n').at(-1)).url };
+      return { url: JSON.parse(lastLine(run.stdout)).url };
     } finally {
       rmSync(local, { recursive: true, force: true });
     }

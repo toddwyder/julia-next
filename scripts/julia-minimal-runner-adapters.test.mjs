@@ -5,7 +5,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { agyArgs, agyOutcome, agyStepLine, workerEnv } from './julia-minimal-runner-adapters.mjs';
+import { agyArgs, agyOutcome, agyStepLine, broadAllowRules, geminiAdapter, workerEnv } from './julia-minimal-runner-adapters.mjs';
 
 // Gemini's limits. agy honours only the user's global allow list in headless
 // mode (JUL-122 step 3: a project's own rules were ignored), so the runner
@@ -78,4 +78,25 @@ test('the turn outcome is read from the final result event of the stream', () =>
   const denied = stream({ event: 'result', result: { status: 'SUCCESS', response: '', denied_actions: [{ action: 'command', display_name: 'RunCommand' }] } });
   assert.equal(agyOutcome(denied).ok, false);
   assert.equal(agyOutcome(stream(activeStep('view_file', {}))).ok, false, 'a stream with no result event is a failed turn');
+});
+
+// -- From DeepSeek's round-2 review of cda3377: no Gemini turn under a broad
+// global allow list. Headless agy obeys only that list, so the runner reads
+// it and refuses to start Gemini while it allows more than `npm test` and
+// `git status` (Todd's open decision on JUL-122).
+
+test('allow rules broader than npm test and git status are named', () => {
+  const settings = JSON.stringify({ permissions: { allow: ['command(npm run)', 'command(npx)', 'command(git status)', 'command(npm test)', 'command($env:PYTHONIOENCODING="utf-8";)'] } });
+  assert.deepEqual(broadAllowRules(settings), ['command(npm run)', 'command(npx)', 'command($env:PYTHONIOENCODING="utf-8";)']);
+  assert.deepEqual(broadAllowRules(JSON.stringify({ permissions: { allow: ['command(npm test)'] } })), []);
+  assert.deepEqual(broadAllowRules(null), [], 'no settings file means nothing is pre-approved');
+  assert.deepEqual(broadAllowRules('{ not json'), ['the settings file could not be read'], 'unreadable settings fail closed');
+});
+
+test('the Gemini adapter refuses to start Gemini under a broad allow list, naming the rules', async () => {
+  const gemini = geminiAdapter({ readSettings: () => JSON.stringify({ permissions: { allow: ['command(npx)', 'command(npm test)'] } }) });
+  const turn = await gemini('the brief', { cwd: tmpdir() });
+  assert.equal(turn.ok, false);
+  assert.match(turn.reason, /command\(npx\)/);
+  assert.match(turn.reason, /JUL-122/);
 });

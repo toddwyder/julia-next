@@ -515,3 +515,11 @@ test('a resume does not run checks again that already passed for this commit', a
   assert.equal(lines.filter((line) => line.includes('Red proof and checks')).length, 1, `checks ran more than once:\n${lines.join('\n')}`);
   rmSync(fx.root, { recursive: true, force: true });
 });
+
+test('the checks report names the suite scope that actually ran', async () => {
+  const fx = makeRepo();
+  const { adapters, comments } = fakes();
+  await run(fx, adapters);
+  assert.ok(comments.some((body) => body.includes('the `scripts/*.test.mjs` suite (the scope CI runs) passed')), comments.filter((b) => b.includes('Checks')).join('\n'));
+  rmSync(fx.root, { recursive: true, force: true });
+});

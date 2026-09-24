@@ -59,6 +59,7 @@ const { NODE_TEST_CONTEXT: _inherited, ...TEST_ENV } = process.env;
 // The suite is whatever package.json's `test` script says, the same command
 // Gemini is told to run, so the two can never drift apart.
 const SUITE = 'npm test';
+const SUITE_SCOPE = 'the `scripts/*.test.mjs` suite (the scope CI runs)';
 const runShell = (command, cwd) => spawnSync(command, { cwd, encoding: 'utf8', shell: true, env: TEST_ENV });
 const failedTests = (output) => new Set([...String(output).matchAll(/^✖ (.+?) \([\d.]+m?s\)\s*$/gm)].map((match) => match[1]));
 
@@ -69,14 +70,14 @@ function runChecks(cwd, onStartCommit) {
   const lint = runShell('npm run lint:framework', cwd);
   if (lint.status !== 0) return { pass: false, summary: 'lint failed (`npm run lint:framework`)', output: `${lint.stdout}${lint.stderr}`.slice(-4000) };
   const suite = runShell(SUITE, cwd);
-  if (suite.status === 0) return { pass: true, summary: 'lint:framework and the full suite passed', output: '' };
+  if (suite.status === 0) return { pass: true, summary: `lint:framework and ${SUITE_SCOPE} passed`, output: '' };
   const failed = [...failedTests(suite.stdout)];
   const before = failed.length ? onStartCommit(() => failedTests(runShell(SUITE, cwd).stdout)) : new Set();
   const fresh = failed.filter((name) => !before.has(name));
   if (!failed.length || fresh.length) {
     return { pass: false, summary: `tests failed (\`${SUITE}\`): ${fresh.join('; ') || 'the suite did not run'}`, output: `${suite.stdout}${suite.stderr}`.slice(-4000) };
   }
-  return { pass: true, summary: `lint:framework passed, and the suite passed except ${failed.length} test(s) that already fail on the start commit: ${failed.join('; ')}`, output: '' };
+  return { pass: true, summary: `lint:framework passed, and ${SUITE_SCOPE} passed except ${failed.length} test(s) that already fail on the start commit: ${failed.join('; ')}`, output: '' };
 }
 
 // The pre-agreed seams (tdd skill: "Test only at pre-agreed seams"): the
