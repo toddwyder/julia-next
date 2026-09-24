@@ -1,235 +1,360 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
-import {
-  advancePhase,
-  initialState,
-  acquireLock,
-  releaseLock,
-  extractVerdict,
-  buildImplementPrompt,
-  runIssue,
-} from './julia-minimal-runner.mjs';
+import { runIssue } from './julia-minimal-runner.mjs';
 
-// -- advancePhase: the state machine's transitions, no process spawned. -----
+// The seam: runIssue(issueId, { base, repoRoot, worktreeRoot, adapters }).
+// Git, the checks and the red proof are real (a fixture repo with a bare
+// origin); only the four outside services -- Linear, Gemini, DeepSeek and
+// the publisher -- are fakes, and each records its calls so a test can say
+// an external effect happened exactly once.
 
-test('advancePhase: fetch succeeds moves to implement', () => {
-  const next = advancePhase(initialState('JUL-1'), { type: 'fetched', branch: 'runner/jul-1', worktree: '/tmp/x', baseSha: 'abc' });
-  assert.equal(next.phase, 'implement');
-  assert.equal(next.baseSha, 'abc');
-});
+const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
 
-test('advancePhase: fetch failure blocks immediately', () => {
-  const next = advancePhase(initialState('JUL-1'), { type: 'fetchFailed', reason: 'no description' });
-  assert.equal(next.phase, 'blocked');
-  assert.equal(next.reason, 'no description');
-});
+function write(root, path, text) {
+  mkdirSync(dirname(join(root, path)), { recursive: true });
+  writeFileSync(join(root, path), text);
+}
 
-test('advancePhase: implement failure blocks immediately (no retry)', () => {
-  const state = { ...initialState('JUL-1'), phase: 'implement' };
-  const next = advancePhase(state, { type: 'implementFailed', reason: 'agy exited 1' });
-  assert.equal(next.phase, 'blocked');
-});
-
-test('advancePhase: checks failing on attempt 1 goes back to implement, attempt 2', () => {
-  const state = { ...initialState('JUL-1'), phase: 'check', attempt: 1 };
-  const next = advancePhase(state, { type: 'checksFailed', result: { pass: false, summary: 'tests red' } });
-  assert.equal(next.phase, 'implement');
-  assert.equal(next.attempt, 2);
-});
-
-test('advancePhase: checks failing again on attempt 2 blocks -- the correction round is used up', () => {
-  const state = { ...initialState('JUL-1'), phase: 'check', attempt: 2 };
-  const next = advancePhase(state, { type: 'checksFailed', result: { pass: false, summary: 'still red' } });
-  assert.equal(next.phase, 'blocked');
-  assert.match(next.reason, /still red/);
-});
-
-test('advancePhase: review clean on both axes reaches done', () => {
-  const state = { ...initialState('JUL-1'), phase: 'review', attempt: 1 };
-  const next = advancePhase(state, { type: 'reviewClean', result: { summary: 'clean on both axes' } });
-  assert.equal(next.phase, 'done');
-});
-
-test('advancePhase: review findings on attempt 1 triggers one correction round', () => {
-  const state = { ...initialState('JUL-1'), phase: 'review', attempt: 1 };
-  const next = advancePhase(state, { type: 'reviewFindings', result: { summary: 'actionable findings on: spec' } });
-  assert.equal(next.phase, 'implement');
-  assert.equal(next.attempt, 2);
-});
-
-test('advancePhase: review findings again on attempt 2 blocks', () => {
-  const state = { ...initialState('JUL-1'), phase: 'review', attempt: 2 };
-  const next = advancePhase(state, { type: 'reviewFindings', result: { summary: 'still findings' } });
-  assert.equal(next.phase, 'blocked');
-});
-
-test('advancePhase: an outcome that does not belong to the current phase throws', () => {
-  const state = { ...initialState('JUL-1'), phase: 'implement' };
-  assert.throws(() => advancePhase(state, { type: 'checksPassed', result: {} }));
-});
-
-// -- extractVerdict / buildImplementPrompt: small pure helpers. -------------
-
-test('extractVerdict reads the last VERDICT line', () => {
-  assert.equal(extractVerdict('blah blah\nVERDICT: CLEAN\n'), 'CLEAN');
-  assert.equal(extractVerdict('no verdict here'), null);
-});
-
-test('buildImplementPrompt includes the issue and, on a correction round, the findings', () => {
-  const skillPath = join(mkdtempSync(join(tmpdir(), 'skills-')), 'skill.md');
-  writeFileSync(skillPath, '# a skill');
-  const issue = { identifier: 'JUL-9', title: 'Do the thing', description: 'Make X return Y' };
-  const clean = buildImplementPrompt(issue, { implementSkillPath: skillPath, tddSkillPath: skillPath, findings: [] });
-  assert.match(clean, /Make X return Y/);
-  assert.doesNotMatch(clean, /Correction round/);
-  const corrected = buildImplementPrompt(issue, { implementSkillPath: skillPath, tddSkillPath: skillPath, findings: ['fix the off-by-one'] });
-  assert.match(corrected, /Correction round/);
-  assert.match(corrected, /fix the off-by-one/);
-});
-
-// -- Lock: only one run at a time. -------------------------------------------
-
-test('acquireLock refuses a second run while the first holds the lock', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'runner-lock-'));
-  const path = acquireLock(dir, 'JUL-1');
-  assert.throws(() => acquireLock(dir, 'JUL-1'), /already being run/);
-  releaseLock(path);
-  rmSync(dir, { recursive: true, force: true });
-});
-
-// -- runIssue end to end, against a fixture git repo and fake model commands.
+const BASE_FILES = {
+  'package.json': '{ "type": "module", "scripts": { "lint:framework": "node -e \\"\\"" } }\n',
+  'scripts/add.mjs': 'export const add = () => 0;\n',
+  'CLAUDE.md': '# Rules\n\nSTANDARD-MARKER-CLAUDE: name things plainly.\n',
+  'AGENTS.md': '# Agents\n\nSTANDARD-MARKER-AGENTS\n',
+  'eslint.config.mjs': '// STANDARD-MARKER-ESLINT\nexport default [];\n',
+  '.agents/skills/implement/SKILL.md': 'IMPLEMENT-SKILL-MARKER\n',
+  '.agents/skills/tdd/SKILL.md': 'TDD-SKILL-MARKER\n',
+  '.agents/skills/tdd/tests.md': 'TDD-TESTS-MARKER\n',
+  '.agents/skills/tdd/mocking.md': 'TDD-MOCKING-MARKER\n',
+  '.agents/skills/code-review/SKILL.md': 'CODE-REVIEW-SKILL-MARKER\n',
+};
 
 function makeRepo() {
-  const repoRoot = mkdtempSync(join(tmpdir(), 'runner-repo-'));
-  execFileSync('git', ['init', '-q'], { cwd: repoRoot });
-  execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd: repoRoot });
-  execFileSync('git', ['config', 'user.name', 'Test'], { cwd: repoRoot });
-  mkdirSync(join(repoRoot, 'scripts'), { recursive: true });
-  writeFileSync(join(repoRoot, 'README.md'), 'hello\n');
-  execFileSync('git', ['add', '.'], { cwd: repoRoot });
-  execFileSync('git', ['commit', '-q', '-m', 'init'], { cwd: repoRoot });
-  return repoRoot;
+  const root = mkdtempSync(join(tmpdir(), 'runner-fixture-'));
+  const origin = join(root, 'origin.git');
+  const repoRoot = join(root, 'repo');
+  execFileSync('git', ['init', '-q', '--bare', '-b', 'main', origin]);
+  execFileSync('git', ['init', '-q', '-b', 'main', repoRoot]);
+  git(repoRoot, 'config', 'user.email', 'fixture@example.com');
+  git(repoRoot, 'config', 'user.name', 'Fixture');
+  git(repoRoot, 'config', 'core.autocrlf', 'false');
+  for (const [path, text] of Object.entries(BASE_FILES)) write(repoRoot, path, text);
+  git(repoRoot, 'add', '.');
+  git(repoRoot, 'commit', '-q', '-m', 'base');
+  git(repoRoot, 'remote', 'add', 'origin', origin);
+  git(repoRoot, 'push', '-q', 'origin', 'main');
+  const base = git(repoRoot, 'rev-parse', 'HEAD');
+  return { root, repoRoot, worktreeRoot: join(root, 'worktrees'), base };
 }
 
-function baseOpts(repoRoot, stateDir, overrides = {}) {
-  const issue = { identifier: 'JUL-1', title: 'Fixture issue', description: 'A described public seam.' };
-  return {
-    stateDir,
-    repoRoot,
-    fetchIssueImpl: async () => issue,
-    execImpl: spawnSync,
-    ...overrides,
+const SEAMED_CARD = {
+  identifier: 'JUL-900',
+  title: 'add() adds',
+  description: '## What\n\nadd(a, b) returns the sum.\n\n## Seams\n\n* Interface: `add(a, b)` in `scripts/add.mjs`\n* Tests: `scripts/add.test.mjs`\n* Kind: behavior\n',
+};
+
+// What a good Gemini turn leaves behind: a real fix plus a test at the seam.
+function goodFix(cwd) {
+  write(cwd, 'scripts/add.mjs', 'export const add = (a, b) => a + b;\n');
+  write(cwd, 'scripts/add.test.mjs', "import { test } from 'node:test';\nimport assert from 'node:assert/strict';\nimport { add } from './add.mjs';\ntest('add sums', () => assert.equal(add(2, 3), 5));\n");
+}
+
+function fakes({ card = SEAMED_CARD, geminiTurn = goodFix, verdicts = [{ spec: 'CLEAN', standards: 'CLEAN' }] } = {}) {
+  const calls = { gemini: [], deepseek: [], publish: [], uat: 0 };
+  const comments = [];
+  const adapters = {
+    linear: {
+      getCard: async () => ({ ...card, comments: comments.map((body) => ({ body })) }),
+      comment: async (_id, body) => { comments.push(body); },
+      moveToUat: async () => { calls.uat += 1; },
+    },
+    gemini: async (prompt, { cwd }) => {
+      calls.gemini.push(prompt);
+      geminiTurn(cwd, calls.gemini.length);
+      return { ok: true };
+    },
+    deepseek: async (prompt, { axis }) => {
+      calls.deepseek.push({ axis, prompt });
+      const round = verdicts[Math.min(Math.floor((calls.deepseek.length - 1) / 2), verdicts.length - 1)];
+      return { ok: true, text: `Review of ${axis}.\nVERDICT: ${round[axis]}\n` };
+    },
+    publish: async (request) => {
+      calls.publish.push(request);
+      return { url: 'https://example.test/pull/1' };
+    },
   };
+  return { adapters, calls, comments };
 }
 
-// A fake `spawnImpl` that: for agy, makes a real commit in the given cwd (so
-// the runner's "did HEAD move" check is exercised against real git); for pi,
-// returns a canned VERDICT. Call counts are recorded per command so tests can
-// assert an external effect ran exactly once.
-function fakeSpawn({ agyOutcome = 'commit', verdicts = { spec: 'CLEAN', standards: 'CLEAN' } } = {}) {
-  const calls = { agy: 0, pi: 0 };
-  const impl = (command, args, opts) => {
-    if (command === 'agy') {
-      calls.agy += 1;
-      if (agyOutcome === 'commit') {
-        writeFileSync(join(opts.cwd, `change-${calls.agy}.txt`), 'x\n');
-        execFileSync('git', ['add', '.'], { cwd: opts.cwd });
-        execFileSync('git', ['commit', '-q', '-m', `candidate ${calls.agy}`], { cwd: opts.cwd });
-        return { status: 0, stdout: '{}', stderr: '' };
-      }
-      if (agyOutcome === 'noCommit') return { status: 0, stdout: '{}', stderr: '' };
-      return { status: 1, stdout: '', stderr: 'boom' };
-    }
-    if (command === 'pi') {
-      calls.pi += 1;
-      const axisArgIndex = args.indexOf('--model');
-      // The prompt is the last arg; find which axis it's for by content.
-      const prompt = args[args.length - 1];
-      const axis = /spec/i.test(prompt.split('\n')[0]) ? 'spec' : 'standards';
-      const verdict = verdicts[axis] ?? 'CLEAN';
-      return { status: 0, stdout: `some review text\nVERDICT: ${verdict}\n`, stderr: '' };
-    }
-    return { status: 1, error: new Error(`unexpected command ${command}`) };
-  };
-  return { impl, calls };
+function run(fx, adapters, issueId = 'JUL-900') {
+  return runIssue(issueId, { base: fx.base, repoRoot: fx.repoRoot, worktreeRoot: fx.worktreeRoot, adapters });
 }
 
-// npm/node checks run through execImpl too (spawnSync is real for git, but we
-// need a fake for npm/node so the fixture doesn't need real lint/test setup).
-function fakeExec(realExecImpl, { checksPass = true } = {}) {
-  return (command, args, opts) => {
-    if (command === 'npm' || command === 'node') {
-      return checksPass ? { status: 0, stdout: 'ok', stderr: '' } : { status: 1, stdout: '', stderr: 'checks failed' };
-    }
-    return realExecImpl(command, args, opts);
-  };
-}
-
-test('runIssue: happy path reaches done, commits once, reviews once per axis', async () => {
-  const repoRoot = makeRepo();
-  const stateDir = mkdtempSync(join(tmpdir(), 'runner-state-'));
-  const { impl: spawnImpl, calls } = fakeSpawn();
-  const result = await runIssue('JUL-1', baseOpts(repoRoot, stateDir, {
-    execImpl: fakeExec(spawnSync),
-    spawnImpl,
-  }));
-  assert.equal(result.phase, 'done');
-  assert.equal(calls.agy, 1);
-  assert.equal(calls.pi, 2);
-  rmSync(repoRoot, { recursive: true, force: true });
-  rmSync(stateDir, { recursive: true, force: true });
+test('happy path: one Gemini turn, one review per axis, one PR, card to UAT', async () => {
+  const fx = makeRepo();
+  const { adapters, calls, comments } = fakes();
+  const result = await run(fx, adapters);
+  assert.equal(result.outcome, 'pr', result.reason);
+  assert.equal(result.prUrl, 'https://example.test/pull/1');
+  assert.equal(calls.gemini.length, 1);
+  assert.deepEqual(calls.deepseek.map((c) => c.axis), ['spec', 'standards']);
+  assert.equal(calls.publish.length, 1);
+  assert.equal(calls.publish[0].sha, result.sha);
+  assert.equal(calls.uat, 1);
+  assert.ok(comments.length >= 4, 'one progress comment per step (implement, checks, review, PR)');
+  rmSync(fx.root, { recursive: true, force: true });
 });
 
-test('runIssue: resuming after done does not repeat the completed implement or review effects', async () => {
-  const repoRoot = makeRepo();
-  const stateDir = mkdtempSync(join(tmpdir(), 'runner-state-'));
-  const { impl: spawnImpl, calls } = fakeSpawn();
-  const opts = baseOpts(repoRoot, stateDir, { execImpl: fakeExec(spawnSync), spawnImpl });
-  await runIssue('JUL-1', opts);
-  const again = await runIssue('JUL-1', opts);
-  assert.equal(again.phase, 'done');
-  assert.equal(calls.agy, 1, 'agy must not be called again once the candidate is already committed and reviewed');
-  assert.equal(calls.pi, 2, 'DeepSeek must not be re-run once the review is already clean');
-  rmSync(repoRoot, { recursive: true, force: true });
-  rmSync(stateDir, { recursive: true, force: true });
-});
+// Crash once at a named point, then resume with the same command. Whatever
+// had already happened before the crash must not happen a second time.
+function crashOnce(adapters, where) {
+  let armed = true;
+  const trip = () => { if (armed) { armed = false; throw new Error(`crash at ${where}`); } };
+  const { linear } = adapters;
+  if (where === 'after-commit') {
+    const comment = linear.comment;
+    linear.comment = async (id, body) => { if (body.includes('runner: implement')) trip(); return comment(id, body); };
+  }
+  if (where === 'after-review') {
+    const publish = adapters.publish;
+    adapters.publish = async (request) => { trip(); return publish(request); };
+  }
+  if (where === 'after-pr') {
+    const moveToUat = linear.moveToUat;
+    linear.moveToUat = async (id) => { trip(); return moveToUat(id); };
+  }
+}
 
-test('runIssue: checks failing twice blocks without ever reaching review', async () => {
-  const repoRoot = makeRepo();
-  const stateDir = mkdtempSync(join(tmpdir(), 'runner-state-'));
-  const { impl: spawnImpl, calls } = fakeSpawn();
-  const result = await runIssue('JUL-1', baseOpts(repoRoot, stateDir, {
-    execImpl: fakeExec(spawnSync, { checksPass: false }),
-    spawnImpl,
-  }));
-  assert.equal(result.phase, 'blocked');
-  assert.match(result.reason, /checks still failing after 2 attempts/);
-  assert.equal(calls.agy, 2, 'one initial attempt plus one correction round');
-  assert.equal(calls.pi, 0, 'review must never run while checks are still failing');
-  rmSync(repoRoot, { recursive: true, force: true });
-  rmSync(stateDir, { recursive: true, force: true });
-});
-
-test('runIssue: a missing description fails clearly before any model is invoked', async () => {
-  const repoRoot = makeRepo();
-  const stateDir = mkdtempSync(join(tmpdir(), 'runner-state-'));
-  const { impl: spawnImpl, calls } = fakeSpawn();
-  const result = await runIssue('JUL-2', {
-    stateDir,
-    repoRoot,
-    fetchIssueImpl: async () => ({ identifier: 'JUL-2', title: 'No seam', description: '' }),
-    execImpl: fakeExec(spawnSync),
-    spawnImpl,
+for (const where of ['after-commit', 'after-review', 'after-pr']) {
+  test(`resume after a crash ${where} repeats no Gemini turn, review or PR`, async () => {
+    const fx = makeRepo();
+    const { adapters, calls } = fakes();
+    crashOnce(adapters, where);
+    await assert.rejects(run(fx, adapters), /crash at/);
+    const result = await run(fx, adapters);
+    assert.equal(result.outcome, 'pr', result.reason);
+    assert.equal(calls.gemini.length, 1, 'Gemini ran once');
+    assert.equal(calls.deepseek.length, 2, 'one review per axis, never repeated');
+    assert.equal(calls.publish.length, 1, 'one PR');
+    assert.equal(calls.uat, 1);
+    rmSync(fx.root, { recursive: true, force: true });
   });
-  assert.equal(result.phase, 'blocked');
-  assert.match(result.reason, /no description|test seam/);
-  assert.equal(calls.agy, 0);
-  assert.equal(calls.pi, 0);
-  rmSync(repoRoot, { recursive: true, force: true });
-  rmSync(stateDir, { recursive: true, force: true });
+}
+
+test('a tracked change in the checkout is refused before anything runs', async () => {
+  const fx = makeRepo();
+  write(fx.repoRoot, 'scripts/add.mjs', 'export const add = () => 1;\n');
+  const { adapters, calls, comments } = fakes();
+  const result = await run(fx, adapters);
+  assert.equal(result.outcome, 'blocked');
+  assert.match(result.reason, /uncommitted/);
+  assert.equal(calls.gemini.length + calls.deepseek.length + calls.publish.length, 0);
+  assert.match(comments.at(-1), /uncommitted/, 'the reason is on the card');
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+test('a start commit that is not origin/main is refused before anything runs', async () => {
+  const fx = makeRepo();
+  write(fx.repoRoot, 'README.md', 'later\n');
+  git(fx.repoRoot, 'add', '.');
+  git(fx.repoRoot, 'commit', '-q', '-m', 'local only, never pushed');
+  const { adapters, calls } = fakes();
+  const result = await runIssue('JUL-900', { base: git(fx.repoRoot, 'rev-parse', 'HEAD'), repoRoot: fx.repoRoot, worktreeRoot: fx.worktreeRoot, adapters });
+  assert.equal(result.outcome, 'blocked');
+  assert.match(result.reason, /origin\/main/);
+  assert.equal(calls.gemini.length, 0);
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+test('a card with no Seams section, or one naming no test file, blocks before Gemini', async () => {
+  for (const description of ['## What\n\nadd(a, b) returns the sum.\n', '## Seams\n\n* Interface: `add(a, b)`\n']) {
+    const fx = makeRepo();
+    const { adapters, calls } = fakes({ card: { ...SEAMED_CARD, description } });
+    const result = await run(fx, adapters);
+    assert.equal(result.outcome, 'blocked');
+    assert.match(result.reason, /Seams/);
+    assert.equal(calls.gemini.length, 0);
+    rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+test("Gemini's brief carries the implement and tdd skills word for word, from the start commit", async () => {
+  const fx = makeRepo();
+  const { adapters, calls } = fakes();
+  await run(fx, adapters);
+  for (const marker of ['IMPLEMENT-SKILL-MARKER', 'TDD-SKILL-MARKER', 'TDD-TESTS-MARKER', 'TDD-MOCKING-MARKER', 'add(a, b) returns the sum.']) {
+    assert.ok(calls.gemini[0].includes(marker), `brief is missing ${marker}`);
+  }
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+const TAUTOLOGICAL_TEST = "import { test } from 'node:test';\nimport assert from 'node:assert/strict';\nimport { add } from './add.mjs';\ntest('add exists', () => assert.equal(typeof add, 'function'));\n";
+
+test('red proof: a seam test that already passes on the start commit blocks the run before review', async () => {
+  const fx = makeRepo();
+  const { adapters, calls } = fakes({
+    geminiTurn: (cwd) => { goodFix(cwd); write(cwd, 'scripts/add.test.mjs', TAUTOLOGICAL_TEST); },
+  });
+  const result = await run(fx, adapters);
+  assert.equal(result.outcome, 'blocked');
+  assert.match(result.reason, /red proof/);
+  assert.equal(calls.deepseek.length, 0, 'no review of a change whose tests prove nothing');
+  assert.equal(calls.publish.length, 0);
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+test('red proof: a behaviour change that touches no seam test blocks the run', async () => {
+  const fx = makeRepo();
+  const { adapters, calls } = fakes({ geminiTurn: (cwd) => write(cwd, 'scripts/add.mjs', 'export const add = (a, b) => a + b;\n') });
+  const result = await run(fx, adapters);
+  assert.equal(result.outcome, 'blocked');
+  assert.match(result.reason, /red proof/);
+  assert.equal(calls.publish.length, 0);
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+test('red proof: a refactor that edits its seam test blocks the run', async () => {
+  const fx = makeRepo();
+  write(fx.repoRoot, 'scripts/add.test.mjs', TAUTOLOGICAL_TEST);
+  git(fx.repoRoot, 'add', '.');
+  git(fx.repoRoot, 'commit', '-q', '-m', 'seam test');
+  git(fx.repoRoot, 'push', '-q', 'origin', 'main');
+  fx.base = git(fx.repoRoot, 'rev-parse', 'HEAD');
+  const card = { ...SEAMED_CARD, description: SEAMED_CARD.description.replace('Kind: behavior', 'Kind: refactor') };
+  const { adapters, calls } = fakes({ card, geminiTurn: goodFix });
+  const result = await run(fx, adapters);
+  assert.equal(result.outcome, 'blocked');
+  assert.match(result.reason, /red proof/);
+  assert.equal(calls.publish.length, 0);
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+test('DeepSeek gets the whole diff, the card, the code-review skill and the pinned standards, word for word', async () => {
+  const fx = makeRepo();
+  const bigLine = 'x'.repeat(100);
+  const big = `${Array.from({ length: 1500 }, (_, i) => `// ${i} ${bigLine}`).join('\n')}\n// END-OF-BIG-FILE\n`;
+  const { adapters, calls } = fakes({ geminiTurn: (cwd) => { goodFix(cwd); write(cwd, 'scripts/big.mjs', big); } });
+  const result = await run(fx, adapters);
+  assert.equal(result.outcome, 'pr', result.reason);
+  const [spec, standards] = calls.deepseek;
+  for (const { prompt } of calls.deepseek) {
+    assert.ok(prompt.includes('// END-OF-BIG-FILE'), 'the diff is not cut off');
+    assert.ok(prompt.includes('// 1499 '), 'every line of the diff is there');
+    assert.ok(prompt.includes('CODE-REVIEW-SKILL-MARKER'));
+  }
+  assert.ok(spec.prompt.includes('add(a, b) returns the sum.'), 'the Spec axis sees the card');
+  for (const marker of ['STANDARD-MARKER-CLAUDE: name things plainly.', 'STANDARD-MARKER-AGENTS', 'STANDARD-MARKER-ESLINT']) {
+    assert.ok(standards.prompt.includes(marker), `the Standards axis is missing ${marker}`);
+  }
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+test('a diff too big for one review blocks with "split the card" instead of being cut off', async () => {
+  const fx = makeRepo();
+  const huge = `${'y'.repeat(120)}\n`.repeat(5000);
+  const { adapters, calls } = fakes({ geminiTurn: (cwd) => { goodFix(cwd); write(cwd, 'scripts/huge.mjs', huge); } });
+  const result = await run(fx, adapters);
+  assert.equal(result.outcome, 'blocked');
+  assert.match(result.reason, /split the card/);
+  assert.equal(calls.deepseek.length, 0);
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+test('review findings get exactly one correction round, with the findings in the second brief', async () => {
+  const fx = makeRepo();
+  const { adapters, calls } = fakes({ verdicts: [{ spec: 'FINDINGS', standards: 'CLEAN' }, { spec: 'CLEAN', standards: 'CLEAN' }] });
+  adapters.gemini = async (prompt, { cwd }) => {
+    calls.gemini.push(prompt);
+    goodFix(cwd);
+    if (calls.gemini.length === 2) write(cwd, 'scripts/add.mjs', 'export const add = (a, b) => a + b; // corrected\n');
+    return { ok: true };
+  };
+  const result = await run(fx, adapters);
+  assert.equal(result.outcome, 'pr', result.reason);
+  assert.equal(calls.gemini.length, 2);
+  assert.match(calls.gemini[1], /Review of spec\.\nVERDICT: FINDINGS/, 'the second brief carries the review');
+  assert.equal(calls.deepseek.length, 4);
+  assert.equal(calls.publish[0].sha, result.sha);
+  assert.equal(git(fx.repoRoot, 'rev-list', '--count', `${fx.base}..${result.sha}`), '2');
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+test('failing checks get the same one correction round, with the failure in the second brief', async () => {
+  const fx = makeRepo();
+  const { adapters, calls } = fakes({
+    geminiTurn: (cwd, turn) => {
+      goodFix(cwd);
+      if (turn === 1) write(cwd, 'scripts/other.test.mjs', "import { test } from 'node:test';\ntest('broken', () => { throw new Error('boom'); });\n");
+      else rmSync(join(cwd, 'scripts/other.test.mjs'));
+    },
+  });
+  const result = await run(fx, adapters);
+  assert.equal(result.outcome, 'pr', result.reason);
+  assert.equal(calls.gemini.length, 2);
+  assert.match(calls.gemini[1], /tests failed/);
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+test('findings after the correction round block the run, with no PR', async () => {
+  const fx = makeRepo();
+  const { adapters, calls } = fakes({
+    verdicts: [{ spec: 'CLEAN', standards: 'FINDINGS' }],
+    geminiTurn: (cwd, turn) => { goodFix(cwd); write(cwd, 'scripts/add.mjs', `export const add = (a, b) => a + b; // turn ${turn}\n`); },
+  });
+  const result = await run(fx, adapters);
+  assert.equal(result.outcome, 'blocked');
+  assert.match(result.reason, /after the correction round/);
+  assert.equal(calls.gemini.length, 2);
+  assert.equal(calls.publish.length, 0);
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+test('a Gemini turn that fails, or a review with no verdict, blocks with the reason', async () => {
+  const fx = makeRepo();
+  const { adapters, calls } = fakes();
+  adapters.gemini = async () => ({ ok: false, reason: 'agy denied `git status`' });
+  const denied = await run(fx, adapters);
+  assert.equal(denied.outcome, 'blocked');
+  assert.match(denied.reason, /agy denied `git status`/);
+  rmSync(fx.root, { recursive: true, force: true });
+
+  const fx2 = makeRepo();
+  const second = fakes();
+  second.adapters.deepseek = async () => ({ ok: true, text: 'Looks fine to me.' });
+  const silent = await run(fx2, second.adapters);
+  assert.equal(silent.outcome, 'blocked');
+  assert.match(silent.reason, /no VERDICT line/);
+  assert.equal(second.calls.publish.length, 0);
+  assert.equal(calls.publish.length, 0);
+  rmSync(fx2.root, { recursive: true, force: true });
+});
+
+test("Gemini's brief names the only shell commands it may run", async () => {
+  const fx = makeRepo();
+  const { adapters, calls } = fakes();
+  await run(fx, adapters);
+  // Measured 24 Sep: headless agy allowed exactly `npm test` and refused
+  // `npm test -- <file>`, `npm run test <file>` and `npm run lint:framework`.
+  assert.match(calls.gemini[0], /The only shell command you may run is `npm test`/);
+  assert.match(calls.gemini[0], /Any other shell command is refused and ends your turn as a failure/);
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+test('a test that already fails on the start commit does not block the run; a new failure still does', async () => {
+  const fx = makeRepo();
+  write(fx.repoRoot, 'scripts/windows-only.test.mjs', "import { test } from 'node:test';\ntest('already broken here', () => { throw new Error('platform'); });\n");
+  git(fx.repoRoot, 'add', '.');
+  git(fx.repoRoot, 'commit', '-q', '-m', 'a test that fails on this machine');
+  git(fx.repoRoot, 'push', '-q', 'origin', 'main');
+  fx.base = git(fx.repoRoot, 'rev-parse', 'HEAD');
+  const { adapters, calls, comments } = fakes();
+  const result = await run(fx, adapters);
+  assert.equal(result.outcome, 'pr', result.reason);
+  assert.equal(calls.gemini.length, 1);
+  assert.ok(comments.some((body) => body.includes('already broken here')), 'the card names the failure that was already there');
+  rmSync(fx.root, { recursive: true, force: true });
 });

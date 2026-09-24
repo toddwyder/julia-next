@@ -1,487 +1,312 @@
-#!/usr/bin/env node
-// julia-minimal-runner.mjs -- a small, deterministic, fixed-route Julia
-// refactoring runner. Todd gives it one Linear issue ID; it drives a fixed
-// sequence (fetch -> Gemini implement+commit -> checks -> DeepSeek review ->
-// at most one Gemini correction round -> done/blocked) and reports a
-// reviewed candidate. It does not select issues, publish, deploy, or
-// supervise itself with another model.
+// julia-minimal-runner.mjs -- the fixed-route stopgap (JUL-122): one card goes
+// Gemini implement -> checks -> DeepSeek two-axis review -> at most one
+// correction round -> PR -> UAT. It is not the LangGraph controller
+// (JUL-116/JUL-118) and it keeps no state file: git holds the candidate
+// commits, and the card's own comments hold the review and PR results.
 //
-// Deliberately independent of the existing controller/graph/queue/publisher/
-// seat-table/run-seat machinery (that machinery is for the always-on graph;
-// this is the fixed-route exception for a laptop session, agreed with Todd).
-// CLI model calls go straight to `agy` (Gemini CLI) and `pi` (DeepSeek, via
-// the Command Code route) -- flags below are taken from `agy --help` and
-// from ops/service-dropbox/run-pi-seat.mjs's own comments (read, not
-// imported), not guessed.
+// runIssue is the seam. The four outside services come in as adapters
+// (linear, gemini, deepseek, publish); git and the checks are run for real.
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { existsSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { getIssue } from './linear-cli.mjs';
-
-export const STATE_DIR = '.julia-runner-state';
 export const MAX_ATTEMPTS = 2;
-export const MAX_DIFF_BYTES = 200_000;
-export const REVIEW_AXES = ['spec', 'standards'];
 
-export const DEFAULT_IMPLEMENT_SKILL_PATH =
-  process.env.JULIA_RUNNER_IMPLEMENT_SKILL ?? 'C:\\Users\\toddw\\Documents\\Codex\\2026-09-23\\le\\work\\cc-implement-skill.md';
-export const DEFAULT_TDD_SKILL_PATH =
-  process.env.JULIA_RUNNER_TDD_SKILL ?? 'C:\\Users\\toddw\\.agents\\skills\\tdd\\SKILL.md';
-
-// ---------------------------------------------------------------------------
-// State file: one atomic JSON file per issue, in an ignored local directory.
-// ---------------------------------------------------------------------------
-
-export function stateFilePath(stateDir, issueId) {
-  return join(stateDir, `${issueId}.json`);
+function git(cwd, ...args) {
+  const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
+  if (result.status !== 0) throw new Error(`git ${args.join(' ')} failed: ${(result.stderr || '').trim()}`);
+  return result.stdout.trim();
 }
 
-export function loadState(stateDir, issueId) {
-  const path = stateFilePath(stateDir, issueId);
-  if (!existsSync(path)) return null;
-  return JSON.parse(readFileSync(path, 'utf8'));
-}
+// One machine-readable line per step, at the end of a readable comment. A
+// later run finds its own earlier results by these lines.
+const markerLine = (step, fields) => `runner: ${step} ${Object.entries(fields).map(([k, v]) => `${k}=${v}`).join(' ')}`;
 
-// Write-to-temp-then-rename, so a crash mid-write never leaves a half-written
-// (unparsable) state file behind for the next run to trip over.
-export function saveStateAtomic(stateDir, issueId, state) {
-  mkdirSync(stateDir, { recursive: true });
-  const path = stateFilePath(stateDir, issueId);
-  const tmp = `${path}.tmp-${process.pid}`;
-  writeFileSync(tmp, `${JSON.stringify(state, null, 2)}\n`);
-  renameSync(tmp, path);
-  return state;
-}
-
-export function initialState(issueId) {
-  return {
-    issue: issueId,
-    phase: 'fetch',
-    attempt: 1,
-    branch: null,
-    worktree: null,
-    baseSha: null,
-    candidateSha: null,
-    checks: [],
-    review: [],
-    reason: null,
-    updatedAt: null,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// One run at a time. A stale lock (holder pid no longer alive) is reclaimed.
-// ---------------------------------------------------------------------------
-
-function lockFilePath(stateDir, issueId) {
-  return join(stateDir, `${issueId}.lock`);
-}
-
-function pidAlive(pid) {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export function acquireLock(stateDir, issueId) {
-  mkdirSync(stateDir, { recursive: true });
-  const path = lockFilePath(stateDir, issueId);
-  if (existsSync(path)) {
-    const holder = Number(readFileSync(path, 'utf8').trim());
-    if (Number.isInteger(holder) && pidAlive(holder)) {
-      throw new Error(`julia-minimal-runner: issue ${issueId} is already being run (pid ${holder}); only one run at a time`);
-    }
-  }
-  writeFileSync(path, String(process.pid));
-  return path;
-}
-
-export function releaseLock(path) {
-  try { unlinkSync(path); } catch { /* already gone */ }
-}
-
-// ---------------------------------------------------------------------------
-// The state machine's reducer. Pure: given the current state and an outcome
-// of the phase that just ran, returns the next state. This is the seam the
-// tests exercise directly, with no process spawned.
-// ---------------------------------------------------------------------------
-
-export function advancePhase(state, outcome) {
-  const at = () => new Date().toISOString();
-  switch (state.phase) {
-    case 'fetch':
-      if (outcome.type === 'fetched') {
-        return { ...state, phase: 'implement', branch: outcome.branch, worktree: outcome.worktree, baseSha: outcome.baseSha, updatedAt: at() };
-      }
-      if (outcome.type === 'fetchFailed') {
-        return { ...state, phase: 'blocked', reason: outcome.reason, updatedAt: at() };
-      }
-      break;
-    case 'implement':
-      if (outcome.type === 'implemented') {
-        return { ...state, phase: 'check', candidateSha: outcome.candidateSha, updatedAt: at() };
-      }
-      if (outcome.type === 'implementFailed') {
-        return { ...state, phase: 'blocked', reason: outcome.reason, updatedAt: at() };
-      }
-      break;
-    case 'check':
-      if (outcome.type === 'checksPassed') {
-        return { ...state, phase: 'review', checks: [...state.checks, outcome.result], updatedAt: at() };
-      }
-      if (outcome.type === 'checksFailed') {
-        const checks = [...state.checks, outcome.result];
-        if (state.attempt < MAX_ATTEMPTS) {
-          return { ...state, phase: 'implement', attempt: state.attempt + 1, checks, reason: outcome.result.summary, updatedAt: at() };
-        }
-        return { ...state, phase: 'blocked', checks, reason: `checks still failing after ${state.attempt} attempts: ${outcome.result.summary}`, updatedAt: at() };
-      }
-      break;
-    case 'review':
-      if (outcome.type === 'reviewClean') {
-        return { ...state, phase: 'done', review: [...state.review, outcome.result], updatedAt: at() };
-      }
-      if (outcome.type === 'reviewFindings') {
-        const review = [...state.review, outcome.result];
-        if (state.attempt < MAX_ATTEMPTS) {
-          return { ...state, phase: 'implement', attempt: state.attempt + 1, review, reason: outcome.result.summary, updatedAt: at() };
-        }
-        return { ...state, phase: 'blocked', review, reason: `review still finds actionable issues after ${state.attempt} attempts: ${outcome.result.summary}`, updatedAt: at() };
-      }
-      if (outcome.type === 'reviewFailed') {
-        return { ...state, phase: 'blocked', review: [...state.review, outcome.result], reason: outcome.reason, updatedAt: at() };
-      }
-      break;
-    default:
-      break;
-  }
-  throw new Error(`advancePhase: outcome ${JSON.stringify(outcome.type)} is not valid in phase ${JSON.stringify(state.phase)}`);
-}
-
-// ---------------------------------------------------------------------------
-// Git helpers. Every call is an argument array, never shell interpolation.
-// ---------------------------------------------------------------------------
-
-export function runGit(args, { cwd, execImpl = spawnSync } = {}) {
-  const result = execImpl('git', args, { cwd, encoding: 'utf8' });
-  if (result.error) throw new Error(`git ${args.join(' ')} failed to start: ${result.error.message}`);
-  if (result.status !== 0) {
-    throw new Error(`git ${args.join(' ')} exited ${result.status}: ${(result.stderr || '').trim()}`);
-  }
-  return (result.stdout || '').trim();
-}
-
-export function branchNameFor(issueId) {
-  return `runner/${issueId.toLowerCase()}`;
-}
-
-export function worktreePathFor(worktreeRoot, issueId) {
-  return join(worktreeRoot, issueId.toLowerCase());
-}
-
-// Create the worktree the first time; resume it (unchanged) on later runs of
-// the same issue. Returns the base SHA the branch forked from.
-export function ensureWorktree({ repoRoot, worktreeRoot, issueId, execImpl }) {
-  const branch = branchNameFor(issueId);
-  const worktree = worktreePathFor(worktreeRoot, issueId);
+// A fresh run starts only from a clean checkout and from exactly origin/main,
+// so the base is a commit everyone can see. A resumed run keeps the base it
+// started from, even if main has moved on since. Returns a refusal reason or null.
+function pinWorktree({ repoRoot, worktree, branch, base }) {
   if (existsSync(worktree)) {
-    const head = runGit(['rev-parse', 'HEAD'], { cwd: worktree, execImpl });
-    return { branch, worktree, baseSha: head };
+    // Resuming: put the branch back as committed. An interrupted Gemini turn's
+    // uncommitted edits are discarded, never counted as a finished turn.
+    git(worktree, 'checkout', '-q', '-f', branch);
+    git(worktree, 'clean', '-fdq');
+    const growsFromBase = spawnSync('git', ['merge-base', '--is-ancestor', base, 'HEAD'], { cwd: worktree }).status === 0;
+    return growsFromBase ? null : `the runner's branch does not grow from ${base}; pass the start commit this card began from`;
   }
-  const baseSha = runGit(['rev-parse', 'HEAD'], { cwd: repoRoot, execImpl });
-  mkdirSync(dirname(worktree), { recursive: true });
-  runGit(['worktree', 'add', '-b', branch, worktree, baseSha], { cwd: repoRoot, execImpl });
-  return { branch, worktree, baseSha };
-}
-
-// "Changed base" guard: the commit we started from must still be an ancestor
-// of the worktree's HEAD. If it isn't, something rewrote history under us.
-export function baseStillAnAncestor({ worktree, baseSha, execImpl }) {
-  const result = execImpl('git', ['merge-base', '--is-ancestor', baseSha, 'HEAD'], { cwd: worktree, encoding: 'utf8' });
-  return result.status === 0;
-}
-
-// ---------------------------------------------------------------------------
-// Issue validation: fail clearly rather than guess at a missing TDD seam.
-// ---------------------------------------------------------------------------
-
-export function validateIssueForTdd(issue) {
-  if (!issue) return { ok: false, reason: 'issue not found or ambiguous' };
-  if (!issue.description || !issue.description.trim()) {
-    return { ok: false, reason: `issue ${issue.identifier ?? ''} has no description, so there is no agreed public behavior/test seam to build from` };
+  if (git(repoRoot, 'status', '--porcelain', '--untracked-files=no')) {
+    return `the checkout at ${repoRoot} has uncommitted changes to tracked files`;
   }
-  return { ok: true };
+  git(repoRoot, 'fetch', '-q', 'origin', 'main');
+  const main = git(repoRoot, 'rev-parse', 'origin/main');
+  if (git(repoRoot, 'rev-parse', '--verify', `${base}^{commit}`) !== main) {
+    return `start commit ${base} is not origin/main (${main})`;
+  }
+  git(repoRoot, 'worktree', 'add', '-q', '-b', branch, worktree, main);
+  return null;
 }
 
-// ---------------------------------------------------------------------------
-// Prompts.
-// ---------------------------------------------------------------------------
+// A `node --test` started from inside another test run inherits
+// NODE_TEST_CONTEXT and then exits 0 even when its tests fail (measured
+// 24 Sep, Node 24). The checks must never inherit it.
+const { NODE_TEST_CONTEXT: _inherited, ...TEST_ENV } = process.env;
 
-function readSkill(path) {
+const SUITE = 'node --test "scripts/*.test.mjs"';
+const sh = (command, cwd) => spawnSync(command, { cwd, encoding: 'utf8', shell: true, env: TEST_ENV });
+const failedTests = (output) => new Set([...String(output).matchAll(/^✖ (.+?) \([\d.]+m?s\)\s*$/gm)].map((match) => match[1]));
+
+// The lint must pass. The suite may fail only in tests that already failed on
+// the start commit: on the Windows laptop two tests fail for path reasons
+// before any change (24 Sep), and a change is judged on what it breaks.
+function runChecks(cwd, onStartCommit) {
+  const lint = sh('npm run lint:framework', cwd);
+  if (lint.status !== 0) return { pass: false, summary: 'lint failed (`npm run lint:framework`)', output: `${lint.stdout}${lint.stderr}`.slice(-4000) };
+  const suite = sh(SUITE, cwd);
+  if (suite.status === 0) return { pass: true, summary: 'lint:framework and the full suite passed', output: '' };
+  const failed = [...failedTests(suite.stdout)];
+  const before = failed.length ? onStartCommit(() => failedTests(sh(SUITE, cwd).stdout)) : new Set();
+  const fresh = failed.filter((name) => !before.has(name));
+  if (!failed.length || fresh.length) {
+    return { pass: false, summary: `tests failed (\`${SUITE}\`): ${fresh.join('; ') || 'the suite did not run'}`, output: `${suite.stdout}${suite.stderr}`.slice(-4000) };
+  }
+  return { pass: true, summary: `lint:framework passed, and the suite passed except ${failed.length} test(s) that already fail on the start commit: ${failed.join('; ')}`, output: '' };
+}
+
+// The pre-agreed seams (tdd skill: "Test only at pre-agreed seams"): the
+// card's `## Seams` section must name at least one test file. `Kind:
+// refactor` means the seam's tests must stay unchanged; anything else is a
+// behaviour change.
+export function seamsOf(description) {
+  const section = /^##\s+Seams\s*$([\s\S]*?)(?=^##\s|(?![\s\S]))/m.exec(description ?? '')?.[1];
+  const tests = [...(section ?? '').matchAll(/`([^`\s]+\.test\.mjs)`/g)].map((match) => match[1]);
+  if (!tests.length) return null;
+  return { tests, kind: /Kind:\s*refactor/i.test(section) ? 'refactor' : 'behavior' };
+}
+
+// Everything the workers read comes from the start commit, never from a
+// working copy or a personal path, so every run of a card reads the same text.
+const SKILL_FILES = ['.agents/skills/implement/SKILL.md', '.agents/skills/tdd/SKILL.md', '.agents/skills/tdd/tests.md', '.agents/skills/tdd/mocking.md'];
+const pinnedText = (repoRoot, base, paths) => paths.map((path) => `<file path="${path}">\n${git(repoRoot, 'show', `${base}:${path}`)}\n</file>`).join('\n\n');
+
+const RUN_NOTES = [
+  '# How this run differs from the skills',
+  '- The seams are pre-agreed in the card\'s Seams section below. Test only there.',
+  '- Do not run /code-review: the runner has your change reviewed separately.',
+  '- Do not run git and do not commit: the runner commits your change and reads its id from git.',
+  '- Read, search and edit files with your file tools, not the shell. The only shell command you may run is `npm test`, exactly as written: it runs the whole suite (about 80 seconds). Use it for each red and green step. Tests that already fail before your change are not yours to fix. There is no typecheck command. Any other shell command is refused and ends your turn as a failure.',
+].join('\n');
+
+const cardText = (card) => [
+  `# Card ${card.identifier}: ${card.title}`,
+  card.description,
+  ...card.comments.filter((comment) => !comment.body.includes('\nrunner: ')).map((comment) => `## Comment on the card\n\n${comment.body}`),
+].join('\n\n');
+
+const testsPass = (cwd, files) => spawnSync('node', ['--test', ...files], { cwd, encoding: 'utf8', env: TEST_ENV }).status === 0;
+
+// Run `check` with the worktree switched to `commit`, optionally carrying some
+// of the candidate's files along, then put the branch back exactly.
+function onCommit({ worktree, branch, commit, carry = [], sha }, check) {
+  git(worktree, 'checkout', '-q', '--detach', commit);
   try {
-    return readFileSync(path, 'utf8');
-  } catch (error) {
-    throw new Error(`julia-minimal-runner: could not read skill file ${path}: ${error.message}`);
-  }
-}
-
-export function buildImplementPrompt(issue, { implementSkillPath = DEFAULT_IMPLEMENT_SKILL_PATH, tddSkillPath = DEFAULT_TDD_SKILL_PATH, findings = [] } = {}) {
-  const implementSkill = readSkill(implementSkillPath);
-  const tddSkill = readSkill(tddSkillPath);
-  const findingsSection = findings.length
-    ? `\n\n## Correction round\n\nThe previous candidate failed review or checks. Fix these before anything else:\n\n${findings.map((f) => `- ${f}`).join('\n')}\n`
-    : '';
-  return [
-    '# Implement skill',
-    implementSkill,
-    '# TDD skill',
-    tddSkill,
-    '# Issue',
-    `${issue.identifier ?? issue.id}: ${issue.title ?? ''}`,
-    issue.description ?? '',
-    findingsSection,
-    '\nCommit your work to the current branch when done, as the implement skill says.',
-  ].join('\n\n');
-}
-
-export function buildReviewPrompt(axis, issue, diff) {
-  if (axis === 'spec') {
-    return [
-      'Review the diff below against the originating issue. Report: (a) requirements missing or partial; ' +
-        '(b) behaviour not asked for (scope creep); (c) requirements that look implemented but wrong. ' +
-        'Quote the issue for each finding. Under 400 words.',
-      'End your report with exactly one line: "VERDICT: CLEAN" if there are no actionable findings, or "VERDICT: FINDINGS" if there are.',
-      `## Issue ${issue.identifier ?? issue.id}: ${issue.title ?? ''}`,
-      issue.description ?? '',
-      '## Diff',
-      diff,
-    ].join('\n\n');
-  }
-  return [
-    'Review the diff below against this repo\'s documented standards (CLAUDE.md, AGENTS.md) and ordinary code-smell judgement ' +
-      '(Fowler ch.3: mysterious names, duplication, feature envy, primitive obsession, speculative generality, and the like). ' +
-      'Report hard standard violations separately from judgement calls. Under 400 words.',
-    'End your report with exactly one line: "VERDICT: CLEAN" if there are no actionable findings, or "VERDICT: FINDINGS" if there are.',
-    '## Diff',
-    diff,
-  ].join('\n\n');
-}
-
-// ---------------------------------------------------------------------------
-// Model command specs. Flags verified against `agy --help` and against
-// ops/service-dropbox/run-pi-seat.mjs's own comments (read, not imported).
-// ---------------------------------------------------------------------------
-
-export function agySpawnSpec(prompt) {
-  return {
-    command: 'agy',
-    args: ['-p', prompt, '--dangerously-skip-permissions', '--output-format', 'json'],
-  };
-}
-
-// Read-only: run from a scratch directory, never the worktree, so DeepSeek
-// has nothing to edit even if it tried. The diff and issue are in the prompt.
-export function piReviewSpawnSpec(prompt) {
-  return {
-    command: 'pi',
-    args: ['--provider', 'commandcode', '--model', 'deepseek/deepseek-v4-pro', '-p', '--mode', 'json', '--', prompt],
-  };
-}
-
-export function extractVerdict(output) {
-  const match = /VERDICT:\s*(CLEAN|FINDINGS)/.exec(String(output));
-  return match ? match[1] : null;
-}
-
-// ---------------------------------------------------------------------------
-// Checks: targeted (framework lint) then the full suite once, as the repo
-// already runs it (`.github/workflows/ci.yml`). There is no typecheck
-// command in this repo's package.json, so none is invented or run here.
-// ---------------------------------------------------------------------------
-
-export function runChecks({ worktree, execImpl }) {
-  const targeted = execImpl('npm', ['run', 'lint:framework'], { cwd: worktree, encoding: 'utf8' });
-  if (targeted.status !== 0) {
-    return { pass: false, summary: `npm run lint:framework failed (exit ${targeted.status})`, targeted: targeted.stdout + targeted.stderr, suite: null };
-  }
-  const suite = execImpl('node', ['--test', 'scripts/*.test.mjs'], { cwd: worktree, encoding: 'utf8', shell: true });
-  if (suite.status !== 0) {
-    return { pass: false, summary: `node --test scripts/*.test.mjs failed (exit ${suite.status})`, targeted: targeted.stdout, suite: suite.stdout + suite.stderr };
-  }
-  return { pass: true, summary: 'lint:framework and full test suite passed', targeted: targeted.stdout, suite: suite.stdout };
-}
-
-// ---------------------------------------------------------------------------
-// Orchestration. Each call performs at most one phase's external effect, then
-// persists the resulting state, so resuming never repeats a completed effect.
-// ---------------------------------------------------------------------------
-
-async function stepFetch(state, deps) {
-  const { fetchIssueImpl, repoRoot, worktreeRoot, execImpl } = deps;
-  let issue;
-  try {
-    issue = await fetchIssueImpl(state.issue);
-  } catch (error) {
-    return advancePhase(state, { type: 'fetchFailed', reason: `could not fetch issue ${state.issue}: ${error.message}` });
-  }
-  const valid = validateIssueForTdd(issue);
-  if (!valid.ok) return advancePhase(state, { type: 'fetchFailed', reason: valid.reason });
-  const { branch, worktree, baseSha } = ensureWorktree({ repoRoot, worktreeRoot, issueId: state.issue, execImpl });
-  deps.issueCache = issue;
-  return advancePhase(state, { type: 'fetched', branch, worktree, baseSha });
-}
-
-function checkBaseUnchanged(state, execImpl) {
-  if (!baseStillAnAncestor({ worktree: state.worktree, baseSha: state.baseSha, execImpl })) {
-    throw new Error(`julia-minimal-runner: base commit ${state.baseSha} is no longer an ancestor of ${state.worktree}'s HEAD -- the base changed under this run`);
-  }
-}
-
-async function stepImplement(state, deps) {
-  const { execImpl, spawnImpl, issueCache, fetchIssueImpl } = deps;
-  checkBaseUnchanged(state, execImpl);
-  const issue = issueCache ?? await fetchIssueImpl(state.issue);
-  const findings = [...state.checks, ...state.review].map((r) => r.summary).filter(Boolean);
-  const prompt = buildImplementPrompt(issue, { findings: state.attempt > 1 ? findings : [] });
-  const spec = agySpawnSpec(prompt);
-  const before = runGit(['rev-parse', 'HEAD'], { cwd: state.worktree, execImpl });
-  const result = spawnImpl(spec.command, spec.args, { cwd: state.worktree, encoding: 'utf8' });
-  if (result.error) return advancePhase(state, { type: 'implementFailed', reason: `agy failed to start: ${result.error.message}` });
-  if (result.status !== 0) return advancePhase(state, { type: 'implementFailed', reason: `agy exited ${result.status}: ${(result.stderr || '').slice(-500)}` });
-  const after = runGit(['rev-parse', 'HEAD'], { cwd: state.worktree, execImpl });
-  if (after === before) return advancePhase(state, { type: 'implementFailed', reason: 'agy finished but left no new commit' });
-  return advancePhase(state, { type: 'implemented', candidateSha: after });
-}
-
-async function stepCheck(state, deps) {
-  const { execImpl } = deps;
-  checkBaseUnchanged(state, execImpl);
-  const result = runChecks({ worktree: state.worktree, execImpl });
-  return advancePhase(state, { type: result.pass ? 'checksPassed' : 'checksFailed', result });
-}
-
-async function stepReview(state, deps) {
-  const { execImpl, spawnImpl, issueCache, fetchIssueImpl, maxDiffBytes = MAX_DIFF_BYTES } = deps;
-  checkBaseUnchanged(state, execImpl);
-  const issue = issueCache ?? await fetchIssueImpl(state.issue);
-  let diff;
-  try {
-    diff = runGit(['diff', `${state.baseSha}...${state.candidateSha}`], { cwd: state.worktree, execImpl });
-  } catch (error) {
-    return advancePhase(state, { type: 'reviewFailed', result: { axes: {} }, reason: `could not read the pinned diff: ${error.message}` });
-  }
-  if (diff.length > maxDiffBytes) diff = `${diff.slice(0, maxDiffBytes)}\n...[diff truncated at ${maxDiffBytes} bytes]`;
-
-  const axes = {};
-  for (const axis of REVIEW_AXES) {
-    const prompt = buildReviewPrompt(axis, issue, diff);
-    const spec = piReviewSpawnSpec(prompt);
-    const result = spawnImpl(spec.command, spec.args, { cwd: tmpdir(), encoding: 'utf8' });
-    if (result.error) {
-      return advancePhase(state, { type: 'reviewFailed', result: { axes }, reason: `DeepSeek (${axis}) failed to start: ${result.error.message}` });
-    }
-    if (result.status !== 0) {
-      return advancePhase(state, { type: 'reviewFailed', result: { axes }, reason: `DeepSeek (${axis}) exited ${result.status}: ${(result.stderr || '').slice(-500)}` });
-    }
-    const output = result.stdout || '';
-    const verdict = extractVerdict(output);
-    if (!verdict) {
-      return advancePhase(state, { type: 'reviewFailed', result: { axes }, reason: `DeepSeek (${axis}) gave no VERDICT line` });
-    }
-    axes[axis] = { verdict, output };
-  }
-  const findingAxes = Object.entries(axes).filter(([, v]) => v.verdict === 'FINDINGS').map(([axis]) => axis);
-  const result = { axes, summary: findingAxes.length ? `actionable findings on: ${findingAxes.join(', ')}` : 'clean on both axes' };
-  return advancePhase(state, { type: findingAxes.length ? 'reviewFindings' : 'reviewClean', result });
-}
-
-const STEPS = { fetch: stepFetch, implement: stepImplement, check: stepCheck, review: stepReview };
-
-export function summarize(state) {
-  return {
-    issue: state.issue,
-    branch: state.branch,
-    candidateSha: state.candidateSha,
-    phase: state.phase,
-    attempt: state.attempt,
-    checks: state.checks,
-    review: state.review,
-    reason: state.reason,
-    nextAction: state.phase === 'done'
-      ? 'reviewed candidate ready; PR creation is a separate manual follow-up'
-      : state.phase === 'blocked'
-        ? `blocked: ${state.reason}`
-        : `resume with the same issue ID to continue from phase ${state.phase}`,
-  };
-}
-
-export async function runIssue(issueId, opts = {}) {
-  const stateDir = opts.stateDir ?? STATE_DIR;
-  const repoRoot = opts.repoRoot ?? process.cwd();
-  const worktreeRoot = opts.worktreeRoot ?? join(stateDir, 'worktrees');
-  const execImpl = opts.execImpl ?? spawnSync;
-  const spawnImpl = opts.spawnImpl ?? spawnSync;
-  const fetchIssueImpl = opts.fetchIssueImpl ?? ((id) => getIssue(id, { apiKey: process.env.LINEAR_API_KEY }));
-  const maxDiffBytes = opts.maxDiffBytes ?? MAX_DIFF_BYTES;
-
-  const lock = acquireLock(stateDir, issueId);
-  try {
-    let state = loadState(stateDir, issueId) ?? initialState(issueId);
-    const deps = { fetchIssueImpl, repoRoot, worktreeRoot, execImpl, spawnImpl, maxDiffBytes, issueCache: null };
-    while (state.phase !== 'done' && state.phase !== 'blocked') {
-      const step = STEPS[state.phase];
-      if (!step) throw new Error(`julia-minimal-runner: no handler for phase ${JSON.stringify(state.phase)}`);
-      state = await step(state, deps);
-      saveStateAtomic(stateDir, issueId, state);
-    }
-    return summarize(state);
+    if (carry.length) git(worktree, 'checkout', '-q', sha, '--', ...carry);
+    return check();
   } finally {
-    releaseLock(lock);
+    git(worktree, 'checkout', '-q', '-f', branch);
   }
 }
 
-// ---------------------------------------------------------------------------
-// CLI entry.
-// ---------------------------------------------------------------------------
-
-function preflight() {
-  const problems = [];
-  for (const command of ['git', 'agy', 'pi', 'npm', 'node']) {
-    const result = spawnSync(command, ['--version'], { encoding: 'utf8' });
-    if (result.error) problems.push(`${command}: not runnable here (${result.error.message})`);
+// The red proof. A behaviour change must change a seam test that fails on the
+// start commit and passes on the candidate; otherwise its tests prove nothing.
+// A refactor must leave its seam tests untouched and green on both commits.
+// Returns a reason the proof failed, or null.
+function redProof({ worktree, branch, base, sha, seams }) {
+  const atSeam = (paths) => paths.filter((path) => seams.tests.some((seam) => path.endsWith(seam)));
+  const changedTests = atSeam(git(worktree, 'diff', '--name-only', '--diff-filter=AM', `${base}...${sha}`).split('\n').filter(Boolean));
+  if (seams.kind === 'refactor') {
+    const edited = atSeam(git(worktree, 'diff', '--name-only', `${base}...${sha}`).split('\n').filter(Boolean));
+    if (edited.length) return `red proof: a refactor must leave its seam tests unchanged, but it edits ${edited.join(', ')}`;
+    const existing = atSeam(git(worktree, 'ls-tree', '-r', '--name-only', base).split('\n'));
+    if (!existing.length) return `red proof: the seam tests (${seams.tests.join(', ')}) do not exist on the start commit`;
+    if (!testsPass(worktree, existing)) return `red proof: the seam tests fail on the candidate`;
+    if (!onCommit({ worktree, branch, commit: base }, () => testsPass(worktree, existing))) return 'red proof: the seam tests already fail on the start commit';
+    return null;
   }
-  return problems;
+  if (!changedTests.length) return `red proof: the change adds or changes none of the seam tests (${seams.tests.join(', ')})`;
+  if (!testsPass(worktree, changedTests)) return `red proof: the seam tests fail on the candidate`;
+  const greenOnBase = onCommit({ worktree, branch, commit: base, carry: changedTests, sha }, () => testsPass(worktree, changedTests));
+  if (greenOnBase) return `red proof: ${changedTests.join(', ')} already pass on the start commit, so they do not test the change`;
+  return null;
 }
 
-async function main() {
-  const issueId = process.argv[2];
-  if (!issueId) {
-    console.error('usage: node scripts/julia-minimal-runner.mjs <LINEAR-ISSUE-ID>');
-    process.exitCode = 2;
-    return;
+function implementPrompt(card, skills, findings) {
+  const correction = findings ? ['# Correction round', 'Your previous change was not accepted. Fix this before anything else:', findings] : [];
+  return ['# Skills', skills, RUN_NOTES, cardText(card), ...correction].join('\n\n');
+}
+
+// One review is one prompt; above this size it is refused, never cut short.
+export const MAX_REVIEW_CHARS = 400_000;
+const STANDARDS_FILES = ['CLAUDE.md', 'AGENTS.md', 'eslint.config.mjs'];
+const AXIS_NAMES = { spec: 'Spec', standards: 'Standards' };
+
+// The code-review skill's own method, with its step 4 sub-agent brief for one
+// axis, and the material that brief needs pasted in full: the reviewer runs
+// on another machine and can open nothing itself.
+function reviewPrompt(axis, { card, skill, standards, commits, diff }) {
+  const source = axis === 'spec'
+    ? ['## The spec: the card and its comments', cardText(card)]
+    : ['## The standards sources (from the start commit)', standards];
+  return [
+    `# Review axis: ${AXIS_NAMES[axis]}`,
+    `You are the ${AXIS_NAMES[axis]} sub-agent in the code-review skill below. Follow that skill's step 4 brief for the ${AXIS_NAMES[axis]} axis, and only that axis.`,
+    skill,
+    ...source,
+    '## Commits under review', commits,
+    '## The complete diff', diff,
+    'End your report with exactly one line: `VERDICT: CLEAN` if there are no actionable findings, or `VERDICT: FINDINGS` if there are.',
+  ].join('\n\n');
+}
+
+const verdictOf = (text) => /VERDICT:\s*(CLEAN|FINDINGS)\s*$/m.exec(text)?.[1] ?? null;
+
+export async function runIssue(issueId, { base, repoRoot, worktreeRoot, adapters }) {
+  const { linear, gemini, deepseek, publish } = adapters;
+  // No card id in the branch name: Linear's GitHub link would move the card
+  // on its own when a branch named after it opens or merges.
+  const slug = `card-${issueId.split('-').at(-1)}`;
+  const branch = `runner/${slug}`;
+  const worktree = join(worktreeRoot, slug);
+  const card = await linear.getCard(issueId);
+  const posted = card.comments.map((comment) => comment.body);
+  const recorded = (step, sha) => posted.find((body) => body.includes(markerLine(step, { sha })));
+  // Post a step's comment once: a resumed run that finds the same line
+  // already on the card does not post it again.
+  const sayOnce = async (text, line) => {
+    if (posted.some((body) => body.includes(line))) return;
+    const body = `${text}\n\n${line}`;
+    await linear.comment(issueId, body);
+    posted.push(body);
+  };
+
+  const blocked = async (reason) => {
+    await linear.comment(issueId, `The runner stopped: ${reason}.\n\n${markerLine('blocked', { attempt: 0 })}`);
+    return { outcome: 'blocked', sha: null, prUrl: null, reason };
+  };
+
+  const seams = seamsOf(card.description);
+  if (!seams) return blocked('the card has no `## Seams` section naming a test file, so there is no agreed place for the tests');
+  const refusal = pinWorktree({ repoRoot, worktree, branch, base });
+  if (refusal) return blocked(refusal);
+
+  const head = () => git(worktree, 'rev-parse', 'HEAD');
+  const commitCount = () => Number(git(worktree, 'rev-list', '--count', `${base}..HEAD`));
+
+  // One Gemini turn. The runner, not Gemini, commits the result.
+  const implement = async (attempt, findings) => {
+    const before = head();
+    const turn = await gemini(implementPrompt(card, pinnedText(repoRoot, base, SKILL_FILES), findings), { cwd: worktree });
+    if (!turn.ok) return `Gemini's turn failed: ${turn.reason}`;
+    if (head() !== before) return 'Gemini made its own commit, which this route does not allow';
+    if (!git(worktree, 'status', '--porcelain')) return `Gemini's turn changed nothing${findings ? `; the last problem was: ${findings.split('\n')[0]}` : ''}`;
+    git(worktree, 'add', '-A');
+    git(worktree, 'commit', '-q', '-m', `runner: ${issueId} attempt ${attempt}`);
+    return null;
+  };
+
+  // Both review axes for one candidate, or the result already on the card.
+  const review = async (sha) => {
+    const earlier = recorded('review', sha);
+    if (earlier) return { clean: earlier.includes('spec=CLEAN standards=CLEAN'), text: earlier };
+    const material = {
+      card,
+      skill: pinnedText(repoRoot, base, ['.agents/skills/code-review/SKILL.md']),
+      standards: pinnedText(repoRoot, base, STANDARDS_FILES),
+      commits: git(worktree, 'log', '--oneline', `${base}..${sha}`),
+      diff: git(worktree, 'diff', `${base}...${sha}`),
+    };
+    const prompts = { spec: reviewPrompt('spec', material), standards: reviewPrompt('standards', material) };
+    const longest = Math.max(prompts.spec.length, prompts.standards.length);
+    if (longest > MAX_REVIEW_CHARS) return { failure: `the review would be ${longest} characters, over the ${MAX_REVIEW_CHARS} limit for one review; split the card` };
+    const verdicts = {};
+    const reports = [];
+    for (const axis of ['spec', 'standards']) {
+      const reply = await deepseek(prompts[axis], { axis });
+      if (!reply.ok) return { failure: `DeepSeek's ${AXIS_NAMES[axis]} review failed: ${reply.reason}` };
+      verdicts[axis] = verdictOf(reply.text);
+      if (!verdicts[axis]) return { failure: `DeepSeek's ${AXIS_NAMES[axis]} review gave no VERDICT line` };
+      reports.push(`### ${AXIS_NAMES[axis]}\n\n${reply.text.trim()}`);
+    }
+    const text = `DeepSeek review of \`${sha.slice(0, 12)}\`: Spec ${verdicts.spec}, Standards ${verdicts.standards}.\n\n${reports.join('\n\n')}`;
+    await sayOnce(text, markerLine('review', { sha, ...verdicts }));
+    return { clean: verdicts.spec === 'CLEAN' && verdicts.standards === 'CLEAN', text };
+  };
+
+  // Git is the record of Gemini's work: each runner commit past the base is a
+  // finished turn, never run again. The card's comments record the rest.
+  if (commitCount() > MAX_ATTEMPTS) return blocked(`the runner's branch has more than ${MAX_ATTEMPTS} commits past the start commit`);
+  let findings = null;
+  for (let attempt = Math.max(1, commitCount()); attempt <= MAX_ATTEMPTS; attempt += 1) {
+    if (commitCount() < attempt) {
+      const failure = await implement(attempt, findings);
+      if (failure) return blocked(failure);
+    }
+    const sha = head();
+    await sayOnce(`Gemini's turn ${attempt} is committed as \`${sha.slice(0, 12)}\`.`, markerLine('implement', { sha, attempt }));
+
+    const proofFailure = redProof({ worktree, branch, base, sha, seams });
+    const checks = proofFailure ? { pass: false, summary: proofFailure, output: '' } : runChecks(worktree, (check) => onCommit({ worktree, branch, commit: base }, check));
+    await sayOnce(`Checks on \`${sha.slice(0, 12)}\`: ${checks.summary}.`, markerLine('checks', { sha, result: checks.pass ? 'pass' : 'fail' }));
+    if (!checks.pass) {
+      findings = `The checks failed: ${checks.summary}\n\n${checks.output}`.trim();
+      continue;
+    }
+
+    const verdict = await review(sha);
+    if (verdict.failure) return blocked(verdict.failure);
+    if (!verdict.clean) {
+      findings = verdict.text;
+      continue;
+    }
+
+    let url = /url=(\S+)/.exec(recorded('pr', sha) ?? '')?.[1];
+    if (!url) {
+      ({ url } = await publish({ branch, sha, worktree, title: card.title, body: `${cardText(card)}\n\n---\n\n${verdict.text}` }));
+      await sayOnce(`PR opened for \`${sha.slice(0, 12)}\`: ${url}`, markerLine('pr', { sha, url }));
+    }
+    await linear.moveToUat(issueId);
+    return { outcome: 'pr', sha, prUrl: url, reason: null };
   }
-  const problems = preflight();
-  if (problems.length) {
-    console.error(`julia-minimal-runner: missing prerequisites:\n${problems.map((p) => `  - ${p}`).join('\n')}`);
-    process.exitCode = 3;
-    return;
+  return blocked(`still not passing after the correction round: ${findings.split('\n')[0]}`);
+}
+
+// ---------------------------------------------------------------- Command line
+
+async function main([issueId, flag, base]) {
+  if (!/^[A-Z]+-\d+$/.test(issueId ?? '') || flag !== '--base' || !base) {
+    console.error('usage: node scripts/julia-minimal-runner.mjs JUL-NN --base <origin/main commit>');
+    return 2;
   }
-  try {
-    const result = await runIssue(issueId);
-    console.log(JSON.stringify(result, null, 2));
-    process.exitCode = result.phase === 'blocked' ? 1 : 0;
-  } catch (error) {
-    console.error(`julia-minimal-runner: ${error.message}`);
-    process.exitCode = 1;
+  if (!process.env.LINEAR_API_KEY) {
+    console.error('LINEAR_API_KEY is not set: the runner reads the card and posts its progress with a Linear personal API key.');
+    return 2;
   }
+  const { deepseekAdapter, geminiAdapter, linearAdapter, publishAdapter } = await import('./julia-minimal-runner-adapters.mjs');
+  const linear = linearAdapter();
+  const comment = linear.comment;
+  // The terminal shows the same progress lines as the card.
+  linear.comment = (id, body) => { console.log(body.split('\n')[0]); return comment(id, body); };
+  const repoRoot = git(process.cwd(), 'rev-parse', '--show-toplevel');
+  const result = await runIssue(issueId, {
+    base,
+    repoRoot,
+    worktreeRoot: join(repoRoot, '.julia-runner-state', 'worktrees'),
+    adapters: { linear, gemini: geminiAdapter(), deepseek: deepseekAdapter(), publish: publishAdapter() },
+  });
+  console.log(JSON.stringify(result, null, 2));
+  return result.outcome === 'pr' ? 0 : 1;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  main();
+  main(process.argv.slice(2)).then((code) => { process.exitCode = code; }, (error) => { console.error(error.stack ?? error); process.exitCode = 1; });
 }
