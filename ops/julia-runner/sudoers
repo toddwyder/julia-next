@@ -1,0 +1,7 @@
+# /etc/sudoers.d/julia-runner (JUL-122): the minimal runner, running as
+# orchestrator-svc, starts each worker in its own account with exactly one
+# fixed command line -- no wildcards, no shell, arguments fixed. Every path
+# is root-owned under /opt/julia-runner. Install with visudo -c (README.md).
+orchestrator-svc ALL=(gemini-worker) NOPASSWD: /usr/bin/node /opt/julia-runner/ops/julia-runner/run-gemini.mjs
+orchestrator-svc ALL=(julia-tester) NOPASSWD: /usr/bin/node /opt/julia-runner/ops/julia-runner/run-tests.mjs
+orchestrator-svc ALL=(runner) NOPASSWD: /usr/bin/node /opt/julia-runner/ops/service-dropbox/run-pi-seat.mjs reviewer-backup --effort high

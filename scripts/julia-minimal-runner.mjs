@@ -11,15 +11,9 @@ import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const MAX_ATTEMPTS = 2;
+import { git, redProof, runChecks } from './julia-minimal-runner-checks.mjs';
 
-// A large buffer so a big diff is measured and refused by the review size
-// limit, instead of overflowing Node's 1 MB default and crashing the run.
-function git(cwd, ...args) {
-  const result = spawnSync('git', args, { cwd, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
-  if (result.status !== 0) throw new Error(`git ${args.join(' ')} failed: ${(result.stderr || '').trim()}`);
-  return result.stdout.trim();
-}
+export const MAX_ATTEMPTS = 2;
 
 // One machine-readable line per step, at the end of a readable comment. A
 // later run finds its own earlier results by these lines.
@@ -51,35 +45,6 @@ function pinWorktree({ repoRoot, worktree, branch, base }) {
   return { refusal: null, discarded: [] };
 }
 
-// A `node --test` started from inside another test run inherits
-// NODE_TEST_CONTEXT and then exits 0 even when its tests fail (measured
-// 24 Sep, Node 24). The checks must never inherit it.
-const { NODE_TEST_CONTEXT: _inherited, ...TEST_ENV } = process.env;
-
-// The suite is whatever package.json's `test` script says, the same command
-// Gemini is told to run, so the two can never drift apart.
-const SUITE = 'npm test';
-const SUITE_SCOPE = 'the `scripts/*.test.mjs` suite (the scope CI runs)';
-const runShell = (command, cwd) => spawnSync(command, { cwd, encoding: 'utf8', shell: true, env: TEST_ENV });
-const failedTests = (output) => new Set([...String(output).matchAll(/^✖ (.+?) \([\d.]+m?s\)\s*$/gm)].map((match) => match[1]));
-
-// The lint must pass. The suite may fail only in tests that already failed on
-// the start commit: on the Windows laptop two tests fail for path reasons
-// before any change (24 Sep), and a change is judged on what it breaks.
-function runChecks(cwd, onStartCommit) {
-  const lint = runShell('npm run lint:framework', cwd);
-  if (lint.status !== 0) return { pass: false, summary: 'lint failed (`npm run lint:framework`)', output: `${lint.stdout}${lint.stderr}`.slice(-4000) };
-  const suite = runShell(SUITE, cwd);
-  if (suite.status === 0) return { pass: true, summary: `lint:framework and ${SUITE_SCOPE} passed`, output: '' };
-  const failed = [...failedTests(suite.stdout)];
-  const before = failed.length ? onStartCommit(() => failedTests(runShell(SUITE, cwd).stdout)) : new Set();
-  const fresh = failed.filter((name) => !before.has(name));
-  if (!failed.length || fresh.length) {
-    return { pass: false, summary: `tests failed (\`${SUITE}\`): ${fresh.join('; ') || 'the suite did not run'}`, output: `${suite.stdout}${suite.stderr}`.slice(-4000) };
-  }
-  return { pass: true, summary: `lint:framework passed, and ${SUITE_SCOPE} passed except ${failed.length} test(s) that already fail on the start commit: ${failed.join('; ')}`, output: '' };
-}
-
 // The pre-agreed seams (tdd skill: "Test only at pre-agreed seams"): the
 // card's `## Seams` section must name at least one test file. `Kind:
 // refactor` means the seam's tests must stay unchanged; anything else is a
@@ -101,7 +66,7 @@ const RUN_NOTES = [
   '- The seams are pre-agreed in the card\'s Seams section below. Test only there.',
   '- Do not run /code-review: the runner has your change reviewed separately.',
   '- Do not run git and do not commit: the runner commits your change and reads its id from git.',
-  '- Read, search and edit files with your file tools, not the shell. The only shell command you may run is `npm test`, exactly as written: it runs the whole suite (about 80 seconds). Use it for each red and green step. Tests that already fail before your change are not yours to fix. There is no typecheck command. Any other shell command is refused and ends your turn as a failure.',
+  '- Do not run any shell command. Read, search and edit files with your file tools only; any command is refused and ends your turn as a failure. Write the failing test at the seam first, then the code that makes it pass: the runner\'s test worker runs the tests after your turn (the red proof, the lint and the suite) and sends back any failure. Tests that already fail before your change are not yours to fix. There is no typecheck command.',
 ].join('\n');
 
 const cardText = (card) => [
@@ -109,43 +74,6 @@ const cardText = (card) => [
   card.description,
   ...card.comments.filter((comment) => !comment.body.includes('\nrunner: ')).map((comment) => `## Comment on the card\n\n${comment.body}`),
 ].join('\n\n');
-
-const testsPass = (cwd, files) => spawnSync('node', ['--test', ...files], { cwd, encoding: 'utf8', env: TEST_ENV }).status === 0;
-
-// Run `check` with the worktree switched to `commit`, optionally carrying some
-// of the candidate's files along, then put the branch back exactly.
-function onCommit({ worktree, branch, commit, carry = [], sha }, check) {
-  git(worktree, 'checkout', '-q', '--detach', commit);
-  try {
-    if (carry.length) git(worktree, 'checkout', '-q', sha, '--', ...carry);
-    return check();
-  } finally {
-    git(worktree, 'checkout', '-q', '-f', branch);
-  }
-}
-
-// The red proof. A behaviour change must change a seam test that fails on the
-// start commit and passes on the candidate; otherwise its tests prove nothing.
-// A refactor must leave its seam tests untouched and green on both commits.
-// Returns a reason the proof failed, or null.
-function redProof({ worktree, branch, base, sha, seams }) {
-  const atSeam = (paths) => paths.filter((path) => seams.tests.some((seam) => path.endsWith(seam)));
-  const changedTests = atSeam(git(worktree, 'diff', '--name-only', '--diff-filter=AM', `${base}...${sha}`).split('\n').filter(Boolean));
-  if (seams.kind === 'refactor') {
-    const edited = atSeam(git(worktree, 'diff', '--name-only', `${base}...${sha}`).split('\n').filter(Boolean));
-    if (edited.length) return `red proof: a refactor must leave its seam tests unchanged, but it edits ${edited.join(', ')}`;
-    const existing = atSeam(git(worktree, 'ls-tree', '-r', '--name-only', base).split('\n'));
-    if (!existing.length) return `red proof: the seam tests (${seams.tests.join(', ')}) do not exist on the start commit`;
-    if (!testsPass(worktree, existing)) return `red proof: the seam tests fail on the candidate`;
-    if (!onCommit({ worktree, branch, commit: base }, () => testsPass(worktree, existing))) return 'red proof: the seam tests already fail on the start commit';
-    return null;
-  }
-  if (!changedTests.length) return `red proof: the change adds or changes none of the seam tests (${seams.tests.join(', ')})`;
-  if (!testsPass(worktree, changedTests)) return `red proof: the seam tests fail on the candidate`;
-  const greenOnBase = onCommit({ worktree, branch, commit: base, carry: changedTests, sha }, () => testsPass(worktree, changedTests));
-  if (greenOnBase) return `red proof: ${changedTests.join(', ')} already pass on the start commit, so they do not test the change`;
-  return null;
-}
 
 function implementPrompt(card, skills, findings) {
   const correction = findings ? ['# Correction round', 'Your previous change was not accepted. Fix this before anything else:', findings] : [];
@@ -182,7 +110,10 @@ export function reviewPrompt(axis, { card, skill, standards, commits, diff }) {
 const verdictOf = (text) => /VERDICT:\s*(CLEAN|FINDINGS)\s*$/m.exec(text)?.[1] ?? null;
 
 export async function runIssue(issueId, { base, repoRoot, worktreeRoot, adapters }) {
-  const { linear, gemini, deepseek, publish } = adapters;
+  const { linear, gemini, deepseek, publish, tests } = adapters;
+  // The runner never runs a candidate's tests itself (they are code Gemini
+  // wrote): without a test worker there is no safe way to check a change.
+  if (typeof tests !== 'function') throw new Error('runIssue needs a test worker (adapters.tests); the runner does not run candidate tests itself');
   // No card id in the branch name: Linear's GitHub link would move the card
   // on its own when a branch named after it opens or merges.
   const slug = `card-${issueId.split('-').at(-1)}`;
@@ -209,6 +140,17 @@ export async function runIssue(issueId, { base, repoRoot, worktreeRoot, adapters
   if (!seams) return blocked('the card has no `## Seams` section naming a test file, so there is no agreed place for the tests');
   const { refusal, discarded } = pinWorktree({ repoRoot, worktree, branch, base });
   if (refusal) return blocked(refusal);
+  // Long calls report as they go: each phase is announced when it starts, and
+  // a worker's own progress is passed on with its name.
+  const progress = adapters.progress ?? (() => {});
+  const relay = (worker) => (line) => progress(`${worker}: ${line}`);
+  // A fresh worktree has no dependencies. They come from the start commit's own
+  // lockfile (trusted code on main), installed once, before Gemini's turn.
+  if (existsSync(join(worktree, 'package-lock.json')) && !existsSync(join(worktree, 'node_modules'))) {
+    progress('Installing dependencies (npm ci) from the start commit');
+    const install = spawnSync('npm', ['ci', '--no-audit', '--no-fund'], { cwd: worktree, encoding: 'utf8', shell: process.platform === 'win32' });
+    if (install.status !== 0) return blocked(`npm ci failed in the new worktree (exit ${install.status}): ${String(install.stderr).trim().split('\n').at(-1)}`);
+  }
 
   const head = () => git(worktree, 'rev-parse', 'HEAD');
   const commitCount = () => Number(git(worktree, 'rev-list', '--count', `${base}..HEAD`));
@@ -225,10 +167,6 @@ export async function runIssue(issueId, { base, repoRoot, worktreeRoot, adapters
     const dirty = git(worktree, 'status', '--porcelain');
     return dirty ? `the worktree has uncommitted changes on top of ${sha.slice(0, 12)} (${dirty.split('\n').length} file(s))` : null;
   };
-  // Long calls report as they go: each phase is announced when it starts, and
-  // a worker's own progress is passed on with its name.
-  const progress = adapters.progress ?? (() => {});
-  const relay = (worker) => (line) => progress(`${worker}: ${line}`);
 
   // One Gemini turn. The runner, not Gemini, commits the result. The card
   // records that the turn started, so a restart can say it was interrupted.
@@ -307,8 +245,8 @@ export async function runIssue(issueId, { base, repoRoot, worktreeRoot, adapters
     let checks = { pass: true, summary: 'passed earlier for this commit (recorded on the card)', output: '' };
     if (!passedEarlier) {
       progress(`Red proof and checks on ${sha.slice(0, 12)} started`);
-      const proofFailure = redProof({ worktree, branch, base, sha, seams });
-      checks = proofFailure ? { pass: false, summary: proofFailure, output: '' } : runChecks(worktree, (check) => onCommit({ worktree, branch, commit: base }, check));
+      const proofFailure = await redProof({ worktree, branch, base, sha, seams, test: tests });
+      checks = proofFailure ? { pass: false, summary: proofFailure, output: '' } : await runChecks({ worktree, branch, base, test: tests });
     }
     await sayOnce(`Checks on \`${sha.slice(0, 12)}\`: ${checks.summary}.`, markerLine('checks', { sha, result: checks.pass ? 'pass' : 'fail' }));
     if (!checks.pass) return { findings: `The checks failed: ${checks.summary}\n\n${checks.output}`.trim() };
@@ -349,27 +287,33 @@ export async function runIssue(issueId, { base, repoRoot, worktreeRoot, adapters
 
 // ---------------------------------------------------------------- Command line
 
+// On the server (ops/julia-runner/README.md): run as orchestrator-svc by
+// systemd-run, which loads the Linear app credential; the card's working copy
+// lives where the Gemini and test workers are allowed to reach it.
+const SERVER_REPO = '/srv/julia-runner/repo';
+const SERVER_WORKTREES = '/srv/julia-runner/worktrees';
+
 async function main([issueId, flag, base]) {
   if (!/^[A-Z]+-\d+$/.test(issueId ?? '') || flag !== '--base' || !base) {
     console.error('usage: node scripts/julia-minimal-runner.mjs JUL-NN --base <origin/main commit>');
     return 2;
   }
-  if (!process.env.LINEAR_API_KEY) {
-    console.error('LINEAR_API_KEY is not set: the runner reads the card and posts its progress with a Linear personal API key.');
-    return 2;
-  }
-  const { deepseekAdapter, geminiAdapter, linearAdapter, publishAdapter } = await import('./julia-minimal-runner-adapters.mjs');
+  // Files the runner checks out stay writable by the worktree group, so the
+  // Gemini worker can edit them and the runner can switch commits afterwards.
+  process.umask(0o002);
+  const { deepseekAdapter, geminiAdapter, linearAdapter, publishAdapter, readAppCredential, testerAdapter } = await import('./julia-minimal-runner-adapters.mjs');
+  // Fail before anything else if the credential is not there.
+  readAppCredential();
   const linear = linearAdapter();
   const comment = linear.comment;
   // The terminal shows the same progress lines as the card.
   linear.comment = (id, body) => { console.log(body.split('\n')[0]); return comment(id, body); };
-  const repoRoot = git(process.cwd(), 'rev-parse', '--show-toplevel');
   const progress = (line) => console.log(`${new Date().toISOString().slice(11, 19)}Z  ${line}`);
   const result = await runIssue(issueId, {
     base,
-    repoRoot,
-    worktreeRoot: join(repoRoot, '.julia-runner-state', 'worktrees'),
-    adapters: { linear, progress, gemini: geminiAdapter(), deepseek: deepseekAdapter(), publish: publishAdapter() },
+    repoRoot: SERVER_REPO,
+    worktreeRoot: SERVER_WORKTREES,
+    adapters: { linear, progress, gemini: geminiAdapter(), tests: testerAdapter(), deepseek: deepseekAdapter(), publish: publishAdapter() },
   });
   console.log(JSON.stringify(result, null, 2));
   return result.outcome === 'pr' ? 0 : 1;

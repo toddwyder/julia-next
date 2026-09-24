@@ -1,11 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { runIssue } from './julia-minimal-runner.mjs';
+import { localTester } from './julia-minimal-runner-checks.mjs';
+import { linearAdapter, readAppCredential } from './julia-minimal-runner-adapters.mjs';
 
 // The seam: runIssue(issueId, { base, repoRoot, worktreeRoot, adapters }).
 // Git, the checks and the red proof are real (a fixture repo with a bare
@@ -64,7 +66,7 @@ function goodFix(cwd) {
 }
 
 function fakes({ card = SEAMED_CARD, geminiTurn = goodFix, verdicts = [{ spec: 'CLEAN', standards: 'CLEAN' }] } = {}) {
-  const calls = { gemini: [], deepseek: [], publish: [], uat: 0 };
+  const calls = { gemini: [], deepseek: [], publish: [], tests: [], uat: 0 };
   const comments = [];
   const adapters = {
     linear: {
@@ -85,6 +87,13 @@ function fakes({ card = SEAMED_CARD, geminiTurn = goodFix, verdicts = [{ spec: '
     publish: async (request) => {
       calls.publish.push(request);
       return { url: 'https://example.test/pull/1' };
+    },
+    // The test worker: every lint, suite and seam-test run goes through here.
+    // The fake runs them locally, the way the real worker runs them in its
+    // own account on the server.
+    tests: async (request) => {
+      calls.tests.push(request);
+      return localTester(request);
     },
   };
   return { adapters, calls, comments };
@@ -254,16 +263,20 @@ test('DeepSeek gets the whole diff, the card, the code-review skill and the pinn
   rmSync(fx.root, { recursive: true, force: true });
 });
 
-test('a diff too big for one review blocks with "split the card" instead of being cut off', async () => {
-  const fx = makeRepo();
-  const huge = `${'y'.repeat(120)}\n`.repeat(5000);
-  const { adapters, calls } = fakes({ geminiTurn: (cwd) => { goodFix(cwd); write(cwd, 'scripts/huge.mjs', huge); } });
-  const result = await run(fx, adapters);
-  assert.equal(result.outcome, 'blocked');
-  assert.match(result.reason, /split the card/);
-  assert.equal(calls.deepseek.length, 0);
-  rmSync(fx.root, { recursive: true, force: true });
-});
+// Two limits, one refusal: a review prompt over MAX_REVIEW_CHARS, and a diff
+// over the 1 MB that Node's default git buffer would have crashed on.
+for (const [limit, huge] of [['over the review size limit', `${'y'.repeat(120)}\n`.repeat(5000)], ['over a megabyte', `${'z'.repeat(200)}\n`.repeat(6000)]]) {
+  test(`a diff ${limit} is refused with "split the card", on the card, and never reaches a review`, async () => {
+    const fx = makeRepo();
+    const { adapters, calls, comments } = fakes({ geminiTurn: (cwd) => { goodFix(cwd); write(cwd, 'scripts/huge.mjs', huge); } });
+    const result = await run(fx, adapters);
+    assert.equal(result.outcome, 'blocked');
+    assert.match(result.reason, /split the card/);
+    assert.equal(calls.deepseek.length, 0);
+    assert.match(comments.at(-1), /split the card/);
+    rmSync(fx.root, { recursive: true, force: true });
+  });
+}
 
 test('review findings get exactly one correction round, with the findings in the second brief', async () => {
   const fx = makeRepo();
@@ -334,14 +347,34 @@ test('a Gemini turn that fails, or a review with no verdict, blocks with the rea
   rmSync(fx2.root, { recursive: true, force: true });
 });
 
-test("Gemini's brief names the only shell commands it may run", async () => {
+test("Gemini's brief says it runs no shell commands: the test worker runs the tests", async () => {
   const fx = makeRepo();
   const { adapters, calls } = fakes();
   await run(fx, adapters);
-  // Measured 24 Sep: headless agy allowed exactly `npm test` and refused
-  // `npm test -- <file>`, `npm run test <file>` and `npm run lint:framework`.
-  assert.match(calls.gemini[0], /The only shell command you may run is `npm test`/);
-  assert.match(calls.gemini[0], /Any other shell command is refused and ends your turn as a failure/);
+  assert.match(calls.gemini[0], /Do not run any shell command/);
+  assert.match(calls.gemini[0], /the runner's test worker runs the tests after your turn/);
+  assert.doesNotMatch(calls.gemini[0], /you may run is `npm test`/);
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+test('every lint, suite and seam-test run goes through the test worker', async () => {
+  const fx = makeRepo();
+  const { adapters, calls } = fakes();
+  const result = await run(fx, adapters);
+  assert.equal(result.outcome, 'pr', result.reason);
+  const kinds = calls.tests.map((request) => request.run);
+  assert.deepEqual(kinds, ['files', 'files', 'lint', 'suite'], 'red proof on the candidate and on the start commit, then lint, then the suite');
+  assert.deepEqual(calls.tests[0].files, ['scripts/add.test.mjs']);
+  for (const request of calls.tests) assert.equal(request.worktree, worktreeOf(fx));
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+test('a run without a test worker is refused before Gemini', async () => {
+  const fx = makeRepo();
+  const { adapters, calls } = fakes();
+  delete adapters.tests;
+  await assert.rejects(run(fx, adapters), /test worker/);
+  assert.equal(calls.gemini.length, 0);
   rmSync(fx.root, { recursive: true, force: true });
 });
 
@@ -463,17 +496,6 @@ test('a crash while publishing stops a resume instead of risking a second PR', a
   rmSync(fx.root, { recursive: true, force: true });
 });
 
-test('a diff over a megabyte is refused with "split the card", not a crash, and never reaches a review', async () => {
-  const fx = makeRepo();
-  const huge = `${'z'.repeat(200)}\n`.repeat(6000);
-  const { adapters, calls, comments } = fakes({ geminiTurn: (cwd) => { goodFix(cwd); write(cwd, 'scripts/huge.mjs', huge); } });
-  const result = await run(fx, adapters);
-  assert.equal(result.outcome, 'blocked');
-  assert.match(result.reason, /split the card/);
-  assert.equal(calls.deepseek.length, 0);
-  assert.match(comments.at(-1), /split the card/, 'the refusal is on the card');
-  rmSync(fx.root, { recursive: true, force: true });
-});
 
 // -- From DeepSeek's round-1 review of c8a9fd6.
 
@@ -521,5 +543,97 @@ test('the checks report names the suite scope that actually ran', async () => {
   const { adapters, comments } = fakes();
   await run(fx, adapters);
   assert.ok(comments.some((body) => body.includes('the `scripts/*.test.mjs` suite (the scope CI runs) passed')), comments.filter((b) => b.includes('Checks')).join('\n'));
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+// -- The Linear app credential (Todd, 24 Sep): only the runner holds it,
+// read at run time from systemd's credentials directory; nothing it produces
+// may carry it. These run the REAL Linear adapter against a stand-in Linear.
+
+const CLIENT_ID = 'client-id-XYZ789';
+const CLIENT_SECRET = 'SECRET-abc123-do-not-leak';
+const ACCESS_TOKEN = 'TOKEN-def456-do-not-leak';
+
+function fakeLinear(card) {
+  const requests = [];
+  const comments = [];
+  const answer = (data) => ({ ok: true, status: 200, json: async () => ({ data }) });
+  const fetchImpl = async (url, init) => {
+    requests.push({ url, init });
+    if (url === 'https://api.linear.app/oauth/token') return { ok: true, status: 200, json: async () => ({ access_token: ACCESS_TOKEN, expires_in: 2592000 }) };
+    const { query, variables } = JSON.parse(init.body);
+    if (query.includes('query Card')) {
+      return answer({ issue: { id: 'uuid-900', identifier: card.identifier, title: card.title, description: card.description, team: { states: { nodes: [{ id: 'state-uat', name: 'UAT' }] } }, comments: { nodes: comments.map((body, i) => ({ body, createdAt: `2026-09-24T00:00:0${i}Z` })) } } });
+    }
+    if (query.includes('IssueIdByIdentifier')) return answer({ issue: { id: 'uuid-900' } });
+    if (query.includes('CommentCreate')) { comments.push(variables.body); return answer({ commentCreate: { success: true, comment: { id: `c${comments.length}`, url: 'https://linear.test/c' } } }); }
+    if (query.includes('mutation Move')) return answer({ issueUpdate: { success: true } });
+    throw new Error(`unexpected Linear call: ${query.slice(0, 40)}`);
+  };
+  return { fetchImpl, requests, comments };
+}
+
+test('without the Linear app credential the run stops before any work, saying why', async () => {
+  const fx = makeRepo();
+  const { adapters, calls } = fakes();
+  const { fetchImpl } = fakeLinear(SEAMED_CARD);
+  adapters.linear = linearAdapter({ fetchImpl, readCredential: () => readAppCredential({ dir: undefined }) });
+  await assert.rejects(run(fx, adapters), /Linear app credential is not available/);
+  assert.equal(calls.gemini.length + calls.deepseek.length + calls.publish.length + calls.tests.length, 0);
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+test('a whole run carries the Linear credential into nothing it produces', async () => {
+  const fx = makeRepo();
+  const credentials = mkdtempSync(join(tmpdir(), 'creds-'));
+  writeFileSync(join(credentials, 'linear-app-id'), `${CLIENT_ID}\n`);
+  writeFileSync(join(credentials, 'linear-app-secret'), `${CLIENT_SECRET}\n`);
+  const { adapters, calls } = fakes();
+  const linear = fakeLinear(SEAMED_CARD);
+  adapters.linear = linearAdapter({ fetchImpl: linear.fetchImpl, readCredential: () => readAppCredential({ dir: credentials }) });
+  const progress = [];
+  adapters.progress = (line) => progress.push(line);
+  const result = await run(fx, adapters);
+  assert.equal(result.outcome, 'pr', result.reason);
+
+  const [tokenRequest, ...linearCalls] = linear.requests;
+  assert.equal(tokenRequest.url, 'https://api.linear.app/oauth/token', 'the credential goes to Linear\'s token endpoint and nowhere else');
+  assert.ok(tokenRequest.init.body.includes(CLIENT_SECRET));
+  for (const call of linearCalls) {
+    assert.equal(call.url, 'https://api.linear.app/graphql');
+    assert.equal(call.init.headers.Authorization, `Bearer ${ACCESS_TOKEN}`, 'the token travels only in the Authorization header');
+  }
+  const produced = {
+    'Gemini briefs': calls.gemini.join('\n'),
+    'DeepSeek prompts': calls.deepseek.map((c) => c.prompt).join('\n'),
+    'test worker requests': JSON.stringify(calls.tests),
+    'the PR (title, body, branch)': JSON.stringify(calls.publish),
+    'Linear comments': linear.comments.join('\n'),
+    'Linear request bodies': linearCalls.map((c) => c.init.body).join('\n'),
+    'progress lines': progress.join('\n'),
+    'the run result': JSON.stringify(result),
+    'git history and diff': git(fx.repoRoot, 'log', '-p', '--all'),
+    'files in the worktree': spawnSync('git', ['grep', '-I', '-e', CLIENT_SECRET, '-e', ACCESS_TOKEN, '-e', CLIENT_ID], { cwd: worktreeOf(fx), encoding: 'utf8' }).stdout,
+  };
+  for (const [where, text] of Object.entries(produced)) {
+    for (const value of [CLIENT_ID, CLIENT_SECRET, ACCESS_TOKEN]) assert.ok(!text.includes(value), `${where} must not contain a credential`);
+  }
+  rmSync(credentials, { recursive: true, force: true });
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+test('a fresh worktree gets its dependencies installed from the start commit\'s lockfile', async () => {
+  const fx = makeRepo();
+  write(fx.repoRoot, 'package-lock.json', '{ "name": "fixture", "lockfileVersion": 3, "requires": true, "packages": { "": { "name": "fixture" } } }\n');
+  git(fx.repoRoot, 'add', '.');
+  git(fx.repoRoot, 'commit', '-q', '-m', 'lockfile');
+  git(fx.repoRoot, 'push', '-q', 'origin', 'main');
+  fx.base = git(fx.repoRoot, 'rev-parse', 'HEAD');
+  const { adapters } = fakes();
+  const lines = [];
+  adapters.progress = (line) => lines.push(line);
+  const result = await run(fx, adapters);
+  assert.equal(result.outcome, 'pr', result.reason);
+  assert.ok(lines.some((line) => /npm ci/.test(line)), lines.join('\n'));
   rmSync(fx.root, { recursive: true, force: true });
 });
