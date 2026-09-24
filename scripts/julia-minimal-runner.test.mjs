@@ -262,14 +262,15 @@ test('red proof: a refactor that edits its seam test blocks the run', async () =
 test('DeepSeek gets the whole diff, the card, the code-review skill and the pinned standards, word for word', async () => {
   const fx = makeRepo();
   const bigLine = 'x'.repeat(100);
-  const big = `${Array.from({ length: 1500 }, (_, i) => `// ${i} ${bigLine}`).join('\n')}\n// END-OF-BIG-FILE\n`;
+  // About 100 KB: far past any cut-off, and under MAX_REVIEW_BYTES.
+  const big = `${Array.from({ length: 900 }, (_, i) => `// ${i} ${bigLine}`).join('\n')}\n// END-OF-BIG-FILE\n`;
   const { adapters, calls } = fakes({ geminiTurn: (cwd) => { goodFix(cwd); write(cwd, 'scripts/big.mjs', big); } });
   const result = await run(fx, adapters);
   assert.equal(result.outcome, 'pr', result.reason);
   const [spec, standards] = calls.deepseek;
   for (const { prompt } of calls.deepseek) {
     assert.ok(prompt.includes('// END-OF-BIG-FILE'), 'the diff is not cut off');
-    assert.ok(prompt.includes('// 1499 '), 'every line of the diff is there');
+    assert.ok(prompt.includes('// 899 '), 'every line of the diff is there');
     assert.ok(prompt.includes('CODE-REVIEW-SKILL-MARKER'));
   }
   assert.ok(spec.prompt.includes('add(a, b) returns the sum.'), 'the Spec axis sees the card');
@@ -279,9 +280,12 @@ test('DeepSeek gets the whole diff, the card, the code-review skill and the pinn
   rmSync(fx.root, { recursive: true, force: true });
 });
 
-// Two limits, one refusal: a review prompt over MAX_REVIEW_CHARS, and a diff
-// over the 1 MB that Node's default git buffer would have crashed on.
-for (const [limit, huge] of [['over the review size limit', `${'y'.repeat(120)}\n`.repeat(5000)], ['over a megabyte', `${'z'.repeat(200)}\n`.repeat(6000)]]) {
+// Three limits, one refusal: a review prompt over MAX_REVIEW_BYTES; one that
+// is short in characters but over it in bytes (the reviewer seat hands the
+// prompt to Pi as one argument, which Linux caps at 128 KiB: E2BIG, found
+// live 24 Sep); and a diff over the 1 MB Node's default git buffer would
+// have crashed on.
+for (const [limit, huge] of [['over the review size limit', `${'y'.repeat(120)}\n`.repeat(5000)], ['over the limit in bytes though not in characters', `${'é'.repeat(60)}\n`.repeat(1200)], ['over a megabyte', `${'z'.repeat(200)}\n`.repeat(6000)]]) {
   test(`a diff ${limit} is refused with "split the card", on the card, and never reaches a review`, async () => {
     const fx = makeRepo();
     const { adapters, calls, comments } = fakes({ geminiTurn: (cwd) => { goodFix(cwd); write(cwd, 'scripts/huge.mjs', huge); } });
