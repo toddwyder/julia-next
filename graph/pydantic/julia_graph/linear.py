@@ -1,0 +1,76 @@
+"""Linear, as the "Julia controller" OAuth app.
+
+The client id and secret are systemd credentials (ops/julia-runner/README.md):
+systemd-run decrypts them into $CREDENTIALS_DIRECTORY, readable only by this
+process's account. They are read in-process and sent only to Linear's token
+endpoint.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import os
+import urllib.parse
+import urllib.request
+from pathlib import Path
+
+TOKEN_URL = 'https://api.linear.app/oauth/token'
+API_URL = 'https://api.linear.app/graphql'
+
+CARD_QUERY = """query Card($id: String!) {
+  issue(id: $id) { id identifier title description comments(first: 250) { nodes { body createdAt } } }
+}"""
+COMMENT = """mutation Comment($issueId: String!, $body: String!) {
+  commentCreate(input: { issueId: $issueId, body: $body }) { success }
+}"""
+
+
+def read_credential(directory: str | None = None) -> tuple[str, str]:
+    directory = directory or os.environ.get('CREDENTIALS_DIRECTORY')
+    if not directory:
+        raise RuntimeError('the Linear app credential is not available: start the graph with systemd-run and '
+                           'LoadCredentialEncrypted=linear-app-id and linear-app-secret')
+    read = lambda name: (Path(directory) / name).read_text().rstrip('\n')
+    return read('linear-app-id'), read('linear-app-secret')
+
+
+def _post(url: str, data: bytes, headers: dict) -> dict:
+    request = urllib.request.Request(url, data=data, headers=headers, method='POST')
+    with urllib.request.urlopen(request, timeout=60) as response:
+        return json.loads(response.read())
+
+
+class LinearApp:
+    def __init__(self):
+        self._token = None
+        self._ids: dict[str, str] = {}
+
+    def _call(self, query: str, variables: dict) -> dict:
+        if not self._token:
+            client_id, secret = read_credential()
+            body = urllib.parse.urlencode({'grant_type': 'client_credentials', 'client_id': client_id,
+                                           'client_secret': secret, 'scope': 'comments:create read write',
+                                           'actor': 'app'}).encode()
+            self._token = _post(TOKEN_URL, body, {'Content-Type': 'application/x-www-form-urlencoded'}).get('access_token')
+            if not self._token:
+                raise RuntimeError('Linear returned no access token for the app credential')
+        reply = _post(API_URL, json.dumps({'query': query, 'variables': variables}).encode(),
+                      {'Content-Type': 'application/json', 'Authorization': f'Bearer {self._token}'})
+        if reply.get('errors'):
+            raise RuntimeError(f"Linear refused the request: {reply['errors'][0].get('message')}")
+        return reply['data']
+
+    async def card(self, card: str) -> dict:
+        issue = (await asyncio.to_thread(self._call, CARD_QUERY, {'id': card}))['issue']
+        self._ids[card] = issue['id']
+        comments = sorted(issue['comments']['nodes'], key=lambda c: c['createdAt'])
+        return {'identifier': issue['identifier'], 'title': issue['title'],
+                'description': issue['description'] or '', 'comments': [c['body'] for c in comments]}
+
+    async def comment(self, card: str, body: str) -> None:
+        if card not in self._ids:
+            await self.card(card)
+        data = await asyncio.to_thread(self._call, COMMENT, {'issueId': self._ids[card], 'body': body})
+        if not data['commentCreate']['success']:
+            raise RuntimeError(f'Linear did not accept the comment on {card}')
