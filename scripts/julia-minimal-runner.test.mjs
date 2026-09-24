@@ -5,7 +5,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { runIssue } from './julia-minimal-runner.mjs';
+import { runIssue, verdictOf } from './julia-minimal-runner.mjs';
 import { localTester } from './julia-minimal-runner-checks.mjs';
 import { linearAdapter, readAppCredential } from './julia-minimal-runner-adapters.mjs';
 
@@ -644,4 +644,15 @@ test('a fresh worktree gets its dependencies installed from the start commit\'s 
   assert.equal(result.outcome, 'pr', result.reason);
   assert.ok(lines.some((line) => /npm ci/.test(line)), lines.join('\n'));
   rmSync(fx.root, { recursive: true, force: true });
+});
+
+test('the verdict line is read even when DeepSeek formats it as code or bold', () => {
+  // Round 2 on e23b298 (24 Sep): DeepSeek ended its report with `VERDICT: CLEAN`
+  // in backticks, which the runner read as no verdict at all.
+  for (const line of ['VERDICT: CLEAN', '`VERDICT: CLEAN`', '**VERDICT: CLEAN**', '  VERDICT:  CLEAN  ']) {
+    assert.equal(verdictOf(`Report.\n\n${line}\n`), 'CLEAN', line);
+  }
+  assert.equal(verdictOf('Report.\n`VERDICT: FINDINGS`'), 'FINDINGS');
+  assert.equal(verdictOf('The verdict: CLEAN, I think.'), null, 'prose is not a verdict line');
+  assert.equal(verdictOf('VERDICT: CLEAN-ish'), null);
 });

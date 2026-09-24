@@ -108,7 +108,8 @@ export function reviewPrompt(axis, { card, skill, standards, commits, diff }) {
   ].join('\n\n');
 }
 
-const verdictOf = (text) => /VERDICT:\s*(CLEAN|FINDINGS)\s*$/m.exec(text)?.[1] ?? null;
+// The verdict line, bare or wrapped as `code` or **bold** (DeepSeek does both).
+export const verdictOf = (text) => /^[\s`*]*VERDICT:\s*(CLEAN|FINDINGS)[\s`*]*$/m.exec(text)?.[1] ?? null;
 
 export async function runIssue(issueId, { base, repoRoot, worktreeRoot, adapters }) {
   const { linear, gemini, deepseek, publish, tests } = adapters;
