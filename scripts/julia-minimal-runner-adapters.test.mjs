@@ -35,7 +35,7 @@ test('Gemini gets the worktree and the brief on stdin, and nothing of the runner
   process.env.CREDENTIALS_DIRECTORY = '/run/credentials/julia-runner.service';
   try {
     const turn = await geminiAdapter({ run })('the brief', { cwd: '/srv/julia-runner/worktrees/card-9' });
-    assert.deepEqual(turn, { ok: true, reason: null });
+    assert.deepEqual(turn, { ok: true, reason: null, text: 'Done.' });
   } finally {
     delete process.env.CREDENTIALS_DIRECTORY;
   }
@@ -107,7 +107,7 @@ test('a denied action, an empty reply, a non-SUCCESS status or no result is a fa
   assert.equal(agyOutcome(stream({ event: 'result', result: { status: 'SUCCESS', response: '' } })).ok, false);
   assert.equal(agyOutcome(stream({ event: 'result', result: { status: 'ERROR', error: 'quota' } })).ok, false);
   assert.equal(agyOutcome(stream(activeStep('view_file', {}))).ok, false);
-  assert.deepEqual(agyOutcome(stream({ event: 'result', result: { status: 'SUCCESS', response: 'Done.' } })), { ok: true, reason: null });
+  assert.deepEqual(agyOutcome(stream({ event: 'result', result: { status: 'SUCCESS', response: 'Done.' } })), { ok: true, reason: null, text: 'Done.' }, 'the reply text carries the hand-in');
 });
 
 test('the reviewer\'s reply is the last assistant message with text', () => {

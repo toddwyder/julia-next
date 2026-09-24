@@ -56,8 +56,15 @@ function makeRepo() {
 const SEAMED_CARD = {
   identifier: 'JUL-900',
   title: 'add() adds',
-  description: '## What\n\nadd(a, b) returns the sum.\n\n## Seams\n\n* Interface: `add(a, b)` in `scripts/add.mjs`\n* Tests: `scripts/add.test.mjs`\n* Kind: behavior\n',
+  description: '## What\n\nadd(a, b) returns the sum.\n\n## Acceptance criteria\n\n- [ ] add(a, b) returns the sum of a and b.\n\n## UAT plan\n\n1. **The sum:** add(2, 3) is 5.\n\n## Seams\n\n* Interface: `add(a, b)` in `scripts/add.mjs`\n* Tests: `scripts/add.test.mjs`\n* Kind: behavior\n',
 };
+const AC1 = 'add(a, b) returns the sum of a and b.';
+
+// Gemini's hand-in, as the builder template asks for it: evidence per
+// criterion and a plain line per UAT item, as JSON at the end of its reply.
+const GOOD_ANSWER = { outcome: 'done', summary: 'add sums its arguments', acceptance: [{ id: 'AC1', criterion: AC1, evidence: 'scripts/add.mjs line 1 returns a + b; scripts/add.test.mjs asserts add(2, 3) is 5' }], uat: [{ id: 'UAT1', text: 'add(2, 3) now gives 5.' }] };
+const handIn = (answer) => (answer === null ? 'Done, no hand-in.' : `Done.\n\n\`\`\`json\n${JSON.stringify(answer)}\n\`\`\`\n`);
+const MET = [{ id: 'AC1', criterion: AC1, verdict: 'met', how: 'read scripts/add.mjs in the diff; the checks passed' }];
 
 // What a good Gemini turn leaves behind: a real fix plus a test at the seam.
 function goodFix(cwd) {
@@ -65,24 +72,28 @@ function goodFix(cwd) {
   write(cwd, 'scripts/add.test.mjs', "import { test } from 'node:test';\nimport assert from 'node:assert/strict';\nimport { add } from './add.mjs';\ntest('add sums', () => assert.equal(add(2, 3), 5));\n");
 }
 
-function fakes({ card = SEAMED_CARD, geminiTurn = goodFix, verdicts = [{ spec: 'CLEAN', standards: 'CLEAN' }] } = {}) {
-  const calls = { gemini: [], deepseek: [], publish: [], tests: [], uat: 0 };
+function fakes({ card = SEAMED_CARD, geminiTurn = goodFix, verdicts = [{ spec: 'CLEAN', standards: 'CLEAN' }], answer = () => GOOD_ANSWER, criteria = () => MET } = {}) {
+  const calls = { gemini: [], deepseek: [], publish: [], tests: [], uat: 0, descriptions: [] };
   const comments = [];
+  let description = card.description;
   const adapters = {
     linear: {
-      getCard: async () => ({ ...card, comments: comments.map((body) => ({ body })) }),
+      getCard: async () => ({ ...card, description, comments: comments.map((body, i) => ({ body, createdAt: `2026-09-24T00:00:${String(i).padStart(2, '0')}Z` })) }),
       comment: async (_id, body) => { comments.push(body); },
+      setDescription: async (_id, text) => { description = text; calls.descriptions.push(text); },
       moveToUat: async () => { calls.uat += 1; },
     },
     gemini: async (prompt, { cwd }) => {
       calls.gemini.push(prompt);
       geminiTurn(cwd, calls.gemini.length);
-      return { ok: true };
+      return { ok: true, text: handIn(answer(calls.gemini.length)) };
     },
     deepseek: async (prompt, { axis }) => {
       calls.deepseek.push({ axis, prompt });
-      const round = verdicts[Math.min(Math.floor((calls.deepseek.length - 1) / 2), verdicts.length - 1)];
-      return { ok: true, text: `Review of ${axis}.\nVERDICT: ${round[axis]}\n` };
+      const index = Math.floor((calls.deepseek.length - 1) / 2);
+      const round = verdicts[Math.min(index, verdicts.length - 1)];
+      const perCriterion = axis === 'spec' ? `\`\`\`json\n${JSON.stringify({ criteria: criteria(index + 1) })}\n\`\`\`\n` : '';
+      return { ok: true, text: `${perCriterion}Review of ${axis}.\nVERDICT: ${round[axis]}\n` };
     },
     publish: async (request) => {
       calls.publish.push(request);
@@ -290,7 +301,7 @@ test('review findings get exactly one correction round, with the findings in the
     calls.gemini.push(prompt);
     goodFix(cwd);
     if (calls.gemini.length === 2) write(cwd, 'scripts/add.mjs', 'export const add = (a, b) => a + b; // corrected\n');
-    return { ok: true };
+    return { ok: true, text: handIn(GOOD_ANSWER) };
   };
   const result = await run(fx, adapters);
   assert.equal(result.outcome, 'pr', result.reason);
@@ -576,6 +587,7 @@ function fakeLinear(card) {
     if (query.includes('IssueIdByIdentifier')) return answer({ issue: { id: 'uuid-900' } });
     if (query.includes('CommentCreate')) { comments.push(variables.body); return answer({ commentCreate: { success: true, comment: { id: `c${comments.length}`, url: 'https://linear.test/c' } } }); }
     if (query.includes('mutation Move')) return answer({ issueUpdate: { success: true } });
+    if (query.includes('mutation Describe')) { card.description = variables.description; return answer({ issueUpdate: { success: true } }); }
     throw new Error(`unexpected Linear call: ${query.slice(0, 40)}`);
   };
   return { fetchImpl, requests, comments };
@@ -597,7 +609,7 @@ test('a whole run carries the Linear credential into nothing it produces', async
   writeFileSync(join(credentials, 'linear-app-id'), `${CLIENT_ID}\n`);
   writeFileSync(join(credentials, 'linear-app-secret'), `${CLIENT_SECRET}\n`);
   const { adapters, calls } = fakes();
-  const linear = fakeLinear(SEAMED_CARD);
+  const linear = fakeLinear({ ...SEAMED_CARD });
   adapters.linear = linearAdapter({ fetchImpl: linear.fetchImpl, readCredential: () => readAppCredential({ dir: credentials }) });
   const progress = [];
   adapters.progress = (line) => progress.push(line);
@@ -655,4 +667,119 @@ test('the verdict line is read even when DeepSeek formats it as code or bold', (
   assert.equal(verdictOf('Report.\n`VERDICT: FINDINGS`'), 'FINDINGS');
   assert.equal(verdictOf('The verdict: CLEAN, I think.'), null, 'prose is not a verdict line');
   assert.equal(verdictOf('VERDICT: CLEAN-ish'), null);
+});
+
+// ------------------------------------------------ The acceptance loop (JUL-122)
+// Mapped from the committed Orca role files: the builder hands in evidence per
+// criterion and per UAT item, the Spec reviewer checks each criterion by id,
+// and scripts/acceptance-check.mjs refuses the change before the PR and again
+// (on the live card) before the UAT move.
+
+test('a card with no acceptance criteria, or no UAT plan, is refused before Gemini runs', async () => {
+  for (const cut of [/## Acceptance criteria[\s\S]*?(?=## UAT plan)/, /## UAT plan[\s\S]*?(?=## Seams)/]) {
+    const fx = makeRepo();
+    const { adapters, calls, comments } = fakes({ card: { ...SEAMED_CARD, description: SEAMED_CARD.description.replace(cut, '') } });
+    const result = await run(fx, adapters);
+    assert.equal(result.outcome, 'blocked');
+    assert.match(result.reason, /no acceptance criteria|UAT plan lists no numbered items/);
+    assert.equal(calls.gemini.length, 0);
+    assert.match(comments.at(-1), /acceptance criteria|UAT plan/);
+    rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+test("Gemini's brief lists every criterion and UAT item by id, asks for the hand-in, and carries the mapped builder rules only", async () => {
+  const fx = makeRepo();
+  const { adapters, calls } = fakes();
+  await run(fx, adapters);
+  const brief = calls.gemini[0];
+  assert.match(brief, /- AC1: add\(a, b\) returns the sum of a and b\./);
+  assert.match(brief, /- UAT1: The sum/);
+  assert.match(brief, /"outcome":"done"/);
+  assert.match(brief, /"acceptance":\[\{"id":"AC1","criterion":"<its exact words>","evidence":/);
+  assert.match(brief, /"outcome":"blocked"/);
+  assert.match(brief, /all of them and only them/, 'never widen the step');
+  assert.match(brief, /names its source/, 'every claim names its source');
+  assert.match(brief, /would fail if the code it guards were deleted/, 'tests must guard something');
+  assert.doesNotMatch(brief, /framework's official docs|Orca's docs/, 'no graph-framework or Orca rule: they conflict with the separated workers');
+  assert.doesNotMatch(brief, /Invoke `\/code-review`|runbook/, 'no self-review, no runbook edits');
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+test('the builder hand-in is kept in the commit message, so a resume reuses it without a new Gemini turn', async () => {
+  const fx = makeRepo();
+  const { adapters, calls, comments } = fakes();
+  crashOnce(adapters, 'after-commit');
+  await assert.rejects(run(fx, adapters), /crash at/);
+  const result = await run(fx, adapters);
+  assert.equal(result.outcome, 'pr', result.reason);
+  assert.equal(calls.gemini.length, 1);
+  assert.match(git(worktreeOf(fx), 'log', '-1', '--format=%B'), /"evidence":"scripts\/add\.mjs line 1/);
+  assert.ok(comments.some((body) => body.includes('UAT evidence (the acceptance check passed)') && body.includes('scripts/add.mjs line 1 returns a + b')));
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+test('Gemini handing in as blocked stops the run with its reason, and nothing is committed', async () => {
+  const fx = makeRepo();
+  const { adapters, calls } = fakes({ answer: () => ({ outcome: 'blocked', summary: 'AC1 contradicts the Seams section' }) });
+  const result = await run(fx, adapters);
+  assert.equal(result.outcome, 'blocked');
+  assert.match(result.reason, /Gemini stopped as blocked: AC1 contradicts the Seams section/);
+  assert.equal(git(worktreeOf(fx), 'rev-list', '--count', `${fx.base}..HEAD`), '0');
+  assert.equal(calls.deepseek.length + calls.publish.length, 0);
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+test('the Spec brief carries the criteria, the hand-in as a claim, the checks and its attack list; Standards gets the checks and its own; preferences never block', async () => {
+  const fx = makeRepo();
+  const { adapters, calls } = fakes();
+  await run(fx, adapters);
+  const [spec, standards] = calls.deepseek.map((c) => c.prompt);
+  assert.match(spec, /- AC1: add\(a, b\) returns the sum of a and b\./);
+  assert.match(spec, /a claim to check, not a check/);
+  assert.match(spec, /scripts\/add\.mjs line 1 returns a \+ b/, 'the builder evidence itself');
+  assert.match(spec, /"verdict":"met"\|"not_met"/);
+  for (const attack of ['Test theatre', 'Wiring', 'Scope', 'Evidence']) assert.match(spec, new RegExp(`\\*\\*${attack}\\.`));
+  for (const attack of ['Security', 'Observability']) assert.match(standards, new RegExp(`\\*\\*${attack}\\.`));
+  for (const prompt of [spec, standards]) {
+    assert.match(prompt, /## The runner's checks on this commit[\s\S]*red proof passed[\s\S]*lint:framework/);
+    assert.match(prompt, /do not block a pass/);
+  }
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+test('a clean run ticks the criteria, posts the evidence, passes the UAT guard and only then moves the card', async () => {
+  const fx = makeRepo();
+  const { adapters, calls, comments } = fakes();
+  const result = await run(fx, adapters);
+  assert.equal(result.outcome, 'pr', result.reason);
+  assert.ok(comments.some((body) => body.includes(`runner: acceptance sha=${result.sha} result=pass`)));
+  assert.match(calls.descriptions.at(-1), /- \[x\] add\(a, b\) returns the sum of a and b\./);
+  const evidence = comments.find((body) => body.includes('UAT evidence (the acceptance check passed)'));
+  assert.match(evidence, /\*\*UAT1\. The sum\*\*[\s\S]*add\(2, 3\) now gives 5\./);
+  assert.match(evidence, /Checked \(reviewer\): met/);
+  assert.equal(calls.uat, 1);
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+test('a criterion the reviewer found not met goes back for the correction round, even under a CLEAN verdict, and a second miss blocks with no PR', async () => {
+  const fx = makeRepo();
+  const notMet = [{ ...MET[0], verdict: 'not_met', how: 'add ignores b' }];
+  const { adapters, calls } = fakes({ criteria: () => notMet, geminiTurn: (cwd, turn) => { goodFix(cwd); write(cwd, 'scripts/add.mjs', `export const add = (a, b) => a + b; // turn ${turn}\n`); } });
+  const result = await run(fx, adapters);
+  assert.equal(result.outcome, 'blocked');
+  assert.match(result.reason, /acceptance check/);
+  assert.match(calls.gemini[1], /AC1[^\n]*the reviewer found it "not_met", not "met" -- add ignores b/);
+  assert.equal(calls.publish.length + calls.uat, 0);
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+test('a hand-in with no evidence is refused by the acceptance check and sent back', async () => {
+  const fx = makeRepo();
+  const { adapters, calls } = fakes({ answer: (turn) => (turn === 1 ? null : GOOD_ANSWER), geminiTurn: (cwd, turn) => { goodFix(cwd); write(cwd, 'scripts/add.mjs', `export const add = (a, b) => a + b; // turn ${turn}\n`); } });
+  const result = await run(fx, adapters);
+  assert.equal(result.outcome, 'pr', result.reason);
+  assert.match(calls.gemini[1], /AC1[^\n]*the builder gave no evidence naming it/);
+  assert.match(calls.deepseek[0].prompt, /\(the builder gave no hand-in\)/);
+  rmSync(fx.root, { recursive: true, force: true });
 });
