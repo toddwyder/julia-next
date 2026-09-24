@@ -1,8 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { findPersonalPaths } from './personal-paths.mjs';
+import { findPersonalPaths, scanPersonalPaths, scanForPersonalPaths } from './personal-paths.mjs';
+
+export { scanPersonalPaths, scanForPersonalPaths };
 
 // A literal C:\Users\<name> default (e.g. a fallback for a CLI binary path)
 // works on exactly one machine and fails with a raw, unactionable error
@@ -14,14 +17,32 @@ import { findPersonalPaths } from './personal-paths.mjs';
 // shouldn't be able to edit its own CI. A regular test in this suite runs
 // under the same `node --test scripts/*.test.mjs` CI already invokes,
 // without touching the workflow file at all.
-const SCRIPTS_DIR = path.join(import.meta.dirname, '.');
+const REPO_ROOT = path.resolve(import.meta.dirname, '..');
+const SCRIPTS_DIR = path.join(REPO_ROOT, 'scripts');
+const OPS_DIR = path.join(REPO_ROOT, 'ops');
 
-test('no script under scripts/ hardcodes a personal-machine path (C:\\Users\\<name>)', () => {
-  const offenders = [];
-  for (const name of readdirSync(SCRIPTS_DIR)) {
-    if (!name.endsWith('.mjs') || name.endsWith('.test.mjs')) continue;
-    const contents = readFileSync(path.join(SCRIPTS_DIR, name), 'utf8');
-    if (findPersonalPaths(contents).length > 0) offenders.push(name);
-  }
+test('no script under scripts/ or ops/ hardcodes a personal-machine path (C:\\Users\\<name>)', () => {
+  const offenders = scanPersonalPaths([SCRIPTS_DIR, OPS_DIR], { baseDir: REPO_ROOT });
   assert.deepEqual(offenders, [], `hardcoded personal-machine path found in: ${offenders.join(', ')} -- require the value from an env var instead, with an actionable error if unset`);
+});
+
+test('a personal path in a nested folder is caught and reported by the scan', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'personal-paths-nested-'));
+  try {
+    const nestedDir = path.join(dir, 'nested', 'worker-scripts');
+    mkdirSync(nestedDir, { recursive: true });
+    const fixturePath = path.join(nestedDir, 'fixture.mjs');
+    writeFileSync(fixturePath, "export const workerPath = 'C:\\\\Users\\\\name\\\\worker.mjs';\n");
+
+    const cleanPath = path.join(nestedDir, 'clean.mjs');
+    writeFileSync(cleanPath, "export const clean = '/usr/local/bin/worker.mjs';\n");
+
+    const testPath = path.join(nestedDir, 'fixture.test.mjs');
+    writeFileSync(testPath, "export const ignoredTest = 'C:\\\\Users\\\\name\\\\test.mjs';\n");
+
+    const offenders = scanPersonalPaths(dir);
+    assert.deepEqual(offenders, ['nested/worker-scripts/fixture.mjs']);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
