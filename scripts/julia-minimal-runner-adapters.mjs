@@ -167,7 +167,9 @@ export function deepseekAdapter() {
 // The CLAUDE.md publishing route: the branch travels as a git bundle, the
 // runner account checks it out, orchestrator-svc pushes and opens the PR with
 // the GitHub App. Title and body travel as files, never inside the script.
-export function publishAdapter({ repo = 'toddwyder/julia-next' } = {}) {
+const REPO = 'toddwyder/julia-next';
+
+export function publishAdapter() {
   return async ({ branch, sha, worktree, title, body, onProgress = () => {} }) => {
     const local = mkdtempSync(join(tmpdir(), 'julia-runner-publish-'));
     const name = `julia-runner-${sha.slice(0, 12)}`;
@@ -188,8 +190,8 @@ export function publishAdapter({ repo = 'toddwyder/julia-next' } = {}) {
         `sudo -u runner git -C /home/runner/julia-next worktree add -q "$W" "${branch}"`,
         `test "$(sudo -u runner git -C "$W" rev-parse HEAD)" = "${sha}"`,
         'cd /tmp',
-        `${publisher} push --repo ${repo} --branch "${branch}" --cwd "$W" >&2`,
-        `${publisher} open --repo ${repo} --head "${branch}" --base main --title "$(cat "$F.title")" --body "$(cat "$F.body")"`,
+        `${publisher} push --repo ${REPO} --branch "${branch}" --cwd "$W" >&2`,
+        `${publisher} open --repo ${REPO} --head "${branch}" --base main --title "$(cat "$F.title")" --body "$(cat "$F.body")"`,
       ].join('\n');
       onProgress('checking the commit on the server, pushing and opening the PR');
       const run = ssh(script);
@@ -212,8 +214,8 @@ const MOVE_MUTATION = `mutation Move($id: String!, $stateId: String!, $assigneeI
 }`;
 
 // UAT, assigned to the key's owner (CLAUDE.md: finished work goes to UAT for Todd).
-export function linearAdapter({ apiKey = process.env.LINEAR_API_KEY } = {}) {
-  const opts = { apiKey };
+export function linearAdapter() {
+  const opts = { apiKey: process.env.LINEAR_API_KEY };
   const read = (id) => linearGraphQL(CARD_QUERY, { id }, opts);
   return {
     getCard: async (id) => {

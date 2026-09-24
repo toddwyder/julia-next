@@ -8,6 +8,6 @@ node_modules/
 # refuses to remove one holding an untracked file, measured 23 Sep).
 .julia/
 
-# julia-minimal-runner: per-issue state file, lock file and the local git
-# worktrees it drives -- laptop-local, never shared, never published.
+# julia-minimal-runner: the local git worktrees it drives -- laptop-local,
+# never shared, never published. The runner keeps no state file.
 .julia-runner-state/

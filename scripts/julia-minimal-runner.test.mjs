@@ -21,7 +21,7 @@ function write(root, path, text) {
 }
 
 const BASE_FILES = {
-  'package.json': '{ "type": "module", "scripts": { "lint:framework": "node -e \\"\\"" } }\n',
+  'package.json': '{ "type": "module", "scripts": { "lint:framework": "node -e \\"\\"", "test": "node --test \\"scripts/*.test.mjs\\"" } }\n',
   'scripts/add.mjs': 'export const add = () => 0;\n',
   'CLAUDE.md': '# Rules\n\nSTANDARD-MARKER-CLAUDE: name things plainly.\n',
   'AGENTS.md': '# Agents\n\nSTANDARD-MARKER-AGENTS\n',

@@ -56,7 +56,9 @@ function pinWorktree({ repoRoot, worktree, branch, base }) {
 // 24 Sep, Node 24). The checks must never inherit it.
 const { NODE_TEST_CONTEXT: _inherited, ...TEST_ENV } = process.env;
 
-const SUITE = 'node --test "scripts/*.test.mjs"';
+// The suite is whatever package.json's `test` script says, the same command
+// Gemini is told to run, so the two can never drift apart.
+const SUITE = 'npm test';
 const sh = (command, cwd) => spawnSync(command, { cwd, encoding: 'utf8', shell: true, env: TEST_ENV });
 const failedTests = (output) => new Set([...String(output).matchAll(/^✖ (.+?) \([\d.]+m?s\)\s*$/gm)].map((match) => match[1]));
 
