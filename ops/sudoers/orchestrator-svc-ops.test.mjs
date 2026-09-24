@@ -14,6 +14,10 @@ import { userInfo } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const FILE = fileURLToPath(new URL('./orchestrator-svc-ops', import.meta.url));
+// The minimal runner's worker rules (JUL-122) are orchestrator-svc's only other
+// live rules; they are guarded in scripts/julia-runner-ops.test.mjs.
+const RUNNER_WORKER_COMMANDS = readFileSync(fileURLToPath(new URL('../julia-runner/sudoers', import.meta.url)), 'utf8')
+  .split('\n').filter((line) => line.includes('NOPASSWD:')).map((line) => line.split('NOPASSWD:')[1].trim());
 const ACCOUNTS = ['runner', 'orchestrator-svc'];
 const KEY_GROUPS = ['deepseek-readers', 'commandcode-readers'];
 
@@ -125,9 +129,12 @@ test('on the server: an install attempt as orchestrator-svc is refused by sudo',
     '/etc/systemd/system/julia-ready-queue.service',
   ], { encoding: 'utf8' });
   assert.notEqual(attempt.status, 0, 'sudo allowed an install as orchestrator-svc');
-  // The whole live rule set must be exactly this file's rules plus the one
-  // pre-existing checkout-sync rule -- nothing older left installed.
-  const listing = spawnSync('sudo', ['-n', '-l'], { encoding: 'utf8' });
+  // The whole live rule set must be exactly this file's rules, the one
+  // pre-existing checkout-sync rule and the minimal runner's worker rules --
+  // nothing older left installed.
+  // A wide COLUMNS: with no terminal, sudo wraps a rule longer than 80
+  // characters onto a second line (the runner's worker rules are).
+  const listing = spawnSync('sudo', ['-n', '-l'], { encoding: 'utf8', env: { ...process.env, COLUMNS: '4096' } });
   // JUL-98, found live: `ops/controller/julia-controller.service` runs the
   // controller (also as orchestrator-svc, also on this box) under
   // `NoNewPrivileges=yes`, which stops `sudo` from executing AT ALL --
@@ -158,7 +165,7 @@ test('on the server: an install attempt as orchestrator-svc is refused by sudo',
   const live = listing.stdout.split('\n')
     .filter((line) => line.includes('NOPASSWD:'))
     .map((line) => line.split('NOPASSWD:')[1].trim()).sort();
-  const expected = [...commands.map((c) => c.join(' ')), '/usr/bin/systemctl start julia-next-checkout-sync.service'].sort();
+  const expected = [...commands.map((c) => c.join(' ')), '/usr/bin/systemctl start julia-next-checkout-sync.service', ...RUNNER_WORKER_COMMANDS].sort();
   assert.deepEqual(live, expected);
 });
 
