@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { findPersonalPaths } from './personal-paths.mjs';
 
 // A literal C:\Users\<name> default (e.g. a fallback for a CLI binary path)
 // works on exactly one machine and fails with a raw, unactionable error
@@ -13,7 +14,6 @@ import path from 'node:path';
 // shouldn't be able to edit its own CI. A regular test in this suite runs
 // under the same `node --test scripts/*.test.mjs` CI already invokes,
 // without touching the workflow file at all.
-const PERSONAL_PATH = /C:\\Users\\[A-Za-z0-9_.-]+/;
 const SCRIPTS_DIR = path.join(import.meta.dirname, '.');
 
 test('no script under scripts/ hardcodes a personal-machine path (C:\\Users\\<name>)', () => {
@@ -21,7 +21,7 @@ test('no script under scripts/ hardcodes a personal-machine path (C:\\Users\\<na
   for (const name of readdirSync(SCRIPTS_DIR)) {
     if (!name.endsWith('.mjs') || name.endsWith('.test.mjs')) continue;
     const contents = readFileSync(path.join(SCRIPTS_DIR, name), 'utf8');
-    if (PERSONAL_PATH.test(contents)) offenders.push(name);
+    if (findPersonalPaths(contents).length > 0) offenders.push(name);
   }
   assert.deepEqual(offenders, [], `hardcoded personal-machine path found in: ${offenders.join(', ')} -- require the value from an env var instead, with an actionable error if unset`);
 });
