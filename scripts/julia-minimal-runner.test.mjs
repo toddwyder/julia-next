@@ -787,3 +787,28 @@ test('a hand-in with no evidence is refused by the acceptance check and sent bac
   assert.match(calls.deepseek[0].prompt, /\(the builder gave no hand-in\)/);
   rmSync(fx.root, { recursive: true, force: true });
 });
+
+test('the evidence comment is on the card before any box is ticked (CLAUDE.md: never tick before the evidence exists)', async () => {
+  const fx = makeRepo();
+  const { adapters, comments } = fakes();
+  const order = [];
+  const { comment, setDescription } = adapters.linear;
+  adapters.linear.comment = async (id, body) => { if (body.includes('UAT evidence (the acceptance check passed)')) order.push('evidence'); return comment(id, body); };
+  adapters.linear.setDescription = async (id, text) => { order.push('tick'); return setDescription(id, text); };
+  const result = await run(fx, adapters);
+  assert.equal(result.outcome, 'pr', result.reason);
+  assert.deepEqual(order, ['evidence', 'tick']);
+  assert.ok(comments.length > 0);
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+test('the UAT guard refuses a card whose boxes did not get ticked, and the card is not moved', async () => {
+  const fx = makeRepo();
+  const { adapters, calls } = fakes();
+  adapters.linear.setDescription = async () => {}; // Linear accepted the call but the boxes stayed open
+  const result = await run(fx, adapters);
+  assert.equal(result.outcome, 'blocked');
+  assert.match(result.reason, /not ready for UAT: AC1 \("add\(a, b\) returns the sum of a and b\."\) is not ticked/);
+  assert.equal(calls.uat, 0);
+  rmSync(fx.root, { recursive: true, force: true });
+});

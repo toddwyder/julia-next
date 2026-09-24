@@ -71,8 +71,9 @@ The runner refuses a card before Gemini starts unless its description has:
 
 Gemini hands in evidence for each criterion and a line for each UAT item. The Spec reviewer answers
 met or not met for each criterion. `scripts/acceptance-check.mjs` refuses the change before the PR
-unless every criterion has both. Before the UAT move, the runner ticks the boxes, posts the evidence
-comment, and passes the same script's live-card guard.
+unless every criterion has both. Before the UAT move, the runner posts the evidence comment, then
+ticks the boxes (never before their evidence is on the card), and then passes the same script's
+live-card guard.
 
 ## Running a card
 

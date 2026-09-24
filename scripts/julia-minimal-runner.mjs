@@ -265,10 +265,12 @@ export async function runIssue(issueId, { base, repoRoot, worktreeRoot, adapters
       ({ url } = await publish({ branch, sha, worktree, title: card.title, body: `${cardText(card)}\n\n---\n\n${verdict.text}`, onProgress: relay('Publisher') }));
       await sayOnce(`PR opened for \`${sha.slice(0, 12)}\`: ${url}`, markerLine('pr', { sha, url }));
     }
+    // Evidence first, then the ticks: a box is never ticked before its
+    // evidence is on the card (CLAUDE.md, "Tick as you go").
+    await sayOnce(evidenceCommentBody({ card, check, builder, reviewer }), markerLine('evidence', { sha }));
     const live = await linear.getCard(issueId);
     const ticked = tickCriteria(live.description);
     if (ticked !== live.description) await linear.setDescription(issueId, ticked);
-    await sayOnce(evidenceCommentBody({ card, check, builder, reviewer }), markerLine('evidence', { sha }));
     const now = await linear.getCard(issueId);
     const guard = checkCardForUat({ description: now.description, comments: now.comments });
     if (!guard.ok) return stop(`the card is not ready for UAT: ${guard.missing.join('; ')}`);

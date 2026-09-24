@@ -234,7 +234,7 @@ export function linearAdapter({ fetchImpl = fetch, readCredential = readAppCrede
     setDescription: async (id, description) => {
       const issue = await read(id);
       const { issueUpdate } = await linearGraphQL(DESCRIBE_MUTATION, { id: issue.id, description }, await opts());
-      if (!issueUpdate.success) throw new Error(`Linear refused to update ${id}'s description`);
+      if (!issueUpdate?.success) throw new Error(`Linear refused to update ${id}'s description`);
     },
     moveToUat: async (id) => {
       const issue = await read(id);
