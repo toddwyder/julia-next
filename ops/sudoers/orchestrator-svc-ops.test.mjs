@@ -132,7 +132,9 @@ test('on the server: an install attempt as orchestrator-svc is refused by sudo',
   // The whole live rule set must be exactly this file's rules, the one
   // pre-existing checkout-sync rule and the minimal runner's worker rules --
   // nothing older left installed.
-  const listing = spawnSync('sudo', ['-n', '-l'], { encoding: 'utf8' });
+  // A wide COLUMNS: with no terminal, sudo wraps a rule longer than 80
+  // characters onto a second line (the runner's worker rules are).
+  const listing = spawnSync('sudo', ['-n', '-l'], { encoding: 'utf8', env: { ...process.env, COLUMNS: '4096' } });
   // JUL-98, found live: `ops/controller/julia-controller.service` runs the
   // controller (also as orchestrator-svc, also on this box) under
   // `NoNewPrivileges=yes`, which stops `sudo` from executing AT ALL --
