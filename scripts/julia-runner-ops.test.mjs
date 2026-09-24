@@ -60,7 +60,12 @@ test('the test worker refuses anything but an approved run in a card worktree', 
   const ran = [];
   const tester = async (request, { env }) => { ran.push({ request, env }); return { status: 0, output: 'ok' }; };
   assert.deepEqual(await answer({ worktree: '/srv/julia-runner/worktrees/card-1', run: 'suite' }, { tester, problem: fine }), { status: 0, output: 'ok' });
-  assert.deepEqual(Object.keys(ran[0].env).sort(), ['HOME', 'LANG', 'PATH'], 'tests run with HOME, PATH and LANG only');
+  assert.deepEqual(Object.keys(ran[0].env).sort(), ['GIT_CONFIG_COUNT', 'GIT_CONFIG_KEY_0', 'GIT_CONFIG_VALUE_0', 'HOME', 'LANG', 'PATH'], 'tests run with HOME, PATH, LANG and one git setting only');
+  // The worktree belongs to the runner's account, so git refuses to work in it
+  // as julia-tester ("dubious ownership"; JUL-122, 24 Sep). The worker trusts
+  // exactly the worktree it was handed, for this run only (git 2.43 has no
+  // wildcard for it), and nothing else.
+  assert.deepEqual([ran[0].env.GIT_CONFIG_COUNT, ran[0].env.GIT_CONFIG_KEY_0, ran[0].env.GIT_CONFIG_VALUE_0], ['1', 'safe.directory', '/srv/julia-runner/worktrees/card-1']);
   assert.match((await answer({ worktree: '/elsewhere', run: 'suite' }, { tester })).output, /^refused/);
   const real = await answer({ worktree: '/srv/julia-runner/worktrees/card-1', run: 'rm -rf /' }, { problem: fine });
   assert.equal(real.status, 2);

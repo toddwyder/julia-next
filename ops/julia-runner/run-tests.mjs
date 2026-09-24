@@ -18,9 +18,15 @@ import { worktreeProblem } from './run-gemini.mjs';
 export async function answer(request, { tester = localTester, problem = worktreeProblem } = {}) {
   const refused = problem(request?.worktree);
   if (refused) return { status: 2, output: refused };
+  // The worktree belongs to the runner's account, so git refuses to work in it
+  // as julia-tester ("dubious ownership"), and tests that run git fail for
+  // that reason alone. Trust exactly this worktree, for this run only: git
+  // 2.43 on the server has no wildcard for the worktrees folder, and a
+  // standing "trust everything" setting would be wider than this needs.
+  const trustThisWorktree = { GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'safe.directory', GIT_CONFIG_VALUE_0: request.worktree };
   try {
     return await tester({ worktree: request.worktree, run: request.run, files: request.files ?? [] }, {
-      env: { HOME: homedir(), PATH: '/usr/bin:/bin', LANG: 'C.UTF-8' },
+      env: { HOME: homedir(), PATH: '/usr/bin:/bin', LANG: 'C.UTF-8', ...trustThisWorktree },
     });
   } catch (error) {
     return { status: 2, output: `refused: ${error.message}` };
