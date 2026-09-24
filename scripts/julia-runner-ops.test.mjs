@@ -65,3 +65,13 @@ test('the test worker refuses anything but an approved run in a card worktree', 
   const escape = await answer({ worktree: '/srv/julia-runner/worktrees/card-1', run: 'files', files: ['../../etc/x.test.mjs'] }, { problem: fine });
   assert.match(escape.output, /only test files inside the worktree/);
 });
+
+test('every test run asks for the spec reporter, whose failure lines the checks read', async () => {
+  // Measured 24 Sep: Node 22 on the server prints TAP when not on a terminal,
+  // so the "✖ name" lines the regression comparison reads would be missing.
+  const { testCommand } = await import('./julia-minimal-runner-checks.mjs');
+  assert.deepEqual(testCommand({ run: 'files', files: ['scripts/a.test.mjs'] }).args, ['--test', '--test-reporter=spec', 'scripts/a.test.mjs']);
+  // The suite is run directly, not through package.json: the start commit a
+  // card branches from need not have a `test` script (origin/main has none).
+  assert.deepEqual(testCommand({ run: 'suite' }), { command: 'node', args: ['--test', '--test-reporter=spec', 'scripts/*.test.mjs'] });
+});

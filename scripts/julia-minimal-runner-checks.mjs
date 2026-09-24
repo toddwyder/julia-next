@@ -18,8 +18,10 @@ export function git(cwd, ...args) {
 // test files inside the worktree.
 export const TEST_RUNS = {
   lint: { command: 'npm', args: ['run', 'lint:framework'] },
-  suite: { command: 'npm', args: ['test'] },
-  files: { command: 'node', args: ['--test'] },
+  suite: { command: 'node', args: ['--test', '--test-reporter=spec', 'scripts/*.test.mjs'] },
+  // The spec reporter always: Node 22 prints TAP off a terminal, and the
+  // regression comparison reads the spec reporter's "✖ name" lines.
+  files: { command: 'node', args: ['--test', '--test-reporter=spec'] },
 };
 
 export function testCommand({ run, files = [] }) {
@@ -73,7 +75,7 @@ export async function runChecks({ worktree, branch, base, test }) {
     : new Set();
   const fresh = failed.filter((name) => !before.has(name));
   if (!failed.length || fresh.length) {
-    return { pass: false, summary: `tests failed (\`npm test\`): ${fresh.join('; ') || 'the suite did not run'}`, output: suite.output.slice(-4000) };
+    return { pass: false, summary: `tests failed (\`node --test scripts/*.test.mjs\`):${fresh.join('; ') || 'the suite did not run'}`, output: suite.output.slice(-4000) };
   }
   return { pass: true, summary: `lint:framework passed, and ${SUITE_SCOPE} passed except ${failed.length} test(s) that already fail on the start commit: ${failed.join('; ')}`, output: '' };
 }
