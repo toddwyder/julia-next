@@ -19,10 +19,13 @@ TOKEN_URL = 'https://api.linear.app/oauth/token'
 API_URL = 'https://api.linear.app/graphql'
 
 CARD_QUERY = """query Card($id: String!) {
-  issue(id: $id) { id identifier title description comments(first: 250) { nodes { body createdAt } } }
+  issue(id: $id) { id identifier title description comments(first: 250) { nodes { id body createdAt } } }
 }"""
 COMMENT = """mutation Comment($issueId: String!, $body: String!) {
-  commentCreate(input: { issueId: $issueId, body: $body }) { success }
+  commentCreate(input: { issueId: $issueId, body: $body }) { success comment { id } }
+}"""
+EDIT = """mutation Edit($id: String!, $body: String!) {
+  commentUpdate(id: $id, input: { body: $body }) { success }
 }"""
 
 
@@ -65,12 +68,18 @@ class LinearApp:
         issue = (await asyncio.to_thread(self._call, CARD_QUERY, {'id': card}))['issue']
         self._ids[card] = issue['id']
         comments = sorted(issue['comments']['nodes'], key=lambda c: c['createdAt'])
-        return {'identifier': issue['identifier'], 'title': issue['title'],
-                'description': issue['description'] or '', 'comments': [c['body'] for c in comments]}
+        return {'identifier': issue['identifier'], 'title': issue['title'], 'description': issue['description'] or '',
+                'comments': [{'id': c['id'], 'body': c['body']} for c in comments]}
 
-    async def comment(self, card: str, body: str) -> None:
+    async def comment(self, card: str, body: str) -> str:
         if card not in self._ids:
             await self.card(card)
         data = await asyncio.to_thread(self._call, COMMENT, {'issueId': self._ids[card], 'body': body})
         if not data['commentCreate']['success']:
             raise RuntimeError(f'Linear did not accept the comment on {card}')
+        return data['commentCreate']['comment']['id']
+
+    async def edit(self, comment_id: str, body: str) -> None:
+        data = await asyncio.to_thread(self._call, EDIT, {'id': comment_id, 'body': body})
+        if not data['commentUpdate']['success']:
+            raise RuntimeError(f'Linear did not accept the edit to comment {comment_id}')

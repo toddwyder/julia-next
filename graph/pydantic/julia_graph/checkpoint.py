@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import fcntl
 import os
+from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
@@ -23,6 +24,20 @@ class TestResult(BaseModel):
     passed: bool
     summary: str
     failing: list[str] = []
+    # True when the test run was stopped for running past its time limit.
+    stopped: bool = False
+
+
+class StepMark(BaseModel):
+    """One line of the card's "Where this card is" comment."""
+    doing: str  # 'Building (attempt 1)'
+    done: str  # 'Built (attempt 1)'
+    worker: str | None = None
+    limit: int | None = None  # seconds
+    started: datetime
+    ended: datetime | None = None
+    # None while running; 'done', or what went wrong in a few words.
+    outcome: str | None = None
 
 
 class CardRun(BaseModel):
@@ -39,6 +54,12 @@ class CardRun(BaseModel):
     builder_report: str | None = None
     tests: TestResult | None = None
     failure: str | None = None
+    # The card's one "Where this card is" comment (JUL-126).
+    status_id: str | None = None
+    marks: list[StepMark] = []
+    moved_at: datetime | None = None  # the last time anything happened
+    shown_at: datetime | None = None  # the last time the comment was edited
+    ending: str | None = None  # the comment's closing line, once the run is over
 
 
 class CardLocked(Exception):

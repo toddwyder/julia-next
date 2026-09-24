@@ -17,7 +17,7 @@ from pathlib import Path
 
 from . import workers
 from .checkpoint import CardLocked, CardRun, Checkpoint
-from .graph import Deps, run_card
+from .graph import LIMITS, Deps, run_card
 from .linear import LinearApp
 
 REPO = '/srv/julia-runner/repo'
@@ -40,6 +40,9 @@ def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(prog='julia_graph')
     parser.add_argument('card')
     parser.add_argument('--base', required=True, help='the commit the card starts from')
+    # Shorter limits are for proving a stop on a throwaway card; the launcher caps any value.
+    parser.add_argument('--builder-limit', type=int, default=LIMITS['builder'], help='seconds (default %(default)s)')
+    parser.add_argument('--tests-limit', type=int, default=LIMITS['tests'], help='seconds (default %(default)s)')
     args = parser.parse_args(argv)
     os.umask(0o002)  # the builder account shares the working copy through its group
     number = args.card.split('-')[-1]
@@ -51,6 +54,7 @@ def main(argv: list[str]) -> int:
         prepare=workers.prepare(REPO), builder=workers.builder(log), discard=workers.discard,
         commit=workers.commit, tester=workers.tester, live_workers=workers.live_workers,
         wait_for_exit=workers.waiter(WAIT_LIMIT_SECONDS), graph_version=graph_version(), log=log,
+        worker_names=workers.WORKER_NAMES, limits={'builder': args.builder_limit, 'tests': args.tests_limit},
     )
     log(f'{args.card}: {deps.graph_version}')
     try:
