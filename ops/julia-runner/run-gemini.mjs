@@ -39,7 +39,10 @@ export function allowListProblem(settingsText) {
 // project's rules do not help (measured 24 Sep). The worktree goes in with
 // --add-dir and is named in the brief, or Gemini guesses paths. --print is
 // variadic and must come last, straight before the prompt.
-export const agyArgs = (prompt, worktree) => ['--add-dir', worktree, '--output-format', 'stream-json', '--disable-slash-commands', '--print', `Your working folder is ${worktree}.\n\n${prompt}`];
+// With the empty allow list, headless agy refuses file edits too; the
+// accept-edits mode lets Gemini edit inside the worktree only, while a write
+// outside it and any command stay refused (measured on the server, 24 Sep).
+export const agyArgs = (prompt, worktree) => ['--add-dir', worktree, '--mode', 'accept-edits', '--output-format', 'stream-json', '--disable-slash-commands', '--print', `Your working folder is ${worktree}.\n\n${prompt}`];
 
 function readSettings(home) {
   try { return readFileSync(join(home, '.gemini', 'antigravity-cli', 'settings.json'), 'utf8'); } catch (error) {
