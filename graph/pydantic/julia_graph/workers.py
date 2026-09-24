@@ -183,17 +183,17 @@ def npm_ci(worktree: str) -> str | None:
 
 def prepare(repo: str, install=npm_ci):
     """Only runs while the saved step is 'prepare', so an existing working copy
-    is one a killed run left: it must be this card's branch, grown from this
-    base, and its dependencies are installed again (npm ci starts clean)."""
+    is one a killed run left before any build: it must be this card's branch,
+    exactly at this base, and its dependencies are installed again (npm ci
+    starts clean)."""
     async def prepare_card(run: CardRun) -> str | None:
         wt = Path(run.worktree)
         if wt.exists():
             branch = git(run.worktree, 'rev-parse', '--abbrev-ref', 'HEAD')
             if branch != run.branch:
                 return f'{run.worktree} already holds branch {branch}, not {run.branch}'
-            ancestor = subprocess.run(['git', 'merge-base', '--is-ancestor', run.base, 'HEAD'], cwd=run.worktree)
-            if ancestor.returncode != 0:
-                return f'{run.worktree} does not start from base {run.base[:12]}'
+            if git(run.worktree, 'rev-parse', 'HEAD') != run.base:
+                return f'{run.worktree} does not start from base {run.base[:12]}: it is at another commit'
         else:
             git(repo, 'fetch', '-q', 'origin', 'main')
             git(repo, 'rev-parse', '--verify', f'{run.base}^{{commit}}')

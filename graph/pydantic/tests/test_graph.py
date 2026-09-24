@@ -312,6 +312,14 @@ class PrepareTest(unittest.IsolatedAsyncioTestCase):
         refusal = await prepare(self.run_for(self.second))
         self.assertIn('does not start from', refusal)
 
+    async def test_a_leftover_working_copy_ahead_of_the_base_is_refused(self):
+        prepare = workers.prepare(str(self.repo), install=self.install)
+        self.assertIsNone(await prepare(self.run_for(self.first)))
+        (self.worktree / 'other.txt').write_text('another card')
+        sh(self.worktree, 'git', *workers.GIT_ID, 'add', '-A')
+        sh(self.worktree, 'git', *workers.GIT_ID, 'commit', '-q', '-m', 'other card')
+        self.assertIn('does not start from', await prepare(self.run_for(self.first)))
+
     async def test_an_interrupted_install_is_run_again(self):
         prepare = workers.prepare(str(self.repo), install=self.install)
         await prepare(self.run_for(self.second))
