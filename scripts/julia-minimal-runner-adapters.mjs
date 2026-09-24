@@ -97,7 +97,7 @@ export function deepseekAdapter() {
     'D=$(sudo -u runner mktemp -d /home/runner/julia-runner-review-XXXXXX)',
     'trap \'sudo rm -rf "${D:?}"\' EXIT',
     `sudo cp ${SERVER_CHECKOUT}/ops/service-dropbox/run-pi-seat.mjs ${SERVER_CHECKOUT}/ops/service-dropbox/read-secret.mjs "$D"/`,
-    'sudo chown runner: "$D"/*',
+    'sudo chown -R runner: "$D"',
     'cd /tmp',
     'sudo -u runner timeout 1800 node "$D/run-pi-seat.mjs" reviewer-backup --effort high',
   ].join('\n');
