@@ -188,10 +188,9 @@ export async function runIssue(issueId, { base, repoRoot, worktreeRoot, adapters
     return null;
   };
 
-  // Both review axes for one candidate, or the result already on the card.
+  // Both review axes for one candidate. Each axis's report goes on the card as
+  // soon as it returns, so a restart reuses it and never runs that axis again.
   const review = async (sha) => {
-    const earlier = recorded('review', sha);
-    if (earlier) return { clean: earlier.includes('spec=CLEAN standards=CLEAN'), text: earlier };
     const material = {
       card,
       skill: pinnedText(repoRoot, base, ['.agents/skills/code-review/SKILL.md']),
@@ -208,6 +207,13 @@ export async function runIssue(issueId, { base, repoRoot, worktreeRoot, adapters
     // the skill asks for parallel sub-agents, but a laptop run of two at once
     // was stopped for low memory (24 Sep). The axes stay separate.
     for (const axis of ['spec', 'standards']) {
+      const done = markerLine('review-axis', { sha, axis });
+      const earlier = posted.find((body) => body.includes(done));
+      if (earlier) {
+        verdicts[axis] = /verdict=(CLEAN|FINDINGS)/.exec(earlier.slice(earlier.indexOf(done)))[1];
+        reports.push(earlier.slice(0, earlier.indexOf(done)).trim());
+        continue;
+      }
       const drift = candidateDrift(sha);
       if (drift) return { failure: drift };
       await sayOnce(`DeepSeek's ${AXIS_NAMES[axis]} review of \`${sha.slice(0, 12)}\` started.`, markerLine('review-started', { sha, axis }));
@@ -216,11 +222,12 @@ export async function runIssue(issueId, { base, repoRoot, worktreeRoot, adapters
       if (!reply.ok) return { failure: `DeepSeek's ${AXIS_NAMES[axis]} review failed: ${reply.reason}` };
       verdicts[axis] = verdictOf(reply.text);
       if (!verdicts[axis]) return { failure: `DeepSeek's ${AXIS_NAMES[axis]} review gave no VERDICT line` };
-      reports.push(`### ${AXIS_NAMES[axis]}\n\n${reply.text.trim()}`);
+      const report = `### ${AXIS_NAMES[axis]} review of \`${sha.slice(0, 12)}\`: ${verdicts[axis]}\n\n${reply.text.trim()}`;
+      await sayOnce(report, markerLine('review-axis', { sha, axis, verdict: verdicts[axis] }));
+      reports.push(report);
     }
-    const text = `DeepSeek review of \`${sha.slice(0, 12)}\`: Spec ${verdicts.spec}, Standards ${verdicts.standards}.\n\n${reports.join('\n\n')}`;
-    await sayOnce(text, markerLine('review', { sha, ...verdicts }));
-    return { clean: verdicts.spec === 'CLEAN' && verdicts.standards === 'CLEAN', text };
+    await sayOnce(`DeepSeek review of \`${sha.slice(0, 12)}\`: Spec ${verdicts.spec}, Standards ${verdicts.standards} (each report is in its own comment above).`, markerLine('review', { sha, ...verdicts }));
+    return { clean: verdicts.spec === 'CLEAN' && verdicts.standards === 'CLEAN', text: reports.join('\n\n') };
   };
 
   // Git is the record of Gemini's work: each runner commit past the base is a

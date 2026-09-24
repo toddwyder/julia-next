@@ -128,6 +128,11 @@ function crashOnce(adapters, where) {
     const comment = linear.comment;
     linear.comment = async (id, body) => { if (body.includes('runner: implement')) trip(); return comment(id, body); };
   }
+  if (where === 'between-reviews') {
+    // The Spec review is done; the Standards review is about to start.
+    const comment = linear.comment;
+    linear.comment = async (id, body) => { if (body.includes('runner: review-started') && body.includes('axis=standards')) trip(); return comment(id, body); };
+  }
   if (where === 'after-review') {
     // After the review is on the card, before the runner says it is publishing.
     const comment = linear.comment;
@@ -139,7 +144,7 @@ function crashOnce(adapters, where) {
   }
 }
 
-for (const where of ['after-commit', 'after-review', 'after-pr']) {
+for (const where of ['after-commit', 'between-reviews', 'after-review', 'after-pr']) {
   test(`resume after a crash ${where} repeats no Gemini turn, review or PR`, async () => {
     const fx = makeRepo();
     const { adapters, calls } = fakes();

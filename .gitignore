@@ -7,7 +7,3 @@ node_modules/
 # card's working copy. Ignored so the working copy still removes cleanly (Orca
 # refuses to remove one holding an untracked file, measured 23 Sep).
 .julia/
-
-# julia-minimal-runner: the local git worktrees it drives -- laptop-local,
-# never shared, never published. The runner keeps no state file.
-.julia-runner-state/

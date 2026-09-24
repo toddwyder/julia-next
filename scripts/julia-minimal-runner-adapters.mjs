@@ -20,15 +20,15 @@ import { parseAgyJsonResult } from '../ops/service-dropbox/run-agy-seat.mjs';
 import { parsePiJsonStream } from '../ops/service-dropbox/run-pi-seat.mjs';
 import { linearGraphQL, postComment } from './linear-cli.mjs';
 
-export const WORKER_ACCOUNTS = { gemini: 'gemini-worker', tests: 'julia-tester', review: 'runner' };
-const WORKER_COMMANDS = {
-  gemini: ['/usr/bin/node', '/opt/julia-runner/ops/julia-runner/run-gemini.mjs'],
-  tests: ['/usr/bin/node', '/opt/julia-runner/ops/julia-runner/run-tests.mjs'],
-  review: ['/usr/bin/node', '/opt/julia-runner/ops/service-dropbox/run-pi-seat.mjs', 'reviewer-backup', '--effort', 'high'],
+// Each worker's account and the one command line it runs there.
+export const WORKERS = {
+  gemini: { account: 'gemini-worker', command: ['/usr/bin/node', '/opt/julia-runner/ops/julia-runner/run-gemini.mjs'] },
+  tests: { account: 'julia-tester', command: ['/usr/bin/node', '/opt/julia-runner/ops/julia-runner/run-tests.mjs'] },
+  review: { account: 'runner', command: ['/usr/bin/node', '/opt/julia-runner/ops/service-dropbox/run-pi-seat.mjs', 'reviewer-backup', '--effort', 'high'] },
 };
 // Exactly the command lines the sudoers rules allow; -n fails at once rather
 // than waiting for a password nobody will type.
-export const sudoCommand = (worker) => ['-n', '-u', WORKER_ACCOUNTS[worker], '--', ...WORKER_COMMANDS[worker]];
+export const sudoCommand = (worker) => ['-n', '-u', WORKERS[worker].account, '--', ...WORKERS[worker].command];
 const WORKER_ENV = { PATH: '/usr/bin:/bin', LANG: 'C.UTF-8' };
 
 // Runs a command to its end, handing each line of its output to onLine as the

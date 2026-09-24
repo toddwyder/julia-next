@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 import { agyArgs, allowListProblem, shareWithGroup, worktreeProblem } from '../ops/julia-runner/run-gemini.mjs';
 import { answer } from '../ops/julia-runner/run-tests.mjs';
-import { sudoCommand, WORKER_ACCOUNTS } from './julia-minimal-runner-adapters.mjs';
+import { sudoCommand, WORKERS } from './julia-minimal-runner-adapters.mjs';
 
 // The server side of julia-minimal-runner (JUL-122): the worker wrappers and
 // the sudo rules that start them. The rules are the security boundary between
@@ -18,7 +18,7 @@ const rules = SUDOERS.split('\n').filter((line) => line.trim() && !line.trim().s
 
 test('the sudo rules are exactly the three worker commands the runner uses, and nothing wider', () => {
   assert.equal(rules.length, 3);
-  const expected = Object.keys(WORKER_ACCOUNTS).map((worker) => {
+  const expected = Object.keys(WORKERS).map((worker) => {
     const [, , account, , ...command] = sudoCommand(worker);
     return `orchestrator-svc ALL=(${account}) NOPASSWD: ${command.join(' ')}`;
   });

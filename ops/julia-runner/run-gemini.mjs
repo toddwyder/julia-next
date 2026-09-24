@@ -60,16 +60,20 @@ export function shareWithGroup(dir, { uid = process.getuid() } = {}) {
   }
 }
 
-function readSettings(home) {
-  try { return readFileSync(join(home, '.gemini', 'antigravity-cli', 'settings.json'), 'utf8'); } catch (error) {
-    return error.code === 'ENOENT' ? null : '{ unreadable';
+// No settings file means an empty allow list; one that exists but cannot be
+// read is refused, never taken as empty.
+function settingsProblem(home) {
+  let text;
+  try { text = readFileSync(join(home, '.gemini', 'antigravity-cli', 'settings.json'), 'utf8'); } catch (error) {
+    return error.code === 'ENOENT' ? null : `refused: the agy settings file could not be read (${error.code})`;
   }
+  return allowListProblem(text);
 }
 
 function main() {
   const { worktree, prompt } = JSON.parse(readFileSync(0, 'utf8'));
   const home = homedir();
-  const problem = worktreeProblem(worktree) ?? allowListProblem(readSettings(home));
+  const problem = worktreeProblem(worktree) ?? settingsProblem(home);
   if (problem || typeof prompt !== 'string') {
     console.error(problem ?? 'refused: no prompt');
     process.exit(2);

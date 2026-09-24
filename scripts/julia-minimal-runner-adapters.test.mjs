@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import {
-  agyOutcome, agyStepLine, deepseekAdapter, geminiAdapter, lastAssistantText, readAppCredential, sudoCommand, testerAdapter, WORKER_ACCOUNTS,
+  agyOutcome, agyStepLine, deepseekAdapter, geminiAdapter, lastAssistantText, readAppCredential, sudoCommand, testerAdapter, WORKERS,
 } from './julia-minimal-runner-adapters.mjs';
 
 // The server split (JUL-122, Todd 24 Sep): the runner (orchestrator-svc) holds
@@ -24,7 +24,7 @@ function recordingRun(reply = { status: 0, stdout: '', stderr: '' }) {
 const ONLY_SAFE_ENV = (env) => assert.deepEqual(Object.keys(env).sort(), ['LANG', 'PATH'], 'the worker gets PATH and LANG only, never the runner\'s environment');
 
 test('each worker runs as its own account through one fixed sudo command', () => {
-  assert.deepEqual(WORKER_ACCOUNTS, { gemini: 'gemini-worker', tests: 'julia-tester', review: 'runner' });
+  assert.deepEqual(Object.fromEntries(Object.entries(WORKERS).map(([worker, { account }]) => [worker, account])), { gemini: 'gemini-worker', tests: 'julia-tester', review: 'runner' });
   assert.deepEqual(sudoCommand('gemini'), ['-n', '-u', 'gemini-worker', '--', '/usr/bin/node', '/opt/julia-runner/ops/julia-runner/run-gemini.mjs']);
   assert.deepEqual(sudoCommand('tests'), ['-n', '-u', 'julia-tester', '--', '/usr/bin/node', '/opt/julia-runner/ops/julia-runner/run-tests.mjs']);
   assert.deepEqual(sudoCommand('review'), ['-n', '-u', 'runner', '--', '/usr/bin/node', '/opt/julia-runner/ops/service-dropbox/run-pi-seat.mjs', 'reviewer-backup', '--effort', 'high']);
