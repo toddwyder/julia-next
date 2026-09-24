@@ -73,9 +73,12 @@ async def run_worker(kind: str, request: dict | str, on_line=None) -> tuple[int 
         stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
         limit=64 * 1024 * 1024,
     )
-    proc.stdin.write((request if isinstance(request, str) else json.dumps(request)).encode())
-    await proc.stdin.drain()
-    proc.stdin.close()
+    try:
+        proc.stdin.write((request if isinstance(request, str) else json.dumps(request)).encode())
+        await proc.stdin.drain()
+        proc.stdin.close()
+    except (BrokenPipeError, ConnectionResetError):
+        pass  # the worker ended before reading; its exit status and stderr say why
     out: list[str] = []
 
     async def read_out():
@@ -173,20 +176,29 @@ async def tester(run: CardRun) -> TestResult:
 
 # ------------------------------------------------------------ git
 
-def prepare(repo: str):
+def npm_ci(worktree: str) -> str | None:
+    done = subprocess.run(['npm', 'ci', '--no-audit', '--no-fund'], cwd=worktree, capture_output=True, text=True)
+    return None if done.returncode == 0 else f'npm ci failed (exit {done.returncode}): {done.stderr.strip()[-300:]}'
+
+
+def prepare(repo: str, install=npm_ci):
+    """Only runs while the saved step is 'prepare', so an existing working copy
+    is one a killed run left: it must be this card's branch, grown from this
+    base, and its dependencies are installed again (npm ci starts clean)."""
     async def prepare_card(run: CardRun) -> str | None:
         wt = Path(run.worktree)
         if wt.exists():
             branch = git(run.worktree, 'rev-parse', '--abbrev-ref', 'HEAD')
-            return None if branch == run.branch else f'{run.worktree} already holds branch {branch}, not {run.branch}'
-        git(repo, 'fetch', '-q', 'origin', 'main')
-        git(repo, 'rev-parse', '--verify', f'{run.base}^{{commit}}')
-        git(repo, 'worktree', 'add', '-q', '-b', run.branch, run.worktree, run.base)
-        if (wt / 'package-lock.json').exists():
-            done = subprocess.run(['npm', 'ci', '--no-audit', '--no-fund'], cwd=run.worktree, capture_output=True, text=True)
-            if done.returncode != 0:
-                return f'npm ci failed (exit {done.returncode}): {done.stderr.strip()[-300:]}'
-        return None
+            if branch != run.branch:
+                return f'{run.worktree} already holds branch {branch}, not {run.branch}'
+            ancestor = subprocess.run(['git', 'merge-base', '--is-ancestor', run.base, 'HEAD'], cwd=run.worktree)
+            if ancestor.returncode != 0:
+                return f'{run.worktree} does not start from base {run.base[:12]}'
+        else:
+            git(repo, 'fetch', '-q', 'origin', 'main')
+            git(repo, 'rev-parse', '--verify', f'{run.base}^{{commit}}')
+            git(repo, 'worktree', 'add', '-q', '-b', run.branch, run.worktree, run.base)
+        return install(run.worktree) if (wt / 'package-lock.json').exists() else None
     return prepare_card
 
 

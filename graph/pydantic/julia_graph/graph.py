@@ -176,7 +176,11 @@ class Build(BaseNode[CardRun, Deps, str]):
         s.build_started = True
         save(ctx)  # saved before the builder starts, so a crash is seen on restart
         await say_once(ctx, f'Builder attempt {s.attempt} started.', marker('build-started', s, attempt=s.attempt))
-        result = await ctx.deps.builder(s, builder_brief(card, s))
+        try:
+            result = await ctx.deps.builder(s, builder_brief(card, s))
+        except Exception as error:  # a worker that cannot even start is a failed worker
+            s.build_started = False
+            return fail(ctx, f'the builder could not run: {type(error).__name__}: {error}')
         s.build_started = False
         if not result.ok:
             return fail(ctx, f'the builder failed: {result.reason}')
@@ -193,7 +197,10 @@ class Build(BaseNode[CardRun, Deps, str]):
 @dataclass
 class Test(BaseNode[CardRun, Deps, str]):
     async def run(self, ctx: GraphRunContext[CardRun, Deps]) -> Report:
-        ctx.state.tests = await ctx.deps.tester(ctx.state)
+        try:
+            ctx.state.tests = await ctx.deps.tester(ctx.state)
+        except Exception as error:  # reported once, not retried on every restart
+            ctx.state.tests = TestResult(passed=False, summary=f'the test worker could not run: {type(error).__name__}: {error}')
         ctx.state.step = 'report'
         save(ctx)
         return Report()

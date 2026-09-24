@@ -19,7 +19,7 @@ Checked against the installed `pydantic-graph==2.49.0` (the pin is in `requireme
 | Typed state, nodes, routing from each node's return type | pydantic-graph (`GraphBuilder`, `BaseNode`, `End`) |
 | Saved progress across a restart | this code (`checkpoint.py`). 2.49.0 has no persistence module; the 1.x `FileStatePersistence` is gone. One JSON file per card, replaced atomically after every step. |
 | One graph per card | this code: a lock file held for the whole run |
-| No second worker after a restart | this code: before any builder or test run starts, the graph looks for a live one in the process table and waits for it to end; if it will not end, the card says so and nothing starts |
+| No second worker after a restart | this code: before any builder or test run starts, the graph looks for a live one in the process table and waits for it to end; if it will not end, the card says so and nothing starts. The check is machine-wide on purpose: one builder at a time across all cards (JUL-116 story 3) |
 | Unfinished work never counted as done | this code: `build_started` is saved before the builder starts; a restart that finds it set reports the attempt as interrupted, puts the working copy back to the base commit and builds again (at most two attempts) |
 | One result comment | this code: comments carry a `graph: <step> card=...` marker line, and the card is checked for it before posting |
 

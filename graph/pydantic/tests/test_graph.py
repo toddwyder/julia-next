@@ -131,6 +131,24 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(outcome, 'failed')
         self.assertIn('no changes to commit', self.results()[0])
 
+    async def test_a_builder_that_cannot_start_is_reported(self):
+        async def no_sudo(run, brief):
+            raise BrokenPipeError('the worker exited before reading its brief')
+        outcome = await run_card(self.state(), self.deps(builder=no_sudo))
+        self.assertEqual(outcome, 'failed')
+        self.assertIn('the builder could not run: BrokenPipeError', self.results()[0])
+        self.assertEqual(self.tester_calls, 0)
+
+    async def test_a_test_worker_that_cannot_start_is_reported_not_retried_forever(self):
+        async def no_sudo(run):
+            raise BrokenPipeError('the worker exited before reading its request')
+        outcome = await run_card(self.state(), self.deps(tester=no_sudo))
+        self.assertEqual(outcome, 'failed')
+        [result] = self.results()
+        self.assertIn('FAILED', result)
+        self.assertIn('the test worker could not run: BrokenPipeError', result)
+        self.assertEqual(self.saved().step, 'done')
+
     async def test_failing_tests_are_reported_with_their_names(self):
         async def red(run):
             return TestResult(passed=False, summary='tests 3, pass 2, fail 1', failing=['greets politely'])
@@ -255,6 +273,50 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         finally:
             held.unlock()
         self.assertEqual(self.builder_calls, 0)
+
+
+class PrepareTest(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        root = Path(self.tmp.name)
+        self.origin = root / 'origin'
+        self.origin.mkdir()
+        sh(self.origin, 'git', 'init', '-q', '-b', 'main')
+        (self.origin / 'package-lock.json').write_text('{}\n')
+        sh(self.origin, 'git', *workers.GIT_ID, 'add', '-A')
+        sh(self.origin, 'git', *workers.GIT_ID, 'commit', '-q', '-m', 'one')
+        self.first = sh(self.origin, 'git', 'rev-parse', 'HEAD')
+        sh(self.origin, 'git', *workers.GIT_ID, 'commit', '-q', '--allow-empty', '-m', 'two')
+        self.second = sh(self.origin, 'git', 'rev-parse', 'HEAD')
+        self.repo = root / 'repo'
+        sh(root, 'git', 'clone', '-q', str(self.origin), str(self.repo))
+        self.worktree = root / 'worktrees' / 'card-1'
+        self.installs = []
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def run_for(self, base):
+        return CardRun(card='JUL-1', base=base, branch='graph/card-1', worktree=str(self.worktree))
+
+    def install(self, worktree):
+        self.installs.append(worktree)
+        return None
+
+    async def test_a_leftover_working_copy_from_another_base_is_refused(self):
+        prepare = workers.prepare(str(self.repo), install=self.install)
+        self.assertIsNone(await prepare(self.run_for(self.second)))
+        sh(self.worktree, 'git', 'checkout', '-q', '--detach')
+        sh(self.worktree, 'git', 'reset', '-q', '--hard', self.first)
+        sh(self.worktree, 'git', 'checkout', '-q', '-B', 'graph/card-1')
+        refusal = await prepare(self.run_for(self.second))
+        self.assertIn('does not start from', refusal)
+
+    async def test_an_interrupted_install_is_run_again(self):
+        prepare = workers.prepare(str(self.repo), install=self.install)
+        await prepare(self.run_for(self.second))
+        await prepare(self.run_for(self.second))  # a restart while still preparing
+        self.assertEqual(len(self.installs), 2)
 
 
 class WorkerParsingTest(unittest.TestCase):
