@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { answerWithin } from '../ops/julia-runner/run-tests.mjs';
+import { answerWithin, MAX_OUTPUT } from '../ops/julia-runner/run-tests.mjs';
 import { LIMITS, limitSeconds, runLimited, STOPPED_EXIT, stoppedLine } from '../ops/julia-runner/time-limit.mjs';
 
 // The time limit each worker's launcher enforces (JUL-126): a worker that runs
@@ -98,4 +98,21 @@ test('a test run that is stopped answers as stopped, and one that finishes answe
   assert.ok(calls[0].args.includes('--test'), 'it ran the suite command');
   const refused = await answerWithin({ ...request, worktree: '/etc' }, { run: fakeRun({}), problem: () => 'refused: not a card worktree' });
   assert.equal(refused.status, 2);
+});
+
+test('the test worker says when the tests print, and keeps at most the newest 16 MiB of output', async () => {
+  const request = { worktree: '/srv/julia-runner/worktrees/card-7', run: 'suite' };
+  let printed = 0;
+  const chunk = 'x'.repeat(1024 * 1024);
+  const run = async (command, args, options, limits) => {
+    const listeners = [];
+    limits.started({ stdout: { on: (e, f) => listeners.push(f) }, stderr: { on: () => {} } });
+    for (let i = 0; i < 17; i += 1) listeners[0](chunk);
+    listeners[0]('the end');
+    return { code: 0, signal: null, stopped: false };
+  };
+  const reply = await answerWithin(request, { run, problem: () => null, onOutput: () => { printed += 1; } });
+  assert.equal(printed, 18);
+  assert.equal(reply.output.length, MAX_OUTPUT);
+  assert.ok(reply.output.endsWith('the end'), 'the newest output is kept');
 });

@@ -38,8 +38,8 @@ def mark_line(mark: StepMark) -> str:
     if mark.outcome is None:
         return f'- … {mark.doing}, since {clock(mark.started)}'
     if mark.outcome == 'done':
-        return f'- ✓ {mark.done} ({clock(mark.ended or mark.started)})'
-    return f'- ✗ {mark.doing}: {mark.outcome} ({clock(mark.ended or mark.started)})'
+        return f'- ✓ {mark.done}, {clock(mark.ended or mark.started)}'
+    return f'- ✗ {mark.doing}: {mark.outcome}, {clock(mark.ended or mark.started)}'
 
 
 def render(run: CardRun) -> str:

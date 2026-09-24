@@ -30,7 +30,18 @@ MAX_BUILD_ATTEMPTS = 2
 # Each worker's time limit in seconds. The worker's own launcher enforces it
 # (ops/julia-runner/time-limit.mjs), so a worker is stopped even if the graph dies.
 LIMITS = {'builder': 60 * 60, 'tests': 15 * 60}
+# The most each launcher accepts (time-limit.mjs LIMITS.max): a longer limit
+# would be quoted on the card but never enforced, so it is refused.
+LIMIT_CAPS = {'builder': 3 * 60 * 60, 'tests': 60 * 60}
 WHAT = {'builder': 'The builder', 'tests': 'The test run'}
+
+
+def checked_limit(kind: str, text: str) -> int:
+    """A time limit from the command line: whole seconds, above 0, within the launcher's cap."""
+    seconds = int(text)
+    if not 0 < seconds <= LIMIT_CAPS[kind]:
+        raise ValueError(f'the {kind} limit must be 1 to {LIMIT_CAPS[kind]} seconds, not {seconds}')
+    return seconds
 
 
 class Linear(Protocol):
@@ -65,7 +76,8 @@ class Deps:
     # git, never from the builder's report.
     discard: Callable[[CardRun], Awaitable[int]]
     commit: Callable[[CardRun], Awaitable[tuple[str | None, str | None]]]
-    tester: Callable[[CardRun, int], Awaitable[TestResult]]  # tester(run, limit_seconds)
+    # tester(run, limit_seconds, progress), progress as for the builder
+    tester: Callable[[CardRun, int, Callable[[], Awaitable[None]]], Awaitable[TestResult]]
     # The processes of a worker kind ('builder' or 'tests') still alive on the
     # machine, and a wait for them to end, so a restart never adds a second one.
     live_workers: Callable[[str], list[int]]
@@ -156,21 +168,41 @@ async def moved(ctx: GraphRunContext[CardRun, Deps]) -> None:
         await show(ctx)
 
 
-async def stopped_reason(ctx: GraphRunContext[CardRun, Deps], kind: str) -> str:
-    """Say which step ran too long and for how long, and whether it is gone:
-    the builder is free again only once no process of the worker remains."""
-    mark = open_mark(ctx.state)
-    ran = (ctx.deps.now() - mark.started).total_seconds() if mark else 0
-    close(ctx, f'stopped after {duration(ran)}')
+async def stopped(ctx: GraphRunContext[CardRun, Deps], kind: str) -> Report:
+    """A worker was stopped for running too long. The stop is saved before the
+    graph waits to see the worker gone, so a crash in that wait resumes as the
+    same confirmation (Resume) and never starts the worker again."""
+    s = ctx.state
+    mark = open_mark(s)
+    s.stop_kind = kind
+    s.stop_ran = (ctx.deps.now() - mark.started).total_seconds() if mark else 0
+    s.ending = f'Stopped: {WHAT[kind].lower()} ran too long. The result comment says what happened.'
+    s.step = 'report'
+    close(ctx, f'stopped after {duration(s.stop_ran)}')  # saves
+    await confirm_stop(ctx)
+    return Report()
+
+
+async def confirm_stop(ctx: GraphRunContext[CardRun, Deps]) -> None:
+    """Say which step ran too long, for how long, and whether it is gone. The
+    builder is free again only once no process of the worker remains."""
+    s = ctx.state
+    kind = s.stop_kind
     reason = (f'{WHAT[kind]} ran longer than its {duration(ctx.deps.limits[kind])} time limit '
-              f'and was stopped after {duration(ran)}.')
+              f'and was stopped after {duration(s.stop_ran)}.')
     still = ctx.deps.live_workers(kind)
     if still:
         still = await ctx.deps.wait_for_exit(kind)
     if still:
-        return reason + (f' The graph could not confirm it ended: it is still running '
-                         f'(process {", ".join(map(str, still))}), so the builder is not free.')
-    return reason + ' It is no longer running, so the builder is free for the next card.'
+        after = 'so the builder is not free' if kind == 'builder' else 'so no new test run starts until it ends'
+        s.failure = reason + (f' The graph could not confirm it ended: it is still running '
+                              f'(process {", ".join(map(str, still))}), {after}.')
+    elif kind == 'builder':
+        s.failure = reason + ' It is no longer running, so the builder is free for the next card.'
+    else:
+        s.failure = reason + ' It is no longer running.'
+    s.stop_kind = None
+    save(ctx)
 
 
 async def no_second_worker(ctx: GraphRunContext[CardRun, Deps], kind: str) -> str | None:
@@ -178,9 +210,13 @@ async def no_second_worker(ctx: GraphRunContext[CardRun, Deps], kind: str) -> st
     if not ctx.deps.live_workers(kind):
         return None
     ctx.deps.log(f'an earlier {kind} is still running; waiting for it to end')
+    name = 'builder' if kind == 'builder' else 'test run'
+    await step(ctx, f'Waiting for an earlier {name} to end', f'Waited for an earlier {name} to end')
     still = await ctx.deps.wait_for_exit(kind)
     if still:
+        close(ctx, 'it did not end')
         return f'an earlier {kind} is still running (process {", ".join(map(str, still))}), so the graph did not start a second one'
+    close(ctx, 'done')
     return None
 
 
@@ -200,6 +236,9 @@ class Resume(BaseNode[CardRun, Deps, str]):
         if open_mark(s):
             # A step the card showed as running never finished: the graph died in it.
             close(ctx, 'interrupted')
+        if s.stop_kind:
+            await confirm_stop(ctx)  # the graph died while seeing a stopped worker gone
+            return Report()
         if s.step == 'prepare':
             return Prepare()
         if s.step == 'build':
@@ -238,7 +277,7 @@ class Prepare(BaseNode[CardRun, Deps, str]):
             marker('started', ctx.state),
         )
         ctx.state.step = 'build'
-        save(ctx)
+        close(ctx, 'done')  # saves; the card never shows a finished step as still running
         return Build()
 
 
@@ -284,8 +323,7 @@ class Build(BaseNode[CardRun, Deps, str]):
             return fail(ctx, f'the builder could not run: {type(error).__name__}: {error}')
         s.build_started = False
         if result.stopped:
-            s.ending = 'Stopped: the builder ran too long. The result comment says what happened.'
-            return fail(ctx, await stopped_reason(ctx, 'builder'))
+            return await stopped(ctx, 'builder')
         if not result.ok:
             close(ctx, 'failed')
             return fail(ctx, f'the builder failed: {result.reason}')
@@ -305,14 +343,12 @@ class Test(BaseNode[CardRun, Deps, str]):
     async def run(self, ctx: GraphRunContext[CardRun, Deps]) -> Report:
         await step(ctx, 'Running the tests', 'Ran the tests', 'tests')
         try:
-            ctx.state.tests = await ctx.deps.tester(ctx.state, ctx.deps.limits['tests'])
+            ctx.state.tests = await ctx.deps.tester(ctx.state, ctx.deps.limits['tests'], lambda: moved(ctx))
         except Exception as error:  # reported once, not retried on every restart
             ctx.state.tests = TestResult(passed=False, summary=f'the test worker could not run: {type(error).__name__}: {error}')
         if ctx.state.tests.stopped:
-            ctx.state.ending = 'Stopped: the test run ran too long. The result comment says what happened.'
-            ctx.state.failure = await stopped_reason(ctx, 'tests')
-        else:
-            close(ctx, 'done' if ctx.state.tests.passed else 'failed')
+            return await stopped(ctx, 'tests')
+        close(ctx, 'done' if ctx.state.tests.passed else 'failed')
         ctx.state.step = 'report'
         save(ctx)
         return Report()

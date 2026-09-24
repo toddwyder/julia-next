@@ -9,6 +9,8 @@
 // beyond the worktree group and no service keys, so a test Gemini wrote runs
 // with nothing to steal. A run past its time limit (JUL-126) is stopped with
 // everything it started; the worker then exits 124 and says so on stderr.
+// While the tests print, it also prints {"progress":true} lines, at most one a
+// second, so the graph can show the card moving.
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
@@ -38,8 +40,12 @@ export async function answer(request, { tester = localTester, problem = worktree
   }
 }
 
+// The most test output kept for the answer; beyond it, the oldest is dropped.
+export const MAX_OUTPUT = 16 * 1024 * 1024;
+
 // What the server's worker does: the same test run, under its time limit.
-export async function answerWithin(request, { run = runLimited, problem = worktreeProblem } = {}) {
+// onOutput is called whenever the tests print, so the graph sees them moving.
+export async function answerWithin(request, { run = runLimited, problem = worktreeProblem, onOutput = () => {} } = {}) {
   const refused = problem(request?.worktree);
   if (refused) return { status: 2, output: refused };
   let command;
@@ -50,7 +56,11 @@ export async function answerWithin(request, { run = runLimited, problem = worktr
   }
   const seconds = limitSeconds(request.limit_seconds, LIMITS.tests);
   let output = '';
-  const collect = (chunk) => { output += chunk; };
+  const collect = (chunk) => {
+    output += chunk;
+    if (output.length > MAX_OUTPUT) output = output.slice(-MAX_OUTPUT);
+    onOutput();
+  };
   const options = { cwd: request.worktree, env: testEnv(request.worktree), stdio: ['ignore', 'pipe', 'pipe'] };
   const result = await run(command.command, command.args, options, {
     seconds, started: (child) => { child.stdout.on('data', collect); child.stderr.on('data', collect); },
@@ -61,7 +71,14 @@ export async function answerWithin(request, { run = runLimited, problem = worktr
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  answerWithin(JSON.parse(readFileSync(0, 'utf8'))).then((reply) => {
+  // A progress line at most once a second while the tests print; the answer is the last line.
+  let last = 0;
+  const onOutput = () => {
+    if (Date.now() - last < 1000) return;
+    last = Date.now();
+    process.stdout.write('{"progress":true}\n');
+  };
+  answerWithin(JSON.parse(readFileSync(0, 'utf8')), { onOutput }).then((reply) => {
     if (reply.stopped) {
       console.error(reply.output);
       process.exit(STOPPED_EXIT);

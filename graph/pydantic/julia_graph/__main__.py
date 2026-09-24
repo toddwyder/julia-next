@@ -17,7 +17,7 @@ from pathlib import Path
 
 from . import workers
 from .checkpoint import CardLocked, CardRun, Checkpoint
-from .graph import LIMITS, Deps, run_card
+from .graph import LIMIT_CAPS, LIMITS, Deps, checked_limit, run_card
 from .linear import LinearApp
 
 REPO = '/srv/julia-runner/repo'
@@ -40,9 +40,11 @@ def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(prog='julia_graph')
     parser.add_argument('card')
     parser.add_argument('--base', required=True, help='the commit the card starts from')
-    # Shorter limits are for proving a stop on a throwaway card; the launcher caps any value.
-    parser.add_argument('--builder-limit', type=int, default=LIMITS['builder'], help='seconds (default %(default)s)')
-    parser.add_argument('--tests-limit', type=int, default=LIMITS['tests'], help='seconds (default %(default)s)')
+    # Shorter limits are for proving a stop on a throwaway card. A limit the
+    # launcher would not enforce is refused, so the card never quotes one.
+    for kind in ('builder', 'tests'):
+        parser.add_argument(f'--{kind}-limit', type=lambda text, kind=kind: checked_limit(kind, text), default=LIMITS[kind],
+                            help=f'seconds, 1 to {LIMIT_CAPS[kind]} (default %(default)s)')
     args = parser.parse_args(argv)
     os.umask(0o002)  # the builder account shares the working copy through its group
     number = args.card.split('-')[-1]

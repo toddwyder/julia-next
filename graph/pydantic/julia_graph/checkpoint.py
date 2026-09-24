@@ -60,6 +60,11 @@ class CardRun(BaseModel):
     moved_at: datetime | None = None  # the last time anything happened
     shown_at: datetime | None = None  # the last time the comment was edited
     ending: str | None = None  # the comment's closing line, once the run is over
+    # A worker stopped for running too long whose end the graph has yet to see:
+    # its kind and how long it ran. Saved first, so a crash while confirming the
+    # stop is resumed as that confirmation, never as a new worker.
+    stop_kind: str | None = None
+    stop_ran: float = 0
 
 
 class CardLocked(Exception):

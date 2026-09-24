@@ -61,6 +61,16 @@ test('a test worker that fails to answer is a failed run, never a pass', async (
   assert.match(result.output, /test worker did not answer.*password is required/s);
 });
 
+test('a worker stopped by its time limit (exit 124) is reported as stopped, never as a pass (JUL-126)', async () => {
+  const stoppedTests = recordingRun({ status: 124, stdout: '', stderr: 'stopped: ran longer than its 900-second time limit' });
+  const tests = await testerAdapter({ run: stoppedTests.run })({ worktree: '/srv/julia-runner/worktrees/card-9', run: 'suite' });
+  assert.notEqual(tests.status, 0);
+  assert.equal(tests.output, 'the test run was stopped: stopped: ran longer than its 900-second time limit');
+  const stoppedGemini = recordingRun({ status: 124, stdout: JSON.stringify({ event: 'result', result: { status: 'SUCCESS', response: 'Done.' } }), stderr: 'stopped: ran longer than its 3600-second time limit' });
+  const turn = await geminiAdapter({ run: stoppedGemini.run })('the brief', { cwd: '/srv/julia-runner/worktrees/card-9' });
+  assert.deepEqual(turn, { ok: false, reason: 'the Gemini worker was stopped: stopped: ran longer than its 3600-second time limit' });
+});
+
 test('DeepSeek gets the review on stdin as runner, from /, with nothing of the runner\'s environment', async () => {
   const assistant = { type: 'message_end', message: { role: 'assistant', stopReason: 'stop', content: [{ type: 'text', text: 'Fine.\nVERDICT: CLEAN' }] } };
   const { run, calls } = recordingRun({ status: 0, stdout: JSON.stringify(assistant) });

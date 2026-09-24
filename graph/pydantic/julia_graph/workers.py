@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import pwd
 import re
 import subprocess
 import time
@@ -45,17 +46,35 @@ def git(cwd: str, *args: str) -> str:
 
 # ------------------------------------------------------------ live workers
 
-def live_workers(kind: str, proc: Path = Path('/proc')) -> list[int]:
-    """Processes on this machine running this kind of worker's script."""
+def account_uid(kind: str) -> int | None:
+    try:
+        return pwd.getpwnam(WORKER_COMMANDS[kind][0]).pw_uid
+    except KeyError:  # no such account on this machine (the tests' laptop)
+        return None
+
+
+def real_uid(entry: Path) -> int | None:
+    for line in (entry / 'status').read_text().splitlines():
+        if line.startswith('Uid:'):
+            return int(line.split()[1])
+    return None
+
+
+def live_workers(kind: str, proc: Path = Path('/proc'), uid: int | None | str = 'account') -> list[int]:
+    """Processes on this machine running this kind of worker's launcher, or
+    owned by the worker's account: an agy or `node --test` left behind has no
+    launcher in its command line. uid is the account's, looked up by default."""
     script = WORKER_COMMANDS[kind][1].encode()
+    if uid == 'account':
+        uid = account_uid(kind)
     found = []
     for entry in proc.iterdir():
         if not entry.name.isdigit() or int(entry.name) == os.getpid():
             continue
         try:
-            if script in (entry / 'cmdline').read_bytes().split(b'\0'):
+            if script in (entry / 'cmdline').read_bytes().split(b'\0') or (uid is not None and real_uid(entry) == uid):
                 found.append(int(entry.name))
-        except OSError:
+        except (OSError, ValueError):
             continue
     return sorted(found)
 
@@ -166,24 +185,30 @@ def suite_result(status: int, output: str) -> TestResult:
     return TestResult(passed=passed, summary=f'`node --test scripts/*.test.mjs`: {summary or "no summary"} (exit {status})', failing=failing)
 
 
-async def ask_tester(run: CardRun, what: str, limit_seconds: int) -> tuple[int, str]:
-    status, out, err = await run_worker('tests', {'worktree': run.worktree, 'run': what, 'limit_seconds': limit_seconds})
+async def ask_tester(run: CardRun, what: str, limit_seconds: int, progress) -> tuple[int, str, bool]:
+    """(status, output, stopped). Only the launcher's own exit 124 is a stop; a
+    test command that itself exits 124 comes back inside the JSON answer. The
+    launcher prints a line whenever the tests print, and each line moves the card."""
+    async def on_line(line):
+        await progress()
+    request = {'worktree': run.worktree, 'run': what, 'limit_seconds': limit_seconds}
+    status, out, err = await run_worker('tests', request, on_line if progress else None)
     if status == STOPPED_EXIT:
-        return STOPPED_EXIT, (err.strip().splitlines()[-1:] or ['stopped by its time limit'])[0]
+        return STOPPED_EXIT, (err.strip().splitlines()[-1:] or ['stopped by its time limit'])[0], True
     reply = _json((out.strip().splitlines() or [''])[-1])
     if status == 0 and isinstance(reply, dict) and isinstance(reply.get('status'), int):
-        return reply['status'], str(reply.get('output', ''))
-    return 1, f'the test worker did not answer (exit {status}): {err.strip()[-500:]}'
+        return reply['status'], str(reply.get('output', '')), False
+    return 1, f'the test worker did not answer (exit {status}): {err.strip()[-500:]}', False
 
 
-async def tester(run: CardRun, limit_seconds: int, ask=ask_tester) -> TestResult:
+async def tester(run: CardRun, limit_seconds: int, progress, ask=ask_tester) -> TestResult:
     # The card shows one limit for the step, so the suite gets what the lint left of it.
     started = time.monotonic()
-    lint_status, lint_output = await ask(run, 'lint', limit_seconds)
-    if lint_status == STOPPED_EXIT:
+    lint_status, lint_output, stopped = await ask(run, 'lint', limit_seconds, progress)
+    if stopped:
         return TestResult(passed=False, summary=f'`npm run lint:framework` {lint_output}', stopped=True)
-    status, output = await ask(run, 'suite', max(1, limit_seconds - int(time.monotonic() - started)))
-    if status == STOPPED_EXIT:
+    status, output, stopped = await ask(run, 'suite', max(1, limit_seconds - int(time.monotonic() - started)), progress)
+    if stopped:
         return TestResult(passed=False, summary=f'`node --test scripts/*.test.mjs` {output}', stopped=True)
     result = suite_result(status, output)
     if lint_status != 0:
