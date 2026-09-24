@@ -100,3 +100,9 @@ test('the Gemini adapter refuses to start Gemini under a broad allow list, namin
   assert.match(turn.reason, /command\(npx\)/);
   assert.match(turn.reason, /JUL-122/);
 });
+
+test('a denied turn is explained by the last line of agy\'s stderr only', () => {
+  const denied = JSON.stringify({ status: 'SUCCESS', response: '', denied_actions: [{ action: 'command', display_name: 'RunCommand' }] });
+  const { reason } = agyOutcome(denied, 'startup noise\nmore noise\njetski: a tool required the "command" permission\n');
+  assert.equal(reason, 'agy denied command (RunCommand): jetski: a tool required the "command" permission');
+});

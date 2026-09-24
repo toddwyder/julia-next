@@ -219,7 +219,7 @@ export async function runIssue(issueId, { base, repoRoot, worktreeRoot, adapters
   // The candidate under check, review and PR must be exactly the commit the
   // runner made: HEAD unchanged and nothing uncommitted. Results are keyed by
   // that commit, so a different commit never inherits them.
-  const changed = (sha) => {
+  const candidateDrift = (sha) => {
     const now = head();
     if (now !== sha) return `the candidate changed: expected ${sha.slice(0, 12)}, but HEAD is ${now.slice(0, 12)}`;
     const dirty = git(worktree, 'status', '--porcelain');
@@ -269,8 +269,8 @@ export async function runIssue(issueId, { base, repoRoot, worktreeRoot, adapters
     // the skill asks for parallel sub-agents, but a laptop run of two at once
     // was stopped for low memory (24 Sep). The axes stay separate.
     for (const axis of ['spec', 'standards']) {
-      const moved = changed(sha);
-      if (moved) return { failure: moved };
+      const drift = candidateDrift(sha);
+      if (drift) return { failure: drift };
       await sayOnce(`DeepSeek's ${AXIS_NAMES[axis]} review of \`${sha.slice(0, 12)}\` started.`, markerLine('review-started', { sha, axis }));
       progress(`DeepSeek ${AXIS_NAMES[axis]} review of ${sha.slice(0, 12)} started`);
       const reply = await deepseek(prompts[axis], { axis, onProgress: relay(`DeepSeek ${AXIS_NAMES[axis]}`) });
@@ -287,17 +287,21 @@ export async function runIssue(issueId, { base, repoRoot, worktreeRoot, adapters
   // Git is the record of Gemini's work: each runner commit past the base is a
   // finished turn, never run again. The card's comments record the rest.
   if (commitCount() > MAX_ATTEMPTS) return blocked(`the runner's branch has more than ${MAX_ATTEMPTS} commits past the start commit`);
-  let findings = null;
-  for (let attempt = Math.max(1, commitCount()); attempt <= MAX_ATTEMPTS; attempt += 1) {
+  const stop = async (reason) => ({ result: await blocked(reason) });
+
+  // One attempt: a Gemini turn (unless git already holds it), checks, review,
+  // PR. Returns { result } when the run is over, or { findings } for the
+  // correction round.
+  const attemptRound = async (attempt, findings) => {
     if (commitCount() < attempt) {
       const failure = await implement(attempt, findings);
-      if (failure) return blocked(failure);
+      if (failure) return stop(failure);
     }
     const sha = head();
     await sayOnce(`Gemini's turn ${attempt} is committed as \`${sha.slice(0, 12)}\`.`, markerLine('implement', { sha, attempt }));
 
-    const beforeChecks = changed(sha);
-    if (beforeChecks) return blocked(beforeChecks);
+    const beforeChecks = candidateDrift(sha);
+    if (beforeChecks) return stop(beforeChecks);
     // Checks that already passed for this exact commit are not run again.
     const passedEarlier = recorded('checks', sha)?.includes(`${markerLine('checks', { sha })} result=pass`);
     let checks = { pass: true, summary: 'passed earlier for this commit (recorded on the card)', output: '' };
@@ -307,17 +311,11 @@ export async function runIssue(issueId, { base, repoRoot, worktreeRoot, adapters
       checks = proofFailure ? { pass: false, summary: proofFailure, output: '' } : runChecks(worktree, (check) => onCommit({ worktree, branch, commit: base }, check));
     }
     await sayOnce(`Checks on \`${sha.slice(0, 12)}\`: ${checks.summary}.`, markerLine('checks', { sha, result: checks.pass ? 'pass' : 'fail' }));
-    if (!checks.pass) {
-      findings = `The checks failed: ${checks.summary}\n\n${checks.output}`.trim();
-      continue;
-    }
+    if (!checks.pass) return { findings: `The checks failed: ${checks.summary}\n\n${checks.output}`.trim() };
 
     const verdict = await review(sha);
-    if (verdict.failure) return blocked(verdict.failure);
-    if (!verdict.clean) {
-      findings = verdict.text;
-      continue;
-    }
+    if (verdict.failure) return stop(verdict.failure);
+    if (!verdict.clean) return { findings: verdict.text };
 
     // The card says a publish is starting before it starts. A restart that
     // finds that line but no PR line cannot know whether the PR opened (the
@@ -326,19 +324,27 @@ export async function runIssue(issueId, { base, repoRoot, worktreeRoot, adapters
     if (!url) {
       const publishing = markerLine('publishing', { sha });
       if (posted.some((body) => body.includes(publishing))) {
-        return blocked(`a PR for ${sha.slice(0, 12)} may already be open: the runner stopped while publishing it. Look for branch ${branch} on GitHub; to go on, post \`${markerLine('pr', { sha, url: '<the PR link>' })}\` on this card`);
+        return stop(`a PR for ${sha.slice(0, 12)} may already be open: the runner stopped while publishing it. Look for branch ${branch} on GitHub; to go on, post \`${markerLine('pr', { sha, url: '<the PR link>' })}\` on this card`);
       }
-      const beforePublish = changed(sha);
-      if (beforePublish) return blocked(beforePublish);
+      const beforePublish = candidateDrift(sha);
+      if (beforePublish) return stop(beforePublish);
       await sayOnce(`Publishing \`${sha.slice(0, 12)}\` as a PR.`, publishing);
       progress(`Publishing ${sha.slice(0, 12)} started`);
       ({ url } = await publish({ branch, sha, worktree, title: card.title, body: `${cardText(card)}\n\n---\n\n${verdict.text}`, onProgress: relay('Publisher') }));
       await sayOnce(`PR opened for \`${sha.slice(0, 12)}\`: ${url}`, markerLine('pr', { sha, url }));
     }
     await linear.moveToUat(issueId);
-    return { outcome: 'pr', sha, prUrl: url, reason: null };
-  }
-  return blocked(`still not passing after the correction round: ${findings.split('\n')[0]}`);
+    return { result: { outcome: 'pr', sha, prUrl: url, reason: null } };
+  };
+
+  // The first attempt, then at most one correction round: two explicit calls,
+  // not a loop. A resume whose branch already holds the second turn goes
+  // straight to the correction round.
+  const first = commitCount() < MAX_ATTEMPTS ? await attemptRound(1, null) : { findings: null };
+  if (first.result) return first.result;
+  const second = await attemptRound(MAX_ATTEMPTS, first.findings);
+  if (second.result) return second.result;
+  return blocked(`still not passing after the correction round: ${second.findings.split('\n')[0]}`);
 }
 
 // ---------------------------------------------------------------- Command line

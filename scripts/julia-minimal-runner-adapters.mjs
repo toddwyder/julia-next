@@ -67,7 +67,7 @@ export function agyOutcome(stdout, stderr = '') {
   const denied = final.denied_actions ?? [];
   if (denied.length) {
     const names = denied.map((d) => `${d.action} (${d.display_name})`).join(', ');
-    return { ok: false, reason: `agy denied ${names}: ${lastLine(stderr)}` };
+    return { ok: false, reason: `agy denied ${names}: ${lastLines(stderr, 1)}` };
   }
   if (!String(result.response ?? '').trim()) return { ok: false, reason: 'agy reported SUCCESS with an empty reply' };
   return { ok: true, reason: null };
@@ -141,8 +141,7 @@ const SERVER_CHECKOUT = '/srv/orchestrator-svc/julia-next';
 // The key and batch-mode options every ssh and scp call to the server shares.
 const SERVER_OPTIONS = ['-i', SERVER.key, '-o', 'BatchMode=yes'];
 const ssh = (script, options = {}) => spawnSync('ssh', [...SERVER_OPTIONS, SERVER.host, script], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, ...options });
-const lastLines = (text) => String(text ?? '').trim().split('\n').slice(-5).join('\n');
-const lastLine = (text) => String(text ?? '').trim().split('\n').at(-1) ?? '';
+const lastLines = (text, count = 5) => String(text ?? '').trim().split('\n').slice(-count).join('\n');
 
 // The last assistant message's text in Pi's JSON event stream.
 export function lastAssistantText(stream) {
@@ -224,7 +223,7 @@ export function publishAdapter() {
       onProgress('checking the commit on the server, pushing and opening the PR');
       const run = ssh(script);
       if (run.status !== 0) throw new Error(`publishing on the server failed: ${lastLines(run.stderr)}`);
-      return { url: JSON.parse(lastLine(run.stdout)).url };
+      return { url: JSON.parse(lastLines(run.stdout, 1)).url };
     } finally {
       rmSync(local, { recursive: true, force: true });
     }
