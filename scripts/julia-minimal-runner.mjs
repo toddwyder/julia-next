@@ -66,6 +66,7 @@ const RUN_NOTES = [
   '- The seams are pre-agreed in the card\'s Seams section below. Test only there.',
   '- Do not run /code-review: the runner has your change reviewed separately.',
   '- Do not run git and do not commit: the runner commits your change and reads its id from git.',
+  '- Read only files inside your working folder, and never git\'s own data (`.git`): reading anywhere else is refused and ends your turn as a failure.',
   '- Do not run any shell command. Read, search and edit files with your file tools only; any command is refused and ends your turn as a failure. Write the failing test at the seam first, then the code that makes it pass: the runner\'s test worker runs the tests after your turn (the red proof, the lint and the suite) and sends back any failure. Tests that already fail before your change are not yours to fix. There is no typecheck command.',
 ].join('\n');
 

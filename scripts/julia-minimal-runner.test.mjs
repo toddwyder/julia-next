@@ -352,6 +352,9 @@ test("Gemini's brief says it runs no shell commands: the test worker runs the te
   const { adapters, calls } = fakes();
   await run(fx, adapters);
   assert.match(calls.gemini[0], /Do not run any shell command/);
+  // Live JUL-123 run, 24 Sep: Gemini read the worktree's `.git` pointer and
+  // agy refused the read outside its folder, failing the turn.
+  assert.match(calls.gemini[0], /Read only files inside your working folder, and never git's own data/);
   assert.match(calls.gemini[0], /the runner's test worker runs the tests after your turn/);
   assert.doesNotMatch(calls.gemini[0], /you may run is `npm test`/);
   rmSync(fx.root, { recursive: true, force: true });
