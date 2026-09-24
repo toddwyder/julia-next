@@ -194,6 +194,8 @@ def prepare(repo: str, install=npm_ci):
                 return f'{run.worktree} already holds branch {branch}, not {run.branch}'
             if git(run.worktree, 'rev-parse', 'HEAD') != run.base:
                 return f'{run.worktree} does not start from base {run.base[:12]}: it is at another commit'
+            if git(run.worktree, 'status', '--porcelain'):
+                return f'{run.worktree} has uncommitted changes left by an earlier run'
         else:
             git(repo, 'fetch', '-q', 'origin', 'main')
             git(repo, 'rev-parse', '--verify', f'{run.base}^{{commit}}')

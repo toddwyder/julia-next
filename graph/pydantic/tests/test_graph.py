@@ -320,6 +320,12 @@ class PrepareTest(unittest.IsolatedAsyncioTestCase):
         sh(self.worktree, 'git', *workers.GIT_ID, 'commit', '-q', '-m', 'other card')
         self.assertIn('does not start from', await prepare(self.run_for(self.first)))
 
+    async def test_a_leftover_working_copy_with_uncommitted_edits_is_refused(self):
+        prepare = workers.prepare(str(self.repo), install=self.install)
+        self.assertIsNone(await prepare(self.run_for(self.first)))
+        (self.worktree / 'stale.txt').write_text('an abandoned edit')
+        self.assertIn('uncommitted', await prepare(self.run_for(self.first)) or '')
+
     async def test_an_interrupted_install_is_run_again(self):
         prepare = workers.prepare(str(self.repo), install=self.install)
         await prepare(self.run_for(self.second))
