@@ -12,7 +12,7 @@
 //   * only a card worktree under /srv/julia-runner/worktrees is accepted;
 //   * agy gets HOME, PATH, LANG and USER only.
 import { spawn } from 'node:child_process';
-import { readFileSync, realpathSync } from 'node:fs';
+import { chmodSync, lstatSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -46,6 +46,20 @@ export function allowListProblem(settingsText) {
 // turn after five minutes (three live JUL-123 turns cut off at 5:02, 24 Sep).
 export const agyArgs = (prompt, worktree) => ['--add-dir', worktree, '--mode', 'accept-edits', '--print-timeout', '0', '--output-format', 'stream-json', '--disable-slash-commands', '--print', `Your working folder is ${worktree}.\n\n${prompt}`];
 
+// agy writes new files 0644 and folders 0755 whatever the umask (live JUL-123
+// run, 24 Sep), so the runner could not commit, switch or clean them. After
+// the turn, everything Gemini owns in the worktree becomes group-writable.
+export function shareWithGroup(dir, { uid = process.getuid() } = {}) {
+  for (const name of readdirSync(dir)) {
+    if (name === '.git' || name === 'node_modules') continue;
+    const path = join(dir, name);
+    const stat = lstatSync(path);
+    if (stat.isSymbolicLink()) continue;
+    if (stat.uid === uid && !(stat.mode & 0o020)) chmodSync(path, (stat.mode & 0o7777) | 0o020);
+    if (stat.isDirectory()) shareWithGroup(path, { uid });
+  }
+}
+
 function readSettings(home) {
   try { return readFileSync(join(home, '.gemini', 'antigravity-cli', 'settings.json'), 'utf8'); } catch (error) {
     return error.code === 'ENOENT' ? null : '{ unreadable';
@@ -69,7 +83,10 @@ function main() {
     stdio: ['ignore', 'inherit', 'inherit'],
   });
   agy.on('error', (error) => { console.error(`agy did not start: ${error.message}`); process.exit(1); });
-  agy.on('close', (code) => process.exit(code ?? 1));
+  agy.on('close', (code) => {
+    shareWithGroup(worktree);
+    process.exit(code ?? 1);
+  });
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
