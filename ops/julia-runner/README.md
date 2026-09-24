@@ -61,6 +61,20 @@ Git, a PR or Linear.
    `settings.json` whose `permissions.allow` is empty, and **Todd's one-time sign-in** in that
    account.
 
+## What a card needs
+
+The runner refuses a card before Gemini starts unless its description has:
+
+- a `## Seams` section naming the seam test files (`Kind: refactor` for a pure refactor);
+- checkboxes under an `Acceptance criteria` heading; and
+- numbered items under `## UAT plan`.
+
+Gemini hands in evidence for each criterion and a line for each UAT item. The Spec reviewer answers
+met or not met for each criterion. `scripts/acceptance-check.mjs` refuses the change before the PR
+unless every criterion has both. Before the UAT move, the runner posts the evidence comment, then
+ticks the boxes (never before their evidence is on the card), and then passes the same script's
+live-card guard.
+
 ## Running a card
 
 ```

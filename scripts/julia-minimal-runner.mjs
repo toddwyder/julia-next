@@ -1,6 +1,6 @@
 // julia-minimal-runner.mjs -- the fixed-route stopgap (JUL-122): one card goes
 // Gemini implement -> checks -> DeepSeek two-axis review -> at most one
-// correction round -> PR -> UAT. It is not the LangGraph controller
+// correction round -> acceptance check -> PR -> UAT. It is not the LangGraph controller
 // (JUL-116/JUL-118) and it keeps no state file: git holds the candidate
 // commits, and the card's own comments hold the review and PR results.
 //
@@ -11,7 +11,11 @@ import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { checkCardForUat, checkEvidence, evidenceCommentBody, parseAcceptanceCriteria, parseUatPlan, tickCriteria } from './acceptance-check.mjs';
+import { AXIS_NAMES, cardText, handInOf, implementPrompt, reviewPrompt, verdictOf } from './julia-minimal-runner-brief.mjs';
 import { git, redProof, runChecks } from './julia-minimal-runner-checks.mjs';
+
+export { reviewPrompt, verdictOf };
 
 export const MAX_ATTEMPTS = 2;
 
@@ -61,55 +65,16 @@ export function seamsOf(description) {
 const SKILL_FILES = ['.agents/skills/implement/SKILL.md', '.agents/skills/tdd/SKILL.md', '.agents/skills/tdd/tests.md', '.agents/skills/tdd/mocking.md'];
 const pinnedText = (repoRoot, base, paths) => paths.map((path) => `<file path="${path}">\n${git(repoRoot, 'show', `${base}:${path}`)}\n</file>`).join('\n\n');
 
-const RUN_NOTES = [
-  '# How this run differs from the skills',
-  '- The seams are pre-agreed in the card\'s Seams section below. Test only there.',
-  '- Do not run /code-review: the runner has your change reviewed separately.',
-  '- Do not run git and do not commit: the runner commits your change and reads its id from git.',
-  '- Read only files inside your working folder, and never git\'s own data (`.git`): reading anywhere else is refused and ends your turn as a failure.',
-  '- Do not run any shell command. Read, search and edit files with your file tools only; any command is refused and ends your turn as a failure. Write the failing test at the seam first, then the code that makes it pass: the runner\'s test worker runs the tests after your turn (the red proof, the lint and the suite) and sends back any failure. Tests that already fail before your change are not yours to fix. There is no typecheck command.',
-].join('\n');
-
-const cardText = (card) => [
-  `# Card ${card.identifier}: ${card.title}`,
-  card.description,
-  ...card.comments.filter((comment) => !comment.body.includes('\nrunner: ')).map((comment) => `## Comment on the card\n\n${comment.body}`),
-].join('\n\n');
-
-function implementPrompt(card, skills, findings) {
-  const correction = findings ? ['# Correction round', 'Your previous change was not accepted. Fix this before anything else:', findings] : [];
-  return ['# Skills', skills, RUN_NOTES, cardText(card), ...correction].join('\n\n');
-}
-
 // One review is one prompt; above this size it is refused, never cut short.
-export const MAX_REVIEW_CHARS = 400_000;
+// The reviewer seat (run-pi-seat.mjs) hands the prompt to Pi as one command
+// argument, and Linux caps one argument at 128 KiB (E2BIG, measured 24 Sep),
+// so the limit is in bytes and just under that.
+export const MAX_REVIEW_BYTES = 130_000;
 // The repo's documented standards: the three it has, plus the two files the
 // code-review skill names, whenever the start commit has them.
 const STANDARDS_FILES = ['CLAUDE.md', 'AGENTS.md', 'eslint.config.mjs'];
 const OPTIONAL_STANDARDS_FILES = ['CODING_STANDARDS.md', 'CONTRIBUTING.md'];
 const existsAt = (repoRoot, base, path) => spawnSync('git', ['cat-file', '-e', `${base}:${path}`], { cwd: repoRoot }).status === 0;
-const AXIS_NAMES = { spec: 'Spec', standards: 'Standards' };
-
-// The code-review skill's own method, with its step 4 sub-agent brief for one
-// axis, and the material that brief needs pasted in full: the reviewer runs
-// on another machine and can open nothing itself.
-export function reviewPrompt(axis, { card, skill, standards, commits, diff }) {
-  const source = axis === 'spec'
-    ? ['## The spec: the card and its comments', cardText(card)]
-    : ['## The standards sources (from the start commit)', standards];
-  return [
-    `# Review axis: ${AXIS_NAMES[axis]}`,
-    `You are the ${AXIS_NAMES[axis]} sub-agent in the code-review skill below. Follow that skill's step 4 brief for the ${AXIS_NAMES[axis]} axis, and only that axis.`,
-    skill,
-    ...source,
-    '## Commits under review', commits,
-    '## The complete diff', diff,
-    'End your report with exactly one line: `VERDICT: CLEAN` if there are no actionable findings, or `VERDICT: FINDINGS` if there are.',
-  ].join('\n\n');
-}
-
-// The verdict line, bare or wrapped as `code` or **bold** (DeepSeek does both).
-export const verdictOf = (text) => /^[\s`*]*VERDICT:\s*(CLEAN|FINDINGS)[\s`*]*$/m.exec(text)?.[1] ?? null;
 
 export async function runIssue(issueId, { base, repoRoot, worktreeRoot, adapters }) {
   const { linear, gemini, deepseek, publish, tests } = adapters;
@@ -140,6 +105,8 @@ export async function runIssue(issueId, { base, repoRoot, worktreeRoot, adapters
 
   const seams = seamsOf(card.description);
   if (!seams) return blocked('the card has no `## Seams` section naming a test file, so there is no agreed place for the tests');
+  if (!parseAcceptanceCriteria(card.description).length) return blocked('the card lists no acceptance criteria (checkboxes under an "Acceptance criteria" heading), so there is nothing to accept against');
+  if (!parseUatPlan(card.description).length) return blocked('the card\'s UAT plan lists no numbered items (under "## UAT plan"), so there is nothing to hand Todd');
   const { refusal, discarded } = pinWorktree({ repoRoot, worktree, branch, base });
   if (refusal) return blocked(refusal);
   // Long calls report as they go: each phase is announced when it starts, and
@@ -183,27 +150,33 @@ export async function runIssue(issueId, { base, repoRoot, worktreeRoot, adapters
     const turn = await gemini(implementPrompt(card, pinnedText(repoRoot, base, SKILL_FILES), findings), { cwd: worktree, onProgress: relay('Gemini') });
     if (!turn.ok) return `Gemini's turn failed: ${turn.reason}`;
     if (head() !== before) return 'Gemini made its own commit, which this route does not allow';
+    const handIn = handInOf(turn.text);
+    if (handIn?.outcome === 'blocked') return `Gemini stopped as blocked: ${handIn.summary ?? '(no reason given)'}`;
     if (!git(worktree, 'status', '--porcelain')) return `Gemini's turn changed nothing${findings ? `; the last problem was: ${findings.split('\n')[0]}` : ''}`;
     git(worktree, 'add', '-A');
-    git(worktree, 'commit', '-q', '-m', `runner: ${issueId} attempt ${attempt}`);
+    // The hand-in rides in the commit message, so git keeps it with the change
+    // and a restart never loses it.
+    git(worktree, 'commit', '-q', '-m', `runner: ${issueId} attempt ${attempt}${handIn ? `\n\n${JSON.stringify(handIn)}` : ''}`);
     return null;
   };
 
   // Both review axes for one candidate. Each axis's report goes on the card as
   // soon as it returns, so a restart reuses it and never runs that axis again.
-  const review = async (sha) => {
+  const review = async (sha, { builder, checks }) => {
     const material = {
       card,
+      builder,
+      checks,
       skill: pinnedText(repoRoot, base, ['.agents/skills/code-review/SKILL.md']),
       standards: pinnedText(repoRoot, base, [...STANDARDS_FILES, ...OPTIONAL_STANDARDS_FILES.filter((path) => existsAt(repoRoot, base, path))]),
       commits: git(worktree, 'log', '--oneline', `${base}..${sha}`),
       diff: git(worktree, 'diff', `${base}...${sha}`),
     };
     const prompts = { spec: reviewPrompt('spec', material), standards: reviewPrompt('standards', material) };
-    const longest = Math.max(prompts.spec.length, prompts.standards.length);
-    if (longest > MAX_REVIEW_CHARS) return { failure: `the review would be ${longest} characters, over the ${MAX_REVIEW_CHARS} limit for one review; split the card` };
+    const longest = Math.max(Buffer.byteLength(prompts.spec), Buffer.byteLength(prompts.standards));
+    if (longest > MAX_REVIEW_BYTES) return { failure: `the review would be ${longest} bytes, over the ${MAX_REVIEW_BYTES}-byte limit for one review; split the card` };
     const verdicts = {};
-    const reports = [];
+    const reports = {};
     // The two axes run one after the other, each in its own DeepSeek session:
     // the skill asks for parallel sub-agents, but a laptop run of two at once
     // was stopped for low memory (24 Sep). The axes stay separate.
@@ -212,7 +185,7 @@ export async function runIssue(issueId, { base, repoRoot, worktreeRoot, adapters
       const earlier = posted.find((body) => body.includes(done));
       if (earlier) {
         verdicts[axis] = /verdict=(CLEAN|FINDINGS)/.exec(earlier.slice(earlier.indexOf(done)))[1];
-        reports.push(earlier.slice(0, earlier.indexOf(done)).trim());
+        reports[axis] = earlier.slice(0, earlier.indexOf(done)).trim();
         continue;
       }
       const drift = candidateDrift(sha);
@@ -225,10 +198,10 @@ export async function runIssue(issueId, { base, repoRoot, worktreeRoot, adapters
       if (!verdicts[axis]) return { failure: `DeepSeek's ${AXIS_NAMES[axis]} review gave no VERDICT line` };
       const report = `### ${AXIS_NAMES[axis]} review of \`${sha.slice(0, 12)}\`: ${verdicts[axis]}\n\n${reply.text.trim()}`;
       await sayOnce(report, markerLine('review-axis', { sha, axis, verdict: verdicts[axis] }));
-      reports.push(report);
+      reports[axis] = report;
     }
     await sayOnce(`DeepSeek review of \`${sha.slice(0, 12)}\`: Spec ${verdicts.spec}, Standards ${verdicts.standards} (each report is in its own comment above).`, markerLine('review', { sha, ...verdicts }));
-    return { clean: verdicts.spec === 'CLEAN' && verdicts.standards === 'CLEAN', text: reports.join('\n\n') };
+    return { clean: verdicts.spec === 'CLEAN' && verdicts.standards === 'CLEAN', text: `${reports.spec}\n\n${reports.standards}`, reports };
   };
 
   // Git is the record of Gemini's work: each runner commit past the base is a
@@ -255,14 +228,26 @@ export async function runIssue(issueId, { base, repoRoot, worktreeRoot, adapters
     if (!passedEarlier) {
       progress(`Red proof and checks on ${sha.slice(0, 12)} started`);
       const proofFailure = await redProof({ worktree, branch, base, sha, seams, test: tests });
+      const proof = seams.kind === 'refactor' ? 'the seam tests are unchanged and pass on the start commit and on this one' : 'the changed seam tests fail on the start commit and pass on this one';
       checks = proofFailure ? { pass: false, summary: proofFailure, output: '' } : await runChecks({ worktree, branch, base, test: tests });
+      if (!proofFailure) checks.summary = `red proof passed (${proof}); ${checks.summary}`;
     }
     await sayOnce(`Checks on \`${sha.slice(0, 12)}\`: ${checks.summary}.`, markerLine('checks', { sha, result: checks.pass ? 'pass' : 'fail' }));
     if (!checks.pass) return { findings: `The checks failed: ${checks.summary}\n\n${checks.output}`.trim() };
+    const checksReport = recorded('checks', sha).split('\n\nrunner: ')[0];
 
-    const verdict = await review(sha);
+    const builder = handInOf(git(worktree, 'log', '-1', '--format=%b', sha));
+    const verdict = await review(sha, { builder, checks: checksReport });
     if (verdict.failure) return stop(verdict.failure);
     if (!verdict.clean) return { findings: verdict.text };
+
+    // The acceptance check (scripts/acceptance-check.mjs, no AI): every
+    // criterion has the builder's evidence and the Spec reviewer's "met", and
+    // every UAT item an answer. A refusal is unfinished work, like a finding.
+    const reviewer = { criteria: handInOf(verdict.reports.spec)?.criteria ?? [] };
+    const check = checkEvidence({ description: card.description, builder: builder ?? {}, reviewer });
+    await sayOnce(`Acceptance check on \`${sha.slice(0, 12)}\`: ${check.ok ? 'every criterion has evidence and "met", and every UAT item an answer' : check.missing.join('; ')}.`, markerLine('acceptance', { sha, result: check.ok ? 'pass' : 'fail' }));
+    if (!check.ok) return { findings: `The acceptance check refused the change (scripts/acceptance-check.mjs):\n- ${check.missing.join('\n- ')}` };
 
     // The card says a publish is starting before it starts. A restart that
     // finds that line but no PR line cannot know whether the PR opened (the
@@ -280,6 +265,15 @@ export async function runIssue(issueId, { base, repoRoot, worktreeRoot, adapters
       ({ url } = await publish({ branch, sha, worktree, title: card.title, body: `${cardText(card)}\n\n---\n\n${verdict.text}`, onProgress: relay('Publisher') }));
       await sayOnce(`PR opened for \`${sha.slice(0, 12)}\`: ${url}`, markerLine('pr', { sha, url }));
     }
+    // Evidence first, then the ticks: a box is never ticked before its
+    // evidence is on the card (CLAUDE.md, "Tick as you go").
+    await sayOnce(evidenceCommentBody({ card, check, builder, reviewer }), markerLine('evidence', { sha }));
+    const live = await linear.getCard(issueId);
+    const ticked = tickCriteria(live.description);
+    if (ticked !== live.description) await linear.setDescription(issueId, ticked);
+    const now = await linear.getCard(issueId);
+    const guard = checkCardForUat({ description: now.description, comments: now.comments });
+    if (!guard.ok) return stop(`the card is not ready for UAT: ${guard.missing.join('; ')}`);
     await linear.moveToUat(issueId);
     return { result: { outcome: 'pr', sha, prUrl: url, reason: null } };
   };
