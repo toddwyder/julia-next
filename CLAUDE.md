@@ -15,6 +15,10 @@ honest answer is anything else, stop: put the work in the Ready queue instead an
 
 **Finish the card.** When the work is done and the report is posted, move the card to UAT and assign it to Todd. Never leave a finished card in Backlog, and never move it to Complete; acceptance is Todd's.
 
+## How a turn ends
+
+A standing instruction from the user, the person you are working for. It is about how your turns end. A message with no tool call in it ends your turn, and the work stops there until you are asked to continue. The user has seen you end turns in four ways while work they asked for was still owed, and does not want any of them. One: a long summary of what was done that closes by announcing the next step and has no tool call, so the next thing never starts. Two: an offer to carry on with something unless the user would prefer otherwise, which stops to wait for an answer the user was not going to give. Three: a list of decisions for the user when, by your own account, none of them blocks the rest of the work. Four: deciding that this is a good place to report, because the turn has been long or a milestone is done. Status notes are welcome, and so are your recommendations on open decisions, but put them in the same message as your next tool call and carry on with whatever does not depend on the user's answer. If you notice yourself inviting the user to redirect you or offering to wait, delete it and do the next thing. The stops the user does want are the ones where nothing can move without them, or where the thing blocking you is deliberately protected from you. This does not override the need for confirmation on risky or destructive actions.
+
 ## Framework-first rules (JUL-116)
 
 1. Read the framework's official docs before writing code, and post a framework map (need → framework feature → docs link) on the card.
@@ -43,7 +47,7 @@ Details, the account table and the known traps are in `docs/agents/server-runboo
 `julia-next` is the restart of Julia, an offline-first PWA culinary management tool (recipe
 intake, menu planning, shopping lists, kitchen prep, full-screen cook mode). The prior codebase
 (`toddwyder/Julia`) is frozen as of 2026-09-15. See `docs/adr/0001-restart.md` for why, and
-`docs/CONTEXT.md` (once written) for the domain model as it's established.
+`CONTEXT.md` for the domain model.
 
 ## Agent skills
 
@@ -54,8 +58,7 @@ Issues live in Linear (team Julia-next), via the Linear MCP tools — not GitHub
 
 **Clean up every test or throwaway card you create.** Any test or throwaway Linear card an agent
 creates must be cancelled by that same agent, with a one-line reason, before its ticket counts as
-done. Leftover test cards count as unfinished work, not board noise — five of them sat on the
-board for two days before Todd found them.
+done. Leftover test cards count as unfinished work, not board noise.
 
 ### Triage labels
 
