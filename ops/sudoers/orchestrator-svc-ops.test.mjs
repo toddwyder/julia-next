@@ -17,8 +17,7 @@ const FILE = fileURLToPath(new URL('./orchestrator-svc-ops', import.meta.url));
 // The minimal runner's worker rules (JUL-122) are orchestrator-svc's only other
 // live rules; they are guarded in scripts/julia-runner-ops.test.mjs.
 const RUNNER_WORKER_COMMANDS = readFileSync(fileURLToPath(new URL('../julia-runner/sudoers', import.meta.url)), 'utf8')
-  .split('
-').filter((line) => line.includes('NOPASSWD:')).map((line) => line.split('NOPASSWD:')[1].trim());
+  .split('\n').filter((line) => line.includes('NOPASSWD:')).map((line) => line.split('NOPASSWD:')[1].trim());
 const ACCOUNTS = ['runner', 'orchestrator-svc'];
 const KEY_GROUPS = ['deepseek-readers', 'commandcode-readers'];
 
