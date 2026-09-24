@@ -86,7 +86,8 @@ export function agyOutcome(stdout, stderr = '') {
     return { ok: false, reason: `agy denied ${names}: ${lastLines(stderr, 1)}` };
   }
   if (!String(result.response ?? '').trim()) return { ok: false, reason: 'agy reported SUCCESS with an empty reply' };
-  return { ok: true, reason: null };
+  // The reply carries Gemini's hand-in (its JSON evidence) for the runner.
+  return { ok: true, reason: null, text: String(result.response) };
 }
 
 export function geminiAdapter({ run = runStreaming } = {}) {
@@ -199,6 +200,9 @@ const TODD_LINEAR_USER_ID = 'a55c040c-d281-4382-8e66-c23ab7346919';
 const CARD_QUERY = `query Card($id: String!) {
   issue(id: $id) { id identifier title description team { states { nodes { id name } } } comments(first: 250) { nodes { body createdAt } } }
 }`;
+const DESCRIBE_MUTATION = `mutation Describe($id: String!, $description: String!) {
+  issueUpdate(id: $id, input: { description: $description }) { success }
+}`;
 const MOVE_MUTATION = `mutation Move($id: String!, $stateId: String!, $assigneeId: String!) {
   issueUpdate(id: $id, input: { stateId: $stateId, assigneeId: $assigneeId }) { success }
 }`;
@@ -226,6 +230,12 @@ export function linearAdapter({ fetchImpl = fetch, readCredential = readAppCrede
       return { identifier: issue.identifier, title: issue.title, description: issue.description ?? '', comments };
     },
     comment: async (id, body) => postComment(id, body, await opts()),
+    // Ticks the acceptance boxes before the UAT move (acceptance-check.mjs tickCriteria).
+    setDescription: async (id, description) => {
+      const issue = await read(id);
+      const { issueUpdate } = await linearGraphQL(DESCRIBE_MUTATION, { id: issue.id, description }, await opts());
+      if (!issueUpdate.success) throw new Error(`Linear refused to update ${id}'s description`);
+    },
     moveToUat: async (id) => {
       const issue = await read(id);
       const uat = issue.team.states.nodes.find((state) => state.name === 'UAT');
