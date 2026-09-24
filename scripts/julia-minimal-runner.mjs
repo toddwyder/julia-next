@@ -153,7 +153,7 @@ const AXIS_NAMES = { spec: 'Spec', standards: 'Standards' };
 // The code-review skill's own method, with its step 4 sub-agent brief for one
 // axis, and the material that brief needs pasted in full: the reviewer runs
 // on another machine and can open nothing itself.
-function reviewPrompt(axis, { card, skill, standards, commits, diff }) {
+export function reviewPrompt(axis, { card, skill, standards, commits, diff }) {
   const source = axis === 'spec'
     ? ['## The spec: the card and its comments', cardText(card)]
     : ['## The standards sources (from the start commit)', standards];
