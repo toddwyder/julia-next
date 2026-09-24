@@ -13,8 +13,10 @@ import { fileURLToPath } from 'node:url';
 
 export const MAX_ATTEMPTS = 2;
 
+// A large buffer so a big diff is measured and refused by the review size
+// limit, instead of overflowing Node's 1 MB default and crashing the run.
 function git(cwd, ...args) {
-  const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
+  const result = spawnSync('git', args, { cwd, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
   if (result.status !== 0) throw new Error(`git ${args.join(' ')} failed: ${(result.stderr || '').trim()}`);
   return result.stdout.trim();
 }
@@ -29,22 +31,24 @@ const markerLine = (step, fields) => `runner: ${step} ${Object.entries(fields).m
 function pinWorktree({ repoRoot, worktree, branch, base }) {
   if (existsSync(worktree)) {
     // Resuming: put the branch back as committed. An interrupted Gemini turn's
-    // uncommitted edits are discarded, never counted as a finished turn.
+    // uncommitted edits are discarded (and reported), never counted as a
+    // finished turn.
+    const discarded = git(worktree, 'status', '--porcelain').split('\n').filter(Boolean);
     git(worktree, 'checkout', '-q', '-f', branch);
     git(worktree, 'clean', '-fdq');
     const growsFromBase = spawnSync('git', ['merge-base', '--is-ancestor', base, 'HEAD'], { cwd: worktree }).status === 0;
-    return growsFromBase ? null : `the runner's branch does not grow from ${base}; pass the start commit this card began from`;
+    return { refusal: growsFromBase ? null : `the runner's branch does not grow from ${base}; pass the start commit this card began from`, discarded };
   }
   if (git(repoRoot, 'status', '--porcelain', '--untracked-files=no')) {
-    return `the checkout at ${repoRoot} has uncommitted changes to tracked files`;
+    return { refusal: `the checkout at ${repoRoot} has uncommitted changes to tracked files`, discarded: [] };
   }
   git(repoRoot, 'fetch', '-q', 'origin', 'main');
   const main = git(repoRoot, 'rev-parse', 'origin/main');
   if (git(repoRoot, 'rev-parse', '--verify', `${base}^{commit}`) !== main) {
-    return `start commit ${base} is not origin/main (${main})`;
+    return { refusal: `start commit ${base} is not origin/main (${main})`, discarded: [] };
   }
   git(repoRoot, 'worktree', 'add', '-q', '-b', branch, worktree, main);
-  return null;
+  return { refusal: null, discarded: [] };
 }
 
 // A `node --test` started from inside another test run inherits
@@ -196,16 +200,40 @@ export async function runIssue(issueId, { base, repoRoot, worktreeRoot, adapters
 
   const seams = seamsOf(card.description);
   if (!seams) return blocked('the card has no `## Seams` section naming a test file, so there is no agreed place for the tests');
-  const refusal = pinWorktree({ repoRoot, worktree, branch, base });
+  const { refusal, discarded } = pinWorktree({ repoRoot, worktree, branch, base });
   if (refusal) return blocked(refusal);
 
   const head = () => git(worktree, 'rev-parse', 'HEAD');
   const commitCount = () => Number(git(worktree, 'rev-list', '--count', `${base}..HEAD`));
+  const foreign = git(worktree, 'log', '--format=%h %s', `${base}..HEAD`).split('\n').filter(Boolean)
+    .filter((line) => !new RegExp(`^\\S+ runner: ${issueId} attempt \\d+$`).test(line));
+  if (foreign.length) return blocked(`the runner's branch holds commits the runner did not make (${foreign.join('; ')})`);
 
-  // One Gemini turn. The runner, not Gemini, commits the result.
+  // The candidate under check, review and PR must be exactly the commit the
+  // runner made: HEAD unchanged and nothing uncommitted. Results are keyed by
+  // that commit, so a different commit never inherits them.
+  const changed = (sha) => {
+    const now = head();
+    if (now !== sha) return `the candidate changed: expected ${sha.slice(0, 12)}, but HEAD is ${now.slice(0, 12)}`;
+    const dirty = git(worktree, 'status', '--porcelain');
+    return dirty ? `the worktree has uncommitted changes on top of ${sha.slice(0, 12)} (${dirty.split('\n').length} file(s))` : null;
+  };
+  // Long calls report as they go: each phase is announced when it starts, and
+  // a worker's own progress is passed on with its name.
+  const progress = adapters.progress ?? (() => {});
+  const relay = (worker) => (line) => progress(`${worker}: ${line}`);
+
+  // One Gemini turn. The runner, not Gemini, commits the result. The card
+  // records that the turn started, so a restart can say it was interrupted.
   const implement = async (attempt, findings) => {
+    const started = markerLine('implement-started', { base, attempt });
+    if (posted.some((body) => body.includes(started))) {
+      await linear.comment(issueId, `Gemini's turn ${attempt} was interrupted before the runner committed it. The runner discarded ${discarded.length} uncommitted file(s) it left and is starting that turn again.\n\n${markerLine('implement-restarted', { base, attempt })}`);
+    }
+    await sayOnce(`Gemini's turn ${attempt} started.`, started);
+    progress(`Gemini turn ${attempt} started`);
     const before = head();
-    const turn = await gemini(implementPrompt(card, pinnedText(repoRoot, base, SKILL_FILES), findings), { cwd: worktree });
+    const turn = await gemini(implementPrompt(card, pinnedText(repoRoot, base, SKILL_FILES), findings), { cwd: worktree, onProgress: relay('Gemini') });
     if (!turn.ok) return `Gemini's turn failed: ${turn.reason}`;
     if (head() !== before) return 'Gemini made its own commit, which this route does not allow';
     if (!git(worktree, 'status', '--porcelain')) return `Gemini's turn changed nothing${findings ? `; the last problem was: ${findings.split('\n')[0]}` : ''}`;
@@ -230,8 +258,14 @@ export async function runIssue(issueId, { base, repoRoot, worktreeRoot, adapters
     if (longest > MAX_REVIEW_CHARS) return { failure: `the review would be ${longest} characters, over the ${MAX_REVIEW_CHARS} limit for one review; split the card` };
     const verdicts = {};
     const reports = [];
+    // The two axes run one after the other, each in its own DeepSeek session:
+    // the skill asks for parallel sub-agents, but a laptop run of two at once
+    // was stopped for low memory (24 Sep). The axes stay separate.
     for (const axis of ['spec', 'standards']) {
-      const reply = await deepseek(prompts[axis], { axis });
+      const moved = changed(sha);
+      if (moved) return { failure: moved };
+      progress(`DeepSeek ${AXIS_NAMES[axis]} review of ${sha.slice(0, 12)} started`);
+      const reply = await deepseek(prompts[axis], { axis, onProgress: relay(`DeepSeek ${AXIS_NAMES[axis]}`) });
       if (!reply.ok) return { failure: `DeepSeek's ${AXIS_NAMES[axis]} review failed: ${reply.reason}` };
       verdicts[axis] = verdictOf(reply.text);
       if (!verdicts[axis]) return { failure: `DeepSeek's ${AXIS_NAMES[axis]} review gave no VERDICT line` };
@@ -254,6 +288,9 @@ export async function runIssue(issueId, { base, repoRoot, worktreeRoot, adapters
     const sha = head();
     await sayOnce(`Gemini's turn ${attempt} is committed as \`${sha.slice(0, 12)}\`.`, markerLine('implement', { sha, attempt }));
 
+    const beforeChecks = changed(sha);
+    if (beforeChecks) return blocked(beforeChecks);
+    progress(`Red proof and checks on ${sha.slice(0, 12)} started`);
     const proofFailure = redProof({ worktree, branch, base, sha, seams });
     const checks = proofFailure ? { pass: false, summary: proofFailure, output: '' } : runChecks(worktree, (check) => onCommit({ worktree, branch, commit: base }, check));
     await sayOnce(`Checks on \`${sha.slice(0, 12)}\`: ${checks.summary}.`, markerLine('checks', { sha, result: checks.pass ? 'pass' : 'fail' }));
@@ -269,9 +306,20 @@ export async function runIssue(issueId, { base, repoRoot, worktreeRoot, adapters
       continue;
     }
 
+    // The card says a publish is starting before it starts. A restart that
+    // finds that line but no PR line cannot know whether the PR opened (the
+    // publisher cannot list PRs), so it stops rather than open a second one.
     let url = /url=(\S+)/.exec(recorded('pr', sha) ?? '')?.[1];
     if (!url) {
-      ({ url } = await publish({ branch, sha, worktree, title: card.title, body: `${cardText(card)}\n\n---\n\n${verdict.text}` }));
+      const publishing = markerLine('publishing', { sha });
+      if (posted.some((body) => body.includes(publishing))) {
+        return blocked(`a PR for ${sha.slice(0, 12)} may already be open: the runner stopped while publishing it. Look for branch ${branch} on GitHub; to go on, post \`${markerLine('pr', { sha, url: '<the PR link>' })}\` on this card`);
+      }
+      const beforePublish = changed(sha);
+      if (beforePublish) return blocked(beforePublish);
+      await sayOnce(`Publishing \`${sha.slice(0, 12)}\` as a PR.`, publishing);
+      progress(`Publishing ${sha.slice(0, 12)} started`);
+      ({ url } = await publish({ branch, sha, worktree, title: card.title, body: `${cardText(card)}\n\n---\n\n${verdict.text}`, onProgress: relay('Publisher') }));
       await sayOnce(`PR opened for \`${sha.slice(0, 12)}\`: ${url}`, markerLine('pr', { sha, url }));
     }
     await linear.moveToUat(issueId);
@@ -297,11 +345,12 @@ async function main([issueId, flag, base]) {
   // The terminal shows the same progress lines as the card.
   linear.comment = (id, body) => { console.log(body.split('\n')[0]); return comment(id, body); };
   const repoRoot = git(process.cwd(), 'rev-parse', '--show-toplevel');
+  const progress = (line) => console.log(`${new Date().toISOString().slice(11, 19)}Z  ${line}`);
   const result = await runIssue(issueId, {
     base,
     repoRoot,
     worktreeRoot: join(repoRoot, '.julia-runner-state', 'worktrees'),
-    adapters: { linear, gemini: geminiAdapter(), deepseek: deepseekAdapter(), publish: publishAdapter() },
+    adapters: { linear, progress, gemini: geminiAdapter(), deepseek: deepseekAdapter(), publish: publishAdapter() },
   });
   console.log(JSON.stringify(result, null, 2));
   return result.outcome === 'pr' ? 0 : 1;

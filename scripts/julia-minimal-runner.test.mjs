@@ -120,8 +120,9 @@ function crashOnce(adapters, where) {
     linear.comment = async (id, body) => { if (body.includes('runner: implement')) trip(); return comment(id, body); };
   }
   if (where === 'after-review') {
-    const publish = adapters.publish;
-    adapters.publish = async (request) => { trip(); return publish(request); };
+    // After the review is on the card, before the runner says it is publishing.
+    const comment = linear.comment;
+    linear.comment = async (id, body) => { if (body.includes('runner: publishing')) trip(); return comment(id, body); };
   }
   if (where === 'after-pr') {
     const moveToUat = linear.moveToUat;
@@ -356,5 +357,120 @@ test('a test that already fails on the start commit does not block the run; a ne
   assert.equal(result.outcome, 'pr', result.reason);
   assert.equal(calls.gemini.length, 1);
   assert.ok(comments.some((body) => body.includes('already broken here')), 'the card names the failure that was already there');
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+// -- Commit integrity: the candidate under check, review and PR is exactly
+// the commit the runner made, and nothing else is in the worktree.
+
+const worktreeOf = (fx) => join(fx.worktreeRoot, 'card-900');
+
+test('a worktree change during a review stops the run before the next review and the PR', async () => {
+  const fx = makeRepo();
+  const { adapters, calls } = fakes();
+  const review = adapters.deepseek;
+  adapters.deepseek = async (prompt, opts) => { write(worktreeOf(fx), 'stray.txt', 'x\n'); return review(prompt, opts); };
+  const result = await run(fx, adapters);
+  assert.equal(result.outcome, 'blocked');
+  assert.match(result.reason, /uncommitted/);
+  assert.equal(calls.deepseek.length, 1, 'the Standards review does not run on a changed candidate');
+  assert.equal(calls.publish.length, 0);
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+test('a new commit during a review stops the run: that review no longer describes HEAD', async () => {
+  const fx = makeRepo();
+  const { adapters, calls } = fakes();
+  const review = adapters.deepseek;
+  adapters.deepseek = async (prompt, opts) => {
+    write(worktreeOf(fx), 'late.txt', 'x\n');
+    git(worktreeOf(fx), 'add', '.');
+    git(worktreeOf(fx), 'commit', '-q', '-m', 'late change');
+    return review(prompt, opts);
+  };
+  const result = await run(fx, adapters);
+  assert.equal(result.outcome, 'blocked');
+  assert.match(result.reason, /HEAD is/);
+  assert.equal(calls.publish.length, 0);
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+test('a commit the runner did not make on its branch blocks a resume before any check or review', async () => {
+  const fx = makeRepo();
+  const { adapters, calls } = fakes();
+  const comment = adapters.linear.comment;
+  let armed = true;
+  adapters.linear.comment = async (id, body) => { if (armed && body.includes('runner: checks')) { armed = false; throw new Error('crash at checks'); } return comment(id, body); };
+  await assert.rejects(run(fx, adapters), /crash at/);
+  write(worktreeOf(fx), 'foreign.txt', 'x\n');
+  git(worktreeOf(fx), 'add', '.');
+  git(worktreeOf(fx), 'commit', '-q', '-m', 'someone else');
+  const result = await run(fx, adapters);
+  assert.equal(result.outcome, 'blocked');
+  assert.match(result.reason, /the runner did not make/);
+  assert.equal(calls.deepseek.length, 0);
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+// -- Progress and restart.
+
+test('each phase is announced as it starts, and a worker\'s own progress is passed on', async () => {
+  const fx = makeRepo();
+  const { adapters } = fakes();
+  const lines = [];
+  adapters.progress = (line) => lines.push(line);
+  const turn = adapters.gemini;
+  adapters.gemini = async (prompt, opts) => { opts.onProgress('run_command npm test'); return turn(prompt, opts); };
+  await run(fx, adapters);
+  const order = ['Gemini turn 1', 'Gemini: run_command npm test', 'Red proof and checks', 'DeepSeek Spec review', 'DeepSeek Standards review', 'Publishing'];
+  let at = -1;
+  for (const phase of order) {
+    const found = lines.findIndex((line, i) => i > at && line.includes(phase));
+    assert.ok(found > at, `"${phase}" should be announced after "${lines[at] ?? 'start'}"; got:\n${lines.join('\n')}`);
+    at = found;
+  }
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+test('an interrupted Gemini turn is announced on the card before it runs again, never repeated silently', async () => {
+  const fx = makeRepo();
+  const { adapters, calls, comments } = fakes();
+  const turn = adapters.gemini;
+  adapters.gemini = async (prompt, opts) => {
+    if (calls.gemini.length === 0) { calls.gemini.push(prompt); write(opts.cwd, 'scripts/add.mjs', 'half done\n'); throw new Error('crash mid-turn'); }
+    return turn(prompt, opts);
+  };
+  await assert.rejects(run(fx, adapters), /crash mid-turn/);
+  const result = await run(fx, adapters);
+  assert.equal(result.outcome, 'pr', result.reason);
+  assert.equal(calls.gemini.length, 2);
+  assert.ok(comments.some((body) => /turn 1 was interrupted/.test(body) && /1 uncommitted file/.test(body)), `comments:\n${comments.join('\n---\n')}`);
+  assert.equal(git(fx.repoRoot, 'rev-list', '--count', `${fx.base}..${result.sha}`), '1', 'one commit, not two');
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+test('a crash while publishing stops a resume instead of risking a second PR', async () => {
+  const fx = makeRepo();
+  const { adapters, calls } = fakes();
+  const publish = adapters.publish;
+  let armed = true;
+  adapters.publish = async (request) => { const pr = await publish(request); if (armed) { armed = false; throw new Error('crash after the PR opened'); } return pr; };
+  await assert.rejects(run(fx, adapters), /crash after the PR opened/);
+  const result = await run(fx, adapters);
+  assert.equal(result.outcome, 'blocked');
+  assert.match(result.reason, /may already be open/);
+  assert.equal(calls.publish.length, 1, 'no second PR');
+  rmSync(fx.root, { recursive: true, force: true });
+});
+
+test('a diff over a megabyte is refused with "split the card", not a crash, and never reaches a review', async () => {
+  const fx = makeRepo();
+  const huge = `${'z'.repeat(200)}\n`.repeat(6000);
+  const { adapters, calls, comments } = fakes({ geminiTurn: (cwd) => { goodFix(cwd); write(cwd, 'scripts/huge.mjs', huge); } });
+  const result = await run(fx, adapters);
+  assert.equal(result.outcome, 'blocked');
+  assert.match(result.reason, /split the card/);
+  assert.equal(calls.deepseek.length, 0);
+  assert.match(comments.at(-1), /split the card/, 'the refusal is on the card');
   rmSync(fx.root, { recursive: true, force: true });
 });

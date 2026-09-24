@@ -5,7 +5,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { agyArgs, agyOutcome, workerEnv } from './julia-minimal-runner-adapters.mjs';
+import { agyArgs, agyOutcome, agyStepLine, workerEnv } from './julia-minimal-runner-adapters.mjs';
 
 // Gemini's limits. agy honours only the user's global allow list in headless
 // mode (JUL-122 step 3: a project's own rules were ignored), so the runner
@@ -57,4 +57,25 @@ test('a denied action, an empty reply or a non-SUCCESS status is a failed turn',
   assert.equal(agyOutcome(JSON.stringify({ status: 'ERROR', error: 'quota' })).ok, false);
   assert.equal(agyOutcome('not json').ok, false);
   assert.deepEqual(agyOutcome(JSON.stringify({ status: 'SUCCESS', response: 'Done: add() now sums.' })), { ok: true, reason: null });
+});
+
+// Progress during long calls. agy's stream-json output (measured 24 Sep)
+// is one event per line; a tool step appears as a step_update with state
+// ACTIVE, and the turn ends with one {"event":"result"} line.
+const stream = (...events) => events.map((e) => JSON.stringify(e)).join('\n');
+const activeStep = (tool, parameters) => ({ event: 'step_update', step_update: { state: 'ACTIVE', step_type: 'tool', tool_name: tool, tool_info: { name: tool, parameters } } });
+
+test('each Gemini tool step becomes one progress line', () => {
+  assert.equal(agyStepLine(activeStep('run_command', { CommandLine: 'npm test' })), 'run_command npm test');
+  assert.equal(agyStepLine(activeStep('view_file', { AbsolutePath: 'C:/w/scripts/add.mjs' })), 'view_file C:/w/scripts/add.mjs');
+  assert.equal(agyStepLine({ event: 'step_update', step_update: { state: 'DONE', tool_name: 'view_file' } }), null, 'only the start of a step');
+  assert.equal(agyStepLine('not json'), null);
+});
+
+test('the turn outcome is read from the final result event of the stream', () => {
+  const ok = stream(activeStep('run_command', { CommandLine: 'npm test' }), { event: 'result', result: { status: 'SUCCESS', response: 'Done.' } });
+  assert.deepEqual(agyOutcome(ok), { ok: true, reason: null });
+  const denied = stream({ event: 'result', result: { status: 'SUCCESS', response: '', denied_actions: [{ action: 'command', display_name: 'RunCommand' }] } });
+  assert.equal(agyOutcome(denied).ok, false);
+  assert.equal(agyOutcome(stream(activeStep('view_file', {}))).ok, false, 'a stream with no result event is a failed turn');
 });
