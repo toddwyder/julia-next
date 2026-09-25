@@ -53,8 +53,9 @@ MAX_TEST_REPAIRS = 2
 MAX_REVIEW_ROUNDS = 2
 # One review is one prompt, and DeepSeek's seat hands it to Pi as a single
 # command argument, which Linux caps at 128 KiB (E2BIG): a bigger brief is
-# refused, never cut short (the same limit as scripts/julia-minimal-runner.mjs).
-MAX_REVIEW_BYTES = 130_000
+# refused, never cut short. Gemini's stream input carries a full diff on stdin,
+# so the limit is for review context rather than the OS's per-argument limit.
+MAX_REVIEW_BYTES = 500_000
 # The reviewer's standing orders, read from the card's start commit.
 REVIEWER_ROLE_FILE = '.agents/skills/julia-reviewer/SKILL.md'
 # Each worker's time limit in seconds. Each worker's own launcher enforces it
@@ -150,6 +151,8 @@ class Deps:
     worker_names: dict[str, str] = field(default_factory=lambda: {'builder': 'the builder', 'tests': 'the test runner',
                                                                   'reviewer': 'the reviewer'})
     worker_makers: dict[str, str] = field(default_factory=dict)
+    worker_models: dict[str, str] = field(default_factory=dict)
+    model_labels: tuple[str, str] | None = None
     limits: dict[str, int] = field(default_factory=lambda: dict(LIMITS))
     # Worker output moves the card at once, but edits its comment at most this often.
     status_every: float = 60
@@ -835,6 +838,10 @@ class Review(BaseNode[CardRun, Deps, str]):
             review = review.model_copy(update={'ok': False, 'reason': f'the model that ran ({review.model or "not reported"}) '
                                                                      f'is from {ran or "an unknown maker"}, not {maker}, '
                                                                      'so it is not the independent review asked for'})
+        if review.ok and (expected := ctx.deps.worker_models.get('reviewer')) and \
+                (review.model or '').rsplit('/', 1)[-1] != expected:
+            review = review.model_copy(update={'ok': False, 'reason': f'the reviewer ran {review.model or "an unconfirmed model"}, '
+                                                                     f'not the selected {expected}'})
         if review.ok and review.verdict == 'approve':
             if gaps := criteria_gaps(card['description'], review.criteria):
                 review = review.model_copy(update={'ok': False, 'reason': 'its approval does not cover the acceptance '
@@ -990,9 +997,18 @@ async def run_card(state: CardRun, deps: Deps) -> str:
     try:
         saved = deps.checkpoint.load()
         if saved is None:
+            if deps.model_labels:
+                state.builder_model, state.reviewer_model = deps.model_labels
             deps.checkpoint.save(state)
         else:
             state = saved
+            if deps.model_labels:
+                chosen = (state.builder_model, state.reviewer_model)
+                if all(chosen) and chosen != deps.model_labels:
+                    raise ValueError(f'this card started with model labels {chosen}; a resume cannot change them to {deps.model_labels}')
+                if not all(chosen):
+                    state.builder_model, state.reviewer_model = deps.model_labels
+                    deps.checkpoint.save(state)
         return await GRAPH.run(state=state, deps=deps)
     finally:
         deps.checkpoint.unlock()

@@ -33,11 +33,14 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { buildPiSpawnSpec, parsePiJsonStream } from '../service-dropbox/run-pi-seat.mjs';
+import { worktreeProblem } from './run-gemini.mjs';
 import { limitSeconds, runLimited, STOPPED_EXIT, stoppedLine } from './time-limit.mjs';
 
 // Seconds, as time-limit.mjs LIMITS does for the builder and the tests.
 export const LIMIT = { fallback: 20 * 60, max: 60 * 60 };
+export const BUILDER_LIMIT = { fallback: 60 * 60, max: 3 * 60 * 60 };
 export const CODEX_MODEL = 'gpt-5.5';
+export const GEMINI_MODEL = 'gemini-3.8-flash';
 // The reviewer's subreaper (see above), beside this file.
 export const REAPER = join(dirname(fileURLToPath(import.meta.url)), 'reap.py');
 export const PYTHON = '/usr/bin/python3';
@@ -57,13 +60,34 @@ export const REVIEWERS = {
     args: ['exec', '-m', CODEX_MODEL, '-c', 'model_reasoning_effort=high', '-s', 'read-only', '--skip-git-repo-check', '--json', '-'],
     env: ENV,
     stdin: true,
+    kind: 'codex',
   }),
   // DeepSeek V4 Pro through the reviewer seat's own settings (run-pi-seat.mjs
   // SEATS['reviewer-backup']): its key reaches Pi's environment only.
-  deepseek: (prompt) => {
+  deepseek: (prompt, _worktree, selectedModel = 'deepseek-v4-pro') => {
+    if (selectedModel !== 'deepseek-v4-pro') throw new Error(`DeepSeek reviewer model ${selectedModel} is not installed`);
     const spec = buildPiSpawnSpec('reviewer-backup', prompt, { mode: 'json', effort: 'high' });
-    return { command: spec.command, args: spec.args, env: { ...ENV, ...pickKey(spec.env) }, stdin: false };
+    return { command: spec.command, args: spec.args, env: { ...ENV, ...pickKey(spec.env) }, stdin: false, kind: 'pi' };
   },
+  gemini: (_prompt, _worktree, selectedModel = GEMINI_MODEL) => {
+    if (selectedModel !== GEMINI_MODEL) throw new Error(`Gemini reviewer model ${selectedModel} is not installed`);
+    return {
+      command: join(homedir(), '.local', 'bin', 'agy'),
+      args: ['--model', selectedModel, '--effort', 'high', '--print-timeout', '0', '--input-format', 'stream-json',
+        '--output-format', 'stream-json', '--disable-slash-commands'],
+      env: { ...ENV, USER: 'gemini-worker' }, stdin: true, streamPrompt: true, kind: 'gemini', readOnly: true,
+    };
+  },
+};
+
+// The graph selects the model through MODEL_CATALOG before calling this
+// account-specific launcher. A builder gets write access only to its card copy.
+export const BUILDERS = {
+  codex: (_prompt, worktree) => ({
+    command: 'codex',
+    args: ['exec', '-m', CODEX_MODEL, '-c', 'model_reasoning_effort=high', '-s', 'workspace-write', '-C', worktree, '--json', '-'],
+    env: ENV, stdin: true, kind: 'codex',
+  }),
 };
 
 function pickKey(env) {
@@ -142,6 +166,25 @@ export function piReply(stdout) {
   return { ok: true, text, model };
 }
 
+// Antigravity CLI's stream: init reports the model it actually started and
+// result is its final answer. A denied tool can still end with SUCCESS, so it
+// never counts as a completed review.
+export function geminiReply(stdout) {
+  const events = String(stdout).split('\n').map(json).filter(Boolean);
+  const init = events.find((event) => event.event === 'init');
+  const final = events.findLast((event) => event.event === 'result')?.result;
+  const model = init?.init?.model ?? null;
+  const text = final?.response ?? null;
+  if (!init || !final || final.conversation_id !== init.conversation_id) {
+    return { ok: false, error: 'the Gemini turn did not finish with a matching result', text, model };
+  }
+  if (final.status !== 'SUCCESS' || final.denied_actions?.length || !String(text ?? '').trim()) {
+    return { ok: false, error: String(final.error ?? (final.denied_actions?.length ? 'Gemini was denied a tool' : 'Gemini gave no completed reply')),
+      text, model };
+  }
+  return { ok: true, text, model };
+}
+
 // Each review runs in its own systemd user scope (a cgroup): nothing its
 // processes start can leave it, whether by setsid, a double fork or a scrubbed
 // environment, and killing the scope kills all of it. This needs the account's
@@ -179,30 +222,50 @@ export async function stopScope(unit, { env, run = spawnSync, read = readFileSyn
 export const CONTAIN = { manager: userManager, stop: stopScope };
 
 export async function review(request, {
-  run = runLimited, model = codexModel, onOutput = () => {}, reviewers = REVIEWERS, kill = process.kill.bind(process),
-  contain = CONTAIN,
+  run = runLimited, model = codexModel, onOutput = () => {}, reviewers = null, kill = process.kill.bind(process),
+  contain = CONTAIN, role = 'reviewer', worktreeCheck = worktreeProblem,
 } = {}) {
-  const which = request?.reviewer;
-  if (!Object.hasOwn(reviewers, which)) return { status: 'failed', error: `refused: unknown reviewer ${JSON.stringify(which)}` };
+  const which = role === 'builder' ? request?.builder : request?.reviewer;
+  const table = reviewers ?? (role === 'builder' ? BUILDERS : REVIEWERS);
+  if (!['builder', 'reviewer'].includes(role) || !Object.hasOwn(table, which)) {
+    return { status: 'failed', error: `refused: unknown ${role} ${JSON.stringify(which)}` };
+  }
   if (typeof request.prompt !== 'string' || !request.prompt.trim()) return { status: 'failed', error: 'refused: no prompt' };
+  if (role === 'builder') {
+    try {
+      const problem = worktreeCheck(request.worktree);
+      if (problem) return { status: 'failed', error: problem };
+    } catch (error) {
+      return { status: 'failed', error: `refused: the card worktree could not be checked: ${error.message}` };
+    }
+  }
   const manager = contain.manager();
   if (!manager) {
     return { status: 'failed', error: "refused: the reviewer's account has no systemd user manager (loginctl enable-linger), "
       + 'so a review could not be contained, and none was started' };
   }
-  const seconds = limitSeconds(request.limit_seconds, LIMIT);
+  const seconds = limitSeconds(request.limit_seconds, role === 'builder' ? BUILDER_LIMIT : LIMIT);
   let spec;
   try {
-    spec = reviewers[which](request.prompt);
+    spec = table[which](request.prompt, request.worktree, request.model);
   } catch (error) {
     return { status: 'failed', error: `refused: ${error.message}` };
   }
   let stdout = '';
   let stderr = '';
-  const unit = `${SCOPE_PREFIX}${randomUUID()}.scope`;
+  const unit = `${SCOPE_PREFIX}${randomUUID()}.${spec.readOnly ? 'service' : 'scope'}`;
   const stop = () => contain.stop(unit, { env: { ...process.env, ...manager } });
-  const options = { cwd: '/', env: { ...spec.env, ...manager }, stdio: [spec.stdin ? 'pipe' : 'ignore', 'pipe', 'pipe'] };
-  const command = ['--user', '--scope', '--quiet', '--collect', `--unit=${unit}`, '--', PYTHON, REAPER, '--', spec.command, ...spec.args];
+  const options = { cwd: role === 'builder' ? request.worktree : '/', env: { ...spec.env, ...manager },
+    stdio: [spec.stdin ? 'pipe' : 'ignore', 'pipe', 'pipe'] };
+  // A transient service can enforce filesystem restrictions; a scope cannot
+  // (verified on this server). Gemini gets only its own home writable for the
+  // CLI session, and cannot even read the candidate. Its whole diff is in the
+  // prompt. Existing Codex/Pi process scopes retain their tested containment.
+  const command = spec.readOnly
+    ? ['--user', '--pipe', '--wait', '--collect', '--quiet', `--unit=${unit}`,
+      '-p', 'ProtectSystem=strict', '-p', 'PrivateTmp=yes', '-p', 'ReadWritePaths=/home/gemini-worker',
+      '-p', 'InaccessiblePaths=/srv/julia-runner', '--', PYTHON, REAPER, '--', spec.command, ...spec.args]
+    : ['--user', '--scope', '--quiet', '--collect', `--unit=${unit}`, '--', PYTHON, REAPER, '--', spec.command, ...spec.args];
   const result = await run('systemd-run', command, options, {
     seconds,
     graceMs: STOP_GRACE_MS,
@@ -217,7 +280,8 @@ export async function review(request, {
         try { kill(-child.pid, 'SIGKILL'); } catch { /* the group is gone */ }
         stop();
       });
-      if (spec.stdin) child.stdin.end(request.prompt);
+      if (spec.stdin) child.stdin.end(spec.streamPrompt
+        ? `${JSON.stringify({ event: 'user', message: { content: request.prompt } })}\n` : request.prompt);
     },
   });
   // However the reviewer ended, nothing of its scope is left running.
@@ -227,19 +291,20 @@ export async function review(request, {
   }
   if (result.stopped) return { status: 'stopped', error: stoppedLine(seconds) };
   if (result.error) return { status: 'failed', error: `the reviewer did not start: ${result.error.message}` };
-  const reply = which === 'codex' ? codexReply(stdout) : piReply(stdout);
-  const ran = which === 'codex' ? await model(reply.thread) : reply.model;
+  const kind = spec.kind ?? (which === 'codex' ? 'codex' : 'pi');
+  const reply = kind === 'codex' ? codexReply(stdout) : kind === 'gemini' ? geminiReply(stdout) : piReply(stdout);
+  const ran = kind === 'codex' ? await model(reply.thread) : reply.model;
   const tail = stderr.trim().split('\n').slice(-3).join(' | ').slice(-500);
   if (result.code !== 0) {
     const how = result.code === null ? `was stopped by ${result.signal}` : `exited ${result.code}`;
-    return { status: 'failed', error: `the reviewer ${how}${reply.error || tail ? `: ${reply.error ?? tail}` : ''}`, text: reply.text, model: ran };
+    return { status: 'failed', error: `the ${role} ${how}${reply.error || tail ? `: ${reply.error ?? tail}` : ''}`, text: reply.text, model: ran };
   }
   if (!reply.ok) return { status: 'failed', error: reply.error, text: reply.text, model: ran };
   if (!ran) return { status: 'failed', error: 'the model that ran could not be confirmed, so the review does not count', text: reply.text };
   return { status: 'ok', text: reply.text, model: ran };
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+export function main(role = 'reviewer') {
   // A progress line at most once a second while the reviewer prints; the answer is the last line.
   let last = 0;
   const onOutput = () => {
@@ -272,12 +337,17 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const run = (command, args, options, limits) => runLimited(command, args, options, {
     ...limits, started: (child) => { group = child.pid; limits.started(child); },
   });
-  review(request, { run, onOutput }).then((reply) => {
+  review(request, { run, onOutput, role }).then((reply) => {
     if (stopping) finish();
     if (reply.status === 'stopped') {
       console.error(reply.error);
       process.exit(STOPPED_EXIT);
     }
     process.stdout.write(`${JSON.stringify(reply)}\n`);
+  }).catch((error) => {
+    console.error(`the ${role} launcher failed: ${error.message}`);
+    process.exitCode = 1;
   });
 }
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();

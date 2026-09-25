@@ -23,39 +23,56 @@ from pathlib import Path
 from .checkpoint import CardRun, ReviewResult, TestResult
 from .graph import TODD_REASONS, BuildResult
 
-WORKER_COMMANDS = {
-    'builder': ('gemini-worker', '/opt/julia-runner/ops/julia-runner/run-gemini.mjs'),
-    'tests': ('julia-tester', '/opt/julia-runner/ops/julia-runner/run-tests.mjs'),
-    # The reviewer launcher (JUL-128): Codex or DeepSeek, chosen in its JSON
-    # request, run from / in its own process group under its own time limit.
-    'reviewer': ('runner', '/opt/julia-runner/ops/julia-runner/run-reviewer.mjs'),
+LAUNCHERS = {
+    'gemini-builder': '/opt/julia-runner/ops/julia-runner/run-gemini.mjs',
+    'codex-builder': '/opt/julia-runner/ops/julia-runner/run-codex-builder.mjs',
+    'tests': '/opt/julia-runner/ops/julia-runner/run-tests.mjs',
+    'reviewer': '/opt/julia-runner/ops/julia-runner/run-reviewer.mjs',
 }
+MODEL_RESOLVER = Path(__file__).resolve().parents[3] / 'scripts' / 'julia-graph-model.mjs'
 # The command lines a reviewer's own processes carry, so one left behind is
 # still found: DeepSeek's Pi (its model) and Codex (its read-only exec).
-REVIEWER_MARKS = [[b'deepseek/deepseek-v4-pro'], [b'exec', b'read-only', b'--skip-git-repo-check', b'--json']]
+REVIEWER_MARKS = [[b'deepseek/deepseek-v4-pro'], [b'exec', b'read-only', b'--skip-git-repo-check', b'--json'],
+                  [b'--model', b'gemini-3.8-flash', b'--disable-slash-commands']]
+BUILDER_MARKS = [[b'exec', b'workspace-write', b'-C', b'--json']]
 # Accounts that run other things too (runner hosts Orca's server all day), so
 # their other processes are never taken for a live worker of this kind.
 SHARED_ACCOUNTS = {'reviewer'}
 WORKER_ENV = {'PATH': '/usr/bin:/bin', 'LANG': 'C.UTF-8'}
 # Who each worker is, and who makes its model, in the words the card shows.
 # The reviewer's maker must differ from the builder's (graph.Review).
-REVIEWERS = {'deepseek': ('DeepSeek V4 Pro (Pi)', 'DeepSeek'), 'codex': ('Codex (gpt-5.5)', 'OpenAI')}
-DEFAULT_REVIEWER = 'deepseek'
+def resolve_pair(builder: str, reviewer: str) -> dict:
+    """The shared JS MODEL_CATALOG is the single source for labels and makers."""
+    done = subprocess.run(['/usr/bin/node', str(MODEL_RESOLVER), builder, reviewer], capture_output=True, text=True)
+    if done.returncode != 0:
+        raise ValueError(done.stderr.strip() or f'model choices could not be resolved (exit {done.returncode})')
+    return json.loads(done.stdout)
 
 
-def worker_names(reviewer: str = DEFAULT_REVIEWER) -> dict[str, str]:
-    return {'builder': 'Gemini (agy)', 'tests': 'the test runner (no AI model)', 'reviewer': REVIEWERS[reviewer][0]}
+def worker_names(pair: dict) -> dict[str, str]:
+    return {'builder': pair['builder']['name'], 'tests': 'the test runner (no AI model)',
+            'reviewer': pair['reviewer']['name']}
 
 
-def worker_makers(reviewer: str = DEFAULT_REVIEWER) -> dict[str, str]:
-    return {'builder': 'Google', 'reviewer': REVIEWERS[reviewer][1]}
+def worker_makers(pair: dict) -> dict[str, str]:
+    return {'builder': pair['builder']['maker'], 'reviewer': pair['reviewer']['maker']}
 # The exit code ops/julia-runner/time-limit.mjs gives a worker it stopped, as GNU timeout does.
 STOPPED_EXIT = 124
 GIT_ID = ['-c', 'user.name=Julia graph', '-c', 'user.email=graph@julia-next.invalid']
 
 
-def sudo_command(kind: str) -> list[str]:
-    account, script = WORKER_COMMANDS[kind]
+def sudo_command(kind: str, choice: dict | None = None) -> list[str]:
+    if kind == 'tests':
+        account, script = 'julia-tester', LAUNCHERS['tests']
+    elif kind == 'builder' and choice:
+        entry = choice['entry']
+        if entry not in ('gemini', 'codex'):
+            raise ValueError(f'no builder launcher for {entry}')
+        account, script = choice['account'], LAUNCHERS[f'{entry}-builder']
+    elif kind == 'reviewer' and choice:
+        account, script = choice['account'], LAUNCHERS['reviewer']
+    else:
+        raise ValueError(f'the {kind} worker has no selected model')
     return ['sudo', '-n', '-u', account, '--', '/usr/bin/node', script]
 
 
@@ -70,7 +87,7 @@ def git(cwd: str, *args: str) -> str:
 
 def account_uid(kind: str) -> int | None:
     try:
-        return pwd.getpwnam(WORKER_COMMANDS[kind][0]).pw_uid
+        return pwd.getpwnam({'builder': 'gemini-worker', 'tests': 'julia-tester'}[kind]).pw_uid
     except KeyError:  # no such account on this machine (the tests' laptop)
         return None
 
@@ -88,8 +105,10 @@ def live_workers(kind: str, proc: Path = Path('/proc'), uid: int | None | str = 
     launcher in its command line. uid is the account's, looked up by default.
     A shared account's other processes do not count: for the reviewer it is
     the seat, or a Pi process running the reviewer's model."""
-    script = WORKER_COMMANDS[kind][1].encode()
-    marks = REVIEWER_MARKS if kind == 'reviewer' else []
+    scripts = [LAUNCHERS[name].encode() for name in {
+        'builder': ('gemini-builder', 'codex-builder'), 'tests': ('tests',), 'reviewer': ('reviewer',),
+    }[kind]]
+    marks = REVIEWER_MARKS if kind == 'reviewer' else BUILDER_MARKS if kind == 'builder' else []
     if uid == 'account':
         uid = None if kind in SHARED_ACCOUNTS else account_uid(kind)
     found = []
@@ -98,7 +117,7 @@ def live_workers(kind: str, proc: Path = Path('/proc'), uid: int | None | str = 
             continue
         try:
             args = (entry / 'cmdline').read_bytes().split(b'\0')
-            if script in args or any(all(m in args for m in mark) for mark in marks) or (uid is not None and real_uid(entry) == uid):
+            if any(script in args for script in scripts) or any(all(m in args for m in mark) for mark in marks) or (uid is not None and real_uid(entry) == uid):
                 found.append(int(entry.name))
         except (OSError, ValueError):
             continue
@@ -116,13 +135,13 @@ def waiter(limit_seconds: float, every: float = 5.0):
 
 # ------------------------------------------------------------ worker runs
 
-async def run_worker(kind: str, request: dict | str, on_line=None, cwd: str | None = None,
+async def run_worker(kind: str, request: dict | str, on_line=None, cwd: str | None = None, choice: dict | None = None,
                      limit_seconds: float | None = None) -> tuple[int | None, str, str]:
     """(status, stdout, stderr). With limit_seconds the graph stops the worker
     itself (for a worker whose launcher has no limit): past it, the worker is
     asked to end, then killed, and the status is STOPPED_EXIT."""
     proc = await asyncio.create_subprocess_exec(
-        *sudo_command(kind), env=WORKER_ENV, cwd=cwd,
+        *sudo_command(kind, choice), env=WORKER_ENV, cwd=cwd,
         stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
         limit=64 * 1024 * 1024,
     )
@@ -178,13 +197,17 @@ def agy_step(line: str) -> str | None:
     return f"{step['tool_name']} {arg}".strip()
 
 
-def agy_outcome(status: int | None, stdout: str, stderr: str) -> BuildResult:
+def agy_outcome(status: int | None, stdout: str, stderr: str, expected_model: str | None = None) -> BuildResult:
     """agy exits 0 and says SUCCESS even when it denied a tool, so the outcome
     is the stream's final result event, and an empty reply is a failure."""
     tail = stderr.strip().splitlines()[-1:] or ['']
     if status == STOPPED_EXIT:
         return BuildResult(False, tail[0] or 'stopped by its time limit', stopped=True)
     events = [e for e in map(_json, stdout.splitlines()) if isinstance(e, dict)]
+    if expected_model:
+        ran = next((e.get('init', {}).get('model') for e in events if e.get('event') == 'init'), None)
+        if ran != expected_model:
+            return BuildResult(False, f'the builder ran {ran or "an unconfirmed model"}, not {expected_model}')
     final = next((e['result'] for e in reversed(events) if e.get('event') == 'result'), None)
     if final is None:
         return BuildResult(False, f'the builder ended without a result (exit {status}) {tail[0]}'.strip())
@@ -210,11 +233,27 @@ def line_handler(log, progress):
     return on_line
 
 
-def builder(log):
+def codex_builder_outcome(status: int | None, stdout: str, stderr: str) -> BuildResult:
+    """The bounded Codex launcher must report a complete turn and its model."""
+    if status == STOPPED_EXIT:
+        return BuildResult(False, stderr.strip().splitlines()[-1] if stderr.strip() else 'stopped by its time limit', stopped=True)
+    reply = next((r for r in map(_json, reversed(stdout.strip().splitlines())) if isinstance(r, dict) and 'status' in r), None)
+    if status != 0 or not reply or reply.get('status') != 'ok':
+        return BuildResult(False, str((reply or {}).get('error') or f'the Codex builder failed (exit {status})'))
+    if reply.get('model') != 'gpt-5.5':
+        return BuildResult(False, f'the builder ran {reply.get("model") or "an unconfirmed model"}, not gpt-5.5')
+    report = str(reply.get('text') or '').strip()
+    return BuildResult(bool(report), None if report else 'the Codex builder gave no final report', report or None)
+
+
+def builder(log, pair: dict):
     async def build(run: CardRun, brief: str, limit_seconds: int, progress) -> BuildResult:
-        request = {'worktree': run.worktree, 'prompt': brief, 'limit_seconds': limit_seconds}
-        status, out, err = await run_worker('builder', request, line_handler(log, progress))
-        return agy_outcome(status, out, err)
+        choice = pair['builder']
+        request = {'worktree': run.worktree, 'prompt': brief, 'limit_seconds': limit_seconds, 'model': choice['model']}
+        if choice['entry'] == 'codex':
+            request['builder'] = 'codex'
+        status, out, err = await run_worker('builder', request, line_handler(log, progress), choice=choice)
+        return codex_builder_outcome(status, out, err) if choice['entry'] == 'codex' else agy_outcome(status, out, err, choice['model'])
     return build
 
 
@@ -334,7 +373,7 @@ def reviewer_outcome(status: int | None, stdout: str, stderr: str) -> ReviewResu
                         todd_reason=str(verdict.get('todd_reason') or '').strip() if todd else '', text=text, model=model)
 
 
-def reviewer(log, which: str = DEFAULT_REVIEWER):
+def reviewer(log, pair: dict):
     """The reviewer, through its launcher as runner. The launcher enforces the
     time limit and stops every process the reviewer started; the graph's own
     limit, a minute later, is only a backstop for a launcher that hangs."""
@@ -342,8 +381,10 @@ def reviewer(log, which: str = DEFAULT_REVIEWER):
         async def on_line(line):
             if progress:
                 await progress()
-        request = {'reviewer': which, 'prompt': brief, 'limit_seconds': limit_seconds}
-        status, out, err = await run_worker('reviewer', request, on_line, cwd='/', limit_seconds=limit_seconds + 60)
+        choice = pair['reviewer']
+        which = 'deepseek' if choice['entry'] == 'pi-deepseek' else choice['entry']
+        request = {'reviewer': which, 'model': choice['model'], 'prompt': brief, 'limit_seconds': limit_seconds}
+        status, out, err = await run_worker('reviewer', request, on_line, cwd='/', choice=choice, limit_seconds=limit_seconds + 60)
         result = reviewer_outcome(status, out, err)
         log(f'reviewer {which}: exit {status}, model {result.model}, '
             f'verdict {result.verdict if result.ok else "none: " + str(result.reason)}')

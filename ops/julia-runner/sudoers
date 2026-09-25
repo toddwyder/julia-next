@@ -8,3 +8,5 @@ orchestrator-svc ALL=(gemini-worker) NOPASSWD: /usr/bin/node /opt/julia-runner/o
 orchestrator-svc ALL=(julia-tester) NOPASSWD: /usr/bin/node /opt/julia-runner/ops/julia-runner/run-tests.mjs
 orchestrator-svc ALL=(runner) NOPASSWD: /usr/bin/node /opt/julia-runner/ops/service-dropbox/run-pi-seat.mjs reviewer-backup --effort high
 orchestrator-svc ALL=(runner) NOPASSWD: /usr/bin/node /opt/julia-runner/ops/julia-runner/run-reviewer.mjs
+orchestrator-svc ALL=(runner) NOPASSWD: /usr/bin/node /opt/julia-runner/ops/julia-runner/run-codex-builder.mjs
+orchestrator-svc ALL=(gemini-worker) NOPASSWD: /usr/bin/node /opt/julia-runner/ops/julia-runner/run-reviewer.mjs

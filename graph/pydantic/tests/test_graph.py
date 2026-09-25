@@ -870,6 +870,14 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.reviewer_calls, 0)
         self.assertIn('different model maker', self.results()[0])
 
+    async def test_the_reviewer_must_report_the_exact_selected_model(self):
+        deps = self.deps(reviewer=self.reviewer_says(self.APPROVE.model_copy(update={'model': 'gemini-3.7-flash'})))
+        deps.worker_makers = {'builder': 'OpenAI', 'reviewer': 'Google'}
+        deps.worker_models = {'reviewer': 'gemini-3.8-flash'}
+        self.assertEqual(await run_card(self.state(), deps), 'failed')
+        self.assertIn('not the selected gemini-3.8-flash', self.results()[0])
+        self.assertEqual(self.verdicts(), [])
+
     async def test_a_review_too_big_for_one_prompt_is_refused_not_cut_short(self):
         async def big(run, brief, *_):
             self.builder_calls += 1
@@ -1424,22 +1432,26 @@ class WorkerParsingTest(unittest.TestCase):
                              ('anthropic/claude-opus', 'Anthropic'), ('deepseek/gemini-x', 'Google'), ('', ''), (None, '')):
             self.assertEqual(maker_of(model), maker, model)
 
-    def test_each_reviewer_has_its_own_maker_and_neither_is_the_builders(self):
-        self.assertEqual(workers.worker_makers('codex'), {'builder': 'Google', 'reviewer': 'OpenAI'})
-        self.assertEqual(workers.worker_makers('deepseek'), {'builder': 'Google', 'reviewer': 'DeepSeek'})
-        self.assertEqual(workers.worker_names('codex')['reviewer'], 'Codex (gpt-5.5)')
+    def test_the_selected_pair_comes_from_the_shared_model_catalog(self):
+        pair = workers.resolve_pair('builder-codex', 'adversary-gemini-flash')
+        self.assertEqual(workers.worker_makers(pair), {'builder': 'OpenAI', 'reviewer': 'Google'})
+        self.assertEqual(workers.worker_names(pair)['reviewer'], 'Gemini 3.8 Flash')
+        with self.assertRaisesRegex(ValueError, 'different model makers'):
+            workers.resolve_pair('builder-gemini-flash', 'adversary-gemini-flash')
 
     def test_the_reviewer_is_started_exactly_as_its_sudo_rule_allows(self):
         rules = (REPO_ROOT / 'ops' / 'julia-runner' / 'sudoers').read_text()
-        command = workers.sudo_command('reviewer')
-        self.assertEqual(command[:5], ['sudo', '-n', '-u', 'runner', '--'])
-        self.assertIn(f"orchestrator-svc ALL=(runner) NOPASSWD: {' '.join(command[5:])}\n", rules)
+        pair = workers.resolve_pair('builder-codex', 'adversary-gemini-flash')
+        for kind, account in (('builder', 'runner'), ('reviewer', 'gemini-worker')):
+            command = workers.sudo_command(kind, pair[kind])
+            self.assertEqual(command[:5], ['sudo', '-n', '-u', account, '--'])
+            self.assertIn(f"orchestrator-svc ALL=({account}) NOPASSWD: {' '.join(command[5:])}\n", rules)
 
     def test_the_reviewers_account_is_shared_so_only_the_reviewer_counts(self):
         with tempfile.TemporaryDirectory() as d:
             proc = Path(d)
             for pid, cmd in {'10': ['/opt/Orca/orca-ide', '--serve'],
-                             '11': ['/usr/bin/node', workers.WORKER_COMMANDS['reviewer'][1]],
+                             '11': ['/usr/bin/node', workers.LAUNCHERS['reviewer']],
                              '12': ['node', '/usr/bin/pi', '--model', 'deepseek/deepseek-v4-pro', '-p'],
                              '13': ['codex', 'exec', '-m', 'gpt-5.5', '-s', 'read-only', '--skip-git-repo-check', '--json', '-'],
                              '14': ['codex', 'exec', '-s', 'danger-full-access', '-']}.items():  # someone else's Codex
@@ -1540,14 +1552,15 @@ class WorkerCallTest(unittest.IsolatedAsyncioTestCase):
     async def test_the_reviewer_gets_its_brief_and_limit_from_the_root_folder(self):
         seen = {}
 
-        async def run_worker(kind, request, on_line=None, cwd=None, limit_seconds=None):
+        async def run_worker(kind, request, on_line=None, cwd=None, choice=None, limit_seconds=None):
             seen.update(kind=kind, request=request, cwd=cwd, limit=limit_seconds)
             return 0, reply(verdict('approve')), ''
         run = CardRun(card='JUL-1', base='b', branch='graph/card-1', worktree='/w')
         with mock.patch.object(workers, 'run_worker', run_worker):
-            result = await workers.reviewer(lambda line: None, 'codex')(run, 'the brief', 1200, None)
+            pair = workers.resolve_pair('builder-gemini-flash', 'adversary-codex')
+            result = await workers.reviewer(lambda line: None, pair)(run, 'the brief', 1200, None)
         # the launcher enforces the limit; the graph's own, a minute later, is a backstop
-        self.assertEqual(seen, {'kind': 'reviewer', 'request': {'reviewer': 'codex', 'prompt': 'the brief', 'limit_seconds': 1200},
+        self.assertEqual(seen, {'kind': 'reviewer', 'request': {'reviewer': 'codex', 'model': None, 'prompt': 'the brief', 'limit_seconds': 1200},
                                 'cwd': '/', 'limit': 1260})
         self.assertEqual((result.verdict, result.model), ('approve', 'gpt-5.5'))
 

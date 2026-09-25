@@ -16,15 +16,19 @@ import { sudoCommand, WORKERS } from './julia-minimal-runner-adapters.mjs';
 const SUDOERS = readFileSync(fileURLToPath(new URL('../ops/julia-runner/sudoers', import.meta.url)), 'utf8');
 const rules = SUDOERS.split('\n').filter((line) => line.trim() && !line.trim().startsWith('#'));
 
-// The Pydantic graph's reviewer launcher (JUL-128), as graph/pydantic/julia_graph/workers.py starts it.
-const GRAPH_REVIEWER = 'orchestrator-svc ALL=(runner) NOPASSWD: /usr/bin/node /opt/julia-runner/ops/julia-runner/run-reviewer.mjs';
+// The graph selects an account-specific launcher from the model catalog.
+const GRAPH_ROUTES = [
+  'orchestrator-svc ALL=(runner) NOPASSWD: /usr/bin/node /opt/julia-runner/ops/julia-runner/run-reviewer.mjs',
+  'orchestrator-svc ALL=(runner) NOPASSWD: /usr/bin/node /opt/julia-runner/ops/julia-runner/run-codex-builder.mjs',
+  'orchestrator-svc ALL=(gemini-worker) NOPASSWD: /usr/bin/node /opt/julia-runner/ops/julia-runner/run-reviewer.mjs',
+];
 
-test('the sudo rules are exactly the three minimal-runner workers and the graph reviewer, and nothing wider', () => {
-  assert.equal(rules.length, 4);
+test('the sudo rules name only the fixed account-specific launchers, and nothing wider', () => {
+  assert.equal(rules.length, 6);
   const expected = [...Object.keys(WORKERS).map((worker) => {
     const [, , account, , ...command] = sudoCommand(worker);
     return `orchestrator-svc ALL=(${account}) NOPASSWD: ${command.join(' ')}`;
-  }), GRAPH_REVIEWER];
+  }), ...GRAPH_ROUTES];
   assert.deepEqual(rules.sort(), expected.sort());
   for (const rule of rules) {
     assert.doesNotMatch(rule, /[*?[\]\\]|ALL\s*$|\(ALL|\(root\)/, `no wildcards, no ALL, no root: ${rule}`);
@@ -53,6 +57,7 @@ test('agy runs headless in the worktree, never with permissions skipped', () => 
   const args = agyArgs('the brief', '/srv/julia-runner/worktrees/card-9');
   for (const flag of ['--dangerously-skip-permissions', '--sandbox', '--project']) assert.ok(!args.includes(flag), flag);
   assert.deepEqual(args.slice(0, 4), ['--add-dir', '/srv/julia-runner/worktrees/card-9', '--mode', 'accept-edits'], 'edits allowed in the worktree only; commands stay refused');
+  assert.deepEqual(args.slice(args.indexOf('--model'), args.indexOf('--model') + 2), ['--model', 'gemini-3.8-flash']);
   assert.equal(args[args.indexOf('--print-timeout') + 1], '0', 'no five-minute cut-off on a turn');
   assert.equal(args.at(-2), '--print');
   assert.equal(args.at(-1), 'Your working folder is /srv/julia-runner/worktrees/card-9.\n\nthe brief');

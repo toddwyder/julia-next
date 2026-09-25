@@ -27,6 +27,8 @@ REPO = '/srv/julia-runner/repo'
 WORKTREES = '/srv/julia-runner/worktrees'
 STATE = '/srv/julia-runner/graph-state'
 WAIT_LIMIT_SECONDS = 45 * 60
+DEFAULT_BUILDER_MODEL = 'builder-gemini-flash'
+DEFAULT_REVIEWER_MODEL = 'adversary-deepseek-pro'
 
 
 def log(line: str) -> None:
@@ -39,17 +41,22 @@ def graph_version() -> str:
     return f"pydantic-graph {importlib.metadata.version('pydantic-graph')}, graph code `{code or 'unknown'}`"
 
 
-def card_deps(card: str, limits: dict[str, int] | None = None, reviewer: str = workers.DEFAULT_REVIEWER) -> Deps:
+def card_deps(card: str, limits: dict[str, int] | None = None,
+              builder_model: str = DEFAULT_BUILDER_MODEL, reviewer_model: str = DEFAULT_REVIEWER_MODEL) -> Deps:
+    pair = workers.resolve_pair(builder_model, reviewer_model)
     return Deps(
         linear=LinearApp(), checkpoint=Checkpoint(Path(STATE), card),
-        prepare=workers.prepare(REPO), builder=workers.builder(log), discard=workers.discard,
-        commit=workers.commit, tester=workers.tester, reviewer=workers.reviewer(log, reviewer),
+        prepare=workers.prepare(REPO), builder=workers.builder(log, pair), discard=workers.discard,
+        commit=workers.commit, tester=workers.tester, reviewer=workers.reviewer(log, pair),
         live_workers=workers.live_workers, wait_for_exit=workers.waiter(WAIT_LIMIT_SECONDS),
         snapshot=workers.snapshot, restore=workers.restore, drift=workers.drift, diff=workers.change,
         install=workers.clean_install,
         base_file=workers.base_file,
-        graph_version=graph_version(), log=log, worker_names=workers.worker_names(reviewer),
-        worker_makers=workers.worker_makers(reviewer), limits=limits or dict(LIMITS), files=workers.tracked_files,
+        graph_version=graph_version(), log=log, worker_names=workers.worker_names(pair),
+        worker_makers=workers.worker_makers(pair),
+        worker_models={'reviewer': pair['reviewer']['model'] or 'gpt-5.5'},
+        model_labels=(builder_model, reviewer_model),
+        limits=limits or dict(LIMITS), files=workers.tracked_files,
     )
 
 
@@ -89,8 +96,10 @@ def main(argv: list[str]) -> int:
     for kind in ('builder', 'tests', 'reviewer'):
         parser.add_argument(f'--{kind}-limit', type=lambda text, kind=kind: checked_limit(kind, text), default=LIMITS[kind],
                             help=f'seconds, 1 to {LIMIT_CAPS[kind]} (default %(default)s)')
-    # The reviewer for this run: the service always uses the default.
-    parser.add_argument('--reviewer', choices=sorted(workers.REVIEWERS), default=workers.DEFAULT_REVIEWER)
+    # Hand runs choose both models by the same labels the model catalog uses.
+    # The service retains its current defaults until it is deliberately updated.
+    parser.add_argument('--builder-model', default=DEFAULT_BUILDER_MODEL)
+    parser.add_argument('--reviewer-model', default=DEFAULT_REVIEWER_MODEL)
     args = parser.parse_args(argv)
     os.umask(0o002)  # the builder account shares the working copy through its group
     number = args.card.split('-')[-1]
@@ -98,7 +107,7 @@ def main(argv: list[str]) -> int:
     state = CardRun(card=args.card, base=workers.git(REPO, 'rev-parse', '--verify', f'{args.base}^{{commit}}'),
                     branch=f'graph/card-{number}', worktree=f'{WORKTREES}/card-{number}')
     deps = card_deps(args.card, {'builder': args.builder_limit, 'tests': args.tests_limit, 'reviewer': args.reviewer_limit},
-                     args.reviewer)
+                     args.builder_model, args.reviewer_model)
     log(f'{args.card}: {deps.graph_version}')
     try:
         outcome = asyncio.run(run_card(state, deps))

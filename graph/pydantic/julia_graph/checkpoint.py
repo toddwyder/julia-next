@@ -75,6 +75,9 @@ class CardRun(BaseModel):
     base: str
     branch: str
     worktree: str
+    # Selected through MODEL_CATALOG and pinned for every resumed attempt.
+    builder_model: str | None = None
+    reviewer_model: str | None = None
     step: Step = 'prepare'
     # True once a builder has been started for the current attempt. A restart
     # that finds it still set knows the builder never finished.

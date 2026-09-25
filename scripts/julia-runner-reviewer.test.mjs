@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { runLimited } from '../ops/julia-runner/time-limit.mjs';
-import { codexModel, codexReply, piReply, PYTHON, REAPER, REVIEWERS, review, SCOPE_PREFIX, STOP_GRACE_MS, stopScope, userManager } from '../ops/julia-runner/run-reviewer.mjs';
+import { BUILDERS, codexModel, codexReply, geminiReply, piReply, PYTHON, REAPER, REVIEWERS, review, SCOPE_PREFIX, STOP_GRACE_MS, stopScope, userManager } from '../ops/julia-runner/run-reviewer.mjs';
 
 // For the tests that fake the run: a user manager that is there, and a scope with nothing left in it.
 const FREE = { manager: () => ({ XDG_RUNTIME_DIR: '/run/user/1' }), stop: async () => [] };
@@ -35,6 +35,55 @@ test('Codex is started read-only, on the pinned model, with the prompt on stdin'
   assert.deepEqual(spec.args, ['exec', '-m', 'gpt-5.5', '-c', 'model_reasoning_effort=high', '-s', 'read-only', '--skip-git-repo-check', '--json', '-']);
   assert.equal(spec.stdin, true);
   assert.deepEqual(Object.keys(spec.env).sort(), ['HOME', 'LANG', 'PATH']);
+});
+
+test('the Codex builder gets the selected worktree, write sandbox and its own limit', async () => {
+  const worktree = '/srv/julia-runner/worktrees/card-999';
+  const spec = BUILDERS.codex('the brief', worktree);
+  assert.equal(spec.command, 'codex');
+  assert.deepEqual(spec.args, ['exec', '-m', 'gpt-5.5', '-c', 'model_reasoning_effort=high', '-s', 'workspace-write', '-C', worktree, '--json', '-']);
+  let seen;
+  await review({ builder: 'codex', worktree, prompt: 'p', limit_seconds: 99999 }, {
+    role: 'builder', contain: FREE, worktreeCheck: () => null,
+    run: async (command, args, options, limits) => { seen = { command, args, options, limits }; return { stopped: true }; },
+  });
+  assert.equal(seen.command, 'systemd-run');
+  assert.equal(seen.options.cwd, worktree);
+  assert.equal(seen.limits.seconds, 10800);
+  assert.match((await review({ builder: 'codex', worktree: '/tmp/elsewhere', prompt: 'p' }, {
+    role: 'builder', run: () => assert.fail('must not start'), contain: FREE,
+  })).error, /not a card worktree/);
+});
+
+test('Gemini review uses its reported model and only a completed, non-denied final result', () => {
+  const init = { event: 'init', conversation_id: 'turn-1', init: { model: 'gemini-3.8-flash' } };
+  const result = { event: 'result', result: { conversation_id: 'turn-1', status: 'SUCCESS', response: '{"verdict":"approve"}' } };
+  assert.deepEqual(geminiReply(lines(init, result)), { ok: true, text: '{"verdict":"approve"}', model: 'gemini-3.8-flash' });
+  assert.equal(geminiReply(lines(init, { event: 'result', result: { ...result.result, denied_actions: [{ action: 'command' }] } })).ok, false);
+  assert.equal(geminiReply(lines(init, { event: 'result', result: { ...result.result, status: 'FAILED' } })).ok, false);
+  assert.equal(geminiReply(lines(init)).ok, false);
+  assert.equal(geminiReply(lines(result)).ok, false);
+});
+
+test('Gemini review starts in a read-only transient service with no access to candidate files', async () => {
+  let seen;
+  const reply = await review({ reviewer: 'gemini', prompt: 'the full brief' }, {
+    contain: FREE,
+    run: async (command, args, options) => { seen = { command, args, options }; return { stopped: true }; },
+  });
+  assert.equal(reply.status, 'stopped');
+  assert.equal(seen.command, 'systemd-run');
+  assert.ok(seen.args.includes('-p'));
+  assert.ok(seen.args.includes('ProtectSystem=strict'));
+  assert.ok(seen.args.includes('InaccessiblePaths=/srv/julia-runner'));
+  assert.ok(seen.args.includes('ReadWritePaths=/home/gemini-worker'));
+  assert.ok(seen.args.some((arg) => arg.endsWith('.service')));
+  assert.equal(seen.options.cwd, '/');
+  assert.ok(REVIEWERS.gemini('brief').args.includes('stream-json'));
+  assert.ok(REVIEWERS.gemini('brief').args.includes('--input-format'));
+  assert.equal(REVIEWERS.gemini('brief').streamPrompt, true);
+  assert.ok(!REVIEWERS.gemini('brief').args.includes('brief'));
+  assert.ok(!REVIEWERS.gemini('brief').args.includes('--dangerously-skip-permissions'));
 });
 
 test('Codex: the last agent message of a completed turn is the reply; a failed turn is not', () => {
