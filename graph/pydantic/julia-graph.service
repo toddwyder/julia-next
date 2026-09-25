@@ -1,0 +1,24 @@
+# The graph as a service (JUL-127): checks the board about once a minute and
+# starts the top eligible Ready card. Install: graph/pydantic/README.md.
+[Unit]
+Description=Julia graph: Ready starts the card
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=orchestrator-svc
+Group=orchestrator-svc
+WorkingDirectory=/srv/julia-runner/graph-code/graph/pydantic
+LoadCredentialEncrypted=linear-app-id:/etc/credstore.encrypted/julia-runner-linear-app-id.cred
+LoadCredentialEncrypted=linear-app-secret:/etc/credstore.encrypted/julia-runner-linear-app-secret.cred
+ExecStart=/srv/julia-runner/graph-venv/bin/python -m julia_graph serve
+Restart=always
+RestartSec=10
+# A stop or restart ends the graph and any worker it started together; the
+# builder reservation file makes the next start resume that card.
+KillMode=control-group
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

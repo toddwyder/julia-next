@@ -13,6 +13,7 @@ import json
 import os
 import pwd
 import re
+import shutil
 import subprocess
 import time
 from pathlib import Path
@@ -234,6 +235,8 @@ def prepare(repo: str, install=npm_ci):
     starts clean)."""
     async def prepare_card(run: CardRun) -> str | None:
         wt = Path(run.worktree)
+        if wt.exists() and old_style(run.worktree):
+            set_aside(wt)  # an older graph's git worktree: its .git points out of the folder
         if wt.exists():
             branch = git(run.worktree, 'rev-parse', '--abbrev-ref', 'HEAD')
             if branch != run.branch:
@@ -242,12 +245,66 @@ def prepare(repo: str, install=npm_ci):
                 return f'{run.worktree} does not start from base {run.base[:12]}: it is at another commit'
             if git(run.worktree, 'status', '--porcelain'):
                 return f'{run.worktree} has uncommitted changes left by an earlier run'
+            cut_ties(run.worktree)  # a run killed straight after cloning left them
         else:
             git(repo, 'fetch', '-q', 'origin', 'main')
             git(repo, 'rev-parse', '--verify', f'{run.base}^{{commit}}')
-            git(repo, 'worktree', 'add', '-q', '-b', run.branch, run.worktree, run.base)
+            # A local clone, not `git worktree add`: a worktree's .git is a
+            # pointer into the main repo, outside the one folder the builder may
+            # read, and headless agy ends the whole turn when Gemini follows it
+            # (JUL-142 and JUL-144, 25 Sep). A clone keeps its git data inside
+            # the folder. --local hardlinks the objects where it can (the
+            # server's repo is shallow, so there git copies them instead).
+            # It is made beside the card's folder and moved into place only when
+            # complete, so a run killed half-way never leaves a half-made card-N.
+            new = wt.with_name(f'{wt.name}.new')
+            shutil.rmtree(new, ignore_errors=True)
+            git(repo, 'clone', '-q', '--local', '--no-checkout', '.', str(new))
+            # A clone brings only the repo's own branches; the base is the repo's
+            # copy of GitHub's main, which its local main may lag, so fetch that too.
+            git(str(new), 'fetch', '-q', 'origin', '+refs/remotes/origin/*:refs/remotes/github/*')
+            if subprocess.run(['git', 'cat-file', '-e', f'{run.base}^{{commit}}'], cwd=new).returncode:
+                shutil.rmtree(new, ignore_errors=True)
+                return f'the base commit {run.base[:12]} is not in the working copy made for this card'
+            git(str(new), 'checkout', '-q', '-b', run.branch, run.base)
+            cut_ties(str(new))
+            os.replace(new, wt)
         return install(run.worktree) if (wt / 'package-lock.json').exists() else None
     return prepare_card
+
+
+def old_style(worktree: str) -> bool:
+    """A working copy an older graph made with `git worktree add`: its .git is a
+    one-line pointer into the main repo, outside the builder's folder."""
+    return Path(worktree, '.git').is_file()
+
+
+def set_aside(folder: Path) -> Path:
+    """Move a working copy to <folder>.runN, kept as it was; returns where it went."""
+    n = 1
+    while folder.with_name(f'{folder.name}.run{n}').exists():
+        n += 1
+    kept = folder.with_name(f'{folder.name}.run{n}')
+    os.replace(folder, kept)
+    return kept
+
+
+def cut_ties(worktree: str) -> None:
+    """Leave nothing in the folder that names the repo it was cloned from.
+    Gemini reads git's own files and follows any path it finds: the clone's
+    history log says "clone: from /srv/julia-runner/repo", and reading that
+    repo was refused and ended the turn (live check, 25 Sep). The remote, the
+    last-fetch record and the history logs are the only places that name it."""
+    if 'origin' in git(worktree, 'remote').split():
+        git(worktree, 'remote', 'remove', 'origin')
+    Path(worktree, '.git', 'FETCH_HEAD').unlink(missing_ok=True)
+    shutil.rmtree(Path(worktree, '.git', 'logs'), ignore_errors=True)
+
+
+def tracked_files(run: CardRun) -> list[str]:
+    """The repo's files, for the builder's brief: with them it has no reason to
+    scan the folder, which Gemini did with a shell command that was refused."""
+    return git(run.worktree, 'ls-files').splitlines()
 
 
 async def discard(run: CardRun) -> int:

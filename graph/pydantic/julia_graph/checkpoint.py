@@ -65,6 +65,10 @@ class CardRun(BaseModel):
     # stop is resumed as that confirmation, never as a new worker.
     stop_kind: str | None = None
     stop_ran: float = 0
+    # The card's "## UAT plan" section as it was when the card started (JUL-127).
+    # Later edits to the card do not change it; only an Instruction comment does.
+    uat_plan: str | None = None
+    uat_locked_at: datetime | None = None
 
 
 class CardLocked(Exception):

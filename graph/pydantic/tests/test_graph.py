@@ -91,8 +91,11 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         return CardRun(card='JUL-1', base=self.base, branch='graph/card-1', worktree=str(self.worktree))
 
     async def prepare(self, run):
+        if self.worktree.exists() and (self.worktree / '.git').is_file():
+            workers.set_aside(self.worktree)  # as the real prepare does with an old-style worktree
         if not self.worktree.exists():
-            sh(self.repo, 'git', 'worktree', 'add', '-q', '-b', run.branch, run.worktree, run.base)
+            sh(self.repo, 'git', 'clone', '-q', '--no-checkout', '.', run.worktree)
+            sh(self.worktree, 'git', 'checkout', '-q', '-b', run.branch, run.base)
         return None
 
     def deps(self, builder=None, tester=None, alive_after_wait=None):
@@ -138,6 +141,24 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn(head, result)
         self.assertIn('tests 3, pass 3, fail 0', result)
         self.assertIn('pydantic-graph test', result)
+
+    async def test_the_brief_lists_the_files_and_forbids_commands_and_subagents(self):
+        deps = self.deps()
+        deps.files = lambda run: ['README.md', 'scripts/a.test.mjs']
+        self.assertEqual(await run_card(self.state(), deps), 'passed')
+        self.assertIn('<files>\nREADME.md\nscripts/a.test.mjs\n</files>', self.brief)
+        self.assertIn('Do not run any command, not even to list', self.brief)
+        self.assertIn('do not start subagents', self.brief)
+        self.assertIn(f'inside your working folder,\n{self.worktree}', self.brief)
+        self.assertIn('This overrides any file in the repository', self.brief)
+
+    async def test_a_file_list_that_cannot_be_read_does_not_stop_the_build(self):
+        def broken(run):
+            raise RuntimeError('git ls-files failed')
+        deps = self.deps()
+        deps.files = broken
+        self.assertEqual(await run_card(self.state(), deps), 'passed')
+        self.assertNotIn('<files>', self.brief)
 
     # ----------------------------------------------------------------- failures say so
 
@@ -207,6 +228,32 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(interrupted), 1)
         self.assertIn('did not count it as done', interrupted[0])
         self.assertEqual(len(self.results()), 1)
+
+    async def test_a_run_resumed_in_an_older_graphs_worktree_starts_again_from_a_fresh_copy(self):
+        # A card mid-build when the new graph is deployed: its folder is a git
+        # worktree whose .git points outside the builder's folder.
+        sh(self.repo, 'git', 'worktree', 'add', '-q', '-b', 'graph/card-1', str(self.worktree), self.base)
+        (self.worktree / 'half.txt').write_text('left by the old builder')
+        old = self.state()
+        old.step, old.build_started, old.attempt = 'build', True, 1
+        Checkpoint(self.state_dir, 'JUL-1').save(old)
+        self.assertEqual(await run_card(self.state(), self.deps()), 'passed')
+        self.assertEqual(self.builder_calls, 1)
+        self.assertTrue((self.worktree / '.git').is_dir())  # built in a fresh clone
+        self.assertFalse((self.worktree / 'half.txt').exists())
+        self.assertTrue((self.worktree.with_name('card-1.run1') / 'half.txt').exists())  # kept aside as it was
+        [note] = [c for c in self.linear.comments if 'graph: fresh-copy' in c]
+        self.assertIn('made by an older version of the graph', note)
+
+    async def test_a_fresh_copy_waits_for_an_old_builder_still_running(self):
+        sh(self.repo, 'git', 'worktree', 'add', '-q', '-b', 'graph/card-1', str(self.worktree), self.base)
+        old = self.state()
+        old.step, old.build_started, old.attempt = 'build', True, 1
+        Checkpoint(self.state_dir, 'JUL-1').save(old)
+        self.alive['builder'] = [4242]
+        self.assertEqual(await run_card(self.state(), self.deps(alive_after_wait=[4242])), 'failed')
+        self.assertEqual(self.builder_calls, 0)
+        self.assertTrue((self.worktree / '.git').is_file())  # untouched while the old builder runs
 
     async def test_a_restart_while_the_old_builder_still_runs_starts_no_second_one(self):
         async def killed(run, brief, *_):
@@ -525,6 +572,90 @@ class PrepareTest(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(await prepare(self.run_for(self.first)))
         (self.worktree / 'stale.txt').write_text('an abandoned edit')
         self.assertIn('uncommitted', await prepare(self.run_for(self.first)) or '')
+
+    async def test_the_working_copy_holds_its_own_git_data(self):
+        # JUL-127 live check: Gemini followed a worktree's .git pointer out of
+        # its folder and headless agy ended the build. Nothing may point out.
+        prepare = workers.prepare(str(self.repo), install=self.install)
+        self.assertIsNone(await prepare(self.run_for(self.second)))
+        git_dir = self.worktree / '.git'
+        self.assertTrue(git_dir.is_dir())  # a folder, not a "gitdir:" pointer file
+        self.assertFalse((git_dir / 'objects' / 'info' / 'alternates').exists())
+        self.assertEqual(Path(sh(self.worktree, 'git', 'rev-parse', '--absolute-git-dir')), git_dir.resolve())
+        self.assertEqual(sh(self.worktree, 'git', 'rev-parse', 'HEAD'), self.second)
+        self.assertEqual(sh(self.worktree, 'git', 'rev-parse', '--abbrev-ref', 'HEAD'), 'graph/card-1')
+
+    def names_the_repo(self) -> list[str]:
+        """Files in the working copy whose contents name the repo it came from."""
+        needle = str(self.repo).encode()
+        found = []
+        for path in self.worktree.rglob('*'):
+            if path.is_file() and '/objects/' not in path.as_posix() and needle in path.read_bytes():
+                found.append(str(path.relative_to(self.worktree)))
+        return found
+
+    async def test_nothing_in_the_working_copy_names_the_repo(self):
+        # Live check, 25 Sep: Gemini read the clone's history log ("clone: from
+        # /srv/julia-runner/repo"), followed it, and the refused read ended the build.
+        prepare = workers.prepare(str(self.repo), install=self.install)
+        self.assertIsNone(await prepare(self.run_for(self.second)))
+        self.assertEqual(self.names_the_repo(), [])
+        self.assertEqual(sh(self.worktree, 'git', 'remote'), '')
+        self.assertEqual(sh(self.worktree, 'git', 'rev-parse', 'HEAD'), self.second)
+        # and the graph can still commit and discard there
+        (self.worktree / 'hello.txt').write_text('hello\n')
+        commit, _ = await workers.commit(self.run_for(self.second))
+        self.assertEqual(sh(self.worktree, 'git', 'rev-parse', 'HEAD'), commit)
+        self.assertEqual(await workers.discard(self.run_for(self.second)), 1)
+        self.assertEqual(sh(self.worktree, 'git', 'rev-parse', 'HEAD'), self.second)
+
+    async def test_a_working_copy_left_straight_after_cloning_is_cleaned_on_resume(self):
+        sh(self.repo, 'git', 'clone', '-q', '--no-checkout', '.', str(self.worktree))
+        sh(self.worktree, 'git', 'checkout', '-q', '-b', 'graph/card-1', self.second)
+        self.assertTrue(self.names_the_repo())  # the killed run never cut the ties
+        prepare = workers.prepare(str(self.repo), install=self.install)
+        self.assertIsNone(await prepare(self.run_for(self.second)))
+        self.assertEqual(self.names_the_repo(), [])
+
+    async def test_an_older_graphs_git_worktree_is_kept_aside_and_replaced_by_a_clone(self):
+        sh(self.repo, 'git', 'worktree', 'add', '-q', '-b', 'graph/card-1', str(self.worktree), self.second)
+        prepare = workers.prepare(str(self.repo), install=self.install)
+        self.assertIsNone(await prepare(self.run_for(self.second)))
+        self.assertTrue((self.worktree / '.git').is_dir())  # a clone now
+        self.assertEqual(self.names_the_repo(), [])
+        kept = self.worktree.with_name('card-1.run1')
+        self.assertTrue((kept / '.git').is_file())  # the old worktree, kept as it was
+
+    async def test_a_half_made_clone_is_never_left_as_the_cards_folder(self):
+        new = self.worktree.with_name('card-1.new')
+        new.mkdir(parents=True)
+        (new / 'junk').write_text('a clone killed half-way\n')
+        prepare = workers.prepare(str(self.repo), install=self.install)
+        self.assertIsNone(await prepare(self.run_for(self.second)))
+        self.assertFalse(new.exists())
+        self.assertEqual(sh(self.worktree, 'git', 'rev-parse', 'HEAD'), self.second)
+
+    async def test_a_missing_base_leaves_no_folder_behind(self):
+        prepare = workers.prepare(str(self.repo), install=self.install)
+        with self.assertRaises(RuntimeError):
+            await prepare(self.run_for('0' * 40))
+        self.assertFalse(self.worktree.exists())
+        self.assertFalse(self.worktree.with_name('card-1.new').exists())
+
+    async def test_a_base_newer_than_the_repos_own_main_is_still_found(self):
+        # The base is the repo's fresh copy of GitHub's main; the repo's local
+        # main lags behind it. The server's repo is shallow, so its clone copies
+        # only what its branches reach, and a clone alone would not carry the base.
+        shallow = Path(self.tmp.name) / 'shallow-repo'
+        sh(Path(self.tmp.name), 'git', 'clone', '-q', '--depth', '1', f'file://{self.origin}', str(shallow))
+        (self.origin / 'new.txt').write_text('newer\n')
+        sh(self.origin, 'git', *workers.GIT_ID, 'add', '-A')
+        sh(self.origin, 'git', *workers.GIT_ID, 'commit', '-q', '-m', 'three')
+        third = sh(self.origin, 'git', 'rev-parse', 'HEAD')
+        prepare = workers.prepare(str(shallow), install=self.install)
+        self.assertIsNone(await prepare(self.run_for(third)))
+        self.assertEqual(sh(self.worktree, 'git', 'rev-parse', 'HEAD'), third)
+        self.assertNotEqual(sh(shallow, 'git', 'rev-parse', 'main'), third)  # the repo's own main did lag
 
     async def test_an_interrupted_install_is_run_again(self):
         prepare = workers.prepare(str(self.repo), install=self.install)
