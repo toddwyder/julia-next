@@ -171,17 +171,43 @@ export function piReply(stdout) {
 export function geminiReply(stdout) {
   const events = String(stdout).split('\n').map(json).filter(Boolean);
   const init = events.find((event) => event.event === 'init');
-  const final = events.findLast((event) => event.event === 'result')?.result;
+  const results = events.filter((event) => event.event === 'result').map((event) => event.result);
+  const final = results.at(-1);
   const model = init?.init?.model ?? null;
   const text = final?.response ?? null;
-  if (!init || !final || final.conversation_id !== init.conversation_id) {
+  if (!init || !final || results.some((result) => result?.conversation_id !== init.conversation_id)) {
     return { ok: false, error: 'the Gemini turn did not finish with a matching result', text, model };
   }
-  if (final.status !== 'SUCCESS' || final.denied_actions?.length || !String(text ?? '').trim()) {
-    return { ok: false, error: String(final.error ?? (final.denied_actions?.length ? 'Gemini was denied a tool' : 'Gemini gave no completed reply')),
+  const failed = results.find((result) => result.status !== 'SUCCESS' || result.denied_actions?.length);
+  if (failed || !String(text ?? '').trim()) {
+    return { ok: false, error: String(failed?.error ?? (failed?.denied_actions?.length ? 'Gemini was denied a tool' : 'Gemini gave no completed reply')),
       text, model };
   }
   return { ok: true, text, model };
+}
+
+// A large full diff can be clipped by a model's single-turn input handling.
+// Stream bounded parts into one agy conversation; its intermediate responses
+// become context for the final verdict. Every byte of the brief is sent once.
+export function geminiMessages(prompt, maxBytes = 90_000) {
+  const lines = prompt.match(/[^\n]*\n|[^\n]+$/g) ?? [];
+  const parts = [];
+  let part = '';
+  for (const line of lines) {
+    if (Buffer.byteLength(line) > maxBytes) throw new Error('the Gemini review has a line too large to send intact');
+    if (part && Buffer.byteLength(part) + Buffer.byteLength(line) > maxBytes) {
+      parts.push(part);
+      part = '';
+    }
+    part += line;
+  }
+  if (part) parts.push(part);
+  return parts.map((body, index) => {
+    const content = parts.length === 1 ? body : index === parts.length - 1
+      ? `Final part ${index + 1}/${parts.length} of one review. Do not use tools. Read this part and all prior parts. Now give the final verdict required by the role file.\n\n${body}`
+      : `Part ${index + 1}/${parts.length} of one review. Do not use tools. Read this part and reply with concise provisional findings only. The final part will ask for a verdict.\n\n${body}`;
+    return `${JSON.stringify({ event: 'user', message: { content } })}\n`;
+  }).join('');
 }
 
 // Each review runs in its own systemd user scope (a cgroup): nothing its
@@ -280,8 +306,7 @@ export async function review(request, {
         try { kill(-child.pid, 'SIGKILL'); } catch { /* the group is gone */ }
         stop();
       });
-      if (spec.stdin) child.stdin.end(spec.streamPrompt
-        ? `${JSON.stringify({ event: 'user', message: { content: request.prompt } })}\n` : request.prompt);
+      if (spec.stdin) child.stdin.end(spec.streamPrompt ? geminiMessages(request.prompt) : request.prompt);
     },
   });
   // However the reviewer ended, nothing of its scope is left running.

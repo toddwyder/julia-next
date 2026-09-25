@@ -2,13 +2,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { EventEmitter } from 'node:events';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { runLimited } from '../ops/julia-runner/time-limit.mjs';
-import { BUILDERS, codexModel, codexReply, geminiReply, piReply, PYTHON, REAPER, REVIEWERS, review, SCOPE_PREFIX, STOP_GRACE_MS, stopScope, userManager } from '../ops/julia-runner/run-reviewer.mjs';
+import { BUILDERS, codexModel, codexReply, geminiMessages, geminiReply, piReply, PYTHON, REAPER, REVIEWERS, review, SCOPE_PREFIX, STOP_GRACE_MS, stopScope, userManager } from '../ops/julia-runner/run-reviewer.mjs';
 
 // For the tests that fake the run: a user manager that is there, and a scope with nothing left in it.
 const FREE = { manager: () => ({ XDG_RUNTIME_DIR: '/run/user/1' }), stop: async () => [] };
@@ -61,8 +62,36 @@ test('Gemini review uses its reported model and only a completed, non-denied fin
   assert.deepEqual(geminiReply(lines(init, result)), { ok: true, text: '{"verdict":"approve"}', model: 'gemini-3.8-flash' });
   assert.equal(geminiReply(lines(init, { event: 'result', result: { ...result.result, denied_actions: [{ action: 'command' }] } })).ok, false);
   assert.equal(geminiReply(lines(init, { event: 'result', result: { ...result.result, status: 'FAILED' } })).ok, false);
+  assert.equal(geminiReply(lines(init, { event: 'result', result: { ...result.result, denied_actions: [{ action: 'command' }] } }, result)).ok, false);
   assert.equal(geminiReply(lines(init)).ok, false);
   assert.equal(geminiReply(lines(result)).ok, false);
+});
+
+test('a full Gemini review is sent in bounded parts in one conversation without losing diff bytes', () => {
+  const prompt = `role and card\n${'diff line\n'.repeat(15_000)}end marker\n`;
+  const messages = geminiMessages(prompt).trim().split('\n').map(JSON.parse);
+  assert.ok(messages.length > 1);
+  assert.ok(messages.every((message) => message.event === 'user'));
+  const restored = messages.map((message) => message.message.content.split('\n\n').slice(1).join('\n\n')).join('');
+  assert.equal(restored, prompt);
+  assert.ok(messages.every((message) => Buffer.byteLength(message.message.content) < 91_000));
+  assert.deepEqual(geminiMessages('small\n').trim().split('\n').map(JSON.parse),
+    [{ event: 'user', message: { content: 'small\n' } }]);
+});
+
+test('the Gemini launcher writes the bounded stream to its contained process', async () => {
+  let sent;
+  const prompt = `role\n${'diff line\n'.repeat(15_000)}end marker\n`;
+  await review({ reviewer: 'gemini', model: 'gemini-3.8-flash', prompt }, {
+    contain: FREE,
+    run: async (_command, _args, _options, limits) => {
+      limits.started({ stdout: new EventEmitter(), stderr: new EventEmitter(),
+        stdin: { end: (value) => { sent = value; } }, on: () => {} });
+      return { code: 1 };
+    },
+  });
+  assert.ok(sent.split('\n').filter(Boolean).length > 1);
+  assert.equal(sent.split('\n').filter(Boolean).map((line) => JSON.parse(line).message.content.split('\n\n').slice(1).join('\n\n')).join(''), prompt);
 });
 
 test('Gemini review starts in a read-only transient service with no access to candidate files', async () => {
