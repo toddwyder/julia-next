@@ -19,7 +19,7 @@ from julia_graph.checkpoint import CardRun, Checkpoint, TestResult
 from julia_graph.graph import BuildResult, Deps, run_card
 from julia_graph.linear import ready_card
 
-from .test_graph import Clock, Crash, sh
+from .test_graph import Clock, Crash, approving_reviewer, sh
 
 GOOD = """## What to build
 
@@ -64,7 +64,7 @@ class PretendBoard:
         return {'identifier': name, 'title': f'Card {name}', 'description': self.cards[name]['description'],
                 'comments': [{'id': i, 'body': b} for i, (card, b) in self.store.items() if card == name]}
 
-    async def comment(self, name, body):
+    async def comment(self, name, body, chosen_id=None):
         await asyncio.sleep(0)  # a real call yields, so two checks can interleave
         comment_id = f'c{len(self.store) + 1}'
         self.store[comment_id] = (name, body)
@@ -79,6 +79,13 @@ class PretendBoard:
     async def move(self, name, state):
         await asyncio.sleep(0)  # a real call yields, so two checks can interleave
         self.cards[name]['state'] = state
+
+    async def assign(self, name, assignee):
+        await asyncio.sleep(0)
+        self.cards[name]['assignee'] = assignee
+
+    async def assign_to_todd(self, name):
+        await self.assign(name, 'Todd Wyder')
 
 
 class BoardTest(unittest.IsolatedAsyncioTestCase):
@@ -100,7 +107,7 @@ class BoardTest(unittest.IsolatedAsyncioTestCase):
         self.clock = Clock()
         self.built: list[str] = []  # the card each builder was started for, in order
         self.briefs: dict[str, str] = {}
-        self.alive: dict[str, list[int]] = {'builder': [], 'tests': []}
+        self.alive: dict[str, list[int]] = {'builder': [], 'tests': [], 'reviewer': []}
         self.builder = self.default_builder
         self.on_prepare = None
         self.logged: list[str] = []
@@ -140,7 +147,11 @@ class BoardTest(unittest.IsolatedAsyncioTestCase):
         return Deps(
             linear=self.linear, checkpoint=Checkpoint(self.state_dir, name), prepare=prepare,
             builder=builder, discard=workers.discard, commit=workers.commit, tester=tester,
-            live_workers=lambda kind: self.alive[kind], wait_for_exit=wait_for_exit,
+            reviewer=approving_reviewer, live_workers=lambda kind: self.alive[kind], wait_for_exit=wait_for_exit,
+            snapshot=workers.snapshot, restore=workers.restore, drift=workers.drift, diff=workers.change,
+            install=lambda run: workers.clean_install(run, install=lambda wt: None),
+            base_file=lambda run, path: 'role',
+            worker_makers={'builder': 'Google', 'reviewer': 'DeepSeek'},
             graph_version='pydantic-graph test', log=lambda line: None, now=self.clock,
         )
 

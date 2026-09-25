@@ -17,7 +17,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-Step = Literal['prepare', 'build', 'test', 'report', 'done']
+Step = Literal['prepare', 'build', 'test', 'review', 'report', 'done']
 
 
 class TestResult(BaseModel):
@@ -29,6 +29,33 @@ class TestResult(BaseModel):
     # What the failures said (the reporter's "failing tests" section, or the
     # lint's output), for the builder's repair brief.
     details: str = ''
+
+
+class ReviewResult(BaseModel):
+    """One review, as read from the reviewer's final message (JUL-128)."""
+    # True only when the final message ended with a clear verdict. A crash, a
+    # timeout, an abnormal exit or a missing verdict leaves it False, and
+    # False is never an approval.
+    ok: bool = False
+    verdict: Literal['approve', 'changes_needed'] | None = None
+    summary: str = ''
+    findings: str = ''
+    # Set only when the reviewer says the findings need Todd: an account
+    # action, a money decision or a product decision (graph.TODD_REASONS).
+    todd: str | None = None
+    todd_reason: str = ''
+    # The reviewer's answer for each acceptance criterion, as its role file asks:
+    # [{id, criterion, verdict, how}]. An approval must cover every one (graph.criteria_gaps).
+    criteria: list[dict] = []
+    reason: str | None = None  # why there is no verdict
+    stopped: bool = False  # ran past its time limit
+    voided: bool = False  # it changed the candidate, so it does not count
+    text: str = ''  # the reviewer's final message
+    # Filled in by the graph: who reviewed, as the card shows it, and which round.
+    reviewer: str = ''
+    round: int = 0
+    # The model the reviewer itself reports it ran (run-reviewer.mjs), or None.
+    model: str | None = None
 
 
 class StepMark(BaseModel):
@@ -48,6 +75,9 @@ class CardRun(BaseModel):
     base: str
     branch: str
     worktree: str
+    # Selected through MODEL_CATALOG and pinned for every resumed attempt.
+    builder_model: str | None = None
+    reviewer_model: str | None = None
     step: Step = 'prepare'
     # True once a builder has been started for the current attempt. A restart
     # that finds it still set knows the builder never finished.
@@ -64,6 +94,22 @@ class CardRun(BaseModel):
     commit: str | None = None
     builder_report: str | None = None
     tests: TestResult | None = None
+    # The independent review (JUL-128): the latest review, the findings each
+    # unsuccessful round gave the builder, and what the builder is fixing now
+    # ('tests' for failed tests, 'review' for review findings, None at first).
+    review: ReviewResult | None = None
+    round_reasons: list[str] = []
+    fixing: Literal['tests', 'review'] | None = None
+    # Set when a stopped card needs Todd: one of graph.TODD_REASONS.
+    needs_todd: str | None = None
+    # The working copy as a review found it (HEAD, status with the dependency
+    # fingerprint), saved before the reviewer starts and cleared with its
+    # outcome: a restart that finds it set knows a review was interrupted.
+    review_before: list[str] | None = None
+    # The marker lines of the comments this run has posted (graph.say_once),
+    # so it need not ask Linear again. What keeps a comment from ever being
+    # posted twice is its own id (graph.comment_id), which Linear will not repeat.
+    posted: list[str] = []
     failure: str | None = None
     # The card's one "Where this card is" comment (JUL-126).
     status_id: str | None = None
