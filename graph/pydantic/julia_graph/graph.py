@@ -796,12 +796,15 @@ class Review(BaseNode[CardRun, Deps, str]):
         # Every outcome is saved before anything is posted; post_review (here,
         # or in Build or Report after a restart) posts it, once.
         if after != before:
-            # AC 4: the reviewer changed the candidate. Whatever it said does not count.
+            # AC 4: the candidate changed while it was reviewed. Whatever the
+            # reviewer said does not count. (The graph sees the change, not who
+            # made it: on the server the reviewer cannot write here at all.)
             changed = ', '.join(x for x in (
                 f'the commit moved from `{before[0][:12]}` to `{after[0][:12]}`' if after[0] != before[0] else '',
                 'files in the working copy changed' if after[1] != before[1] else '') if x)
             s.review = review.model_copy(update={'ok': False, 'voided': True, 'reason': changed})
-            return await failed_review(ctx, 'voided', f'the review was voided because the reviewer changed the candidate ({changed})')
+            return await failed_review(ctx, 'voided', f'the review was voided because the candidate changed while it was '
+                                                      f'reviewed ({changed})')
         if review.ok and (ran := maker_of(review.model)).lower() != maker.lower():
             # AC 1: the maker is the confirmed model's, not the route's.
             review = review.model_copy(update={'ok': False, 'reason': f'the model that ran ({review.model or "not reported"}) '
@@ -857,9 +860,10 @@ async def post_review(ctx: GraphRunContext[CardRun, Deps]) -> None:
         # Everything goes, the installed dependencies too: the run ends here,
         # and a next run of the card installs them again.
         await ctx.deps.restore(s, s.commit, False)
-        await say_once(ctx, f'The review by {review.reviewer} of `{(s.commit or "")[:12]}` is **void**: the reviewer '
-                            f'changed the candidate ({review.reason}). Its verdict does not count, and the working copy '
-                            f'was put back to `{(s.commit or "")[:12]}`, without its installed dependencies.', marker('review-voided', s, commit=s.commit))
+        await say_once(ctx, f'The review by {review.reviewer} of `{(s.commit or "")[:12]}` is **void**: the candidate '
+                            f'changed while it was being reviewed ({review.reason}). A review of a changed candidate does '
+                            f'not count, and the working copy was put back to `{(s.commit or "")[:12]}`, without its '
+                            'installed dependencies.', marker('review-voided', s, commit=s.commit))
         return
     if not review.ok:
         return  # no verdict to post; the result comment says why

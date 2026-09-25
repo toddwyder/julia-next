@@ -139,7 +139,9 @@ export function piReply(stdout) {
   return { ok: true, text, model };
 }
 
-export async function review(request, { run = runLimited, model = codexModel, onOutput = () => {}, reviewers = REVIEWERS } = {}) {
+export async function review(request, {
+  run = runLimited, model = codexModel, onOutput = () => {}, reviewers = REVIEWERS, kill = process.kill.bind(process),
+} = {}) {
   const which = request?.reviewer;
   if (!Object.hasOwn(reviewers, which)) return { status: 'failed', error: `refused: unknown reviewer ${JSON.stringify(which)}` };
   if (typeof request.prompt !== 'string' || !request.prompt.trim()) return { status: 'failed', error: 'refused: no prompt' };
@@ -159,6 +161,13 @@ export async function review(request, { run = runLimited, model = codexModel, on
     started: (child) => {
       child.stdout.on('data', (chunk) => { stdout += chunk; onOutput(); });
       child.stderr.on('data', (chunk) => { stderr += chunk; });
+      // reap.py killed outright (only root or the kernel's out-of-memory killer
+      // can: it sweeps before any exit of its own) cannot sweep: stop the rest
+      // of its group at once. (A process that also left the group is then
+      // found by the graph's leftover check, by its command line.)
+      child.on('exit', (code, signal) => {
+        if (signal) { try { kill(-child.pid, 'SIGKILL'); } catch { /* the group is gone */ } }
+      });
       if (spec.stdin) child.stdin.end(request.prompt);
     },
   });
@@ -168,7 +177,8 @@ export async function review(request, { run = runLimited, model = codexModel, on
   const ran = which === 'codex' ? await model(reply.thread) : reply.model;
   const tail = stderr.trim().split('\n').slice(-3).join(' | ').slice(-500);
   if (result.code !== 0) {
-    return { status: 'failed', error: `the reviewer exited ${result.code ?? result.signal}: ${reply.error ?? tail}`, text: reply.text, model: ran };
+    const how = result.code === null ? `was stopped by ${result.signal}` : `exited ${result.code}`;
+    return { status: 'failed', error: `the reviewer ${how}${reply.error || tail ? `: ${reply.error ?? tail}` : ''}`, text: reply.text, model: ran };
   }
   if (!reply.ok) return { status: 'failed', error: reply.error, text: reply.text, model: ran };
   if (!ran) return { status: 'failed', error: 'the model that ran could not be confirmed, so the review does not count', text: reply.text };

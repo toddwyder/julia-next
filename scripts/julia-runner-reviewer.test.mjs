@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { runLimited } from '../ops/julia-runner/time-limit.mjs';
 import { codexModel, codexReply, piReply, PYTHON, REAPER, REVIEWERS, review, STOP_GRACE_MS } from '../ops/julia-runner/run-reviewer.mjs';
 
 const LAUNCHER = fileURLToPath(new URL('../ops/julia-runner/run-reviewer.mjs', import.meta.url));
@@ -83,11 +84,26 @@ test('an unknown reviewer or an empty prompt is refused before anything starts',
   assert.match((await review({ reviewer: 'codex', prompt: ' ' }, { run })).error, /no prompt/);
 });
 
-const fakeRun = (result, stdout = '') => async (command, args, options, { seconds, started }) => {
-  const child = { stdout: { on: (e, f) => f(stdout) }, stderr: { on: () => {} }, stdin: { end: () => {} } };
+const fakeRun = (result, stdout = '', exit = null) => async (command, args, options, { seconds, started }) => {
+  const child = {
+    pid: 4242, stdout: { on: (e, f) => f(stdout) }, stderr: { on: () => {} }, stdin: { end: () => {} },
+    on: (event, f) => { if (event === 'exit' && exit) f(...exit); },
+  };
   started(child);
   return { seconds, options, ...result };
 };
+
+test('if the reaper itself is killed outright, the rest of its group is killed at once', async () => {
+  const killed = [];
+  const kill = (pid, signal) => killed.push([pid, signal]);
+  const reply = await review({ reviewer: 'codex', prompt: 'p' }, { run: fakeRun({ code: null, signal: 'SIGKILL' }, '', [null, 'SIGKILL']), kill, model: () => null });
+  assert.deepEqual(killed, [[-4242, 'SIGKILL']]);
+  assert.equal(reply.status, 'failed');
+  assert.match(reply.error, /^the reviewer was stopped by SIGKILL(: |$)/);
+  killed.length = 0;
+  await review({ reviewer: 'codex', prompt: 'p' }, { run: fakeRun({ code: 0 }, '', [0, null]), kill, model: () => 'gpt-5.5' });
+  assert.deepEqual(killed, [], 'a reaper that ended by itself has already swept');
+});
 
 test('the reviewer runs under its reaper from /, and a stop, a crash, an abnormal exit or an unconfirmed model is never an ok reply', async () => {
   let seen;
@@ -193,6 +209,37 @@ test('a reviewer that ends leaves nothing running behind it', linuxOnly, async (
     for (const pid of fake.pids()) assert.equal(alive(pid), false, `child ${pid} outlived the reviewer`);
   } finally {
     fake.cleanup();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a reviewer left behind by a reaper killed outright is stopped with its group', linuxOnly, async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'reviewer-'));
+  const script = join(dir, 'codex');
+  // a pretend reviewer with a plain child and a double-fork orphan, all in its process group
+  writeFileSync(script, [
+    '#!/bin/sh',
+    `sleep 60 & echo $! > "${script}.plain"`,
+    `( sleep 60 & echo $! > "${script}.orphan" ) &`,
+    `while [ ! -s "${script}.orphan" ]; do sleep 0.05; done`,
+    'wait', '',
+  ].join('\n'), { mode: 0o755 });
+  const reviewers = { fake: () => ({ command: script, args: [], env: process.env, stdin: false }) };
+  let reaper;
+  const run = (command, args, options, limits) => runLimited(command, args, options, {
+    ...limits, started: (child) => { reaper = child.pid; limits.started(child); },
+  });
+  try {
+    const pending = review({ reviewer: 'fake', prompt: 'p', limit_seconds: 40 }, { run, reviewers });
+    for (let i = 0; i < 100 && pidsIn(`${script}.orphan`).length === 0; i += 1) await new Promise((r) => setTimeout(r, 100));
+    process.kill(reaper, 'SIGKILL'); // as the kernel's out-of-memory killer would
+    const reply = await pending;
+    assert.equal(reply.status, 'failed');
+    assert.match(reply.error, /stopped by SIGKILL/);
+    await settle();
+    for (const pid of pidsIn(`${script}.plain`, `${script}.orphan`)) assert.equal(alive(pid), false, `child ${pid} outlived its reaper`);
+  } finally {
+    killAll(pidsIn(`${script}.plain`, `${script}.orphan`));
     rmSync(dir, { recursive: true, force: true });
   }
 });
