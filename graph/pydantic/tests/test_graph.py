@@ -1496,6 +1496,7 @@ class WorkerParsingTest(unittest.TestCase):
                 (proc / pid / 'cmdline').write_bytes(b'\0'.join(c.encode() for c in cmd) + b'\0')
                 (proc / pid / 'status').write_text('Uid:\t995\t995\t995\t995\n')
             self.assertEqual(workers.live_workers('builder', proc=proc), [11, 12])
+            self.assertEqual(workers.live_workers('reviewer', proc=proc), [10])
 
 
 class WorkerCallTest(unittest.IsolatedAsyncioTestCase):

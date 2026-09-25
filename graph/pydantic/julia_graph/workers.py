@@ -33,7 +33,7 @@ MODEL_RESOLVER = Path(__file__).resolve().parents[3] / 'scripts' / 'julia-graph-
 # The command lines a reviewer's own processes carry, so one left behind is
 # still found: DeepSeek's Pi (its model) and Codex (its read-only exec).
 REVIEWER_MARKS = [[b'deepseek/deepseek-v4-pro'], [b'exec', b'read-only', b'--skip-git-repo-check', b'--json'],
-                  [b'--model', b'gemini-3.8-flash', b'--disable-slash-commands']]
+                  [b'--model', b'gemini-3.8-flash', b'--input-format', b'stream-json']]
 BUILDER_MARKS = [[b'exec', b'workspace-write', b'-C', b'--json'],
                  [b'--add-dir', b'--mode', b'accept-edits', b'--model', b'gemini-3.8-flash']]
 # Accounts that run other things too (runner hosts Orca's server all day), so
