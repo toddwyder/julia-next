@@ -175,7 +175,7 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
                           'reviewer': 'DeepSeek V4 Pro (Pi)'},
             worker_makers={'builder': 'Google', 'reviewer': 'DeepSeek'},
             limits={'builder': 3600, 'tests': 900, 'reviewer': 1200},
-            snapshot=workers.snapshot, restore=workers.restore, diff=workers.change,
+            snapshot=workers.snapshot, restore=workers.restore, drift=workers.drift, diff=workers.change,
             base_file=lambda run, path: ROLE if path == '.agents/skills/julia-reviewer/SKILL.md' else '',
         )
 
@@ -912,6 +912,59 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         self.assertFalse((self.worktree / '.julia').exists())
         self.assertTrue((self.worktree / 'node_modules' / 'dep.js').exists())  # installed dependencies are kept
 
+    async def test_5_a_crash_right_after_a_tamper_is_seen_still_voids_it_and_never_reviews_again(self):
+        async def edits(run):
+            (Path(run.worktree) / 'hello.txt').write_text('reviewer was here\n')
+            return self.APPROVE
+        deps = self.deps(reviewer=self.reviewer_says(edits))
+        real_restore = deps.restore
+
+        async def dies(run, commit):
+            if (Path(run.worktree) / 'hello.txt').read_text() == 'reviewer was here\n':
+                raise Crash()  # the graph dies before it can put the working copy back
+            await real_restore(run, commit)
+        deps.restore = dies
+        with self.assertRaises(Crash):
+            await run_card(self.state(), deps)
+        self.assertEqual((self.saved().step, self.saved().review.voided), ('report', True))
+        self.assertEqual(await run_card(self.state(), self.deps(reviewer=self.reviewer_says(self.APPROVE))), 'failed')
+        self.assertEqual(self.reviewer_calls, 1)  # no second review
+        self.assertTrue(any('graph: review-voided' in c for c in self.linear.comments))
+        self.assertEqual((Path(self.worktree) / 'hello.txt').read_text(), 'hello 1\n')
+
+    async def test_a_review_starts_from_exactly_the_candidate(self):
+        async def build_and_leave_a_mess(run, brief, *_):
+            self.builder_calls += 1
+            (Path(run.worktree) / 'hello.txt').write_text('hello 1\n')
+            return BuildResult(True, report='built')
+
+        async def dirty_after_tests(run, *_):
+            (Path(run.worktree) / 'stray.txt').write_text('left by something')
+            return TestResult(passed=True, summary='tests 3, pass 3, fail 0')
+        seen = []
+
+        async def looks(run):
+            seen.append(sh(self.worktree, 'git', 'status', '--porcelain', '--untracked-files=all'))
+            return self.APPROVE
+        outcome = await run_card(self.state(), self.deps(builder=build_and_leave_a_mess, tester=dirty_after_tests,
+                                                         reviewer=self.reviewer_says(looks)))
+        self.assertEqual(outcome, 'passed')  # put back, then reviewed; the stray file was not the reviewer's doing
+        self.assertEqual(seen, [''])
+        [note] = [c for c in self.linear.comments if 'graph: review-drift' in c]
+        self.assertIn('1 file(s) differ', note)
+
+    async def test_a_reviewer_still_running_after_its_limit_is_named_and_no_new_review_starts(self):
+        # The seat's Pi child can outlive the seat, and the graph cannot signal runner's processes:
+        # it says the reviewer is still running and holds any new review until it ends.
+        async def times_out_leaving_pi(run):
+            self.alive['reviewer'] = [4242]  # the seat's Pi child, still running
+            return ReviewResult(stopped=True, reason='stopped by the graph after its 1200-second time limit')
+        outcome = await run_card(self.state(), self.deps(reviewer=self.reviewer_says(times_out_leaving_pi),
+                                                         alive_after_wait=[4242]))
+        self.assertEqual(outcome, 'failed')
+        [result] = self.results()
+        self.assertIn('still running (process 4242), so no new review starts until it ends', result)
+
     async def test_a_crash_between_saving_a_verdict_and_posting_it_still_posts_it_and_keeps_the_round(self):
         deps = self.deps(reviewer=self.reviewer_says(self.findings('F1: x'), self.APPROVE))
         real = deps.linear.comment
@@ -1278,7 +1331,9 @@ class WorkerCallTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.failing, ['lint: scripts/a.mjs:3 no-unused-vars'])
         self.assertIn('scripts/a.mjs:3 no-unused-vars', result.details)
 
-    async def test_the_graph_stops_a_reviewer_past_its_limit(self):
+    async def test_the_graph_stops_the_process_it_started_past_its_limit(self):
+        # Only the process the graph started (sudo, on the server): a grandchild it leaves is caught by
+        # live_workers and reported (test_a_reviewer_still_running_after_its_limit_is_named...).
         with mock.patch.object(workers, 'sudo_command', return_value=[sys.executable, '-c', 'import time; time.sleep(30)']):
             status, _, err = await workers.run_worker('reviewer', 'brief', limit_seconds=1)
         self.assertEqual(status, workers.STOPPED_EXIT)

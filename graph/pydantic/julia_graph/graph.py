@@ -129,6 +129,8 @@ class Deps:
     # restore puts it back to a commit, with nothing uncommitted left.
     snapshot: Callable[[CardRun], tuple[str, str]]
     restore: Callable[[CardRun, str], Awaitable[None]]
+    # How the working copy differs from a commit, or '' (workers.drift).
+    drift: Callable[[CardRun, str], str]
     # The change under review (the diff from the base) and a file as it was at
     # the base commit (the reviewer's role file), both read from git.
     diff: Callable[[CardRun], str]
@@ -728,6 +730,14 @@ class Review(BaseNode[CardRun, Deps, str]):
             close(ctx, 'too big')
             return fail(ctx, f'the review would be {size} bytes, over the {MAX_REVIEW_BYTES}-byte limit for one review, '
                              'so it was not started; the card needs splitting')
+        # The review starts from exactly the candidate. Anything else (a crash
+        # left it changed) is put back first, and the card says so when it
+        # was more than a test run's ignored leftovers.
+        if drifted := ctx.deps.drift(s, s.commit):
+            await say_once(ctx, f'Before review round {round_}, the working copy did not match the candidate `{s.commit[:12]}` '
+                                f'({drifted}). It was put back to the candidate; nothing from it is reviewed or kept.',
+                           marker('review-drift', s, commit=s.commit, round=round_))
+        await ctx.deps.restore(s, s.commit)
         before = ctx.deps.snapshot(s)
         try:
             review = await ctx.deps.reviewer(s, brief, ctx.deps.limits['reviewer'], lambda: moved(ctx))
@@ -743,8 +753,7 @@ class Review(BaseNode[CardRun, Deps, str]):
                 f'the commit moved from `{before[0][:12]}` to `{after[0][:12]}`' if after[0] != before[0] else '',
                 'files in the working copy changed' if after[1] != before[1] else '') if x)
             s.review = review.model_copy(update={'ok': False, 'voided': True, 'reason': changed})
-            close(ctx, 'voided')
-            return await failed_review(ctx, f'the review was voided because the reviewer changed the candidate ({changed})')
+            return await failed_review(ctx, 'voided', f'the review was voided because the reviewer changed the candidate ({changed})')
         if review.ok and review.verdict == 'approve':
             if gaps := criteria_gaps(card['description'], review.criteria):
                 review = review.model_copy(update={'ok': False, 'reason': 'its approval does not cover the acceptance '
@@ -754,8 +763,8 @@ class Review(BaseNode[CardRun, Deps, str]):
             return await stopped(ctx, 'reviewer')
         if not review.ok:
             # AC 3: no clear final verdict, whatever the reviewer wrote before.
-            close(ctx, 'no verdict')
-            return fail(ctx, f'the review gave no clear final verdict, so it is not an approval: {review.reason}')
+            return await failed_review(ctx, 'no verdict', f'the review gave no clear final verdict, so it is not an approval: '
+                                                          f'{review.reason}')
         if review.verdict == 'approve':
             s.step = 'report'
             close(ctx, 'done')  # saves
@@ -770,15 +779,18 @@ class Review(BaseNode[CardRun, Deps, str]):
         # AC 2: the last round also asked for changes.
         if review.todd in TODD_REASONS:
             s.needs_todd = review.todd
-        close(ctx, 'changes needed')
-        return await failed_review(ctx, f'the review asked for changes in {MAX_REVIEW_ROUNDS} rounds; '
-                                        'the reasons are in one comment above')
+        return await failed_review(ctx, 'changes needed', f'the review asked for changes in {MAX_REVIEW_ROUNDS} rounds; '
+                                                          'the reasons are in one comment above')
 
 
-async def failed_review(ctx: GraphRunContext[CardRun, Deps], reason: str) -> Report:
-    report = fail(ctx, reason)  # saves
+async def failed_review(ctx: GraphRunContext[CardRun, Deps], outcome: str, reason: str) -> Report:
+    """End the run on this review: the review, the failure and the next step
+    are saved together, so a restart never reviews again from a changed
+    working copy or a decided round; then what it says is posted."""
+    ctx.state.failure, ctx.state.step = reason, 'report'
+    close(ctx, outcome)  # saves
     await post_review(ctx)
-    return report
+    return Report()
 
 
 async def post_review(ctx: GraphRunContext[CardRun, Deps]) -> None:

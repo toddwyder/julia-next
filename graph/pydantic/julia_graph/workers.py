@@ -394,6 +394,16 @@ def snapshot(run: CardRun) -> tuple[str, str]:
             git(run.worktree, 'status', '--porcelain', '--untracked-files=all', '--ignored'))
 
 
+def drift(run: CardRun, commit: str) -> str:
+    """How the working copy differs from this commit, in a few words, or ''
+    when it is exactly the commit. Ignored files other than the installed
+    dependencies (a test run's leftovers) are not drift: a restore removes them."""
+    head = git(run.worktree, 'rev-parse', 'HEAD')
+    changed = git(run.worktree, 'status', '--porcelain', '--untracked-files=all')
+    return ', '.join(x for x in (f'it is at `{head[:12]}`, not `{commit[:12]}`' if head != commit else '',
+                                 f'{len(changed.splitlines())} file(s) differ' if changed else '') if x)
+
+
 async def restore(run: CardRun, commit: str) -> None:
     """Put the working copy back to this commit: nothing uncommitted is left,
     ignored files included, except the installed dependencies."""
