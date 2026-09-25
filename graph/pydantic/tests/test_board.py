@@ -504,15 +504,45 @@ class BoardTest(unittest.IsolatedAsyncioTestCase):
         async def refused(name, state):
             raise ConnectionError('Linear is unreachable')
         self.linear.move = refused
+        self.linear.add('JUL-2', 2)
         board = self.board()
         self.assertEqual(await board.check(), 'JUL-1 waits: it could not leave Ready')
         self.assertEqual(self.built, [])
-        self.assertIsNone(board.reserved())
+        self.assertEqual(board.reserved(), 'JUL-1')  # held, so JUL-2 does not jump in
         self.linear.move = real_move
-        self.assertEqual(await board.check(), 'started JUL-1')
+        self.assertEqual(await board.check(), 'resumed JUL-1')
+        await board.idle()
+        self.assertEqual(self.built, ['JUL-1'])
+        self.assertEqual(await board.check(), 'started JUL-2')
+
+    async def test_a_move_whose_reply_was_lost_still_builds_the_card_once(self):
+        self.linear.add('JUL-1', 1)
+        real_move = self.linear.move
+
+        async def moved_but_reply_lost(name, state):
+            await real_move(name, state)
+            raise ConnectionResetError('the reply never arrived')
+        self.linear.move = moved_but_reply_lost
+        board = self.board()
+        self.assertEqual(await board.check(), 'JUL-1 waits: it could not leave Ready')
+        self.assertEqual(self.linear.cards['JUL-1']['state'], 'Implementation')  # moved after all
+        self.linear.move = real_move
+        self.assertEqual(await board.check(), 'resumed JUL-1')  # not left there unbuilt
         await board.idle()
         self.assertEqual(await board.check(), 'nothing to start')
         self.assertEqual(self.built, ['JUL-1'])
+
+    async def test_a_damaged_saved_progress_file_does_not_stop_the_board(self):
+        self.state_dir.mkdir(parents=True, exist_ok=True)
+        (self.state_dir / 'JUL-1.json').write_text('{"card": "JUL-1", "ba')
+        self.linear.add('JUL-1', 1)
+        board = self.board()
+        self.assertEqual(await board.check(), 'started JUL-1')
+        await board.idle()
+        self.assertEqual(self.built, ['JUL-1'])
+        self.assertEqual(Checkpoint(self.state_dir, 'JUL-1').load().branch, 'graph/card-1-r2')  # a fresh branch
+        self.assertTrue((self.state_dir / 'JUL-1.run1.json').exists())
+        self.assertTrue(any('unreadable and was kept as run 1' in line for line in self.logged))
 
     async def test_a_graph_that_died_before_moving_the_card_moves_it_on_resume(self):
         self.linear.add('JUL-1', 1)

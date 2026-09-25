@@ -219,7 +219,7 @@ class Board:
     async def _resume(self, card: str) -> str | None:
         """A reservation left by a graph that died mid-run: carry on with that card.
         One whose run had already ended is released instead."""
-        saved = Checkpoint(self.state_dir, card).load()
+        saved = self._load(Checkpoint(self.state_dir, card))
         if saved is None or saved.step == 'done':
             self._release()
             return None
@@ -232,7 +232,7 @@ class Board:
     async def _start(self, card: dict) -> str:
         name = card['identifier']
         checkpoint = Checkpoint(self.state_dir, name)
-        saved = checkpoint.load()
+        saved = self._load(checkpoint)
         if saved and saved.step != 'done':
             state = saved  # moved back to Ready mid-run: carry on from where it stopped
         else:
@@ -241,7 +241,7 @@ class Board:
             except Exception as error:
                 self.log(f'{name}: no base commit, not started: {type(error).__name__}: {error}')
                 return 'no base commit'
-            runs = self._archive(checkpoint) if saved else 0
+            runs = self._archive(checkpoint) if checkpoint.path.exists() else self._runs(checkpoint)
             number = name.split('-')[-1] + (f'-r{runs + 1}' if runs else '')
             state = CardRun(card=name, base=base, branch=f'graph/card-{number}',
                             worktree=f'{self.worktrees}/card-{number}',
@@ -249,7 +249,9 @@ class Board:
             checkpoint.save(state)
         self._reserve(name)  # before anything starts, so a restart sees it
         if not await self._leave_ready(name):
-            self._release()
+            # The reservation stays: Linear may have made the move and lost only
+            # the reply. The next check resumes the card, moving it again first,
+            # so it is neither started twice nor left in Implementation unbuilt.
             return f'{name} waits: it could not leave Ready'
         self.log(f'{name}: started from Ready')
         self._launch(state)
@@ -279,11 +281,25 @@ class Board:
             self.log(f'{card}: could not move the card to {STARTED}, not started: {type(error).__name__}: {error}')
             return False
 
+    def _runs(self, checkpoint: Checkpoint) -> int:
+        return len(list(self.state_dir.glob(f'{checkpoint.path.stem}.run*.json')))
+
     def _archive(self, checkpoint: Checkpoint) -> int:
-        """Keep a finished run's saved progress under a new name; returns how many are kept."""
-        runs = len(list(self.state_dir.glob(f'{checkpoint.path.stem}.run*.json')))
+        """Keep an earlier run's saved progress under a new name; returns how many are kept."""
+        runs = self._runs(checkpoint)
         os.replace(checkpoint.path, checkpoint.path.with_name(f'{checkpoint.path.stem}.run{runs + 1}.json'))
         return runs + 1
+
+    def _load(self, checkpoint: Checkpoint) -> CardRun | None:
+        """A card's saved progress. A damaged file is set aside as an earlier run
+        rather than crashing every check: the card then starts afresh on a new branch."""
+        try:
+            return checkpoint.load()
+        except ValueError as error:  # pydantic's ValidationError is a ValueError
+            kept = self._archive(checkpoint)
+            self.log(f'{checkpoint.path.stem}: its saved progress was unreadable and was kept as run {kept}: '
+                     f'{type(error).__name__}')
+            return None
 
     def _launch(self, state: CardRun) -> None:
         self._running = asyncio.create_task(self._carry(state))

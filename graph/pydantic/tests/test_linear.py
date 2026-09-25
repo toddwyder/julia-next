@@ -93,3 +93,10 @@ class LinearAppTest(unittest.TestCase):
                              {'nodes': [card(1)], 'pageInfo': {'hasNextPage': True, 'endCursor': 'a'}}]
         with self.assertRaisesRegex(RuntimeError, 'no new cursor'):
             asyncio.run(self.app.ready_cards())
+
+    def test_page_cursors_that_go_round_in_a_circle_stop_the_read(self):
+        page = lambda cursor: {'nodes': [card(1)], 'pageInfo': {'hasNextPage': True, 'endCursor': cursor}}
+        self.server.pages = [page('a'), page('b'), page('a'), page('b')]
+        with self.assertRaisesRegex(RuntimeError, 'no new cursor'):
+            asyncio.run(self.app.ready_cards())
+        self.assertEqual(len(self.server.pages), 1)  # stopped at the first repeat

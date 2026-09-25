@@ -143,15 +143,16 @@ class LinearApp:
                 'comments': [{'id': c['id'], 'body': c['body']} for c in comments]}
 
     async def ready_cards(self) -> list[dict]:
-        cards, after = [], None
+        cards, after, seen = [], None, set()
         while True:
             page = (await asyncio.to_thread(self._call, READY_QUERY, {'team': TEAM, 'state': 'Ready', 'after': after}))['issues']
             cards += [ready_card(issue) for issue in page['nodes']]
             if not page['pageInfo']['hasNextPage']:
                 return cards
-            if not page['pageInfo']['endCursor'] or page['pageInfo']['endCursor'] == after:
-                raise RuntimeError('Linear reported another page of Ready cards but gave no new cursor')
             after = page['pageInfo']['endCursor']
+            if not after or after in seen:
+                raise RuntimeError('Linear reported another page of Ready cards but gave no new cursor')
+            seen.add(after)
 
     async def move(self, card: str, state: str) -> None:
         issue = (await asyncio.to_thread(self._call, STATES_QUERY, {'id': card}))['issue']
