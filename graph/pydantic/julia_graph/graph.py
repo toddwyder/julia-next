@@ -56,6 +56,7 @@ MAX_REVIEW_ROUNDS = 2
 # refused, never cut short. Gemini's stream input carries a full diff on stdin,
 # so the limit is for review context rather than the OS's per-argument limit.
 MAX_REVIEW_BYTES = 500_000
+MAX_PI_REVIEW_BYTES = 120_000
 # The reviewer's standing orders, read from the card's start commit.
 REVIEWER_ROLE_FILE = '.agents/skills/julia-reviewer/SKILL.md'
 # Each worker's time limit in seconds. Each worker's own launcher enforces it
@@ -779,9 +780,10 @@ class Review(BaseNode[CardRun, Deps, str]):
             close(ctx, 'could not start')
             return fail(ctx, f'the review brief could not be made: {type(error).__name__}: {error}')
         size = len(brief.encode())
-        if size > MAX_REVIEW_BYTES:
+        limit = MAX_PI_REVIEW_BYTES if ctx.deps.worker_models.get('reviewer') == 'deepseek-v4-pro' else MAX_REVIEW_BYTES
+        if size > limit:
             close(ctx, 'too big')
-            return fail(ctx, f'the review would be {size} bytes, over the {MAX_REVIEW_BYTES}-byte limit for one review, '
+            return fail(ctx, f'the review would be {size} bytes, over the {limit}-byte limit for one review, '
                              'so it was not started; the card needs splitting')
         if s.review_before is not None:
             # A review was interrupted (the graph died while the reviewer ran).

@@ -77,6 +77,7 @@ test('Gemini review starts in a read-only transient service with no access to ca
   assert.ok(seen.args.includes('ProtectSystem=strict'));
   assert.ok(seen.args.includes('InaccessiblePaths=/srv/julia-runner'));
   assert.ok(seen.args.includes('ReadWritePaths=/home/gemini-worker'));
+  assert.ok(seen.args.includes('--working-directory=/home/gemini-worker'));
   assert.ok(seen.args.some((arg) => arg.endsWith('.service')));
   assert.equal(seen.options.cwd, '/');
   assert.ok(REVIEWERS.gemini('brief').args.includes('stream-json'));

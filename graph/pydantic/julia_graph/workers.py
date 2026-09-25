@@ -34,10 +34,11 @@ MODEL_RESOLVER = Path(__file__).resolve().parents[3] / 'scripts' / 'julia-graph-
 # still found: DeepSeek's Pi (its model) and Codex (its read-only exec).
 REVIEWER_MARKS = [[b'deepseek/deepseek-v4-pro'], [b'exec', b'read-only', b'--skip-git-repo-check', b'--json'],
                   [b'--model', b'gemini-3.8-flash', b'--disable-slash-commands']]
-BUILDER_MARKS = [[b'exec', b'workspace-write', b'-C', b'--json']]
+BUILDER_MARKS = [[b'exec', b'workspace-write', b'-C', b'--json'],
+                 [b'--add-dir', b'--mode', b'accept-edits', b'--model', b'gemini-3.8-flash']]
 # Accounts that run other things too (runner hosts Orca's server all day), so
 # their other processes are never taken for a live worker of this kind.
-SHARED_ACCOUNTS = {'reviewer'}
+SHARED_ACCOUNTS = {'builder', 'reviewer'}
 WORKER_ENV = {'PATH': '/usr/bin:/bin', 'LANG': 'C.UTF-8'}
 # Who each worker is, and who makes its model, in the words the card shows.
 # The reviewer's maker must differ from the builder's (graph.Review).
@@ -473,7 +474,7 @@ async def clean_install(run: CardRun, install=npm_ci_no_scripts) -> str | None:
     Whatever the builder did to the ignored files (node_modules above all)
     cannot reach the tests."""
     await restore(run, run.commit, keep_dependencies=False)
-    return install(run.worktree) if Path(run.worktree, 'package-lock.json').exists() else None
+    return await asyncio.to_thread(install, run.worktree) if Path(run.worktree, 'package-lock.json').exists() else None
 
 
 def prepare(repo: str, install=npm_ci):

@@ -21,7 +21,7 @@ from pathlib import Path
 
 from julia_graph import workers
 from julia_graph.checkpoint import CardLocked, CardRun, Checkpoint, ReviewResult, TestResult
-from julia_graph.graph import MAX_REVIEW_BYTES, BuildResult, Deps, checked_limit, comment_id, run_card
+from julia_graph.graph import MAX_PI_REVIEW_BYTES, MAX_REVIEW_BYTES, BuildResult, Deps, checked_limit, comment_id, run_card
 from julia_graph.linear import AlreadyPosted
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -887,6 +887,16 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.reviewer_calls, 0)
         self.assertIn(f'over the {MAX_REVIEW_BYTES}-byte limit', self.results()[0])
 
+    async def test_pi_argument_limit_is_checked_before_launch(self):
+        async def big(run, brief, *_):
+            (Path(run.worktree) / 'big.txt').write_text('x\n' * (MAX_PI_REVIEW_BYTES // 2))
+            return BuildResult(True, report='big')
+        deps = self.deps(builder=big)
+        deps.worker_models = {'reviewer': 'deepseek-v4-pro'}
+        self.assertEqual(await run_card(self.state(), deps), 'failed')
+        self.assertEqual(self.reviewer_calls, 0)
+        self.assertIn(f'over the {MAX_PI_REVIEW_BYTES}-byte limit', self.results()[0])
+
     async def test_a_restart_during_the_review_reviews_again_without_rebuilding(self):
         async def dies(run):
             raise Crash()
@@ -1439,6 +1449,17 @@ class WorkerParsingTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'different model makers'):
             workers.resolve_pair('builder-gemini-flash', 'adversary-gemini-flash')
 
+    def test_card_deps_resumes_the_saved_model_pair(self):
+        from julia_graph import __main__ as entry
+        with tempfile.TemporaryDirectory() as d:
+            Checkpoint(Path(d), 'JUL-999').save(CardRun(card='JUL-999', base='a' * 40,
+                branch='graph/card-999', worktree='/srv/julia-runner/worktrees/card-999',
+                builder_model='builder-codex', reviewer_model='adversary-gemini-flash'))
+            with mock.patch.object(entry, 'STATE', d):
+                deps = entry.card_deps('JUL-999')
+            self.assertEqual(deps.model_labels, ('builder-codex', 'adversary-gemini-flash'))
+            self.assertEqual(deps.worker_models['reviewer'], 'gemini-3.8-flash')
+
     def test_the_reviewer_is_started_exactly_as_its_sudo_rule_allows(self):
         rules = (REPO_ROOT / 'ops' / 'julia-runner' / 'sudoers').read_text()
         pair = workers.resolve_pair('builder-codex', 'adversary-gemini-flash')
@@ -1460,6 +1481,21 @@ class WorkerParsingTest(unittest.TestCase):
                 (proc / pid / 'status').write_text('Uid:\t1001\t1001\t1001\t1001\n')
             with mock.patch.object(workers, 'account_uid', return_value=1001):
                 self.assertEqual(workers.live_workers('reviewer', proc=proc), [11, 12, 13])
+
+    def test_builder_detection_does_not_count_gemini_reviewer_as_a_builder(self):
+        with tempfile.TemporaryDirectory() as d:
+            proc = Path(d)
+            commands = {
+                '10': ['agy', '--model', 'gemini-3.8-flash', '--input-format', 'stream-json'],
+                '11': ['agy', '--add-dir', '/srv/julia-runner/worktrees/card-1', '--mode', 'accept-edits',
+                       '--model', 'gemini-3.8-flash'],
+                '12': ['codex', 'exec', '-s', 'workspace-write', '-C', '/srv/julia-runner/worktrees/card-2', '--json'],
+            }
+            for pid, cmd in commands.items():
+                (proc / pid).mkdir()
+                (proc / pid / 'cmdline').write_bytes(b'\0'.join(c.encode() for c in cmd) + b'\0')
+                (proc / pid / 'status').write_text('Uid:\t995\t995\t995\t995\n')
+            self.assertEqual(workers.live_workers('builder', proc=proc), [11, 12])
 
 
 class WorkerCallTest(unittest.IsolatedAsyncioTestCase):

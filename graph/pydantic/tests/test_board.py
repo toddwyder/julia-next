@@ -84,6 +84,9 @@ class PretendBoard:
         await asyncio.sleep(0)
         self.cards[name]['assignee'] = assignee
 
+    async def assign_to_todd(self, name):
+        await self.assign(name, 'Todd Wyder')
+
 
 class BoardTest(unittest.IsolatedAsyncioTestCase):
     def setUp(self):

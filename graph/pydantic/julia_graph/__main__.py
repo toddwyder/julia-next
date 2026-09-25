@@ -42,10 +42,16 @@ def graph_version() -> str:
 
 
 def card_deps(card: str, limits: dict[str, int] | None = None,
-              builder_model: str = DEFAULT_BUILDER_MODEL, reviewer_model: str = DEFAULT_REVIEWER_MODEL) -> Deps:
+              builder_model: str | None = None, reviewer_model: str | None = None) -> Deps:
+    # The saved selection belongs to the card. The board can resume a hand-run
+    # card without silently replacing its models with service defaults.
+    checkpoint = Checkpoint(Path(STATE), card)
+    saved = checkpoint.load() if builder_model is None or reviewer_model is None else None
+    builder_model = builder_model or (saved.builder_model if saved else None) or DEFAULT_BUILDER_MODEL
+    reviewer_model = reviewer_model or (saved.reviewer_model if saved else None) or DEFAULT_REVIEWER_MODEL
     pair = workers.resolve_pair(builder_model, reviewer_model)
     return Deps(
-        linear=LinearApp(), checkpoint=Checkpoint(Path(STATE), card),
+        linear=LinearApp(), checkpoint=checkpoint,
         prepare=workers.prepare(REPO), builder=workers.builder(log, pair), discard=workers.discard,
         commit=workers.commit, tester=workers.tester, reviewer=workers.reviewer(log, pair),
         live_workers=workers.live_workers, wait_for_exit=workers.waiter(WAIT_LIMIT_SECONDS),
@@ -98,8 +104,8 @@ def main(argv: list[str]) -> int:
                             help=f'seconds, 1 to {LIMIT_CAPS[kind]} (default %(default)s)')
     # Hand runs choose both models by the same labels the model catalog uses.
     # The service retains its current defaults until it is deliberately updated.
-    parser.add_argument('--builder-model', default=DEFAULT_BUILDER_MODEL)
-    parser.add_argument('--reviewer-model', default=DEFAULT_REVIEWER_MODEL)
+    parser.add_argument('--builder-model')
+    parser.add_argument('--reviewer-model')
     args = parser.parse_args(argv)
     os.umask(0o002)  # the builder account shares the working copy through its group
     number = args.card.split('-')[-1]

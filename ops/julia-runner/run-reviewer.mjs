@@ -1,10 +1,9 @@
 // run-reviewer.mjs -- the graph's independent reviewer (JUL-128).
 //
 // Installed root-owned at /opt/julia-runner/ops/julia-runner/run-reviewer.mjs
-// and started only by `sudo -n -u runner /usr/bin/node <this file>`
-// (./sudoers). It reads {reviewer, prompt, limit_seconds} as JSON on stdin,
-// where reviewer is 'codex' or 'deepseek', runs that reviewer from / (it never
-// needs the card's working copy, which runner cannot read), and answers with
+// and started by a fixed sudo rule as runner (Codex/Pi) or gemini-worker
+// (Gemini). It reads {reviewer, prompt, limit_seconds} as JSON on stdin,
+// runs the selected reviewer without candidate filesystem access, and answers with
 // one JSON line:
 //
 //   {status: 'ok', text, model}    the run finished; text is its final
@@ -16,7 +15,7 @@
 // final message), not what was asked for. A run whose model cannot be
 // confirmed is 'failed': it never counts as a review.
 //
-// The reviewer runs in its own systemd user scope, under reap.py, in its own
+// The reviewer runs in its own systemd user unit, under reap.py, in its own
 // process group, under its time limit (time-limit.mjs runLimited). reap.py is
 // the reviewer's child subreaper: anything the reviewer starts stays below it,
 // even a process that left the group (setsid) or double-forked, and when the
@@ -263,6 +262,7 @@ export async function review(request, {
   // prompt. Existing Codex/Pi process scopes retain their tested containment.
   const command = spec.readOnly
     ? ['--user', '--pipe', '--wait', '--collect', '--quiet', `--unit=${unit}`,
+      '--working-directory=/home/gemini-worker',
       '-p', 'ProtectSystem=strict', '-p', 'PrivateTmp=yes', '-p', 'ReadWritePaths=/home/gemini-worker',
       '-p', 'InaccessiblePaths=/srv/julia-runner', '--', PYTHON, REAPER, '--', spec.command, ...spec.args]
     : ['--user', '--scope', '--quiet', '--collect', `--unit=${unit}`, '--', PYTHON, REAPER, '--', spec.command, ...spec.args];
