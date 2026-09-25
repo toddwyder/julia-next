@@ -10,6 +10,7 @@ from __future__ import annotations
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -844,6 +845,32 @@ class WorkerCallTest(unittest.IsolatedAsyncioTestCase):
         result = await workers.tester(None, 900, None, ask=ask)
         self.assertFalse(result.stopped)
         self.assertFalse(result.passed)
+
+    async def test_a_test_worker_that_does_not_answer_names_no_failure_for_the_builder(self):
+        # review finding: a lint call the worker never answered is not a lint failure to repair
+        for replies in ([(None, 'the test worker did not answer (exit 1): sudo: a password is required', False)],
+                        [(0, 'lint ok', False), (None, 'the test worker did not answer (exit 1): boom', False)]):
+            replies = iter(replies)
+
+            async def ask(run, what, limit, progress):
+                return next(replies)
+            result = await workers.tester(None, 900, None, ask=ask)
+            self.assertFalse(result.passed)
+            self.assertEqual(result.failing, [])
+            self.assertIn('the test worker did not answer', result.summary)
+
+    async def test_ask_tester_gives_no_status_when_the_worker_does_not_answer(self):
+        run = CardRun(card='JUL-1', base='b', branch='graph/card-1', worktree='/w')
+        cases = [((1, '', 'sudo: a password is required\n'), (None, 'password is required')),
+                 ((0, '{"status": 1, "output": "ℹ fail 1"}\n', ''), (1, 'ℹ fail 1'))]
+        for reply, (want_status, want_output) in cases:
+            async def run_worker(kind, request, on_line=None, reply=reply):
+                return reply
+            with mock.patch.object(workers, 'run_worker', run_worker):
+                status, output, stopped = await workers.ask_tester(run, 'lint', 60, None)
+            self.assertEqual(status, want_status)
+            self.assertIn(want_output, output)
+            self.assertFalse(stopped)
 
     async def test_a_failed_lint_is_named_and_its_output_goes_to_the_builder(self):
         replies = iter([(1, 'eslint\nscripts/a.mjs:3 no-unused-vars', False), (0, 'ℹ tests 1\nℹ pass 1\nℹ fail 0\n', False)])

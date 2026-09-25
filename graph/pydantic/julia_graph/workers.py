@@ -200,10 +200,12 @@ def suite_result(status: int, output: str) -> TestResult:
                       failing=failing, details='' if passed else failure_details(output))
 
 
-async def ask_tester(run: CardRun, what: str, limit_seconds: int, progress) -> tuple[int, str, bool]:
+async def ask_tester(run: CardRun, what: str, limit_seconds: int, progress) -> tuple[int | None, str, bool]:
     """(status, output, stopped). Only the launcher's own exit 124 is a stop; a
-    test command that itself exits 124 comes back inside the JSON answer. The
-    launcher prints a line whenever the tests print, and each line moves the card."""
+    test command that itself exits 124 comes back inside the JSON answer. A
+    worker that did not answer has no status (None): nothing ran that the
+    builder could fix. The launcher prints a line whenever the tests print, and
+    each line moves the card."""
     async def on_line(line):
         await progress()
     request = {'worktree': run.worktree, 'run': what, 'limit_seconds': limit_seconds}
@@ -213,7 +215,7 @@ async def ask_tester(run: CardRun, what: str, limit_seconds: int, progress) -> t
     reply = _json((out.strip().splitlines() or [''])[-1])
     if status == 0 and isinstance(reply, dict) and isinstance(reply.get('status'), int):
         return reply['status'], str(reply.get('output', '')), False
-    return 1, f'the test worker did not answer (exit {status}): {err.strip()[-500:]}', False
+    return None, f'the test worker did not answer (exit {status}): {err.strip()[-500:]}', False
 
 
 async def tester(run: CardRun, limit_seconds: int, progress, ask=ask_tester) -> TestResult:
@@ -222,9 +224,13 @@ async def tester(run: CardRun, limit_seconds: int, progress, ask=ask_tester) -> 
     lint_status, lint_output, stopped = await ask(run, 'lint', limit_seconds, progress)
     if stopped:
         return TestResult(passed=False, summary=f'`npm run lint:framework` {lint_output}', stopped=True)
+    if lint_status is None:  # names no failure, so it is reported and never sent to the builder
+        return TestResult(passed=False, summary=f'`npm run lint:framework`: {lint_output}')
     status, output, stopped = await ask(run, 'suite', max(1, limit_seconds - int(time.monotonic() - started)), progress)
     if stopped:
         return TestResult(passed=False, summary=f'`node --test scripts/*.test.mjs` {output}', stopped=True)
+    if status is None:
+        return TestResult(passed=False, summary=f'`node --test scripts/*.test.mjs`: {output}')
     result = suite_result(status, output)
     if lint_status != 0:
         result.passed = False
