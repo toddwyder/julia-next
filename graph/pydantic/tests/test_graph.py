@@ -175,11 +175,14 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
             worker_names={'builder': 'Gemini (agy)', 'tests': 'the test runner (no AI model)',
                           'reviewer': 'DeepSeek V4 Pro (Pi)'},
             worker_makers={'builder': 'Google', 'reviewer': 'DeepSeek'},
-            limits={'builder': 3600, 'tests': 900, 'reviewer': 1200},
+            limits={'builder': 3600, 'tests': 900, 'reviewer': 1200}, pause=self.no_pause,
             snapshot=workers.snapshot, restore=workers.restore, drift=workers.drift, diff=workers.change,
             install=self.install,
             base_file=lambda run, path: ROLE if path == '.agents/skills/julia-reviewer/SKILL.md' else '',
         )
+
+    async def no_pause(self, seconds):
+        self.paused = getattr(self, 'paused', 0) + seconds
 
     async def install(self, run):
         """As workers.clean_install: the commit exactly, then a pretend install."""
@@ -1072,6 +1075,44 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(seen, [''])
         [note] = [c for c in self.linear.comments if 'graph: review-drift' in c]
         self.assertIn('1 file(s) differ', note)
+
+    async def test_a_reviewer_that_left_something_running_is_not_a_clean_review(self):
+        async def approves_but_leaves_a_process(run):
+            self.alive['reviewer'] = [4343]
+            return self.APPROVE
+        outcome = await run_card(self.state(), self.deps(reviewer=self.reviewer_says(approves_but_leaves_a_process),
+                                                         alive_after_wait=[4343]))
+        self.assertEqual(outcome, 'failed')
+        self.assertIn('the reviewer left process 4343 running, so no new review starts until it ends', self.results()[0])
+        self.assertEqual(self.verdicts(), [])
+
+    async def test_a_reviewer_process_that_ends_while_waited_for_leaves_the_review_as_it_was(self):
+        async def approves_with_a_process_ending(run):
+            self.alive['reviewer'] = [4343]
+            return self.APPROVE
+        # wait_for_exit finds it gone
+        outcome = await run_card(self.state(), self.deps(reviewer=self.reviewer_says(approves_with_a_process_ending)))
+        self.assertEqual(outcome, 'passed')
+
+    async def test_a_comment_whose_post_was_cut_short_by_a_crash_is_not_posted_twice(self):
+        # Linear took the verdict, the graph died before recording it, and Linear
+        # still lists it late when the graph comes back
+        self.linear = FakeLinear()
+        deps = self.deps(reviewer=self.reviewer_says(self.APPROVE))
+        real = deps.linear.comment
+
+        async def takes_it_then_dies(card, body):
+            await real(card, body)
+            if 'graph: review-verdict' in body:
+                self.linear.hidden[list(self.linear.store)[-1]] = 2  # listed only from the third read
+                raise Crash()
+        deps.linear.comment = takes_it_then_dies
+        with self.assertRaises(Crash):
+            await run_card(self.state(), deps)
+        self.assertIn('graph: review-verdict', self.saved().posting)
+        deps.linear.comment = real
+        self.assertEqual(await run_card(self.state(), self.deps(reviewer=self.reviewer_says(self.APPROVE))), 'passed')
+        self.assertEqual(len(self.verdicts()), 1)
 
     async def test_a_reviewer_still_running_after_its_limit_is_named_and_no_new_review_starts(self):
         # The seat's Pi child can outlive the seat, and the graph cannot signal runner's processes:

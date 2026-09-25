@@ -30,6 +30,7 @@ saved step and never counts unfinished work as done:
 
 from __future__ import annotations
 
+import asyncio
 import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -151,11 +152,19 @@ class Deps:
     status_every: float = 60
     # The files in the card's working copy, listed in the builder's brief.
     files: Callable[[CardRun], list[str]] = field(default=lambda run: [])
+    # A wait (asyncio.sleep; instant in the tests).
+    pause: Callable[[float], Awaitable[None]] = field(default=asyncio.sleep)
 
 
 def marker(step: str, run: CardRun, **fields: object) -> str:
     extra = ''.join(f' {k}={v}' for k, v in fields.items())
     return f'graph: {step} card={run.card} base={run.base[:12]}{extra}'
+
+
+# Linear's comment list lagged a new comment by about 2.5 s (JUL-151, 25 Sep):
+# after a crash mid-post, the card is read this many times, this far apart.
+LAG_READS = 4
+LAG_PAUSE_SECONDS = 3
 
 
 async def say_once(ctx: GraphRunContext[CardRun, Deps], text: str, line: str) -> None:
@@ -164,12 +173,24 @@ async def say_once(ctx: GraphRunContext[CardRun, Deps], text: str, line: str) ->
     moment behind a new comment (a verdict was posted twice, 2.5 s apart, on
     JUL-151 on 25 Sep); the card is checked too, for a comment posted before
     a crash could record it."""
-    if line in ctx.state.posted:
+    s = ctx.state
+    if line in s.posted:
         return
-    card = await ctx.deps.linear.card(ctx.state.card)
-    if not any(line in c['body'] for c in card['comments']):
-        await ctx.deps.linear.comment(ctx.state.card, f'{text}\n\n{line}')
-    ctx.state.posted.append(line)
+    # A post of this comment was under way when the graph stopped: Linear may
+    # have taken it and not list it yet, so the card is read a few times first.
+    reads = LAG_READS if s.posting == line else 1
+    for n in range(reads):
+        card = await ctx.deps.linear.card(s.card)
+        if any(line in c['body'] for c in card['comments']):
+            break
+        if n + 1 < reads:
+            await ctx.deps.pause(LAG_PAUSE_SECONDS)
+    else:
+        s.posting = line
+        save(ctx)  # before the post, so a crash after it is known on restart
+        await ctx.deps.linear.comment(s.card, f'{text}\n\n{line}')
+    s.posted.append(line)
+    s.posting = None
     save(ctx)
 
 
@@ -791,6 +812,13 @@ class Review(BaseNode[CardRun, Deps, str]):
         except Exception as error:  # a reviewer that cannot even run never approves
             review = ReviewResult(reason=f'the reviewer could not run: {type(error).__name__}: {error}')
         review = review.model_copy(update={'reviewer': f'{who}, from {maker}', 'round': round_})
+        if not review.stopped and ctx.deps.live_workers('reviewer'):
+            # The launcher stops everything a review started; anything of a
+            # reviewer still running now is waited for, and named if it stays.
+            if still := await ctx.deps.wait_for_exit('reviewer'):
+                review = review.model_copy(update={'ok': False, 'reason': f'the reviewer left process '
+                                                                         f'{", ".join(map(str, still))} running, so no '
+                                                                         'new review starts until it ends'})
         after = ctx.deps.snapshot(s)
         s.review_before = None  # saved with the outcome, whichever it is
         # Every outcome is saved before anything is posted; post_review (here,

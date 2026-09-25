@@ -24,6 +24,7 @@
 // reap.py stops all of it. A stopped reviewer exits STOPPED_EXIT (124) and
 // says so on stderr. runner also hosts Orca's server, so nothing is swept by
 // account.
+import { randomUUID } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -139,8 +140,45 @@ export function piReply(stdout) {
   return { ok: true, text, model };
 }
 
+// Each review run's processes carry this in their environment, with the run's
+// own id: every child inherits it, even one that left the process group, so
+// the launcher can find all of them as long as they run as runner.
+export const RUN_MARK = 'JULIA_REVIEW_RUN';
+
+// This account's processes that carry this run's mark (their environment is
+// readable only by the account itself and root).
+export function marked(mark, { proc = '/proc', read = readFileSync, list = readdirSync, self = process.pid } = {}) {
+  const found = [];
+  let names;
+  try {
+    names = list(proc);
+  } catch {
+    return found; // no /proc (not Linux): nothing to find
+  }
+  for (const name of names) {
+    if (!/^\d+$/.test(name) || Number(name) === self) continue;
+    try {
+      if (read(`${proc}/${name}/environ`).toString('latin1').split('\0').includes(`${RUN_MARK}=${mark}`)) found.push(Number(name));
+    } catch { /* gone, or not ours */ }
+  }
+  return found;
+}
+
+// Kill every process still carrying the mark, pass after pass, so one that
+// forks meanwhile is caught too. Returns what is left (nothing, normally).
+export async function sweepMarked(mark, { find = marked, kill = process.kill.bind(process), passes = 20, pause = 50 } = {}) {
+  for (let pass = 0; pass < passes; pass += 1) {
+    const left = find(mark);
+    if (left.length === 0) return [];
+    for (const pid of left) { try { kill(pid, 'SIGKILL'); } catch { /* gone */ } }
+    await new Promise((done) => setTimeout(done, pause));
+  }
+  return find(mark);
+}
+
 export async function review(request, {
   run = runLimited, model = codexModel, onOutput = () => {}, reviewers = REVIEWERS, kill = process.kill.bind(process),
+  sweep = sweepMarked,
 } = {}) {
   const which = request?.reviewer;
   if (!Object.hasOwn(reviewers, which)) return { status: 'failed', error: `refused: unknown reviewer ${JSON.stringify(which)}` };
@@ -154,7 +192,8 @@ export async function review(request, {
   }
   let stdout = '';
   let stderr = '';
-  const options = { cwd: '/', env: spec.env, stdio: [spec.stdin ? 'pipe' : 'ignore', 'pipe', 'pipe'] };
+  const mark = randomUUID();
+  const options = { cwd: '/', env: { ...spec.env, [RUN_MARK]: mark }, stdio: [spec.stdin ? 'pipe' : 'ignore', 'pipe', 'pipe'] };
   const result = await run(PYTHON, [REAPER, '--', spec.command, ...spec.args], options, {
     seconds,
     graceMs: STOP_GRACE_MS,
@@ -163,14 +202,21 @@ export async function review(request, {
       child.stderr.on('data', (chunk) => { stderr += chunk; });
       // reap.py killed outright (only root or the kernel's out-of-memory killer
       // can: it sweeps before any exit of its own) cannot sweep: stop the rest
-      // of its group at once. (A process that also left the group is then
-      // found by the graph's leftover check, by its command line.)
+      // of its group at once, and then everything carrying this run's mark,
+      // which also finds a process that had left the group.
       child.on('exit', (code, signal) => {
-        if (signal) { try { kill(-child.pid, 'SIGKILL'); } catch { /* the group is gone */ } }
+        if (!signal) return;
+        try { kill(-child.pid, 'SIGKILL'); } catch { /* the group is gone */ }
+        sweep(mark);
       });
       if (spec.stdin) child.stdin.end(request.prompt);
     },
   });
+  // However the reviewer ended, nothing of this run is left running.
+  const left = await sweep(mark);
+  if (left.length) {
+    return { status: 'failed', error: `the reviewer left ${left.length} process(es) running that could not be stopped: ${left.join(', ')}` };
+  }
   if (result.stopped) return { status: 'stopped', error: stoppedLine(seconds) };
   if (result.error) return { status: 'failed', error: `the reviewer did not start: ${result.error.message}` };
   const reply = which === 'codex' ? codexReply(stdout) : piReply(stdout);
@@ -202,7 +248,11 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     stopping = true;
     const signal = (name) => { if (group) { try { process.kill(-group, name); } catch { /* already gone */ } } };
     signal('SIGTERM');
-    setTimeout(() => { signal('SIGKILL'); finish(); }, STOP_GRACE_MS).unref();
+    // Past the grace, SIGKILL: reap.py then dies by a signal, and review()
+    // sweeps everything carrying the run's mark before it answers, which ends
+    // this launcher (below). The last timer is only a backstop.
+    setTimeout(() => signal('SIGKILL'), STOP_GRACE_MS).unref();
+    setTimeout(finish, STOP_GRACE_MS + 30_000).unref();
   };
   const finish = () => {
     console.error('stopped: the graph stopped the reviewer');

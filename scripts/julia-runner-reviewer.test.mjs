@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { runLimited } from '../ops/julia-runner/time-limit.mjs';
-import { codexModel, codexReply, piReply, PYTHON, REAPER, REVIEWERS, review, STOP_GRACE_MS } from '../ops/julia-runner/run-reviewer.mjs';
+import { codexModel, codexReply, marked, piReply, PYTHON, REAPER, REVIEWERS, review, STOP_GRACE_MS, sweepMarked } from '../ops/julia-runner/run-reviewer.mjs';
 
 const LAUNCHER = fileURLToPath(new URL('../ops/julia-runner/run-reviewer.mjs', import.meta.url));
 
@@ -93,10 +93,42 @@ const fakeRun = (result, stdout = '', exit = null) => async (command, args, opti
   return { seconds, options, ...result };
 };
 
+test('each run is marked, and whatever still carries its mark is killed, pass after pass', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'proc-'));
+  try {
+    for (const [pid, env] of [['10', 'A=1\0JULIA_REVIEW_RUN=m1\0'], ['11', 'JULIA_REVIEW_RUN=m2\0'], ['12', 'JULIA_REVIEW_RUN=m1\0'], ['self', '']]) {
+      mkdirSync(join(root, pid));
+      writeFileSync(join(root, pid, 'environ'), env);
+    }
+    assert.deepEqual(marked('m1', { proc: root, self: 0 }).sort(), [10, 12]);
+    assert.deepEqual(marked('m1', { proc: join(root, 'nothing-here') }), []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+  // a marked process that forks once as it is killed: the second pass catches its child
+  let alive = [10];
+  const killed = [];
+  const left = await sweepMarked('m1', { find: () => alive, kill: (pid) => { killed.push(pid); alive = pid === 10 ? [11] : []; }, pause: 1 });
+  assert.deepEqual([left, killed], [[], [10, 11]]);
+  // and the mark reaches the reviewer's environment
+  let env;
+  await review({ reviewer: 'codex', prompt: 'p' }, { run: async (c, a, options) => { env = options.env; return { stopped: true }; }, sweep: async () => [] });
+  assert.match(env.JULIA_REVIEW_RUN, /^[0-9a-f-]{36}$/);
+});
+
+test('a run that leaves a marked process nothing could stop is never a clean reply', async () => {
+  const reply = await review({ reviewer: 'codex', prompt: 'p' }, {
+    run: fakeRun({ code: 0 }, lines({ type: 'thread.started', thread_id: 't' }, { type: 'item.completed', item: { type: 'agent_message', text: 'v' } }, { type: 'turn.completed' })),
+    model: () => 'gpt-5.5', sweep: async () => [777],
+  });
+  assert.equal(reply.status, 'failed');
+  assert.match(reply.error, /left 1 process\(es\) running that could not be stopped: 777/);
+});
+
 test('if the reaper itself is killed outright, the rest of its group is killed at once', async () => {
   const killed = [];
   const kill = (pid, signal) => killed.push([pid, signal]);
-  const reply = await review({ reviewer: 'codex', prompt: 'p' }, { run: fakeRun({ code: null, signal: 'SIGKILL' }, '', [null, 'SIGKILL']), kill, model: () => null });
+  const reply = await review({ reviewer: 'codex', prompt: 'p' }, { run: fakeRun({ code: null, signal: 'SIGKILL' }, '', [null, 'SIGKILL']), kill, model: () => null, sweep: async () => [] });
   assert.deepEqual(killed, [[-4242, 'SIGKILL']]);
   assert.equal(reply.status, 'failed');
   assert.match(reply.error, /^the reviewer was stopped by SIGKILL(: |$)/);
@@ -213,15 +245,16 @@ test('a reviewer that ends leaves nothing running behind it', linuxOnly, async (
   }
 });
 
-test('a reviewer left behind by a reaper killed outright is stopped with its group', linuxOnly, async () => {
+test('a reviewer left behind by a reaper killed outright is stopped, even a helper that left the group', linuxOnly, async () => {
   const dir = mkdtempSync(join(tmpdir(), 'reviewer-'));
   const script = join(dir, 'codex');
-  // a pretend reviewer with a plain child and a double-fork orphan, all in its process group
+  // a pretend reviewer with a plain child, a double-fork orphan and a helper that left the group (setsid)
   writeFileSync(script, [
     '#!/bin/sh',
     `sleep 60 & echo $! > "${script}.plain"`,
     `( sleep 60 & echo $! > "${script}.orphan" ) &`,
-    `while [ ! -s "${script}.orphan" ]; do sleep 0.05; done`,
+    `setsid sleep 60 & echo $! > "${script}.escaped"`,
+    `while [ ! -s "${script}.orphan" ] || [ ! -s "${script}.escaped" ]; do sleep 0.05; done`,
     'wait', '',
   ].join('\n'), { mode: 0o755 });
   const reviewers = { fake: () => ({ command: script, args: [], env: process.env, stdin: false }) };
@@ -231,15 +264,17 @@ test('a reviewer left behind by a reaper killed outright is stopped with its gro
   });
   try {
     const pending = review({ reviewer: 'fake', prompt: 'p', limit_seconds: 40 }, { run, reviewers });
-    for (let i = 0; i < 100 && pidsIn(`${script}.orphan`).length === 0; i += 1) await new Promise((r) => setTimeout(r, 100));
+    for (let i = 0; i < 100 && pidsIn(`${script}.orphan`, `${script}.escaped`).length < 2; i += 1) await new Promise((r) => setTimeout(r, 100));
     process.kill(reaper, 'SIGKILL'); // as the kernel's out-of-memory killer would
     const reply = await pending;
     assert.equal(reply.status, 'failed');
     assert.match(reply.error, /stopped by SIGKILL/);
     await settle();
-    for (const pid of pidsIn(`${script}.plain`, `${script}.orphan`)) assert.equal(alive(pid), false, `child ${pid} outlived its reaper`);
+    const made = pidsIn(`${script}.plain`, `${script}.orphan`, `${script}.escaped`);
+    assert.equal(made.length, 3);
+    for (const pid of made) assert.equal(alive(pid), false, `child ${pid} outlived its reaper`);
   } finally {
-    killAll(pidsIn(`${script}.plain`, `${script}.orphan`));
+    killAll(pidsIn(`${script}.plain`, `${script}.orphan`, `${script}.escaped`));
     rmSync(dir, { recursive: true, force: true });
   }
 });

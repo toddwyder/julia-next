@@ -107,6 +107,7 @@ class CardRun(BaseModel):
     # Linear's comment list can lag behind a new comment, so the run's own
     # record is what keeps a comment from being posted twice.
     posted: list[str] = []
+    posting: str | None = None  # a marker being posted: set before the post, cleared after
     failure: str | None = None
     # The card's one "Where this card is" comment (JUL-126).
     status_id: str | None = None
