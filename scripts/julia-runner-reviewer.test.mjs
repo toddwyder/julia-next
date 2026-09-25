@@ -33,7 +33,8 @@ const lines = (...events) => events.map((e) => JSON.stringify(e)).join('\n');
 test('Codex is started read-only, on the pinned model, with the prompt on stdin', () => {
   const spec = REVIEWERS.codex('the brief');
   assert.equal(spec.command, 'codex');
-  assert.deepEqual(spec.args, ['exec', '-m', 'gpt-5.5', '-c', 'model_reasoning_effort=high', '-s', 'read-only', '--skip-git-repo-check', '--json', '-']);
+  assert.deepEqual(spec.args, ['exec', '-m', 'gpt-5.5', '-c', 'model_reasoning_effort=medium', '-s', 'read-only', '--skip-git-repo-check', '--json', '-']);
+  assert.ok(REVIEWERS.codex('the brief', null, 'gpt-5.5', 'low').args.includes('model_reasoning_effort=low'));
   assert.equal(spec.stdin, true);
   assert.deepEqual(Object.keys(spec.env).sort(), ['HOME', 'LANG', 'PATH']);
   assert.throws(() => REVIEWERS.codex('brief', null, 'gpt-unknown'), /not installed/);
@@ -43,7 +44,7 @@ test('the Codex builder gets the selected worktree, write sandbox and its own li
   const worktree = '/srv/julia-runner/worktrees/card-999';
   const spec = BUILDERS.codex('the brief', worktree);
   assert.equal(spec.command, 'codex');
-  assert.deepEqual(spec.args, ['exec', '-m', 'gpt-5.5', '-c', 'model_reasoning_effort=high', '-s', 'workspace-write', '-C', worktree, '--json', '-']);
+  assert.deepEqual(spec.args, ['exec', '-m', 'gpt-5.5', '-c', 'model_reasoning_effort=medium', '-s', 'workspace-write', '-C', worktree, '--json', '-']);
   assert.throws(() => BUILDERS.codex('brief', worktree, 'gpt-unknown'), /not installed/);
   let seen;
   await review({ builder: 'codex', worktree, prompt: 'p', limit_seconds: 99999 }, {

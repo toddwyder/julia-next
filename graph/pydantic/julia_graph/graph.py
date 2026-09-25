@@ -43,6 +43,7 @@ from pydantic_graph import BaseNode, End, GraphBuilder, GraphRunContext
 
 from .checkpoint import CardRun, Checkpoint, ReviewResult, StepMark, TestResult
 from .linear import AlreadyPosted
+from .model_choice import quota
 from .status import day, duration, render, status_marker
 
 # Builder runs for one build or one repair: an interrupted run is tried again once.
@@ -154,6 +155,8 @@ class Deps:
     worker_makers: dict[str, str] = field(default_factory=dict)
     worker_models: dict[str, str] = field(default_factory=dict)
     model_labels: tuple[str, str] | None = None
+    # The service selects from Linear at start and on a quota response.
+    select_models: Callable[[CardRun, str | None], Awaitable[str | None]] | None = None
     limits: dict[str, int] = field(default_factory=lambda: dict(LIMITS))
     # Worker output moves the card at once, but edits its comment at most this often.
     status_every: float = 60
@@ -497,7 +500,7 @@ def instructions_part(card: dict) -> str:
 
 @dataclass
 class Build(BaseNode[CardRun, Deps, str]):
-    async def run(self, ctx: GraphRunContext[CardRun, Deps]) -> Test | Report:
+    async def run(self, ctx: GraphRunContext[CardRun, Deps]) -> Build | Test | Report:
         s = ctx.state
         if s.tries >= MAX_BUILD_ATTEMPTS:
             what = {'tests': f'repair {s.repairs}', 'review': f'fix for review round {len(s.round_reasons)}'}.get(s.fixing, 'build')
@@ -528,6 +531,16 @@ class Build(BaseNode[CardRun, Deps, str]):
         if result.stopped:
             return await stopped(ctx, 'builder')
         if not result.ok:
+            if quota(result.reason) and ctx.deps.select_models:
+                old = s.builder_model
+                if reason := await ctx.deps.select_models(s, 'builder'):
+                    close(ctx, 'quota reached')
+                    return fail(ctx, reason)
+                await say_once(ctx, f'Builder model {old} hit its quota. Switched to {s.builder_model}.',
+                               marker('quota-builder', s, from_model=old, to_model=s.builder_model))
+                s.tries = 0
+                close(ctx, 'quota reached')
+                return Build()
             close(ctx, 'failed')
             return fail(ctx, f'the builder failed: {result.reason}')
         commit, reason = await ctx.deps.commit(s)
@@ -762,7 +775,7 @@ def verdict_text(s: CardRun, review: ReviewResult) -> str:
 
 @dataclass
 class Review(BaseNode[CardRun, Deps, str]):
-    async def run(self, ctx: GraphRunContext[CardRun, Deps]) -> Build | Report:
+    async def run(self, ctx: GraphRunContext[CardRun, Deps]) -> Build | Review | Report:
         s = ctx.state
         who = ctx.deps.worker_names.get('reviewer', 'the reviewer')
         builder_maker = ctx.deps.worker_makers.get('builder', '')
@@ -814,6 +827,16 @@ class Review(BaseNode[CardRun, Deps, str]):
             review = await ctx.deps.reviewer(s, brief, ctx.deps.limits['reviewer'], lambda: moved(ctx))
         except Exception as error:  # a reviewer that cannot even run never approves
             review = ReviewResult(reason=f'the reviewer could not run: {type(error).__name__}: {error}')
+        if quota(review.reason) and ctx.deps.select_models:
+            old = s.reviewer_model
+            s.review_before = None
+            if reason := await ctx.deps.select_models(s, 'reviewer'):
+                close(ctx, 'quota reached')
+                return fail(ctx, reason)
+            await say_once(ctx, f'Reviewer model {old} hit its quota. Switched to {s.reviewer_model}.',
+                           marker('quota-reviewer', s, from_model=old, to_model=s.reviewer_model))
+            close(ctx, 'quota reached')
+            return Review()
         review = review.model_copy(update={'reviewer': f'{who}, from {maker}', 'round': round_})
         if not review.stopped and ctx.deps.live_workers('reviewer'):
             # The launcher stops everything a review started; anything of a
@@ -925,6 +948,10 @@ def result_text(s: CardRun, version: str) -> tuple[str, str]:
     )
     lines = [f'**Pydantic graph result: {"PASSED" if passed else "FAILED"}**', '']
     lines.append(f'- Graph: {version}')
+    if s.builder_model:
+        lines.append(f'- Builder model: {s.builder_model} (effort {s.builder_effort})')
+    if s.reviewer_model:
+        lines.append(f'- Reviewer model: {s.reviewer_model} (effort {s.reviewer_effort})')
     lines.append(f'- Base commit: `{s.base}`')
     lines.append(f'- Candidate commit: `{s.commit}`' if s.commit else '- Candidate commit: none')
     if s.failure:
@@ -1003,11 +1030,18 @@ async def run_card(state: CardRun, deps: Deps) -> str:
     try:
         saved = deps.checkpoint.load()
         if saved is None:
+            if deps.select_models:
+                if reason := await deps.select_models(state, None):
+                    state.failure, state.step = reason, 'report'
             if deps.model_labels:
                 state.builder_model, state.reviewer_model = deps.model_labels
             deps.checkpoint.save(state)
         else:
             state = saved
+            if saved.step != 'done' and deps.select_models:
+                if reason := await deps.select_models(state, None):
+                    state.failure, state.step = reason, 'report'
+                    deps.checkpoint.save(state)
             if deps.model_labels:
                 chosen = (state.builder_model, state.reviewer_model)
                 if all(chosen) and chosen != deps.model_labels:

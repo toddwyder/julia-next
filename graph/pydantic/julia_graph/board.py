@@ -41,7 +41,7 @@ STARTED = 'Implementation'  # the column a started card moves to (graph/board-sp
 # A blocker counts as cleared once it reaches UAT or later, or is finished or
 # abandoned (scripts/ready-queue.mjs isBlockerClosed, Todd's rule).
 CLEARED_COLUMNS = {'UAT', 'Complete'}
-NOT_AGENT_WORK = ('Parent', 'Decision')
+NOT_AGENT_WORK = ('Parent', 'Decision', 'graph-settings')
 CHECK_EVERY = 60  # seconds
 UAT_ITEM = re.compile(r'^ {0,2}\d+\.\s+\S', re.M)
 

@@ -23,6 +23,7 @@ from julia_graph import workers
 from julia_graph.checkpoint import CardLocked, CardRun, Checkpoint, ReviewResult, TestResult
 from julia_graph.graph import MAX_PI_REVIEW_BYTES, MAX_REVIEW_BYTES, BuildResult, Deps, checked_limit, comment_id, run_card
 from julia_graph.linear import AlreadyPosted
+from julia_graph.model_choice import effective, next_pair
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 ROLE = 'ROLE FILE: attack the candidate against every acceptance criterion.'
@@ -1192,6 +1193,108 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn('F1: x', self.brief)  # the builder still got round 1's findings
 
 
+    def settings_deps(self, settings_labels, card_labels=(), builder_backups='builder-codex',
+                      reviewer_backups='adversary-gemini-flash', builder=None, reviewer=None):
+        """The real graph with pretend workers and a pretend Linear selection read."""
+        settings = {'labels': list(settings_labels), 'description':
+                    f'Builder backups: {builder_backups}\nReviewer backups: {reviewer_backups}'}
+        card = {'labels': list(card_labels), 'description': ''}
+        deps = self.deps(builder=builder, reviewer=reviewer)
+
+        def resolve(b, r):
+            makers = {'codex': 'OpenAI', 'gemini-flash': 'Google', 'deepseek-pro': 'DeepSeek'}
+            bm, rm = makers[b.removeprefix('builder-')], makers[r.removeprefix('adversary-')]
+            if bm == rm:
+                raise ValueError('same maker')
+            return {'builder': {'label': b, 'maker': bm}, 'reviewer': {'label': r, 'maker': rm}}
+
+        async def select(run, role):
+            choices = effective(settings, card)
+            if role is None:
+                pair = resolve(choices['builder']['model'], choices['reviewer']['model'])
+            else:
+                old = getattr(run, f'{role}_model')
+                exhausted = getattr(run, f'exhausted_{role}')
+                exhausted.append(old)
+                pair = next_pair(choices, {'builder': run.builder_model, 'reviewer': run.reviewer_model},
+                                 {'builder': run.exhausted_builder, 'reviewer': run.exhausted_reviewer}, role, resolve)
+                if pair is None:
+                    return f'{role} model {old} hit its quota. No legal builder and reviewer pair remains.'
+            run.builder_model, run.reviewer_model = pair['builder']['label'], pair['reviewer']['label']
+            run.builder_effort, run.reviewer_effort = choices['builder']['effort'], choices['reviewer']['effort']
+            deps.worker_makers = {role: pair[role]['maker'] for role in ('builder', 'reviewer')}
+            deps.worker_names['builder'], deps.worker_names['reviewer'] = run.builder_model, run.reviewer_model
+            deps.worker_models['reviewer'] = {'adversary-codex': 'gpt-5.5',
+                'adversary-gemini-flash': 'gemini-3.8-flash',
+                'adversary-deepseek-pro': 'deepseek-v4-pro'}[run.reviewer_model]
+            return None
+
+        deps.select_models = select
+        return deps
+
+    async def test_settings_defaults_drive_graph_run(self):
+        seen = []
+        async def builder(run, brief, limit, progress):
+            seen.append((run.builder_model, run.builder_effort))
+            (Path(run.worktree) / 'hello.txt').write_text('hello\n')
+            return BuildResult(True, report='done')
+        deps = self.settings_deps(['builder-codex', 'adversary-deepseek-pro',
+                                   'builder-effort-low'], builder=builder)
+        self.assertEqual(await run_card(self.state(), deps), 'passed')
+        self.assertEqual(seen, [('builder-codex', 'low')])
+        self.assertEqual(self.saved().reviewer_effort, 'medium')
+
+    async def test_card_override_is_only_for_that_run(self):
+        deps = self.settings_deps(['builder-gemini-flash', 'adversary-deepseek-pro'],
+                                  ['builder-codex', 'builder-effort-high'])
+        self.assertEqual(await run_card(self.state(), deps), 'passed')
+        self.assertEqual((self.saved().builder_model, self.saved().builder_effort), ('builder-codex', 'high'))
+        self.assertEqual(effective({'labels': ['builder-gemini-flash'], 'description': ''},
+                                   {'labels': [], 'description': ''})['builder']['model'], 'builder-gemini-flash')
+        self.assertEqual(effective({'labels': ['builder-gemini-flash'],
+                                    'description': 'Builder backups: builder-codex'},
+                                   {'labels': [], 'description': 'Builder backups: builder-gemini-flash'})
+                         ['builder']['backups'], ['builder-gemini-flash'])
+
+    async def test_quota_switches_and_records_models(self):
+        seen = []
+        async def builder(run, brief, limit, progress):
+            seen.append(run.builder_model)
+            if len(seen) == 1:
+                return BuildResult(False, reason='weekly quota reached')
+            (Path(run.worktree) / 'hello.txt').write_text('hello\n')
+            return BuildResult(True, report='done')
+        deps = self.settings_deps(['builder-gemini-flash', 'adversary-deepseek-pro'], builder=builder)
+        self.assertEqual(await run_card(self.state(), deps), 'passed')
+        self.assertEqual(seen, ['builder-gemini-flash', 'builder-codex'])
+        self.assertTrue(any('hit its quota. Switched to builder-codex' in c for c in self.linear.comments))
+
+    async def test_quota_skips_same_maker_backup(self):
+        seen = []
+        async def builder(run, brief, limit, progress):
+            seen.append((run.builder_model, run.reviewer_model))
+            if len(seen) == 1:
+                return BuildResult(False, reason='quota exhausted')
+            (Path(run.worktree) / 'hello.txt').write_text('hello\n')
+            return BuildResult(True, report='done')
+        deps = self.settings_deps(['builder-gemini-flash', 'adversary-codex'],
+                                  builder_backups='builder-codex, builder-gemini-flash',
+                                  reviewer_backups='adversary-gemini-flash', builder=builder)
+        async def reviewer(run, brief, limit, progress):
+            return ReviewResult(ok=True, verdict='approve', criteria=met('say hello'), model='gemini-3.8-flash')
+        deps.reviewer = reviewer
+        self.assertEqual(await run_card(self.state(), deps), 'passed')
+        self.assertEqual(seen[-1], ('builder-codex', 'adversary-gemini-flash'))
+
+    async def test_quota_with_no_legal_pair_stops_plainly(self):
+        async def builder(run, brief, limit, progress):
+            return BuildResult(False, reason='quota reached')
+        deps = self.settings_deps(['builder-gemini-flash', 'adversary-codex'],
+                                  builder_backups='builder-codex', reviewer_backups='', builder=builder)
+        self.assertEqual(await run_card(self.state(), deps), 'failed')
+        self.assertIn('No legal builder and reviewer pair remains', self.results()[0])
+
+
 class PrepareTest(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -1469,13 +1572,21 @@ class WorkerParsingTest(unittest.TestCase):
 
     def test_card_deps_resumes_the_saved_model_pair(self):
         from julia_graph import __main__ as entry
+        import asyncio
         with tempfile.TemporaryDirectory() as d:
-            Checkpoint(Path(d), 'JUL-999').save(CardRun(card='JUL-999', base='a' * 40,
+            saved = CardRun(card='JUL-999', base='a' * 40,
                 branch='graph/card-999', worktree='/srv/julia-runner/worktrees/card-999',
-                builder_model='builder-codex', reviewer_model='adversary-gemini-flash'))
-            with mock.patch.object(entry, 'STATE', d):
+                builder_model='builder-codex', reviewer_model='adversary-gemini-flash')
+            Checkpoint(Path(d), 'JUL-999').save(saved)
+            linear = mock.Mock()
+            linear.settings = mock.AsyncMock(return_value={'labels': ['builder-gemini-flash',
+                'adversary-deepseek-pro'], 'description': ''})
+            linear.card = mock.AsyncMock(return_value={'labels': [], 'description': ''})
+            with mock.patch.object(entry, 'STATE', d), mock.patch.object(entry, 'LinearApp', return_value=linear):
                 deps = entry.card_deps('JUL-999')
-            self.assertEqual(deps.model_labels, ('builder-codex', 'adversary-gemini-flash'))
+            self.assertIsNone(asyncio.run(deps.select_models(saved, None)))
+            self.assertEqual((saved.builder_model, saved.reviewer_model),
+                             ('builder-codex', 'adversary-gemini-flash'))
             self.assertEqual(deps.worker_models['reviewer'], 'gemini-3.8-flash')
 
     def test_the_reviewer_is_started_exactly_as_its_sudo_rule_allows(self):
@@ -1622,7 +1733,7 @@ class WorkerCallTest(unittest.IsolatedAsyncioTestCase):
             pair = workers.resolve_pair('builder-gemini-flash', 'adversary-codex')
             result = await workers.reviewer(lambda line: None, pair)(run, 'the brief', 1200, None)
         # the launcher enforces the limit; the graph's own, a minute later, is a backstop
-        self.assertEqual(seen, {'kind': 'reviewer', 'request': {'reviewer': 'codex', 'model': 'gpt-5.5', 'prompt': 'the brief', 'limit_seconds': 1200},
+        self.assertEqual(seen, {'kind': 'reviewer', 'request': {'reviewer': 'codex', 'model': 'gpt-5.5', 'prompt': 'the brief', 'limit_seconds': 1200, 'effort': 'medium'},
                                 'cwd': '/', 'limit': 1260})
         self.assertEqual((result.verdict, result.model), ('approve', 'gpt-5.5'))
 
