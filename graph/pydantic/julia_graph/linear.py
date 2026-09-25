@@ -24,6 +24,22 @@ CARD_QUERY = """query Card($id: String!) {
 COMMENT = """mutation Comment($issueId: String!, $body: String!) {
   commentCreate(input: { issueId: $issueId, body: $body }) { success comment { id } }
 }"""
+READY_QUERY = """query Ready($team: String!, $state: String!, $after: String) {
+  issues(filter: { team: { name: { eq: $team } }, state: { name: { eq: $state } } }, first: 100, after: $after) {
+    nodes {
+      identifier title description sortOrder
+      labels { nodes { name } }
+      inverseRelations { nodes { type issue { identifier state { name type } } } }
+    }
+    pageInfo { hasNextPage endCursor }
+  }
+}"""
+STATES_QUERY = """query States($id: String!) {
+  issue(id: $id) { id team { states { nodes { id name } } } }
+}"""
+MOVE = """mutation Move($id: String!, $stateId: String!) {
+  issueUpdate(id: $id, input: { stateId: $stateId }) { success }
+}"""
 EDIT = """mutation Edit($id: String!, $body: String!) {
   commentUpdate(id: $id, input: { body: $body }) { success }
 }"""
@@ -42,6 +58,23 @@ def _post(url: str, data: bytes, headers: dict) -> dict:
     request = urllib.request.Request(url, data=data, headers=headers, method='POST')
     with urllib.request.urlopen(request, timeout=60) as response:
         return json.loads(response.read())
+
+
+TEAM = 'Julia-next'
+
+
+def ready_card(issue: dict) -> dict:
+    """A Ready card in the board check's shape. Linear keeps a blocking relation
+    on the blocker (type "blocks"), so the blocked card sees it among its
+    inverse relations, with the blocker as `issue` (live-verified for JUL-79)."""
+    return {
+        'identifier': issue['identifier'], 'title': issue['title'], 'description': issue['description'] or '',
+        'sort_order': float(issue['sortOrder']),
+        'labels': [label['name'] for label in issue['labels']['nodes']],
+        'blockers': [{'identifier': r['issue']['identifier'], 'state': r['issue']['state']['name'],
+                      'type': r['issue']['state']['type']}
+                     for r in issue['inverseRelations']['nodes'] if r['type'] == 'blocks'],
+    }
 
 
 class LinearApp:
@@ -70,6 +103,24 @@ class LinearApp:
         comments = sorted(issue['comments']['nodes'], key=lambda c: c['createdAt'])
         return {'identifier': issue['identifier'], 'title': issue['title'], 'description': issue['description'] or '',
                 'comments': [{'id': c['id'], 'body': c['body']} for c in comments]}
+
+    async def ready_cards(self) -> list[dict]:
+        cards, after = [], None
+        while True:
+            page = (await asyncio.to_thread(self._call, READY_QUERY, {'team': TEAM, 'state': 'Ready', 'after': after}))['issues']
+            cards += [ready_card(issue) for issue in page['nodes']]
+            if not page['pageInfo']['hasNextPage']:
+                return cards
+            after = page['pageInfo']['endCursor']
+
+    async def move(self, card: str, state: str) -> None:
+        issue = (await asyncio.to_thread(self._call, STATES_QUERY, {'id': card}))['issue']
+        state_id = next((s['id'] for s in issue['team']['states']['nodes'] if s['name'] == state), None)
+        if state_id is None:
+            raise RuntimeError(f'the team has no "{state}" column')
+        data = await asyncio.to_thread(self._call, MOVE, {'id': issue['id'], 'stateId': state_id})
+        if not data['issueUpdate']['success']:
+            raise RuntimeError(f'Linear did not move {card} to {state}')
 
     async def comment(self, card: str, body: str) -> str:
         if card not in self._ids:

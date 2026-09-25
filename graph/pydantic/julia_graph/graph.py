@@ -16,6 +16,7 @@ saved step and never counts unfinished work as done:
 
 from __future__ import annotations
 
+import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -24,7 +25,7 @@ from typing import Protocol
 from pydantic_graph import BaseNode, End, GraphBuilder, GraphRunContext
 
 from .checkpoint import CardRun, Checkpoint, StepMark, TestResult
-from .status import duration, render, status_marker
+from .status import day, duration, render, status_marker
 
 MAX_BUILD_ATTEMPTS = 2
 # Each worker's time limit in seconds. The worker's own launcher enforces it
@@ -270,10 +271,15 @@ class Prepare(BaseNode[CardRun, Deps, str]):
         if refusal := await ctx.deps.prepare(ctx.state):
             close(ctx, 'refused')
             return fail(ctx, f'the working copy could not be prepared: {refusal}')
+        if ctx.state.uat_locked_at is None:
+            # Started by hand rather than from Ready: the UAT steps lock now.
+            card = await ctx.deps.linear.card(ctx.state.card)
+            ctx.state.uat_plan, ctx.state.uat_locked_at = uat_section(card['description']), ctx.deps.now()
+            save(ctx)
         await say_once(
             ctx,
             f'The Pydantic graph started on this card ({ctx.deps.graph_version}), '
-            f'from base commit `{ctx.state.base[:12]}`.',
+            f'from base commit `{ctx.state.base[:12]}`. {uat_note(ctx.state)}',
             marker('started', ctx.state),
         )
         ctx.state.step = 'build'
@@ -296,9 +302,56 @@ each acceptance criterion, where it is met. If you cannot do the work, say
 BLOCKED and why.
 
 <card>
-{card['description']}
+{with_locked_uat(card['description'], run.uat_plan)}
 </card>
-"""
+""" + instructions_part(card)
+
+
+# ------------------------------------------------------------ the locked UAT steps (JUL-127)
+
+UAT_HEADING = re.compile(r'^[ \t]*##[ \t]+UAT plan[ \t]*$', re.I | re.M)
+SECTION_END = re.compile(r'^[ \t]*#{1,2}[ \t]', re.M)
+INSTRUCTION = re.compile(r'^\W*instruction\b', re.I)
+
+
+def uat_section(description: str) -> str | None:
+    """The card's "## UAT plan" section, heading included, up to the next
+    heading of level 2 or above; None when the card has none. The same heading
+    rule as scripts/acceptance-check.mjs."""
+    start = UAT_HEADING.search(description)
+    if not start:
+        return None
+    end = SECTION_END.search(description, start.end())
+    return description[start.start():end.start() if end else len(description)].rstrip()
+
+
+def with_locked_uat(description: str, locked: str | None) -> str:
+    """The card as the builder sees it: today's text, but the UAT steps as they
+    were when the card started. An edit to them since then does not count."""
+    if locked is None:
+        return description
+    now = uat_section(description)
+    if now is None:
+        return description.rstrip() + '\n\n' + locked
+    return description.replace(now, locked, 1)
+
+
+def uat_note(run: CardRun) -> str:
+    if run.uat_plan is None:
+        return 'The card had no UAT plan when it started.'
+    steps = len(re.findall(r'^ {0,2}\d+\.\s+\S', run.uat_plan, re.M))
+    return (f'Its UAT plan ({steps} step{"" if steps == 1 else "s"}) is locked as it was at {day(run.uat_locked_at)}: '
+            'a later edit to it does not count, only a new Instruction comment does.')
+
+
+def instructions_part(card: dict) -> str:
+    """Todd's Instruction comments, oldest first: they override the card, and
+    they are the only way to change the UAT steps once the card has started."""
+    found = [c['body'].strip() for c in card['comments'] if INSTRUCTION.match(c['body'])]
+    if not found:
+        return ''
+    return ('\nTodd posted these Instruction comments on the card. They override the card text, '
+            'including its UAT plan:\n\n' + '\n\n'.join(f'<instruction>\n{text}\n</instruction>' for text in found) + '\n')
 
 
 @dataclass
