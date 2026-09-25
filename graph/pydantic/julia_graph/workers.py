@@ -25,27 +25,29 @@ from .graph import TODD_REASONS, BuildResult
 WORKER_COMMANDS = {
     'builder': ('gemini-worker', '/opt/julia-runner/ops/julia-runner/run-gemini.mjs'),
     'tests': ('julia-tester', '/opt/julia-runner/ops/julia-runner/run-tests.mjs'),
-    # DeepSeek V4 Pro through the reviewer seat the minimal runner already uses
-    # (scripts/julia-minimal-runner-adapters.mjs): the sudo rule allows exactly
-    # these arguments, and the seat reads its prompt as plain text on stdin.
-    'reviewer': ('runner', '/opt/julia-runner/ops/service-dropbox/run-pi-seat.mjs'),
+    # The reviewer launcher (JUL-128): Codex or DeepSeek, chosen in its JSON
+    # request, run from / in its own process group under its own time limit.
+    'reviewer': ('runner', '/opt/julia-runner/ops/julia-runner/run-reviewer.mjs'),
 }
-WORKER_ARGS = {'reviewer': ['reviewer-backup', '--effort', 'high']}
-# The model the reviewer seat runs (run-pi-seat.mjs SEATS['reviewer-backup']):
-# its Pi process carries it in its command line.
-REVIEWER_MODEL = 'deepseek/deepseek-v4-pro'
+# The command lines a reviewer's own processes carry, so one left behind is
+# still found: DeepSeek's Pi (its model) and Codex (its read-only exec).
+REVIEWER_MARKS = [[b'deepseek/deepseek-v4-pro'], [b'exec', b'read-only', b'--skip-git-repo-check', b'--json']]
 # Accounts that run other things too (runner hosts Orca's server all day), so
 # their other processes are never taken for a live worker of this kind.
 SHARED_ACCOUNTS = {'reviewer'}
 WORKER_ENV = {'PATH': '/usr/bin:/bin', 'LANG': 'C.UTF-8'}
 # Who each worker is, and who makes its model, in the words the card shows.
 # The reviewer's maker must differ from the builder's (graph.Review).
-WORKER_NAMES = {
-    'builder': 'Gemini (agy)',
-    'tests': 'the test runner (no AI model)',
-    'reviewer': 'DeepSeek V4 Pro (Pi)',
-}
-WORKER_MAKERS = {'builder': 'Google', 'reviewer': 'DeepSeek'}
+REVIEWERS = {'deepseek': ('DeepSeek V4 Pro (Pi)', 'DeepSeek'), 'codex': ('Codex (gpt-5.5)', 'OpenAI')}
+DEFAULT_REVIEWER = 'deepseek'
+
+
+def worker_names(reviewer: str = DEFAULT_REVIEWER) -> dict[str, str]:
+    return {'builder': 'Gemini (agy)', 'tests': 'the test runner (no AI model)', 'reviewer': REVIEWERS[reviewer][0]}
+
+
+def worker_makers(reviewer: str = DEFAULT_REVIEWER) -> dict[str, str]:
+    return {'builder': 'Google', 'reviewer': REVIEWERS[reviewer][1]}
 # The exit code ops/julia-runner/time-limit.mjs gives a worker it stopped, as GNU timeout does.
 STOPPED_EXIT = 124
 GIT_ID = ['-c', 'user.name=Julia graph', '-c', 'user.email=graph@julia-next.invalid']
@@ -53,7 +55,7 @@ GIT_ID = ['-c', 'user.name=Julia graph', '-c', 'user.email=graph@julia-next.inva
 
 def sudo_command(kind: str) -> list[str]:
     account, script = WORKER_COMMANDS[kind]
-    return ['sudo', '-n', '-u', account, '--', '/usr/bin/node', script, *WORKER_ARGS.get(kind, [])]
+    return ['sudo', '-n', '-u', account, '--', '/usr/bin/node', script]
 
 
 def git(cwd: str, *args: str) -> str:
@@ -85,9 +87,8 @@ def live_workers(kind: str, proc: Path = Path('/proc'), uid: int | None | str = 
     launcher in its command line. uid is the account's, looked up by default.
     A shared account's other processes do not count: for the reviewer it is
     the seat, or a Pi process running the reviewer's model."""
-    names = {WORKER_COMMANDS[kind][1].encode()}
-    if kind == 'reviewer':
-        names.add(REVIEWER_MODEL.encode())
+    script = WORKER_COMMANDS[kind][1].encode()
+    marks = REVIEWER_MARKS if kind == 'reviewer' else []
     if uid == 'account':
         uid = None if kind in SHARED_ACCOUNTS else account_uid(kind)
     found = []
@@ -95,7 +96,8 @@ def live_workers(kind: str, proc: Path = Path('/proc'), uid: int | None | str = 
         if not entry.name.isdigit() or int(entry.name) == os.getpid():
             continue
         try:
-            if names & set((entry / 'cmdline').read_bytes().split(b'\0')) or (uid is not None and real_uid(entry) == uid):
+            args = (entry / 'cmdline').read_bytes().split(b'\0')
+            if script in args or any(all(m in args for m in mark) for mark in marks) or (uid is not None and real_uid(entry) == uid):
                 found.append(int(entry.name))
         except (OSError, ValueError):
             continue
@@ -284,41 +286,6 @@ async def tester(run: CardRun, limit_seconds: int, progress, ask=ask_tester) -> 
     return result
 
 
-def message_text(message: dict) -> str:
-    content = message.get('content')
-    if isinstance(content, str):
-        return content
-    return ''.join(p.get('text', '') for p in content or [] if isinstance(p, dict) and p.get('type') == 'text')
-
-
-def pi_final(stream: str) -> tuple[str, str | None]:
-    """(the reviewer's final message, Pi's error or None).
-
-    The final message is the last assistant `message_end` event, and only if
-    it ended the turn (stopReason "stop"): the `agent_end` event that follows
-    repeats messages, sometimes without their text, and a message that ended
-    in a tool call is not the reviewer's last word. The error is read as
-    run-pi-seat.mjs parsePiJsonStream reads it."""
-    final, last, error = None, None, None
-    for line in stream.splitlines():
-        event = _json(line)
-        if not isinstance(event, dict):
-            continue
-        if event.get('type') == 'error':
-            error = str(event.get('error') or event.get('message') or line)[:500]
-        message = event.get('message')
-        if event.get('type') == 'message_end' and isinstance(message, dict) and message.get('role') == 'assistant':
-            final = message
-        for m in [message, *(event.get('messages') or [])]:
-            if isinstance(m, dict) and m.get('role') == 'assistant' and isinstance(m.get('stopReason'), str):
-                last = m
-    if last is not None:
-        error = str(last.get('errorMessage') or 'Pi reported a vendor error')[:500] if last['stopReason'] == 'error' else None
-    if final is None or final.get('stopReason') != 'stop':
-        return '', error
-    return message_text(final), error
-
-
 def final_verdict(text: str) -> dict | None:
     """The JSON object that ends the reviewer's final message (a closing code
     fence may follow it), or None. Only this counts: a verdict written earlier
@@ -336,47 +303,49 @@ def final_verdict(text: str) -> dict | None:
 
 
 def reviewer_outcome(status: int | None, stdout: str, stderr: str) -> ReviewResult:
-    """A clear final verdict, or the reason there is none. Anything short of a
-    verdict ending the final message of a clean run is never an approval."""
-    text, vendor_error = pi_final(stdout)
+    """A clear final verdict, or the reason there is none, from the launcher's
+    answer (run-reviewer.mjs): its last line, {status, text, model, error}.
+    Anything short of a verdict ending the final message of a finished run is
+    never an approval."""
+    reply = next((r for r in map(_json, reversed(stdout.strip().splitlines())) if isinstance(r, dict) and 'status' in r), None)
     tail = (stderr.strip().splitlines() or [''])[-1][:300]
-    if status == STOPPED_EXIT:
-        return ReviewResult(stopped=True, reason=tail or 'stopped by its time limit', text=text)
-    if status != 0:
-        return ReviewResult(reason=f'the reviewer exited {status}: {vendor_error or tail or "no error text"}', text=text)
-    if vendor_error:
-        return ReviewResult(reason=f'the reviewer\'s model failed: {vendor_error}', text=text)
+    model = str(reply.get('model')) if isinstance(reply, dict) and reply.get('model') else None
+    text = str(reply.get('text') or '') if isinstance(reply, dict) else ''
+    if status == STOPPED_EXIT or (reply or {}).get('status') == 'stopped':
+        return ReviewResult(stopped=True, reason=tail or 'stopped by its time limit', model=model)
+    if reply is None or status != 0:
+        return ReviewResult(reason=f'the reviewer launcher did not answer (exit {status}): {tail or "no error text"}', model=model)
+    if reply['status'] != 'ok':
+        return ReviewResult(reason=str(reply.get('error') or 'the reviewer failed')[:500], text=text, model=model)
     verdict = final_verdict(text)
     if verdict is None or verdict.get('verdict') not in ('approve', 'changes_needed'):
-        return ReviewResult(reason='its final message does not end with a verdict object', text=text)
+        return ReviewResult(reason='its final message does not end with a verdict object', text=text, model=model)
     criteria = [c for c in verdict.get('criteria') or [] if isinstance(c, dict)] if isinstance(verdict.get('criteria'), list) else []
     unmet = [c for c in criteria if c.get('verdict') != 'met']
     if verdict['verdict'] == 'approve' and unmet:
-        return ReviewResult(reason=f'it approved with {len(unmet)} criteria not met, which is not a clear verdict', text=text)
+        return ReviewResult(reason=f'it approved with {len(unmet)} criteria not met, which is not a clear verdict', text=text, model=model)
     findings = str(verdict.get('findings') or '').strip()
     if verdict['verdict'] == 'changes_needed' and not findings:
         findings = '\n'.join(f"- {c.get('id', '?')}: {c.get('how', 'not met')}" for c in unmet)
     todd = verdict.get('todd') if verdict.get('todd') in TODD_REASONS else None
     return ReviewResult(ok=True, verdict=verdict['verdict'], summary=str(verdict.get('summary') or '').strip(),
-                        findings=findings, todd=todd, criteria=criteria, todd_reason=str(verdict.get('todd_reason') or '').strip() if todd else '',
-                        text=text)
+                        findings=findings, todd=todd, criteria=criteria,
+                        todd_reason=str(verdict.get('todd_reason') or '').strip() if todd else '', text=text, model=model)
 
 
-def reviewer(log):
-    """DeepSeek through the reviewer seat, as runner, from / (it never needs
-    the working copy: the brief carries the whole review). The graph enforces
-    the time limit, since the seat has no launcher limit of its own."""
+def reviewer(log, which: str = DEFAULT_REVIEWER):
+    """The reviewer, through its launcher as runner. The launcher enforces the
+    time limit and stops every process the reviewer started; the graph's own
+    limit, a minute later, is only a backstop for a launcher that hangs."""
     async def review(run: CardRun, brief: str, limit_seconds: int, progress) -> ReviewResult:
-        received = 0
-
         async def on_line(line):
-            nonlocal received
-            received += len(line)
             if progress:
                 await progress()
-        status, out, err = await run_worker('reviewer', brief, on_line, cwd='/', limit_seconds=limit_seconds)
+        request = {'reviewer': which, 'prompt': brief, 'limit_seconds': limit_seconds}
+        status, out, err = await run_worker('reviewer', request, on_line, cwd='/', limit_seconds=limit_seconds + 60)
         result = reviewer_outcome(status, out, err)
-        log(f'reviewer: exit {status}, {received} bytes, verdict {result.verdict if result.ok else "none: " + str(result.reason)}')
+        log(f'reviewer {which}: exit {status}, model {result.model}, '
+            f'verdict {result.verdict if result.ok else "none: " + str(result.reason)}')
         return result
     return review
 

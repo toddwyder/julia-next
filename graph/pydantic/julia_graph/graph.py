@@ -48,16 +48,15 @@ MAX_BUILD_ATTEMPTS = 2
 MAX_TEST_REPAIRS = 2
 # Review rounds that may end in findings before the card stops (JUL-128).
 MAX_REVIEW_ROUNDS = 2
-# One review is one prompt, and the reviewer seat hands it to Pi as a single
+# One review is one prompt, and DeepSeek's seat hands it to Pi as a single
 # command argument, which Linux caps at 128 KiB (E2BIG): a bigger brief is
 # refused, never cut short (the same limit as scripts/julia-minimal-runner.mjs).
 MAX_REVIEW_BYTES = 130_000
 # The reviewer's standing orders, read from the card's start commit.
 REVIEWER_ROLE_FILE = '.agents/skills/julia-reviewer/SKILL.md'
-# Each worker's time limit in seconds. The builder's and the tests' own
-# launcher enforces theirs (ops/julia-runner/time-limit.mjs), so they are
-# stopped even if the graph dies; the reviewer's seat has no launcher limit,
-# so the graph enforces the reviewer's itself (workers.run_worker).
+# Each worker's time limit in seconds. Each worker's own launcher enforces it
+# (ops/julia-runner/time-limit.mjs; the reviewer's through run-reviewer.mjs),
+# so a worker is stopped, with everything it started, even if the graph dies.
 LIMITS = {'builder': 60 * 60, 'tests': 15 * 60, 'reviewer': 20 * 60}
 # The most each launcher accepts (time-limit.mjs LIMITS.max): a longer limit
 # would be quoted on the card but never enforced, so it is refused.
@@ -697,7 +696,8 @@ nothing else: an ordinary defect never needs Todd.
 
 def verdict_text(s: CardRun, review: ReviewResult) -> str:
     lines = [f'**Independent review of `{(s.commit or "")[:12]}`: {"APPROVED" if review.verdict == "approve" else "CHANGES NEEDED"}**',
-             '', f'- Reviewer: {review.reviewer}', f'- Round: {review.round} of {MAX_REVIEW_ROUNDS}']
+             '', f'- Reviewer: {review.reviewer}', f'- Model that ran: {review.model or "not reported"}',
+             f'- Round: {review.round} of {MAX_REVIEW_ROUNDS}']
     if review.summary:
         lines.append(f'- Summary: {review.summary.strip()}')
     if review.verdict != 'approve' and review.findings:
@@ -843,7 +843,8 @@ def result_text(s: CardRun, version: str) -> tuple[str, str]:
     if s.review:
         verdict = ('void' if s.review.voided else 'no clear verdict' if not s.review.ok
                    else 'approved' if s.review.verdict == 'approve' else 'changes needed')
-        lines.append(f'- Review: {verdict}, by {s.review.reviewer} (round {s.review.round} of {MAX_REVIEW_ROUNDS})')
+        lines.append(f'- Review: {verdict}, by {s.review.reviewer}, model {s.review.model or "not reported"} '
+                     f'(round {s.review.round} of {MAX_REVIEW_ROUNDS})')
     elif s.tests and s.tests.passed:
         lines.append('- Review: not run')
     if s.builder_report:

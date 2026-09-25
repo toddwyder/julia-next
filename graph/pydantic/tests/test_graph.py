@@ -42,21 +42,10 @@ def verdict(value, **extra) -> str:
     return 'I checked the diff against each criterion.\n\n' + json.dumps({'verdict': value, **extra})
 
 
-def pi_stream(*finals: str, stop='stop', error=None) -> str:
-    """A Pi JSON event stream (run-pi-seat.mjs's output), one assistant message
-    per text, ending as Pi ends a run: agent_end repeating the last message
-    without its text (ops/service-dropbox/run-pi-seat.test.mjs), then agent_settled."""
-    events = [{'type': 'agent_start'}]
-    for text in finals:
-        events.append({'type': 'message_start', 'message': {'role': 'assistant', 'content': [], 'stopReason': 'pending'}})
-        events.append({'type': 'message_update', 'message': {'role': 'assistant', 'content': [{'type': 'text', 'text': text[:10]}]}})
-        events.append({'type': 'message_end', 'message': {'role': 'assistant', 'stopReason': stop,
-                                                          'content': [{'type': 'text', 'text': text}],
-                                                          **({'errorMessage': error} if error else {})}})
-    events.append({'type': 'agent_end', 'messages': [{'role': 'assistant', 'stopReason': stop,
-                                                      **({'errorMessage': error} if error else {})}], 'willRetry': False})
-    events.append({'type': 'agent_settled'})
-    return '\n'.join(map(json.dumps, events)) + '\n'
+def reply(text='', status='ok', model='gpt-5.5', error=None) -> str:
+    """The reviewer launcher's output (run-reviewer.mjs): progress lines, then one answer."""
+    answer = {'status': status, 'text': text, 'model': model, **({'error': error} if error else {})}
+    return '{"progress":true}\n' + json.dumps(answer) + '\n'
 
 
 class Crash(BaseException):
@@ -695,7 +684,8 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
     def head(self):
         return sh(self.worktree, 'git', 'rev-parse', 'HEAD')
 
-    APPROVE = ReviewResult(ok=True, verdict='approve', summary='every criterion met', criteria=met('say hello'))
+    APPROVE = ReviewResult(ok=True, verdict='approve', summary='every criterion met', criteria=met('say hello'),
+                           model='deepseek/deepseek-v4-pro')
 
     @staticmethod
     def findings(text, **extra):
@@ -711,9 +701,10 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         [posted] = self.verdicts()
         self.assertIn('APPROVED', posted)
         self.assertIn('Reviewer: DeepSeek V4 Pro (Pi), from DeepSeek', posted)
+        self.assertIn('Model that ran: deepseek/deepseek-v4-pro', posted)
         [result] = self.results()
         self.assertIn('PASSED', result)
-        self.assertIn('Review: approved, by DeepSeek V4 Pro (Pi), from DeepSeek (round 1 of 2)', result)
+        self.assertIn('Review: approved, by DeepSeek V4 Pro (Pi), from DeepSeek, model deepseek/deepseek-v4-pro (round 1 of 2)', result)
         self.assertEqual(self.linear.assigned, [])
         self.assertIn('Finished: the tests passed and the review approved.', self.linear.status()[0])
 
@@ -1192,65 +1183,64 @@ class WorkerParsingTest(unittest.TestCase):
 
     # the reviewer's reply, as run-pi-seat.mjs prints it
 
-    def test_the_final_message_is_read_from_a_real_pi_stream(self):
-        fixture = REPO_ROOT / 'graph' / 'fixtures' / 'orca-1.4.205' / 'cost.pi.seat-json-stream.multi-turn.jsonl'
-        text, error = workers.pi_final(fixture.read_text())
-        self.assertIsNone(error)
-        self.assertIn('julia-next', text)  # the turn's last message, after a tool call and an agent_end
-        cut = '\n'.join(line for line in fixture.read_text().splitlines() if '"stopReason":"stop"' not in line)
-        self.assertEqual(workers.pi_final(cut)[0], '')  # a message that ended in a tool call is not final
-
     def test_the_final_messages_closing_json_is_the_verdict(self):
         answers = {'criteria': met('say hello')}
-        result = workers.reviewer_outcome(0, pi_stream(verdict('approve', summary='checked', **answers)), '')
+        result = workers.reviewer_outcome(0, reply(verdict('approve', summary='checked', **answers)), '')
         self.assertTrue(result.ok)
-        self.assertEqual((result.verdict, result.summary, result.criteria), ('approve', 'checked', met('say hello')))
-        fenced = workers.reviewer_outcome(0, pi_stream('```json\n' + json.dumps({'verdict': 'approve'}) + '\n```'), '')
+        self.assertEqual((result.verdict, result.summary, result.criteria, result.model),
+                         ('approve', 'checked', met('say hello'), 'gpt-5.5'))
+        fenced = workers.reviewer_outcome(0, reply('```json\n' + json.dumps({'verdict': 'approve'}) + '\n```'), '')
         self.assertEqual(fenced.verdict, 'approve')
 
     def test_an_approve_written_earlier_is_not_the_final_verdict(self):
+        # which message is final is the launcher's job (scripts/julia-runner-reviewer.test.mjs);
+        # here, the final message itself must end with the verdict
         cases = {
-            'a later message with no verdict': pi_stream(verdict('approve'), 'Wait, let me look again.'),
-            'text after the verdict': pi_stream(verdict('approve') + '\nActually, one more problem.'),
-            'no verdict object at all': pi_stream('VERDICT: APPROVE'),
-            'a verdict the role file does not know': pi_stream(verdict('lgtm')),
+            'text after the verdict': verdict('approve') + '\nActually, one more problem.',
+            'no verdict object at all': 'VERDICT: APPROVE',
+            'a verdict the role file does not know': verdict('lgtm'),
+            'nothing': '',
         }
-        for name, stream in cases.items():
-            result = workers.reviewer_outcome(0, stream, '')
+        for name, text in cases.items():
+            result = workers.reviewer_outcome(0, reply(text), '')
             self.assertFalse(result.ok, name)
             self.assertIsNone(result.verdict, name)
-        later = workers.reviewer_outcome(0, pi_stream(verdict('approve'), verdict('changes_needed', findings='F1')), '')
-        self.assertEqual((later.verdict, later.findings), ('changes_needed', 'F1'))
 
     def test_an_approval_with_a_criterion_not_met_is_not_clear(self):
         unmet = {'criteria': [{'id': 'AC1', 'verdict': 'met'}, {'id': 'AC2', 'verdict': 'not_met', 'how': 'no test'}]}
-        self.assertFalse(workers.reviewer_outcome(0, pi_stream(verdict('approve', **unmet)), '').ok)
-        found = workers.reviewer_outcome(0, pi_stream(verdict('changes_needed', **unmet)), '')
+        self.assertFalse(workers.reviewer_outcome(0, reply(verdict('approve', **unmet)), '').ok)
+        found = workers.reviewer_outcome(0, reply(verdict('changes_needed', **unmet)), '')
         self.assertEqual(found.findings, '- AC2: no test')
 
     def test_a_crash_a_vendor_error_or_a_stop_is_never_an_approval(self):
-        # the stream the seat printed live on 25 Sep when the reviewer's weekly allowance ran out
-        limit = ('429: {"message":"You\'ve reached your weekly usage limit for your plan.",'
-                 '"type":"rate_limit_error","code":"RATE_LIMITED"}')
+        # the text the DeepSeek seat gave live on 25 Sep when its weekly allowance ran out
+        limit = '429: {"message":"You\'ve reached your weekly usage limit for your plan.","type":"rate_limit_error"}'
         cases = {
-            'vendor error, exit 1': (1, pi_stream('', stop='error', error=limit), 'reached your weekly usage limit'),
-            'vendor error, exit 0': (0, pi_stream(verdict('approve'), stop='error', error='overloaded'), 'overloaded'),
-            'killed after writing approve': (137, pi_stream(verdict('approve')), 'exited 137'),
-            'nothing printed': (0, '', 'does not end with a verdict'),
+            'vendor error': (0, reply(verdict('approve'), status='failed', error=limit), 'reached your weekly usage limit'),
+            'killed after writing approve': (0, reply(verdict('approve'), status='failed', error='the reviewer exited 137: '),
+                                             'exited 137'),
+            'launcher crashed': (1, '', 'did not answer (exit 1)'),
+            'launcher printed only progress': (0, '{"progress":true}\n', 'did not answer'),
         }
-        for name, (status, stream, reason) in cases.items():
-            result = workers.reviewer_outcome(status, stream, '')
+        for name, (status, out, reason) in cases.items():
+            result = workers.reviewer_outcome(status, out, '')
             self.assertFalse(result.ok, name)
             self.assertIn(reason, result.reason, name)
-        stopped = workers.reviewer_outcome(workers.STOPPED_EXIT, pi_stream(verdict('approve')), 'stopped by the graph')
-        self.assertTrue(stopped.stopped)
-        self.assertFalse(stopped.ok)
+        for out in (reply(verdict('approve'), status='stopped'), ''):
+            stopped = workers.reviewer_outcome(workers.STOPPED_EXIT if not out else 0, out, 'stopped: ran longer than its 1200-second time limit')
+            self.assertTrue(stopped.stopped)
+            self.assertFalse(stopped.ok)
 
     def test_only_the_three_named_reasons_go_to_todd(self):
-        says = lambda todd: workers.reviewer_outcome(0, pi_stream(verdict('changes_needed', findings='F', todd=todd, todd_reason='r')), '')
+        says = lambda todd: workers.reviewer_outcome(0, reply(verdict('changes_needed', findings='F', todd=todd, todd_reason='r')), '')
         self.assertEqual(says('product_decision').todd, 'product_decision')
         self.assertIsNone(says('whatever').todd)
         self.assertEqual(says('whatever').todd_reason, '')
+
+    def test_each_reviewer_has_its_own_maker_and_neither_is_the_builders(self):
+        self.assertEqual(workers.worker_makers('codex'), {'builder': 'Google', 'reviewer': 'OpenAI'})
+        self.assertEqual(workers.worker_makers('deepseek'), {'builder': 'Google', 'reviewer': 'DeepSeek'})
+        self.assertEqual(workers.worker_names('codex')['reviewer'], 'Codex (gpt-5.5)')
 
     def test_the_reviewer_is_started_exactly_as_its_sudo_rule_allows(self):
         rules = (REPO_ROOT / 'ops' / 'julia-runner' / 'sudoers').read_text()
@@ -1258,17 +1248,19 @@ class WorkerParsingTest(unittest.TestCase):
         self.assertEqual(command[:5], ['sudo', '-n', '-u', 'runner', '--'])
         self.assertIn(f"orchestrator-svc ALL=(runner) NOPASSWD: {' '.join(command[5:])}\n", rules)
 
-    def test_the_reviewers_account_is_shared_so_only_the_seat_or_its_model_counts(self):
+    def test_the_reviewers_account_is_shared_so_only_the_reviewer_counts(self):
         with tempfile.TemporaryDirectory() as d:
             proc = Path(d)
             for pid, cmd in {'10': ['/opt/Orca/orca-ide', '--serve'],
-                             '11': ['/usr/bin/node', workers.WORKER_COMMANDS['reviewer'][1], 'reviewer-backup'],
-                             '12': ['node', '/usr/bin/pi', '--model', workers.REVIEWER_MODEL, '-p']}.items():
+                             '11': ['/usr/bin/node', workers.WORKER_COMMANDS['reviewer'][1]],
+                             '12': ['node', '/usr/bin/pi', '--model', 'deepseek/deepseek-v4-pro', '-p'],
+                             '13': ['codex', 'exec', '-m', 'gpt-5.5', '-s', 'read-only', '--skip-git-repo-check', '--json', '-'],
+                             '14': ['codex', 'exec', '-s', 'danger-full-access', '-']}.items():  # someone else's Codex
                 (proc / pid).mkdir()
                 (proc / pid / 'cmdline').write_bytes(b'\0'.join(c.encode() for c in cmd) + b'\0')
                 (proc / pid / 'status').write_text('Uid:\t1001\t1001\t1001\t1001\n')
             with mock.patch.object(workers, 'account_uid', return_value=1001):
-                self.assertEqual(workers.live_workers('reviewer', proc=proc), [11, 12])
+                self.assertEqual(workers.live_workers('reviewer', proc=proc), [11, 12, 13])
 
 
 class WorkerCallTest(unittest.IsolatedAsyncioTestCase):
@@ -1339,17 +1331,19 @@ class WorkerCallTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(status, workers.STOPPED_EXIT)
         self.assertIn('1-second time limit', err)
 
-    async def test_the_reviewer_gets_its_brief_as_plain_text_from_the_root_folder(self):
+    async def test_the_reviewer_gets_its_brief_and_limit_from_the_root_folder(self):
         seen = {}
 
         async def run_worker(kind, request, on_line=None, cwd=None, limit_seconds=None):
             seen.update(kind=kind, request=request, cwd=cwd, limit=limit_seconds)
-            return 0, pi_stream(verdict('approve')), ''
+            return 0, reply(verdict('approve')), ''
         run = CardRun(card='JUL-1', base='b', branch='graph/card-1', worktree='/w')
         with mock.patch.object(workers, 'run_worker', run_worker):
-            result = await workers.reviewer(lambda line: None)(run, 'the brief', 1200, None)
-        self.assertEqual(seen, {'kind': 'reviewer', 'request': 'the brief', 'cwd': '/', 'limit': 1200})
-        self.assertEqual(result.verdict, 'approve')
+            result = await workers.reviewer(lambda line: None, 'codex')(run, 'the brief', 1200, None)
+        # the launcher enforces the limit; the graph's own, a minute later, is a backstop
+        self.assertEqual(seen, {'kind': 'reviewer', 'request': {'reviewer': 'codex', 'prompt': 'the brief', 'limit_seconds': 1200},
+                                'cwd': '/', 'limit': 1260})
+        self.assertEqual((result.verdict, result.model), ('approve', 'gpt-5.5'))
 
     async def test_worker_output_lines_reach_the_progress_callback(self):
         lines = []

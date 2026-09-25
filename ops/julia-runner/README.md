@@ -9,6 +9,7 @@ and a PR. On the OVH server its jobs run in separate accounts (Todd, 24 Sep):
 | Gemini: edits files, runs no command | `gemini-worker` | its own agy sign-in; no groups, no service keys |
 | Test worker: lint, suite, seam tests; no model | `julia-tester` | nothing |
 | DeepSeek review | `runner` | the Command Code key (as today) |
+| The graph's reviewer (JUL-128): Codex or DeepSeek, through `run-reviewer.mjs` | `runner` | Codex's ChatGPT sign-in, or the Command Code key |
 | Publisher: push and open the PR | `orchestrator-svc` | the GitHub App (as today) |
 
 The runner starts each worker only through `sudoers` in this folder: one fixed command per
@@ -50,7 +51,7 @@ Git, a PR or Linear.
 4. The worker code, root-owned, mirroring the repo layout, copied from a checkout of the
    reviewed commit:
    ```
-   for f in ops/julia-runner/run-gemini.mjs ops/julia-runner/run-tests.mjs ops/julia-runner/time-limit.mjs \
+   for f in ops/julia-runner/run-gemini.mjs ops/julia-runner/run-tests.mjs ops/julia-runner/time-limit.mjs ops/julia-runner/run-reviewer.mjs \
             scripts/julia-minimal-runner-checks.mjs ops/service-dropbox/run-pi-seat.mjs ops/service-dropbox/read-secret.mjs; do
      sudo install -D -o root -g root -m 0644 "$CHECKOUT/$f" "/opt/julia-runner/$f"
    done

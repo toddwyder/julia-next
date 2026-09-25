@@ -16,12 +16,15 @@ import { sudoCommand, WORKERS } from './julia-minimal-runner-adapters.mjs';
 const SUDOERS = readFileSync(fileURLToPath(new URL('../ops/julia-runner/sudoers', import.meta.url)), 'utf8');
 const rules = SUDOERS.split('\n').filter((line) => line.trim() && !line.trim().startsWith('#'));
 
-test('the sudo rules are exactly the three worker commands the runner uses, and nothing wider', () => {
-  assert.equal(rules.length, 3);
-  const expected = Object.keys(WORKERS).map((worker) => {
+// The Pydantic graph's reviewer launcher (JUL-128), as graph/pydantic/julia_graph/workers.py starts it.
+const GRAPH_REVIEWER = 'orchestrator-svc ALL=(runner) NOPASSWD: /usr/bin/node /opt/julia-runner/ops/julia-runner/run-reviewer.mjs';
+
+test('the sudo rules are exactly the three minimal-runner workers and the graph reviewer, and nothing wider', () => {
+  assert.equal(rules.length, 4);
+  const expected = [...Object.keys(WORKERS).map((worker) => {
     const [, , account, , ...command] = sudoCommand(worker);
     return `orchestrator-svc ALL=(${account}) NOPASSWD: ${command.join(' ')}`;
-  });
+  }), GRAPH_REVIEWER];
   assert.deepEqual(rules.sort(), expected.sort());
   for (const rule of rules) {
     assert.doesNotMatch(rule, /[*?[\]\\]|ALL\s*$|\(ALL|\(root\)/, `no wildcards, no ALL, no root: ${rule}`);

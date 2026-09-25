@@ -54,6 +54,8 @@ class ReviewResult(BaseModel):
     # Filled in by the graph: who reviewed, as the card shows it, and which round.
     reviewer: str = ''
     round: int = 0
+    # The model the reviewer itself reports it ran (run-reviewer.mjs), or None.
+    model: str | None = None
 
 
 class StepMark(BaseModel):

@@ -39,16 +39,16 @@ def graph_version() -> str:
     return f"pydantic-graph {importlib.metadata.version('pydantic-graph')}, graph code `{code or 'unknown'}`"
 
 
-def card_deps(card: str, limits: dict[str, int] | None = None) -> Deps:
+def card_deps(card: str, limits: dict[str, int] | None = None, reviewer: str = workers.DEFAULT_REVIEWER) -> Deps:
     return Deps(
         linear=LinearApp(), checkpoint=Checkpoint(Path(STATE), card),
         prepare=workers.prepare(REPO), builder=workers.builder(log), discard=workers.discard,
-        commit=workers.commit, tester=workers.tester, reviewer=workers.reviewer(log),
+        commit=workers.commit, tester=workers.tester, reviewer=workers.reviewer(log, reviewer),
         live_workers=workers.live_workers, wait_for_exit=workers.waiter(WAIT_LIMIT_SECONDS),
         snapshot=workers.snapshot, restore=workers.restore, drift=workers.drift, diff=workers.change,
         base_file=workers.base_file,
-        graph_version=graph_version(), log=log, worker_names=workers.WORKER_NAMES,
-        worker_makers=workers.WORKER_MAKERS, limits=limits or dict(LIMITS), files=workers.tracked_files,
+        graph_version=graph_version(), log=log, worker_names=workers.worker_names(reviewer),
+        worker_makers=workers.worker_makers(reviewer), limits=limits or dict(LIMITS), files=workers.tracked_files,
     )
 
 
@@ -88,13 +88,16 @@ def main(argv: list[str]) -> int:
     for kind in ('builder', 'tests', 'reviewer'):
         parser.add_argument(f'--{kind}-limit', type=lambda text, kind=kind: checked_limit(kind, text), default=LIMITS[kind],
                             help=f'seconds, 1 to {LIMIT_CAPS[kind]} (default %(default)s)')
+    # The reviewer for this run: the service always uses the default.
+    parser.add_argument('--reviewer', choices=sorted(workers.REVIEWERS), default=workers.DEFAULT_REVIEWER)
     args = parser.parse_args(argv)
     os.umask(0o002)  # the builder account shares the working copy through its group
     number = args.card.split('-')[-1]
     Path(STATE).mkdir(exist_ok=True)
     state = CardRun(card=args.card, base=workers.git(REPO, 'rev-parse', '--verify', f'{args.base}^{{commit}}'),
                     branch=f'graph/card-{number}', worktree=f'{WORKTREES}/card-{number}')
-    deps = card_deps(args.card, {'builder': args.builder_limit, 'tests': args.tests_limit, 'reviewer': args.reviewer_limit})
+    deps = card_deps(args.card, {'builder': args.builder_limit, 'tests': args.tests_limit, 'reviewer': args.reviewer_limit},
+                     args.reviewer)
     log(f'{args.card}: {deps.graph_version}')
     try:
         outcome = asyncio.run(run_card(state, deps))
