@@ -11,7 +11,11 @@ when the graph stops the reviewer), every process still below it is sent
 SIGTERM, then SIGKILL. The reviewer's account also runs other things (Orca), so
 nothing is swept by account: only what is below this process.
 
-Exits with the command's own status, or 124 when it was stopped.
+A process that forks while being stopped is caught too: the sweep repeats
+until nothing is left below it. Anything still running after that is named
+on stderr, and a run that left it exits 125 (never a clean run).
+
+Exits with the command's own status, 124 when it was stopped, or 125.
 """
 
 import ctypes
@@ -23,19 +27,26 @@ import time
 
 PR_SET_CHILD_SUBREAPER = 36
 STOPPED_EXIT = 124
+# The reviewer ended but left something that would not stop: never a clean run.
+LEFT_RUNNING = 125
 GRACE_SECONDS = 3
+KILL_SECONDS = 5
 
 
 def below(root: int, proc: str = '/proc') -> list[int]:
-    """Every process whose parent chain leads to root."""
-    parents = {}
+    """Every live process whose parent chain leads to root. A zombie (already
+    dead, waiting to be reaped) is walked through but not listed."""
+    parents, zombies = {}, set()
     for name in os.listdir(proc):
         if not name.isdigit():
             continue
         try:
             with open(f'{proc}/{name}/stat') as f:
                 # pid (comm) state ppid ...: comm may hold spaces, so split after the last ')'
-                parents[int(name)] = int(f.read().rsplit(')', 1)[1].split()[1])
+                state, ppid = f.read().rsplit(')', 1)[1].split()[:2]
+            parents[int(name)] = int(ppid)
+            if state == 'Z':
+                zombies.add(int(name))
         except (OSError, IndexError, ValueError):
             continue
     found, frontier = [], [root]
@@ -44,14 +55,18 @@ def below(root: int, proc: str = '/proc') -> list[int]:
         children = [pid for pid, ppid in parents.items() if ppid == parent]
         found += children
         frontier += children
-    return found
+    return [pid for pid in found if pid not in zombies]
 
 
-def signal_all(sig: int) -> int:
+def mine() -> list[int]:
+    return below(os.getpid())
+
+
+def signal_all(sig: int, listed=mine, kill=os.kill) -> int:
     count = 0
-    for pid in below(os.getpid()):
+    for pid in listed():
         try:
-            os.kill(pid, sig)
+            kill(pid, sig)
             count += 1
         except ProcessLookupError:
             pass
@@ -68,16 +83,34 @@ def reap_zombies() -> None:
             return
 
 
-def sweep() -> None:
-    """Stop everything below this process: politely, then for good."""
-    if signal_all(signal.SIGTERM):
-        deadline = time.monotonic() + GRACE_SECONDS
-        while below(os.getpid()) and time.monotonic() < deadline:
-            reap_zombies()
-            time.sleep(0.1)
-    signal_all(signal.SIGKILL)
-    time.sleep(0.1)
-    reap_zombies()
+def sweep(listed=mine, kill=os.kill, reap=reap_zombies, pause=time.sleep, clock=time.monotonic) -> list[int]:
+    """Stop everything below this process: politely, then for good, again and
+    again until nothing is left, so a process that forks while being stopped
+    is caught on the next pass (SIGKILL cannot be caught, so the passes end).
+    Returns what could still not be stopped within KILL_SECONDS: nothing,
+    unless a process is stuck in the kernel."""
+    if signal_all(signal.SIGTERM, listed, kill):
+        deadline = clock() + GRACE_SECONDS
+        while listed() and clock() < deadline:
+            reap()
+            pause(0.1)
+    deadline = clock() + KILL_SECONDS
+    while True:
+        reap()
+        left = listed()
+        if not left or clock() >= deadline:
+            return left
+        signal_all(signal.SIGKILL, listed, kill)
+        pause(0.05)
+
+
+def swept() -> bool:
+    """Sweep, and say on stderr what could not be stopped."""
+    left = sweep()
+    if left:
+        print(f'reap: could not stop {len(left)} process(es) the reviewer started: {", ".join(map(str, left))}',
+              file=sys.stderr)
+    return not left
 
 
 def main(argv: list[str]) -> int:
@@ -93,7 +126,7 @@ def main(argv: list[str]) -> int:
     def stop(signum, frame):
         nonlocal stopped
         stopped = True
-        sweep()
+        swept()
         os._exit(STOPPED_EXIT)
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
@@ -103,7 +136,8 @@ def main(argv: list[str]) -> int:
         print(f'reap: {argv[1]} did not start: {error}', file=sys.stderr)
         return 127
     code = child.wait()
-    sweep()  # anything the command left running
+    if not swept():  # anything the command left running
+        return LEFT_RUNNING
     if stopped:
         return STOPPED_EXIT
     return 128 - code if code < 0 else code  # killed by a signal: 128 + its number, as a shell says

@@ -694,6 +694,18 @@ nothing else: an ordinary defect never needs Todd.
 """
 
 
+# Who makes a model, from the name the reviewer reports it ran (a provider
+# prefix, as in deepseek/deepseek-v4-pro, is ignored: the model's own name says).
+MODEL_MAKERS = (('deepseek', 'DeepSeek'), ('gpt-', 'OpenAI'), ('codex', 'OpenAI'), ('o1', 'OpenAI'), ('o3', 'OpenAI'),
+                ('o4', 'OpenAI'), ('gemini', 'Google'), ('claude', 'Anthropic'))
+
+
+def maker_of(model: str | None) -> str:
+    """The company that makes this model, or '' when the name is unknown."""
+    name = (model or '').strip().lower().rsplit('/', 1)[-1]
+    return next((maker for prefix, maker in MODEL_MAKERS if name.startswith(prefix)), '')
+
+
 def verdict_text(s: CardRun, review: ReviewResult) -> str:
     lines = [f'**Independent review of `{(s.commit or "")[:12]}`: {"APPROVED" if review.verdict == "approve" else "CHANGES NEEDED"}**',
              '', f'- Reviewer: {review.reviewer}', f'- Model that ran: {review.model or "not reported"}',
@@ -754,6 +766,11 @@ class Review(BaseNode[CardRun, Deps, str]):
                 'files in the working copy changed' if after[1] != before[1] else '') if x)
             s.review = review.model_copy(update={'ok': False, 'voided': True, 'reason': changed})
             return await failed_review(ctx, 'voided', f'the review was voided because the reviewer changed the candidate ({changed})')
+        if review.ok and (ran := maker_of(review.model)).lower() != maker.lower():
+            # AC 1: the maker is the confirmed model's, not the route's.
+            review = review.model_copy(update={'ok': False, 'reason': f'the model that ran ({review.model or "not reported"}) '
+                                                                     f'is from {ran or "an unknown maker"}, not {maker}, '
+                                                                     'so it is not the independent review asked for'})
         if review.ok and review.verdict == 'approve':
             if gaps := criteria_gaps(card['description'], review.criteria):
                 review = review.model_copy(update={'ok': False, 'reason': 'its approval does not cover the acceptance '

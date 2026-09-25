@@ -358,14 +358,16 @@ KEPT = 'node_modules'
 
 
 def fingerprint(folder: Path) -> str:
-    """Every file below folder, by path, type, size and modification time."""
+    """Every file below folder, by path, type, size, inode and change time.
+    The change time (ctime) moves on any write, rename or utime call, and no
+    unprivileged process can set it back, unlike the modification time."""
     digest = hashlib.sha256()
     for top, dirs, files in os.walk(folder):
         dirs.sort()
         for name in sorted(dirs + files):
             path = Path(top, name)
             st = path.lstat()
-            digest.update(f'{path.relative_to(folder)}|{st.st_mode}|{st.st_size}|{st.st_mtime_ns}\n'.encode())
+            digest.update(f'{path.relative_to(folder)}|{st.st_mode}|{st.st_size}|{st.st_ino}|{st.st_ctime_ns}\n'.encode())
     return digest.hexdigest()
 
 

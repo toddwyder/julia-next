@@ -8,6 +8,7 @@ the card, the commits in git, and the saved progress.
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -34,7 +35,8 @@ def met(*criteria: str) -> list[dict]:
 async def approving_reviewer(run, brief, limit, progress):
     """Approves whatever card it gets, answering each criterion the brief lists."""
     listed = re.findall(r'^- AC\d+: (.*)$', brief, re.M)
-    return ReviewResult(ok=True, verdict='approve', summary='all criteria met', criteria=met(*listed))
+    return ReviewResult(ok=True, verdict='approve', summary='all criteria met', criteria=met(*listed),
+                        model='deepseek/deepseek-v4-pro')
 
 
 def verdict(value, **extra) -> str:
@@ -148,7 +150,8 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         async def default_reviewer(run, brief, limit, *_):
             self.reviewer_calls += 1
             self.reviewer_briefs.append(brief)
-            return ReviewResult(ok=True, verdict='approve', summary='candidate approved', criteria=met('say hello'))
+            return ReviewResult(ok=True, verdict='approve', summary='candidate approved', criteria=met('say hello'),
+                                model='deepseek/deepseek-v4-pro')
 
         async def wait_for_exit(kind):
             return alive_after_wait if alive_after_wait is not None else []
@@ -689,7 +692,7 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
 
     @staticmethod
     def findings(text, **extra):
-        return ReviewResult(ok=True, verdict='changes_needed', findings=text, **extra)
+        return ReviewResult(ok=True, verdict='changes_needed', findings=text, model='deepseek/deepseek-v4-pro', **extra)
 
     async def test_1_approval_is_posted_with_the_reviewer_and_its_company(self):
         outcome = await run_card(self.state(), self.deps(reviewer=self.reviewer_says(self.APPROVE)))
@@ -806,6 +809,19 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
             self.findings('the cost of this loop is quadratic'), self.findings('price field has no budget check'))))
         self.assertEqual(self.linear.assigned, [])
 
+    async def test_the_model_that_ran_decides_the_maker_not_the_route(self):
+        # the route is DeepSeek's, but a review by the builder's maker, or by a model
+        # nobody can place, is not the independent review the card asks for
+        for model, said in (('google/gemini-3-pro', 'is from Google, not DeepSeek'),
+                            ('mystery-1', 'is from an unknown maker, not DeepSeek'),
+                            (None, '(not reported) is from an unknown maker')):
+            self.setUp()
+            approval = self.APPROVE.model_copy(update={'model': model})
+            self.assertEqual(await run_card(self.state(), self.deps(reviewer=self.reviewer_says(approval))), 'failed', model)
+            self.assertIn(said, self.results()[0], model)
+            self.assertEqual(self.verdicts(), [], model)
+            self.tearDown()
+
     async def test_the_reviewer_must_come_from_a_different_maker(self):
         deps = self.deps()
         deps.worker_makers = {'builder': 'Google', 'reviewer': 'google'}
@@ -873,7 +889,7 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         }
         for name, criteria in cases.items():
             self.setUp()
-            bare = ReviewResult(ok=True, verdict='approve', summary='fine', criteria=criteria)
+            bare = ReviewResult(ok=True, verdict='approve', summary='fine', criteria=criteria, model='deepseek/deepseek-v4-pro')
             self.assertEqual(await run_card(self.state(), self.deps(reviewer=self.reviewer_says(bare))), 'failed', name)
             self.assertIn('its approval does not cover the acceptance criteria', self.results()[0], name)
             self.assertEqual(self.verdicts(), [], name)
@@ -916,8 +932,12 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
             return BuildResult(True, report='built')
 
         async def edits_a_dependency(run):
-            # the same size as 'installed': only its modification time gives it away
-            (Path(run.worktree) / 'node_modules' / 'dep' / 'index.js').write_text('INSTALLED')
+            # same size as 'installed', and the modification time set back afterwards:
+            # only the change time, which no process can set back, gives it away
+            dep = Path(run.worktree) / 'node_modules' / 'dep' / 'index.js'
+            was = dep.stat()
+            dep.write_text('INSTALLED')
+            os.utime(dep, ns=(was.st_atime_ns, was.st_mtime_ns))
             return self.APPROVE
         outcome = await run_card(self.state(), self.deps(builder=install_then_build, reviewer=self.reviewer_says(edits_a_dependency)))
         self.assertEqual(outcome, 'failed')
@@ -1272,6 +1292,12 @@ class WorkerParsingTest(unittest.TestCase):
         self.assertEqual(says('product_decision').todd, 'product_decision')
         self.assertIsNone(says('whatever').todd)
         self.assertEqual(says('whatever').todd_reason, '')
+
+    def test_a_models_maker_comes_from_its_own_name(self):
+        from julia_graph.graph import maker_of
+        for model, maker in (('deepseek/deepseek-v4-pro', 'DeepSeek'), ('gpt-5.5', 'OpenAI'), ('gemini-2.5-pro', 'Google'),
+                             ('anthropic/claude-opus', 'Anthropic'), ('deepseek/gemini-x', 'Google'), ('', ''), (None, '')):
+            self.assertEqual(maker_of(model), maker, model)
 
     def test_each_reviewer_has_its_own_maker_and_neither_is_the_builders(self):
         self.assertEqual(workers.worker_makers('codex'), {'builder': 'Google', 'reviewer': 'OpenAI'})

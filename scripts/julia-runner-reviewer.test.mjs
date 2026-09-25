@@ -98,9 +98,13 @@ test('the reviewer runs under its reaper from /, and a stop, a crash, an abnorma
 
 // Real processes: whatever the reviewer starts is stopped with it, even a
 // process that left its group (setsid) or was orphaned by a double fork.
+// Each test has a timeout, and cleans up what its pretend reviewer made even when it fails,
+// so a broken stop can never leave processes running on the machine.
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
-const linuxOnly = { skip: process.platform === 'win32' ? 'process groups and subreapers: Linux only' : false };
+const linuxOnly = { skip: process.platform === 'win32' ? 'process groups and subreapers: Linux only' : false, timeout: 60_000 };
 const settle = () => new Promise((r) => setTimeout(r, 500));
+const pidsIn = (...files) => files.flatMap((file) => { try { return readFileSync(file, 'utf8').split('\n').map(Number).filter(Boolean); } catch { return []; } });
+const killAll = (pids) => { for (const pid of pids) { try { process.kill(pid, 'SIGKILL'); } catch { /* gone */ } } };
 
 // A pretend reviewer (a shell script) that starts a plain child, one that escapes its
 // process group with setsid, and one orphaned by a double fork, writes their pids, then
@@ -119,8 +123,36 @@ function fakeReviewer(dir, { endAtOnce = false } = {}) {
   ].join('\n'), { mode: 0o755 });
   const pids = () => ['plain', 'escaped', 'orphan'].map((kind) => Number(readFileSync(`${script}.${kind}`, 'utf8').trim()));
   const ready = () => { try { return readFileSync(`${script}.ready`, 'utf8').includes('ready'); } catch { return false; } };
-  return { script, pids, ready };
+  const cleanup = () => killAll(pidsIn(`${script}.plain`, `${script}.escaped`, `${script}.orphan`));
+  return { script, pids, ready, cleanup };
 }
+
+test('a child that ignores SIGTERM and keeps forking while being stopped is stopped with everything it made', linuxOnly, async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'reviewer-'));
+  const script = join(dir, 'codex');
+  writeFileSync(script, [
+    '#!/bin/sh',
+    // a detached forker: ignores SIGTERM and starts a new sleeper every 20 ms, well past the 2 s
+    // limit; it is bounded (200 sleepers of 30 s) so a broken stop cannot flood the machine
+    `setsid sh -c 'trap "" TERM; echo $$ > "${script}.forker"; i=0; while [ $i -lt 200 ]; do sleep 30 & echo $! >> "${script}.forks"; i=$((i+1)); sleep 0.02; done; wait' &`,
+    `while [ ! -s "${script}.forks" ]; do sleep 0.05; done`,
+    'wait',
+    '',
+  ].join('\n'), { mode: 0o755 });
+  const reviewers = { fake: () => ({ command: script, args: [], env: process.env, stdin: false }) };
+  try {
+    const reply = await review({ reviewer: 'fake', prompt: 'p', limit_seconds: 2 }, { reviewers });
+    assert.equal(reply.status, 'stopped');
+    await settle();
+    const made = [readFileSync(`${script}.forker`, 'utf8'), ...readFileSync(`${script}.forks`, 'utf8').split('\n')].map(Number).filter(Boolean);
+    assert.ok(made.length > 5, `the forker made ${made.length} processes`);
+    const left = made.filter(alive);
+    assert.deepEqual(left, [], `${left.length} of the ${made.length} processes the forker made outlived the stop`);
+  } finally {
+    killAll(pidsIn(`${script}.forker`, `${script}.forks`));
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 test('at its limit the whole reviewer is stopped, escaped and orphaned children included', linuxOnly, async () => {
   const dir = mkdtempSync(join(tmpdir(), 'reviewer-'));
@@ -133,6 +165,7 @@ test('at its limit the whole reviewer is stopped, escaped and orphaned children 
     await settle();
     for (const pid of fake.pids()) assert.equal(alive(pid), false, `child ${pid} outlived the limit`);
   } finally {
+    fake.cleanup();
     rmSync(dir, { recursive: true, force: true });
   }
 });
@@ -147,6 +180,7 @@ test('a reviewer that ends leaves nothing running behind it', linuxOnly, async (
     await settle();
     for (const pid of fake.pids()) assert.equal(alive(pid), false, `child ${pid} outlived the reviewer`);
   } finally {
+    fake.cleanup();
     rmSync(dir, { recursive: true, force: true });
   }
 });
@@ -165,6 +199,7 @@ test('when the graph stops the launcher, everything the reviewer started stops t
     await settle();
     for (const pid of fake.pids()) assert.equal(alive(pid), false, `child ${pid} outlived the graph's stop`);
   } finally {
+    fake.cleanup();
     rmSync(dir, { recursive: true, force: true });
   }
 });
