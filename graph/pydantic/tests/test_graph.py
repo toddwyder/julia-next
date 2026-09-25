@@ -108,7 +108,7 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         async def default_builder(run, brief, limit, progress):
             self.builder_calls += 1
             self.brief = brief
-            (Path(run.worktree) / 'hello.txt').write_text('hello\n')
+            (Path(run.worktree) / 'hello.txt').write_text(f'hello {run.attempt}\n')
             return BuildResult(True, report='Added hello.txt')
 
         async def default_tester(run, limit, *_):
@@ -601,6 +601,11 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
     async def test_reviewer_two_unsuccessful_rounds_stops_with_both_reasons_in_one_comment(self):
         # AC 2 & UAT 2: After two unsuccessful rounds the card stops with both reasons in one comment,
         # and the card should not be assigned to Todd.
+        async def builder(run, brief, limit, progress):
+            self.builder_calls += 1
+            (Path(run.worktree) / 'hello.txt').write_text(f'hello attempt {run.attempt}\n')
+            return BuildResult(True, report=f'Attempt {run.attempt} done')
+
         async def reviewer(run, brief, limit, progress):
             self.reviewer_calls += 1
             return ReviewResult(
@@ -609,7 +614,7 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
                 findings=f'Issue in attempt {run.attempt}: check validation',
             )
 
-        outcome = await run_card(self.state(), self.deps(reviewer=reviewer))
+        outcome = await run_card(self.state(), self.deps(builder=builder, reviewer=reviewer))
         self.assertEqual(outcome, 'failed')
         self.assertEqual(self.builder_calls, 2)
         self.assertEqual(self.reviewer_calls, 2)

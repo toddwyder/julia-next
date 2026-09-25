@@ -81,7 +81,7 @@ test('AC 6: Python graph-run tests cover approve, findings then approve, two fai
   try {
     execFileSync(
       pythonPath,
-      ['-m', 'unittest', 'discover', '-s', 'tests', '-p', 'test_*.py'],
+      ['-m', 'unittest', 'discover', '-t', '.', '-s', 'tests', '-p', 'test_*.py'],
       {
         cwd,
         encoding: 'utf8',

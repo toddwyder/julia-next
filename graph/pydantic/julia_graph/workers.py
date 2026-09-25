@@ -295,6 +295,8 @@ def diff(run: CardRun) -> str:
 # ------------------------------------------------------------ git
 
 def npm_ci(worktree: str) -> str | None:
+    if not (Path(worktree) / 'package-lock.json').is_file():
+        return None
     done = subprocess.run(['npm', 'ci', '--no-audit', '--no-fund'], cwd=worktree, capture_output=True, text=True)
     return None if done.returncode == 0 else f'npm ci failed (exit {done.returncode}): {done.stderr.strip()[-300:]}'
 

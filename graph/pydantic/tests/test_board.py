@@ -19,7 +19,10 @@ from julia_graph.checkpoint import CardRun, Checkpoint, TestResult
 from julia_graph.graph import BuildResult, Deps, run_card
 from julia_graph.linear import ready_card
 
-from .test_graph import Clock, Crash, sh
+try:
+    from .test_graph import Clock, Crash, sh
+except (ImportError, ValueError):
+    from test_graph import Clock, Crash, sh
 
 GOOD = """## What to build
 
@@ -123,7 +126,7 @@ class BoardTest(unittest.IsolatedAsyncioTestCase):
         return BuildResult(True, report='Added hello.txt')
 
     def card_deps(self, name):
-        real_prepare = workers.prepare(str(self.repo))  # the server's own, making a local clone
+        real_prepare = workers.prepare(str(self.repo), install=lambda wt: None)  # the server's own, making a local clone
 
         async def prepare(run):
             if self.on_prepare:
