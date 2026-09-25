@@ -7,7 +7,12 @@ the card, the commits in git, and the saved progress.
 
 from __future__ import annotations
 
+import json
+import os
+import re
+import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -15,8 +20,36 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from julia_graph import workers
-from julia_graph.checkpoint import CardLocked, CardRun, Checkpoint, TestResult
-from julia_graph.graph import BuildResult, Deps, checked_limit, run_card
+from julia_graph.checkpoint import CardLocked, CardRun, Checkpoint, ReviewResult, TestResult
+from julia_graph.graph import MAX_PI_REVIEW_BYTES, MAX_REVIEW_BYTES, BuildResult, Deps, checked_limit, comment_id, run_card
+from julia_graph.linear import AlreadyPosted
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+ROLE = 'ROLE FILE: attack the candidate against every acceptance criterion.'
+
+
+def met(*criteria: str) -> list[dict]:
+    """The reviewer's answers, one per acceptance criterion, all met."""
+    return [{'id': f'AC{n}', 'criterion': text, 'verdict': 'met', 'how': f'read the diff for {text}'}
+            for n, text in enumerate(criteria, 1)]
+
+
+async def approving_reviewer(run, brief, limit, progress):
+    """Approves whatever card it gets, answering each criterion the brief lists."""
+    listed = re.findall(r'^- AC\d+: (.*)$', brief, re.M)
+    return ReviewResult(ok=True, verdict='approve', summary='all criteria met', criteria=met(*listed),
+                        model='deepseek/deepseek-v4-pro')
+
+
+def verdict(value, **extra) -> str:
+    """A reviewer's final message ending with its JSON verdict, as the role file asks."""
+    return 'I checked the diff against each criterion.\n\n' + json.dumps({'verdict': value, **extra})
+
+
+def reply(text='', status='ok', model='gpt-5.5', error=None) -> str:
+    """The reviewer launcher's output (run-reviewer.mjs): progress lines, then one answer."""
+    answer = {'status': status, 'text': text, 'model': model, **({'error': error} if error else {})}
+    return '{"progress":true}\n' + json.dumps(answer) + '\n'
 
 
 class Crash(BaseException):
@@ -24,27 +57,44 @@ class Crash(BaseException):
 
 
 class FakeLinear:
-    def __init__(self):
+    def __init__(self, lag: int = 0):
         self.store: dict[str, str] = {}  # comment id -> body, in posting order
         self.edits: list[str] = []  # ids, one per edit
+        self.assigned: list[tuple[str, str | None]] = []
+        # Like Linear's API on 25 Sep: a new comment stays out of the card's
+        # comment list for this many reads after it is posted.
+        self.lag = lag
+        self.hidden: dict[str, int] = {}  # comment id -> reads it stays hidden
+        self.ids: set[str] = set()  # ids the poster chose: Linear refuses a second comment with one
 
     @property
     def comments(self) -> list[str]:
         return list(self.store.values())
 
     async def card(self, card):
-        return {'identifier': card, 'title': 'Add a greeting', 'description': '- [ ] say hello',
-                'comments': [{'id': i, 'body': b} for i, b in self.store.items()]}
+        shown = [{'id': i, 'body': b} for i, b in self.store.items() if self.hidden.get(i, 0) == 0]
+        self.hidden = {i: n - 1 for i, n in self.hidden.items() if n > 0}
+        return {'identifier': card, 'title': 'Add a greeting', 'description': '## Acceptance criteria\n\n- [ ] say hello\n',
+                'comments': shown}
 
-    async def comment(self, card, body):
+    async def comment(self, card, body, chosen_id=None):
+        if chosen_id is not None:
+            if chosen_id in self.ids:
+                raise AlreadyPosted(chosen_id)  # as Linear: 'conflict on insert of Comment'
+            self.ids.add(chosen_id)
         comment_id = f'c{len(self.store) + 1}'
         self.store[comment_id] = body
+        if self.lag:
+            self.hidden[comment_id] = self.lag
         return comment_id
 
     async def edit(self, comment_id, body):
         assert comment_id in self.store, f'no comment {comment_id} to edit'
         self.store[comment_id] = body
         self.edits.append(comment_id)
+
+    async def assign_to_todd(self, card):
+        self.assigned.append(card)
 
     def status(self) -> list[str]:
         return [b for b in self.store.values() if 'graph: status' in b]
@@ -82,7 +132,9 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         self.linear = FakeLinear()
         self.builder_calls = 0
         self.tester_calls = 0
-        self.alive: dict[str, list[int]] = {'builder': [], 'tests': []}
+        self.reviewer_calls = 0
+        self.reviewer_briefs: list[str] = []
+        self.alive: dict[str, list[int]] = {'builder': [], 'tests': [], 'reviewer': []}
         self.clock = Clock()
 
     def tearDown(self):
@@ -99,16 +151,22 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
             sh(self.worktree, 'git', 'checkout', '-q', '-b', run.branch, run.base)
         return None
 
-    def deps(self, builder=None, tester=None, alive_after_wait=None):
+    def deps(self, builder=None, tester=None, reviewer=None, alive_after_wait=None):
         async def default_builder(run, brief, limit, progress):
             self.builder_calls += 1
             self.brief = brief
-            (Path(run.worktree) / 'hello.txt').write_text('hello\n')
+            (Path(run.worktree) / 'hello.txt').write_text(f'hello {run.attempt}\n')
             return BuildResult(True, report='Added hello.txt')
 
         async def default_tester(run, limit, *_):
             self.tester_calls += 1
             return TestResult(passed=True, summary='tests 3, pass 3, fail 0')
+
+        async def default_reviewer(run, brief, limit, *_):
+            self.reviewer_calls += 1
+            self.reviewer_briefs.append(brief)
+            return ReviewResult(ok=True, verdict='approve', summary='candidate approved', criteria=met('say hello'),
+                                model='deepseek/deepseek-v4-pro')
 
         async def wait_for_exit(kind):
             return alive_after_wait if alive_after_wait is not None else []
@@ -116,11 +174,30 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         return Deps(
             linear=self.linear, checkpoint=Checkpoint(self.state_dir, 'JUL-1'), prepare=self.prepare,
             builder=builder or default_builder, discard=workers.discard, commit=workers.commit,
-            tester=tester or default_tester, live_workers=lambda kind: self.alive[kind],
+            tester=tester or default_tester, reviewer=reviewer or default_reviewer,
+            live_workers=lambda kind: self.alive[kind],
             wait_for_exit=wait_for_exit, graph_version='pydantic-graph test', log=lambda line: None,
-            now=self.clock, worker_names={'builder': 'Gemini (agy)', 'tests': 'the test runner (no AI model)'},
-            limits={'builder': 3600, 'tests': 900},
+            now=self.clock,
+            worker_names={'builder': 'Gemini (agy)', 'tests': 'the test runner (no AI model)',
+                          'reviewer': 'DeepSeek V4 Pro (Pi)'},
+            worker_makers={'builder': 'Google', 'reviewer': 'DeepSeek'},
+            worker_models={'reviewer': 'deepseek-v4-pro'},
+            limits={'builder': 3600, 'tests': 900, 'reviewer': 1200},
+            snapshot=workers.snapshot, restore=workers.restore, drift=workers.drift, diff=workers.change,
+            install=self.install,
+            base_file=lambda run, path: ROLE if path == '.agents/skills/julia-reviewer/SKILL.md' else '',
         )
+
+    async def install(self, run):
+        """As workers.clean_install: the commit exactly, then a pretend install."""
+        await workers.restore(run, run.commit, keep_dependencies=False)
+        ignore = Path(run.worktree) / '.gitignore'
+        if ignore.exists() and 'node_modules/' in ignore.read_text():  # a repo with dependencies, as julia-next
+            dep = Path(run.worktree) / 'node_modules' / 'dep'
+            dep.mkdir(parents=True, exist_ok=True)
+            (dep / 'index.js').write_text('installed')
+        self.installs = getattr(self, 'installs', 0) + 1
+        return None
 
     def saved(self):
         return Checkpoint(self.state_dir, 'JUL-1').load()
@@ -302,7 +379,7 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         [status] = self.linear.status()
         self.assertIn('✗ Running the tests: failed', status)
         self.assertIn('✓ Built (attempt 2, repairing failed tests)', status)
-        self.assertIn('Finished: the tests passed.', status)
+        self.assertIn('Finished: the tests passed and the review approved.', status)
 
     # ----------------------------------------------------------------- restarts
 
@@ -340,6 +417,14 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         self.assertTrue((self.worktree.with_name('card-1.run1') / 'half.txt').exists())  # kept aside as it was
         [note] = [c for c in self.linear.comments if 'graph: fresh-copy' in c]
         self.assertIn('made by an older version of the graph', note)
+
+    async def test_an_interrupted_review_in_an_old_worktree_discards_its_stale_snapshot(self):
+        sh(self.repo, 'git', 'worktree', 'add', '-q', '-b', 'graph/card-1', str(self.worktree), self.base)
+        old = self.state()
+        old.step, old.review_before = 'review', ['old commit', 'old working copy']
+        Checkpoint(self.state_dir, 'JUL-1').save(old)
+        self.assertEqual(await run_card(self.state(), self.deps()), 'passed')
+        self.assertFalse(any('graph: review-voided' in comment for comment in self.linear.comments))
 
     async def test_a_fresh_copy_waits_for_an_old_builder_still_running(self):
         sh(self.repo, 'git', 'worktree', 'add', '-q', '-b', 'graph/card-1', str(self.worktree), self.base)
@@ -617,6 +702,495 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         [status] = self.linear.status()
         self.assertIn('Stopped: the test run ran too long', status)
 
+    # ----------------------------------------------------------------- independent review (JUL-128)
+
+    # ----------------------------------------------------------------- the independent review (JUL-128)
+
+    def reviewer_says(self, *answers):
+        """A pretend reviewer giving these answers in turn (the last one repeats)."""
+        answers = list(answers)
+
+        async def review(run, brief, limit, progress):
+            self.reviewer_calls += 1
+            self.reviewer_briefs.append(brief)
+            answer = answers[min(self.reviewer_calls, len(answers)) - 1]
+            return await answer(run) if callable(answer) else answer
+        return review
+
+    def verdicts(self):
+        return [c for c in self.linear.comments if 'graph: review-verdict' in c]
+
+    def head(self):
+        return sh(self.worktree, 'git', 'rev-parse', 'HEAD')
+
+    APPROVE = ReviewResult(ok=True, verdict='approve', summary='every criterion met', criteria=met('say hello'),
+                           model='deepseek/deepseek-v4-pro')
+
+    @staticmethod
+    def findings(text, **extra):
+        return ReviewResult(ok=True, verdict='changes_needed', findings=text, model='deepseek/deepseek-v4-pro', **extra)
+
+    async def test_1_approval_is_posted_with_the_reviewer_and_its_company(self):
+        outcome = await run_card(self.state(), self.deps(reviewer=self.reviewer_says(self.APPROVE)))
+        self.assertEqual(outcome, 'passed')
+        [brief] = self.reviewer_briefs
+        # the reviewer works from its role file, the card, the graph's test result and the whole change
+        for part in (ROLE, '- AC1: say hello', 'tests 3, pass 3, fail 0', '+hello 1', self.head(), self.base):
+            self.assertIn(part, brief)
+        [posted] = self.verdicts()
+        self.assertIn('APPROVED', posted)
+        self.assertIn('Reviewer: DeepSeek V4 Pro (Pi), from DeepSeek', posted)
+        self.assertIn('Model that ran: deepseek/deepseek-v4-pro', posted)
+        [result] = self.results()
+        self.assertIn('PASSED', result)
+        self.assertIn('Review: approved, by DeepSeek V4 Pro (Pi), from DeepSeek, model deepseek/deepseek-v4-pro (round 1 of 2)', result)
+        self.assertEqual(self.linear.assigned, [])
+        self.assertIn('Finished: the tests passed and the review approved.', self.linear.status()[0])
+
+    async def test_2_findings_go_back_to_the_builder_on_top_of_its_commit_then_approval(self):
+        outcome = await run_card(self.state(), self.deps(
+            reviewer=self.reviewer_says(self.findings('F1: hello.txt must end with a full stop'), self.APPROVE)))
+        self.assertEqual(outcome, 'passed')
+        self.assertEqual((self.builder_calls, self.tester_calls, self.reviewer_calls), (2, 2, 2))
+        first, second = sh(self.worktree, 'git', 'rev-list', '--reverse', f'{self.base}..HEAD').splitlines()
+        self.assertIn('F1: hello.txt must end with a full stop', self.brief)  # the second build's brief
+        self.assertIn(f'({first})', self.brief)
+        self.assertNotIn('The tests failed', self.brief)
+        self.assertIn(second, self.reviewer_briefs[1])  # the new commit was reviewed
+        found, approved = self.verdicts()
+        self.assertIn('CHANGES NEEDED', found)
+        self.assertIn('F1: hello.txt must end with a full stop', found)
+        self.assertIn('APPROVED', approved)
+        self.assertIn('Round: 2 of 2', approved)
+        self.assertIn('✓ Built (attempt 2, fixing review findings)', self.linear.status()[0])
+
+    async def test_every_comment_is_posted_once_even_when_linear_is_slow_to_list_it(self):
+        # live JUL-151, 25 Sep: an approval was posted twice when Linear's comment list lagged
+        self.linear = FakeLinear(lag=5)
+        outcome = await run_card(self.state(), self.deps(
+            reviewer=self.reviewer_says(self.findings('F1: add a full stop'), self.APPROVE)))
+        self.assertEqual(outcome, 'passed')
+        markers = [line for c in self.linear.comments for line in c.splitlines() if line.startswith('graph: ')
+                   and not line.startswith('graph: status')]
+        self.assertEqual(len(markers), len(set(markers)), f'posted twice: {[m for m in markers if markers.count(m) > 1]}')
+        self.assertEqual(len(self.verdicts()), 2)  # one per round
+        # and a restarted run, whose own record is gone, still finds them on the card
+        self.linear.lag = 0
+        self.assertEqual(await run_card(self.state(), self.deps()), 'already reported')
+
+    async def test_3_two_rounds_of_findings_stop_the_card_with_both_reasons_in_one_comment(self):
+        outcome = await run_card(self.state(), self.deps(reviewer=self.reviewer_says(
+            self.findings('F1: no validation'), self.findings('F2: still no validation, now off by one'))))
+        self.assertEqual(outcome, 'failed')
+        self.assertEqual((self.builder_calls, self.reviewer_calls), (2, 2))
+        [stop] = [c for c in self.linear.comments if 'graph: review-stopped' in c]
+        self.assertIn('Round 1:** F1: no validation', stop)
+        self.assertIn('Round 2:** F2: still no validation, now off by one', stop)
+        self.assertIn('No new card was opened', stop)
+        self.assertEqual(len(self.verdicts()), 1)  # final verdict and both reasons share the stop comment
+        self.assertIn('CHANGES NEEDED', stop)
+        self.assertIn('model: deepseek/deepseek-v4-pro', stop)
+        self.assertEqual(self.linear.assigned, [])  # UAT 2: not assigned to Todd
+        self.assertIn('the review asked for changes in 2 rounds', self.results()[0])
+
+    async def test_4_a_crashed_reviewer_is_never_an_approval_even_after_writing_approve(self):
+        crashed = ReviewResult(reason='the reviewer exited 137: killed', text=verdict('approve'))
+        outcome = await run_card(self.state(), self.deps(reviewer=self.reviewer_says(crashed)))
+        self.assertEqual(outcome, 'failed')
+        self.assertEqual(self.verdicts(), [])
+        [result] = self.results()
+        self.assertIn('FAILED', result)
+        self.assertIn('no clear final verdict, so it is not an approval: the reviewer exited 137', result)
+        self.assertIn('Review: no clear verdict', result)
+
+    async def test_4_a_reviewer_that_cannot_run_is_never_an_approval(self):
+        async def broken(run):
+            raise BrokenPipeError('sudo: a password is required')
+        self.assertEqual(await run_card(self.state(), self.deps(reviewer=self.reviewer_says(broken))), 'failed')
+        self.assertIn('the reviewer could not run: BrokenPipeError', self.results()[0])
+
+    async def test_4_a_reviewer_past_its_time_limit_is_never_an_approval(self):
+        timed_out = ReviewResult(stopped=True, reason='stopped by the graph after its 1200-second time limit',
+                                 text=verdict('approve'))
+        outcome = await run_card(self.state(), self.deps(reviewer=self.reviewer_says(timed_out)))
+        self.assertEqual(outcome, 'failed')
+        self.assertIn('The reviewer ran longer than its 20 min time limit', self.results()[0])
+        self.assertEqual(self.verdicts(), [])
+
+    async def test_5_a_reviewer_that_changed_the_candidate_is_voided_and_the_candidate_put_back(self):
+        async def edits(run):
+            (Path(run.worktree) / 'hello.txt').write_text('reviewer was here\n')
+            (Path(run.worktree) / 'new.txt').write_text('x')
+            return self.APPROVE
+        outcome = await run_card(self.state(), self.deps(reviewer=self.reviewer_says(edits)))
+        self.assertEqual(outcome, 'failed')
+        [void] = [c for c in self.linear.comments if 'graph: review-voided' in c]
+        self.assertIn('is **void**', void)
+        self.assertIn('files in the working copy changed', void)
+        self.assertEqual(self.verdicts(), [])  # its approval was never posted
+        self.assertEqual(self.head(), self.saved().commit)
+        self.assertEqual(sh(self.worktree, 'git', 'status', '--porcelain', '--untracked-files=all'), '')
+        self.assertEqual((Path(self.worktree) / 'hello.txt').read_text(), 'hello 1\n')
+        self.assertIn('the review was voided', self.results()[0])
+
+    async def test_5_a_reviewer_that_committed_is_voided_and_its_commit_dropped(self):
+        async def commits(run):
+            (Path(run.worktree) / 'hello.txt').write_text('reviewer commit\n')
+            sh(self.worktree, 'git', *workers.GIT_ID, 'commit', '-qam', 'reviewer')
+            return self.APPROVE
+        candidate = None
+
+        async def remember(run):
+            nonlocal candidate
+            candidate = self.head()
+            return await commits(run)
+        self.assertEqual(await run_card(self.state(), self.deps(reviewer=self.reviewer_says(remember))), 'failed')
+        [void] = [c for c in self.linear.comments if 'graph: review-voided' in c]
+        self.assertIn(f'the commit moved from `{candidate[:12]}`', void)
+        self.assertEqual(self.head(), candidate)
+
+    async def test_a_stopped_card_goes_to_todd_only_when_the_reviewer_names_one_of_the_three_reasons(self):
+        money = self.findings('F2: this needs a paid plan', todd='money_decision', todd_reason='It needs a paid plan.')
+        await run_card(self.state(), self.deps(reviewer=self.reviewer_says(self.findings('F1: x'), money)))
+        self.assertEqual(self.linear.assigned, ['JUL-1'])
+        [stop] = [c for c in self.linear.comments if 'graph: review-stopped' in c]
+        self.assertIn('needs Todd: a money decision. It needs a paid plan.', stop)
+        self.assertTrue(any('Assigned to Todd' in c for c in self.linear.comments))
+
+    async def test_findings_that_merely_mention_money_do_not_go_to_todd(self):
+        await run_card(self.state(), self.deps(reviewer=self.reviewer_says(
+            self.findings('the cost of this loop is quadratic'), self.findings('price field has no budget check'))))
+        self.assertEqual(self.linear.assigned, [])
+
+    async def test_the_model_that_ran_decides_the_maker_not_the_route(self):
+        # the route is DeepSeek's, but a review by the builder's maker, or by a model
+        # nobody can place, is not the independent review the card asks for
+        for model, said in (('google/gemini-3-pro', 'is from Google, not DeepSeek'),
+                            ('mystery-1', 'is from an unknown maker, not DeepSeek'),
+                            (None, '(not reported) is from an unknown maker')):
+            self.setUp()
+            approval = self.APPROVE.model_copy(update={'model': model})
+            self.assertEqual(await run_card(self.state(), self.deps(reviewer=self.reviewer_says(approval))), 'failed', model)
+            self.assertIn(said, self.results()[0], model)
+            self.assertEqual(self.verdicts(), [], model)
+            self.tearDown()
+
+    async def test_the_reviewer_must_come_from_a_different_maker(self):
+        deps = self.deps()
+        deps.worker_makers = {'builder': 'Google', 'reviewer': 'google'}
+        self.assertEqual(await run_card(self.state(), deps), 'failed')
+        self.assertEqual(self.reviewer_calls, 0)
+        self.assertIn('different model maker', self.results()[0])
+
+    async def test_the_reviewer_must_report_the_exact_selected_model(self):
+        deps = self.deps(reviewer=self.reviewer_says(self.APPROVE.model_copy(update={'model': 'gemini-3.7-flash'})))
+        deps.worker_makers = {'builder': 'OpenAI', 'reviewer': 'Google'}
+        deps.worker_models = {'reviewer': 'gemini-3.8-flash'}
+        self.assertEqual(await run_card(self.state(), deps), 'failed')
+        self.assertIn('not the selected gemini-3.8-flash', self.results()[0])
+        self.assertEqual(self.verdicts(), [])
+
+    async def test_a_review_too_big_for_one_prompt_is_refused_not_cut_short(self):
+        async def big(run, brief, *_):
+            self.builder_calls += 1
+            (Path(run.worktree) / 'big.txt').write_text('x\n' * (MAX_REVIEW_BYTES // 2))
+            return BuildResult(True, report='big')
+        deps = self.deps(builder=big)
+        deps.worker_models = {'reviewer': 'gpt-5.5'}
+        deps.worker_makers = {'builder': 'Google', 'reviewer': 'OpenAI'}
+        self.assertEqual(await run_card(self.state(), deps), 'failed')
+        self.assertEqual(self.reviewer_calls, 0)
+        self.assertIn(f'over the {MAX_REVIEW_BYTES}-byte limit', self.results()[0])
+
+    async def test_pi_argument_limit_is_checked_before_launch(self):
+        async def big(run, brief, *_):
+            (Path(run.worktree) / 'big.txt').write_text('x\n' * (MAX_PI_REVIEW_BYTES // 2))
+            return BuildResult(True, report='big')
+        deps = self.deps(builder=big)
+        deps.worker_models = {'reviewer': 'deepseek-v4-pro'}
+        self.assertEqual(await run_card(self.state(), deps), 'failed')
+        self.assertEqual(self.reviewer_calls, 0)
+        self.assertIn(f'over the {MAX_PI_REVIEW_BYTES}-byte limit', self.results()[0])
+
+    async def test_a_restart_during_the_review_reviews_again_without_rebuilding(self):
+        async def dies(run):
+            raise Crash()
+        with self.assertRaises(Crash):
+            await run_card(self.state(), self.deps(reviewer=self.reviewer_says(dies)))
+        self.assertEqual(self.saved().step, 'review')
+        self.builder_calls = 0
+        self.assertEqual(await run_card(self.state(), self.deps(reviewer=self.reviewer_says(self.APPROVE))), 'passed')
+        self.assertEqual(self.builder_calls, 0)
+        self.assertEqual(len(self.verdicts()), 1)
+
+    async def test_an_interrupted_findings_round_goes_back_to_the_candidate_not_the_base(self):
+        async def build_then_die(run, brief, *_):
+            self.builder_calls += 1
+            (Path(run.worktree) / 'hello.txt').write_text(f'hello {run.attempt}\n')
+            if self.builder_calls == 2:
+                raise Crash()
+            return BuildResult(True, report='built')
+        with self.assertRaises(Crash):
+            await run_card(self.state(), self.deps(builder=build_then_die,
+                                                   reviewer=self.reviewer_says(self.findings('F1: x'))))
+        candidate = self.saved().commit
+        self.assertEqual(await run_card(self.state(), self.deps(reviewer=self.reviewer_says(self.APPROVE))), 'passed')
+        self.assertEqual(sh(self.worktree, 'git', 'rev-list', '--reverse', f'{self.base}..HEAD').splitlines()[0], candidate)
+
+    async def test_test_repairs_and_review_rounds_are_counted_apart(self):
+        async def red_once(run, *_):
+            self.tester_calls += 1
+            if self.tester_calls == 1:
+                return TestResult(passed=False, summary='tests 3, fail 1', failing=['greets'], details='boom')
+            return TestResult(passed=True, summary='tests 3, pass 3, fail 0')
+        outcome = await run_card(self.state(), self.deps(
+            tester=red_once, reviewer=self.reviewer_says(self.findings('F1: x'), self.APPROVE)))
+        self.assertEqual(outcome, 'passed')
+        # build, test repair, review fix: three builder runs, and the review fix was told only the findings
+        self.assertEqual(self.builder_calls, 3)
+        self.assertIn('F1: x', self.brief)
+        self.assertNotIn('boom', self.brief)
+
+    async def test_the_builders_brief_names_the_starting_commit(self):
+        await run_card(self.state(), self.deps())
+        self.assertIn(f'This card starts from commit {self.base}.', self.brief)
+
+    async def test_an_approval_that_does_not_answer_every_criterion_is_not_an_approval(self):
+        cases = {
+            'no criteria at all': [],
+            'criterion named without its words': [{'id': 'AC1', 'criterion': 'something else', 'verdict': 'met', 'how': 'x'}],
+            'met without saying how': [{'id': 'AC1', 'criterion': 'say hello', 'verdict': 'met', 'how': ' '}],
+        }
+        for name, criteria in cases.items():
+            self.setUp()
+            bare = ReviewResult(ok=True, verdict='approve', summary='fine', criteria=criteria, model='deepseek/deepseek-v4-pro')
+            self.assertEqual(await run_card(self.state(), self.deps(reviewer=self.reviewer_says(bare))), 'failed', name)
+            self.assertIn('its approval does not cover the acceptance criteria', self.results()[0], name)
+            self.assertEqual(self.verdicts(), [], name)
+            self.tearDown()
+
+    async def test_5_an_ignored_file_the_reviewer_wrote_voids_the_review_and_is_removed(self):
+        (self.repo / '.gitignore').write_text('.julia/\nnode_modules/\n')
+        sh(self.repo, 'git', *workers.GIT_ID, 'add', '-A')
+        sh(self.repo, 'git', *workers.GIT_ID, 'commit', '-q', '-m', 'ignore')
+        self.base = sh(self.repo, 'git', 'rev-parse', 'HEAD')
+
+        async def writes_ignored(run):
+            (Path(run.worktree) / 'node_modules').mkdir(exist_ok=True)
+            (Path(run.worktree) / '.julia').mkdir()
+            (Path(run.worktree) / '.julia' / 'answer.json').write_text('{}')
+            return self.APPROVE
+
+        async def install_then_build(run, brief, *_):
+            self.builder_calls += 1
+            (Path(run.worktree) / 'node_modules').mkdir(exist_ok=True)
+            (Path(run.worktree) / 'node_modules' / 'dep.js').write_text('installed')
+            (Path(run.worktree) / 'hello.txt').write_text('hello 1\n')
+            return BuildResult(True, report='built')
+        outcome = await run_card(self.state(), self.deps(builder=install_then_build, reviewer=self.reviewer_says(writes_ignored)))
+        self.assertEqual(outcome, 'failed')
+        self.assertTrue(any('graph: review-voided' in c for c in self.linear.comments))
+        self.assertFalse((self.worktree / '.julia').exists())
+
+    async def test_5_a_change_inside_the_installed_dependencies_voids_the_review(self):
+        (self.repo / '.gitignore').write_text('node_modules/\n')
+        sh(self.repo, 'git', *workers.GIT_ID, 'add', '-A')
+        sh(self.repo, 'git', *workers.GIT_ID, 'commit', '-q', '-m', 'ignore')
+        self.base = sh(self.repo, 'git', 'rev-parse', 'HEAD')
+
+        async def edits_a_dependency(run):
+            # same size as 'installed', and the modification time set back afterwards:
+            # only the change time, which no process can set back, gives it away
+            dep = Path(run.worktree) / 'node_modules' / 'dep' / 'index.js'
+            was = dep.stat()
+            dep.write_text('INSTALLED')
+            os.utime(dep, ns=(was.st_atime_ns, was.st_mtime_ns))
+            return self.APPROVE
+        outcome = await run_card(self.state(), self.deps(reviewer=self.reviewer_says(edits_a_dependency)))
+        self.assertEqual(outcome, 'failed')
+        [void] = [c for c in self.linear.comments if 'graph: review-voided' in c]
+        self.assertIn('without its installed dependencies', void)
+        self.assertFalse((self.worktree / 'node_modules').exists())  # the changed dependencies are gone
+
+    async def test_a_review_keeps_the_installed_dependencies_when_nothing_changed(self):
+        (self.repo / '.gitignore').write_text('node_modules/\n')
+        sh(self.repo, 'git', *workers.GIT_ID, 'add', '-A')
+        sh(self.repo, 'git', *workers.GIT_ID, 'commit', '-q', '-m', 'ignore')
+        self.base = sh(self.repo, 'git', 'rev-parse', 'HEAD')
+        self.assertEqual(await run_card(self.state(), self.deps()), 'passed')
+        self.assertEqual((self.worktree / 'node_modules' / 'dep' / 'index.js').read_text(), 'installed')
+
+    async def test_the_tests_run_on_the_commit_not_on_what_the_builder_left_in_ignored_files(self):
+        (self.repo / '.gitignore').write_text('node_modules/\n')
+        sh(self.repo, 'git', *workers.GIT_ID, 'add', '-A')
+        sh(self.repo, 'git', *workers.GIT_ID, 'commit', '-q', '-m', 'ignore')
+        self.base = sh(self.repo, 'git', 'rev-parse', 'HEAD')
+
+        async def patches_a_dependency(run, brief, *_):
+            self.builder_calls += 1
+            (Path(run.worktree) / 'hello.txt').write_text('hello 1\n')
+            (Path(run.worktree) / 'node_modules' / 'dep').mkdir(parents=True, exist_ok=True)
+            (Path(run.worktree) / 'node_modules' / 'dep' / 'index.js').write_text('patched so the tests pass')
+            (Path(run.worktree) / 'scratch.log').write_text('left behind')  # untracked but, say, ignored elsewhere
+            return BuildResult(True, report='built')
+        seen = []
+
+        async def tester(run, *_):
+            seen.append((Path(run.worktree) / 'node_modules' / 'dep' / 'index.js').read_text())
+            return TestResult(passed=True, summary='tests 3, pass 3, fail 0')
+        self.assertEqual(await run_card(self.state(), self.deps(builder=patches_a_dependency, tester=tester)), 'passed')
+        self.assertEqual(seen, ['installed'])  # a clean install, not the builder's patch
+
+    async def test_dependencies_that_cannot_be_installed_stop_the_card_before_its_tests(self):
+        async def refuses(run):
+            return 'npm ci failed (exit 1): lock file out of date'
+        deps = self.deps()
+        deps.install = refuses
+        self.assertEqual(await run_card(self.state(), deps), 'failed')
+        self.assertEqual(self.tester_calls, 0)
+        self.assertIn("dependencies could not be installed for its tests: npm ci failed", self.results()[0])
+
+    async def test_5_a_change_made_by_a_reviewer_the_graph_died_during_voids_that_review(self):
+        async def edits_then_graph_dies(run):
+            (Path(run.worktree) / 'hello.txt').write_text('reviewer was here\n')
+            raise Crash()  # the graph dies while the reviewer runs
+        with self.assertRaises(Crash):
+            await run_card(self.state(), self.deps(reviewer=self.reviewer_says(edits_then_graph_dies)))
+        self.assertIsNotNone(self.saved().review_before)
+        self.assertEqual(await run_card(self.state(), self.deps(reviewer=self.reviewer_says(self.APPROVE))), 'failed')
+        self.assertEqual(self.reviewer_calls, 1)  # no second review over a changed working copy
+        [void] = [c for c in self.linear.comments if 'graph: review-voided' in c]
+        self.assertIn('interrupted', void)
+        self.assertEqual((Path(self.worktree) / 'hello.txt').read_text(), 'hello 1\n')
+
+    async def test_an_interrupted_review_with_nothing_changed_is_simply_run_again(self):
+        async def graph_dies(run):
+            raise Crash()
+        with self.assertRaises(Crash):
+            await run_card(self.state(), self.deps(reviewer=self.reviewer_says(graph_dies)))
+        self.assertEqual(await run_card(self.state(), self.deps(reviewer=self.reviewer_says(self.APPROVE))), 'passed')
+        self.assertIsNone(self.saved().review_before)
+
+    async def test_5_a_crash_right_after_a_tamper_is_seen_still_voids_it_and_never_reviews_again(self):
+        async def edits(run):
+            (Path(run.worktree) / 'hello.txt').write_text('reviewer was here\n')
+            return self.APPROVE
+        deps = self.deps(reviewer=self.reviewer_says(edits))
+        real_restore = deps.restore
+
+        async def dies(run, commit, keep_dependencies=True):
+            if (Path(run.worktree) / 'hello.txt').read_text() == 'reviewer was here\n':
+                raise Crash()  # the graph dies before it can put the working copy back
+            await real_restore(run, commit, keep_dependencies)
+        deps.restore = dies
+        with self.assertRaises(Crash):
+            await run_card(self.state(), deps)
+        self.assertEqual((self.saved().step, self.saved().review.voided), ('report', True))
+        self.assertEqual(await run_card(self.state(), self.deps(reviewer=self.reviewer_says(self.APPROVE))), 'failed')
+        self.assertEqual(self.reviewer_calls, 1)  # no second review
+        self.assertTrue(any('graph: review-voided' in c for c in self.linear.comments))
+        self.assertEqual((Path(self.worktree) / 'hello.txt').read_text(), 'hello 1\n')
+
+    async def test_a_review_starts_from_exactly_the_candidate(self):
+        async def build_and_leave_a_mess(run, brief, *_):
+            self.builder_calls += 1
+            (Path(run.worktree) / 'hello.txt').write_text('hello 1\n')
+            return BuildResult(True, report='built')
+
+        async def dirty_after_tests(run, *_):
+            (Path(run.worktree) / 'stray.txt').write_text('left by something')
+            return TestResult(passed=True, summary='tests 3, pass 3, fail 0')
+        seen = []
+
+        async def looks(run):
+            seen.append(sh(self.worktree, 'git', 'status', '--porcelain', '--untracked-files=all'))
+            return self.APPROVE
+        outcome = await run_card(self.state(), self.deps(builder=build_and_leave_a_mess, tester=dirty_after_tests,
+                                                         reviewer=self.reviewer_says(looks)))
+        self.assertEqual(outcome, 'passed')  # put back, then reviewed; the stray file was not the reviewer's doing
+        self.assertEqual(seen, [''])
+        [note] = [c for c in self.linear.comments if 'graph: review-drift' in c]
+        self.assertIn('1 file(s) differ', note)
+
+    async def test_a_reviewer_that_left_something_running_is_not_a_clean_review(self):
+        async def approves_but_leaves_a_process(run):
+            self.alive['reviewer'] = [4343]
+            return self.APPROVE
+        outcome = await run_card(self.state(), self.deps(reviewer=self.reviewer_says(approves_but_leaves_a_process),
+                                                         alive_after_wait=[4343]))
+        self.assertEqual(outcome, 'failed')
+        self.assertIn('the reviewer left process 4343 running, so no new review starts until it ends', self.results()[0])
+        self.assertEqual(self.verdicts(), [])
+
+    async def test_a_reviewer_process_that_ends_while_waited_for_leaves_the_review_as_it_was(self):
+        async def approves_with_a_process_ending(run):
+            self.alive['reviewer'] = [4343]
+            return self.APPROVE
+        # wait_for_exit finds it gone
+        outcome = await run_card(self.state(), self.deps(reviewer=self.reviewer_says(approves_with_a_process_ending)))
+        self.assertEqual(outcome, 'passed')
+
+    async def test_a_comment_whose_post_was_cut_short_by_a_crash_is_not_posted_twice(self):
+        # Linear took the verdict, the graph died before recording it, and Linear
+        # still lists it late when the graph comes back
+        self.linear = FakeLinear()
+        deps = self.deps(reviewer=self.reviewer_says(self.APPROVE))
+        real = deps.linear.comment
+
+        async def takes_it_then_dies(card, body, chosen_id=None):
+            await real(card, body, chosen_id)
+            if 'graph: review-verdict' in body:
+                self.linear.hidden[list(self.linear.store)[-1]] = 10 ** 6  # and Linear does not list it for a long time
+                raise Crash()
+        deps.linear.comment = takes_it_then_dies
+        with self.assertRaises(Crash):
+            await run_card(self.state(), deps)
+        self.assertFalse(any('graph: review-verdict' in line for line in self.saved().posted))
+        deps.linear.comment = real
+        self.assertEqual(await run_card(self.state(), self.deps(reviewer=self.reviewer_says(self.APPROVE))), 'passed')
+        self.assertEqual(len(self.verdicts()), 1)
+
+    async def test_a_comments_id_is_the_same_every_time_and_shaped_as_linear_asks(self):
+        line = 'graph: result card=JUL-1 base=abc commit=def outcome=passed'
+        cid = comment_id('JUL-1', line)
+        self.assertEqual(cid, comment_id('JUL-1', line))
+        self.assertNotEqual(cid, comment_id('JUL-2', line))
+        self.assertNotEqual(cid, comment_id('JUL-1', line.replace('passed', 'failed')))
+        self.assertRegex(cid, r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')
+
+    async def test_a_reviewer_still_running_after_its_limit_is_named_and_no_new_review_starts(self):
+        # The seat's Pi child can outlive the seat, and the graph cannot signal runner's processes:
+        # it says the reviewer is still running and holds any new review until it ends.
+        async def times_out_leaving_pi(run):
+            self.alive['reviewer'] = [4242]  # the seat's Pi child, still running
+            return ReviewResult(stopped=True, reason='stopped by the graph after its 1200-second time limit')
+        outcome = await run_card(self.state(), self.deps(reviewer=self.reviewer_says(times_out_leaving_pi),
+                                                         alive_after_wait=[4242]))
+        self.assertEqual(outcome, 'failed')
+        [result] = self.results()
+        self.assertIn('still running (process 4242), so no new review starts until it ends', result)
+
+    async def test_a_crash_between_saving_a_verdict_and_posting_it_still_posts_it_and_keeps_the_round(self):
+        deps = self.deps(reviewer=self.reviewer_says(self.findings('F1: x'), self.APPROVE))
+        real = deps.linear.comment
+
+        async def dies_on_verdict(card, body, chosen_id=None):
+            if 'graph: review-verdict' in body:
+                raise Crash()
+            return await real(card, body, chosen_id)
+        deps.linear.comment = dies_on_verdict
+        with self.assertRaises(Crash):
+            await run_card(self.state(), deps)
+        saved = self.saved()
+        self.assertEqual((saved.step, saved.fixing, len(saved.round_reasons)), ('build', 'review', 1))
+        deps.linear.comment = real
+        outcome = await run_card(self.state(), self.deps(reviewer=self.reviewer_says(self.APPROVE)))
+        self.assertEqual(outcome, 'passed')
+        self.assertEqual(self.reviewer_calls, 2)  # round 1 was not reviewed again
+        found, approved = self.verdicts()
+        self.assertIn('F1: x', found)
+        self.assertIn('F1: x', self.brief)  # the builder still got round 1's findings
+
 
 class PrepareTest(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
@@ -821,8 +1395,136 @@ class WorkerParsingTest(unittest.TestCase):
                 (proc / pid / 'status').write_text('Name: x' + chr(10) + 'Uid:' + f'{chr(9)}{uid}' * 4 + chr(10))
             self.assertEqual(workers.live_workers('builder', proc, uid=1005), [201])
 
+    # the reviewer's reply, as run-pi-seat.mjs prints it
+
+    def test_the_final_messages_closing_json_is_the_verdict(self):
+        answers = {'criteria': met('say hello')}
+        result = workers.reviewer_outcome(0, reply(verdict('approve', summary='checked', **answers)), '')
+        self.assertTrue(result.ok)
+        self.assertEqual((result.verdict, result.summary, result.criteria, result.model),
+                         ('approve', 'checked', met('say hello'), 'gpt-5.5'))
+        fenced = workers.reviewer_outcome(0, reply('```json\n' + json.dumps({'verdict': 'approve'}) + '\n```'), '')
+        self.assertEqual(fenced.verdict, 'approve')
+        long_fence = workers.reviewer_outcome(0, reply('````json\n' + json.dumps({'verdict': 'approve'}) + '\n````'), '')
+        self.assertEqual(long_fence.verdict, 'approve')
+
+    def test_an_approve_written_earlier_is_not_the_final_verdict(self):
+        # which message is final is the launcher's job (scripts/julia-runner-reviewer.test.mjs);
+        # here, the final message itself must end with the verdict
+        cases = {
+            'text after the verdict': verdict('approve') + '\nActually, one more problem.',
+            'no verdict object at all': 'VERDICT: APPROVE',
+            'a verdict the role file does not know': verdict('lgtm'),
+            'nothing': '',
+        }
+        for name, text in cases.items():
+            result = workers.reviewer_outcome(0, reply(text), '')
+            self.assertFalse(result.ok, name)
+            self.assertIsNone(result.verdict, name)
+
+    def test_an_approval_with_a_criterion_not_met_is_not_clear(self):
+        unmet = {'criteria': [{'id': 'AC1', 'verdict': 'met'}, {'id': 'AC2', 'verdict': 'not_met', 'how': 'no test'}]}
+        self.assertFalse(workers.reviewer_outcome(0, reply(verdict('approve', **unmet)), '').ok)
+        found = workers.reviewer_outcome(0, reply(verdict('changes_needed', **unmet)), '')
+        self.assertEqual(found.findings, '- AC2: no test')
+
+    def test_a_crash_a_vendor_error_or_a_stop_is_never_an_approval(self):
+        # the text the DeepSeek seat gave live on 25 Sep when its weekly allowance ran out
+        limit = '429: {"message":"You\'ve reached your weekly usage limit for your plan.","type":"rate_limit_error"}'
+        cases = {
+            'vendor error': (0, reply(verdict('approve'), status='failed', error=limit), 'reached your weekly usage limit'),
+            'killed after writing approve': (0, reply(verdict('approve'), status='failed', error='the reviewer exited 137: '),
+                                             'exited 137'),
+            'launcher crashed': (1, '', 'did not answer (exit 1)'),
+            'launcher printed only progress': (0, '{"progress":true}\n', 'did not answer'),
+        }
+        for name, (status, out, reason) in cases.items():
+            result = workers.reviewer_outcome(status, out, '')
+            self.assertFalse(result.ok, name)
+            self.assertIn(reason, result.reason, name)
+        for out in (reply(verdict('approve'), status='stopped'), ''):
+            stopped = workers.reviewer_outcome(workers.STOPPED_EXIT if not out else 0, out, 'stopped: ran longer than its 1200-second time limit')
+            self.assertTrue(stopped.stopped)
+            self.assertFalse(stopped.ok)
+
+    def test_only_the_three_named_reasons_go_to_todd(self):
+        says = lambda todd: workers.reviewer_outcome(0, reply(verdict('changes_needed', findings='F', todd=todd, todd_reason='r')), '')
+        self.assertEqual(says('product_decision').todd, 'product_decision')
+        self.assertIsNone(says('whatever').todd)
+        self.assertEqual(says('whatever').todd_reason, '')
+
+    def test_a_models_maker_comes_from_its_own_name(self):
+        from julia_graph.graph import maker_of
+        for model, maker in (('deepseek/deepseek-v4-pro', 'DeepSeek'), ('gpt-5.5', 'OpenAI'), ('gemini-2.5-pro', 'Google'),
+                             ('anthropic/claude-opus', 'Anthropic'), ('deepseek/gemini-x', 'Google'), ('', ''), (None, '')):
+            self.assertEqual(maker_of(model), maker, model)
+
+    def test_the_selected_pair_comes_from_the_shared_model_catalog(self):
+        pair = workers.resolve_pair('builder-codex', 'adversary-gemini-flash')
+        self.assertEqual(workers.worker_makers(pair), {'builder': 'OpenAI', 'reviewer': 'Google'})
+        self.assertEqual(pair['builder']['model'], 'gpt-5.5')
+        self.assertEqual(workers.worker_names(pair)['reviewer'], 'Gemini 3.8 Flash')
+        with self.assertRaisesRegex(ValueError, 'different model makers'):
+            workers.resolve_pair('builder-gemini-flash', 'adversary-gemini-flash')
+
+    def test_card_deps_resumes_the_saved_model_pair(self):
+        from julia_graph import __main__ as entry
+        with tempfile.TemporaryDirectory() as d:
+            Checkpoint(Path(d), 'JUL-999').save(CardRun(card='JUL-999', base='a' * 40,
+                branch='graph/card-999', worktree='/srv/julia-runner/worktrees/card-999',
+                builder_model='builder-codex', reviewer_model='adversary-gemini-flash'))
+            with mock.patch.object(entry, 'STATE', d):
+                deps = entry.card_deps('JUL-999')
+            self.assertEqual(deps.model_labels, ('builder-codex', 'adversary-gemini-flash'))
+            self.assertEqual(deps.worker_models['reviewer'], 'gemini-3.8-flash')
+
+    def test_the_reviewer_is_started_exactly_as_its_sudo_rule_allows(self):
+        rules = (REPO_ROOT / 'ops' / 'julia-runner' / 'sudoers').read_text()
+        pair = workers.resolve_pair('builder-codex', 'adversary-gemini-flash')
+        for kind, account in (('builder', 'runner'), ('reviewer', 'gemini-worker')):
+            command = workers.sudo_command(kind, pair[kind])
+            self.assertEqual(command[:5], ['sudo', '-n', '-u', account, '--'])
+            self.assertIn(f"orchestrator-svc ALL=({account}) NOPASSWD: {' '.join(command[5:])}\n", rules)
+
+    def test_the_reviewers_account_is_shared_so_only_the_reviewer_counts(self):
+        with tempfile.TemporaryDirectory() as d:
+            proc = Path(d)
+            for pid, cmd in {'10': ['/opt/Orca/orca-ide', '--serve'],
+                             '11': ['/usr/bin/node', workers.LAUNCHERS['reviewer']],
+                             '12': ['node', '/usr/bin/pi', '--model', 'deepseek/deepseek-v4-pro', '-p'],
+                             '13': ['codex', 'exec', '-m', 'gpt-5.5', '-s', 'read-only', '--skip-git-repo-check', '--json', '-'],
+                             '14': ['codex', 'exec', '-s', 'danger-full-access', '-']}.items():  # someone else's Codex
+                (proc / pid).mkdir()
+                (proc / pid / 'cmdline').write_bytes(b'\0'.join(c.encode() for c in cmd) + b'\0')
+                (proc / pid / 'status').write_text('Uid:\t1001\t1001\t1001\t1001\n')
+            with mock.patch.object(workers, 'account_uid', return_value=1001):
+                self.assertEqual(workers.live_workers('reviewer', proc=proc), [11, 12, 13])
+
+    def test_builder_detection_does_not_count_gemini_reviewer_as_a_builder(self):
+        with tempfile.TemporaryDirectory() as d:
+            proc = Path(d)
+            commands = {
+                '10': ['agy', '--model', 'gemini-3.8-flash', '--input-format', 'stream-json'],
+                '11': ['agy', '--add-dir', '/srv/julia-runner/worktrees/card-1', '--mode', 'accept-edits',
+                       '--model', 'gemini-3.8-flash'],
+                '12': ['codex', 'exec', '-s', 'workspace-write', '-C', '/srv/julia-runner/worktrees/card-2', '--json'],
+            }
+            for pid, cmd in commands.items():
+                (proc / pid).mkdir()
+                (proc / pid / 'cmdline').write_bytes(b'\0'.join(c.encode() for c in cmd) + b'\0')
+                (proc / pid / 'status').write_text('Uid:\t995\t995\t995\t995\n')
+            self.assertEqual(workers.live_workers('builder', proc=proc), [11, 12])
+            self.assertEqual(workers.live_workers('reviewer', proc=proc), [10])
+
 
 class WorkerCallTest(unittest.IsolatedAsyncioTestCase):
+    async def test_large_request_drains_while_child_writes_a_full_output_pipe(self):
+        command = "import sys; sys.stdout.write('y' * 200000 + '\\n'); sys.stdout.flush(); print(len(sys.stdin.read()))"
+        with mock.patch.object(workers, 'sudo_command', return_value=[sys.executable, '-c', command]):
+            status, out, err = await workers.run_worker('reviewer', 'x' * 200000, limit_seconds=5)
+        self.assertEqual(status, 0, err)
+        self.assertTrue(out.endswith('200000\n'))
+
     async def test_a_test_run_stopped_by_its_time_limit_is_reported_as_stopped(self):
         replies = iter([(0, 'lint ok', False), (workers.STOPPED_EXIT, 'stopped: ran longer than its 900-second time limit', True)])
         asked = []
@@ -882,6 +1584,48 @@ class WorkerCallTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.failing, ['lint: scripts/a.mjs:3 no-unused-vars'])
         self.assertIn('scripts/a.mjs:3 no-unused-vars', result.details)
 
+    @unittest.skipUnless(shutil.which('npm'), 'needs npm')
+    async def test_a_candidates_install_scripts_never_run_as_the_graph(self):
+        with tempfile.TemporaryDirectory() as d:
+            repo, marker = Path(d, 'card'), Path(d, 'ran-as-the-graph')
+            repo.mkdir()
+            (repo / 'package.json').write_text(json.dumps({
+                'name': 'candidate', 'version': '1.0.0',
+                'scripts': {'preinstall': f'touch {marker}', 'install': f'touch {marker}', 'postinstall': f'touch {marker}'}}))
+            (repo / 'package-lock.json').write_text(json.dumps({
+                'name': 'candidate', 'version': '1.0.0', 'lockfileVersion': 3, 'requires': True,
+                'packages': {'': {'name': 'candidate', 'version': '1.0.0', 'hasInstallScript': True}}}))
+            (repo / '.gitignore').write_text('node_modules/\n')
+            sh(repo, 'git', 'init', '-q', '-b', 'main')
+            sh(repo, 'git', *workers.GIT_ID, 'add', '-A')
+            sh(repo, 'git', *workers.GIT_ID, 'commit', '-q', '-m', 'candidate')
+            run = CardRun(card='JUL-1', base='b', branch='main', worktree=str(repo), commit=sh(repo, 'git', 'rev-parse', 'HEAD'))
+            self.assertIsNone(await workers.clean_install(run))
+            self.assertFalse(marker.exists(), 'an install script from the candidate ran as the graph')
+
+    async def test_the_graph_stops_the_process_it_started_past_its_limit(self):
+        # Only the process the graph started (sudo, on the server): a grandchild it leaves is caught by
+        # live_workers and reported (test_a_reviewer_still_running_after_its_limit_is_named...).
+        with mock.patch.object(workers, 'sudo_command', return_value=[sys.executable, '-c', 'import time; time.sleep(30)']):
+            status, _, err = await workers.run_worker('reviewer', 'brief', limit_seconds=1)
+        self.assertEqual(status, workers.STOPPED_EXIT)
+        self.assertIn('1-second time limit', err)
+
+    async def test_the_reviewer_gets_its_brief_and_limit_from_the_root_folder(self):
+        seen = {}
+
+        async def run_worker(kind, request, on_line=None, cwd=None, choice=None, limit_seconds=None):
+            seen.update(kind=kind, request=request, cwd=cwd, limit=limit_seconds)
+            return 0, reply(verdict('approve')), ''
+        run = CardRun(card='JUL-1', base='b', branch='graph/card-1', worktree='/w')
+        with mock.patch.object(workers, 'run_worker', run_worker):
+            pair = workers.resolve_pair('builder-gemini-flash', 'adversary-codex')
+            result = await workers.reviewer(lambda line: None, pair)(run, 'the brief', 1200, None)
+        # the launcher enforces the limit; the graph's own, a minute later, is a backstop
+        self.assertEqual(seen, {'kind': 'reviewer', 'request': {'reviewer': 'codex', 'model': 'gpt-5.5', 'prompt': 'the brief', 'limit_seconds': 1200},
+                                'cwd': '/', 'limit': 1260})
+        self.assertEqual((result.verdict, result.model), ('approve', 'gpt-5.5'))
+
     async def test_worker_output_lines_reach_the_progress_callback(self):
         lines = []
 
@@ -898,11 +1642,14 @@ class LimitTest(unittest.TestCase):
         # review finding 5: the card never quotes a limit the launcher would not enforce
         self.assertEqual(checked_limit('builder', '20'), 20)
         self.assertEqual(checked_limit('tests', str(60 * 60)), 60 * 60)
+        self.assertEqual(checked_limit('reviewer', str(60 * 60)), 60 * 60)
         for bad in ('0', '-5', 'x', str(3 * 60 * 60 + 1)):
             with self.assertRaises(ValueError, msg=bad):
                 checked_limit('builder', bad)
         with self.assertRaises(ValueError):
             checked_limit('tests', str(60 * 60 + 1))
+        with self.assertRaises(ValueError):
+            checked_limit('reviewer', str(60 * 60 + 1))
 
 if __name__ == '__main__':
     unittest.main()

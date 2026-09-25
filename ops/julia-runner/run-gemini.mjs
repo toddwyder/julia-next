@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { LIMITS, limitSeconds, runLimited, STOPPED_EXIT, stoppedLine } from './time-limit.mjs';
 
 export const WORKTREES = '/srv/julia-runner/worktrees';
+export const GEMINI_MODEL = 'gemini-3.8-flash';
 
 export function worktreeProblem(path, { realpath = realpathSync } = {}) {
   if (typeof path !== 'string' || !/^\/srv\/julia-runner\/worktrees\/card-\d+$/.test(path)) {
@@ -47,7 +48,7 @@ export function allowListProblem(settingsText) {
 // outside it and any command stay refused (measured on the server, 24 Sep).
 // --print-timeout 0, as run-agy-seat passes: without it agy ends a headless
 // turn after five minutes (three live JUL-123 turns cut off at 5:02, 24 Sep).
-export const agyArgs = (prompt, worktree) => ['--add-dir', worktree, '--mode', 'accept-edits', '--print-timeout', '0', '--output-format', 'stream-json', '--disable-slash-commands', '--print', `Your working folder is ${worktree}.\n\n${prompt}`];
+export const agyArgs = (prompt, worktree, model = GEMINI_MODEL) => ['--add-dir', worktree, '--mode', 'accept-edits', '--model', model, '--effort', 'high', '--print-timeout', '0', '--output-format', 'stream-json', '--disable-slash-commands', '--print', `Your working folder is ${worktree}.\n\n${prompt}`];
 
 // agy writes new files 0644 and folders 0755 whatever the umask (live JUL-123
 // run, 24 Sep), so the runner could not commit, switch or clean them. After
@@ -74,18 +75,18 @@ function settingsProblem(home) {
 }
 
 function main() {
-  const { worktree, prompt, limit_seconds } = JSON.parse(readFileSync(0, 'utf8'));
+  const { worktree, prompt, limit_seconds, model = GEMINI_MODEL } = JSON.parse(readFileSync(0, 'utf8'));
   const home = homedir();
   const problem = worktreeProblem(worktree) ?? settingsProblem(home);
-  if (problem || typeof prompt !== 'string') {
-    console.error(problem ?? 'refused: no prompt');
+  if (problem || typeof prompt !== 'string' || model !== GEMINI_MODEL) {
+    console.error(problem ?? (model !== GEMINI_MODEL ? `refused: Gemini model ${model} is not installed` : 'refused: no prompt'));
     process.exit(2);
   }
   // New files stay writable by the worktree group, so the runner can commit
   // them and switch commits afterwards.
   process.umask(0o002);
   const seconds = limitSeconds(limit_seconds, LIMITS.builder);
-  runLimited(join(home, '.local', 'bin', 'agy'), agyArgs(prompt, worktree), {
+  runLimited(join(home, '.local', 'bin', 'agy'), agyArgs(prompt, worktree, model), {
     cwd: worktree,
     env: { HOME: home, USER: 'gemini-worker', PATH: `${home}/.local/bin:/usr/bin:/bin`, LANG: 'C.UTF-8' },
     stdio: ['ignore', 'inherit', 'inherit'],

@@ -9,6 +9,9 @@ and a PR. On the OVH server its jobs run in separate accounts (Todd, 24 Sep):
 | Gemini: edits files, runs no command | `gemini-worker` | its own agy sign-in; no groups, no service keys |
 | Test worker: lint, suite, seam tests; no model | `julia-tester` | nothing |
 | DeepSeek review | `runner` | the Command Code key (as today) |
+| The graph's Codex builder, through `run-codex-builder.mjs` | `runner` | Codex's ChatGPT sign-in |
+| The graph's reviewer (JUL-128): Codex or DeepSeek | `runner` | Codex's ChatGPT sign-in, or the Command Code key |
+| The graph's Gemini reviewer | `gemini-worker` | its own agy sign-in |
 | Publisher: push and open the PR | `orchestrator-svc` | the GitHub App (as today) |
 
 The runner starts each worker only through `sudoers` in this folder: one fixed command per
@@ -31,7 +34,7 @@ Git, a PR or Linear.
    sudo useradd --system --create-home --shell /usr/sbin/nologin gemini-worker
    sudo useradd --system --create-home --shell /usr/sbin/nologin julia-tester
    sudo groupadd julia-runner-work
-   for u in orchestrator-svc gemini-worker julia-tester; do sudo usermod -aG julia-runner-work "$u"; done
+   for u in orchestrator-svc gemini-worker julia-tester runner; do sudo usermod -aG julia-runner-work "$u"; done
    ```
 2. Folders. `/srv/julia-runner` belongs to `orchestrator-svc`; worktrees are group-shared:
    ```
@@ -50,13 +53,18 @@ Git, a PR or Linear.
 4. The worker code, root-owned, mirroring the repo layout, copied from a checkout of the
    reviewed commit:
    ```
-   for f in ops/julia-runner/run-gemini.mjs ops/julia-runner/run-tests.mjs ops/julia-runner/time-limit.mjs \
+   for f in ops/julia-runner/run-gemini.mjs ops/julia-runner/run-tests.mjs ops/julia-runner/time-limit.mjs ops/julia-runner/run-reviewer.mjs ops/julia-runner/run-codex-builder.mjs ops/julia-runner/reap.py \
             scripts/julia-minimal-runner-checks.mjs ops/service-dropbox/run-pi-seat.mjs ops/service-dropbox/read-secret.mjs; do
      sudo install -D -o root -g root -m 0644 "$CHECKOUT/$f" "/opt/julia-runner/$f"
    done
    sudo install -o root -g root -m 0440 "$CHECKOUT/ops/julia-runner/sudoers" /etc/sudoers.d/julia-runner
    sudo visudo -c
+   sudo loginctl enable-linger runner   # the graph's reviewer runs each review in its own systemd user scope
+   sudo loginctl enable-linger gemini-worker   # Gemini review uses a read-only transient user service
    ```
+   Without the selected account's user manager the reviewer launcher refuses to start a review.
+   Gemini's transient service makes `/srv/julia-runner` inaccessible and permits writes only in
+   `gemini-worker`'s home for its CLI session. Disable linger for either account to undo it.
 5. Gemini for `gemini-worker`: the agy binary in `~gemini-worker/.local/bin/agy`, an agy
    `settings.json` whose `permissions.allow` is empty, and **Todd's one-time sign-in** in that
    account.

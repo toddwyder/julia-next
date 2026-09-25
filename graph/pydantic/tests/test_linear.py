@@ -21,6 +21,7 @@ class PretendLinearServer:
         self.tokens = 0
         self.valid: set[str] = set()
         self.pages: list[dict] = []
+        self.comment_ids: set[str] = set()  # as Linear: a comment id is never taken twice
 
     def post(self, url, data, headers):
         if url == linear.TOKEN_URL:
@@ -30,8 +31,19 @@ class PretendLinearServer:
             return {'access_token': token}
         if headers['Authorization'].split()[-1] not in self.valid:
             raise refused(url)
-        if 'query Ready' in json.loads(data)['query']:
+        request = json.loads(data)
+        if 'query Ready' in request['query']:
             return {'data': {'issues': self.pages.pop(0)}}
+        if 'query Card' in request['query']:
+            return {'data': {'issue': {'id': 'uuid-1', 'identifier': 'JUL-1', 'title': 'T', 'description': '',
+                                       'comments': {'nodes': []}}}}
+        if 'commentCreate' in request['query']:
+            chosen = request['variables'].get('id')
+            if chosen in self.comment_ids:  # Linear's own reply, seen live on JUL-150 (25 Sep)
+                return {'data': None, 'errors': [{'message': 'conflict on insert of Comment',
+                                                  'extensions': {'code': 'INPUT_ERROR', 'type': 'invalid input'}}]}
+            self.comment_ids.add(chosen)
+            return {'data': {'commentCreate': {'success': True, 'comment': {'id': chosen or 'generated'}}}}
         return {'data': {'ok': True}}
 
 
@@ -82,6 +94,14 @@ class LinearAppTest(unittest.TestCase):
         with mock.patch.object(linear, '_post', always_refused):
             with self.assertRaises(urllib.error.HTTPError):
                 self.app._call('query Q { ok }', {})
+
+    def test_a_comment_with_an_id_linear_already_has_is_already_posted(self):
+        self.assertEqual(asyncio.run(self.app.comment('JUL-1', 'hello', '6f1c0e5a-1b2c-4d3e-8f40-0a1b2c3d4e5f')),
+                         '6f1c0e5a-1b2c-4d3e-8f40-0a1b2c3d4e5f')
+        with self.assertRaises(linear.AlreadyPosted):
+            asyncio.run(self.app.comment('JUL-1', 'hello', '6f1c0e5a-1b2c-4d3e-8f40-0a1b2c3d4e5f'))
+        # without an id, any refusal is still an error, never "already posted"
+        self.assertEqual(asyncio.run(self.app.comment('JUL-1', 'no id')), 'generated')
 
     def test_ready_cards_walks_every_page(self):
         self.server.pages = [{'nodes': [card(1)], 'pageInfo': {'hasNextPage': True, 'endCursor': 'a'}},
