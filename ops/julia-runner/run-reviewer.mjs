@@ -38,8 +38,12 @@ export const CODEX_MODEL = 'gpt-5.5';
 // The reviewer's subreaper (see above), beside this file.
 export const REAPER = join(dirname(fileURLToPath(import.meta.url)), 'reap.py');
 export const PYTHON = '/usr/bin/python3';
-// The launcher's own stop: SIGTERM first, so reap.py can sweep, then SIGKILL.
-export const STOP_GRACE_MS = 8_000;
+// How long reap.py is given, after SIGTERM, to sweep everything below it before
+// its group is killed: at the time limit (runLimited's grace) and when the
+// graph stops the launcher. It must outlast reap.py's own GRACE_SECONDS +
+// KILL_SECONDS (3 + 5 s) with room to spare, or a SIGKILL could cut the sweep
+// short (scripts/julia-runner-reviewer.test.mjs checks the two files agree).
+export const STOP_GRACE_MS = 15_000;
 // sudo resets PATH to its root-owned secure_path; nothing else of the caller's environment passes.
 const ENV = { HOME: homedir(), PATH: process.env.PATH || '/usr/bin:/bin', LANG: 'C.UTF-8' };
 
@@ -151,6 +155,7 @@ export async function review(request, { run = runLimited, model = codexModel, on
   const options = { cwd: '/', env: spec.env, stdio: [spec.stdin ? 'pipe' : 'ignore', 'pipe', 'pipe'] };
   const result = await run(PYTHON, [REAPER, '--', spec.command, ...spec.args], options, {
     seconds,
+    graceMs: STOP_GRACE_MS,
     started: (child) => {
       child.stdout.on('data', (chunk) => { stdout += chunk; onOutput(); });
       child.stderr.on('data', (chunk) => { stderr += chunk; });

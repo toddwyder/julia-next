@@ -7,9 +7,21 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { codexModel, codexReply, piReply, PYTHON, REAPER, REVIEWERS, review } from '../ops/julia-runner/run-reviewer.mjs';
+import { codexModel, codexReply, piReply, PYTHON, REAPER, REVIEWERS, review, STOP_GRACE_MS } from '../ops/julia-runner/run-reviewer.mjs';
 
 const LAUNCHER = fileURLToPath(new URL('../ops/julia-runner/run-reviewer.mjs', import.meta.url));
+
+test('the reaper always has time to finish its sweep before anything kills it', async () => {
+  const reap = readFileSync(REAPER, 'utf8');
+  const seconds = (name) => Number(new RegExp(`^${name} = (\\d+)$`, 'm').exec(reap)?.[1]);
+  const sweep = seconds('GRACE_SECONDS') + seconds('KILL_SECONDS');
+  assert.ok(sweep > 0, 'read reap.py\'s sweep time');
+  assert.ok(STOP_GRACE_MS >= (sweep + 5) * 1000, `the launcher waits ${STOP_GRACE_MS} ms; reap.py may sweep for ${sweep} s`);
+  // the same grace at the time limit, where runLimited sends the group SIGKILL
+  let grace;
+  await review({ reviewer: 'codex', prompt: 'p' }, { run: async (c, a, o, limits) => { grace = limits.graceMs; return { stopped: true }; } });
+  assert.equal(grace, STOP_GRACE_MS);
+});
 const PI_FIXTURE = fileURLToPath(new URL('../graph/fixtures/orca-1.4.205/cost.pi.seat-json-stream.multi-turn.jsonl', import.meta.url));
 const lines = (...events) => events.map((e) => JSON.stringify(e)).join('\n');
 
