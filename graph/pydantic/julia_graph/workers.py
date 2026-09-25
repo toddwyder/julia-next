@@ -414,6 +414,15 @@ def npm_ci(worktree: str) -> str | None:
     return None if done.returncode == 0 else f'npm ci failed (exit {done.returncode}): {done.stderr.strip()[-300:]}'
 
 
+async def clean_install(run: CardRun, install=npm_ci) -> str | None:
+    """The candidate exactly, before its tests: the working copy put back to
+    the commit with nothing else left, the dependencies included, and those
+    installed again from the committed lock file. Whatever the builder did to
+    the ignored files (node_modules above all) cannot reach the tests."""
+    await restore(run, run.commit, keep_dependencies=False)
+    return install(run.worktree) if Path(run.worktree, 'package-lock.json').exists() else None
+
+
 def prepare(repo: str, install=npm_ci):
     """Only runs while the saved step is 'prepare', so an existing working copy
     is one a killed run left before any build: it must be this card's branch,

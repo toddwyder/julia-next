@@ -168,8 +168,20 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
             worker_makers={'builder': 'Google', 'reviewer': 'DeepSeek'},
             limits={'builder': 3600, 'tests': 900, 'reviewer': 1200},
             snapshot=workers.snapshot, restore=workers.restore, drift=workers.drift, diff=workers.change,
+            install=self.install,
             base_file=lambda run, path: ROLE if path == '.agents/skills/julia-reviewer/SKILL.md' else '',
         )
+
+    async def install(self, run):
+        """As workers.clean_install: the commit exactly, then a pretend install."""
+        await workers.restore(run, run.commit, keep_dependencies=False)
+        ignore = Path(run.worktree) / '.gitignore'
+        if ignore.exists() and 'node_modules/' in ignore.read_text():  # a repo with dependencies, as julia-next
+            dep = Path(run.worktree) / 'node_modules' / 'dep'
+            dep.mkdir(parents=True, exist_ok=True)
+            (dep / 'index.js').write_text('installed')
+        self.installs = getattr(self, 'installs', 0) + 1
+        return None
 
     def saved(self):
         return Checkpoint(self.state_dir, 'JUL-1').load()
@@ -924,13 +936,6 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         sh(self.repo, 'git', *workers.GIT_ID, 'commit', '-q', '-m', 'ignore')
         self.base = sh(self.repo, 'git', 'rev-parse', 'HEAD')
 
-        async def install_then_build(run, brief, *_):
-            self.builder_calls += 1
-            (Path(run.worktree) / 'node_modules' / 'dep').mkdir(parents=True, exist_ok=True)
-            (Path(run.worktree) / 'node_modules' / 'dep' / 'index.js').write_text('installed')
-            (Path(run.worktree) / 'hello.txt').write_text('hello 1\n')
-            return BuildResult(True, report='built')
-
         async def edits_a_dependency(run):
             # same size as 'installed', and the modification time set back afterwards:
             # only the change time, which no process can set back, gives it away
@@ -939,25 +944,70 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
             dep.write_text('INSTALLED')
             os.utime(dep, ns=(was.st_atime_ns, was.st_mtime_ns))
             return self.APPROVE
-        outcome = await run_card(self.state(), self.deps(builder=install_then_build, reviewer=self.reviewer_says(edits_a_dependency)))
+        outcome = await run_card(self.state(), self.deps(reviewer=self.reviewer_says(edits_a_dependency)))
         self.assertEqual(outcome, 'failed')
         [void] = [c for c in self.linear.comments if 'graph: review-voided' in c]
         self.assertIn('without its installed dependencies', void)
         self.assertFalse((self.worktree / 'node_modules').exists())  # the changed dependencies are gone
 
     async def test_a_review_keeps_the_installed_dependencies_when_nothing_changed(self):
-        async def install_then_build(run, brief, *_):
-            self.builder_calls += 1
-            (Path(run.worktree) / 'node_modules').mkdir(exist_ok=True)
-            (Path(run.worktree) / 'node_modules' / 'dep.js').write_text('installed')
-            (Path(run.worktree) / 'hello.txt').write_text('hello 1\n')
-            return BuildResult(True, report='built')
         (self.repo / '.gitignore').write_text('node_modules/\n')
         sh(self.repo, 'git', *workers.GIT_ID, 'add', '-A')
         sh(self.repo, 'git', *workers.GIT_ID, 'commit', '-q', '-m', 'ignore')
         self.base = sh(self.repo, 'git', 'rev-parse', 'HEAD')
-        self.assertEqual(await run_card(self.state(), self.deps(builder=install_then_build)), 'passed')
-        self.assertTrue((self.worktree / 'node_modules' / 'dep.js').exists())
+        self.assertEqual(await run_card(self.state(), self.deps()), 'passed')
+        self.assertEqual((self.worktree / 'node_modules' / 'dep' / 'index.js').read_text(), 'installed')
+
+    async def test_the_tests_run_on_the_commit_not_on_what_the_builder_left_in_ignored_files(self):
+        (self.repo / '.gitignore').write_text('node_modules/\n')
+        sh(self.repo, 'git', *workers.GIT_ID, 'add', '-A')
+        sh(self.repo, 'git', *workers.GIT_ID, 'commit', '-q', '-m', 'ignore')
+        self.base = sh(self.repo, 'git', 'rev-parse', 'HEAD')
+
+        async def patches_a_dependency(run, brief, *_):
+            self.builder_calls += 1
+            (Path(run.worktree) / 'hello.txt').write_text('hello 1\n')
+            (Path(run.worktree) / 'node_modules' / 'dep').mkdir(parents=True, exist_ok=True)
+            (Path(run.worktree) / 'node_modules' / 'dep' / 'index.js').write_text('patched so the tests pass')
+            (Path(run.worktree) / 'scratch.log').write_text('left behind')  # untracked but, say, ignored elsewhere
+            return BuildResult(True, report='built')
+        seen = []
+
+        async def tester(run, *_):
+            seen.append((Path(run.worktree) / 'node_modules' / 'dep' / 'index.js').read_text())
+            return TestResult(passed=True, summary='tests 3, pass 3, fail 0')
+        self.assertEqual(await run_card(self.state(), self.deps(builder=patches_a_dependency, tester=tester)), 'passed')
+        self.assertEqual(seen, ['installed'])  # a clean install, not the builder's patch
+
+    async def test_dependencies_that_cannot_be_installed_stop_the_card_before_its_tests(self):
+        async def refuses(run):
+            return 'npm ci failed (exit 1): lock file out of date'
+        deps = self.deps()
+        deps.install = refuses
+        self.assertEqual(await run_card(self.state(), deps), 'failed')
+        self.assertEqual(self.tester_calls, 0)
+        self.assertIn("dependencies could not be installed for its tests: npm ci failed", self.results()[0])
+
+    async def test_5_a_change_made_by_a_reviewer_the_graph_died_during_voids_that_review(self):
+        async def edits_then_graph_dies(run):
+            (Path(run.worktree) / 'hello.txt').write_text('reviewer was here\n')
+            raise Crash()  # the graph dies while the reviewer runs
+        with self.assertRaises(Crash):
+            await run_card(self.state(), self.deps(reviewer=self.reviewer_says(edits_then_graph_dies)))
+        self.assertIsNotNone(self.saved().review_before)
+        self.assertEqual(await run_card(self.state(), self.deps(reviewer=self.reviewer_says(self.APPROVE))), 'failed')
+        self.assertEqual(self.reviewer_calls, 1)  # no second review over a changed working copy
+        [void] = [c for c in self.linear.comments if 'graph: review-voided' in c]
+        self.assertIn('interrupted', void)
+        self.assertEqual((Path(self.worktree) / 'hello.txt').read_text(), 'hello 1\n')
+
+    async def test_an_interrupted_review_with_nothing_changed_is_simply_run_again(self):
+        async def graph_dies(run):
+            raise Crash()
+        with self.assertRaises(Crash):
+            await run_card(self.state(), self.deps(reviewer=self.reviewer_says(graph_dies)))
+        self.assertEqual(await run_card(self.state(), self.deps(reviewer=self.reviewer_says(self.APPROVE))), 'passed')
+        self.assertIsNone(self.saved().review_before)
 
     async def test_5_a_crash_right_after_a_tamper_is_seen_still_voids_it_and_never_reviews_again(self):
         async def edits(run):

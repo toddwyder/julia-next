@@ -99,6 +99,10 @@ class CardRun(BaseModel):
     fixing: Literal['tests', 'review'] | None = None
     # Set when a stopped card needs Todd: one of graph.TODD_REASONS.
     needs_todd: str | None = None
+    # The working copy as a review found it (HEAD, status with the dependency
+    # fingerprint), saved before the reviewer starts and cleared with its
+    # outcome: a restart that finds it set knows a review was interrupted.
+    review_before: list[str] | None = None
     failure: str | None = None
     # The card's one "Where this card is" comment (JUL-126).
     status_id: str | None = None

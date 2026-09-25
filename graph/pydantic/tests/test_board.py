@@ -146,6 +146,7 @@ class BoardTest(unittest.IsolatedAsyncioTestCase):
             builder=builder, discard=workers.discard, commit=workers.commit, tester=tester,
             reviewer=approving_reviewer, live_workers=lambda kind: self.alive[kind], wait_for_exit=wait_for_exit,
             snapshot=workers.snapshot, restore=workers.restore, drift=workers.drift, diff=workers.change,
+            install=lambda run: workers.clean_install(run, install=lambda wt: None),
             base_file=lambda run, path: 'role',
             worker_makers={'builder': 'Google', 'reviewer': 'DeepSeek'},
             graph_version='pydantic-graph test', log=lambda line: None, now=self.clock,

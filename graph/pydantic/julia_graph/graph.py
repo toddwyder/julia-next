@@ -130,6 +130,10 @@ class Deps:
     restore: Callable[[CardRun, str, bool], Awaitable[None]]
     # How the working copy differs from a commit, or '' (workers.drift).
     drift: Callable[[CardRun, str], str]
+    # The candidate exactly, before each test run: the working copy put back to
+    # the commit, nothing ignored kept, dependencies installed again. Returns a
+    # refusal reason or None (workers.clean_install).
+    install: Callable[[CardRun], Awaitable[str | None]]
     # The change under review (the diff from the base) and a file as it was at
     # the base commit (the reviewer's role file), both read from git.
     diff: Callable[[CardRun], str]
@@ -564,6 +568,15 @@ class Test(BaseNode[CardRun, Deps, str]):
     async def run(self, ctx: GraphRunContext[CardRun, Deps]) -> Build | Review | Report:
         s = ctx.state
         await step(ctx, 'Running the tests', 'Ran the tests', 'tests')
+        # The tests run on the commit and nothing else: a builder's change to an
+        # ignored file (an installed dependency) is gone before they start.
+        try:
+            refused = await ctx.deps.install(s)
+        except Exception as error:
+            refused = f'{type(error).__name__}: {error}'
+        if refused:
+            close(ctx, 'could not install')
+            return fail(ctx, f"the candidate's dependencies could not be installed for its tests: {refused}")
         try:
             s.tests = await ctx.deps.tester(s, ctx.deps.limits['tests'], lambda: moved(ctx))
         except Exception as error:  # reported once, not retried on every restart
@@ -742,6 +755,19 @@ class Review(BaseNode[CardRun, Deps, str]):
             close(ctx, 'too big')
             return fail(ctx, f'the review would be {size} bytes, over the {MAX_REVIEW_BYTES}-byte limit for one review, '
                              'so it was not started; the card needs splitting')
+        if s.review_before is not None:
+            # A review was interrupted (the graph died while the reviewer ran).
+            # If the working copy changed since it started, that review is void.
+            if (now := list(ctx.deps.snapshot(s))) != s.review_before:
+                changed = ', '.join(x for x in (
+                    f'the commit moved from `{s.review_before[0][:12]}` to `{now[0][:12]}`' if now[0] != s.review_before[0] else '',
+                    'files in the working copy changed' if now[1] != s.review_before[1] else '') if x)
+                s.review = ReviewResult(voided=True, reviewer=f'{who}, from {maker}', round=round_,
+                                        reason=f'{changed}; the review was interrupted before it finished')
+                s.review_before = None
+                return await failed_review(ctx, 'voided', 'the review was voided because the working copy changed during an '
+                                                          f'interrupted review ({changed})')
+            s.review_before = None  # unchanged: review again from the start
         # The review starts from exactly the candidate. Anything else (a crash
         # left it changed) is put back first, and the card says so when it
         # was more than a test run's ignored leftovers.
@@ -751,12 +777,15 @@ class Review(BaseNode[CardRun, Deps, str]):
                            marker('review-drift', s, commit=s.commit, round=round_))
         await ctx.deps.restore(s, s.commit)
         before = ctx.deps.snapshot(s)
+        s.review_before = list(before)
+        save(ctx)  # before the reviewer starts, so a restart sees a review was under way
         try:
             review = await ctx.deps.reviewer(s, brief, ctx.deps.limits['reviewer'], lambda: moved(ctx))
         except Exception as error:  # a reviewer that cannot even run never approves
             review = ReviewResult(reason=f'the reviewer could not run: {type(error).__name__}: {error}')
         review = review.model_copy(update={'reviewer': f'{who}, from {maker}', 'round': round_})
         after = ctx.deps.snapshot(s)
+        s.review_before = None  # saved with the outcome, whichever it is
         # Every outcome is saved before anything is posted; post_review (here,
         # or in Build or Report after a restart) posts it, once.
         if after != before:
