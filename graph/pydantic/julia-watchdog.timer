@@ -1,0 +1,11 @@
+[Unit]
+Description=Check Julia graph and cards every minute
+
+[Timer]
+OnBootSec=1min
+OnUnitInactiveSec=1min
+AccuracySec=10s
+Unit=julia-watchdog.service
+
+[Install]
+WantedBy=timers.target

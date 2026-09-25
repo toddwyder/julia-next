@@ -77,6 +77,25 @@ Only one graph may check the board: while the service runs, a hand run of `serve
 "another graph is already checking the board". A hand run of a single card (above) still works
 alongside it. Its builder is covered by the graph's machine-wide no-second-worker check.
 
+### The separate watchdog (JUL-129)
+
+The watchdog reads the existing status comment and the board's `why_not` eligibility rule.
+Each alert carries an incident marker in Linear; it posts the comment before assigning Todd,
+so an assignment failure can be retried without a second comment. A new step movement or a
+new systemd graph outage gets a new marker. It never reads UAT cards.
+
+Install the two units from the same reviewed checkout. The timer starts a separate oneshot
+service about once a minute; neither unit depends on `julia-graph.service`.
+
+```
+sudo install -o root -g root -m 0644 /srv/julia-runner/graph-code/graph/pydantic/julia-watchdog.service /etc/systemd/system/julia-watchdog.service
+sudo install -o root -g root -m 0644 /srv/julia-runner/graph-code/graph/pydantic/julia-watchdog.timer /etc/systemd/system/julia-watchdog.timer
+sudo systemctl daemon-reload
+sudo systemctl enable --now julia-watchdog.timer
+systemctl status julia-watchdog.timer
+journalctl -u julia-watchdog.service --no-pager
+```
+
 ## Tests
 
 `python -m unittest` in this folder (Linux: the card lock uses `fcntl`). The workers are
