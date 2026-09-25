@@ -21,7 +21,8 @@ from pathlib import Path
 
 from julia_graph import workers
 from julia_graph.checkpoint import CardLocked, CardRun, Checkpoint, ReviewResult, TestResult
-from julia_graph.graph import MAX_REVIEW_BYTES, BuildResult, Deps, checked_limit, run_card
+from julia_graph.graph import MAX_REVIEW_BYTES, BuildResult, Deps, checked_limit, comment_id, run_card
+from julia_graph.linear import AlreadyPosted
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 ROLE = 'ROLE FILE: attack the candidate against every acceptance criterion.'
@@ -64,6 +65,7 @@ class FakeLinear:
         # comment list for this many reads after it is posted.
         self.lag = lag
         self.hidden: dict[str, int] = {}  # comment id -> reads it stays hidden
+        self.ids: set[str] = set()  # ids the poster chose: Linear refuses a second comment with one
 
     @property
     def comments(self) -> list[str]:
@@ -75,7 +77,11 @@ class FakeLinear:
         return {'identifier': card, 'title': 'Add a greeting', 'description': '## Acceptance criteria\n\n- [ ] say hello\n',
                 'comments': shown}
 
-    async def comment(self, card, body):
+    async def comment(self, card, body, chosen_id=None):
+        if chosen_id is not None:
+            if chosen_id in self.ids:
+                raise AlreadyPosted(chosen_id)  # as Linear: 'conflict on insert of Comment'
+            self.ids.add(chosen_id)
         comment_id = f'c{len(self.store) + 1}'
         self.store[comment_id] = body
         if self.lag:
@@ -175,14 +181,11 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
             worker_names={'builder': 'Gemini (agy)', 'tests': 'the test runner (no AI model)',
                           'reviewer': 'DeepSeek V4 Pro (Pi)'},
             worker_makers={'builder': 'Google', 'reviewer': 'DeepSeek'},
-            limits={'builder': 3600, 'tests': 900, 'reviewer': 1200}, pause=self.no_pause,
+            limits={'builder': 3600, 'tests': 900, 'reviewer': 1200},
             snapshot=workers.snapshot, restore=workers.restore, drift=workers.drift, diff=workers.change,
             install=self.install,
             base_file=lambda run, path: ROLE if path == '.agents/skills/julia-reviewer/SKILL.md' else '',
         )
-
-    async def no_pause(self, seconds):
-        self.paused = getattr(self, 'paused', 0) + seconds
 
     async def install(self, run):
         """As workers.clean_install: the commit exactly, then a pretend install."""
@@ -1101,18 +1104,26 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         deps = self.deps(reviewer=self.reviewer_says(self.APPROVE))
         real = deps.linear.comment
 
-        async def takes_it_then_dies(card, body):
-            await real(card, body)
+        async def takes_it_then_dies(card, body, chosen_id=None):
+            await real(card, body, chosen_id)
             if 'graph: review-verdict' in body:
-                self.linear.hidden[list(self.linear.store)[-1]] = 2  # listed only from the third read
+                self.linear.hidden[list(self.linear.store)[-1]] = 10 ** 6  # and Linear does not list it for a long time
                 raise Crash()
         deps.linear.comment = takes_it_then_dies
         with self.assertRaises(Crash):
             await run_card(self.state(), deps)
-        self.assertIn('graph: review-verdict', self.saved().posting)
+        self.assertFalse(any('graph: review-verdict' in line for line in self.saved().posted))
         deps.linear.comment = real
         self.assertEqual(await run_card(self.state(), self.deps(reviewer=self.reviewer_says(self.APPROVE))), 'passed')
         self.assertEqual(len(self.verdicts()), 1)
+
+    async def test_a_comments_id_is_the_same_every_time_and_shaped_as_linear_asks(self):
+        line = 'graph: result card=JUL-1 base=abc commit=def outcome=passed'
+        cid = comment_id('JUL-1', line)
+        self.assertEqual(cid, comment_id('JUL-1', line))
+        self.assertNotEqual(cid, comment_id('JUL-2', line))
+        self.assertNotEqual(cid, comment_id('JUL-1', line.replace('passed', 'failed')))
+        self.assertRegex(cid, r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')
 
     async def test_a_reviewer_still_running_after_its_limit_is_named_and_no_new_review_starts(self):
         # The seat's Pi child can outlive the seat, and the graph cannot signal runner's processes:
@@ -1130,10 +1141,10 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         deps = self.deps(reviewer=self.reviewer_says(self.findings('F1: x'), self.APPROVE))
         real = deps.linear.comment
 
-        async def dies_on_verdict(card, body):
+        async def dies_on_verdict(card, body, chosen_id=None):
             if 'graph: review-verdict' in body:
                 raise Crash()
-            return await real(card, body)
+            return await real(card, body, chosen_id)
         deps.linear.comment = dies_on_verdict
         with self.assertRaises(Crash):
             await run_card(self.state(), deps)

@@ -57,7 +57,10 @@ Git, a PR or Linear.
    done
    sudo install -o root -g root -m 0440 "$CHECKOUT/ops/julia-runner/sudoers" /etc/sudoers.d/julia-runner
    sudo visudo -c
+   sudo loginctl enable-linger runner   # the graph's reviewer runs each review in its own systemd user scope
    ```
+   Without `runner`'s user manager the reviewer launcher refuses to start a review. To undo:
+   `sudo loginctl disable-linger runner`.
 5. Gemini for `gemini-worker`: the agy binary in `~gemini-worker/.local/bin/agy`, an agy
    `settings.json` whose `permissions.allow` is empty, and **Todd's one-time sign-in** in that
    account.

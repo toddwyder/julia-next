@@ -16,16 +16,18 @@
 // final message), not what was asked for. A run whose model cannot be
 // confirmed is 'failed': it never counts as a review.
 //
-// The reviewer runs under reap.py, in its own process group, under its time
-// limit (time-limit.mjs runLimited). reap.py is the reviewer's child
-// subreaper: anything the reviewer starts stays below it, even a process that
-// left the group (setsid) or double-forked, and when the reviewer ends, hits
-// its limit, or the graph stops this launcher (SIGTERM, passed on by sudo),
-// reap.py stops all of it. A stopped reviewer exits STOPPED_EXIT (124) and
-// says so on stderr. runner also hosts Orca's server, so nothing is swept by
-// account.
+// The reviewer runs in its own systemd user scope, under reap.py, in its own
+// process group, under its time limit (time-limit.mjs runLimited). reap.py is
+// the reviewer's child subreaper: anything the reviewer starts stays below it,
+// even a process that left the group (setsid) or double-forked, and when the
+// reviewer ends, hits its limit, or the graph stops this launcher (SIGTERM,
+// passed on by sudo), reap.py stops all of it. Then the scope is killed, which
+// stops anything left in its cgroup however it got there. A stopped reviewer
+// exits STOPPED_EXIT (124) and says so on stderr. runner also hosts Orca's
+// server, so nothing is swept by account.
 import { randomUUID } from 'node:crypto';
-import { readdirSync, readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -140,49 +142,54 @@ export function piReply(stdout) {
   return { ok: true, text, model };
 }
 
-// Each review run's processes carry this in their environment, with the run's
-// own id: every child inherits it, even one that left the process group, so
-// the launcher can find all of them as long as they run as runner.
-export const RUN_MARK = 'JULIA_REVIEW_RUN';
+// Each review runs in its own systemd user scope (a cgroup): nothing its
+// processes start can leave it, whether by setsid, a double fork or a scrubbed
+// environment, and killing the scope kills all of it. This needs the account's
+// systemd user manager (`loginctl enable-linger runner`); without one no review
+// is started, since it could not be contained.
+export const SCOPE_PREFIX = 'julia-review-';
 
-// This account's processes that carry this run's mark (their environment is
-// readable only by the account itself and root).
-export function marked(mark, { proc = '/proc', read = readFileSync, list = readdirSync, self = process.pid } = {}) {
-  const found = [];
-  let names;
-  try {
-    names = list(proc);
-  } catch {
-    return found; // no /proc (not Linux): nothing to find
-  }
-  for (const name of names) {
-    if (!/^\d+$/.test(name) || Number(name) === self) continue;
-    try {
-      if (read(`${proc}/${name}/environ`).toString('latin1').split('\0').includes(`${RUN_MARK}=${mark}`)) found.push(Number(name));
-    } catch { /* gone, or not ours */ }
-  }
-  return found;
+// The environment that reaches the account's user manager, or null when it has none.
+export function userManager({ uid = process.getuid?.(), exists = existsSync } = {}) {
+  if (uid === undefined) return null;
+  const dir = `/run/user/${uid}`;
+  return exists(`${dir}/systemd/private`) ? { XDG_RUNTIME_DIR: dir } : null;
 }
 
-// Kill every process still carrying the mark, pass after pass, so one that
-// forks meanwhile is caught too. Returns what is left (nothing, normally).
-export async function sweepMarked(mark, { find = marked, kill = process.kill.bind(process), passes = 20, pause = 50 } = {}) {
+// Kill everything in the scope, pass after pass, until its cgroup is empty or
+// gone. Returns the processes still in it (nothing, normally).
+export async function stopScope(unit, { env, run = spawnSync, read = readFileSync, passes = 20, pause = 100 } = {}) {
+  const systemctl = (...args) => run('systemctl', ['--user', ...args], { env, encoding: 'utf8' });
+  let left = [];
   for (let pass = 0; pass < passes; pass += 1) {
-    const left = find(mark);
+    const cgroup = String(systemctl('show', '-p', 'ControlGroup', '--value', unit).stdout ?? '').trim();
+    if (!cgroup) return []; // the scope is gone: nothing of it runs
+    try {
+      left = read(`/sys/fs/cgroup${cgroup}/cgroup.procs`, 'utf8').split('\n').filter(Boolean).map(Number);
+    } catch {
+      return []; // its cgroup is gone
+    }
     if (left.length === 0) return [];
-    for (const pid of left) { try { kill(pid, 'SIGKILL'); } catch { /* gone */ } }
+    systemctl('kill', '--signal=SIGKILL', unit);
     await new Promise((done) => setTimeout(done, pause));
   }
-  return find(mark);
+  return left;
 }
+
+export const CONTAIN = { manager: userManager, stop: stopScope };
 
 export async function review(request, {
   run = runLimited, model = codexModel, onOutput = () => {}, reviewers = REVIEWERS, kill = process.kill.bind(process),
-  sweep = sweepMarked,
+  contain = CONTAIN,
 } = {}) {
   const which = request?.reviewer;
   if (!Object.hasOwn(reviewers, which)) return { status: 'failed', error: `refused: unknown reviewer ${JSON.stringify(which)}` };
   if (typeof request.prompt !== 'string' || !request.prompt.trim()) return { status: 'failed', error: 'refused: no prompt' };
+  const manager = contain.manager();
+  if (!manager) {
+    return { status: 'failed', error: "refused: the reviewer's account has no systemd user manager (loginctl enable-linger), "
+      + 'so a review could not be contained, and none was started' };
+  }
   const seconds = limitSeconds(request.limit_seconds, LIMIT);
   let spec;
   try {
@@ -192,9 +199,11 @@ export async function review(request, {
   }
   let stdout = '';
   let stderr = '';
-  const mark = randomUUID();
-  const options = { cwd: '/', env: { ...spec.env, [RUN_MARK]: mark }, stdio: [spec.stdin ? 'pipe' : 'ignore', 'pipe', 'pipe'] };
-  const result = await run(PYTHON, [REAPER, '--', spec.command, ...spec.args], options, {
+  const unit = `${SCOPE_PREFIX}${randomUUID()}.scope`;
+  const stop = () => contain.stop(unit, { env: { ...process.env, ...manager } });
+  const options = { cwd: '/', env: { ...spec.env, ...manager }, stdio: [spec.stdin ? 'pipe' : 'ignore', 'pipe', 'pipe'] };
+  const command = ['--user', '--scope', '--quiet', '--collect', `--unit=${unit}`, '--', PYTHON, REAPER, '--', spec.command, ...spec.args];
+  const result = await run('systemd-run', command, options, {
     seconds,
     graceMs: STOP_GRACE_MS,
     started: (child) => {
@@ -202,18 +211,17 @@ export async function review(request, {
       child.stderr.on('data', (chunk) => { stderr += chunk; });
       // reap.py killed outright (only root or the kernel's out-of-memory killer
       // can: it sweeps before any exit of its own) cannot sweep: stop the rest
-      // of its group at once, and then everything carrying this run's mark,
-      // which also finds a process that had left the group.
+      // of its group, and then its whole scope, at once.
       child.on('exit', (code, signal) => {
         if (!signal) return;
         try { kill(-child.pid, 'SIGKILL'); } catch { /* the group is gone */ }
-        sweep(mark);
+        stop();
       });
       if (spec.stdin) child.stdin.end(request.prompt);
     },
   });
-  // However the reviewer ended, nothing of this run is left running.
-  const left = await sweep(mark);
+  // However the reviewer ended, nothing of its scope is left running.
+  const left = await stop();
   if (left.length) {
     return { status: 'failed', error: `the reviewer left ${left.length} process(es) running that could not be stopped: ${left.join(', ')}` };
   }

@@ -103,11 +103,10 @@ class CardRun(BaseModel):
     # fingerprint), saved before the reviewer starts and cleared with its
     # outcome: a restart that finds it set knows a review was interrupted.
     review_before: list[str] | None = None
-    # The marker lines of the comments this run has posted (graph.say_once):
-    # Linear's comment list can lag behind a new comment, so the run's own
-    # record is what keeps a comment from being posted twice.
+    # The marker lines of the comments this run has posted (graph.say_once),
+    # so it need not ask Linear again. What keeps a comment from ever being
+    # posted twice is its own id (graph.comment_id), which Linear will not repeat.
     posted: list[str] = []
-    posting: str | None = None  # a marker being posted: set before the post, cleared after
     failure: str | None = None
     # The card's one "Where this card is" comment (JUL-126).
     status_id: str | None = None

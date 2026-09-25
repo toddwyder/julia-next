@@ -26,6 +26,17 @@ CARD_QUERY = """query Card($id: String!) {
 COMMENT = """mutation Comment($issueId: String!, $body: String!) {
   commentCreate(input: { issueId: $issueId, body: $body }) { success comment { id } }
 }"""
+# With an id the caller chose: Linear refuses a second comment with the same id
+# ("conflict on insert of Comment", checked live on JUL-150, 25 Sep), so the
+# same comment can never be posted twice, however late Linear lists it.
+COMMENT_WITH_ID = """mutation Comment($id: String!, $issueId: String!, $body: String!) {
+  commentCreate(input: { id: $id, issueId: $issueId, body: $body }) { success comment { id } }
+}"""
+DUPLICATE_ID = 'conflict on insert of Comment'
+
+
+class AlreadyPosted(Exception):
+    """Linear already has a comment with this id."""
 READY_QUERY = """query Ready($team: String!, $state: String!, $after: String) {
   issues(filter: { team: { name: { eq: $team } }, state: { name: { eq: $state } } }, first: 100, after: $after) {
     nodes {
@@ -171,10 +182,20 @@ class LinearApp:
         if not data['issueUpdate']['success']:
             raise RuntimeError(f'Linear did not move {card} to {state}')
 
-    async def comment(self, card: str, body: str) -> str:
+    async def comment(self, card: str, body: str, comment_id: str | None = None) -> str:
+        """Post a comment; with comment_id, raise AlreadyPosted if Linear has it already."""
         if card not in self._ids:
             await self.card(card)
-        data = await asyncio.to_thread(self._call, COMMENT, {'issueId': self._ids[card], 'body': body})
+        if comment_id is None:
+            data = await asyncio.to_thread(self._call, COMMENT, {'issueId': self._ids[card], 'body': body})
+        else:
+            try:
+                data = await asyncio.to_thread(self._call, COMMENT_WITH_ID,
+                                               {'id': comment_id, 'issueId': self._ids[card], 'body': body})
+            except RuntimeError as error:
+                if DUPLICATE_ID in str(error):
+                    raise AlreadyPosted(comment_id) from None
+                raise
         if not data['commentCreate']['success']:
             raise RuntimeError(f'Linear did not accept the comment on {card}')
         return data['commentCreate']['comment']['id']

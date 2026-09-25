@@ -64,7 +64,7 @@ class PretendBoard:
         return {'identifier': name, 'title': f'Card {name}', 'description': self.cards[name]['description'],
                 'comments': [{'id': i, 'body': b} for i, (card, b) in self.store.items() if card == name]}
 
-    async def comment(self, name, body):
+    async def comment(self, name, body, chosen_id=None):
         await asyncio.sleep(0)  # a real call yields, so two checks can interleave
         comment_id = f'c{len(self.store) + 1}'
         self.store[comment_id] = (name, body)

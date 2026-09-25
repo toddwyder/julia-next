@@ -30,8 +30,9 @@ saved step and never counts unfinished work as done:
 
 from __future__ import annotations
 
-import asyncio
+import hashlib
 import re
+import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -41,6 +42,7 @@ from typing import Protocol
 from pydantic_graph import BaseNode, End, GraphBuilder, GraphRunContext
 
 from .checkpoint import CardRun, Checkpoint, ReviewResult, StepMark, TestResult
+from .linear import AlreadyPosted
 from .status import day, duration, render, status_marker
 
 # Builder runs for one build or one repair: an interrupted run is tried again once.
@@ -83,7 +85,8 @@ def checked_limit(kind: str, text: str) -> int:
 class Linear(Protocol):
     # {identifier, title, description, comments: [{id, body}]}, oldest comment first
     async def card(self, card: str) -> dict: ...
-    async def comment(self, card: str, body: str) -> str: ...  # returns the new comment's id
+    # returns the new comment's id; with comment_id, raises AlreadyPosted when Linear has one with that id
+    async def comment(self, card: str, body: str, comment_id: str | None = None) -> str: ...
     async def edit(self, comment_id: str, body: str) -> None: ...
     async def assign_to_todd(self, card: str) -> None: ...
 
@@ -152,8 +155,6 @@ class Deps:
     status_every: float = 60
     # The files in the card's working copy, listed in the builder's brief.
     files: Callable[[CardRun], list[str]] = field(default=lambda run: [])
-    # A wait (asyncio.sleep; instant in the tests).
-    pause: Callable[[float], Awaitable[None]] = field(default=asyncio.sleep)
 
 
 def marker(step: str, run: CardRun, **fields: object) -> str:
@@ -161,36 +162,32 @@ def marker(step: str, run: CardRun, **fields: object) -> str:
     return f'graph: {step} card={run.card} base={run.base[:12]}{extra}'
 
 
-# Linear's comment list lagged a new comment by about 2.5 s (JUL-151, 25 Sep):
-# after a crash mid-post, the card is read this many times, this far apart.
-LAG_READS = 4
-LAG_PAUSE_SECONDS = 3
+def comment_id(card: str, line: str) -> str:
+    """A comment's own Linear id, the same every time for this card and marker
+    line: a hash of the two, shaped as the UUID v4 Linear asks for."""
+    raw = bytearray(hashlib.sha256(f'{card}\n{line}'.encode()).digest()[:16])
+    raw[6] = (raw[6] & 0x0F) | 0x40  # version 4
+    raw[8] = (raw[8] & 0x3F) | 0x80  # RFC 4122 variant
+    return str(uuid.UUID(bytes=bytes(raw)))
 
 
 async def say_once(ctx: GraphRunContext[CardRun, Deps], text: str, line: str) -> None:
-    """Post a comment unless it was posted already: the run's own record of
-    what it posted is checked first, because Linear's comment list can lag a
-    moment behind a new comment (a verdict was posted twice, 2.5 s apart, on
-    JUL-151 on 25 Sep); the card is checked too, for a comment posted before
-    a crash could record it."""
+    """Post a comment once, however often this is called and whatever crashes
+    in between. The comment's id comes from the card and its marker line, and
+    Linear refuses a second comment with an id it has, so a repeat can never
+    land, however late Linear lists the first (an approval was posted twice on
+    JUL-151, 25 Sep, when only Linear's list was checked). The card is still
+    read once, for a comment an older graph posted without such an id."""
     s = ctx.state
     if line in s.posted:
         return
-    # A post of this comment was under way when the graph stopped: Linear may
-    # have taken it and not list it yet, so the card is read a few times first.
-    reads = LAG_READS if s.posting == line else 1
-    for n in range(reads):
-        card = await ctx.deps.linear.card(s.card)
-        if any(line in c['body'] for c in card['comments']):
-            break
-        if n + 1 < reads:
-            await ctx.deps.pause(LAG_PAUSE_SECONDS)
-    else:
-        s.posting = line
-        save(ctx)  # before the post, so a crash after it is known on restart
-        await ctx.deps.linear.comment(s.card, f'{text}\n\n{line}')
+    card = await ctx.deps.linear.card(s.card)
+    if not any(line in c['body'] for c in card['comments']):
+        try:
+            await ctx.deps.linear.comment(s.card, f'{text}\n\n{line}', comment_id(s.card, line))
+        except AlreadyPosted:
+            pass  # posted before, by this run or an earlier one
     s.posted.append(line)
-    s.posting = None
     save(ctx)
 
 
