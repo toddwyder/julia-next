@@ -18,18 +18,37 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Protocol
 
 from pydantic_graph import BaseNode, End, GraphBuilder, GraphRunContext
 
-from .checkpoint import CardRun, Checkpoint, TestResult
+from .checkpoint import CardRun, Checkpoint, StepMark, TestResult
+from .status import duration, render, status_marker
 
 MAX_BUILD_ATTEMPTS = 2
+# Each worker's time limit in seconds. The worker's own launcher enforces it
+# (ops/julia-runner/time-limit.mjs), so a worker is stopped even if the graph dies.
+LIMITS = {'builder': 60 * 60, 'tests': 15 * 60}
+# The most each launcher accepts (time-limit.mjs LIMITS.max): a longer limit
+# would be quoted on the card but never enforced, so it is refused.
+LIMIT_CAPS = {'builder': 3 * 60 * 60, 'tests': 60 * 60}
+WHAT = {'builder': 'The builder', 'tests': 'The test run'}
+
+
+def checked_limit(kind: str, text: str) -> int:
+    """A time limit from the command line: whole seconds, above 0, within the launcher's cap."""
+    seconds = int(text)
+    if not 0 < seconds <= LIMIT_CAPS[kind]:
+        raise ValueError(f'the {kind} limit must be 1 to {LIMIT_CAPS[kind]} seconds, not {seconds}')
+    return seconds
 
 
 class Linear(Protocol):
-    async def card(self, card: str) -> dict: ...  # {identifier, title, description, comments: [body]}
-    async def comment(self, card: str, body: str) -> None: ...
+    # {identifier, title, description, comments: [{id, body}]}, oldest comment first
+    async def card(self, card: str) -> dict: ...
+    async def comment(self, card: str, body: str) -> str: ...  # returns the new comment's id
+    async def edit(self, comment_id: str, body: str) -> None: ...
 
 
 @dataclass
@@ -37,6 +56,8 @@ class BuildResult:
     ok: bool
     reason: str | None = None
     report: str | None = None
+    # True when the builder was stopped for running past its time limit.
+    stopped: bool = False
 
 
 @dataclass
@@ -46,20 +67,29 @@ class Deps:
     # Makes the card's working copy at the base commit, or finds the one a
     # previous run made. Returns a refusal reason or None.
     prepare: Callable[[CardRun], Awaitable[str | None]]
-    builder: Callable[[CardRun, str], Awaitable[BuildResult]]
+    # builder(run, brief, limit_seconds, progress): progress() is awaited on
+    # each line of the builder's output, so the card shows it is still moving.
+    builder: Callable[[CardRun, str, int, Callable[[], Awaitable[None]]], Awaitable[BuildResult]]
     # discard puts the working copy back to the base commit and returns how
     # many files and commits it threw away. commit commits what the builder
     # left and returns (commit, None) or (None, reason); the commit comes from
     # git, never from the builder's report.
     discard: Callable[[CardRun], Awaitable[int]]
     commit: Callable[[CardRun], Awaitable[tuple[str | None, str | None]]]
-    tester: Callable[[CardRun], Awaitable[TestResult]]
+    # tester(run, limit_seconds, progress), progress as for the builder
+    tester: Callable[[CardRun, int, Callable[[], Awaitable[None]]], Awaitable[TestResult]]
     # The processes of a worker kind ('builder' or 'tests') still alive on the
     # machine, and a wait for them to end, so a restart never adds a second one.
     live_workers: Callable[[str], list[int]]
     wait_for_exit: Callable[[str], Awaitable[list[int]]]
     graph_version: str = 'unknown'
     log: Callable[[str], None] = field(default=print)
+    now: Callable[[], datetime] = field(default=lambda: datetime.now(timezone.utc))
+    # Who each kind of worker is, in the words the card shows.
+    worker_names: dict[str, str] = field(default_factory=lambda: {'builder': 'the builder', 'tests': 'the test runner'})
+    limits: dict[str, int] = field(default_factory=lambda: dict(LIMITS))
+    # Worker output moves the card at once, but edits its comment at most this often.
+    status_every: float = 60
 
 
 def marker(step: str, run: CardRun, **fields: object) -> str:
@@ -70,7 +100,7 @@ def marker(step: str, run: CardRun, **fields: object) -> str:
 async def say_once(ctx: GraphRunContext[CardRun, Deps], text: str, line: str) -> None:
     """Post a comment unless the card already has one with this marker line."""
     card = await ctx.deps.linear.card(ctx.state.card)
-    if any(line in body for body in card['comments']):
+    if any(line in c['body'] for c in card['comments']):
         return
     await ctx.deps.linear.comment(ctx.state.card, f'{text}\n\n{line}')
 
@@ -79,14 +109,114 @@ def save(ctx: GraphRunContext[CardRun, Deps]) -> None:
     ctx.deps.checkpoint.save(ctx.state)
 
 
+# ------------------------------------------------------------ where the card is
+
+async def show(ctx: GraphRunContext[CardRun, Deps]) -> None:
+    """Edit the card's one status comment, first finding it by its marker if the
+    saved progress has no id for it (a crash can fall between posting and saving).
+    Linear being unreachable never stops the run: the card simply stops moving,
+    which is what the stuck check looks for."""
+    s = ctx.state
+    text = render(s)
+    try:
+        if s.status_id is None:
+            card = await ctx.deps.linear.card(s.card)
+            line = status_marker(s)
+            s.status_id = next((c['id'] for c in card['comments'] if line in c['body']), None)
+            if s.status_id is None:
+                s.status_id = await ctx.deps.linear.comment(s.card, text)
+            else:
+                await ctx.deps.linear.edit(s.status_id, text)
+        else:
+            await ctx.deps.linear.edit(s.status_id, text)
+    except Exception as error:
+        ctx.deps.log(f'the status comment could not be updated: {type(error).__name__}: {error}')
+        return
+    s.shown_at = s.moved_at
+    save(ctx)
+
+
+def open_mark(s: CardRun) -> StepMark | None:
+    return s.marks[-1] if s.marks and s.marks[-1].outcome is None else None
+
+
+def close(ctx: GraphRunContext[CardRun, Deps], outcome: str) -> None:
+    """End the running step (if any) with this outcome: 'done' or a few words."""
+    now = ctx.deps.now()
+    if mark := open_mark(ctx.state):
+        mark.outcome, mark.ended = outcome, now
+    ctx.state.moved_at = now
+    save(ctx)
+
+
+async def step(ctx: GraphRunContext[CardRun, Deps], doing: str, done: str, kind: str | None = None) -> None:
+    """Start a step on the card: any step still running ends as done."""
+    close(ctx, 'done')
+    ctx.state.marks.append(StepMark(
+        doing=doing, done=done, worker=ctx.deps.worker_names.get(kind) if kind else None,
+        limit=ctx.deps.limits.get(kind) if kind else None, started=ctx.deps.now(),
+    ))
+    save(ctx)
+    await show(ctx)
+
+
+async def moved(ctx: GraphRunContext[CardRun, Deps]) -> None:
+    """The worker produced output: the card moved, and its comment says so at most once a minute."""
+    s = ctx.state
+    s.moved_at = ctx.deps.now()
+    if s.shown_at is None or (s.moved_at - s.shown_at).total_seconds() >= ctx.deps.status_every:
+        await show(ctx)
+
+
+async def stopped(ctx: GraphRunContext[CardRun, Deps], kind: str) -> Report:
+    """A worker was stopped for running too long. The stop is saved before the
+    graph waits to see the worker gone, so a crash in that wait resumes as the
+    same confirmation (Resume) and never starts the worker again."""
+    s = ctx.state
+    mark = open_mark(s)
+    s.stop_kind = kind
+    s.stop_ran = (ctx.deps.now() - mark.started).total_seconds() if mark else 0
+    s.ending = f'Stopped: {WHAT[kind].lower()} ran too long. The result comment says what happened.'
+    s.step = 'report'
+    close(ctx, f'stopped after {duration(s.stop_ran)}')  # saves
+    await confirm_stop(ctx)
+    return Report()
+
+
+async def confirm_stop(ctx: GraphRunContext[CardRun, Deps]) -> None:
+    """Say which step ran too long, for how long, and whether it is gone. The
+    builder is free again only once no process of the worker remains."""
+    s = ctx.state
+    kind = s.stop_kind
+    reason = (f'{WHAT[kind]} ran longer than its {duration(ctx.deps.limits[kind])} time limit '
+              f'and was stopped after {duration(s.stop_ran)}.')
+    still = ctx.deps.live_workers(kind)
+    if still:
+        still = await ctx.deps.wait_for_exit(kind)
+    if still:
+        after = 'so the builder is not free' if kind == 'builder' else 'so no new test run starts until it ends'
+        s.failure = reason + (f' The graph could not confirm it ended: it is still running '
+                              f'(process {", ".join(map(str, still))}), {after}.')
+    elif kind == 'builder':
+        s.failure = reason + ' It is no longer running, so the builder is free for the next card.'
+    else:
+        s.failure = reason + ' It is no longer running.'
+    s.stop_kind = None
+    save(ctx)
+
+
 async def no_second_worker(ctx: GraphRunContext[CardRun, Deps], kind: str) -> str | None:
     """Wait for any earlier worker of this kind to end; refuse if it will not."""
     if not ctx.deps.live_workers(kind):
         return None
     ctx.deps.log(f'an earlier {kind} is still running; waiting for it to end')
+    name = 'builder' if kind == 'builder' else 'test run'
+    await step(ctx, f'Waiting for an earlier {name} to end', f'Waited for an earlier {name} to end')
     still = await ctx.deps.wait_for_exit(kind)
     if still:
+        close(ctx, 'it did not end')
         return f'an earlier {kind} is still running (process {", ".join(map(str, still))}), so the graph did not start a second one'
+    close(ctx, 'done')
     return None
 
 
@@ -103,6 +233,12 @@ class Resume(BaseNode[CardRun, Deps, str]):
         s = ctx.state
         if s.step == 'done':
             return End('already reported')
+        if open_mark(s):
+            # A step the card showed as running never finished: the graph died in it.
+            close(ctx, 'interrupted')
+        if s.stop_kind:
+            await confirm_stop(ctx)  # the graph died while seeing a stopped worker gone
+            return Report()
         if s.step == 'prepare':
             return Prepare()
         if s.step == 'build':
@@ -130,7 +266,9 @@ class Resume(BaseNode[CardRun, Deps, str]):
 @dataclass
 class Prepare(BaseNode[CardRun, Deps, str]):
     async def run(self, ctx: GraphRunContext[CardRun, Deps]) -> Build | Report:
+        await step(ctx, 'Preparing the working copy', 'Prepared the working copy')
         if refusal := await ctx.deps.prepare(ctx.state):
+            close(ctx, 'refused')
             return fail(ctx, f'the working copy could not be prepared: {refusal}')
         await say_once(
             ctx,
@@ -139,7 +277,7 @@ class Prepare(BaseNode[CardRun, Deps, str]):
             marker('started', ctx.state),
         )
         ctx.state.step = 'build'
-        save(ctx)
+        close(ctx, 'done')  # saves; the card never shows a finished step as still running
         return Build()
 
 
@@ -176,31 +314,41 @@ class Build(BaseNode[CardRun, Deps, str]):
         s.build_started = True
         save(ctx)  # saved before the builder starts, so a crash is seen on restart
         await say_once(ctx, f'Builder attempt {s.attempt} started.', marker('build-started', s, attempt=s.attempt))
+        await step(ctx, f'Building (attempt {s.attempt})', f'Built (attempt {s.attempt})', 'builder')
         try:
-            result = await ctx.deps.builder(s, builder_brief(card, s))
+            result = await ctx.deps.builder(s, builder_brief(card, s), ctx.deps.limits['builder'], lambda: moved(ctx))
         except Exception as error:  # a worker that cannot even start is a failed worker
             s.build_started = False
+            close(ctx, 'could not start')
             return fail(ctx, f'the builder could not run: {type(error).__name__}: {error}')
         s.build_started = False
+        if result.stopped:
+            return await stopped(ctx, 'builder')
         if not result.ok:
+            close(ctx, 'failed')
             return fail(ctx, f'the builder failed: {result.reason}')
         commit, reason = await ctx.deps.commit(s)
         if not commit:
+            close(ctx, 'changed nothing')
             return fail(ctx, f'the builder reported done, but {reason}')
         s.commit = commit
         s.builder_report = result.report
         s.step = 'test'
-        save(ctx)
+        close(ctx, 'done')  # saves, so a restart from here never shows the build as interrupted
         return Test()
 
 
 @dataclass
 class Test(BaseNode[CardRun, Deps, str]):
     async def run(self, ctx: GraphRunContext[CardRun, Deps]) -> Report:
+        await step(ctx, 'Running the tests', 'Ran the tests', 'tests')
         try:
-            ctx.state.tests = await ctx.deps.tester(ctx.state)
+            ctx.state.tests = await ctx.deps.tester(ctx.state, ctx.deps.limits['tests'], lambda: moved(ctx))
         except Exception as error:  # reported once, not retried on every restart
             ctx.state.tests = TestResult(passed=False, summary=f'the test worker could not run: {type(error).__name__}: {error}')
+        if ctx.state.tests.stopped:
+            return await stopped(ctx, 'tests')
+        close(ctx, 'done' if ctx.state.tests.passed else 'failed')
         ctx.state.step = 'report'
         save(ctx)
         return Report()
@@ -230,6 +378,11 @@ class Report(BaseNode[CardRun, Deps, str]):
     async def run(self, ctx: GraphRunContext[CardRun, Deps]) -> End[str]:
         text, outcome = result_text(ctx.state, ctx.deps.graph_version)
         await say_once(ctx, text, marker('result', ctx.state, commit=ctx.state.commit or 'none', outcome=outcome))
+        if not ctx.state.ending:
+            ctx.state.ending = ('Finished: the tests passed.' if outcome == 'passed'
+                                else 'Finished: the run failed. The result comment says why.')
+        close(ctx, 'done')
+        await show(ctx)
         ctx.state.step = 'done'
         save(ctx)
         return End(outcome)

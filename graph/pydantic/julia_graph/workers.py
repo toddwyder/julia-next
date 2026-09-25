@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import pwd
 import re
 import subprocess
 import time
@@ -24,6 +25,10 @@ WORKER_COMMANDS = {
     'tests': ('julia-tester', '/opt/julia-runner/ops/julia-runner/run-tests.mjs'),
 }
 WORKER_ENV = {'PATH': '/usr/bin:/bin', 'LANG': 'C.UTF-8'}
+# Who each worker is, in the words the card shows.
+WORKER_NAMES = {'builder': 'Gemini (agy)', 'tests': 'the test runner (no AI model)'}
+# The exit code ops/julia-runner/time-limit.mjs gives a worker it stopped, as GNU timeout does.
+STOPPED_EXIT = 124
 GIT_ID = ['-c', 'user.name=Julia graph', '-c', 'user.email=graph@julia-next.invalid']
 
 
@@ -41,17 +46,35 @@ def git(cwd: str, *args: str) -> str:
 
 # ------------------------------------------------------------ live workers
 
-def live_workers(kind: str, proc: Path = Path('/proc')) -> list[int]:
-    """Processes on this machine running this kind of worker's script."""
+def account_uid(kind: str) -> int | None:
+    try:
+        return pwd.getpwnam(WORKER_COMMANDS[kind][0]).pw_uid
+    except KeyError:  # no such account on this machine (the tests' laptop)
+        return None
+
+
+def real_uid(entry: Path) -> int | None:
+    for line in (entry / 'status').read_text().splitlines():
+        if line.startswith('Uid:'):
+            return int(line.split()[1])
+    return None
+
+
+def live_workers(kind: str, proc: Path = Path('/proc'), uid: int | None | str = 'account') -> list[int]:
+    """Processes on this machine running this kind of worker's launcher, or
+    owned by the worker's account: an agy or `node --test` left behind has no
+    launcher in its command line. uid is the account's, looked up by default."""
     script = WORKER_COMMANDS[kind][1].encode()
+    if uid == 'account':
+        uid = account_uid(kind)
     found = []
     for entry in proc.iterdir():
         if not entry.name.isdigit() or int(entry.name) == os.getpid():
             continue
         try:
-            if script in (entry / 'cmdline').read_bytes().split(b'\0'):
+            if script in (entry / 'cmdline').read_bytes().split(b'\0') or (uid is not None and real_uid(entry) == uid):
                 found.append(int(entry.name))
-        except OSError:
+        except (OSError, ValueError):
             continue
     return sorted(found)
 
@@ -86,7 +109,7 @@ async def run_worker(kind: str, request: dict | str, on_line=None) -> tuple[int 
             line = raw.decode(errors='replace')
             out.append(line)
             if on_line:
-                on_line(line)
+                await on_line(line)
 
     reader = asyncio.create_task(read_out())
     err = await proc.stderr.read()
@@ -113,9 +136,11 @@ def agy_step(line: str) -> str | None:
 def agy_outcome(status: int | None, stdout: str, stderr: str) -> BuildResult:
     """agy exits 0 and says SUCCESS even when it denied a tool, so the outcome
     is the stream's final result event, and an empty reply is a failure."""
+    tail = stderr.strip().splitlines()[-1:] or ['']
+    if status == STOPPED_EXIT:
+        return BuildResult(False, tail[0] or 'stopped by its time limit', stopped=True)
     events = [e for e in map(_json, stdout.splitlines()) if isinstance(e, dict)]
     final = next((e['result'] for e in reversed(events) if e.get('event') == 'result'), None)
-    tail = stderr.strip().splitlines()[-1:] or ['']
     if final is None:
         return BuildResult(False, f'the builder ended without a result (exit {status}) {tail[0]}'.strip())
     if final.get('status') != 'SUCCESS':
@@ -131,12 +156,19 @@ def agy_outcome(status: int | None, stdout: str, stderr: str) -> BuildResult:
     return BuildResult(True, report=reply)
 
 
+def line_handler(log, progress):
+    """Every line the builder prints moves the card; tool steps are also logged."""
+    async def on_line(line):
+        if step := agy_step(line):
+            log(f'builder: {step}')
+        await progress()
+    return on_line
+
+
 def builder(log):
-    async def build(run: CardRun, brief: str) -> BuildResult:
-        def on_line(line):
-            if step := agy_step(line):
-                log(f'builder: {step}')
-        status, out, err = await run_worker('builder', {'worktree': run.worktree, 'prompt': brief}, on_line)
+    async def build(run: CardRun, brief: str, limit_seconds: int, progress) -> BuildResult:
+        request = {'worktree': run.worktree, 'prompt': brief, 'limit_seconds': limit_seconds}
+        status, out, err = await run_worker('builder', request, line_handler(log, progress))
         return agy_outcome(status, out, err)
     return build
 
@@ -153,17 +185,31 @@ def suite_result(status: int, output: str) -> TestResult:
     return TestResult(passed=passed, summary=f'`node --test scripts/*.test.mjs`: {summary or "no summary"} (exit {status})', failing=failing)
 
 
-async def ask_tester(run: CardRun, what: str) -> tuple[int, str]:
-    status, out, err = await run_worker('tests', {'worktree': run.worktree, 'run': what})
+async def ask_tester(run: CardRun, what: str, limit_seconds: int, progress) -> tuple[int, str, bool]:
+    """(status, output, stopped). Only the launcher's own exit 124 is a stop; a
+    test command that itself exits 124 comes back inside the JSON answer. The
+    launcher prints a line whenever the tests print, and each line moves the card."""
+    async def on_line(line):
+        await progress()
+    request = {'worktree': run.worktree, 'run': what, 'limit_seconds': limit_seconds}
+    status, out, err = await run_worker('tests', request, on_line if progress else None)
+    if status == STOPPED_EXIT:
+        return STOPPED_EXIT, (err.strip().splitlines()[-1:] or ['stopped by its time limit'])[0], True
     reply = _json((out.strip().splitlines() or [''])[-1])
     if status == 0 and isinstance(reply, dict) and isinstance(reply.get('status'), int):
-        return reply['status'], str(reply.get('output', ''))
-    return 1, f'the test worker did not answer (exit {status}): {err.strip()[-500:]}'
+        return reply['status'], str(reply.get('output', '')), False
+    return 1, f'the test worker did not answer (exit {status}): {err.strip()[-500:]}', False
 
 
-async def tester(run: CardRun) -> TestResult:
-    lint_status, lint_output = await ask_tester(run, 'lint')
-    status, output = await ask_tester(run, 'suite')
+async def tester(run: CardRun, limit_seconds: int, progress, ask=ask_tester) -> TestResult:
+    # The card shows one limit for the step, so the suite gets what the lint left of it.
+    started = time.monotonic()
+    lint_status, lint_output, stopped = await ask(run, 'lint', limit_seconds, progress)
+    if stopped:
+        return TestResult(passed=False, summary=f'`npm run lint:framework` {lint_output}', stopped=True)
+    status, output, stopped = await ask(run, 'suite', max(1, limit_seconds - int(time.monotonic() - started)), progress)
+    if stopped:
+        return TestResult(passed=False, summary=f'`node --test scripts/*.test.mjs` {output}', stopped=True)
     result = suite_result(status, output)
     if lint_status != 0:
         result.passed = False

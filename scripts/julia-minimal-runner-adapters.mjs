@@ -18,6 +18,7 @@ import { join } from 'node:path';
 
 import { parseAgyJsonResult } from '../ops/service-dropbox/run-agy-seat.mjs';
 import { parsePiJsonStream } from '../ops/service-dropbox/run-pi-seat.mjs';
+import { STOPPED_EXIT } from '../ops/julia-runner/time-limit.mjs';
 import { linearGraphQL, postComment } from './linear-cli.mjs';
 
 // Each worker's account and the one command line it runs there.
@@ -95,6 +96,7 @@ export function geminiAdapter({ run = runStreaming } = {}) {
     const onLine = (line) => { const step = agyStepLine(line); if (step) onProgress(step); };
     const turn = await run('sudo', sudoCommand('gemini'), { input: JSON.stringify({ worktree: cwd, prompt }), env: WORKER_ENV, onLine });
     if (turn.error) return { ok: false, reason: `the Gemini worker did not start: ${turn.error.message}` };
+    if (turn.status === STOPPED_EXIT) return { ok: false, reason: `the Gemini worker was stopped: ${lastLines(turn.stderr, 1)}` };
     return agyOutcome(turn.stdout, turn.stderr);
   };
 }
@@ -106,6 +108,7 @@ export function geminiAdapter({ run = runStreaming } = {}) {
 export function testerAdapter({ run = runStreaming } = {}) {
   return async (request) => {
     const answer = await run('sudo', sudoCommand('tests'), { input: JSON.stringify(request), env: WORKER_ENV });
+    if (answer.status === STOPPED_EXIT) return { status: 1, output: `the test run was stopped: ${lastLines(answer.stderr, 1)}` };
     const reply = parseLine(lastLines(answer.stdout, 1));
     if (answer.status === 0 && Number.isInteger(reply?.status)) return { status: reply.status, output: String(reply.output ?? '') };
     return { status: 1, output: `the test worker did not answer (exit ${answer.status}): ${lastLines(answer.stderr) || answer.error?.message || ''}` };

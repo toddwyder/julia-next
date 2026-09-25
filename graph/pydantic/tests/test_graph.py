@@ -10,11 +10,12 @@ from __future__ import annotations
 import subprocess
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from julia_graph import workers
 from julia_graph.checkpoint import CardLocked, CardRun, Checkpoint, TestResult
-from julia_graph.graph import BuildResult, Deps, run_card
+from julia_graph.graph import BuildResult, Deps, checked_limit, run_card
 
 
 class Crash(BaseException):
@@ -23,13 +24,40 @@ class Crash(BaseException):
 
 class FakeLinear:
     def __init__(self):
-        self.comments: list[str] = []
+        self.store: dict[str, str] = {}  # comment id -> body, in posting order
+        self.edits: list[str] = []  # ids, one per edit
+
+    @property
+    def comments(self) -> list[str]:
+        return list(self.store.values())
 
     async def card(self, card):
-        return {'identifier': card, 'title': 'Add a greeting', 'description': '- [ ] say hello', 'comments': list(self.comments)}
+        return {'identifier': card, 'title': 'Add a greeting', 'description': '- [ ] say hello',
+                'comments': [{'id': i, 'body': b} for i, b in self.store.items()]}
 
     async def comment(self, card, body):
-        self.comments.append(body)
+        comment_id = f'c{len(self.store) + 1}'
+        self.store[comment_id] = body
+        return comment_id
+
+    async def edit(self, comment_id, body):
+        assert comment_id in self.store, f'no comment {comment_id} to edit'
+        self.store[comment_id] = body
+        self.edits.append(comment_id)
+
+    def status(self) -> list[str]:
+        return [b for b in self.store.values() if 'graph: status' in b]
+
+
+class Clock:
+    def __init__(self):
+        self.t = datetime(2026, 9, 25, 13, 57, tzinfo=timezone.utc)
+
+    def __call__(self):
+        return self.t
+
+    def advance(self, seconds):
+        self.t += timedelta(seconds=seconds)
 
 
 def sh(cwd, *args):
@@ -54,6 +82,7 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         self.builder_calls = 0
         self.tester_calls = 0
         self.alive: dict[str, list[int]] = {'builder': [], 'tests': []}
+        self.clock = Clock()
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -67,18 +96,15 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         return None
 
     def deps(self, builder=None, tester=None, alive_after_wait=None):
-        async def default_builder(run, brief):
+        async def default_builder(run, brief, limit, progress):
             self.builder_calls += 1
             self.brief = brief
             (Path(run.worktree) / 'hello.txt').write_text('hello\n')
             return BuildResult(True, report='Added hello.txt')
 
-        async def default_tester(run):
+        async def default_tester(run, limit, *_):
             self.tester_calls += 1
             return TestResult(passed=True, summary='tests 3, pass 3, fail 0')
-
-        async def counted(fn, *a):
-            return await fn(*a)
 
         async def wait_for_exit(kind):
             return alive_after_wait if alive_after_wait is not None else []
@@ -88,6 +114,8 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
             builder=builder or default_builder, discard=workers.discard, commit=workers.commit,
             tester=tester or default_tester, live_workers=lambda kind: self.alive[kind],
             wait_for_exit=wait_for_exit, graph_version='pydantic-graph test', log=lambda line: None,
+            now=self.clock, worker_names={'builder': 'Gemini (agy)', 'tests': 'the test runner (no AI model)'},
+            limits={'builder': 3600, 'tests': 900},
         )
 
     def saved(self):
@@ -114,7 +142,7 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
     # ----------------------------------------------------------------- failures say so
 
     async def test_a_failed_builder_is_reported_and_not_tested(self):
-        async def broken(run, brief):
+        async def broken(run, brief, *_):
             return BuildResult(False, 'agy denied read_file (ViewFile)')
         outcome = await run_card(self.state(), self.deps(builder=broken))
         self.assertEqual(outcome, 'failed')
@@ -125,14 +153,14 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn('Candidate commit: none', result)
 
     async def test_a_builder_that_claims_success_but_changes_nothing_fails(self):
-        async def idle(run, brief):
+        async def idle(run, brief, *_):
             return BuildResult(True, report='All done!')
         outcome = await run_card(self.state(), self.deps(builder=idle))
         self.assertEqual(outcome, 'failed')
         self.assertIn('no changes to commit', self.results()[0])
 
     async def test_a_builder_that_cannot_start_is_reported(self):
-        async def no_sudo(run, brief):
+        async def no_sudo(run, brief, *_):
             raise BrokenPipeError('the worker exited before reading its brief')
         outcome = await run_card(self.state(), self.deps(builder=no_sudo))
         self.assertEqual(outcome, 'failed')
@@ -140,7 +168,7 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.tester_calls, 0)
 
     async def test_a_test_worker_that_cannot_start_is_reported_not_retried_forever(self):
-        async def no_sudo(run):
+        async def no_sudo(run, *_):
             raise BrokenPipeError('the worker exited before reading its request')
         outcome = await run_card(self.state(), self.deps(tester=no_sudo))
         self.assertEqual(outcome, 'failed')
@@ -150,7 +178,7 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.saved().step, 'done')
 
     async def test_failing_tests_are_reported_with_their_names(self):
-        async def red(run):
+        async def red(run, *_):
             return TestResult(passed=False, summary='tests 3, pass 2, fail 1', failing=['greets politely'])
         outcome = await run_card(self.state(), self.deps(tester=red))
         self.assertEqual(outcome, 'failed')
@@ -162,7 +190,7 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
     # ----------------------------------------------------------------- restarts
 
     async def test_a_restart_after_a_killed_builder_does_not_count_it_as_done(self):
-        async def killed(run, brief):
+        async def killed(run, brief, *_):
             (Path(run.worktree) / 'half.txt').write_text('half')
             raise Crash()
         with self.assertRaises(Crash):
@@ -181,7 +209,7 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.results()), 1)
 
     async def test_a_restart_while_the_old_builder_still_runs_starts_no_second_one(self):
-        async def killed(run, brief):
+        async def killed(run, brief, *_):
             raise Crash()
         with self.assertRaises(Crash):
             await run_card(self.state(), self.deps(builder=killed))
@@ -194,7 +222,7 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('PASSED', result)
 
     async def test_a_restart_waits_for_an_old_builder_to_end_before_starting_one(self):
-        async def killed(run, brief):
+        async def killed(run, brief, *_):
             raise Crash()
         with self.assertRaises(Crash):
             await run_card(self.state(), self.deps(builder=killed))
@@ -206,7 +234,7 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
             self.alive['builder'] = []
             return []
 
-        async def builder(run, brief):
+        async def builder(run, brief, *_):
             order.append('built')
             (Path(run.worktree) / 'hello.txt').write_text('hello\n')
             return BuildResult(True, report='ok')
@@ -231,7 +259,7 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.saved().commit, sh(self.worktree, 'git', 'rev-parse', 'HEAD'))
 
     async def test_a_restart_during_tests_reruns_them_and_does_not_rebuild(self):
-        async def dies(run):
+        async def dies(run, *_):
             raise Crash()
         with self.assertRaises(Crash):
             await run_card(self.state(), self.deps(tester=dies))
@@ -273,6 +301,178 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         finally:
             held.unlock()
         self.assertEqual(self.builder_calls, 0)
+
+    # ----------------------------------------------------------------- where the card is (JUL-126)
+
+    async def test_the_status_comment_shows_the_step_the_worker_and_when_it_last_moved(self):
+        seen = {}
+
+        async def builder(run, brief, limit, progress):
+            self.clock.advance(120)  # 13:59
+            seen['building'] = self.linear.status()
+            seen['limits'] = [('builder', limit)]
+            (Path(run.worktree) / 'hello.txt').write_text('hello\n')
+            return BuildResult(True, report='ok')
+
+        async def tester(run, limit, *_):
+            self.clock.advance(60)  # 14:00
+            seen['testing'] = self.linear.status()
+            seen['limits'].append(('tests', limit))
+            self.clock.advance(30)
+            return TestResult(passed=True, summary='tests 3, pass 3, fail 0')
+
+        self.assertEqual(await run_card(self.state(), self.deps(builder=builder, tester=tester)), 'passed')
+        [building] = seen['building']
+        self.assertIn('Now: Building (attempt 1)', building)
+        self.assertIn('Gemini (agy)', building)
+        self.assertIn('Last moved: 13:57 UTC, 25 Sep', building)
+        self.assertIn('time limit 60 min', building)
+        self.assertIn('✓ Prepared the working copy', building)
+        [testing] = seen['testing']
+        self.assertIn('Now: Running the tests', testing)
+        self.assertIn('the test runner (no AI model)', testing)
+        self.assertIn('Last moved: 13:59 UTC, 25 Sep', testing)  # the build finishing moved it
+        self.assertIn('✓ Built (attempt 1)', testing)
+        [final] = self.linear.status()
+        self.assertIn('Finished: the tests passed', final)
+        self.assertIn('Last moved: 14:00 UTC, 25 Sep', final)
+        self.assertNotIn('Now:', final)
+        self.assertIn('graph-moved: 2026-09-25T14:00:30Z', final)  # the machine line the stuck check reads
+        self.assertEqual(seen['limits'], [('builder', 3600), ('tests', 900)])
+
+    async def test_worker_output_moves_the_card_but_edits_it_at_most_once_a_minute(self):
+        async def chatty(run, brief, limit, progress):
+            for _ in range(12):  # a line every 10 s for two minutes
+                self.clock.advance(10)
+                await progress()
+            (Path(run.worktree) / 'hello.txt').write_text('hello\n')
+            return BuildResult(True, report='ok')
+
+        edits_before = {}
+
+        async def tester(run, limit, *_):
+            edits_before['n'] = len(self.linear.edits)
+            edits_before['text'] = self.linear.status()[0]
+            return TestResult(passed=True, summary='tests 1, pass 1, fail 0')
+
+        await run_card(self.state(), self.deps(builder=chatty, tester=tester))
+        # the build starting and the tests starting are one edit each; the rest came from output
+        output_edits = edits_before['n'] - 2
+        self.assertEqual(output_edits, 2)
+        self.assertIn('Last moved: 13:59 UTC', edits_before['text'])
+
+    async def test_a_restart_edits_the_same_status_comment_and_never_posts_a_second(self):
+        async def killed(run, brief, *_):
+            raise Crash()
+        with self.assertRaises(Crash):
+            await run_card(self.state(), self.deps(builder=killed))
+        # even if the saved progress lost the comment's id, the card's marker finds it
+        saved = self.saved()
+        saved.status_id = None
+        Checkpoint(self.state_dir, 'JUL-1').save(saved)
+        self.clock.advance(300)
+        self.assertEqual(await run_card(self.state(), self.deps()), 'passed')
+        [status] = self.linear.status()
+        self.assertIn('Building (attempt 1): interrupted', status)
+        self.assertIn('✓ Built (attempt 2)', status)
+        self.assertIn('Finished: the tests passed', status)
+
+    async def test_a_builder_past_its_limit_is_stopped_and_the_card_says_so(self):
+        async def overrun(run, brief, limit, progress):
+            self.clock.advance(limit + 12)
+            return BuildResult(False, reason='stopped: ran longer than its 3600-second time limit', stopped=True)
+
+        self.assertEqual(await run_card(self.state(), self.deps(builder=overrun)), 'failed')
+        self.assertEqual(self.tester_calls, 0)
+        [result] = self.results()
+        self.assertIn('The builder ran longer than its 60 min time limit and was stopped after 60 min 12 s.', result)
+        self.assertIn('It is no longer running, so the builder is free for the next card.', result)
+        [status] = self.linear.status()
+        self.assertIn('Stopped: the builder ran too long', status)
+        self.assertIn('Building (attempt 1): stopped after 60 min 12 s', status)
+
+    async def test_a_stopped_builder_that_does_not_end_is_named_and_the_builder_is_not_free(self):
+        async def overrun(run, brief, limit, progress):
+            self.alive['builder'] = [5151]
+            self.clock.advance(limit + 1)
+            return BuildResult(False, reason='stopped', stopped=True)
+
+        await run_card(self.state(), self.deps(builder=overrun, alive_after_wait=[5151]))
+        [result] = self.results()
+        self.assertIn('was stopped after 60 min 1 s', result)
+        self.assertIn('still running (process 5151)', result)
+        self.assertIn('the builder is not free', result)
+        self.assertNotIn('free for the next card', result)
+
+    async def test_a_crash_while_confirming_a_stop_reports_the_stop_and_never_reruns_the_worker(self):
+        # review finding 1: the graph can die while it waits to see the stopped worker gone
+        async def overrun(run, brief, limit, progress):
+            self.builder_calls += 1
+            self.alive['builder'] = [7]
+            self.clock.advance(limit + 5)
+            return BuildResult(False, reason='stopped', stopped=True)
+
+        async def dies(kind):
+            raise Crash()
+        deps = self.deps(builder=overrun)
+        deps.wait_for_exit = dies
+        with self.assertRaises(Crash):
+            await run_card(self.state(), deps)
+        self.alive['builder'] = []  # it ended while the graph was down
+        self.assertEqual(await run_card(self.state(), self.deps(builder=overrun)), 'failed')
+        self.assertEqual(self.builder_calls, 1)
+        [result] = self.results()
+        self.assertIn('was stopped after 60 min 5 s', result)
+        self.assertIn('It is no longer running, so the builder is free for the next card.', result)
+
+    async def test_test_output_moves_the_card_too(self):
+        # review finding 2
+        async def tester(run, limit, progress):
+            for _ in range(3):
+                self.clock.advance(70)
+                await progress()
+            return TestResult(passed=True, summary='tests 1, pass 1, fail 0')
+        edits = []
+
+        async def spy(run, limit, progress):
+            before = len(self.linear.edits)
+            result = await tester(run, limit, progress)
+            edits.append(len(self.linear.edits) - before)
+            return result
+        await run_card(self.state(), self.deps(tester=spy))
+        self.assertEqual(edits, [3])
+
+    async def test_a_restart_that_waits_for_an_earlier_builder_says_so_on_the_card(self):
+        # review finding 8: the card never shows a finished step as still running
+        async def killed(run, brief, *_):
+            raise Crash()
+        with self.assertRaises(Crash):
+            await run_card(self.state(), self.deps(builder=killed))
+        self.alive['builder'] = [4242]
+        seen = []
+
+        async def wait_and_look(kind):
+            seen.append(self.linear.status()[0])
+            self.alive['builder'] = []
+            return []
+        deps = self.deps()
+        deps.wait_for_exit = wait_and_look
+        await run_card(self.state(), deps)
+        self.assertIn('Now: Waiting for an earlier builder to end', seen[0])
+        self.assertNotIn('Now: Preparing', seen[0])
+
+    async def test_a_test_run_past_its_limit_is_stopped_and_the_card_says_so(self):
+        async def hangs(run, limit, *_):
+            self.clock.advance(limit + 3)
+            return TestResult(passed=False, summary='stopped: ran longer than its 900-second time limit', stopped=True)
+
+        self.assertEqual(await run_card(self.state(), self.deps(tester=hangs)), 'failed')
+        [result] = self.results()
+        self.assertIn('The test run ran longer than its 15 min time limit and was stopped after 15 min 3 s.', result)
+        self.assertIn('It is no longer running.', result)  # review finding 9: nothing about "the builder"
+        self.assertNotIn('builder is free', result)
+        [status] = self.linear.status()
+        self.assertIn('Stopped: the test run ran too long', status)
 
 
 class PrepareTest(unittest.IsolatedAsyncioTestCase):
@@ -344,6 +544,14 @@ class WorkerParsingTest(unittest.TestCase):
         self.assertIn('denied read_file', workers.agy_outcome(0, denied, '').reason)
         self.assertFalse(workers.agy_outcome(1, ok, '').ok)
 
+    def test_a_builder_stopped_by_its_time_limit_is_reported_as_stopped(self):
+        # time-limit.mjs exits 124 and says so on stderr; whatever agy printed first does not count
+        ok = '{"event":"result","result":{"status":"SUCCESS","response":"done"}}\n'
+        result = workers.agy_outcome(124, ok, 'stopped: ran longer than its 3600-second time limit\n')
+        self.assertFalse(result.ok)
+        self.assertTrue(result.stopped)
+        self.assertFalse(workers.agy_outcome(1, ok, '').stopped)
+
     def test_suite_counts_come_from_the_spec_reporter(self):
         out = '✔ a (1ms)\n✖ b breaks (2.5ms)\nℹ tests 2\nℹ pass 1\nℹ fail 1\nℹ skipped 0\n'
         result = workers.suite_result(1, out)
@@ -361,9 +569,66 @@ class WorkerParsingTest(unittest.TestCase):
             (proc / '102').mkdir()
             (proc / '102' / 'cmdline').write_bytes(b'/usr/bin/node\0/opt/julia-runner/ops/julia-runner/run-tests.mjs\0')
             (proc / 'self').mkdir()
-            self.assertEqual(workers.live_workers('builder', proc), [101])
-            self.assertEqual(workers.live_workers('tests', proc), [102])
+            self.assertEqual(workers.live_workers('builder', proc, uid=None), [101])
+            self.assertEqual(workers.live_workers('tests', proc, uid=None), [102])
 
+    def test_live_workers_also_counts_anything_the_worker_account_still_runs(self):
+        # review finding 4: an agy or node --test left behind has no launcher in its command line
+        with tempfile.TemporaryDirectory() as d:
+            proc = Path(d)
+            agy = '/home/gemini-worker/.local/bin/agy' + chr(0) + '--print' + chr(0)
+            for pid, uid, cmd in [('201', 1005, agy), ('202', 1000, '/usr/bin/bash' + chr(0))]:
+                (proc / pid).mkdir()
+                (proc / pid / 'cmdline').write_bytes(cmd.encode())
+                (proc / pid / 'status').write_text('Name: x' + chr(10) + 'Uid:' + f'{chr(9)}{uid}' * 4 + chr(10))
+            self.assertEqual(workers.live_workers('builder', proc, uid=1005), [201])
+
+
+class WorkerCallTest(unittest.IsolatedAsyncioTestCase):
+    async def test_a_test_run_stopped_by_its_time_limit_is_reported_as_stopped(self):
+        replies = iter([(0, 'lint ok', False), (workers.STOPPED_EXIT, 'stopped: ran longer than its 900-second time limit', True)])
+        asked = []
+
+        async def ask(run, what, limit, progress):
+            asked.append((what, limit))
+            return next(replies)
+        result = await workers.tester(None, 900, None, ask=ask)
+        self.assertTrue(result.stopped)
+        self.assertFalse(result.passed)
+        self.assertIn('stopped: ran longer than its 900-second time limit', result.summary)
+        self.assertEqual(asked, [('lint', 900), ('suite', 900)])
+
+    async def test_a_test_command_that_itself_exits_124_is_a_failure_not_a_stop(self):
+        # review finding 6: only the launcher's own stop counts as stopped
+        replies = iter([(0, 'lint ok', False), (124, 'ℹ tests 1\nℹ pass 0\nℹ fail 1\n', False)])
+
+        async def ask(run, what, limit, progress):
+            return next(replies)
+        result = await workers.tester(None, 900, None, ask=ask)
+        self.assertFalse(result.stopped)
+        self.assertFalse(result.passed)
+
+    async def test_worker_output_lines_reach_the_progress_callback(self):
+        lines = []
+
+        async def progress():
+            lines.append('moved')
+        on_line = workers.line_handler(lambda line: None, progress)
+        await on_line('{"step_update":{"state":"ACTIVE","tool_name":"edit_file","tool_info":{"parameters":{"path":"a.js"}}}}\n')
+        await on_line('plain text\n')
+        self.assertEqual(lines, ['moved', 'moved'])
+
+
+class LimitTest(unittest.TestCase):
+    def test_a_limit_outside_what_the_launcher_allows_is_refused(self):
+        # review finding 5: the card never quotes a limit the launcher would not enforce
+        self.assertEqual(checked_limit('builder', '20'), 20)
+        self.assertEqual(checked_limit('tests', str(60 * 60)), 60 * 60)
+        for bad in ('0', '-5', 'x', str(3 * 60 * 60 + 1)):
+            with self.assertRaises(ValueError, msg=bad):
+                checked_limit('builder', bad)
+        with self.assertRaises(ValueError):
+            checked_limit('tests', str(60 * 60 + 1))
 
 if __name__ == '__main__':
     unittest.main()

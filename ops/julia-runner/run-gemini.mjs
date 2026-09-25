@@ -2,20 +2,23 @@
 //
 // Installed root-owned at /opt/julia-runner/ops/julia-runner/run-gemini.mjs and
 // started only by `sudo -n -u gemini-worker /usr/bin/node <this file>` (the one
-// sudoers rule in ./sudoers). It reads {worktree, prompt} as JSON on stdin and
-// runs one headless agy turn in that worktree, as gemini-worker:
+// sudoers rule in ./sudoers). It reads {worktree, prompt, limit_seconds} as JSON
+// on stdin and runs one headless agy turn in that worktree, as gemini-worker:
 //
 //   * gemini-worker has no groups and no service keys; it cannot read the
 //     runner's Linear credential or the drop box;
 //   * its own agy allow list must be empty: Gemini edits files and runs no
 //     command at all (Todd, 24 Sep: not npm test, not git commit, not npx);
 //   * only a card worktree under /srv/julia-runner/worktrees is accepted;
-//   * agy gets HOME, PATH, LANG and USER only.
-import { spawn } from 'node:child_process';
+//   * agy gets HOME, PATH, LANG and USER only;
+//   * the turn runs under a time limit (time-limit.mjs, JUL-126): past it, agy
+//     and everything it started is stopped, and this exits 124.
 import { chmodSync, lstatSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { LIMITS, limitSeconds, runLimited, STOPPED_EXIT, stoppedLine } from './time-limit.mjs';
 
 export const WORKTREES = '/srv/julia-runner/worktrees';
 
@@ -71,7 +74,7 @@ function settingsProblem(home) {
 }
 
 function main() {
-  const { worktree, prompt } = JSON.parse(readFileSync(0, 'utf8'));
+  const { worktree, prompt, limit_seconds } = JSON.parse(readFileSync(0, 'utf8'));
   const home = homedir();
   const problem = worktreeProblem(worktree) ?? settingsProblem(home);
   if (problem || typeof prompt !== 'string') {
@@ -81,14 +84,21 @@ function main() {
   // New files stay writable by the worktree group, so the runner can commit
   // them and switch commits afterwards.
   process.umask(0o002);
-  const agy = spawn(join(home, '.local', 'bin', 'agy'), agyArgs(prompt, worktree), {
+  const seconds = limitSeconds(limit_seconds, LIMITS.builder);
+  runLimited(join(home, '.local', 'bin', 'agy'), agyArgs(prompt, worktree), {
     cwd: worktree,
     env: { HOME: home, USER: 'gemini-worker', PATH: `${home}/.local/bin:/usr/bin:/bin`, LANG: 'C.UTF-8' },
     stdio: ['ignore', 'inherit', 'inherit'],
-  });
-  agy.on('error', (error) => { console.error(`agy did not start: ${error.message}`); process.exit(1); });
-  agy.on('close', (code) => {
+  }, { seconds }).then(({ code, stopped, error }) => {
+    if (error) {
+      console.error(`agy did not start: ${error.message}`);
+      process.exit(1);
+    }
     shareWithGroup(worktree);
+    if (stopped) {
+      console.error(stoppedLine(seconds));
+      process.exit(STOPPED_EXIT);
+    }
     process.exit(code ?? 1);
   });
 }
