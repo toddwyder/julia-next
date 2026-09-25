@@ -8,6 +8,7 @@ the card, the commits in git, and the saved progress.
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -24,8 +25,16 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 ROLE = 'ROLE FILE: attack the candidate against every acceptance criterion.'
 
 
+def met(*criteria: str) -> list[dict]:
+    """The reviewer's answers, one per acceptance criterion, all met."""
+    return [{'id': f'AC{n}', 'criterion': text, 'verdict': 'met', 'how': f'read the diff for {text}'}
+            for n, text in enumerate(criteria, 1)]
+
+
 async def approving_reviewer(run, brief, limit, progress):
-    return ReviewResult(ok=True, verdict='approve', summary='all criteria met')
+    """Approves whatever card it gets, answering each criterion the brief lists."""
+    listed = re.findall(r'^- AC\d+: (.*)$', brief, re.M)
+    return ReviewResult(ok=True, verdict='approve', summary='all criteria met', criteria=met(*listed))
 
 
 def verdict(value, **extra) -> str:
@@ -34,13 +43,19 @@ def verdict(value, **extra) -> str:
 
 
 def pi_stream(*finals: str, stop='stop', error=None) -> str:
-    """A Pi JSON event stream (run-pi-seat.mjs's output), one assistant message per text."""
+    """A Pi JSON event stream (run-pi-seat.mjs's output), one assistant message
+    per text, ending as Pi ends a run: agent_end repeating the last message
+    without its text (ops/service-dropbox/run-pi-seat.test.mjs), then agent_settled."""
     events = [{'type': 'agent_start'}]
     for text in finals:
+        events.append({'type': 'message_start', 'message': {'role': 'assistant', 'content': [], 'stopReason': 'pending'}})
         events.append({'type': 'message_update', 'message': {'role': 'assistant', 'content': [{'type': 'text', 'text': text[:10]}]}})
         events.append({'type': 'message_end', 'message': {'role': 'assistant', 'stopReason': stop,
                                                           'content': [{'type': 'text', 'text': text}],
                                                           **({'errorMessage': error} if error else {})}})
+    events.append({'type': 'agent_end', 'messages': [{'role': 'assistant', 'stopReason': stop,
+                                                      **({'errorMessage': error} if error else {})}], 'willRetry': False})
+    events.append({'type': 'agent_settled'})
     return '\n'.join(map(json.dumps, events)) + '\n'
 
 
@@ -59,7 +74,7 @@ class FakeLinear:
         return list(self.store.values())
 
     async def card(self, card):
-        return {'identifier': card, 'title': 'Add a greeting', 'description': '- [ ] say hello',
+        return {'identifier': card, 'title': 'Add a greeting', 'description': '## Acceptance criteria\n\n- [ ] say hello\n',
                 'comments': [{'id': i, 'body': b} for i, b in self.store.items()]}
 
     async def comment(self, card, body):
@@ -144,7 +159,7 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         async def default_reviewer(run, brief, limit, *_):
             self.reviewer_calls += 1
             self.reviewer_briefs.append(brief)
-            return ReviewResult(ok=True, verdict='approve', summary='candidate approved')
+            return ReviewResult(ok=True, verdict='approve', summary='candidate approved', criteria=met('say hello'))
 
         async def wait_for_exit(kind):
             return alive_after_wait if alive_after_wait is not None else []
@@ -680,7 +695,7 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
     def head(self):
         return sh(self.worktree, 'git', 'rev-parse', 'HEAD')
 
-    APPROVE = ReviewResult(ok=True, verdict='approve', summary='every criterion met')
+    APPROVE = ReviewResult(ok=True, verdict='approve', summary='every criterion met', criteria=met('say hello'))
 
     @staticmethod
     def findings(text, **extra):
@@ -691,15 +706,14 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(outcome, 'passed')
         [brief] = self.reviewer_briefs
         # the reviewer works from its role file, the card, the graph's test result and the whole change
-        for part in (ROLE, 'say hello', 'tests 3, pass 3, fail 0', '+hello 1', self.head(), self.base):
+        for part in (ROLE, '- AC1: say hello', 'tests 3, pass 3, fail 0', '+hello 1', self.head(), self.base):
             self.assertIn(part, brief)
         [posted] = self.verdicts()
         self.assertIn('APPROVED', posted)
-        self.assertIn('Reviewer: DeepSeek V4 Pro (Pi)', posted)
-        self.assertIn('Company: DeepSeek', posted)
+        self.assertIn('Reviewer: DeepSeek V4 Pro (Pi), from DeepSeek', posted)
         [result] = self.results()
         self.assertIn('PASSED', result)
-        self.assertIn('Review: approved, by DeepSeek V4 Pro (Pi) (DeepSeek) (round 1 of 2)', result)
+        self.assertIn('Review: approved, by DeepSeek V4 Pro (Pi), from DeepSeek (round 1 of 2)', result)
         self.assertEqual(self.linear.assigned, [])
         self.assertIn('Finished: the tests passed and the review approved.', self.linear.status()[0])
 
@@ -859,6 +873,65 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
     async def test_the_builders_brief_names_the_starting_commit(self):
         await run_card(self.state(), self.deps())
         self.assertIn(f'This card starts from commit {self.base}.', self.brief)
+
+    async def test_an_approval_that_does_not_answer_every_criterion_is_not_an_approval(self):
+        cases = {
+            'no criteria at all': [],
+            'criterion named without its words': [{'id': 'AC1', 'criterion': 'something else', 'verdict': 'met', 'how': 'x'}],
+            'met without saying how': [{'id': 'AC1', 'criterion': 'say hello', 'verdict': 'met', 'how': ' '}],
+        }
+        for name, criteria in cases.items():
+            self.setUp()
+            bare = ReviewResult(ok=True, verdict='approve', summary='fine', criteria=criteria)
+            self.assertEqual(await run_card(self.state(), self.deps(reviewer=self.reviewer_says(bare))), 'failed', name)
+            self.assertIn('its approval does not cover the acceptance criteria', self.results()[0], name)
+            self.assertEqual(self.verdicts(), [], name)
+            self.tearDown()
+
+    async def test_5_an_ignored_file_the_reviewer_wrote_voids_the_review_and_is_removed(self):
+        (self.repo / '.gitignore').write_text('.julia/\nnode_modules/\n')
+        sh(self.repo, 'git', *workers.GIT_ID, 'add', '-A')
+        sh(self.repo, 'git', *workers.GIT_ID, 'commit', '-q', '-m', 'ignore')
+        self.base = sh(self.repo, 'git', 'rev-parse', 'HEAD')
+
+        async def writes_ignored(run):
+            (Path(run.worktree) / 'node_modules').mkdir(exist_ok=True)
+            (Path(run.worktree) / '.julia').mkdir()
+            (Path(run.worktree) / '.julia' / 'answer.json').write_text('{}')
+            return self.APPROVE
+
+        async def install_then_build(run, brief, *_):
+            self.builder_calls += 1
+            (Path(run.worktree) / 'node_modules').mkdir(exist_ok=True)
+            (Path(run.worktree) / 'node_modules' / 'dep.js').write_text('installed')
+            (Path(run.worktree) / 'hello.txt').write_text('hello 1\n')
+            return BuildResult(True, report='built')
+        outcome = await run_card(self.state(), self.deps(builder=install_then_build, reviewer=self.reviewer_says(writes_ignored)))
+        self.assertEqual(outcome, 'failed')
+        self.assertTrue(any('graph: review-voided' in c for c in self.linear.comments))
+        self.assertFalse((self.worktree / '.julia').exists())
+        self.assertTrue((self.worktree / 'node_modules' / 'dep.js').exists())  # installed dependencies are kept
+
+    async def test_a_crash_between_saving_a_verdict_and_posting_it_still_posts_it_and_keeps_the_round(self):
+        deps = self.deps(reviewer=self.reviewer_says(self.findings('F1: x'), self.APPROVE))
+        real = deps.linear.comment
+
+        async def dies_on_verdict(card, body):
+            if 'graph: review-verdict' in body:
+                raise Crash()
+            return await real(card, body)
+        deps.linear.comment = dies_on_verdict
+        with self.assertRaises(Crash):
+            await run_card(self.state(), deps)
+        saved = self.saved()
+        self.assertEqual((saved.step, saved.fixing, len(saved.round_reasons)), ('build', 'review', 1))
+        deps.linear.comment = real
+        outcome = await run_card(self.state(), self.deps(reviewer=self.reviewer_says(self.APPROVE)))
+        self.assertEqual(outcome, 'passed')
+        self.assertEqual(self.reviewer_calls, 2)  # round 1 was not reviewed again
+        found, approved = self.verdicts()
+        self.assertIn('F1: x', found)
+        self.assertIn('F1: x', self.brief)  # the builder still got round 1's findings
 
 
 class PrepareTest(unittest.IsolatedAsyncioTestCase):
@@ -1066,11 +1139,19 @@ class WorkerParsingTest(unittest.TestCase):
 
     # the reviewer's reply, as run-pi-seat.mjs prints it
 
+    def test_the_final_message_is_read_from_a_real_pi_stream(self):
+        fixture = REPO_ROOT / 'graph' / 'fixtures' / 'orca-1.4.205' / 'cost.pi.seat-json-stream.multi-turn.jsonl'
+        text, error = workers.pi_final(fixture.read_text())
+        self.assertIsNone(error)
+        self.assertIn('julia-next', text)  # the turn's last message, after a tool call and an agent_end
+        cut = '\n'.join(line for line in fixture.read_text().splitlines() if '"stopReason":"stop"' not in line)
+        self.assertEqual(workers.pi_final(cut)[0], '')  # a message that ended in a tool call is not final
+
     def test_the_final_messages_closing_json_is_the_verdict(self):
-        met = {'criteria': [{'id': 'AC1', 'verdict': 'met', 'how': 'read graph.py:10'}]}
-        result = workers.reviewer_outcome(0, pi_stream(verdict('approve', summary='checked', **met)), '')
+        answers = {'criteria': met('say hello')}
+        result = workers.reviewer_outcome(0, pi_stream(verdict('approve', summary='checked', **answers)), '')
         self.assertTrue(result.ok)
-        self.assertEqual((result.verdict, result.summary), ('approve', 'checked'))
+        self.assertEqual((result.verdict, result.summary, result.criteria), ('approve', 'checked', met('say hello')))
         fenced = workers.reviewer_outcome(0, pi_stream('```json\n' + json.dumps({'verdict': 'approve'}) + '\n```'), '')
         self.assertEqual(fenced.verdict, 'approve')
 

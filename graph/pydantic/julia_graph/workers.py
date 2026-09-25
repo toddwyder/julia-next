@@ -284,27 +284,39 @@ async def tester(run: CardRun, limit_seconds: int, progress, ask=ask_tester) -> 
     return result
 
 
+def message_text(message: dict) -> str:
+    content = message.get('content')
+    if isinstance(content, str):
+        return content
+    return ''.join(p.get('text', '') for p in content or [] if isinstance(p, dict) and p.get('type') == 'text')
+
+
 def pi_final(stream: str) -> tuple[str, str | None]:
-    """(the final assistant message's text, Pi's error or None), read as
-    run-pi-seat.mjs parsePiJsonStream reads the stream: the last assistant
-    message with a stop reason is the final one."""
-    final, error = None, None
+    """(the reviewer's final message, Pi's error or None).
+
+    The final message is the last assistant `message_end` event, and only if
+    it ended the turn (stopReason "stop"): the `agent_end` event that follows
+    repeats messages, sometimes without their text, and a message that ended
+    in a tool call is not the reviewer's last word. The error is read as
+    run-pi-seat.mjs parsePiJsonStream reads it."""
+    final, last, error = None, None, None
     for line in stream.splitlines():
         event = _json(line)
         if not isinstance(event, dict):
             continue
         if event.get('type') == 'error':
             error = str(event.get('error') or event.get('message') or line)[:500]
-        for message in [event.get('message'), *(event.get('messages') or [])]:
-            if isinstance(message, dict) and message.get('role') == 'assistant' and isinstance(message.get('stopReason'), str):
-                final = message
-    if final is None:
+        message = event.get('message')
+        if event.get('type') == 'message_end' and isinstance(message, dict) and message.get('role') == 'assistant':
+            final = message
+        for m in [message, *(event.get('messages') or [])]:
+            if isinstance(m, dict) and m.get('role') == 'assistant' and isinstance(m.get('stopReason'), str):
+                last = m
+    if last is not None:
+        error = str(last.get('errorMessage') or 'Pi reported a vendor error')[:500] if last['stopReason'] == 'error' else None
+    if final is None or final.get('stopReason') != 'stop':
         return '', error
-    content = final.get('content')
-    parts = [content] if isinstance(content, str) else [p.get('text', '') for p in content or [] if isinstance(p, dict) and p.get('type') == 'text']
-    if final['stopReason'] == 'error':
-        return ''.join(parts), str(final.get('errorMessage') or 'Pi reported a vendor error')[:500]
-    return ''.join(parts), None
+    return message_text(final), error
 
 
 def final_verdict(text: str) -> dict | None:
@@ -337,8 +349,8 @@ def reviewer_outcome(status: int | None, stdout: str, stderr: str) -> ReviewResu
     verdict = final_verdict(text)
     if verdict is None or verdict.get('verdict') not in ('approve', 'changes_needed'):
         return ReviewResult(reason='its final message does not end with a verdict object', text=text)
-    criteria = verdict.get('criteria') if isinstance(verdict.get('criteria'), list) else []
-    unmet = [c for c in criteria if isinstance(c, dict) and c.get('verdict') != 'met']
+    criteria = [c for c in verdict.get('criteria') or [] if isinstance(c, dict)] if isinstance(verdict.get('criteria'), list) else []
+    unmet = [c for c in criteria if c.get('verdict') != 'met']
     if verdict['verdict'] == 'approve' and unmet:
         return ReviewResult(reason=f'it approved with {len(unmet)} criteria not met, which is not a clear verdict', text=text)
     findings = str(verdict.get('findings') or '').strip()
@@ -346,7 +358,7 @@ def reviewer_outcome(status: int | None, stdout: str, stderr: str) -> ReviewResu
         findings = '\n'.join(f"- {c.get('id', '?')}: {c.get('how', 'not met')}" for c in unmet)
     todd = verdict.get('todd') if verdict.get('todd') in TODD_REASONS else None
     return ReviewResult(ok=True, verdict=verdict['verdict'], summary=str(verdict.get('summary') or '').strip(),
-                        findings=findings, todd=todd, todd_reason=str(verdict.get('todd_reason') or '').strip() if todd else '',
+                        findings=findings, todd=todd, criteria=criteria, todd_reason=str(verdict.get('todd_reason') or '').strip() if todd else '',
                         text=text)
 
 
@@ -369,15 +381,24 @@ def reviewer(log):
     return review
 
 
+# Installed dependencies: ignored by git, made by the graph (npm ci), kept by a
+# restore. A change inside them is not seen; the reviewer cannot write to the
+# working copy at all on the server (runner is not in its group).
+KEPT = 'node_modules'
+
+
 def snapshot(run: CardRun) -> tuple[str, str]:
-    """The working copy's HEAD and everything `git status` sees, untracked files included."""
-    return git(run.worktree, 'rev-parse', 'HEAD'), git(run.worktree, 'status', '--porcelain', '--untracked-files=all')
+    """The working copy's HEAD and everything `git status` sees, untracked and
+    ignored files included (an ignored folder is listed by name)."""
+    return (git(run.worktree, 'rev-parse', 'HEAD'),
+            git(run.worktree, 'status', '--porcelain', '--untracked-files=all', '--ignored'))
 
 
 async def restore(run: CardRun, commit: str) -> None:
-    """Put the working copy back to this commit, with nothing uncommitted left."""
+    """Put the working copy back to this commit: nothing uncommitted is left,
+    ignored files included, except the installed dependencies."""
     git(run.worktree, 'reset', '-q', '--hard', commit)
-    git(run.worktree, 'clean', '-fdq')
+    git(run.worktree, 'clean', '-fdqx', '-e', KEPT)
 
 
 def change(run: CardRun) -> str:

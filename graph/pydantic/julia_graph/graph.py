@@ -470,6 +470,8 @@ class Build(BaseNode[CardRun, Deps, str]):
         if s.fixing == 'tests':
             # Said here, not in Test, so a restart between the two still says it.
             await say_once(ctx, repair_notice(s), marker('tests-failed', s, commit=s.repair_from))
+        if s.fixing == 'review':
+            await post_review(ctx)  # the same, for the review that asked for changes
         if reason := await no_second_worker(ctx, 'builder'):
             return fail(ctx, reason)
         card = await ctx.deps.linear.card(s.card)
@@ -588,6 +590,59 @@ class Test(BaseNode[CardRun, Deps, str]):
 
 # ------------------------------------------------------------ the independent review (JUL-128)
 
+# The acceptance criteria, numbered as scripts/acceptance-check.mjs numbers them:
+# the checkbox items under an "Acceptance criteria" heading (or bold label), up
+# to a heading of the same level or higher; struck-through items do not count.
+CHECKBOX = re.compile(r'^\s*[-*]\s+\[( |x|X)\]\s+(.*)$')
+ACCEPTANCE_HEADING = re.compile(r'^\s*(#{1,6})?\s*\**\s*acceptance criteria\s*:?\s*\**\s*:?\s*$', re.I)
+HEADING = re.compile(r'^\s*(#{1,6})\s')
+
+
+def acceptance_criteria(description: str) -> list[tuple[str, str]]:
+    """[(id, text)]: AC1, AC2, ... in order."""
+    found, level = [], None
+    for line in (description or '').split('\n'):
+        line = line.rstrip('\r')
+        if opening := ACCEPTANCE_HEADING.match(line):
+            level = len(opening[1]) if opening[1] else 6
+            continue
+        if level is None:
+            continue
+        if (heading := HEADING.match(line)) and len(heading[1]) <= level:
+            level = None
+            continue
+        if (box := CHECKBOX.match(line)) and not box[2].strip().startswith('~~'):
+            found.append((f'AC{len(found) + 1}', box[2].strip()))
+    return found
+
+
+def normalize(text: object) -> str:
+    """Markdown, links and punctuation out, words kept (acceptance-check.mjs normalize)."""
+    text = re.sub(r'<[^>]+>', ' ', str(text or ''))
+    text = re.sub(r'\[([^\]]*)\]\([^)]*\)', r'\1', text)
+    text = re.sub(r'[*_`~>#]', ' ', text)
+    return ' '.join(re.sub(r'[^\w]+|_', ' ', text).split()).lower()
+
+
+def criteria_gaps(description: str, answers: list[dict]) -> list[str]:
+    """Why an approval does not cover the card: each criterion needs an answer
+    naming its id and its words, found "met", saying how it was checked."""
+    wanted = acceptance_criteria(description)
+    if not wanted:
+        return ['the card lists no acceptance criteria to approve against']
+    gaps = []
+    for ac, text in wanted:
+        answer = next((a for a in answers if str(a.get('id', '')).upper() == ac
+                       and normalize(text) and normalize(text) in normalize(a.get('criterion'))), None)
+        if answer is None:
+            gaps.append(f'{ac} was not checked by name')
+        elif answer.get('verdict') != 'met':
+            gaps.append(f'{ac} was found {answer.get("verdict")!r}, not "met"')
+        elif not str(answer.get('how') or '').strip():
+            gaps.append(f'{ac} was called met without saying how it was checked')
+    return gaps
+
+
 def reviewer_brief(card: dict, run: CardRun, role: str, diff: str) -> str:
     """Everything the reviewer sees: its role file (from the start commit), the
     card with its locked UAT steps, the graph's own test result, the builder's
@@ -611,6 +666,9 @@ candidate is unchanged after you finish, and posts your verdict on the card.
 {with_locked_uat(card['description'], run.uat_plan)}
 </card>
 {instructions_part(card)}
+The acceptance criteria, by id:
+{chr(10).join(f'- {ac}: {text}' for ac, text in acceptance_criteria(card['description'])) or '(none found on the card)'}
+
 The candidate is commit {run.commit}, from start commit {run.base} ({commits}).
 
 <test-result>
@@ -627,17 +685,17 @@ The graph ran the tests once on the candidate: {run.tests.summary if run.tests e
 
 End your final message with the single JSON object your role file describes,
 and nothing after it: that object is your verdict, and only it counts. Earlier
-text does not. If your findings cannot be fixed by the builder because they
+text does not. Its "criteria" list must answer every criterion above by its id
+and its exact words; an approval that leaves one out does not count. If your findings cannot be fixed by the builder because they
 need Todd himself, add "todd": "account_action", "money_decision" or
 "product_decision", and "todd_reason": "<why, in one sentence>". Use it for
 nothing else: an ordinary defect never needs Todd.
 """
 
 
-def verdict_text(s: CardRun, review: ReviewResult, who: str, maker: str) -> str:
+def verdict_text(s: CardRun, review: ReviewResult) -> str:
     lines = [f'**Independent review of `{(s.commit or "")[:12]}`: {"APPROVED" if review.verdict == "approve" else "CHANGES NEEDED"}**',
-             '', f'- Reviewer: {who}', f'- Company: {maker}',
-             f'- Round: {review.round} of {MAX_REVIEW_ROUNDS}']
+             '', f'- Reviewer: {review.reviewer}', f'- Round: {review.round} of {MAX_REVIEW_ROUNDS}']
     if review.summary:
         lines.append(f'- Summary: {review.summary.strip()}')
     if review.verdict != 'approve' and review.findings:
@@ -675,51 +733,76 @@ class Review(BaseNode[CardRun, Deps, str]):
             review = await ctx.deps.reviewer(s, brief, ctx.deps.limits['reviewer'], lambda: moved(ctx))
         except Exception as error:  # a reviewer that cannot even run never approves
             review = ReviewResult(reason=f'the reviewer could not run: {type(error).__name__}: {error}')
-        review = review.model_copy(update={'reviewer': f'{who} ({maker})', 'round': round_})
+        review = review.model_copy(update={'reviewer': f'{who}, from {maker}', 'round': round_})
         after = ctx.deps.snapshot(s)
+        # Every outcome is saved before anything is posted; post_review (here,
+        # or in Build or Report after a restart) posts it, once.
         if after != before:
-            # AC 4: the reviewer changed the candidate. Whatever it said does not
-            # count; the working copy goes back to the commit it was given.
-            s.review = review.model_copy(update={'ok': False, 'voided': True})
-            save(ctx)
-            await ctx.deps.restore(s, before[0])
+            # AC 4: the reviewer changed the candidate. Whatever it said does not count.
             changed = ', '.join(x for x in (
                 f'the commit moved from `{before[0][:12]}` to `{after[0][:12]}`' if after[0] != before[0] else '',
                 'files in the working copy changed' if after[1] != before[1] else '') if x)
-            await say_once(ctx, f'The review by {who} ({maker}) of `{before[0][:12]}` is **void**: the reviewer changed '
-                                f'the candidate ({changed}). Its verdict does not count, and the working copy was put back '
-                                f'to `{before[0][:12]}`.', marker('review-voided', s, commit=before[0]))
+            s.review = review.model_copy(update={'ok': False, 'voided': True, 'reason': changed})
             close(ctx, 'voided')
-            return fail(ctx, f'the review was voided because the reviewer changed the candidate ({changed})')
+            return await failed_review(ctx, f'the review was voided because the reviewer changed the candidate ({changed})')
+        if review.ok and review.verdict == 'approve':
+            if gaps := criteria_gaps(card['description'], review.criteria):
+                review = review.model_copy(update={'ok': False, 'reason': 'its approval does not cover the acceptance '
+                                                                         'criteria: ' + '; '.join(gaps)})
         s.review = review
         if review.stopped:
             return await stopped(ctx, 'reviewer')
         if not review.ok:
             # AC 3: no clear final verdict, whatever the reviewer wrote before.
-            save(ctx)
             close(ctx, 'no verdict')
             return fail(ctx, f'the review gave no clear final verdict, so it is not an approval: {review.reason}')
-        if review.verdict == 'changes_needed':
-            s.round_reasons.append(review.findings.strip() or review.summary.strip() or '(the reviewer gave no detail)')
-        await say_once(ctx, verdict_text(s, review, who, maker), marker('review-verdict', s, commit=s.commit))
         if review.verdict == 'approve':
             s.step = 'report'
             close(ctx, 'done')  # saves
+            await post_review(ctx)
             return Report()
+        s.round_reasons.append(review.findings.strip() or review.summary.strip() or '(the reviewer gave no detail)')
         if len(s.round_reasons) < MAX_REVIEW_ROUNDS:
             s.repair_from, s.tries, s.fixing, s.step = s.commit, 0, 'review', 'build'
             close(ctx, 'changes needed')  # saves
+            await post_review(ctx)
             return Build()
-        # AC 2: the last round also asked for changes. One comment, every reason.
+        # AC 2: the last round also asked for changes.
         if review.todd in TODD_REASONS:
             s.needs_todd = review.todd
+        close(ctx, 'changes needed')
+        return await failed_review(ctx, f'the review asked for changes in {MAX_REVIEW_ROUNDS} rounds; '
+                                        'the reasons are in one comment above')
+
+
+async def failed_review(ctx: GraphRunContext[CardRun, Deps], reason: str) -> Report:
+    report = fail(ctx, reason)  # saves
+    await post_review(ctx)
+    return report
+
+
+async def post_review(ctx: GraphRunContext[CardRun, Deps]) -> None:
+    """Post what the saved review says, once each: the verdict (AC 1), the stop
+    with every round's reasons (AC 2), or the void (AC 4), putting a changed
+    working copy back to the candidate first. Safe to run again after a restart."""
+    s, review = ctx.state, ctx.state.review
+    if review is None:
+        return
+    if review.voided:
+        await ctx.deps.restore(s, s.commit)
+        await say_once(ctx, f'The review by {review.reviewer} of `{(s.commit or "")[:12]}` is **void**: the reviewer '
+                            f'changed the candidate ({review.reason}). Its verdict does not count, and the working copy '
+                            f'was put back to `{(s.commit or "")[:12]}`.', marker('review-voided', s, commit=s.commit))
+        return
+    if not review.ok:
+        return  # no verdict to post; the result comment says why
+    await say_once(ctx, verdict_text(s, review), marker('review-verdict', s, commit=s.commit))
+    if review.verdict == 'changes_needed' and len(s.round_reasons) >= MAX_REVIEW_ROUNDS:
         reasons = '\n\n'.join(f'**Round {n}:** {text}' for n, text in enumerate(s.round_reasons, 1))
         todd = (f'\n\nThe reviewer says this needs Todd: {TODD_REASONS[s.needs_todd]}. {review.todd_reason}'.rstrip()
                 if s.needs_todd else '')
         await say_once(ctx, f'**The review stopped this card after {MAX_REVIEW_ROUNDS} rounds of findings.** No new card was '
                             f'opened for them.\n\n{reasons}{todd}', marker('review-stopped', s))
-        close(ctx, 'changes needed')
-        return fail(ctx, f'the review asked for changes in {MAX_REVIEW_ROUNDS} rounds; the reasons are in one comment above')
 
 
 def result_text(s: CardRun, version: str) -> tuple[str, str]:
@@ -760,6 +843,7 @@ def result_text(s: CardRun, version: str) -> tuple[str, str]:
 @dataclass
 class Report(BaseNode[CardRun, Deps, str]):
     async def run(self, ctx: GraphRunContext[CardRun, Deps]) -> End[str]:
+        await post_review(ctx)  # a no-op unless a restart fell between saving a review and posting it
         text, outcome = result_text(ctx.state, ctx.deps.graph_version)
         await say_once(ctx, text, marker('result', ctx.state, commit=ctx.state.commit or 'none', outcome=outcome))
         if not ctx.state.ending:

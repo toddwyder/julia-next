@@ -44,6 +44,9 @@ class ReviewResult(BaseModel):
     # action, a money decision or a product decision (graph.TODD_REASONS).
     todd: str | None = None
     todd_reason: str = ''
+    # The reviewer's answer for each acceptance criterion, as its role file asks:
+    # [{id, criterion, verdict, how}]. An approval must cover every one (graph.criteria_gaps).
+    criteria: list[dict] = []
     reason: str | None = None  # why there is no verdict
     stopped: bool = False  # ran past its time limit
     voided: bool = False  # it changed the candidate, so it does not count
