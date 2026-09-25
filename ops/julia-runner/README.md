@@ -51,7 +51,7 @@ Git, a PR or Linear.
 4. The worker code, root-owned, mirroring the repo layout, copied from a checkout of the
    reviewed commit:
    ```
-   for f in ops/julia-runner/run-gemini.mjs ops/julia-runner/run-tests.mjs ops/julia-runner/time-limit.mjs ops/julia-runner/run-reviewer.mjs \
+   for f in ops/julia-runner/run-gemini.mjs ops/julia-runner/run-tests.mjs ops/julia-runner/time-limit.mjs ops/julia-runner/run-reviewer.mjs ops/julia-runner/reap.py \
             scripts/julia-minimal-runner-checks.mjs ops/service-dropbox/run-pi-seat.mjs ops/service-dropbox/read-secret.mjs; do
      sudo install -D -o root -g root -m 0644 "$CHECKOUT/$f" "/opt/julia-runner/$f"
    done
