@@ -18,16 +18,31 @@ import subprocess
 import time
 from pathlib import Path
 
-from .checkpoint import CardRun, TestResult
+from .checkpoint import CardRun, ReviewResult, TestResult
 from .graph import BuildResult
 
 WORKER_COMMANDS = {
     'builder': ('gemini-worker', '/opt/julia-runner/ops/julia-runner/run-gemini.mjs'),
     'tests': ('julia-tester', '/opt/julia-runner/ops/julia-runner/run-tests.mjs'),
+    'reviewer': ('runner', '/opt/julia-runner/ops/service-dropbox/run-pi-seat.mjs'),
 }
 WORKER_ENV = {'PATH': '/usr/bin:/bin', 'LANG': 'C.UTF-8'}
 # Who each worker is, in the words the card shows.
-WORKER_NAMES = {'builder': 'Gemini (agy)', 'tests': 'the test runner (no AI model)'}
+WORKER_NAMES = {
+    'builder': 'Gemini (agy)',
+    'tests': 'the test runner (no AI model)',
+    'reviewer': 'DeepSeek (Pi)',
+}
+WORKER_COMPANIES = {
+    'builder': 'Google',
+    'tests': 'none',
+    'reviewer': 'DeepSeek',
+}
+WORKER_MAKERS = {
+    'builder': 'Google',
+    'tests': 'none',
+    'reviewer': 'DeepSeek',
+}
 # The exit code ops/julia-runner/time-limit.mjs gives a worker it stopped, as GNU timeout does.
 STOPPED_EXIT = 124
 GIT_ID = ['-c', 'user.name=Julia graph', '-c', 'user.email=graph@julia-next.invalid']
@@ -219,6 +234,62 @@ async def tester(run: CardRun, limit_seconds: int, progress, ask=ask_tester) -> 
     else:
         result.summary = '`npm run lint:framework` passed; ' + result.summary
     return result
+
+
+def reviewer_outcome(status: int | None, stdout: str, stderr: str) -> ReviewResult:
+    tail = stderr.strip().splitlines()[-1:] or ['']
+    if status == STOPPED_EXIT:
+        return ReviewResult(ok=False, stopped=True, reason=tail[0] or 'stopped by its time limit')
+    if status != 0:
+        return ReviewResult(ok=False, reason=f'the reviewer exited {status} {tail[0]}'.strip(), report=stdout)
+
+    for line in stdout.splitlines():
+        line = line.strip()
+        if line.startswith('{') and line.endswith('}'):
+            try:
+                data = json.loads(line)
+                if isinstance(data, dict):
+                    verdict = data.get('verdict')
+                    if verdict in ('approve', 'clean'):
+                        return ReviewResult(ok=True, verdict='approve', summary=data.get('summary', ''), report=stdout)
+                    if verdict in ('findings', 'changes_needed'):
+                        return ReviewResult(ok=True, verdict='findings', summary=data.get('summary', ''), findings=data.get('findings') or stdout, report=stdout)
+            except Exception:
+                pass
+
+    if re.search(r'^\s*VERDICT:\s*CLEAN\s*$', stdout, re.M | re.I):
+        return ReviewResult(ok=True, verdict='approve', summary='all checks clean', report=stdout)
+    if re.search(r'^\s*VERDICT:\s*FINDINGS\s*$', stdout, re.M | re.I):
+        return ReviewResult(ok=True, verdict='findings', findings=stdout, report=stdout)
+    if re.search(r'^\s*verdict:\s*approve\b', stdout, re.M | re.I):
+        return ReviewResult(ok=True, verdict='approve', summary='approved', report=stdout)
+    if re.search(r'^\s*verdict:\s*(?:changes_needed|findings)\b', stdout, re.M | re.I):
+        return ReviewResult(ok=True, verdict='findings', findings=stdout, report=stdout)
+
+    return ReviewResult(ok=False, verdict=None, reason='the reviewer ended without a valid verdict', report=stdout)
+
+
+def reviewer(log):
+    async def review(run: CardRun, brief: str, limit_seconds: int, progress) -> ReviewResult:
+        async def on_line(line):
+            if progress:
+                await progress()
+        request = {'worktree': run.worktree, 'prompt': brief, 'limit_seconds': limit_seconds}
+        status, out, err = await run_worker('reviewer', request, on_line)
+        return reviewer_outcome(status, out, err)
+    return review
+
+
+def head_commit(run: CardRun) -> str:
+    return git(run.worktree, 'rev-parse', 'HEAD')
+
+
+def is_clean(run: CardRun) -> bool:
+    return not bool(git(run.worktree, 'status', '--porcelain').strip())
+
+
+def diff(run: CardRun) -> str:
+    return git(run.worktree, 'diff', f'{run.base}...HEAD')
 
 
 # ------------------------------------------------------------ git

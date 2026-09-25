@@ -80,6 +80,10 @@ class PretendBoard:
         await asyncio.sleep(0)  # a real call yields, so two checks can interleave
         self.cards[name]['state'] = state
 
+    async def assign(self, name, assignee):
+        await asyncio.sleep(0)
+        self.cards[name]['assignee'] = assignee
+
 
 class BoardTest(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
@@ -100,7 +104,7 @@ class BoardTest(unittest.IsolatedAsyncioTestCase):
         self.clock = Clock()
         self.built: list[str] = []  # the card each builder was started for, in order
         self.briefs: dict[str, str] = {}
-        self.alive: dict[str, list[int]] = {'builder': [], 'tests': []}
+        self.alive: dict[str, list[int]] = {'builder': [], 'tests': [], 'reviewer': []}
         self.builder = self.default_builder
         self.on_prepare = None
         self.logged: list[str] = []

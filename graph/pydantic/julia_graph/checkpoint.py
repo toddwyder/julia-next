@@ -17,7 +17,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-Step = Literal['prepare', 'build', 'test', 'report', 'done']
+Step = Literal['prepare', 'build', 'test', 'review', 'report', 'done']
 
 
 class TestResult(BaseModel):
@@ -26,6 +26,22 @@ class TestResult(BaseModel):
     failing: list[str] = []
     # True when the test run was stopped for running past its time limit.
     stopped: bool = False
+
+
+class ReviewResult(BaseModel):
+    ok: bool = True
+    verdict: str | None = None  # 'approve' | 'findings'
+    summary: str = ''
+    findings: str | None = None
+    reason: str | None = None
+    report: str | None = None
+    stopped: bool = False
+    tampered: bool = False
+    voided: bool = False
+    void_reason: str | None = None
+    reviewer: str | None = None
+    company: str | None = None
+    maker: str | None = None
 
 
 class StepMark(BaseModel):
@@ -53,6 +69,9 @@ class CardRun(BaseModel):
     commit: str | None = None
     builder_report: str | None = None
     tests: TestResult | None = None
+    review: ReviewResult | None = None
+    prior_findings: str | None = None
+    round_reasons: list[str] = []
     failure: str | None = None
     # The card's one "Where this card is" comment (JUL-126).
     status_id: str | None = None

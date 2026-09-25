@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from julia_graph import workers
-from julia_graph.checkpoint import CardLocked, CardRun, Checkpoint, TestResult
+from julia_graph.checkpoint import CardLocked, CardRun, Checkpoint, ReviewResult, TestResult
 from julia_graph.graph import BuildResult, Deps, checked_limit, run_card
 
 
@@ -26,6 +26,7 @@ class FakeLinear:
     def __init__(self):
         self.store: dict[str, str] = {}  # comment id -> body, in posting order
         self.edits: list[str] = []  # ids, one per edit
+        self.assigned: list[tuple[str, str | None]] = []
 
     @property
     def comments(self) -> list[str]:
@@ -44,6 +45,9 @@ class FakeLinear:
         assert comment_id in self.store, f'no comment {comment_id} to edit'
         self.store[comment_id] = body
         self.edits.append(comment_id)
+
+    async def assign(self, card, assignee=None):
+        self.assigned.append((card, assignee))
 
     def status(self) -> list[str]:
         return [b for b in self.store.values() if 'graph: status' in b]
@@ -81,7 +85,9 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         self.linear = FakeLinear()
         self.builder_calls = 0
         self.tester_calls = 0
-        self.alive: dict[str, list[int]] = {'builder': [], 'tests': []}
+        self.reviewer_calls = 0
+        self.reviewer_brief = None
+        self.alive: dict[str, list[int]] = {'builder': [], 'tests': [], 'reviewer': []}
         self.clock = Clock()
 
     def tearDown(self):
@@ -98,7 +104,7 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
             sh(self.worktree, 'git', 'checkout', '-q', '-b', run.branch, run.base)
         return None
 
-    def deps(self, builder=None, tester=None, alive_after_wait=None):
+    def deps(self, builder=None, tester=None, reviewer=None, alive_after_wait=None):
         async def default_builder(run, brief, limit, progress):
             self.builder_calls += 1
             self.brief = brief
@@ -109,16 +115,26 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
             self.tester_calls += 1
             return TestResult(passed=True, summary='tests 3, pass 3, fail 0')
 
+        async def default_reviewer(run, brief, limit, *_):
+            self.reviewer_calls += 1
+            self.reviewer_brief = brief
+            return ReviewResult(ok=True, verdict='approve', summary='candidate approved')
+
         async def wait_for_exit(kind):
             return alive_after_wait if alive_after_wait is not None else []
 
         return Deps(
             linear=self.linear, checkpoint=Checkpoint(self.state_dir, 'JUL-1'), prepare=self.prepare,
             builder=builder or default_builder, discard=workers.discard, commit=workers.commit,
-            tester=tester or default_tester, live_workers=lambda kind: self.alive[kind],
+            tester=tester or default_tester, reviewer=reviewer or default_reviewer,
+            live_workers=lambda kind: self.alive[kind],
             wait_for_exit=wait_for_exit, graph_version='pydantic-graph test', log=lambda line: None,
-            now=self.clock, worker_names={'builder': 'Gemini (agy)', 'tests': 'the test runner (no AI model)'},
-            limits={'builder': 3600, 'tests': 900},
+            now=self.clock,
+            worker_names={'builder': 'Gemini (agy)', 'tests': 'the test runner (no AI model)', 'reviewer': 'DeepSeek (Pi)'},
+            worker_companies={'builder': 'Google', 'tests': 'none', 'reviewer': 'DeepSeek'},
+            worker_makers={'builder': 'Google', 'tests': 'none', 'reviewer': 'DeepSeek'},
+            limits={'builder': 3600, 'tests': 900, 'reviewer': 1200},
+            head_commit=workers.head_commit, is_clean=workers.is_clean, diff=workers.diff,
         )
 
     def saved(self):
@@ -521,6 +537,179 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         [status] = self.linear.status()
         self.assertIn('Stopped: the test run ran too long', status)
 
+    # ----------------------------------------------------------------- independent review (JUL-128)
+
+    async def test_reviewer_approval_posted_on_card(self):
+        # AC 1 & UAT 1: Reviewer from different maker reviews full change, verdict posted on card
+        async def reviewer(run, brief, limit, progress):
+            self.reviewer_calls += 1
+            self.reviewer_brief = brief
+            return ReviewResult(ok=True, verdict='approve', summary='meets all criteria')
+
+        outcome = await run_card(self.state(), self.deps(reviewer=reviewer))
+        self.assertEqual(outcome, 'passed')
+        self.assertEqual(self.reviewer_calls, 1)
+        self.assertIn('<card>', self.reviewer_brief)
+        self.assertIn('<diff>', self.reviewer_brief)
+        # Check verdict comment on card
+        verdicts = [c for c in self.linear.comments if 'graph: review-verdict' in c]
+        self.assertEqual(len(verdicts), 1)
+        self.assertIn('Independent Review: APPROVED', verdicts[0])
+        self.assertIn('Reviewer: DeepSeek (Pi)', verdicts[0])
+        self.assertIn('Company: DeepSeek', verdicts[0])
+        self.assertIn('Verdict: approve', verdicts[0])
+        self.assertIn('Summary: meets all criteria', verdicts[0])
+        # Check result text contains review
+        [result] = self.results()
+        self.assertIn('PASSED', result)
+        self.assertIn('Review: approve (DeepSeek (Pi), DeepSeek) - meets all criteria', result)
+
+    async def test_reviewer_findings_go_back_to_builder_then_approved(self):
+        # AC 2: Findings go back to the builder
+        builder_briefs = []
+
+        async def builder(run, brief, limit, progress):
+            self.builder_calls += 1
+            builder_briefs.append(brief)
+            (Path(run.worktree) / 'hello.txt').write_text(f'hello round {run.attempt}\n')
+            return BuildResult(True, report=f'Attempt {run.attempt} done')
+
+        review_rounds = 0
+
+        async def reviewer(run, brief, limit, progress):
+            nonlocal review_rounds
+            review_rounds += 1
+            self.reviewer_calls += 1
+            if review_rounds == 1:
+                return ReviewResult(ok=True, verdict='findings', summary='missing tests', findings='Please add tests for edge cases')
+            return ReviewResult(ok=True, verdict='approve', summary='all issues resolved')
+
+        outcome = await run_card(self.state(), self.deps(builder=builder, reviewer=reviewer))
+        self.assertEqual(outcome, 'passed')
+        self.assertEqual(self.builder_calls, 2)
+        self.assertEqual(self.reviewer_calls, 2)
+        # Verify findings reached the builder on round 2
+        self.assertNotIn('<findings>', builder_briefs[0])
+        self.assertIn('<findings>', builder_briefs[1])
+        self.assertIn('Please add tests for edge cases', builder_briefs[1])
+        # Both verdict comments exist
+        verdicts = [c for c in self.linear.comments if 'graph: review-verdict' in c]
+        self.assertEqual(len(verdicts), 2)
+        self.assertIn('Independent Review: FINDINGS', verdicts[0])
+        self.assertIn('Independent Review: APPROVED', verdicts[1])
+
+    async def test_reviewer_two_unsuccessful_rounds_stops_with_both_reasons_in_one_comment(self):
+        # AC 2 & UAT 2: After two unsuccessful rounds the card stops with both reasons in one comment,
+        # and the card should not be assigned to Todd.
+        async def reviewer(run, brief, limit, progress):
+            self.reviewer_calls += 1
+            return ReviewResult(
+                ok=True,
+                verdict='findings',
+                findings=f'Issue in attempt {run.attempt}: check validation',
+            )
+
+        outcome = await run_card(self.state(), self.deps(reviewer=reviewer))
+        self.assertEqual(outcome, 'failed')
+        self.assertEqual(self.builder_calls, 2)
+        self.assertEqual(self.reviewer_calls, 2)
+        # Check single comment with both reasons
+        stops = [c for c in self.linear.comments if 'graph: two-rounds-stopped' in c]
+        self.assertEqual(len(stops), 1)
+        self.assertIn('**Review stopped after two unsuccessful rounds:**', stops[0])
+        self.assertIn('1. **Round 1:** Issue in attempt 1: check validation', stops[0])
+        self.assertIn('2. **Round 2:** Issue in attempt 2: check validation', stops[0])
+        # UAT 2: Card should NOT be assigned to Todd
+        self.assertEqual(self.linear.assigned, [])
+
+    async def test_reviewer_crashed_or_abnormal_exit_is_never_an_approval(self):
+        # AC 3: A crash, timeout, missing verdict or abnormal exit is never an approval,
+        # even if the reviewer wrote "approve" earlier.
+        async def crashed_reviewer(run, brief, limit, progress):
+            self.reviewer_calls += 1
+            # Pretend reviewer wrote "approve" in stdout but crashed / had abnormal exit
+            return ReviewResult(ok=False, reason='the reviewer exited 137 (SIGKILL)', report='verdict: approve')
+
+        outcome = await run_card(self.state(), self.deps(reviewer=crashed_reviewer))
+        self.assertEqual(outcome, 'failed')
+        [result] = self.results()
+        self.assertIn('FAILED', result)
+        self.assertIn('the reviewer failed: the reviewer exited 137', result)
+        self.assertNotIn('PASSED', result)
+        # No verdict comment posted
+        verdicts = [c for c in self.linear.comments if 'graph: review-verdict' in c]
+        self.assertEqual(len(verdicts), 0)
+
+    async def test_reviewer_tampering_is_voided_and_card_says_so(self):
+        # AC 4: A reviewer that changed the candidate has its review voided and the card says so.
+        async def tampering_reviewer(run, brief, limit, progress):
+            self.reviewer_calls += 1
+            # Reviewer writes a file to the working tree
+            (Path(run.worktree) / 'tampered.txt').write_text('illicit edit')
+            return ReviewResult(ok=True, verdict='approve', summary='approved with modifications')
+
+        outcome = await run_card(self.state(), self.deps(reviewer=tampering_reviewer))
+        self.assertEqual(outcome, 'failed')
+        # Check review-voided comment on card
+        voids = [c for c in self.linear.comments if 'graph: review-voided' in c]
+        self.assertEqual(len(voids), 1)
+        self.assertIn('was voided because the reviewer modified the candidate', voids[0])
+        self.assertIn('DeepSeek (Pi)', voids[0])
+        # Candidate changes discarded
+        self.assertFalse((Path(self.worktree) / 'tampered.txt').exists())
+        # Not approved
+        [result] = self.results()
+        self.assertIn('FAILED', result)
+        self.assertIn('review was voided', result)
+
+    async def test_stopped_card_assigned_to_todd_only_for_account_money_or_product_decision(self):
+        # AC 5: A stopped card is assigned to Todd only for an account action, a money decision or a product decision.
+        # 1. Builder fails needing account action (sign-in)
+        async def account_action_builder(run, brief, limit, progress):
+            return BuildResult(False, 'sign-in required: please authenticate to continue')
+
+        await run_card(self.state(), self.deps(builder=account_action_builder))
+        self.assertEqual(self.linear.assigned, [('JUL-1', 'Todd')])
+        self.linear.assigned.clear()
+
+        # 2. Builder fails needing money decision
+        self.tmp.cleanup()
+        self.setUp()
+        async def money_builder(run, brief, limit, progress):
+            return BuildResult(False, 'budget exceeded: money decision needed')
+
+        await run_card(self.state(), self.deps(builder=money_builder))
+        self.assertEqual(self.linear.assigned, [('JUL-1', 'Todd')])
+        self.linear.assigned.clear()
+
+        # 3. Builder fails needing product decision
+        self.tmp.cleanup()
+        self.setUp()
+        async def product_builder(run, brief, limit, progress):
+            return BuildResult(False, 'product decision needed: choose between option (a) or (b)')
+
+        await run_card(self.state(), self.deps(builder=product_builder))
+        self.assertEqual(self.linear.assigned, [('JUL-1', 'Todd')])
+        self.linear.assigned.clear()
+
+        # 4. Ordinary code failure -> NOT assigned to Todd
+        self.tmp.cleanup()
+        self.setUp()
+        async def normal_fail_builder(run, brief, limit, progress):
+            return BuildResult(False, 'syntax error on line 42')
+
+        await run_card(self.state(), self.deps(builder=normal_fail_builder))
+        self.assertEqual(self.linear.assigned, [])
+
+    async def test_reviewer_same_maker_as_builder_is_refused(self):
+        # AC 1: Reviewer must be from a different maker than the builder
+        deps = self.deps()
+        deps.worker_makers = {'builder': 'Google', 'reviewer': 'Google'}
+        outcome = await run_card(self.state(), deps)
+        self.assertEqual(outcome, 'failed')
+        [result] = self.results()
+        self.assertIn('the reviewer maker (Google) must be different from the builder maker (Google)', result)
+
 
 class PrepareTest(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
@@ -714,6 +903,47 @@ class WorkerParsingTest(unittest.TestCase):
                 (proc / pid / 'status').write_text('Name: x' + chr(10) + 'Uid:' + f'{chr(9)}{uid}' * 4 + chr(10))
             self.assertEqual(workers.live_workers('builder', proc, uid=1005), [201])
 
+    def test_reviewer_outcome_parses_json_approval(self):
+        stdout = 'some notes\n{"verdict": "approve", "summary": "looks good"}\n'
+        res = workers.reviewer_outcome(0, stdout, '')
+        self.assertTrue(res.ok)
+        self.assertEqual(res.verdict, 'approve')
+        self.assertEqual(res.summary, 'looks good')
+
+    def test_reviewer_outcome_parses_json_findings(self):
+        stdout = '{"verdict": "findings", "summary": "needs work", "findings": "fix bugs"}\n'
+        res = workers.reviewer_outcome(0, stdout, '')
+        self.assertTrue(res.ok)
+        self.assertEqual(res.verdict, 'findings')
+        self.assertEqual(res.findings, 'fix bugs')
+
+    def test_reviewer_outcome_parses_text_verdicts(self):
+        res1 = workers.reviewer_outcome(0, 'Code looks solid.\nVERDICT: CLEAN\n', '')
+        self.assertTrue(res1.ok)
+        self.assertEqual(res1.verdict, 'approve')
+
+        res2 = workers.reviewer_outcome(0, 'VERDICT: FINDINGS\nIssues found.', '')
+        self.assertTrue(res2.ok)
+        self.assertEqual(res2.verdict, 'findings')
+
+    def test_reviewer_outcome_nonzero_exit_is_never_an_approval(self):
+        # AC 3: crash/abnormal exit is never an approval, even if reviewer wrote approve
+        res = workers.reviewer_outcome(1, 'VERDICT: CLEAN\nverdict: approve', 'crash dump')
+        self.assertFalse(res.ok)
+        self.assertIsNone(res.verdict)
+        self.assertIn('the reviewer exited 1', res.reason)
+
+    def test_reviewer_outcome_missing_verdict_fails(self):
+        res = workers.reviewer_outcome(0, 'I read the code and thought about it.', '')
+        self.assertFalse(res.ok)
+        self.assertIsNone(res.verdict)
+        self.assertIn('ended without a valid verdict', res.reason)
+
+    def test_reviewer_outcome_stopped_by_time_limit(self):
+        res = workers.reviewer_outcome(124, '', 'stopped: ran longer than time limit\n')
+        self.assertFalse(res.ok)
+        self.assertTrue(res.stopped)
+
 
 class WorkerCallTest(unittest.IsolatedAsyncioTestCase):
     async def test_a_test_run_stopped_by_its_time_limit_is_reported_as_stopped(self):
@@ -755,11 +985,14 @@ class LimitTest(unittest.TestCase):
         # review finding 5: the card never quotes a limit the launcher would not enforce
         self.assertEqual(checked_limit('builder', '20'), 20)
         self.assertEqual(checked_limit('tests', str(60 * 60)), 60 * 60)
+        self.assertEqual(checked_limit('reviewer', str(60 * 60)), 60 * 60)
         for bad in ('0', '-5', 'x', str(3 * 60 * 60 + 1)):
             with self.assertRaises(ValueError, msg=bad):
                 checked_limit('builder', bad)
         with self.assertRaises(ValueError):
             checked_limit('tests', str(60 * 60 + 1))
+        with self.assertRaises(ValueError):
+            checked_limit('reviewer', str(60 * 60 + 1))
 
 if __name__ == '__main__':
     unittest.main()

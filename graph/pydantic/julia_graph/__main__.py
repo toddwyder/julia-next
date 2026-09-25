@@ -43,9 +43,12 @@ def card_deps(card: str, limits: dict[str, int] | None = None) -> Deps:
     return Deps(
         linear=LinearApp(), checkpoint=Checkpoint(Path(STATE), card),
         prepare=workers.prepare(REPO), builder=workers.builder(log), discard=workers.discard,
-        commit=workers.commit, tester=workers.tester, live_workers=workers.live_workers,
-        wait_for_exit=workers.waiter(WAIT_LIMIT_SECONDS), graph_version=graph_version(), log=log,
-        worker_names=workers.WORKER_NAMES, limits=limits or dict(LIMITS), files=workers.tracked_files,
+        commit=workers.commit, tester=workers.tester, reviewer=workers.reviewer(log),
+        head_commit=workers.head_commit, is_clean=workers.is_clean, diff=workers.diff,
+        live_workers=workers.live_workers, wait_for_exit=workers.waiter(WAIT_LIMIT_SECONDS),
+        graph_version=graph_version(), log=log, worker_names=workers.WORKER_NAMES,
+        worker_companies=workers.WORKER_COMPANIES, worker_makers=workers.WORKER_MAKERS,
+        limits=limits or dict(LIMITS), files=workers.tracked_files,
     )
 
 
@@ -82,7 +85,7 @@ def main(argv: list[str]) -> int:
     parser.add_argument('--base', required=True, help='the commit the card starts from')
     # Shorter limits are for proving a stop on a throwaway card. A limit the
     # launcher would not enforce is refused, so the card never quotes one.
-    for kind in ('builder', 'tests'):
+    for kind in ('builder', 'tests', 'reviewer'):
         parser.add_argument(f'--{kind}-limit', type=lambda text, kind=kind: checked_limit(kind, text), default=LIMITS[kind],
                             help=f'seconds, 1 to {LIMIT_CAPS[kind]} (default %(default)s)')
     args = parser.parse_args(argv)
@@ -91,7 +94,7 @@ def main(argv: list[str]) -> int:
     Path(STATE).mkdir(exist_ok=True)
     state = CardRun(card=args.card, base=workers.git(REPO, 'rev-parse', '--verify', f'{args.base}^{{commit}}'),
                     branch=f'graph/card-{number}', worktree=f'{WORKTREES}/card-{number}')
-    deps = card_deps(args.card, {'builder': args.builder_limit, 'tests': args.tests_limit})
+    deps = card_deps(args.card, {'builder': args.builder_limit, 'tests': args.tests_limit, 'reviewer': args.reviewer_limit})
     log(f'{args.card}: {deps.graph_version}')
     try:
         outcome = asyncio.run(run_card(state, deps))

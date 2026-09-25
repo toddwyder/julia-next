@@ -45,6 +45,12 @@ MOVE = """mutation Move($id: String!, $stateId: String!) {
 EDIT = """mutation Edit($id: String!, $body: String!) {
   commentUpdate(id: $id, input: { body: $body }) { success }
 }"""
+ASSIGN = """mutation Assign($id: String!, $assigneeId: String) {
+  issueUpdate(id: $id, input: { assigneeId: $assigneeId }) { success }
+}"""
+USERS_QUERY = """query Users {
+  users { nodes { id name displayName email } }
+}"""
 
 
 def read_credential(directory: str | None = None) -> tuple[str, str]:
@@ -175,3 +181,20 @@ class LinearApp:
         data = await asyncio.to_thread(self._call, EDIT, {'id': comment_id, 'body': body})
         if not data['commentUpdate']['success']:
             raise RuntimeError(f'Linear did not accept the edit to comment {comment_id}')
+
+    async def assign(self, card: str, assignee: str | None) -> None:
+        if card not in self._ids:
+            await self.card(card)
+        assignee_id = None
+        if assignee:
+            users_data = await asyncio.to_thread(self._call, USERS_QUERY, {})
+            nodes = (users_data.get('users') or {}).get('nodes') or []
+            target = assignee.lower()
+            matched = next(
+                (u['id'] for u in nodes if target in (u.get('name') or '').lower() or target in (u.get('displayName') or '').lower()),
+                None
+            )
+            assignee_id = matched or assignee
+        data = await asyncio.to_thread(self._call, ASSIGN, {'id': self._ids[card], 'assigneeId': assignee_id})
+        if not (data.get('issueUpdate') or {}).get('success'):
+            raise RuntimeError(f'Linear did not update assignee on {card}')
