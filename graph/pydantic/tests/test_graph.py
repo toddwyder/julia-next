@@ -56,22 +56,30 @@ class Crash(BaseException):
 
 
 class FakeLinear:
-    def __init__(self):
+    def __init__(self, lag: int = 0):
         self.store: dict[str, str] = {}  # comment id -> body, in posting order
         self.edits: list[str] = []  # ids, one per edit
         self.assigned: list[tuple[str, str | None]] = []
+        # Like Linear's API on 25 Sep: a new comment stays out of the card's
+        # comment list for this many reads after it is posted.
+        self.lag = lag
+        self.hidden: dict[str, int] = {}  # comment id -> reads it stays hidden
 
     @property
     def comments(self) -> list[str]:
         return list(self.store.values())
 
     async def card(self, card):
+        shown = [{'id': i, 'body': b} for i, b in self.store.items() if self.hidden.get(i, 0) == 0]
+        self.hidden = {i: n - 1 for i, n in self.hidden.items() if n > 0}
         return {'identifier': card, 'title': 'Add a greeting', 'description': '## Acceptance criteria\n\n- [ ] say hello\n',
-                'comments': [{'id': i, 'body': b} for i, b in self.store.items()]}
+                'comments': shown}
 
     async def comment(self, card, body):
         comment_id = f'c{len(self.store) + 1}'
         self.store[comment_id] = body
+        if self.lag:
+            self.hidden[comment_id] = self.lag
         return comment_id
 
     async def edit(self, comment_id, body):
@@ -740,6 +748,20 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn('APPROVED', approved)
         self.assertIn('Round: 2 of 2', approved)
         self.assertIn('✓ Built (attempt 2, fixing review findings)', self.linear.status()[0])
+
+    async def test_every_comment_is_posted_once_even_when_linear_is_slow_to_list_it(self):
+        # live JUL-151, 25 Sep: an approval was posted twice when Linear's comment list lagged
+        self.linear = FakeLinear(lag=5)
+        outcome = await run_card(self.state(), self.deps(
+            reviewer=self.reviewer_says(self.findings('F1: add a full stop'), self.APPROVE)))
+        self.assertEqual(outcome, 'passed')
+        markers = [line for c in self.linear.comments for line in c.splitlines() if line.startswith('graph: ')
+                   and not line.startswith('graph: status')]
+        self.assertEqual(len(markers), len(set(markers)), f'posted twice: {[m for m in markers if markers.count(m) > 1]}')
+        self.assertEqual(len(self.verdicts()), 2)  # one per round
+        # and a restarted run, whose own record is gone, still finds them on the card
+        self.linear.lag = 0
+        self.assertEqual(await run_card(self.state(), self.deps()), 'already reported')
 
     async def test_3_two_rounds_of_findings_stop_the_card_with_both_reasons_in_one_comment(self):
         outcome = await run_card(self.state(), self.deps(reviewer=self.reviewer_says(

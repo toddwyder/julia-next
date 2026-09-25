@@ -159,11 +159,18 @@ def marker(step: str, run: CardRun, **fields: object) -> str:
 
 
 async def say_once(ctx: GraphRunContext[CardRun, Deps], text: str, line: str) -> None:
-    """Post a comment unless the card already has one with this marker line."""
-    card = await ctx.deps.linear.card(ctx.state.card)
-    if any(line in c['body'] for c in card['comments']):
+    """Post a comment unless it was posted already: the run's own record of
+    what it posted is checked first, because Linear's comment list can lag a
+    moment behind a new comment (a verdict was posted twice, 2.5 s apart, on
+    JUL-151 on 25 Sep); the card is checked too, for a comment posted before
+    a crash could record it."""
+    if line in ctx.state.posted:
         return
-    await ctx.deps.linear.comment(ctx.state.card, f'{text}\n\n{line}')
+    card = await ctx.deps.linear.card(ctx.state.card)
+    if not any(line in c['body'] for c in card['comments']):
+        await ctx.deps.linear.comment(ctx.state.card, f'{text}\n\n{line}')
+    ctx.state.posted.append(line)
+    save(ctx)
 
 
 def save(ctx: GraphRunContext[CardRun, Deps]) -> None:
