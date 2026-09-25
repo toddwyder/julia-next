@@ -13,6 +13,7 @@ import json
 import os
 import pwd
 import re
+import shutil
 import subprocess
 import time
 from pathlib import Path
@@ -242,6 +243,7 @@ def prepare(repo: str, install=npm_ci):
                 return f'{run.worktree} does not start from base {run.base[:12]}: it is at another commit'
             if git(run.worktree, 'status', '--porcelain'):
                 return f'{run.worktree} has uncommitted changes left by an earlier run'
+            cut_ties(run.worktree)  # a run killed straight after cloning left them
         else:
             git(repo, 'fetch', '-q', 'origin', 'main')
             git(repo, 'rev-parse', '--verify', f'{run.base}^{{commit}}')
@@ -258,8 +260,27 @@ def prepare(repo: str, install=npm_ci):
             if subprocess.run(['git', 'cat-file', '-e', f'{run.base}^{{commit}}'], cwd=run.worktree).returncode:
                 return f'the base commit {run.base[:12]} is not in the working copy made for this card'
             git(run.worktree, 'checkout', '-q', '-b', run.branch, run.base)
+            cut_ties(run.worktree)
         return install(run.worktree) if (wt / 'package-lock.json').exists() else None
     return prepare_card
+
+
+def cut_ties(worktree: str) -> None:
+    """Leave nothing in the folder that names the repo it was cloned from.
+    Gemini reads git's own files and follows any path it finds: the clone's
+    history log says "clone: from /srv/julia-runner/repo", and reading that
+    repo was refused and ended the turn (live check, 25 Sep). The remote, the
+    last-fetch record and the history logs are the only places that name it."""
+    if 'origin' in git(worktree, 'remote').split():
+        git(worktree, 'remote', 'remove', 'origin')
+    Path(worktree, '.git', 'FETCH_HEAD').unlink(missing_ok=True)
+    shutil.rmtree(Path(worktree, '.git', 'logs'), ignore_errors=True)
+
+
+def tracked_files(run: CardRun) -> list[str]:
+    """The repo's files, for the builder's brief: with them it has no reason to
+    scan the folder, which Gemini did with a shell command that was refused."""
+    return git(run.worktree, 'ls-files').splitlines()
 
 
 async def discard(run: CardRun) -> int:

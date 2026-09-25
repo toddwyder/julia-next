@@ -45,7 +45,7 @@ def card_deps(card: str, limits: dict[str, int] | None = None) -> Deps:
         prepare=workers.prepare(REPO), builder=workers.builder(log), discard=workers.discard,
         commit=workers.commit, tester=workers.tester, live_workers=workers.live_workers,
         wait_for_exit=workers.waiter(WAIT_LIMIT_SECONDS), graph_version=graph_version(), log=log,
-        worker_names=workers.WORKER_NAMES, limits=limits or dict(LIMITS),
+        worker_names=workers.WORKER_NAMES, limits=limits or dict(LIMITS), files=workers.tracked_files,
     )
 
 

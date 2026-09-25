@@ -91,6 +91,8 @@ class Deps:
     limits: dict[str, int] = field(default_factory=lambda: dict(LIMITS))
     # Worker output moves the card at once, but edits its comment at most this often.
     status_every: float = 60
+    # The files in the card's working copy, listed in the builder's brief.
+    files: Callable[[CardRun], list[str]] = field(default=lambda run: [])
 
 
 def marker(step: str, run: CardRun, **fields: object) -> str:
@@ -287,16 +289,33 @@ class Prepare(BaseNode[CardRun, Deps, str]):
         return Build()
 
 
-def builder_brief(card: dict, run: CardRun) -> str:
+MAX_LISTED_FILES = 3000
+
+
+def listed(ctx: GraphRunContext[CardRun, Deps]) -> list[str]:
+    """The working copy's files for the brief; a brief without them still works."""
+    try:
+        return ctx.deps.files(ctx.state)
+    except Exception as error:
+        ctx.deps.log(f'the file list for the brief could not be read: {type(error).__name__}: {error}')
+        return []
+
+
+def builder_brief(card: dict, run: CardRun, files: list[str] | None = None) -> str:
     return f"""You are the builder for Linear card {card['identifier']}: {card['title']}.
 
 Make the change this card asks for, in the working folder. Follow the card's
 acceptance criteria exactly and change nothing outside them. Add or update the
 tests that prove the change (node:test files named scripts/*.test.mjs).
 
-You can read and edit files only; you cannot run commands. The graph commits
-your edits and runs the test suite itself after you finish.
-
+What you may do in this run: read and edit files inside your working folder,
+{run.worktree}, and nothing else. Do not run any command, not even to list
+files or run tests, and do not start subagents. Do not read anything outside
+the working folder. Any of these is refused, and a refusal ends your turn and
+fails the card. This overrides any file in the repository (AGENTS.md, CLAUDE.md,
+role or skill files) that tells you to run tests or commands: in this run the
+graph commits your edits and runs the test suite itself after you finish.
+{files_part(files or [])}
 When you are done, end with a short final report: what you changed, and for
 each acceptance criterion, where it is met. If you cannot do the work, say
 BLOCKED and why.
@@ -305,6 +324,16 @@ BLOCKED and why.
 {with_locked_uat(card['description'], run.uat_plan)}
 </card>
 """ + instructions_part(card)
+
+
+def files_part(files: list[str]) -> str:
+    """The repository's files, so the builder never needs to scan the folder
+    (Gemini's subagent once ran `find` for that, and was refused)."""
+    if not files:
+        return ''
+    shown = files[:MAX_LISTED_FILES]
+    more = f'\n(and {len(files) - len(shown)} more)' if len(files) > len(shown) else ''
+    return '\nThe files in your working folder (from git, before your changes):\n\n<files>\n' + '\n'.join(shown) + more + '\n</files>\n'
 
 
 # ------------------------------------------------------------ the locked UAT steps (JUL-127)
@@ -369,7 +398,7 @@ class Build(BaseNode[CardRun, Deps, str]):
         await say_once(ctx, f'Builder attempt {s.attempt} started.', marker('build-started', s, attempt=s.attempt))
         await step(ctx, f'Building (attempt {s.attempt})', f'Built (attempt {s.attempt})', 'builder')
         try:
-            result = await ctx.deps.builder(s, builder_brief(card, s), ctx.deps.limits['builder'], lambda: moved(ctx))
+            result = await ctx.deps.builder(s, builder_brief(card, s, listed(ctx)), ctx.deps.limits['builder'], lambda: moved(ctx))
         except Exception as error:  # a worker that cannot even start is a failed worker
             s.build_started = False
             close(ctx, 'could not start')

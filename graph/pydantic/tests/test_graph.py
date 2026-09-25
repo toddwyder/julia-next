@@ -139,6 +139,24 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn('tests 3, pass 3, fail 0', result)
         self.assertIn('pydantic-graph test', result)
 
+    async def test_the_brief_lists_the_files_and_forbids_commands_and_subagents(self):
+        deps = self.deps()
+        deps.files = lambda run: ['README.md', 'scripts/a.test.mjs']
+        self.assertEqual(await run_card(self.state(), deps), 'passed')
+        self.assertIn('<files>\nREADME.md\nscripts/a.test.mjs\n</files>', self.brief)
+        self.assertIn('Do not run any command, not even to list', self.brief)
+        self.assertIn('do not start subagents', self.brief)
+        self.assertIn(f'inside your working folder,\n{self.worktree}', self.brief)
+        self.assertIn('This overrides any file in the repository', self.brief)
+
+    async def test_a_file_list_that_cannot_be_read_does_not_stop_the_build(self):
+        def broken(run):
+            raise RuntimeError('git ls-files failed')
+        deps = self.deps()
+        deps.files = broken
+        self.assertEqual(await run_card(self.state(), deps), 'passed')
+        self.assertNotIn('<files>', self.brief)
+
     # ----------------------------------------------------------------- failures say so
 
     async def test_a_failed_builder_is_reported_and_not_tested(self):
@@ -537,6 +555,38 @@ class PrepareTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(Path(sh(self.worktree, 'git', 'rev-parse', '--absolute-git-dir')), git_dir.resolve())
         self.assertEqual(sh(self.worktree, 'git', 'rev-parse', 'HEAD'), self.second)
         self.assertEqual(sh(self.worktree, 'git', 'rev-parse', '--abbrev-ref', 'HEAD'), 'graph/card-1')
+
+    def names_the_repo(self) -> list[str]:
+        """Files in the working copy whose contents name the repo it came from."""
+        needle = str(self.repo).encode()
+        found = []
+        for path in self.worktree.rglob('*'):
+            if path.is_file() and '/objects/' not in path.as_posix() and needle in path.read_bytes():
+                found.append(str(path.relative_to(self.worktree)))
+        return found
+
+    async def test_nothing_in_the_working_copy_names_the_repo(self):
+        # Live check, 25 Sep: Gemini read the clone's history log ("clone: from
+        # /srv/julia-runner/repo"), followed it, and the refused read ended the build.
+        prepare = workers.prepare(str(self.repo), install=self.install)
+        self.assertIsNone(await prepare(self.run_for(self.second)))
+        self.assertEqual(self.names_the_repo(), [])
+        self.assertEqual(sh(self.worktree, 'git', 'remote'), '')
+        self.assertEqual(sh(self.worktree, 'git', 'rev-parse', 'HEAD'), self.second)
+        # and the graph can still commit and discard there
+        (self.worktree / 'hello.txt').write_text('hello\n')
+        commit, _ = await workers.commit(self.run_for(self.second))
+        self.assertEqual(sh(self.worktree, 'git', 'rev-parse', 'HEAD'), commit)
+        self.assertEqual(await workers.discard(self.run_for(self.second)), 1)
+        self.assertEqual(sh(self.worktree, 'git', 'rev-parse', 'HEAD'), self.second)
+
+    async def test_a_working_copy_left_straight_after_cloning_is_cleaned_on_resume(self):
+        sh(self.repo, 'git', 'clone', '-q', '--no-checkout', '.', str(self.worktree))
+        sh(self.worktree, 'git', 'checkout', '-q', '-b', 'graph/card-1', self.second)
+        self.assertTrue(self.names_the_repo())  # the killed run never cut the ties
+        prepare = workers.prepare(str(self.repo), install=self.install)
+        self.assertIsNone(await prepare(self.run_for(self.second)))
+        self.assertEqual(self.names_the_repo(), [])
 
     async def test_a_base_newer_than_the_repos_own_main_is_still_found(self):
         # The base is the repo's fresh copy of GitHub's main; the repo's local
