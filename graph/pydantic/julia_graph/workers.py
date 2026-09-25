@@ -235,6 +235,8 @@ def prepare(repo: str, install=npm_ci):
     starts clean)."""
     async def prepare_card(run: CardRun) -> str | None:
         wt = Path(run.worktree)
+        if wt.exists() and old_style(run.worktree):
+            set_aside(wt)  # an older graph's git worktree: its .git points out of the folder
         if wt.exists():
             branch = git(run.worktree, 'rev-parse', '--abbrev-ref', 'HEAD')
             if branch != run.branch:
@@ -253,16 +255,38 @@ def prepare(repo: str, install=npm_ci):
             # (JUL-142 and JUL-144, 25 Sep). A clone keeps its git data inside
             # the folder. --local hardlinks the objects where it can (the
             # server's repo is shallow, so there git copies them instead).
-            git(repo, 'clone', '-q', '--local', '--no-checkout', '.', run.worktree)
+            # It is made beside the card's folder and moved into place only when
+            # complete, so a run killed half-way never leaves a half-made card-N.
+            new = wt.with_name(f'{wt.name}.new')
+            shutil.rmtree(new, ignore_errors=True)
+            git(repo, 'clone', '-q', '--local', '--no-checkout', '.', str(new))
             # A clone brings only the repo's own branches; the base is the repo's
             # copy of GitHub's main, which its local main may lag, so fetch that too.
-            git(run.worktree, 'fetch', '-q', 'origin', '+refs/remotes/origin/*:refs/remotes/github/*')
-            if subprocess.run(['git', 'cat-file', '-e', f'{run.base}^{{commit}}'], cwd=run.worktree).returncode:
+            git(str(new), 'fetch', '-q', 'origin', '+refs/remotes/origin/*:refs/remotes/github/*')
+            if subprocess.run(['git', 'cat-file', '-e', f'{run.base}^{{commit}}'], cwd=new).returncode:
+                shutil.rmtree(new, ignore_errors=True)
                 return f'the base commit {run.base[:12]} is not in the working copy made for this card'
-            git(run.worktree, 'checkout', '-q', '-b', run.branch, run.base)
-            cut_ties(run.worktree)
+            git(str(new), 'checkout', '-q', '-b', run.branch, run.base)
+            cut_ties(str(new))
+            os.replace(new, wt)
         return install(run.worktree) if (wt / 'package-lock.json').exists() else None
     return prepare_card
+
+
+def old_style(worktree: str) -> bool:
+    """A working copy an older graph made with `git worktree add`: its .git is a
+    one-line pointer into the main repo, outside the builder's folder."""
+    return Path(worktree, '.git').is_file()
+
+
+def set_aside(folder: Path) -> Path:
+    """Move a working copy to <folder>.runN, kept as it was; returns where it went."""
+    n = 1
+    while folder.with_name(f'{folder.name}.run{n}').exists():
+        n += 1
+    kept = folder.with_name(f'{folder.name}.run{n}')
+    os.replace(folder, kept)
+    return kept
 
 
 def cut_ties(worktree: str) -> None:

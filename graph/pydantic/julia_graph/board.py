@@ -33,6 +33,7 @@ from typing import Protocol
 
 from .checkpoint import CardRun, Checkpoint
 from .graph import Deps, uat_section
+from .workers import set_aside
 from .status import clock
 
 READY = 'Ready'
@@ -297,13 +298,8 @@ class Board:
         """An earlier run's working copy moves to <folder>.runN, kept as it was,
         so the card starts afresh in its usual folder."""
         folder = Path(worktree)
-        if not folder.exists():
-            return
-        n = 1
-        while folder.with_name(f'{folder.name}.run{n}').exists():
-            n += 1
-        os.replace(folder, folder.with_name(f'{folder.name}.run{n}'))
-        self.log(f'{folder.name}: the earlier working copy was kept as {folder.name}.run{n}')
+        if folder.exists():
+            self.log(f'{folder.name}: the earlier working copy was kept as {set_aside(folder).name}')
 
     def _load(self, checkpoint: Checkpoint) -> CardRun | None:
         """A card's saved progress. A damaged file is set aside as an earlier run

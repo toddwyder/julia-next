@@ -20,6 +20,7 @@ import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Protocol
 
 from pydantic_graph import BaseNode, End, GraphBuilder, GraphRunContext
@@ -242,6 +243,21 @@ class Resume(BaseNode[CardRun, Deps, str]):
         if s.stop_kind:
             await confirm_stop(ctx)  # the graph died while seeing a stopped worker gone
             return Report()
+        if s.step in ('build', 'test') and Path(s.worktree, '.git').is_file():
+            # An older graph made this working copy with `git worktree add`: its
+            # .git points out of the builder's folder, and following it ended
+            # every build (JUL-127). Start again from a fresh copy; Prepare
+            # keeps the old one aside. Any worker still running goes first.
+            for kind in ('builder', 'tests'):
+                if reason := await no_second_worker(ctx, kind):
+                    return fail(ctx, reason)
+            await say_once(ctx, "This card's working copy was made by an older version of the graph, and its git "
+                                "data points outside the builder's folder. The old copy is kept aside and the card "
+                                'starts again from a fresh one.', marker('fresh-copy', s))
+            s.step, s.build_started, s.attempt = 'prepare', False, 0
+            s.commit, s.builder_report, s.tests = None, None, None
+            save(ctx)
+            return Prepare()
         if s.step == 'prepare':
             return Prepare()
         if s.step == 'build':

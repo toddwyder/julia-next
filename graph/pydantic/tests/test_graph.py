@@ -91,8 +91,11 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         return CardRun(card='JUL-1', base=self.base, branch='graph/card-1', worktree=str(self.worktree))
 
     async def prepare(self, run):
+        if self.worktree.exists() and (self.worktree / '.git').is_file():
+            workers.set_aside(self.worktree)  # as the real prepare does with an old-style worktree
         if not self.worktree.exists():
-            sh(self.repo, 'git', 'worktree', 'add', '-q', '-b', run.branch, run.worktree, run.base)
+            sh(self.repo, 'git', 'clone', '-q', '--no-checkout', '.', run.worktree)
+            sh(self.worktree, 'git', 'checkout', '-q', '-b', run.branch, run.base)
         return None
 
     def deps(self, builder=None, tester=None, alive_after_wait=None):
@@ -225,6 +228,32 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(interrupted), 1)
         self.assertIn('did not count it as done', interrupted[0])
         self.assertEqual(len(self.results()), 1)
+
+    async def test_a_run_resumed_in_an_older_graphs_worktree_starts_again_from_a_fresh_copy(self):
+        # A card mid-build when the new graph is deployed: its folder is a git
+        # worktree whose .git points outside the builder's folder.
+        sh(self.repo, 'git', 'worktree', 'add', '-q', '-b', 'graph/card-1', str(self.worktree), self.base)
+        (self.worktree / 'half.txt').write_text('left by the old builder')
+        old = self.state()
+        old.step, old.build_started, old.attempt = 'build', True, 1
+        Checkpoint(self.state_dir, 'JUL-1').save(old)
+        self.assertEqual(await run_card(self.state(), self.deps()), 'passed')
+        self.assertEqual(self.builder_calls, 1)
+        self.assertTrue((self.worktree / '.git').is_dir())  # built in a fresh clone
+        self.assertFalse((self.worktree / 'half.txt').exists())
+        self.assertTrue((self.worktree.with_name('card-1.run1') / 'half.txt').exists())  # kept aside as it was
+        [note] = [c for c in self.linear.comments if 'graph: fresh-copy' in c]
+        self.assertIn('made by an older version of the graph', note)
+
+    async def test_a_fresh_copy_waits_for_an_old_builder_still_running(self):
+        sh(self.repo, 'git', 'worktree', 'add', '-q', '-b', 'graph/card-1', str(self.worktree), self.base)
+        old = self.state()
+        old.step, old.build_started, old.attempt = 'build', True, 1
+        Checkpoint(self.state_dir, 'JUL-1').save(old)
+        self.alive['builder'] = [4242]
+        self.assertEqual(await run_card(self.state(), self.deps(alive_after_wait=[4242])), 'failed')
+        self.assertEqual(self.builder_calls, 0)
+        self.assertTrue((self.worktree / '.git').is_file())  # untouched while the old builder runs
 
     async def test_a_restart_while_the_old_builder_still_runs_starts_no_second_one(self):
         async def killed(run, brief, *_):
@@ -587,6 +616,31 @@ class PrepareTest(unittest.IsolatedAsyncioTestCase):
         prepare = workers.prepare(str(self.repo), install=self.install)
         self.assertIsNone(await prepare(self.run_for(self.second)))
         self.assertEqual(self.names_the_repo(), [])
+
+    async def test_an_older_graphs_git_worktree_is_kept_aside_and_replaced_by_a_clone(self):
+        sh(self.repo, 'git', 'worktree', 'add', '-q', '-b', 'graph/card-1', str(self.worktree), self.second)
+        prepare = workers.prepare(str(self.repo), install=self.install)
+        self.assertIsNone(await prepare(self.run_for(self.second)))
+        self.assertTrue((self.worktree / '.git').is_dir())  # a clone now
+        self.assertEqual(self.names_the_repo(), [])
+        kept = self.worktree.with_name('card-1.run1')
+        self.assertTrue((kept / '.git').is_file())  # the old worktree, kept as it was
+
+    async def test_a_half_made_clone_is_never_left_as_the_cards_folder(self):
+        new = self.worktree.with_name('card-1.new')
+        new.mkdir(parents=True)
+        (new / 'junk').write_text('a clone killed half-way\n')
+        prepare = workers.prepare(str(self.repo), install=self.install)
+        self.assertIsNone(await prepare(self.run_for(self.second)))
+        self.assertFalse(new.exists())
+        self.assertEqual(sh(self.worktree, 'git', 'rev-parse', 'HEAD'), self.second)
+
+    async def test_a_missing_base_leaves_no_folder_behind(self):
+        prepare = workers.prepare(str(self.repo), install=self.install)
+        with self.assertRaises(RuntimeError):
+            await prepare(self.run_for('0' * 40))
+        self.assertFalse(self.worktree.exists())
+        self.assertFalse(self.worktree.with_name('card-1.new').exists())
 
     async def test_a_base_newer_than_the_repos_own_main_is_still_found(self):
         # The base is the repo's fresh copy of GitHub's main; the repo's local
