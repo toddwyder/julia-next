@@ -33,6 +33,7 @@ from typing import Protocol
 
 from .checkpoint import CardRun, Checkpoint
 from .graph import Deps, uat_section
+from .status import clock
 
 READY = 'Ready'
 STARTED = 'Implementation'  # the column a started card moves to (graph/board-spec.mjs)
@@ -73,9 +74,11 @@ def why_not(card: dict) -> list[tuple[str, str]]:
             reasons.append((f'label={label}', f'It is a {label} card, and {label} cards are not built by the graph.'))
     blockers = sorted((b for b in card.get('blockers', []) if blocker_open(b)), key=lambda b: b['identifier'])
     if blockers:
-        names = ', '.join(f"{b['identifier']} ({b['state']})" for b in blockers)
-        reasons.append((f"blocked-by={','.join(b['identifier'] for b in blockers)}",
-                        f'It is blocked by {names}, which has not reached UAT yet.'))
+        # Named without their columns: the comment changes only when the reason
+        # does, so a column shown here would go stale as the blocker moves on.
+        names = ', '.join(b['identifier'] for b in blockers)
+        reasons.append((f'blocked-by={names.replace(" ", "")}',
+                        f'It is blocked by {names}, not yet at UAT.'))
     plan = uat_section(card.get('description') or '')
     if plan is None:
         reasons.append(('no-uat-plan', 'It has no "## UAT plan" section, so there is no way to check it at the end.'))
@@ -146,6 +149,13 @@ class Board:
         try:
             return json.loads(self._reservation.read_text())['card']
         except FileNotFoundError:
+            return None
+        except (ValueError, KeyError, TypeError) as error:
+            # Written atomically, so only a damaged disk gets here. Crashing on it
+            # every restart would stop the board for good; a builder still alive
+            # is caught by the graph's own no-second-worker check instead.
+            self.log(f'the builder reservation is unreadable and was removed: {type(error).__name__}: {error}')
+            self._release()
             return None
 
     def _reserve(self, card: str) -> None:
@@ -243,7 +253,20 @@ class Board:
             return f'{name} waits: it could not leave Ready'
         self.log(f'{name}: started from Ready')
         self._launch(state)
+        await self._started(name)
         return f'started {name}'
+
+    async def _started(self, card: str) -> None:
+        """A card told earlier why it would not start is told that no longer applies."""
+        try:
+            comments = (await self.linear.card(card))['comments']
+            old = next((c for c in comments if not_started_marker(card) in c['body'].splitlines()), None)
+            if old and why_line(old['body']) != 'graph-why: started':
+                await self.linear.edit(old['id'], f'The graph started this card at {clock(self.now())}. '
+                                                  'The earlier reason it could not start no longer applies.\n\n'
+                                                  f'{not_started_marker(card)}\ngraph-why: started')
+        except Exception as error:
+            self.log(f'{card}: the not-started comment could not be updated: {type(error).__name__}: {error}')
 
     async def _leave_ready(self, card: str) -> bool:
         """Move the card out of Ready before its run starts. A card left in Ready

@@ -14,7 +14,7 @@ import unittest
 from pathlib import Path
 
 from julia_graph import workers
-from julia_graph.board import CHECK_EVERY, Board, BoardLocked, serve
+from julia_graph.board import CHECK_EVERY, Board, BoardLocked, serve, why_not
 from julia_graph.checkpoint import CardRun, Checkpoint, TestResult
 from julia_graph.graph import BuildResult, Deps, run_card
 from julia_graph.linear import ready_card
@@ -221,7 +221,7 @@ class BoardTest(unittest.IsolatedAsyncioTestCase):
         board = self.board()
         self.assertEqual(await board.check(), 'started JUL-7')
         await board.idle()
-        self.assertIn('blocked by JUL-9 (Implementation)', self.not_started('JUL-2')[0])
+        self.assertIn('blocked by JUL-9, not yet at UAT', self.not_started('JUL-2')[0])
         self.assertIn('It is a Parent card', self.not_started('JUL-3')[0])
         self.assertIn('It is a Decision card', self.not_started('JUL-4')[0])
         self.assertIn('has no numbered steps', self.not_started('JUL-5')[0])
@@ -255,6 +255,17 @@ class BoardTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn('It is a Decision card', comment)
         self.assertIn('blocked by JUL-9', comment)
         self.assertEqual(self.built, [])
+
+    async def test_the_comment_says_so_once_the_card_starts(self):
+        self.linear.add('JUL-2', 1, labels=['Parent'])
+        board = self.board()
+        await board.check()
+        self.linear.cards['JUL-2']['labels'] = []  # Todd fixes the card
+        self.assertEqual(await board.check(), 'started JUL-2')
+        await board.idle()
+        [comment] = self.not_started('JUL-2')
+        self.assertTrue(comment.startswith('The graph started this card at 13:57 UTC.'))
+        self.assertNotIn('will not start', comment)
 
     async def test_a_restarted_graph_does_not_repeat_the_comment(self):
         self.linear.add('JUL-2', 1, labels=['Parent'])
@@ -338,6 +349,66 @@ class BoardTest(unittest.IsolatedAsyncioTestCase):
         await again.idle()
         self.assertEqual(self.built, ['JUL-1'])  # only the one that was killed
         self.assertIn('an earlier builder is still running (process 4242)', self.result('JUL-1')[0])
+
+    async def test_a_run_that_breaks_frees_the_builder_for_the_next_card(self):
+        self.linear.add('JUL-1', 1)
+        self.linear.add('JUL-2', 2)
+        board = self.board()
+
+        async def run_that_breaks(state, deps):
+            if state.card == 'JUL-1':
+                raise RuntimeError('a bug in the graph')
+            return await run_card(state, deps)
+        board.run = run_that_breaks
+        self.assertEqual(await board.check(), 'started JUL-1')
+        await board.idle()
+        self.assertIsNone(board.reserved())
+        self.assertTrue(any('JUL-1: the run broke: RuntimeError: a bug in the graph' in l for l in self.logged))
+        self.assertEqual(self.linear.cards['JUL-1']['state'], 'Implementation')  # never restarted from Ready
+        self.assertEqual(await board.check(), 'started JUL-2')
+        await board.idle()
+        self.assertEqual(self.built, ['JUL-2'])
+
+    async def test_a_resume_that_cannot_move_the_card_waits_and_builds_nothing(self):
+        self.linear.add('JUL-1', 1)
+        first = self.board()
+        first._reserve('JUL-1')
+        Checkpoint(self.state_dir, 'JUL-1').save(CardRun(card='JUL-1', base=self.base, branch='graph/card-1',
+                                                         worktree=str(self.worktrees / 'card-1')))
+        first.close()
+        real_move = self.linear.move
+
+        async def refused(name, state):
+            raise ConnectionError('Linear is unreachable')
+        self.linear.move = refused
+        again = self.board()
+        self.assertEqual(await again.check(), 'JUL-1 waits: it could not leave Ready')
+        self.assertEqual(self.built, [])
+        self.assertEqual(again.reserved(), 'JUL-1')  # still held: nothing else may start
+        self.linear.move = real_move
+        self.assertEqual(await again.check(), 'resumed JUL-1')
+        await again.idle()
+        self.assertEqual(self.built, ['JUL-1'])
+
+    async def test_an_unreadable_reservation_does_not_stop_the_board(self):
+        self.state_dir.mkdir(parents=True, exist_ok=True)
+        (self.state_dir / 'builder.json').write_text('{"card": ')
+        self.linear.add('JUL-1', 1)
+        board = self.board()
+        self.assertEqual(await board.check(), 'started JUL-1')
+        await board.idle()
+        self.assertTrue(any('the builder reservation is unreadable' in l for l in self.logged))
+
+    async def test_the_servers_run_in_its_own_thread_carries_a_card(self):
+        from julia_graph.__main__ import in_own_thread
+        self.linear.add('JUL-1', 1)
+        board = self.board()
+        board.run = in_own_thread
+        self.assertEqual(await board.check(), 'started JUL-1')
+        await board.idle()
+        self.assertEqual(self.built, ['JUL-1'])
+        self.assertIn('PASSED', self.result('JUL-1')[0])
+        self.assertIsNone(board.reserved())
 
     async def test_a_reservation_whose_run_had_ended_is_released(self):
         self.linear.add('JUL-1', 1)
@@ -475,6 +546,16 @@ class BoardTest(unittest.IsolatedAsyncioTestCase):
 
 
 class LinearShapeTest(unittest.TestCase):
+    def test_a_card_with_missing_fields_is_read_not_refused(self):
+        card = ready_card({'identifier': 'JUL-5', 'title': 'T', 'description': '', 'sortOrder': None,
+                           'labels': {'nodes': []},
+                           'inverseRelations': {'nodes': [{'type': 'blocks', 'issue': None},
+                                                          {'type': 'blocks', 'issue': {'identifier': 'JUL-4', 'state': None}}]}})
+        self.assertEqual(card['sort_order'], float('inf'))  # goes last
+        self.assertEqual(card['blockers'], [{'identifier': 'an unknown card', 'state': 'unknown state', 'type': ''},
+                                            {'identifier': 'JUL-4', 'state': 'unknown state', 'type': ''}])
+        self.assertTrue(why_not(card))  # a half-known blocker still blocks
+
     def test_a_ready_card_reads_its_blockers_from_the_inverse_relations(self):
         card = ready_card({
             'identifier': 'JUL-5', 'title': 'T', 'description': None, 'sortOrder': -28624.5,

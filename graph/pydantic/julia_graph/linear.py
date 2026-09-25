@@ -11,6 +11,8 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -29,7 +31,7 @@ READY_QUERY = """query Ready($team: String!, $state: String!, $after: String) {
     nodes {
       identifier title description sortOrder
       labels { nodes { name } }
-      inverseRelations { nodes { type issue { identifier state { name type } } } }
+      inverseRelations(first: 250) { nodes { type issue { identifier state { name type } } } }
     }
     pageInfo { hasNextPage endCursor }
   }
@@ -61,6 +63,27 @@ def _post(url: str, data: bytes, headers: dict) -> dict:
 
 
 TEAM = 'Julia-next'
+# The app's token lives 30 days (graph/controller/token.mjs). A long-running
+# graph fetches a new one well before that, and at once if Linear refuses it.
+TOKEN_RENEW_SECONDS = 24 * 60 * 60
+
+
+def sort_order(value) -> float:
+    """Board order; a card with no sortOrder goes last (scripts/ready-queue.mjs sortOrderOf)."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return float('inf')
+    return number if number == number else float('inf')  # NaN goes last too
+
+
+def blocker(relation: dict) -> dict:
+    """A blocker Linear only half returns (deleted, or no state) still counts as
+    open, as in scripts/ready-queue.mjs: the card waits rather than starting blocked."""
+    issue = relation.get('issue') or {}
+    state = issue.get('state') or {}
+    return {'identifier': issue.get('identifier') or 'an unknown card', 'state': state.get('name') or 'unknown state',
+            'type': state.get('type') or ''}
 
 
 def ready_card(issue: dict) -> dict:
@@ -69,33 +92,48 @@ def ready_card(issue: dict) -> dict:
     inverse relations, with the blocker as `issue` (live-verified for JUL-79)."""
     return {
         'identifier': issue['identifier'], 'title': issue['title'], 'description': issue['description'] or '',
-        'sort_order': float(issue['sortOrder']),
-        'labels': [label['name'] for label in issue['labels']['nodes']],
-        'blockers': [{'identifier': r['issue']['identifier'], 'state': r['issue']['state']['name'],
-                      'type': r['issue']['state']['type']}
-                     for r in issue['inverseRelations']['nodes'] if r['type'] == 'blocks'],
+        'sort_order': sort_order(issue.get('sortOrder')),
+        'labels': [label['name'] for label in (issue.get('labels') or {}).get('nodes', [])],
+        'blockers': [blocker(r) for r in (issue.get('inverseRelations') or {}).get('nodes', []) if r.get('type') == 'blocks'],
     }
 
 
 class LinearApp:
-    def __init__(self):
+    def __init__(self, clock=time.monotonic):
         self._token = None
+        self._token_at = 0.0
+        self._clock = clock
         self._ids: dict[str, str] = {}
 
-    def _call(self, query: str, variables: dict) -> dict:
-        if not self._token:
+    def _fresh_token(self) -> str:
+        if not self._token or self._clock() - self._token_at >= TOKEN_RENEW_SECONDS:
             client_id, secret = read_credential()
             body = urllib.parse.urlencode({'grant_type': 'client_credentials', 'client_id': client_id,
                                            'client_secret': secret, 'scope': 'comments:create read write',
                                            'actor': 'app'}).encode()
-            self._token = _post(TOKEN_URL, body, {'Content-Type': 'application/x-www-form-urlencoded'}).get('access_token')
-            if not self._token:
+            token = _post(TOKEN_URL, body, {'Content-Type': 'application/x-www-form-urlencoded'}).get('access_token')
+            if not token:
                 raise RuntimeError('Linear returned no access token for the app credential')
-        reply = _post(API_URL, json.dumps({'query': query, 'variables': variables}).encode(),
-                      {'Content-Type': 'application/json', 'Authorization': f'Bearer {self._token}'})
-        if reply.get('errors'):
-            raise RuntimeError(f"Linear refused the request: {reply['errors'][0].get('message')}")
-        return reply['data']
+            self._token, self._token_at = token, self._clock()
+        return self._token
+
+    def _call(self, query: str, variables: dict) -> dict:
+        for attempt in (1, 2):
+            try:
+                reply = _post(API_URL, json.dumps({'query': query, 'variables': variables}).encode(),
+                              {'Content-Type': 'application/json', 'Authorization': f'Bearer {self._fresh_token()}'})
+            except urllib.error.HTTPError as error:
+                if error.code == 401 and attempt == 1:
+                    self._token = None  # expired or revoked: fetch a new one and try once more
+                    continue
+                raise
+            errors = reply.get('errors') or []
+            if attempt == 1 and any((e.get('extensions') or {}).get('code') == 'AUTHENTICATION_ERROR' for e in errors):
+                self._token = None
+                continue
+            if errors:
+                raise RuntimeError(f"Linear refused the request: {errors[0].get('message')}")
+            return reply['data']
 
     async def card(self, card: str) -> dict:
         issue = (await asyncio.to_thread(self._call, CARD_QUERY, {'id': card}))['issue']
@@ -111,6 +149,8 @@ class LinearApp:
             cards += [ready_card(issue) for issue in page['nodes']]
             if not page['pageInfo']['hasNextPage']:
                 return cards
+            if not page['pageInfo']['endCursor'] or page['pageInfo']['endCursor'] == after:
+                raise RuntimeError('Linear reported another page of Ready cards but gave no new cursor')
             after = page['pageInfo']['endCursor']
 
     async def move(self, card: str, state: str) -> None:
