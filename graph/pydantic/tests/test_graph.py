@@ -181,6 +181,7 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
             worker_names={'builder': 'Gemini (agy)', 'tests': 'the test runner (no AI model)',
                           'reviewer': 'DeepSeek V4 Pro (Pi)'},
             worker_makers={'builder': 'Google', 'reviewer': 'DeepSeek'},
+            worker_models={'reviewer': 'deepseek-v4-pro'},
             limits={'builder': 3600, 'tests': 900, 'reviewer': 1200},
             snapshot=workers.snapshot, restore=workers.restore, drift=workers.drift, diff=workers.change,
             install=self.install,
@@ -883,7 +884,10 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
             self.builder_calls += 1
             (Path(run.worktree) / 'big.txt').write_text('x\n' * (MAX_REVIEW_BYTES // 2))
             return BuildResult(True, report='big')
-        self.assertEqual(await run_card(self.state(), self.deps(builder=big)), 'failed')
+        deps = self.deps(builder=big)
+        deps.worker_models = {'reviewer': 'gpt-5.5'}
+        deps.worker_makers = {'builder': 'Google', 'reviewer': 'OpenAI'}
+        self.assertEqual(await run_card(self.state(), deps), 'failed')
         self.assertEqual(self.reviewer_calls, 0)
         self.assertIn(f'over the {MAX_REVIEW_BYTES}-byte limit', self.results()[0])
 
@@ -1500,6 +1504,13 @@ class WorkerParsingTest(unittest.TestCase):
 
 
 class WorkerCallTest(unittest.IsolatedAsyncioTestCase):
+    async def test_large_request_drains_while_child_writes_a_full_output_pipe(self):
+        command = "import sys; sys.stdout.write('y' * 200000 + '\\n'); sys.stdout.flush(); print(len(sys.stdin.read()))"
+        with mock.patch.object(workers, 'sudo_command', return_value=[sys.executable, '-c', command]):
+            status, out, err = await workers.run_worker('reviewer', 'x' * 200000, limit_seconds=5)
+        self.assertEqual(status, 0, err)
+        self.assertTrue(out.endswith('200000\n'))
+
     async def test_a_test_run_stopped_by_its_time_limit_is_reported_as_stopped(self):
         replies = iter([(0, 'lint ok', False), (workers.STOPPED_EXIT, 'stopped: ran longer than its 900-second time limit', True)])
         asked = []

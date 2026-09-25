@@ -193,15 +193,31 @@ export function geminiMessages(prompt, maxBytes = 90_000) {
   const lines = prompt.match(/[^\n]*\n|[^\n]+$/g) ?? [];
   const parts = [];
   let part = '';
+  let size = 0;
+  const flush = () => {
+    if (part) parts.push(part);
+    part = '';
+    size = 0;
+  };
   for (const line of lines) {
-    if (Buffer.byteLength(line) > maxBytes) throw new Error('the Gemini review has a line too large to send intact');
-    if (part && Buffer.byteLength(part) + Buffer.byteLength(line) > maxBytes) {
-      parts.push(part);
-      part = '';
+    const lineSize = Buffer.byteLength(line);
+    if (lineSize <= maxBytes) {
+      if (size + lineSize > maxBytes) flush();
+      part += line;
+      size += lineSize;
+      continue;
     }
-    part += line;
+    // A minified asset or lockfile can be one very long diff line. Split it
+    // at Unicode character boundaries; concatenating the parts restores it.
+    flush();
+    for (const character of line) {
+      const bytes = Buffer.byteLength(character);
+      if (size + bytes > maxBytes) flush();
+      part += character;
+      size += bytes;
+    }
   }
-  if (part) parts.push(part);
+  flush();
   return parts.map((body, index) => {
     const content = parts.length === 1 ? body : index === parts.length - 1
       ? `Final part ${index + 1}/${parts.length} of one review. Do not use tools. Read this part and all prior parts. Now give the final verdict required by the role file.\n\n${body}`

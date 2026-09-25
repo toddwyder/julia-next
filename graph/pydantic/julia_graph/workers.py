@@ -146,13 +146,16 @@ async def run_worker(kind: str, request: dict | str, on_line=None, cwd: str | No
         stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
         limit=64 * 1024 * 1024,
     )
-    try:
-        proc.stdin.write((request if isinstance(request, str) else json.dumps(request)).encode())
-        await proc.stdin.drain()
-        proc.stdin.close()
-    except (BrokenPipeError, ConnectionResetError):
-        pass  # the worker ended before reading; its exit status and stderr say why
     out: list[str] = []
+
+    async def write_in():
+        try:
+            proc.stdin.write((request if isinstance(request, str) else json.dumps(request)).encode())
+            await proc.stdin.drain()
+        except (BrokenPipeError, ConnectionResetError):
+            pass  # the worker ended before reading; its exit status and stderr say why
+        finally:
+            proc.stdin.close()
 
     async def read_out():
         async for raw in proc.stdout:
@@ -161,10 +164,11 @@ async def run_worker(kind: str, request: dict | str, on_line=None, cwd: str | No
             if on_line:
                 await on_line(line)
 
+    writer = asyncio.create_task(write_in())
     reader = asyncio.create_task(read_out())
     errors = asyncio.create_task(proc.stderr.read())
     try:
-        await asyncio.wait_for(asyncio.gather(reader, errors, proc.wait()), limit_seconds)
+        await asyncio.wait_for(asyncio.gather(writer, reader, errors, proc.wait()), limit_seconds)
     except asyncio.TimeoutError:
         # sudo passes a signal from its caller on to the worker.
         with contextlib.suppress(ProcessLookupError):
@@ -175,6 +179,7 @@ async def run_worker(kind: str, request: dict | str, on_line=None, cwd: str | No
             with contextlib.suppress(ProcessLookupError):
                 proc.kill()
             await proc.wait()
+        writer.cancel()
         reader.cancel()
         errors.cancel()
         return STOPPED_EXIT, ''.join(out), f'stopped by the graph after its {int(limit_seconds)}-second time limit'

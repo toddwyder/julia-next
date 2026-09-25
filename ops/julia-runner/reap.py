@@ -68,7 +68,9 @@ def signal_all(sig: int, listed=mine, kill=os.kill) -> int:
         try:
             kill(pid, sig)
             count += 1
-        except ProcessLookupError:
+        except (ProcessLookupError, PermissionError):
+            # A process we cannot signal remains on the next /proc pass and
+            # makes this review exit 125 after the deadline, not a clean run.
             pass
     return count
 

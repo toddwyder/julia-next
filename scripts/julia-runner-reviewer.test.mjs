@@ -77,6 +77,10 @@ test('a full Gemini review is sent in bounded parts in one conversation without 
   assert.ok(messages.every((message) => Buffer.byteLength(message.message.content) < 91_000));
   assert.deepEqual(geminiMessages('small\n').trim().split('\n').map(JSON.parse),
     [{ event: 'user', message: { content: 'small\n' } }]);
+  const longLine = `+${'é'.repeat(55_000)}\n`;
+  const longParts = geminiMessages(longLine).trim().split('\n').map(JSON.parse);
+  assert.ok(longParts.length > 1);
+  assert.equal(longParts.map((message) => message.message.content.split('\n\n').slice(1).join('\n\n')).join(''), longLine);
 });
 
 test('the Gemini launcher writes the bounded stream to its contained process', async () => {

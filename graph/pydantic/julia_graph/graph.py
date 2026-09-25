@@ -805,7 +805,7 @@ class Review(BaseNode[CardRun, Deps, str]):
             await say_once(ctx, f'Before review round {round_}, the working copy did not match the candidate `{s.commit[:12]}` '
                                 f'({drifted}). It was put back to the candidate; nothing from it is reviewed or kept.',
                            marker('review-drift', s, commit=s.commit, round=round_))
-        await ctx.deps.restore(s, s.commit)
+        await ctx.deps.restore(s, s.commit, True)
         before = ctx.deps.snapshot(s)
         s.review_before = list(before)
         save(ctx)  # before the reviewer starts, so a restart sees a review was under way

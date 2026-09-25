@@ -65,6 +65,16 @@ class SweepTest(unittest.TestCase):
         self.assertEqual(world.sweep(), [20])
         self.assertGreaterEqual(world.t, reap.KILL_SECONDS)
 
+    def test_an_unsignalable_child_is_reported_without_crashing_the_sweep(self):
+        clock = [0.0]
+        def denied(_pid, _sig):
+            raise PermissionError('cannot signal')
+        def pause(seconds):
+            clock[0] += seconds
+        self.assertEqual(reap.sweep(listed=lambda: [10], kill=denied, reap=lambda: None,
+                                    pause=pause, clock=lambda: clock[0]), [10])
+        self.assertGreaterEqual(clock[0], reap.KILL_SECONDS)
+
 
 class BelowTest(unittest.TestCase):
     def test_the_parent_chain_is_followed_and_zombies_are_not_listed(self):
