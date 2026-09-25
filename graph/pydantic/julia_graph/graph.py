@@ -1,8 +1,13 @@
 """The build-and-test graph (JUL-118): one card, one builder, the tests, the result on the card.
 
     Resume -> Prepare -> Build -> Test -> Report -> end
-                           \\        \\
-                            `--------`--> Report (with the failure)
+                           ^  \\      |  \\
+                           |   `-----|---`--> Report (with the failure)
+                           `---------'  failed tests, at most MAX_TEST_REPAIRS times
+
+Failed tests that name what failed go back to the builder, with the failures,
+to repair on top of its own commit; the repaired commit is tested again. Once
+the repairs are used up the result says the tests still failed, with each run.
 
 Every step saves the card's progress before the next one starts
 (``checkpoint.py``). A restart enters at ``Resume``, which picks up from the
@@ -28,7 +33,10 @@ from pydantic_graph import BaseNode, End, GraphBuilder, GraphRunContext
 from .checkpoint import CardRun, Checkpoint, StepMark, TestResult
 from .status import day, duration, render, status_marker
 
+# Builder runs for one build or one repair: an interrupted run is tried again once.
 MAX_BUILD_ATTEMPTS = 2
+# Times failed tests go back to the builder before the card reports the failure.
+MAX_TEST_REPAIRS = 2
 # Each worker's time limit in seconds. The worker's own launcher enforces it
 # (ops/julia-runner/time-limit.mjs), so a worker is stopped even if the graph dies.
 LIMITS = {'builder': 60 * 60, 'tests': 15 * 60}
@@ -254,8 +262,9 @@ class Resume(BaseNode[CardRun, Deps, str]):
             await say_once(ctx, "This card's working copy was made by an older version of the graph, and its git "
                                 "data points outside the builder's folder. The old copy is kept aside and the card "
                                 'starts again from a fresh one.', marker('fresh-copy', s))
-            s.step, s.build_started, s.attempt = 'prepare', False, 0
+            s.step, s.build_started, s.attempt, s.tries = 'prepare', False, 0, 0
             s.commit, s.builder_report, s.tests = None, None, None
+            s.repairs, s.repair_from, s.test_rounds = 0, None, []
             save(ctx)
             return Prepare()
         if s.step == 'prepare':
@@ -403,18 +412,25 @@ def instructions_part(card: dict) -> str:
 class Build(BaseNode[CardRun, Deps, str]):
     async def run(self, ctx: GraphRunContext[CardRun, Deps]) -> Test | Report:
         s = ctx.state
-        if s.attempt >= MAX_BUILD_ATTEMPTS:
-            return fail(ctx, f'the builder did not finish in {MAX_BUILD_ATTEMPTS} attempts')
+        if s.tries >= MAX_BUILD_ATTEMPTS:
+            what = f'repair {s.repairs}' if s.repairs else 'build'
+            return fail(ctx, f'the builder did not finish the {what} in {MAX_BUILD_ATTEMPTS} attempts')
+        if s.repairs:
+            # Said here, not in Test, so a restart between the two still says it.
+            await say_once(ctx, repair_notice(s), marker('tests-failed', s, commit=s.repair_from))
         if reason := await no_second_worker(ctx, 'builder'):
             return fail(ctx, reason)
         card = await ctx.deps.linear.card(s.card)
         s.attempt += 1
+        s.tries += 1
         s.build_started = True
         save(ctx)  # saved before the builder starts, so a crash is seen on restart
         await say_once(ctx, f'Builder attempt {s.attempt} started.', marker('build-started', s, attempt=s.attempt))
-        await step(ctx, f'Building (attempt {s.attempt})', f'Built (attempt {s.attempt})', 'builder')
+        why = ', repairing failed tests' if s.repairs else ''
+        await step(ctx, f'Building (attempt {s.attempt}{why})', f'Built (attempt {s.attempt}{why})', 'builder')
+        brief = builder_brief(card, s, listed(ctx)) + repair_part(s)
         try:
-            result = await ctx.deps.builder(s, builder_brief(card, s, listed(ctx)), ctx.deps.limits['builder'], lambda: moved(ctx))
+            result = await ctx.deps.builder(s, brief, ctx.deps.limits['builder'], lambda: moved(ctx))
         except Exception as error:  # a worker that cannot even start is a failed worker
             s.build_started = False
             close(ctx, 'could not start')
@@ -436,19 +452,61 @@ class Build(BaseNode[CardRun, Deps, str]):
         return Test()
 
 
+def failing_lines(tests: TestResult, most: int) -> str:
+    return ''.join(f'\n- failing: {name}' for name in tests.failing[:most])
+
+
+def repair_notice(s: CardRun) -> str:
+    return (f'The tests failed on candidate `{s.repair_from}`: {s.tests.summary}{failing_lines(s.tests, 20)}\n\n'
+            f'The builder gets the failures to repair on top of that commit (repair {s.repairs} of {MAX_TEST_REPAIRS}), '
+            'and the repaired commit is tested again.')
+
+
+def repair_part(s: CardRun) -> str:
+    """The failed tests, for a repair: the builder cannot run them itself."""
+    if not s.repairs:
+        return ''
+    return f"""
+## The tests failed on your last commit
+
+This is repair {s.repairs} of {MAX_TEST_REPAIRS}. Your earlier work is already
+committed in the working folder (commit {s.repair_from}): change it, do not
+start again. The graph ran the tests on that commit and they failed:
+
+- {s.tests.summary}{failing_lines(s.tests, 50)}
+
+<test-failures>
+{s.tests.details or '(the test run gave no more detail)'}
+</test-failures>
+
+Fix the change so these tests pass and the card's acceptance criteria are still
+met. If a test is itself wrong about what the card asks, correct the test and
+say so in your final report.
+"""
+
+
 @dataclass
 class Test(BaseNode[CardRun, Deps, str]):
-    async def run(self, ctx: GraphRunContext[CardRun, Deps]) -> Report:
+    async def run(self, ctx: GraphRunContext[CardRun, Deps]) -> Build | Report:
+        s = ctx.state
         await step(ctx, 'Running the tests', 'Ran the tests', 'tests')
         try:
-            ctx.state.tests = await ctx.deps.tester(ctx.state, ctx.deps.limits['tests'], lambda: moved(ctx))
+            s.tests = await ctx.deps.tester(s, ctx.deps.limits['tests'], lambda: moved(ctx))
         except Exception as error:  # reported once, not retried on every restart
-            ctx.state.tests = TestResult(passed=False, summary=f'the test worker could not run: {type(error).__name__}: {error}')
-        if ctx.state.tests.stopped:
+            s.tests = TestResult(passed=False, summary=f'the test worker could not run: {type(error).__name__}: {error}')
+        s.test_rounds.append(f'`{(s.commit or "none")[:12]}`: {s.tests.summary}')
+        if s.tests.stopped:
             return await stopped(ctx, 'tests')
-        close(ctx, 'done' if ctx.state.tests.passed else 'failed')
-        ctx.state.step = 'report'
-        save(ctx)
+        # Only a finished run that names what failed is the builder's to repair;
+        # a test worker that did not run or answer is reported as it is.
+        if not s.tests.passed and s.tests.failing:
+            if s.repairs < MAX_TEST_REPAIRS:
+                s.repairs, s.repair_from, s.tries, s.step = s.repairs + 1, s.commit, 0, 'build'
+                close(ctx, 'failed')  # saves
+                return Build()
+            s.failure = f'the tests still failed after {MAX_TEST_REPAIRS} repair attempts'
+        s.step = 'report'
+        close(ctx, 'done' if s.tests.passed else 'failed')  # saves
         return Report()
 
 
@@ -465,6 +523,9 @@ def result_text(s: CardRun, version: str) -> tuple[str, str]:
         lines.extend(f'  - failing: {name}' for name in s.tests.failing[:20])
     elif s.commit:
         lines.append('- Tests: not run')
+    if s.repairs:
+        lines.append(f'- Test runs ({s.repairs} of {MAX_TEST_REPAIRS} repairs used), oldest first:')
+        lines.extend(f'  {n}. {text}' for n, text in enumerate(s.test_rounds, 1))
     if s.builder_report:
         report = s.builder_report.strip()
         lines += ['', "Builder's final report:", '', '> ' + report[:3000].replace('\n', '\n> ')]
