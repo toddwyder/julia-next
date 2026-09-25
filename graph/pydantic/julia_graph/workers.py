@@ -338,7 +338,7 @@ def final_verdict(text: str) -> dict | None:
     """The JSON object that ends the reviewer's final message (a closing code
     fence may follow it), or None. Only this counts: a verdict written earlier
     in the message, or followed by more text, is not a final verdict."""
-    body = re.sub(r'\n?```\s*$', '', text.strip()).rstrip()
+    body = re.sub(r'\n?`{3,}\s*$', '', text.strip()).rstrip()
     decoder = json.JSONDecoder()
     for start in [m.start() for m in re.finditer(r'\{', body)][::-1]:
         try:

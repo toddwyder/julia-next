@@ -902,13 +902,16 @@ async def post_review(ctx: GraphRunContext[CardRun, Deps]) -> None:
         return
     if not review.ok:
         return  # no verdict to post; the result comment says why
-    await say_once(ctx, verdict_text(s, review), marker('review-verdict', s, commit=s.commit, round=review.round))
     if review.verdict == 'changes_needed' and len(s.round_reasons) >= MAX_REVIEW_ROUNDS:
         reasons = '\n\n'.join(f'**Round {n}:** {text}' for n, text in enumerate(s.round_reasons, 1))
         todd = (f'\n\nThe reviewer says this needs Todd: {TODD_REASONS[s.needs_todd]}. {review.todd_reason}'.rstrip()
                 if s.needs_todd else '')
-        await say_once(ctx, f'**The review stopped this card after {MAX_REVIEW_ROUNDS} rounds of findings.** No new card was '
-                            f'opened for them.\n\n{reasons}{todd}', marker('review-stopped', s))
+        await say_once(ctx, f'**The review stopped this card after {MAX_REVIEW_ROUNDS} rounds of findings: '
+                            f'CHANGES NEEDED.** No new card was opened for them.\n\n'
+                            f'Reviewer: {review.reviewer}; model: {review.model or "not reported"}.\n\n'
+                            f'{reasons}{todd}', marker('review-stopped', s))
+        return
+    await say_once(ctx, verdict_text(s, review), marker('review-verdict', s, commit=s.commit, round=review.round))
 
 
 def result_text(s: CardRun, version: str) -> tuple[str, str]:

@@ -787,7 +787,9 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn('Round 1:** F1: no validation', stop)
         self.assertIn('Round 2:** F2: still no validation, now off by one', stop)
         self.assertIn('No new card was opened', stop)
-        self.assertEqual(sorted(re.search(r'round=(\d+)', text).group(1) for text in self.verdicts()), ['1', '2'])
+        self.assertEqual(len(self.verdicts()), 1)  # final verdict and both reasons share the stop comment
+        self.assertIn('CHANGES NEEDED', stop)
+        self.assertIn('model: deepseek/deepseek-v4-pro', stop)
         self.assertEqual(self.linear.assigned, [])  # UAT 2: not assigned to Todd
         self.assertIn('the review asked for changes in 2 rounds', self.results()[0])
 
@@ -1403,6 +1405,8 @@ class WorkerParsingTest(unittest.TestCase):
                          ('approve', 'checked', met('say hello'), 'gpt-5.5'))
         fenced = workers.reviewer_outcome(0, reply('```json\n' + json.dumps({'verdict': 'approve'}) + '\n```'), '')
         self.assertEqual(fenced.verdict, 'approve')
+        long_fence = workers.reviewer_outcome(0, reply('````json\n' + json.dumps({'verdict': 'approve'}) + '\n````'), '')
+        self.assertEqual(long_fence.verdict, 'approve')
 
     def test_an_approve_written_earlier_is_not_the_final_verdict(self):
         # which message is final is the launcher's job (scripts/julia-runner-reviewer.test.mjs);
