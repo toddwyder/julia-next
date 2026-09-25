@@ -6,8 +6,9 @@ steps yet.
 
 ```
 Resume -> Prepare -> Build -> Test -> Report -> end
-                      |  failure       ^
-                      +----------------+
+                      ^  |     |         ^
+                      |  +-----|---------+  failure
+                      +--------+  failed tests, repaired at most twice
 ```
 
 ## What the library gives, and what this code adds
@@ -21,6 +22,7 @@ Checked against the installed `pydantic-graph==2.49.0` (the pin is in `requireme
 | One graph per card | this code: a lock file held for the whole run |
 | No second worker after a restart | this code: before any builder or test run starts, the graph looks for a live one in the process table and waits for it to end; if it will not end, the card says so and nothing starts. The check is machine-wide on purpose: one builder at a time across all cards (JUL-116 story 3) |
 | The builder stays in its folder (JUL-127) | this code: each card's working copy, `/srv/julia-runner/worktrees/card-<number>`, is a local clone of the repo, not a `git worktree`. A worktree's `.git` is a pointer into the main repo, outside the one folder headless agy lets Gemini read, and agy ends the whole turn on that refusal (live JUL-142 and JUL-144, 25 Sep). The repo's copy of GitHub's `main` is fetched into the clone, because the server's repo is shallow. A card run again keeps the name `card-<number>`, the only one the worker launchers accept, and the earlier copy moves to `card-<number>.runN`. |
+| Failed tests go back to the builder | this code: when the test run finishes and names what failed (a test or the lint), the builder gets the failures and repairs on top of its own commit, and the repaired commit is tested again, at most twice (`MAX_TEST_REPAIRS`). Each round is announced on the card by a `graph: tests-failed` comment. A test worker that did not run or answer, or a run stopped at its time limit, is reported as it is, since there is nothing for the builder to fix. An interrupted repair goes back to the failed candidate, not to the base. Once the repairs are used up, the result says the tests still failed and lists every test run. |
 | Unfinished work never counted as done | this code: `build_started` is saved before the builder starts; a restart that finds it set reports the attempt as interrupted, puts the working copy back to the base commit and builds again (at most two attempts) |
 | One result comment | this code: comments carry a `graph: <step> card=...` marker line, and the card is checked for it before posting |
 | Where the card is (JUL-126) | this code (`status.py`): one "Where this card is" comment, edited in place, shows the step, who is working, the time limit, when the card last moved, and the steps so far. A restart finds it by its `graph: status` marker and never posts a second one. Worker output moves the card at once but edits the comment at most once a minute. Its last line, `graph-moved: <time> running=<step> limit=<seconds>`, is for the stuck check (JUL-129). |

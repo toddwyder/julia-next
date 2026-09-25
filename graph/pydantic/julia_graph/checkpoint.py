@@ -26,6 +26,9 @@ class TestResult(BaseModel):
     failing: list[str] = []
     # True when the test run was stopped for running past its time limit.
     stopped: bool = False
+    # What the failures said (the reporter's "failing tests" section, or the
+    # lint's output), for the builder's repair brief.
+    details: str = ''
 
 
 class StepMark(BaseModel):
@@ -49,7 +52,15 @@ class CardRun(BaseModel):
     # True once a builder has been started for the current attempt. A restart
     # that finds it still set knows the builder never finished.
     build_started: bool = False
-    attempt: int = 0
+    attempt: int = 0  # builder runs on this card, repairs included
+    tries: int = 0  # builder runs for the current build or repair; an interrupted one is tried again
+    # Failed tests the builder has been given to repair, and the commit that
+    # repair starts from: the failed candidate. An interrupted repair goes back
+    # to it, never to the base, so the first build's work is kept.
+    repairs: int = 0
+    repair_from: str | None = None
+    # Every test run's summary, oldest first, for the result comment.
+    test_rounds: list[str] = []
     commit: str | None = None
     builder_report: str | None = None
     tests: TestResult | None = None

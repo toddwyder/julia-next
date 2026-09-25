@@ -197,16 +197,111 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn('FAILED', result)
         self.assertIn('the test worker could not run: BrokenPipeError', result)
         self.assertEqual(self.saved().step, 'done')
+        self.assertEqual(self.builder_calls, 1)  # not the builder's to fix
 
-    async def test_failing_tests_are_reported_with_their_names(self):
-        async def red(run, *_):
-            return TestResult(passed=False, summary='tests 3, pass 2, fail 1', failing=['greets politely'])
-        outcome = await run_card(self.state(), self.deps(tester=red))
+    # ----------------------------------------------------------------- failed tests go back to the builder
+
+    def repairing_builder(self, crash_on=None):
+        """Builds hello.txt, then each repair adds a line (a real change to commit)."""
+        self.briefs = []
+
+        async def build(run, brief, limit, progress):
+            self.builder_calls += 1
+            self.briefs.append(brief)
+            path = Path(run.worktree) / 'hello.txt'
+            path.write_text((path.read_text() if path.exists() else '') + f'turn {self.builder_calls}\n')
+            if self.builder_calls == crash_on:
+                raise Crash()
+            return BuildResult(True, report=f'turn {self.builder_calls}')
+        return build
+
+    def red_until(self, turn, failing='greets politely'):
+        async def test(run, *_):
+            self.tester_calls += 1
+            if self.tester_calls >= turn:
+                return TestResult(passed=True, summary='tests 3, pass 3, fail 0')
+            return TestResult(passed=False, summary=f'tests 3, pass 2, fail 1 (run {self.tester_calls})',
+                              failing=[failing], details=f'✖ {failing}\n  AssertionError: expected "hello" (run {self.tester_calls})')
+        return test
+
+    async def test_failed_tests_go_to_the_builder_and_the_repaired_commit_is_tested_again(self):
+        outcome = await run_card(self.state(), self.deps(builder=self.repairing_builder(), tester=self.red_until(2)))
+        self.assertEqual(outcome, 'passed')
+        self.assertEqual((self.builder_calls, self.tester_calls), (2, 2))
+        first, repaired = sh(self.worktree, 'git', 'rev-list', '--reverse', f'{self.base}..HEAD').splitlines()
+        # the repair got the failure, the failing commit and its own earlier work
+        self.assertNotIn('failed on', self.briefs[0])
+        self.assertIn('greets politely', self.briefs[1])
+        self.assertIn('AssertionError: expected "hello" (run 1)', self.briefs[1])
+        self.assertIn(first, self.briefs[1])
+        self.assertIn('say hello', self.briefs[1])  # still the card's own brief
+        self.assertEqual((Path(self.worktree) / 'hello.txt').read_text(), 'turn 1\nturn 2\n')
+        # the card said the tests failed and a repair was starting
+        [told] = [c for c in self.linear.comments if 'graph: tests-failed' in c]
+        self.assertIn(first, told)
+        self.assertIn('repair 1 of 2', told)
+        [result] = self.results()
+        self.assertIn('PASSED', result)
+        self.assertIn(f'Candidate commit: `{repaired}`', result)
+        self.assertIn('fail 1 (run 1)', result)  # the earlier round is still listed
+        self.assertEqual(self.saved().commit, repaired)
+
+    async def test_tests_that_keep_failing_end_the_run_once_the_repairs_are_used(self):
+        outcome = await run_card(self.state(), self.deps(builder=self.repairing_builder(), tester=self.red_until(99)))
         self.assertEqual(outcome, 'failed')
+        self.assertEqual((self.builder_calls, self.tester_calls), (3, 3))
         [result] = self.results()
         self.assertIn('FAILED', result)
+        self.assertIn('the tests still failed after 2 repair attempts', result)
         self.assertIn('failing: greets politely', result)
+        for run in (1, 2, 3):
+            self.assertIn(f'fail 1 (run {run})', result)
         self.assertIn(sh(self.worktree, 'git', 'rev-parse', 'HEAD'), result)
+        self.assertEqual(len([c for c in self.linear.comments if 'graph: tests-failed' in c]), 2)
+        self.assertEqual(self.saved().step, 'done')
+
+    async def test_a_failure_that_names_no_test_is_reported_not_repaired(self):
+        async def unclear(run, *_):
+            self.tester_calls += 1
+            return TestResult(passed=False, summary='the test worker did not answer (exit 1)')
+        outcome = await run_card(self.state(), self.deps(tester=unclear))
+        self.assertEqual(outcome, 'failed')
+        self.assertEqual((self.builder_calls, self.tester_calls), (1, 1))
+        self.assertIn('the test worker did not answer', self.results()[0])
+
+    async def test_a_repair_that_changes_nothing_fails_and_says_so(self):
+        async def once(run, brief, *_):
+            self.builder_calls += 1
+            if self.builder_calls == 1:
+                (Path(run.worktree) / 'hello.txt').write_text('hello\n')
+            return BuildResult(True, report='done')
+        outcome = await run_card(self.state(), self.deps(builder=once, tester=self.red_until(99)))
+        self.assertEqual(outcome, 'failed')
+        [result] = self.results()
+        self.assertIn('no changes to commit', result)
+        self.assertIn('fail 1 (run 1)', result)
+
+    async def test_a_restart_during_a_repair_keeps_the_failed_candidate_and_discards_only_the_repair(self):
+        with self.assertRaises(Crash):
+            await run_card(self.state(), self.deps(builder=self.repairing_builder(crash_on=2), tester=self.red_until(2)))
+        first = self.saved().commit
+        self.assertEqual(self.saved().step, 'build')
+        self.builder_calls = 1  # the next builder turn is the repair again
+        outcome = await run_card(self.state(), self.deps(builder=self.repairing_builder(), tester=self.red_until(2)))
+        self.assertEqual(outcome, 'passed')
+        interrupted = [c for c in self.linear.comments if 'graph: build-interrupted' in c]
+        self.assertEqual(len(interrupted), 1)
+        # the interrupted repair's edit was thrown away, the first build's was kept
+        self.assertEqual(sh(self.worktree, 'git', 'rev-list', '--reverse', f'{self.base}..HEAD').splitlines()[0], first)
+        self.assertEqual((Path(self.worktree) / 'hello.txt').read_text(), 'turn 1\nturn 2\n')
+        self.assertIn('greets politely', self.briefs[-1])  # the retried repair still got the failure
+
+    async def test_the_status_comment_shows_the_failed_tests_and_the_repair(self):
+        await run_card(self.state(), self.deps(builder=self.repairing_builder(), tester=self.red_until(2)))
+        [status] = self.linear.status()
+        self.assertIn('✗ Running the tests: failed', status)
+        self.assertIn('✓ Built (attempt 2, repairing failed tests)', status)
+        self.assertIn('Finished: the tests passed.', status)
 
     # ----------------------------------------------------------------- restarts
 
@@ -692,6 +787,17 @@ class WorkerParsingTest(unittest.TestCase):
         self.assertTrue(workers.suite_result(0, 'ℹ tests 2\nℹ pass 2\nℹ fail 0\n').passed)
         self.assertFalse(workers.suite_result(0, 'no summary at all').passed)
 
+    def test_the_failure_details_for_the_builder_come_from_the_reporters_failing_tests_section(self):
+        output = ('✔ says hi (1ms)\n✖ greets politely (2ms)\n  AssertionError: early copy\nℹ tests 2\nℹ pass 1\nℹ fail 1\n'
+                  'ℹ duration_ms 9\n\n✖ failing tests:\n\ntest at scripts/a.test.mjs:3:1\n✖ greets politely (2ms)\n'
+                  '  AssertionError: expected "hello"\n')
+        result = workers.suite_result(1, output)
+        self.assertTrue(result.details.startswith('✖ failing tests:'))
+        self.assertIn('AssertionError: expected "hello"', result.details)
+        self.assertNotIn('says hi', result.details)
+        # no such section: the end of the output instead, capped
+        self.assertEqual(workers.suite_result(1, 'x' * 20000).details, 'x' * workers.MAX_DETAILS)
+
     def test_live_workers_reads_the_process_table(self):
         with tempfile.TemporaryDirectory() as d:
             proc = Path(d)
@@ -738,6 +844,16 @@ class WorkerCallTest(unittest.IsolatedAsyncioTestCase):
         result = await workers.tester(None, 900, None, ask=ask)
         self.assertFalse(result.stopped)
         self.assertFalse(result.passed)
+
+    async def test_a_failed_lint_is_named_and_its_output_goes_to_the_builder(self):
+        replies = iter([(1, 'eslint\nscripts/a.mjs:3 no-unused-vars', False), (0, 'ℹ tests 1\nℹ pass 1\nℹ fail 0\n', False)])
+
+        async def ask(run, what, limit, progress):
+            return next(replies)
+        result = await workers.tester(None, 900, None, ask=ask)
+        self.assertFalse(result.passed)
+        self.assertEqual(result.failing, ['lint: scripts/a.mjs:3 no-unused-vars'])
+        self.assertIn('scripts/a.mjs:3 no-unused-vars', result.details)
 
     async def test_worker_output_lines_reach_the_progress_callback(self):
         lines = []
