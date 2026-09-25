@@ -54,13 +54,16 @@ const ENV = { HOME: homedir(), PATH: process.env.PATH || '/usr/bin:/bin', LANG: 
 
 // How each reviewer is started: always read-only, always from /.
 export const REVIEWERS = {
-  codex: () => ({
+  codex: (_prompt, _worktree, selectedModel = CODEX_MODEL) => {
+    if (selectedModel !== CODEX_MODEL) throw new Error(`Codex reviewer model ${selectedModel} is not installed`);
+    return {
     command: 'codex',
     args: ['exec', '-m', CODEX_MODEL, '-c', 'model_reasoning_effort=high', '-s', 'read-only', '--skip-git-repo-check', '--json', '-'],
     env: ENV,
     stdin: true,
     kind: 'codex',
-  }),
+    };
+  },
   // DeepSeek V4 Pro through the reviewer seat's own settings (run-pi-seat.mjs
   // SEATS['reviewer-backup']): its key reaches Pi's environment only.
   deepseek: (prompt, _worktree, selectedModel = 'deepseek-v4-pro') => {
@@ -82,11 +85,14 @@ export const REVIEWERS = {
 // The graph selects the model through MODEL_CATALOG before calling this
 // account-specific launcher. A builder gets write access only to its card copy.
 export const BUILDERS = {
-  codex: (_prompt, worktree) => ({
+  codex: (_prompt, worktree, selectedModel = CODEX_MODEL) => {
+    if (selectedModel !== CODEX_MODEL) throw new Error(`Codex builder model ${selectedModel} is not installed`);
+    return {
     command: 'codex',
     args: ['exec', '-m', CODEX_MODEL, '-c', 'model_reasoning_effort=high', '-s', 'workspace-write', '-C', worktree, '--json', '-'],
     env: ENV, stdin: true, kind: 'codex',
-  }),
+    };
+  },
 };
 
 function pickKey(env) {

@@ -60,7 +60,7 @@ def card_deps(card: str, limits: dict[str, int] | None = None,
         base_file=workers.base_file,
         graph_version=graph_version(), log=log, worker_names=workers.worker_names(pair),
         worker_makers=workers.worker_makers(pair),
-        worker_models={'reviewer': pair['reviewer']['model'] or 'gpt-5.5'},
+        worker_models={'reviewer': pair['reviewer']['model']},
         model_labels=(builder_model, reviewer_model),
         limits=limits or dict(LIMITS), files=workers.tracked_files,
     )

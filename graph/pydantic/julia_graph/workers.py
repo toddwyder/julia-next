@@ -87,8 +87,10 @@ def git(cwd: str, *args: str) -> str:
 # ------------------------------------------------------------ live workers
 
 def account_uid(kind: str) -> int | None:
+    if kind != 'tests':
+        return None  # builder and reviewer share model accounts; match their process marks
     try:
-        return pwd.getpwnam({'builder': 'gemini-worker', 'tests': 'julia-tester'}[kind]).pw_uid
+        return pwd.getpwnam('julia-tester').pw_uid
     except KeyError:  # no such account on this machine (the tests' laptop)
         return None
 

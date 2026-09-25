@@ -418,6 +418,14 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         [note] = [c for c in self.linear.comments if 'graph: fresh-copy' in c]
         self.assertIn('made by an older version of the graph', note)
 
+    async def test_an_interrupted_review_in_an_old_worktree_discards_its_stale_snapshot(self):
+        sh(self.repo, 'git', 'worktree', 'add', '-q', '-b', 'graph/card-1', str(self.worktree), self.base)
+        old = self.state()
+        old.step, old.review_before = 'review', ['old commit', 'old working copy']
+        Checkpoint(self.state_dir, 'JUL-1').save(old)
+        self.assertEqual(await run_card(self.state(), self.deps()), 'passed')
+        self.assertFalse(any('graph: review-voided' in comment for comment in self.linear.comments))
+
     async def test_a_fresh_copy_waits_for_an_old_builder_still_running(self):
         sh(self.repo, 'git', 'worktree', 'add', '-q', '-b', 'graph/card-1', str(self.worktree), self.base)
         old = self.state()
@@ -779,6 +787,7 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn('Round 1:** F1: no validation', stop)
         self.assertIn('Round 2:** F2: still no validation, now off by one', stop)
         self.assertIn('No new card was opened', stop)
+        self.assertEqual(sorted(re.search(r'round=(\d+)', text).group(1) for text in self.verdicts()), ['1', '2'])
         self.assertEqual(self.linear.assigned, [])  # UAT 2: not assigned to Todd
         self.assertIn('the review asked for changes in 2 rounds', self.results()[0])
 
@@ -1449,6 +1458,7 @@ class WorkerParsingTest(unittest.TestCase):
     def test_the_selected_pair_comes_from_the_shared_model_catalog(self):
         pair = workers.resolve_pair('builder-codex', 'adversary-gemini-flash')
         self.assertEqual(workers.worker_makers(pair), {'builder': 'OpenAI', 'reviewer': 'Google'})
+        self.assertEqual(pair['builder']['model'], 'gpt-5.5')
         self.assertEqual(workers.worker_names(pair)['reviewer'], 'Gemini 3.8 Flash')
         with self.assertRaisesRegex(ValueError, 'different model makers'):
             workers.resolve_pair('builder-gemini-flash', 'adversary-gemini-flash')
@@ -1608,7 +1618,7 @@ class WorkerCallTest(unittest.IsolatedAsyncioTestCase):
             pair = workers.resolve_pair('builder-gemini-flash', 'adversary-codex')
             result = await workers.reviewer(lambda line: None, pair)(run, 'the brief', 1200, None)
         # the launcher enforces the limit; the graph's own, a minute later, is a backstop
-        self.assertEqual(seen, {'kind': 'reviewer', 'request': {'reviewer': 'codex', 'model': None, 'prompt': 'the brief', 'limit_seconds': 1200},
+        self.assertEqual(seen, {'kind': 'reviewer', 'request': {'reviewer': 'codex', 'model': 'gpt-5.5', 'prompt': 'the brief', 'limit_seconds': 1200},
                                 'cwd': '/', 'limit': 1260})
         self.assertEqual((result.verdict, result.model), ('approve', 'gpt-5.5'))
 

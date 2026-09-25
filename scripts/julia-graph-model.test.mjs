@@ -6,7 +6,7 @@ import { resolvePair } from './julia-graph-model.mjs';
 test('the selected Codex builder and Gemini reviewer resolve through the model catalog', () => {
   const pair = resolvePair('builder-codex', 'adversary-gemini-flash');
   assert.deepEqual(pair.builder, {
-    label: 'builder-codex', entry: 'codex', model: null,
+    label: 'builder-codex', entry: 'codex', model: 'gpt-5.5',
     maker: 'OpenAI', account: 'runner', name: 'Codex',
   });
   assert.deepEqual(pair.reviewer, {

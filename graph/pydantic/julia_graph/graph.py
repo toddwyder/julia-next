@@ -345,6 +345,7 @@ class Resume(BaseNode[CardRun, Deps, str]):
             s.commit, s.builder_report, s.tests = None, None, None
             s.repairs, s.repair_from, s.test_rounds = 0, None, []
             s.review, s.round_reasons, s.fixing, s.needs_todd = None, [], None, None
+            s.review_before = None
             save(ctx)
             return Prepare()
         if s.step == 'prepare':
@@ -901,7 +902,7 @@ async def post_review(ctx: GraphRunContext[CardRun, Deps]) -> None:
         return
     if not review.ok:
         return  # no verdict to post; the result comment says why
-    await say_once(ctx, verdict_text(s, review), marker('review-verdict', s, commit=s.commit))
+    await say_once(ctx, verdict_text(s, review), marker('review-verdict', s, commit=s.commit, round=review.round))
     if review.verdict == 'changes_needed' and len(s.round_reasons) >= MAX_REVIEW_ROUNDS:
         reasons = '\n\n'.join(f'**Round {n}:** {text}' for n, text in enumerate(s.round_reasons, 1))
         todd = (f'\n\nThe reviewer says this needs Todd: {TODD_REASONS[s.needs_todd]}. {review.todd_reason}'.rstrip()

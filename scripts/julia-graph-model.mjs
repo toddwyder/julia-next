@@ -9,7 +9,7 @@ import { MODEL_CATALOG } from './seat-labels.mjs';
 
 const MAKER = Object.freeze({ openai: 'OpenAI', google: 'Google', deepseek: 'DeepSeek' });
 const LAUNCH = Object.freeze({
-  codex: Object.freeze({ account: 'runner', name: 'Codex' }),
+  codex: Object.freeze({ account: 'runner', name: 'Codex', installedModel: 'gpt-5.5' }),
   gemini: Object.freeze({ account: 'gemini-worker', name: 'Gemini 3.8 Flash' }),
   'pi-deepseek': Object.freeze({ account: 'runner', name: 'DeepSeek V4 Pro (Pi)' }),
 });
@@ -28,7 +28,8 @@ export function resolveChoice(role, label) {
   const route = LAUNCH[entry];
   const maker = MAKER[FAMILY_OF[entry]];
   if (!route || !maker) throw new Error(`no installed graph launch route for ${label}`);
-  return { label, entry, model, maker, ...route };
+  const { installedModel, ...launcher } = route;
+  return { label, entry, model: model ?? installedModel, maker, ...launcher };
 }
 
 export function resolvePair(builderLabel, reviewerLabel) {
