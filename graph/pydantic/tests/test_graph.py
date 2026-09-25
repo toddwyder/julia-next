@@ -526,6 +526,33 @@ class PrepareTest(unittest.IsolatedAsyncioTestCase):
         (self.worktree / 'stale.txt').write_text('an abandoned edit')
         self.assertIn('uncommitted', await prepare(self.run_for(self.first)) or '')
 
+    async def test_the_working_copy_holds_its_own_git_data(self):
+        # JUL-127 live check: Gemini followed a worktree's .git pointer out of
+        # its folder and headless agy ended the build. Nothing may point out.
+        prepare = workers.prepare(str(self.repo), install=self.install)
+        self.assertIsNone(await prepare(self.run_for(self.second)))
+        git_dir = self.worktree / '.git'
+        self.assertTrue(git_dir.is_dir())  # a folder, not a "gitdir:" pointer file
+        self.assertFalse((git_dir / 'objects' / 'info' / 'alternates').exists())
+        self.assertEqual(Path(sh(self.worktree, 'git', 'rev-parse', '--absolute-git-dir')), git_dir.resolve())
+        self.assertEqual(sh(self.worktree, 'git', 'rev-parse', 'HEAD'), self.second)
+        self.assertEqual(sh(self.worktree, 'git', 'rev-parse', '--abbrev-ref', 'HEAD'), 'graph/card-1')
+
+    async def test_a_base_newer_than_the_repos_own_main_is_still_found(self):
+        # The base is the repo's fresh copy of GitHub's main; the repo's local
+        # main lags behind it. The server's repo is shallow, so its clone copies
+        # only what its branches reach, and a clone alone would not carry the base.
+        shallow = Path(self.tmp.name) / 'shallow-repo'
+        sh(Path(self.tmp.name), 'git', 'clone', '-q', '--depth', '1', f'file://{self.origin}', str(shallow))
+        (self.origin / 'new.txt').write_text('newer\n')
+        sh(self.origin, 'git', *workers.GIT_ID, 'add', '-A')
+        sh(self.origin, 'git', *workers.GIT_ID, 'commit', '-q', '-m', 'three')
+        third = sh(self.origin, 'git', 'rev-parse', 'HEAD')
+        prepare = workers.prepare(str(shallow), install=self.install)
+        self.assertIsNone(await prepare(self.run_for(third)))
+        self.assertEqual(sh(self.worktree, 'git', 'rev-parse', 'HEAD'), third)
+        self.assertNotEqual(sh(shallow, 'git', 'rev-parse', 'main'), third)  # the repo's own main did lag
+
     async def test_an_interrupted_install_is_run_again(self):
         prepare = workers.prepare(str(self.repo), install=self.install)
         await prepare(self.run_for(self.second))

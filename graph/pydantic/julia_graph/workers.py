@@ -245,7 +245,19 @@ def prepare(repo: str, install=npm_ci):
         else:
             git(repo, 'fetch', '-q', 'origin', 'main')
             git(repo, 'rev-parse', '--verify', f'{run.base}^{{commit}}')
-            git(repo, 'worktree', 'add', '-q', '-b', run.branch, run.worktree, run.base)
+            # A local clone, not `git worktree add`: a worktree's .git is a
+            # pointer into the main repo, outside the one folder the builder may
+            # read, and headless agy ends the whole turn when Gemini follows it
+            # (JUL-142 and JUL-144, 25 Sep). A clone keeps its git data inside
+            # the folder. --local hardlinks the objects where it can (the
+            # server's repo is shallow, so there git copies them instead).
+            git(repo, 'clone', '-q', '--local', '--no-checkout', '.', run.worktree)
+            # A clone brings only the repo's own branches; the base is the repo's
+            # copy of GitHub's main, which its local main may lag, so fetch that too.
+            git(run.worktree, 'fetch', '-q', 'origin', '+refs/remotes/origin/*:refs/remotes/github/*')
+            if subprocess.run(['git', 'cat-file', '-e', f'{run.base}^{{commit}}'], cwd=run.worktree).returncode:
+                return f'the base commit {run.base[:12]} is not in the working copy made for this card'
+            git(run.worktree, 'checkout', '-q', '-b', run.branch, run.base)
         return install(run.worktree) if (wt / 'package-lock.json').exists() else None
     return prepare_card
 

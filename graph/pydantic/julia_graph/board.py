@@ -241,10 +241,13 @@ class Board:
             except Exception as error:
                 self.log(f'{name}: no base commit, not started: {type(error).__name__}: {error}')
                 return 'no base commit'
-            runs = self._archive(checkpoint) if checkpoint.path.exists() else self._runs(checkpoint)
-            number = name.split('-')[-1] + (f'-r{runs + 1}' if runs else '')
-            state = CardRun(card=name, base=base, branch=f'graph/card-{number}',
-                            worktree=f'{self.worktrees}/card-{number}',
+            if checkpoint.path.exists():
+                self._archive(checkpoint)
+            number = name.split('-')[-1]
+            # Always card-<number>: the worker launchers accept no other name.
+            worktree = f'{self.worktrees}/card-{number}'
+            self._set_aside(worktree)
+            state = CardRun(card=name, base=base, branch=f'graph/card-{number}', worktree=worktree,
                             uat_plan=uat_section(card.get('description') or ''), uat_locked_at=self.now())
             checkpoint.save(state)
         self._reserve(name)  # before anything starts, so a restart sees it
@@ -290,9 +293,21 @@ class Board:
         os.replace(checkpoint.path, checkpoint.path.with_name(f'{checkpoint.path.stem}.run{runs + 1}.json'))
         return runs + 1
 
+    def _set_aside(self, worktree: str) -> None:
+        """An earlier run's working copy moves to <folder>.runN, kept as it was,
+        so the card starts afresh in its usual folder."""
+        folder = Path(worktree)
+        if not folder.exists():
+            return
+        n = 1
+        while folder.with_name(f'{folder.name}.run{n}').exists():
+            n += 1
+        os.replace(folder, folder.with_name(f'{folder.name}.run{n}'))
+        self.log(f'{folder.name}: the earlier working copy was kept as {folder.name}.run{n}')
+
     def _load(self, checkpoint: Checkpoint) -> CardRun | None:
         """A card's saved progress. A damaged file is set aside as an earlier run
-        rather than crashing every check: the card then starts afresh on a new branch."""
+        rather than crashing every check: the card then starts afresh."""
         try:
             return checkpoint.load()
         except ValueError as error:  # pydantic's ValidationError is a ValueError

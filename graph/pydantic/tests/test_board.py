@@ -85,13 +85,15 @@ class BoardTest(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         root = Path(self.tmp.name)
+        origin = root / 'origin'  # GitHub, as far as the graph's repo knows
+        origin.mkdir()
+        sh(origin, 'git', 'init', '-q', '-b', 'main')
+        (origin / 'README.md').write_text('hi\n')
+        sh(origin, 'git', *workers.GIT_ID, 'add', '-A')
+        sh(origin, 'git', *workers.GIT_ID, 'commit', '-q', '-m', 'base')
+        self.base = sh(origin, 'git', 'rev-parse', 'HEAD')
         self.repo = root / 'repo'
-        self.repo.mkdir()
-        sh(self.repo, 'git', 'init', '-q', '-b', 'main')
-        (self.repo / 'README.md').write_text('hi\n')
-        sh(self.repo, 'git', *workers.GIT_ID, 'add', '-A')
-        sh(self.repo, 'git', *workers.GIT_ID, 'commit', '-q', '-m', 'base')
-        self.base = sh(self.repo, 'git', 'rev-parse', 'HEAD')
+        sh(root, 'git', 'clone', '-q', str(origin), str(self.repo))
         self.state_dir = root / 'state'
         self.worktrees = root / 'worktrees'
         self.linear = PretendBoard()
@@ -117,12 +119,12 @@ class BoardTest(unittest.IsolatedAsyncioTestCase):
         return BuildResult(True, report='Added hello.txt')
 
     def card_deps(self, name):
+        real_prepare = workers.prepare(str(self.repo))  # the server's own, making a local clone
+
         async def prepare(run):
             if self.on_prepare:
                 await self.on_prepare(run)
-            if not Path(run.worktree).exists():
-                sh(self.repo, 'git', 'worktree', 'add', '-q', '-b', run.branch, run.worktree, run.base)
-            return None
+            return await real_prepare(run)
 
         async def builder(run, brief, limit, progress):
             self.built.append(run.card)
@@ -484,17 +486,23 @@ class BoardTest(unittest.IsolatedAsyncioTestCase):
 
     # ----------------------------------------------------------------- the edges
 
-    async def test_a_finished_card_moved_back_to_ready_runs_again_on_a_fresh_branch(self):
+    async def test_a_finished_card_moved_back_to_ready_runs_again_in_a_fresh_working_copy(self):
         self.linear.add('JUL-1', 1)
         board = self.board()
         await board.check()
         await board.idle()
+        first_commit = Checkpoint(self.state_dir, 'JUL-1').load().commit
         self.linear.cards['JUL-1']['state'] = 'Ready'  # Todd sends it round again
         self.assertEqual(await board.check(), 'started JUL-1')
         await board.idle()
         self.assertEqual(self.built, ['JUL-1', 'JUL-1'])
-        self.assertEqual(Checkpoint(self.state_dir, 'JUL-1').load().branch, 'graph/card-1-r2')
+        again = Checkpoint(self.state_dir, 'JUL-1').load()
+        # the same folder name, which is the only one the worker launchers accept
+        self.assertEqual(again.worktree, str(self.worktrees / 'card-1'))
+        self.assertIn('PASSED', self.result('JUL-1')[-1])
         self.assertTrue((self.state_dir / 'JUL-1.run1.json').exists())
+        kept = self.worktrees / 'card-1.run1'  # the first run's copy, kept as it was
+        self.assertEqual(sh(kept, 'git', 'rev-parse', 'HEAD'), first_commit)
 
     async def test_a_card_that_cannot_leave_ready_is_not_started(self):
         # left in Ready, it would be started again the moment its run ended
@@ -540,7 +548,7 @@ class BoardTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await board.check(), 'started JUL-1')
         await board.idle()
         self.assertEqual(self.built, ['JUL-1'])
-        self.assertEqual(Checkpoint(self.state_dir, 'JUL-1').load().branch, 'graph/card-1-r2')  # a fresh branch
+        self.assertEqual(Checkpoint(self.state_dir, 'JUL-1').load().worktree, str(self.worktrees / 'card-1'))
         self.assertTrue((self.state_dir / 'JUL-1.run1.json').exists())
         self.assertTrue(any('unreadable and was kept as run 1' in line for line in self.logged))
 
