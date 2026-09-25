@@ -2,7 +2,9 @@
 
 import unittest
 from datetime import datetime, timedelta, timezone
+from unittest.mock import AsyncMock
 
+from julia_graph.linear import LinearApp, TODD_ID
 from julia_graph.watchdog import check
 
 
@@ -105,3 +107,13 @@ class WatchdogTest(unittest.IsolatedAsyncioTestCase):
         await self.run_check(('inactive', 'outage-1'))
         self.assertEqual(self.linear.posted, [])
         self.assertEqual(self.linear.assigned, [])
+
+    async def test_real_linear_adapter_uses_existing_todd_assignment(self):
+        app = LinearApp()
+        app.watchdog_card = AsyncMock(return_value={'assignee_id': None})
+        app.assign_to_todd = AsyncMock()
+        await app.assign_todd('JUL-1')
+        app.assign_to_todd.assert_awaited_once_with('JUL-1')
+        app.watchdog_card.return_value = {'assignee_id': TODD_ID}
+        await app.assign_todd('JUL-1')
+        app.assign_to_todd.assert_awaited_once()

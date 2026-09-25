@@ -70,9 +70,6 @@ WATCH_COMMENTS_QUERY = """query WatchComments($id: String!, $after: String) {
     }
   }
 }"""
-ASSIGN = """mutation Assign($id: String!, $user: String!) {
-  issueUpdate(id: $id, input: { assigneeId: $user }) { success }
-}"""
 TODD_ID = 'a55c040c-d281-4382-8e66-c23ab7346919'
 STATES_QUERY = """query States($id: String!) {
   issue(id: $id) { id team { states { nodes { id name } } } }
@@ -236,9 +233,7 @@ class LinearApp:
         fresh = await self.watchdog_card(card)
         if fresh['assignee_id'] == TODD_ID:
             return
-        data = await asyncio.to_thread(self._call, ASSIGN, {'id': self._ids[card], 'user': TODD_ID})
-        if not data['issueUpdate']['success']:
-            raise RuntimeError(f'Linear did not assign {card} to Todd')
+        await self.assign_to_todd(card)
 
     async def move(self, card: str, state: str) -> None:
         issue = (await asyncio.to_thread(self._call, STATES_QUERY, {'id': card}))['issue']
