@@ -14,6 +14,40 @@ and evidence trail; this file owns the verified operating procedure only.
 
 ---
 
+## JUL-129 watchdog candidate test (2026-09-25)
+
+The watchdog is a separate `julia-watchdog.timer` and oneshot
+`julia-watchdog.service`, using the same encrypted Linear app credentials as
+the graph. Its Python code was staged at `/srv/julia-runner/jul129-test` for
+candidate testing, with `/etc/systemd/system/julia-watchdog.service.d/test.conf`
+pointing only that service's working directory there. This path override
+keeps the installed graph's code untouched while the PR is unmerged. The
+override must be removed when the reviewed code is installed in
+`/srv/julia-runner/graph-code`.
+
+From the laptop, stage a committed candidate with `git archive` and `scp` to
+`/tmp`; unpack it under `/srv/julia-runner/jul129-test` as `ubuntu`, then
+chown the staging folder to `orchestrator-svc`. Run the graph's Python tests
+as that account with `PYTHONPATH` pointing at the staged `graph/pydantic`.
+The service and timer files themselves are installed verbatim from that staged
+candidate. After `systemctl daemon-reload`, enable the timer and start the
+service once. `systemctl show julia-watchdog.service -p Result -p ExecMainStatus`
+must show `success` and `0`; the oneshot then normally becomes inactive while
+the timer remains active.
+
+The live independence check stopped `julia-graph.service`, ran the watchdog
+service successfully while the graph showed `MainPID=0` and `inactive`, then
+started the graph again and verified it was `active` with a new main PID.
+The Ready column was empty, so this did not create a real alert. The graph
+unit was not edited; Real Julia was not touched.
+
+For a UAT handoff, leave the candidate watchdog timer enabled and the staging
+folder in place until Todd confirms the phone notification and UAT silence.
+After the PR is merged and the graph-code checkout is updated, remove the
+temporary `test.conf`, reload systemd, and restart only the watchdog timer.
+
+---
+
 ## Bootstrap from a laptop
 
 Starting from nothing but this section and a laptop, you can reach the server and start the

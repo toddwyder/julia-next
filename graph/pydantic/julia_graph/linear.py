@@ -36,6 +36,33 @@ READY_QUERY = """query Ready($team: String!, $state: String!, $after: String) {
     pageInfo { hasNextPage endCursor }
   }
 }"""
+IN_PROGRESS_QUERY = """query InProgress($team: String!, $after: String) {
+  issues(filter: { team: { name: { eq: $team } }, state: { name: { eq: "Implementation" } } },
+         first: 100, after: $after) {
+    nodes { identifier }
+    pageInfo { hasNextPage endCursor }
+  }
+}"""
+WATCH_CARD_QUERY = """query WatchCard($id: String!) {
+  issue(id: $id) {
+    id identifier description state { name } assignee { id }
+    labels { nodes { name } }
+    inverseRelations(first: 250) { nodes { type issue { identifier state { name type } } } }
+    comments(first: 250) { nodes { body createdAt } pageInfo { hasNextPage endCursor } }
+  }
+}"""
+WATCH_COMMENTS_QUERY = """query WatchComments($id: String!, $after: String) {
+  issue(id: $id) {
+    comments(first: 250, after: $after) {
+      nodes { body createdAt }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+}"""
+ASSIGN = """mutation Assign($id: String!, $user: String!) {
+  issueUpdate(id: $id, input: { assigneeId: $user }) { success }
+}"""
+TODD_ID = 'a55c040c-d281-4382-8e66-c23ab7346919'
 STATES_QUERY = """query States($id: String!) {
   issue(id: $id) { id team { states { nodes { id name } } } }
 }"""
@@ -153,6 +180,46 @@ class LinearApp:
             if not after or after in seen:
                 raise RuntimeError('Linear reported another page of Ready cards but gave no new cursor')
             seen.add(after)
+
+    async def in_progress_cards(self) -> list[dict]:
+        cards, after, seen = [], None, set()
+        while True:
+            page = (await asyncio.to_thread(self._call, IN_PROGRESS_QUERY, {'team': TEAM, 'after': after}))['issues']
+            cards += page['nodes']
+            if not page['pageInfo']['hasNextPage']:
+                return cards
+            after = page['pageInfo']['endCursor']
+            if not after or after in seen:
+                raise RuntimeError('Linear reported another page of Implementation cards but gave no new cursor')
+            seen.add(after)
+
+    async def watchdog_card(self, card: str) -> dict:
+        issue = (await asyncio.to_thread(self._call, WATCH_CARD_QUERY, {'id': card}))['issue']
+        if issue is None:
+            raise RuntimeError(f'{card} disappeared from Linear')
+        comments = issue['comments']
+        nodes, seen = list(comments['nodes']), set()
+        while comments['pageInfo']['hasNextPage']:
+            after = comments['pageInfo']['endCursor']
+            if not after or after in seen:
+                raise RuntimeError(f'Linear reported another page of {card} comments but gave no new cursor')
+            seen.add(after)
+            comments = (await asyncio.to_thread(self._call, WATCH_COMMENTS_QUERY,
+                                                {'id': issue['id'], 'after': after}))['issue']['comments']
+            nodes += comments['nodes']
+        result = ready_card({**issue, 'title': '', 'sortOrder': 0})
+        result.update(state=issue['state']['name'], assignee_id=(issue.get('assignee') or {}).get('id'),
+                      comments=sorted(nodes, key=lambda c: c['createdAt']))
+        self._ids[card] = issue['id']
+        return result
+
+    async def assign_todd(self, card: str) -> None:
+        fresh = await self.watchdog_card(card)
+        if fresh['assignee_id'] == TODD_ID:
+            return
+        data = await asyncio.to_thread(self._call, ASSIGN, {'id': self._ids[card], 'user': TODD_ID})
+        if not data['issueUpdate']['success']:
+            raise RuntimeError(f'Linear did not assign {card} to Todd')
 
     async def move(self, card: str, state: str) -> None:
         issue = (await asyncio.to_thread(self._call, STATES_QUERY, {'id': card}))['issue']

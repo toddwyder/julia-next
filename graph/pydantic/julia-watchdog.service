@@ -1,0 +1,14 @@
+[Unit]
+Description=Julia watchdog: alert Todd when the graph or a card stops
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=orchestrator-svc
+Group=orchestrator-svc
+WorkingDirectory=/srv/julia-runner/graph-code/graph/pydantic
+LoadCredentialEncrypted=linear-app-id:/etc/credstore.encrypted/julia-runner-linear-app-id.cred
+LoadCredentialEncrypted=linear-app-secret:/etc/credstore.encrypted/julia-runner-linear-app-secret.cred
+ExecStart=/srv/julia-runner/graph-venv/bin/python -m julia_watchdog
+
