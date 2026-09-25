@@ -360,7 +360,10 @@ export function main(role = 'reviewer') {
   process.on('SIGINT', stop);
   const request = json(readFileSync(0, 'utf8'));
   const run = (command, args, options, limits) => runLimited(command, args, options, {
-    ...limits, started: (child) => { group = child.pid; limits.started(child); },
+    // runLimited's account sweep is for the dedicated builder/test accounts.
+    // A reviewer is contained by its own user unit; sweeping gemini-worker
+    // would kill that account's systemd manager as well as the review.
+    ...limits, account: 'reviewer', started: (child) => { group = child.pid; limits.started(child); },
   });
   review(request, { run, onOutput, role }).then((reply) => {
     if (stopping) finish();
