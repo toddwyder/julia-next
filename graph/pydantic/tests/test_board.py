@@ -15,7 +15,7 @@ from pathlib import Path
 
 from julia_graph import workers
 from julia_graph.board import CHECK_EVERY, Board, BoardLocked, serve
-from julia_graph.checkpoint import Checkpoint, TestResult
+from julia_graph.checkpoint import CardRun, Checkpoint, TestResult
 from julia_graph.graph import BuildResult, Deps, run_card
 from julia_graph.linear import ready_card
 
@@ -424,6 +424,38 @@ class BoardTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.built, ['JUL-1', 'JUL-1'])
         self.assertEqual(Checkpoint(self.state_dir, 'JUL-1').load().branch, 'graph/card-1-r2')
         self.assertTrue((self.state_dir / 'JUL-1.run1.json').exists())
+
+    async def test_a_card_that_cannot_leave_ready_is_not_started(self):
+        # left in Ready, it would be started again the moment its run ended
+        self.linear.add('JUL-1', 1)
+        real_move = self.linear.move
+
+        async def refused(name, state):
+            raise ConnectionError('Linear is unreachable')
+        self.linear.move = refused
+        board = self.board()
+        self.assertEqual(await board.check(), 'JUL-1 waits: it could not leave Ready')
+        self.assertEqual(self.built, [])
+        self.assertIsNone(board.reserved())
+        self.linear.move = real_move
+        self.assertEqual(await board.check(), 'started JUL-1')
+        await board.idle()
+        self.assertEqual(await board.check(), 'nothing to start')
+        self.assertEqual(self.built, ['JUL-1'])
+
+    async def test_a_graph_that_died_before_moving_the_card_moves_it_on_resume(self):
+        self.linear.add('JUL-1', 1)
+        board = self.board()
+        board._reserve('JUL-1')  # reserved and saved, then the process died before the move
+        Checkpoint(self.state_dir, 'JUL-1').save(CardRun(card='JUL-1', base=self.base, branch='graph/card-1',
+                                                         worktree=str(self.worktrees / 'card-1')))
+        board.close()
+        again = self.board()
+        self.assertEqual(await again.check(), 'resumed JUL-1')
+        await again.idle()
+        self.assertEqual(self.linear.cards['JUL-1']['state'], 'Implementation')
+        self.assertEqual(await again.check(), 'nothing to start')  # not run a second time
+        self.assertEqual(self.built, ['JUL-1'])
 
     async def test_linear_being_unreachable_starts_nothing_and_the_next_check_carries_on(self):
         self.linear.add('JUL-1', 1)

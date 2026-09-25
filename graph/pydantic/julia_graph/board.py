@@ -187,7 +187,7 @@ class Board:
                     eligible.append(card)
             if self.busy():
                 return f'busy with {self.reserved()}'
-            if (held := self.reserved()) and (resumed := self._resume(held)):
+            if (held := self.reserved()) and (resumed := await self._resume(held)):
                 return resumed
             if not eligible:
                 return 'nothing to start'
@@ -206,13 +206,15 @@ class Board:
         except Exception as error:
             self.log(f'{card}: the not-started comment could not be posted: {type(error).__name__}: {error}')
 
-    def _resume(self, card: str) -> str | None:
+    async def _resume(self, card: str) -> str | None:
         """A reservation left by a graph that died mid-run: carry on with that card.
         One whose run had already ended is released instead."""
         saved = Checkpoint(self.state_dir, card).load()
         if saved is None or saved.step == 'done':
             self._release()
             return None
+        if not await self._leave_ready(card):  # the graph may have died before the move
+            return f'{card} waits: it could not leave Ready'
         self.log(f'{card}: resuming the run a restart interrupted')
         self._launch(saved)
         return f'resumed {card}'
@@ -224,25 +226,35 @@ class Board:
         if saved and saved.step != 'done':
             state = saved  # moved back to Ready mid-run: carry on from where it stopped
         else:
-            runs = self._archive(checkpoint) if saved else 0
-            number = name.split('-')[-1] + (f'-r{runs + 1}' if runs else '')
             try:
                 base = await self.base()
             except Exception as error:
                 self.log(f'{name}: no base commit, not started: {type(error).__name__}: {error}')
                 return 'no base commit'
+            runs = self._archive(checkpoint) if saved else 0
+            number = name.split('-')[-1] + (f'-r{runs + 1}' if runs else '')
             state = CardRun(card=name, base=base, branch=f'graph/card-{number}',
                             worktree=f'{self.worktrees}/card-{number}',
                             uat_plan=uat_section(card.get('description') or ''), uat_locked_at=self.now())
             checkpoint.save(state)
         self._reserve(name)  # before anything starts, so a restart sees it
-        try:
-            await self.linear.move(name, STARTED)
-        except Exception as error:  # the run still starts; the card just shows the wrong column
-            self.log(f'{name}: could not move the card to {STARTED}: {type(error).__name__}: {error}')
+        if not await self._leave_ready(name):
+            self._release()
+            return f'{name} waits: it could not leave Ready'
         self.log(f'{name}: started from Ready')
         self._launch(state)
         return f'started {name}'
+
+    async def _leave_ready(self, card: str) -> bool:
+        """Move the card out of Ready before its run starts. A card left in Ready
+        would be started again once its run ended, so no move means no start;
+        the next check tries again."""
+        try:
+            await self.linear.move(card, STARTED)
+            return True
+        except Exception as error:
+            self.log(f'{card}: could not move the card to {STARTED}, not started: {type(error).__name__}: {error}')
+            return False
 
     def _archive(self, checkpoint: Checkpoint) -> int:
         """Keep a finished run's saved progress under a new name; returns how many are kept."""
