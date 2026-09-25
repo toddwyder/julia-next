@@ -410,15 +410,27 @@ def base_file(run: CardRun, path: str) -> str:
 # ------------------------------------------------------------ git
 
 def npm_ci(worktree: str) -> str | None:
+    """The dependencies of the base commit (reviewed main), when a card starts."""
     done = subprocess.run(['npm', 'ci', '--no-audit', '--no-fund'], cwd=worktree, capture_output=True, text=True)
     return None if done.returncode == 0 else f'npm ci failed (exit {done.returncode}): {done.stderr.strip()[-300:]}'
 
 
-async def clean_install(run: CardRun, install=npm_ci) -> str | None:
+def npm_ci_no_scripts(worktree: str) -> str | None:
+    """The dependencies of a candidate. It runs as orchestrator-svc, and the
+    candidate's package.json and lock file are the builder's, so no install
+    script runs: the candidate's code only ever runs as julia-tester, in its
+    tests. (julia-next's suite needs none: checked on the server, 25 Sep.)"""
+    done = subprocess.run(['npm', 'ci', '--ignore-scripts', '--no-audit', '--no-fund'], cwd=worktree,
+                          capture_output=True, text=True)
+    return None if done.returncode == 0 else f'npm ci failed (exit {done.returncode}): {done.stderr.strip()[-300:]}'
+
+
+async def clean_install(run: CardRun, install=npm_ci_no_scripts) -> str | None:
     """The candidate exactly, before its tests: the working copy put back to
     the commit with nothing else left, the dependencies included, and those
-    installed again from the committed lock file. Whatever the builder did to
-    the ignored files (node_modules above all) cannot reach the tests."""
+    installed again from the committed lock file, with no install script run.
+    Whatever the builder did to the ignored files (node_modules above all)
+    cannot reach the tests."""
     await restore(run, run.commit, keep_dependencies=False)
     return install(run.worktree) if Path(run.worktree, 'package-lock.json').exists() else None
 

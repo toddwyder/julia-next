@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -1434,6 +1435,25 @@ class WorkerCallTest(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(result.passed)
         self.assertEqual(result.failing, ['lint: scripts/a.mjs:3 no-unused-vars'])
         self.assertIn('scripts/a.mjs:3 no-unused-vars', result.details)
+
+    @unittest.skipUnless(shutil.which('npm'), 'needs npm')
+    async def test_a_candidates_install_scripts_never_run_as_the_graph(self):
+        with tempfile.TemporaryDirectory() as d:
+            repo, marker = Path(d, 'card'), Path(d, 'ran-as-the-graph')
+            repo.mkdir()
+            (repo / 'package.json').write_text(json.dumps({
+                'name': 'candidate', 'version': '1.0.0',
+                'scripts': {'preinstall': f'touch {marker}', 'install': f'touch {marker}', 'postinstall': f'touch {marker}'}}))
+            (repo / 'package-lock.json').write_text(json.dumps({
+                'name': 'candidate', 'version': '1.0.0', 'lockfileVersion': 3, 'requires': True,
+                'packages': {'': {'name': 'candidate', 'version': '1.0.0', 'hasInstallScript': True}}}))
+            (repo / '.gitignore').write_text('node_modules/\n')
+            sh(repo, 'git', 'init', '-q', '-b', 'main')
+            sh(repo, 'git', *workers.GIT_ID, 'add', '-A')
+            sh(repo, 'git', *workers.GIT_ID, 'commit', '-q', '-m', 'candidate')
+            run = CardRun(card='JUL-1', base='b', branch='main', worktree=str(repo), commit=sh(repo, 'git', 'rev-parse', 'HEAD'))
+            self.assertIsNone(await workers.clean_install(run))
+            self.assertFalse(marker.exists(), 'an install script from the candidate ran as the graph')
 
     async def test_the_graph_stops_the_process_it_started_past_its_limit(self):
         # Only the process the graph started (sudo, on the server): a grandchild it leaves is caught by
