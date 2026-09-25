@@ -9,6 +9,7 @@ input as JSON on stdin and an environment of PATH and LANG only.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import os
 import pwd
@@ -19,30 +20,32 @@ import time
 from pathlib import Path
 
 from .checkpoint import CardRun, ReviewResult, TestResult
-from .graph import BuildResult
+from .graph import TODD_REASONS, BuildResult
 
 WORKER_COMMANDS = {
     'builder': ('gemini-worker', '/opt/julia-runner/ops/julia-runner/run-gemini.mjs'),
     'tests': ('julia-tester', '/opt/julia-runner/ops/julia-runner/run-tests.mjs'),
+    # DeepSeek V4 Pro through the reviewer seat the minimal runner already uses
+    # (scripts/julia-minimal-runner-adapters.mjs): the sudo rule allows exactly
+    # these arguments, and the seat reads its prompt as plain text on stdin.
     'reviewer': ('runner', '/opt/julia-runner/ops/service-dropbox/run-pi-seat.mjs'),
 }
+WORKER_ARGS = {'reviewer': ['reviewer-backup', '--effort', 'high']}
+# The model the reviewer seat runs (run-pi-seat.mjs SEATS['reviewer-backup']):
+# its Pi process carries it in its command line.
+REVIEWER_MODEL = 'deepseek/deepseek-v4-pro'
+# Accounts that run other things too (runner hosts Orca's server all day), so
+# their other processes are never taken for a live worker of this kind.
+SHARED_ACCOUNTS = {'reviewer'}
 WORKER_ENV = {'PATH': '/usr/bin:/bin', 'LANG': 'C.UTF-8'}
-# Who each worker is, in the words the card shows.
+# Who each worker is, and who makes its model, in the words the card shows.
+# The reviewer's maker must differ from the builder's (graph.Review).
 WORKER_NAMES = {
     'builder': 'Gemini (agy)',
     'tests': 'the test runner (no AI model)',
-    'reviewer': 'DeepSeek (Pi)',
+    'reviewer': 'DeepSeek V4 Pro (Pi)',
 }
-WORKER_COMPANIES = {
-    'builder': 'Google',
-    'tests': 'none',
-    'reviewer': 'DeepSeek',
-}
-WORKER_MAKERS = {
-    'builder': 'Google',
-    'tests': 'none',
-    'reviewer': 'DeepSeek',
-}
+WORKER_MAKERS = {'builder': 'Google', 'reviewer': 'DeepSeek'}
 # The exit code ops/julia-runner/time-limit.mjs gives a worker it stopped, as GNU timeout does.
 STOPPED_EXIT = 124
 GIT_ID = ['-c', 'user.name=Julia graph', '-c', 'user.email=graph@julia-next.invalid']
@@ -50,7 +53,7 @@ GIT_ID = ['-c', 'user.name=Julia graph', '-c', 'user.email=graph@julia-next.inva
 
 def sudo_command(kind: str) -> list[str]:
     account, script = WORKER_COMMANDS[kind]
-    return ['sudo', '-n', '-u', account, '--', '/usr/bin/node', script]
+    return ['sudo', '-n', '-u', account, '--', '/usr/bin/node', script, *WORKER_ARGS.get(kind, [])]
 
 
 def git(cwd: str, *args: str) -> str:
@@ -79,16 +82,20 @@ def real_uid(entry: Path) -> int | None:
 def live_workers(kind: str, proc: Path = Path('/proc'), uid: int | None | str = 'account') -> list[int]:
     """Processes on this machine running this kind of worker's launcher, or
     owned by the worker's account: an agy or `node --test` left behind has no
-    launcher in its command line. uid is the account's, looked up by default."""
-    script = WORKER_COMMANDS[kind][1].encode()
+    launcher in its command line. uid is the account's, looked up by default.
+    A shared account's other processes do not count: for the reviewer it is
+    the seat, or a Pi process running the reviewer's model."""
+    names = {WORKER_COMMANDS[kind][1].encode()}
+    if kind == 'reviewer':
+        names.add(REVIEWER_MODEL.encode())
     if uid == 'account':
-        uid = account_uid(kind)
+        uid = None if kind in SHARED_ACCOUNTS else account_uid(kind)
     found = []
     for entry in proc.iterdir():
         if not entry.name.isdigit() or int(entry.name) == os.getpid():
             continue
         try:
-            if script in (entry / 'cmdline').read_bytes().split(b'\0') or (uid is not None and real_uid(entry) == uid):
+            if names & set((entry / 'cmdline').read_bytes().split(b'\0')) or (uid is not None and real_uid(entry) == uid):
                 found.append(int(entry.name))
         except (OSError, ValueError):
             continue
@@ -106,9 +113,13 @@ def waiter(limit_seconds: float, every: float = 5.0):
 
 # ------------------------------------------------------------ worker runs
 
-async def run_worker(kind: str, request: dict | str, on_line=None) -> tuple[int | None, str, str]:
+async def run_worker(kind: str, request: dict | str, on_line=None, cwd: str | None = None,
+                     limit_seconds: float | None = None) -> tuple[int | None, str, str]:
+    """(status, stdout, stderr). With limit_seconds the graph stops the worker
+    itself (for a worker whose launcher has no limit): past it, the worker is
+    asked to end, then killed, and the status is STOPPED_EXIT."""
     proc = await asyncio.create_subprocess_exec(
-        *sudo_command(kind), env=WORKER_ENV,
+        *sudo_command(kind), env=WORKER_ENV, cwd=cwd,
         stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
         limit=64 * 1024 * 1024,
     )
@@ -128,9 +139,24 @@ async def run_worker(kind: str, request: dict | str, on_line=None) -> tuple[int 
                 await on_line(line)
 
     reader = asyncio.create_task(read_out())
-    err = await proc.stderr.read()
-    await reader
-    status = await proc.wait()
+    errors = asyncio.create_task(proc.stderr.read())
+    try:
+        await asyncio.wait_for(asyncio.gather(reader, errors, proc.wait()), limit_seconds)
+    except asyncio.TimeoutError:
+        # sudo passes a signal from its caller on to the worker.
+        with contextlib.suppress(ProcessLookupError):
+            proc.terminate()
+        try:
+            await asyncio.wait_for(proc.wait(), 10)
+        except asyncio.TimeoutError:
+            with contextlib.suppress(ProcessLookupError):
+                proc.kill()
+            await proc.wait()
+        reader.cancel()
+        errors.cancel()
+        return STOPPED_EXIT, ''.join(out), f'stopped by the graph after its {int(limit_seconds)}-second time limit'
+    err = errors.result()
+    status = proc.returncode
     return status, ''.join(out), err.decode(errors='replace')
 
 
@@ -191,6 +217,19 @@ def builder(log):
 
 SUMMARY = re.compile(r'^\S*\s*(tests|pass|fail|skipped|cancelled|todo) (\d+)\s*$', re.M)
 FAILED = re.compile(r'^✖ (.+?) \([\d.]+m?s\)\s*$', re.M)
+# The spec reporter repeats every failure, with its error, after this line.
+FAILING_SECTION = '✖ failing tests:'
+# The most failure output the builder's repair brief carries.
+MAX_DETAILS = 8000
+
+
+def failure_details(output: str) -> str:
+    """What the builder needs to repair the failures: the reporter's failing-tests
+    section when there is one (it has each error), else the end of the output."""
+    at = output.rfind(FAILING_SECTION)
+    if at >= 0:
+        return output[at:].strip()[:MAX_DETAILS]
+    return output.strip()[-MAX_DETAILS:]
 
 
 def suite_result(status: int, output: str) -> TestResult:
@@ -198,13 +237,16 @@ def suite_result(status: int, output: str) -> TestResult:
     failing = sorted(set(FAILED.findall(output)))
     summary = ', '.join(f'{k} {counts[k]}' for k in ('tests', 'pass', 'fail', 'skipped') if k in counts)
     passed = status == 0 and counts.get('fail', 1) == 0 and counts.get('tests', 0) > 0
-    return TestResult(passed=passed, summary=f'`node --test scripts/*.test.mjs`: {summary or "no summary"} (exit {status})', failing=failing)
+    return TestResult(passed=passed, summary=f'`node --test scripts/*.test.mjs`: {summary or "no summary"} (exit {status})',
+                      failing=failing, details='' if passed else failure_details(output))
 
 
-async def ask_tester(run: CardRun, what: str, limit_seconds: int, progress) -> tuple[int, str, bool]:
+async def ask_tester(run: CardRun, what: str, limit_seconds: int, progress) -> tuple[int | None, str, bool]:
     """(status, output, stopped). Only the launcher's own exit 124 is a stop; a
-    test command that itself exits 124 comes back inside the JSON answer. The
-    launcher prints a line whenever the tests print, and each line moves the card."""
+    test command that itself exits 124 comes back inside the JSON answer. A
+    worker that did not answer has no status (None): nothing ran that the
+    builder could fix. The launcher prints a line whenever the tests print, and
+    each line moves the card."""
     async def on_line(line):
         await progress()
     request = {'worktree': run.worktree, 'run': what, 'limit_seconds': limit_seconds}
@@ -214,7 +256,7 @@ async def ask_tester(run: CardRun, what: str, limit_seconds: int, progress) -> t
     reply = _json((out.strip().splitlines() or [''])[-1])
     if status == 0 and isinstance(reply, dict) and isinstance(reply.get('status'), int):
         return reply['status'], str(reply.get('output', '')), False
-    return 1, f'the test worker did not answer (exit {status}): {err.strip()[-500:]}', False
+    return None, f'the test worker did not answer (exit {status}): {err.strip()[-500:]}', False
 
 
 async def tester(run: CardRun, limit_seconds: int, progress, ask=ask_tester) -> TestResult:
@@ -223,80 +265,134 @@ async def tester(run: CardRun, limit_seconds: int, progress, ask=ask_tester) -> 
     lint_status, lint_output, stopped = await ask(run, 'lint', limit_seconds, progress)
     if stopped:
         return TestResult(passed=False, summary=f'`npm run lint:framework` {lint_output}', stopped=True)
+    if lint_status is None:  # names no failure, so it is reported and never sent to the builder
+        return TestResult(passed=False, summary=f'`npm run lint:framework`: {lint_output}')
     status, output, stopped = await ask(run, 'suite', max(1, limit_seconds - int(time.monotonic() - started)), progress)
     if stopped:
         return TestResult(passed=False, summary=f'`node --test scripts/*.test.mjs` {output}', stopped=True)
+    if status is None:
+        return TestResult(passed=False, summary=f'`node --test scripts/*.test.mjs`: {output}')
     result = suite_result(status, output)
     if lint_status != 0:
         result.passed = False
         result.summary = f'`npm run lint:framework` failed (exit {lint_status}); ' + result.summary
         result.failing.insert(0, 'lint: ' + (lint_output.strip().splitlines() or [''])[-1][:200])
+        lint = f'`npm run lint:framework` failed:\n{lint_output.strip()[-MAX_DETAILS // 2:]}'
+        result.details = f'{lint}\n\n{result.details}'.strip()[:MAX_DETAILS]
     else:
         result.summary = '`npm run lint:framework` passed; ' + result.summary
     return result
 
 
+def pi_final(stream: str) -> tuple[str, str | None]:
+    """(the final assistant message's text, Pi's error or None), read as
+    run-pi-seat.mjs parsePiJsonStream reads the stream: the last assistant
+    message with a stop reason is the final one."""
+    final, error = None, None
+    for line in stream.splitlines():
+        event = _json(line)
+        if not isinstance(event, dict):
+            continue
+        if event.get('type') == 'error':
+            error = str(event.get('error') or event.get('message') or line)[:500]
+        for message in [event.get('message'), *(event.get('messages') or [])]:
+            if isinstance(message, dict) and message.get('role') == 'assistant' and isinstance(message.get('stopReason'), str):
+                final = message
+    if final is None:
+        return '', error
+    content = final.get('content')
+    parts = [content] if isinstance(content, str) else [p.get('text', '') for p in content or [] if isinstance(p, dict) and p.get('type') == 'text']
+    if final['stopReason'] == 'error':
+        return ''.join(parts), str(final.get('errorMessage') or 'Pi reported a vendor error')[:500]
+    return ''.join(parts), None
+
+
+def final_verdict(text: str) -> dict | None:
+    """The JSON object that ends the reviewer's final message (a closing code
+    fence may follow it), or None. Only this counts: a verdict written earlier
+    in the message, or followed by more text, is not a final verdict."""
+    body = re.sub(r'\n?```\s*$', '', text.strip()).rstrip()
+    decoder = json.JSONDecoder()
+    for start in [m.start() for m in re.finditer(r'\{', body)][::-1]:
+        try:
+            value, end = decoder.raw_decode(body, start)
+        except ValueError:
+            continue
+        if end == len(body) and isinstance(value, dict):
+            return value
+    return None
+
+
 def reviewer_outcome(status: int | None, stdout: str, stderr: str) -> ReviewResult:
-    tail = stderr.strip().splitlines()[-1:] or ['']
+    """A clear final verdict, or the reason there is none. Anything short of a
+    verdict ending the final message of a clean run is never an approval."""
+    text, vendor_error = pi_final(stdout)
+    tail = (stderr.strip().splitlines() or [''])[-1][:300]
     if status == STOPPED_EXIT:
-        return ReviewResult(ok=False, stopped=True, reason=tail[0] or 'stopped by its time limit')
+        return ReviewResult(stopped=True, reason=tail or 'stopped by its time limit', text=text)
     if status != 0:
-        return ReviewResult(ok=False, reason=f'the reviewer exited {status} {tail[0]}'.strip(), report=stdout)
-
-    for line in stdout.splitlines():
-        line = line.strip()
-        if line.startswith('{') and line.endswith('}'):
-            try:
-                data = json.loads(line)
-                if isinstance(data, dict):
-                    verdict = data.get('verdict')
-                    if verdict in ('approve', 'clean'):
-                        return ReviewResult(ok=True, verdict='approve', summary=data.get('summary', ''), report=stdout)
-                    if verdict in ('findings', 'changes_needed'):
-                        return ReviewResult(ok=True, verdict='findings', summary=data.get('summary', ''), findings=data.get('findings') or stdout, report=stdout)
-            except Exception:
-                pass
-
-    if re.search(r'^\s*VERDICT:\s*CLEAN\s*$', stdout, re.M | re.I):
-        return ReviewResult(ok=True, verdict='approve', summary='all checks clean', report=stdout)
-    if re.search(r'^\s*VERDICT:\s*FINDINGS\s*$', stdout, re.M | re.I):
-        return ReviewResult(ok=True, verdict='findings', findings=stdout, report=stdout)
-    if re.search(r'^\s*verdict:\s*approve\b', stdout, re.M | re.I):
-        return ReviewResult(ok=True, verdict='approve', summary='approved', report=stdout)
-    if re.search(r'^\s*verdict:\s*(?:changes_needed|findings)\b', stdout, re.M | re.I):
-        return ReviewResult(ok=True, verdict='findings', findings=stdout, report=stdout)
-
-    return ReviewResult(ok=False, verdict=None, reason='the reviewer ended without a valid verdict', report=stdout)
+        return ReviewResult(reason=f'the reviewer exited {status}: {vendor_error or tail or "no error text"}', text=text)
+    if vendor_error:
+        return ReviewResult(reason=f'the reviewer\'s model failed: {vendor_error}', text=text)
+    verdict = final_verdict(text)
+    if verdict is None or verdict.get('verdict') not in ('approve', 'changes_needed'):
+        return ReviewResult(reason='its final message does not end with a verdict object', text=text)
+    criteria = verdict.get('criteria') if isinstance(verdict.get('criteria'), list) else []
+    unmet = [c for c in criteria if isinstance(c, dict) and c.get('verdict') != 'met']
+    if verdict['verdict'] == 'approve' and unmet:
+        return ReviewResult(reason=f'it approved with {len(unmet)} criteria not met, which is not a clear verdict', text=text)
+    findings = str(verdict.get('findings') or '').strip()
+    if verdict['verdict'] == 'changes_needed' and not findings:
+        findings = '\n'.join(f"- {c.get('id', '?')}: {c.get('how', 'not met')}" for c in unmet)
+    todd = verdict.get('todd') if verdict.get('todd') in TODD_REASONS else None
+    return ReviewResult(ok=True, verdict=verdict['verdict'], summary=str(verdict.get('summary') or '').strip(),
+                        findings=findings, todd=todd, todd_reason=str(verdict.get('todd_reason') or '').strip() if todd else '',
+                        text=text)
 
 
 def reviewer(log):
+    """DeepSeek through the reviewer seat, as runner, from / (it never needs
+    the working copy: the brief carries the whole review). The graph enforces
+    the time limit, since the seat has no launcher limit of its own."""
     async def review(run: CardRun, brief: str, limit_seconds: int, progress) -> ReviewResult:
+        received = 0
+
         async def on_line(line):
+            nonlocal received
+            received += len(line)
             if progress:
                 await progress()
-        request = {'worktree': run.worktree, 'prompt': brief, 'limit_seconds': limit_seconds}
-        status, out, err = await run_worker('reviewer', request, on_line)
-        return reviewer_outcome(status, out, err)
+        status, out, err = await run_worker('reviewer', brief, on_line, cwd='/', limit_seconds=limit_seconds)
+        result = reviewer_outcome(status, out, err)
+        log(f'reviewer: exit {status}, {received} bytes, verdict {result.verdict if result.ok else "none: " + str(result.reason)}')
+        return result
     return review
 
 
-def head_commit(run: CardRun) -> str:
-    return git(run.worktree, 'rev-parse', 'HEAD')
+def snapshot(run: CardRun) -> tuple[str, str]:
+    """The working copy's HEAD and everything `git status` sees, untracked files included."""
+    return git(run.worktree, 'rev-parse', 'HEAD'), git(run.worktree, 'status', '--porcelain', '--untracked-files=all')
 
 
-def is_clean(run: CardRun) -> bool:
-    return not bool(git(run.worktree, 'status', '--porcelain').strip())
+async def restore(run: CardRun, commit: str) -> None:
+    """Put the working copy back to this commit, with nothing uncommitted left."""
+    git(run.worktree, 'reset', '-q', '--hard', commit)
+    git(run.worktree, 'clean', '-fdq')
 
 
-def diff(run: CardRun) -> str:
-    return git(run.worktree, 'diff', f'{run.base}...HEAD')
+def change(run: CardRun) -> str:
+    """The candidate under review: its whole diff from the start commit."""
+    return git(run.worktree, 'diff', f'{run.base}..{run.commit}')
+
+
+def base_file(run: CardRun, path: str) -> str:
+    """A file as it was at the card's start commit."""
+    return git(run.worktree, 'show', f'{run.base}:{path}')
 
 
 # ------------------------------------------------------------ git
 
 def npm_ci(worktree: str) -> str | None:
-    if not (Path(worktree) / 'package-lock.json').is_file():
-        return None
     done = subprocess.run(['npm', 'ci', '--no-audit', '--no-fund'], cwd=worktree, capture_output=True, text=True)
     return None if done.returncode == 0 else f'npm ci failed (exit {done.returncode}): {done.stderr.strip()[-300:]}'
 
@@ -381,9 +477,12 @@ def tracked_files(run: CardRun) -> list[str]:
 
 
 async def discard(run: CardRun) -> int:
+    """Back to where this build started: the base, or for a repair the failed
+    candidate it was repairing, so a first build's work is never thrown away."""
+    start = run.repair_from or run.base
     dirty = [l for l in git(run.worktree, 'status', '--porcelain').splitlines() if l]
-    commits = int(git(run.worktree, 'rev-list', '--count', f'{run.base}..HEAD'))
-    git(run.worktree, 'reset', '-q', '--hard', run.base)
+    commits = int(git(run.worktree, 'rev-list', '--count', f'{start}..HEAD'))
+    git(run.worktree, 'reset', '-q', '--hard', start)
     git(run.worktree, 'clean', '-fdq')
     return len(dirty) + commits
 

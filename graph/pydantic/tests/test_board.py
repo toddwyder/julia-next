@@ -19,10 +19,7 @@ from julia_graph.checkpoint import CardRun, Checkpoint, TestResult
 from julia_graph.graph import BuildResult, Deps, run_card
 from julia_graph.linear import ready_card
 
-try:
-    from .test_graph import Clock, Crash, sh
-except (ImportError, ValueError):
-    from test_graph import Clock, Crash, sh
+from .test_graph import Clock, Crash, approving_reviewer, sh
 
 GOOD = """## What to build
 
@@ -126,7 +123,7 @@ class BoardTest(unittest.IsolatedAsyncioTestCase):
         return BuildResult(True, report='Added hello.txt')
 
     def card_deps(self, name):
-        real_prepare = workers.prepare(str(self.repo), install=lambda wt: None)  # the server's own, making a local clone
+        real_prepare = workers.prepare(str(self.repo))  # the server's own, making a local clone
 
         async def prepare(run):
             if self.on_prepare:
@@ -147,7 +144,9 @@ class BoardTest(unittest.IsolatedAsyncioTestCase):
         return Deps(
             linear=self.linear, checkpoint=Checkpoint(self.state_dir, name), prepare=prepare,
             builder=builder, discard=workers.discard, commit=workers.commit, tester=tester,
-            live_workers=lambda kind: self.alive[kind], wait_for_exit=wait_for_exit,
+            reviewer=approving_reviewer, live_workers=lambda kind: self.alive[kind], wait_for_exit=wait_for_exit,
+            snapshot=workers.snapshot, restore=workers.restore, diff=workers.change, base_file=lambda run, path: 'role',
+            worker_makers={'builder': 'Google', 'reviewer': 'DeepSeek'},
             graph_version='pydantic-graph test', log=lambda line: None, now=self.clock,
         )
 

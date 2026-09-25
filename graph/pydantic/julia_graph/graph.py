@@ -1,8 +1,22 @@
-"""The build-and-test graph (JUL-118): one card, one builder, the tests, the result on the card.
+"""The card graph (JUL-118, JUL-128): one card, one builder, the tests, an
+independent review, the result on the card.
 
-    Resume -> Prepare -> Build -> Test -> Report -> end
-                           \\        \\
-                            `--------`--> Report (with the failure)
+    Resume -> Prepare -> Build -> Test -> Review -> Report -> end
+                           ^       |        |
+                           |<------'        |   failed tests, at most MAX_TEST_REPAIRS times
+                           |<---------------'   review findings, at most MAX_REVIEW_ROUNDS rounds
+                   (any failure goes straight to Report)
+
+Failed tests that name what failed go back to the builder, with the failures,
+to repair on top of its own commit; the repaired commit is tested again. Once
+the repairs are used up the result says the tests still failed, with each run.
+
+Passing tests go to a reviewer from a different model maker than the
+builder. Its findings go back to the builder, on top of its own commit, and
+the new commit is tested and reviewed again. After MAX_REVIEW_ROUNDS rounds of
+findings the card stops with every round's reasons in one comment. Only a
+clear final verdict counts: a reviewer that crashes, runs out of time or ends
+without one never approves, and one that changed the candidate is voided.
 
 Every step saves the card's progress before the next one starts
 (``checkpoint.py``). A restart enters at ``Resume``, which picks up from the
@@ -28,29 +42,34 @@ from pydantic_graph import BaseNode, End, GraphBuilder, GraphRunContext
 from .checkpoint import CardRun, Checkpoint, ReviewResult, StepMark, TestResult
 from .status import day, duration, render, status_marker
 
+# Builder runs for one build or one repair: an interrupted run is tried again once.
 MAX_BUILD_ATTEMPTS = 2
-# Each worker's time limit in seconds. The worker's own launcher enforces it
-# (ops/julia-runner/time-limit.mjs), so a worker is stopped even if the graph dies.
+# Times failed tests go back to the builder before the card reports the failure.
+MAX_TEST_REPAIRS = 2
+# Review rounds that may end in findings before the card stops (JUL-128).
+MAX_REVIEW_ROUNDS = 2
+# One review is one prompt, and the reviewer seat hands it to Pi as a single
+# command argument, which Linux caps at 128 KiB (E2BIG): a bigger brief is
+# refused, never cut short (the same limit as scripts/julia-minimal-runner.mjs).
+MAX_REVIEW_BYTES = 130_000
+# The reviewer's standing orders, read from the card's start commit.
+REVIEWER_ROLE_FILE = '.agents/skills/julia-reviewer/SKILL.md'
+# Each worker's time limit in seconds. The builder's and the tests' own
+# launcher enforces theirs (ops/julia-runner/time-limit.mjs), so they are
+# stopped even if the graph dies; the reviewer's seat has no launcher limit,
+# so the graph enforces the reviewer's itself (workers.run_worker).
 LIMITS = {'builder': 60 * 60, 'tests': 15 * 60, 'reviewer': 20 * 60}
 # The most each launcher accepts (time-limit.mjs LIMITS.max): a longer limit
 # would be quoted on the card but never enforced, so it is refused.
 LIMIT_CAPS = {'builder': 3 * 60 * 60, 'tests': 60 * 60, 'reviewer': 60 * 60}
 WHAT = {'builder': 'The builder', 'tests': 'The test run', 'reviewer': 'The reviewer'}
-
-ACCOUNT_ACTION = re.compile(r'\b(?:sign[- ]?in|log[- ]?in|payment|payments|account action)\b', re.I)
-MONEY_DECISION = re.compile(r'\b(?:money decision|money|cost|spend|budget|billing|subscription|purchase|price)\b', re.I)
-PRODUCT_DECISION = re.compile(r'\b(?:product decision)\b|\((?:a|b|c)\)', re.I)
-
-
-def needs_todd(text: str) -> bool:
-    """AC 5: A stopped card is assigned to Todd only for an account action, a money decision or a product decision."""
-    if not text:
-        return False
-    return bool(
-        ACCOUNT_ACTION.search(text)
-        or MONEY_DECISION.search(text)
-        or PRODUCT_DECISION.search(text)
-    )
+# The only reasons a stopped card goes to Todd (JUL-128 AC 5), as the reviewer
+# names them in its verdict's "todd" field.
+TODD_REASONS = {
+    'account_action': 'an account action',
+    'money_decision': 'a money decision',
+    'product_decision': 'a product decision',
+}
 
 
 def checked_limit(kind: str, text: str) -> int:
@@ -66,7 +85,7 @@ class Linear(Protocol):
     async def card(self, card: str) -> dict: ...
     async def comment(self, card: str, body: str) -> str: ...  # returns the new comment's id
     async def edit(self, comment_id: str, body: str) -> None: ...
-    async def assign(self, card: str, assignee: str | None = None) -> None: ...
+    async def assign_to_todd(self, card: str) -> None: ...
 
 
 @dataclass
@@ -76,10 +95,6 @@ class BuildResult:
     report: str | None = None
     # True when the builder was stopped for running past its time limit.
     stopped: bool = False
-
-
-async def _default_reviewer(run: CardRun, brief: str, limit: int, progress: Callable[[], Awaitable[None]]) -> ReviewResult:
-    return ReviewResult(ok=True, verdict='approve', summary='approved')
 
 
 @dataclass
@@ -100,35 +115,37 @@ class Deps:
     commit: Callable[[CardRun], Awaitable[tuple[str | None, str | None]]]
     # tester(run, limit_seconds, progress), progress as for the builder
     tester: Callable[[CardRun, int, Callable[[], Awaitable[None]]], Awaitable[TestResult]]
-    # reviewer(run, brief, limit_seconds, progress): independent reviewer from a different maker
-    reviewer: Callable[[CardRun, str, int, Callable[[], Awaitable[None]]], Awaitable[ReviewResult]] = field(
-        default_factory=lambda: _default_reviewer
-    )
-    # The processes of a worker kind ('builder', 'tests', 'reviewer') still alive on the
-    # machine, and a wait for them to end, so a restart never adds a second one.
-    live_workers: Callable[[str], list[int]] = field(default_factory=lambda: lambda kind: [])
-    wait_for_exit: Callable[[str], Awaitable[list[int]]] = field(default_factory=lambda: lambda kind: asyncio.sleep(0, result=[]))
+    # reviewer(run, brief, limit_seconds, progress): the independent reviewer.
+    # It gets the whole review in its brief and runs where it cannot reach the
+    # working copy; its verdict is read from its final message only.
+    reviewer: Callable[[CardRun, str, int, Callable[[], Awaitable[None]]], Awaitable[ReviewResult]]
+    # The processes of a worker kind ('builder', 'tests' or 'reviewer') still
+    # alive on the machine, and a wait for them to end, so a restart never adds
+    # a second one.
+    live_workers: Callable[[str], list[int]]
+    wait_for_exit: Callable[[str], Awaitable[list[int]]]
+    # What the working copy holds, as (HEAD commit, `git status` output): taken
+    # before and after a review, so a reviewer that changed anything is caught.
+    # restore puts it back to a commit, with nothing uncommitted left.
+    snapshot: Callable[[CardRun], tuple[str, str]]
+    restore: Callable[[CardRun, str], Awaitable[None]]
+    # The change under review (the diff from the base) and a file as it was at
+    # the base commit (the reviewer's role file), both read from git.
+    diff: Callable[[CardRun], str]
+    base_file: Callable[[CardRun, str], str]
     graph_version: str = 'unknown'
     log: Callable[[str], None] = field(default=print)
     now: Callable[[], datetime] = field(default=lambda: datetime.now(timezone.utc))
-    # Who each kind of worker is, in the words the card shows.
-    worker_names: dict[str, str] = field(default_factory=lambda: {
-        'builder': 'Gemini (agy)', 'tests': 'the test runner (no AI model)', 'reviewer': 'DeepSeek (Pi)',
-    })
-    worker_companies: dict[str, str] = field(default_factory=lambda: {
-        'builder': 'Google', 'tests': 'none', 'reviewer': 'DeepSeek',
-    })
-    worker_makers: dict[str, str] = field(default_factory=lambda: {
-        'builder': 'Google', 'tests': 'none', 'reviewer': 'DeepSeek',
-    })
+    # Who each kind of worker is, and the company that makes its model, in the
+    # words the card shows. The reviewer's maker must differ from the builder's.
+    worker_names: dict[str, str] = field(default_factory=lambda: {'builder': 'the builder', 'tests': 'the test runner',
+                                                                  'reviewer': 'the reviewer'})
+    worker_makers: dict[str, str] = field(default_factory=dict)
     limits: dict[str, int] = field(default_factory=lambda: dict(LIMITS))
     # Worker output moves the card at once, but edits its comment at most this often.
     status_every: float = 60
     # The files in the card's working copy, listed in the builder's brief.
     files: Callable[[CardRun], list[str]] = field(default=lambda run: [])
-    head_commit: Callable[[CardRun], str] = field(default=lambda run: '')
-    is_clean: Callable[[CardRun], bool] = field(default=lambda run: True)
-    diff: Callable[[CardRun], str] = field(default=lambda run: '')
 
 
 def marker(step: str, run: CardRun, **fields: object) -> str:
@@ -233,7 +250,8 @@ async def confirm_stop(ctx: GraphRunContext[CardRun, Deps]) -> None:
     if still:
         still = await ctx.deps.wait_for_exit(kind)
     if still:
-        after = 'so the builder is not free' if kind == 'builder' else 'so no new test run starts until it ends'
+        after = {'builder': 'so the builder is not free', 'tests': 'so no new test run starts until it ends',
+                 'reviewer': 'so no new review starts until it ends'}[kind]
         s.failure = reason + (f' The graph could not confirm it ended: it is still running '
                               f'(process {", ".join(map(str, still))}), {after}.')
     elif kind == 'builder':
@@ -249,7 +267,7 @@ async def no_second_worker(ctx: GraphRunContext[CardRun, Deps], kind: str) -> st
     if not ctx.deps.live_workers(kind):
         return None
     ctx.deps.log(f'an earlier {kind} is still running; waiting for it to end')
-    name = 'builder' if kind == 'builder' else 'test run'
+    name = {'builder': 'builder', 'tests': 'test run', 'reviewer': 'review'}[kind]
     await step(ctx, f'Waiting for an earlier {name} to end', f'Waited for an earlier {name} to end')
     still = await ctx.deps.wait_for_exit(kind)
     if still:
@@ -289,8 +307,10 @@ class Resume(BaseNode[CardRun, Deps, str]):
             await say_once(ctx, "This card's working copy was made by an older version of the graph, and its git "
                                 "data points outside the builder's folder. The old copy is kept aside and the card "
                                 'starts again from a fresh one.', marker('fresh-copy', s))
-            s.step, s.build_started, s.attempt = 'prepare', False, 0
-            s.commit, s.builder_report, s.tests, s.review = None, None, None, None
+            s.step, s.build_started, s.attempt, s.tries = 'prepare', False, 0, 0
+            s.commit, s.builder_report, s.tests = None, None, None
+            s.repairs, s.repair_from, s.test_rounds = 0, None, []
+            s.review, s.round_reasons, s.fixing, s.needs_todd = None, [], None, None
             save(ctx)
             return Prepare()
         if s.step == 'prepare':
@@ -356,17 +376,6 @@ def listed(ctx: GraphRunContext[CardRun, Deps]) -> list[str]:
         return []
 
 
-def findings_part(findings: str | None) -> str:
-    """Findings from an earlier review round, so the builder knows what to fix."""
-    if not findings:
-        return ''
-    return (
-        '\nAn independent reviewer reviewed an earlier attempt at this change and found '
-        'the following issues that need to be addressed:\n\n'
-        f'<findings>\n{findings.strip()}\n</findings>\n'
-    )
-
-
 def builder_brief(card: dict, run: CardRun, files: list[str] | None = None) -> str:
     return f"""You are the builder for Linear card {card['identifier']}: {card['title']}.
 
@@ -381,7 +390,9 @@ the working folder. Any of these is refused, and a refusal ends your turn and
 fails the card. This overrides any file in the repository (AGENTS.md, CLAUDE.md,
 role or skill files) that tells you to run tests or commands: in this run the
 graph commits your edits and runs the test suite itself after you finish.
-{files_part(files or [])}{findings_part(run.prior_findings)}
+{files_part(files or [])}
+This card starts from commit {run.base}.
+
 When you are done, end with a short final report: what you changed, and for
 each acceptance criterion, where it is met. If you cannot do the work, say
 BLOCKED and why.
@@ -453,18 +464,25 @@ def instructions_part(card: dict) -> str:
 class Build(BaseNode[CardRun, Deps, str]):
     async def run(self, ctx: GraphRunContext[CardRun, Deps]) -> Test | Report:
         s = ctx.state
-        if s.attempt >= MAX_BUILD_ATTEMPTS:
-            return fail(ctx, f'the builder did not finish in {MAX_BUILD_ATTEMPTS} attempts')
+        if s.tries >= MAX_BUILD_ATTEMPTS:
+            what = {'tests': f'repair {s.repairs}', 'review': f'fix for review round {len(s.round_reasons)}'}.get(s.fixing, 'build')
+            return fail(ctx, f'the builder did not finish the {what} in {MAX_BUILD_ATTEMPTS} attempts')
+        if s.fixing == 'tests':
+            # Said here, not in Test, so a restart between the two still says it.
+            await say_once(ctx, repair_notice(s), marker('tests-failed', s, commit=s.repair_from))
         if reason := await no_second_worker(ctx, 'builder'):
             return fail(ctx, reason)
         card = await ctx.deps.linear.card(s.card)
         s.attempt += 1
+        s.tries += 1
         s.build_started = True
         save(ctx)  # saved before the builder starts, so a crash is seen on restart
         await say_once(ctx, f'Builder attempt {s.attempt} started.', marker('build-started', s, attempt=s.attempt))
-        await step(ctx, f'Building (attempt {s.attempt})', f'Built (attempt {s.attempt})', 'builder')
+        why = {'tests': ', repairing failed tests', 'review': ', fixing review findings'}.get(s.fixing, '')
+        await step(ctx, f'Building (attempt {s.attempt}{why})', f'Built (attempt {s.attempt}{why})', 'builder')
+        brief = builder_brief(card, s, listed(ctx)) + repair_part(s) + findings_part(s)
         try:
-            result = await ctx.deps.builder(s, builder_brief(card, s, listed(ctx)), ctx.deps.limits['builder'], lambda: moved(ctx))
+            result = await ctx.deps.builder(s, brief, ctx.deps.limits['builder'], lambda: moved(ctx))
         except Exception as error:  # a worker that cannot even start is a failed worker
             s.build_started = False
             close(ctx, 'could not start')
@@ -486,179 +504,222 @@ class Build(BaseNode[CardRun, Deps, str]):
         return Test()
 
 
-def reviewer_brief(
-    card: dict,
-    run: CardRun,
-    diff: str,
-    test_summary: str | None = None,
-    builder_report: str | None = None,
-) -> str:
-    report_section = f'\n<builder_report>\n{builder_report.strip()}\n</builder_report>\n' if builder_report else ''
-    tests_section = f'\n<tests>\n{test_summary.strip()}\n</tests>\n' if test_summary else ''
-    diff_section = f'\n<diff>\n{diff.strip()}\n</diff>\n' if diff else '\n<diff>\n(no changes)\n</diff>\n'
-    return f"""You are the independent reviewer for Linear card {card['identifier']}: {card['title']}.
+def failing_lines(tests: TestResult, most: int) -> str:
+    return ''.join(f'\n- failing: {name}' for name in tests.failing[:most])
 
-Your role is to review the candidate change against the card's acceptance criteria and UAT plan.
-You must be independent and verify that the change meets the spec and follows codebase standards.
-Do NOT modify any files in the working tree. You are only reviewing the candidate change.
 
-<card>
-{with_locked_uat(card['description'], run.uat_plan)}
-</card>
-{instructions_part(card)}{tests_section}{report_section}
-Here is the full git diff of the candidate change:
-{diff_section}
+def repair_notice(s: CardRun) -> str:
+    return (f'The tests failed on candidate `{s.repair_from}`: {s.tests.summary}{failing_lines(s.tests, 20)}\n\n'
+            f'The builder gets the failures to repair on top of that commit (repair {s.repairs} of {MAX_TEST_REPAIRS}), '
+            'and the repaired commit is tested again.')
 
-Provide your review verdict.
-If the candidate satisfies all acceptance criteria and the diff is clean and safe, state:
-VERDICT: CLEAN
-or verdict: approve
 
-If changes are needed, state:
-VERDICT: FINDINGS
-or verdict: changes_needed
-and detail the exact findings that must be addressed by the builder.
+def repair_part(s: CardRun) -> str:
+    """The failed tests, for a repair: the builder cannot run them itself."""
+    if s.fixing != 'tests':
+        return ''
+    return f"""
+## The tests failed on your last commit
+
+This is repair {s.repairs} of {MAX_TEST_REPAIRS}. Your earlier work is already
+committed in the working folder (commit {s.repair_from}): change it, do not
+start again. The graph ran the tests on that commit and they failed:
+
+- {s.tests.summary}{failing_lines(s.tests, 50)}
+
+<test-failures>
+{s.tests.details or '(the test run gave no more detail)'}
+</test-failures>
+
+Fix the change so these tests pass and the card's acceptance criteria are still
+met. If a test is itself wrong about what the card asks, correct the test and
+say so in your final report.
+"""
+
+
+def findings_part(s: CardRun) -> str:
+    """The reviewer's findings, for the round that fixes them."""
+    if s.fixing != 'review' or not s.round_reasons:
+        return ''
+    return f"""
+## The independent review asked for changes
+
+Review round {len(s.round_reasons)} of {MAX_REVIEW_ROUNDS} found problems with your
+last commit ({s.repair_from}). Your earlier work is already committed in the
+working folder: change it, do not start again. Address every finding:
+
+<findings>
+{s.round_reasons[-1].strip()}
+</findings>
+
+Say in your final report how each finding was addressed.
 """
 
 
 @dataclass
 class Test(BaseNode[CardRun, Deps, str]):
-    async def run(self, ctx: GraphRunContext[CardRun, Deps]) -> Review | Report:
+    async def run(self, ctx: GraphRunContext[CardRun, Deps]) -> Build | Review | Report:
+        s = ctx.state
         await step(ctx, 'Running the tests', 'Ran the tests', 'tests')
         try:
-            ctx.state.tests = await ctx.deps.tester(ctx.state, ctx.deps.limits['tests'], lambda: moved(ctx))
+            s.tests = await ctx.deps.tester(s, ctx.deps.limits['tests'], lambda: moved(ctx))
         except Exception as error:  # reported once, not retried on every restart
-            ctx.state.tests = TestResult(passed=False, summary=f'the test worker could not run: {type(error).__name__}: {error}')
-        if ctx.state.tests.stopped:
+            s.tests = TestResult(passed=False, summary=f'the test worker could not run: {type(error).__name__}: {error}')
+        s.test_rounds.append(f'`{(s.commit or "none")[:12]}`: {s.tests.summary}')
+        if s.tests.stopped:
             return await stopped(ctx, 'tests')
-        if not ctx.state.tests.passed:
-            close(ctx, 'failed')
-            ctx.state.step = 'report'
-            save(ctx)
+        # Only a finished run that names what failed is the builder's to repair;
+        # a test worker that did not run or answer is reported as it is.
+        if not s.tests.passed and s.tests.failing:
+            if s.repairs < MAX_TEST_REPAIRS:
+                s.repairs, s.repair_from, s.tries, s.step = s.repairs + 1, s.commit, 0, 'build'
+                s.fixing = 'tests'
+                close(ctx, 'failed')  # saves
+                return Build()
+            s.failure = f'the tests still failed after {MAX_TEST_REPAIRS} repair attempts'
+        if not s.tests.passed:
+            s.step = 'report'
+            close(ctx, 'failed')  # saves
             return Report()
-        close(ctx, 'done')
-        ctx.state.step = 'review'
-        save(ctx)
+        s.step = 'review'
+        close(ctx, 'done')  # saves
         return Review()
+
+
+# ------------------------------------------------------------ the independent review (JUL-128)
+
+def reviewer_brief(card: dict, run: CardRun, role: str, diff: str) -> str:
+    """Everything the reviewer sees: its role file (from the start commit), the
+    card with its locked UAT steps, the graph's own test result, the builder's
+    report and the whole change. It runs where it cannot open the working copy,
+    so this is the whole review."""
+    commits = f'{run.base[:12]}..{(run.commit or "")[:12]}'
+    report = (run.builder_report or '(none)').strip()
+    return f"""You are the independent reviewer for Linear card {card['identifier']}: {card['title']}.
+
+Your standing orders are your role file, below. In this run two things differ
+from it: you cannot open the working copy or run anything, so the change, the
+card and the graph's test result below are the whole review; and "the
+controller" in it is the graph, which runs the tests once, checks that the
+candidate is unchanged after you finish, and posts your verdict on the card.
+
+<role-file path="{REVIEWER_ROLE_FILE}">
+{role.strip()}
+</role-file>
+
+<card>
+{with_locked_uat(card['description'], run.uat_plan)}
+</card>
+{instructions_part(card)}
+The candidate is commit {run.commit}, from start commit {run.base} ({commits}).
+
+<test-result>
+The graph ran the tests once on the candidate: {run.tests.summary if run.tests else 'not run'}
+</test-result>
+
+<builder-report>
+{report}
+</builder-report>
+
+<diff>
+{diff.strip() or '(no changes)'}
+</diff>
+
+End your final message with the single JSON object your role file describes,
+and nothing after it: that object is your verdict, and only it counts. Earlier
+text does not. If your findings cannot be fixed by the builder because they
+need Todd himself, add "todd": "account_action", "money_decision" or
+"product_decision", and "todd_reason": "<why, in one sentence>". Use it for
+nothing else: an ordinary defect never needs Todd.
+"""
+
+
+def verdict_text(s: CardRun, review: ReviewResult, who: str, maker: str) -> str:
+    lines = [f'**Independent review of `{(s.commit or "")[:12]}`: {"APPROVED" if review.verdict == "approve" else "CHANGES NEEDED"}**',
+             '', f'- Reviewer: {who}', f'- Company: {maker}',
+             f'- Round: {review.round} of {MAX_REVIEW_ROUNDS}']
+    if review.summary:
+        lines.append(f'- Summary: {review.summary.strip()}')
+    if review.verdict != 'approve' and review.findings:
+        lines += ['', '**Findings:**', '', review.findings.strip()]
+    return '\n'.join(lines)
 
 
 @dataclass
 class Review(BaseNode[CardRun, Deps, str]):
     async def run(self, ctx: GraphRunContext[CardRun, Deps]) -> Build | Report:
         s = ctx.state
+        who = ctx.deps.worker_names.get('reviewer', 'the reviewer')
+        builder_maker = ctx.deps.worker_makers.get('builder', '')
+        maker = ctx.deps.worker_makers.get('reviewer', '')
+        if not builder_maker or not maker or builder_maker.lower() == maker.lower():
+            return fail(ctx, f'the reviewer must come from a different model maker than the builder '
+                             f'(builder: {builder_maker or "unknown"}, reviewer: {maker or "unknown"})')
         if reason := await no_second_worker(ctx, 'reviewer'):
             return fail(ctx, reason)
-
-        builder_maker = ctx.deps.worker_makers.get('builder', 'Google')
-        reviewer_maker = ctx.deps.worker_makers.get('reviewer', 'DeepSeek')
-        if builder_maker and reviewer_maker and builder_maker.lower() == reviewer_maker.lower():
-            return fail(ctx, f'the reviewer maker ({reviewer_maker}) must be different from the builder maker ({builder_maker})')
-
-        reviewer_name = ctx.deps.worker_names.get('reviewer', 'DeepSeek (Pi)')
-        reviewer_company = ctx.deps.worker_companies.get('reviewer', 'DeepSeek')
-
-        await step(ctx, f'Reviewing (attempt {s.attempt})', f'Reviewed (attempt {s.attempt})', 'reviewer')
-
-        # Capture pre-review state to detect tampering (AC 4)
-        pre_commit = ctx.deps.head_commit(s)
-        pre_clean = ctx.deps.is_clean(s)
-
+        round_ = len(s.round_reasons) + 1
+        await step(ctx, f'Reviewing (round {round_})', f'Reviewed (round {round_})', 'reviewer')
         card = await ctx.deps.linear.card(s.card)
-        test_summary = s.tests.summary if s.tests else None
-        current_diff = ctx.deps.diff(s)
-        brief = reviewer_brief(card, s, current_diff, test_summary, s.builder_report)
-
         try:
-            result = await ctx.deps.reviewer(s, brief, ctx.deps.limits['reviewer'], lambda: moved(ctx))
+            brief = reviewer_brief(card, s, ctx.deps.base_file(s, REVIEWER_ROLE_FILE), ctx.deps.diff(s))
         except Exception as error:
             close(ctx, 'could not start')
-            return fail(ctx, f'the reviewer could not run: {type(error).__name__}: {error}')
-
-        result.reviewer = reviewer_name
-        result.company = reviewer_company
-        result.maker = reviewer_maker
-
-        if result.stopped:
-            return await stopped(ctx, 'reviewer')
-
-        # Check for tampering (AC 4): A reviewer that changed the candidate has its review voided and the card says so.
-        post_commit = ctx.deps.head_commit(s)
-        post_clean = ctx.deps.is_clean(s)
-        if (pre_commit and post_commit and post_commit != pre_commit) or not post_clean:
-            result.tampered = True
-            result.voided = True
-            result.void_reason = 'the reviewer changed the candidate'
-            result.ok = False
-            result.verdict = 'voided'
-            s.review = result
-            await say_once(
-                ctx,
-                f'The review by {reviewer_name} ({reviewer_company}) was voided because the reviewer '
-                f'modified the candidate working tree or commit. An independent reviewer must not change the candidate.',
-                marker('review-voided', s, attempt=s.attempt),
-            )
-            try:
-                await ctx.deps.discard(s)
-            except Exception:
-                pass
+            return fail(ctx, f'the review brief could not be made: {type(error).__name__}: {error}')
+        size = len(brief.encode())
+        if size > MAX_REVIEW_BYTES:
+            close(ctx, 'too big')
+            return fail(ctx, f'the review would be {size} bytes, over the {MAX_REVIEW_BYTES}-byte limit for one review, '
+                             'so it was not started; the card needs splitting')
+        before = ctx.deps.snapshot(s)
+        try:
+            review = await ctx.deps.reviewer(s, brief, ctx.deps.limits['reviewer'], lambda: moved(ctx))
+        except Exception as error:  # a reviewer that cannot even run never approves
+            review = ReviewResult(reason=f'the reviewer could not run: {type(error).__name__}: {error}')
+        review = review.model_copy(update={'reviewer': f'{who} ({maker})', 'round': round_})
+        after = ctx.deps.snapshot(s)
+        if after != before:
+            # AC 4: the reviewer changed the candidate. Whatever it said does not
+            # count; the working copy goes back to the commit it was given.
+            s.review = review.model_copy(update={'ok': False, 'voided': True})
+            save(ctx)
+            await ctx.deps.restore(s, before[0])
+            changed = ', '.join(x for x in (
+                f'the commit moved from `{before[0][:12]}` to `{after[0][:12]}`' if after[0] != before[0] else '',
+                'files in the working copy changed' if after[1] != before[1] else '') if x)
+            await say_once(ctx, f'The review by {who} ({maker}) of `{before[0][:12]}` is **void**: the reviewer changed '
+                                f'the candidate ({changed}). Its verdict does not count, and the working copy was put back '
+                                f'to `{before[0][:12]}`.', marker('review-voided', s, commit=before[0]))
             close(ctx, 'voided')
-            return fail(ctx, 'the review was voided because the reviewer changed the candidate')
-
-        # AC 3: A crash, timeout, missing verdict or abnormal exit is never an approval, even if the reviewer wrote "approve" earlier.
-        if not result.ok or result.verdict not in ('approve', 'findings'):
-            result.ok = False
-            result.verdict = None
-            s.review = result
-            close(ctx, 'failed')
-            return fail(ctx, f'the reviewer failed: {result.reason or "missing or invalid verdict"}')
-
-        s.review = result
-
-        # AC 1, UAT 1: Verdict posted on the card
-        verdict_title = 'APPROVED' if result.verdict == 'approve' else 'FINDINGS'
-        verdict_body = (
-            f'**Independent Review: {verdict_title}**\n\n'
-            f'- Reviewer: {reviewer_name}\n'
-            f'- Company: {reviewer_company}\n'
-            f'- Verdict: {result.verdict}\n'
-        )
-        if result.summary:
-            verdict_body += f'- Summary: {result.summary}\n'
-        if result.findings and result.verdict != 'approve':
-            verdict_body += f'\n**Findings:**\n\n{result.findings.strip()}'
-        elif result.report:
-            verdict_body += f"\n> {result.report.strip()[:1000].replace(chr(10), chr(10) + '> ')}"
-
-        await say_once(ctx, verdict_body, marker('review-verdict', s, attempt=s.attempt))
-
-        if result.verdict == 'approve':
-            close(ctx, 'done')
+            return fail(ctx, f'the review was voided because the reviewer changed the candidate ({changed})')
+        s.review = review
+        if review.stopped:
+            return await stopped(ctx, 'reviewer')
+        if not review.ok:
+            # AC 3: no clear final verdict, whatever the reviewer wrote before.
+            save(ctx)
+            close(ctx, 'no verdict')
+            return fail(ctx, f'the review gave no clear final verdict, so it is not an approval: {review.reason}')
+        if review.verdict == 'changes_needed':
+            s.round_reasons.append(review.findings.strip() or review.summary.strip() or '(the reviewer gave no detail)')
+        await say_once(ctx, verdict_text(s, review, who, maker), marker('review-verdict', s, commit=s.commit))
+        if review.verdict == 'approve':
             s.step = 'report'
-            save(ctx)
+            close(ctx, 'done')  # saves
             return Report()
-
-        # result.verdict == 'findings'
-        reason = result.findings or result.summary or f'findings on round {s.attempt}'
-        s.round_reasons.append(reason)
-
-        if s.attempt < MAX_BUILD_ATTEMPTS:
-            s.prior_findings = reason
-            close(ctx, 'findings')
-            s.step = 'build'
-            save(ctx)
+        if len(s.round_reasons) < MAX_REVIEW_ROUNDS:
+            s.repair_from, s.tries, s.fixing, s.step = s.commit, 0, 'review', 'build'
+            close(ctx, 'changes needed')  # saves
             return Build()
-
-        # Two unsuccessful rounds (AC 2, UAT 2)
-        close(ctx, 'two unsuccessful rounds')
-        r1 = s.round_reasons[0].strip() if len(s.round_reasons) > 0 else 'Unknown'
-        r2 = s.round_reasons[1].strip() if len(s.round_reasons) > 1 else reason.strip()
-        both_reasons = (
-            '**Review stopped after two unsuccessful rounds:**\n\n'
-            f'1. **Round 1:** {r1}\n\n'
-            f'2. **Round 2:** {r2}'
-        )
-        await say_once(ctx, both_reasons, marker('two-rounds-stopped', s))
-        return fail(ctx, f'review stopped after two unsuccessful rounds:\nRound 1: {r1}\nRound 2: {r2}')
+        # AC 2: the last round also asked for changes. One comment, every reason.
+        if review.todd in TODD_REASONS:
+            s.needs_todd = review.todd
+        reasons = '\n\n'.join(f'**Round {n}:** {text}' for n, text in enumerate(s.round_reasons, 1))
+        todd = (f'\n\nThe reviewer says this needs Todd: {TODD_REASONS[s.needs_todd]}. {review.todd_reason}'.rstrip()
+                if s.needs_todd else '')
+        await say_once(ctx, f'**The review stopped this card after {MAX_REVIEW_ROUNDS} rounds of findings.** No new card was '
+                            f'opened for them.\n\n{reasons}{todd}', marker('review-stopped', s))
+        close(ctx, 'changes needed')
+        return fail(ctx, f'the review asked for changes in {MAX_REVIEW_ROUNDS} rounds; the reasons are in one comment above')
 
 
 def result_text(s: CardRun, version: str) -> tuple[str, str]:
@@ -681,17 +742,13 @@ def result_text(s: CardRun, version: str) -> tuple[str, str]:
         lines.extend(f'  - failing: {name}' for name in s.tests.failing[:20])
     elif s.commit:
         lines.append('- Tests: not run')
+    if s.repairs:
+        lines.append(f'- Test runs ({s.repairs} of {MAX_TEST_REPAIRS} repairs used), oldest first:')
+        lines.extend(f'  {n}. {text}' for n, text in enumerate(s.test_rounds, 1))
     if s.review:
-        verdict_str = s.review.verdict or ('voided' if s.review.voided else 'failed')
-        rev_info = f'- Review: {verdict_str}'
-        if s.review.reviewer:
-            rev_info += f' ({s.review.reviewer}'
-            if s.review.company:
-                rev_info += f', {s.review.company}'
-            rev_info += ')'
-        if s.review.summary:
-            rev_info += f' - {s.review.summary}'
-        lines.append(rev_info)
+        verdict = ('void' if s.review.voided else 'no clear verdict' if not s.review.ok
+                   else 'approved' if s.review.verdict == 'approve' else 'changes needed')
+        lines.append(f'- Review: {verdict}, by {s.review.reviewer} (round {s.review.round} of {MAX_REVIEW_ROUNDS})')
     elif s.tests and s.tests.passed:
         lines.append('- Review: not run')
     if s.builder_report:
@@ -706,18 +763,17 @@ class Report(BaseNode[CardRun, Deps, str]):
         text, outcome = result_text(ctx.state, ctx.deps.graph_version)
         await say_once(ctx, text, marker('result', ctx.state, commit=ctx.state.commit or 'none', outcome=outcome))
         if not ctx.state.ending:
-            ctx.state.ending = ('Finished: the tests passed and the review was approved.' if outcome == 'passed'
+            ctx.state.ending = ('Finished: the tests passed and the review approved.' if outcome == 'passed'
                                 else 'Finished: the run failed. The result comment says why.')
-        if outcome == 'failed' and needs_todd(ctx.state.failure or ''):
+        if outcome == 'failed' and ctx.state.needs_todd in TODD_REASONS:
+            # AC 5: only the reviewer's own "needs Todd" answer assigns the card,
+            # and only for an account action, a money decision or a product decision.
             try:
-                await ctx.deps.linear.assign(ctx.state.card, 'Todd')
-                await say_once(
-                    ctx,
-                    'This card stopped due to an account action, money decision, or product decision, and has been assigned to Todd.',
-                    marker('assigned-todd', ctx.state),
-                )
+                await ctx.deps.linear.assign_to_todd(ctx.state.card)
+                await say_once(ctx, f'Assigned to Todd: the review says this needs {TODD_REASONS[ctx.state.needs_todd]}.',
+                               marker('assigned-todd', ctx.state))
             except Exception as error:
-                ctx.deps.log(f'could not assign card to Todd: {type(error).__name__}: {error}')
+                ctx.deps.log(f'the card could not be assigned to Todd: {type(error).__name__}: {error}')
         close(ctx, 'done')
         await show(ctx)
         ctx.state.step = 'done'

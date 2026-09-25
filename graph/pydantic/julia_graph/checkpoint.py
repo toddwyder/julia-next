@@ -26,22 +26,31 @@ class TestResult(BaseModel):
     failing: list[str] = []
     # True when the test run was stopped for running past its time limit.
     stopped: bool = False
+    # What the failures said (the reporter's "failing tests" section, or the
+    # lint's output), for the builder's repair brief.
+    details: str = ''
 
 
 class ReviewResult(BaseModel):
-    ok: bool = True
-    verdict: str | None = None  # 'approve' | 'findings'
+    """One review, as read from the reviewer's final message (JUL-128)."""
+    # True only when the final message ended with a clear verdict. A crash, a
+    # timeout, an abnormal exit or a missing verdict leaves it False, and
+    # False is never an approval.
+    ok: bool = False
+    verdict: Literal['approve', 'changes_needed'] | None = None
     summary: str = ''
-    findings: str | None = None
-    reason: str | None = None
-    report: str | None = None
-    stopped: bool = False
-    tampered: bool = False
-    voided: bool = False
-    void_reason: str | None = None
-    reviewer: str | None = None
-    company: str | None = None
-    maker: str | None = None
+    findings: str = ''
+    # Set only when the reviewer says the findings need Todd: an account
+    # action, a money decision or a product decision (graph.TODD_REASONS).
+    todd: str | None = None
+    todd_reason: str = ''
+    reason: str | None = None  # why there is no verdict
+    stopped: bool = False  # ran past its time limit
+    voided: bool = False  # it changed the candidate, so it does not count
+    text: str = ''  # the reviewer's final message
+    # Filled in by the graph: who reviewed, as the card shows it, and which round.
+    reviewer: str = ''
+    round: int = 0
 
 
 class StepMark(BaseModel):
@@ -65,13 +74,26 @@ class CardRun(BaseModel):
     # True once a builder has been started for the current attempt. A restart
     # that finds it still set knows the builder never finished.
     build_started: bool = False
-    attempt: int = 0
+    attempt: int = 0  # builder runs on this card, repairs included
+    tries: int = 0  # builder runs for the current build or repair; an interrupted one is tried again
+    # Failed tests the builder has been given to repair, and the commit that
+    # repair starts from: the failed candidate. An interrupted repair goes back
+    # to it, never to the base, so the first build's work is kept.
+    repairs: int = 0
+    repair_from: str | None = None
+    # Every test run's summary, oldest first, for the result comment.
+    test_rounds: list[str] = []
     commit: str | None = None
     builder_report: str | None = None
     tests: TestResult | None = None
+    # The independent review (JUL-128): the latest review, the findings each
+    # unsuccessful round gave the builder, and what the builder is fixing now
+    # ('tests' for failed tests, 'review' for review findings, None at first).
     review: ReviewResult | None = None
-    prior_findings: str | None = None
     round_reasons: list[str] = []
+    fixing: Literal['tests', 'review'] | None = None
+    # Set when a stopped card needs Todd: one of graph.TODD_REASONS.
+    needs_todd: str | None = None
     failure: str | None = None
     # The card's one "Where this card is" comment (JUL-126).
     status_id: str | None = None
