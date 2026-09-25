@@ -901,7 +901,43 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(outcome, 'failed')
         self.assertTrue(any('graph: review-voided' in c for c in self.linear.comments))
         self.assertFalse((self.worktree / '.julia').exists())
-        self.assertTrue((self.worktree / 'node_modules' / 'dep.js').exists())  # installed dependencies are kept
+
+    async def test_5_a_change_inside_the_installed_dependencies_voids_the_review(self):
+        (self.repo / '.gitignore').write_text('node_modules/\n')
+        sh(self.repo, 'git', *workers.GIT_ID, 'add', '-A')
+        sh(self.repo, 'git', *workers.GIT_ID, 'commit', '-q', '-m', 'ignore')
+        self.base = sh(self.repo, 'git', 'rev-parse', 'HEAD')
+
+        async def install_then_build(run, brief, *_):
+            self.builder_calls += 1
+            (Path(run.worktree) / 'node_modules' / 'dep').mkdir(parents=True, exist_ok=True)
+            (Path(run.worktree) / 'node_modules' / 'dep' / 'index.js').write_text('installed')
+            (Path(run.worktree) / 'hello.txt').write_text('hello 1\n')
+            return BuildResult(True, report='built')
+
+        async def edits_a_dependency(run):
+            # the same size as 'installed': only its modification time gives it away
+            (Path(run.worktree) / 'node_modules' / 'dep' / 'index.js').write_text('INSTALLED')
+            return self.APPROVE
+        outcome = await run_card(self.state(), self.deps(builder=install_then_build, reviewer=self.reviewer_says(edits_a_dependency)))
+        self.assertEqual(outcome, 'failed')
+        [void] = [c for c in self.linear.comments if 'graph: review-voided' in c]
+        self.assertIn('without its installed dependencies', void)
+        self.assertFalse((self.worktree / 'node_modules').exists())  # the changed dependencies are gone
+
+    async def test_a_review_keeps_the_installed_dependencies_when_nothing_changed(self):
+        async def install_then_build(run, brief, *_):
+            self.builder_calls += 1
+            (Path(run.worktree) / 'node_modules').mkdir(exist_ok=True)
+            (Path(run.worktree) / 'node_modules' / 'dep.js').write_text('installed')
+            (Path(run.worktree) / 'hello.txt').write_text('hello 1\n')
+            return BuildResult(True, report='built')
+        (self.repo / '.gitignore').write_text('node_modules/\n')
+        sh(self.repo, 'git', *workers.GIT_ID, 'add', '-A')
+        sh(self.repo, 'git', *workers.GIT_ID, 'commit', '-q', '-m', 'ignore')
+        self.base = sh(self.repo, 'git', 'rev-parse', 'HEAD')
+        self.assertEqual(await run_card(self.state(), self.deps(builder=install_then_build)), 'passed')
+        self.assertTrue((self.worktree / 'node_modules' / 'dep.js').exists())
 
     async def test_5_a_crash_right_after_a_tamper_is_seen_still_voids_it_and_never_reviews_again(self):
         async def edits(run):
@@ -910,10 +946,10 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
         deps = self.deps(reviewer=self.reviewer_says(edits))
         real_restore = deps.restore
 
-        async def dies(run, commit):
+        async def dies(run, commit, keep_dependencies=True):
             if (Path(run.worktree) / 'hello.txt').read_text() == 'reviewer was here\n':
                 raise Crash()  # the graph dies before it can put the working copy back
-            await real_restore(run, commit)
+            await real_restore(run, commit, keep_dependencies)
         deps.restore = dies
         with self.assertRaises(Crash):
             await run_card(self.state(), deps)

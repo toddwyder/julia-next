@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { codexModel, codexReply, piReply, REVIEWERS, review } from '../ops/julia-runner/run-reviewer.mjs';
+import { codexModel, codexReply, piReply, PYTHON, REAPER, REVIEWERS, review } from '../ops/julia-runner/run-reviewer.mjs';
 
 const LAUNCHER = fileURLToPath(new URL('../ops/julia-runner/run-reviewer.mjs', import.meta.url));
 const PI_FIXTURE = fileURLToPath(new URL('../graph/fixtures/orca-1.4.205/cost.pi.seat-json-stream.multi-turn.jsonl', import.meta.url));
@@ -32,15 +32,17 @@ test('Codex: the last agent message of a completed turn is the reply; a failed t
   assert.equal(codexReply(lines({ type: 'thread.started', thread_id: 't3' })).error, 'the turn did not complete');
 });
 
-test('Codex: the model that ran is read from its own session log', () => {
+test('Codex: the model that ran is read from its own session log, for exactly its thread', async () => {
   const root = mkdtempSync(join(tmpdir(), 'codex-sessions-'));
   try {
     mkdirSync(join(root, '2026', '09', '25'), { recursive: true });
     writeFileSync(join(root, '2026', '09', '25', 'rollout-2026-09-25T12-07-16-abc.jsonl'), lines(
       { type: 'session_meta', payload: { model_provider: 'openai' } }, { type: 'turn_context', payload: { model: 'gpt-5.5', cwd: '/' } }));
-    assert.equal(codexModel('abc', { root }), 'gpt-5.5');
-    assert.equal(codexModel('other', { root }), null);
-    assert.equal(codexModel(null, { root }), null);
+    const quick = { root, pause: 1 };
+    assert.equal(await codexModel('abc', quick), 'gpt-5.5');
+    assert.equal(await codexModel('bc', quick), null); // a thread whose id only ends the same is not this one
+    assert.equal(await codexModel('other', quick), null);
+    assert.equal(await codexModel(null, quick), null);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -75,13 +77,17 @@ const fakeRun = (result, stdout = '') => async (command, args, options, { second
   return { seconds, options, ...result };
 };
 
-test('the reviewer runs from /, and a stop, a crash or an abnormal exit is never an ok reply', async () => {
+test('the reviewer runs under its reaper from /, and a stop, a crash, an abnormal exit or an unconfirmed model is never an ok reply', async () => {
   let seen;
-  const run = async (command, args, options, limits) => { seen = { options, seconds: limits.seconds }; return fakeRun({ code: 0 }, lines({ type: 'thread.started', thread_id: 't' }, { type: 'item.completed', item: { type: 'agent_message', text: 'v' } }, { type: 'turn.completed' }))(command, args, options, limits); };
+  const run = async (command, args, options, limits) => { seen = { command, args, options, seconds: limits.seconds }; return fakeRun({ code: 0 }, lines({ type: 'thread.started', thread_id: 't' }, { type: 'item.completed', item: { type: 'agent_message', text: 'v' } }, { type: 'turn.completed' }))(command, args, options, limits); };
   const ok = await review({ reviewer: 'codex', prompt: 'p', limit_seconds: 99999 }, { run, model: () => 'gpt-5.5' });
   assert.deepEqual(ok, { status: 'ok', text: 'v', model: 'gpt-5.5' });
   assert.equal(seen.options.cwd, '/');
   assert.equal(seen.seconds, 3600); // capped
+  assert.deepEqual([seen.command, ...seen.args.slice(0, 3)], [PYTHON, REAPER, '--', 'codex']);
+  const unconfirmed = await review({ reviewer: 'codex', prompt: 'p' }, { run, model: () => null });
+  assert.equal(unconfirmed.status, 'failed');
+  assert.match(unconfirmed.error, /model that ran could not be confirmed/);
   assert.equal((await review({ reviewer: 'codex', prompt: 'p' }, { run: fakeRun({ stopped: true }) })).status, 'stopped');
   const crashed = await review({ reviewer: 'codex', prompt: 'p' }, { run: fakeRun({ code: 137 }, lines({ type: 'item.completed', item: { type: 'agent_message', text: '{"verdict":"approve"}' } }, { type: 'turn.completed' })), model: () => null });
   assert.equal(crashed.status, 'failed');
@@ -90,42 +96,74 @@ test('the reviewer runs from /, and a stop, a crash or an abnormal exit is never
   assert.match(noStart.error, /did not start: spawn codex ENOENT/);
 });
 
-// Real processes: a reviewer whose own child keeps running is stopped with it.
+// Real processes: whatever the reviewer starts is stopped with it, even a
+// process that left its group (setsid) or was orphaned by a double fork.
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
-const linuxOnly = { skip: process.platform === 'win32' ? 'process groups: Linux only' : false };
+const linuxOnly = { skip: process.platform === 'win32' ? 'process groups and subreapers: Linux only' : false };
+const settle = () => new Promise((r) => setTimeout(r, 500));
 
-test('at its limit the whole reviewer is stopped, its children included', linuxOnly, async () => {
+// A pretend reviewer (a shell script) that starts a plain child, one that escapes its
+// process group with setsid, and one orphaned by a double fork, writes their pids, then
+// either waits or ends at once.
+function fakeReviewer(dir, { endAtOnce = false } = {}) {
+  const script = join(dir, 'codex');
+  writeFileSync(script, [
+    '#!/bin/sh',
+    'sleep 60 & echo $! > "$0.plain"',
+    'setsid sleep 60 & echo $! > "$0.escaped"',
+    '( sleep 60 & echo $! > "$0.orphan" ) &',
+    'while [ ! -s "$0.orphan" ]; do sleep 0.05; done',
+    'echo ready > "$0.ready"',
+    endAtOnce ? 'exit 0' : 'wait',
+    '',
+  ].join('\n'), { mode: 0o755 });
+  const pids = () => ['plain', 'escaped', 'orphan'].map((kind) => Number(readFileSync(`${script}.${kind}`, 'utf8').trim()));
+  const ready = () => { try { return readFileSync(`${script}.ready`, 'utf8').includes('ready'); } catch { return false; } };
+  return { script, pids, ready };
+}
+
+test('at its limit the whole reviewer is stopped, escaped and orphaned children included', linuxOnly, async () => {
   const dir = mkdtempSync(join(tmpdir(), 'reviewer-'));
-  const pidFile = join(dir, 'child.pid');
-  const reviewers = { fake: () => ({ command: process.execPath, args: ['-e', `const c=require('child_process').spawn('sleep',['60'],{stdio:'ignore'});require('fs').writeFileSync(${JSON.stringify(pidFile)},String(c.pid));setTimeout(()=>{},60000)`], env: process.env, stdin: false }) };
+  const fake = fakeReviewer(dir);
+  const reviewers = { fake: () => ({ command: fake.script, args: [], env: process.env, stdin: false }) };
   try {
-    const reply = await review({ reviewer: 'fake', prompt: 'p', limit_seconds: 1 }, { reviewers });
+    const reply = await review({ reviewer: 'fake', prompt: 'p', limit_seconds: 2 }, { reviewers });
     assert.equal(reply.status, 'stopped');
-    const child = Number(readFileSync(pidFile, 'utf8'));
-    await new Promise((r) => setTimeout(r, 300));
-    assert.equal(alive(child), false, `the reviewer's own child ${child} outlived the stop`);
+    assert.ok(fake.ready(), 'the pretend reviewer started its children before the limit');
+    await settle();
+    for (const pid of fake.pids()) assert.equal(alive(pid), false, `child ${pid} outlived the limit`);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test('when the graph stops the launcher, everything it started stops too', linuxOnly, async () => {
+test('a reviewer that ends leaves nothing running behind it', linuxOnly, async () => {
   const dir = mkdtempSync(join(tmpdir(), 'reviewer-'));
-  const fakeCodex = join(dir, 'codex');
-  const pidFile = join(dir, 'child.pid');
-  writeFileSync(fakeCodex, `#!/bin/sh\nsleep 60 &\necho $! > ${pidFile}\nwait\n`, { mode: 0o755 });
+  const fake = fakeReviewer(dir, { endAtOnce: true });
+  const reviewers = { fake: () => ({ command: fake.script, args: [], env: process.env, stdin: false }) };
+  try {
+    const reply = await review({ reviewer: 'fake', prompt: 'p', limit_seconds: 30 }, { reviewers });
+    assert.equal(reply.status, 'failed'); // no final message: never a review
+    await settle();
+    for (const pid of fake.pids()) assert.equal(alive(pid), false, `child ${pid} outlived the reviewer`);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('when the graph stops the launcher, everything the reviewer started stops too', linuxOnly, async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'reviewer-'));
+  const fake = fakeReviewer(dir);
   try {
     const launcher = spawn(process.execPath, [LAUNCHER], { env: { ...process.env, PATH: `${dir}:/usr/bin:/bin` }, stdio: ['pipe', 'pipe', 'pipe'] });
     launcher.stdin.end(JSON.stringify({ reviewer: 'codex', prompt: 'p', limit_seconds: 60 }));
-    // wait for the fake reviewer's child to exist (an empty file is not a pid: kill(0) means "my own group")
-    const childPid = () => Number(readFileSync(pidFile, { encoding: 'utf8', flag: 'a+' }).trim()) || null;
-    for (let i = 0; i < 100 && !childPid(); i += 1) await new Promise((r) => setTimeout(r, 100));
-    const child = childPid();
-    assert.ok(child && alive(child), 'the fake reviewer started its child');
+    for (let i = 0; i < 100 && !fake.ready(); i += 1) await new Promise((r) => setTimeout(r, 100));
+    assert.ok(fake.ready(), 'the pretend reviewer started its children');
+    for (const pid of fake.pids()) assert.ok(alive(pid), `child ${pid} started`);
     const code = await new Promise((r) => { launcher.on('close', r); launcher.kill('SIGTERM'); });
     assert.equal(code, 124);
-    await new Promise((r) => setTimeout(r, 300));
-    assert.equal(alive(child), false, `the reviewer's child ${child} outlived the graph's stop`);
+    await settle();
+    for (const pid of fake.pids()) assert.equal(alive(pid), false, `child ${pid} outlived the graph's stop`);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

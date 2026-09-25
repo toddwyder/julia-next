@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import hashlib
 import json
 import os
 import pwd
@@ -350,17 +351,30 @@ def reviewer(log, which: str = DEFAULT_REVIEWER):
     return review
 
 
-# Installed dependencies: ignored by git, made by the graph (npm ci), kept by a
-# restore. A change inside them is not seen; the reviewer cannot write to the
-# working copy at all on the server (runner is not in its group).
+# Installed dependencies: ignored by git and made by the graph (npm ci), so
+# `git status` lists the folder by name only. The snapshot adds a fingerprint
+# of every file in it, so a change inside it is seen too.
 KEPT = 'node_modules'
 
 
+def fingerprint(folder: Path) -> str:
+    """Every file below folder, by path, type, size and modification time."""
+    digest = hashlib.sha256()
+    for top, dirs, files in os.walk(folder):
+        dirs.sort()
+        for name in sorted(dirs + files):
+            path = Path(top, name)
+            st = path.lstat()
+            digest.update(f'{path.relative_to(folder)}|{st.st_mode}|{st.st_size}|{st.st_mtime_ns}\n'.encode())
+    return digest.hexdigest()
+
+
 def snapshot(run: CardRun) -> tuple[str, str]:
-    """The working copy's HEAD and everything `git status` sees, untracked and
-    ignored files included (an ignored folder is listed by name)."""
-    return (git(run.worktree, 'rev-parse', 'HEAD'),
-            git(run.worktree, 'status', '--porcelain', '--untracked-files=all', '--ignored'))
+    """The working copy's HEAD, and everything `git status` sees (untracked and
+    ignored files included) with the installed dependencies' fingerprint."""
+    status = git(run.worktree, 'status', '--porcelain', '--untracked-files=all', '--ignored')
+    deps = Path(run.worktree, KEPT)
+    return git(run.worktree, 'rev-parse', 'HEAD'), f'{status}\n{KEPT}: {fingerprint(deps) if deps.is_dir() else "none"}'
 
 
 def drift(run: CardRun, commit: str) -> str:
@@ -373,11 +387,12 @@ def drift(run: CardRun, commit: str) -> str:
                                  f'{len(changed.splitlines())} file(s) differ' if changed else '') if x)
 
 
-async def restore(run: CardRun, commit: str) -> None:
+async def restore(run: CardRun, commit: str, keep_dependencies: bool = True) -> None:
     """Put the working copy back to this commit: nothing uncommitted is left,
-    ignored files included, except the installed dependencies."""
+    ignored files included. The installed dependencies stay unless told not
+    to (after a voided review, when they may have been changed too)."""
     git(run.worktree, 'reset', '-q', '--hard', commit)
-    git(run.worktree, 'clean', '-fdqx', '-e', KEPT)
+    git(run.worktree, 'clean', '-fdqx', *(['-e', KEPT] if keep_dependencies else []))
 
 
 def change(run: CardRun) -> str:

@@ -127,7 +127,7 @@ class Deps:
     # before and after a review, so a reviewer that changed anything is caught.
     # restore puts it back to a commit, with nothing uncommitted left.
     snapshot: Callable[[CardRun], tuple[str, str]]
-    restore: Callable[[CardRun, str], Awaitable[None]]
+    restore: Callable[[CardRun, str, bool], Awaitable[None]]
     # How the working copy differs from a commit, or '' (workers.drift).
     drift: Callable[[CardRun, str], str]
     # The change under review (the diff from the base) and a file as it was at
@@ -801,10 +801,12 @@ async def post_review(ctx: GraphRunContext[CardRun, Deps]) -> None:
     if review is None:
         return
     if review.voided:
-        await ctx.deps.restore(s, s.commit)
+        # Everything goes, the installed dependencies too: the run ends here,
+        # and a next run of the card installs them again.
+        await ctx.deps.restore(s, s.commit, False)
         await say_once(ctx, f'The review by {review.reviewer} of `{(s.commit or "")[:12]}` is **void**: the reviewer '
                             f'changed the candidate ({review.reason}). Its verdict does not count, and the working copy '
-                            f'was put back to `{(s.commit or "")[:12]}`.', marker('review-voided', s, commit=s.commit))
+                            f'was put back to `{(s.commit or "")[:12]}`, without its installed dependencies.', marker('review-voided', s, commit=s.commit))
         return
     if not review.ok:
         return  # no verdict to post; the result comment says why

@@ -13,17 +13,20 @@
 //                                  abnormal exit: never a verdict
 //
 // model is what the reviewer itself reports it ran (Codex's session log, Pi's
-// final message), not what was asked for.
+// final message), not what was asked for. A run whose model cannot be
+// confirmed is 'failed': it never counts as a review.
 //
-// The reviewer runs in its own process group under its time limit
-// (time-limit.mjs runLimited), so at the limit, or when the graph stops this
-// launcher (SIGTERM, passed on by sudo), every process it started is stopped
-// with it: Pi's or Codex's own children included. A stopped reviewer exits
-// STOPPED_EXIT (124) and says so on stderr. runner also hosts Orca's server,
-// so its other processes are never swept.
+// The reviewer runs under reap.py, in its own process group, under its time
+// limit (time-limit.mjs runLimited). reap.py is the reviewer's child
+// subreaper: anything the reviewer starts stays below it, even a process that
+// left the group (setsid) or double-forked, and when the reviewer ends, hits
+// its limit, or the graph stops this launcher (SIGTERM, passed on by sudo),
+// reap.py stops all of it. A stopped reviewer exits STOPPED_EXIT (124) and
+// says so on stderr. runner also hosts Orca's server, so nothing is swept by
+// account.
 import { readdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { buildPiSpawnSpec, parsePiJsonStream } from '../service-dropbox/run-pi-seat.mjs';
@@ -32,6 +35,11 @@ import { limitSeconds, runLimited, STOPPED_EXIT, stoppedLine } from './time-limi
 // Seconds, as time-limit.mjs LIMITS does for the builder and the tests.
 export const LIMIT = { fallback: 20 * 60, max: 60 * 60 };
 export const CODEX_MODEL = 'gpt-5.5';
+// The reviewer's subreaper (see above), beside this file.
+export const REAPER = join(dirname(fileURLToPath(import.meta.url)), 'reap.py');
+export const PYTHON = '/usr/bin/python3';
+// The launcher's own stop: SIGTERM first, so reap.py can sweep, then SIGKILL.
+export const STOP_GRACE_MS = 8_000;
 // sudo resets PATH to its root-owned secure_path; nothing else of the caller's environment passes.
 const ENV = { HOME: homedir(), PATH: process.env.PATH || '/usr/bin:/bin', LANG: 'C.UTF-8' };
 
@@ -82,8 +90,12 @@ export function codexReply(stdout) {
   return { ok: true, text: text ?? '', thread };
 }
 
-// The model a Codex run really used: its session log's turn_context.
-export function codexModel(thread, { root = join(homedir(), '.codex', 'sessions'), read = readFileSync, list = readdirSync } = {}) {
+// The model a Codex run really used: its session log's turn_context. The log
+// is named rollout-<time>-<thread>.jsonl; only that exact thread counts, and
+// it is looked for a few times in case Codex is still writing it.
+export async function codexModel(thread, {
+  root = join(homedir(), '.codex', 'sessions'), read = readFileSync, list = readdirSync, tries = 5, pause = 200,
+} = {}) {
   if (!thread) return null;
   const walk = (dir) => {
     for (const entry of list(dir, { withFileTypes: true })) {
@@ -91,18 +103,19 @@ export function codexModel(thread, { root = join(homedir(), '.codex', 'sessions'
       if (entry.isDirectory()) {
         const found = walk(path);
         if (found) return found;
-      } else if (entry.name.includes(thread) && entry.name.endsWith('.jsonl')) return path;
+      } else if (entry.name.startsWith('rollout-') && entry.name.endsWith(`-${thread}.jsonl`)) return path;
     }
     return null;
   };
-  try {
-    const log = walk(root);
-    if (!log) return null;
-    const context = read(log, 'utf8').split('\n').map(json).find((e) => e?.type === 'turn_context');
-    return context?.payload?.model ?? null;
-  } catch {
-    return null;
+  for (let attempt = 1; attempt <= tries; attempt += 1) {
+    try {
+      const log = walk(root);
+      const context = log && read(log, 'utf8').split('\n').map(json).find((e) => e?.type === 'turn_context');
+      if (context?.payload?.model) return String(context.payload.model);
+    } catch { /* not there yet */ }
+    if (attempt < tries) await new Promise((done) => setTimeout(done, pause));
   }
+  return null;
 }
 
 // Pi (the DeepSeek seat's stream): the last assistant message that ended the
@@ -136,7 +149,7 @@ export async function review(request, { run = runLimited, model = codexModel, on
   let stdout = '';
   let stderr = '';
   const options = { cwd: '/', env: spec.env, stdio: [spec.stdin ? 'pipe' : 'ignore', 'pipe', 'pipe'] };
-  const result = await run(spec.command, spec.args, options, {
+  const result = await run(PYTHON, [REAPER, '--', spec.command, ...spec.args], options, {
     seconds,
     started: (child) => {
       child.stdout.on('data', (chunk) => { stdout += chunk; onOutput(); });
@@ -147,12 +160,13 @@ export async function review(request, { run = runLimited, model = codexModel, on
   if (result.stopped) return { status: 'stopped', error: stoppedLine(seconds) };
   if (result.error) return { status: 'failed', error: `the reviewer did not start: ${result.error.message}` };
   const reply = which === 'codex' ? codexReply(stdout) : piReply(stdout);
-  const ran = which === 'codex' ? model(reply.thread) : reply.model;
+  const ran = which === 'codex' ? await model(reply.thread) : reply.model;
   const tail = stderr.trim().split('\n').slice(-3).join(' | ').slice(-500);
   if (result.code !== 0) {
     return { status: 'failed', error: `the reviewer exited ${result.code ?? result.signal}: ${reply.error ?? tail}`, text: reply.text, model: ran };
   }
   if (!reply.ok) return { status: 'failed', error: reply.error, text: reply.text, model: ran };
+  if (!ran) return { status: 'failed', error: 'the model that ran could not be confirmed, so the review does not count', text: reply.text };
   return { status: 'ok', text: reply.text, model: ran };
 }
 
@@ -164,13 +178,18 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     last = Date.now();
     process.stdout.write('{"progress":true}\n');
   };
-  // The graph stops this launcher with SIGTERM (through sudo). runLimited's
-  // group is stopped by the limit; this stops it now, with everything in it.
+  // The graph stops this launcher with SIGTERM (through sudo): the reviewer's
+  // group gets SIGTERM, so reap.py sweeps everything below it, then SIGKILL.
   let group = null;
+  let stopping = false;
   const stop = () => {
-    if (group) {
-      try { process.kill(-group, 'SIGKILL'); } catch { /* already gone */ }
-    }
+    if (stopping) return;
+    stopping = true;
+    const signal = (name) => { if (group) { try { process.kill(-group, name); } catch { /* already gone */ } } };
+    signal('SIGTERM');
+    setTimeout(() => { signal('SIGKILL'); finish(); }, STOP_GRACE_MS).unref();
+  };
+  const finish = () => {
     console.error('stopped: the graph stopped the reviewer');
     process.exit(STOPPED_EXIT);
   };
@@ -181,6 +200,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     ...limits, started: (child) => { group = child.pid; limits.started(child); },
   });
   review(request, { run, onOutput }).then((reply) => {
+    if (stopping) finish();
     if (reply.status === 'stopped') {
       console.error(reply.error);
       process.exit(STOPPED_EXIT);
