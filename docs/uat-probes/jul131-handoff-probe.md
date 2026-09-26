@@ -1,1 +1,1 @@
-This disposable card checks the UAT handoff.
+The UAT reply was read.
