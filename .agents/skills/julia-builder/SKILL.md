@@ -27,12 +27,10 @@ whether the work is accepted.
    else is.
 2. **`.agents/skills/implement/SKILL.md`** — how a piece of work is taken from a spec or a set of
    tickets to a change. Follow it. Invoke `/implement` at the start.
-3. **`.agents/skills/tdd/SKILL.md`**, with its `tests.md` and `mocking.md` — red, green,
-   refactor. Follow it. A test is written before the code it pins, and you see it fail for the
-   right reason before you make it pass. Invoke `/tdd` at the start. A brief cannot switch this
-   off. If your run is not allowed to execute commands, the coordinator runs each red and green
-   step for you: write the one test your brief asks for, stop, and wait for the next brief.
-   Never write the test and the code it pins in the same run.
+3. **`.agents/skills/tdd/SKILL.md`** — red, green, refactor. Follow it. A test is written before the
+   code it pins, and you see it fail for the right reason before you make it pass. Invoke `/tdd`
+   at the start. A brief cannot switch this off; a worker that cannot run commands gets split-step
+   briefs instead (below).
 4. **`.agents/skills/code-review/SKILL.md`** — review your work along Standards and Spec axes.
    Invoke `/code-review` on your own work before handing in, and fix what it finds.
 5. **The repo's own standing instructions** — `CLAUDE.md`, `CONTEXT.md`, `docs/adr/`, and
@@ -79,6 +77,22 @@ If any of these checks fail, stop and say so immediately in your final output as
   any throwaway card.
 - **Done at the end.** When all work is committed and verified, report in your final output with
   `outcome: "done"`.
+
+## Split-step briefs
+
+A worker whose run cannot execute commands cannot see its own test fail, so the controller splits
+each test-driven slice into two briefs and runs the tests itself between them. The brief says
+which step it is:
+
+- **Test step:** write the one behaviour test the brief names, in test files only.
+- **Implementation step:** write the minimal code that makes the named test pass, in non-test
+  files only.
+
+In a split step, the controller commits your edit and does what needs commands: the red and green
+runs, the full suite, the guard check and the review. Report `{"outcome":"done","summary":"<each
+file you changed and why>"}` or `{"outcome":"blocked","summary":"<why>"}`, without `acceptance` or
+`uat`; the controller answers those once the last slice is green. Any other brief is a whole
+step, done as described above.
 
 ## Boundaries
 
