@@ -15,19 +15,21 @@ Follow `.agents/skills/tdd/SKILL.md`.
       fake or an unrelated failure is not a red step.
    3. Write the minimal code.
    4. Run the test and the full suite, and show them pass.
-   5. Guard check: revert the slice's code in a copy and show the test fails again.
+   5. Guard check (the builder skill's mutation check): revert the slice's code in a copy and
+      show the test fails again.
 3. Only then start the next slice.
 
-**A worker that cannot run commands** (headless Gemini, for one) gets split-step briefs, as the
-builder skill describes: one brief asks for the test, the next for the minimal code, never both.
-The coordinator commits each, and runs every red, green and guard step between them.
+**A worker that cannot run commands** (headless Gemini, for one) gets the builder skill's
+split-step briefs: one brief asks for the test, the next for the minimal code. Here the
+coordinator does the controller's part: it commits each edit, and runs every red, green and guard
+step between them.
 
 ## Reviewing
 
 After every slice is green, follow `.agents/skills/code-review/SKILL.md`. Run its Standards and
 Spec sub-agents separately and keep both reports verbatim, without merging or reranking them.
-They come in addition to any adversarial reviewer Todd asks for, never instead of one, and that
-reviewer is from a different model maker than the builder.
+They come in addition to any adversarial reviewer Todd asks for, not instead of one. As in the
+builder skill, that reviewer is from a different model maker than the builder.
 
 ## Evidence
 
@@ -37,5 +39,5 @@ Record these on the card:
 - each guard check;
 - both code-review reports.
 
-Tick each checkbox in the same step as its evidence is posted. A card moves to UAT only after
-every check and review passes.
+Tick checkboxes as CLAUDE.md says ("Tick as you go"). A card moves to UAT only after every check
+and review passes.
