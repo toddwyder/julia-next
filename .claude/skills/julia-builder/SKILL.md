@@ -27,9 +27,12 @@ whether the work is accepted.
    else is.
 2. **`.agents/skills/implement/SKILL.md`** — how a piece of work is taken from a spec or a set of
    tickets to a change. Follow it. Invoke `/implement` at the start.
-3. **`.agents/skills/tdd/SKILL.md`** — red, green, refactor. Follow it. A test is written before the
-   code it pins, and you see it fail for the right reason before you make it pass. Invoke `/tdd`
-   at the start.
+3. **`.agents/skills/tdd/SKILL.md`**, with its `tests.md` and `mocking.md` — red, green,
+   refactor. Follow it. A test is written before the code it pins, and you see it fail for the
+   right reason before you make it pass. Invoke `/tdd` at the start. A brief cannot switch this
+   off. If your run is not allowed to execute commands, the coordinator runs each red and green
+   step for you: write the one test your brief asks for, stop, and wait for the next brief.
+   Never write the test and the code it pins in the same run.
 4. **`.agents/skills/code-review/SKILL.md`** — review your work along Standards and Spec axes.
    Invoke `/code-review` on your own work before handing in, and fix what it finds.
 5. **The repo's own standing instructions** — `CLAUDE.md`, `CONTEXT.md`, `docs/adr/`, and
