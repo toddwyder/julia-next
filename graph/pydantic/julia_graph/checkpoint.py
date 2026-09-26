@@ -17,7 +17,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-Step = Literal['prepare', 'build', 'test', 'review', 'report', 'done']
+Step = Literal['prepare', 'build', 'test', 'review', 'report', 'publish', 'uat', 'release_wait', 'done']
 
 
 class TestResult(BaseModel):
@@ -103,7 +103,7 @@ class CardRun(BaseModel):
     # ('tests' for failed tests, 'review' for review findings, None at first).
     review: ReviewResult | None = None
     round_reasons: list[str] = []
-    fixing: Literal['tests', 'review'] | None = None
+    fixing: Literal['tests', 'review', 'uat'] | None = None
     # Set when a stopped card needs Todd: one of graph.TODD_REASONS.
     needs_todd: str | None = None
     # The working copy as a review found it (HEAD, status with the dependency
@@ -130,6 +130,10 @@ class CardRun(BaseModel):
     # Later edits to the card do not change it; only an Instruction comment does.
     uat_plan: str | None = None
     uat_locked_at: datetime | None = None
+    pr_url: str | None = None
+    uat_waiting_at: datetime | None = None
+    uat_reply: str | None = None
+    uat_reply_at: datetime | None = None
 
 
 class CardLocked(Exception):

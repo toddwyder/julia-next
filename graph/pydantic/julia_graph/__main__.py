@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import importlib.metadata
+import json
 import os
 import subprocess
 import sys
@@ -28,6 +29,8 @@ REPO = '/srv/julia-runner/repo'
 WORKTREES = '/srv/julia-runner/worktrees'
 STATE = '/srv/julia-runner/graph-state'
 WAIT_LIMIT_SECONDS = 45 * 60
+PUBLISHER = '/srv/orchestrator-svc/julia-next/scripts/publish-pr.mjs'
+PUBLISHER_ENV = '/etc/orchestrator-svc/.env.publisher'
 
 
 def log(line: str) -> None:
@@ -38,6 +41,27 @@ def graph_version() -> str:
     here = Path(__file__).resolve().parent
     code = subprocess.run(['git', 'rev-parse', '--short=12', 'HEAD'], cwd=here, capture_output=True, text=True).stdout.strip()
     return f"pydantic-graph {importlib.metadata.version('pydantic-graph')}, graph code `{code or 'unknown'}`"
+
+
+async def publish_pr(run: CardRun, title: str, body: str, existing_url: str | None) -> str:
+    """Use the existing GitHub App publisher; never call the merge action."""
+    if workers.git(run.worktree, 'rev-parse', 'HEAD') != run.commit:
+        raise RuntimeError('the working copy moved after review, so it was not published')
+
+    def call(*args: str) -> dict:
+        result = subprocess.run(['node', f'--env-file={PUBLISHER_ENV}', PUBLISHER, *args],
+                                capture_output=True, text=True)
+        if result.returncode:
+            raise RuntimeError(f'publisher {args[0]} failed: {result.stderr.strip()}')
+        return json.loads(result.stdout.strip().splitlines()[-1])
+
+    await asyncio.to_thread(call, 'push', '--repo', 'toddwyder/julia-next', '--branch', run.branch,
+                            '--cwd', run.worktree)
+    if existing_url:
+        return existing_url
+    opened = await asyncio.to_thread(call, 'open', '--repo', 'toddwyder/julia-next', '--head', run.branch,
+                                     '--base', 'main', '--title', title, '--body', body)
+    return opened['url']
 
 
 def card_deps(card: str, limits: dict[str, int] | None = None) -> Deps:
@@ -52,6 +76,7 @@ def card_deps(card: str, limits: dict[str, int] | None = None) -> Deps:
         snapshot=workers.snapshot, restore=workers.restore, drift=workers.drift, diff=workers.change,
         install=workers.clean_install,
         base_file=workers.base_file,
+        publish=publish_pr,
         graph_version=graph_version(), log=log,
         limits=limits or dict(LIMITS), files=workers.tracked_files,
     )
@@ -151,7 +176,7 @@ def main(argv: list[str]) -> int:
         log(f'refused: {refused}')
         return 3
     log(f'{args.card}: {outcome}')
-    return 0 if outcome in ('passed', 'already reported') else 1
+    return 0 if outcome in ('passed', 'already reported', 'waiting for UAT', 'waiting for release') else 1
 
 
 if __name__ == '__main__':
