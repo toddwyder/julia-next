@@ -33,8 +33,9 @@ from typing import Protocol
 
 from .checkpoint import CardRun, Checkpoint
 from .graph import Deps, uat_section
+from .linear import TODD_ID
 from .workers import set_aside
-from .status import clock
+from .status import clock, render
 
 READY = 'Ready'
 STARTED = 'Implementation'  # the column a started card moves to (graph/board-spec.mjs)
@@ -54,6 +55,7 @@ class BoardLinear(Protocol):
     async def comment(self, card: str, body: str) -> str: ...
     async def edit(self, comment_id: str, body: str) -> None: ...
     async def move(self, card: str, state: str) -> None: ...
+    async def watchdog_card(self, card: str) -> dict: ...
 
 
 class BoardLocked(Exception):
@@ -185,6 +187,7 @@ class Board:
         if self._board_lock is None:
             raise BoardLocked('the board is not open: call open() first')
         async with self._checking:
+            await self._read_uat_replies()
             try:
                 ready = sorted(await self.linear.ready_cards(), key=lambda c: c['sort_order'])
             except Exception as error:  # Linear unreachable: try again next minute
@@ -200,9 +203,70 @@ class Board:
                 return f'busy with {self.reserved()}'
             if (held := self.reserved()) and (resumed := await self._resume(held)):
                 return resumed
+            if sent_back := self._sent_back():
+                return await self._start({'identifier': sent_back.card})
             if not eligible:
                 return 'nothing to start'
             return await self._start(eligible[0])
+
+    def _saved_cards(self) -> list[CardRun]:
+        cards = []
+        for path in self.state_dir.glob('*.json'):
+            if not re.fullmatch(r'[A-Z]+-\d+', path.stem):
+                continue
+            try:
+                cards.append(CardRun.model_validate_json(path.read_text()))
+            except ValueError as error:
+                self.log(f'{path.stem}: saved progress could not be read: {error}')
+        return cards
+
+    def _sent_back(self) -> CardRun | None:
+        pending = [s for s in self._saved_cards() if s.step == 'build' and s.fixing == 'uat' and s.uat_reply_at]
+        return min(pending, key=lambda s: s.uat_reply_at) if pending else None
+
+    async def _read_uat_replies(self) -> None:
+        for saved in self._saved_cards():
+            if saved.step != 'uat' or saved.uat_waiting_at is None:
+                continue
+            try:
+                card = await self.linear.watchdog_card(saved.card)
+                if card['state'] != 'UAT':
+                    continue
+                replies = [(datetime.fromisoformat(c['createdAt'].replace('Z', '+00:00')), c)
+                           for c in card['comments'] if (c.get('user') or {}).get('id') == TODD_ID]
+                replies = [(at, c) for at, c in replies if at > saved.uat_waiting_at]
+                if not replies:
+                    continue
+                at, latest = max(replies, key=lambda pair: pair[0])
+                reply = latest['body']
+                if reply != 'Accepted' and (not reply.strip() or '\n' in reply.strip() or
+                                            re.search(r'[.!?]\s+\S', reply.strip())):
+                    continue
+                checkpoint = Checkpoint(self.state_dir, saved.card)
+                checkpoint.lock()
+                try:
+                    current = checkpoint.load()
+                    if current.step != 'uat':
+                        continue
+                    current.uat_reply, current.uat_reply_at = reply, at
+                    if reply == 'Accepted':
+                        current.step = 'release_wait'
+                        current.ending = f'Accepted at {clock(at)}. Waiting for the release step.'
+                        current.moved_at = at
+                    else:
+                        current.step, current.fixing = 'build', 'uat'
+                        current.repair_from, current.tries = current.commit, 0
+                        current.tests, current.review = None, None
+                        current.repairs, current.round_reasons, current.test_rounds = 0, [], []
+                        current.failure, current.needs_todd = None, None
+                        current.ending = None
+                    checkpoint.save(current)
+                finally:
+                    checkpoint.unlock()
+                if reply == 'Accepted' and current.status_id:
+                    await self.linear.edit(current.status_id, render(current))
+            except Exception as error:
+                self.log(f'{saved.card}: UAT reply could not be read: {type(error).__name__}: {error}')
 
     async def _tell(self, card: str, reasons: list[tuple[str, str]]) -> None:
         """One comment per ineligible card, edited only when the reason changes."""
@@ -221,7 +285,7 @@ class Board:
         """A reservation left by a graph that died mid-run: carry on with that card.
         One whose run had already ended is released instead."""
         saved = self._load(Checkpoint(self.state_dir, card))
-        if saved is None or saved.step == 'done':
+        if saved is None or saved.step in ('done', 'uat', 'release_wait'):
             self._release()
             return None
         if not await self._leave_ready(card):  # the graph may have died before the move

@@ -92,6 +92,7 @@ class Linear(Protocol):
     async def comment(self, card: str, body: str, comment_id: str | None = None) -> str: ...
     async def edit(self, comment_id: str, body: str) -> None: ...
     async def assign_to_todd(self, card: str) -> None: ...
+    async def move(self, card: str, state: str) -> None: ...
 
 
 @dataclass
@@ -145,6 +146,9 @@ class Deps:
     # the base commit (the reviewer's role file), both read from git.
     diff: Callable[[CardRun], str]
     base_file: Callable[[CardRun, str], str]
+    # Push the reviewed commit with the publisher app and open a PR, or update
+    # the already-open PR after UAT sends the same branch back to the builder.
+    publish: Callable[[CardRun, str, str, str | None], Awaitable[str]] | None = None
     graph_version: str = 'unknown'
     log: Callable[[str], None] = field(default=print)
     now: Callable[[], datetime] = field(default=lambda: datetime.now(timezone.utc))
@@ -323,10 +327,12 @@ def fail(ctx: GraphRunContext[CardRun, Deps], reason: str) -> Report:
 
 @dataclass
 class Resume(BaseNode[CardRun, Deps, str]):
-    async def run(self, ctx: GraphRunContext[CardRun, Deps]) -> Prepare | Build | Test | Review | Report | End[str]:
+    async def run(self, ctx: GraphRunContext[CardRun, Deps]) -> Prepare | Build | Test | Review | Report | Publish | End[str]:
         s = ctx.state
         if s.step == 'done':
             return End('already reported')
+        if s.step in ('uat', 'release_wait'):
+            return End('waiting for UAT' if s.step == 'uat' else 'waiting for release')
         if open_mark(s):
             # A step the card showed as running never finished: the graph died in it.
             close(ctx, 'interrupted')
@@ -376,6 +382,8 @@ class Resume(BaseNode[CardRun, Deps, str]):
             if reason := await no_second_worker(ctx, 'reviewer'):
                 return fail(ctx, reason)
             return Review()
+        if s.step == 'publish':
+            return Publish()
         return Report()
 
 
@@ -503,7 +511,8 @@ class Build(BaseNode[CardRun, Deps, str]):
     async def run(self, ctx: GraphRunContext[CardRun, Deps]) -> Build | Test | Report:
         s = ctx.state
         if s.tries >= MAX_BUILD_ATTEMPTS:
-            what = {'tests': f'repair {s.repairs}', 'review': f'fix for review round {len(s.round_reasons)}'}.get(s.fixing, 'build')
+            what = {'tests': f'repair {s.repairs}', 'review': f'fix for review round {len(s.round_reasons)}',
+                    'uat': 'UAT send-back'}.get(s.fixing, 'build')
             return fail(ctx, f'the builder did not finish the {what} in {MAX_BUILD_ATTEMPTS} attempts')
         if s.fixing == 'tests':
             # Said here, not in Test, so a restart between the two still says it.
@@ -518,9 +527,10 @@ class Build(BaseNode[CardRun, Deps, str]):
         s.build_started = True
         save(ctx)  # saved before the builder starts, so a crash is seen on restart
         await say_once(ctx, f'Builder attempt {s.attempt} started.', marker('build-started', s, attempt=s.attempt))
-        why = {'tests': ', repairing failed tests', 'review': ', fixing review findings'}.get(s.fixing, '')
+        why = {'tests': ', repairing failed tests', 'review': ', fixing review findings',
+               'uat': ', fixing Todd\'s UAT feedback'}.get(s.fixing, '')
         await step(ctx, f'Building (attempt {s.attempt}{why})', f'Built (attempt {s.attempt}{why})', 'builder')
-        brief = builder_brief(card, s, listed(ctx)) + repair_part(s) + findings_part(s)
+        brief = builder_brief(card, s, listed(ctx)) + repair_part(s) + findings_part(s) + uat_feedback_part(s)
         try:
             result = await ctx.deps.builder(s, brief, ctx.deps.limits['builder'], lambda: moved(ctx))
         except Exception as error:  # a worker that cannot even start is a failed worker
@@ -603,6 +613,21 @@ working folder: change it, do not start again. Address every finding:
 </findings>
 
 Say in your final report how each finding was addressed.
+"""
+
+
+def uat_feedback_part(s: CardRun) -> str:
+    if s.fixing != 'uat' or not s.uat_reply:
+        return ''
+    return f"""
+## Todd sent this back from UAT
+
+Your earlier work is already committed at {s.repair_from}. Fix this sentence
+on top of that work, then report what changed:
+
+<uat-feedback>
+{s.uat_reply}
+</uat-feedback>
 """
 
 
@@ -979,10 +1004,14 @@ def result_text(s: CardRun, version: str) -> tuple[str, str]:
 
 @dataclass
 class Report(BaseNode[CardRun, Deps, str]):
-    async def run(self, ctx: GraphRunContext[CardRun, Deps]) -> End[str]:
+    async def run(self, ctx: GraphRunContext[CardRun, Deps]) -> Publish | End[str]:
         await post_review(ctx)  # a no-op unless a restart fell between saving a review and posting it
         text, outcome = result_text(ctx.state, ctx.deps.graph_version)
         await say_once(ctx, text, marker('result', ctx.state, commit=ctx.state.commit or 'none', outcome=outcome))
+        if outcome == 'passed' and ctx.deps.publish:
+            ctx.state.step = 'publish'
+            save(ctx)
+            return Publish()
         if not ctx.state.ending:
             ctx.state.ending = ('Finished: the tests passed and the review approved.' if outcome == 'passed'
                                 else 'Finished: the run failed. The result comment says why.')
@@ -1002,6 +1031,42 @@ class Report(BaseNode[CardRun, Deps, str]):
         return End(outcome)
 
 
+@dataclass
+class Publish(BaseNode[CardRun, Deps, str]):
+    async def run(self, ctx: GraphRunContext[CardRun, Deps]) -> End[str]:
+        s = ctx.state
+        card = await ctx.deps.linear.card(s.card)
+        if s.pr_url is None:
+            body = f'{s.card}: {card["title"]}\n\nReviewed candidate: {s.commit}\n\n' + (s.uat_plan or '')
+        else:
+            body = ''  # the same open PR receives the sent-back commit
+        s.pr_url = await ctx.deps.publish(s, f'{s.card}: {card["title"]}', body, s.pr_url)
+        save(ctx)  # before Linear changes, so a restart retains the open PR
+        if s.uat_waiting_at is None or (s.uat_reply_at and s.uat_reply_at >= s.uat_waiting_at):
+            s.uat_waiting_at = ctx.deps.now()
+            save(ctx)  # replies arriving as the card moves to UAT still count
+        await ctx.deps.linear.move(s.card, 'UAT')
+        await ctx.deps.linear.assign_to_todd(s.card)
+        if s.round_reasons:
+            review = (f'The review found {len(s.round_reasons)} round(s) of issues; the builder fixed them '
+                      f'and the final review approved: {s.review.summary}.')
+        else:
+            review = f'The independent review approved with no findings: {s.review.summary}.'
+        handoff = (f'**Ready for your UAT**\n\n'
+                   f'What changed: {(s.builder_report or "the candidate change is in the PR").strip()}\n\n'
+                   f'Review: {review}\n\n'
+                   f'Tests: {s.tests.summary}.\n\n'
+                   f'Pull request (open and unmerged): {s.pr_url}\n\n'
+                   f'Follow these steps:\n\n{s.uat_plan or "The card has no UAT steps."}\n\n'
+                   'Reply `Accepted` exactly, or send one sentence describing what needs fixing.')
+        await say_once(ctx, handoff, marker('uat-handoff', s, commit=s.commit))
+        s.ending = "Waiting for Todd's UAT reply. The builder is free for the next card."
+        s.step = 'uat'
+        save(ctx)
+        await show(ctx)
+        return End('waiting for UAT')
+
+
 def build_graph():
     g = GraphBuilder(state_type=CardRun, deps_type=Deps, output_type=str)
 
@@ -1017,6 +1082,7 @@ def build_graph():
         g.node(Test),
         g.node(Review),
         g.node(Report),
+        g.node(Publish),
     )
     return g.build()
 

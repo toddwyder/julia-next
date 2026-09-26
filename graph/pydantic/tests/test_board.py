@@ -17,7 +17,7 @@ from julia_graph import workers
 from julia_graph.board import CHECK_EVERY, Board, BoardLocked, serve, why_not
 from julia_graph.checkpoint import CardRun, Checkpoint, TestResult
 from julia_graph.graph import BuildResult, Deps, run_card
-from julia_graph.linear import ready_card
+from julia_graph.linear import TODD_ID, ready_card
 
 from .test_graph import Clock, Crash, approving_reviewer, sh
 
@@ -43,6 +43,7 @@ class PretendBoard:
         self.store: dict[str, tuple[str, str]] = {}  # comment id -> (card, body)
         self.edits: list[str] = []
         self.down = False
+        self.replies: dict[str, list[dict]] = {}
 
     def add(self, name, order, description=GOOD, labels=(), blockers=(), state='Ready'):
         self.cards[name] = {'state': state, 'sort_order': order, 'description': description,
@@ -63,6 +64,13 @@ class PretendBoard:
         await asyncio.sleep(0)  # a real call yields, so two checks can interleave
         return {'identifier': name, 'title': f'Card {name}', 'description': self.cards[name]['description'],
                 'comments': [{'id': i, 'body': b} for i, (card, b) in self.store.items() if card == name]}
+
+    async def watchdog_card(self, name):
+        return {'state': self.cards[name]['state'], 'comments': self.replies.get(name, [])}
+
+    def reply(self, name, body, at, user=TODD_ID):
+        self.replies.setdefault(name, []).append({'body': body, 'createdAt': at.isoformat(),
+                                                    'user': {'id': user}})
 
     async def comment(self, name, body, chosen_id=None):
         await asyncio.sleep(0)  # a real call yields, so two checks can interleave
@@ -112,6 +120,7 @@ class BoardTest(unittest.IsolatedAsyncioTestCase):
         self.on_prepare = None
         self.logged: list[str] = []
         self.boards: list[Board] = []
+        self.publisher = None
 
     async def asyncTearDown(self):
         for board in self.boards:
@@ -151,6 +160,7 @@ class BoardTest(unittest.IsolatedAsyncioTestCase):
             snapshot=workers.snapshot, restore=workers.restore, drift=workers.drift, diff=workers.change,
             install=lambda run: workers.clean_install(run, install=lambda wt: None),
             base_file=lambda run, path: 'role',
+            publish=self.publisher,
             worker_makers={'builder': 'Google', 'reviewer': 'DeepSeek'},
             graph_version='pydantic-graph test', log=lambda line: None, now=self.clock,
         )
@@ -170,6 +180,107 @@ class BoardTest(unittest.IsolatedAsyncioTestCase):
 
     def result(self, name) -> list[str]:
         return [b for b in self.linear.on(name) if 'graph: result' in b]
+
+    def enable_publisher(self):
+        self.published = []
+
+        async def publish(run, title, body, existing_url):
+            self.published.append((run.card, run.commit, existing_url))
+            return existing_url or f'https://github.com/toddwyder/julia-next/pull/{len(self.published)}'
+        self.publisher = publish
+
+    # ----------------------------------------------------------------- JUL-131: UAT handoff and reply
+
+    async def test_review_pass_opens_one_unmerged_pr_hands_off_and_frees_builder(self):
+        self.enable_publisher()
+        self.linear.add('JUL-1', 1)
+        self.linear.add('JUL-2', 2)
+        board = self.board()
+        self.assertEqual(await board.check(), 'started JUL-1')
+        await board.idle()
+        saved = Checkpoint(self.state_dir, 'JUL-1').load()
+        self.assertEqual(saved.step, 'uat')
+        self.assertEqual(self.linear.cards['JUL-1']['state'], 'UAT')
+        self.assertEqual(self.linear.cards['JUL-1']['assignee'], 'Todd Wyder')
+        self.assertEqual(self.published, [('JUL-1', saved.commit, None)])
+        self.assertTrue(saved.pr_url.endswith('/pull/1'))
+        [handoff] = [c for c in self.linear.on('JUL-1') if 'graph: uat-handoff' in c]
+        for detail in ('Added hello.txt', 'independent review approved', 'tests 3, pass 3',
+                       '1. Open the page and see hello.', saved.pr_url, 'open and unmerged'):
+            self.assertIn(detail, handoff)
+        self.assertIsNone(board.reserved())
+        self.assertEqual(await board.check(), 'started JUL-2')
+        await board.idle()
+        self.assertEqual(self.built, ['JUL-1', 'JUL-2'])
+
+    async def test_exact_latest_todd_accepted_is_saved_and_waits_for_release_only(self):
+        self.enable_publisher()
+        self.linear.add('JUL-1', 1)
+        board = self.board()
+        await board.check()
+        await board.idle()
+        self.clock.advance(60)
+        self.linear.reply('JUL-1', 'Accepted', self.clock(), user='another-user')
+        self.assertEqual(await board.check(), 'nothing to start')
+        self.assertEqual(Checkpoint(self.state_dir, 'JUL-1').load().step, 'uat')
+        self.clock.advance(60)
+        self.linear.reply('JUL-1', 'Accepted', self.clock())
+        self.assertEqual(await board.check(), 'nothing to start')
+        saved = Checkpoint(self.state_dir, 'JUL-1').load()
+        self.assertEqual((saved.step, saved.uat_reply, saved.uat_reply_at),
+                         ('release_wait', 'Accepted', self.clock()))
+        self.assertIn('Waiting for the release step.', next(c for c in self.linear.on('JUL-1') if 'graph: status' in c))
+        self.assertEqual(self.linear.cards['JUL-1']['state'], 'UAT')
+        self.assertEqual(len(self.published), 1)  # no release or merge call
+
+    async def test_one_sentence_send_back_reaches_builder_and_updates_same_open_pr(self):
+        self.enable_publisher()
+        self.linear.add('JUL-1', 1)
+        async def changed(run, brief, limit, progress):
+            if len(self.built) == 2:
+                self.assertIsNone(run.review)
+                self.assertIsNone(run.tests)
+                self.assertEqual(run.round_reasons, [])
+                self.assertEqual(run.repairs, 0)
+            (Path(run.worktree) / 'hello.txt').write_text(f'hello {len(self.built)}\n')
+            return BuildResult(True, report='Adjusted hello.txt')
+        self.builder = changed
+        board = self.board()
+        await board.check()
+        await board.idle()
+        checkpoint = Checkpoint(self.state_dir, 'JUL-1')
+        previous = checkpoint.load()
+        first_url = previous.pr_url
+        previous.round_reasons = ['an earlier review finding']
+        previous.repairs = 2
+        checkpoint.save(previous)
+        self.clock.advance(60)
+        self.linear.reply('JUL-1', 'Accepted', self.clock())  # the latest Todd reply wins
+        self.clock.advance(1)
+        feedback = 'The greeting needs a full stop.'
+        self.linear.reply('JUL-1', feedback, self.clock())
+        self.assertEqual(await board.check(), 'started JUL-1')
+        await board.idle()
+        saved = Checkpoint(self.state_dir, 'JUL-1').load()
+        self.assertEqual((saved.uat_reply, saved.uat_reply_at), (feedback, self.clock()))
+        self.assertIn(feedback, self.briefs['JUL-1'])
+        self.assertEqual(saved.step, 'uat')
+        self.assertEqual(saved.pr_url, first_url)
+        self.assertEqual([url for _, _, url in self.published], [None, first_url])
+
+    async def test_sent_back_card_runs_before_a_new_ready_card(self):
+        self.enable_publisher()
+        self.linear.add('JUL-1', 1)
+        board = self.board()
+        await board.check()
+        await board.idle()
+        self.linear.add('JUL-2', 2)
+        self.clock.advance(60)
+        self.linear.reply('JUL-1', 'The greeting needs a full stop.', self.clock())
+        self.assertEqual(await board.check(), 'started JUL-1')
+        await board.idle()
+        self.assertEqual(self.built[:2], ['JUL-1', 'JUL-1'])
+        self.assertEqual(await board.check(), 'started JUL-2')
 
     # ----------------------------------------------------------------- 1. Ready starts the card
 

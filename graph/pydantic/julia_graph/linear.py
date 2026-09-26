@@ -65,13 +65,13 @@ WATCH_CARD_QUERY = """query WatchCard($id: String!) {
     id identifier description state { name } assignee { id }
     labels { nodes { name } }
     inverseRelations(first: 250) { nodes { type issue { identifier state { name type } } } }
-    comments(first: 250) { nodes { body createdAt } pageInfo { hasNextPage endCursor } }
+    comments(first: 250) { nodes { id body createdAt user { id } } pageInfo { hasNextPage endCursor } }
   }
 }"""
 WATCH_COMMENTS_QUERY = """query WatchComments($id: String!, $after: String) {
   issue(id: $id) {
     comments(first: 250, after: $after) {
-      nodes { body createdAt }
+      nodes { id body createdAt user { id } }
       pageInfo { hasNextPage endCursor }
     }
   }
