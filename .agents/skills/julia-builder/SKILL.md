@@ -18,7 +18,8 @@ report in your final output.
 
 Build the one step you were given, in your own worktree, test-first, and commit it locally.
 That is the whole job. You do not move the card, you do not publish, and you do not decide
-whether the work is accepted.
+whether the work is accepted. A **split-step brief** (below) gives you half a step instead; its
+own contract (below) replaces this file's rules where they differ.
 
 ## Inputs
 
@@ -29,7 +30,8 @@ whether the work is accepted.
    tickets to a change. Follow it. Invoke `/implement` at the start.
 3. **`.agents/skills/tdd/SKILL.md`** — red, green, refactor. Follow it. A test is written before the
    code it pins, and you see it fail for the right reason before you make it pass. Invoke `/tdd`
-   at the start.
+   at the start. A brief cannot switch this off; a worker that cannot run commands gets
+   split-step briefs instead (below).
 4. **`.agents/skills/code-review/SKILL.md`** — review your work along Standards and Spec axes.
    Invoke `/code-review` on your own work before handing in, and fix what it finds.
 5. **The repo's own standing instructions** — `CLAUDE.md`, `CONTEXT.md`, `docs/adr/`, and
@@ -77,6 +79,30 @@ If any of these checks fail, stop and say so immediately in your final output as
 - **Done at the end.** When all work is committed and verified, report in your final output with
   `outcome: "done"`.
 
+## Split-step briefs
+
+When a coordinator runs a card by hand (`docs/agents/work-execution.md`) with a worker that
+cannot run commands, it splits each test-driven slice into two briefs and runs the tests itself
+between them. The graph does not send these briefs. The brief says which step it is:
+
+- **Test step:** write the one behaviour test the brief names, in test files only.
+- **Implementation step:** write the minimal code that makes the named test pass, in non-test
+  files only.
+
+In a split step you only edit files, and the coordinator does everything that needs a command:
+committing, the red and green runs, the full suite, the guard check, the review, and the
+acceptance and UAT answers. So in a split step:
+
+- **Preflight** is only: the brief names its step and its test, and the named skill files exist.
+- **Execution:** read `/tdd`'s files and follow them; the command-based items (self-review,
+  mutation check, "done at the end" once verified) are the coordinator's.
+- **The named test failing is expected** in an implementation step: that is the red you are
+  there to turn green, not a reason to stop and escalate.
+- **Report** `{"outcome":"done","summary":"<each file you changed and why>"}` or
+  `{"outcome":"blocked","summary":"<why>"}`.
+
+Any other brief is a whole step, done as the rest of this file describes.
+
 ## Boundaries
 
 - **Never push, never open a pull request, never merge.** The publisher does that, run by the
@@ -108,7 +134,7 @@ Stop, escalate, and wait — do not improvise around any of these:
 
 ## Output contract
 
-In the `summary` of your final output:
+For a whole step, in the `summary` of your final output:
 
 - The branch name and the commit sha.
 - The exact pass and fail counts from the full test run, and the command that produced them.
@@ -133,7 +159,7 @@ The controller verifies the work itself; the worker's own word never counts:
 
 ### When you report
 
-When you finish, give one report saying either that you're done (with a summary, evidence for each acceptance criterion, and a plain line for each UAT item) or that you're blocked and why. Report once, at the end of your run, in your final output: a single JSON object, either `{"outcome":"done","summary":"<branch, commit sha, test counts with command, one line per criterion and per finding fixed, gaps>","acceptance":[{"id":"AC1","criterion":"<exact words>","evidence":"<evidence and its source>"}, ...],"uat":[{"id":"UAT1","text":"<plain English for Todd>"}, ...]}` or `{"outcome":"blocked","summary":"<why you stopped>"}`. Include every field the graph reads: top-level `"outcome"` and `"summary"`, `"acceptance"` (entries with `"id"`, `"criterion"`, and `"evidence"`), and `"uat"` (entries with `"id"` and `"text"` for Todd). The worker's final output is the report. A worker is stuck only when it passes its time limit, which the operating system enforces.
+For a whole step, when you finish, give one report saying either that you're done (with a summary, evidence for each acceptance criterion, and a plain line for each UAT item) or that you're blocked and why. Report once, at the end of your run, in your final output: a single JSON object, either `{"outcome":"done","summary":"<branch, commit sha, test counts with command, one line per criterion and per finding fixed, gaps>","acceptance":[{"id":"AC1","criterion":"<exact words>","evidence":"<evidence and its source>"}, ...],"uat":[{"id":"UAT1","text":"<plain English for Todd>"}, ...]}` or `{"outcome":"blocked","summary":"<why you stopped>"}`. Include every field the graph reads: top-level `"outcome"` and `"summary"`, `"acceptance"` (entries with `"id"`, `"criterion"`, and `"evidence"`), and `"uat"` (entries with `"id"` and `"text"` for Todd). The worker's final output is the report. A worker is stuck only when it passes its time limit, which the operating system enforces.
 
 ### Cleanup
 
