@@ -21,7 +21,13 @@ TOKEN_URL = 'https://api.linear.app/oauth/token'
 API_URL = 'https://api.linear.app/graphql'
 
 CARD_QUERY = """query Card($id: String!) {
-  issue(id: $id) { id identifier title description comments(first: 250) { nodes { id body createdAt } } }
+  issue(id: $id) { id identifier title description labels { nodes { name } }
+    comments(first: 250) { nodes { id body createdAt } } }
+}"""
+SETTINGS_QUERY = """query Settings($team: String!) {
+  issues(filter: { team: { name: { eq: $team } }, labels: { name: { eq: "graph-settings" } } }, first: 2) {
+    nodes { identifier description labels { nodes { name } } }
+  }
 }"""
 COMMENT = """mutation Comment($issueId: String!, $body: String!) {
   commentCreate(input: { issueId: $issueId, body: $body }) { success comment { id } }
@@ -183,7 +189,16 @@ class LinearApp:
         self._ids[card] = issue['id']
         comments = sorted(issue['comments']['nodes'], key=lambda c: c['createdAt'])
         return {'identifier': issue['identifier'], 'title': issue['title'], 'description': issue['description'] or '',
+                'labels': [label['name'] for label in issue['labels']['nodes']],
                 'comments': [{'id': c['id'], 'body': c['body']} for c in comments]}
+
+    async def settings(self) -> dict:
+        nodes = (await asyncio.to_thread(self._call, SETTINGS_QUERY, {'team': TEAM}))['issues']['nodes']
+        if len(nodes) != 1:
+            raise RuntimeError(f'expected one Graph Settings card in Linear, found {len(nodes)}')
+        issue = nodes[0]
+        return {'description': issue['description'] or '',
+                'labels': [label['name'] for label in issue['labels']['nodes']]}
 
     async def ready_cards(self) -> list[dict]:
         cards, after, seen = [], None, set()

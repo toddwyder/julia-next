@@ -48,7 +48,7 @@ export function allowListProblem(settingsText) {
 // outside it and any command stay refused (measured on the server, 24 Sep).
 // --print-timeout 0, as run-agy-seat passes: without it agy ends a headless
 // turn after five minutes (three live JUL-123 turns cut off at 5:02, 24 Sep).
-export const agyArgs = (prompt, worktree, model = GEMINI_MODEL) => ['--add-dir', worktree, '--mode', 'accept-edits', '--model', model, '--effort', 'high', '--print-timeout', '0', '--output-format', 'stream-json', '--disable-slash-commands', '--print', `Your working folder is ${worktree}.\n\n${prompt}`];
+export const agyArgs = (prompt, worktree, model = GEMINI_MODEL, effort = 'medium') => ['--add-dir', worktree, '--mode', 'accept-edits', '--model', model, '--effort', effort, '--print-timeout', '0', '--output-format', 'stream-json', '--disable-slash-commands', '--print', `Your working folder is ${worktree}.\n\n${prompt}`];
 
 // agy writes new files 0644 and folders 0755 whatever the umask (live JUL-123
 // run, 24 Sep), so the runner could not commit, switch or clean them. After
@@ -75,7 +75,7 @@ function settingsProblem(home) {
 }
 
 function main() {
-  const { worktree, prompt, limit_seconds, model = GEMINI_MODEL } = JSON.parse(readFileSync(0, 'utf8'));
+  const { worktree, prompt, limit_seconds, model = GEMINI_MODEL, effort = 'medium' } = JSON.parse(readFileSync(0, 'utf8'));
   const home = homedir();
   const problem = worktreeProblem(worktree) ?? settingsProblem(home);
   if (problem || typeof prompt !== 'string' || model !== GEMINI_MODEL) {
@@ -86,7 +86,7 @@ function main() {
   // them and switch commits afterwards.
   process.umask(0o002);
   const seconds = limitSeconds(limit_seconds, LIMITS.builder);
-  runLimited(join(home, '.local', 'bin', 'agy'), agyArgs(prompt, worktree, model), {
+  runLimited(join(home, '.local', 'bin', 'agy'), agyArgs(prompt, worktree, model, effort), {
     cwd: worktree,
     env: { HOME: home, USER: 'gemini-worker', PATH: `${home}/.local/bin:/usr/bin:/bin`, LANG: 'C.UTF-8' },
     stdio: ['ignore', 'inherit', 'inherit'],

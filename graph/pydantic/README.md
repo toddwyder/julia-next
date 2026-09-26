@@ -36,13 +36,16 @@ Checked against the installed `pydantic-graph==2.49.0` (the pin is in `requireme
 ## The workers
 
 The graph runs as `orchestrator-svc` and reuses the minimal runner's server setup
-(`ops/julia-runner/README.md`). Select models with `--builder-model` and
-`--reviewer-model`, using labels from `MODEL_CATALOG`. The resolver rejects an
-unknown label, a pair from one model maker, or a model without an installed graph
-launcher. `builder-codex` runs under `runner`; `adversary-gemini-flash` runs under
+(`ops/julia-runner/README.md`). The one Linear card labeled `graph-settings`
+sets the builder and reviewer model and effort defaults. A work card's own
+model or effort label overrides that value. Missing effort is medium. The
+description on either card can set `Builder backups: label, label` and
+`Reviewer backups: label, label`; a work card's line overrides the Settings
+line. A quota response uses the current lines in Linear and records the switch
+on the work card. The resolver refuses a pair from one maker and skips illegal
+backups. `builder-codex` runs under `runner`; `adversary-gemini-flash` runs under
 `gemini-worker` in a read-only transient service. The test worker runs as
-`julia-tester`. The graph commits the builder's changes and records the selected
-labels in its checkpoint, so a resumed card cannot silently switch models.
+`julia-tester`.
 
 ## Install and run on the server
 

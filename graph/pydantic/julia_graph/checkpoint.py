@@ -78,6 +78,10 @@ class CardRun(BaseModel):
     # Selected through MODEL_CATALOG and pinned for every resumed attempt.
     builder_model: str | None = None
     reviewer_model: str | None = None
+    builder_effort: str = 'medium'
+    reviewer_effort: str = 'medium'
+    exhausted_builder: list[str] = []
+    exhausted_reviewer: list[str] = []
     step: Step = 'prepare'
     # True once a builder has been started for the current attempt. A restart
     # that finds it still set knows the builder never finished.

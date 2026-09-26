@@ -22,13 +22,12 @@ from .board import Board, BoardLocked, serve
 from .checkpoint import CardLocked, CardRun, Checkpoint
 from .graph import LIMIT_CAPS, LIMITS, Deps, checked_limit, run_card
 from .linear import LinearApp
+from .model_choice import effective, next_pair
 
 REPO = '/srv/julia-runner/repo'
 WORKTREES = '/srv/julia-runner/worktrees'
 STATE = '/srv/julia-runner/graph-state'
 WAIT_LIMIT_SECONDS = 45 * 60
-DEFAULT_BUILDER_MODEL = 'builder-gemini-flash'
-DEFAULT_REVIEWER_MODEL = 'adversary-deepseek-pro'
 
 
 def log(line: str) -> None:
@@ -41,29 +40,65 @@ def graph_version() -> str:
     return f"pydantic-graph {importlib.metadata.version('pydantic-graph')}, graph code `{code or 'unknown'}`"
 
 
-def card_deps(card: str, limits: dict[str, int] | None = None,
-              builder_model: str | None = None, reviewer_model: str | None = None) -> Deps:
-    # The saved selection belongs to the card. The board can resume a hand-run
-    # card without silently replacing its models with service defaults.
+def card_deps(card: str, limits: dict[str, int] | None = None) -> Deps:
     checkpoint = Checkpoint(Path(STATE), card)
-    saved = checkpoint.load() if builder_model is None or reviewer_model is None else None
-    builder_model = builder_model or (saved.builder_model if saved else None) or DEFAULT_BUILDER_MODEL
-    reviewer_model = reviewer_model or (saved.reviewer_model if saved else None) or DEFAULT_REVIEWER_MODEL
-    pair = workers.resolve_pair(builder_model, reviewer_model)
-    return Deps(
-        linear=LinearApp(), checkpoint=checkpoint,
+    pair = {}  # filled from Linear before the first graph node or worker starts
+    linear = LinearApp()
+    deps = Deps(
+        linear=linear, checkpoint=checkpoint,
         prepare=workers.prepare(REPO), builder=workers.builder(log, pair), discard=workers.discard,
         commit=workers.commit, tester=workers.tester, reviewer=workers.reviewer(log, pair),
         live_workers=workers.live_workers, wait_for_exit=workers.waiter(WAIT_LIMIT_SECONDS),
         snapshot=workers.snapshot, restore=workers.restore, drift=workers.drift, diff=workers.change,
         install=workers.clean_install,
         base_file=workers.base_file,
-        graph_version=graph_version(), log=log, worker_names=workers.worker_names(pair),
-        worker_makers=workers.worker_makers(pair),
-        worker_models={'reviewer': pair['reviewer']['model']},
-        model_labels=(builder_model, reviewer_model),
+        graph_version=graph_version(), log=log,
         limits=limits or dict(LIMITS), files=workers.tracked_files,
     )
+
+    async def select_models(run: CardRun, quota_role: str | None) -> str | None:
+        try:
+            choices = effective(await linear.settings(), await linear.card(run.card))
+            if quota_role is None:
+                builder = run.builder_model or choices['builder']['model']
+                reviewer = run.reviewer_model or choices['reviewer']['model']
+                try:
+                    selected = workers.resolve_pair(builder, reviewer)
+                except ValueError:
+                    current = {'builder': builder, 'reviewer': reviewer}
+                    exhausted = {'builder': run.exhausted_builder, 'reviewer': run.exhausted_reviewer}
+                    selected = (next_pair(choices, current, exhausted, 'builder', workers.resolve_pair)
+                                or next_pair(choices, current, exhausted, 'reviewer', workers.resolve_pair))
+                    if selected is None:
+                        return 'No legal builder and reviewer pair remains in this card\'s current choices and backups.'
+            else:
+                current = getattr(run, f'{quota_role}_model')
+                exhausted = getattr(run, f'exhausted_{quota_role}')
+                if current not in exhausted:
+                    exhausted.append(current)
+                other = 'reviewer' if quota_role == 'builder' else 'builder'
+                selected = next_pair(choices, {'builder': run.builder_model, 'reviewer': run.reviewer_model},
+                                     {'builder': run.exhausted_builder, 'reviewer': run.exhausted_reviewer},
+                                     quota_role, workers.resolve_pair)
+                if selected is None:
+                    return f'{quota_role} model {current} hit its quota. No legal builder and reviewer pair remains in this card\'s current backup lists.'
+                if getattr(run, f'{other}_model') != selected[other]['label']:
+                    await linear.comment(run.card, f'{other.title()} moved from {getattr(run, f"{other}_model")} to '
+                                         f'{selected[other]["label"]} so builder and reviewer have different makers.')
+            run.builder_model, run.reviewer_model = selected['builder']['label'], selected['reviewer']['label']
+            run.builder_effort, run.reviewer_effort = choices['builder']['effort'], choices['reviewer']['effort']
+            pair.update(selected)
+            deps.worker_names = workers.worker_names(pair)
+            deps.worker_makers = workers.worker_makers(pair)
+            deps.worker_models = {'reviewer': pair['reviewer']['model']}
+            checkpoint.save(run)
+            return None
+        except (ValueError, RuntimeError) as error:
+            return f'models could not be selected from Linear: {error}'
+
+    deps.select_models = select_models
+    deps.model_labels = None
+    return deps
 
 
 async def fresh_main() -> str:
@@ -102,18 +137,13 @@ def main(argv: list[str]) -> int:
     for kind in ('builder', 'tests', 'reviewer'):
         parser.add_argument(f'--{kind}-limit', type=lambda text, kind=kind: checked_limit(kind, text), default=LIMITS[kind],
                             help=f'seconds, 1 to {LIMIT_CAPS[kind]} (default %(default)s)')
-    # Hand runs choose both models by the same labels the model catalog uses.
-    # The service retains its current defaults until it is deliberately updated.
-    parser.add_argument('--builder-model')
-    parser.add_argument('--reviewer-model')
     args = parser.parse_args(argv)
     os.umask(0o002)  # the builder account shares the working copy through its group
     number = args.card.split('-')[-1]
     Path(STATE).mkdir(exist_ok=True)
     state = CardRun(card=args.card, base=workers.git(REPO, 'rev-parse', '--verify', f'{args.base}^{{commit}}'),
                     branch=f'graph/card-{number}', worktree=f'{WORKTREES}/card-{number}')
-    deps = card_deps(args.card, {'builder': args.builder_limit, 'tests': args.tests_limit, 'reviewer': args.reviewer_limit},
-                     args.builder_model, args.reviewer_model)
+    deps = card_deps(args.card, {'builder': args.builder_limit, 'tests': args.tests_limit, 'reviewer': args.reviewer_limit})
     log(f'{args.card}: {deps.graph_version}')
     try:
         outcome = asyncio.run(run_card(state, deps))

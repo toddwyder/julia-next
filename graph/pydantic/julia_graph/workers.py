@@ -257,7 +257,8 @@ def codex_builder_outcome(status: int | None, stdout: str, stderr: str) -> Build
 def builder(log, pair: dict):
     async def build(run: CardRun, brief: str, limit_seconds: int, progress) -> BuildResult:
         choice = pair['builder']
-        request = {'worktree': run.worktree, 'prompt': brief, 'limit_seconds': limit_seconds, 'model': choice['model']}
+        request = {'worktree': run.worktree, 'prompt': brief, 'limit_seconds': limit_seconds,
+                   'model': choice['model'], 'effort': run.builder_effort}
         if choice['entry'] == 'codex':
             request['builder'] = 'codex'
         status, out, err = await run_worker('builder', request, line_handler(log, progress), choice=choice)
@@ -391,7 +392,8 @@ def reviewer(log, pair: dict):
                 await progress()
         choice = pair['reviewer']
         which = 'deepseek' if choice['entry'] == 'pi-deepseek' else choice['entry']
-        request = {'reviewer': which, 'model': choice['model'], 'prompt': brief, 'limit_seconds': limit_seconds}
+        request = {'reviewer': which, 'model': choice['model'], 'prompt': brief,
+                   'limit_seconds': limit_seconds, 'effort': run.reviewer_effort}
         status, out, err = await run_worker('reviewer', request, on_line, cwd='/', choice=choice, limit_seconds=limit_seconds + 60)
         result = reviewer_outcome(status, out, err)
         log(f'reviewer {which}: exit {status}, model {result.model}, '

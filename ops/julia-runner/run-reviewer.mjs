@@ -54,11 +54,11 @@ const ENV = { HOME: homedir(), PATH: process.env.PATH || '/usr/bin:/bin', LANG: 
 
 // How each reviewer is started: always read-only, always from /.
 export const REVIEWERS = {
-  codex: (_prompt, _worktree, selectedModel = CODEX_MODEL) => {
+  codex: (_prompt, _worktree, selectedModel = CODEX_MODEL, effort = 'medium') => {
     if (selectedModel !== CODEX_MODEL) throw new Error(`Codex reviewer model ${selectedModel} is not installed`);
     return {
     command: 'codex',
-    args: ['exec', '-m', CODEX_MODEL, '-c', 'model_reasoning_effort=high', '-s', 'read-only', '--skip-git-repo-check', '--json', '-'],
+    args: ['exec', '-m', CODEX_MODEL, '-c', `model_reasoning_effort=${effort}`, '-s', 'read-only', '--skip-git-repo-check', '--json', '-'],
     env: ENV,
     stdin: true,
     kind: 'codex',
@@ -66,16 +66,16 @@ export const REVIEWERS = {
   },
   // DeepSeek V4 Pro through the reviewer seat's own settings (run-pi-seat.mjs
   // SEATS['reviewer-backup']): its key reaches Pi's environment only.
-  deepseek: (prompt, _worktree, selectedModel = 'deepseek-v4-pro') => {
+  deepseek: (prompt, _worktree, selectedModel = 'deepseek-v4-pro', effort = 'medium') => {
     if (selectedModel !== 'deepseek-v4-pro') throw new Error(`DeepSeek reviewer model ${selectedModel} is not installed`);
-    const spec = buildPiSpawnSpec('reviewer-backup', prompt, { mode: 'json', effort: 'high' });
+    const spec = buildPiSpawnSpec('reviewer-backup', prompt, { mode: 'json', effort });
     return { command: spec.command, args: spec.args, env: { ...ENV, ...pickKey(spec.env) }, stdin: false, kind: 'pi' };
   },
-  gemini: (_prompt, _worktree, selectedModel = GEMINI_MODEL) => {
+  gemini: (_prompt, _worktree, selectedModel = GEMINI_MODEL, effort = 'medium') => {
     if (selectedModel !== GEMINI_MODEL) throw new Error(`Gemini reviewer model ${selectedModel} is not installed`);
     return {
       command: join(homedir(), '.local', 'bin', 'agy'),
-      args: ['--model', selectedModel, '--effort', 'high', '--print-timeout', '0', '--input-format', 'stream-json',
+      args: ['--model', selectedModel, '--effort', effort, '--print-timeout', '0', '--input-format', 'stream-json',
         '--output-format', 'stream-json', '--disable-slash-commands'],
       env: { ...ENV, USER: 'gemini-worker' }, stdin: true, streamPrompt: true, kind: 'gemini', readOnly: true,
     };
@@ -85,11 +85,11 @@ export const REVIEWERS = {
 // The graph selects the model through MODEL_CATALOG before calling this
 // account-specific launcher. A builder gets write access only to its card copy.
 export const BUILDERS = {
-  codex: (_prompt, worktree, selectedModel = CODEX_MODEL) => {
+  codex: (_prompt, worktree, selectedModel = CODEX_MODEL, effort = 'medium') => {
     if (selectedModel !== CODEX_MODEL) throw new Error(`Codex builder model ${selectedModel} is not installed`);
     return {
     command: 'codex',
-    args: ['exec', '-m', CODEX_MODEL, '-c', 'model_reasoning_effort=high', '-s', 'workspace-write', '-C', worktree, '--json', '-'],
+    args: ['exec', '-m', CODEX_MODEL, '-c', `model_reasoning_effort=${effort}`, '-s', 'workspace-write', '-C', worktree, '--json', '-'],
     env: ENV, stdin: true, kind: 'codex',
     };
   },
@@ -294,7 +294,7 @@ export async function review(request, {
   const seconds = limitSeconds(request.limit_seconds, role === 'builder' ? BUILDER_LIMIT : LIMIT);
   let spec;
   try {
-    spec = table[which](request.prompt, request.worktree, request.model);
+    spec = table[which](request.prompt, request.worktree, request.model, request.effort ?? 'medium');
   } catch (error) {
     return { status: 'failed', error: `refused: ${error.message}` };
   }
