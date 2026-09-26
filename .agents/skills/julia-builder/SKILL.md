@@ -19,7 +19,7 @@ report in your final output.
 Build the one step you were given, in your own worktree, test-first, and commit it locally.
 That is the whole job. You do not move the card, you do not publish, and you do not decide
 whether the work is accepted. A **split-step brief** (below) gives you half a step instead; its
-own contract replaces the committing, checking and reporting rules in this file.
+own contract (below) replaces this file's rules where they differ.
 
 ## Inputs
 
@@ -81,7 +81,7 @@ If any of these checks fail, stop and say so immediately in your final output as
 
 ## Split-step briefs
 
-When a coordinator runs a card by hand (`docs/agents/build-and-review.md`) with a worker that
+When a coordinator runs a card by hand (`docs/agents/work-execution.md`) with a worker that
 cannot run commands, it splits each test-driven slice into two briefs and runs the tests itself
 between them. The graph does not send these briefs. The brief says which step it is:
 
@@ -89,12 +89,19 @@ between them. The graph does not send these briefs. The brief says which step it
 - **Implementation step:** write the minimal code that makes the named test pass, in non-test
   files only.
 
-In a split step you only edit files. The coordinator commits your edit and produces all the
-evidence that needs commands: the red and green runs, the full suite, the guard check, the
-review, the commit sha and the acceptance and UAT answers. Your final output is
-`{"outcome":"done","summary":"<each file you changed and why>"}` or
-`{"outcome":"blocked","summary":"<why>"}`, and the Output contract and "When you report" below
-do not apply. Any other brief is a whole step, done as the rest of this file describes.
+In a split step you only edit files, and the coordinator does everything that needs a command:
+committing, the red and green runs, the full suite, the guard check, the review, and the
+acceptance and UAT answers. So in a split step:
+
+- **Preflight** is only: the brief names its step and its test, and the named skill files exist.
+- **Execution:** read `/tdd`'s files and follow them; the command-based items (self-review,
+  mutation check, "done at the end" once verified) are the coordinator's.
+- **The named test failing is expected** in an implementation step: that is the red you are
+  there to turn green, not a reason to stop and escalate.
+- **Report** `{"outcome":"done","summary":"<each file you changed and why>"}` or
+  `{"outcome":"blocked","summary":"<why>"}`.
+
+Any other brief is a whole step, done as the rest of this file describes.
 
 ## Boundaries
 
@@ -127,7 +134,7 @@ Stop, escalate, and wait — do not improvise around any of these:
 
 ## Output contract
 
-For a whole step (a split step reports as above), in the `summary` of your final output:
+For a whole step, in the `summary` of your final output:
 
 - The branch name and the commit sha.
 - The exact pass and fail counts from the full test run, and the command that produced them.
