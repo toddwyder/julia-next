@@ -7,13 +7,20 @@ on:
 
 jobs:
   checks:
-    runs-on: ubuntu-latest
+    # JUL-183: hosted Actions is billing-blocked. Keep trial jobs on its
+    # dedicated OVH account, and accept only same-repository publisher PRs.
+    if: github.event_name == 'push' || (github.event.pull_request.head.repo.full_name == github.repository && contains(fromJSON('["julia-graph-publisher[bot]", "julia-factory-todd-wyder[bot]"]'), github.event.pull_request.user.login))
+    runs-on: [self-hosted, Linux, X64, julia-factory-trial]
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22.23.2
 
       - name: Syntax-check all scripts
         run: |
@@ -71,5 +78,17 @@ jobs:
           fi
           echo "OK: example env file holds only placeholder values"
 
+      - name: Install pinned graph test dependencies
+        run: |
+          python3 -m venv "$RUNNER_TEMP/graph-venv"
+          "$RUNNER_TEMP/graph-venv/bin/python" -m pip install -r graph/pydantic/requirements.txt
+          echo "$RUNNER_TEMP/graph-venv/bin" >> "$GITHUB_PATH"
+
       - name: Run scripts/ unit tests
         run: node --test scripts/*.test.mjs
+
+      - run: npm ci
+      - run: npx playwright install chromium
+      - run: npx playwright test
+      - run: npm run lint:framework
+      - run: npm run build

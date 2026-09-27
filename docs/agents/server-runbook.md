@@ -14,6 +14,110 @@ and evidence trail; this file owns the verified operating procedure only.
 
 ---
 
+## Mastra Factory JUL-183 trial (verified 2026-09-27)
+
+Factory runs as the dedicated `julia-factory` service account from
+`/var/lib/julia-factory/app` under `julia-factory-trial.service`, bound to
+`127.0.0.1:4111` behind the existing Tailscale HTTPS Funnel, with WorkOS
+login protection. The root-owned,
+mode-600 `/etc/julia-factory/factory.env` holds service configuration; never
+put credential values here. The installed versions are pinned: Factory 0.17.2,
+`@mastra/auth-workos` 1.6.5, core 1.71.0 and SDK 1.8.3. Do not upgrade them
+for this trial.
+
+Version- and hash-guarded, removable install patches make cookie
+`authenticateToken` infer an organization only for exactly one ACTIVE
+membership (as `getCurrentUser` does), preserving an explicit organization,
+and deduplicate mirrored skill roots via the canonical
+`.agents/skills`. Repeat application after install is idempotent. Individual
+install, check, build and app/output identity checks passed; the *full clean-
+install wrapper was not rerun* while workers were active. The upstream Mastra
+defect is [#25252](https://github.com/mastra-ai/mastra/issues/25252).
+
+Fresh and resource-addressed GPT-6 Sol sessions hydrate observer settings;
+no permanent memory-library patch is installed. A temporary 3k-token probe
+caused a recall loop; the personal threshold was restored to 30k, while
+the factory-wide threshold was already 30k. Native `forked: true` subagents
+inherit an authenticated GPT-6 Sol parent's context; non-forked model overrides do not inherit that
+login. The normal Git identity is the verified Factory App bot, not Todd;
+the Factory App is restricted to `julia-next` and has Workflows write permission.
+
+The protected evidence gate `/var/lib/julia-factory/evidence/jul183`
+rejects missing or wrong-candidate proof. No graph implementation was changed
+for this trial. For Factory installation and removal, see
+[Factory installation](../../ops/factory/README.md).
+
+### OVH trial CI runner (verified 2026-09-27)
+
+GitHub-hosted Actions were blocked by account billing, although Vercel
+succeeded. The isolated self-hosted runner is registered to **only**
+`toddwyder/julia-next`: system account `julia-trial-ci` has no login shell or
+sudo access; runner name `ovh-julia-factory-trial`, custom label
+`julia-factory-trial`, and service
+`actions.runner.toddwyder-julia-next.ovh-julia-factory-trial.service`. GitHub
+Settings > Actions > Runners supplied the Linux x64 runner **2.337.0** archive
+and SHA-256
+`70920811a4f8ad4328818682bca5c6469c1c942fab52448868071d0063816613`.
+Verify the downloaded archive against that hash **before** extracting it into
+`/var/lib/julia-trial-ci/runner`; obtain the short-lived registration token
+from the same Settings page, never from this repository. Live inspection
+shows `/var/lib/julia-trial-ci` mode **750** and its `runner` directory mode
+**755**, owned by `julia-trial-ci`.
+
+As `julia-trial-ci`, verify the downloaded archive and extract it only after
+`sha256sum` succeeds. Run `config.sh` from the runner directory using the
+short-lived token from Settings; then run `svc.sh` as root from that same
+directory (the runner account has no sudo access):
+
+```sh
+# As julia-trial-ci, after downloading the Linux x64 2.337.0 archive:
+archive=/path/to/downloaded/runner-archive.tar.gz
+printf '%s  %s\n' '70920811a4f8ad4328818682bca5c6469c1c942fab52448868071d0063816613' "$archive" | sha256sum --check -
+tar -xzf "$archive" -C /var/lib/julia-trial-ci/runner
+cd /var/lib/julia-trial-ci/runner
+./config.sh --unattended --url https://github.com/toddwyder/julia-next \
+  --token "$REGISTRATION_TOKEN" --name ovh-julia-factory-trial \
+  --labels julia-factory-trial
+# As root, from the same directory:
+./svc.sh install julia-trial-ci
+./svc.sh start
+```
+
+The active service has `User=julia-trial-ci` and this systemd drop-in (verify
+these settings after any reinstall):
+
+```ini
+[Service]
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/julia-trial-ci
+UMask=0077
+```
+
+The runner has separate credential access from Factory: live
+`sudo -u julia-trial-ci test -r` checks reject both
+`/etc/julia-factory/factory.env` and the protected evidence manifest. CI uses
+Node 22.23.2 and runs Chromium, framework lint and the production build. It
+creates a job-local Python venv, installs pinned graph dependencies from
+`graph/pydantic/requirements.txt`, then runs **all** `scripts/*.test.mjs`,
+including the graph execution suite, on every change. CI accepts
+same-repository PRs from the two approved publisher Apps or pushes to main;
+the publisher check rejects personal PR authors without checking out branch
+code. Exact candidate `324bbf40cc6d8be60750c0754b0573b9d4b4b249`
+passed CI run `36329389576`.
+
+When hosted jobs work again, restore the workflow runner labels; stop and
+uninstall the service with `./svc.sh stop` and `./svc.sh uninstall`, remove the
+runner in GitHub Settings, then remove the dedicated directory and account.
+Keep the Factory publisher allowlist while that App is the authorized
+publisher. Sources: [trial CI runner notes](../../ops/factory/ci-runner.md),
+[GitHub runner installation](https://docs.github.com/en/actions/how-tos/manage-runners/self-hosted-runners/add-runners)
+and [service setup](https://docs.github.com/en/actions/how-tos/manage-runners/self-hosted-runners/configure-the-application).
+
+---
+
 ## JUL-129 watchdog candidate test (2026-09-25)
 
 The watchdog is a separate `julia-watchdog.timer` and oneshot

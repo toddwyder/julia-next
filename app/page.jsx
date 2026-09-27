@@ -1,3 +1,5 @@
+import { version } from '../package.json';
+
 export default function Page() {
-  return <main>Julia is ready</main>;
+  return <main>Julia {version}</main>;
 }

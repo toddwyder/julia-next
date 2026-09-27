@@ -36,7 +36,7 @@ class PretendLinearServer:
             return {'data': {'issues': self.pages.pop(0)}}
         if 'query Card' in request['query']:
             return {'data': {'issue': {'id': 'uuid-1', 'identifier': 'JUL-1', 'title': 'T', 'description': '',
-                                       'comments': {'nodes': []}}}}
+                                       'labels': {'nodes': []}, 'comments': {'nodes': []}}}}
         if 'commentCreate' in request['query']:
             chosen = request['variables'].get('id')
             if chosen in self.comment_ids:  # Linear's own reply, seen live on JUL-150 (25 Sep)
