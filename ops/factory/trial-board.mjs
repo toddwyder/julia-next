@@ -34,6 +34,14 @@ export async function checkEvidence(evidenceDir, candidate, stage) {
       if (!data.length || createHash('sha256').update(data).digest('hex') !== proof.sha256) {
         throw Error('Artifact hash mismatch');
       }
+      if (key === 'approval') {
+        const review = JSON.parse(data.toString('utf8')).review;
+        if (!Number.isInteger(review?.id) || review.id <= 0 ||
+            review.user?.login !== 'toddwyder' || review.state !== 'APPROVED' ||
+            review.commit_id !== candidate) {
+          failures.push('Invalid approval evidence: approval');
+        }
+      }
     } catch { failures.push(`Unreadable or changed evidence: ${key}`); }
   }
   return failures;
