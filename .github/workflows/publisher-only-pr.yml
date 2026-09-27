@@ -1,7 +1,7 @@
 name: Publisher-only PR
 
 # JUL-43: every PR on this repo must be opened by the julia-graph-publisher
-# GitHub App, never by a personal account -- publishing goes through review,
+# GitHub App or the approved Factory App, never by a personal account -- publishing goes through review,
 # not around it. Mirrors toddwyder/AI-Stack's own publisher-only-pr.yml.
 #
 # Not yet a required branch-protection status check: this repo is private on
@@ -24,10 +24,10 @@ permissions:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, julia-factory-trial]
     timeout-minutes: 5
     steps:
-      - name: Verify the PR was opened by the julia-graph-publisher GitHub App
+      - name: Verify the PR was opened by an approved Julia publisher App
         env:
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -35,12 +35,13 @@ jobs:
           AXIOM_DATASET: ${{ secrets.AXIOM_DATASET }}
           AXIOM_TOKEN: ${{ secrets.AXIOM_TOKEN }}
         run: |
-          if [ "$PR_AUTHOR" = "julia-graph-publisher[bot]" ]; then
-            echo "PR #$PR_NUMBER opened by julia-graph-publisher[bot] -- OK."
+          if [ "$PR_AUTHOR" = "julia-graph-publisher[bot]" ] ||
+             [ "$PR_AUTHOR" = "julia-factory-todd-wyder[bot]" ]; then
+            echo "PR #$PR_NUMBER opened by approved publisher $PR_AUTHOR -- OK."
             exit 0
           fi
 
-          reason='author is not julia-graph-publisher[bot]'
+          reason='author is not an approved Julia publisher App'
           attempted="PR #$PR_NUMBER ($PR_URL) opened by $PR_AUTHOR"
           record=$(node -e '
             const record = {
@@ -68,5 +69,5 @@ jobs:
             echo "(Axiom: not sent -- AXIOM_DATASET/AXIOM_TOKEN not set) $record"
           fi
 
-          echo "::error::PR #$PR_NUMBER was opened by '$PR_AUTHOR', not julia-graph-publisher[bot]. Every PR on this repo must be opened by the publisher identity."
+          echo "::error::PR #$PR_NUMBER was opened by '$PR_AUTHOR'. Every PR must be opened by an approved Julia publisher App."
           exit 1

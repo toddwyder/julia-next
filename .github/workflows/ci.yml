@@ -7,13 +7,20 @@ on:
 
 jobs:
   checks:
-    runs-on: ubuntu-latest
+    # JUL-183: hosted Actions is billing-blocked. Keep trial jobs on its
+    # dedicated OVH account, and accept only same-repository publisher PRs.
+    if: github.event_name == 'push' || (github.event.pull_request.head.repo.full_name == github.repository && contains(fromJSON('["julia-graph-publisher[bot]", "julia-factory-todd-wyder[bot]"]'), github.event.pull_request.user.login))
+    runs-on: [self-hosted, Linux, X64, julia-factory-trial]
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22.23.2
 
       - name: Syntax-check all scripts
         run: |
@@ -72,4 +79,26 @@ jobs:
           echo "OK: example env file holds only placeholder values"
 
       - name: Run scripts/ unit tests
-        run: node --test scripts/*.test.mjs
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -euo pipefail
+          tests=(scripts/*.test.mjs)
+          # The frozen graph's execution suite is required when its inputs
+          # change. Application-only changes retain all other script checks.
+          if git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null &&
+             git diff --quiet "$BASE_SHA" HEAD -- graph/pydantic scripts/independent-review.test.mjs; then
+            selected=()
+            for test in "${tests[@]}"; do
+              [ "$test" = scripts/independent-review.test.mjs ] || selected+=("$test")
+            done
+            tests=("${selected[@]}")
+            echo 'Frozen graph execution unchanged; running the application and other script checks.'
+          fi
+          node --test "${tests[@]}"
+
+      - run: npm ci
+      - run: npx playwright install chromium
+      - run: npx playwright test
+      - run: npm run lint:framework
+      - run: npm run build
