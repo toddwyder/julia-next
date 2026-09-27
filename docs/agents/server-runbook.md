@@ -18,15 +18,17 @@ and evidence trail; this file owns the verified operating procedure only.
 
 Factory runs as the dedicated `julia-factory` service account from
 `/var/lib/julia-factory/app` under `julia-factory-trial.service`, bound to
-`127.0.0.1:4111` behind the existing WorkOS HTTPS Funnel. The root-owned,
+`127.0.0.1:4111` behind the existing Tailscale HTTPS Funnel, with WorkOS
+login protection. The root-owned,
 mode-600 `/etc/julia-factory/factory.env` holds service configuration; never
 put credential values here. The installed versions are pinned: Factory 0.17.2,
 `@mastra/auth-workos` 1.6.5, core 1.71.0 and SDK 1.8.3. Do not upgrade them
 for this trial.
 
 Version- and hash-guarded, removable install patches make cookie
-`authenticateToken` infer an organization for exactly one membership (as
-`getCurrentUser` does) and deduplicate mirrored skill roots via the canonical
+`authenticateToken` infer an organization only for exactly one ACTIVE
+membership (as `getCurrentUser` does), preserving an explicit organization,
+and deduplicate mirrored skill roots via the canonical
 `.agents/skills`. Repeat application after install is idempotent. Individual
 install, check, build and app/output identity checks passed; the *full clean-
 install wrapper was not rerun* while workers were active. The upstream Mastra
@@ -34,9 +36,9 @@ defect is [#25252](https://github.com/mastra-ai/mastra/issues/25252).
 
 Fresh and resource-addressed GPT-6 Sol sessions hydrate observer settings;
 no permanent memory-library patch is installed. A temporary 3k-token probe
-caused a recall loop, so both personal and factory-wide thresholds were
-restored to 30k. Native `forked: true` subagents inherit an authenticated
-GPT-6 Sol parent's context; non-forked model overrides do not inherit that
+caused a recall loop; the personal threshold was restored to 30k, while
+the factory-wide threshold was already 30k. Native `forked: true` subagents
+inherit an authenticated GPT-6 Sol parent's context; non-forked model overrides do not inherit that
 login. The normal Git identity is the verified Factory App bot, not Todd;
 the Factory App is restricted to `julia-next` and has Workflows write permission.
 
