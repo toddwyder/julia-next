@@ -10,7 +10,7 @@ const REPO_ROOT = resolve(SCRIPTS_DIR, '..');
 
 export const ROLE_NAMES = ['julia-builder', 'julia-reviewer'];
 
-export const EXPECTED_HEADINGS = [
+const SHARED_HEADINGS = [
   '## Purpose and scope',
   '## Inputs',
   '## Preflight',
@@ -22,11 +22,20 @@ export const EXPECTED_HEADINGS = [
   '## Reporting and cleanup',
 ];
 
+export const EXPECTED_HEADINGS = {
+  'julia-builder': [
+    ...SHARED_HEADINGS.slice(0, 4),
+    '## Split-step briefs',
+    ...SHARED_HEADINGS.slice(4),
+  ],
+  'julia-reviewer': SHARED_HEADINGS,
+};
+
 /**
  * Validates that a role file contains a valid frontmatter block
- * and the exact nine headings in order.
+ * and the role's exact headings in order.
  */
-export function validateRoleFileStructure(content) {
+export function validateRoleFileStructure(content, role) {
   const frontmatterMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/);
   if (!frontmatterMatch) {
     throw new Error('Missing or malformed frontmatter block');
@@ -39,17 +48,18 @@ export function validateRoleFileStructure(content) {
     throw new Error('Frontmatter missing "description" field');
   }
 
+  const expectedHeadings = EXPECTED_HEADINGS[role];
   const h2Headings = [...content.matchAll(/^##\s+.*$/gm)].map((m) => m[0].trim());
-  if (h2Headings.length !== EXPECTED_HEADINGS.length) {
+  if (h2Headings.length !== expectedHeadings.length) {
     throw new Error(
-      `Expected ${EXPECTED_HEADINGS.length} headings, but found ${h2Headings.length}: ${h2Headings.join(', ')}`
+      `Expected ${expectedHeadings.length} headings, but found ${h2Headings.length}: ${h2Headings.join(', ')}`
     );
   }
 
-  for (let i = 0; i < EXPECTED_HEADINGS.length; i++) {
-    if (h2Headings[i] !== EXPECTED_HEADINGS[i]) {
+  for (let i = 0; i < expectedHeadings.length; i++) {
+    if (h2Headings[i] !== expectedHeadings[i]) {
       throw new Error(
-        `Heading at index ${i} was expected to be "${EXPECTED_HEADINGS[i]}", but found "${h2Headings[i]}"`
+        `Heading at index ${i} was expected to be "${expectedHeadings[i]}", but found "${h2Headings[i]}"`
       );
     }
   }
@@ -58,12 +68,12 @@ export function validateRoleFileStructure(content) {
 /**
  * Validates a role file on disk.
  */
-export function validateRoleFile(filePath) {
+export function validateRoleFile(filePath, role) {
   if (!existsSync(filePath)) {
     throw new Error(`File does not exist: ${filePath}`);
   }
   const content = readFileSync(filePath, 'utf8');
-  validateRoleFileStructure(content);
+  validateRoleFileStructure(content, role);
   return content;
 }
 
@@ -95,7 +105,7 @@ export function checkSkillPathsExist(content, repoRoot = REPO_ROOT) {
 }
 
 for (const role of ROLE_NAMES) {
-  test(`${role}: frontmatter block and nine headings are present and in order in both trees`, () => {
+  test(`${role}: frontmatter block and required headings are present and in order in both trees`, () => {
     const agentsPath = join(REPO_ROOT, '.agents', 'skills', role, 'SKILL.md');
     const claudePath = join(REPO_ROOT, '.claude', 'skills', role, 'SKILL.md');
 
@@ -105,8 +115,8 @@ for (const role of ROLE_NAMES) {
     const agentsContent = readFileSync(agentsPath, 'utf8');
     const claudeContent = readFileSync(claudePath, 'utf8');
 
-    validateRoleFileStructure(agentsContent);
-    validateRoleFileStructure(claudeContent);
+    validateRoleFileStructure(agentsContent, role);
+    validateRoleFileStructure(claudeContent, role);
   });
 
   test(`${role}: .agents and .claude copies are identical`, () => {
@@ -157,12 +167,12 @@ for (const role of ROLE_NAMES) {
       const content = readFileSync(filePath, 'utf8');
 
       // Test in-memory: removing any of the required headings must fail validation
-      for (const heading of EXPECTED_HEADINGS) {
+      for (const heading of EXPECTED_HEADINGS[role]) {
         assert.ok(content.includes(heading), `${heading} must be present in ${filePath}`);
         const planted = removeSection(content, heading);
         assert.throws(
-          () => validateRoleFileStructure(planted),
-          /Expected 9 headings|Heading at index/,
+          () => validateRoleFileStructure(planted, role),
+          new RegExp(`Expected ${EXPECTED_HEADINGS[role].length} headings|Heading at index`),
           `Planted copy with section "${heading}" removed from ${filePath} must be rejected by heading check`
         );
       }
@@ -170,13 +180,13 @@ for (const role of ROLE_NAMES) {
       // Test with temp folder file
       const tempDir = mkdtempSync(join(tmpdir(), `role-test-${role}-${root.replace('.', '')}-`));
       try {
-        const plantedHeading = EXPECTED_HEADINGS[2]; // ## Preflight
+        const plantedHeading = EXPECTED_HEADINGS[role][2]; // ## Preflight
         const planted = removeSection(content, plantedHeading);
         const tempFile = join(tempDir, 'SKILL.md');
         writeFileSync(tempFile, planted, 'utf8');
         assert.throws(
-          () => validateRoleFile(tempFile),
-          /Expected 9 headings|Heading at index/,
+          () => validateRoleFile(tempFile, role),
+          new RegExp(`Expected ${EXPECTED_HEADINGS[role].length} headings|Heading at index`),
           `Planted file on disk missing "${plantedHeading}" must be rejected`
         );
       } finally {
