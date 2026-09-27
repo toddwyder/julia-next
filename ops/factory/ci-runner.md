@@ -15,7 +15,7 @@ The archive hash was verified before extraction. Registration used the page's
 time-limited token; no token belongs in the repository.
 
 - Account: `julia-trial-ci`, system account with no login shell or sudo access.
-- Directory: `/var/lib/julia-trial-ci/runner`, owned by that account, mode 700.
+- Directories: `/var/lib/julia-trial-ci` mode 750 and its `runner` directory mode 755 (live inspection); runner owned by `julia-trial-ci`.
 - Repository: only `toddwyder/julia-next`.
 - Runner name: `ovh-julia-factory-trial`; custom label: `julia-factory-trial`.
 - Service: `actions.runner.toddwyder-julia-next.ovh-julia-factory-trial.service`.
@@ -40,10 +40,12 @@ no branch code. CI uses the builder's verified Node 22.23.2 runtime. Normal
 application CI now also runs Chromium, framework lint
 and the production build.
 
-The unchanged frozen graph had a missing Python dependency and a broken Linear
-test fixture at the trial baseline. Application-only changes run every other
-script test. Changes to `graph/pydantic` or its execution wrapper still require
-the graph execution suite; its failures are not presented as passing evidence.
+The trial baseline lacked Python graph dependencies and had a broken Linear
+test fixture. CI now creates a job-local Python venv, installs the pinned
+`graph/pydantic/requirements.txt` without sudo or secrets, and runs **all**
+`scripts/*.test.mjs` on every change, including the graph execution suite.
+The Card-query fixture includes the labels the client reads; failures must not
+be presented as passing evidence.
 
 Removal: restore the workflow runner labels after hosted jobs work; stop and
 uninstall this service with `svc.sh`, remove this runner in GitHub Settings,

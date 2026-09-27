@@ -38,9 +38,10 @@ preference without a resource ID does not switch an already live session's
 observer. A fresh session loads the stored configuration. Personal and
 factory-wide observer/reflector settings now select `openai/gpt-6-sol`; an actual
 observer run on the fresh builder thread was captured while observations grew.
-Temporary model-resolution logging was removed after verification. If lowering
-the observation threshold for a probe, keep it above the installed 2,000-token
-buffer activation threshold; 3,000 was used successfully.
+Temporary model-resolution logging was removed after verification. A temporary
+3,000-token personal-threshold probe completed but caused repeated recall; the
+personal threshold was restored to 30,000 tokens. The factory-wide threshold
+was already 30,000 tokens and did not need restoration.
 
 The dedicated `julia-factory` account also needed a Git commit identity. GitHub's
 API confirmed this installation's bot identity; its normal Git configuration is:

@@ -60,10 +60,9 @@ and SHA-256
 `70920811a4f8ad4328818682bca5c6469c1c942fab52448868071d0063816613`.
 Verify the downloaded archive against that hash **before** extracting it into
 `/var/lib/julia-trial-ci/runner`; obtain the short-lived registration token
-from the same Settings page, never from this repository. The original setup
-note called for mode 700 on the runner directory. Live inspection now shows
-`/var/lib/julia-trial-ci` mode **750** and its `runner` directory mode **755**;
-do not mistake the original instruction for the current state.
+from the same Settings page, never from this repository. Live inspection
+shows `/var/lib/julia-trial-ci` mode **750** and its `runner` directory mode
+**755**, owned by `julia-trial-ci`.
 
 As `julia-trial-ci`, verify the downloaded archive and extract it only after
 `sha256sum` succeeds. Run `config.sh` from the runner directory using the
@@ -101,9 +100,9 @@ The runner has separate credential access from Factory: live
 `sudo -u julia-trial-ci test -r` checks reject both
 `/etc/julia-factory/factory.env` and the protected evidence manifest. CI uses
 Node 22.23.2 and runs Chromium, framework lint and the production build. It
-runs other script tests for application-only changes; changes to
-`graph/pydantic` or the graph execution wrapper still require the graph
-suite, whose baseline failures must not be reported as passes. CI accepts
+creates a job-local Python venv, installs pinned graph dependencies from
+`graph/pydantic/requirements.txt`, then runs **all** `scripts/*.test.mjs`,
+including the graph execution suite, on every change. CI accepts
 same-repository PRs from the two approved publisher Apps or pushes to main;
 the publisher check rejects personal PR authors without checking out branch
 code. Exact candidate `324bbf40cc6d8be60750c0754b0573b9d4b4b249`
