@@ -14,6 +14,48 @@ and evidence trail; this file owns the verified operating procedure only.
 
 ---
 
+## Mastra Factory JUL-183 trial (verified 2026-09-27)
+
+Factory runs as the dedicated `julia-factory` service account from
+`/var/lib/julia-factory/app` under `julia-factory-trial.service`, bound to
+`127.0.0.1:4111` behind the existing WorkOS HTTPS Funnel. The root-owned,
+mode-600 `/etc/julia-factory/factory.env` holds service configuration; never
+put credential values here. The installed versions are pinned: Factory 0.17.2,
+`@mastra/auth-workos` 1.6.5, core 1.71.0 and SDK 1.8.3. Do not upgrade them
+for this trial.
+
+Version- and hash-guarded, removable install patches make cookie
+`authenticateToken` infer an organization for exactly one membership (as
+`getCurrentUser` does) and deduplicate mirrored skill roots via the canonical
+`.agents/skills`. Repeat application after install is idempotent. Individual
+install, check, build and app/output identity checks passed; the *full clean-
+install wrapper was not rerun* while workers were active. The upstream Mastra
+defect is [#25252](https://github.com/mastra-ai/mastra/issues/25252).
+
+Fresh and resource-addressed GPT-6 Sol sessions hydrate observer settings;
+no permanent memory-library patch is installed. A temporary 3k-token probe
+caused a recall loop, so both personal and factory-wide thresholds were
+restored to 30k. Native `forked: true` subagents inherit an authenticated
+GPT-6 Sol parent's context; non-forked model overrides do not inherit that
+login. The normal Git identity is the verified Factory App bot, not Todd;
+the Factory App is restricted to `julia-next` and has Workflows write permission.
+
+The isolated no-sudo `julia-trial-ci` runner lives at
+`/var/lib/julia-trial-ci/runner` under
+`actions.runner.toddwyder-julia-next.ovh-julia-factory-trial.service`, with
+label `julia-factory-trial`, a restrictive systemd drop-in and separate
+credential access (no Factory credentials). GitHub-hosted Actions were blocked
+by account billing; OVH CI retains graph execution for graph-input changes.
+Exact candidate `324bbf40cc6d8be60750c0754b0573b9d4b4b249` passed CI run
+`36329389576`. The protected evidence gate
+`/var/lib/julia-factory/evidence/jul183` rejects missing or wrong-candidate
+proof. No graph implementation was changed for this trial.
+
+For procedures and removal, see [Factory installation](../../ops/factory/README.md)
+and [trial CI runner](../../ops/factory/ci-runner.md).
+
+---
+
 ## JUL-129 watchdog candidate test (2026-09-25)
 
 The watchdog is a separate `julia-watchdog.timer` and oneshot
