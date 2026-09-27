@@ -84,3 +84,13 @@ installer in the Factory package environment, where their dependencies exist.
 They are deliberately separate from Next.js's application test discovery.
 Removal: remove the two supported constructor options/import and this board's
 files after moving any active trial card back to an installed board.
+
+For native parallel reviews on the ChatGPT sign-in, use the installed subagent
+tool's supported `forked: true` option. It clones the parent thread and reuses
+the parent agent's selected model, authentication context and tools. Its schema
+explicitly says `modelId` overrides are ignored in this mode. Non-forked explore
+defaults use an API-key model; spelling `openai/gpt-6-sol` does not transfer the
+parent's OAuth connection. Prepare a clean GPT-6 Sol review parent with refs,
+spec and standards, then launch both axes in parallel with complete prompts.
+Keep earlier axis reports outside that parent context. This requires no library
+change; remove this environment note if the default credential route changes.

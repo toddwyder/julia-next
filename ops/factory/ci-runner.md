@@ -3,7 +3,10 @@
 PR #130's GitHub-hosted jobs never started. GitHub's check annotation reported
 failed account payments or a spending limit. Vercel still deployed successfully.
 For JUL-183, GitHub's supported self-hosted runner now executes checks on OVH.
-No billing setting or App permission was changed.
+Runner registration required no billing change or additional App permission.
+Publishing the workflow repair subsequently required adding only **Workflows
+read/write** to the existing Factory App installation, still selecting only
+`julia-next`. The native permission-review page confirmed that exact delta.
 
 GitHub's repository Settings > Actions > Runners page supplied the Linux x64
 runner **2.337.0** and SHA-256
