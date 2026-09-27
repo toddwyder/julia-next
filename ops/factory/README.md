@@ -33,6 +33,27 @@ remove the files from an installation: `npm ci` restores clean package contents.
 
 Runtime evidence and further small fixes belong on JUL-183 and in this directory.
 
+Memory needed no permanent library patch. In the installed SDK, saving a global
+preference without a resource ID does not switch an already live session's
+observer. A fresh session loads the stored configuration. Personal and
+factory-wide observer/reflector settings now select `openai/gpt-6-sol`; an actual
+observer run on the fresh builder thread was captured while observations grew.
+Temporary model-resolution logging was removed after verification. If lowering
+the observation threshold for a probe, keep it above the installed 2,000-token
+buffer activation threshold; 3,000 was used successfully.
+
+The dedicated `julia-factory` account also needed a Git commit identity. GitHub's
+API confirmed this installation's bot identity; its normal Git configuration is:
+
+```sh
+git config --global user.name 'julia-factory-todd-wyder[bot]'
+git config --global user.email '334524704+julia-factory-todd-wyder[bot]@users.noreply.github.com'
+```
+
+Run these only as the dedicated service account. They persist for fresh
+sandboxes and do not authorize publishing. Removal is `git config --global
+--unset user.name` and the corresponding `user.email` command for that account.
+
 Factory **0.17.2** also scans both `.claude/skills` and `.agents/skills` as local
 sources and rejects duplicate names. Julia mirrors those skills. A second pinned
 patch removes `.claude/skills` from this deployment's project discovery roots;
@@ -58,5 +79,8 @@ requirements. This is a single-card trial gate, not a general delivery engine.
 The regression drives the actual installed `FactoryTransitionService` with real
 isolated libSQL storage. It proves rejection for absent and wrong-commit proof,
 and acceptance for valid proof. Fixture cards exist only in the temporary test DB.
+The `*.check.mjs` files are standalone installation checks: run them through the
+installer in the Factory package environment, where their dependencies exist.
+They are deliberately separate from Next.js's application test discovery.
 Removal: remove the two supported constructor options/import and this board's
 files after moving any active trial card back to an installed board.
