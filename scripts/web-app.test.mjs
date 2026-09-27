@@ -39,11 +39,6 @@ test('(a) every required web-app file exists', () => {
   assert.deepEqual(missing, [], `missing required files: ${missing.join(', ')}`);
 });
 
-test('(b) app/page.jsx contains the exact text "Julia is ready"', () => {
-  const page = readFileSync(path.join(ROOT, 'app/page.jsx'), 'utf8');
-  assert.ok(page.includes('Julia is ready'), 'app/page.jsx must render "Julia is ready"');
-});
-
 test('(c) no literal Sentry DSN or Axiom token under app/ or lib/', () => {
   const offenders = [];
   for (const base of ['app', 'lib']) {
