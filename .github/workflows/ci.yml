@@ -7,10 +7,7 @@ on:
 
 jobs:
   checks:
-    # JUL-183: hosted Actions is billing-blocked. Keep trial jobs on its
-    # dedicated OVH account, and accept only same-repository publisher PRs.
-    if: github.event_name == 'push' || (github.event.pull_request.head.repo.full_name == github.repository && contains(fromJSON('["julia-graph-publisher[bot]", "julia-factory-todd-wyder[bot]"]'), github.event.pull_request.user.login))
-    runs-on: [self-hosted, Linux, X64, julia-factory-trial]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
