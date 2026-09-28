@@ -10,7 +10,7 @@ Todd adds or removes an entry. Anything custom that is not listed here is not ap
 | 1 | WorkOS cookie identity fix in `@mastra/auth-workos` 1.6.5 | Default platform sign-in rejects our self-hosted address; the WorkOS cookie path drops the organization ([#25252](https://github.com/mastra-ai/mastra/issues/25252)) | #25252 ships in a Mastra release |
 
 Approved by ADR 0009 but not built yet: the check that rejects unapproved custom machinery, and
-the weekly cost forecast. Each gets its row when it is built.
+the weekly cost summary (Monday note). Each gets its row when it is built.
 
 ## Installation
 

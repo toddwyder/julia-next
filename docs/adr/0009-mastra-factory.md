@@ -60,10 +60,11 @@ and an independent audit against Mastra's documentation runs after setup and aft
 three cards.
 
 **Costs.** Mastra traces and cost charts are on before the first real card, because costs cannot
-be reduced without data. GitHub's hosted runners run CI (billing fixed, $0 Actions cap as a
-backstop, minute-saving CI settings). One weekly summary covers model costs and GitHub minutes
-with a month-end forecast, and an early warning goes out the day the forecast passes the 2,000
-free minutes. The forecast is a small piece of our own code and goes on the exceptions list.
+be reduced without data. The repository was made public on 2026-09-28: GitHub Actions minutes are
+free on public repositories, and branch rules (required approval, required checks, code owners)
+work without a paid plan. Todd judged that nothing in a personal cooking app is secret; only people
+he adds can open issues or pull requests (GitHub interaction limit, renewed every six months). One
+weekly summary covers model costs from Mastra's cost data.
 
 Cards move from Linear to GitHub issues and the Factory board. JUL-184 (this setup) is the last
 new Linear card. Linear stays as the read-only library of Julia documents: nothing is deleted,
@@ -76,10 +77,10 @@ Linear intake: two boards kept in step is the kind of homemade machinery that sa
 ## Consequences
 
 - No more trials. Setup comes first: traces and cost charts, the memory model, GitHub billing,
-  and Todd's one-time Vercel sign-in. Then the spec is written from this ADR, and its tickets
+  and Todd's one-time Vercel sign-in (done 2026-09-28). Then the spec is written from this ADR, and its tickets
   run through Factory as real cards, smallest first.
 - Approved exceptions today: the WorkOS sign-in fix (upstream mastra-ai/mastra#25252; remove when
-  it ships), the unapproved-machinery check, and the cost forecast.
+  it ships), the unapproved-machinery check, and the weekly cost summary.
 - `docs/research/mastra-route-requirements.md` is retired; the spec replaces it.
   `docs/agents/work-execution.md` and `CLAUDE.md` must stop describing hand-driven builds and the
   Pydantic graph, or agents following them will repeat the first trial.
