@@ -2,14 +2,19 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working in this repository.
 
-## Laptop sessions are the exception, not the route
+## Factory does the work
 
-The graph does the work. Work reaches it by moving a card to the Ready queue (or by `julia-run`
-on the server), not by a laptop session doing it by hand. Before doing anything else, a laptop
-session must state, in one plain sentence, **why the graph cannot do this job**. The normal
-reason is "the graph is broken and can't repair itself" (for example: the fix needs root, a
-sign-in only Todd's account can do, or the thing that broke is the graph's own launcher). If the
-honest answer is anything else, stop: put the work in the Ready queue instead and end the session.
+Cards are built and reviewed by Mastra Factory, used the way its makers intend (ADR 0009). A
+card starts only when Todd taps it in Factory's Intake column. A laptop session never builds,
+reviews, moves, or merges a Factory card by hand, and never uses Factory's GitHub keys. Laptop
+sessions set up and look after Factory itself, and write specs and documents.
+
+**Use the product, not a workaround.** Use the built-in feature of Factory, Mastra, or GitHub for
+anything they already do; check their docs or package source before saying they can't. Before
+any custom script, workaround, or change to Mastra's code, stop and tell Todd the gap, the docs
+you checked (with links), and what breaks without it. Todd approves or refuses; approved pieces go
+on the exceptions list in `ops/factory/README.md`. Use the stock product first and improve only
+what real use shows is lacking.
 
 **Tick as you go.** Tick each checkbox on the card you're working the moment its evidence is posted, in the same step. Never tick at the end, and never tick before the evidence exists. The checkbox count is Todd's only view of progress.
 
@@ -20,6 +25,8 @@ honest answer is anything else, stop: put the work in the Ready queue instead an
 A standing instruction from the user, the person you are working for. It is about how your turns end. A message with no tool call in it ends your turn, and the work stops there until you are asked to continue. The user has seen you end turns in four ways while work they asked for was still owed, and does not want any of them. One: a long summary of what was done that closes by announcing the next step and has no tool call, so the next thing never starts. Two: an offer to carry on with something unless the user would prefer otherwise, which stops to wait for an answer the user was not going to give. Three: a list of decisions for the user when, by your own account, none of them blocks the rest of the work. Four: deciding that this is a good place to report, because the turn has been long or a milestone is done. Status notes are welcome, and so are your recommendations on open decisions, but put them in the same message as your next tool call and carry on with whatever does not depend on the user's answer. If you notice yourself inviting the user to redirect you or offering to wait, delete it and do the next thing. The stops the user does want are the ones where nothing can move without them, or where the thing blocking you is deliberately protected from you. This does not override the need for confirmation on risky or destructive actions.
 
 ## Framework-first rules (JUL-116)
+
+These apply to any code written outside Factory's own sessions too.
 
 1. Read the framework's official docs before writing code, and post a framework map (need → framework feature → docs link) on the card.
 2. Start from the framework's own example and change as little as possible.
@@ -53,8 +60,11 @@ intake, menu planning, shopping lists, kitchen prep, full-screen cook mode). The
 
 ### Issue tracker
 
-Issues live in Linear (team Julia-next), via the Linear MCP tools — not GitHub issues. See
-`docs/agents/issue-tracker.md`.
+New work goes in GitHub issues, where Factory's Intake picks it up; nothing starts until Todd
+taps it. Linear (team Julia-next) is the read-only library of Julia documents: read it through the
+Linear MCP tools, link each GitHub issue to the Linear card or document it came from, and close a
+Linear feature card only once its GitHub issue exists, with a one-line pointer. JUL-184 (Factory
+setup) is the last new Linear card. See `docs/agents/issue-tracker.md` for the Linear conventions.
 
 **Clean up every test or throwaway card you create.** Any test or throwaway Linear card an agent
 creates must be cancelled by that same agent, with a one-line reason, before its ticket counts as
