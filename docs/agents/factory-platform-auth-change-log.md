@@ -179,3 +179,35 @@ Todd authorized installing open PR #147 (`factory/issue-146`, head `03783eb00316
 - Started `julia-factory-trial.service` at 22:58:13 UTC. It returned `active` with MainPID `2162614`. Installed source byte-matches the staged PR inputs; `.mastra/output/mastra.mjs` contains `allowNetwork: true` and the `isolation=bwrap network=on` log statement. The service setting is `FACTORY_SANDBOX_PROVIDER=local`. An unauthenticated local HTTP probe returned 401. No Factory screen was pressed and nothing was merged.
 
 The restarted service is running the new built configuration. Actual bound-session isolation, protected-location canaries, fail-closed execution, and Factory-managed Git fetch/commit/push remain unverified pre-merge checks. No secret values were read or printed.
+
+## 2026-09-28: PR #147 protected-path inventory and host canaries
+
+Recorded on [PR #147](https://github.com/toddwyder/julia-next/pull/147#issuecomment-5880430929).
+
+Operator host-side inventory for PR #147 (no sandbox command was run; no secret value was printed):
+
+| Protected location | Path | Owner | Mode |
+|---|---|---|---|
+| GitHub App private key and credential environment source | `/etc/julia-factory/factory.env` | `root:root` | `0600` |
+| Running service environment (virtual file) | `/proc/2162614/environ` | `julia-factory:julia-factory` | `0400` |
+| PostgreSQL data directory | `/var/lib/postgresql/16/main` | `postgres:postgres` | `0700` |
+| PostgreSQL file existence witness | `/var/lib/postgresql/16/main/PG_VERSION` | `postgres:postgres` | `0600` |
+| Factory local database | `/var/lib/julia-factory/.local/share/mastracode/observability.duckdb` | `julia-factory:julia-factory` | `0600` |
+| Factory service home | `/var/lib/julia-factory` | `julia-factory:julia-factory` | `0750` |
+| Home Git config | `/var/lib/julia-factory/.gitconfig` | `julia-factory:julia-factory` | `0664` |
+| Home application config | `/var/lib/julia-factory/.config/varlock/config.json` | `julia-factory:julia-factory` | `0600` |
+| Factory settings | `/var/lib/julia-factory/.local/share/mastracode/settings.json` | `julia-factory:julia-factory` | `0600` |
+
+The service environment contains nonempty `GITHUB_APP_PRIVATE_KEY`, `DATABASE_URL`, and `FACTORY_CREDENTIAL_ENCRYPTION_KEY` variables; only presence was checked. No standalone GitHub App key file was found in the inspected protected directories. The process environment is a virtual file, so its physical source directory `/etc/julia-factory` received a canary.
+
+Harmless canaries created and independently stat-checked outside the sandbox (each holds an undisclosed random word):
+
+| Canary path | Owner | Mode |
+|---|---|---|
+| `/etc/julia-factory/.factory-bwrap-canary-pr147-20260928` | `root:root` | `0600` |
+| `/var/lib/postgresql/16/main/.factory-bwrap-canary-pr147-20260928` | `postgres:postgres` | `0600` |
+| `/var/lib/julia-factory/.factory-bwrap-canary-pr147-20260928` | `julia-factory:julia-factory` | `0600` |
+| `/var/lib/julia-factory/.config/.factory-bwrap-canary-pr147-20260928` | `julia-factory:julia-factory` | `0600` |
+| `/var/lib/julia-factory/.local/share/mastracode/.factory-bwrap-canary-pr147-20260928` | `julia-factory:julia-factory` | `0600` |
+
+The three `julia-factory`-owned canaries are readable by that account on the host. The root/PostgreSQL canaries establish existence but their parent directories already deny that account under normal host permissions. This inventory prepares the live Factory-command test; it does not claim sandbox denial. No merge or Factory screen action was performed.
