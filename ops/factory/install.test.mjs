@@ -29,7 +29,7 @@ test('a repo-sourced install preserves service secrets and applies the WorkOS pa
   });
   assert.equal(result.status, 0, result.stderr);
   for (const file of [
-    'package.json', 'package-lock.json', 'tsconfig.json', 'src/mastra/index.ts',
+    'package.json', 'package-lock.json', 'tsconfig.json', 'src/mastra/index.ts', 'src/mastra/local-sandbox.ts',
     'src/mastra/public/factory-skills/factory-plan/SKILL.md',
     'src/mastra/public/factory-skills/factory-review/SKILL.md',
   ]) {
@@ -66,7 +66,7 @@ test('a missing required skill leaves an existing install untouched', () => {
   mkdirSync(target);
   writeFileSync(resolve(target, 'package.json'), 'existing manifest');
   for (const file of [
-    'package.json', 'package-lock.json', 'tsconfig.json', 'src/mastra/index.ts',
+    'package.json', 'package-lock.json', 'tsconfig.json', 'src/mastra/index.ts', 'src/mastra/local-sandbox.ts',
     'src/mastra/public/factory-skills/factory-plan/SKILL.md',
   ]) {
     const destination = resolve(source, file);

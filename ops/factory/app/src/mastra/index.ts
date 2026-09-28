@@ -17,13 +17,11 @@
  * the server.
  */
 
-import { homedir } from 'node:os';
-import { join } from 'node:path';
 import { Mastra } from '@mastra/core/mastra';
 import { Observability, MastraStorageExporter, SensitiveDataFilter } from '@mastra/observability';
 import { LibSQLFactoryStorage } from '@mastra/libsql';
 import { PgVector, PgFactoryStorage } from '@mastra/pg';
-import { LocalSandbox } from '@mastra/core/workspace';
+import { createLocalFactorySandbox } from './local-sandbox.js';
 import { PlatformSandbox, createRepoTemplate as createPlatformRepoTemplate } from '@mastra/platform-workspace';
 import { E2BSandbox, createRepoTemplate as createE2BRepoTemplate } from '@mastra/e2b';
 import { RedisStreamsPubSub } from '@mastra/redis-streams';
@@ -384,13 +382,7 @@ export const factory = new MastraFactory({
       });
     }
 
-    return new LocalSandbox({
-      workingDirectory: join(
-        process.env.MASTRACODE_LOCAL_SANDBOX_ROOT?.trim() || join(homedir(), '.mastracode', 'web', 'sandboxes'),
-        ctx.sessionId,
-      ),
-      env: localSandboxEnv(),
-    });
+    return createLocalFactorySandbox(ctx.sessionId, localSandboxEnv());
   },
   // Per-replica cap on concurrent Factory background dispatches. Unset means
   // the dispatcher default; invalid and non-positive values are ignored.

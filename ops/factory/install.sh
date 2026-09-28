@@ -4,7 +4,7 @@ app_dir="$(realpath "$1")"
 patch_dir="$(cd -- "$(dirname -- "$0")" && pwd)"
 source_dir="$patch_dir/app"
 files=(
-  package.json package-lock.json tsconfig.json src/mastra/index.ts
+  package.json package-lock.json tsconfig.json src/mastra/index.ts src/mastra/local-sandbox.ts
   src/mastra/public/factory-skills/factory-plan/SKILL.md
   src/mastra/public/factory-skills/factory-review/SKILL.md
 )

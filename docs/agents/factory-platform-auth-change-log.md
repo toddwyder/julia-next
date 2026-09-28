@@ -126,3 +126,45 @@ tracked by issue #140. The trace store was 1.7 GB after approximately 10 hours,
 with 30 GB of disk space free. The backups above provide the source/patch
 rollback copies; no rollback was performed because the restarted service was
 healthy. Source: Todd's 2026-09-28 comment on PR #142.
+
+## 2026-09-28: #146 bubblewrap staging — not deployed
+
+In the disposable Factory work checkout, `julia-factory` could execute `bwrap`
+(version 0.9.0). The repository-sourced local sandbox was changed to request
+Mastra's native `isolation: 'bwrap'` with its default offline policy; no installed
+service files, environment variables, or live service were changed. A throwaway
+workspace probe through the public `LocalSandbox.executeCommand` API produced:
+
+| Check | Result |
+|---|---|
+| Isolated command (`printf isolated`) | Exit 0 |
+| Outside-workspace readable canary (`test -r`) | Exit 1, while the service user could read it outside the sandbox |
+| Installed application source readability (`test -r`) | Exit 1; host service user can read it outside the sandbox |
+| `/etc/julia-factory/factory.env` readability (`test -r`) | Exit 1; that path was not present in this checkout's host view, so this is not a server-secret proof |
+| `git ls-remote https://github.com/toddwyder/julia-next.git HEAD` | Exit 128 inside the offline sandbox; the same command succeeded outside it |
+| Backend metadata | `bwrap` |
+| Backend missing from `PATH` | Construction threw; no host fallback |
+
+This is **not** a live bound Factory session or a pre-merge server proof. No
+credentials or secret contents were read or printed. Factory's pinned package
+scopes Git credentials to individual processes, but its materialization clones
+inside the sandbox and needs outbound Git network access. Mastra core 1.71.0
+implements `nativeSandbox.allowNetwork: true` by omitting `--unshare-net`, which
+restores general host networking rather than Git-only egress. With the safe
+network-off policy, the required fetch/commit/push proof cannot succeed. Enabling
+unrestricted egress would weaken the issue's intended boundary; no custom
+network filter, paid provider, Mastra patch, or silent fallback was added. Todd
+chose to keep restricted networking on 2026-09-28: do not deploy/merge this
+staged change or open a PR. Plan a separately approved restricted-egress design
+before resuming. After that decision, the actual Factory server still needs operator installation proof,
+key/database denial, disposable Git fetch/commit/push, and (after #144) retired
+Orca unreachability; a real card must traverse planning and review. None of those
+server/end-to-end checks is claimed complete here.
+
+## 2026-09-28: #146 decision update — network-enabled bubblewrap in repository, server proof pending
+
+Todd's later decision supersedes the restricted-network stop in the earlier staging entry: general internet access for isolated Factory agent commands is approved. The saved `.artifacts/plans/issue-146.md` was revised in place. The repository configuration now sets `isolation: 'bwrap', nativeSandbox: { allowNetwork: true }`; no custom network filter, new host bind, Mastra patch or paid provider was added. The earlier offline results remain historical, not a description of the current configuration. The retired Orca reachability check moved to #144 and is not a #146 release gate.
+
+A new disposable-workspace test first failed with network-off (HTTP request to a temporary localhost server exited 7), then passed with network enabled while the outside readable canary remained inaccessible. This test does not demonstrate a live bound Factory session, installed-service package versions, protected-location canaries, or Factory-managed Git credentials. Before merge, verify on the installed server that every protected canary exists outside the sandbox before testing denial inside, test fail-closed execution, and complete a disposable fetch/commit/push via Factory's integration. Record the actual commands, exit statuses, deployment and rollback steps, network scope, and limitations in this log and the PR without exposing secrets.
+
+Non-invasive host check from the `julia-factory` checkout (not an installed-session proof): `command -v bwrap` returned `/usr/bin/bwrap`; `bwrap --version` returned 0.9.0; the installed lockfile reports Factory 0.17.2 and Core 1.71.0; `systemctl is-active julia-factory-trial.service` returned `active` with `WorkingDirectory=/var/lib/julia-factory/app`. The readable installed `src/mastra/index.ts` is still the original version, not the new local-sandbox delegate; the running service has **not** loaded this change. `/etc/julia-factory` is root-only and its `factory.env` is not readable by this checkout user; that fact is **not** evidence that agent commands in the live service cannot read it. `sudo -n true` failed (exit 1), so this session cannot perform the required operator-managed service backup/restart. No service files, secrets, credentials, or runtime process were changed. The installed Factory command path, protected-location canaries, and disposable Git fetch/commit/push remain unverified. Any PR from this checkout must remain unmerged until the operator stages the install with rollback and records those actual Factory-session results.
