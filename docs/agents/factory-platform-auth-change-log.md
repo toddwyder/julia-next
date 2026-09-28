@@ -104,12 +104,25 @@ A fresh isolated install at `/tmp/julia-factory-stage.55mT7x` completed `npm ci`
 WorkOS cookie regression, `tsc --noEmit`, Factory build, built-package patch and
 second cookie regression. Both package copies had the approved patched hash
 `dcefe1c1948970e65bc9f943ef43c05d0bc3de11da06cbde887a98f94d6c7761`.
-This is **not** a live service reinstall: no service was stopped or restarted,
-no protected environment was changed, and no browser sign-in or new trace has
-been claimed. Before switching the live service, back up its current source,
-lockfile, `.env` and persistent data with their original permissions; run the
-repository installer as `julia-factory`, restart only after its checks pass, then
-verify WorkOS redirect, Todd's fresh sign-in and a fresh Mastra trace in DuckDB
-and Studio. If checks fail, restore the backups and restart the previously
-working service. Record the actual deployed commit and observed verification
-results here when that operator-only step occurs.
+
+Later on 2026-09-28, Todd authorized an operator to install PR #142's repository
+copy at commit `8e97c95` on the live service. The operator reported that the
+four copied source files matched the live app except for the intended removal
+of the server-specific `postinstall` hook and its lockfile flag. They backed
+up `/var/lib/julia-factory/patches` to
+`/var/lib/julia-factory/patches.before-pr142-20260928` and the four app files
+with suffix `.before-pr142-20260928`; deployed `ops/factory` to
+`/var/lib/julia-factory/patches`; stopped the service and ran `install.sh`.
+The install exited 0 with the WorkOS regression, typecheck and build passing;
+its log is `/var/lib/julia-factory/install-pr142-20260928.log`. After the
+restart, the service was active, both copies had the approved WorkOS patched
+hash, `/auth/login` returned 302 to the WorkOS authorize URL, the DuckDB trace
+store had been written after restart, and the journal had no errors. These are
+operator-reported observations, not independent browser verification.
+
+Todd's personal sign-in, a fresh session's trace/metric contents, and Studio
+visibility were not verified by that report; Studio and trace retention are
+tracked by issue #140. The trace store was 1.7 GB after approximately 10 hours,
+with 30 GB of disk space free. The backups above provide the source/patch
+rollback copies; no rollback was performed because the restarted service was
+healthy. Source: Todd's 2026-09-28 comment on PR #142.
