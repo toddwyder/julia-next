@@ -72,3 +72,19 @@ Scope: setup cleanup only. No second-trial issue, card, session, PR, or run was 
 ### Todd's start action
 
 After Todd creates the second trial's GitHub issue himself and Factory imports it, he opens the [Factory Work board](https://julia-factory.tail91f394.ts.net/factories/49b0ea94-d24b-43d7-8ce1-618cb61c5188/work), finds the new card in **Intake**, and taps **Investigate** once. Auto-start runs is off; no agent will trigger it. The existing issue #1 card already demonstrates the exact Intake/Investigate control. No agent is to touch Factory once Todd starts the second trial.
+
+## Observability switched on and memory models moved (JUL-184) — 2026-09-28
+
+Todd instructed the change and restart in chat. Only Mastra's documented configuration was used. No Mastra package code changed beyond approved exception #1.
+
+1. **Memory models.** Observer and reflector are set to `deepseek/deepseek-flash` in both the personal and Factory-wide memory settings, through Factory's own `PUT /web/config/om/:role/model`. Read back from `GET /web/config/om` (previously `openai/gpt-6-sol`). **Auto-approve plans** is on, and Auto-start runs stays off (project settings read back).
+2. **Backups** (suffix `.before-observability-20260928`): `app/src/mastra/index.ts`, `app/package.json`, `app/package-lock.json`, `/var/lib/julia-factory/.local/share/mastracode/settings.json`, and `/etc/julia-factory/factory.env` (root-only).
+3. **Tracing switch.** `settings.json` now has `observability.localTracing: true`. Factory's code-sdk uses this switch to put a DuckDB observability area into the storage it passes to `new Mastra`. DuckDB is the metrics-capable store that [Mastra's observability docs](https://mastra.ai/docs/observability/overview) require.
+4. **Entry file.** `src/mastra/index.ts` now imports `Observability`, `MastraStorageExporter` and `SensitiveDataFilter` from `@mastra/observability`, and passes `observability: new Observability({ configs: { default: { serviceName: 'julia-factory', exporters: [new MastraStorageExporter()], spanOutputProcessors: [new SensitiveDataFilter()] } } })` to `new Mastra`, as in the docs example.
+5. **Packages.** `package.json` now declares `@mastra/observability` 1.18.1 and `@mastra/duckdb` 1.11.1. These versions were already installed as transitive dependencies. `npm install --package-lock-only` changed the lock file's root entry only: the two dependencies plus `hasInstallScript`.
+6. **Memory fallback.** `/etc/julia-factory/factory.env` now sets `DEFAULT_OM_MODEL_ID=deepseek/deepseek-flash` (read by `@mastra/code-sdk` `dist/constants.js:12`). This replaces the uncredentialed `google/gemini-3.5-flash` default.
+7. **Install and restart.** Stopped the service, then ran `patches/install.sh` as `julia-factory` (exit 0; log at `/var/lib/julia-factory/install-observability-20260928.log`), then started the service. The WorkOS regression passed, and both package copies hash `dcefe1c1948970e6…`. The service is active. `observability.duckdb` and its `.wal` were created in the mastracode data folder. Public `/auth/login` returns 302 to WorkOS.
+
+Not yet verified: that a real session's spans and cost metrics land in DuckDB, which will be checked on the first real card, and whether Studio can be opened.
+
+Rollback: restore the five backups, run `install.sh`, and restart `julia-factory-trial.service`.

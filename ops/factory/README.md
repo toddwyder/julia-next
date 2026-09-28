@@ -37,7 +37,9 @@ membership without using a real account.
 Remove the exception when #25252 ships in a Mastra release. Review that release,
 remove this patch and installer hook, then reinstall and build from the lockfile.
 
-Personal and factory-wide observer/reflector settings select `openai/gpt-6-sol`.
+Personal and factory-wide observer/reflector settings select `deepseek/deepseek-flash`
+(2026-09-28), with `DEFAULT_OM_MODEL_ID` set to the same model in the environment. Mastra
+observability (traces and metrics, DuckDB) is on; see the change log.
 The organization has a normal OpenAI Codex OAuth connection and a direct
 DeepSeek API-key connection. There is no model package patch.
 
