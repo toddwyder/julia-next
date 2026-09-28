@@ -276,10 +276,8 @@ _Avoid_: Production, prod, live
 
 **Monday note**:
 The weekly summary the delivery system sends Todd, never written by him: what was accepted, what
-each card cost in model spend and GitHub minutes including failed attempts, the month-end
-forecast against the 2,000 free minutes, how long cards took, and every time Todd was pulled in.
-Costs come from Mastra's traces and GitHub's usage data, not agent reports. An early warning goes
-out separately the day the forecast passes 2,000. Quiet weeks say so.
+each card cost in model spend including failed attempts, how long cards took, and every time Todd
+was pulled in. Costs come from Mastra's traces, not agent reports. Quiet weeks say so.
 _Avoid_: Report, dashboard, metrics (in anything Todd reads)
 
 **Done by Factory**:

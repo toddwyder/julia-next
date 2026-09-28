@@ -109,7 +109,7 @@ test('the coordinator skill and the runbook say the headless coordinator is one-
 // itself is spelled once, in graph/board-spec.mjs. The skills are discovered
 // by scanning both mirrored trees, so a creation route added later cannot slip
 // past this test the way to-spec and wayfinder did.
-test('every document and skill that creates a Linear card names the team template', () => {
+test('the tracker is GitHub, and every skill that can create a Linear card names the team template', () => {
   assert.equal(TEMPLATE_NAME, 'Julia-next agent defaults');
   // The name is not duplicated in board-setup.mjs; it imports and re-exports
   // the spec's constant.
@@ -117,15 +117,13 @@ test('every document and skill that creates a Linear card names the team templat
   assert.doesNotMatch(setup, /=\s*'Julia-next agent defaults'/, 'the template name is spelled once, in the board spec');
   assert.match(setup, /TEMPLATE_NAME,?\n\} from '\.\.\/graph\/board-spec\.mjs'/);
 
+  // ADR 0009: new work is GitHub issues; Linear is the read-only library, so the
+  // tracker doc no longer creates Linear cards but still names the template for it.
   const tracker = read('docs/agents/issue-tracker.md');
-  // The create convention itself names it, and says why.
-  assert.match(tracker, /\*\*Create an issue\*\*[\s\S]{0,200}template: "Julia-next agent\s+defaults"/);
-  assert.match(tracker, /Always name the\s+template/);
-  assert.match(tracker, /only to a card a person creates in the app/);
-  // And so do the other two places this file tells a session to make a card.
-  const publish = tracker.slice(tracker.indexOf('## When a skill says "publish to the issue tracker"'));
-  assert.match(publish.slice(0, 300), /Julia-next agent defaults/);
-  assert.match(tracker, /\*\*Child ticket\*\*[\s\S]{0,160}Julia-next\s+agent defaults/);
+  assert.match(tracker, /^# Issue tracker: GitHub/);
+  assert.match(tracker, /gh issue create[\s\S]{0,120}--milestone/);
+  assert.match(tracker, /don't create new Linear cards/);
+  assert.match(tracker, /Julia-next agent\s+defaults/);
 
   assert.match(read('docs/agents/triage-labels.md'), /template: "Julia-next agent defaults"/);
 
