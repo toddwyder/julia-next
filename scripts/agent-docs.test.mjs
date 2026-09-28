@@ -34,10 +34,10 @@ test('CLAUDE.md carries the two card-hygiene rules for laptop sessions, word for
   const finish = "**Finish the card.** When the work is done and the report is posted, move the card to UAT and assign it to Todd. Never leave a finished card in Backlog, and never move it to Complete; acceptance is Todd's.";
   assert.ok(text.includes(tick), 'the "Tick as you go" rule is missing or reworded');
   assert.ok(text.includes(finish), 'the "Finish the card" rule is missing or reworded');
-  // Both sit under the laptop-sessions section, "Finish the card" directly after "Tick as you go".
-  const laptopHeading = text.indexOf('## Laptop sessions are the exception');
+  // Both sit under the Factory section, "Finish the card" directly after "Tick as you go" (ADR 0009).
+  const laptopHeading = text.indexOf('## Factory does the work');
   const nextHeading = text.indexOf('## Reaching the server');
-  assert.ok(laptopHeading >= 0, 'the laptop-sessions heading is missing');
+  assert.ok(laptopHeading >= 0, 'the Factory heading is missing');
   assert.ok(nextHeading >= 0, 'the heading after it is missing');
   assert.ok(laptopHeading < text.indexOf(tick));
   assert.equal(text.indexOf(finish), text.indexOf(tick) + tick.length + 1, '"Finish the card" must sit directly under "Tick as you go"');

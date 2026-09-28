@@ -203,37 +203,89 @@ spec is written in and the unit Todd accepts.
 _Avoid_: Feature, story, epic, screen
 
 **Evidence**:
-What a builder hands over for a journey: one recording of it on the deployed Julia plus the
-journey's checklist with a proof per line.
-_Avoid_: Demo, proof of work, test results
+The checkable proof each step of a card leaves behind, tied to the exact change under test: the
+failing test, the passing run, the guard check, both code-review reports, and the adversarial
+review's verdict on every acceptance criterion. No evidence means not done, whatever an agent
+says.
+_Avoid_: Demo, proof of work, "it works"
+
+**Adversarial review**:
+A review by a different model maker than the builder's that tries to break the work rather
+than confirm it, giving a verdict on every acceptance criterion or naming the evidence that is
+missing.
+_Avoid_: Second opinion, sign-off, approval
 
 **Gate**:
-The check that evidence passes before it reaches Todd: code for what code can verify, a
-separate reviewing agent for what needs the recording watched. Runs on the OVH runner. A
-failed check is a bounce back to the builder; a third bounce on one journey becomes Todd's
-ticket the same day.
+What a pull request passes before GitHub asks Todd to review it: the robot checks on GitHub's
+own runners, Factory's code review, and the adversarial review. A failed gate is a bounce back to
+the builder.
 _Avoid_: Review, QA, approval
 
 **Bounce**:
-The gate sending evidence back to its builder with the rule or checklist line it failed.
-Counted as an attempt; never seen on Todd's ticket except as a count in the "Gate passed" line.
+A gate or Todd sending work back to its builder, through Factory, with the reason it failed.
 _Avoid_: Rejection, fail, kickback
 
+**Backlog**:
+Factory's Intake column. Cards wait there, including issues an agent opens, until Todd taps one
+to start it.
+_Avoid_: Queue, inbox, ready list
+
+**Plan**:
+The builder's written approach for one card, approved automatically and saved in the pull
+request. It always names the seams and the failing tests written first, and the lasting
+observability the change adds. Both reviewers check the work against it.
+_Avoid_: Design, spec, ticket
+
+**Coding standards**:
+`CODING_STANDARDS.md`, the rules Factory's code review checks against. Grows one line at a time,
+added in the same pull request as the fix that showed the rule was needed.
+_Avoid_: Style guide, conventions, lint rules
+
+**Exceptions list**:
+The one list of every place we built our own piece instead of using Factory's, Mastra's, or
+GitHub's, each with the gap it fills and when it can go. Only Todd can change it; a required
+check rejects custom machinery that is not on it.
+_Avoid_: Workarounds, patches, customisations
+
 **Rehearsal copy**:
-A temporary Julia, website and throwaway data, created for one proposed change as the stage to
-record its evidence on. Torn down as soon as the recording exists; rebuilt for that change if
-Todd asks to try it himself. Real Julia is never involved.
+A Julia website built for one proposed change, running on the test data. Todd follows the
+card's steps on it before he accepts. Real Julia is never involved.
 _Avoid_: Preview, staging, test environment
+
+**UAT**:
+Todd using the rehearsal copy the way a household member would, following the card's steps,
+then accepting or sending it back. Only things a user would do: tap, type, read the screen.
+Never a console, log, terminal, developer tool, or copying between tools. Technical checking
+is the robot's job and happens before UAT.
+_Avoid_: QA, testing, verification (for Todd's part)
+
+**Test data**:
+The one permanent set of Julia data that every rehearsal copy shares. Set up once; never
+Real Julia's data.
+_Avoid_: Staging database, sandbox, throwaway data
+
+**Needs attention**:
+Factory's own list of cards that are stuck, stalled, or waiting on someone, rechecked every five
+minutes. How Todd tells a slow card from a dead one. A phone alert waits until this proves not
+to be enough.
+_Avoid_: Stuck alert, heartbeat, ping, alarm
 
 **Real Julia**:
 The one Julia the household actually uses. Only accepted changes reach it.
 _Avoid_: Production, prod, live
 
 **Monday note**:
-The weekly summary posted in Linear by the runner, never by Todd: what was accepted, what
-each journey cost including failed attempts, how long it took, what broke after acceptance and
-who found it, and every time Todd was pulled in, planned or unplanned. Quiet weeks say so.
+The weekly summary the delivery system sends Todd, never written by him: what was accepted, what
+each card cost in model spend and GitHub minutes including failed attempts, the month-end
+forecast against the 2,000 free minutes, how long cards took, and every time Todd was pulled in.
+Costs come from Mastra's traces and GitHub's usage data, not agent reports. An early warning goes
+out separately the day the forecast passes 2,000. Quiet weeks say so.
 _Avoid_: Report, dashboard, metrics (in anything Todd reads)
+
+**Done by Factory**:
+The per-card line, read from Factory's own audit records, saying whether every step was done by
+Factory's agents or by Todd. Anything else means someone went around the product.
+_Avoid_: Compliance, audit trail (in anything Todd reads)
 
 **Backup**:
 The folder in Todd's Google Drive that mirrors the household: a readable text file per
