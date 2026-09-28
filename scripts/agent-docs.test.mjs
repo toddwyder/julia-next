@@ -17,6 +17,19 @@ const read = (relativePath) => readFileSync(new URL(`../${relativePath}`, import
 // half-updated test file behind (JUL-92).
 const RUNBOOK = 'docs/agents/server-runbook.md';
 
+test('coding standards seed reflects the framework-first rules and is linked from AGENTS.md', () => {
+  const standards = read('CODING_STANDARDS.md');
+  assert.match(standards, /official (framework )?docs/i);
+  assert.match(standards, /framework map/i);
+  assert.match(standards, /framework.*example/i);
+  assert.match(standards, /npm run lint:framework/);
+  assert.match(standards, /progress files/i);
+  assert.match(standards, /retry or wait loops/i);
+  assert.match(standards, /controller code over 400 lines/i);
+  assert.match(standards, /built-in feature/i);
+  assert.match(read('AGENTS.md'), /\[CODING_STANDARDS\.md\]\(CODING_STANDARDS\.md\)/);
+});
+
 test('CLAUDE.md states the standing cleanup rule for agent-created test/throwaway Linear cards', () => {
   const text = read('CLAUDE.md');
   assert.match(text, /test\s+or\s+throwaway/i);

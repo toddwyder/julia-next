@@ -25,11 +25,16 @@ Run installation as the dedicated Factory service user:
 bash /path/to/julia-next/ops/factory/install.sh /var/lib/julia-factory/app
 ```
 
-The installer copies `ops/factory/app/{package.json,package-lock.json,tsconfig.json}`
-and `ops/factory/app/src/mastra/index.ts` into the service directory before
-`npm ci`; it never copies `.env`, databases or runtime workspaces. The versioned
-lockfile pins the deployed dependencies; it does not upgrade them. The Factory
-UI is supplied by Mastra's build, not committed as generated assets. The WorkOS
+The installer copies `ops/factory/app/{package.json,package-lock.json,tsconfig.json}`,
+`ops/factory/app/src/mastra/index.ts`, and the two project overrides in
+`ops/factory/app/src/mastra/public/factory-skills/{factory-plan,factory-review}/SKILL.md`
+into the service directory before `npm ci`; it never copies `.env`, databases or
+runtime workspaces. The versioned lockfile pins the deployed dependencies; it does
+not upgrade them. Factory 0.17.2 loads project-local `factory-skills` before its
+bundled skills; Mastra's build places the overrides under `.mastra/output/factory-skills`.
+After installing and restarting, verify precedence in Factory's Settings › Skills
+or a fresh bound session; a staged build alone proves packaging, not live activation.
+The Factory UI is supplied by Mastra's build, not committed as generated assets. The WorkOS
 patch checks version and original SHA-256 and rejects unexpected files. It applies
 before build and checks the copied deployment dependency afterward. Repeat
 application is safe. Back up the service directory before a live install and

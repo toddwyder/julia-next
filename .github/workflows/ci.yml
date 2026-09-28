@@ -106,7 +106,8 @@ jobs:
           node --test scripts/agent-docs.test.mjs scripts/line-endings.test.mjs \
             scripts/no-personal-paths.test.mjs scripts/merge-pr.test.mjs \
             scripts/publish-pr.test.mjs scripts/publish-pr.real-git.test.mjs \
-            scripts/publish-via-github-app.test.mjs ops/factory/workflows.test.mjs
+            scripts/publish-via-github-app.test.mjs ops/factory/workflows.test.mjs \
+            ops/factory/skills.test.mjs
 
       - name: Install application dependencies
         if: steps.changes.outputs.docs_only != 'true'

@@ -3,14 +3,19 @@ set -euo pipefail
 app_dir="$(realpath "$1")"
 patch_dir="$(cd -- "$(dirname -- "$0")" && pwd)"
 source_dir="$patch_dir/app"
-for file in package.json package-lock.json tsconfig.json src/mastra/index.ts; do
+files=(
+  package.json package-lock.json tsconfig.json src/mastra/index.ts
+  src/mastra/public/factory-skills/factory-plan/SKILL.md
+  src/mastra/public/factory-skills/factory-review/SKILL.md
+)
+for file in "${files[@]}"; do
   if [[ ! -f "$source_dir/$file" ]]; then
     echo "missing Factory source: $source_dir/$file" >&2
     exit 1
   fi
 done
-mkdir -p "$app_dir/src/mastra"
-for file in package.json package-lock.json tsconfig.json src/mastra/index.ts; do
+for file in "${files[@]}"; do
+  mkdir -p "$(dirname -- "$app_dir/$file")"
   cp -- "$source_dir/$file" "$app_dir/$file"
 done
 printf 'Installing Factory from %s into %s\n' "$source_dir" "$app_dir"

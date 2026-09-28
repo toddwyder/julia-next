@@ -28,7 +28,11 @@ test('a repo-sourced install preserves service secrets and applies the WorkOS pa
     encoding: 'utf8',
   });
   assert.equal(result.status, 0, result.stderr);
-  for (const file of ['package.json', 'package-lock.json', 'tsconfig.json', 'src/mastra/index.ts']) {
+  for (const file of [
+    'package.json', 'package-lock.json', 'tsconfig.json', 'src/mastra/index.ts',
+    'src/mastra/public/factory-skills/factory-plan/SKILL.md',
+    'src/mastra/public/factory-skills/factory-review/SKILL.md',
+  ]) {
     assert.equal(readFileSync(resolve(target, file), 'utf8'), readFileSync(resolve(root, 'ops/factory/app', file), 'utf8'), file);
   }
   assert.equal(readFileSync(resolve(target, '.env'), 'utf8'), 'KEEP_THIS_SECRET=fixture\n');
@@ -42,6 +46,43 @@ test('a repo-sourced install preserves service secrets and applies the WorkOS pa
     `python3 ${resolve(import.meta.dirname, 'apply-install-patches.py')} ${target}`,
     `node ${resolve(import.meta.dirname, 'workos-cookie-identity.check.mjs')} ${target}/.mastra/output`,
   ].join('\n'));
+  const plan = resolve(target, 'src/mastra/public/factory-skills/factory-plan/SKILL.md');
+  writeFileSync(plan, 'stale plan');
+  const repeated = spawnSync('bash', [installer, target], {
+    cwd: tmp,
+    env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, STUB_LOG: log },
+    encoding: 'utf8',
+  });
+  assert.equal(repeated.status, 0, repeated.stderr);
+  assert.equal(readFileSync(plan, 'utf8'), readFileSync(resolve(root, 'ops/factory/app/src/mastra/public/factory-skills/factory-plan/SKILL.md'), 'utf8'));
+  assert.equal(readFileSync(resolve(target, '.env'), 'utf8'), 'KEEP_THIS_SECRET=fixture\n');
+  assert.equal(readFileSync(resolve(target, 'runtime.db'), 'utf8'), 'existing state');
+});
+
+test('a missing required skill leaves an existing install untouched', () => {
+  const tmp = mkdtempSync(resolve(tmpdir(), 'julia-factory-missing-skill-'));
+  const target = resolve(tmp, 'target');
+  const source = resolve(tmp, 'app');
+  mkdirSync(target);
+  writeFileSync(resolve(target, 'package.json'), 'existing manifest');
+  for (const file of [
+    'package.json', 'package-lock.json', 'tsconfig.json', 'src/mastra/index.ts',
+    'src/mastra/public/factory-skills/factory-plan/SKILL.md',
+  ]) {
+    const destination = resolve(source, file);
+    mkdirSync(resolve(destination, '..'), { recursive: true });
+    copyFileSync(resolve(root, 'ops/factory/app', file), destination);
+  }
+  copyFileSync(installer, resolve(tmp, 'install.sh'));
+  const bin = resolve(tmp, 'bin');
+  mkdirSync(bin);
+  writeFileSync(resolve(bin, 'npm'), '#!/bin/sh\nexit 9\n', { mode: 0o755 });
+  const result = spawnSync('bash', [resolve(tmp, 'install.sh'), target], {
+    encoding: 'utf8', env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /missing Factory source.*factory-review\/SKILL\.md/i);
+  assert.equal(readFileSync(resolve(target, 'package.json'), 'utf8'), 'existing manifest');
 });
 
 test('an incomplete repository source leaves an existing install untouched', () => {
