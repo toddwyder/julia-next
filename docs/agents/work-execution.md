@@ -26,6 +26,8 @@ every step was done by Factory or by Todd; anything else means someone went arou
 
 - Sets up and looks after Factory, Mastra, GitHub and Vercel settings, writes specs and
   documents, and runs the independent product-use audits.
+- Merges its own setup or document pull requests through the publisher App (`merge-pr.mjs`, pinned
+  to the head), since they change nothing Todd can try; product changes wait for Todd's approval.
 - Never builds, reviews, moves or merges a Factory card by hand, and never uses Factory's GitHub
   keys. If Factory seems unable to do something, check its docs and package source, then tell Todd
   the gap; don't work around it.

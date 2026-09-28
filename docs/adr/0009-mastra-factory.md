@@ -47,7 +47,9 @@ Robot checks (CI, including the Playwright browser test) and both reviews pass b
 asks for Todd's review. He tries the Vercel rehearsal copy, following the plain-language steps
 on the pull request, and approves or requests changes in one sentence. Approval is acceptance:
 GitHub's own auto-merge, with a branch rule requiring Todd's approval, merges it. Factory never
-merges. Progress is Factory's board and its Needs attention list; the issue checklist is dropped.
+merges. Todd's approval is only for product changes he can try on a rehearsal copy. Setup and
+document pull requests that change nothing he can try are merged by the publisher App, pinned to
+the reviewed head, and never by an agent's own credentials (Todd, 2026-09-28). Progress is Factory's board and its Needs attention list; the issue checklist is dropped.
 
 **Keeping agents honest.** A rule an agent can ignore is not enough, so there are locks: agent
 permissions that deny moving Factory cards, using Factory's GitHub keys, or merging; a required
