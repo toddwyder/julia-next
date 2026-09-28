@@ -1,8 +1,10 @@
-# Trial CI runner
+# Retired trial CI runner
 
 PR #130's GitHub-hosted jobs never started. GitHub's check annotation reported
 failed account payments or a spending limit. Vercel still deployed successfully.
-For JUL-183, GitHub's supported self-hosted runner now executes checks on OVH.
+For JUL-183, GitHub's supported self-hosted runner temporarily executed checks
+on OVH. Issue #136 restores GitHub-hosted `ubuntu-latest` for CI and the
+publisher gate; verify new hosted runs start before removing the trial runner.
 Runner registration required no billing change or additional App permission.
 Publishing the workflow repair subsequently required adding only **Workflows
 read/write** to the existing Factory App installation, still selecting only
@@ -41,13 +43,13 @@ application CI now also runs Chromium, framework lint
 and the production build.
 
 The trial baseline lacked Python graph dependencies and had a broken Linear
-test fixture. CI now creates a job-local Python venv, installs the pinned
-`graph/pydantic/requirements.txt` without sudo or secrets, and runs **all**
-`scripts/*.test.mjs` on every change, including the graph execution suite.
-The Card-query fixture includes the labels the client reads; failures must not
-be presented as passing evidence.
+test fixture. Historically CI created a Python venv and ran all
+`scripts/*.test.mjs`, including the retired graph execution suite. CI now runs
+current-app and policy tests; docs-only PRs retain their checks while skipping
+package installation, browser tests and build. Historical graph tests remain
+in the repository but no longer block current-app changes.
 
-Removal: restore the workflow runner labels after hosted jobs work; stop and
+Removal: after hosted jobs work, stop and
 uninstall this service with `svc.sh`, remove this runner in GitHub Settings,
 then remove its dedicated directory/account. Keep the Factory publisher
 allowlist while that App is the authorized publisher.
