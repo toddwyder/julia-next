@@ -88,3 +88,28 @@ Todd instructed the change and restart in chat. Only Mastra's documented configu
 Not yet verified: that a real session's spans and cost metrics land in DuckDB, which will be checked on the first real card, and whether Studio can be opened.
 
 Rollback: restore the five backups, run `install.sh`, and restart `julia-factory-trial.service`.
+
+## Repository-sourced Factory setup (issue #136) — 2026-09-28
+
+The server's deployed `package.json`, `package-lock.json`, `tsconfig.json`, and
+`src/mastra/index.ts` were captured in `ops/factory/app/`. The entry and TypeScript
+config are byte-identical to the live source; the manifest and lock differ only
+by removal of the machine-specific `postinstall` hook and its root lockfile flag.
+The repository installer now copies these four files to the target and invokes
+only the approved in-repo WorkOS patch after `npm ci` and after Mastra's build.
+No `.env`, credentials, databases, generated public UI, `node_modules`, or
+workspace state were copied. Mastra generates the Factory UI during build.
+
+A fresh isolated install at `/tmp/julia-factory-stage.55mT7x` completed `npm ci`,
+WorkOS cookie regression, `tsc --noEmit`, Factory build, built-package patch and
+second cookie regression. Both package copies had the approved patched hash
+`dcefe1c1948970e65bc9f943ef43c05d0bc3de11da06cbde887a98f94d6c7761`.
+This is **not** a live service reinstall: no service was stopped or restarted,
+no protected environment was changed, and no browser sign-in or new trace has
+been claimed. Before switching the live service, back up its current source,
+lockfile, `.env` and persistent data with their original permissions; run the
+repository installer as `julia-factory`, restart only after its checks pass, then
+verify WorkOS redirect, Todd's fresh sign-in and a fresh Mastra trace in DuckDB
+and Studio. If checks fail, restore the backups and restart the previously
+working service. Record the actual deployed commit and observed verification
+results here when that operator-only step occurs.

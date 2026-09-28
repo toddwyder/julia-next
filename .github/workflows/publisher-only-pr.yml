@@ -4,12 +4,6 @@ name: Publisher-only PR
 # GitHub App or the approved Factory App, never by a personal account -- publishing goes through review,
 # not around it. Mirrors toddwyder/AI-Stack's own publisher-only-pr.yml.
 #
-# Not yet a required branch-protection status check: this repo is private on
-# a plan that doesn't support that GitHub feature (confirmed via the API,
-# not assumed -- see the JUL-43 evidence trail). So this fails visibly on a
-# non-publisher PR but does not yet block the merge button. Flip that once
-# the plan/visibility question is decided.
-#
 # Deliberately no checkout step -- see AI-Stack's copy of this file for why
 # (secrets ARE available to same-repo pull_request runs; not checking out
 # and executing branch code keeps AXIOM_TOKEN out of reach of anything an
@@ -19,12 +13,16 @@ on:
   pull_request:
     types: [opened, reopened, synchronize, edited]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
   check:
-    runs-on: [self-hosted, Linux, X64, julia-factory-trial]
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Verify the PR was opened by an approved Julia publisher App

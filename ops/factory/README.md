@@ -25,10 +25,15 @@ Run installation as the dedicated Factory service user:
 bash /path/to/julia-next/ops/factory/install.sh /var/lib/julia-factory/app
 ```
 
-This uses the existing lockfile; it does not upgrade dependencies. The WorkOS
+The installer copies `ops/factory/app/{package.json,package-lock.json,tsconfig.json}`
+and `ops/factory/app/src/mastra/index.ts` into the service directory before
+`npm ci`; it never copies `.env`, databases or runtime workspaces. The versioned
+lockfile pins the deployed dependencies; it does not upgrade them. The Factory
+UI is supplied by Mastra's build, not committed as generated assets. The WorkOS
 patch checks version and original SHA-256 and rejects unexpected files. It applies
 before build and checks the copied deployment dependency afterward. Repeat
-application is safe. Restart the service only after checks succeed.
+application is safe. Back up the service directory before a live install and
+restart the service only after checks succeed.
 
 The installer runs `workos-cookie-identity.check.mjs` against both package copies.
 Its fixture checks one membership, an explicit organization choice, and no
@@ -59,12 +64,9 @@ Factory **0.17.2** scans both `.claude/skills` and `.agents/skills` as local
 sources. The earlier package patch selecting one root was removed so WorkOS is
 the only Mastra code exception. Skill-loading repair is separate work.
 
-The Factory app's `postinstall` script is
-`python3 /var/lib/julia-factory/patches/apply-install-patches.py .`; this keeps a
-plain `npm ci` from silently losing the exception. Copy this directory to that
-protected deployment path before installing. The wrapper remains the complete
-install/build/check procedure.
-
-The installer runs only the approved WorkOS package fix and its regression,
-followed by the scaffold's normal check and build. Factory uses its installed
-boards and normal model and GitHub connections.
+The server's previous `postinstall` pointed at a machine-specific patch copy.
+The repository manifest removes that hook; **always use this installer**, never
+run `npm ci` alone on the service directory: the installer applies the approved
+patch after install and again to Mastra's built output and runs both regressions.
+No additional Mastra package code is changed. Factory uses its installed boards
+and normal model and GitHub connections.
