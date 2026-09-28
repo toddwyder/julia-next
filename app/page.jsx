@@ -1,5 +1,10 @@
 import { version } from '../package.json';
 
 export default function Page() {
-  return <main>Julia {version}</main>;
+  return (
+    <main>
+      <div>Julia {version}</div>
+      <p>what are we cooking today?</p>
+    </main>
+  );
 }
