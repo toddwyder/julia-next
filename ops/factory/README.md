@@ -111,17 +111,45 @@ wait means a session question, a plan waiting for review, an unresolved
 supervisor finding, or a Triage card labeled `status: needs approval`.
 Automation run suggestions, other decisions, and mentions are excluded.
 The watcher records each wait's stable key before publishing, so an uncertain
-network result cannot resend it. Only a definite ntfy HTTP 429 rejection is
-retried: first after at least 60 seconds, then (if rejected again) after the
-next midnight UTC plus one minute. A third 429 exhausts that wait's retry
-budget. Timeouts, interrupted sends, other HTTP failures, old `attempted`
-rows, and exhausted retries need operator inspection; they are not automatically
-resent. The existing one-minute systemd timer checks when a retry is due and
-stays enabled across Factory restarts and server reboots. Its journal records
-only wait kind, outcome (`sent`, `rate_limited`, `rate_limit_exhausted`, or
-`uncertain_failure`), rejection count, and UTC due time; the private SQLite
-ledger records status, rejection count, and due time. Never publish the ledger's
-keys or links, or the ntfy topic, in an issue or log.
+network result cannot resend it. A definite ntfy HTTP 429 rejection is safe to
+retry: numeric code 42901 (request bucket) is retried at most once per minute
+while another attempt fits inside the first five minutes; code 42908 (daily
+quota), an unknown subtype, or a burst limit that lasts past the deadline is
+recorded as `deadline_unmet`, not called a successful delivery. A rejected
+publish does not prevent other new waits from being attempted. An optional,
+independently hosted ntfy origin can be used immediately after a definite
+primary 429 (even when its subtype is unknown); it uses the same wait identity
+and Click link. A fallback 429 follows the same bounded primary retry policy;
+an uncertain result on either origin is never sent again. Timeouts, interrupted
+sends, other HTTP failures, and old `attempted` rows need operator inspection;
+they are not automatically resent. Existing due rows lacking a recorded
+five-minute deadline are marked `deadline_unmet` rather than replayed. The
+one-minute systemd timer checks when a retry is due and stays enabled across
+Factory restarts and server reboots. Its journal records only wait kind,
+outcome (`sent`, `rate_limited`, `deadline_unmet`, or `uncertain_failure`),
+allowlisted numeric subtype (or `unknown`), rejection count, and UTC due time;
+the private SQLite ledger records these outcomes and the deadline. Never
+publish the ledger's keys or links, ntfy topics, host credentials, or raw error
+responses in an issue or log.
+
+**Fallback rollout is not approved by configuring a URL alone.** Leave
+`fallback_url` and `fallback_topic` absent until Todd approves the additional
+service/subscriptions on issue #156 and the authorized operator confirms a free,
+independent HTTPS ntfy origin can deliver promptly to *both* devices. Once
+approved, add both fields to the existing root-owned `config.json`:
+`fallback_url` is the HTTPS origin (no path, query, fragment, or user info), and
+`fallback_topic` is a separate private topic subscribed on both devices.
+Do not create another topic on ntfy.sh as a fallback: rate limits apply to the
+publisher's visitor. Self-hosted PWA delivery needs Web Push configured
+([ntfy configuration](https://docs.ntfy.sh/config/#web-push)); iOS app instant
+push for self-hosted servers may require forwarding poll requests to ntfy.sh
+([iOS instant notifications](https://docs.ntfy.sh/config/#ios-instant-notifications)).
+A self-hosted server accepted a publish is not proof of phone delivery. If
+neither approved route can meet the deadline, report the blocker on #156
+instead of weakening the two-device/five-minute requirement. Keep #148 open
+until Todd confirms the next naturally occurring question/plan reaches phone
+and Windows once with the correct link; do not manufacture a question or
+send a test notification to prove it.
 
 The setup generates a random topic in
 `/etc/julia-factory-wait-alerts/config.json` (root-owned, group

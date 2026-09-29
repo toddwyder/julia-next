@@ -3,7 +3,7 @@
 
 import argparse
 from contextlib import closing
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 import hashlib
 import json
 import os
@@ -14,7 +14,7 @@ import subprocess
 import sys
 import time
 from urllib.error import HTTPError
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit
 from urllib.request import Request, urlopen
 
 
@@ -33,6 +33,13 @@ def config_from(path):
         raise ValueError('Invalid Factory user ID')
     if not config['factory_url'].startswith('https://'):
         raise ValueError('Factory URL must use HTTPS')
+    if 'fallback_url' in config or 'fallback_topic' in config:
+        url = urlsplit(config['fallback_url'])
+        if (url.scheme != 'https' or not url.hostname or url.username or url.password
+                or url.path not in ('', '/') or url.query or url.fragment):
+            raise ValueError('Fallback URL must be an HTTPS origin')
+        if not re.fullmatch(r'[a-zA-Z0-9_-]{20,64}', config['fallback_topic']):
+            raise ValueError('Invalid fallback topic')
     return config
 
 
@@ -58,12 +65,24 @@ def sequence_id(key):
     return hashlib.sha256(key.encode('utf-8')).hexdigest()[:32]
 
 
-def publish(config, wait):
-    topic = config['topic']
+def ntfy_code(error):
+    try:
+        body = error.read(2049)
+        if len(body) > 2048:
+            return None
+        code = json.loads(body)['code']
+        return code if type(code) is int and code in (42901, 42908) else None
+    except (ValueError, KeyError, TypeError, AttributeError):
+        return None
+
+
+def publish(config, wait, *, fallback=False):
+    origin = config['fallback_url'].rstrip('/') if fallback else 'https://ntfy.sh'
+    topic = config['fallback_topic'] if fallback else config['topic']
     target = urljoin(config['factory_url'].rstrip('/') + '/', wait['path'].lstrip('/'))
     body = f"{wait['detail']}: {wait['title']}".encode('utf-8')
     request = Request(
-        f'https://ntfy.sh/{topic}/{sequence_id(wait["key"])}',
+        f'{origin}/{topic}/{sequence_id(wait["key"])}',
         data=body,
         headers={'Title': 'Factory needs you', 'Click': target,
                  'Content-Type': 'text/plain; charset=utf-8'},
@@ -90,6 +109,10 @@ def deliver(config, state_path, waits):
             db.execute('ALTER TABLE delivered ADD COLUMN rejections INTEGER NOT NULL DEFAULT 0')
         if 'retry_at' not in columns:
             db.execute('ALTER TABLE delivered ADD COLUMN retry_at REAL')
+        if 'ntfy_code' not in columns:
+            db.execute('ALTER TABLE delivered ADD COLUMN ntfy_code INTEGER')
+        if 'deadline_at' not in columns:
+            db.execute('ALTER TABLE delivered ADD COLUMN deadline_at REAL')
         # The first release included an occurrence suffix on these keys. Preserve
         # its history when moving to one stable identity per finding or card.
         for key, kind, link, delivered_at, status in db.execute(
@@ -107,10 +130,17 @@ def deliver(config, state_path, waits):
                     (stable_key, kind, link, delivered_at, status))
         db.commit()
         for wait in waits:
-            row = db.execute('SELECT status,retry_at,rejections FROM delivered WHERE wait_key=?',
+            row = db.execute('SELECT status,retry_at,rejections,deadline_at FROM delivered WHERE wait_key=?',
                              (wait['key'],)).fetchone()
+            deadline_at = row[3] if row else time.time() + 300
             if row:
                 if row[0] != 'rate_limited' or row[1] > time.time():
+                    continue
+                if row[3] is None or time.time() >= row[3]:
+                    db.execute("UPDATE delivered SET status='deadline_unmet', retry_at=NULL "
+                               "WHERE wait_key=?", (wait['key'],))
+                    db.commit()
+                    print(f"wait-alerts kind={wait['kind']} outcome=deadline_unmet")
                     continue
                 # Reclaim before sending: an interrupted retry remains uncertain.
                 db.execute("UPDATE delivered SET status='attempted', retry_at=NULL WHERE wait_key=?",
@@ -119,8 +149,9 @@ def deliver(config, state_path, waits):
                 link = urljoin(config['factory_url'].rstrip('/') + '/', wait['path'].lstrip('/'))
                 # Claim before the network call. A timeout or process crash must never
                 # turn the same wait into a second phone/desktop notification.
-                db.execute("INSERT INTO delivered (wait_key,kind,link,status) VALUES (?,?,?,'attempted')",
-                           (wait['key'], wait['kind'], link))
+                db.execute("INSERT INTO delivered (wait_key,kind,link,status,deadline_at) "
+                           "VALUES (?,?,?,'attempted',?)",
+                           (wait['key'], wait['kind'], link, deadline_at))
             db.commit()
             try:
                 publish(config, wait)
@@ -128,26 +159,42 @@ def deliver(config, state_path, waits):
                 if error.code != 429:
                     print(f"wait-alerts kind={wait['kind']} outcome=uncertain_failure")
                     raise
-                now = time.time()
-                retry_at = now + 60
-                if row and row[2] == 1:
-                    tomorrow = datetime.fromtimestamp(now, timezone.utc).date() + timedelta(days=1)
-                    midnight = datetime.combine(tomorrow, datetime.min.time(), tzinfo=timezone.utc)
-                    retry_at = max(retry_at, midnight.timestamp() + 60)
-                if row and row[2] >= 2:
-                    db.execute("UPDATE delivered SET status='rate_limit_exhausted', "
-                               "rejections=rejections+1, retry_at=NULL WHERE wait_key=?", (wait['key'],))
-                    outcome = 'rate_limit_exhausted'
+                code = ntfy_code(error)
+                if 'fallback_url' in config:
+                    try:
+                        publish(config, wait, fallback=True)
+                    except HTTPError as fallback_error:
+                        if fallback_error.code != 429:
+                            print(f"wait-alerts kind={wait['kind']} outcome=uncertain_failure")
+                            raise
+                        # Both origins definitely rejected; only the primary subtype
+                        # determines whether a bounded request-bucket retry is useful.
+                    except Exception:
+                        print(f"wait-alerts kind={wait['kind']} outcome=uncertain_failure")
+                        raise
+                    else:
+                        db.execute("UPDATE delivered SET status='sent', delivered_at=CURRENT_TIMESTAMP "
+                                   "WHERE wait_key=?", (wait['key'],))
+                        db.commit()
+                        print(f"wait-alerts kind={wait['kind']} outcome=sent via=fallback")
+                        continue
+                retry_at = time.time() + 60
+                if code != 42901 or retry_at >= deadline_at:
+                    db.execute("UPDATE delivered SET status='deadline_unmet', "
+                               "rejections=rejections+1, retry_at=NULL, ntfy_code=? WHERE wait_key=?",
+                               (code, wait['key']))
+                    outcome = 'deadline_unmet'
                 else:
                     db.execute("UPDATE delivered SET status='rate_limited', rejections=rejections+1, "
-                               "retry_at=? WHERE wait_key=?", (retry_at, wait['key']))
+                               "retry_at=?, ntfy_code=? WHERE wait_key=?", (retry_at, code, wait['key']))
                     outcome = 'rate_limited'
                 db.commit()
                 count = (row[2] if row else 0) + 1
                 due = (f' retry_at={datetime.fromtimestamp(retry_at, timezone.utc).isoformat()}'
                        if outcome == 'rate_limited' else '')
-                print(f"wait-alerts kind={wait['kind']} outcome={outcome} rejections={count}{due}")
-                break
+                subtype = f' subtype={code}' if code is not None else ' subtype=unknown'
+                print(f"wait-alerts kind={wait['kind']} outcome={outcome} rejections={count}{subtype}{due}")
+                continue
             except Exception:
                 print(f"wait-alerts kind={wait['kind']} outcome=uncertain_failure")
                 raise
