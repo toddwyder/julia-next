@@ -8,7 +8,7 @@ Todd adds or removes an entry. Anything custom that is not listed here is not ap
 | # | Exception | Gap it fills | Remove when |
 |---|---|---|---|
 | 1 | WorkOS cookie identity fix in `@mastra/auth-workos` 1.6.5 | Default platform sign-in rejects our self-hosted address; the WorkOS cookie path drops the organization ([#25252](https://github.com/mastra-ai/mastra/issues/25252)) | #25252 ships in a Mastra release |
-| 2 | Factory wait watcher and private ntfy origin | Stock Factory 0.17.2 shows waits in the web app but does not send phone and Windows alerts when Todd is away ([Mastra request #25378](https://github.com/mastra-ai/mastra/issues/25378)); public ntfy.sh exhausted its daily quota (42908) with only 15 watcher publishes | Remove when Mastra adds its own alerts |
+| 2 | Factory wait watcher and Discord webhook | Stock Factory 0.17.2 shows waits in the web app but does not send phone and Windows alerts when Todd is away ([Mastra request #25378](https://github.com/mastra-ai/mastra/issues/25378)); public ntfy.sh exhausted its daily quota (42908), and the private ntfy PWA did not register desktop Web Push | Remove when Mastra adds its own alerts |
 
 Approved by ADR 0009 but not built yet: the check that rejects unapproved custom machinery, and
 the weekly cost summary (Monday note). Each gets its row when it is built.
@@ -20,11 +20,14 @@ identity fix described in [mastra-ai/mastra#25252](https://github.com/mastra-ai/
 It is the only installed Mastra package code change. See
 `docs/agents/factory-platform-auth-change-log.md` for the complete change list.
 
-When migrating an existing ntfy.sh watcher, stop its timer before copying the
-new watcher: `sudo systemctl stop julia-factory-wait-alerts.timer`. The old
-`subscribed` marker may still enable the installed old service. The one-time
-`install-wait-alerts.sh` step below installs the new gate and starts the timer
-again; it stays gated until both private-origin subscriptions are ready.
+When replacing the ntfy watcher, stop its timer before copying the new watcher:
+`sudo systemctl stop julia-factory-wait-alerts.timer`. The new service uses a
+separate `discord-ready` gate; old ntfy subscription markers cannot enable it.
+After the normal `install.sh` below, re-run `install-wait-alerts.sh` to install
+the new unit and restart the timer. It preserves the existing config and
+delivery ledger. Remove the old `subscribed` and `subscribed-self-hosted`
+markers, add the Discord webhook URL to the config, then create `discord-ready`.
+Check `systemctl status julia-factory-wait-alerts.timer` afterward.
 
 Run installation as the dedicated Factory service user:
 
@@ -127,64 +130,42 @@ it never changes Factory records, answers questions, or moves cards. A
 wait means a session question, a plan waiting for review, an unresolved
 supervisor finding, or a Triage card labeled `status: needs approval`.
 Automation run suggestions, other decisions, and mentions are excluded.
-The watcher records each wait's stable key before publishing to the loopback
-ntfy origin. An accepted message is sent once. A timeout or interrupted send
-has an uncertain outcome and is never replayed. A definite HTTP rejection
-records only numeric HTTP and ntfy codes in the private ledger and journal.
-Definite HTTP rejections make the systemd run fail visibly; a refused local
-connection releases its unsent claim for the next timer run.
-Historical attempted and rate-limited rows from ntfy.sh are never replayed.
-The one-minute systemd timer remains enabled across Factory restarts and reboots.
-Never publish the ledger's keys or links, the ntfy topic, or its token in an
-issue or log.
+The watcher claims each wait's stable key before posting to a dedicated Discord
+channel webhook. It uses Discord's `wait=true` response to record the confirmed
+message ID. A timeout, HTTP 5xx, or interrupted send has an uncertain outcome
+and is never replayed. A non-rate-limit HTTP 4xx rejection records only the
+numeric status in the private ledger and journal and makes the systemd run fail
+visibly. Historical attempted and rate-limited ntfy rows are never replayed.
+A Discord HTTP 429 means no message was posted; the watcher keeps that wait
+pending and uses Discord's `Retry-After` time before another attempt. It also
+retries a DNS failure or refused TCP connection after one minute, because the
+message never reached Discord. The one-minute timer remains enabled across
+Factory restarts and reboots. Never publish ledger keys, links, or the webhook
+URL in an issue or log.
 
-### Private ntfy origin
+### Discord delivery
 
-The public ntfy.sh route returned HTTP 42908, its daily message quota rejection.
-The watcher logged only 15 accepted publishes on 2026-09-29, far below
-ntfy.sh's 250-message daily visitor limit. ntfy.sh applies the free quota by
-visitor IP, so this installation cannot reserve its own capacity. The private
-ntfy 2.28.0 origin listens only on `127.0.0.1:8085`; Tailscale Funnel exposes
-its HTTPS PWA at `https://julia-factory.tail91f394.ts.net:8443`. Factory
-remains on port 443. ntfy denies anonymous access by default. Only the existing
-random topic is anonymously readable; a dedicated service token can publish
-to it. Auth tokens and Web Push subscriptions persist under `/var/lib/ntfy`.
+Discord's [incoming webhooks](https://docs.discord.com/developers/resources/webhook#execute-webhook)
+post to one channel without a bot or paid service. Create a webhook for a
+private text channel Todd can access on Windows and Android. Set that channel's
+[notification override](https://support.discord.com/hc/en-us/articles/215253258-Notifications-Settings-101)
+to **All messages** on both devices, enable mobile push, and leave the server
+unmuted. Keep the Discord desktop app running for Windows alerts. Discord may
+delay mobile push while the desktop is active; its **Push Notification Inactive
+Timeout** controls that behavior. The watcher includes the Factory link in the
+message and disables mentions from untrusted card titles. Discord returns one
+message for each new wait; the watcher does not post a staged Factory question
+to test delivery.
 
-Install ntfy from its [official Ubuntu repository](https://docs.ntfy.sh/install/#debianubuntu-repository).
-After the normal Factory installer and the one-time wait-alert setup above,
-install the reviewed script in a root-owned location and run it there:
-
-```sh
-sudo install -o root -g root -m 0755 \
-  "$(pwd -P)/ops/factory/install-local-ntfy.py" \
-  /usr/local/sbin/julia-factory-install-ntfy
-sudo python3 /usr/local/sbin/julia-factory-install-ntfy
-```
-
-Every parent of `/usr/local/sbin` is root-owned. Never execute a root Python
-script from the service-owned app or patches tree.
-This configures ntfy, its service token, Web Push, and the port 8443 Funnel
-route. It preserves existing keys and tokens on repeat runs.
-
-The setup generates a random topic in
-`/etc/julia-factory-wait-alerts/config.json` (root-owned, group
-`julia-factory`, mode `0640`). The private-origin installer adds its
-loopback publish URL and access token there. Keep both topic and token private.
-Todd subscribes from the [ntfy Android app](https://docs.ntfy.sh/subscribe/phone/)
-to the private origin and installs the
-[Windows PWA](https://docs.ntfy.sh/subscribe/pwa/) from that same HTTPS origin.
-In the Windows PWA, enter only the topic name and leave **Use another server**
-off. ntfy sends background push only for topics whose server address matches
-the PWA's origin. Leaving the switch off ensures that exact match.
-He enables background notifications in the web app's Settings if using a
-browser tab; an installed PWA enables them by default. The Windows browser
-must be running for desktop Web Push. [ntfy says](https://docs.ntfy.sh/subscribe/web/#background-notifications)
-background notifications pause if the app is not opened for over a week, so
-open the PWA at least weekly. On Android, choose
-instant delivery and allow the ntfy app to run in the background. After both
-subscriptions are confirmed,
-the operator creates `/etc/julia-factory-wait-alerts/subscribed-self-hosted`
-and starts the watcher. The old `subscribed` marker does not enable delivery.
+The webhook URL belongs in `/etc/julia-factory-wait-alerts/config.json`
+(root-owned, group `julia-factory`, mode `0640`) under `discord_webhook_url`.
+Use the URL Discord provides, beginning with `https://discord.com/api/webhooks/`.
+The watcher accepts only that host and endpoint shape. After confirming the
+channel's notification settings and a successful webhook metadata lookup,
+create `/etc/julia-factory-wait-alerts/discord-ready` as root, then start
+`julia-factory-wait-alerts.service`. Keep the old ntfy markers absent; they do
+not enable Discord delivery. Once a real wait reaches both devices, disable
+the retired ntfy service and remove its port 8443 Funnel route.
 
 Inspect current waits without publishing:
 

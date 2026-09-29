@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
-"""Read Factory's wait state and deliver each new wait to one ntfy topic."""
+"""Read Factory's wait state and deliver each new wait to Discord."""
 
 import argparse
 from contextlib import closing
-import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
+import socket
 import sqlite3
 import subprocess
 import sys
+import time
 from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin, urlsplit
 from urllib.request import Request, urlopen
@@ -23,21 +25,17 @@ SQL = Path(__file__).with_name('wait-alerts.sql')
 
 def config_from(path):
     config = json.loads(path.read_text(encoding='utf-8'))
-    if not re.fullmatch(r'[a-zA-Z0-9_-]{20,64}', config['topic']):
-        raise ValueError('Invalid ntfy topic')
     if not re.fullmatch(r'[a-zA-Z0-9_-]+', config['project_id']):
         raise ValueError('Invalid Factory project ID')
     if not re.fullmatch(r'[a-zA-Z0-9_-]+', config['user_id']):
         raise ValueError('Invalid Factory user ID')
     if not config['factory_url'].startswith('https://'):
         raise ValueError('Factory URL must use HTTPS')
-    ntfy_url = urlsplit(config['ntfy_url'])
-    if ntfy_url.scheme != 'http' or ntfy_url.hostname not in ('127.0.0.1', 'localhost'):
-        raise ValueError('ntfy publisher must be loopback HTTP')
-    if ntfy_url.username or ntfy_url.password or ntfy_url.path not in ('', '/'):
-        raise ValueError('Invalid ntfy publisher URL')
-    if not re.fullmatch(r'tk_[a-z0-9]{29}', config['ntfy_token']):
-        raise ValueError('Invalid ntfy access token')
+    webhook = urlsplit(config['discord_webhook_url'])
+    if (webhook.scheme != 'https' or webhook.netloc != 'discord.com' or
+            webhook.query or webhook.fragment or not re.fullmatch(
+                r'/api/webhooks/[0-9]{17,20}/[A-Za-z0-9_-]{30,}', webhook.path)):
+        raise ValueError('Invalid Discord webhook URL')
     return config
 
 
@@ -59,27 +57,47 @@ def read_waits(config):
     return waits
 
 
-def sequence_id(key):
-    return hashlib.sha256(key.encode('utf-8')).hexdigest()[:32]
-
-
 def publish(config, wait):
-    topic = config['topic']
     target = urljoin(config['factory_url'].rstrip('/') + '/', wait['path'].lstrip('/'))
-    body = f"{wait['detail']}: {wait['title']}".encode('utf-8')
+    summary = f"{wait['detail']}: {wait['title']}".replace('\r', ' ').replace('\n', ' ')
+    prefix = 'Factory needs you\n'
+    budget = 2000 - len(prefix) - len(target) - 1
+    if budget < 0:
+        raise ValueError('Factory deep link exceeds Discord message limit')
+    content = f'{prefix}{summary[:budget]}\n{target}'
+    body = json.dumps({'content': content, 'username': 'Factory',
+                       'allowed_mentions': {'parse': []}}).encode('utf-8')
     request = Request(
-        f'{config["ntfy_url"].rstrip("/")}/{topic}/{sequence_id(wait["key"])}',
+        config['discord_webhook_url'] + '?wait=true',
         data=body,
-        headers={'Title': 'Factory needs you', 'Click': target,
-                 'Authorization': f'Bearer {config["ntfy_token"]}',
-                 'Content-Type': 'text/plain; charset=utf-8'},
+        headers={'Content-Type': 'application/json',
+                 'User-Agent': 'JuliaFactoryAlerts/1.0'},
         method='POST',
     )
     with urlopen(request, timeout=20) as response:
-        if response.status not in (200, 201):
-            raise RuntimeError(f'ntfy publish returned HTTP {response.status}')
-        json.load(response)
-    return target
+        if response.status != 200:
+            raise RuntimeError(f'Discord publish returned HTTP {response.status}')
+        message = json.load(response)
+    if not isinstance(message, dict) or not re.fullmatch(r'[0-9]{17,20}', str(message.get('id', ''))):
+        raise RuntimeError('Discord did not confirm a message ID')
+    return message['id']
+
+
+def retry_after_seconds(error):
+    """Discord says a 429 is unposted and specifies when another attempt is allowed."""
+    value = error.headers.get('Retry-After') if error.headers else None
+    if value is None:
+        try:
+            value = json.loads(error.read(4096)).get('retry_after')
+        except (ValueError, AttributeError, UnicodeDecodeError):
+            value = None
+    try:
+        seconds = float(value)
+    except (TypeError, ValueError):
+        seconds = 60.0
+    if not math.isfinite(seconds) or seconds <= 0:
+        seconds = 60.0
+    return min(max(seconds, 1.0), 86400.0)
 
 
 def deliver(config, state_path, waits):
@@ -94,8 +112,10 @@ def deliver(config, state_path, waits):
             db.execute("ALTER TABLE delivered ADD COLUMN status TEXT NOT NULL DEFAULT 'sent'")
         if 'http_status' not in columns:
             db.execute('ALTER TABLE delivered ADD COLUMN http_status INTEGER')
-        if 'ntfy_code' not in columns:
-            db.execute('ALTER TABLE delivered ADD COLUMN ntfy_code INTEGER')
+        if 'discord_message_id' not in columns:
+            db.execute('ALTER TABLE delivered ADD COLUMN discord_message_id TEXT')
+        if 'retry_at' not in columns:
+            db.execute('ALTER TABLE delivered ADD COLUMN retry_at REAL')
         # The first release included an occurrence suffix on these keys. Preserve
         # its history when moving to one stable identity per finding or card.
         for key, kind, link, delivered_at, status in db.execute(
@@ -114,51 +134,67 @@ def deliver(config, state_path, waits):
         db.commit()
         rejected = False
         for wait in waits:
-            if db.execute('SELECT 1 FROM delivered WHERE wait_key=?', (wait['key'],)).fetchone():
+            prior = db.execute('SELECT status,retry_at FROM delivered WHERE wait_key=?',
+                               (wait['key'],)).fetchone()
+            if prior and prior[0] != 'discord_retry':
+                continue
+            if prior and (prior[1] is None or prior[1] > time.time()):
                 continue
             link = urljoin(config['factory_url'].rstrip('/') + '/', wait['path'].lstrip('/'))
             # Claim before the network call. An uncertain result cannot create a
             # duplicate notification on the next timer run.
-            db.execute("INSERT INTO delivered (wait_key,kind,link,status) VALUES (?,?,?,'attempted')",
-                       (wait['key'], wait['kind'], link))
+            if prior:
+                db.execute("UPDATE delivered SET status='attempted', retry_at=NULL "
+                           "WHERE wait_key=?", (wait['key'],))
+            else:
+                db.execute("INSERT INTO delivered (wait_key,kind,link,status) VALUES (?,?,?,'attempted')",
+                           (wait['key'], wait['kind'], link))
             db.commit()
             try:
-                publish(config, wait)
+                message_id = publish(config, wait)
             except HTTPError as error:
-                ntfy_code = None
-                try:
-                    candidate = json.load(error).get('code')
-                    if type(candidate) is int and 40000 <= candidate <= 59999:
-                        ntfy_code = candidate
-                except (ValueError, AttributeError, UnicodeDecodeError):
-                    pass
-                db.execute("UPDATE delivered SET status='rejected', http_status=?, ntfy_code=? "
-                           "WHERE wait_key=?", (error.code, ntfy_code, wait['key']))
+                if error.code == 429:
+                    seconds = retry_after_seconds(error)
+                    db.execute("UPDATE delivered SET status='discord_retry', retry_at=?, "
+                               "http_status=429 WHERE wait_key=?",
+                               (time.time() + seconds, wait['key']))
+                    db.commit()
+                    print(f"wait-alerts kind={wait['kind']} outcome=rate_limited "
+                          f"retry_in_seconds={seconds:g}")
+                    break
+                if error.code == 408 or error.code >= 500:
+                    print(f"wait-alerts kind={wait['kind']} outcome=uncertain_failure "
+                          f"http_status={error.code}")
+                    raise
+                db.execute("UPDATE delivered SET status='rejected', http_status=? "
+                           "WHERE wait_key=?", (error.code, wait['key']))
                 db.commit()
                 print(f"wait-alerts kind={wait['kind']} outcome=rejected "
-                      f"http_status={error.code} ntfy_code={ntfy_code}")
+                      f"http_status={error.code}")
                 rejected = True
                 continue
             except URLError as error:
-                if isinstance(error.reason, ConnectionRefusedError):
-                    # The loopback listener refused the connection before ntfy
-                    # could accept a message. Reclaim this unsent wait so the
-                    # next timer run can deliver it after ntfy starts.
-                    db.execute('DELETE FROM delivered WHERE wait_key=?', (wait['key'],))
+                if isinstance(error.reason, (socket.gaierror, ConnectionRefusedError)):
+                    # DNS or TCP refusal happened before Discord could accept
+                    # this message. A later attempt cannot duplicate it.
+                    db.execute("UPDATE delivered SET status='discord_retry', retry_at=? "
+                               "WHERE wait_key=?", (time.time() + 60, wait['key']))
                     db.commit()
-                    print(f"wait-alerts kind={wait['kind']} outcome=local_origin_unavailable")
-                else:
-                    print(f"wait-alerts kind={wait['kind']} outcome=uncertain_failure")
+                    print(f"wait-alerts kind={wait['kind']} outcome=transport_unavailable "
+                          "retry_in_seconds=60")
+                    break
+                print(f"wait-alerts kind={wait['kind']} outcome=uncertain_failure")
                 raise
             except Exception:
                 print(f"wait-alerts kind={wait['kind']} outcome=uncertain_failure")
                 raise
-            db.execute("UPDATE delivered SET status='sent', delivered_at=CURRENT_TIMESTAMP WHERE wait_key=?",
-                       (wait['key'],))
+            db.execute("UPDATE delivered SET status='sent', discord_message_id=?, "
+                       "delivered_at=CURRENT_TIMESTAMP WHERE wait_key=?",
+                       (message_id, wait['key']))
             db.commit()
             print(f"wait-alerts kind={wait['kind']} outcome=sent")
         if rejected:
-            raise RuntimeError('ntfy rejected one or more alerts; inspect numeric codes in the journal')
+            raise RuntimeError('Discord rejected one or more alerts; inspect HTTP codes in the journal')
 
 
 def main():
