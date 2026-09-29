@@ -4,12 +4,14 @@
 import argparse
 from contextlib import closing
 import json
+import math
 import os
 from pathlib import Path
 import re
 import sqlite3
 import subprocess
 import sys
+import time
 from urllib.error import HTTPError
 from urllib.parse import urljoin, urlsplit
 from urllib.request import Request, urlopen
@@ -80,6 +82,23 @@ def publish(config, wait):
     return message['id']
 
 
+def retry_after_seconds(error):
+    """Discord says a 429 is unposted and specifies when another attempt is allowed."""
+    value = error.headers.get('Retry-After') if error.headers else None
+    if value is None:
+        try:
+            value = json.loads(error.read(4096)).get('retry_after')
+        except (ValueError, AttributeError, UnicodeDecodeError):
+            value = None
+    try:
+        seconds = float(value)
+    except (TypeError, ValueError):
+        seconds = 60.0
+    if not math.isfinite(seconds) or seconds <= 0:
+        seconds = 60.0
+    return min(max(seconds, 1.0), 86400.0)
+
+
 def deliver(config, state_path, waits):
     state_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     with closing(sqlite3.connect(state_path)) as db:
@@ -94,6 +113,8 @@ def deliver(config, state_path, waits):
             db.execute('ALTER TABLE delivered ADD COLUMN http_status INTEGER')
         if 'discord_message_id' not in columns:
             db.execute('ALTER TABLE delivered ADD COLUMN discord_message_id TEXT')
+        if 'retry_at' not in columns:
+            db.execute('ALTER TABLE delivered ADD COLUMN retry_at REAL')
         # The first release included an occurrence suffix on these keys. Preserve
         # its history when moving to one stable identity per finding or card.
         for key, kind, link, delivered_at, status in db.execute(
@@ -112,17 +133,38 @@ def deliver(config, state_path, waits):
         db.commit()
         rejected = False
         for wait in waits:
-            if db.execute('SELECT 1 FROM delivered WHERE wait_key=?', (wait['key'],)).fetchone():
+            prior = db.execute('SELECT status,retry_at FROM delivered WHERE wait_key=?',
+                               (wait['key'],)).fetchone()
+            if prior and prior[0] != 'discord_retry':
+                continue
+            if prior and (prior[1] is None or prior[1] > time.time()):
                 continue
             link = urljoin(config['factory_url'].rstrip('/') + '/', wait['path'].lstrip('/'))
             # Claim before the network call. An uncertain result cannot create a
             # duplicate notification on the next timer run.
-            db.execute("INSERT INTO delivered (wait_key,kind,link,status) VALUES (?,?,?,'attempted')",
-                       (wait['key'], wait['kind'], link))
+            if prior:
+                db.execute("UPDATE delivered SET status='attempted', retry_at=NULL "
+                           "WHERE wait_key=?", (wait['key'],))
+            else:
+                db.execute("INSERT INTO delivered (wait_key,kind,link,status) VALUES (?,?,?,'attempted')",
+                           (wait['key'], wait['kind'], link))
             db.commit()
             try:
                 message_id = publish(config, wait)
             except HTTPError as error:
+                if error.code == 429:
+                    seconds = retry_after_seconds(error)
+                    db.execute("UPDATE delivered SET status='discord_retry', retry_at=?, "
+                               "http_status=429 WHERE wait_key=?",
+                               (time.time() + seconds, wait['key']))
+                    db.commit()
+                    print(f"wait-alerts kind={wait['kind']} outcome=rate_limited "
+                          f"retry_in_seconds={seconds:g}")
+                    break
+                if error.code == 408 or error.code >= 500:
+                    print(f"wait-alerts kind={wait['kind']} outcome=uncertain_failure "
+                          f"http_status={error.code}")
+                    raise
                 db.execute("UPDATE delivered SET status='rejected', http_status=? "
                            "WHERE wait_key=?", (error.code, wait['key']))
                 db.commit()

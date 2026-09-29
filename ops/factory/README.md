@@ -23,6 +23,11 @@ It is the only installed Mastra package code change. See
 When replacing the ntfy watcher, stop its timer before copying the new watcher:
 `sudo systemctl stop julia-factory-wait-alerts.timer`. The new service uses a
 separate `discord-ready` gate; old ntfy subscription markers cannot enable it.
+After the normal `install.sh` below, re-run `install-wait-alerts.sh` to install
+the new unit and restart the timer. It preserves the existing config and
+delivery ledger. Remove the old `subscribed` and `subscribed-self-hosted`
+markers, add the Discord webhook URL to the config, then create `discord-ready`.
+Check `systemctl status julia-factory-wait-alerts.timer` afterward.
 
 Run installation as the dedicated Factory service user:
 
@@ -127,11 +132,14 @@ supervisor finding, or a Triage card labeled `status: needs approval`.
 Automation run suggestions, other decisions, and mentions are excluded.
 The watcher claims each wait's stable key before posting to a dedicated Discord
 channel webhook. It uses Discord's `wait=true` response to record the confirmed
-message ID. A timeout or interrupted send has an uncertain outcome and is never
-replayed. A definite HTTP rejection records only the numeric status in the
-private ledger and journal and makes the systemd run fail visibly. Historical
-attempted and rate-limited ntfy rows are never replayed. The one-minute timer
-remains enabled across Factory restarts and reboots. Never publish the ledger's
+message ID. A timeout, HTTP 5xx, or interrupted send has an uncertain outcome
+and is never replayed. A non-rate-limit HTTP 4xx rejection records only the
+numeric status in the private ledger and journal and makes the systemd run fail
+visibly. Historical attempted and rate-limited ntfy rows are never replayed.
+A Discord HTTP 429 means no message was posted; the watcher keeps that wait
+pending and uses Discord's `Retry-After` time before another attempt. The
+one-minute timer remains enabled across Factory restarts and reboots. Never
+publish the ledger's
 keys or links, or the webhook URL, in an issue or log.
 
 ### Discord delivery
@@ -141,9 +149,12 @@ post to one channel without a bot or paid service. Create a webhook for a
 private text channel Todd can access on Windows and Android. Set that channel's
 [notification override](https://support.discord.com/hc/en-us/articles/215253258-Notifications-Settings-101)
 to **All messages** on both devices, enable mobile push, and leave the server
-unmuted. The watcher includes the Factory link in the message and disables
-mentions from untrusted card titles. Discord returns one message for each new
-wait; the watcher does not post a staged Factory question to test delivery.
+unmuted. Keep the Discord desktop app running for Windows alerts. Discord may
+delay mobile push while the desktop is active; its **Push Notification Inactive
+Timeout** controls that behavior. The watcher includes the Factory link in the
+message and disables mentions from untrusted card titles. Discord returns one
+message for each new wait; the watcher does not post a staged Factory question
+to test delivery.
 
 The webhook URL belongs in `/etc/julia-factory-wait-alerts/config.json`
 (root-owned, group `julia-factory`, mode `0640`) under `discord_webhook_url`.

@@ -70,7 +70,7 @@ class WaitAlertsTest(unittest.TestCase):
     def test_rejection_records_safe_code_without_replay_or_secret_output(self):
         with tempfile.TemporaryDirectory() as directory:
             state = Path(directory) / 'delivered.sqlite3'
-            error = HTTPError(self.config['discord_webhook_url'], 429,
+            error = HTTPError(self.config['discord_webhook_url'], 403,
                               'private detail', {}, BytesIO(b'{"message":"private detail"}'))
             output = StringIO()
             with redirect_stdout(output), patch.object(watcher, 'urlopen', side_effect=error) as send:
@@ -81,11 +81,44 @@ class WaitAlertsTest(unittest.TestCase):
             with closing(sqlite3.connect(state)) as db:
                 self.assertEqual(db.execute(
                     'SELECT status,http_status FROM delivered'
-                ).fetchone(), ('rejected', 429))
-            self.assertIn('http_status=429', output.getvalue())
+                ).fetchone(), ('rejected', 403))
+            self.assertIn('http_status=403', output.getvalue())
             for private in (self.config['discord_webhook_url'],
                             self.wait['key'], self.wait['path'], 'private detail'):
                 self.assertNotIn(private, output.getvalue())
+
+    def test_discord_429_retries_after_deadline_without_losing_wait(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory) / 'delivered.sqlite3'
+            error = HTTPError(self.config['discord_webhook_url'], 429, 'slow down',
+                              {'Retry-After': '2'}, BytesIO(b'{"retry_after":2}'))
+            with patch.object(watcher.time, 'time', return_value=1000), \
+                    patch.object(watcher, 'urlopen', side_effect=error) as send:
+                watcher.deliver(self.config, state, [self.wait])
+                watcher.deliver(self.config, state, [self.wait])
+            self.assertEqual(send.call_count, 1)
+            with closing(sqlite3.connect(state)) as db:
+                self.assertEqual(db.execute('SELECT status,retry_at FROM delivered').fetchone(),
+                                 ('discord_retry', 1002.0))
+            with patch.object(watcher.time, 'time', return_value=1003), \
+                    patch.object(watcher, 'urlopen', return_value=Response(CONFIRMATION)) as send:
+                watcher.deliver(self.config, state, [self.wait])
+                watcher.deliver(self.config, state, [self.wait])
+            self.assertEqual(send.call_count, 1)
+            with closing(sqlite3.connect(state)) as db:
+                self.assertEqual(db.execute('SELECT status FROM delivered').fetchone()[0], 'sent')
+
+    def test_server_error_is_uncertain_and_never_replayed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory) / 'delivered.sqlite3'
+            error = HTTPError(self.config['discord_webhook_url'], 502, 'upstream', {}, BytesIO())
+            with patch.object(watcher, 'urlopen', side_effect=error) as send:
+                with self.assertRaises(HTTPError):
+                    watcher.deliver(self.config, state, [self.wait])
+                watcher.deliver(self.config, state, [self.wait])
+            self.assertEqual(send.call_count, 1)
+            with closing(sqlite3.connect(state)) as db:
+                self.assertEqual(db.execute('SELECT status FROM delivered').fetchone()[0], 'attempted')
 
     def test_network_failure_is_not_replayed_when_outcome_is_uncertain(self):
         with tempfile.TemporaryDirectory() as directory:
