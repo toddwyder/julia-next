@@ -11,7 +11,9 @@ concurrency:
 
 jobs:
   checks:
-    runs-on: ubuntu-latest
+    # ubuntu-latest rejects the bubblewrap command on the hosted runner.
+    # Run the actual sandbox behavior tests on GitHub's Ubuntu 22.04 VM.
+    runs-on: ubuntu-22.04
     permissions:
       contents: read
     steps:
