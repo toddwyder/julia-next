@@ -1,7 +1,14 @@
 import importlib.util
-from contextlib import closing
+from contextlib import closing, redirect_stderr, redirect_stdout
+from datetime import datetime, timezone
+from io import BytesIO, StringIO
 from pathlib import Path
+import json
+import runpy
 import sqlite3
+import sys
+from types import SimpleNamespace
+from urllib.error import HTTPError
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -10,6 +17,10 @@ from unittest.mock import patch
 SPEC = importlib.util.spec_from_file_location('wait_alerts', Path(__file__).with_name('wait-alerts.py'))
 watcher = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(watcher)
+
+
+class SuccessResponse(BytesIO):
+    status = 200
 
 
 class WaitAlertsTest(unittest.TestCase):
@@ -31,6 +42,107 @@ class WaitAlertsTest(unittest.TestCase):
                 watcher.deliver(self.config, state, [self.wait])
             self.assertEqual(publish.call_count, 1)
 
+    def test_rate_limited_wait_delivers_once_after_cooldown(self):
+        start = datetime(2026, 9, 29, 12, 0, tzinfo=timezone.utc).timestamp()
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory) / 'delivered.sqlite3'
+            error = HTTPError('https://ntfy.sh/private-topic', 429, 'Too Many Requests', {}, None)
+            with patch('time.time', return_value=start) as clock, \
+                 patch.object(watcher, 'urlopen', side_effect=[error, SuccessResponse(b'{"id":"test"}')]) as send:
+                watcher.deliver(self.config, state, [self.wait])
+                clock.return_value = start + 59
+                watcher.deliver(self.config, state, [self.wait])
+                self.assertEqual(send.call_count, 1)
+                clock.return_value = start + 61
+                watcher.deliver(self.config, state, [self.wait])
+                watcher.deliver(self.config, state, [self.wait])
+            self.assertEqual(send.call_count, 2)
+            requests = [call.args[0] for call in send.call_args_list]
+            self.assertEqual(requests[0].full_url, requests[1].full_url)
+            self.assertEqual(requests[0].get_header('Click'),
+                             'https://factory.example/factories/project/work?item=139')
+            self.assertEqual(requests[0].get_header('Click'), requests[1].get_header('Click'))
+
+    def test_second_rejection_waits_until_after_midnight_utc(self):
+        start = datetime(2026, 9, 29, 12, 0, tzinfo=timezone.utc).timestamp()
+        midnight = datetime(2026, 9, 30, 0, 0, tzinfo=timezone.utc).timestamp()
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory) / 'delivered.sqlite3'
+            error = HTTPError('https://ntfy.sh/private-topic', 429, 'Too Many Requests', {}, None)
+            with patch('time.time', return_value=start) as clock, \
+                 patch.object(watcher, 'urlopen', side_effect=[error, error,
+                                                              SuccessResponse(b'{"id":"test"}')]) as send:
+                watcher.deliver(self.config, state, [self.wait])
+                clock.return_value = start + 60
+                watcher.deliver(self.config, state, [self.wait])
+                clock.return_value = midnight + 59
+                watcher.deliver(self.config, state, [self.wait])
+                self.assertEqual(send.call_count, 2)
+                clock.return_value = midnight + 61
+                watcher.deliver(self.config, state, [self.wait])
+                watcher.deliver(self.config, state, [self.wait])
+            self.assertEqual(send.call_count, 3)
+
+    def test_third_rejection_is_terminal(self):
+        start = datetime(2026, 9, 29, 12, 0, tzinfo=timezone.utc).timestamp()
+        midnight = datetime(2026, 9, 30, 0, 0, tzinfo=timezone.utc).timestamp()
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory) / 'delivered.sqlite3'
+            error = HTTPError('https://ntfy.sh/private-topic', 429, 'Too Many Requests', {}, None)
+            with patch('time.time', return_value=start) as clock, \
+                 patch.object(watcher, 'urlopen', side_effect=[error, error, error]) as send:
+                watcher.deliver(self.config, state, [self.wait])
+                clock.return_value = start + 60
+                watcher.deliver(self.config, state, [self.wait])
+                clock.return_value = midnight + 60
+                watcher.deliver(self.config, state, [self.wait])
+                clock.return_value += 86400 * 2
+                watcher.deliver(self.config, state, [self.wait])
+            self.assertEqual(send.call_count, 3)
+            with closing(sqlite3.connect(state)) as db:
+                self.assertEqual(db.execute('SELECT status FROM delivered').fetchone()[0],
+                                 'rate_limit_exhausted')
+
+    def test_delivery_events_hide_wait_and_ntfy_identifiers(self):
+        start = datetime(2026, 9, 29, 12, 0, tzinfo=timezone.utc).timestamp()
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory) / 'delivered.sqlite3'
+            output = StringIO()
+            error = HTTPError('https://ntfy.sh/private-topic', 429, 'Too Many Requests', {}, None)
+            with redirect_stdout(output), patch('time.time', return_value=start) as clock, \
+                 patch.object(watcher, 'urlopen', side_effect=[error, SuccessResponse(b'{}')]):
+                watcher.deliver(self.config, state, [self.wait])
+                clock.return_value += 60
+                watcher.deliver(self.config, state, [self.wait])
+                watcher.deliver(self.config, state, [self.wait])
+            text = output.getvalue()
+            self.assertIn('rate_limited', text)
+            self.assertIn('sent', text)
+            self.assertIn('triage-approval', text)
+            for secret in (self.config['topic'], self.wait['key'], self.wait['path'],
+                           self.wait['title'], 'private-topic'):
+                self.assertNotIn(secret, text)
+
+    def test_error_output_hides_the_private_http_url(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config_path = Path(directory) / 'config.json'
+            config_path.write_text(json.dumps({**self.config, 'project_id': 'project',
+                                               'user_id': 'todd', 'database': 'factory'}))
+            error = HTTPError(f"https://ntfy.sh/{self.config['topic']}/private",
+                              403, f"rejected https://ntfy.sh/{self.config['topic']}/private", {}, None)
+            stderr = StringIO()
+            with patch.object(sys, 'argv', ['wait-alerts.py', '--config', str(config_path),
+                                            '--state', str(Path(directory) / 'state.sqlite3')]), \
+                 patch('subprocess.run', return_value=SimpleNamespace(stdout=json.dumps(self.wait))), \
+                 patch('urllib.request.urlopen', side_effect=error), redirect_stderr(stderr), \
+                 redirect_stdout(StringIO()):
+                with self.assertRaises(SystemExit) as exit_status:
+                    runpy.run_path(str(Path(watcher.__file__)), run_name='__main__')
+            self.assertEqual(exit_status.exception.code, 1)
+            self.assertNotIn(self.config['topic'], stderr.getvalue())
+            self.assertNotIn(self.wait['key'], stderr.getvalue())
+            self.assertNotIn('https://ntfy.sh/', stderr.getvalue())
+
     def test_failed_publish_is_not_retried(self):
         with tempfile.TemporaryDirectory() as directory:
             state = Path(directory) / 'delivered.sqlite3'
@@ -41,6 +153,39 @@ class WaitAlertsTest(unittest.TestCase):
             self.assertEqual(publish.call_count, 1)
             with closing(sqlite3.connect(state)) as db:
                 self.assertEqual(db.execute('SELECT status FROM delivered').fetchone()[0], 'attempted')
+
+    def test_timeout_on_due_retry_stays_claimed(self):
+        start = datetime(2026, 9, 29, 12, 0, tzinfo=timezone.utc).timestamp()
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory) / 'delivered.sqlite3'
+            error = HTTPError('https://ntfy.sh/private-topic', 429, 'Too Many Requests', {}, None)
+            with patch('time.time', return_value=start) as clock, \
+                 patch.object(watcher, 'urlopen', side_effect=[error, TimeoutError('unknown outcome')]) as send:
+                watcher.deliver(self.config, state, [self.wait])
+                clock.return_value += 60
+                with self.assertRaises(TimeoutError):
+                    watcher.deliver(self.config, state, [self.wait])
+                clock.return_value += 86400
+                watcher.deliver(self.config, state, [self.wait])
+            self.assertEqual(send.call_count, 2)
+            with closing(sqlite3.connect(state)) as db:
+                self.assertEqual(db.execute('SELECT status FROM delivered').fetchone()[0], 'attempted')
+
+    def test_old_attempted_row_is_not_retried(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory) / 'delivered.sqlite3'
+            with closing(sqlite3.connect(state)) as db:
+                db.execute('''CREATE TABLE delivered (
+                    wait_key TEXT PRIMARY KEY, kind TEXT NOT NULL, link TEXT NOT NULL,
+                    delivered_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    status TEXT NOT NULL DEFAULT 'sent'
+                )''')
+                db.execute("INSERT INTO delivered(wait_key,kind,link,status) VALUES (?,?,?,'attempted')",
+                           (self.wait['key'], self.wait['kind'], 'https://factory.example/card'))
+                db.commit()
+            with patch.object(watcher, 'urlopen') as send:
+                watcher.deliver(self.config, state, [self.wait])
+            send.assert_not_called()
 
     def test_old_card_and_finding_keys_are_not_resent(self):
         with tempfile.TemporaryDirectory() as directory:

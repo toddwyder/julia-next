@@ -111,9 +111,17 @@ wait means a session question, a plan waiting for review, an unresolved
 supervisor finding, or a Triage card labeled `status: needs approval`.
 Automation run suggestions, other decisions, and mentions are excluded.
 The watcher records each wait's stable key before publishing, so an uncertain
-network result cannot resend it. A failed publish needs operator inspection;
-it is not automatically retried. The one-minute systemd timer stays enabled
-across Factory restarts and server reboots.
+network result cannot resend it. Only a definite ntfy HTTP 429 rejection is
+retried: first after at least 60 seconds, then (if rejected again) after the
+next midnight UTC plus one minute. A third 429 exhausts that wait's retry
+budget. Timeouts, interrupted sends, other HTTP failures, old `attempted`
+rows, and exhausted retries need operator inspection; they are not automatically
+resent. The existing one-minute systemd timer checks when a retry is due and
+stays enabled across Factory restarts and server reboots. Its journal records
+only wait kind, outcome (`sent`, `rate_limited`, `rate_limit_exhausted`, or
+`uncertain_failure`), rejection count, and UTC due time; the private SQLite
+ledger records status, rejection count, and due time. Never publish the ledger's
+keys or links, or the ntfy topic, in an issue or log.
 
 The setup generates a random topic in
 `/etc/julia-factory-wait-alerts/config.json` (root-owned, group
