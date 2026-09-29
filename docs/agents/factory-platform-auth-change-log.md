@@ -282,3 +282,29 @@ returned 403, and an authenticated local noncached diagnostic publish returned
 No watcher code or service gate has been switched yet, and neither device has
 subscribed to the new origin. Those checks are origin plumbing evidence only;
 they are not a natural Factory wait or two-device delivery proof.
+
+# 2026-09-29: reviewed step 1 host install
+
+The operator verified a root-only compressed backup of the prior Factory app,
+watcher unit, ntfy configuration, and watcher config under
+`/var/backups/julia-step1-20260929/` before changing the live install. They
+stopped the old watcher timer and Factory service, copied the reviewed PR #159
+head `602193d82f65e52870d703924a9a19687fd9e267` into the Factory patch
+source, and ran the normal installer as `julia-factory`. `npm ci`, the WorkOS
+cookie regression, TypeScript check, Mastra build, and the copied-output
+regression passed. The root ntfy setup script was installed under
+`/usr/local/sbin` and run there. It moved the auth and Web Push databases to
+`/var/lib/ntfy` using SQLite backup while ntfy was stopped, then restarted
+ntfy. The watcher unit and timer were installed with the new
+`subscribed-self-hosted` gate. Factory, ntfy, and the timer became active;
+the watcher service remained inactive with `ConditionResult=no`, as intended
+until both devices subscribe. The watcher dry run found zero current waits.
+
+The existing topic, publish token, and Web Push keys were preserved. The
+private ntfy HTTPS origin returned 200; anonymous publishing to an unrelated
+topic returned 403; an authenticated noncached local diagnostic publish
+returned 200. These are transport checks, not device delivery acceptance.
+After the new GitHub rules were live, the operator removed the ten recreated
+machine cards using Factory's `WorkItemsStorage.delete` operation. Four done
+Julia history cards remained. A future GitHub poll and the next natural Julia
+wait still need observation before #148 closes.
