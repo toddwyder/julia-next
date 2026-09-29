@@ -1,7 +1,9 @@
-# julia-runner -- the minimal runner on the server (JUL-122)
+# julia-runner -- historical minimal runner (JUL-122)
 
-`scripts/julia-minimal-runner.mjs` takes one card through Gemini, the tests, a DeepSeek review
-and a PR. On the OVH server its jobs run in separate accounts (Todd, 24 Sep):
+**Retired route.** Do not use these setup steps to start new work. GitHub issues enter Factory's Intake; Todd starts them there. The standalone `scripts/julia-minimal-runner.mjs` command now refuses to launch cards. This document preserves the old design for reference only.
+
+The former runner took one card through Gemini, the tests, a DeepSeek review
+and a PR. On the OVH server its jobs ran in separate accounts (Todd, 24 Sep):
 
 | Job | Account | Holds |
 | --- | --- | --- |
@@ -83,15 +85,6 @@ unless every criterion has both. Before the UAT move, the runner posts the evide
 ticks the boxes (never before their evidence is on the card), and then passes the same script's
 live-card guard.
 
-## Running a card
+## Retired launch
 
-```
-sudo systemd-run --uid=orchestrator-svc --gid=orchestrator-svc --pipe --wait --collect \
-  --working-directory=/srv/julia-runner/repo \
-  -p LoadCredentialEncrypted=linear-app-id:/etc/credstore.encrypted/julia-runner-linear-app-id.cred \
-  -p LoadCredentialEncrypted=linear-app-secret:/etc/credstore.encrypted/julia-runner-linear-app-secret.cred \
-  /usr/bin/node /srv/julia-runner/code/scripts/julia-minimal-runner.mjs JUL-NN --base <origin/main commit>
-```
-
-Without the two `LoadCredentialEncrypted` lines the runner stops at once with "the Linear app
-credential is not available".
+The former credential-backed server command is no longer an available route. Executing `scripts/julia-minimal-runner.mjs` exits with a retirement message without loading a Linear credential or starting a card. Start new work from Factory's Intake instead.
