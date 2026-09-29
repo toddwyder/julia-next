@@ -137,10 +137,11 @@ and is never replayed. A non-rate-limit HTTP 4xx rejection records only the
 numeric status in the private ledger and journal and makes the systemd run fail
 visibly. Historical attempted and rate-limited ntfy rows are never replayed.
 A Discord HTTP 429 means no message was posted; the watcher keeps that wait
-pending and uses Discord's `Retry-After` time before another attempt. The
-one-minute timer remains enabled across Factory restarts and reboots. Never
-publish the ledger's
-keys or links, or the webhook URL, in an issue or log.
+pending and uses Discord's `Retry-After` time before another attempt. It also
+retries a DNS failure or refused TCP connection after one minute, because the
+message never reached Discord. The one-minute timer remains enabled across
+Factory restarts and reboots. Never publish ledger keys, links, or the webhook
+URL in an issue or log.
 
 ### Discord delivery
 

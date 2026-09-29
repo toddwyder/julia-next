@@ -8,11 +8,12 @@ import math
 import os
 from pathlib import Path
 import re
+import socket
 import sqlite3
 import subprocess
 import sys
 import time
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin, urlsplit
 from urllib.request import Request, urlopen
 
@@ -172,6 +173,18 @@ def deliver(config, state_path, waits):
                       f"http_status={error.code}")
                 rejected = True
                 continue
+            except URLError as error:
+                if isinstance(error.reason, (socket.gaierror, ConnectionRefusedError)):
+                    # DNS or TCP refusal happened before Discord could accept
+                    # this message. A later attempt cannot duplicate it.
+                    db.execute("UPDATE delivered SET status='discord_retry', retry_at=? "
+                               "WHERE wait_key=?", (time.time() + 60, wait['key']))
+                    db.commit()
+                    print(f"wait-alerts kind={wait['kind']} outcome=transport_unavailable "
+                          "retry_in_seconds=60")
+                    break
+                print(f"wait-alerts kind={wait['kind']} outcome=uncertain_failure")
+                raise
             except Exception:
                 print(f"wait-alerts kind={wait['kind']} outcome=uncertain_failure")
                 raise

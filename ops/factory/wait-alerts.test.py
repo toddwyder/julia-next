@@ -120,10 +120,26 @@ class WaitAlertsTest(unittest.TestCase):
             with closing(sqlite3.connect(state)) as db:
                 self.assertEqual(db.execute('SELECT status FROM delivered').fetchone()[0], 'attempted')
 
-    def test_network_failure_is_not_replayed_when_outcome_is_uncertain(self):
+    def test_connection_refusal_is_retried_after_deadline(self):
         with tempfile.TemporaryDirectory() as directory:
             state = Path(directory) / 'delivered.sqlite3'
-            with patch.object(watcher, 'urlopen', side_effect=URLError(ConnectionRefusedError())):
+            with patch.object(watcher.time, 'time', return_value=1000), \
+                    patch.object(watcher, 'urlopen', side_effect=URLError(ConnectionRefusedError())) as send:
+                watcher.deliver(self.config, state, [self.wait])
+                watcher.deliver(self.config, state, [self.wait])
+            self.assertEqual(send.call_count, 1)
+            with closing(sqlite3.connect(state)) as db:
+                self.assertEqual(db.execute('SELECT status,retry_at FROM delivered').fetchone(),
+                                 ('discord_retry', 1060.0))
+            with patch.object(watcher.time, 'time', return_value=1061), \
+                    patch.object(watcher, 'urlopen', return_value=Response(CONFIRMATION)) as send:
+                watcher.deliver(self.config, state, [self.wait])
+            self.assertEqual(send.call_count, 1)
+
+    def test_unknown_network_failure_is_not_replayed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory) / 'delivered.sqlite3'
+            with patch.object(watcher, 'urlopen', side_effect=URLError(TimeoutError())):
                 with self.assertRaises(URLError):
                     watcher.deliver(self.config, state, [self.wait])
             with closing(sqlite3.connect(state)) as db:
