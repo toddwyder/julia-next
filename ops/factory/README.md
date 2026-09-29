@@ -114,6 +114,8 @@ The watcher records each wait's stable key before publishing to the loopback
 ntfy origin. An accepted message is sent once. A timeout or interrupted send
 has an uncertain outcome and is never replayed. A definite HTTP rejection
 records only numeric HTTP and ntfy codes in the private ledger and journal.
+Definite HTTP rejections make the systemd run fail visibly; a refused local
+connection releases its unsent claim for the next timer run.
 Historical attempted and rate-limited rows from ntfy.sh are never replayed.
 The one-minute systemd timer remains enabled across Factory restarts and reboots.
 Never publish the ledger's keys or links, the ntfy topic, or its token in an
@@ -129,11 +131,13 @@ ntfy 2.28.0 origin listens only on `127.0.0.1:8085`; Tailscale Funnel exposes
 its HTTPS PWA at `https://julia-factory.tail91f394.ts.net:8443`. Factory
 remains on port 443. ntfy denies anonymous access by default. Only the existing
 random topic is anonymously readable; a dedicated service token can publish
-to it. Web Push keys and subscriptions persist under `/var/cache/ntfy`.
+to it. Auth tokens and Web Push subscriptions persist under `/var/lib/ntfy`.
 
 Install ntfy from its [official Ubuntu repository](https://docs.ntfy.sh/install/#debianubuntu-repository).
 After the normal Factory installer and the one-time wait-alert setup above, run
-`sudo python3 /var/lib/julia-factory/app/ops/factory/install-local-ntfy.py`.
+`sudo python3 /var/lib/julia-factory/patches/install-local-ntfy.py` from the
+root-owned patches directory. Never run this root setup from the service-owned
+app directory.
 This configures ntfy, its service token, Web Push, and the port 8443 Funnel
 route. It preserves existing keys and tokens on repeat runs.
 
@@ -145,7 +149,10 @@ Todd subscribes from the [ntfy Android app](https://docs.ntfy.sh/subscribe/phone
 to the private origin and installs the
 [Windows PWA](https://docs.ntfy.sh/subscribe/pwa/) from that same HTTPS origin.
 He enables background notifications in the PWA. The Windows browser must be
-running for background notifications. After both subscriptions are confirmed,
+running for background notifications; open the PWA at least monthly so ntfy's
+inactive Web Push subscription expiry does not lapse. On Android, choose
+instant delivery and allow the ntfy app to run in the background. After both
+subscriptions are confirmed,
 the operator creates `/etc/julia-factory-wait-alerts/subscribed-self-hosted`
 and starts the watcher. The old `subscribed` marker does not enable delivery.
 

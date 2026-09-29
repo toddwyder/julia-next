@@ -7,7 +7,7 @@ import sqlite3
 import tempfile
 import unittest
 from unittest.mock import patch
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 
 
 SPEC = importlib.util.spec_from_file_location('wait_alerts', Path(__file__).with_name('wait-alerts.py'))
@@ -71,7 +71,8 @@ class WaitAlertsTest(unittest.TestCase):
                               'private detail', {}, BytesIO(b'{"code":42908,"error":"private detail"}'))
             output = StringIO()
             with redirect_stdout(output), patch.object(watcher, 'urlopen', side_effect=error) as send:
-                watcher.deliver(self.config, state, [self.wait])
+                with self.assertRaisesRegex(RuntimeError, 'ntfy rejected'):
+                    watcher.deliver(self.config, state, [self.wait])
                 watcher.deliver(self.config, state, [self.wait])
             self.assertEqual(send.call_count, 1)
             with closing(sqlite3.connect(state)) as db:
@@ -82,6 +83,18 @@ class WaitAlertsTest(unittest.TestCase):
             for private in (self.config['topic'], self.config['ntfy_token'],
                             self.wait['key'], self.wait['path'], 'private detail'):
                 self.assertNotIn(private, output.getvalue())
+
+    def test_connection_refused_releases_unsent_wait_for_next_run(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory) / 'delivered.sqlite3'
+            with patch.object(watcher, 'urlopen', side_effect=URLError(ConnectionRefusedError())):
+                with self.assertRaises(URLError):
+                    watcher.deliver(self.config, state, [self.wait])
+            with closing(sqlite3.connect(state)) as db:
+                self.assertEqual(db.execute('SELECT count(*) FROM delivered').fetchone()[0], 0)
+            with patch.object(watcher, 'urlopen', return_value=Response(b'{"id":"sent"}')) as send:
+                watcher.deliver(self.config, state, [self.wait])
+            self.assertEqual(send.call_count, 1)
 
     def test_timeout_is_never_replayed(self):
         with tempfile.TemporaryDirectory() as directory:

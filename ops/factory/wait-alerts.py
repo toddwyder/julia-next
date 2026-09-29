@@ -11,7 +11,7 @@ import re
 import sqlite3
 import subprocess
 import sys
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin, urlsplit
 from urllib.request import Request, urlopen
 
@@ -112,6 +112,7 @@ def deliver(config, state_path, waits):
                     (wait_key,kind,link,delivered_at,status) VALUES (?,?,?,?,?)''',
                     (stable_key, kind, link, delivered_at, status))
         db.commit()
+        rejected = False
         for wait in waits:
             if db.execute('SELECT 1 FROM delivered WHERE wait_key=?', (wait['key'],)).fetchone():
                 continue
@@ -136,7 +137,19 @@ def deliver(config, state_path, waits):
                 db.commit()
                 print(f"wait-alerts kind={wait['kind']} outcome=rejected "
                       f"http_status={error.code} ntfy_code={ntfy_code}")
+                rejected = True
                 continue
+            except URLError as error:
+                if isinstance(error.reason, ConnectionRefusedError):
+                    # The loopback listener refused the connection before ntfy
+                    # could accept a message. Reclaim this unsent wait so the
+                    # next timer run can deliver it after ntfy starts.
+                    db.execute('DELETE FROM delivered WHERE wait_key=?', (wait['key'],))
+                    db.commit()
+                    print(f"wait-alerts kind={wait['kind']} outcome=local_origin_unavailable")
+                else:
+                    print(f"wait-alerts kind={wait['kind']} outcome=uncertain_failure")
+                raise
             except Exception:
                 print(f"wait-alerts kind={wait['kind']} outcome=uncertain_failure")
                 raise
@@ -144,6 +157,8 @@ def deliver(config, state_path, waits):
                        (wait['key'],))
             db.commit()
             print(f"wait-alerts kind={wait['kind']} outcome=sent")
+        if rejected:
+            raise RuntimeError('ntfy rejected one or more alerts; inspect numeric codes in the journal')
 
 
 def main():

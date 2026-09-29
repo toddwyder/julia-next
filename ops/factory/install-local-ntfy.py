@@ -13,6 +13,7 @@ import subprocess
 
 CONFIG = Path('/etc/julia-factory-wait-alerts/config.json')
 SERVER = Path('/etc/ntfy/server.yml')
+STATE = Path('/var/lib/ntfy')
 BASE_URL = 'https://julia-factory.tail91f394.ts.net:8443'
 LISTEN = '127.0.0.1:8085'
 
@@ -31,6 +32,8 @@ def main():
     topic = config['topic']
     if not re.fullmatch(r'[A-Za-z0-9_-]{20,64}', topic):
         raise SystemExit('Invalid watcher topic')
+    STATE.mkdir(mode=0o700, parents=True, exist_ok=True)
+    os.chown(STATE, pwd.getpwnam('ntfy').pw_uid, pwd.getpwnam('ntfy').pw_gid)
     if SERVER.exists() and BASE_URL in SERVER.read_text(encoding='utf-8'):
         print('Self-hosted ntfy already configured; preserving Web Push keys')
     else:
@@ -49,15 +52,31 @@ def main():
             'behind-proxy: true\n'
             'cache-file: /var/cache/ntfy/cache.db\n'
             'cache-duration: 12h\n'
-            'auth-file: /var/cache/ntfy/user.db\n'
+            f'auth-file: {STATE}/user.db\n'
             'auth-default-access: deny-all\n'
-            'web-push-file: /var/cache/ntfy/webpush.db\n'
+            f'web-push-file: {STATE}/webpush.db\n'
             'web-push-email-address: toddwyder@users.noreply.github.com\n'
             f'web-push-public-key: {keys["web-push-public-key"]}\n'
             f'web-push-private-key: {keys["web-push-private-key"]}\n'
         )
         SERVER.write_text(server_config, encoding='utf-8')
         os.chown(SERVER, 0, pwd.getpwnam('ntfy').pw_gid)
+        SERVER.chmod(0o640)
+    # Older provisioning placed durable auth and Web Push subscriptions in
+    # /var/cache. Stop SQLite before copying them into ntfy's state directory.
+    server_config = SERVER.read_text(encoding='utf-8')
+    if 'auth-file: /var/cache/ntfy/user.db' in server_config or \
+            'web-push-file: /var/cache/ntfy/webpush.db' in server_config:
+        run('systemctl', 'stop', 'ntfy.service')
+        for filename in ('user.db', 'webpush.db'):
+            old = Path('/var/cache/ntfy') / filename
+            new = STATE / filename
+            if old.exists() and not new.exists():
+                shutil.copy2(old, new)
+                os.chown(new, pwd.getpwnam('ntfy').pw_uid, pwd.getpwnam('ntfy').pw_gid)
+                new.chmod(0o600)
+            server_config = server_config.replace(f'/var/cache/ntfy/{filename}', str(new))
+        SERVER.write_text(server_config, encoding='utf-8')
         SERVER.chmod(0o640)
     # First start creates the auth database while all anonymous access is denied.
     run('systemctl', 'enable', '--now', 'ntfy.service')
@@ -66,9 +85,10 @@ def main():
     # CLI manages its own auth database; no password enters a command line or log.
     run('runuser', '-u', 'ntfy', '--', 'ntfy', 'user', 'add',
         '--ignore-exists', 'factory-watcher', env=env)
-    run('runuser', '-u', 'ntfy', '--', 'ntfy', 'access', 'factory-watcher', topic, 'rw')
+    run('runuser', '-u', 'ntfy', '--', 'ntfy', 'access', 'factory-watcher', topic, 'wo')
     run('runuser', '-u', 'ntfy', '--', 'ntfy', 'access', 'everyone', topic, 'ro')
-    if 'ntfy_token' not in config:
+    tokens = run('runuser', '-u', 'ntfy', '--', 'ntfy', 'token', 'list', 'factory-watcher')
+    if not config.get('ntfy_token') or config['ntfy_token'] not in tokens:
         token_output = run('runuser', '-u', 'ntfy', '--', 'ntfy', 'token',
                            'add', '--label=factory-wait', 'factory-watcher')
         token_match = re.search(r'\btk_[a-z0-9]{29}\b', token_output)
