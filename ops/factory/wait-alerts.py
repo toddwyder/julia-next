@@ -44,10 +44,7 @@ def read_waits(config):
     )
     waits = [json.loads(line) for line in result.stdout.splitlines() if line]
     for wait in waits:
-        if wait['kind'] not in {
-            'agent-waiting', 'automation-proposed', 'automation-failed',
-            'supervisor-finding', 'mention', 'triage-approval',
-        }:
+        if wait['kind'] not in {'agent-waiting', 'supervisor-finding', 'triage-approval'}:
             raise ValueError('Unexpected wait kind')
         if not wait['path'].startswith(f"/factories/{config['project_id']}/"):
             raise ValueError('Unexpected Factory deep link')
@@ -83,12 +80,36 @@ def deliver(config, state_path, waits):
             wait_key TEXT PRIMARY KEY, kind TEXT NOT NULL,
             link TEXT NOT NULL, delivered_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         )''')
+        if 'status' not in {row[1] for row in db.execute('PRAGMA table_info(delivered)')}:
+            db.execute("ALTER TABLE delivered ADD COLUMN status TEXT NOT NULL DEFAULT 'sent'")
+        # The first release included an occurrence suffix on these keys. Preserve
+        # its history when moving to one stable identity per finding or card.
+        for key, kind, link, delivered_at, status in db.execute(
+            "SELECT wait_key,kind,link,delivered_at,status FROM delivered "
+            "WHERE kind IN ('supervisor-finding','triage-approval')"
+        ).fetchall():
+            stable_key = key
+            if kind == 'supervisor-finding' and key.rsplit(':', 1)[-1].isdigit():
+                stable_key = key.rsplit(':', 1)[0]
+            elif kind == 'triage-approval' and key.count(':') > 1:
+                stable_key = ':'.join(key.split(':', 2)[:2])
+            if stable_key != key:
+                db.execute('''INSERT OR IGNORE INTO delivered
+                    (wait_key,kind,link,delivered_at,status) VALUES (?,?,?,?,?)''',
+                    (stable_key, kind, link, delivered_at, status))
+        db.commit()
         for wait in waits:
             if db.execute('SELECT 1 FROM delivered WHERE wait_key=?', (wait['key'],)).fetchone():
                 continue
-            link = publish(config, wait)
-            db.execute('INSERT INTO delivered (wait_key,kind,link) VALUES (?,?,?)',
+            link = urljoin(config['factory_url'].rstrip('/') + '/', wait['path'].lstrip('/'))
+            # Claim before the network call. A timeout or process crash must never
+            # turn the same wait into a second phone/desktop notification.
+            db.execute("INSERT INTO delivered (wait_key,kind,link,status) VALUES (?,?,?,'attempted')",
                        (wait['key'], wait['kind'], link))
+            db.commit()
+            publish(config, wait)
+            db.execute("UPDATE delivered SET status='sent', delivered_at=CURRENT_TIMESTAMP WHERE wait_key=?",
+                       (wait['key'],))
             db.commit()
             print(f"delivered {wait['kind']} {wait['key']} {link}")
 

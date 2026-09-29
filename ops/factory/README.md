@@ -107,9 +107,13 @@ The setup creates a PostgreSQL peer role with SELECT only on the tables the
 watcher needs. Its query runs in a read-only transaction. The watcher writes
 only its own SQLite delivery ledger in `/var/lib/julia-factory-wait-alerts`;
 it never changes Factory records, answers questions, or moves cards. A
-deterministic ntfy sequence ID prevents a second visible alert when a publish
-succeeds but its acknowledgement is lost. The one-minute systemd timer stays
-enabled across Factory restarts and server reboots.
+wait means a session question, a plan waiting for review, an unresolved
+supervisor finding, or a Triage card labeled `status: needs approval`.
+Automation run suggestions, other decisions, and mentions are excluded.
+The watcher records each wait's stable key before publishing, so an uncertain
+network result cannot resend it. A failed publish needs operator inspection;
+it is not automatically retried. The one-minute systemd timer stays enabled
+across Factory restarts and server reboots.
 
 The setup generates a random topic in
 `/etc/julia-factory-wait-alerts/config.json` (root-owned, group

@@ -25,10 +25,10 @@ DO $$ BEGIN
 END $$;
 GRANT CONNECT ON DATABASE julia_factory_trial TO "julia-factory";
 GRANT USAGE ON SCHEMA public TO "julia-factory";
+REVOKE SELECT ON factory_deferred_decisions, work_item_comment_mentions,
+  work_item_comments FROM "julia-factory";
 GRANT SELECT ON factory_run_bindings, work_items, mastra_messages,
-  factory_attention_receipts, factory_deferred_decisions,
-  factory_supervisor_findings, work_item_comment_mentions,
-  work_item_comments TO "julia-factory";
+  factory_attention_receipts, factory_supervisor_findings TO "julia-factory";
 ALTER ROLE "julia-factory" SET default_transaction_read_only = on;
 SQL
 
