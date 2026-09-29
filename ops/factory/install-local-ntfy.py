@@ -8,7 +8,9 @@ import pwd
 import re
 import secrets
 import shutil
+import sqlite3
 import subprocess
+import tempfile
 
 
 CONFIG = Path('/etc/julia-factory-wait-alerts/config.json')
@@ -72,9 +74,18 @@ def main():
             old = Path('/var/cache/ntfy') / filename
             new = STATE / filename
             if old.exists() and not new.exists():
-                shutil.copy2(old, new)
-                os.chown(new, pwd.getpwnam('ntfy').pw_uid, pwd.getpwnam('ntfy').pw_gid)
-                new.chmod(0o600)
+                # SQLite backup includes committed WAL pages; copying only the
+                # main .db file can silently lose a recent subscription.
+                with tempfile.NamedTemporaryFile(dir=STATE, suffix='.db', delete=False) as temp:
+                    staged = Path(temp.name)
+                try:
+                    with sqlite3.connect(old) as source, sqlite3.connect(staged) as target:
+                        source.backup(target)
+                    os.chown(staged, pwd.getpwnam('ntfy').pw_uid, pwd.getpwnam('ntfy').pw_gid)
+                    staged.chmod(0o600)
+                    staged.replace(new)
+                finally:
+                    staged.unlink(missing_ok=True)
             server_config = server_config.replace(f'/var/cache/ntfy/{filename}', str(new))
         SERVER.write_text(server_config, encoding='utf-8')
         SERVER.chmod(0o640)

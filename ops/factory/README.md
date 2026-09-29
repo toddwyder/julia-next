@@ -83,6 +83,13 @@ Factory **0.17.2** scans both `.claude/skills` and `.agents/skills` as local
 sources. The earlier package patch selecting one root was removed so WorkOS is
 the only Mastra code exception. Skill-loading repair is separate work.
 
+The supported GitHub event-rule overrides in `app/src/mastra/index.ts` keep
+machine issues and publisher App PRs off Factory's Work and Review boards.
+Known machine source numbers are explicitly excluded; new machine issues use
+the `factory:machine` GitHub label. Factory-authored Julia PRs enter Reviewing
+directly so Review auto-start can run. Remove these rules when stock Factory
+supports source filters and automatic Review entry for trusted authoring PRs.
+
 The server's previous `postinstall` pointed at a machine-specific patch copy.
 The repository manifest removes that hook; **always use this installer**, never
 run `npm ci` alone on the service directory: the installer applies the approved
@@ -95,8 +102,10 @@ and normal model and GitHub connections.
 The normal installer copies `wait-alerts.py` and `wait-alerts.sql` into the app.
 Run the one-time root setup after the normal install:
 
+From the root of a reviewed checkout owned by the operator, run:
+
 ```sh
-sudo bash /var/lib/julia-factory/patches/install-wait-alerts.sh \
+sudo bash "$(pwd -P)/ops/factory/install-wait-alerts.sh" \
   /var/lib/julia-factory/app \
   49b0ea94-d24b-43d7-8ce1-618cb61c5188 \
   user_01M3HB0CKYTK5V2DXGTZ4PA3B8 \
@@ -134,10 +143,18 @@ random topic is anonymously readable; a dedicated service token can publish
 to it. Auth tokens and Web Push subscriptions persist under `/var/lib/ntfy`.
 
 Install ntfy from its [official Ubuntu repository](https://docs.ntfy.sh/install/#debianubuntu-repository).
-After the normal Factory installer and the one-time wait-alert setup above, run
-`sudo python3 /var/lib/julia-factory/patches/install-local-ntfy.py` from the
-root-owned patches directory. Never run this root setup from the service-owned
-app directory.
+After the normal Factory installer and the one-time wait-alert setup above,
+install the reviewed script in a root-owned location and run it there:
+
+```sh
+sudo install -o root -g root -m 0755 \
+  "$(pwd -P)/ops/factory/install-local-ntfy.py" \
+  /usr/local/sbin/julia-factory-install-ntfy
+sudo python3 /usr/local/sbin/julia-factory-install-ntfy
+```
+
+Every parent of `/usr/local/sbin` is root-owned. Never execute a root Python
+script from the service-owned app or patches tree.
 This configures ntfy, its service token, Web Push, and the port 8443 Funnel
 route. It preserves existing keys and tokens on repeat runs.
 

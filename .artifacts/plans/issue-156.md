@@ -15,6 +15,7 @@ a five-minute delivery.
 | Phone and Windows delivery | Self-hosted ntfy, Android app, PWA Web Push | https://docs.ntfy.sh/install/ and https://docs.ntfy.sh/config/#web-push |
 | Public HTTPS | Tailscale Funnel on port 8443, alongside Factory on 443 | https://tailscale.com/docs/features/tailscale-funnel |
 | Review handoff | Factory GitHub event rule and stock Review board | https://factory.mastra.ai/configure/boards-and-rules and installed @mastra/factory 0.17.2 source |
+| Machine card exclusion | Factory GitHub event rules filter known machine sources and labeled future machine issues | https://factory.mastra.ai/configure/boards-and-rules and installed @mastra/factory 0.17.2 source |
 
 ## Seams and checks
 
@@ -36,6 +37,10 @@ a five-minute delivery.
    PWA to the private origin. A later naturally occurring actionable Factory
    wait must reach both devices once with the correct link within five minutes.
    Do not manufacture a Factory question or count the origin diagnostic.
+5. GitHub's periodic source poll replays `issueOpened` for open issues after
+   card deletion. Filter machine sources in the supported event rule, delete
+   the recreated cards with Factory's storage operation, and verify a later
+   poll leaves only Julia cards.
 
 ## Observability and rollout
 
