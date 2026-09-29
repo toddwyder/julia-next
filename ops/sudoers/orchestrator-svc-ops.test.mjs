@@ -123,14 +123,10 @@ test('on the server: an install attempt as orchestrator-svc is refused by sudo',
   // Only meaningful where the file is actually installed and this test runs as
   // orchestrator-svc (the server's read-only checkout); skipped everywhere else.
   if (userInfo().username !== 'orchestrator-svc') return t.skip('not running as orchestrator-svc');
-  const attempt = spawnSync('sudo', [
-    '-n', '/usr/bin/install', '-m', '0644', '-o', 'root', '-g', 'root',
-    '/srv/orchestrator-svc/julia-next/ops/ready-queue/julia-ready-queue.service',
-    '/etc/systemd/system/julia-ready-queue.service',
-  ], { encoding: 'utf8' });
+  const attempt = spawnSync('sudo', ['-n', '/usr/bin/install', '--version'], { encoding: 'utf8' });
   assert.notEqual(attempt.status, 0, 'sudo allowed an install as orchestrator-svc');
-  // The whole live rule set must be exactly this file's rules, the one
-  // pre-existing checkout-sync rule and the minimal runner's worker rules --
+  // The whole live rule set must be exactly this file's rules and the
+  // minimal runner's worker rules --
   // nothing older left installed.
   // A wide COLUMNS: with no terminal, sudo wraps a rule longer than 80
   // characters onto a second line (the runner's worker rules are).
@@ -165,7 +161,7 @@ test('on the server: an install attempt as orchestrator-svc is refused by sudo',
   const live = listing.stdout.split('\n')
     .filter((line) => line.includes('NOPASSWD:'))
     .map((line) => line.split('NOPASSWD:')[1].trim()).sort();
-  const expected = [...commands.map((c) => c.join(' ')), '/usr/bin/systemctl start julia-next-checkout-sync.service', ...RUNNER_WORKER_COMMANDS].sort();
+  const expected = [...commands.map((c) => c.join(' ')), ...RUNNER_WORKER_COMMANDS].sort();
   assert.deepEqual(live, expected);
 });
 

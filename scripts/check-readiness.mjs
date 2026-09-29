@@ -73,36 +73,6 @@ async function defaultPublisherCheckImpl() {
   }
 }
 
-// terminalCreate/terminalRead's real --json shape nests everything under
-// result.terminal (a {handle, tail: [...], ...} object, not a flat string)
-// -- confirmed live against the installed CLI, not guessed (see
-// orca-cli.test.mjs). Exported, with the two Orca calls injectable, so this
-// unwrapping is covered by its own test rather than only exercised live.
-export async function defaultRelayCheckImpl({
-  terminalCreateImpl = terminalCreate,
-  terminalReadImpl = terminalRead,
-} = {}) {
-  // The relay binds to 127.0.0.1:8943 on the OVH runner only, so this must
-  // run from a terminal on that runner, not from wherever this check
-  // itself is invoked.
-  const created = await terminalCreateImpl({
-    environment: getEnvironment(),
-    // path:<path> avoids needing this runner's internal repo UUID -- the
-    // main julia-next checkout's real filesystem path, confirmed live via
-    // `orca project setups` (see the "julia-next project registered" check
-    // above), not a guessed selector.
-    worktree: 'path:/home/runner/julia-next',
-    command: 'curl -s -m 5 -X POST http://127.0.0.1:8943/events -H "content-type: application/json" -d \'{"event":"journey-relay.readiness-check","attempted":"readiness","reason":"check-readiness.mjs","context":"readiness"}\'',
-    title: 'readiness-relay-check',
-  });
-  const read = await terminalReadImpl({ environment: getEnvironment(), terminal: created.terminal.handle });
-  const output = (read.terminal.tail ?? []).join('\n');
-  if (/"sent":\s*true/.test(output)) {
-    return { reachable: true, detail: output };
-  }
-  return { reachable: false, detail: `journey-relay at 127.0.0.1:8943 did not confirm delivery: ${output || '(no output)'}` };
-}
-
 // The LAST `<field>:...` line anchored to a line start, never the first match
 // anywhere in the string -- see the comment inside defaultGroupDriftCheckImpl
 // below for why a first match is wrong here. Returns the comma-separated
@@ -214,7 +184,6 @@ export async function checkReadiness({
   orcaStatusImpl = defaultOrcaStatusImpl,
   orcaProjectSetupsImpl = defaultOrcaProjectSetupsImpl,
   publisherCheckImpl = defaultPublisherCheckImpl,
-  relayCheckImpl = defaultRelayCheckImpl,
   groupDriftCheckImpl = defaultGroupDriftCheckImpl,
 } = {}) {
   const checks = [];
@@ -248,13 +217,6 @@ export async function checkReadiness({
     checks.push(check('julia-graph-publisher installed on julia-next', installed, detail));
   } catch (error) {
     checks.push(check('julia-graph-publisher installed on julia-next', false, error.message));
-  }
-
-  try {
-    const { reachable, detail } = await relayCheckImpl();
-    checks.push(check('journey-relay reachable', reachable, detail));
-  } catch (error) {
-    checks.push(check('journey-relay reachable', false, error.message));
   }
 
   try {

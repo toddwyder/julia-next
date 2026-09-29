@@ -210,7 +210,7 @@ test('terminalCreate runs a plain shell command in the given worktree, not an ag
   const result = await terminalCreate({
     environment: 'OVH runner',
     worktree: 'path:/home/runner/julia-next',
-    command: 'curl -s -X POST http://127.0.0.1:8943/events',
+    command: 'printf ready',
     title: 'coordinator-diag',
     execImpl,
   });
@@ -219,7 +219,7 @@ test('terminalCreate runs a plain shell command in the given worktree, not an ag
     'terminal', 'create',
     '--environment', 'OVH runner',
     '--worktree', 'path:/home/runner/julia-next',
-    '--command', 'curl -s -X POST http://127.0.0.1:8943/events',
+    '--command', 'printf ready',
     '--title', 'coordinator-diag',
     '--json',
   ]);
@@ -234,8 +234,8 @@ test('terminalRead returns the real {terminal: {tail: [...]}} shape, not a flat 
         handle: 'term_edd1057b-c44b-4e95-b513-05851efcc6c2',
         status: 'running',
         tail: [
-          'runner@vps-ce27cb55:~/julia-next$ curl ...',
-          '{"sent":true,"event":"journey-relay.readiness-check"}',
+          'runner@vps-ce27cb55:~/julia-next$ printf ready',
+          'ready',
           'runner@vps-ce27cb55:~/julia-next$',
         ],
         truncated: false,
@@ -246,7 +246,7 @@ test('terminalRead returns the real {terminal: {tail: [...]}} shape, not a flat 
   });
   const result = await terminalRead({ environment: 'OVH runner', terminal: 'term_edd1057b-c44b-4e95-b513-05851efcc6c2', execImpl });
   assert.ok(Array.isArray(result.terminal.tail));
-  assert.match(result.terminal.tail.join('\n'), /"sent":true/);
+  assert.match(result.terminal.tail.join('\n'), /ready/);
   assert.deepEqual(calls[0].args, [
     'terminal', 'read',
     '--environment', 'OVH runner',
