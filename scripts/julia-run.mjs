@@ -365,23 +365,8 @@ export async function juliaRun(issueId, impls = {}) {
   return result;
 }
 
-async function main() {
-  const issueId = process.argv[2];
-  if (!issueId) {
-    console.error('usage: julia-run <ISSUE-ID>');
-    process.exitCode = 2;
-    return;
-  }
-  try {
-    const { runId } = await juliaRun(issueId);
-    console.log(runId);
-  } catch (error) {
-    console.error(error.message);
-    process.exitCode = 1;
-  }
-}
-
 import { pathToFileURL } from 'node:url';
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main();
+  console.error('Graph launcher retired; start work through Factory.');
+  process.exitCode = 1;
 }

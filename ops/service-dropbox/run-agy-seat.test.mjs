@@ -55,8 +55,8 @@ test('--print is always the last flag in the argv array, whatever effort or mode
   }
 });
 
-test('a prompt starting with dashes (coordinator skill front matter) is passed through unchanged', () => {
-  const prompt = ['---', 'name: julia-coordinator', '---', '# Julia-next coordinator'].join('\n');
+test('a prompt starting with dashes is passed through unchanged', () => {
+  const prompt = ['---', 'name: example', '---', '# Example'].join('\n');
   const spec = buildAgySpawnSpec(prompt);
   assert.equal(spec.args[spec.args.length - 1], prompt);
 });

@@ -1,11 +1,16 @@
 # AGENTS.md
 
 This file provides guidance to coding agents working in this repository, including Mastra
-Factory's build sessions. How card work runs is in `docs/agents/work-execution.md`.
+Factory's build sessions. GitHub issues enter Factory's Intake; Todd starts them, Factory plans,
+builds and reviews, and Todd approves product changes after checks and rehearsal. GitHub
+handles auto-merge. An outside agent may merge only its own setup or documentation PR through
+the publisher App pinned to the reviewed head, never a Factory card. Keep SSH and sudo
+outside the Factory sandbox; an authorized operator uses the laptop's Tailscale route.
+See `docs/agents/work-execution.md` and `docs/adr/0009-mastra-factory.md`.
 
 ## Building a card
 
-1. Follow the approved plan. Build test-first with `.agents/skills/tdd/SKILL.md`: one behaviour
+1. Follow the approved plan. Build test-first with `.claude/skills/tdd/SKILL.md`: one behaviour
    test at a seam the plan names, shown failing, then the minimal code, then the full suite green.
 2. Add the lasting observability the plan names (logs and measurements that stay in the code),
    not temporary debugging.

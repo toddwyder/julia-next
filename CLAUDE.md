@@ -16,13 +16,14 @@ you checked (with links), and what breaks without it. Todd approves or refuses; 
 on the exceptions list in `ops/factory/README.md`. Use the stock product first and improve only
 what real use shows is lacking.
 
-**Tick as you go.** Tick each checkbox on the card you're working the moment its evidence is posted, in the same step. Never tick at the end, and never tick before the evidence exists. The checkbox count is Todd's only view of progress.
+Factory's Work and Review boards and Needs attention list show progress; do not drive a card through
+Linear or manually move its Factory stage. The plan is saved with the pull request. After CI and
+both reviews pass, Todd tries the Vercel rehearsal copy; his approval enables GitHub auto-merge
+for product changes. Factory never merges. An agent outside Factory may merge its own setup or
+document-only pull request via the publisher App pinned to the reviewed head, never a Factory card.
 
-**Finish the card.** When the work is done and the report is posted, move the card to UAT and assign it to Todd. Never leave a finished card in Backlog, and never move it to Complete; acceptance is Todd's.
-
-## How a turn ends
-
-A standing instruction from the user, the person you are working for. It is about how your turns end. A message with no tool call in it ends your turn, and the work stops there until you are asked to continue. The user has seen you end turns in four ways while work they asked for was still owed, and does not want any of them. One: a long summary of what was done that closes by announcing the next step and has no tool call, so the next thing never starts. Two: an offer to carry on with something unless the user would prefer otherwise, which stops to wait for an answer the user was not going to give. Three: a list of decisions for the user when, by your own account, none of them blocks the rest of the work. Four: deciding that this is a good place to report, because the turn has been long or a milestone is done. Status notes are welcome, and so are your recommendations on open decisions, but put them in the same message as your next tool call and carry on with whatever does not depend on the user's answer. If you notice yourself inviting the user to redirect you or offering to wait, delete it and do the next thing. The stops the user does want are the ones where nothing can move without them, or where the thing blocking you is deliberately protected from you. This does not override the need for confirmation on risky or destructive actions.
+Factory builds test-first using `.claude/skills/tdd/SKILL.md` and the plan's named seams.
+See `docs/agents/work-execution.md` and `docs/adr/0009-mastra-factory.md` for the full route.
 
 ## Framework-first rules (JUL-116)
 
@@ -35,17 +36,16 @@ These apply to any code written outside Factory's own sessions too.
 
 ## Reaching the server
 
-Do not stop and ask whether you can reach the server. The route is set up and used every day:
+Keep SSH and sudo outside the Factory sandbox. An authorized operator uses the laptop's
+Tailscale SSH route; never copy a private key into Factory or request one in chat.
 
-- **SSH (over Tailscale):** `ssh -i ~/.ssh/ovh_runner_ed25519 ubuntu@100.125.239.98` (`scp -i` the
+- **Operator SSH (over Tailscale):** `ssh -i ~/.ssh/ovh_runner_ed25519 ubuntu@100.125.239.98` (`scp -i` the
   same way; use Git Bash, not raw PowerShell).
 - **`ubuntu` has passwordless sudo.** It is the installation channel: install files under `/opt` and
   `/etc`, manage systemd, run a command as another account with `sudo -u <account>`.
-- **Publishing runs on the server as `orchestrator-svc`, never with a personal git or `gh`
-  credential from the laptop.** Get the commit onto the server (`git bundle` + `scp`), then run
-  `publish-pr.mjs` and `merge-pr.mjs` from `/srv/orchestrator-svc/julia-next` via
-  `sudo -u orchestrator-svc`, with the App's key loaded from `/etc/orchestrator-svc/.env.publisher`.
-  Merging needs `--sha <reviewed-head-commit>`.
+- **Factory card publishing and merging stay in the stock Factory/GitHub route.** An agent
+  outside Factory may use the publisher App to merge its own setup or document-only PR pinned
+  to the reviewed head; it must never merge a Factory card. See `docs/agents/work-execution.md`.
 
 Details, the account table and the known traps are in `docs/agents/server-runbook.md`.
 
@@ -61,19 +61,13 @@ intake, menu planning, shopping lists, kitchen prep, full-screen cook mode). The
 ### Issue tracker
 
 New work goes in GitHub issues, where Factory's Intake picks it up; nothing starts until Todd
-taps it. Linear (team Julia-next) is the read-only library of Julia documents: read it through the
-Linear MCP tools, link each GitHub issue to the Linear card or document it came from, and close a
-Linear feature card only once its GitHub issue exists, with a one-line pointer. JUL-184 (Factory
-setup) is the last new Linear card. See `docs/agents/issue-tracker.md` for the Linear conventions.
-
-**Clean up every test or throwaway card you create.** Any test or throwaway Linear card an agent
-creates must be cancelled by that same agent, with a one-line reason, before its ticket counts as
-done. Leftover test cards count as unfinished work, not board noise.
+taps it. Linear is a read-only historical library, not a route for new work or status changes.
+See `docs/agents/issue-tracker.md` for GitHub issue conventions.
 
 ### Triage labels
 
-Default label vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`,
-`wontfix`), unchanged from the skill's defaults. See `docs/agents/triage-labels.md`.
+Factory's Intake is the queue; no issue label is required to start work. See
+`docs/agents/issue-tracker.md` for current conventions.
 
 ### Domain docs
 

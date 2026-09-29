@@ -36,7 +36,7 @@ Write the full plan into the conversation, structured as:
 - **Goal** — the outcome in one paragraph; what "done" means, stated verifiably.
 - **Scope** — what's in, what's explicitly out.
 - **Phases** — each with: the changes (files and shape of the edit), the tests that prove it, and the verification commands to run. Order phases so each lands independently verifiable.
-- **Seams and tests** — include a section headed `## Seams and tests`; identify the public boundary where each behavior test attaches, name the failing test to write first, and show its red → minimal green sequence. Use the repository's `.agents/skills/tdd/SKILL.md`; do not list implementation-coupled tests or write all tests before all code. Place each test alongside the phase it proves.
+- **Seams and tests** — include a section headed `## Seams and tests`; identify the public boundary where each behavior test attaches, name the failing test to write first, and show its red → minimal green sequence. Use the repository's `.claude/skills/tdd/SKILL.md`; do not list implementation-coupled tests or write all tests before all code. Place each test alongside the phase it proves.
 - **Observability** — include a section headed `## Observability`; name the lasting logs or measurements that will remain in the code and how they show the intended behavior or a failure; do not substitute temporary debugging or a hand-built progress file.
 - **Risks** — what could go wrong, and what to check to catch it early.
 - **Assumptions** — every recorded design decision and understanding correction from the run.

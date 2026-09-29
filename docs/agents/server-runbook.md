@@ -4,13 +4,13 @@
 the routes in, the graph's own launcher and dispatch, the publisher, and every trap a session
 has hit and recorded. It is not the record of one ticket: it was filed under a ticket-specific
 name when JUL-43 created it, and renamed to this general one on 2026-09-23 (JUL-92) once it had
-long outgrown that. Read top to bottom for the live operating procedure — you should never
-need the original chat that produced any part of it.
+long outgrown that. Historical graph/Orca instructions below are retained as records, not a live route. For current work use `docs/agents/work-execution.md`.
 
 **Currency.** Sections carry the date they were verified live; the oldest live procedure here
 was re-verified 2026-09-17 (JUL-61). JUL-43 is closed and its history is preserved at the bottom
-under "JUL-43 history — not the current procedure." A Linear issue owns its own work definition
-and evidence trail; this file owns the verified operating procedure only.
+under "JUL-43 history — not the current procedure." GitHub issues and the Factory board own current work and its evidence trail.
+
+**2026-09-29 route note.** Graph/Orca/Linear launch procedures below are historical, not instructions for starting new work. GitHub issues and Mastra Factory are the current route (see `docs/agents/work-execution.md` and ADR 0009). Issue #144 owns retirement of the old host services; until before-and-after operator evidence is entered in `docs/agents/factory-platform-auth-change-log.md`, their live state is unverified.
 
 ---
 

@@ -146,12 +146,10 @@ test('effort -> --thinking <level>: Low is off, Medium/High are on, and the flag
   }
 });
 
-// The live failure (JUL-79 relaunches): a bare `--thinking` made Pi read `-p`
-// as the thinking level, so the coordinator prompt -- which begins with the
-// skill's `---` front matter -- was parsed as an unknown option and the seat
-// died before doing anything. The prompt now follows a `--` separator.
-test('a prompt that starts with dashes (the coordinator skill front matter) is the last argv entry, after `--`', () => {
-  const prompt = ['---', 'name: julia-coordinator', '---', '# Julia-next coordinator'].join('\n');
+// A bare `--thinking` made Pi read `-p` as the thinking level, so a prompt
+// starting with `---` was parsed as an option. The prompt follows `--`.
+test('a prompt that starts with dashes is the last argv entry, after `--`', () => {
+  const prompt = ['---', 'name: example', '---', '# Example'].join('\n');
   for (const seat of Object.keys(SEATS)) {
     for (const effort of ['low', 'medium', 'high']) {
       const spec = buildPiSpawnSpec(seat, prompt, { effort, readSecretImpl: () => 'tok' });

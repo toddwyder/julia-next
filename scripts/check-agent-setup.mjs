@@ -3,8 +3,8 @@
 import { existsSync, readFileSync } from "node:fs";
 
 const checks = [
-  ["wayfinder skill installed", existsSync(".agents/skills/wayfinder")],
-  ["setup-matt-pocock-skills skill installed", existsSync(".agents/skills/setup-matt-pocock-skills")],
+  ["wayfinder skill installed", existsSync(".claude/skills/wayfinder")],
+  ["setup-matt-pocock-skills skill installed", existsSync(".claude/skills/setup-matt-pocock-skills")],
   ["docs/agents/issue-tracker.md written", existsSync("docs/agents/issue-tracker.md")],
   ["docs/agents/triage-labels.md written", existsSync("docs/agents/triage-labels.md")],
   ["docs/agents/domain.md written", existsSync("docs/agents/domain.md")],

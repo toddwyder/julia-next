@@ -45,10 +45,9 @@ test('the free stand-in is reachable only when the caller asks for it, never fro
   assert.deepEqual({ ok: standIn.ok, agent: standIn.agent }, { ok: true, agent: 'stand-in' });
 });
 
-test('the brief names the seat\'s own standing orders, the card and the step, and carries a prior finding only when there is one', () => {
+test('the historical brief carries the card, step and a prior finding only when there is one', () => {
   const card = { identifier: 'JUL-92', title: 'Docs match', url: 'https://linear.app/x' };
   const first = buildStepBrief({ seat: 'builder', card, step: { title: 'Docs match', brief: 'Fix the docs.' } });
-  assert.match(first, /\.claude\/skills\/julia-builder\/SKILL\.md/);
   assert.match(first, /Fix the docs\./);
   assert.doesNotMatch(first, /finding you are fixing/);
   const second = buildStepBrief({ seat: 'builder', card, step: { title: 'Docs match', brief: 'Fix the docs.', priorFinding: 'F1: the rename missed CLAUDE.md' } });

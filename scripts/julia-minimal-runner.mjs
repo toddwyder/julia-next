@@ -62,7 +62,7 @@ export function seamsOf(description) {
 
 // Everything the workers read comes from the start commit, never from a
 // working copy or a personal path, so every run of a card reads the same text.
-const SKILL_FILES = ['.agents/skills/implement/SKILL.md', '.agents/skills/tdd/SKILL.md', '.agents/skills/tdd/tests.md', '.agents/skills/tdd/mocking.md'];
+const SKILL_FILES = ['.claude/skills/implement/SKILL.md', '.claude/skills/tdd/SKILL.md', '.claude/skills/tdd/tests.md', '.claude/skills/tdd/mocking.md'];
 const pinnedText = (repoRoot, base, paths) => paths.map((path) => `<file path="${path}">\n${git(repoRoot, 'show', `${base}:${path}`)}\n</file>`).join('\n\n');
 
 // One review is one prompt; above this size it is refused, never cut short.
@@ -167,7 +167,7 @@ export async function runIssue(issueId, { base, repoRoot, worktreeRoot, adapters
       card,
       builder,
       checks,
-      skill: pinnedText(repoRoot, base, ['.agents/skills/code-review/SKILL.md']),
+      skill: pinnedText(repoRoot, base, ['.claude/skills/code-review/SKILL.md']),
       standards: pinnedText(repoRoot, base, [...STANDARDS_FILES, ...OPTIONAL_STANDARDS_FILES.filter((path) => existsAt(repoRoot, base, path))]),
       commits: git(worktree, 'log', '--oneline', `${base}..${sha}`),
       diff: git(worktree, 'diff', `${base}...${sha}`),

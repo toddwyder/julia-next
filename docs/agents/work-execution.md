@@ -7,12 +7,12 @@ in `docs/adr/0009-mastra-factory.md`; this page says what that means for an agen
 
 1. A GitHub issue lands in Factory's Intake column and waits. It starts only when Todd taps it.
 2. Factory's planning step writes the plan. Every plan names the seams and the failing tests
-   written first (`.agents/skills/tdd/SKILL.md`), and the lasting observability the change adds.
+   written first (`.claude/skills/tdd/SKILL.md`), and the lasting observability the change adds.
    Plans are approved automatically and saved in the pull request.
 3. Factory's build step follows the approved plan and `AGENTS.md`, and opens a pull request with
    a plain-language "Try it" section: what changed and the steps Todd follows on the rehearsal
    copy.
-4. CI runs on GitHub's own runners. Factory's review step runs `.agents/skills/code-review/SKILL.md`
+4. CI runs on GitHub's own runners. Factory's review step runs `.claude/skills/code-review/SKILL.md`
    against `CODING_STANDARDS.md` and the plan. A separate review agent from a different model
    maker than the builder tries to break the work against every acceptance criterion. Either
    reviewer's "Request changes" goes back to the builder through Factory's own GitHub rule.
