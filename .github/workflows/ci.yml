@@ -11,7 +11,9 @@ concurrency:
 
 jobs:
   checks:
-    runs-on: ubuntu-latest
+    # ubuntu-latest rejects the bubblewrap command on the hosted runner.
+    # Run the actual sandbox behavior tests on GitHub's Ubuntu 22.04 VM.
+    runs-on: ubuntu-22.04
     permissions:
       contents: read
     steps:
@@ -112,6 +114,15 @@ jobs:
       - name: Install application dependencies
         if: steps.changes.outputs.docs_only != 'true'
         run: npm ci
+
+      - name: Run Factory sandbox isolation tests
+        if: steps.changes.outputs.docs_only != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap
+          npm ci --prefix ops/factory/app
+          node --experimental-strip-types --test ops/factory/app/local-sandbox.test.mjs
+          npm run check --prefix ops/factory/app
 
       - name: Run current application and installation tests
         if: steps.changes.outputs.docs_only != 'true'

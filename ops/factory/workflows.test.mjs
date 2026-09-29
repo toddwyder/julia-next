@@ -30,7 +30,7 @@ test('both workflows cancel superseded runs; CI retains its required job for doc
     assert.match(workflow, /cancel-in-progress: true/);
   }
   assert.doesNotMatch(ci, /\n\s+paths(?:-ignore)?:/);
-  assert.match(ci, /checks:\s*\n\s+runs-on: ubuntu-latest/);
+  assert.match(ci, /checks:\s*\n(?:\s*#[^\n]*\n)*\s+runs-on: ubuntu-22\.04/);
   assert.match(ci, /docs\//);
   assert.match(ci, /if: steps\.changes\.outputs\.docs_only != 'true'/);
 });

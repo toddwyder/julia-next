@@ -26,7 +26,7 @@ bash /path/to/julia-next/ops/factory/install.sh /var/lib/julia-factory/app
 ```
 
 The installer copies `ops/factory/app/{package.json,package-lock.json,tsconfig.json}`,
-`ops/factory/app/src/mastra/index.ts`, and the two project overrides in
+`ops/factory/app/src/mastra/{index,local-sandbox}.ts`, and the two project overrides in
 `ops/factory/app/src/mastra/public/factory-skills/{factory-plan,factory-review}/SKILL.md`
 into the service directory before `npm ci`; it never copies `.env`, databases or
 runtime workspaces. The versioned lockfile pins the deployed dependencies; it does
@@ -39,6 +39,19 @@ patch checks version and original SHA-256 and rejects unexpected files. It appli
 before build and checks the copied deployment dependency afterward. Repeat
 application is safe. Back up the service directory before a live install and
 restart the service only after checks succeed.
+
+**Issue #146 deployment gate:** The local-provider configuration requires native
+`bubblewrap` with `nativeSandbox.allowNetwork: true`. Todd approved general internet
+access on 2026-09-28; the earlier Git-only egress restriction was withdrawn.
+Before merging, check `bwrap` as the service user, back up the service install, use
+the installer above, restart the service, and prove the installed Factory session
+runs isolated commands. Independently verify harmless canaries exist at protected
+file/key/database/secret locations outside the sandbox, then prove each is denied
+inside. Prove a disposable Git fetch/commit/push using Factory's intended short-lived
+Git credentials, and record commands/results and accepted network scope in the
+change log and PR. Roll back if the service fails to start or isolation is bypassed;
+never print key or database contents. #144 owns the retired Orca reachability check
+and does not block #146.
 
 The installer runs `workos-cookie-identity.check.mjs` against both package copies.
 Its fixture checks one membership, an explicit organization choice, and no

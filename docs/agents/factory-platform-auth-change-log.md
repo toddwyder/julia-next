@@ -126,3 +126,96 @@ tracked by issue #140. The trace store was 1.7 GB after approximately 10 hours,
 with 30 GB of disk space free. The backups above provide the source/patch
 rollback copies; no rollback was performed because the restarted service was
 healthy. Source: Todd's 2026-09-28 comment on PR #142.
+
+## 2026-09-28: #146 bubblewrap staging — not deployed
+
+In the disposable Factory work checkout, `julia-factory` could execute `bwrap`
+(version 0.9.0). The repository-sourced local sandbox was changed to request
+Mastra's native `isolation: 'bwrap'` with its default offline policy; no installed
+service files, environment variables, or live service were changed. A throwaway
+workspace probe through the public `LocalSandbox.executeCommand` API produced:
+
+| Check | Result |
+|---|---|
+| Isolated command (`printf isolated`) | Exit 0 |
+| Outside-workspace readable canary (`test -r`) | Exit 1, while the service user could read it outside the sandbox |
+| Installed application source readability (`test -r`) | Exit 1; host service user can read it outside the sandbox |
+| `/etc/julia-factory/factory.env` readability (`test -r`) | Exit 1; that path was not present in this checkout's host view, so this is not a server-secret proof |
+| `git ls-remote https://github.com/toddwyder/julia-next.git HEAD` | Exit 128 inside the offline sandbox; the same command succeeded outside it |
+| Backend metadata | `bwrap` |
+| Backend missing from `PATH` | Construction threw; no host fallback |
+
+This is **not** a live bound Factory session or a pre-merge server proof. No
+credentials or secret contents were read or printed. Factory's pinned package
+scopes Git credentials to individual processes, but its materialization clones
+inside the sandbox and needs outbound Git network access. Mastra core 1.71.0
+implements `nativeSandbox.allowNetwork: true` by omitting `--unshare-net`, which
+restores general host networking rather than Git-only egress. With the safe
+network-off policy, the required fetch/commit/push proof cannot succeed. Enabling
+unrestricted egress would weaken the issue's intended boundary; no custom
+network filter, paid provider, Mastra patch, or silent fallback was added. Todd
+chose to keep restricted networking on 2026-09-28: do not deploy/merge this
+staged change or open a PR. Plan a separately approved restricted-egress design
+before resuming. After that decision, the actual Factory server still needs operator installation proof,
+key/database denial, disposable Git fetch/commit/push, and (after #144) retired
+Orca unreachability; a real card must traverse planning and review. None of those
+server/end-to-end checks is claimed complete here.
+
+## 2026-09-28: #146 decision update — network-enabled bubblewrap in repository, server proof pending
+
+Todd's later decision supersedes the restricted-network stop in the earlier staging entry: general internet access for isolated Factory agent commands is approved. The saved `.artifacts/plans/issue-146.md` was revised in place. The repository configuration now sets `isolation: 'bwrap', nativeSandbox: { allowNetwork: true }`; no custom network filter, new host bind, Mastra patch or paid provider was added. The earlier offline results remain historical, not a description of the current configuration. The retired Orca reachability check moved to #144 and is not a #146 release gate.
+
+A new disposable-workspace test first failed with network-off (HTTP request to a temporary localhost server exited 7), then passed with network enabled while the outside readable canary remained inaccessible. This test does not demonstrate a live bound Factory session, installed-service package versions, protected-location canaries, or Factory-managed Git credentials. Before merge, verify on the installed server that every protected canary exists outside the sandbox before testing denial inside, test fail-closed execution, and complete a disposable fetch/commit/push via Factory's integration. Record the actual commands, exit statuses, deployment and rollback steps, network scope, and limitations in this log and the PR without exposing secrets.
+
+Non-invasive host check from the `julia-factory` checkout (not an installed-session proof): `command -v bwrap` returned `/usr/bin/bwrap`; `bwrap --version` returned 0.9.0; the installed lockfile reports Factory 0.17.2 and Core 1.71.0; `systemctl is-active julia-factory-trial.service` returned `active` with `WorkingDirectory=/var/lib/julia-factory/app`. The readable installed `src/mastra/index.ts` is still the original version, not the new local-sandbox delegate; the running service has **not** loaded this change. `/etc/julia-factory` is root-only and its `factory.env` is not readable by this checkout user; that fact is **not** evidence that agent commands in the live service cannot read it. `sudo -n true` failed (exit 1), so this session cannot perform the required operator-managed service backup/restart. No service files, secrets, credentials, or runtime process were changed. The installed Factory command path, protected-location canaries, and disposable Git fetch/commit/push remain unverified. Any PR from this checkout must remain unmerged until the operator stages the install with rollback and records those actual Factory-session results.
+
+## 2026-09-28: PR #147 installed on the Factory server
+
+Todd authorized installing open PR #147 (`factory/issue-146`, head `03783eb00316fb0f4c079f1238e68dedaf502f97`) without merging or using Factory's screens. The server's existing #146 checkout was clean at that exact commit. Before the change, the service was active with Factory 0.17.2 and Core 1.71.0.
+
+- Stopped `julia-factory-trial.service` at 22:54 UTC. Archived `/var/lib/julia-factory/app` and `/var/lib/julia-factory/patches` to `/var/lib/julia-factory/app-and-patches-before-pr147-20260928T225424Z.tar.zst` (885,911,652 bytes; SHA-256 `8431c92874027bc2c0067561b87b9300499172550075d57a271724e862671f5b`). `zstd -t` passed. The backup wrapper returned exit 1 only because its final `true` had a Windows CRLF; archive creation and verification had completed.
+- Copied only `ops/factory/install.sh` and its seven declared inputs from that clean commit to `/var/lib/julia-factory/patches/`; every `cmp` passed. The new `local-sandbox.ts` SHA-256 was `da326fdda378aacbfc778e78ecdaa7ff00d5f28732c313180accb8e03bfb13cb`; `index.ts` was `3a5ad4f2327db94e3a20113342c0daea8c23c8a8a32e126c02b48b17abe9be51`.
+- Ran `sudo -u julia-factory -H bash /var/lib/julia-factory/patches/install.sh /var/lib/julia-factory/app`. It exited 0: `npm ci`, the existing WorkOS patch/regression in app and output, `npm run check`, and `npm run build` passed. No Mastra package patch was added.
+- Started `julia-factory-trial.service` at 22:58:13 UTC. It returned `active` with MainPID `2162614`. Installed source byte-matches the staged PR inputs; `.mastra/output/mastra.mjs` contains `allowNetwork: true` and the `isolation=bwrap network=on` log statement. The service setting is `FACTORY_SANDBOX_PROVIDER=local`. An unauthenticated local HTTP probe returned 401. No Factory screen was pressed and nothing was merged.
+
+The restarted service is running the new built configuration. Actual bound-session isolation, protected-location canaries, fail-closed execution, and Factory-managed Git fetch/commit/push remain unverified pre-merge checks. No secret values were read or printed.
+
+## 2026-09-28: PR #147 protected-path inventory and host canaries
+
+Recorded on [PR #147](https://github.com/toddwyder/julia-next/pull/147#issuecomment-5880430929).
+
+Operator host-side inventory for PR #147 (no sandbox command was run; no secret value was printed):
+
+| Protected location | Path | Owner | Mode |
+|---|---|---|---|
+| GitHub App private key and credential environment source | `/etc/julia-factory/factory.env` | `root:root` | `0600` |
+| Running service environment (virtual file) | `/proc/2162614/environ` | `julia-factory:julia-factory` | `0400` |
+| PostgreSQL data directory | `/var/lib/postgresql/16/main` | `postgres:postgres` | `0700` |
+| PostgreSQL file existence witness | `/var/lib/postgresql/16/main/PG_VERSION` | `postgres:postgres` | `0600` |
+| Factory local database | `/var/lib/julia-factory/.local/share/mastracode/observability.duckdb` | `julia-factory:julia-factory` | `0600` |
+| Factory service home | `/var/lib/julia-factory` | `julia-factory:julia-factory` | `0750` |
+| Home Git config | `/var/lib/julia-factory/.gitconfig` | `julia-factory:julia-factory` | `0664` |
+| Home application config | `/var/lib/julia-factory/.config/varlock/config.json` | `julia-factory:julia-factory` | `0600` |
+| Factory settings | `/var/lib/julia-factory/.local/share/mastracode/settings.json` | `julia-factory:julia-factory` | `0600` |
+
+The service environment contains nonempty `GITHUB_APP_PRIVATE_KEY`, `DATABASE_URL`, and `FACTORY_CREDENTIAL_ENCRYPTION_KEY` variables; only presence was checked. No standalone GitHub App key file was found in the inspected protected directories. The process environment is a virtual file, so its physical source directory `/etc/julia-factory` received a canary.
+
+Harmless canaries created and independently stat-checked outside the sandbox (each holds an undisclosed random word):
+
+| Canary path | Owner | Mode |
+|---|---|---|
+| `/etc/julia-factory/.factory-bwrap-canary-pr147-20260928` | `root:root` | `0600` |
+| `/var/lib/postgresql/16/main/.factory-bwrap-canary-pr147-20260928` | `postgres:postgres` | `0600` |
+| `/var/lib/julia-factory/.factory-bwrap-canary-pr147-20260928` | `julia-factory:julia-factory` | `0600` |
+| `/var/lib/julia-factory/.config/.factory-bwrap-canary-pr147-20260928` | `julia-factory:julia-factory` | `0600` |
+| `/var/lib/julia-factory/.local/share/mastracode/.factory-bwrap-canary-pr147-20260928` | `julia-factory:julia-factory` | `0600` |
+
+The three `julia-factory`-owned canaries are readable by that account on the host. The root/PostgreSQL canaries establish existence but their parent directories already deny that account under normal host permissions. This inventory prepares the live Factory-command test; it does not claim sandbox denial. No merge or Factory screen action was performed.
+
+## 2026-09-29: PR #147 installed-session proof and CI follow-up
+
+In the installed Factory command session, the operator-confirmed protected paths and all five canaries were inaccessible: each `test -r` failed, and one-byte reads of the five canaries failed without printing contents. The service home directory itself is visible as the workspace ancestor, which Todd accepted; none of its inventoried private files was readable. The session environment contained no `GITHUB_APP_*`, `WORKOS_*`, `DATABASE_URL`, or `FACTORY_*` names, and the running service PID was absent in the command namespace. Individual results and host-existence qualifications are on PR #147 comments 5881032612 and 5881281690. Todd checked #146's protected-file item. The missing-bwrap test (`PATH` without bwrap) passed again, 1/1, and Todd accepted it as sufficient fail-closed proof without deliberately breaking the live service (issue comment 5881399372).
+
+An isolated installed-session disposable branch `factory-proof-146-20260928230825-2` completed fetch, commit, push, matching remote read-back, and verified remote deletion. It used this command session's `GH_TOKEN`, not a directly inspected Factory installation token; no credential value was printed. Todd separately accepted PR #147's own Factory review session preparing its checkout in the installed sandbox at 17:28 PT September 28 as proof that Factory's normal repository-materialization credential route works. General internet access through `nativeSandbox.allowNetwork: true` is enabled and accepted; this is not Git-only egress. Issue #146 Git item checked and decision recorded in comment 5882005208.
+
+GitHub Actions run 36497019721 installed bubblewrap 0.9.0 on `ubuntu-latest`, but both permitted sandbox commands exited 1 before reaching their expected output; the missing-bwrap test passed. The CI job now requests GitHub's `ubuntu-22.04` VM instead of `ubuntu-latest` while retaining all three behavior tests and the app typecheck. The hosted-runner outcome must be checked before treating this fix as verified. The Factory review's separate Standards and Spec verdict has not been recorded on PR #147; do not merge on this entry alone.
