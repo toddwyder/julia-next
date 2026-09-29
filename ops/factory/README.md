@@ -173,9 +173,11 @@ loopback publish URL and access token there. Keep both topic and token private.
 Todd subscribes from the [ntfy Android app](https://docs.ntfy.sh/subscribe/phone/)
 to the private origin and installs the
 [Windows PWA](https://docs.ntfy.sh/subscribe/pwa/) from that same HTTPS origin.
-He enables background notifications in the PWA. The Windows browser must be
-running for background notifications; open the PWA at least monthly so ntfy's
-inactive Web Push subscription expiry does not lapse. On Android, choose
+He enables background notifications in the web app's Settings if using a
+browser tab; an installed PWA enables them by default. The Windows browser
+must be running for desktop Web Push. [ntfy says](https://docs.ntfy.sh/subscribe/web/#background-notifications)
+background notifications pause if the app is not opened for over a week, so
+open the PWA at least weekly. On Android, choose
 instant delivery and allow the ntfy app to run in the background. After both
 subscriptions are confirmed,
 the operator creates `/etc/julia-factory-wait-alerts/subscribed-self-hosted`
