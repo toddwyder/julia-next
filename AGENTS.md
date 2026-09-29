@@ -8,6 +8,13 @@ the publisher App pinned to the reviewed head, never a Factory card. Keep SSH an
 outside the Factory sandbox; an authorized operator uses the laptop's Tailscale route.
 See `docs/agents/work-execution.md` and `docs/adr/0009-mastra-factory.md`.
 
+## Recommend the next action
+
+In every status update or blocker report, lead with your recommended next action. If there are
+options, choose one and say why. Complete any authorized steps yourself. Ask Todd only for a
+decision or action that genuinely requires him. Do not merely report status or leave Todd to
+ask what to do next.
+
 ## Building a card
 
 1. Follow the approved plan. Build test-first with `.claude/skills/tdd/SKILL.md`: one behaviour
