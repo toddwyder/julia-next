@@ -60,48 +60,12 @@ jobs:
       - name: Builder client must never read the Axiom credential
         run: |
           set -euo pipefail
-          # scripts/ is builder-side code (runs under the low-privilege builder
-          # account). ops/journey-relay/ is the trusted boundary and is the one
-          # place allowed to read AXIOM_TOKEN/AXIOM_DATASET. Comments in
-          # scripts/ are allowed to *mention* those names (they document the
-          # boundary); only an actual process.env read is disallowed.
+          # Scripts must not read the retired relay's Axiom credentials.
           if grep -rE 'process\.env\.AXIOM_(TOKEN|DATASET)' scripts/; then
             echo "::error::builder-side script under scripts/ reads an Axiom credential env var directly"
             exit 1
           fi
           echo "OK: no Axiom credential read under scripts/"
-
-      - name: Relay must bind to localhost only
-        run: |
-          set -euo pipefail
-          if ! grep -qE "listen\([^)]*'127\.0\.0\.1'" ops/journey-relay/relay.mjs; then
-            echo "::error::relay.mjs must bind explicitly to 127.0.0.1, not 0.0.0.0/all interfaces"
-            exit 1
-          fi
-          echo "OK: relay binds to 127.0.0.1"
-
-      - name: Relay systemd unit must run as the dedicated low-privilege account
-        run: |
-          set -euo pipefail
-          unit=ops/journey-relay/journey-relay.service
-          for directive in 'User=axiom-relay' 'NoNewPrivileges=' 'ProtectSystem=' 'ProtectHome=' 'EnvironmentFile='; do
-            if ! grep -q "$directive" "$unit"; then
-              echo "::error::$unit is missing expected hardening directive: $directive"
-              exit 1
-            fi
-          done
-          echo "OK: journey-relay.service has expected account and hardening directives"
-
-      - name: Example env file must not contain a real-looking token
-        run: |
-          set -euo pipefail
-          example=ops/journey-relay/journey-axiom.env.example
-          value=$(grep -E '^AXIOM_TOKEN=' "$example" | cut -d= -f2-)
-          if [[ "$value" != *REPLACE* && "$value" != *PLACEHOLDER* && "$value" != "" ]]; then
-            echo "::error::$example's AXIOM_TOKEN does not look like a placeholder (expected it to contain REPLACE or PLACEHOLDER)"
-            exit 1
-          fi
-          echo "OK: example env file holds only placeholder values"
 
       - name: Run documentation and policy tests
         run: |

@@ -1,5 +1,7 @@
 # Readiness review
 
+**Historical graph-era procedure.** Current GitHub issues run through Factory's Intake, Work and Review boards; use `docs/agents/work-execution.md` instead. The coordinator skill named below has been retired.
+
 A repeatable check, used at two points: before any ticket gets the `ready-for-agent` label
 (`docs/agents/triage-labels.md`), and at the start of a run, by the coordinator before the
 first build step. It proves a ticket (or a batch of related tickets) can run all the way

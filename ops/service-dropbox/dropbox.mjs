@@ -1,8 +1,7 @@
 // dropbox.mjs -- JUL-72's one-time code drop box.
 //
 // Runs as its own dedicated system account (dropbox-svc), NOT the `runner`
-// builder account and NOT `orchestrator-svc`, the same isolation reasoning
-// as ops/journey-relay/relay.mjs: same-UID processes can read each other's
+// builder account and NOT `orchestrator-svc`: same-UID processes can read each other's
 // environment via /proc/<pid>/environ, so the account that briefly handles
 // four raw bearer tokens must not be an account any builder worktree or the
 // publisher also runs as.

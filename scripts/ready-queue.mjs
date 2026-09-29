@@ -942,18 +942,6 @@ export function resolveIntervalMinutes({ flag, env = process.env } = {}) {
   return value;
 }
 
-const USAGE = `usage: node scripts/ready-queue.mjs --check [--interval-minutes N] [--state-path PATH]
-
-Runs exactly ONE Ready-queue check cycle and exits; this script never sleeps.
-The systemd timer (a later step) is what repeats it. Pass --interval-minutes
-to match that timer's OnUnitActiveSec (default ${DEFAULT_INTERVAL_MINUTES}, or
-READY_QUEUE_INTERVAL_MINUTES); the value is reported, never waited on.
-
-  --check                 perform one check cycle (required)
-  --interval-minutes N    expected timer interval in minutes (default ${DEFAULT_INTERVAL_MINUTES})
-  --state-path PATH       state file (default ${DEFAULT_STATE_PATH})
-`;
-
 export function describeResult(result) {
   switch (result?.status) {
     case 'no-ready-state':
@@ -984,28 +972,7 @@ export function describeResult(result) {
   }
 }
 
-async function main() {
-  const options = parseArgs(process.argv.slice(2));
-  if (options.help) {
-    console.log(USAGE);
-    return;
-  }
-  if (!options.check) {
-    console.error(USAGE);
-    process.exitCode = 2;
-    return;
-  }
-  const intervalMinutes = resolveIntervalMinutes({ flag: options.intervalMinutesFlag });
-  const result = await readyQueueCheck({
-    ...(options.statePath ? { statePath: options.statePath } : {}),
-    intervalMinutes,
-  });
-  console.log(describeResult(result));
-}
-
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main().catch((error) => {
-    console.error(error.message);
-    process.exitCode = 1;
-  });
+  console.error('Graph ready queue retired; start work through Factory.');
+  process.exitCode = 1;
 }

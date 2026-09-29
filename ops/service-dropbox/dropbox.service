@@ -7,16 +7,16 @@ Type=simple
 ExecStart=/usr/bin/node /opt/orca-runner/service-dropbox/dropbox.mjs
 EnvironmentFile=/etc/orca-runner/dropbox.env
 # Runs as the dedicated dropbox-svc account, not `runner` and not
-# `orchestrator-svc` -- same reasoning as journey-relay.service: same-UID
-# processes can read each other's environment via /proc/<pid>/environ, and
+# `orchestrator-svc` -- same-UID processes can read each other's environment
+# via /proc/<pid>/environ, and
 # this process briefly handles four raw bearer tokens in memory per
 # request, so it must not share a UID with any builder worktree or the
 # publisher.
 User=dropbox-svc
 Group=dropbox-svc
-# NoNewPrivileges is deliberately NOT set here, unlike journey-relay.service.
-# journey-relay never escalates privileges -- this process's entire security
-# model depends on being ABLE to: it never has write access to the
+# NoNewPrivileges is deliberately NOT set here: this process's entire security
+# model depends on being ABLE to escalate through its narrowly scoped sudo rule.
+# It never has write access to the
 # destination secret files itself, and reaches them only by invoking
 # write-secret.sh (root:root 0700) through the narrowly scoped
 # `dropbox-svc ALL=(root) NOPASSWD: /opt/.../write-secret.sh` sudoers rule

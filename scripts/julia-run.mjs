@@ -14,7 +14,6 @@ import { checkReadiness } from './check-readiness.mjs';
 import {
   runCreate, runList, taskList, terminalCreate, terminalWait, terminalRead,
 } from './orca-cli.mjs';
-import { getPublisherInstallationToken } from './publish-via-github-app.mjs';
 import { SEAT_TABLE } from '../graph/seat-table.mjs';
 import { translateEffort, normalizeEffort } from './effort.mjs';
 
@@ -64,40 +63,6 @@ export async function assertReady({ checkReadinessImpl = checkReadiness } = {}) 
     const failing = checks.find((c) => !c.ok);
     throw new Error(`readiness check failed: ${failing.name} -- ${failing.detail}`);
   }
-}
-
-// The checkout can't sync itself (no write access to its own .git dir --
-// see the runbook), so this triggers the one narrowly-scoped sudo rule
-// that lets orchestrator-svc run exactly `systemctl start
-// julia-next-checkout-sync.service`, then re-checks.
-// julia-next is a private repo -- an unauthenticated `git ls-remote` hangs
-// forever waiting for a credential prompt in a non-interactive terminal
-// (hit live, JUL-63). Resolve the remote head via the GitHub API with the
-// publisher's own installation token instead of touching git credentials
-// at all for this check.
-export async function getRemoteMainHead({ tokenImpl = getPublisherInstallationToken, fetchImpl = fetch } = {}) {
-  const token = await tokenImpl({ ...process.env, JULIA_PUBLISHER_REPO: 'julia-next' });
-  const res = await fetchImpl('https://api.github.com/repos/toddwyder/julia-next/git/ref/heads/main', {
-    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
-  });
-  const body = await res.json();
-  if (!res.ok) {
-    throw new Error(`could not resolve origin/main via the GitHub API (HTTP ${res.status}): ${body.message ?? JSON.stringify(body)}`);
-  }
-  return body.object.sha;
-}
-
-export async function ensureCheckoutSynced({ execImpl = execFileAsync, getRemoteMainHeadImpl = getRemoteMainHead } = {}) {
-  const localHead = (await execImpl('git', ['-C', CHECKOUT, 'rev-parse', 'HEAD'])).stdout.trim();
-  const remoteHead = await getRemoteMainHeadImpl({ execImpl });
-  if (localHead === remoteHead) return { head: localHead, triggeredSync: false };
-
-  await execImpl('sudo', ['-n', 'systemctl', 'start', 'julia-next-checkout-sync.service']);
-  const afterHead = (await execImpl('git', ['-C', CHECKOUT, 'rev-parse', 'HEAD'])).stdout.trim();
-  if (afterHead !== remoteHead) {
-    throw new Error(`checkout still at ${afterHead} after triggering a sync, expected ${remoteHead}`);
-  }
-  return { head: afterHead, triggeredSync: true };
 }
 
 const TERMINAL_TASK_STATUSES = new Set(['completed', 'failed', 'stopped', 'cancelled']);
@@ -354,7 +319,6 @@ export async function juliaRun(issueId, impls = {}) {
   assertAccount(impls);
   prepareServerEnvironment(impls);
   await assertReady(impls);
-  await ensureCheckoutSynced(impls);
 
   const existing = await findExistingRun(issueId, impls);
   if (existing) {
@@ -365,23 +329,8 @@ export async function juliaRun(issueId, impls = {}) {
   return result;
 }
 
-async function main() {
-  const issueId = process.argv[2];
-  if (!issueId) {
-    console.error('usage: julia-run <ISSUE-ID>');
-    process.exitCode = 2;
-    return;
-  }
-  try {
-    const { runId } = await juliaRun(issueId);
-    console.log(runId);
-  } catch (error) {
-    console.error(error.message);
-    process.exitCode = 1;
-  }
-}
-
 import { pathToFileURL } from 'node:url';
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main();
+  console.error('Graph launcher retired; start work through Factory.');
+  process.exitCode = 1;
 }

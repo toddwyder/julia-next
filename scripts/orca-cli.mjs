@@ -201,11 +201,8 @@ export async function workerAbandon({ environment, dispatch, execImpl } = {}) {
   return run(['orchestration', 'worker-abandon', '--environment', environment, '--dispatch', dispatch, '--json'], { execImpl });
 }
 
-// A plain shell command, not a supervised agent worker -- used for
-// diagnostics (readiness checks) and for emitting coordinator-events.mjs
-// from inside the OVH runner itself, the one place that can reach the
-// journey-relay's loopback binding (127.0.0.1:8943). Never used for agent
-// dispatch; worker-start is the supervised path for that.
+// A plain shell command, not a supervised agent worker. The historical
+// graph route used it for diagnostics; worker-start was its supervised path.
 export async function terminalCreate({
   environment, worktree, command, title, execImpl,
 } = {}) {

@@ -28,11 +28,11 @@ const BASE_FILES = {
   'CLAUDE.md': '# Rules\n\nSTANDARD-MARKER-CLAUDE: name things plainly.\n',
   'AGENTS.md': '# Agents\n\nSTANDARD-MARKER-AGENTS\n',
   'eslint.config.mjs': '// STANDARD-MARKER-ESLINT\nexport default [];\n',
-  '.agents/skills/implement/SKILL.md': 'IMPLEMENT-SKILL-MARKER\n',
-  '.agents/skills/tdd/SKILL.md': 'TDD-SKILL-MARKER\n',
-  '.agents/skills/tdd/tests.md': 'TDD-TESTS-MARKER\n',
-  '.agents/skills/tdd/mocking.md': 'TDD-MOCKING-MARKER\n',
-  '.agents/skills/code-review/SKILL.md': 'CODE-REVIEW-SKILL-MARKER\n',
+  '.claude/skills/implement/SKILL.md': 'IMPLEMENT-SKILL-MARKER\n',
+  '.claude/skills/tdd/SKILL.md': 'TDD-SKILL-MARKER\n',
+  '.claude/skills/tdd/tests.md': 'TDD-TESTS-MARKER\n',
+  '.claude/skills/tdd/mocking.md': 'TDD-MOCKING-MARKER\n',
+  '.claude/skills/code-review/SKILL.md': 'CODE-REVIEW-SKILL-MARKER\n',
 };
 
 function makeRepo() {

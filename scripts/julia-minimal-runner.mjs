@@ -62,7 +62,7 @@ export function seamsOf(description) {
 
 // Everything the workers read comes from the start commit, never from a
 // working copy or a personal path, so every run of a card reads the same text.
-const SKILL_FILES = ['.agents/skills/implement/SKILL.md', '.agents/skills/tdd/SKILL.md', '.agents/skills/tdd/tests.md', '.agents/skills/tdd/mocking.md'];
+const SKILL_FILES = ['.claude/skills/implement/SKILL.md', '.claude/skills/tdd/SKILL.md', '.claude/skills/tdd/tests.md', '.claude/skills/tdd/mocking.md'];
 const pinnedText = (repoRoot, base, paths) => paths.map((path) => `<file path="${path}">\n${git(repoRoot, 'show', `${base}:${path}`)}\n</file>`).join('\n\n');
 
 // One review is one prompt; above this size it is refused, never cut short.
@@ -167,7 +167,7 @@ export async function runIssue(issueId, { base, repoRoot, worktreeRoot, adapters
       card,
       builder,
       checks,
-      skill: pinnedText(repoRoot, base, ['.agents/skills/code-review/SKILL.md']),
+      skill: pinnedText(repoRoot, base, ['.claude/skills/code-review/SKILL.md']),
       standards: pinnedText(repoRoot, base, [...STANDARDS_FILES, ...OPTIONAL_STANDARDS_FILES.filter((path) => existsAt(repoRoot, base, path))]),
       commits: git(worktree, 'log', '--oneline', `${base}..${sha}`),
       diff: git(worktree, 'diff', `${base}...${sha}`),
@@ -288,40 +288,8 @@ export async function runIssue(issueId, { base, repoRoot, worktreeRoot, adapters
   return blocked(`still not passing after the correction round: ${second.findings.split('\n')[0]}`);
 }
 
-// ---------------------------------------------------------------- Command line
-
-// On the server (ops/julia-runner/README.md): run as orchestrator-svc by
-// systemd-run, which loads the Linear app credential; the card's working copy
-// lives where the Gemini and test workers are allowed to reach it.
-const SERVER_REPO = '/srv/julia-runner/repo';
-const SERVER_WORKTREES = '/srv/julia-runner/worktrees';
-
-async function main([issueId, flag, base]) {
-  if (!/^[A-Z]+-\d+$/.test(issueId ?? '') || flag !== '--base' || !base) {
-    console.error('usage: node scripts/julia-minimal-runner.mjs JUL-NN --base <origin/main commit>');
-    return 2;
-  }
-  // Files the runner checks out stay writable by the worktree group, so the
-  // Gemini worker can edit them and the runner can switch commits afterwards.
-  process.umask(0o002);
-  const { deepseekAdapter, geminiAdapter, linearAdapter, publishAdapter, readAppCredential, testerAdapter } = await import('./julia-minimal-runner-adapters.mjs');
-  // Fail before anything else if the credential is not there.
-  readAppCredential();
-  const linear = linearAdapter();
-  const comment = linear.comment;
-  // The terminal shows the same progress lines as the card.
-  linear.comment = (id, body) => { console.log(body.split('\n')[0]); return comment(id, body); };
-  const progress = (line) => console.log(`${new Date().toISOString().slice(11, 19)}Z  ${line}`);
-  const result = await runIssue(issueId, {
-    base,
-    repoRoot: SERVER_REPO,
-    worktreeRoot: SERVER_WORKTREES,
-    adapters: { linear, progress, gemini: geminiAdapter(), tests: testerAdapter(), deepseek: deepseekAdapter(), publish: publishAdapter() },
-  });
-  console.log(JSON.stringify(result, null, 2));
-  return result.outcome === 'pr' ? 0 : 1;
-}
-
+// The historical runIssue seam remains for fixture tests; it is not a card launcher.
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  main(process.argv.slice(2)).then((code) => { process.exitCode = code; }, (error) => { console.error(error.stack ?? error); process.exitCode = 1; });
+  console.error('Graph runner retired; start work through Factory.');
+  process.exitCode = 1;
 }

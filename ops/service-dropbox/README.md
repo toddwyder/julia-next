@@ -21,7 +21,7 @@ orchestrator-only field (including `linear`), not just the fields it's meant to 
 ## Architecture
 
 `dropbox.mjs` runs as its own dedicated system account, `dropbox-svc` -- not `runner`, not
-`orchestrator-svc`, same isolation reasoning as `ops/journey-relay/`. It never has write access
+`orchestrator-svc`. It never has write access
 to the destination secret files itself: it can only invoke `write-secret.sh` (installed
 root:root, 0700) via a narrowly scoped NOPASSWD sudoers rule that names that exact path. The
 helper reads the value from stdin (never argv) and is the only thing that ever writes or chowns
@@ -144,8 +144,8 @@ unsupported_model` -- the two providers are not interchangeable by model id.
 
 ## Why a dedicated account, and why a sudo helper instead of direct writes
 
-Same reasoning as `ops/journey-relay/README.md`: same-UID processes can read each other's
-environment and open files via `/proc/<pid>/`. `dropbox-svc` briefly holds up to eight raw
+Same-UID processes can read each other's environment and open files via
+`/proc/<pid>/`. `dropbox-svc` briefly holds up to eight raw
 tokens and secrets per request; if it also owned the destination files, any bug or compromise in
 this ~250-line HTTP handler would have direct write access to every one of those accounts'
 credential stores, not just `orchestrator-svc`'s.
