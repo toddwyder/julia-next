@@ -35,13 +35,12 @@ SQL
 config_dir=/etc/julia-factory-wait-alerts
 install -d -m 0750 -o root -g julia-factory "$config_dir"
 if [[ ! -e $config_dir/config.json ]]; then
-  topic="julia_factory_$(openssl rand -hex 24)"
-  python3 - "$config_dir/config.json" "$project_id" "$user_id" "$factory_url" "$topic" <<'PY'
+  python3 - "$config_dir/config.json" "$project_id" "$user_id" "$factory_url" <<'PY'
 import json, sys
 from pathlib import Path
 Path(sys.argv[1]).write_text(json.dumps({
     'database': 'julia_factory_trial', 'project_id': sys.argv[2],
-    'user_id': sys.argv[3], 'factory_url': sys.argv[4], 'topic': sys.argv[5],
+    'user_id': sys.argv[3], 'factory_url': sys.argv[4],
 }) + '\n', encoding='utf-8')
 PY
   chown root:julia-factory "$config_dir/config.json"
@@ -51,4 +50,4 @@ install -m 0644 "$patch_dir/julia-factory-wait-alerts.service" /etc/systemd/syst
 install -m 0644 "$patch_dir/julia-factory-wait-alerts.timer" /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now julia-factory-wait-alerts.timer
-echo 'Watcher installed. Delivery stays off until /etc/julia-factory-wait-alerts/subscribed-self-hosted exists.'
+echo 'Watcher installed. Delivery stays off until a Discord webhook is configured and /etc/julia-factory-wait-alerts/discord-ready exists.'

@@ -19,6 +19,9 @@ class Response(BytesIO):
     status = 200
 
 
+CONFIRMATION = b'{"id":"123456789012345678","channel_id":"123456789012345679"}'
+
+
 class WaitAlertsTest(unittest.TestCase):
     def setUp(self):
         self.wait = {
@@ -27,80 +30,91 @@ class WaitAlertsTest(unittest.TestCase):
             'path': '/factories/project/workspaces/session/threads/thread',
         }
         self.config = {
-            'topic': 'julia_factory_0123456789abcdef0123456789abcdef',
             'factory_url': 'https://factory.example',
-            'ntfy_url': 'http://127.0.0.1:8085',
-            'ntfy_token': 'tk_' + 'a' * 29,
+            'discord_webhook_url': 'https://discord.com/api/webhooks/123456789012345678/' + 'a' * 68,
             'project_id': 'project', 'user_id': 'todd', 'database': 'factory',
         }
 
-    def test_config_rejects_public_publisher(self):
+    def test_config_rejects_non_discord_destination(self):
         with tempfile.TemporaryDirectory() as directory:
             config_path = Path(directory) / 'config.json'
-            config_path.write_text(json.dumps({**self.config, 'ntfy_url': 'https://ntfy.sh'}))
-            with self.assertRaisesRegex(ValueError, 'loopback'):
+            config_path.write_text(json.dumps({**self.config, 'discord_webhook_url':
+                                              'https://example.com/api/webhooks/123456789012345678/token'}))
+            with self.assertRaisesRegex(ValueError, 'Discord webhook'):
                 watcher.config_from(config_path)
             config_path.write_text(json.dumps(self.config))
-            self.assertEqual(watcher.config_from(config_path)['ntfy_url'], self.config['ntfy_url'])
+            self.assertEqual(watcher.config_from(config_path)['discord_webhook_url'],
+                             self.config['discord_webhook_url'])
 
-    def test_publish_targets_local_origin_with_correct_link_and_token(self):
-        with patch.object(watcher, 'urlopen', return_value=Response(b'{"id":"sent"}')) as send:
-            link = watcher.publish(self.config, self.wait)
+    def test_publish_confirms_discord_message_with_factory_link_and_no_mentions(self):
+        with patch.object(watcher, 'urlopen', return_value=Response(CONFIRMATION)) as send:
+            message_id = watcher.publish(self.config, self.wait)
         request = send.call_args.args[0]
-        self.assertEqual(link, 'https://factory.example' + self.wait['path'])
-        self.assertEqual(request.get_header('Click'), link)
-        self.assertEqual(request.get_header('Authorization'),
-                         'Bearer ' + self.config['ntfy_token'])
-        self.assertEqual(request.full_url, self.config['ntfy_url'] + '/' +
-                         self.config['topic'] + '/' + watcher.sequence_id(self.wait['key']))
+        payload = json.loads(request.data)
+        self.assertEqual(message_id, '123456789012345678')
+        self.assertEqual(request.full_url, self.config['discord_webhook_url'] + '?wait=true')
+        self.assertEqual(payload['allowed_mentions'], {'parse': []})
+        self.assertIn('https://factory.example' + self.wait['path'], payload['content'])
 
     def test_accepted_wait_is_sent_only_once(self):
         with tempfile.TemporaryDirectory() as directory:
             state = Path(directory) / 'delivered.sqlite3'
-            with patch.object(watcher, 'urlopen', return_value=Response(b'{"id":"sent"}')) as send:
+            with patch.object(watcher, 'urlopen', return_value=Response(CONFIRMATION)) as send:
                 watcher.deliver(self.config, state, [self.wait])
                 watcher.deliver(self.config, state, [self.wait])
             self.assertEqual(send.call_count, 1)
             with closing(sqlite3.connect(state)) as db:
-                self.assertEqual(db.execute('SELECT status FROM delivered').fetchone()[0], 'sent')
+                self.assertEqual(db.execute('SELECT status,discord_message_id FROM delivered').fetchone(),
+                                 ('sent', '123456789012345678'))
 
-    def test_rejection_records_safe_codes_without_replay_or_private_output(self):
+    def test_rejection_records_safe_code_without_replay_or_secret_output(self):
         with tempfile.TemporaryDirectory() as directory:
             state = Path(directory) / 'delivered.sqlite3'
-            error = HTTPError(self.config['ntfy_url'] + '/private-topic', 429,
-                              'private detail', {}, BytesIO(b'{"code":42908,"error":"private detail"}'))
+            error = HTTPError(self.config['discord_webhook_url'], 429,
+                              'private detail', {}, BytesIO(b'{"message":"private detail"}'))
             output = StringIO()
             with redirect_stdout(output), patch.object(watcher, 'urlopen', side_effect=error) as send:
-                with self.assertRaisesRegex(RuntimeError, 'ntfy rejected'):
+                with self.assertRaisesRegex(RuntimeError, 'Discord rejected'):
                     watcher.deliver(self.config, state, [self.wait])
                 watcher.deliver(self.config, state, [self.wait])
             self.assertEqual(send.call_count, 1)
             with closing(sqlite3.connect(state)) as db:
                 self.assertEqual(db.execute(
-                    'SELECT status,http_status,ntfy_code FROM delivered'
-                ).fetchone(), ('rejected', 429, 42908))
-            self.assertIn('http_status=429 ntfy_code=42908', output.getvalue())
-            for private in (self.config['topic'], self.config['ntfy_token'],
+                    'SELECT status,http_status FROM delivered'
+                ).fetchone(), ('rejected', 429))
+            self.assertIn('http_status=429', output.getvalue())
+            for private in (self.config['discord_webhook_url'],
                             self.wait['key'], self.wait['path'], 'private detail'):
                 self.assertNotIn(private, output.getvalue())
 
-    def test_connection_refused_releases_unsent_wait_for_next_run(self):
+    def test_network_failure_is_not_replayed_when_outcome_is_uncertain(self):
         with tempfile.TemporaryDirectory() as directory:
             state = Path(directory) / 'delivered.sqlite3'
             with patch.object(watcher, 'urlopen', side_effect=URLError(ConnectionRefusedError())):
                 with self.assertRaises(URLError):
                     watcher.deliver(self.config, state, [self.wait])
             with closing(sqlite3.connect(state)) as db:
-                self.assertEqual(db.execute('SELECT count(*) FROM delivered').fetchone()[0], 0)
-            with patch.object(watcher, 'urlopen', return_value=Response(b'{"id":"sent"}')) as send:
+                self.assertEqual(db.execute('SELECT status FROM delivered').fetchone()[0], 'attempted')
+            with patch.object(watcher, 'urlopen', return_value=Response(CONFIRMATION)) as send:
                 watcher.deliver(self.config, state, [self.wait])
-            self.assertEqual(send.call_count, 1)
+            send.assert_not_called()
 
     def test_timeout_is_never_replayed(self):
         with tempfile.TemporaryDirectory() as directory:
             state = Path(directory) / 'delivered.sqlite3'
             with patch.object(watcher, 'urlopen', side_effect=TimeoutError('unknown')) as send:
                 with self.assertRaises(TimeoutError):
+                    watcher.deliver(self.config, state, [self.wait])
+                watcher.deliver(self.config, state, [self.wait])
+            self.assertEqual(send.call_count, 1)
+            with closing(sqlite3.connect(state)) as db:
+                self.assertEqual(db.execute('SELECT status FROM delivered').fetchone()[0], 'attempted')
+
+    def test_unconfirmed_200_is_not_recorded_as_sent_or_replayed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory) / 'delivered.sqlite3'
+            with patch.object(watcher, 'urlopen', return_value=Response(b'{}')) as send:
+                with self.assertRaisesRegex(RuntimeError, 'message ID'):
                     watcher.deliver(self.config, state, [self.wait])
                 watcher.deliver(self.config, state, [self.wait])
             self.assertEqual(send.call_count, 1)
