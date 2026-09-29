@@ -8,6 +8,7 @@ Todd adds or removes an entry. Anything custom that is not listed here is not ap
 | # | Exception | Gap it fills | Remove when |
 |---|---|---|---|
 | 1 | WorkOS cookie identity fix in `@mastra/auth-workos` 1.6.5 | Default platform sign-in rejects our self-hosted address; the WorkOS cookie path drops the organization ([#25252](https://github.com/mastra-ai/mastra/issues/25252)) | #25252 ships in a Mastra release |
+| 2 | Factory wait watcher | Stock Factory 0.17.2 shows waits in the web app but does not send phone and Windows alerts when Todd is away ([Mastra request #25378](https://github.com/mastra-ai/mastra/issues/25378)) | Remove when Mastra adds its own alerts |
 
 Approved by ADR 0009 but not built yet: the check that rejects unapproved custom machinery, and
 the weekly cost summary (Monday note). Each gets its row when it is built.
@@ -88,3 +89,41 @@ run `npm ci` alone on the service directory: the installer applies the approved
 patch after install and again to Mastra's built output and runs both regressions.
 No additional Mastra package code is changed. Factory uses its installed boards
 and normal model and GitHub connections.
+
+## Wait-alert watcher
+
+The normal installer copies `wait-alerts.py` and `wait-alerts.sql` into the app.
+Run the one-time root setup after the normal install:
+
+```sh
+sudo bash /var/lib/julia-factory/patches/install-wait-alerts.sh \
+  /var/lib/julia-factory/app \
+  49b0ea94-d24b-43d7-8ce1-618cb61c5188 \
+  user_01M3HB0CKYTK5V2DXGTZ4PA3B8 \
+  https://julia-factory.tail91f394.ts.net
+```
+
+The setup creates a PostgreSQL peer role with SELECT only on the tables the
+watcher needs. Its query runs in a read-only transaction. The watcher writes
+only its own SQLite delivery ledger in `/var/lib/julia-factory-wait-alerts`;
+it never changes Factory records, answers questions, or moves cards. A
+deterministic ntfy sequence ID prevents a second visible alert when a publish
+succeeds but its acknowledgement is lost. The one-minute systemd timer stays
+enabled across Factory restarts and server reboots.
+
+The setup generates a random topic in
+`/etc/julia-factory-wait-alerts/config.json` (root-owned, group
+`julia-factory`, mode `0640`). Keep that topic out of public issues and logs:
+anyone who knows a public ntfy topic can read or post to it. Todd installs the
+[ntfy phone app](https://docs.ntfy.sh/subscribe/phone/) and the
+[Windows PWA](https://docs.ntfy.sh/subscribe/pwa/), subscribes to the same
+topic in both, and enables notifications. The Windows browser must be running
+for background notifications. Delivery remains gated until the operator
+creates `/etc/julia-factory-wait-alerts/subscribed` after Todd confirms both
+subscriptions.
+
+Inspect current waits without publishing:
+
+```sh
+sudo -u julia-factory python3 /var/lib/julia-factory/app/ops/factory/wait-alerts.py --dry-run
+```

@@ -28,4 +28,6 @@ npm run build
 # Mastra copies external packages into its deployable output.
 python3 "$patch_dir/apply-install-patches.py" "$app_dir"
 node "$patch_dir/workos-cookie-identity.check.mjs" "$app_dir/.mastra/output"
+install -D -m 0644 "$patch_dir/wait-alerts.py" "$app_dir/ops/factory/wait-alerts.py"
+install -D -m 0644 "$patch_dir/wait-alerts.sql" "$app_dir/ops/factory/wait-alerts.sql"
 printf 'Factory install, WorkOS regression, typecheck and build passed in %s\n' "$app_dir"
