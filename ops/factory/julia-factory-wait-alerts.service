@@ -2,7 +2,7 @@
 Description=Notify Todd about actionable Factory waits
 After=network-online.target postgresql.service julia-factory-trial.service
 Wants=network-online.target
-ConditionPathExists=/etc/julia-factory-wait-alerts/subscribed
+ConditionPathExists=/etc/julia-factory-wait-alerts/subscribed-self-hosted
 
 [Service]
 Type=oneshot

@@ -30,6 +30,7 @@ import { DEFAULT_RETENTION } from '@mastra/code-sdk/utils/storage-maintenance';
 import { MastraAuthWorkos } from '@mastra/auth-workos';
 import { createFactorySecretEncryption, MastraFactory } from '@mastra/factory';
 import { GithubIntegration } from '@mastra/factory/integrations/github/integration';
+import { defaultGithubRules } from '@mastra/factory/integrations/github/default-rules';
 import { GitLabIntegration } from '@mastra/factory/integrations/gitlab/integration';
 import { parseAuthorizedBotsEnv } from '@mastra/factory/integrations/github/webhook';
 import { IncidentioIntegration } from '@mastra/factory/integrations/incidentio/integration';
@@ -174,6 +175,18 @@ const githubPrivateKey = process.env.GITHUB_APP_PRIVATE_KEY?.trim();
 const githubClientId = process.env.GITHUB_APP_CLIENT_ID?.trim();
 const githubClientSecret = process.env.GITHUB_APP_CLIENT_SECRET?.trim();
 const githubAppSlug = process.env.GITHUB_APP_SLUG?.trim();
+// Stock pullRequestOpened materializes a Review card in Intake. Auto-start
+// starts eligible runs only after a card enters Reviewing. Factory-authored
+// Julia PRs enter that phase through the supported GitHub event rule.
+const githubRules = {
+  pullRequestOpened: (context: Parameters<typeof defaultGithubRules.pullRequestOpened>[0]) => {
+    const decision = defaultGithubRules.pullRequestOpened(context);
+    if (decision?.type !== 'upsertLinkedWorkItem' || !context.pullRequest?.factoryAuthored) {
+      return decision;
+    }
+    return { ...decision, stage: 'review' as const };
+  },
+};
 const github =
   githubAppId && githubPrivateKey && githubClientId && githubClientSecret && githubAppSlug
     ? new GithubIntegration({
@@ -186,6 +199,7 @@ const github =
         // Extra reviewer bot logins this deployment trusts to trigger
         // review/comment notifications, on top of the built-in defaults.
         authorizedBots: parseAuthorizedBotsEnv(process.env.MASTRACODE_GITHUB_AUTHORIZED_BOTS),
+        rules: githubRules,
       })
     : undefined;
 

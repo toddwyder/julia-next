@@ -8,7 +8,7 @@ Todd adds or removes an entry. Anything custom that is not listed here is not ap
 | # | Exception | Gap it fills | Remove when |
 |---|---|---|---|
 | 1 | WorkOS cookie identity fix in `@mastra/auth-workos` 1.6.5 | Default platform sign-in rejects our self-hosted address; the WorkOS cookie path drops the organization ([#25252](https://github.com/mastra-ai/mastra/issues/25252)) | #25252 ships in a Mastra release |
-| 2 | Factory wait watcher | Stock Factory 0.17.2 shows waits in the web app but does not send phone and Windows alerts when Todd is away ([Mastra request #25378](https://github.com/mastra-ai/mastra/issues/25378)) | Remove when Mastra adds its own alerts |
+| 2 | Factory wait watcher and private ntfy origin | Stock Factory 0.17.2 shows waits in the web app but does not send phone and Windows alerts when Todd is away ([Mastra request #25378](https://github.com/mastra-ai/mastra/issues/25378)); public ntfy.sh exhausted its daily quota (42908) with only 15 watcher publishes | Remove when Mastra adds its own alerts |
 
 Approved by ADR 0009 but not built yet: the check that rejects unapproved custom machinery, and
 the weekly cost summary (Monday note). Each gets its row when it is built.
@@ -110,29 +110,44 @@ it never changes Factory records, answers questions, or moves cards. A
 wait means a session question, a plan waiting for review, an unresolved
 supervisor finding, or a Triage card labeled `status: needs approval`.
 Automation run suggestions, other decisions, and mentions are excluded.
-The watcher records each wait's stable key before publishing, so an uncertain
-network result cannot resend it. Only a definite ntfy HTTP 429 rejection is
-retried: first after at least 60 seconds, then (if rejected again) after the
-next midnight UTC plus one minute. A third 429 exhausts that wait's retry
-budget. Timeouts, interrupted sends, other HTTP failures, old `attempted`
-rows, and exhausted retries need operator inspection; they are not automatically
-resent. The existing one-minute systemd timer checks when a retry is due and
-stays enabled across Factory restarts and server reboots. Its journal records
-only wait kind, outcome (`sent`, `rate_limited`, `rate_limit_exhausted`, or
-`uncertain_failure`), rejection count, and UTC due time; the private SQLite
-ledger records status, rejection count, and due time. Never publish the ledger's
-keys or links, or the ntfy topic, in an issue or log.
+The watcher records each wait's stable key before publishing to the loopback
+ntfy origin. An accepted message is sent once. A timeout or interrupted send
+has an uncertain outcome and is never replayed. A definite HTTP rejection
+records only numeric HTTP and ntfy codes in the private ledger and journal.
+Historical attempted and rate-limited rows from ntfy.sh are never replayed.
+The one-minute systemd timer remains enabled across Factory restarts and reboots.
+Never publish the ledger's keys or links, the ntfy topic, or its token in an
+issue or log.
+
+### Private ntfy origin
+
+The public ntfy.sh route returned HTTP 42908, its daily message quota rejection.
+The watcher logged only 15 accepted publishes on 2026-09-29, far below
+ntfy.sh's 250-message daily visitor limit. ntfy.sh applies the free quota by
+visitor IP, so this installation cannot reserve its own capacity. The private
+ntfy 2.28.0 origin listens only on `127.0.0.1:8085`; Tailscale Funnel exposes
+its HTTPS PWA at `https://julia-factory.tail91f394.ts.net:8443`. Factory
+remains on port 443. ntfy denies anonymous access by default. Only the existing
+random topic is anonymously readable; a dedicated service token can publish
+to it. Web Push keys and subscriptions persist under `/var/cache/ntfy`.
+
+Install ntfy from its [official Ubuntu repository](https://docs.ntfy.sh/install/#debianubuntu-repository).
+After the normal Factory installer and the one-time wait-alert setup above, run
+`sudo python3 /var/lib/julia-factory/app/ops/factory/install-local-ntfy.py`.
+This configures ntfy, its service token, Web Push, and the port 8443 Funnel
+route. It preserves existing keys and tokens on repeat runs.
 
 The setup generates a random topic in
 `/etc/julia-factory-wait-alerts/config.json` (root-owned, group
-`julia-factory`, mode `0640`). Keep that topic out of public issues and logs:
-anyone who knows a public ntfy topic can read or post to it. Todd installs the
-[ntfy phone app](https://docs.ntfy.sh/subscribe/phone/) and the
-[Windows PWA](https://docs.ntfy.sh/subscribe/pwa/), subscribes to the same
-topic in both, and enables notifications. The Windows browser must be running
-for background notifications. Delivery remains gated until the operator
-creates `/etc/julia-factory-wait-alerts/subscribed` after Todd confirms both
-subscriptions.
+`julia-factory`, mode `0640`). The private-origin installer adds its
+loopback publish URL and access token there. Keep both topic and token private.
+Todd subscribes from the [ntfy Android app](https://docs.ntfy.sh/subscribe/phone/)
+to the private origin and installs the
+[Windows PWA](https://docs.ntfy.sh/subscribe/pwa/) from that same HTTPS origin.
+He enables background notifications in the PWA. The Windows browser must be
+running for background notifications. After both subscriptions are confirmed,
+the operator creates `/etc/julia-factory-wait-alerts/subscribed-self-hosted`
+and starts the watcher. The old `subscribed` marker does not enable delivery.
 
 Inspect current waits without publishing:
 
