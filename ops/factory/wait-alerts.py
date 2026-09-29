@@ -132,7 +132,8 @@ def deliver(config, state_path, waits):
         for wait in waits:
             row = db.execute('SELECT status,retry_at,rejections,deadline_at FROM delivered WHERE wait_key=?',
                              (wait['key'],)).fetchone()
-            deadline_at = row[3] if row else time.time() + 300
+            deadline_at = row[3] if row else datetime.fromisoformat(
+                wait['occurred_at'].replace('Z', '+00:00')).timestamp() + 300
             if row:
                 if row[0] != 'rate_limited' or row[1] > time.time():
                     continue
@@ -147,6 +148,13 @@ def deliver(config, state_path, waits):
                            (wait['key'],))
             else:
                 link = urljoin(config['factory_url'].rstrip('/') + '/', wait['path'].lstrip('/'))
+                if time.time() >= deadline_at:
+                    db.execute("INSERT INTO delivered (wait_key,kind,link,status,deadline_at) "
+                               "VALUES (?,?,?,'deadline_unmet',?)",
+                               (wait['key'], wait['kind'], link, deadline_at))
+                    db.commit()
+                    print(f"wait-alerts kind={wait['kind']} outcome=deadline_unmet")
+                    continue
                 # Claim before the network call. A timeout or process crash must never
                 # turn the same wait into a second phone/desktop notification.
                 db.execute("INSERT INTO delivered (wait_key,kind,link,status,deadline_at) "
@@ -160,7 +168,7 @@ def deliver(config, state_path, waits):
                     print(f"wait-alerts kind={wait['kind']} outcome=uncertain_failure")
                     raise
                 code = ntfy_code(error)
-                if 'fallback_url' in config:
+                if 'fallback_url' in config and time.time() < deadline_at:
                     try:
                         publish(config, wait, fallback=True)
                     except HTTPError as fallback_error:
@@ -173,10 +181,11 @@ def deliver(config, state_path, waits):
                         print(f"wait-alerts kind={wait['kind']} outcome=uncertain_failure")
                         raise
                     else:
-                        db.execute("UPDATE delivered SET status='sent', delivered_at=CURRENT_TIMESTAMP "
-                                   "WHERE wait_key=?", (wait['key'],))
+                        outcome = 'sent_fallback' if time.time() < deadline_at else 'sent_late_fallback'
+                        db.execute("UPDATE delivered SET status=?, delivered_at=CURRENT_TIMESTAMP "
+                                   "WHERE wait_key=?", (outcome, wait['key']))
                         db.commit()
-                        print(f"wait-alerts kind={wait['kind']} outcome=sent via=fallback")
+                        print(f"wait-alerts kind={wait['kind']} outcome={outcome}")
                         continue
                 retry_at = time.time() + 60
                 if code != 42901 or retry_at >= deadline_at:
@@ -198,10 +207,11 @@ def deliver(config, state_path, waits):
             except Exception:
                 print(f"wait-alerts kind={wait['kind']} outcome=uncertain_failure")
                 raise
-            db.execute("UPDATE delivered SET status='sent', delivered_at=CURRENT_TIMESTAMP WHERE wait_key=?",
-                       (wait['key'],))
+            outcome = 'sent' if time.time() < deadline_at else 'sent_late'
+            db.execute("UPDATE delivered SET status=?, delivered_at=CURRENT_TIMESTAMP WHERE wait_key=?",
+                       (outcome, wait['key']))
             db.commit()
-            print(f"wait-alerts kind={wait['kind']} outcome=sent")
+            print(f"wait-alerts kind={wait['kind']} outcome={outcome}")
 
 
 def main():

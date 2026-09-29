@@ -30,6 +30,7 @@ class WaitAlertsTest(unittest.TestCase):
             'title': "Todd's approval is the only way to merge",
             'detail': 'This Triage card needs your approval',
             'path': '/factories/project/work?item=139',
+            'occurred_at': datetime.now(timezone.utc).isoformat(),
         }
         self.config = {'topic': 'julia_factory_0123456789abcdef0123456789abcdef',
                        'factory_url': 'https://factory.example'}
@@ -42,8 +43,56 @@ class WaitAlertsTest(unittest.TestCase):
                 watcher.deliver(self.config, state, [self.wait])
             self.assertEqual(publish.call_count, 1)
 
+    def test_delayed_discovery_uses_occurrence_time_for_retry_deadline(self):
+        start = datetime(2026, 9, 29, 12, 0, tzinfo=timezone.utc).timestamp()
+        wait = {**self.wait, 'occurred_at': datetime.fromtimestamp(start, timezone.utc).isoformat()}
+        rejected = HTTPError('https://ntfy.sh/private-topic', 429, 'rate limit', {},
+                             BytesIO(b'{"code":42901}'))
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory) / 'delivered.sqlite3'
+            with patch('time.time', return_value=start + 240) as clock, \
+                 patch.object(watcher, 'urlopen', side_effect=rejected) as send:
+                watcher.deliver(self.config, state, [wait])
+                clock.return_value = start + 300
+                watcher.deliver(self.config, state, [wait])
+            self.assertEqual(send.call_count, 1)
+            with closing(sqlite3.connect(state)) as db:
+                self.assertEqual(db.execute('SELECT status, deadline_at FROM delivered').fetchone(),
+                                 ('deadline_unmet', start + 300))
+
+    def test_publish_accepted_after_deadline_is_recorded_late_once(self):
+        start = datetime(2026, 9, 29, 12, 0, tzinfo=timezone.utc).timestamp()
+        wait = {**self.wait, 'occurred_at': datetime.fromtimestamp(start, timezone.utc).isoformat()}
+        def slow_success(*_args, **_kwargs):
+            clock.return_value = start + 305
+            return SuccessResponse(b'{}')
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory) / 'delivered.sqlite3'
+            with patch('time.time', return_value=start + 299) as clock, \
+                 patch.object(watcher, 'urlopen', side_effect=slow_success) as send:
+                watcher.deliver(self.config, state, [wait])
+                watcher.deliver(self.config, state, [wait])
+            self.assertEqual(send.call_count, 1)
+            with closing(sqlite3.connect(state)) as db:
+                self.assertEqual(db.execute('SELECT status FROM delivered').fetchone()[0],
+                                 'sent_late')
+
+    def test_wait_discovered_after_deadline_is_not_published(self):
+        start = datetime(2026, 9, 29, 12, 0, tzinfo=timezone.utc).timestamp()
+        wait = {**self.wait, 'occurred_at': datetime.fromtimestamp(start, timezone.utc).isoformat()}
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory) / 'delivered.sqlite3'
+            with patch('time.time', return_value=start + 301), \
+                 patch.object(watcher, 'urlopen') as send:
+                watcher.deliver(self.config, state, [wait])
+            send.assert_not_called()
+            with closing(sqlite3.connect(state)) as db:
+                self.assertEqual(db.execute('SELECT status FROM delivered').fetchone()[0],
+                                 'deadline_unmet')
+
     def test_rate_limited_wait_delivers_once_after_cooldown(self):
         start = datetime(2026, 9, 29, 12, 0, tzinfo=timezone.utc).timestamp()
+        self.wait['occurred_at'] = datetime.fromtimestamp(start, timezone.utc).isoformat()
         with tempfile.TemporaryDirectory() as directory:
             state = Path(directory) / 'delivered.sqlite3'
             error = HTTPError('https://ntfy.sh/private-topic', 429, 'Too Many Requests', {},
@@ -66,6 +115,7 @@ class WaitAlertsTest(unittest.TestCase):
 
     def test_repeated_definite_rejection_uses_ready_independent_origin_within_five_minutes_once(self):
         start = datetime(2026, 9, 29, 12, 0, tzinfo=timezone.utc).timestamp()
+        self.wait['occurred_at'] = datetime.fromtimestamp(start, timezone.utc).isoformat()
         config = {**self.config, 'fallback_url': 'https://other.example',
                   'fallback_topic': 'other_0123456789abcdef0123456789abcdef'}
         other = {**self.wait, 'key': 'triage-approval:140',
@@ -92,7 +142,33 @@ class WaitAlertsTest(unittest.TestCase):
                                  f'https://factory.example{wait["path"]}')
                 self.assertTrue(fallback.full_url.endswith(watcher.sequence_id(wait['key'])))
             with closing(sqlite3.connect(state)) as db:
-                self.assertEqual(db.execute("SELECT count(*) FROM delivered WHERE status='sent'").fetchone()[0], 2)
+                self.assertEqual(db.execute("SELECT count(*) FROM delivered WHERE status='sent_fallback'").fetchone()[0], 2)
+
+    def test_fallback_accepted_after_deadline_is_recorded_late_once(self):
+        start = datetime(2026, 9, 29, 12, 0, tzinfo=timezone.utc).timestamp()
+        wait = {**self.wait, 'occurred_at': datetime.fromtimestamp(start, timezone.utc).isoformat()}
+        config = {**self.config, 'fallback_url': 'https://other.example',
+                  'fallback_topic': 'other_0123456789abcdef0123456789abcdef'}
+        rejected = HTTPError('https://ntfy.sh/private-topic', 429, 'rate limit', {},
+                             BytesIO(b'{"code":42901}'))
+        attempts = 0
+        def respond(*_args, **_kwargs):
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                raise rejected
+            clock.return_value = start + 305
+            return SuccessResponse(b'{}')
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory) / 'delivered.sqlite3'
+            with patch('time.time', return_value=start + 299) as clock, \
+                 patch.object(watcher, 'urlopen', side_effect=respond) as send:
+                watcher.deliver(config, state, [wait])
+                watcher.deliver(config, state, [wait])
+            self.assertEqual(send.call_count, 2)
+            with closing(sqlite3.connect(state)) as db:
+                self.assertEqual(db.execute('SELECT status FROM delivered').fetchone()[0],
+                                 'sent_late_fallback')
 
     def test_fallback_timeout_is_not_replayed_on_next_timer_tick(self):
         config = {**self.config, 'fallback_url': 'https://other.example',
@@ -111,6 +187,7 @@ class WaitAlertsTest(unittest.TestCase):
 
     def test_repeated_request_bucket_rejections_retry_before_the_deadline(self):
         start = datetime(2026, 9, 29, 12, 0, tzinfo=timezone.utc).timestamp()
+        self.wait['occurred_at'] = datetime.fromtimestamp(start, timezone.utc).isoformat()
         def rejected():
             return HTTPError('https://ntfy.sh/private-topic', 429, 'Too Many Requests', {},
                              BytesIO(b'{"code":42901}'))
@@ -146,6 +223,7 @@ class WaitAlertsTest(unittest.TestCase):
 
     def test_request_bucket_rejections_exhaust_the_five_minute_window(self):
         start = datetime(2026, 9, 29, 12, 0, tzinfo=timezone.utc).timestamp()
+        self.wait['occurred_at'] = datetime.fromtimestamp(start, timezone.utc).isoformat()
         def rejected():
             return HTTPError('https://ntfy.sh/private-topic', 429, 'Too Many Requests', {},
                              BytesIO(b'{"code":42901}'))
@@ -184,6 +262,7 @@ class WaitAlertsTest(unittest.TestCase):
 
     def test_delivery_events_hide_wait_and_ntfy_identifiers(self):
         start = datetime(2026, 9, 29, 12, 0, tzinfo=timezone.utc).timestamp()
+        self.wait['occurred_at'] = datetime.fromtimestamp(start, timezone.utc).isoformat()
         with tempfile.TemporaryDirectory() as directory:
             state = Path(directory) / 'delivered.sqlite3'
             output = StringIO()
@@ -236,6 +315,7 @@ class WaitAlertsTest(unittest.TestCase):
 
     def test_timeout_on_due_retry_stays_claimed(self):
         start = datetime(2026, 9, 29, 12, 0, tzinfo=timezone.utc).timestamp()
+        self.wait['occurred_at'] = datetime.fromtimestamp(start, timezone.utc).isoformat()
         with tempfile.TemporaryDirectory() as directory:
             state = Path(directory) / 'delivered.sqlite3'
             error = HTTPError('https://ntfy.sh/private-topic', 429, 'Too Many Requests', {},

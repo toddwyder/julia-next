@@ -115,8 +115,12 @@ network result cannot resend it. A definite ntfy HTTP 429 rejection is safe to
 retry: numeric code 42901 (request bucket) is retried at most once per minute
 while another attempt fits inside the first five minutes; code 42908 (daily
 quota), an unknown subtype, or a burst limit that lasts past the deadline is
-recorded as `deadline_unmet`, not called a successful delivery. A rejected
-publish does not prevent other new waits from being attempted. An optional,
+recorded as `deadline_unmet`, not called a successful delivery. The five-minute
+window starts at the wait's `occurred_at`, including timer discovery delay;
+a wait first seen after that deadline is recorded without publishing. An HTTP
+publish accepted after the deadline is recorded as `sent_late` (or
+`sent_late_fallback`), not a timely success. A rejected publish does not prevent
+other new waits from being attempted. An optional,
 independently hosted ntfy origin can be used immediately after a definite
 primary 429 (even when its subtype is unknown); it uses the same wait identity
 and Click link. A fallback 429 follows the same bounded primary retry policy;
@@ -126,9 +130,11 @@ they are not automatically resent. Existing due rows lacking a recorded
 five-minute deadline are marked `deadline_unmet` rather than replayed. The
 one-minute systemd timer checks when a retry is due and stays enabled across
 Factory restarts and server reboots. Its journal records only wait kind,
-outcome (`sent`, `rate_limited`, `deadline_unmet`, or `uncertain_failure`),
-allowlisted numeric subtype (or `unknown`), rejection count, and UTC due time;
-the private SQLite ledger records these outcomes and the deadline. Never
+outcome (`sent`, `sent_fallback`, `sent_late`, `sent_late_fallback`,
+`rate_limited`, `deadline_unmet`, or `uncertain_failure`), allowlisted numeric
+subtype (or `unknown`), rejection count, and UTC due time; the private SQLite
+ledger retains successful publish origin and whether acceptance was late,
+alongside the deadline. An accepted publish does not prove device receipt. Never
 publish the ledger's keys or links, ntfy topics, host credentials, or raw error
 responses in an issue or log.
 
