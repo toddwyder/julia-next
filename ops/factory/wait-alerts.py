@@ -148,13 +148,6 @@ def deliver(config, state_path, waits):
                            (wait['key'],))
             else:
                 link = urljoin(config['factory_url'].rstrip('/') + '/', wait['path'].lstrip('/'))
-                if time.time() >= deadline_at:
-                    db.execute("INSERT INTO delivered (wait_key,kind,link,status,deadline_at) "
-                               "VALUES (?,?,?,'deadline_unmet',?)",
-                               (wait['key'], wait['kind'], link, deadline_at))
-                    db.commit()
-                    print(f"wait-alerts kind={wait['kind']} outcome=deadline_unmet")
-                    continue
                 # Claim before the network call. A timeout or process crash must never
                 # turn the same wait into a second phone/desktop notification.
                 db.execute("INSERT INTO delivered (wait_key,kind,link,status,deadline_at) "

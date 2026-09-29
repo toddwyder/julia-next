@@ -117,8 +117,9 @@ while another attempt fits inside the first five minutes; code 42908 (daily
 quota), an unknown subtype, or a burst limit that lasts past the deadline is
 recorded as `deadline_unmet`, not called a successful delivery. The five-minute
 window starts at the wait's `occurred_at`, including timer discovery delay;
-a wait first seen after that deadline is recorded without publishing. An HTTP
-publish accepted after the deadline is recorded as `sent_late` (or
+a still-actionable wait first seen after that deadline gets one best-effort
+publish, but cannot be recorded as timely. An HTTP publish accepted after the
+deadline is recorded as `sent_late` (or
 `sent_late_fallback`), not a timely success. A rejected publish does not prevent
 other new waits from being attempted. An optional,
 independently hosted ntfy origin can be used immediately after a definite

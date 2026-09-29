@@ -77,18 +77,21 @@ class WaitAlertsTest(unittest.TestCase):
                 self.assertEqual(db.execute('SELECT status FROM delivered').fetchone()[0],
                                  'sent_late')
 
-    def test_wait_discovered_after_deadline_is_not_published(self):
+    def test_still_actionable_wait_first_discovered_at_five_minutes_one_second_is_sent_late_once(self):
         start = datetime(2026, 9, 29, 12, 0, tzinfo=timezone.utc).timestamp()
         wait = {**self.wait, 'occurred_at': datetime.fromtimestamp(start, timezone.utc).isoformat()}
         with tempfile.TemporaryDirectory() as directory:
             state = Path(directory) / 'delivered.sqlite3'
             with patch('time.time', return_value=start + 301), \
-                 patch.object(watcher, 'urlopen') as send:
+                 patch.object(watcher, 'urlopen', return_value=SuccessResponse(b'{}')) as send:
                 watcher.deliver(self.config, state, [wait])
-            send.assert_not_called()
+                watcher.deliver(self.config, state, [wait])
+            self.assertEqual(send.call_count, 1)
+            self.assertEqual(send.call_args.args[0].get_header('Click'),
+                             'https://factory.example/factories/project/work?item=139')
             with closing(sqlite3.connect(state)) as db:
                 self.assertEqual(db.execute('SELECT status FROM delivered').fetchone()[0],
-                                 'deadline_unmet')
+                                 'sent_late')
 
     def test_rate_limited_wait_delivers_once_after_cooldown(self):
         start = datetime(2026, 9, 29, 12, 0, tzinfo=timezone.utc).timestamp()
