@@ -173,6 +173,10 @@ loopback publish URL and access token there. Keep both topic and token private.
 Todd subscribes from the [ntfy Android app](https://docs.ntfy.sh/subscribe/phone/)
 to the private origin and installs the
 [Windows PWA](https://docs.ntfy.sh/subscribe/pwa/) from that same HTTPS origin.
+In the Windows PWA, enter only the topic name and leave **Use another server**
+off. ntfy sends background push only for topics on the PWA's own server;
+adding the same origin as "another server" leaves the topic visible but skips
+Web Push registration.
 He enables background notifications in the web app's Settings if using a
 browser tab; an installed PWA enables them by default. The Windows browser
 must be running for desktop Web Push. [ntfy says](https://docs.ntfy.sh/subscribe/web/#background-notifications)
