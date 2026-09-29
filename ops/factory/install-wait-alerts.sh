@@ -51,4 +51,4 @@ install -m 0644 "$patch_dir/julia-factory-wait-alerts.service" /etc/systemd/syst
 install -m 0644 "$patch_dir/julia-factory-wait-alerts.timer" /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now julia-factory-wait-alerts.timer
-echo 'Watcher installed. Delivery stays off until /etc/julia-factory-wait-alerts/subscribed exists.'
+echo 'Watcher installed. Delivery stays off until /etc/julia-factory-wait-alerts/subscribed-self-hosted exists.'

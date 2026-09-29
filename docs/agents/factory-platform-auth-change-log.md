@@ -261,3 +261,50 @@ The operator verified `julia-factory-trial.service`, `julia-factory-wait-alerts.
 The follow-up repository change at PR #153 head `9d5005731977672edb7b99d3f168d5f33eab77d8` removes the checkout-sync script and test, the journey-relay unit/code and its client/event scripts, the graph launcher's checkout-sync trigger, the graph readiness relay probe, and the relay-specific CI guards. The service-dropbox isolation explanation remains without relying on a retired relay file. Local Node tests (959 passed, 7 skipped, 0 failed), Factory type check, framework lint, and application build passed.
 
 An authorized operator reported the remaining host cleanup on 2026-09-29 UTC in PR #153 comment 5889931273. Before: `julia-next-checkout-sync.timer` active/enabled, its service installed and inactive between runs; `journey-relay.service` active/enabled, listening at `127.0.0.1:8943`; a dedicated `/etc/sudoers.d/orchestrator-svc-checkout-sync` grant allowed only starting checkout-sync. No other systemd service depended on either service. Factory and its wait-alert timer were active/enabled, with Factory listening at `127.0.0.1:4111`. The operator inspected and backed up the exact three installed unit files and dedicated sudoers file under root-only `/var/backups/julia-issue-144-remaining-20260929T1204Z/` (mode 0700), and verified all four backup filenames. They stopped/disabled only the checkout-sync timer and relay, stopped the checkout-sync service, removed only those three units and the dedicated grant, and reloaded systemd. `visudo -c` passed on the remaining sudoers files. After: all three units reported `LoadState=not-found` and `ActiveState=inactive`; the grant was absent; nothing listened on port 8943. `julia-factory-trial.service` and `julia-factory-wait-alerts.timer` remained loaded, active, and enabled, and Factory continued listening at `127.0.0.1:4111`. At that head CI, both Publisher-only PR checks, and Vercel preview were reported successful. These are operator-reported results, not host measurements from Factory. No SSH key, sudoers contents, environment-file contents, or credentials entered the sandbox or the evidence comment.
+# 2026-09-29: private wait-alert origin, before PR review
+
+The laptop operator diagnosed the public ntfy.sh failure from the Factory host.
+A single diagnostic publish to an unsubscribed random topic returned HTTP 429
+with ntfy code 42908 (daily message quota). The watcher journal showed 15
+accepted publishes that day; no other installed host service referencing
+ntfy.sh was found. ntfy.sh documents a 250-message daily visitor limit and
+per-visitor IP accounting. The precise other consumer of this server's quota
+is unknown; the public free route cannot reserve capacity for these alerts.
+
+Before this change was reviewed, the operator installed ntfy 2.28.0 from its
+official Ubuntu repository on the live host and configured a loopback listener
+on port 8085, a persistent cache/auth/Web Push store, anonymous read access
+only for the existing random topic, and a dedicated token for local publishing.
+Tailscale Funnel exposes the new HTTPS origin on port 8443 while preserving
+Factory on port 443. A public GET returned 200, unauthorized public publish
+returned 403, and an authenticated local noncached diagnostic publish returned
+200. The installer was rerun successfully without replacing keys or token.
+No watcher code or service gate has been switched yet, and neither device has
+subscribed to the new origin. Those checks are origin plumbing evidence only;
+they are not a natural Factory wait or two-device delivery proof.
+
+# 2026-09-29: reviewed step 1 host install
+
+The operator verified a root-only compressed backup of the prior Factory app,
+watcher unit, ntfy configuration, and watcher config under
+`/var/backups/julia-step1-20260929/` before changing the live install. They
+stopped the old watcher timer and Factory service, copied the reviewed PR #159
+head `602193d82f65e52870d703924a9a19687fd9e267` into the Factory patch
+source, and ran the normal installer as `julia-factory`. `npm ci`, the WorkOS
+cookie regression, TypeScript check, Mastra build, and the copied-output
+regression passed. The root ntfy setup script was installed under
+`/usr/local/sbin` and run there. It moved the auth and Web Push databases to
+`/var/lib/ntfy` using SQLite backup while ntfy was stopped, then restarted
+ntfy. The watcher unit and timer were installed with the new
+`subscribed-self-hosted` gate. Factory, ntfy, and the timer became active;
+the watcher service remained inactive with `ConditionResult=no`, as intended
+until both devices subscribe. The watcher dry run found zero current waits.
+
+The existing topic, publish token, and Web Push keys were preserved. The
+private ntfy HTTPS origin returned 200; anonymous publishing to an unrelated
+topic returned 403; an authenticated noncached local diagnostic publish
+returned 200. These are transport checks, not device delivery acceptance.
+After the new GitHub rules were live, the operator removed the ten recreated
+machine cards using Factory's `WorkItemsStorage.delete` operation. Four done
+Julia history cards remained. A future GitHub poll and the next natural Julia
+wait still need observation before #148 closes.

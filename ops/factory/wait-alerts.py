@@ -3,7 +3,6 @@
 
 import argparse
 from contextlib import closing
-from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 import os
@@ -12,9 +11,8 @@ import re
 import sqlite3
 import subprocess
 import sys
-import time
-from urllib.error import HTTPError
-from urllib.parse import urljoin
+from urllib.error import HTTPError, URLError
+from urllib.parse import urljoin, urlsplit
 from urllib.request import Request, urlopen
 
 
@@ -33,6 +31,13 @@ def config_from(path):
         raise ValueError('Invalid Factory user ID')
     if not config['factory_url'].startswith('https://'):
         raise ValueError('Factory URL must use HTTPS')
+    ntfy_url = urlsplit(config['ntfy_url'])
+    if ntfy_url.scheme != 'http' or ntfy_url.hostname not in ('127.0.0.1', 'localhost'):
+        raise ValueError('ntfy publisher must be loopback HTTP')
+    if ntfy_url.username or ntfy_url.password or ntfy_url.path not in ('', '/'):
+        raise ValueError('Invalid ntfy publisher URL')
+    if not re.fullmatch(r'tk_[a-z0-9]{29}', config['ntfy_token']):
+        raise ValueError('Invalid ntfy access token')
     return config
 
 
@@ -63,9 +68,10 @@ def publish(config, wait):
     target = urljoin(config['factory_url'].rstrip('/') + '/', wait['path'].lstrip('/'))
     body = f"{wait['detail']}: {wait['title']}".encode('utf-8')
     request = Request(
-        f'https://ntfy.sh/{topic}/{sequence_id(wait["key"])}',
+        f'{config["ntfy_url"].rstrip("/")}/{topic}/{sequence_id(wait["key"])}',
         data=body,
         headers={'Title': 'Factory needs you', 'Click': target,
+                 'Authorization': f'Bearer {config["ntfy_token"]}',
                  'Content-Type': 'text/plain; charset=utf-8'},
         method='POST',
     )
@@ -86,10 +92,10 @@ def deliver(config, state_path, waits):
         columns = {row[1] for row in db.execute('PRAGMA table_info(delivered)')}
         if 'status' not in columns:
             db.execute("ALTER TABLE delivered ADD COLUMN status TEXT NOT NULL DEFAULT 'sent'")
-        if 'rejections' not in columns:
-            db.execute('ALTER TABLE delivered ADD COLUMN rejections INTEGER NOT NULL DEFAULT 0')
-        if 'retry_at' not in columns:
-            db.execute('ALTER TABLE delivered ADD COLUMN retry_at REAL')
+        if 'http_status' not in columns:
+            db.execute('ALTER TABLE delivered ADD COLUMN http_status INTEGER')
+        if 'ntfy_code' not in columns:
+            db.execute('ALTER TABLE delivered ADD COLUMN ntfy_code INTEGER')
         # The first release included an occurrence suffix on these keys. Preserve
         # its history when moving to one stable identity per finding or card.
         for key, kind, link, delivered_at, status in db.execute(
@@ -106,48 +112,44 @@ def deliver(config, state_path, waits):
                     (wait_key,kind,link,delivered_at,status) VALUES (?,?,?,?,?)''',
                     (stable_key, kind, link, delivered_at, status))
         db.commit()
+        rejected = False
         for wait in waits:
-            row = db.execute('SELECT status,retry_at,rejections FROM delivered WHERE wait_key=?',
-                             (wait['key'],)).fetchone()
-            if row:
-                if row[0] != 'rate_limited' or row[1] > time.time():
-                    continue
-                # Reclaim before sending: an interrupted retry remains uncertain.
-                db.execute("UPDATE delivered SET status='attempted', retry_at=NULL WHERE wait_key=?",
-                           (wait['key'],))
-            else:
-                link = urljoin(config['factory_url'].rstrip('/') + '/', wait['path'].lstrip('/'))
-                # Claim before the network call. A timeout or process crash must never
-                # turn the same wait into a second phone/desktop notification.
-                db.execute("INSERT INTO delivered (wait_key,kind,link,status) VALUES (?,?,?,'attempted')",
-                           (wait['key'], wait['kind'], link))
+            if db.execute('SELECT 1 FROM delivered WHERE wait_key=?', (wait['key'],)).fetchone():
+                continue
+            link = urljoin(config['factory_url'].rstrip('/') + '/', wait['path'].lstrip('/'))
+            # Claim before the network call. An uncertain result cannot create a
+            # duplicate notification on the next timer run.
+            db.execute("INSERT INTO delivered (wait_key,kind,link,status) VALUES (?,?,?,'attempted')",
+                       (wait['key'], wait['kind'], link))
             db.commit()
             try:
                 publish(config, wait)
             except HTTPError as error:
-                if error.code != 429:
-                    print(f"wait-alerts kind={wait['kind']} outcome=uncertain_failure")
-                    raise
-                now = time.time()
-                retry_at = now + 60
-                if row and row[2] == 1:
-                    tomorrow = datetime.fromtimestamp(now, timezone.utc).date() + timedelta(days=1)
-                    midnight = datetime.combine(tomorrow, datetime.min.time(), tzinfo=timezone.utc)
-                    retry_at = max(retry_at, midnight.timestamp() + 60)
-                if row and row[2] >= 2:
-                    db.execute("UPDATE delivered SET status='rate_limit_exhausted', "
-                               "rejections=rejections+1, retry_at=NULL WHERE wait_key=?", (wait['key'],))
-                    outcome = 'rate_limit_exhausted'
-                else:
-                    db.execute("UPDATE delivered SET status='rate_limited', rejections=rejections+1, "
-                               "retry_at=? WHERE wait_key=?", (retry_at, wait['key']))
-                    outcome = 'rate_limited'
+                ntfy_code = None
+                try:
+                    candidate = json.load(error).get('code')
+                    if type(candidate) is int and 40000 <= candidate <= 59999:
+                        ntfy_code = candidate
+                except (ValueError, AttributeError, UnicodeDecodeError):
+                    pass
+                db.execute("UPDATE delivered SET status='rejected', http_status=?, ntfy_code=? "
+                           "WHERE wait_key=?", (error.code, ntfy_code, wait['key']))
                 db.commit()
-                count = (row[2] if row else 0) + 1
-                due = (f' retry_at={datetime.fromtimestamp(retry_at, timezone.utc).isoformat()}'
-                       if outcome == 'rate_limited' else '')
-                print(f"wait-alerts kind={wait['kind']} outcome={outcome} rejections={count}{due}")
-                break
+                print(f"wait-alerts kind={wait['kind']} outcome=rejected "
+                      f"http_status={error.code} ntfy_code={ntfy_code}")
+                rejected = True
+                continue
+            except URLError as error:
+                if isinstance(error.reason, ConnectionRefusedError):
+                    # The loopback listener refused the connection before ntfy
+                    # could accept a message. Reclaim this unsent wait so the
+                    # next timer run can deliver it after ntfy starts.
+                    db.execute('DELETE FROM delivered WHERE wait_key=?', (wait['key'],))
+                    db.commit()
+                    print(f"wait-alerts kind={wait['kind']} outcome=local_origin_unavailable")
+                else:
+                    print(f"wait-alerts kind={wait['kind']} outcome=uncertain_failure")
+                raise
             except Exception:
                 print(f"wait-alerts kind={wait['kind']} outcome=uncertain_failure")
                 raise
@@ -155,6 +157,8 @@ def deliver(config, state_path, waits):
                        (wait['key'],))
             db.commit()
             print(f"wait-alerts kind={wait['kind']} outcome=sent")
+        if rejected:
+            raise RuntimeError('ntfy rejected one or more alerts; inspect numeric codes in the journal')
 
 
 def main():

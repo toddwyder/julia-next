@@ -1,9 +1,10 @@
 # How card work runs
 
-Cards are built and reviewed by Mastra Factory, used the way its makers intend. The decisions are
-in `docs/adr/0009-mastra-factory.md`; this page says what that means for an agent.
+Julia feature and defect cards are built and reviewed by Mastra Factory. Server
+and machine work runs directly from the laptop under Todd's 2026-09-29 decision.
+The decisions are in `docs/adr/0009-mastra-factory.md` and issue #148.
 
-## Factory runs the card
+## Factory runs Julia cards
 
 1. A GitHub issue lands in Factory's Intake column and waits. It starts only when Todd taps it.
 2. Factory's planning step writes the plan. Every plan names the seams and the failing tests
@@ -33,6 +34,18 @@ every step was done by Factory or by Todd; anything else means someone went arou
   the gap; don't work around it.
 - Custom code, scripts or changes to Mastra's code need Todd's approval first and go on the
   exceptions list in `ops/factory/README.md`.
+
+## Machine cards
+
+The laptop agent owns Factory, server, repository, and GitHub setup directly.
+Keep these GitHub issues open while working, label new ones `factory:machine`
+at creation,
+and do not send them to Factory. The Factory GitHub rules exclude the known
+machine issues and their PRs, the `factory:machine` label, and publisher App
+PRs from intake. Build on a branch, get a review from a different AI company,
+and merge the reviewed head through the publisher App. Report evidence and
+acceptance boxes on the GitHub issue, ending with two plain-English **For Todd:**
+lines saying what happened and whether he must decide anything.
 
 ## Models
 
