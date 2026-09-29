@@ -191,7 +191,10 @@ const githubRules = {
   },
   pullRequestOpened: (context: Parameters<typeof defaultGithubRules.pullRequestOpened>[0]) => {
     if (context.pullRequest && (machinePullRequests.has(context.pullRequest.number) ||
-        context.pullRequest.author === 'julia-graph-publisher[bot]')) return undefined;
+        context.pullRequest.author === 'julia-graph-publisher[bot]' ||
+        (context.actor.type === 'github' && context.actor.login === 'julia-graph-publisher[bot]'))) {
+      return undefined;
+    }
     const decision = defaultGithubRules.pullRequestOpened(context);
     if (decision?.type !== 'upsertLinkedWorkItem' || !context.pullRequest?.factoryAuthored) {
       return decision;

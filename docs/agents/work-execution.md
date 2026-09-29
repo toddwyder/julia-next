@@ -38,7 +38,8 @@ every step was done by Factory or by Todd; anything else means someone went arou
 ## Machine cards
 
 The laptop agent owns Factory, server, repository, and GitHub setup directly.
-Keep these GitHub issues open while working, label new ones `factory:machine`,
+Keep these GitHub issues open while working, label new ones `factory:machine`
+at creation,
 and do not send them to Factory. The Factory GitHub rules exclude the known
 machine issues and their PRs, the `factory:machine` label, and publisher App
 PRs from intake. Build on a branch, get a review from a different AI company,

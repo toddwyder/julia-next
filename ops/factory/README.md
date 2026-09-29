@@ -20,6 +20,12 @@ identity fix described in [mastra-ai/mastra#25252](https://github.com/mastra-ai/
 It is the only installed Mastra package code change. See
 `docs/agents/factory-platform-auth-change-log.md` for the complete change list.
 
+When migrating an existing ntfy.sh watcher, stop its timer before copying the
+new watcher: `sudo systemctl stop julia-factory-wait-alerts.timer`. The old
+`subscribed` marker may still enable the installed old service. The one-time
+`install-wait-alerts.sh` step below installs the new gate and starts the timer
+again; it stays gated until both private-origin subscriptions are ready.
+
 Run installation as the dedicated Factory service user:
 
 ```sh
@@ -86,7 +92,9 @@ the only Mastra code exception. Skill-loading repair is separate work.
 The supported GitHub event-rule overrides in `app/src/mastra/index.ts` keep
 machine issues and publisher App PRs off Factory's Work and Review boards.
 Known machine source numbers are explicitly excluded; new machine issues use
-the `factory:machine` GitHub label. Factory-authored Julia PRs enter Reviewing
+the `factory:machine` GitHub label when created. If an existing issue gets the
+label later, remove its existing Factory card through the Work card delete
+action. Factory-authored Julia PRs enter Reviewing
 directly so Review auto-start can run. Remove these rules when stock Factory
 supports source filters and automatic Review entry for trusted authoring PRs.
 
