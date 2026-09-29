@@ -3,6 +3,7 @@
 
 import argparse
 from contextlib import closing
+from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 import os
@@ -11,6 +12,8 @@ import re
 import sqlite3
 import subprocess
 import sys
+import time
+from urllib.error import HTTPError
 from urllib.parse import urljoin
 from urllib.request import Request, urlopen
 
@@ -80,8 +83,13 @@ def deliver(config, state_path, waits):
             wait_key TEXT PRIMARY KEY, kind TEXT NOT NULL,
             link TEXT NOT NULL, delivered_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         )''')
-        if 'status' not in {row[1] for row in db.execute('PRAGMA table_info(delivered)')}:
+        columns = {row[1] for row in db.execute('PRAGMA table_info(delivered)')}
+        if 'status' not in columns:
             db.execute("ALTER TABLE delivered ADD COLUMN status TEXT NOT NULL DEFAULT 'sent'")
+        if 'rejections' not in columns:
+            db.execute('ALTER TABLE delivered ADD COLUMN rejections INTEGER NOT NULL DEFAULT 0')
+        if 'retry_at' not in columns:
+            db.execute('ALTER TABLE delivered ADD COLUMN retry_at REAL')
         # The first release included an occurrence suffix on these keys. Preserve
         # its history when moving to one stable identity per finding or card.
         for key, kind, link, delivered_at, status in db.execute(
@@ -99,19 +107,54 @@ def deliver(config, state_path, waits):
                     (stable_key, kind, link, delivered_at, status))
         db.commit()
         for wait in waits:
-            if db.execute('SELECT 1 FROM delivered WHERE wait_key=?', (wait['key'],)).fetchone():
-                continue
-            link = urljoin(config['factory_url'].rstrip('/') + '/', wait['path'].lstrip('/'))
-            # Claim before the network call. A timeout or process crash must never
-            # turn the same wait into a second phone/desktop notification.
-            db.execute("INSERT INTO delivered (wait_key,kind,link,status) VALUES (?,?,?,'attempted')",
-                       (wait['key'], wait['kind'], link))
+            row = db.execute('SELECT status,retry_at,rejections FROM delivered WHERE wait_key=?',
+                             (wait['key'],)).fetchone()
+            if row:
+                if row[0] != 'rate_limited' or row[1] > time.time():
+                    continue
+                # Reclaim before sending: an interrupted retry remains uncertain.
+                db.execute("UPDATE delivered SET status='attempted', retry_at=NULL WHERE wait_key=?",
+                           (wait['key'],))
+            else:
+                link = urljoin(config['factory_url'].rstrip('/') + '/', wait['path'].lstrip('/'))
+                # Claim before the network call. A timeout or process crash must never
+                # turn the same wait into a second phone/desktop notification.
+                db.execute("INSERT INTO delivered (wait_key,kind,link,status) VALUES (?,?,?,'attempted')",
+                           (wait['key'], wait['kind'], link))
             db.commit()
-            publish(config, wait)
+            try:
+                publish(config, wait)
+            except HTTPError as error:
+                if error.code != 429:
+                    print(f"wait-alerts kind={wait['kind']} outcome=uncertain_failure")
+                    raise
+                now = time.time()
+                retry_at = now + 60
+                if row and row[2] == 1:
+                    tomorrow = datetime.fromtimestamp(now, timezone.utc).date() + timedelta(days=1)
+                    midnight = datetime.combine(tomorrow, datetime.min.time(), tzinfo=timezone.utc)
+                    retry_at = max(retry_at, midnight.timestamp() + 60)
+                if row and row[2] >= 2:
+                    db.execute("UPDATE delivered SET status='rate_limit_exhausted', "
+                               "rejections=rejections+1, retry_at=NULL WHERE wait_key=?", (wait['key'],))
+                    outcome = 'rate_limit_exhausted'
+                else:
+                    db.execute("UPDATE delivered SET status='rate_limited', rejections=rejections+1, "
+                               "retry_at=? WHERE wait_key=?", (retry_at, wait['key']))
+                    outcome = 'rate_limited'
+                db.commit()
+                count = (row[2] if row else 0) + 1
+                due = (f' retry_at={datetime.fromtimestamp(retry_at, timezone.utc).isoformat()}'
+                       if outcome == 'rate_limited' else '')
+                print(f"wait-alerts kind={wait['kind']} outcome={outcome} rejections={count}{due}")
+                break
+            except Exception:
+                print(f"wait-alerts kind={wait['kind']} outcome=uncertain_failure")
+                raise
             db.execute("UPDATE delivered SET status='sent', delivered_at=CURRENT_TIMESTAMP WHERE wait_key=?",
                        (wait['key'],))
             db.commit()
-            print(f"delivered {wait['kind']} {wait['key']} {link}")
+            print(f"wait-alerts kind={wait['kind']} outcome=sent")
 
 
 def main():
@@ -133,6 +176,6 @@ def main():
 if __name__ == '__main__':
     try:
         main()
-    except Exception as error:
-        print(f'wait-alerts: {error}', file=sys.stderr)
+    except Exception:
+        print('wait-alerts: failed; inspect the private delivery ledger', file=sys.stderr)
         sys.exit(1)
