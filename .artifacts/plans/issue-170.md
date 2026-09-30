@@ -1,0 +1,43 @@
+# Plan: #170 — practice two kitchen shutdown checks
+
+## Goal
+Prove the live cross-maker request-changes → Factory builder repair loop for #138 using a disposable PR. The first revision of `docs/practice-review-proof.md` deliberately omits the oven line; after a real GitHub request-changes review reaches the builder, the repaired revision contains both exact lines. Record the PR, review, builder-return, trace/cost, and closure evidence on #138; close the practice PR **without merging** and leave the production branch unchanged. Do not claim success for any missing link in the chain.
+
+## Scope
+- In: one throwaway document at `docs/practice-review-proof.md` on the practice branch, one PR linked to #170, its review/repair evidence, and the final unmerged closure. Use GitHub/Factory's existing PR, review and board features.
+- Out: application behavior, reviewer/Factory/workflow code, new automation or test harnesses, changing #138's acceptance criteria, merging the practice PR. Any discovered integration failure is evidence for #138, not permission to implement a workaround in #170.
+
+## Phases
+
+### 1. Plant a detectable omission
+- On the Factory work branch, before creating the document, run a one-line exact-match check for `Stove checked: off.` in `docs/practice-review-proof.md`; record the expected failure (missing file). Create the document with **only** `Stove checked: off.` on its own line and a trailing newline. Re-run the stove check (green) and an independent two-line exact-match check (red because `Oven checked: off.` is absent). Do not commit the check or a fixture/test file: this is a disposable, documentation-only live integration probe.
+- Verify: `node -e "const fs=require('node:fs'); const a=fs.readFileSync('docs/practice-review-proof.md','utf8').split(/\r?\n/); if(!a.includes('Stove checked: off.')) process.exit(1)"`; for the two-line check use `['Stove checked: off.','Oven checked: off.'].every(line => a.includes(line))` in the same command shape. Run `npm run lint:framework` and `git diff --check`. Check the diff includes only the practice document (plus the normal plan artifact, if Factory includes plans on PRs).
+
+### 2. Trigger and observe the real request-changes loop
+- Open the PR using Factory's normal build flow with a plain-language **Try it** section at the top of its description, and `Closes #170` so `ops/factory/app/src/mastra/reviewer/review-pr.ts` can load the two issue criteria. Clearly call it an unmerged practice PR and describe the expected missing oven line as a fixture, not an instruction to the reviewer. Keep the PR non-draft for the `.github/workflows/cross-maker-review.yml` `opened` or `ready_for_review` event; once the workflow run has been queued, convert it to draft **before** the repair so the normal Factory review cannot merge a green repaired revision. Confirm the draft state before pushing any repair. If the workflow never starts or draft conversion fails, stop and report the gate failure on #138; do not risk a merge to pursue this proof.
+- Inspect `gh pr checks <number>`, `gh pr view <number> --json isDraft,state,headRefOid,reviews`, and the workflow run log. Require an actual `CHANGES_REQUESTED` GitHub review on the initial SHA, with the oven criterion marked missing; record the review author and URL, and check Factory's own work session/board receives the event. An endpoint probe or a comment/label alone is not sufficient. If no request-changes event reaches the builder, keep the PR draft and unmerged, document the observed failure on #138 and stop rather than manually simulating the return.
+
+### 3. Repair and close without merge
+- In the returned Factory builder session, first run the independent two-line check again (red). Add exactly `Oven checked: off.` as its own line; re-run the check (green), `npm run lint:framework`, and `git diff --check`, then push to the **draft** PR. Verify the pushed head contains both exact lines with `gh pr diff <number>`; check `gh pr view <number> --json isDraft,state,mergedAt` before and after the push. A draft PR must not be made ready for review again: the acceptance proof is the initial request-changes plus actual builder repair, not a successful second review or a merge.
+- Capture the original review URL/SHA and missing-criterion text, the Factory builder return and repair commit/head, the Mastra trace and cost evidence available in the existing Factory/Mastra views, and the PR's final state on #138. Close the PR with `gh pr close <number>` only after verifying its repaired head; assert `state=CLOSED`, `mergedAt=null` and #170/#138 remain open pending their owners' acceptance decisions. If any required evidence cannot be obtained, report it honestly on #138 and leave the PR draft/unmerged rather than claim a passed rehearsal.
+
+## Seams and tests
+- Follow `.claude/skills/tdd/SKILL.md`: one vertical slice at a time, red before minimal green. The agreed seam here is the **public PR diff** checked against #170's literal acceptance criteria, not an internal reviewer function. First behavior check: `practice PR records the stove shutdown line` (missing file red → create the one-line file → green). Second behavior check: `practice PR records both shutdown lines` (oven absent red while the reviewer observes it → add oven in returned builder session → green). Use exact-line assertions, not substring matching or a reimplementation of the reviewer regex. The two-line check intentionally remains red through phase 2; do not call the initial PR complete.
+- The second public boundary is the **GitHub review event → Factory builder session**: inspect a real `CHANGES_REQUESTED` review tied to the planted SHA and observe Factory's builder return before changing the file. A synthetic review, unit mock or manual handoff would not prove this integration. Existing repository scripts have no root `test` script for this doc; do not add a permanent test suite for a PR that must be discarded.
+
+## Observability
+- Do not add logs or progress files for a disposable document. Retain existing durable evidence: the GitHub Actions workflow log (`.github/scripts/request-cross-maker-review.mjs` records review state, URL and SHA), the GitHub review and commit history, and Factory/Mastra's existing traces/cost and board transitions. Put evidence links and any missing trace/cost data on #138 before closing the PR. No temporary debugging output substitutes for the real review and return.
+
+## Risks
+- **Accidental merge:** the normal Factory review skill merges when both reviewers and CI pass on a head. Keep the repair PR draft and verify `isDraft=true` before pushing; never make it ready again or merge it. Stop immediately if this safety gate cannot be established.
+- **Reviewer/identity/integration failure:** the workflow uses Actions' token, which may not be the separately authorized reviewer App required by #138; inspect the actual author and Factory event routing. Keep the PR unmerged and report the gap on #138 rather than add a custom workaround.
+- **No live signal:** a successful endpoint probe does not demonstrate a real GitHub review, builder return, or cost capture. Require all evidence separately; failed or missing evidence means #138 remains open.
+
+## Assumptions
+- #170 is maintenance rehearsal, not a production kitchen feature: its final two-line requirement applies to the repaired PR head, while the initial omission is intentional per Todd's September 30 update on #138.
+- The checkout at planning had no `docs/practice-review-proof.md` and no PR linked to #170; recheck before building so an in-flight practice PR is not duplicated. Available checkout history was one commit (`8450c0f`, #169), which introduced the reviewer path; no prior fixture implementation dictates a different pattern.
+- `Closes #170` is required by `review-pr.ts:28-33`; a closed **unmerged** PR will not close #170 automatically. The `pull_request_target` workflow skips draft events, so create/ready the PR while non-draft, then use GitHub's draft state to prevent a merge before repairing.
+- Choose direct document checks and the live GitHub/Factory seam over a new unit test, script, or reviewer change: root `package.json` has no `test` script and this fixture is not to be merged. If the existing integration fails, #138 owns the diagnosis and decision, not #170.
+
+## Open questions
+None for this rehearsal. If independent GitHub App identity or another #138 requirement cannot be met through the installed route, report the gap with evidence to Todd on #138 rather than decide an exception here.

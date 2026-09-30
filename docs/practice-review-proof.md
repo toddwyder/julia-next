@@ -1,0 +1,1 @@
+Stove checked: off.
