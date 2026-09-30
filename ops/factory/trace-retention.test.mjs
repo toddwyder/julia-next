@@ -4,12 +4,24 @@
 // a live DuckDB outcome.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import {
   DEFAULT_TRACE_RETENTION_DAYS,
   selectExpiredSpans,
   runTraceCleanup,
 } from './trace-retention.mjs';
+
+// The supported way the store stays bounded: Factory hands Mastra's own
+// DEFAULT_RETENTION to both storage backends. This guard proves the check in
+// this file is paired with real, configured retention; delete the config and
+// it fails, so a "bounded" report can never describe an unbounded store.
+test('the Factory entry passes the supported DEFAULT_RETENTION to both storage backends', () => {
+  const entry = readFileSync(new URL('./app/src/mastra/index.ts', import.meta.url), 'utf8');
+  assert.match(entry, /import \{ DEFAULT_RETENTION \} from '@mastra\/code-sdk\/utils\/storage-maintenance'/);
+  const storageConfigs = entry.match(/retention:\s*DEFAULT_RETENTION/g) ?? [];
+  assert.equal(storageConfigs.length, 2, 'both Pg and LibSQL Factory storage must set DEFAULT_RETENTION');
+});
 
 const NOW = '2026-09-30T00:00:00Z';
 
