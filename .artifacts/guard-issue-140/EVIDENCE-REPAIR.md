@@ -15,7 +15,21 @@ no Discussion posted, no notification sent, no live service or database touched.
 ```
 node --test scripts/agent-docs.test.mjs scripts/line-endings.test.mjs \
   scripts/no-personal-paths.test.mjs ops/factory/*.test.mjs
-# tests 75 / pass 75 / fail 0
+# tests 76 / pass 76 / fail 0
+```
+
+CI's exact test list (with the #140 additions) passes 99 / 0:
+
+```
+node --test scripts/agent-docs.test.mjs scripts/line-endings.test.mjs \
+  scripts/no-personal-paths.test.mjs scripts/merge-pr.test.mjs \
+  scripts/publish-pr.test.mjs scripts/publish-pr.real-git.test.mjs \
+  scripts/publish-via-github-app.test.mjs ops/factory/workflows.test.mjs \
+  ops/factory/skills.test.mjs ops/factory/monday-note.test.mjs \
+  ops/factory/monday-note-run.test.mjs ops/factory/monday-note-adapters.test.mjs \
+  ops/factory/monday-note-units.test.mjs ops/factory/mastra-traces.test.mjs \
+  ops/factory/factory-cards.test.mjs ops/factory/trace-retention.test.mjs
+# tests 99 / pass 99 / fail 0
 ```
 
 Also:
