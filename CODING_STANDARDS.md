@@ -4,4 +4,5 @@
 - Start from the framework's own example and change as little as possible.
 - Run `npm run lint:framework`. Hand-built progress files, retry or wait loops, and controller code over 400 lines need an ESLint skip comment with a reason and docs link, and must be listed on JUL-115.
 - Use the built-in feature of Factory, Mastra, or GitHub before building a workaround. If one is missing, state the gap, docs checked, and consequence to Todd before changing code.
+- A production check must measure the real artifact (a real file, a real API), never an injected fake; if the supported config cannot control the artifact, prove that and fail closed instead of reporting success.
 - When review identifies a rule that should apply to all future code, fix it and add one plain line here in the same PR.

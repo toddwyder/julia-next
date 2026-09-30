@@ -50,6 +50,29 @@ test('the Factory README documents the Monday note and the supported bounded-tra
   assert.match(readme, /DEFAULT_RETENTION/);
   assert.match(readme, /observability\.duckdb/);
   assert.match(readme, /never deletes|does not delete/);
-  assert.match(readme, /adapter is ours/);
-  assert.doesNotMatch(readme, /enforceRetention.*Mastra|Mastra.*enforceRetention/);
+  assert.doesNotMatch(readme, /enforceRetention/);
+  assert.doesNotMatch(readme, /selectExpiredSpans|runTraceCleanup/);
+});
+
+test('the Factory README carries a framework map with local sources and states the gaps', () => {
+  const readme = read('ops/factory/README.md');
+  assert.match(readme, /## Framework map/);
+  // Real, local sources (repository docs and installed package paths), not
+  // invented web citations.
+  assert.match(readme, /docs\/research\/mastra-intended-use-audit\.md/);
+  assert.match(readme, /@mastra\/duckdb|DuckDBStore/);
+  assert.match(readme, /storage-maintenance/);
+  // The gaps this card could not close through supported config are named, with
+  // what is missing, rather than a fabricated citation.
+  assert.match(readme, /gap|not configured|missing/i);
+  assert.match(readme, /no supported|not supported|cannot be configured|fail(s)? closed/i);
+});
+
+test('the exceptions list marks the #140 entry as proposed, not approved, because only Todd approves entries', () => {
+  const readme = read('ops/factory/README.md');
+  assert.match(readme, /Only\s+Todd adds or removes an entry/);
+  // The #140 row must not read as already approved.
+  const row = readme.split('\n').find((line) => line.includes('#140') || (line.includes('Monday note') && line.startsWith('|')));
+  assert.ok(row, 'expected a row mentioning the Monday note / #140');
+  assert.match(row, /[Pp]roposed|[Aa]waiting Todd|[Pp]ending Todd/);
 });
