@@ -45,6 +45,93 @@ const traces = [
   { id: 's5', card: 142, phase: 'build', startedAt: '2026-09-23T09:05:00Z', endedAt: '2026-09-23T09:55:00Z', costUsd: 0.9, outcome: 'passed' },
 ];
 
+// The same card in Factory's own record shape: server-appended `stageHistory`
+// with the actor that entered and left each stage (`by` / `exitedBy`), which is
+// what the note must read instead of a hand-shaped list.
+const stagedCard = {
+  number: 140,
+  title: 'Monday note',
+  stages: ['done'],
+  createdAt: '2026-09-22T09:00:00Z',
+  acceptedAt: '2026-09-22T09:00:00Z',
+  sessions: { 'session-140': { sessionId: 'session-140', threadId: 't', branch: 'b', startedBy: 'todd' } },
+  stageHistory: [
+    { stage: 'planning', enteredAt: '2026-09-22T09:00:00Z', exitedAt: '2026-09-22T09:15:00Z', by: 'agent:run-1', exitedBy: 'agent:run-1' },
+    { stage: 'execute', enteredAt: '2026-09-22T09:15:00Z', exitedAt: '2026-09-22T12:30:00Z', by: 'agent:run-1', exitedBy: 'agent:run-2' },
+    { stage: 'review', enteredAt: '2026-09-22T12:30:00Z', exitedAt: '2026-09-22T13:10:00Z', by: 'agent:run-2', exitedBy: 'agent:run-3' },
+    { stage: 'done', enteredAt: '2026-09-22T13:12:00Z', by: 'agent:run-3' },
+  ],
+};
+
+test('each step is named with its actor, not just the card total', () => {
+  const note = buildMondayNote({ cards: [stagedCard], traces, ...WEEK });
+
+  assert.deepEqual(
+    note.lines[0].steps.map((step) => step.text),
+    [
+      'plan — Factory — $0.40 — 15m',
+      'build — Factory — $5.60 — 3h 15m — 1 failed attempt',
+      'review — Factory — $0.60 — 40m',
+      'done — Factory — $0.00',
+    ],
+  );
+});
+
+test('a step moved by hand names the person, not Factory', () => {
+  const byHand = {
+    ...stagedCard,
+    number: 142,
+    stageHistory: [
+      { stage: 'planning', enteredAt: '2026-09-23T09:00:00Z', exitedAt: '2026-09-23T09:30:00Z', by: 'agent:run-1', exitedBy: 'agent:run-1' },
+      { stage: 'done', enteredAt: '2026-09-23T09:30:00Z', by: 'todd', exitedBy: 'todd' },
+    ],
+  };
+  const note = buildMondayNote({ cards: [byHand], traces: [], ...WEEK });
+
+  assert.deepEqual(note.lines[0].steps.map((step) => step.text), [
+    'plan — Factory — $0.00 — 30m',
+    'done — Todd — $0.00',
+  ]);
+  assert.equal(note.lines[0].doneByFactory, false);
+});
+
+test('a card costs each of its traces exactly once across its steps', () => {
+  const note = buildMondayNote({ cards: [stagedCard], traces, ...WEEK });
+
+  assert.equal(note.lines[0].costUsd, 6.6);
+  assert.equal(note.lines[0].steps.reduce((sum, step) => sum + step.costUsd, 0), 6.6);
+  assert.equal(note.totalUsd, 6.6);
+});
+
+test('the initial report covers every card since observability was switched on', () => {
+  // Observability started Monday 2026-09-28. Cards entered on or after that
+  // Monday are all in the first, clamped note; a card from before it is not
+  // invented into the window.
+  const inWindow = { ...stagedCard, number: 141, enteredAt: '2026-09-28T09:00:00Z' };
+  const later = { ...stagedCard, number: 137, enteredAt: '2026-09-29T09:00:00Z' };
+  const before = { ...stagedCard, number: 139, enteredAt: '2026-09-20T09:00:00Z' };
+  const window = previousWeekWindow({ now: '2026-09-29T12:00:00Z' });
+
+  const note = buildMondayNote({ cards: [inWindow, later, before], traces: [], ...window });
+
+  assert.deepEqual(note.lines.map((line) => line.number), [141, 137]);
+});
+
+test('splitting the period into weeks counts every card and trace exactly once', () => {
+  const cardA = { ...stagedCard, number: 140, enteredAt: '2026-09-22T09:00:00Z' };
+  const cardB = { ...stagedCard, number: 141, enteredAt: '2026-09-29T09:00:00Z' };
+  const weekA = { from: '2026-09-20T00:00:00Z', to: '2026-09-27T00:00:00Z' };
+  const weekB = { from: '2026-09-27T00:00:00Z', to: '2026-10-04T00:00:00Z' };
+
+  const first = buildMondayNote({ cards: [cardA, cardB], traces, ...weekA });
+  const second = buildMondayNote({ cards: [cardA, cardB], traces, ...weekB });
+
+  const counted = [...first.lines, ...second.lines].map((line) => line.number);
+  assert.deepEqual(counted, [140, 141]);
+  assert.equal(new Set(counted).size, counted.length);
+  assert.equal(first.totalUsd + second.totalUsd, 6.6);
+});
+
 test('the note names its category so the publisher can find it', () => {
   assert.equal(MONDAY_NOTE_CATEGORY, 'Monday notes');
 });

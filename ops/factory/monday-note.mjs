@@ -68,46 +68,152 @@ function failedAttemptPhrase(count) {
 }
 
 function actorName(by) {
-  if (by === 'todd') return 'Todd';
-  if (by === 'factory') return 'Factory';
-  return by;
+  if (by === 'todd' || by === 'Todd') return 'Todd';
+  if (by === 'factory' || by === 'Factory') return 'Factory';
+  // Factory's own stage history stamps agent runs as `agent:<id>` (see
+  // @mastra/factory storage/domains/work-items/base isAgentActor); a bare user
+  // id is a person. `github:*`/`factory-rule-dispatcher` are the rule engine
+  // syncing the upstream repo, not a person going around the product, so they
+  // read as Factory here too.
+  if (typeof by === 'string' && (by.startsWith('agent:') || by.startsWith('factory') || by.startsWith('github:') || by.startsWith('system'))) {
+    return 'Factory';
+  }
+  return 'Todd';
+}
+
+function isFactoryActor(by) {
+  return actorName(by) === 'Factory';
 }
 
 /**
- * The one human action Factory's route expects is Todd's Intake tap. Every
- * movement after it belongs to Factory; anything else is how he tells that
- * someone went around the product (CONTEXT.md "Done by Factory").
+ * The card's steps in order, each with the actor who did it.
+ *
+ * Factory's own record is `stageHistory`: one entry per stage a card entered,
+ * with `by` (who entered it) and `exitedBy` (who closed it). Older test and
+ * fixture records use a flat `movements` list; both shapes normalise to the
+ * same step here, so the note never depends on one hand-shaped input.
  */
-function firstStepByHand(movements) {
-  return (movements ?? []).slice(1).find((movement) => movement.by !== 'factory');
+const STAGE_LABEL = {
+  triage: 'triage',
+  planning: 'plan',
+  execute: 'build',
+  review: 'review',
+};
+
+/**
+ * The card's steps in order, each with the actor who did it.
+ *
+ * Factory's own record is `stageHistory`: one entry per stage a card entered,
+ * with `by` (who entered it) and `exitedBy` (who closed it). Older test and
+ * fixture records use a flat `movements` list; both shapes normalise to the
+ * same step here, so the note never depends on one hand-shaped input.
+ */
+function cardSteps(card) {
+  if (Array.isArray(card.stageHistory) && card.stageHistory.length > 0) {
+    return card.stageHistory.map((entry) => ({
+      stage: STAGE_LABEL[entry.stage] ?? entry.stage,
+      by: entry.exitedBy ?? entry.by,
+      startedAt: entry.enteredAt ?? null,
+      endedAt: entry.exitedAt ?? null,
+    }));
+  }
+  const movements = card.movements ?? [];
+  return movements.map((movement, index) => ({
+    stage: movement.what ?? movement.stage ?? 'step',
+    by: movement.by,
+    startedAt: movement.at ?? null,
+    endedAt: movements[index + 1]?.at ?? card.doneAt ?? null,
+  }));
 }
 
 /**
  * A card belongs to a week when it entered the board inside `[from, to)`; a
  * trace belongs when it started in the same window. Everything else is another
  * week's note, so the same card is never counted in two weeks (CONTEXT.md
- * "Monday note": the weekly summary).
+ * "Monday note": the weekly summary). The first note's window starts at
+ * observability switch-on, so it covers every card since then.
  */
 function within(instant, from, to) {
+  if (instant === null || instant === undefined) return false;
   const at = Date.parse(instant);
+  if (!Number.isFinite(at)) return false;
   return at >= Date.parse(from) && at < Date.parse(to);
 }
 
+/** The trace's own start, used to place it on exactly one step. */
+function traceStartedAt(trace) {
+  const at = Date.parse(trace.startedAt ?? trace.startTime);
+  return Number.isFinite(at) ? at : null;
+}
+
+function stepLine(step, stepTraces) {
+  const costUsd = stepTraces.reduce((sum, trace) => sum + (trace.costUsd ?? 0), 0);
+  const failedAttempts = stepTraces.filter((trace) => trace.outcome === 'failed-attempt').length;
+  const elapsedMs = step.startedAt && step.endedAt ? Date.parse(step.endedAt) - Date.parse(step.startedAt) : null;
+
+  const parts = [`${step.stage} — ${actorName(step.by)} — ${usd(costUsd)}`];
+  if (elapsedMs !== null && elapsedMs >= 0) parts.push(duration(elapsedMs));
+  const failedPhrase = failedAttemptPhrase(failedAttempts);
+  if (failedPhrase) parts.push(failedPhrase);
+  return { stage: step.stage, by: step.by, costUsd, elapsedMs, failedAttempts, text: parts.join(' — ') };
+}
+
+/**
+ * Attach every trace to exactly one step: the last step that started at or
+ * before the trace. A trace before the first step (or on a card with no steps)
+ * lands on the card itself and is reported, never dropped or double-counted.
+ */
+function tracesByStep(steps, cardTraces) {
+  const buckets = steps.map(() => []);
+  const unattached = [];
+  for (const trace of cardTraces) {
+    const at = traceStartedAt(trace);
+    let index = -1;
+    if (at !== null) {
+      for (let i = 0; i < steps.length; i += 1) {
+        const start = steps[i].startedAt ? Date.parse(steps[i].startedAt) : null;
+        if (start !== null && start <= at) index = i;
+      }
+    }
+    (index >= 0 ? buckets[index] : unattached).push(trace);
+  }
+  return { buckets, unattached };
+}
+
 function cardLine(card, cardTraces) {
+  const steps = cardSteps(card);
+  const { buckets, unattached } = tracesByStep(steps, cardTraces);
+  const stepLines = steps.map((step, index) => stepLine(step, buckets[index]));
+  const unattachedLine = stepLine(
+    { stage: 'other Factory work', by: 'factory', startedAt: null, endedAt: null },
+    unattached,
+  );
+  if (unattached.length > 0) stepLines.push(unattachedLine);
+
   const costUsd = cardTraces.reduce((sum, trace) => sum + (trace.costUsd ?? 0), 0);
   const failedAttempts = cardTraces.filter((trace) => trace.outcome === 'failed-attempt').length;
-  const lastMovement = (card.movements ?? []).at(-1);
-  const endedAt = card.doneAt ?? lastMovement?.at ?? card.enteredAt;
-  const elapsedMs = Date.parse(endedAt) - Date.parse(card.enteredAt);
+  const firstStep = steps[0];
+  const enteredAt = card.enteredAt ?? firstStep?.startedAt ?? card.createdAt;
+  const lastStep = steps.at(-1);
+  const endedAt = card.doneAt ?? lastStep?.endedAt ?? lastStep?.startedAt ?? enteredAt;
+  const elapsedMs = enteredAt && endedAt ? Date.parse(endedAt) - Date.parse(enteredAt) : 0;
 
-  const byHand = firstStepByHand(card.movements);
+  const byHand = cardSteps(card).slice(1).find((step) => !isFactoryActor(step.by));
   const doneByFactory = byHand === undefined;
   const parts = [`#${card.number} ${card.title}`, usd(costUsd), duration(elapsedMs)];
   const failedPhrase = failedAttemptPhrase(failedAttempts);
   if (failedPhrase) parts.push(failedPhrase);
-  parts.push(doneByFactory ? 'Done by Factory' : `not all by Factory: ${actorName(byHand.by)} ${byHand.what}`);
+  parts.push(doneByFactory ? 'Done by Factory' : `not all by Factory: ${actorName(byHand.by)} ${byHand.stage}`);
 
-  return { number: card.number, costUsd, elapsedMs, failedAttempts, doneByFactory, text: parts.join(' — ') };
+  return {
+    number: card.number,
+    costUsd,
+    elapsedMs,
+    failedAttempts,
+    doneByFactory,
+    steps: stepLines,
+    text: parts.join(' — '),
+  };
 }
 
 /**
@@ -118,7 +224,12 @@ function cardLine(card, cardTraces) {
  *            totalUsd: number, failedAttempts: number}}
  */
 export function buildMondayNote({ cards = [], traces = [], from, to }) {
-  const weekCards = cards.filter((card) => within(card.enteredAt, from, to));
+  // A card's week is measured from when it entered observability: the first
+  // step it has, or its creation time. The first note's window starts at
+  // observability switch-on, so it covers every card since then, and each later
+  // week covers its own slice exactly once.
+  const cardEntry = (card) => card.enteredAt ?? card.stageHistory?.[0]?.enteredAt ?? card.movements?.[0]?.at ?? card.createdAt;
+  const weekCards = cards.filter((card) => within(cardEntry(card), from, to));
   const weekTraces = traces.filter((trace) => within(trace.startedAt, from, to));
   const lines = weekCards.map((card) =>
     cardLine(
