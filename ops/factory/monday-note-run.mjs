@@ -1,11 +1,12 @@
 #!/usr/bin/env node
-// monday-note-run.mjs -- issue #140, blocker 1: the production entrypoint a
-// systemd timer runs. It reads Factory's card records and Mastra's trace costs,
-// builds the week's note, posts it as a GitHub Discussion in the "Monday notes"
-// category, and tells Todd once.
+// monday-note-run.mjs -- issue #140: the production entrypoint a systemd timer
+// runs. It reads Factory's card records and Mastra's trace costs and posts the
+// "Monday notes" Discussions, backfilling every missed full week and telling
+// Todd once per run.
 //
-// Every seam is injected so `runMondayNote` is testable without a database,
-// GitHub, Discord or the Factory API:
+// Every seam is injected so `runMondayNoteBackfill` (and the single-week
+// `runMondayNote`) are testable without a database, GitHub, Discord or the
+// Factory API:
 //   - `readCards`   -> ops/factory/factory-cards.mjs (read-only Factory records)
 //   - `readSpans`   -> ops/factory/mastra-traces.mjs (Mastra's observability API)
 //   - `discussions` -> ops/factory/monday-note-adapters.mjs (GitHub GraphQL)
@@ -13,8 +14,10 @@
 //
 // `main()` is the only place real clients and the real clock are wired, and it
 // reads its configuration from the environment the timer's unit file sets. A
-// failed read throws out of `runMondayNote`, `main` exits non-zero, and the
-// journal records the failure -- a failed run never posts a fabricated week.
+// failed read throws out of the run, `main` exits non-zero, and the journal
+// records the failure -- a failed run never posts a fabricated week. The timer
+// entrypoint runs the backfill, so a multi-week outage produces all the missing
+// notes, bounded per invocation.
 import { readFactoryCards } from './factory-cards.mjs';
 import { readTraceSpans, normalizeTraceSpans } from './mastra-traces.mjs';
 import {
