@@ -17,7 +17,7 @@ test('coding standards seed reflects the framework-first rules and is linked fro
   assert.match(read('AGENTS.md'), /\[CODING_STANDARDS\.md\]\(CODING_STANDARDS\.md\)/);
 });
 
-test('agent instructions use GitHub issues and Factory boards, with Todd approving product merges', () => {
+test('agent instructions use GitHub issues and Factory boards, with live UAT after merge', () => {
   for (const path of ['CLAUDE.md', 'AGENTS.md']) {
     const text = read(path);
     assert.match(text, /GitHub issues/);
@@ -27,9 +27,9 @@ test('agent instructions use GitHub issues and Factory boards, with Todd approvi
     assert.match(text, /publisher App/);
     assert.match(text, /\.claude\/skills\/tdd\/SKILL\.md/);
   }
-  assert.match(read('CLAUDE.md'), /auto-merge/);
+  assert.match(read('CLAUDE.md'), /reviewer merges the PR/);
   assert.doesNotMatch(read('CLAUDE.md'), /close a Linear feature card|throwaway Linear card|Default label vocabulary \(/);
-  assert.match(read('AGENTS.md'), /auto-merge/);
+  assert.match(read('AGENTS.md'), /reviewer merges the PR/);
   assert.match(read('CLAUDE.md'), /outside the Factory sandbox/);
   assert.match(read('AGENTS.md'), /outside the Factory sandbox/);
   assert.match(read('docs/agents/work-execution.md'), /Needs attention/);
