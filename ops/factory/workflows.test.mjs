@@ -25,6 +25,12 @@ test('CI checks the current app but does not run retired graph tests', () => {
   assert.match(ci, /run: npm run build/);
 });
 
+test('CI runs the Monday note and trace retention tests that issue #140 adds', () => {
+  for (const file of ['monday-note', 'trace-retention']) {
+    assert.ok(ci.includes(`ops/factory/${file}.test.mjs`), `CI does not run ops/factory/${file}.test.mjs`);
+  }
+});
+
 test('both workflows cancel superseded runs; CI retains its required job for docs-only PRs', () => {
   for (const workflow of [publisher, ci]) {
     assert.match(workflow, /cancel-in-progress: true/);
