@@ -41,9 +41,11 @@ export function previousWeekWindow({ now, firstWeekStart = OBSERVABILITY_START }
   const thisMonday = start + Math.floor((at - start) / WEEK_MS) * WEEK_MS;
   const from = thisMonday - WEEK_MS;
   if (from < start) {
-    // Before the second Monday there is no completed week; report what exists
-    // so far, starting at switch-on rather than reaching before it.
-    return { from: new Date(start).toISOString(), to: new Date(Math.max(start, at)).toISOString() };
+    // Before the first Monday after switch-on there is no completed week. Return
+    // an empty window at switch-on rather than a partial one: a partial first
+    // week would overlap the first full week (`[start, firstMonday)`) and count
+    // the same card in two notes.
+    return { from: new Date(start).toISOString(), to: new Date(start).toISOString() };
   }
   return { from: new Date(from).toISOString(), to: new Date(thisMonday).toISOString() };
 }

@@ -67,9 +67,11 @@ Sessions run **outside Factory** — Codex, GPT, or Claude sessions started by h
 cards and are not counted; the note says so on its own face.
 
 Each week is `[from, to)`, computed by `previousWeekWindow` from the switch-on Monday
-(`OBSERVABILITY_START`, 2026-09-28). The first note is clamped to that Monday, so it covers every
-card since observability started; later notes cover one week each, and a card or trace is counted
-in exactly one note. A costed span lands on exactly one step, so nothing is double-counted.
+(`OBSERVABILITY_START`, 2026-09-28). Before the first Monday after switch-on there is no completed
+week, so no note is produced for that partial slice; the first note is minted on the first Monday
+after switch-on and its one full week covers every card since observability started. Later notes
+cover one week each, and a card or trace is counted in exactly one note. A costed span lands on
+exactly one step, so nothing is double-counted.
 
 `publishMondayNote({ note, discussions, notifications })` posts the note as a GitHub Discussion in
 the **Monday notes** category and tells Todd through the Discord wait-alert webhook. A run for a

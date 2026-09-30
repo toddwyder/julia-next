@@ -49,7 +49,7 @@ test('one run reads the week, posts the note, and notifies Todd once with the li
   const notifications = fakeNotifications();
 
   const result = await runMondayNote({
-    now: '2026-09-28T09:00:00Z',
+    now: '2026-10-05T08:00:00Z',
     readCards: async () => CARDS,
     readSpans: async () => SPANS,
     discussions,
@@ -61,7 +61,7 @@ test('one run reads the week, posts the note, and notifies Todd once with the li
   assert.equal(notifications.sent.length, 1);
   assert.equal(notifications.sent[0].url, 'https://github.com/o/r/discussions/9');
   assert.match(discussions.calls.posted[0].body, /#140 Monday note/);
-  assert.match(discussions.calls.posted[0].title, /week ending 2026-09-28/);
+  assert.match(discussions.calls.posted[0].title, /week ending 2026-10-05/);
 });
 
 test('a failed card read fails closed: nothing is posted or notified', async () => {
@@ -70,7 +70,7 @@ test('a failed card read fails closed: nothing is posted or notified', async () 
 
   await assert.rejects(
     () => runMondayNote({
-      now: '2026-09-28T09:00:00Z',
+      now: '2026-10-05T08:00:00Z',
       readCards: async () => { throw new Error('psql exited 1'); },
       readSpans: async () => SPANS,
       discussions,
@@ -89,7 +89,7 @@ test('a failed trace read also fails closed', async () => {
 
   await assert.rejects(
     () => runMondayNote({
-      now: '2026-09-28T09:00:00Z',
+      now: '2026-10-05T08:00:00Z',
       readCards: async () => CARDS,
       readSpans: async () => { throw new Error('Mastra trace list returned HTTP 500'); },
       discussions,
@@ -107,7 +107,7 @@ test('a week that already has its Discussion is not posted or notified again', a
   const notifications = fakeNotifications();
 
   const result = await runMondayNote({
-    now: '2026-09-28T09:00:00Z',
+    now: '2026-10-05T08:00:00Z',
     readCards: async () => CARDS,
     readSpans: async () => SPANS,
     discussions,
@@ -124,7 +124,7 @@ test('a quiet week posts its Discussion and tells Todd it was quiet', async () =
   const notifications = fakeNotifications();
 
   await runMondayNote({
-    now: '2026-09-28T09:00:00Z',
+    now: '2026-10-05T08:00:00Z',
     readCards: async () => [],
     readSpans: async () => [],
     discussions,

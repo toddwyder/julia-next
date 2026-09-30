@@ -107,17 +107,21 @@ test('a card costs each of its traces exactly once across its steps', () => {
 });
 
 test('the initial report covers every card since observability was switched on', () => {
-  // Observability started Monday 2026-09-28. Cards entered on or after that
-  // Monday are all in the first, clamped note; a card from before it is not
-  // invented into the window.
+  // Observability started Monday 2026-09-28. The first note is the first Monday
+  // after it (2026-10-05), whose one full week [09-28, 10-05) covers every card
+  // since switch-on; a card from before it is not invented into the window, and
+  // no separate partial-week note can overlap it.
   const inWindow = { ...stagedCard, number: 141, enteredAt: '2026-09-28T09:00:00Z' };
-  const later = { ...stagedCard, number: 137, enteredAt: '2026-09-29T09:00:00Z' };
+  const later = { ...stagedCard, number: 137, enteredAt: '2026-10-04T09:00:00Z' };
   const before = { ...stagedCard, number: 139, enteredAt: '2026-09-20T09:00:00Z' };
-  const window = previousWeekWindow({ now: '2026-09-29T12:00:00Z' });
+  const window = previousWeekWindow({ now: '2026-10-05T08:00:00Z' });
 
   const note = buildMondayNote({ cards: [inWindow, later, before], traces: [], ...window });
 
   assert.deepEqual(note.lines.map((line) => line.number), [141, 137]);
+  // The pre-switch-on card is in no note.
+  const earlier = buildMondayNote({ cards: [before], traces: [], ...previousWeekWindow({ now: '2026-09-28T10:00:00Z' }) });
+  assert.deepEqual(earlier.lines, []);
 });
 
 test('splitting the period into weeks counts every card and trace exactly once', () => {
@@ -199,11 +203,12 @@ test('the scheduled week is the last completed Monday-to-Monday week', () => {
     to: '2026-10-05T00:00:00.000Z',
   });
 
-  // The first note after switch-on has no earlier Monday to start from, so it
-  // is clamped to 2026-09-28 rather than reaching into September before it.
+  // Before the first Monday after switch-on there is no completed week. The
+  // window is empty at switch-on rather than a partial week, so the first full
+  // week cannot count the same card twice.
   assert.deepEqual(previousWeekWindow({ now: '2026-09-28T10:00:00Z' }), {
     from: '2026-09-28T00:00:00.000Z',
-    to: '2026-09-28T10:00:00.000Z',
+    to: '2026-09-28T00:00:00.000Z',
   });
 });
 
