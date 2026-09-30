@@ -64,6 +64,38 @@ function duration(ms) {
   return `${minutes}m`;
 }
 
+/**
+ * Cost correlation is never guessed and never turned into `$0.00`.
+ *
+ * Every span the trace reader returned for the week is a model run and must
+ * carry a numeric `estimatedCost`; a span without one is a failed read, not a
+ * free run. Every span must also correlate to a card in this note through its
+ * session: a cost-bearing span that names no card (or a card outside the week)
+ * is a correlation failure. Numeric zero is valid -- a real free model call is
+ * `0`, not missing. This is fail-closed: the caller must let the error stop the
+ * run rather than publish a note whose totals might be wrong.
+ */
+export function assertCostsAreCorrelated(weekTraces, weekCardNumbers) {
+  for (const trace of weekTraces) {
+    const cost = trace.costUsd;
+    const costKnown = typeof cost === 'number' && Number.isFinite(cost);
+    const correlated = trace.card !== null && trace.card !== undefined && weekCardNumbers.has(trace.card);
+
+    if (correlated && !costKnown) {
+      throw new Error(
+        `Trace ${trace.id ?? '(no id)'} is correlated to card ${trace.card} but has no numeric estimated cost; ` +
+          'refusing to report it as $0.00',
+      );
+    }
+    if (!correlated && costKnown) {
+      throw new Error(
+        `Trace ${trace.id ?? '(no id)'} carries a cost (${cost}) but is not correlated to a card in this week; ` +
+          'refusing to publish a total that may be wrong',
+      );
+    }
+  }
+}
+
 function failedAttemptPhrase(count) {
   if (count <= 0) return null;
   return count === 1 ? '1 failed attempt' : `${count} failed attempts`;
@@ -227,15 +259,18 @@ export function buildMondayNote({ cards = [], traces = [], from, to }) {
   const weekCards = cards.filter((card) => within(cardEntry(card), from, to));
   const weekTraces = traces.filter((trace) => within(trace.startedAt, from, to));
   const weekNumbers = new Set(weekCards.map((card) => card.number));
+  // Fail closed before building any line: a missing cost is never $0 and a
+  // cost-bearing span that names no card in the week is never guessed onto one.
+  assertCostsAreCorrelated(weekTraces, weekNumbers);
   const lines = weekCards.map((card) =>
     cardLine(
       card,
       weekTraces.filter((trace) => trace.card === card.number),
     ),
   );
-  // Cost correlation is auditable: a trace with no card, or a card outside this
-  // week, is summed and reported rather than silently dropped. Widening a
-  // card's total with it (or hiding it) would make the note lie about a card.
+  // Cost correlation is enforced above, so an uncorrelated span here has no
+  // numeric cost: it is summed and reported (at $0.00) rather than silently
+  // dropped, and it can never widen a card's total.
   const uncorrelated = weekTraces.filter((trace) => trace.card === null || !weekNumbers.has(trace.card));
   const uncorrelatedUsd = uncorrelated.reduce((sum, trace) => sum + (trace.costUsd ?? 0), 0);
   const cardUsd = lines.reduce((sum, line) => sum + line.costUsd, 0);
