@@ -23,12 +23,19 @@ test('the Monday note post is a weekly timer that runs the production entrypoint
   assert.match(timer, /Unit=julia-factory-monday-note\.service/);
 });
 
-test('the retention check is a scheduled, read-only guard', () => {
+test('the retention job is a scheduled prune that runs the app route, not a read-only check', () => {
   const service = read('julia-factory-trace-retention.service');
   const timer = read('julia-factory-trace-retention.timer');
 
-  assert.match(service, /ExecStart=.*trace-retention\.mjs/);
-  assert.match(service, /ReadOnlyPaths=.*mastracode/);
+  // Issue #140 review: the unit must run the actual supported prune. It signs an
+  // empty body and calls the running app's retention route, which runs the same
+  // supported Mastra `prune()` + DuckDB `CHECKPOINT` the daily schedule runs.
+  assert.match(service, /ExecStart=.*trace-prune-request\.mjs/);
+  assert.doesNotMatch(service, /ExecStart=.*trace-retention\.mjs/);
+  // No env flag pretending retention is configured.
+  assert.doesNotMatch(service, /MASTRACODE_DUCKDB_RETENTION/);
+  // The secret comes from a root-owned file, never argv.
+  assert.match(service, /EnvironmentFile=\/etc\/julia-factory-retention\/secret\.env/);
   assert.match(timer, /OnCalendar=daily/);
   assert.match(timer, /Unit=julia-factory-trace-retention\.service/);
 });
@@ -48,4 +55,8 @@ test('the installer installs the units, writes a placeholder config with no secr
   assert.match(installer, /MONDAY_NOTE_GITHUB_TOKEN=$/m, 'the token placeholder must be empty');
   assert.match(installer, /MONDAY_NOTE_DISCORD_WEBHOOK=$/m, 'the webhook placeholder must be empty');
   assert.match(installer, /systemctl enable --now julia-factory-trace-retention\.timer/);
+  // The retention route secret is generated once, in a root-owned file, and is
+  // never a literal in the unit or the installer output.
+  assert.match(installer, /JULIA_RETENTION_ROUTE_SECRET=\$secret/);
+  assert.doesNotMatch(installer, /JULIA_RETENTION_ROUTE_SECRET=[^$\n]/);
 });

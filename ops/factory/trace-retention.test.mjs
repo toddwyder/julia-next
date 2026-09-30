@@ -27,15 +27,78 @@ import { join } from 'node:path';
 import {
   DEFAULT_TRACE_BUDGET_BYTES,
   DEFAULT_TRACE_RETENTION_DAYS,
+  EMERGENCY_TRACE_RETENTION_DAYS,
   OBSERVABILITY_DUCKDB_PATH,
   measureStore,
   checkTraceStore,
+  planRetentionAction,
+  requiredFreeBytes,
+  measureFreeBytes,
 } from './trace-retention.mjs';
 
 test('the default budget and window match the supported retention', () => {
   assert.equal(DEFAULT_TRACE_RETENTION_DAYS, 14);
   assert.equal(DEFAULT_TRACE_BUDGET_BYTES, 5 * 1024 * 1024 * 1024);
+  assert.equal(EMERGENCY_TRACE_RETENTION_DAYS, 1);
   assert.equal(OBSERVABILITY_DUCKDB_PATH, '/var/lib/julia-factory/.local/share/mastracode/observability.duckdb');
+});
+
+test('requiredFreeBytes keeps the supported code-sdk headroom (1.2x + 256 MB)', () => {
+  assert.equal(requiredFreeBytes(0), 256 * 1024 * 1024);
+  assert.equal(requiredFreeBytes(1000 * 1024 * 1024), Math.ceil(1000 * 1024 * 1024 * 1.2) + 256 * 1024 * 1024);
+});
+
+test('an under-budget store plans a routine supported prune, never a direct delete', () => {
+  const plan = planRetentionAction({
+    measured: { exists: true, bytes: 1024 * 1024 * 1024 },
+    budgetBytes: DEFAULT_TRACE_BUDGET_BYTES,
+    freeBytes: 30 * 1024 * 1024 * 1024,
+  });
+
+  assert.equal(plan.action, 'routine-prune');
+  assert.equal(plan.ok, true);
+});
+
+test('an over-budget store with room to checkpoint plans the emergency supported prune', () => {
+  const bytes = 6 * 1024 * 1024 * 1024;
+  const plan = planRetentionAction({
+    measured: { exists: true, bytes },
+    budgetBytes: DEFAULT_TRACE_BUDGET_BYTES,
+    freeBytes: 30 * 1024 * 1024 * 1024,
+  });
+
+  // The byte cap cannot be met by age retention alone, so the guard triggers a
+  // tighter supported retention window plus a documented DuckDB CHECKPOINT.
+  assert.equal(plan.action, 'emergency-prune');
+  assert.equal(plan.emergencyRetentionDays, EMERGENCY_TRACE_RETENTION_DAYS);
+  assert.equal(plan.ok, true);
+});
+
+test('an over-budget store with too little free disk fails closed before disk exhaustion', () => {
+  const bytes = 6 * 1024 * 1024 * 1024;
+  const plan = planRetentionAction({
+    measured: { exists: true, bytes },
+    budgetBytes: DEFAULT_TRACE_BUDGET_BYTES,
+    // Less free space than a compacted copy needs: pruning cannot reclaim space
+    // safely, so the safe action is to stop and alert, not to press on and fill
+    // the disk.
+    freeBytes: 512 * 1024 * 1024,
+  });
+
+  assert.equal(plan.action, 'fail-low-disk');
+  assert.equal(plan.ok, false);
+  assert.match(plan.message, /free disk|disk/i);
+});
+
+test('a missing store is not planned for any delete', () => {
+  const plan = planRetentionAction({
+    measured: { exists: false, bytes: 0 },
+    budgetBytes: DEFAULT_TRACE_BUDGET_BYTES,
+    freeBytes: 30 * 1024 * 1024 * 1024,
+  });
+
+  assert.equal(plan.action, 'none');
+  assert.equal(plan.ok, false);
 });
 
 test('measureStore stats the database file and its WAL together', () => {

@@ -7,10 +7,15 @@ import {
 } from './src/mastra/observability-store.ts';
 import {
   DEFAULT_PRUNE_OPTIONS,
+  EMERGENCY_RETENTION,
+  EMERGENCY_TRACE_RETENTION_DAYS,
   OBSERVABILITY_PRUNE_CRON,
+  OBSERVABILITY_SIZE_BUDGET_BYTES,
   observabilityRetentionWorkflow,
   pruneObservabilityRetention,
+  requiredFreeBytes,
   runObservabilityPrune,
+  runObservabilityRetention,
   setObservabilityPruneTarget,
 } from './src/mastra/observability-retention.ts';
 
@@ -85,4 +90,101 @@ test('the workflow declares a daily cron so the prune runs on a framework schedu
   // Mastra reads the declarative schedule through getScheduleConfigs(); this is
   // the same accessor its scheduler uses to register the daily fire.
   assert.deepEqual(observabilityRetentionWorkflow.getScheduleConfigs(), [{ cron: '0 4 * * *' }]);
+});
+
+test('the over-budget guard applies a tighter supported retention, then CHECKPOINT', async () => {
+  const calls = { prune: [], checkpoint: 0 };
+  const target = {
+    prune: async (options) => {
+      calls.prune.push(options);
+      return [{ domain: 'observability', table: 'span_events', deleted: 9, done: true }];
+    },
+    checkpoint: async () => { calls.checkpoint += 1; },
+  };
+  // First measure is over budget; the checkpointed re-measure is under budget,
+  // so the guard reports the reclaim instead of a real DuckDB file.
+  const sizes = [8 * 1024 * 1024 * 1024, 4 * 1024 * 1024 * 1024];
+  let measure = 0;
+
+  const result = await runObservabilityRetention({
+    target,
+    budgetBytes: 5 * 1024 * 1024 * 1024,
+    measureBytes: () => sizes[Math.min(measure++, sizes.length - 1)],
+    measureFree: () => 30 * 1024 * 1024 * 1024,
+    log: () => {},
+  });
+
+  assert.equal(result.action, 'emergency-prune');
+  assert.equal(result.bytesBefore, 8 * 1024 * 1024 * 1024);
+  assert.equal(result.bytesAfter, 4 * 1024 * 1024 * 1024);
+  assert.equal(calls.prune.length, 1);
+  assert.deepEqual(calls.prune[0].retention, EMERGENCY_RETENTION);
+  assert.equal(calls.checkpoint, 1);
+});
+
+test('the guard fails closed when the store is still over budget after the emergency prune', async () => {
+  const target = {
+    prune: async () => [{ domain: 'observability', table: 'span_events', deleted: 1, done: true }],
+    checkpoint: async () => {},
+  };
+
+  await assert.rejects(
+    () => runObservabilityRetention({
+      target,
+      budgetBytes: 5 * 1024 * 1024 * 1024,
+      measureBytes: () => 8 * 1024 * 1024 * 1024,
+      measureFree: () => 30 * 1024 * 1024 * 1024,
+      log: () => {},
+    }),
+    /still over budget/i,
+  );
+});
+
+test('the guard fails closed before touching the store when free disk is too low', async () => {
+  const calls = { prune: 0, checkpoint: 0 };
+  const target = {
+    prune: async () => { calls.prune += 1; return []; },
+    checkpoint: async () => { calls.checkpoint += 1; },
+  };
+
+  await assert.rejects(
+    () => runObservabilityRetention({
+      target,
+      budgetBytes: 5 * 1024 * 1024 * 1024,
+      measureBytes: () => 8 * 1024 * 1024 * 1024,
+      measureFree: () => 128 * 1024 * 1024,
+      log: () => {},
+    }),
+    /free disk|disk/i,
+  );
+
+  // Nothing was pruned or checkpointed, so the disk cannot be pushed over the edge.
+  assert.equal(calls.prune, 0);
+  assert.equal(calls.checkpoint, 0);
+});
+
+test('the guard fails closed when an unknown free-space reading would be assumed safe', async () => {
+  const target = { prune: async () => [] };
+
+  await assert.rejects(
+    () => runObservabilityRetention({
+      target,
+      budgetBytes: 5 * 1024 * 1024 * 1024,
+      measureBytes: () => 6 * 1024 * 1024 * 1024,
+      measureFree: () => null,
+      log: () => {},
+    }),
+    /free disk|disk|unknown/i,
+  );
+});
+
+test('the emergency retention window is the tightened 1d policy', () => {
+  assert.equal(EMERGENCY_TRACE_RETENTION_DAYS, 1);
+  assert.deepEqual(EMERGENCY_RETENTION.observability?.spans, { maxAge: '1d' });
+  assert.deepEqual(EMERGENCY_RETENTION.observability?.logs, { maxAge: '1d' });
+});
+
+test('requiredFreeBytes keeps the documented 1.2x + 256 MB headroom', () => {
+  assert.equal(requiredFreeBytes(0), 256 * 1024 * 1024);
+  assert.equal(OBSERVABILITY_SIZE_BUDGET_BYTES, 5 * 1024 * 1024 * 1024);
 });

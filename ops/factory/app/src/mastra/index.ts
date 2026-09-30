@@ -49,6 +49,7 @@ import {
   duckdbObservabilityConfig,
 } from './observability-store.js';
 import { observabilityRetentionWorkflow, setObservabilityPruneTarget } from './observability-retention.js';
+import { observabilityRetentionRoute } from './observability-retention-route.js';
 
 /**
  * Parse a positive-integer env knob; anything else means "use the default".
@@ -483,7 +484,12 @@ const composedStorage = composeStorageWithObservability({
 });
 // The scheduled retention step prunes this same store; DuckDB allows one writer
 // across processes, so the daily prune must run in the process that holds it.
-setObservabilityPruneTarget(observabilityDuckDB);
+// The target also exposes the documented DuckDB `CHECKPOINT`, which the size
+// guard runs after an over-budget prune to reclaim the freed rows on disk.
+setObservabilityPruneTarget({
+  prune: (options) => observabilityDuckDB.prune(options),
+  checkpoint: () => observabilityDuckDB.db.execute('CHECKPOINT'),
+});
 
 // Construct the server-owned Mastra HERE so the `new Mastra(...)` literal lives
 // in the entry file (see module docs). `prepare()` returns the constructor args
@@ -496,7 +502,7 @@ export const mastra = new Mastra({
   workflows: { ...preparedArgs.workflows, prReviewWorkflow, observabilityRetentionWorkflow },
   server: {
     ...preparedArgs.server,
-    apiRoutes: [...(preparedArgs.server?.apiRoutes ?? []), reviewerRoute],
+    apiRoutes: [...(preparedArgs.server?.apiRoutes ?? []), reviewerRoute, observabilityRetentionRoute],
   },
   storage: composedStorage,
   pubsub: preparedArgs.pubsub,

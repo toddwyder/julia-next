@@ -43,6 +43,7 @@ install -D -m 0644 "$patch_dir/monday-note-run.mjs" "$app_dir/ops/factory/monday
 install -D -m 0644 "$patch_dir/monday-note-adapters.mjs" "$app_dir/ops/factory/monday-note-adapters.mjs"
 install -D -m 0644 "$patch_dir/mastra-traces.mjs" "$app_dir/ops/factory/mastra-traces.mjs"
 install -D -m 0644 "$patch_dir/trace-retention.mjs" "$app_dir/ops/factory/trace-retention.mjs"
+install -D -m 0644 "$patch_dir/trace-prune-request.mjs" "$app_dir/ops/factory/trace-prune-request.mjs"
 install -D -m 0644 "$patch_dir/factory-cards.mjs" "$app_dir/ops/factory/factory-cards.mjs"
 install -D -m 0644 "$patch_dir/factory-cards.sql" "$app_dir/ops/factory/factory-cards.sql"
 install -D -m 0644 "$patch_dir/run-psql.mjs" "$app_dir/ops/factory/run-psql.mjs"

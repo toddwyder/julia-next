@@ -1,23 +1,23 @@
 [Unit]
-Description=Check the Factory observability trace store stays within its budget
-After=network-online.target
+Description=Run the Factory DuckDB observability retention prune
+After=network-online.target julia-factory-trial.service
 Wants=network-online.target
+# The prune runs inside the running Factory process (DuckDB allows one writer),
+# so the app must be up and the route secret must exist.
+ConditionPathExists=/etc/julia-factory-retention/secret.env
 
 [Service]
 Type=oneshot
 User=julia-factory
 Group=julia-factory
-# The check only stats the DuckDB file and its WAL; it never writes or deletes.
-# It exits non-zero when the store is over budget or when supported DuckDB
-# retention is not configured, so the journal shows the failure. Retention is
-# now wired in `app/src/mastra/observability-store.ts` (DuckDBStore with
-# DEFAULT_RETENTION) and pruned on schedule by `observability-retention.ts`, so
-# this flag tells the check the supported bound is in place; a deploy that has
-# not shipped that code yet should set it back to 0.
-Environment=MASTRACODE_DUCKDB_RETENTION=1
-ExecStart=/usr/bin/node /var/lib/julia-factory/app/ops/factory/trace-retention.mjs
+# The route secret and the Factory URL come from the root-owned config, never
+# argv. The program signs an empty body and POSTs to the app's
+# /julia/run-retention route, which runs the supported Mastra `prune()` plus the
+# documented DuckDB `CHECKPOINT`. It exits non-zero when the run fails, so a
+# failed prune is red in the journal instead of a silent env flag.
+EnvironmentFile=/etc/julia-factory-retention/secret.env
+ExecStart=/usr/bin/node /var/lib/julia-factory/app/ops/factory/trace-prune-request.mjs
 ProtectSystem=strict
 ProtectHome=true
-ReadOnlyPaths=/var/lib/julia-factory/.local/share/mastracode
 NoNewPrivileges=true
 PrivateTmp=true

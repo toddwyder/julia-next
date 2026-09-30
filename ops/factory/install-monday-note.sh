@@ -17,7 +17,7 @@ patch_dir=$(cd -- "$(dirname -- "$0")" && pwd)
 [[ $project_id =~ ^[A-Za-z0-9_-]+$ ]] || { echo 'Invalid Factory project ID' >&2; exit 2; }
 test -f "$app_dir/ops/factory/monday-note-run.mjs"
 test -f "$app_dir/ops/factory/factory-cards.sql"
-test -f "$app_dir/ops/factory/trace-retention.mjs"
+test -f "$app_dir/ops/factory/trace-prune-request.mjs"
 
 config_dir=/etc/julia-factory-monday-note
 install -d -m 0750 -o root -g julia-factory "$config_dir"
@@ -41,6 +41,24 @@ install -m 0644 "$patch_dir/julia-factory-monday-note.service" /etc/systemd/syst
 install -m 0644 "$patch_dir/julia-factory-monday-note.timer" /etc/systemd/system/
 install -m 0644 "$patch_dir/julia-factory-trace-retention.service" /etc/systemd/system/
 install -m 0644 "$patch_dir/julia-factory-trace-retention.timer" /etc/systemd/system/
+
+# Root-owned route secret for the retention service. The app reads
+# JULIA_RETENTION_ROUTE_SECRET; the service reads the same value from this file
+# and signs an empty body with it. Generated once; never printed.
+retention_dir=/etc/julia-factory-retention
+install -d -m 0750 -o root -g julia-factory "$retention_dir"
+if [[ ! -e $retention_dir/secret.env ]]; then
+  secret=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')
+  cat > "$retention_dir/secret.env" <<EOF
+# Read by the app and by julia-factory-trace-retention.service. Never put this
+# value in an issue, a log, or the repository.
+JULIA_RETENTION_ROUTE_SECRET=$secret
+MONDAY_NOTE_FACTORY_URL=https://julia-factory.tail91f394.ts.net
+EOF
+  chown root:julia-factory "$retention_dir/secret.env"
+  chmod 0640 "$retention_dir/secret.env"
+fi
+
 systemctl daemon-reload
 systemctl enable --now julia-factory-trace-retention.timer
 # The Monday note timer is enabled but stays inert until config.env has the

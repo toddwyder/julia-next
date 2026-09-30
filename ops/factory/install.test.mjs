@@ -31,6 +31,7 @@ test('the installer copies the issue #140 Monday note and retention programs int
     'ops/factory/monday-note-adapters.mjs',
     'ops/factory/mastra-traces.mjs',
     'ops/factory/trace-retention.mjs',
+    'ops/factory/trace-prune-request.mjs',
     'ops/factory/factory-cards.mjs',
     'ops/factory/factory-cards.sql',
   ]) {

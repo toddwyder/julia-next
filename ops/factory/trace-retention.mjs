@@ -25,7 +25,7 @@
 // it is over budget or when the deployed process has not declared the supported
 // DuckDB retention in place -- rather than reporting a false all-clear from
 // config alone.
-import { statSync } from 'node:fs';
+import { statSync, statfsSync } from 'node:fs';
 
 /** The DuckDB file Factory's observability exporter writes (change log, 2026-09-28). */
 export const OBSERVABILITY_DUCKDB_PATH = '/var/lib/julia-factory/.local/share/mastracode/observability.duckdb';
@@ -33,14 +33,58 @@ export const OBSERVABILITY_DUCKDB_PATH = '/var/lib/julia-factory/.local/share/ma
 /** How long a trace is kept: the `observability.spans` window in DEFAULT_RETENTION. */
 export const DEFAULT_TRACE_RETENTION_DAYS = 14;
 
+/**
+ * The tightened window the size guard applies when the store is over budget.
+ * `prune()` is age-based and cannot promise a byte cap, so the guard escalates
+ * to a supported, tighter `maxAge` (via `PruneOptions.retention`) plus the
+ * documented DuckDB `CHECKPOINT`, and fails closed when it still cannot get
+ * under budget.
+ */
+export const EMERGENCY_TRACE_RETENTION_DAYS = 1;
+
 /** Bytes the observability store may occupy before a cleanup has not done its job. */
 export const DEFAULT_TRACE_BUDGET_BYTES = 5 * 1024 * 1024 * 1024;
+
+/**
+ * Free bytes needed before a DuckDB `CHECKPOINT` can safely reclaim space. The
+ * same headroom formula the installed `@mastra/code-sdk` uses before compacting
+ * a local store (`utils/storage-maintenance`: `requiredFreeBytes`), so the app
+ * and the operator check agree on what "enough room" means.
+ */
+export function requiredFreeBytes(liveBytes) {
+  return Math.ceil(liveBytes * 1.2) + 256 * 1024 * 1024;
+}
 
 function sizeOf(file) {
   try {
     return statSync(file).size;
   } catch {
     return 0;
+  }
+}
+
+/**
+ * Free bytes on the volume holding `path`. Returns `null` when the volume
+ * cannot be measured; a `null` free-space reading always fails closed rather
+ * than assuming there is room.
+ */
+export function measureFreeBytes(path = OBSERVABILITY_DUCKDB_PATH) {
+  try {
+    const { bsize, bavail } = statfsSync(path);
+    return bsize * bavail;
+  } catch {
+    // The file may not exist yet; measure the nearest existing parent.
+    let dir = path;
+    for (let i = 0; i < 16; i += 1) {
+      dir = dir.replace(/\/[^/]+$/, '') || '/';
+      try {
+        const { bsize, bavail } = statfsSync(dir);
+        return bsize * bavail;
+      } catch {
+        if (dir === '/') break;
+      }
+    }
+    return null;
   }
 }
 
@@ -97,6 +141,70 @@ export function checkTraceStore({ measured, budgetBytes = DEFAULT_TRACE_BUDGET_B
     retentionConfigured: duckdbRetentionConfigured === true,
     ok: bounded,
     message,
+  };
+}
+
+/**
+ * The safe action for one measurement. The store is kept physically bounded by
+ * Mastra's own supported retention, never by a direct delete:
+ *
+ *   - `none`           -- no store to prune;
+ *   - `routine-prune`  -- under budget; apply the supported age retention;
+ *   - `emergency-prune`-- over budget with room to checkpoint; apply the
+ *                         tightened supported age retention, then CHECKPOINT;
+ *   - `fail-low-disk`  -- over budget with too little free disk to checkpoint
+ *                         safely; stop before the disk fills and alert.
+ *
+ * `prune()` itself can never enforce a byte budget (it deletes by age and
+ * never reclaims disk), so this is the explicit size-budget guard around it.
+ * A `null` free-space reading fails closed.
+ */
+export function planRetentionAction({
+  measured,
+  budgetBytes = DEFAULT_TRACE_BUDGET_BYTES,
+  freeBytes,
+}) {
+  if (!measured.exists) {
+    return {
+      action: 'none',
+      ok: false,
+      overBudget: false,
+      emergencyRetentionDays: null,
+      message: `observability store not found at ${measured.path ?? OBSERVABILITY_DUCKDB_PATH}; nothing to prune`,
+    };
+  }
+  if (measured.bytes <= budgetBytes) {
+    return {
+      action: 'routine-prune',
+      ok: true,
+      overBudget: false,
+      emergencyRetentionDays: null,
+      message: `observability store is under budget: ${measured.bytes} bytes <= ${budgetBytes} bytes; applying supported age retention`,
+    };
+  }
+  const need = requiredFreeBytes(measured.bytes);
+  if (freeBytes === null || freeBytes === undefined || freeBytes < need) {
+    return {
+      action: 'fail-low-disk',
+      ok: false,
+      overBudget: true,
+      emergencyRetentionDays: null,
+      requiredFreeBytes: need,
+      message:
+        `observability store is over budget (${measured.bytes} bytes > ${budgetBytes}) and there is not ` +
+        `enough free disk to reclaim it safely (need ${need} bytes, have ${freeBytes ?? 'unknown'}); ` +
+        'refusing to prune so the disk cannot fill — free space or move the store, then re-run',
+    };
+  }
+  return {
+    action: 'emergency-prune',
+    ok: true,
+    overBudget: true,
+    emergencyRetentionDays: EMERGENCY_TRACE_RETENTION_DAYS,
+    requiredFreeBytes: need,
+    message:
+      `observability store is over budget (${measured.bytes} bytes > ${budgetBytes}); applying the supported ` +
+      `${EMERGENCY_TRACE_RETENTION_DAYS}d retention, then a DuckDB CHECKPOINT to reclaim the freed rows`,
   };
 }
 
