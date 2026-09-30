@@ -5,7 +5,8 @@
 # Installing the units is safe and sends nothing: the Monday note service runs
 # only when /etc/julia-factory-monday-note/config.env exists, and this script
 # writes a mode-0600 placeholder that the operator fills in. The trace-retention
-# timer is read-only.
+# unit calls the running Factory process, whose route returns the app's real
+# retention result; the secret it needs is generated here.
 set -euo pipefail
 if [[ ${EUID} -ne 0 || $# -ne 2 ]]; then
   echo 'Usage (root): install-monday-note.sh APP_DIR PROJECT_ID' >&2
