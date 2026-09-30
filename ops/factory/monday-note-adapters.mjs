@@ -17,6 +17,9 @@
 
 const GITHUB_GRAPHQL_URL = 'https://api.github.com/graphql';
 
+/** Bound on the discussion pages `find` reads; one page holds 100 discussions. */
+const MAX_DISCUSSION_PAGES = 100;
+
 const CATEGORY_QUERY = `
   query DiscussionCategories($owner: String!, $repo: String!) {
     repository(owner: $owner, name: $repo) {
@@ -27,9 +30,10 @@ const CATEGORY_QUERY = `
 `;
 
 const EXISTING_DISCUSSION_QUERY = `
-  query ExistingDiscussion($owner: String!, $repo: String!) {
+  query ExistingDiscussion($owner: String!, $repo: String!, $after: String) {
     repository(owner: $owner, name: $repo) {
-      discussions(first: 100, orderBy: { field: CREATED_AT, direction: DESC }) {
+      discussions(first: 100, after: $after, orderBy: { field: CREATED_AT, direction: DESC }) {
+        pageInfo { hasNextPage endCursor }
         nodes { id title url }
       }
     }
@@ -86,9 +90,24 @@ export function createDiscussionsClient({ fetchImpl = fetch, token, owner, repo 
   return {
     async find({ category, title }) {
       await resolveCategory(category);
-      const data = await githubGraphQL(EXISTING_DISCUSSION_QUERY, { owner, repo }, { fetchImpl, token });
-      const nodes = data?.repository?.discussions?.nodes ?? [];
-      return nodes.find((node) => node.title === title) ?? null;
+      // Page through every discussion so a note from any earlier week is still
+      // found. The title is the dedupe cursor: if a page's `hasNextPage` is
+      // true and the title is not on it, keep going; an unreadable page fails
+      // closed rather than reporting "not published".
+      let after = null;
+      for (let page = 0; page < MAX_DISCUSSION_PAGES; page += 1) {
+        const data = await githubGraphQL(EXISTING_DISCUSSION_QUERY, { owner, repo, after }, { fetchImpl, token });
+        const discussions = data?.repository?.discussions;
+        if (!discussions || !Array.isArray(discussions.nodes)) {
+          throw new Error('GitHub Discussions listing did not include a nodes array');
+        }
+        const match = discussions.nodes.find((node) => node.title === title);
+        if (match) return match;
+        if (discussions.pageInfo?.hasNextPage !== true) return null;
+        after = discussions.pageInfo.endCursor ?? null;
+        if (!after) throw new Error('GitHub Discussions listing said more pages but returned no cursor');
+      }
+      throw new Error(`GitHub Discussions listing exceeded ${MAX_DISCUSSION_PAGES} pages`);
     },
     async post({ category, title, body }) {
       const { categoryId, repositoryId } = await resolveCategory(category);

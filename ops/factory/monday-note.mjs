@@ -55,6 +55,32 @@ function usd(value) {
   return `$${value.toFixed(2)}`;
 }
 
+/** The Discussion title for a week; one title per week is the dedupe key. */
+export function noteTitle(to) {
+  return `Monday note — week ending ${to.slice(0, 10)}`;
+}
+
+/**
+ * Every complete Monday-to-Monday week from observability switch-on up to the
+ * last one before `now`, oldest first. This is what lets a weekly job backfill
+ * a span of missed Mondays instead of only reporting the most recent one: each
+ * entry is a full week that can be published independently, and a week already
+ * published is skipped by its title.
+ *
+ * @param {{now: string, firstWeekStart?: string}} input
+ * @returns {Array<{from: string, to: string}>}
+ */
+export function completedWeeks({ now, firstWeekStart = OBSERVABILITY_START }) {
+  const at = Date.parse(now);
+  const start = Date.parse(firstWeekStart);
+  const thisMonday = start + Math.floor((at - start) / WEEK_MS) * WEEK_MS;
+  const weeks = [];
+  for (let to = start + WEEK_MS; to <= thisMonday; to += WEEK_MS) {
+    weeks.push({ from: new Date(to - WEEK_MS).toISOString(), to: new Date(to).toISOString() });
+  }
+  return weeks;
+}
+
 /** `4h 12m`, `1h`, `50m` -- the elapsed time Todd asked for, not milliseconds. */
 function duration(ms) {
   const totalMinutes = Math.floor(ms / 60000);
@@ -329,7 +355,7 @@ export function buildMondayNote({ cards = [], traces = [], from, to }) {
   ].join('\n');
 
   return {
-    title: `Monday note — week ending ${to.slice(0, 10)}`,
+    title: noteTitle(to),
     body,
     quiet: lines.length === 0,
     lines,
@@ -354,7 +380,16 @@ export async function publishMondayNote({ note, discussions, notifications }) {
   const existing = await discussions.find({ category: MONDAY_NOTE_CATEGORY, title: note.title });
   if (existing) return { posted: false, reason: 'already published', url: existing.url };
 
+  const url = await postMondayNote({ note, discussions });
+  await notifications.notify({ title: note.title, body: note.quiet ? 'Quiet week.' : note.lines[0].text, url });
+  return { posted: true, url };
+}
+
+/**
+ * Create the Discussion for a note that is known not to have one yet. Split out
+ * so the backfill can publish several weeks and still tell Todd exactly once.
+ */
+export async function postMondayNote({ note, discussions }) {
   const discussion = await discussions.post({ category: MONDAY_NOTE_CATEGORY, title: note.title, body: note.body });
-  await notifications.notify({ title: note.title, body: note.quiet ? 'Quiet week.' : note.lines[0].text, url: discussion.url });
-  return { posted: true, url: discussion.url };
+  return discussion.url;
 }

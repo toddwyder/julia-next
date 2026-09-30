@@ -74,6 +74,47 @@ test('discussions.find returns null when the week has no discussion yet', async 
   assert.equal(await client.find({ category: 'Monday notes', title: 'Monday note — week ending 2026-09-28' }), null);
 });
 
+test('discussions.find pages through every discussion so an old title is still found', async () => {
+  // The cursor must be reliable: a week whose note is older than the first
+  // page must still be seen, or the backfill would re-post it.
+  const fake = recordingFetch((url, init) => {
+    const body = JSON.parse(init.body);
+    if (/discussionCategories/.test(body.query)) {
+      return jsonResponse({ data: { repository: { id: 'REPO', discussionCategories: { nodes: [{ id: 'CAT', name: 'Monday notes' }] }, discussions: { nodes: [] } } } });
+    }
+    const after = body.variables.after;
+    if (!after) {
+      return jsonResponse({
+        data: {
+          repository: {
+            discussions: {
+              pageInfo: { hasNextPage: true, endCursor: 'CURSOR-1' },
+              nodes: [{ id: 'D-new', title: 'Monday note — week ending 2026-10-05', url: 'https://example.test/2' }],
+            },
+          },
+        },
+      });
+    }
+    return jsonResponse({
+      data: {
+        repository: {
+          discussions: {
+            pageInfo: { hasNextPage: false, endCursor: null },
+            nodes: [{ id: 'D-old', title: 'Monday note — week ending 2026-09-28', url: 'https://example.test/1' }],
+          },
+        },
+      },
+    });
+  });
+  const client = createDiscussionsClient({ fetchImpl: fake.fetch, token: 't', owner: 'o', repo: 'r' });
+
+  const found = await client.find({ category: 'Monday notes', title: 'Monday note — week ending 2026-09-28' });
+
+  assert.equal(found.url, 'https://example.test/1');
+  const discussionCalls = fake.calls.filter((c) => /ExistingDiscussion|discussions\(/.test(JSON.parse(c.init.body).query));
+  assert.equal(discussionCalls.length, 2, 'find paginates until the title is found');
+});
+
 test('discussions.find fails closed when the category does not exist', async () => {
   const fake = recordingFetch(() => jsonResponse({
     data: { repository: { id: 'REPO', discussionCategories: { nodes: [{ id: 'CAT', name: 'General' }] }, discussions: { nodes: [] } } },

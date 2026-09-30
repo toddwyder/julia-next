@@ -8,7 +8,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildMondayNote, publishMondayNote, MONDAY_NOTE_CATEGORY, previousWeekWindow } from './monday-note.mjs';
+import { buildMondayNote, publishMondayNote, MONDAY_NOTE_CATEGORY, previousWeekWindow, completedWeeks } from './monday-note.mjs';
 
 const WEEK = { from: '2026-09-21T00:00:00Z', to: '2026-09-28T00:00:00Z' };
 
@@ -308,6 +308,25 @@ test('the scheduled week is the last completed Monday-to-Monday week', () => {
     from: '2026-09-28T00:00:00.000Z',
     to: '2026-09-28T00:00:00.000Z',
   });
+});
+
+test('completedWeeks lists every full week since switch-on, oldest first', () => {
+  // Switch-on Monday is 2026-09-28. On Monday 2026-10-19, three full weeks
+  // have completed; before the first Monday after switch-on there are none.
+  assert.deepEqual(completedWeeks({ now: '2026-09-28T10:00:00Z' }), []);
+  assert.deepEqual(completedWeeks({ now: '2026-10-05T09:00:00Z' }), [
+    { from: '2026-09-28T00:00:00.000Z', to: '2026-10-05T00:00:00.000Z' },
+  ]);
+  assert.deepEqual(completedWeeks({ now: '2026-10-19T23:59:00Z' }), [
+    { from: '2026-09-28T00:00:00.000Z', to: '2026-10-05T00:00:00.000Z' },
+    { from: '2026-10-05T00:00:00.000Z', to: '2026-10-12T00:00:00.000Z' },
+    { from: '2026-10-12T00:00:00.000Z', to: '2026-10-19T00:00:00.000Z' },
+  ]);
+  // Weeks are contiguous and non-overlapping, so no card is counted twice.
+  const weeks = completedWeeks({ now: '2026-11-02T09:00:00Z' });
+  for (let i = 1; i < weeks.length; i += 1) {
+    assert.equal(weeks[i].from, weeks[i - 1].to);
+  }
 });
 
 test('a card or trace outside the week window is left out of that week\'s note', () => {

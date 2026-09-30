@@ -17,8 +17,24 @@
 // journal records the failure -- a failed run never posts a fabricated week.
 import { readFactoryCards } from './factory-cards.mjs';
 import { readTraceSpans, normalizeTraceSpans } from './mastra-traces.mjs';
-import { buildMondayNote, publishMondayNote, previousWeekWindow } from './monday-note.mjs';
+import {
+  MONDAY_NOTE_CATEGORY,
+  buildMondayNote,
+  completedWeeks,
+  noteTitle,
+  postMondayNote,
+  publishMondayNote,
+  previousWeekWindow,
+} from './monday-note.mjs';
 import { createDiscussionsClient, createDiscordNotifier } from './monday-note-adapters.mjs';
+
+/**
+ * How many missed weeks one invocation publishes before stopping. A long outage
+ * (or first install) is a backlog, not a reason to hold one process open for
+ * hours; the next timer fire continues from the first week still missing. The
+ * Discussion lookup by title is the cursor, so this bound never skips a week.
+ */
+export const DEFAULT_MAX_BACKFILL_WEEKS = 8;
 
 /**
  * Run one Monday note for the week before `now`.
@@ -53,6 +69,85 @@ export async function runMondayNote({ now, readCards, readSpans, discussions, no
       `spend_usd=${note.totalUsd.toFixed(2)} posted=${result.posted} url=${result.url ?? ''}`,
   );
   return { ...result, note, window };
+}
+
+/**
+ * Backfill every missed complete Monday-to-Monday week, oldest first.
+ *
+ * The dedupe cursor is GitHub Discussions itself: a week is missing when no
+ * Discussion carries its title. That makes the run idempotent and safe across a
+ * multi-week outage -- every week from observability switch-on to the last
+ * completed week is produced exactly once, however many Mondays were missed.
+ * The batch is bounded so one invocation never runs unbounded; the next fire
+ * finds the same missing weeks and continues, because a published week now has
+ * its Discussion and is skipped.
+ *
+ * Todd is told once per invocation, not once per backfilled week: a backlog is
+ * one event. A re-run that finds nothing missing notifies nothing, so the note
+ * is never sent twice.
+ */
+export async function runMondayNoteBackfill({
+  now,
+  readCards,
+  readSpans,
+  discussions,
+  notifications,
+  maxWeeksPerRun = DEFAULT_MAX_BACKFILL_WEEKS,
+  log = console.log,
+}) {
+  const weeks = completedWeeks({ now });
+  if (weeks.length === 0) {
+    log(`monday-note skipped=no-completed-week`);
+    return { posted: false, published: [], reason: 'no completed week' };
+  }
+
+  // Read the cards once: the same snapshot is spliced into every week's note.
+  const cards = await readCards();
+
+  // The lookup is the cursor. Check every week, oldest first, so the batch is
+  // the oldest missing weeks and no week is ever skipped past its turn.
+  const missing = [];
+  for (const week of weeks) {
+    const title = noteTitle(week.to);
+    const existing = await discussions.find({ category: MONDAY_NOTE_CATEGORY, title });
+    if (!existing) missing.push(week);
+  }
+
+  const batch = missing.slice(0, maxWeeksPerRun);
+  const published = [];
+  for (const week of batch) {
+    const spans = await readSpans({ from: week.from, to: week.to });
+    const traces = normalizeTraceSpans(spans, { cards });
+    const note = buildMondayNote({ cards, traces, ...week });
+    const url = await postMondayNote({ note, discussions });
+    published.push({ from: week.from, to: week.to, title: note.title, url, quiet: note.quiet, cards: note.lines.length, totalUsd: note.totalUsd });
+    log(
+      `monday-note week=${week.from}..${week.to} cards=${note.lines.length} ` +
+        `spend_usd=${note.totalUsd.toFixed(2)} posted=true url=${url}`,
+    );
+  }
+
+  // One notification for the whole invocation. The newest note is the one Todd
+  // wants to open; the count tells him a backlog was drained. If nothing was
+  // missing, nothing is sent -- a repeated fire cannot notify twice.
+  if (published.length > 0) {
+    const newest = published.at(-1);
+    const body = published.length === 1
+      ? (newest.quiet ? 'Quiet week.' : `${newest.cards} card(s), ${newest.totalUsd.toFixed(2)} USD`)
+      : `${published.length} missed weeks backfilled (${published[0].title.slice(0, 10)} to ${newest.title.slice(0, 10)}).`;
+    await notifications.notify({ title: newest.title, body, url: newest.url });
+  }
+
+  if (missing.length > batch.length) {
+    log(`monday-note backfill: ${missing.length - batch.length} older week(s) still missing; the next run continues`);
+  }
+
+  return {
+    posted: published.length > 0,
+    published,
+    remaining: missing.length - batch.length,
+    reason: published.length > 0 ? 'backfilled' : 'already published',
+  };
 }
 
 function requiredEnv(name) {
@@ -92,7 +187,7 @@ async function main() {
     return;
   }
 
-  await runMondayNote({
+  await runMondayNoteBackfill({
     now: new Date().toISOString(),
     readCards: () => readFactoryCards({ config, runPsql }),
     readSpans: ({ from, to }) => readTraceSpans({ factoryUrl, from, to }),

@@ -12,7 +12,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { runMondayNote } from './monday-note-run.mjs';
+import { runMondayNote, runMondayNoteBackfill } from './monday-note-run.mjs';
 
 function fakeDiscussions({ existing = null } = {}) {
   const calls = { found: [], posted: [] };
@@ -200,6 +200,134 @@ test('before the first Monday after switch-on there is no completed week, so not
   assert.equal(result.posted, false);
   assert.equal(result.reason, 'no completed week');
   assert.equal(reads, 0, 'no reads are needed when there is no completed week');
+  assert.equal(discussions.calls.posted.length, 0);
+  assert.equal(notifications.sent.length, 0);
+});
+
+// --- Backfill: the weekly job must fill in every missed full week, not only the
+// most recent one. The Discussion lookup by title is the cursor, so a week that
+// already has its note is skipped and a week that does not is published once.
+
+function discWithExisting(titles) {
+  const existing = new Set(titles);
+  const calls = { found: [], posted: [] };
+  return {
+    calls,
+    find: async ({ title }) => {
+      calls.found.push(title);
+      return existing.has(title) ? { url: `https://example.test/${title}` } : null;
+    },
+    post: async (input) => {
+      calls.posted.push(input);
+      existing.add(input.title);
+      return { url: `https://example.test/${input.title}` };
+    },
+  };
+}
+
+test('a multi-week outage backfills every missed week, oldest first, exactly once', async () => {
+  // Observability started Monday 2026-09-28; by Monday 2026-10-19 three full
+  // weeks have completed, and only the very first note was ever posted.
+  const discussions = discWithExisting(['Monday note — week ending 2026-10-05']);
+  const notifications = fakeNotifications();
+  const windows = [];
+
+  const result = await runMondayNoteBackfill({
+    now: '2026-10-19T09:00:00Z',
+    readCards: async () => CARDS,
+    readSpans: async ({ from, to }) => { windows.push(`${from}..${to}`); return SPANS; },
+    discussions,
+    notifications,
+  });
+
+  assert.deepEqual(result.published.map((p) => p.title), [
+    'Monday note — week ending 2026-10-12',
+    'Monday note — week ending 2026-10-19',
+  ]);
+  assert.deepEqual(windows, [
+    '2026-10-05T00:00:00.000Z..2026-10-12T00:00:00.000Z',
+    '2026-10-12T00:00:00.000Z..2026-10-19T00:00:00.000Z',
+  ]);
+  // The already-published first week was not re-posted.
+  assert.equal(discussions.calls.posted.length, 2);
+  // One notification for the backlog, not one per week.
+  assert.equal(notifications.sent.length, 1);
+  assert.match(notifications.sent[0].body, /2 missed weeks backfilled/);
+});
+
+test('re-running the backfill posts and notifies nothing when no week is missing', async () => {
+  const discussions = discWithExisting([
+    'Monday note — week ending 2026-10-05',
+    'Monday note — week ending 2026-10-12',
+    'Monday note — week ending 2026-10-19',
+  ]);
+  const notifications = fakeNotifications();
+
+  const result = await runMondayNoteBackfill({
+    now: '2026-10-19T23:00:00Z',
+    readCards: async () => CARDS,
+    readSpans: async () => SPANS,
+    discussions,
+    notifications,
+  });
+
+  assert.deepEqual(result.published, []);
+  assert.equal(result.posted, false);
+  assert.equal(discussions.calls.posted.length, 0);
+  assert.equal(notifications.sent.length, 0, 'a repeated fire must not notify twice');
+});
+
+test('a long outage is bounded per run and the next run continues without skipping a week', async () => {
+  // Ten missed weeks, a batch of three: the first run posts the three oldest,
+  // the next run continues from the fourth, so nothing is skipped or duplicated.
+  const discussions = discWithExisting([]);
+  const notifications = fakeNotifications();
+  const seen = [];
+
+  const first = await runMondayNoteBackfill({
+    now: '2026-12-07T09:00:00Z',
+    readCards: async () => CARDS,
+    readSpans: async ({ from }) => { seen.push(from); return SPANS; },
+    discussions,
+    notifications,
+    maxWeeksPerRun: 3,
+  });
+
+  assert.equal(first.published.length, 3);
+  assert.ok(first.remaining > 0);
+  assert.equal(first.published[0].from, '2026-09-28T00:00:00.000Z');
+
+  const second = await runMondayNoteBackfill({
+    now: '2026-12-07T09:00:00Z',
+    readCards: async () => CARDS,
+    readSpans: async ({ from }) => { seen.push(from); return SPANS; },
+    discussions,
+    notifications,
+    maxWeeksPerRun: 3,
+  });
+
+  // The second run starts exactly where the first stopped.
+  assert.equal(second.published[0].from, first.published.at(-1).to);
+  const posted = discussions.calls.posted.map((p) => p.title);
+  assert.equal(new Set(posted).size, posted.length, 'no week is posted twice');
+  assert.ok(seen.length >= 6);
+});
+
+test('a failed read during backfill fails closed: nothing is posted or notified', async () => {
+  const discussions = discWithExisting([]);
+  const notifications = fakeNotifications();
+
+  await assert.rejects(
+    () => runMondayNoteBackfill({
+      now: '2026-10-19T09:00:00Z',
+      readCards: async () => CARDS,
+      readSpans: async () => { throw new Error('Mastra trace list returned HTTP 500'); },
+      discussions,
+      notifications,
+    }),
+    /HTTP 500/,
+  );
+
   assert.equal(discussions.calls.posted.length, 0);
   assert.equal(notifications.sent.length, 0);
 });
