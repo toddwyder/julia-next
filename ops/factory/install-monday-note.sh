@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
-# One-time root setup to install the Monday note and trace-retention timers.
+# One-time root setup to install the Monday note timer.
 # Normal ops/factory/install.sh refreshes the program copies into the app.
 #
-# Installing the units is safe and sends nothing: the Monday note service runs
+# Installing the unit is safe and sends nothing: the Monday note service runs
 # only when /etc/julia-factory-monday-note/config.env exists, and this script
-# writes a mode-0600 placeholder that the operator fills in. The trace-retention
-# unit calls the running Factory process, whose route returns the app's real
-# retention result; the secret it needs is generated here.
+# writes a mode-0600 placeholder that the operator fills in.
+#
+# Trace retention has no systemd unit. The app's own Mastra scheduler runs the
+# supported DuckDB prune daily (declared by observabilityRetentionWorkflow), in
+# the process that holds the DuckDB lock.
 set -euo pipefail
 if [[ ${EUID} -ne 0 || $# -ne 2 ]]; then
   echo 'Usage (root): install-monday-note.sh APP_DIR PROJECT_ID' >&2
@@ -18,7 +20,6 @@ patch_dir=$(cd -- "$(dirname -- "$0")" && pwd)
 [[ $project_id =~ ^[A-Za-z0-9_-]+$ ]] || { echo 'Invalid Factory project ID' >&2; exit 2; }
 test -f "$app_dir/ops/factory/monday-note-run.mjs"
 test -f "$app_dir/ops/factory/factory-cards.sql"
-test -f "$app_dir/ops/factory/trace-prune-request.mjs"
 
 config_dir=/etc/julia-factory-monday-note
 install -d -m 0750 -o root -g julia-factory "$config_dir"
@@ -40,29 +41,9 @@ fi
 
 install -m 0644 "$patch_dir/julia-factory-monday-note.service" /etc/systemd/system/
 install -m 0644 "$patch_dir/julia-factory-monday-note.timer" /etc/systemd/system/
-install -m 0644 "$patch_dir/julia-factory-trace-retention.service" /etc/systemd/system/
-install -m 0644 "$patch_dir/julia-factory-trace-retention.timer" /etc/systemd/system/
-
-# Root-owned route secret for the retention service. The app reads
-# JULIA_RETENTION_ROUTE_SECRET; the service reads the same value from this file
-# and signs an empty body with it. Generated once; never printed.
-retention_dir=/etc/julia-factory-retention
-install -d -m 0750 -o root -g julia-factory "$retention_dir"
-if [[ ! -e $retention_dir/secret.env ]]; then
-  secret=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')
-  cat > "$retention_dir/secret.env" <<EOF
-# Read by the app and by julia-factory-trace-retention.service. Never put this
-# value in an issue, a log, or the repository.
-JULIA_RETENTION_ROUTE_SECRET=$secret
-MONDAY_NOTE_FACTORY_URL=https://julia-factory.tail91f394.ts.net
-EOF
-  chown root:julia-factory "$retention_dir/secret.env"
-  chmod 0640 "$retention_dir/secret.env"
-fi
 
 systemctl daemon-reload
-systemctl enable --now julia-factory-trace-retention.timer
 # The Monday note timer is enabled but stays inert until config.env has the
 # GitHub token and Discord webhook filled in.
 systemctl enable julia-factory-monday-note.timer
-echo "Timers installed. Trace-retention runs daily. The Monday note will not post until $config_dir/config.env is filled in (token and webhook), then: systemctl start julia-factory-monday-note.timer"
+echo "Monday note timer installed. It will not post until $config_dir/config.env is filled in (token and webhook), then: systemctl start julia-factory-monday-note.timer"

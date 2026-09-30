@@ -1,14 +1,16 @@
-// monday-note-units.test.mjs -- issue #140, blocker 1: the deployment wiring.
+// monday-note-units.test.mjs -- issue #140: the deployment wiring.
 //
-// The timer/service units and the one-time installer must exist and point at
-// the programs this repository ships, so the Monday note is a scheduled
-// production route and the retention check is a scheduled guard. Nothing here
-// runs systemd; it only reads the shipped files.
+// The Monday note timer/service must exist and point at the program this
+// repository ships. Trace retention has no systemd trigger: the app's own
+// Mastra scheduler runs the supported DuckDB prune (see
+// app/observability-retention-schedule.test.mjs). Nothing here runs systemd; it
+// only reads the shipped files.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 const read = (name) => readFileSync(new URL(`./${name}`, import.meta.url), 'utf8');
+const exists = (name) => existsSync(new URL(`./${name}`, import.meta.url));
 
 test('the Monday note post is a weekly timer that runs the production entrypoint', () => {
   const service = read('julia-factory-monday-note.service');
@@ -23,40 +25,31 @@ test('the Monday note post is a weekly timer that runs the production entrypoint
   assert.match(timer, /Unit=julia-factory-monday-note\.service/);
 });
 
-test('the retention job is a scheduled prune that runs the app route, not a read-only check', () => {
-  const service = read('julia-factory-trace-retention.service');
-  const timer = read('julia-factory-trace-retention.timer');
+test('trace retention has no systemd timer or service: the Mastra schedule prunes it', () => {
+  // The duplicate trigger this card removes. The supported path is the app's
+  // own scheduled workflow, so a second systemd fire would be a duplicate.
+  assert.equal(exists('julia-factory-trace-retention.service'), false);
+  assert.equal(exists('julia-factory-trace-retention.timer'), false);
+  assert.equal(exists('trace-prune-request.mjs'), false);
+  assert.equal(exists('app/src/mastra/observability-retention-route.ts'), false);
 
-  // Issue #140 review: the unit must run the actual supported prune. It signs an
-  // empty body and calls the running app's retention route, which runs the same
-  // supported Mastra `prune()` + DuckDB `CHECKPOINT` the daily schedule runs.
-  assert.match(service, /ExecStart=.*trace-prune-request\.mjs/);
-  assert.doesNotMatch(service, /ExecStart=.*trace-retention\.mjs/);
-  // No env flag pretending retention is configured.
-  assert.doesNotMatch(service, /MASTRACODE_DUCKDB_RETENTION/);
-  // The secret comes from a root-owned file, never argv.
-  assert.match(service, /EnvironmentFile=\/etc\/julia-factory-retention\/secret\.env/);
-  assert.match(timer, /OnCalendar=daily/);
-  assert.match(timer, /Unit=julia-factory-trace-retention\.service/);
+  const installer = read('install-monday-note.sh');
+  assert.doesNotMatch(installer, /julia-factory-trace-retention/);
+  assert.doesNotMatch(installer, /JULIA_RETENTION_ROUTE_SECRET/);
+  assert.doesNotMatch(installer, /julia-factory-retention/);
 });
 
-test('the installer installs the units, writes a placeholder config with no secrets, and enables the timers', () => {
+test('the installer installs the Monday note unit, writes a placeholder config with no secrets, and enables the timer', () => {
   const installer = read('install-monday-note.sh');
 
   for (const unit of [
     'julia-factory-monday-note.service',
     'julia-factory-monday-note.timer',
-    'julia-factory-trace-retention.service',
-    'julia-factory-trace-retention.timer',
   ]) {
     assert.match(installer, new RegExp(unit.replace(/\./g, '\\.')));
   }
   assert.match(installer, /chmod 0640/);
   assert.match(installer, /MONDAY_NOTE_GITHUB_TOKEN=$/m, 'the token placeholder must be empty');
   assert.match(installer, /MONDAY_NOTE_DISCORD_WEBHOOK=$/m, 'the webhook placeholder must be empty');
-  assert.match(installer, /systemctl enable --now julia-factory-trace-retention\.timer/);
-  // The retention route secret is generated once, in a root-owned file, and is
-  // never a literal in the unit or the installer output.
-  assert.match(installer, /JULIA_RETENTION_ROUTE_SECRET=\$secret/);
-  assert.doesNotMatch(installer, /JULIA_RETENTION_ROUTE_SECRET=[^$\n]/);
+  assert.match(installer, /systemctl enable julia-factory-monday-note\.timer/);
 });

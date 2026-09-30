@@ -16,16 +16,14 @@
 //
 // What this module does NOT do: it never deletes rows. The repository entry
 // composes the DuckDB observability domain with `retention: DEFAULT_RETENTION`
-// (`app/src/mastra/observability-store.ts`) and runs the real prune on a
-// schedule and on demand (`app/src/mastra/observability-retention.ts` +
-// `app/src/mastra/observability-retention-route.ts`). Because `prune()` is
-// age-based and never reclaims disk, it cannot promise a byte cap; this module
-// is the explicit size-budget guard. It measures the real DuckDB file + WAL and
-// the free disk, and decides the safe action: routine retained prune, an
-// emergency tighter-price `maxAge` + `CHECKPOINT`, or failing closed before the
-// disk can fill. The systemd route runs the actual prune through the app's
-// signed route (`ops/factory/trace-prune-request.mjs`); this program stays a
-// read-only diagnostic and never writes.
+// (`app/src/mastra/observability-store.ts`) and runs the real prune on the
+// framework's own schedule (`app/src/mastra/observability-retention.ts`).
+// Because `prune()` is age-based and never reclaims disk, it cannot promise a
+// byte cap; this module is the explicit size-budget guard. It measures the real
+// DuckDB file + WAL and the free disk, and decides the safe action: routine
+// retained prune, an emergency tighter-price `maxAge` + `CHECKPOINT`, or failing
+// closed before the disk can fill. It stays a read-only diagnostic and never
+// writes; there is no systemd trigger.
 import { statSync, statfsSync } from 'node:fs';
 
 /** The DuckDB file Factory's observability exporter writes (change log, 2026-09-28). */
@@ -233,8 +231,8 @@ export function runTraceRetentionCheck({
 /**
  * One read-only diagnostic pass: measure, classify the safe action, print, and
  * exit non-zero when the store needs attention. This program never prunes --
- * the systemd route does that by calling the running app (see
- * `trace-prune-request.mjs`) -- so it is safe to run by hand any time.
+ * the framework's own schedule does that inside the running app -- so it is
+ * safe to run by hand any time.
  */
 export function runTraceRetentionDiagnostic({
   dbPath = OBSERVABILITY_DUCKDB_PATH,

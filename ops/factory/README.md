@@ -9,7 +9,7 @@ Todd adds or removes an entry. Anything custom that is not listed here is not ap
 |---|---|---|---|
 | 1 | WorkOS cookie identity fix in `@mastra/auth-workos` 1.6.5 | Default platform sign-in rejects our self-hosted address; the WorkOS cookie path drops the organization ([#25252](https://github.com/mastra-ai/mastra/issues/25252)) | #25252 ships in a Mastra release |
 | 2 | Factory wait watcher and Discord webhook | Stock Factory 0.17.2 shows waits in the web app but does not send phone and Windows alerts when Todd is away ([Mastra request #25378](https://github.com/mastra-ai/mastra/issues/25378)); public ntfy.sh exhausted its daily quota (42908), and the private ntfy PWA did not register desktop Web Push | Remove when Mastra adds its own alerts |
-| 3 | Monday note and trace-retention check (`ops/factory/monday-note*.mjs`, `ops/factory/mastra-traces.mjs`, `ops/factory/factory-cards.mjs`, `ops/factory/trace-retention.mjs`, `ops/factory/trace-prune-request.mjs`, `app/src/mastra/observability-store.ts`, `app/src/mastra/observability-retention*.ts`) — **approved for GitHub #140 (Todd, 2026-09-30)** | Factory 0.17.2 has no weekly cost summary, and the observability store grew to 1.7 GB after about ten hours (change log, 2026-09-28). The note posts one Discussion in the "Monday notes" category and notifies Todd; the retention job runs Mastra's supported DuckDB retention + CHECKPOINT from a size guard. Neither deletes rows or moves cards by hand. See **Monday note** and **Bounded trace storage** below | Remove when Factory ships its own weekly cost summary and bounded trace retention |
+| 3 | Monday note and bounded trace retention (`ops/factory/monday-note*.mjs`, `ops/factory/mastra-traces.mjs`, `ops/factory/factory-cards.mjs`, `ops/factory/trace-retention.mjs`, `app/src/mastra/observability-store.ts`, `app/src/mastra/observability-retention.ts`) — **approved for GitHub #140 (Todd, 2026-09-30)** | Factory 0.17.2 has no weekly cost summary, and the observability store grew to 1.7 GB after about ten hours (change log, 2026-09-28). The note posts one Discussion in the "Monday notes" category and notifies Todd; retention runs Mastra's supported DuckDB retention + CHECKPOINT on the framework's own daily schedule, from a size guard. Neither deletes rows or moves cards by hand. See **Monday note** and **Bounded trace storage** below | Remove when Factory ships its own weekly cost summary and bounded trace retention |
 
 Approved by ADR 0009 but not built yet: the check that rejects unapproved custom machinery.
 It gets its row when it is built.
@@ -28,7 +28,7 @@ local sources (repository docs and pinned package paths) are cited; gaps are sta
 | Publish the note | GitHub Discussions GraphQL API (the repo's injected-fetch provider pattern) | `scripts/linear-cli.mjs` (`linearGraphQL` seam); `ops/factory/monday-note-adapters.mjs`; [GitHub Discussions GraphQL](https://docs.github.com/en/graphql/reference/objects#discussion) |
 | Notify Todd | Discord channel webhook, `?wait=true` | installed `ops/factory/wait-alerts.py`; `ops/factory/README.md` *Discord delivery*; [Discord webhook execute](https://discord.com/developers/docs/resources/webhook#execute-webhook) |
 | Bound DuckDB storage | Mastra opt-in `retention` + `store.prune()`; DuckDB prunes observability spans and the documented `CHECKPOINT` reclaims the freed rows | `@mastra/duckdb` `dist/storage/index.d.ts` (`DuckDBStoreConfig.retention`, `prune()`); bundled `dist/docs/references/reference-storage-retention.md`; [Storage / retention](https://mastra.ai/docs/storage) |
-| Run the prune on a schedule | Mastra workflow `schedule: { cron }` (the scheduler fires the workflow's step) | `app/src/mastra/observability-retention.ts`; [Scheduled workflows](https://mastra.ai/docs/workflows/scheduled-workflows) |
+| Run the prune on a schedule | Mastra workflow `schedule: { cron }` (the scheduler auto-registers the workflow's declarative schedule and fires it through the event processor) | `app/src/mastra/observability-retention.ts`; `app/observability-retention-schedule.test.mjs`; [Scheduled workflows](https://mastra.ai/docs/workflows/scheduled-workflows) |
 | Enforce a byte budget | The guard around supported retention: tighter `PruneOptions.retention` + `CHECKPOINT`, failing closed when the disk lacks headroom | `app/src/mastra/observability-retention.ts`; `ops/factory/trace-retention.mjs`; [Storage / reclaiming disk](https://mastra.ai/docs/storage) |
 | Default retention window | `DEFAULT_RETENTION` sets `observability.spans` maxAge 14d | `@mastra/code-sdk` `dist/utils/storage-maintenance.js` |
 | Measure the store honestly | `statSync` on the DuckDB file + its `-wal`, the pair Mastra's own maintenance code weighs | `@mastra/code-sdk` `dist/utils/storage-maintenance.js` (`fileSizeWithWal`) |
@@ -37,12 +37,15 @@ local sources (repository docs and pinned package paths) are cited; gaps are sta
 
 - The supported DuckDB observability retention is wired in source
   (`app/src/mastra/observability-store.ts` + `app/src/mastra/observability-retention.ts`, composed
-  in `app/src/mastra/index.ts`) and the systemd route now runs the real prune
-  (`ops/factory/trace-prune-request.mjs` -> the signed `/julia/run-retention` route). It is **not
-  live-verified**: no deploy has run the prune against the server's DuckDB file in this change, so
-  the byte cap is the guard's behaviour and its real effect is measured on the server, not asserted
-  here. `ops/factory/trace-retention.test.mjs` and `ops/factory/trace-prune-request.test.mjs` pin
-  the wired source, the guard decision, and the route.
+  in `app/src/mastra/index.ts`). It is **not live-verified**: no deploy has run the prune against the
+  server's DuckDB file in this change, so the byte cap is the guard's behaviour and its real effect is
+  measured on the server, not asserted here. `app/observability-retention-schedule.test.mjs` proves
+  the framework registers the schedule and fires it into the configured prune target with the real
+  `Mastra`/`Scheduler`; `ops/factory/trace-retention.test.mjs` pins the guard and the wired source.
+- There is **no systemd trigger** for retention. The app's own Mastra scheduler is the only prune
+  trigger, in the process that holds the DuckDB lock. This card removed the earlier
+  `julia-factory-trace-retention.{service,timer}` duplicate, its `trace-prune-request.mjs` program
+  and its signed `/julia/run-retention` route.
 - Mastra's `prune()` is age-based and never reclaims disk, so it cannot enforce a byte budget on
   its own. The guard handles that: it measures the file + WAL and the free disk, applies a tighter
   supported `maxAge` when over budget, runs the documented DuckDB `CHECKPOINT`, and fails closed
@@ -100,15 +103,13 @@ Operator actions (nothing is sent by this repository):
    (`bash ops/factory/install.sh /var/lib/julia-factory/app`).
 2. Run the one-time root setup once:
    `sudo bash "$(pwd -P)/ops/factory/install-monday-note.sh" /var/lib/julia-factory/app <PROJECT_ID>`.
-   It installs both timers, writes a mode-0640 placeholder
-   `/etc/julia-factory-monday-note/config.env` with **empty** token and webhook values, and writes a
-   generated `JULIA_RETENTION_ROUTE_SECRET` to the root-owned
-   `/etc/julia-factory-retention/secret.env` for the retention unit. The Monday note service stays
-   inert while the config file is empty (its unit has
+   It installs the Monday note timer and writes a mode-0640 placeholder
+   `/etc/julia-factory-monday-note/config.env` with **empty** token and webhook values. The Monday
+   note service stays inert while the config file is empty (its unit has
    `ConditionPathExists=/etc/julia-factory-monday-note/config.env`), so installing sends nothing.
+   Retention needs no unit: the app's own Mastra schedule prunes it.
 3. Add the GitHub Discussions token (a token that can create discussions in the repo's **Monday
-   notes** category) and the Discord channel webhook URL to that root-owned config, set the **same**
-   `JULIA_RETENTION_ROUTE_SECRET` value in the app's environment, then
+   notes** category) and the Discord channel webhook URL to that root-owned config, then
    `sudo systemctl start julia-factory-monday-note.timer`. Never put any value in an issue, a log, or
    the repository.
 4. Preview a week without posting: `sudo -u julia-factory /usr/bin/node
@@ -162,35 +163,33 @@ documented `CHECKPOINT`. **Acceptance is not claimed from source**: whether the 
 `measureStore` stats the real DuckDB file and its `-wal` sidecar (the same pair Mastra's own
 maintenance code weighs), `measureFreeBytes` reads the volume, and the plan classifies the store as
 `routine-prune`, `emergency-prune`, or `fail-low-disk`. It **never deletes rows** and does not use an
-injected storage fake.
+injected storage fake. It is a hand diagnostic only; nothing schedules it.
 
-The systemd route runs the actual prune, not the checker:
-`ops/factory/julia-factory-trace-retention.service` starts
-`ops/factory/trace-prune-request.mjs`, which signs an empty body with the root-owned
-`JULIA_RETENTION_ROUTE_SECRET` and POSTs to the app's signed `/julia/run-retention` route. The
-running app (which holds the DuckDB lock) runs the same supported prune + checkpoint and returns the
-result; the unit exits non-zero on failure. It no longer sets `MASTRACODE_DUCKDB_RETENTION`, and it
-no longer depends on any flag claiming deployment state.
+**The Mastra schedule is the only prune trigger.** Declaring `schedule: { cron: '0 4 * * *' }` on
+`observabilityRetentionWorkflow` makes the framework register a declarative schedule row when the
+app boots; the framework's own `Scheduler` claims each due fire and runs the step through the event
+processor, in the process that holds the DuckDB lock. There is no systemd unit for retention: the
+earlier `julia-factory-trace-retention.{service,timer}` duplicate, its `trace-prune-request.mjs`
+program and its signed `/julia/run-retention` route were removed. `app/observability-retention-schedule.test.mjs`
+proves the registration, the fire and the reach into the configured prune target with the real
+`Mastra`/`Scheduler`/schedule store, and asserts the generated `@mastra/deployer` server calls
+`startWorkers()`.
 
 Operator actions:
 
-1. `sudo systemctl status julia-factory-trace-retention.timer`; the daily timer runs the prune
-   program above, which exits non-zero when the guard fails, so the failure shows in the journal.
-   Inspect with `sudo journalctl -u julia-factory-trace-retention.service`.
-2. The app and the unit share `JULIA_RETENTION_ROUTE_SECRET`: the installer writes it once to
-   `/etc/julia-factory-retention/secret.env` (root-owned) for the unit, and the operator must set
-   the **same** value in the app's environment. Without it the route returns 401 and the unit is
-   red, never a silent success.
-3. Record the store size with
+1. Retention runs on the app's own schedule; there is nothing to enable or check in systemd. The
+   framework records each fire in the `schedules` storage domain (visible in Studio's Schedules
+   view) and the app logs the per-table prune result at the 04:00 window.
+2. Record the store size with
    `sudo -u julia-factory du -h /var/lib/julia-factory/.local/share/mastracode/observability.duckdb`.
    Read traces through Mastra's own API (`npx mastra api trace list --url <factory>`), never a
    hand-written DuckDB query.
-4. If it is over budget on the server, report the measured size and the guard's action; do not add a
-   bespoke delete.
+3. If it is over budget on the server, report the measured size and the guard's action; do not add a
+   bespoke delete or a second scheduler.
 
-The guard decisions are covered by `ops/factory/trace-retention.test.mjs` and the wired source by
-`ops/factory/app/observability-retention.test.mjs` (Node's built-in type stripping);
-`ops/factory/trace-prune-request.test.mjs` covers the systemd entrypoint and unit.
+The guard decisions are covered by `ops/factory/trace-retention.test.mjs`; the scheduled reach into
+the prune target by `ops/factory/app/observability-retention-schedule.test.mjs` and the wired source
+by `ops/factory/app/observability-retention.test.mjs`.
 
 ## Installation
 

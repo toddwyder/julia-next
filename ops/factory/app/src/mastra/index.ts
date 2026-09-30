@@ -49,7 +49,6 @@ import {
   duckdbObservabilityConfig,
 } from './observability-store.js';
 import { observabilityRetentionWorkflow, setObservabilityPruneTarget } from './observability-retention.js';
-import { observabilityRetentionRoute } from './observability-retention-route.js';
 
 /**
  * Parse a positive-integer env knob; anything else means "use the default".
@@ -466,10 +465,9 @@ const preparedArgs = await factory.prepare();
 // every non-observability domain; the DuckDB observability domain is layered on
 // top with supported retention, exactly as Mastra documents:
 // https://mastra.ai/blog/introducing-feedback-and-feedback-analytics
-// The daily `ops/factory/duckdb-prune.mjs` timer calls this same store's
-// `prune()`. The observability route and the storage exporter read and write
-// through the composed domain. A store that cannot be opened fails the boot
-// loudly rather than silently writing unbounded traces.
+// The observability exporter reads and writes through the composed domain. A
+// store that cannot be opened fails the boot loudly rather than silently writing
+// unbounded traces.
 const observabilityDuckDB = await createDuckDBStore(duckdbObservabilityConfig());
 const observabilityDomain = await observabilityDuckDB.getStore('observability');
 if (!observabilityDomain) {
@@ -484,8 +482,10 @@ const composedStorage = composeStorageWithObservability({
 });
 // The scheduled retention step prunes this same store; DuckDB allows one writer
 // across processes, so the daily prune must run in the process that holds it.
-// The target also exposes the documented DuckDB `CHECKPOINT`, which the size
-// guard runs after an over-budget prune to reclaim the freed rows on disk.
+// This is the only prune trigger -- the framework's own scheduler, declared by
+// `observabilityRetentionWorkflow`'s `schedule`, runs it in this process. The
+// target also exposes the documented DuckDB `CHECKPOINT`, which the size guard
+// runs after an over-budget prune to reclaim the freed rows on disk.
 setObservabilityPruneTarget({
   prune: (options) => observabilityDuckDB.prune(options),
   checkpoint: () => observabilityDuckDB.db.execute('CHECKPOINT'),
@@ -502,7 +502,7 @@ export const mastra = new Mastra({
   workflows: { ...preparedArgs.workflows, prReviewWorkflow, observabilityRetentionWorkflow },
   server: {
     ...preparedArgs.server,
-    apiRoutes: [...(preparedArgs.server?.apiRoutes ?? []), reviewerRoute, observabilityRetentionRoute],
+    apiRoutes: [...(preparedArgs.server?.apiRoutes ?? []), reviewerRoute],
   },
   storage: composedStorage,
   pubsub: preparedArgs.pubsub,

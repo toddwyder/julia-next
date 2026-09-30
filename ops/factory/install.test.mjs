@@ -73,7 +73,6 @@ test('the installer copies the issue #140 Monday note and retention programs int
     'ops/factory/monday-note-adapters.mjs',
     'ops/factory/mastra-traces.mjs',
     'ops/factory/trace-retention.mjs',
-    'ops/factory/trace-prune-request.mjs',
     'ops/factory/factory-cards.mjs',
     'ops/factory/factory-cards.sql',
   ]) {
@@ -84,10 +83,10 @@ test('the installer copies the issue #140 Monday note and retention programs int
 test('a clean install carries every app module the entry point imports, so check and build resolve them', () => {
   // The install copies a fixed file list, then runs `npm run check` and
   // `npm run build` in the app. The entry point imports local app modules
-  // (the DuckDB observability store, the retention workflow and its route); if
-  // any of those is not in the list, a clean install fails to type-check and
-  // build. This walks the entry's local import graph and asserts the installed
-  // tree contains all of it -- and that check/build run after the copies.
+  // (the DuckDB observability store and the retention workflow); if any of
+  // those is not in the list, a clean install fails to type-check and build.
+  // This walks the entry's local import graph and asserts the installed tree
+  // contains all of it -- and that check/build run after the copies.
   const tmp = mkdtempSync(resolve(tmpdir(), 'julia-factory-install-graph-'));
   const target = resolve(tmp, 'target');
   const bin = resolve(tmp, 'bin');
@@ -113,7 +112,6 @@ test('a clean install carries every app module the entry point imports, so check
   for (const required of [
     'src/mastra/observability-store',
     'src/mastra/observability-retention',
-    'src/mastra/observability-retention-route',
   ]) {
     assert.ok(graph.has(required), `entry point no longer imports ${required}`);
     assert.ok(
@@ -195,7 +193,6 @@ test('a missing required skill leaves an existing install untouched', () => {
   for (const file of [
     'package.json', 'package-lock.json', 'tsconfig.json', 'src/mastra/index.ts', 'src/mastra/local-sandbox.ts',
     'src/mastra/observability-store.ts', 'src/mastra/observability-retention.ts',
-    'src/mastra/observability-retention-route.ts',
     'src/mastra/public/factory-skills/factory-plan/SKILL.md',
   ]) {
     const destination = resolve(source, file);

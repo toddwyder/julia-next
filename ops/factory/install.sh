@@ -6,11 +6,10 @@ source_dir="$patch_dir/app"
 files=(
   package.json package-lock.json tsconfig.json src/mastra/index.ts src/mastra/local-sandbox.ts
   # Issue #140: the app-side bounded observability store and its scheduled
-  # retention workflow/route. index.ts imports all three, so a clean install
-  # must copy them or `npm run check` and `npm run build` cannot resolve them.
+  # retention workflow. index.ts imports both, so a clean install must copy them
+  # or `npm run check` and `npm run build` cannot resolve them.
   src/mastra/observability-store.ts
   src/mastra/observability-retention.ts
-  src/mastra/observability-retention-route.ts
   src/mastra/public/factory-skills/factory-plan/SKILL.md
   src/mastra/public/factory-skills/factory-review/SKILL.md
 )
@@ -42,14 +41,14 @@ python3 "$patch_dir/apply-install-patches.py" "$app_dir"
 node "$patch_dir/workos-cookie-identity.check.mjs" "$app_dir/.mastra/output"
 install -D -m 0644 "$patch_dir/wait-alerts.py" "$app_dir/ops/factory/wait-alerts.py"
 install -D -m 0644 "$patch_dir/wait-alerts.sql" "$app_dir/ops/factory/wait-alerts.sql"
-# Issue #140: the Monday note and the trace-retention check, plus the card
-# reader they share. install-monday-note.sh installs the systemd units.
+# Issue #140: the Monday note, plus the read-only trace-retention diagnostic
+# and the card reader the note shares. Retention itself is pruned by the app's
+# own Mastra scheduler (no systemd trigger).
 install -D -m 0644 "$patch_dir/monday-note.mjs" "$app_dir/ops/factory/monday-note.mjs"
 install -D -m 0644 "$patch_dir/monday-note-run.mjs" "$app_dir/ops/factory/monday-note-run.mjs"
 install -D -m 0644 "$patch_dir/monday-note-adapters.mjs" "$app_dir/ops/factory/monday-note-adapters.mjs"
 install -D -m 0644 "$patch_dir/mastra-traces.mjs" "$app_dir/ops/factory/mastra-traces.mjs"
 install -D -m 0644 "$patch_dir/trace-retention.mjs" "$app_dir/ops/factory/trace-retention.mjs"
-install -D -m 0644 "$patch_dir/trace-prune-request.mjs" "$app_dir/ops/factory/trace-prune-request.mjs"
 install -D -m 0644 "$patch_dir/factory-cards.mjs" "$app_dir/ops/factory/factory-cards.mjs"
 install -D -m 0644 "$patch_dir/factory-cards.sql" "$app_dir/ops/factory/factory-cards.sql"
 install -D -m 0644 "$patch_dir/run-psql.mjs" "$app_dir/ops/factory/run-psql.mjs"
