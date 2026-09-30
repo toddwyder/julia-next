@@ -29,6 +29,14 @@ import { createDiscussionsClient, createDiscordNotifier } from './monday-note-ad
 export async function runMondayNote({ now, readCards, readSpans, discussions, notifications }) {
   const window = previousWeekWindow({ now });
 
+  // Before the first Monday after observability switch-on there is no completed
+  // week. Posting a "quiet week" then would create a Discussion that the first
+  // real note cannot replace, so the run is a no-op.
+  if (window.from === window.to) {
+    console.log(`monday-note week=${window.from}..${window.to} skipped=no-completed-week`);
+    return { posted: false, reason: 'no completed week', url: null, window };
+  }
+
   // Read both sources before publishing anything: a partial week must not be
   // posted. If either read throws, the caller sees the failure and stops.
   const cards = await readCards();

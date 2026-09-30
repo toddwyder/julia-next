@@ -135,3 +135,23 @@ test('a quiet week posts its Discussion and tells Todd it was quiet', async () =
   assert.equal(notifications.sent.length, 1);
   assert.equal(notifications.sent[0].body, 'Quiet week.');
 });
+
+test('before the first Monday after switch-on there is no completed week, so nothing is posted', async () => {
+  const discussions = fakeDiscussions();
+  const notifications = fakeNotifications();
+  let reads = 0;
+
+  const result = await runMondayNote({
+    now: '2026-09-28T10:00:00Z',
+    readCards: async () => { reads += 1; return CARDS; },
+    readSpans: async () => { reads += 1; return SPANS; },
+    discussions,
+    notifications,
+  });
+
+  assert.equal(result.posted, false);
+  assert.equal(result.reason, 'no completed week');
+  assert.equal(reads, 0, 'no reads are needed when there is no completed week');
+  assert.equal(discussions.calls.posted.length, 0);
+  assert.equal(notifications.sent.length, 0);
+});
