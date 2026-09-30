@@ -64,6 +64,41 @@ Docs guard: reverting `ops/factory/README.md` to the pre-repair revision makes
 agent-docs tests 3, 4 and 5 red (2 pass / 3 fail); the shipped README is 5 pass /
 0 fail.
 
+## Finalisation (this change)
+
+- The app retention test (`ops/factory/app/observability-retention.test.mjs`) is
+  TypeScript and was being invoked with `--import tsx`, a tooling dependency the
+  repository does not have. No dependency was added. It now runs the way CI
+  already runs the sibling app test: `node --experimental-strip-types --test`
+  (Node's built-in type stripping). CI's `Run Factory sandbox isolation tests`
+  step runs both app tests, after `npm ci --prefix ops/factory/app`.
+- `ops/factory/workflows.test.mjs` guards that CI runs that test and never uses
+  `--import tsx`.
+- The stale retention guard in `ops/factory/trace-retention.test.mjs` asserted
+  the entry did **not** configure DuckDB retention. The shipped repair wires it
+  (`app/src/mastra/observability-store.ts` + `app/src/mastra/observability-retention.ts`,
+  composed in `app/src/mastra/index.ts`), so the test now asserts the wired
+  `retention: DEFAULT_RETENTION` and the scheduled `prune()`.
+- Generated `mastra build` output is no longer committable:
+  `ops/factory/app/.mastra/` and `ops/factory/app/src/mastra/public/factory/`
+  are gitignored, and the personal-path scanner skips `.mastra` build output.
+- `julia-factory-trace-retention.service` now sets
+  `MASTRACODE_DUCKDB_RETENTION=1`, matching the wired source; a deploy that has
+  not shipped the retention code sets it back to 0.
+
+Commands run and their results:
+
+```
+node --test <CI list: 16 files>          # tests 105 / pass 105 / fail 0
+node --test <second CI app list>         # pass 25 / fail 0 / skipped 16
+node --experimental-strip-types --test ops/factory/app/observability-retention.test.mjs
+                                         # tests 7 / pass 7 / fail 0
+node --experimental-strip-types --test ops/factory/app/local-sandbox.test.mjs
+                                         # tests 3 / pass 3 / fail 0
+npm run check --prefix ops/factory/app   # tsc --noEmit, exit 0
+npm run lint:framework                   # passing
+```
+
 ## What this repair does, and does not, claim
 
 - Claimed: the adapters, trace reader, card reader, entrypoint, retention check
@@ -72,11 +107,16 @@ agent-docs tests 3, 4 and 5 red (2 pass / 3 fail); the shipped README is 5 pass 
   was made.
 - NOT claimed: delivery or retention were live verified. No Discussion was
   posted, no phone notification sent, no DuckDB file measured on the server.
-- Retention is honest: the repository entry configures `DEFAULT_RETENTION` only
-  on the Pg/LibSQL backends, so the DuckDB observability store is **not** bounded
-  by it. The check measures the real DuckDB file + WAL and fails closed when
-  over budget or when no supported DuckDB retention is configured. The supported
-  fix (`DuckDBStore({ retention: DEFAULT_RETENTION })` + scheduled `prune()`) is
-  documented in `ops/factory/README.md`; it is not wired in this slice.
+- Retention is honest: the source wires the supported bound -- the DuckDB
+  observability domain is constructed with `retention: DEFAULT_RETENTION`
+  (`app/src/mastra/observability-store.ts`) and pruned on a daily cron
+  (`app/src/mastra/observability-retention.ts`). It is **not live-verified**: no
+  deploy has run the prune against the server's file in this change. The
+  read-only check still measures the real DuckDB file + WAL and fails closed
+  when over budget or when the deployed process has not declared the retention
+  in place.
+- Official docs for the supported path:
+  [Storage](https://mastra.ai/docs/storage) and
+  [Scheduled workflows](https://mastra.ai/docs/workflows/scheduled-workflows).
 - The exceptions-list row for #140 is marked **proposed; awaiting Todd's
   approval**. No row was added or removed.

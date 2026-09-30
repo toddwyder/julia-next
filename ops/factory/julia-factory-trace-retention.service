@@ -9,8 +9,12 @@ User=julia-factory
 Group=julia-factory
 # The check only stats the DuckDB file and its WAL; it never writes or deletes.
 # It exits non-zero when the store is over budget or when supported DuckDB
-# retention is not configured, so the journal shows the failure.
-Environment=MASTRACODE_DUCKDB_RETENTION=0
+# retention is not configured, so the journal shows the failure. Retention is
+# now wired in `app/src/mastra/observability-store.ts` (DuckDBStore with
+# DEFAULT_RETENTION) and pruned on schedule by `observability-retention.ts`, so
+# this flag tells the check the supported bound is in place; a deploy that has
+# not shipped that code yet should set it back to 0.
+Environment=MASTRACODE_DUCKDB_RETENTION=1
 ExecStart=/usr/bin/node /var/lib/julia-factory/app/ops/factory/trace-retention.mjs
 ProtectSystem=strict
 ProtectHome=true

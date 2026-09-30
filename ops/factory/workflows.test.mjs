@@ -31,6 +31,17 @@ test('CI runs the Monday note and trace retention tests that issue #140 adds', (
   }
 });
 
+test('CI runs the app DuckDB observability retention guard the repo-standard way', () => {
+  // The app's TypeScript retention test is runnable with Node's built-in type
+  // stripping, the same mechanism CI already uses for local-sandbox.test.mjs --
+  // no extra tooling dependency (e.g. tsx) is added just to run a test.
+  assert.match(
+    ci,
+    /node --experimental-strip-types --test ops\/factory\/app\/observability-retention\.test\.mjs/,
+  );
+  assert.doesNotMatch(ci, /--import tsx/);
+});
+
 test('both workflows cancel superseded runs; CI retains its required job for docs-only PRs', () => {
   for (const workflow of [publisher, ci]) {
     assert.match(workflow, /cancel-in-progress: true/);

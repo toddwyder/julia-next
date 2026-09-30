@@ -27,20 +27,21 @@ local sources (repository docs and pinned package paths) are cited; gaps are sta
 | Card ↔ trace correlation | `work_items.sessions` maps session id → card; spans carry `sessionId` | same `work-items/base.d.ts`; `@mastra/core` `LightSpanRecord`) |
 | Publish the note | GitHub Discussions GraphQL API (the repo's injected-fetch provider pattern) | `scripts/linear-cli.mjs` (`linearGraphQL` seam); `ops/factory/monday-note-adapters.mjs` |
 | Notify Todd | Discord channel webhook, `?wait=true` | installed `ops/factory/wait-alerts.py`; `ops/factory/README.md` *Discord delivery* |
-| Bound DuckDB storage | Mastra opt-in `retention` + `store.prune()`; DuckDB prunes observability spans | `@mastra/duckdb` `dist/storage/index.d.ts` (`DuckDBStoreConfig.retention`, `prune()`); bundled `dist/docs/references/reference-storage-retention.md` |
+| Bound DuckDB storage | Mastra opt-in `retention` + `store.prune()`; DuckDB prunes observability spans | `@mastra/duckdb` `dist/storage/index.d.ts` (`DuckDBStoreConfig.retention`, `prune()`); bundled `dist/docs/references/reference-storage-retention.md`; [Storage](https://mastra.ai/docs/storage) |
+| Run the prune on a schedule | Mastra workflow `schedule: { cron }` (the scheduler fires the workflow's step) | `app/src/mastra/observability-retention.ts`; [Scheduled workflows](https://mastra.ai/docs/workflows/scheduled-workflows) |
 | Default retention window | `DEFAULT_RETENTION` sets `observability.spans` maxAge 14d | `@mastra/code-sdk` `dist/utils/storage-maintenance.js` |
 | Measure the store honestly | `statSync` on the DuckDB file + its `-wal`, the pair Mastra's own maintenance code weighs | `@mastra/code-sdk` `dist/utils/storage-maintenance.js` (`fileSizeWithWal`) |
 
 **Gaps this card could not close through supported config (stated, not invented):**
 
-- The repository entry (`app/src/mastra/index.ts`) passes `DEFAULT_RETENTION` only to the Pg and
-  LibSQL factory backends. Nothing in this repository configures the DuckDB observability store
-  or its retention, so that config does not bound the DuckDB file, and `@mastra/code-sdk`
-  constructs its own `DuckDBStore` without a `retention`. The supported fix (from the bundled
-  retention doc) is to construct the DuckDB observability domain with
-  `retention: DEFAULT_RETENTION` and call `prune()` on a schedule; until that is wired, the check
-  **fails closed** and reports the store as unbounded rather than printing a false all-clear.
-  `ops/factory/trace-retention.test.mjs` pins this fact.
+- The supported DuckDB observability retention is wired in source
+  (`app/src/mastra/observability-store.ts` + `app/src/mastra/observability-retention.ts`, composed
+  in `app/src/mastra/index.ts`), but it is **not live-verified**: no deploy has run the daily prune
+  against the server's DuckDB file in this change. The read-only check therefore still **fails
+  closed** until the deployed process declares the retention in place (the shipped
+  `julia-factory-trace-retention.service` sets `MASTRACODE_DUCKDB_RETENTION=1`) and reports the
+  store as unbounded rather than printing a false all-clear. `ops/factory/trace-retention.test.mjs`
+  pins the wired source and this fail-closed behaviour.
 - There is no supported API that lists a card's model cost directly; cost is correlated from the
   trace `sessionId` against `work_items.sessions`. A trace whose session matches no card is
   reported as uncorrelated, never guessed onto one.
@@ -101,16 +102,28 @@ Operator actions (nothing is sent by this repository):
 The observability store is DuckDB at
 `/var/lib/julia-factory/.local/share/mastracode/observability.duckdb` (change log, 2026-09-28).
 The **supported** way to keep it bounded is Mastra's own retention: construct the DuckDB store with
-`retention: DEFAULT_RETENTION` and call `prune()` on a schedule (the bundled
+`retention: DEFAULT_RETENTION` and call `prune()` on a schedule (official docs:
+[Storage / retention](https://mastra.ai/docs/storage) and
+[Scheduled workflows](https://mastra.ai/docs/workflows/scheduled-workflows); the bundled
 `reference-storage-retention.md` lists DuckDB support for observability spans, metrics, logs,
-scores and feedback, and says Mastra never runs `prune()` for you). The repository entry does not
-yet configure that DuckDB retention, so this card does not claim the store is bounded.
+scores and feedback, and says Mastra never runs `prune()` for you).
+
+That supported path is now wired in the app:
+
+- `app/src/mastra/observability-store.ts` composes the DuckDB observability domain over Factory's
+  existing storage with `retention: DEFAULT_RETENTION`
+  (`DuckDBStore({ id, path, retention })` + `MastraCompositeStore({ default, domains })`).
+- `app/src/mastra/observability-retention.ts` declares a daily cron
+  (`schedule: { cron: '0 4 * * *' }`) whose step calls the same store's supported `prune()` with a
+  bounded `maxRows`/`pauseMs`, so a large backlog drains over several days.
+- `app/src/mastra/index.ts` composes both and hands the store to the scheduled step.
 
 `ops/factory/trace-retention.mjs` is the measurable, read-only check: `measureStore` stats the
 real DuckDB file and its `-wal` sidecar (the same pair Mastra's own maintenance code weighs), and
-`checkTraceStore` fails when the store is over budget **or** when supported DuckDB retention is not
-configured. It **never deletes rows** and does not use an injected storage fake. A small file with
-no DuckDB retention configured is reported as not ok, never as a false all-clear.
+`checkTraceStore` fails when the store is over budget **or** when the deployed process has not
+declared the supported DuckDB retention in place. It **never deletes rows** and does not use an
+injected storage fake. A small file with no declared DuckDB retention is reported as not ok, never
+as a false all-clear.
 
 Operator check (read-only):
 
@@ -125,7 +138,10 @@ Operator check (read-only):
 3. If it is over budget, report it; do not add a bespoke delete. The supported remediation is the
    DuckDB `retention` + `prune()` path above.
 
-The check is wired into CI (`ops/factory/trace-retention.test.mjs`) and into the daily timer.
+The scheduled prune is wired in the app and its test runs in CI
+(`ops/factory/app/observability-retention.test.mjs` via Node's built-in type stripping); the
+read-only size check is wired into CI (`ops/factory/trace-retention.test.mjs`) and into the daily
+timer.
 
 ## Installation
 

@@ -110,14 +110,25 @@ test('a missing store is not reported ok: there is nothing to have bounded', () 
   assert.match(result.message, /not found|missing|no store/i);
 });
 
-test('the repo entry does not configure DuckDB retention, so the check must not treat it as configured', () => {
-  // This is the proved fact: `DEFAULT_RETENTION` reaches only the Pg and LibSQL
-  // Factory storage constructors in the entry, and no DuckDBStore/observability
-  // retention is configured anywhere in ops/factory/app/src/mastra.
+test('the repo entry wires supported DuckDB observability retention and a scheduled prune', () => {
+  // The shipped repair (JUL-140): the entry composes the DuckDB observability
+  // domain with `DEFAULT_RETENTION` and hands it to the daily prune workflow.
+  // `@mastra/duckdb` only bounds the file when constructed with `retention` and
+  // `prune()` runs, so both halves are asserted here, not the config alone.
   const entry = readFileSync(new URL('./app/src/mastra/index.ts', import.meta.url), 'utf8');
+  const store = readFileSync(new URL('./app/src/mastra/observability-store.ts', import.meta.url), 'utf8');
+  const retention = readFileSync(new URL('./app/src/mastra/observability-retention.ts', import.meta.url), 'utf8');
 
   const pglibRetention = entry.match(/retention:\s*DEFAULT_RETENTION/g) ?? [];
-  assert.equal(pglibRetention.length, 2, 'DEFAULT_RETENTION is set on the Pg and LibSQL stores');
-  assert.doesNotMatch(entry, /DuckDBStore/);
-  assert.doesNotMatch(entry, /observability[^\n]*retention|retention[^\n]*observability/i);
+  assert.equal(pglibRetention.length, 2, 'DEFAULT_RETENTION is still set on the Pg and LibSQL stores');
+  // The DuckDB store is constructed with the same retention and composed over
+  // the default storage.
+  assert.match(store, /retention: duckdbObservabilityRetention\(\)/);
+  assert.match(store, /return DEFAULT_RETENTION/);
+  assert.match(entry, /createDuckDBStore\(duckdbObservabilityConfig\(\)\)/);
+  assert.match(entry, /composeStorageWithObservability\(/);
+  // The prune is scheduled and calls the same store's supported `prune()`.
+  assert.match(entry, /setObservabilityPruneTarget\(/);
+  assert.match(retention, /schedule: \{ cron: OBSERVABILITY_PRUNE_CRON \}/);
+  assert.match(retention, /target\.prune\(options\)/);
 });

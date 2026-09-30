@@ -44,7 +44,10 @@ export function scanPersonalPaths(target, { baseDir } = {}) {
       return;
     }
     for (const entry of entries) {
-      if (entry.name === 'node_modules' || entry.name === '.git') continue;
+      // Generated build output is never source. `.mastra` is `mastra build`'s
+      // app bundle; scanning it would flag vendored third-party strings and
+      // break CI whenever a build happens to run first (JUL-140).
+      if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === '.mastra') continue;
       const fullPath = path.join(currentDir, entry.name);
       let isDir = entry.isDirectory();
       let isFile = entry.isFile();

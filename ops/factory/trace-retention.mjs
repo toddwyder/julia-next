@@ -15,13 +15,16 @@
 // days (`@mastra/code-sdk` utils/storage-maintenance).
 //
 // What this module does NOT do: it never deletes rows, and it never claims a
-// bounded store from a config that cannot bound it. The repository entry today
-// passes `DEFAULT_RETENTION` only to the Pg and LibSQL backends; nothing here
-// configures the DuckDB observability store, so that config provably does not
-// bound the DuckDB file. The check therefore does the one thing verifiable on
-// the server -- stat the real DuckDB file and its WAL, and fail visibly when it
-// is over budget or when supported DuckDB retention is not configured -- rather
-// than reporting a false all-clear from the wrong backend's config.
+// bounded store from a config that cannot bound it. The repository entry now
+// composes the DuckDB observability domain with `retention: DEFAULT_RETENTION`
+// (`app/src/mastra/observability-store.ts`) and prunes it on a schedule
+// (`app/src/mastra/observability-retention.ts`), which is the supported path.
+// Whether that code has been deployed is a separate question from what this
+// repository holds, so the scheduled check still does the one thing verifiable
+// on the server -- stat the real DuckDB file and its WAL and fail visibly when
+// it is over budget or when the deployed process has not declared the supported
+// DuckDB retention in place -- rather than reporting a false all-clear from
+// config alone.
 import { statSync } from 'node:fs';
 
 /** The DuckDB file Factory's observability exporter writes (change log, 2026-09-28). */
@@ -119,9 +122,11 @@ export function runTraceRetentionCheck({
 }
 
 if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
-  // The scheduled check fails visibly until the supported DuckDB retention is
-  // configured (MASTRACODE_DUCKDB_RETENTION=1 is set by the same change that
-  // wires it). Over budget always fails.
+  // The scheduled check fails visibly until the deployed process declares the
+  // supported DuckDB retention is in place (the shipped
+  // `julia-factory-trace-retention.service` sets MASTRACODE_DUCKDB_RETENTION=1;
+  // a deploy that has not shipped the retention code sets it back to 0). Over
+  // budget always fails.
   const configured = process.env.MASTRACODE_DUCKDB_RETENTION === '1';
   const result = runTraceRetentionCheck({ duckdbRetentionConfigured: configured });
   process.exit(result.ok ? 0 : 1);
