@@ -24,7 +24,7 @@ not ok 1 - ops/factory/monday-note-run.test.mjs
 # pass 0
 # fail 1
 == monday-note-run.mjs: shipped (green) ==
-# pass 5
+# pass 6
 # fail 0
 == trace-retention.mjs: guard (module removed) ==
 not ok 1 - ops/factory/trace-retention.test.mjs
