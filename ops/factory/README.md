@@ -81,8 +81,12 @@ covers every card since observability started. `completedWeeks` lists every full
 job **backfills** each one that has no Discussion yet, oldest first, bounded per invocation, so a
 multi-week outage produces all the missing notes instead of only the latest one. The dedupe cursor is
 GitHub Discussions itself: a week is missing exactly when no Discussion carries its title, and
-`find` pages through every discussion so an older note is still found. A card or trace is counted in
-exactly one note, and a costed span lands on exactly one step, so nothing is double-counted.
+`find` pages through every discussion so an older note is still found. A card is named at most once
+per note, and a trace is counted in exactly one note (the week it started in), so no cost or failed
+attempt is double-counted. A card accepted in an earlier week still appears in the week its work ran:
+the note includes a card that entered the week **or** that has cost/activity in it, and attributes to
+that card only the week's own traces and failed attempts (its elapsed time is the week's activity
+window, not its whole lifetime).
 
 `publishMondayNote({ note, discussions, notifications })` posts one week's note as a GitHub Discussion
 in the **Monday notes** category and tells Todd through the Discord wait-alert webhook. The backfill

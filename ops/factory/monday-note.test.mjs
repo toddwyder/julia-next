@@ -359,6 +359,94 @@ test('a card or trace outside the week window is left out of that week\'s note',
   assert.equal(note.failedAttempts, 1);
 });
 
+test('a card accepted earlier is included in the week its cost and failed attempts landed in', () => {
+  // A card that entered last week but whose build runs this week is this
+  // week's work: the note must name it, attribute only this week's cost and
+  // failed attempts, and never hide the trace by dropping the card (which
+  // would fail closed as uncorrelated).
+  const continued = {
+    number: 200,
+    title: 'Continued from last week',
+    enteredAt: '2026-09-19T09:00:00Z',
+    doneAt: '2026-09-22T13:00:00Z',
+    stageHistory: [
+      { stage: 'planning', enteredAt: '2026-09-19T09:00:00Z', exitedAt: '2026-09-19T09:15:00Z', by: 'agent:r1', exitedBy: 'agent:r1' },
+      { stage: 'execute', enteredAt: '2026-09-22T10:00:00Z', exitedAt: '2026-09-22T12:30:00Z', by: 'agent:r2', exitedBy: 'agent:r2' },
+    ],
+  };
+  // A trace for the same card that landed last week must NOT count this week.
+  const lastWeekTrace = { id: 'old', card: 200, phase: 'plan', startedAt: '2026-09-19T09:05:00Z', endedAt: '2026-09-19T09:15:00Z', costUsd: 99, outcome: 'passed' };
+  const thisWeekTrace = { id: 'new', card: 200, phase: 'build', startedAt: '2026-09-22T10:00:00Z', endedAt: '2026-09-22T12:30:00Z', costUsd: 2, outcome: 'failed-attempt' };
+
+  const note = buildMondayNote({ cards: [continued], traces: [lastWeekTrace, thisWeekTrace], ...WEEK });
+
+  assert.deepEqual(note.lines.map((line) => line.number), [200]);
+  // Only this week's trace is attributed: not the 99 dollars spent before the week.
+  assert.equal(note.lines[0].costUsd, 2);
+  assert.equal(note.lines[0].failedAttempts, 1);
+  assert.equal(note.totalUsd, 2);
+  assert.equal(note.failedAttempts, 1);
+  // The card's elapsed time is this week's activity (10:00 build start to the
+  // 13:00 completion), not its whole lifetime back to the 19th.
+  assert.equal(note.lines[0].elapsedMs, 3 * 60 * 60 * 1000);
+});
+
+test('a card with no cost or activity in the week is left out even when it entered earlier', () => {
+  const staleCard = {
+    number: 201,
+    title: 'Idle since last week',
+    enteredAt: '2026-09-01T09:00:00Z',
+    doneAt: '2026-09-01T10:00:00Z',
+    movements: [
+      { at: '2026-09-01T09:00:00Z', by: 'todd', what: 'started the card' },
+      { at: '2026-09-01T10:00:00Z', by: 'factory', what: 'merged the pull request' },
+    ],
+  };
+
+  const note = buildMondayNote({ cards: [staleCard], traces: [], ...WEEK });
+
+  assert.deepEqual(note.lines, []);
+  assert.equal(note.quiet, true);
+});
+
+test('an earlier accepted card appears in exactly one week of the split period', () => {
+  // The card entered last week, so it is last week's acceptance; only the
+  // activity this week brings it into this week's note. Both notes together
+  // name the card once per its active week and no trace is counted twice.
+  const continued = {
+    number: 200,
+    title: 'Continued from last week',
+    enteredAt: '2026-09-22T09:00:00Z',
+    doneAt: '2026-09-29T13:00:00Z',
+    movements: [
+      { at: '2026-09-22T09:00:00Z', by: 'todd', what: 'started the card' },
+      { at: '2026-09-29T13:00:00Z', by: 'factory', what: 'merged the pull request' },
+    ],
+  };
+  const firstTrace = { id: 'first', card: 200, phase: 'plan', startedAt: '2026-09-22T09:00:00Z', endedAt: '2026-09-22T09:15:00Z', costUsd: 1, outcome: 'passed' };
+  const secondTrace = { id: 'second', card: 200, phase: 'build', startedAt: '2026-09-29T09:00:00Z', endedAt: '2026-09-29T09:30:00Z', costUsd: 2, outcome: 'failed-attempt' };
+  const weekA = { from: '2026-09-21T00:00:00Z', to: '2026-09-28T00:00:00Z' };
+  const weekB = { from: '2026-09-28T00:00:00Z', to: '2026-10-05T00:00:00Z' };
+
+  const first = buildMondayNote({ cards: [continued], traces: [firstTrace, secondTrace], ...weekA });
+  const second = buildMondayNote({ cards: [continued], traces: [firstTrace, secondTrace], ...weekB });
+
+  assert.deepEqual(first.lines.map((line) => line.number), [200]);
+  assert.deepEqual(second.lines.map((line) => line.number), [200]);
+  assert.equal(first.lines[0].costUsd, 1);
+  assert.equal(first.lines[0].failedAttempts, 0);
+  assert.equal(second.lines[0].costUsd, 2);
+  assert.equal(second.lines[0].failedAttempts, 1);
+  assert.equal(first.totalUsd + second.totalUsd, 3, 'no trace cost is counted twice');
+  assert.equal(first.failedAttempts + second.failedAttempts, 1);
+});
+
+test('a card in the week is named once even when it has several traces in that week', () => {
+  const note = buildMondayNote({ cards: [stagedCard], traces: traces.filter((trace) => trace.card === 140), ...WEEK });
+
+  assert.equal(note.lines.filter((line) => line.number === 140).length, 1);
+});
+
 test('the note says where the costs came from and that outside-Factory sessions are excluded', () => {
   const note = buildMondayNote({ cards: [factoryCard, handMovedCard], traces, ...WEEK });
 

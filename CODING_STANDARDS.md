@@ -8,3 +8,4 @@
 - Never render an unknown measurement as zero (a missing cost is not `$0.00`); fail the report closed and let a real numeric zero stay zero.
 - A scheduled operational action must run the real supported feature, not a read-only check behind a flag that claims the feature is configured.
 - When review identifies a rule that should apply to all future code, fix it and add one plain line here in the same PR.
+- The install file list must carry every app source module the entry point imports (transitively), and a test must prove a clean install leaves no unresolved local import before `check`/`build`.

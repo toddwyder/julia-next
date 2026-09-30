@@ -5,6 +5,12 @@ patch_dir="$(cd -- "$(dirname -- "$0")" && pwd)"
 source_dir="$patch_dir/app"
 files=(
   package.json package-lock.json tsconfig.json src/mastra/index.ts src/mastra/local-sandbox.ts
+  # Issue #140: the app-side bounded observability store and its scheduled
+  # retention workflow/route. index.ts imports all three, so a clean install
+  # must copy them or `npm run check` and `npm run build` cannot resolve them.
+  src/mastra/observability-store.ts
+  src/mastra/observability-retention.ts
+  src/mastra/observability-retention-route.ts
   src/mastra/public/factory-skills/factory-plan/SKILL.md
   src/mastra/public/factory-skills/factory-review/SKILL.md
 )

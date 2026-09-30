@@ -195,9 +195,10 @@ function cardSteps(card) {
 }
 
 /**
- * A card belongs to a week when it entered the board inside `[from, to)`; a
- * trace belongs when it started in the same window. Everything else is another
- * week's note, so the same card is never counted in two weeks (CONTEXT.md
+ * A card belongs to a week when it entered the board inside `[from, to)` OR when
+ * its work (a trace) ran in the same window; a trace belongs when it started in
+ * the window. A card is named at most once per note, and each trace lands in
+ * exactly one week, so no cost or failed attempt is counted twice (CONTEXT.md
  * "Monday note": the weekly summary). The first note's window starts at
  * observability switch-on, so it covers every card since then.
  */
@@ -248,8 +249,25 @@ function tracesByStep(steps, cardTraces) {
   return { buckets, unattached };
 }
 
-function cardLine(card, cardTraces) {
-  const steps = cardSteps(card);
+function cardLine(card, cardTraces, { acceptedInWeek = true, from, to } = {}) {
+  const allSteps = cardSteps(card);
+  // Which of the card's steps own a trace in this week (a trace lands on the
+  // last step that started at or before it). Used to keep a continued card's
+  // in-week steps and drop its earlier ones.
+  const stepHasWeekTrace = new Set(
+    tracesByStep(allSteps, cardTraces)
+      .buckets.map((bucket, index) => (bucket.length > 0 ? index : -1))
+      .filter((index) => index >= 0),
+  );
+  // A card accepted before this week is only here for this week's activity, so
+  // its earlier steps are not shown again: keep the steps that started in the
+  // week, or that a trace in the week was attributed to. A card accepted in the
+  // week keeps its full step history.
+  const steps = acceptedInWeek
+    ? allSteps
+    : allSteps.filter(
+        (step, index) => within(step.startedAt, from, to) || stepHasWeekTrace.has(index),
+      );
   const { buckets, unattached } = tracesByStep(steps, cardTraces);
   const stepLines = steps.map((step, index) => stepLine(step, buckets[index]));
   const unattachedLine = stepLine(
@@ -260,11 +278,42 @@ function cardLine(card, cardTraces) {
 
   const costUsd = cardTraces.reduce((sum, trace) => sum + (trace.costUsd ?? 0), 0);
   const failedAttempts = cardTraces.filter((trace) => trace.outcome === 'failed-attempt').length;
-  const firstStep = steps[0];
-  const enteredAt = card.enteredAt ?? firstStep?.startedAt ?? card.createdAt;
+  const enteredAt = card.enteredAt ?? allSteps[0]?.startedAt ?? card.createdAt;
   const lastStep = steps.at(-1);
   const endedAt = card.doneAt ?? lastStep?.endedAt ?? lastStep?.startedAt ?? enteredAt;
-  const elapsedMs = enteredAt && endedAt ? Date.parse(endedAt) - Date.parse(enteredAt) : 0;
+  let elapsedMs;
+  if (acceptedInWeek) {
+    elapsedMs = enteredAt && endedAt ? Date.parse(endedAt) - Date.parse(enteredAt) : 0;
+  } else {
+    // A continued card's elapsed is this week's activity window, never its
+    // whole lifetime: the same card must not report the same weeks-long
+    // duration in every note it appears in. Measure from the earliest in-week
+    // activity (step start or trace start) to the latest in-week activity
+    // (step end, trace end, or the card's done time), clamped to the week.
+    const windowStart = Date.parse(from);
+    const windowEnd = Date.parse(to);
+    let activityStart = null;
+    let activityEnd = null;
+    const consider = (value) => {
+      const at = value === null || value === undefined ? NaN : Date.parse(value);
+      if (!Number.isFinite(at)) return;
+      const clamped = Math.min(Math.max(at, windowStart), windowEnd);
+      activityStart = activityStart === null ? clamped : Math.min(activityStart, clamped);
+      activityEnd = activityEnd === null ? clamped : Math.max(activityEnd, clamped);
+    };
+    for (const step of steps) {
+      consider(step.startedAt);
+      consider(step.endedAt);
+    }
+    for (const trace of cardTraces) {
+      consider(trace.startedAt);
+      consider(trace.endedAt);
+    }
+    if (within(endedAt, from, to)) consider(endedAt);
+    elapsedMs = activityStart !== null && activityEnd !== null && activityEnd > activityStart
+      ? activityEnd - activityStart
+      : 0;
+  }
 
   const byHand = steps.slice(1).find((step) => !isFactoryActor(step.by));
   const doneByFactory = byHand === undefined;
@@ -297,8 +346,17 @@ export function buildMondayNote({ cards = [], traces = [], from, to }) {
   // observability switch-on, so it covers every card since then, and each later
   // week covers its own slice exactly once.
   const cardEntry = (card) => card.enteredAt ?? card.stageHistory?.[0]?.enteredAt ?? card.movements?.[0]?.at ?? card.createdAt;
-  const weekCards = cards.filter((card) => within(cardEntry(card), from, to));
   const weekTraces = traces.filter((trace) => within(trace.startedAt, from, to));
+  const cardsWithWeekTraces = new Set(
+    weekTraces.map((trace) => trace.card).filter((card) => card !== null && card !== undefined),
+  );
+  // A card is this week's when it entered the week, OR when its work ran in the
+  // week: a card accepted earlier but built this week is this week's note, not
+  // dropped. Filtering on entry alone would silently exclude it and then fail
+  // closed on its trace as uncorrelated.
+  const weekCards = cards.filter(
+    (card) => within(cardEntry(card), from, to) || cardsWithWeekTraces.has(card.number),
+  );
   const weekNumbers = new Set(weekCards.map((card) => card.number));
   // Fail closed before building any line: a missing cost is never $0 and a
   // cost-bearing span that names no card in the week is never guessed onto one.
@@ -307,6 +365,7 @@ export function buildMondayNote({ cards = [], traces = [], from, to }) {
     cardLine(
       card,
       weekTraces.filter((trace) => trace.card === card.number),
+      { acceptedInWeek: within(cardEntry(card), from, to), from, to },
     ),
   );
   // Cost correlation is enforced above, so an uncorrelated span here has no

@@ -64,6 +64,45 @@ test('one run reads the week, posts the note, and notifies Todd once with the li
   assert.match(discussions.calls.posted[0].title, /week ending 2026-10-05/);
 });
 
+test('a run names a card accepted in an earlier week when its cost and failed attempts land this week', async () => {
+  // The weekly job reads a card snapshot and the week's traces. A card accepted
+  // last week whose build ran and failed this week must appear in this week's
+  // note with this week's cost and failed attempts, and its earlier-week trace
+  // must not be attributed to this note.
+  const continued = {
+    number: 141,
+    title: 'Continued card',
+    enteredAt: '2026-09-27T09:00:00Z',
+    doneAt: '2026-09-28T13:00:00Z',
+    stageHistory: [
+      { stage: 'planning', enteredAt: '2026-09-27T09:00:00Z', exitedAt: '2026-09-27T09:15:00Z', by: 'agent:r1', exitedBy: 'agent:r1' },
+      { stage: 'execute', enteredAt: '2026-09-28T10:00:00Z', exitedAt: '2026-09-28T13:00:00Z', by: 'agent:r2', exitedBy: 'agent:r2' },
+    ],
+    sessions: { 'session-141': {} },
+  };
+  const spans = [
+    { id: 'old', sessionId: 'session-141', startedAt: '2026-09-27T09:00:00Z', endedAt: '2026-09-27T09:15:00Z', attributes: { costContext: { estimatedCost: 99, costUnit: 'usd' } } },
+    { id: 'new', sessionId: 'session-141', startedAt: '2026-09-28T10:00:00Z', endedAt: '2026-09-28T13:00:00Z', spanType: 'model_generation', status: 'error', attributes: { costContext: { estimatedCost: 2, costUnit: 'usd' } } },
+  ];
+  const discussions = fakeDiscussions();
+  const notifications = fakeNotifications();
+
+  const result = await runMondayNote({
+    now: '2026-10-05T08:00:00Z',
+    readCards: async () => [continued],
+    readSpans: async ({ from, to }) => spans.filter((span) => span.startedAt >= from && span.startedAt < to),
+    discussions,
+    notifications,
+  });
+
+  const body = discussions.calls.posted[0].body;
+  assert.match(body, /#141 Continued card — \$2\.00/);
+  assert.match(body, /1 failed attempt/);
+  assert.doesNotMatch(body, /\$99/);
+  assert.equal(result.note.totalUsd, 2);
+  assert.equal(result.note.failedAttempts, 1);
+});
+
 test('a failed card read fails closed: nothing is posted or notified', async () => {
   const discussions = fakeDiscussions();
   const notifications = fakeNotifications();
