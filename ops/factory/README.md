@@ -60,9 +60,11 @@ Todd: Factory's own card records and Mastra's trace cost data.
 
 Each card line carries every step with its actor, the card's summed trace cost **including failed
 attempts**, and how long it took. Whether every step after Todd's Intake tap was done by Factory
-or by hand is read from the actors, not agent narrative (CONTEXT.md "Done by Factory"). A quiet
-week says so. Sessions run **outside Factory** — Codex, GPT, or Claude sessions started by hand —
-are not Factory cards and are not counted; the note says so on its own face.
+or by hand is read from the actors, not agent narrative (CONTEXT.md "Done by Factory"). Cost that
+cannot be matched to a card in the week is summed on its own "Not matched to a card" line, so it
+is auditable and never folded onto the wrong card or silently dropped. A quiet week says so.
+Sessions run **outside Factory** — Codex, GPT, or Claude sessions started by hand — are not Factory
+cards and are not counted; the note says so on its own face.
 
 Each week is `[from, to)`, computed by `previousWeekWindow` from the switch-on Monday
 (`OBSERVABILITY_START`, 2026-09-28). The first note is clamped to that Monday, so it covers every

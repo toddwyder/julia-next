@@ -96,11 +96,14 @@ test('a step moved by hand names the person, not Factory', () => {
 });
 
 test('a card costs each of its traces exactly once across its steps', () => {
+  // Only card 140 is in the note; s5 belongs to card 142 and is reported as
+  // uncorrelated (0.90) rather than folded into 140.
   const note = buildMondayNote({ cards: [stagedCard], traces, ...WEEK });
 
   assert.equal(note.lines[0].costUsd, 6.6);
   assert.equal(note.lines[0].steps.reduce((sum, step) => sum + step.costUsd, 0), 6.6);
-  assert.equal(note.totalUsd, 6.6);
+  assert.equal(note.uncorrelatedUsd, 0.9);
+  assert.equal(note.totalUsd, 7.5);
 });
 
 test('the initial report covers every card since observability was switched on', () => {
@@ -122,14 +125,44 @@ test('splitting the period into weeks counts every card and trace exactly once',
   const cardB = { ...stagedCard, number: 141, enteredAt: '2026-09-29T09:00:00Z' };
   const weekA = { from: '2026-09-20T00:00:00Z', to: '2026-09-27T00:00:00Z' };
   const weekB = { from: '2026-09-27T00:00:00Z', to: '2026-10-04T00:00:00Z' };
+  // Every trace is correlated to a card in the note, so the card-cost sum is
+  // the whole spend and no trace is attributed outside its week.
+  const traceA = { id: 'a1', card: 140, phase: 'plan', startedAt: '2026-09-22T09:00:00Z', endedAt: '2026-09-22T09:15:00Z', costUsd: 1, outcome: 'passed' };
+  const traceB = { id: 'b1', card: 141, phase: 'build', startedAt: '2026-09-29T09:05:00Z', endedAt: '2026-09-29T09:55:00Z', costUsd: 2, outcome: 'passed' };
+  const allTraces = [traceA, traceB];
 
-  const first = buildMondayNote({ cards: [cardA, cardB], traces, ...weekA });
-  const second = buildMondayNote({ cards: [cardA, cardB], traces, ...weekB });
+  const first = buildMondayNote({ cards: [cardA, cardB], traces: allTraces, ...weekA });
+  const second = buildMondayNote({ cards: [cardA, cardB], traces: allTraces, ...weekB });
 
   const counted = [...first.lines, ...second.lines].map((line) => line.number);
   assert.deepEqual(counted, [140, 141]);
-  assert.equal(new Set(counted).size, counted.length);
-  assert.equal(first.totalUsd + second.totalUsd, 6.6);
+  assert.equal(new Set(counted).size, counted.length, 'a card appears in exactly one week');
+  assert.equal(first.lines[0].costUsd, 1);
+  assert.equal(second.lines[0].costUsd, 2);
+  assert.equal(first.totalUsd + second.totalUsd, 3);
+  assert.equal(first.uncorrelatedUsd, 0);
+  assert.equal(second.uncorrelatedUsd, 0);
+});
+
+test('an uncorrelated trace\'s cost is reported, not silently dropped', () => {
+  const orphan = { id: 's9', card: null, correlated: false, phase: 'build', startedAt: '2026-09-22T10:00:00Z', endedAt: '2026-09-22T10:30:00Z', costUsd: 1.25, outcome: 'passed' };
+  const card140Traces = traces.filter((trace) => trace.card === 140);
+  const note = buildMondayNote({ cards: [stagedCard], traces: [...card140Traces, orphan], ...WEEK });
+
+  assert.equal(note.totalUsd, 7.85);
+  assert.equal(note.uncorrelatedUsd, 1.25);
+  assert.match(note.body, /[Nn]ot matched to a card/);
+  assert.match(note.body, /\$1\.25/);
+});
+
+test('a trace for a card outside the week is reported as uncorrelated, not added to another card', () => {
+  const trace99 = { id: 's99', card: 99, phase: 'build', startedAt: '2026-09-22T10:00:00Z', endedAt: '2026-09-22T10:30:00Z', costUsd: 2, outcome: 'passed' };
+  const card140Traces = traces.filter((trace) => trace.card === 140);
+  const note = buildMondayNote({ cards: [stagedCard], traces: [...card140Traces, trace99], ...WEEK });
+
+  assert.equal(note.lines.length, 1);
+  assert.equal(note.lines[0].costUsd, 6.6);
+  assert.equal(note.uncorrelatedUsd, 2);
 });
 
 test('the note names its category so the publisher can find it', () => {
@@ -197,7 +230,9 @@ test('a card or trace outside the week window is left out of that week\'s note',
   });
 
   assert.deepEqual(note.lines.map((line) => line.number), [140]);
-  assert.equal(note.totalUsd, 6.6);
+  // 142's trace is out of this note's cards and is reported as uncorrelated.
+  assert.equal(note.lines[0].costUsd, 6.6);
+  assert.equal(note.uncorrelatedUsd, 0.9);
   assert.equal(note.failedAttempts, 1);
 });
 

@@ -85,14 +85,7 @@ function isFactoryActor(by) {
   return actorName(by) === 'Factory';
 }
 
-/**
- * The card's steps in order, each with the actor who did it.
- *
- * Factory's own record is `stageHistory`: one entry per stage a card entered,
- * with `by` (who entered it) and `exitedBy` (who closed it). Older test and
- * fixture records use a flat `movements` list; both shapes normalise to the
- * same step here, so the note never depends on one hand-shaped input.
- */
+/** Factory's working stage names, labelled the way the note reads. */
 const STAGE_LABEL = {
   triage: 'triage',
   planning: 'plan',
@@ -198,7 +191,7 @@ function cardLine(card, cardTraces) {
   const endedAt = card.doneAt ?? lastStep?.endedAt ?? lastStep?.startedAt ?? enteredAt;
   const elapsedMs = enteredAt && endedAt ? Date.parse(endedAt) - Date.parse(enteredAt) : 0;
 
-  const byHand = cardSteps(card).slice(1).find((step) => !isFactoryActor(step.by));
+  const byHand = steps.slice(1).find((step) => !isFactoryActor(step.by));
   const doneByFactory = byHand === undefined;
   const parts = [`#${card.number} ${card.title}`, usd(costUsd), duration(elapsedMs)];
   const failedPhrase = failedAttemptPhrase(failedAttempts);
@@ -231,13 +224,20 @@ export function buildMondayNote({ cards = [], traces = [], from, to }) {
   const cardEntry = (card) => card.enteredAt ?? card.stageHistory?.[0]?.enteredAt ?? card.movements?.[0]?.at ?? card.createdAt;
   const weekCards = cards.filter((card) => within(cardEntry(card), from, to));
   const weekTraces = traces.filter((trace) => within(trace.startedAt, from, to));
+  const weekNumbers = new Set(weekCards.map((card) => card.number));
   const lines = weekCards.map((card) =>
     cardLine(
       card,
       weekTraces.filter((trace) => trace.card === card.number),
     ),
   );
-  const totalUsd = lines.reduce((sum, line) => sum + line.costUsd, 0);
+  // Cost correlation is auditable: a trace with no card, or a card outside this
+  // week, is summed and reported rather than silently dropped. Widening a
+  // card's total with it (or hiding it) would make the note lie about a card.
+  const uncorrelated = weekTraces.filter((trace) => trace.card === null || !weekNumbers.has(trace.card));
+  const uncorrelatedUsd = uncorrelated.reduce((sum, trace) => sum + (trace.costUsd ?? 0), 0);
+  const cardUsd = lines.reduce((sum, line) => sum + line.costUsd, 0);
+  const totalUsd = cardUsd + uncorrelatedUsd;
   const failedAttempts = lines.reduce((sum, line) => sum + line.failedAttempts, 0);
   const spentPhrase = failedAttemptPhrase(failedAttempts);
 
@@ -245,6 +245,9 @@ export function buildMondayNote({ cards = [], traces = [], from, to }) {
     `Monday note — week ending ${to.slice(0, 10)}`,
     '',
     ...(lines.length > 0 ? lines.map((line) => line.text) : ['No cards were accepted this week.']),
+    ...(uncorrelated.length > 0
+      ? ['', `Not matched to a card: ${usd(uncorrelatedUsd)} across ${uncorrelated.length} traces.`]
+      : []),
     '',
     `Total model spend: ${usd(totalUsd)} across ${weekCards.length} cards${spentPhrase ? ` (${spentPhrase})` : ''}.`,
     '',
@@ -257,6 +260,7 @@ export function buildMondayNote({ cards = [], traces = [], from, to }) {
     quiet: lines.length === 0,
     lines,
     totalUsd,
+    uncorrelatedUsd,
     failedAttempts,
     from,
     to,
