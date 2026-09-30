@@ -11,11 +11,12 @@ The decisions are in `docs/adr/0009-mastra-factory.md` and issue #148.
    written first (`.claude/skills/tdd/SKILL.md`), and the lasting observability the change adds.
    Plans are approved automatically and saved in the pull request.
 3. Factory's build step follows the approved plan and `AGENTS.md`, and opens a pull request with
-   a plain-language "Try it" section: what changed and the steps Todd follows on the rehearsal
-   copy.
+   a plain-language "Try it" section: what changed and how Todd tries it on the live app after
+   merge.
 4. CI runs on GitHub's own runners. Factory's review step runs `.claude/skills/code-review/SKILL.md`
    against `CODING_STANDARDS.md` and the plan. When the review passes and CI is green, the
-   Factory reviewer merges the Julia PR and completes the Review card.
+   Factory reviewer merges the Julia PR and completes the Review card. An open PR stays in the
+   Review board's Intake rather than being presented as ready for UAT.
 5. Todd tries the live app after merge. If he rejects the change, revert it and return the card
    to Factory. The completed Review card and merged PR are the live UAT handoff; Factory's stock
    boards have no UAT column.
