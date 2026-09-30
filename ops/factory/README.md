@@ -9,9 +9,69 @@ Todd adds or removes an entry. Anything custom that is not listed here is not ap
 |---|---|---|---|
 | 1 | WorkOS cookie identity fix in `@mastra/auth-workos` 1.6.5 | Default platform sign-in rejects our self-hosted address; the WorkOS cookie path drops the organization ([#25252](https://github.com/mastra-ai/mastra/issues/25252)) | #25252 ships in a Mastra release |
 | 2 | Factory wait watcher and Discord webhook | Stock Factory 0.17.2 shows waits in the web app but does not send phone and Windows alerts when Todd is away ([Mastra request #25378](https://github.com/mastra-ai/mastra/issues/25378)); public ntfy.sh exhausted its daily quota (42908), and the private ntfy PWA did not register desktop Web Push | Remove when Mastra adds its own alerts |
+| 3 | Monday note and trace-retention check (`ops/factory/monday-note.mjs`, `ops/factory/trace-retention.mjs`) | Factory 0.17.2 has no weekly cost summary, and the observability store grew to 1.7 GB after about ten hours (change log, 2026-09-28). The note posts one Discussion in the "Monday notes" category and notifies Todd; the retention check plans the spans outside Mastra's `DEFAULT_RETENTION` window and reports a store that stays over budget. Neither deletes rows or moves cards by hand. See **Monday note** and **Bounded trace storage** below | Remove when Factory ships its own weekly cost summary and bounded trace retention |
 
-Approved by ADR 0009 but not built yet: the check that rejects unapproved custom machinery, and
-the weekly cost summary (Monday note). Each gets its row when it is built.
+Approved by ADR 0009 but not built yet: the check that rejects unapproved custom machinery.
+It gets its row when it is built.
+
+## Monday note
+
+Once a week, `ops/factory/monday-note.mjs` turns two inputs into one plain summary for Todd:
+Factory's own card records (the card moves and who made them) and Mastra's trace cost data.
+Each card gets one line — its number and title, its summed trace cost including failed attempts,
+how long it took, and whether every step after Todd's Intake tap was done by Factory or by hand
+(CONTEXT.md "Done by Factory"). A quiet week says so.
+
+Costs are never agent-reported: they are summed from the trace records the observability
+exporter wrote. Sessions run **outside Factory** — Codex, GPT, or Claude sessions started by
+hand — are not Factory cards and are not counted; the note says so on its own face. The week is
+`[from, to)` from the caller, so a card that entered before the week, or a trace that ran after
+it, never lands in the wrong note.
+
+`publishMondayNote({ note, discussions, notifications })` posts the note as a GitHub Discussion
+in the **Monday notes** category and tells Todd through a notification adapter. Both are injected,
+so the tests drive them with fakes. A run for a week that already has its Discussion posts and
+notifies nothing, so a repeated timer fire cannot send the note twice. Discussions are not
+ingested by Factory, so the note never lands in Intake. The schedule belongs to a systemd timer,
+like the wait-alert watcher; this program is the only place the outside world is touched.
+
+How to see what a week's note would say, without publishing or notifying anyone:
+
+```sh
+node -e "import('./ops/factory/monday-note.mjs').then(m => console.log(m.buildMondayNote({ cards: [], traces: [], from: '2026-09-21T00:00:00Z', to: '2026-09-28T00:00:00Z' }).body))"
+```
+
+## Bounded trace storage
+
+The observability store is DuckDB at
+`/var/lib/julia-factory/.local/share/mastracode/observability.duckdb` (change log, 2026-09-28).
+The **supported** way to keep it bounded is Mastra's own retention: `src/mastra/index.ts` passes
+`DEFAULT_RETENTION` (imported from `@mastra/code-sdk/utils/storage-maintenance`) to both the
+Postgres and LibSQL storage backends. Factory 0.17.2 applies that retention; we do not add a
+second, hand-built deleter.
+
+`ops/factory/trace-retention.mjs` is the read-only check around it. `selectExpiredSpans` plans
+which spans fall outside the retention window, and `runTraceCleanup` hands the cutoff to the
+storage backend's own retention through an injected `storage.enforceRetention` adapter and
+reports the store size before and after. It **never deletes rows itself**. The verdict uses the
+size the backend measured (`storeBytes`) before any inventory estimate, so a partial read-only
+inventory cannot produce a false all-clear. A store that is still over budget after cleanup is
+reported, never retried.
+
+Operator check (read-only; run as `julia-factory`, never from the Factory sandbox):
+
+1. Confirm the supported retention is still configured: both storage backends in
+   `/var/lib/julia-factory/app/src/mastra/index.ts` pass `retention: DEFAULT_RETENTION`.
+2. Record the store size:
+   `sudo -u julia-factory du -h /var/lib/julia-factory/.local/share/mastracode/observability.duckdb`.
+   Read traces through Mastra's own API (`npx mastra api trace list --url <factory>`), not a
+   hand-written query against the DuckDB file.
+3. Compare the store size against the budget in `trace-retention.mjs`
+   (`DEFAULT_TRACE_BUDGET_BYTES`, 5 GiB). If it is over budget, report it; do not add a bespoke
+   delete.
+
+The check is wired into CI (`ops/factory/trace-retention.test.mjs`), so a regression in the plan
+or the measured-size verdict fails the build.
 
 ## Installation
 

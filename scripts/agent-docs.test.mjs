@@ -34,3 +34,20 @@ test('agent instructions use GitHub issues and Factory boards, with live UAT aft
   assert.match(read('AGENTS.md'), /outside the Factory sandbox/);
   assert.match(read('docs/agents/work-execution.md'), /Needs attention/);
 });
+
+test('the Factory README documents the Monday note and the supported bounded-trace procedure', () => {
+  const readme = read('ops/factory/README.md');
+  // The note and its exclusion: costs come from Mastra traces, never agent reports,
+  // and hand-run Codex/GPT/Claude sessions are outside Factory and never counted.
+  assert.match(readme, /## Monday note/);
+  assert.match(readme, /Mastra's trace cost data/);
+  assert.match(readme, /outside Factory/);
+  assert.match(readme, /Codex, GPT, or Claude/);
+  assert.match(readme, /Discussion.*Monday notes/);
+  // Bounded storage: name the supported retention (DEFAULT_RETENTION on the
+  // storage backends) and the operator check that reads the DuckDB store.
+  assert.match(readme, /## Bounded trace storage/);
+  assert.match(readme, /DEFAULT_RETENTION/);
+  assert.match(readme, /observability\.duckdb/);
+  assert.match(readme, /never deletes|does not delete/);
+});
