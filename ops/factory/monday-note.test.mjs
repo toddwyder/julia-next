@@ -64,7 +64,7 @@ const stagedCard = {
 };
 
 test('each step is named with its actor, not just the card total', () => {
-  const note = buildMondayNote({ cards: [stagedCard], traces, ...WEEK });
+  const note = buildMondayNote({ cards: [stagedCard], traces: traces.filter((trace) => trace.card === 140), ...WEEK });
 
   assert.deepEqual(
     note.lines[0].steps.map((step) => step.text),
@@ -96,14 +96,15 @@ test('a step moved by hand names the person, not Factory', () => {
 });
 
 test('a card costs each of its traces exactly once across its steps', () => {
-  // Only card 140 is in the note; s5 belongs to card 142 and is reported as
-  // uncorrelated (0.90) rather than folded into 140.
-  const note = buildMondayNote({ cards: [stagedCard], traces, ...WEEK });
+  // Every trace in the week belongs to a card in the note, so the card-cost sum
+  // is the whole spend and no cost lands outside a card.
+  const card140Traces = traces.filter((trace) => trace.card === 140);
+  const note = buildMondayNote({ cards: [stagedCard], traces: card140Traces, ...WEEK });
 
   assert.equal(note.lines[0].costUsd, 6.6);
   assert.equal(note.lines[0].steps.reduce((sum, step) => sum + step.costUsd, 0), 6.6);
-  assert.equal(note.uncorrelatedUsd, 0.9);
-  assert.equal(note.totalUsd, 7.5);
+  assert.equal(note.uncorrelatedUsd, 0);
+  assert.equal(note.totalUsd, 6.6);
 });
 
 test('the initial report covers every card since observability was switched on', () => {
@@ -148,25 +149,58 @@ test('splitting the period into weeks counts every card and trace exactly once',
   assert.equal(second.uncorrelatedUsd, 0);
 });
 
-test('an uncorrelated trace\'s cost is reported, not silently dropped', () => {
+test('an uncorrelated cost-bearing span fails closed instead of being reported or dropped', () => {
+  // A model span that names no card is a correlation failure: folding it onto a
+  // card would lie, and printing it as its own line would still publish a note
+  // whose card totals may be wrong. The whole note fails instead.
   const orphan = { id: 's9', card: null, correlated: false, phase: 'build', startedAt: '2026-09-22T10:00:00Z', endedAt: '2026-09-22T10:30:00Z', costUsd: 1.25, outcome: 'passed' };
   const card140Traces = traces.filter((trace) => trace.card === 140);
-  const note = buildMondayNote({ cards: [stagedCard], traces: [...card140Traces, orphan], ...WEEK });
 
-  assert.equal(note.totalUsd, 7.85);
-  assert.equal(note.uncorrelatedUsd, 1.25);
-  assert.match(note.body, /[Nn]ot matched to a card/);
-  assert.match(note.body, /\$1\.25/);
+  assert.throws(
+    () => buildMondayNote({ cards: [stagedCard], traces: [...card140Traces, orphan], ...WEEK }),
+    /uncorrelated|not matched|correlat/i,
+  );
 });
 
-test('a trace for a card outside the week is reported as uncorrelated, not added to another card', () => {
+test('a cost-bearing trace for a card outside the week fails closed, not added to another card', () => {
   const trace99 = { id: 's99', card: 99, phase: 'build', startedAt: '2026-09-22T10:00:00Z', endedAt: '2026-09-22T10:30:00Z', costUsd: 2, outcome: 'passed' };
   const card140Traces = traces.filter((trace) => trace.card === 140);
-  const note = buildMondayNote({ cards: [stagedCard], traces: [...card140Traces, trace99], ...WEEK });
 
-  assert.equal(note.lines.length, 1);
-  assert.equal(note.lines[0].costUsd, 6.6);
-  assert.equal(note.uncorrelatedUsd, 2);
+  assert.throws(
+    () => buildMondayNote({ cards: [stagedCard], traces: [...card140Traces, trace99], ...WEEK }),
+    /uncorrelated|not matched|correlat/i,
+  );
+});
+
+test('a correlated trace with no numeric estimated cost fails closed, never becomes $0', () => {
+  const noCost = { id: 's-nocost', card: 140, phase: 'build', startedAt: '2026-09-22T10:00:00Z', endedAt: '2026-09-22T10:30:00Z', costUsd: null, outcome: 'passed' };
+  const card140Traces = traces.filter((trace) => trace.card === 140);
+
+  assert.throws(
+    () => buildMondayNote({ cards: [stagedCard], traces: [...card140Traces, noCost], ...WEEK }),
+    /cost/i,
+  );
+});
+
+test('an uncorrelated span with no numeric cost is reported, not silently dropped, and does not fail', () => {
+  // A non-model span (no estimated cost) that names no card cannot inflate a
+  // card total, so it is listed as uncorrelated at $0.00 rather than failing the
+  // whole note.
+  const orphanNoCost = { id: 's9', card: null, correlated: false, phase: 'build', startedAt: '2026-09-22T10:00:00Z', endedAt: '2026-09-22T10:30:00Z', costUsd: null, outcome: 'passed' };
+  const card140Traces = traces.filter((trace) => trace.card === 140);
+  const note = buildMondayNote({ cards: [stagedCard], traces: [...card140Traces, orphanNoCost], ...WEEK });
+
+  assert.equal(note.totalUsd, 6.6);
+  assert.equal(note.uncorrelatedUsd, 0);
+  assert.match(note.body, /[Nn]ot matched to a card/);
+});
+
+test('a numeric zero estimated cost is valid and never fails the note', () => {
+  const zeroCost = { id: 's-zero', card: 140, phase: 'plan', startedAt: '2026-09-22T09:00:00Z', endedAt: '2026-09-22T09:15:00Z', costUsd: 0, outcome: 'passed' };
+  const note = buildMondayNote({ cards: [stagedCard], traces: [zeroCost], ...WEEK });
+
+  assert.equal(note.lines[0].costUsd, 0);
+  assert.equal(note.totalUsd, 0);
 });
 
 test('the note names its category so the publisher can find it', () => {
@@ -225,19 +259,20 @@ test('a card or trace outside the week window is left out of that week\'s note',
   };
   const earlierTrace = { id: 's0', card: 139, phase: 'build', startedAt: '2026-09-19T09:05:00Z', endedAt: '2026-09-19T09:55:00Z', costUsd: 5, outcome: 'passed' };
   // A trace for this week's card that landed after the week closed, plus a
-  // stale trace for the earlier card attached to this week's card number.
+  // stale trace for the earlier card attached to this week's card number. Both
+  // are outside the window, so neither is in this note at all.
   const afterWeekTrace = { id: 's6', card: 140, phase: 'review', startedAt: '2026-09-29T09:05:00Z', endedAt: '2026-09-29T09:55:00Z', costUsd: 9, outcome: 'failed-attempt' };
+  const factoryCardTraces = traces.filter((trace) => trace.card === 140);
 
   const note = buildMondayNote({
     cards: [earlierCard, factoryCard],
-    traces: [...traces, earlierTrace, afterWeekTrace],
+    traces: [...factoryCardTraces, earlierTrace, afterWeekTrace],
     ...WEEK,
   });
 
   assert.deepEqual(note.lines.map((line) => line.number), [140]);
-  // 142's trace is out of this note's cards and is reported as uncorrelated.
   assert.equal(note.lines[0].costUsd, 6.6);
-  assert.equal(note.uncorrelatedUsd, 0.9);
+  assert.equal(note.uncorrelatedUsd, 0);
   assert.equal(note.failedAttempts, 1);
 });
 
@@ -259,7 +294,7 @@ test('a quiet week says so instead of reporting nothing', () => {
 });
 
 test('a card built only by Factory is not blamed for a failed attempt it recovered from', () => {
-  const note = buildMondayNote({ cards: [factoryCard], traces, ...WEEK });
+  const note = buildMondayNote({ cards: [factoryCard], traces: traces.filter((trace) => trace.card === 140), ...WEEK });
   assert.equal(note.lines[0].doneByFactory, true);
   assert.equal(note.lines[0].elapsedMs, 4 * 60 * 60 * 1000 + 12 * 60 * 1000);
   assert.equal(note.lines[0].failedAttempts, 1);
@@ -322,7 +357,7 @@ test('a quiet week still tells Todd, without inventing a card line', async () =>
 });
 
 test('a second run for the same week posts and notifies nothing', async () => {
-  const note = buildMondayNote({ cards: [factoryCard], traces, ...WEEK });
+  const note = buildMondayNote({ cards: [factoryCard], traces: traces.filter((trace) => trace.card === 140), ...WEEK });
   const discussions = fakeDiscussions({ url: DISCUSSION_URL });
   const notifications = fakeNotifications();
 

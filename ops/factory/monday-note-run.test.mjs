@@ -136,6 +136,54 @@ test('a quiet week posts its Discussion and tells Todd it was quiet', async () =
   assert.equal(notifications.sent[0].body, 'Quiet week.');
 });
 
+test('a trace whose cost is missing fails closed: nothing is posted or notified', async () => {
+  const discussions = fakeDiscussions();
+  const notifications = fakeNotifications();
+  const noCost = { ...SPANS[0], id: 's-nocost', sessionId: 'session-140', costUsd: undefined };
+
+  await assert.rejects(
+    () => runMondayNote({
+      now: '2026-10-05T08:00:00Z',
+      readCards: async () => CARDS,
+      readSpans: async () => [noCost],
+      discussions,
+      notifications,
+    }),
+    /cost/i,
+  );
+
+  assert.equal(discussions.calls.posted.length, 0);
+  assert.equal(notifications.sent.length, 0);
+});
+
+test('a cost-bearing span that matches no card fails closed: nothing is posted or notified', async () => {
+  const discussions = fakeDiscussions();
+  const notifications = fakeNotifications();
+  // A real generation span: the cost lives on `attributes.costContext`, and it
+  // names a session no card in this project owns.
+  const orphan = {
+    id: 's-orphan',
+    sessionId: 'session-no-card',
+    startedAt: '2026-09-28T02:00:00Z',
+    endedAt: '2026-09-28T02:30:00Z',
+    attributes: { costContext: { estimatedCost: 0.75, costUnit: 'usd' } },
+  };
+
+  await assert.rejects(
+    () => runMondayNote({
+      now: '2026-10-05T08:00:00Z',
+      readCards: async () => CARDS,
+      readSpans: async () => [orphan],
+      discussions,
+      notifications,
+    }),
+    /uncorrelated|not correlated|correlat/i,
+  );
+
+  assert.equal(discussions.calls.posted.length, 0);
+  assert.equal(notifications.sent.length, 0);
+});
+
 test('before the first Monday after switch-on there is no completed week, so nothing is posted', async () => {
   const discussions = fakeDiscussions();
   const notifications = fakeNotifications();
