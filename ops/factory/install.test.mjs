@@ -8,6 +8,36 @@ import { test } from 'node:test';
 const root = resolve(import.meta.dirname, '../..');
 const installer = resolve(import.meta.dirname, 'install.sh');
 
+test('the installer copies the issue #140 Monday note and retention programs into the app', () => {
+  const tmp = mkdtempSync(resolve(tmpdir(), 'julia-factory-install-140-'));
+  const target = resolve(tmp, 'target');
+  const bin = resolve(tmp, 'bin');
+  mkdirSync(target);
+  mkdirSync(bin);
+  for (const command of ['npm', 'python3', 'node']) {
+    const stub = resolve(bin, command);
+    writeFileSync(stub, `#!/bin/sh\nif [ '${command}' = npm ] && [ "$1" = build ]; then mkdir -p .mastra/output; fi\n`);
+    spawnSync('chmod', ['+x', stub]);
+  }
+  const result = spawnSync('bash', [installer, target], {
+    cwd: tmp,
+    env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+    encoding: 'utf8',
+  });
+  assert.equal(result.status, 0, result.stderr);
+  for (const file of [
+    'ops/factory/monday-note.mjs',
+    'ops/factory/monday-note-run.mjs',
+    'ops/factory/monday-note-adapters.mjs',
+    'ops/factory/mastra-traces.mjs',
+    'ops/factory/trace-retention.mjs',
+    'ops/factory/factory-cards.mjs',
+    'ops/factory/factory-cards.sql',
+  ]) {
+    assert.equal(readFileSync(resolve(target, file), 'utf8'), readFileSync(resolve(root, 'ops/factory', file.split('/').pop()), 'utf8'), file);
+  }
+});
+
 test('a repo-sourced install preserves service secrets and applies the WorkOS patch before and after build', () => {
   const tmp = mkdtempSync(resolve(tmpdir(), 'julia-factory-install-'));
   const target = resolve(tmp, 'target');
@@ -47,8 +77,7 @@ test('a repo-sourced install preserves service secrets and applies the WorkOS pa
     `node ${resolve(import.meta.dirname, 'workos-cookie-identity.check.mjs')} ${target}/.mastra/output`,
   ].join('\n'));
   const plan = resolve(target, 'src/mastra/public/factory-skills/factory-plan/SKILL.md');
-  writeFileSync(plan, 'stale plan');
-  const repeated = spawnSync('bash', [installer, target], {
+  writeFileSync(plan, 'stale plan');  const repeated = spawnSync('bash', [installer, target], {
     cwd: tmp,
     env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, STUB_LOG: log },
     encoding: 'utf8',

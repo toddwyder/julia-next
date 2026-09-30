@@ -1,0 +1,19 @@
+[Unit]
+Description=Check the Factory observability trace store stays within its budget
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=julia-factory
+Group=julia-factory
+# The check only stats the DuckDB file and its WAL; it never writes or deletes.
+# It exits non-zero when the store is over budget or when supported DuckDB
+# retention is not configured, so the journal shows the failure.
+Environment=MASTRACODE_DUCKDB_RETENTION=0
+ExecStart=/usr/bin/node /var/lib/julia-factory/app/ops/factory/trace-retention.mjs
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/var/lib/julia-factory/.local/share/mastracode
+NoNewPrivileges=true
+PrivateTmp=true

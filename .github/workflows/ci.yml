@@ -74,7 +74,9 @@ jobs:
             scripts/publish-pr.test.mjs scripts/publish-pr.real-git.test.mjs \
             scripts/publish-via-github-app.test.mjs ops/factory/workflows.test.mjs \
             ops/factory/skills.test.mjs ops/factory/monday-note.test.mjs \
-            ops/factory/trace-retention.test.mjs
+            ops/factory/monday-note-run.test.mjs ops/factory/monday-note-adapters.test.mjs \
+            ops/factory/monday-note-units.test.mjs ops/factory/mastra-traces.test.mjs \
+            ops/factory/factory-cards.test.mjs ops/factory/trace-retention.test.mjs
 
       - name: Install application dependencies
         if: steps.changes.outputs.docs_only != 'true'

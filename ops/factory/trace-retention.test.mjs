@@ -1,100 +1,112 @@
-// trace-retention.test.mjs -- issue #140, seam 3: bounded observability
-// storage. Sample inventory only; the storage adapter is a fake, so this
-// proves the plan, the measured-size verdict and the single adapter call, not
-// a live DuckDB outcome.
+// trace-retention.test.mjs -- issue #140, blocker 4: bounded observability
+// storage, measured honestly.
+//
+// What is true (verified from the installed, pinned sources):
+//   - Mastra's supported bound is an opt-in `retention` config plus
+//     `store.prune()`. The DuckDB adapter supports it for the observability
+//     domain (`@mastra/duckdb` storage/index.d.ts; bundled
+//     `reference-storage-retention.md`: "DuckDB | prune() | Observability
+//     spans, metrics, logs, scores, and feedback").
+//   - `DEFAULT_RETENTION` sets `observability.spans: { maxAge: '14d' }`
+//     (`@mastra/code-sdk` utils/storage-maintenance).
+//   - The Factory entry in this repo passes `DEFAULT_RETENTION` only to the Pg
+//     and LibSQL backends. Nothing in the repo configures the DuckDB
+//     observability store or its retention, so that config provably does NOT
+//     bound the DuckDB file. Reporting "bounded" from it would be deceptive.
+//
+// So the module does the one thing that can be honestly measured -- stat the
+// real DuckDB file and its WAL -- and fails visibly when the store is over
+// budget or when no supported DuckDB retention is configured. It never deletes
+// rows itself.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import {
+  DEFAULT_TRACE_BUDGET_BYTES,
   DEFAULT_TRACE_RETENTION_DAYS,
-  selectExpiredSpans,
-  runTraceCleanup,
+  OBSERVABILITY_DUCKDB_PATH,
+  measureStore,
+  checkTraceStore,
 } from './trace-retention.mjs';
 
-// The supported way the store stays bounded: Factory hands Mastra's own
-// DEFAULT_RETENTION to both storage backends. This guard proves the check in
-// this file is paired with real, configured retention; delete the config and
-// it fails, so a "bounded" report can never describe an unbounded store.
-test('the Factory entry passes the supported DEFAULT_RETENTION to both storage backends', () => {
-  const entry = readFileSync(new URL('./app/src/mastra/index.ts', import.meta.url), 'utf8');
-  assert.match(entry, /import \{ DEFAULT_RETENTION \} from '@mastra\/code-sdk\/utils\/storage-maintenance'/);
-  const storageConfigs = entry.match(/retention:\s*DEFAULT_RETENTION/g) ?? [];
-  assert.equal(storageConfigs.length, 2, 'both Pg and LibSQL Factory storage must set DEFAULT_RETENTION');
-});
-
-const NOW = '2026-09-30T00:00:00Z';
-
-// 20 days of one span a day, newest last. 1 GB each: the store the change log
-// describes, scaled to a fixture.
-const spans = Array.from({ length: 20 }, (_, index) => {
-  const day = 20 - index;
-  return {
-    id: `span-${day}`,
-    startedAt: new Date(Date.parse(NOW) - day * 24 * 60 * 60 * 1000).toISOString(),
-    bytes: 1024 * 1024 * 1024,
-  };
-});
-
-function fakeStorage(result) {
-  const calls = [];
-  return { calls, enforceRetention: async (request) => { calls.push(request); return result; } };
-}
-
-test('the default window keeps two working weeks', () => {
+test('the default budget and window match the supported retention', () => {
   assert.equal(DEFAULT_TRACE_RETENTION_DAYS, 14);
+  assert.equal(DEFAULT_TRACE_BUDGET_BYTES, 5 * 1024 * 1024 * 1024);
+  assert.equal(OBSERVABILITY_DUCKDB_PATH, '/var/lib/julia-factory/.local/share/mastracode/observability.duckdb');
 });
 
-test('exactly the spans outside the window are expired', () => {
-  const expired = selectExpiredSpans({ spans, now: NOW, retentionDays: 14 });
-  assert.deepEqual(expired.map((span) => span.id), [
-    'span-20', 'span-19', 'span-18', 'span-17', 'span-16', 'span-15',
-  ]);
+test('measureStore stats the database file and its WAL together', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'duckdb-measure-'));
+  try {
+    const db = join(dir, 'observability.duckdb');
+    writeFileSync(db, Buffer.alloc(1024 * 1024));
+    writeFileSync(`${db}-wal`, Buffer.alloc(512 * 1024));
+
+    const measured = measureStore(db);
+
+    assert.equal(measured.exists, true);
+    assert.equal(measured.bytes, 1024 * 1024 + 512 * 1024);
+    assert.ok(measured.oldestAgeMs !== null);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
-test('cleanup hands the cutoff to the backend once and reports a bounded store', async () => {
-  const storage = fakeStorage({ remainingBytes: 4 * 1024 * 1024 * 1024 });
-  const result = await runTraceCleanup({ spans, now: NOW, storage });
+test('measureStore reports a missing store as absent, not as zero bytes present', () => {
+  const measured = measureStore('/nonexistent/observability.duckdb');
 
-  assert.equal(storage.calls.length, 1);
-  assert.deepEqual(storage.calls[0], { retentionDays: 14, cutoff: '2026-09-16T00:00:00.000Z' });
-  assert.equal(result.expiredCount, 6);
-  assert.equal(result.bytesBefore, 20 * 1024 * 1024 * 1024);
-  assert.equal(result.bytesAfter, 4 * 1024 * 1024 * 1024);
-  assert.equal(result.overBudget, false);
+  assert.equal(measured.exists, false);
+  assert.equal(measured.bytes, 0);
 });
 
-test('a store still over budget after cleanup is reported, not retried', async () => {
-  const storage = fakeStorage({ remainingBytes: 9 * 1024 * 1024 * 1024 });
-  const result = await runTraceCleanup({ spans, now: NOW, storage });
-
-  assert.equal(storage.calls.length, 1);
-  assert.equal(result.overBudget, true);
-});
-
-test('the measured store size wins over an inventory that does not add up to it', async () => {
-  // The backend can measure the real store: pages the read-only inventory does
-  // not list (metrics, half-written rows). A bounded verdict must never come
-  // from a smaller inventory when the backend has weighed the store itself.
-  const storage = fakeStorage({ storeBytes: 9 * 1024 * 1024 * 1024 });
-  const result = await runTraceCleanup({ spans: [spans.at(-1)], now: NOW, storage });
-
-  assert.equal(result.bytesAfter, 9 * 1024 * 1024 * 1024);
-  assert.equal(result.overBudget, true);
-});
-
-test('a store that never reports back is measured by what was expired', async () => {
-  const storage = fakeStorage(undefined);
-  // A budget wider than the 14 GiB left after cleanup, so this test is about
-  // the fallback measurement, not about the default budget (the test below
-  // covers a store that stays over the default).
-  const result = await runTraceCleanup({
-    spans,
-    now: NOW,
-    budgetBytes: 16 * 1024 * 1024 * 1024,
-    storage,
+test('a store over budget fails visibly', () => {
+  const result = checkTraceStore({
+    measured: { exists: true, bytes: 6 * 1024 * 1024 * 1024, oldestAgeMs: 60 * 60 * 1000 },
+    budgetBytes: DEFAULT_TRACE_BUDGET_BYTES,
   });
 
-  assert.equal(result.bytesAfter, 14 * 1024 * 1024 * 1024);
+  assert.equal(result.overBudget, true);
+  assert.equal(result.ok, false);
+  assert.match(result.message, /over budget/i);
+});
+
+test('a bounded, configured store is the only thing reported ok', () => {
+  const result = checkTraceStore({
+    measured: { exists: true, bytes: 1024 * 1024, oldestAgeMs: 60 * 60 * 1000 },
+    budgetBytes: DEFAULT_TRACE_BUDGET_BYTES,
+    duckdbRetentionConfigured: true,
+  });
+
   assert.equal(result.overBudget, false);
+  assert.equal(result.ok, true);
+});
+
+test('a small store with no supported DuckDB retention configured is not reported ok', () => {
+  // The false all-clear this replaces: the Pg/LibSQL DEFAULT_RETENTION cannot
+  // bound the DuckDB file, so a small file today is not evidence the store is
+  // bounded.
+  const result = checkTraceStore({
+    measured: { exists: true, bytes: 1024 * 1024, oldestAgeMs: 60 * 60 * 1000 },
+    budgetBytes: DEFAULT_TRACE_BUDGET_BYTES,
+    duckdbRetentionConfigured: false,
+  });
+
+  assert.equal(result.overBudget, false);
+  assert.equal(result.ok, false);
+  assert.match(result.message, /DuckDB.*retention|retention.*DuckDB|not configured/i);
+});
+
+test('the repo entry does not configure DuckDB retention, so the check must not treat it as configured', () => {
+  // This is the proved fact: `DEFAULT_RETENTION` reaches only the Pg and LibSQL
+  // Factory storage constructors in the entry, and no DuckDBStore/observability
+  // retention is configured anywhere in ops/factory/app/src/mastra.
+  const entry = readFileSync(new URL('./app/src/mastra/index.ts', import.meta.url), 'utf8');
+
+  const pglibRetention = entry.match(/retention:\s*DEFAULT_RETENTION/g) ?? [];
+  assert.equal(pglibRetention.length, 2, 'DEFAULT_RETENTION is set on the Pg and LibSQL stores');
+  assert.doesNotMatch(entry, /DuckDBStore/);
+  assert.doesNotMatch(entry, /observability[^\n]*retention|retention[^\n]*observability/i);
 });

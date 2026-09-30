@@ -1,72 +1,126 @@
-// trace-retention.mjs -- issue #140, seam 3 (addendum): keep observability
-// storage bounded.
+// trace-retention.mjs -- issue #140, blocker 4: keep observability storage
+// bounded, measured honestly.
 //
 // The change log records the DuckDB trace store at 1.7 GB after about ten
-// hours with 30 GB free (docs/agents/factory-platform-auth-change-log.md:124).
-// Factory already hands its storage backends Mastra's own `DEFAULT_RETENTION`
-// (ops/factory/app/src/mastra/index.ts:344,349); this program is the supported
-// check around it: plan what falls outside the window, hand the cutoff to the
-// backend's own retention, and report whether the store came back inside its
-// budget. It never deletes rows itself -- a hand-built deleter is exactly the
-// custom machinery the exceptions list exists to refuse.
+// hours (docs/agents/factory-platform-auth-change-log.md). The supported,
+// installed way to bound it is Mastra's own opt-in retention:
+//
+//   new DuckDBStore({ path, retention: DEFAULT_RETENTION })
+//   await store.prune()          // from your own scheduler
+//
+// (`@mastra/duckdb` `storage/index.d.ts` `DuckDBStoreConfig.retention` and
+// `prune()`; bundled `reference-storage-retention.md`: DuckDB prunes
+// observability spans, metrics, logs, scores and feedback, and "Mastra never
+// runs it for you".) `DEFAULT_RETENTION` keeps `observability.spans` for 14
+// days (`@mastra/code-sdk` utils/storage-maintenance).
+//
+// What this module does NOT do: it never deletes rows, and it never claims a
+// bounded store from a config that cannot bound it. The repository entry today
+// passes `DEFAULT_RETENTION` only to the Pg and LibSQL backends; nothing here
+// configures the DuckDB observability store, so that config provably does not
+// bound the DuckDB file. The check therefore does the one thing verifiable on
+// the server -- stat the real DuckDB file and its WAL, and fail visibly when it
+// is over budget or when supported DuckDB retention is not configured -- rather
+// than reporting a false all-clear from the wrong backend's config.
+import { statSync } from 'node:fs';
 
-/** How long a trace is kept. Two working weeks: long enough for one Monday note either side. */
+/** The DuckDB file Factory's observability exporter writes (change log, 2026-09-28). */
+export const OBSERVABILITY_DUCKDB_PATH = '/var/lib/julia-factory/.local/share/mastracode/observability.duckdb';
+
+/** How long a trace is kept: the `observability.spans` window in DEFAULT_RETENTION. */
 export const DEFAULT_TRACE_RETENTION_DAYS = 14;
 
 /** Bytes the observability store may occupy before a cleanup has not done its job. */
 export const DEFAULT_TRACE_BUDGET_BYTES = 5 * 1024 * 1024 * 1024;
 
-function cutoffFor(now, retentionDays) {
-  return new Date(Date.parse(now) - retentionDays * 24 * 60 * 60 * 1000).toISOString();
+function sizeOf(file) {
+  try {
+    return statSync(file).size;
+  } catch {
+    return 0;
+  }
 }
 
 /**
- * The spans outside the retention window, oldest first. Pure: the same
- * inventory and clock always give the same answer, so this is the seam a
- * retention defect is reproduced at.
+ * Measure the real DuckDB store: the database file plus its `-wal` sidecar, the
+ * same pair Mastra's own maintenance code weighs (`fileSizeWithWal` in
+ * `@mastra/code-sdk` utils/storage-maintenance). `oldestAgeMs` is the age of
+ * the file's last write; a store that has not been written in a long time while
+ * still over budget is a different signal from a live, growing one.
  */
-export function selectExpiredSpans({ spans = [], now, retentionDays = DEFAULT_TRACE_RETENTION_DAYS }) {
-  const cutoff = cutoffFor(now, retentionDays);
-  return spans.filter((span) => Date.parse(span.startedAt) < Date.parse(cutoff));
+export function measureStore(dbPath = OBSERVABILITY_DUCKDB_PATH, now = Date.now()) {
+  let exists = true;
+  let mtimeMs = null;
+  try {
+    mtimeMs = statSync(dbPath).mtimeMs;
+  } catch {
+    exists = false;
+  }
+  const bytes = sizeOf(dbPath) + sizeOf(`${dbPath}-wal`);
+  return {
+    path: dbPath,
+    exists,
+    bytes,
+    oldestAgeMs: mtimeMs === null ? null : Math.max(0, now - mtimeMs),
+  };
 }
 
 /**
- * Ask the storage backend to run its retention, then report the result.
- *
- * Enforcement itself is the supported `DEFAULT_RETENTION` already passed to
- * the storage backends in `app/src/mastra/index.ts`; this program only plans
- * and reports. The injected `storage` adapter is ours: the operator connects
- * it to the supported backend, tests pass a fake, and no adapter method is
- * claimed to be a Mastra API. The verdict uses the size the backend measured
- * (`storeBytes`), falling back to the bytes it removed (`remainingBytes`) and
- * only then to the inventory, so a partial read-only inventory cannot produce
- * a false all-clear. A store still over budget after cleanup is reported,
- * never retried: retrying would hide the misconfiguration that let it grow.
+ * The verdict for one measurement. `duckdbRetentionConfigured` must be true only
+ * when supported DuckDB retention is actually wired (see the module header);
+ * otherwise a small file today is not evidence of a bounded store.
  */
-export async function runTraceCleanup({
-  spans = [],
-  now,
-  retentionDays = DEFAULT_TRACE_RETENTION_DAYS,
-  budgetBytes = DEFAULT_TRACE_BUDGET_BYTES,
-  storage,
-}) {
-  const cutoff = cutoffFor(now, retentionDays);
-  const expired = selectExpiredSpans({ spans, now, retentionDays });
-  const bytesBefore = spans.reduce((sum, span) => sum + (span.bytes ?? 0), 0);
+export function checkTraceStore({ measured, budgetBytes = DEFAULT_TRACE_BUDGET_BYTES, duckdbRetentionConfigured }) {
+  const overBudget = measured.bytes > budgetBytes;
+  const bounded = !overBudget && duckdbRetentionConfigured === true;
 
-  const enforced = await storage.enforceRetention({ retentionDays, cutoff });
-  const bytesAfter =
-    enforced?.storeBytes ??
-    enforced?.remainingBytes ??
-    bytesBefore - expired.reduce((sum, span) => sum + (span.bytes ?? 0), 0);
+  let message;
+  if (overBudget) {
+    message = `observability store is over budget: ${measured.bytes} bytes > ${budgetBytes} bytes`;
+  } else if (duckdbRetentionConfigured !== true) {
+    message =
+      'observability store size is under budget, but no supported DuckDB retention is configured; ' +
+      'size alone is not proof the store is bounded';
+  } else {
+    message = `observability store is bounded: ${measured.bytes} bytes <= ${budgetBytes} bytes`;
+  }
 
   return {
-    cutoff,
-    retentionDays,
-    expiredIds: expired.map((span) => span.id),
-    expiredCount: expired.length,
-    bytesBefore,
-    bytesAfter,
-    overBudget: bytesAfter > budgetBytes,
+    ...measured,
+    budgetBytes,
+    overBudget,
+    retentionConfigured: duckdbRetentionConfigured === true,
+    ok: bounded,
+    message,
   };
+}
+
+/**
+ * One scheduled check: measure, verdict, print, and fail visibly when not ok.
+ * Returning a non-zero exit from `main()` is what makes the systemd run show
+ * up red in the journal; nothing is retried or deleted here.
+ */
+export function runTraceRetentionCheck({
+  dbPath = OBSERVABILITY_DUCKDB_PATH,
+  budgetBytes = DEFAULT_TRACE_BUDGET_BYTES,
+  duckdbRetentionConfigured = false,
+  now = Date.now(),
+  log = console.log,
+} = {}) {
+  const result = checkTraceStore({ measured: measureStore(dbPath, now), budgetBytes, duckdbRetentionConfigured });
+  log(
+    `trace-retention path=${result.path} exists=${result.exists} bytes=${result.bytes} ` +
+      `over_budget=${result.overBudget} retention_configured=${result.retentionConfigured} ok=${result.ok}`,
+  );
+  log(result.message);
+  return result;
+}
+
+if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+  // The scheduled check fails visibly until the supported DuckDB retention is
+  // configured (MASTRACODE_DUCKDB_RETENTION=1 is set by the same change that
+  // wires it). Over budget always fails.
+  const configured = process.env.MASTRACODE_DUCKDB_RETENTION === '1';
+  const result = runTraceRetentionCheck({ duckdbRetentionConfigured: configured });
+  process.exit(result.ok ? 0 : 1);
 }
