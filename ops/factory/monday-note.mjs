@@ -16,6 +16,38 @@
 /** The GitHub Discussions category the note is published in. */
 export const MONDAY_NOTE_CATEGORY = 'Monday notes';
 
+/**
+ * The Monday the observability store came on (JUL-184, 2026-09-28). The first
+ * note never reaches back before it, so "every card since 2026-09-28" is
+ * exactly what the sequence of weekly notes covers.
+ */
+export const OBSERVABILITY_START = '2026-09-28T00:00:00Z';
+
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * The last completed Monday-to-Monday week before `now`, clamped so it never
+ * starts before observability did. A timer may fire any time on the Monday; the
+ * window it reports is the same all day, so a retry cannot split a week.
+ *
+ * @param {{now: string, firstWeekStart?: string}} input
+ * @returns {{from: string, to: string}}
+ */
+export function previousWeekWindow({ now, firstWeekStart = OBSERVABILITY_START }) {
+  const at = Date.parse(now);
+  const start = Date.parse(firstWeekStart);
+  // The Monday on or before `now`, then the Monday before that: the last week
+  // that is fully in the past.
+  const thisMonday = start + Math.floor((at - start) / WEEK_MS) * WEEK_MS;
+  const from = thisMonday - WEEK_MS;
+  if (from < start) {
+    // Before the second Monday there is no completed week; report what exists
+    // so far, starting at switch-on rather than reaching before it.
+    return { from: new Date(start).toISOString(), to: new Date(Math.max(start, at)).toISOString() };
+  }
+  return { from: new Date(from).toISOString(), to: new Date(thisMonday).toISOString() };
+}
+
 /** `$6.60`; two decimals, always, so a figure never reads as rounded prose. */
 function usd(value) {
   return `$${value.toFixed(2)}`;

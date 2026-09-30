@@ -8,7 +8,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildMondayNote, publishMondayNote, MONDAY_NOTE_CATEGORY } from './monday-note.mjs';
+import { buildMondayNote, publishMondayNote, MONDAY_NOTE_CATEGORY, previousWeekWindow } from './monday-note.mjs';
 
 const WEEK = { from: '2026-09-21T00:00:00Z', to: '2026-09-28T00:00:00Z' };
 
@@ -62,6 +62,29 @@ test('each card gets one line with its trace cost, failed attempts, elapsed time
   );
   assert.equal(note.totalUsd, 7.5);
   assert.equal(note.failedAttempts, 1);
+});
+
+test('the scheduled week is the last completed Monday-to-Monday week', () => {
+  // Minted on Monday 2026-10-05: the week that just ended, starting at the
+  // first Monday after observability was switched on (2026-09-28).
+  assert.deepEqual(previousWeekWindow({ now: '2026-10-05T09:00:00Z' }), {
+    from: '2026-09-28T00:00:00.000Z',
+    to: '2026-10-05T00:00:00.000Z',
+  });
+
+  // A timer that fires later the same Monday reports the same week, not a
+  // half-empty one.
+  assert.deepEqual(previousWeekWindow({ now: '2026-10-05T23:59:00Z' }), {
+    from: '2026-09-28T00:00:00.000Z',
+    to: '2026-10-05T00:00:00.000Z',
+  });
+
+  // The first note after switch-on has no earlier Monday to start from, so it
+  // is clamped to 2026-09-28 rather than reaching into September before it.
+  assert.deepEqual(previousWeekWindow({ now: '2026-09-28T10:00:00Z' }), {
+    from: '2026-09-28T00:00:00.000Z',
+    to: '2026-09-28T10:00:00.000Z',
+  });
 });
 
 test('a card or trace outside the week window is left out of that week\'s note', () => {
