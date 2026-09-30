@@ -21,7 +21,7 @@ local sources (repository docs and pinned package paths) are cited; gaps are sta
 
 | Need | Framework feature | Local source |
 |---|---|---|
-| Weekly cost from traces | Mastra observability route `GET /api/observability/traces`, wrapped by `mastra api trace list --url <factory>` | `mastra@1.31.3` `dist/index.js` "api trace" command; `@mastra/core` observability route schema; `docs/research/mastra-intended-use-audit.md` |
+| Weekly cost from traces | Mastra full observability route `GET /api/observability/traces` (the CLI's `mastra api trace list --verbose --url <factory>` route; the non-verbose `/light` route omits cost) | `mastra@1.31.3` `dist/index.js` "api trace" command; `@mastra/core` observability route schema; `docs/research/mastra-intended-use-audit.md` |
 | Cost per model span | `attributes.costContext.estimatedCost` on model-generation spans | `@mastra/core` `observability/types/metrics.d.ts` (`CostContext`) and `types/tracing.d.ts` |
 | Card steps and actors | Factory `work_items.stage_history` (`by` / `exitedBy`) | `@mastra/factory` `dist/storage/domains/work-items/base.d.ts` (`WorkItemRow`, `WorkItemStageEntry`, `isAgentActor`) |
 | Card ↔ trace correlation | `work_items.sessions` maps session id → card; spans carry `sessionId` | same `work-items/base.d.ts`; `@mastra/core` `LightSpanRecord`) |
@@ -54,9 +54,9 @@ Todd: Factory's own card records and Mastra's trace cost data.
   wait watcher uses (`install-wait-alerts.sh`'s peer role; `factory-cards.sql` is read-only and
   scoped to `work_items`). Factory's `stage_history` gives each step's actor (`by` / `exitedBy`).
 - **Costs** come from `ops/factory/mastra-traces.mjs` over Mastra's own observability route
-  (`GET /api/observability/traces`, the route `mastra api trace list --url <factory>` wraps). The
-  reader never queries DuckDB by hand, pages through the store, and fails closed on any
-  unexpected shape instead of reporting `$0.00`.
+  (`GET /api/observability/traces`, the full route the CLI's
+  `mastra api trace list --verbose` uses). The reader never queries DuckDB by hand, pages through
+  the store, and fails closed on any unexpected shape instead of reporting `$0.00`.
 
 Each card line carries every step with its actor, the card's summed trace cost **including failed
 attempts**, and how long it took. Whether every step after Todd's Intake tap was done by Factory

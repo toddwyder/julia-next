@@ -4,8 +4,14 @@
 // The supported surface is the one the pinned `mastra` CLI wraps, and the same
 // route `@mastra/core`'s observability route schema declares:
 //
-//   mastra api trace list --url <factory>   -> GET  <factory>/api/observability/traces
-//   mastra api trace query '<json>'         -> POST <factory>/api/observability/traces/query
+//   mastra api trace list --verbose --url <factory>  -> GET <factory>/api/observability/traces
+//   mastra api trace query '<json>'                 -> POST <factory>/api/observability/traces/query
+//
+// The non-verbose `trace list` hits `/observability/traces/light`, whose
+// LightSpanRecord omits `attributes`, so it cannot carry cost; the full route
+// (`GET /observability/traces`, the CLI's `--verbose` route) includes
+// `attributes.costContext.estimatedCost` and `sessionId`, which is what the
+// note needs.
 //
 // (`mastra@1.31.3` `dist/index.js`, the "api trace" command; the route schema
 // lives in the installed `@mastra/core` `observability/types` route table.) We
@@ -45,10 +51,12 @@ export async function readTraceSpans({ factoryUrl, from, to, fetchImpl = fetch, 
   const collected = [];
   for (let page = 0; page < MAX_PAGES; page += 1) {
     const url = new URL(`${base}${MASTRA_TRACE_ROUTE}`);
-    url.searchParams.set('startedAt', from);
-    url.searchParams.set('endedAt', to);
-    url.searchParams.set('page', String(page));
-    url.searchParams.set('perPage', String(pageSize));
+    // The route's filters are objects, and the pinned mastra CLI puts an object
+    // in the query string as JSON (`buildUrl` -> `JSON.stringify(value)`).
+    // `startedAt` is the trace's start range; `endExclusive` makes the window
+    // half-open `[from, to)`, matching the note's week semantics.
+    url.searchParams.set('startedAt', JSON.stringify({ start: from, end: to, startExclusive: false, endExclusive: true }));
+    url.searchParams.set('pagination', JSON.stringify({ page, perPage: pageSize }));
 
     const response = await fetchImpl(url.toString(), { method: 'GET' });
     if (!response.ok) {
@@ -62,11 +70,16 @@ export async function readTraceSpans({ factoryUrl, from, to, fetchImpl = fetch, 
     }
     collected.push(...body.spans);
 
+    // The response pagination is `{ total, page, perPage, hasMore }`
+    // (listTracesResponseSchema in @mastra/core observability tracing).
     const pagination = isObject(body.pagination) ? body.pagination : {};
-    const totalPages = Number(pagination.totalPages ?? pagination.total_pages ?? 1);
+    const hasMore = pagination.hasMore === true;
     const nextPage = Number(pagination.page ?? page) + 1;
-    if (!Number.isFinite(totalPages) || totalPages <= 0 || body.spans.length === 0 || nextPage >= totalPages) {
+    if (!hasMore || body.spans.length === 0) {
       break;
+    }
+    if (!Number.isFinite(nextPage)) {
+      throw new Error('Mastra trace list returned an unusable pagination object');
     }
   }
   return collected;

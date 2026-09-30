@@ -80,18 +80,25 @@ test('readTraceSpans asks the supported route and reads the spans list', async (
   assert.equal(fake.calls.length, 1);
   const url = new URL(fake.calls[0].url);
   assert.equal(url.pathname, '/api/observability/traces');
-  assert.equal(url.searchParams.get('startedAt'), FROM);
-  assert.equal(url.searchParams.get('endedAt'), TO);
+  // The route's `startedAt` filter is a range object, serialized the way the
+  // pinned mastra CLI serializes objects: JSON in the query string.
+  assert.deepEqual(JSON.parse(url.searchParams.get('startedAt')), {
+    start: FROM,
+    end: TO,
+    startExclusive: false,
+    endExclusive: true,
+  });
+  assert.deepEqual(JSON.parse(url.searchParams.get('pagination')), { page: 0, perPage: 100 });
   assert.equal(fake.calls[0].init.method, 'GET');
 });
 
 test('a page with no spans but a next page is followed', async () => {
   const pages = [
-    { spans: [generationSpan], pagination: { page: 0, totalPages: 2 } },
-    { spans: [{ ...generationSpan, spanId: 'span-b', traceId: 'trace-b' }], pagination: { page: 1, totalPages: 2 } },
+    { spans: [generationSpan], pagination: { page: 0, total: 2, hasMore: true } },
+    { spans: [{ ...generationSpan, spanId: 'span-b', traceId: 'trace-b' }], pagination: { page: 1, total: 2, hasMore: false } },
   ];
   const fake = fakeFetch((url) => {
-    const page = Number(new URL(url).searchParams.get('page') ?? '0');
+    const page = JSON.parse(new URL(url).searchParams.get('pagination')).page;
     return jsonResponse(pages[page]);
   });
 
