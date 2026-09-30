@@ -1,9 +1,10 @@
 # AGENTS.md
 
 This file provides guidance to coding agents working in this repository, including Mastra
-Factory's build sessions. GitHub issues enter Factory's Intake; Todd starts them, Factory plans,
-builds and reviews, and Todd approves product changes after checks and rehearsal. GitHub
-handles auto-merge. An outside agent may merge only its own setup or documentation PR through
+Factory's build sessions. GitHub issues enter Factory's Intake; Todd starts them, and Factory plans,
+builds and reviews. Todd tests product changes on the live app after merge and can request a revert.
+GitHub auto-merge is enabled for the repository, but Julia PRs are not yet armed to merge
+automatically after Factory review. An outside agent may merge only its own setup or documentation PR through
 the publisher App pinned to the reviewed head, never a Factory card. Keep SSH and sudo
 outside the Factory sandbox; an authorized operator uses the laptop's Tailscale route.
 See `docs/agents/work-execution.md` and `docs/adr/0009-mastra-factory.md`.
@@ -18,7 +19,7 @@ See `docs/agents/work-execution.md` and `docs/adr/0009-mastra-factory.md`.
    all future code, fix it and add one plain line to `CODING_STANDARDS.md` in the same pull
    request.
 4. The pull request description starts with a plain-language **Try it** section for Todd: what
-   changed and the steps to follow on the rehearsal copy. No code, logs or technical tools in it.
+   changed and how to try it on the live app after merge. No code, logs or technical tools in it.
 
 ## Use the product, not a workaround
 

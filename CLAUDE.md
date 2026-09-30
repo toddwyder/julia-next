@@ -17,10 +17,11 @@ on the exceptions list in `ops/factory/README.md`. Use the stock product first a
 what real use shows is lacking.
 
 Factory's Work and Review boards and Needs attention list show progress; do not drive a card through
-Linear or manually move its Factory stage. The plan is saved with the pull request. After CI and
-both reviews pass, Todd tries the Vercel rehearsal copy; his approval enables GitHub auto-merge
-for product changes. Factory never merges. An agent outside Factory may merge its own setup or
-document-only pull request via the publisher App pinned to the reviewed head, never a Factory card.
+Linear or manually move its Factory stage. The plan is saved with the pull request. Todd tries
+product changes on the live app after merge and can request a revert. GitHub auto-merge is enabled
+for the repository, but Julia PRs are not yet armed to merge automatically after Factory review.
+An agent outside Factory may merge its own setup or document-only pull request via the publisher
+App pinned to the reviewed head, never a Factory card.
 
 Factory builds test-first using `.claude/skills/tdd/SKILL.md` and the plan's named seams.
 See `docs/agents/work-execution.md` and `docs/adr/0009-mastra-factory.md` for the full route.
