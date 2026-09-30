@@ -1,7 +1,7 @@
 // trace-retention.test.mjs -- issue #140, seam 3: bounded observability
-// storage. Sample inventory only; the storage backend is a fake, so this
-// proves the plan and the one call into Mastra's own retention, not a live
-// DuckDB outcome.
+// storage. Sample inventory only; the storage adapter is a fake, so this
+// proves the plan, the measured-size verdict and the single adapter call, not
+// a live DuckDB outcome.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
