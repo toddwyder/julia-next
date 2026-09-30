@@ -51,12 +51,13 @@ Postgres and LibSQL storage backends. Factory 0.17.2 applies that retention; we 
 second, hand-built deleter.
 
 `ops/factory/trace-retention.mjs` is the read-only check around it. `selectExpiredSpans` plans
-which spans fall outside the retention window, and `runTraceCleanup` hands the cutoff to the
-storage backend's own retention through an injected `storage.enforceRetention` adapter and
-reports the store size before and after. It **never deletes rows itself**. The verdict uses the
-size the backend measured (`storeBytes`) before any inventory estimate, so a partial read-only
-inventory cannot produce a false all-clear. A store that is still over budget after cleanup is
-reported, never retried.
+which spans fall outside the retention window, and `runTraceCleanup` hands the cutoff to a
+`storage` adapter we inject and reports the store size before and after. That adapter is ours,
+not a Mastra API: the operator connects it to the supported backend, and no adapter method is
+claimed to be a Mastra method. It **never deletes rows itself**. The verdict uses the size the
+backend measured (`storeBytes`) before any inventory estimate, so a partial read-only inventory
+cannot produce a false all-clear. A store that is still over budget after cleanup is reported,
+never retried.
 
 Operator check (read-only; run as `julia-factory`, never from the Factory sandbox):
 

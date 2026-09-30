@@ -50,4 +50,6 @@ test('the Factory README documents the Monday note and the supported bounded-tra
   assert.match(readme, /DEFAULT_RETENTION/);
   assert.match(readme, /observability\.duckdb/);
   assert.match(readme, /never deletes|does not delete/);
+  assert.match(readme, /adapter is ours/);
+  assert.doesNotMatch(readme, /enforceRetention.*Mastra|Mastra.*enforceRetention/);
 });

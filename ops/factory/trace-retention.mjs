@@ -31,11 +31,13 @@ export function selectExpiredSpans({ spans = [], now, retentionDays = DEFAULT_TR
 }
 
 /**
- * Ask the storage backend to enforce retention, then report the result.
+ * Ask the storage backend to run its retention, then report the result.
  *
- * The `storage` adapter is the single call into Mastra's own maintenance; the
- * tests pass a fake, and the operator passes the read-only connection to the
- * supported backend. The verdict uses the size the backend measured
+ * Enforcement itself is the supported `DEFAULT_RETENTION` already passed to
+ * the storage backends in `app/src/mastra/index.ts`; this program only plans
+ * and reports. The injected `storage` adapter is ours: the operator connects
+ * it to the supported backend, tests pass a fake, and no adapter method is
+ * claimed to be a Mastra API. The verdict uses the size the backend measured
  * (`storeBytes`), falling back to the bytes it removed (`remainingBytes`) and
  * only then to the inventory, so a partial read-only inventory cannot produce
  * a false all-clear. A store still over budget after cleanup is reported,
