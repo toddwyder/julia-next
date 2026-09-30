@@ -12,7 +12,7 @@ import {
 import { SKIP_PATTERNS, MEDIUM_PR_MAX, getReviewDepth, MIN_DELETION_ONLY_LINES } from '../lib/review-config';
 
 /** Max total chars across all files in a single agent call. */
-const BATCH_CHAR_BUDGET = 400_000;
+export const BATCH_CHAR_BUDGET = 400_000;
 /** Max files per agent call. */
 const BATCH_FILE_LIMIT = 40;
 
@@ -87,23 +87,46 @@ function buildFileSection(f: FileEntry, includeContent: boolean): string {
   return s;
 }
 
-function batchFiles(files: FileEntry[], includeContent: boolean): FileEntry[][] {
+/**
+ * Partition reviewable files into agent-call batches that respect both the
+ * character budget and the file limit.
+ *
+ * A single file whose own section exceeds `BATCH_CHAR_BUDGET` cannot be split
+ * (splitting a diff across prompts would review it with no whole-file context),
+ * so it is returned separately in `oversized` instead of being placed in a
+ * batch that silently exceeds the budget. Callers mark each oversized file as
+ * skipped/unreviewed so the verdict fails closed with explicit evidence.
+ */
+export function planFileBatches(
+  files: FileEntry[],
+  includeContent: boolean,
+): { batches: FileEntry[][]; oversized: string[] } {
   const batches: FileEntry[][] = [];
+  const oversized: string[] = [];
   let batch: FileEntry[] = [];
   let chars = 0;
 
+  const flush = () => {
+    if (batch.length > 0) batches.push(batch);
+    batch = [];
+    chars = 0;
+  };
+
   for (const f of files) {
     const size = buildFileSection(f, includeContent).length;
+    if (size > BATCH_CHAR_BUDGET) {
+      flush();
+      oversized.push(f.filename);
+      continue;
+    }
     if (batch.length > 0 && (chars + size > BATCH_CHAR_BUDGET || batch.length >= BATCH_FILE_LIMIT)) {
-      batches.push(batch);
-      batch = [];
-      chars = 0;
+      flush();
     }
     batch.push(f);
     chars += size;
   }
-  if (batch.length > 0) batches.push(batch);
-  return batches;
+  flush();
+  return { batches, oversized };
 }
 
 const reviewFiles = createStep({
@@ -127,14 +150,19 @@ const reviewFiles = createStep({
         )
       : reviewableFiles.map(f => ({ ...f, content: '' }));
 
-    const batches = batchFiles(entries, includeContent);
+    const batches = planFileBatches(entries, includeContent);
     const isLargePR = reviewableFiles.length > MEDIUM_PR_MAX;
+
+    // A file too large for one batch is never sent to an agent. Record it as
+    // skipped/unreviewed so the aggregate summary and the cross-maker route
+    // both fail closed with explicit evidence instead of approving it.
+    const batchSkippedFiles = [...skippedFiles, ...batches.oversized];
 
     function buildPrompt(batch: FileEntry[], batchIndex: number): string {
       const label =
-        batches.length === 1
+        batches.batches.length === 1
           ? `Files to Review (${entries.length} files)`
-          : `Batch ${batchIndex + 1}/${batches.length} (${batch.length} files)`;
+          : `Batch ${batchIndex + 1}/${batches.batches.length} (${batch.length} files)`;
       const sections = batch.map(f => buildFileSection(f, includeContent)).join('\n---\n\n');
       return `Review the following PR files. Apply all workspace skills (code-standards, security-review, performance-review).
 
@@ -165,12 +193,12 @@ For EACH file, return an entry with the filename and an array of issues found (e
     let allReviews: z.infer<typeof fileReviewSchema>[];
 
     if (isLargePR) {
-      const results = await Promise.all(batches.map((batch, i) => reviewBatch(batch, i)));
+      const results = await Promise.all(batches.batches.map((batch, i) => reviewBatch(batch, i)));
       allReviews = results.flat();
     } else {
       allReviews = [];
-      for (let i = 0; i < batches.length; i++) {
-        allReviews.push(...(await reviewBatch(batches[i]!, i)));
+      for (let i = 0; i < batches.batches.length; i++) {
+        allReviews.push(...(await reviewBatch(batches.batches[i]!, i)));
       }
     }
 
@@ -180,7 +208,7 @@ For EACH file, return an entry with the filename and an array of issues found (e
       pullNumber,
       pr,
       fileReviews: allReviews,
-      skippedFiles,
+      skippedFiles: batchSkippedFiles,
     };
   },
 });
@@ -241,7 +269,24 @@ Rules:
       positiveNotes: [],
     };
 
-    return { ...summary, fileReviews, skippedFiles };
+    // A reviewable file that was skipped -- because its diff exceeded the batch
+    // budget, or because the workflow dropped it -- was never reviewed, so the
+    // workflow's own verdict fails closed with explicit evidence.
+    const unreviewed = skippedFiles.filter(
+      filename => !SKIP_PATTERNS.some(pattern => pattern.test(filename)),
+    );
+    const failClosed = unreviewed.length > 0
+      ? {
+          verdict: 'REQUEST_CHANGES' as const,
+          criticalIssues: [
+            ...summary.criticalIssues,
+            ...unreviewed.map(filename => `${filename}: not reviewed (skipped by the batched reviewer); approval refused.`),
+          ],
+          summary: `${summary.summary}\n\nFail closed: ${unreviewed.join(', ')} could not be reviewed and must be reviewed before approval.`,
+        }
+      : undefined;
+
+    return failClosed ? { ...summary, ...failClosed, fileReviews, skippedFiles } : { ...summary, fileReviews, skippedFiles };
   },
 });
 

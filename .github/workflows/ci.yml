@@ -73,7 +73,10 @@ jobs:
             scripts/no-personal-paths.test.mjs scripts/merge-pr.test.mjs \
             scripts/publish-pr.test.mjs scripts/publish-pr.real-git.test.mjs \
             scripts/publish-via-github-app.test.mjs ops/factory/workflows.test.mjs \
-            ops/factory/skills.test.mjs
+            ops/factory/skills.test.mjs ops/factory/monday-note.test.mjs \
+            ops/factory/monday-note-run.test.mjs ops/factory/monday-note-adapters.test.mjs \
+            ops/factory/monday-note-units.test.mjs ops/factory/mastra-traces.test.mjs \
+            ops/factory/factory-cards.test.mjs ops/factory/trace-retention.test.mjs
 
       - name: Install application dependencies
         if: steps.changes.outputs.docs_only != 'true'
@@ -86,6 +89,9 @@ jobs:
           sudo apt-get install -y bubblewrap
           npm ci --prefix ops/factory/app
           node --experimental-strip-types --test ops/factory/app/local-sandbox.test.mjs
+          (cd ops/factory/app && node --experimental-strip-types --import ./register-typescript-esm.mjs \
+            --test observability-retention.test.mjs observability-retention-schedule.test.mjs \
+            review-route-batching.test.mjs)
           npm run check --prefix ops/factory/app
 
       - name: Run current application and installation tests

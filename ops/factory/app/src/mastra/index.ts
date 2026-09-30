@@ -43,6 +43,12 @@ import { codeReviewAgent } from './reviewer/agents/code-review-agent';
 import { workflowReviewAgent } from './reviewer/agents/workflow-review-agent';
 import { prReviewWorkflow } from './reviewer/workflows/pr-review-workflow';
 import { reviewerRoute } from './reviewer/route';
+import {
+  composeStorageWithObservability,
+  createDuckDBStore,
+  duckdbObservabilityConfig,
+} from './observability-store.js';
+import { observabilityRetentionWorkflow, setObservabilityPruneTarget } from './observability-retention.js';
 
 /**
  * Parse a positive-integer env knob; anything else means "use the default".
@@ -426,6 +432,8 @@ export const factory = new MastraFactory({
   // single app Postgres alongside the github/app tables — one shared DB (and
   // pg pool) for all users, separated by `resourceId` scoping. Unset (bare
   // local dev) → default storage resolution applies (local libSQL file).
+  // Observability is layered onto the Mastra storage this backend returns
+  // (see `composedStorage` below).
   storage,
   vector,
   pubsub,
@@ -453,6 +461,36 @@ export const factory = new MastraFactory({
 
 const preparedArgs = await factory.prepare();
 
+// Bounded observability storage (JUL-140). Factory's own default storage keeps
+// every non-observability domain; the DuckDB observability domain is layered on
+// top with supported retention, exactly as Mastra documents:
+// https://mastra.ai/blog/introducing-feedback-and-feedback-analytics
+// The observability exporter reads and writes through the composed domain. A
+// store that cannot be opened fails the boot loudly rather than silently writing
+// unbounded traces.
+const observabilityDuckDB = await createDuckDBStore(duckdbObservabilityConfig());
+const observabilityDomain = await observabilityDuckDB.getStore('observability');
+if (!observabilityDomain) {
+  throw new Error('DuckDB observability store did not expose an observability domain');
+}
+if (!preparedArgs.storage) {
+  throw new Error('Factory prepare() returned no Mastra storage to layer DuckDB observability onto');
+}
+const composedStorage = composeStorageWithObservability({
+  defaultStorage: preparedArgs.storage,
+  observabilityDomain,
+});
+// The scheduled retention step prunes this same store; DuckDB allows one writer
+// across processes, so the daily prune must run in the process that holds it.
+// This is the only prune trigger -- the framework's own scheduler, declared by
+// `observabilityRetentionWorkflow`'s `schedule`, runs it in this process. The
+// target also exposes the documented DuckDB `CHECKPOINT`, which the size guard
+// runs after an over-budget prune to reclaim the freed rows on disk.
+setObservabilityPruneTarget({
+  prune: (options) => observabilityDuckDB.prune(options),
+  checkpoint: () => observabilityDuckDB.db.execute('CHECKPOINT'),
+});
+
 // Construct the server-owned Mastra HERE so the `new Mastra(...)` literal lives
 // in the entry file (see module docs). `prepare()` returns the constructor args
 // carrying the controller (via `agentControllers`), storage, and the assembled
@@ -461,12 +499,12 @@ const preparedArgs = await factory.prepare();
 export const mastra = new Mastra({
   ...preparedArgs,
   agents: { ...preparedArgs.agents, codeReviewAgent, workflowReviewAgent },
-  workflows: { ...preparedArgs.workflows, prReviewWorkflow },
+  workflows: { ...preparedArgs.workflows, prReviewWorkflow, observabilityRetentionWorkflow },
   server: {
     ...preparedArgs.server,
     apiRoutes: [...(preparedArgs.server?.apiRoutes ?? []), reviewerRoute],
   },
-  storage: preparedArgs.storage,
+  storage: composedStorage,
   pubsub: preparedArgs.pubsub,
   workers: preparedArgs.workers,
   // Traces and cost metrics (JUL-184, ADR 0009): https://mastra.ai/docs/observability/overview

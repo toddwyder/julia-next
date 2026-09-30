@@ -51,6 +51,18 @@ function gitEnv(callerEnv, { askpassPath, token, emptyGlobalConfigPath }) {
 }
 
 const execFileAsync = promisify(execFile);
+
+// GIT_CONFIG_GLOBAL (gitEnv) must name a real, empty file: pointing it at
+// a path that does not exist makes git fail to read the global config
+// layer, so the rewrite check can never confirm a clean repo and the
+// approved push is blocked. Create the file before any git invocation;
+// cleanup already removes only the file, leaving the directory behind as
+// it does today.
+function emptyGlobalConfigFile(directory) {
+  const configPath = join(directory, 'empty.gitconfig');
+  writeFileSync(configPath, '', { mode: 0o600 });
+  return configPath;
+}
 const APPROVED_TARGETS = new Set(['toddwyder/julia-next', 'toddwyder/Julia', 'toddwyder/AI-Stack']);
 
 function assertApproved(owner, repo) {
@@ -107,7 +119,7 @@ export async function pushBranch({
 }) {
   assertApproved(owner, repo);
   const askpassPathForCheck = writeAskpass();
-  const emptyGlobalConfigPathForCheck = join(mkdtempSync(join(tmpdir(), 'julia-publisher-gitconfig-')), 'empty.gitconfig');
+  const emptyGlobalConfigPathForCheck = emptyGlobalConfigFile(mkdtempSync(join(tmpdir(), 'julia-publisher-gitconfig-')));
   try {
     await assertNoUrlRewrites({
       cwd, env, askpassPath: askpassPathForCheck, emptyGlobalConfigPath: emptyGlobalConfigPathForCheck, execImpl,
@@ -127,7 +139,7 @@ export async function pushBranch({
   const token = await tokenImpl({ ...env, JULIA_PUBLISHER_OWNER: owner, JULIA_PUBLISHER_REPO: repo });
   const askpassPath = writeAskpass();
   const emptyHooksDir = mkdtempSync(join(tmpdir(), 'julia-publisher-hooks-'));
-  const emptyGlobalConfigPath = join(mkdtempSync(join(tmpdir(), 'julia-publisher-gitconfig-')), 'empty.gitconfig');
+  const emptyGlobalConfigPath = emptyGlobalConfigFile(mkdtempSync(join(tmpdir(), 'julia-publisher-gitconfig-')));
   try {
     // JUL-71: the publisher runs as orchestrator-svc, but a coordinator's
     // worker commits live in runner-owned worktrees (by design -- see the

@@ -25,6 +25,24 @@ test('CI checks the current app but does not run retired graph tests', () => {
   assert.match(ci, /run: npm run build/);
 });
 
+test('CI runs the Monday note and trace retention tests that issue #140 adds', () => {
+  for (const file of ['monday-note', 'monday-note-run', 'monday-note-adapters', 'monday-note-units', 'mastra-traces', 'factory-cards', 'trace-retention']) {
+    assert.ok(ci.includes(`ops/factory/${file}.test.mjs`), `CI does not run ops/factory/${file}.test.mjs`);
+  }
+});
+
+test('CI runs the app DuckDB observability retention tests the repo-standard way', () => {
+  // The app's TypeScript tests are runnable with Node's built-in type stripping
+  // plus the repo's `.js` -> `.ts` resolve hook, the same mechanism CI already
+  // uses for local-sandbox.test.mjs -- no extra tooling dependency (e.g. tsx) is
+  // added just to run a test.
+  assert.match(ci, /--experimental-strip-types/);
+  assert.match(ci, /--import .\/register-typescript-esm\.mjs/);
+  assert.match(ci, /observability-retention\.test\.mjs/);
+  assert.match(ci, /observability-retention-schedule\.test\.mjs/);
+  assert.doesNotMatch(ci, /--import tsx/);
+});
+
 test('both workflows cancel superseded runs; CI retains its required job for docs-only PRs', () => {
   for (const workflow of [publisher, ci]) {
     assert.match(workflow, /cancel-in-progress: true/);

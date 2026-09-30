@@ -34,3 +34,48 @@ test('agent instructions use GitHub issues and Factory boards, with live UAT aft
   assert.match(read('AGENTS.md'), /outside the Factory sandbox/);
   assert.match(read('docs/agents/work-execution.md'), /Needs attention/);
 });
+
+test('the Factory README documents the Monday note and the supported bounded-trace procedure', () => {
+  const readme = read('ops/factory/README.md');
+  // The note and its exclusion: costs come from Mastra traces, never agent reports,
+  // and hand-run Codex/GPT/Claude sessions are outside Factory and never counted.
+  assert.match(readme, /## Monday note/);
+  assert.match(readme, /Mastra's trace cost data/);
+  assert.match(readme, /outside Factory/);
+  assert.match(readme, /Codex, GPT, or Claude/);
+  assert.match(readme, /Discussion.*Monday notes/);
+  // Bounded storage: name the supported retention (DEFAULT_RETENTION on the
+  // storage backends) and the operator check that reads the DuckDB store.
+  assert.match(readme, /## Bounded trace storage/);
+  assert.match(readme, /DEFAULT_RETENTION/);
+  assert.match(readme, /observability\.duckdb/);
+  assert.match(readme, /never deletes|does not delete/);
+  assert.doesNotMatch(readme, /enforceRetention/);
+  assert.doesNotMatch(readme, /selectExpiredSpans|runTraceCleanup/);
+});
+
+test('the Factory README carries a framework map with local sources and states the gaps', () => {
+  const readme = read('ops/factory/README.md');
+  assert.match(readme, /## Framework map/);
+  // Real, local sources (repository docs and installed package paths), not
+  // invented web citations.
+  assert.match(readme, /docs\/research\/mastra-intended-use-audit\.md/);
+  assert.match(readme, /@mastra\/duckdb|DuckDBStore/);
+  assert.match(readme, /storage-maintenance/);
+  // The gaps this card could not close through supported config are named, with
+  // what is missing, rather than a fabricated citation.
+  assert.match(readme, /gap|not configured|missing/i);
+  assert.match(readme, /no supported|not supported|cannot be configured|fail(s)? closed/i);
+});
+
+test('the exceptions list marks the #140 entry approved by Todd, citing GitHub #140', () => {
+  const readme = read('ops/factory/README.md');
+  assert.match(readme, /Only\s+Todd adds or removes an entry/);
+  // Issue #140: Todd approved this entry (2026-09-30); the row must name the
+  // approval and the card, and must no longer read as merely proposed.
+  const row = readme.split('\n').find((line) => line.includes('#140') || (line.includes('Monday note') && line.startsWith('|')));
+  assert.ok(row, 'expected a row mentioning the Monday note / #140');
+  assert.match(row, /approved/i);
+  assert.match(row, /#140/);
+  assert.doesNotMatch(row, /proposed|awaiting Todd|pending Todd/i);
+});
