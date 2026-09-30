@@ -15,7 +15,7 @@ no Discussion posted, no notification sent, no live service or database touched.
 ```
 node --test scripts/agent-docs.test.mjs scripts/line-endings.test.mjs \
   scripts/no-personal-paths.test.mjs ops/factory/*.test.mjs
-# tests 78 / pass 78 / fail 0
+# tests 75 / pass 75 / fail 0
 ```
 
 Also:
