@@ -75,8 +75,9 @@ export function storeBytes(path: string = observabilityDuckDBPath()): number {
   for (const file of [path, `${path}-wal`]) {
     try {
       total += statSync(file).size;
-    } catch {
-      // missing file counts as zero
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      // Only a genuinely missing file counts as zero.
     }
   }
   return total;
@@ -92,7 +93,8 @@ export function freeBytesAt(path: string = observabilityDuckDBPath()): number | 
     try {
       const { bsize, bavail } = statfsSync(dir);
       return bsize * bavail;
-    } catch {
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
       const parent = dir.replace(/\/[^/]+$/, '') || '/';
       if (parent === dir) break;
       dir = parent;

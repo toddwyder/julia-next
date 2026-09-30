@@ -57,7 +57,8 @@ export function requiredFreeBytes(liveBytes) {
 function sizeOf(file) {
   try {
     return statSync(file).size;
-  } catch {
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
     return 0;
   }
 }
@@ -99,7 +100,8 @@ export function measureStore(dbPath = OBSERVABILITY_DUCKDB_PATH, now = Date.now(
   let mtimeMs = null;
   try {
     mtimeMs = statSync(dbPath).mtimeMs;
-  } catch {
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
     exists = false;
   }
   const bytes = sizeOf(dbPath) + sizeOf(`${dbPath}-wal`);

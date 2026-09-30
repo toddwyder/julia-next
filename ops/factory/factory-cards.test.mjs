@@ -32,6 +32,8 @@ test('the read is one read-only query against the Factory work-items table', () 
   assert.match(FACTORY_CARDS_SQL, /BEGIN TRANSACTION READ ONLY/);
   assert.match(FACTORY_CARDS_SQL, /FROM work_items/);
   assert.match(FACTORY_CARDS_SQL, /stage_history|stages/);
+  assert.match(FACTORY_CARDS_SQL, /'review'/);
+  assert.match(FACTORY_CARDS_SQL, /github-pr:/);
 });
 
 test('normalizeWorkItemRows maps a row to the note\'s card shape with number, steps and sessions', () => {
@@ -45,11 +47,14 @@ test('normalizeWorkItemRows maps a row to the note\'s card shape with number, st
   assert.deepEqual(card.stageHistory.map((entry) => entry.stage), ['planning', 'execute', 'done']);
 });
 
-test('a row with no card number in metadata is skipped, not reported as card null', () => {
+test('a row with no card reference fails instead of disappearing from the report', () => {
   const { number: _number, ...noNumber } = row;
-  const cards = normalizeWorkItemRows([noNumber]);
+  assert.throws(() => normalizeWorkItemRows([noNumber]), /no usable reference/);
+});
 
-  assert.deepEqual(cards, []);
+test('review cards keep a distinct PR reference so issue and PR numbers cannot collide', () => {
+  const [review] = normalizeWorkItemRows([{ ...row, board: 'review', number: 'PR-140' }]);
+  assert.equal(review.number, 'PR-140');
 });
 
 test('readFactoryCards runs psql read-only and returns the normalised cards', async () => {

@@ -181,6 +181,7 @@ function cardSteps(card) {
     return card.stageHistory.map((entry, index) => ({
       stage: STAGE_LABEL[entry.stage] ?? entry.stage,
       by: entry.exitedBy ?? entry.by,
+      enteredBy: entry.by,
       startedAt: entry.enteredAt ?? null,
       endedAt: entry.exitedAt ?? null,
       // The first entry's `by` is the actor who moved the card out of Intake
@@ -277,7 +278,13 @@ function tracesByStep(steps, cardTraces) {
 }
 
 function cardLine(card, cardTraces, { acceptedInWeek = true, from, to } = {}) {
-  const allSteps = cardSteps(card);
+  // A backfilled week must be rendered as it stood then. Later board moves
+  // cannot change an earlier report's actor or elapsed time.
+  const allSteps = cardSteps(card)
+    .filter((step) => !step.startedAt || Date.parse(step.startedAt) < Date.parse(to))
+    .map((step) => step.endedAt && Date.parse(step.endedAt) >= Date.parse(to)
+      ? { ...step, by: step.enteredBy ?? step.by, endedAt: null }
+      : step);
   // Which of the card's steps own a trace in this week (a trace lands on the
   // last step that started at or before it). Used to keep a continued card's
   // in-week steps and drop its earlier ones.
@@ -293,10 +300,15 @@ function cardLine(card, cardTraces, { acceptedInWeek = true, from, to } = {}) {
   const steps = acceptedInWeek
     ? allSteps
     : allSteps.filter(
-        (step, index) => within(step.startedAt, from, to) || stepHasWeekTrace.has(index),
+        (step, index) => within(step.startedAt, from, to) || within(step.endedAt, from, to) || stepHasWeekTrace.has(index),
       );
+  const boundedSteps = steps.map((step) => ({
+    ...step,
+    startedAt: step.startedAt && Date.parse(step.startedAt) < Date.parse(from) ? from : step.startedAt,
+    endedAt: step.endedAt && Date.parse(step.endedAt) > Date.parse(to) ? to : step.endedAt,
+  }));
   const { buckets, unattached } = tracesByStep(steps, cardTraces);
-  const stepLines = steps.map((step, index) => stepLine(step, buckets[index]));
+  const stepLines = boundedSteps.map((step, index) => stepLine(step, buckets[index]));
   const unattachedLine = stepLine(
     { stage: 'other Factory work', by: 'factory', startedAt: null, endedAt: null },
     unattached,
@@ -307,7 +319,9 @@ function cardLine(card, cardTraces, { acceptedInWeek = true, from, to } = {}) {
   const failedAttempts = cardTraces.filter((trace) => trace.outcome === 'failed-attempt').length;
   const enteredAt = card.enteredAt ?? allSteps[0]?.startedAt ?? card.createdAt;
   const lastStep = steps.at(-1);
-  const endedAt = card.doneAt ?? lastStep?.endedAt ?? lastStep?.startedAt ?? enteredAt;
+  const doneAsOfWeek = card.doneAt && Date.parse(card.doneAt) < Date.parse(to) ? card.doneAt : null;
+  const rawEnd = doneAsOfWeek ?? lastStep?.endedAt ?? lastStep?.startedAt ?? enteredAt;
+  const endedAt = rawEnd && Date.parse(rawEnd) > Date.parse(to) ? to : rawEnd;
   let elapsedMs;
   if (acceptedInWeek) {
     elapsedMs = enteredAt && endedAt ? Date.parse(endedAt) - Date.parse(enteredAt) : 0;
@@ -343,7 +357,9 @@ function cardLine(card, cardTraces, { acceptedInWeek = true, from, to } = {}) {
   }
 
   const { byHand, doneByFactory } = doneByFactoryFor(allSteps);
-  const parts = [`#${card.number} ${card.title}`, usd(costUsd), duration(elapsedMs)];
+  const reference = String(card.number).startsWith('PR-') ? `PR #${String(card.number).slice(3)}`
+    : String(card.number).startsWith('Factory-') ? `Factory card ${String(card.number).slice(8)}` : `#${card.number}`;
+  const parts = [`${reference} ${card.title}`, usd(costUsd), duration(elapsedMs)];
   const failedPhrase = failedAttemptPhrase(failedAttempts);
   if (failedPhrase) parts.push(failedPhrase);
   parts.push(doneByFactory ? 'Done by Factory' : `not all by Factory: ${actorName(byHand.by)} ${byHand.stage}`);
@@ -380,8 +396,14 @@ export function buildMondayNote({ cards = [], traces = [], from, to }) {
   // week: a card accepted earlier but built this week is this week's note, not
   // dropped. Filtering on entry alone would silently exclude it and then fail
   // closed on its trace as uncorrelated.
-  const weekCards = cards.filter(
-    (card) => within(cardEntry(card), from, to) || cardsWithWeekTraces.has(card.number),
+  const weekCards = cards.filter((card) =>
+    within(cardEntry(card), from, to) || cardsWithWeekTraces.has(card.number) ||
+    cardSteps(card).some((step) => {
+      const entered = Date.parse(cardEntry(card));
+      const activity = Date.parse(step.startedAt ?? step.endedAt);
+      return (!Number.isFinite(entered) || activity >= entered) &&
+        (within(step.startedAt, from, to) || within(step.endedAt, from, to));
+    }),
   );
   const weekNumbers = new Set(weekCards.map((card) => card.number));
   // Fail closed before building any line: a missing cost is never $0 and a

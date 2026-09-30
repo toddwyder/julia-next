@@ -45,8 +45,10 @@ export const FACTORY_CARDS_SQL = readFileSync(new URL('./factory-cards.sql', imp
 export function normalizeWorkItemRows(rows = []) {
   const cards = [];
   for (const row of rows) {
-    const number = typeof row.number === 'number' ? row.number : Number(row.number);
-    if (!Number.isFinite(number) || number <= 0) continue;
+    const number = typeof row.number === 'number' ? row.number : String(row.number ?? '');
+    if ((typeof number === 'number' && (!Number.isSafeInteger(number) || number <= 0)) || !number) {
+      throw new Error('Factory card has no usable reference; refusing an incomplete cost report');
+    }
     const stageHistory = Array.isArray(row.stage_history) ? row.stage_history : [];
     cards.push({
       number,

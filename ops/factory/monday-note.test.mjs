@@ -180,6 +180,25 @@ test('splitting the period into weeks counts every card and trace exactly once',
   assert.equal(second.uncorrelatedUsd, 0);
 });
 
+test('backfill does not include future steps or future elapsed time', () => {
+  const card = {
+    number: 401, title: 'Cross-week build', enteredAt: '2026-09-22T09:00:00Z',
+    doneAt: '2026-09-29T12:00:00Z',
+    stageHistory: [
+      { stage: 'planning', enteredAt: '2026-09-22T09:00:00Z', exitedAt: '2026-09-22T09:30:00Z', by: 'agent:a', exitedBy: 'agent:a' },
+      { stage: 'execute', enteredAt: '2026-09-29T09:00:00Z', exitedAt: '2026-09-29T12:00:00Z', by: 'agent:a', exitedBy: 'todd' },
+    ],
+  };
+  const first = buildMondayNote({ cards: [card], traces: [], from: '2026-09-21T00:00:00Z', to: '2026-09-28T00:00:00Z' });
+  assert.equal(first.lines.length, 1);
+  assert.equal(first.lines[0].doneByFactory, true);
+  assert.equal(first.lines[0].elapsedMs, 30 * 60 * 1000);
+  assert.doesNotMatch(first.body, /build — Todd/);
+  const second = buildMondayNote({ cards: [card], traces: [], from: '2026-09-28T00:00:00Z', to: '2026-10-05T00:00:00Z' });
+  assert.equal(second.lines.length, 1, 'a trace-free hand move is still reported in its week');
+  assert.equal(second.lines[0].doneByFactory, false);
+});
+
 test('an uncorrelated cost-bearing span fails closed instead of being reported or dropped', () => {
   // A model span that names no card is a correlation failure: folding it onto a
   // card would lie, and printing it as its own line would still publish a note

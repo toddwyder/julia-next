@@ -375,6 +375,15 @@ reviews in this repository's workflow permissions.
 
 The route reads only public Julia-next PRs and their linked GitHub issues. A
 PR must say `Closes #N`; the issue must have an Acceptance criteria checklist.
-The reviewer refuses a changed head or missing criterion evidence. Mastra's
-storage exporter records its spans with the Factory traces. The Action never
-receives the DeepSeek key.
+A PR whose diff is over 180,000 characters is reviewed through the registered
+`prReviewWorkflow`, which feeds the reviewer agent bounded file batches and
+hands the criterion verdict only the batched findings -- never the whole diff
+([Mastra workflows](https://mastra.ai/docs/workflows/overview)). The reviewer
+refuses a changed head (checked before and after the batched review) or missing
+criterion evidence. If the workflow skips a reviewable file (an unreviewed
+deletion-only source change), the route fails closed: it can never return
+APPROVE, and the verdict body names the unreviewed material. Files skipped by
+the shared non-reviewable patterns (locks, binaries, build output, snapshots)
+are recorded as findings with evidence but do not block approval. Mastra's
+storage exporter records its spans with the Factory
+traces. The Action never receives the DeepSeek key.

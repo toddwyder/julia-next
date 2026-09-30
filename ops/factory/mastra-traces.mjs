@@ -72,17 +72,16 @@ export async function readTraceSpans({ factoryUrl, from, to, fetchImpl = fetch, 
 
     // The response pagination is `{ total, page, perPage, hasMore }`
     // (listTracesResponseSchema in @mastra/core observability tracing).
-    const pagination = isObject(body.pagination) ? body.pagination : {};
-    const hasMore = pagination.hasMore === true;
-    const nextPage = Number(pagination.page ?? page) + 1;
-    if (!hasMore || body.spans.length === 0) {
-      break;
-    }
-    if (!Number.isFinite(nextPage)) {
+    const pagination = body.pagination;
+    if (!isObject(pagination) || typeof pagination.hasMore !== 'boolean' || pagination.page !== page) {
       throw new Error('Mastra trace list returned an unusable pagination object');
     }
+    if (!pagination.hasMore) return collected;
+    if (body.spans.length === 0 || page === MAX_PAGES - 1) {
+      throw new Error('Mastra trace list pagination was incomplete; refusing a partial cost report');
+    }
   }
-  return collected;
+  throw new Error('Mastra trace list exceeded pagination limit; refusing a partial cost report');
 }
 
 function toIso(value) {

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { pushBranch } from './publish-pr.mjs';
@@ -76,6 +76,34 @@ test('pushBranch refuses a real repo-local insteadOf rewrite before minting a to
     assert.equal(pushAttempts(), 0);
     assert.equal(tokenMints(), 0);
     assert.equal((await git(['for-each-ref', '--format=%(refname)'], bare)).stdout, '');
+  });
+});
+
+test('pushBranch accepts a clean real repository under the isolated global-config setup (regression: GIT_CONFIG_GLOBAL must point at an existing empty file before git runs)', async () => {
+  await withRepositories(async ({ branch, options, pushAttempts }) => {
+    // The publisher points GIT_CONFIG_GLOBAL at a path inside a fresh
+    // mkdtemp directory but, before the repair, never creates the file.
+    // This wraps the injected exec to observe that path at the exact
+    // moment the rewrite check runs -- the same isolated global-config
+    // setup the real publisher uses.
+    const configPathsSeen = [];
+    const injected = options.execImpl;
+    options.execImpl = async (command, args, execOptions) => {
+      const configPath = execOptions.env.GIT_CONFIG_GLOBAL;
+      if (args.includes('--get-regexp')) {
+        configPathsSeen.push({ path: configPath, exists: existsSync(configPath) });
+      }
+      return injected(command, args, execOptions);
+    };
+
+    // A clean repo with no url.*.insteadOf rewrite must pass the safety
+    // check, not be blocked by a missing global-config file.
+    assert.deepEqual(await pushBranch(options), { pushed: true, branch });
+    assert.equal(pushAttempts(), 1);
+    assert.equal(configPathsSeen.length, 1);
+    assert.ok(configPathsSeen[0].path, 'expected GIT_CONFIG_GLOBAL to be set for the check');
+    assert.ok(configPathsSeen[0].exists,
+      'GIT_CONFIG_GLOBAL must point at an existing empty file before git runs');
   });
 });
 

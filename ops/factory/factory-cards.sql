@@ -3,7 +3,14 @@
 -- wait watcher uses; the project id is passed with -v project_id=...
 BEGIN TRANSACTION READ ONLY;
 SELECT jsonb_build_object(
-  'number', (w.metadata->>'number')::int,
+  'number', CASE
+    WHEN w.board = 'review' AND w.external_source->>'externalId' ~ '^github-pr:[0-9]+$'
+      THEN 'PR-' || split_part(w.external_source->>'externalId', ':', 2)
+    WHEN w.board = 'work' AND w.external_source->>'externalId' ~ '^github-issue:[0-9]+$'
+      THEN split_part(w.external_source->>'externalId', ':', 2)
+    WHEN w.metadata->>'number' ~ '^[0-9]+$' THEN w.metadata->>'number'
+    ELSE 'Factory-' || w.id::text
+  END,
   'title', w.title,
   'board', w.board,
   'stages', w.stages,
@@ -15,5 +22,5 @@ SELECT jsonb_build_object(
 )::text
 FROM work_items w
 WHERE w.factory_project_id = :'project_id'
-  AND w.board = 'work';
+  AND w.board IN ('work', 'review');
 COMMIT;

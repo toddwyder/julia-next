@@ -67,7 +67,7 @@ test('the trace route is the one the pinned mastra CLI wraps', () => {
 });
 
 test('readTraceSpans asks the supported route and reads the spans list', async () => {
-  const fake = fakeFetch(() => jsonResponse({ spans: [generationSpan], pagination: { page: 0, totalPages: 1 } }));
+  const fake = fakeFetch(() => jsonResponse({ spans: [generationSpan], pagination: { page: 0, totalPages: 1, hasMore: false } }));
 
   const spans = await readTraceSpans({
     factoryUrl: 'https://factory.example',
@@ -114,6 +114,22 @@ test('a response without a spans list fails closed rather than reporting zero co
   await assert.rejects(
     () => readTraceSpans({ factoryUrl: 'https://factory.example', from: FROM, to: TO, fetchImpl: fake.fetch }),
     /trace list|spans|not the supported shape/i,
+  );
+});
+
+test('missing pagination fails closed instead of returning a partial cost report', async () => {
+  const fake = fakeFetch(() => jsonResponse({ spans: [generationSpan] }));
+  await assert.rejects(
+    () => readTraceSpans({ factoryUrl: 'https://factory.example', from: FROM, to: TO, fetchImpl: fake.fetch }),
+    /pagination/,
+  );
+});
+
+test('empty page claiming more data fails closed', async () => {
+  const fake = fakeFetch(() => jsonResponse({ spans: [], pagination: { page: 0, hasMore: true } }));
+  await assert.rejects(
+    () => readTraceSpans({ factoryUrl: 'https://factory.example', from: FROM, to: TO, fetchImpl: fake.fetch }),
+    /partial cost report/,
   );
 });
 
