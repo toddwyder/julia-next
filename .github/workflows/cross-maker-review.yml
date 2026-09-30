@@ -1,0 +1,31 @@
+name: Cross-maker review
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: cross-maker-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Ask the Mastra reviewer and submit its GitHub review
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          JULIA_REVIEW_ROUTE_SECRET: ${{ secrets.JULIA_REVIEW_ROUTE_SECRET }}
+        run: node .github/scripts/request-cross-maker-review.mjs

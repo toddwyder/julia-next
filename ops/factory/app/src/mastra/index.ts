@@ -39,6 +39,10 @@ import { PlatformJiraIntegration } from '@mastra/factory/integrations/platform/j
 import { LinearIntegration } from '@mastra/factory/integrations/linear/integration';
 import { SlackIntegration } from '@mastra/factory/integrations/slack/integration';
 import type { IMastraAuthProvider } from '@mastra/core/server';
+import { codeReviewAgent } from './reviewer/agents/code-review-agent';
+import { workflowReviewAgent } from './reviewer/agents/workflow-review-agent';
+import { prReviewWorkflow } from './reviewer/workflows/pr-review-workflow';
+import { reviewerRoute } from './reviewer/route';
 
 /**
  * Parse a positive-integer env knob; anything else means "use the default".
@@ -456,6 +460,12 @@ const preparedArgs = await factory.prepare();
 // properties explicit so deploy builds can statically detect the worker topology.
 export const mastra = new Mastra({
   ...preparedArgs,
+  agents: { ...preparedArgs.agents, codeReviewAgent, workflowReviewAgent },
+  workflows: { ...preparedArgs.workflows, prReviewWorkflow },
+  server: {
+    ...preparedArgs.server,
+    apiRoutes: [...(preparedArgs.server?.apiRoutes ?? []), reviewerRoute],
+  },
   storage: preparedArgs.storage,
   pubsub: preparedArgs.pubsub,
   workers: preparedArgs.workers,

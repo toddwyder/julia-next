@@ -172,3 +172,30 @@ Inspect current waits without publishing:
 ```sh
 sudo -u julia-factory python3 /var/lib/julia-factory/app/ops/factory/wait-alerts.py --dry-run
 ```
+
+## Cross-maker PR reviewer
+
+The reviewer is based on Mastra's Apache-2.0 `template-github-review-agent`
+at commit `15f09d4e6fe2230153e1c4551a72250b1b5c009e`. Its agents, workflow,
+GitHub readers, workspace skills, and observational memory live in
+`app/src/mastra/reviewer/`. A signed GitHub `pull_request_target` action calls
+the app's supported `registerApiRoute` endpoint. The action submits a
+commit-bound GitHub review as `github-actions[bot]`; it checks out only the
+base branch and never executes PR code.
+
+The service needs `DEEPSEEK_API_KEY` and `JULIA_REVIEW_ROUTE_SECRET`. Set the
+same route secret as a GitHub Actions repository secret. Optional
+`JULIA_REVIEWER_MODELS` is an ordered comma-separated list of Mastra
+`provider/model` IDs, starting with `deepseek/deepseek-v4-pro`;
+`JULIA_BUILDER_MODEL` defaults to `openai/gpt-6-sol`. Startup rejects any
+reviewer model from the builder's provider. Observational memory uses
+`deepseek/deepseek-v4-flash`. Add `github-actions[bot]` to
+`MASTRACODE_GITHUB_AUTHORIZED_BOTS` so Factory's GitHub rule forwards a
+requested change to its Work session. GitHub Actions must allow approval
+reviews in this repository's workflow permissions.
+
+The route reads only public Julia-next PRs and their linked GitHub issues. A
+PR must say `Closes #N`; the issue must have an Acceptance criteria checklist.
+The reviewer refuses a changed head or missing criterion evidence. Mastra's
+storage exporter records its spans with the Factory traces. The Action never
+receives the DeepSeek key.

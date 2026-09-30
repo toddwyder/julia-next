@@ -14,10 +14,16 @@ for file in "${files[@]}"; do
     exit 1
   fi
 done
+if [[ ! -d "$source_dir/src/mastra/reviewer/workspace/skills" ]]; then
+  echo "missing Mastra reviewer template and workspace skills" >&2
+  exit 1
+fi
 for file in "${files[@]}"; do
   mkdir -p "$(dirname -- "$app_dir/$file")"
   cp -- "$source_dir/$file" "$app_dir/$file"
 done
+mkdir -p "$app_dir/src/mastra/reviewer"
+cp -a "$source_dir/src/mastra/reviewer/." "$app_dir/src/mastra/reviewer/"
 printf 'Installing Factory from %s into %s\n' "$source_dir" "$app_dir"
 cd "$app_dir"
 npm ci
