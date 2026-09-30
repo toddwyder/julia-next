@@ -180,8 +180,9 @@ at commit `15f09d4e6fe2230153e1c4551a72250b1b5c009e`. Its agents, workflow,
 GitHub readers, workspace skills, and observational memory live in
 `app/src/mastra/reviewer/`. A signed GitHub `pull_request_target` action calls
 the app's supported `registerApiRoute` endpoint. The action submits a
-commit-bound GitHub review as `github-actions[bot]`; it checks out only the
-base branch and never executes PR code.
+commit-bound GitHub review and checks out only the base branch; it never
+executes PR code. Configure a dedicated reviewer GitHub App as described
+below before treating its identity criterion as complete.
 
 The service needs `DEEPSEEK_API_KEY` and `JULIA_REVIEW_ROUTE_SECRET`. Set the
 same route secret as a GitHub Actions repository secret. Optional
@@ -189,10 +190,21 @@ same route secret as a GitHub Actions repository secret. Optional
 `provider/model` IDs, starting with `deepseek/deepseek-v4-pro`;
 `JULIA_BUILDER_MODEL` defaults to `openai/gpt-6-sol`. Startup rejects any
 reviewer model from the builder's provider. Observational memory uses
-`deepseek/deepseek-v4-flash`. Add `github-actions[bot]` to
-`MASTRACODE_GITHUB_AUTHORIZED_BOTS` so Factory's GitHub rule forwards a
-requested change to its Work session. GitHub Actions must allow approval
-reviews in this repository's workflow permissions.
+`deepseek/deepseek-v4-flash`. GitHub Actions must allow approval reviews in
+this repository's workflow permissions.
+
+Register a private GitHub App named `julia-cross-maker-reviewer` with only
+**Pull requests: Read and write** and **Issues: Read and write** repository
+permissions, with webhooks disabled. Install it on `toddwyder/julia-next`
+only. Generate its private key and set repository variable
+`JULIA_REVIEWER_APP_ID` to the App ID and repository secret
+`JULIA_REVIEWER_APP_PRIVATE_KEY` to the PEM contents. The workflow mints a
+short-lived installation token scoped to this repository and those two
+permissions. Add the app's `<slug>[bot]` login to
+`MASTRACODE_GITHUB_AUTHORIZED_BOTS` so Factory's GitHub rule returns its
+requested changes to the Work session. Until the App ID is configured, the
+workflow uses the built-in `github-actions[bot]` identity, which proves the
+review flow but is not the dedicated reviewer App identity.
 
 The route reads only public Julia-next PRs and their linked GitHub issues. A
 PR must say `Closes #N`; the issue must have an Acceptance criteria checklist.
