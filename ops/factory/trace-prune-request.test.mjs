@@ -74,3 +74,19 @@ test('the installed systemd unit runs this prune program, not the read-only chec
   // The route secret comes from a root-owned environment file, never argv.
   assert.match(service, /EnvironmentFile=/);
 });
+
+test('the app exposes the signed retention route and hands the store a checkpoint', () => {
+  // The systemd program calls this route inside the process that owns the
+  // DuckDB lock; the entry must register the route and wire the documented
+  // CHECKPOINT the guard needs. Text assertions so this runs without
+  // node_modules.
+  const entry = readFileSync(new URL('./app/src/mastra/index.ts', import.meta.url), 'utf8');
+  const route = readFileSync(new URL('./app/src/mastra/observability-retention-route.ts', import.meta.url), 'utf8');
+
+  assert.match(entry, /observabilityRetentionRoute/);
+  assert.match(entry, /apiRoutes:.*observabilityRetentionRoute/s);
+  assert.match(entry, /checkpoint:\s*\(\)\s*=>\s*observabilityDuckDB\.db\.execute\('CHECKPOINT'\)/);
+  assert.match(route, /registerApiRoute\('\/julia\/run-retention'/);
+  assert.match(route, /x-julia-retention-signature/);
+  assert.match(route, /JULIA_RETENTION_ROUTE_SECRET/);
+});

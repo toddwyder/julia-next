@@ -17,6 +17,7 @@ cp "$root"/ops/factory/*.mjs "$root"/ops/factory/*.sql "$root"/ops/factory/*.ser
 cp "$root/ops/factory/app/src/mastra/index.ts" "$work/ops/factory/app/src/mastra/index.ts"
 cp "$root/ops/factory/app/src/mastra/observability-store.ts" "$work/ops/factory/app/src/mastra/observability-store.ts"
 cp "$root/ops/factory/app/src/mastra/observability-retention.ts" "$work/ops/factory/app/src/mastra/observability-retention.ts"
+cp "$root/ops/factory/app/src/mastra/observability-retention-route.ts" "$work/ops/factory/app/src/mastra/observability-retention-route.ts"
 cp "$root/scripts/agent-docs.test.mjs" "$work/scripts/"
 cp -r "$root/docs" "$work/docs"
 

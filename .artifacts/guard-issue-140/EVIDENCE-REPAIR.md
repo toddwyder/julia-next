@@ -18,10 +18,10 @@ or database touched.
 ```
 node --test scripts/agent-docs.test.mjs scripts/line-endings.test.mjs \
   scripts/no-personal-paths.test.mjs ops/factory/*.test.mjs
-# tests 106 / pass 106 / fail 0
+# tests 107 / pass 107 / fail 0
 ```
 
-CI's exact test list (with the #140 additions) passes 129 / 0:
+CI's exact test list (with the #140 additions) passes 130 / 0:
 
 ```
 node --test scripts/agent-docs.test.mjs scripts/line-endings.test.mjs \
@@ -33,7 +33,7 @@ node --test scripts/agent-docs.test.mjs scripts/line-endings.test.mjs \
   ops/factory/monday-note-units.test.mjs ops/factory/mastra-traces.test.mjs \
   ops/factory/factory-cards.test.mjs ops/factory/trace-retention.test.mjs \
   ops/factory/trace-prune-request.test.mjs
-# tests 129 / pass 129 / fail 0
+# tests 130 / pass 130 / fail 0
 ```
 
 Also:
@@ -64,7 +64,7 @@ captured run is `GUARD-EVIDENCE-2.txt`.
 | `factory-cards.mjs` | fail 1 | 5 pass |
 | `monday-note-run.mjs` | fail 1 | 12 pass |
 | `trace-retention.mjs` | fail 1 | 15 pass |
-| `trace-prune-request.mjs` | fail 1 | 4 pass |
+| `trace-prune-request.mjs` | fail 1 | 5 pass |
 | `monday-note.mjs` | fail 1 | 25 pass |
 
 Docs guard: the exceptions/test guard now asserts the #140 row is **approved by
