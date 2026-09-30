@@ -24,18 +24,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - uses: actions/create-github-app-token@v3
-        id: reviewer_app
-        if: ${{ vars.JULIA_REVIEWER_APP_ID != '' }}
-        with:
-          app-id: ${{ vars.JULIA_REVIEWER_APP_ID }}
-          private-key: ${{ secrets.JULIA_REVIEWER_APP_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
-          repositories: julia-next
-          permission-pull-requests: write
-          permission-issues: write
       - name: Ask the Mastra reviewer and submit its GitHub review
         env:
-          GITHUB_TOKEN: ${{ steps.reviewer_app.outputs.token || github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
           JULIA_REVIEW_ROUTE_SECRET: ${{ secrets.JULIA_REVIEW_ROUTE_SECRET }}
         run: node .github/scripts/request-cross-maker-review.mjs
