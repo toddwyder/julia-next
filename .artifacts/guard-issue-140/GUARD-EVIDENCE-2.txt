@@ -3,14 +3,14 @@ not ok 1 - ops/factory/mastra-traces.test.mjs
 # pass 0
 # fail 1
 == mastra-traces.mjs: shipped (green) ==
-# pass 9
+# pass 12
 # fail 0
 == monday-note-adapters.mjs: guard (module removed) ==
 not ok 1 - ops/factory/monday-note-adapters.test.mjs
 # pass 0
 # fail 1
 == monday-note-adapters.mjs: shipped (green) ==
-# pass 7
+# pass 8
 # fail 0
 == factory-cards.mjs: guard (module removed) ==
 not ok 1 - ops/factory/factory-cards.test.mjs
@@ -24,19 +24,26 @@ not ok 1 - ops/factory/monday-note-run.test.mjs
 # pass 0
 # fail 1
 == monday-note-run.mjs: shipped (green) ==
-# pass 6
+# pass 12
 # fail 0
 == trace-retention.mjs: guard (module removed) ==
 not ok 1 - ops/factory/trace-retention.test.mjs
 # pass 0
 # fail 1
 == trace-retention.mjs: shipped (green) ==
-# pass 8
+# pass 13
+# fail 0
+== trace-prune-request.mjs: guard (module removed) ==
+not ok 1 - ops/factory/trace-prune-request.test.mjs
+# pass 0
+# fail 1
+== trace-prune-request.mjs: shipped (green) ==
+# pass 4
 # fail 0
 == monday-note.mjs: guard (module removed) ==
 not ok 1 - ops/factory/monday-note.test.mjs
 # pass 0
 # fail 1
 == monday-note.mjs: shipped (green) ==
-# pass 17
+# pass 25
 # fail 0

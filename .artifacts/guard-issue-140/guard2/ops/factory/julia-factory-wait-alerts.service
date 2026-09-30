@@ -1,0 +1,17 @@
+[Unit]
+Description=Notify Todd about actionable Factory waits
+After=network-online.target postgresql.service julia-factory-trial.service
+Wants=network-online.target
+ConditionPathExists=/etc/julia-factory-wait-alerts/discord-ready
+
+[Service]
+Type=oneshot
+User=julia-factory
+Group=julia-factory
+ExecStart=/usr/bin/python3 /var/lib/julia-factory/app/ops/factory/wait-alerts.py
+StateDirectory=julia-factory-wait-alerts
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/julia-factory-wait-alerts
+NoNewPrivileges=true
+PrivateTmp=true

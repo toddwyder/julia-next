@@ -1,0 +1,18 @@
+[Unit]
+Description=Post the weekly Factory Monday note and notify Todd
+After=network-online.target postgresql.service julia-factory-trial.service
+Wants=network-online.target
+ConditionPathExists=/etc/julia-factory-monday-note/config.env
+
+[Service]
+Type=oneshot
+User=julia-factory
+Group=julia-factory
+# The token and webhook come from the root-owned config, never argv.
+EnvironmentFile=/etc/julia-factory-monday-note/config.env
+ExecStart=/usr/bin/node /var/lib/julia-factory/app/ops/factory/monday-note-run.mjs
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/var/lib/julia-factory/.local/share/mastracode
+NoNewPrivileges=true
+PrivateTmp=true

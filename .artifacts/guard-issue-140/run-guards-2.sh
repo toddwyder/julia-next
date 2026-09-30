@@ -13,8 +13,10 @@ rm -rf "$work"
 mkdir -p "$work/ops/factory" "$work/scripts" "$work/ops/factory/app/src/mastra"
 
 # Everything the factory tests read.
-cp "$root"/ops/factory/*.mjs "$root"/ops/factory/*.sql "$work/ops/factory/"
+cp "$root"/ops/factory/*.mjs "$root"/ops/factory/*.sql "$root"/ops/factory/*.service "$root"/ops/factory/*.timer "$work/ops/factory/"
 cp "$root/ops/factory/app/src/mastra/index.ts" "$work/ops/factory/app/src/mastra/index.ts"
+cp "$root/ops/factory/app/src/mastra/observability-store.ts" "$work/ops/factory/app/src/mastra/observability-store.ts"
+cp "$root/ops/factory/app/src/mastra/observability-retention.ts" "$work/ops/factory/app/src/mastra/observability-retention.ts"
 cp "$root/scripts/agent-docs.test.mjs" "$work/scripts/"
 cp -r "$root/docs" "$work/docs"
 
@@ -36,6 +38,7 @@ for spec in \
   "factory-cards.test.mjs factory-cards.mjs" \
   "monday-note-run.test.mjs monday-note-run.mjs" \
   "trace-retention.test.mjs trace-retention.mjs" \
+  "trace-prune-request.test.mjs trace-prune-request.mjs" \
   "monday-note.test.mjs monday-note.mjs" ; do
   set -- $spec
   echo "== $2: guard (module removed) =="
