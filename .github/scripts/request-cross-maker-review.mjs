@@ -39,3 +39,22 @@ const reviewResponse = await fetch(`https://api.github.com/repos/${owner}/${repo
 if (!reviewResponse.ok) throw new Error(`GitHub review submission failed: HTTP ${reviewResponse.status}: ${await reviewResponse.text()}`);
 const submitted = await reviewResponse.json();
 console.log(`Submitted ${submitted.state} review ${submitted.html_url} for ${headSha}`);
+
+// Factory routes PR conversation comments back to the original Work session.
+// GitHub review webhooks alone are not routed there in the installed connector.
+if (review.verdict === 'REQUEST_CHANGES') {
+  const relayResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${pullNumber}/comments`, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+      accept: 'application/vnd.github+json',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      body: `Cross-maker reviewer requested changes on ${headSha}: ${submitted.html_url}\n\nBuilder: address that GitHub review and push the repair to this PR branch.`,
+    }),
+  });
+  if (!relayResponse.ok)
+    throw new Error(`GitHub review relay failed: HTTP ${relayResponse.status}: ${await relayResponse.text()}`);
+  console.log(`Relayed requested changes to Factory via PR comment ${(await relayResponse.json()).html_url}`);
+}
