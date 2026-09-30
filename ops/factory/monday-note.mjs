@@ -67,24 +67,39 @@ function duration(ms) {
 /**
  * Cost correlation is never guessed and never turned into `$0.00`.
  *
- * Every span the trace reader returned for the week is a model run and must
- * carry a numeric `estimatedCost`; a span without one is a failed read, not a
- * free run. Every span must also correlate to a card in this note through its
- * session: a cost-bearing span that names no card (or a card outside the week)
- * is a correlation failure. Numeric zero is valid -- a real free model call is
- * `0`, not missing. This is fail-closed: the caller must let the error stop the
- * run rather than publish a note whose totals might be wrong.
+ * A span is cost-bearing when Mastra's own record says it is a model span
+ * (`normalizeTraceSpans` sets `costBearing`) or when it already carries a
+ * numeric cost. Every cost-bearing span in the week must both name a card in
+ * this note and carry a numeric `estimatedCost`:
+ *
+ *   - cost-bearing, no numeric cost  -> failed read, fail closed (never `$0.00`);
+ *   - cost-bearing, no card in week  -> correlation failure, fail closed;
+ *   - a span whose `costBearing` is unknown (not a normalised record) is
+ *     treated as cost-bearing, so an unlabelled span can never slip through.
+ *
+ * Numeric zero is valid -- a real free model call is `0`, not missing. A span
+ * Mastra does not bill (a tool, RAG, processor or generic span with no
+ * `costContext`) is not cost-bearing and does not have to carry a cost.
  */
 export function assertCostsAreCorrelated(weekTraces, weekCardNumbers) {
   for (const trace of weekTraces) {
     const cost = trace.costUsd;
     const costKnown = typeof cost === 'number' && Number.isFinite(cost);
     const correlated = trace.card !== null && trace.card !== undefined && weekCardNumbers.has(trace.card);
+    // `true` is cost-bearing; `false` is provably not; anything else is
+    // unknown and fails closed rather than being assumed free.
+    const costBearing = trace.costBearing !== false;
 
-    if (correlated && !costKnown) {
+    if (correlated && costBearing && !costKnown) {
       throw new Error(
         `Trace ${trace.id ?? '(no id)'} is correlated to card ${trace.card} but has no numeric estimated cost; ` +
           'refusing to report it as $0.00',
+      );
+    }
+    if (!correlated && costBearing && !costKnown) {
+      throw new Error(
+        `Trace ${trace.id ?? '(no id)'} has no numeric estimated cost and is not correlated to a card in this week; ` +
+          'refusing to publish a note that could hide a cost as $0.00',
       );
     }
     if (!correlated && costKnown) {
@@ -278,13 +293,35 @@ export function buildMondayNote({ cards = [], traces = [], from, to }) {
   const failedAttempts = lines.reduce((sum, line) => sum + line.failedAttempts, 0);
   const spentPhrase = failedAttemptPhrase(failedAttempts);
 
+  // The body is what Todd reads, so every fact the note computed is written
+  // here, not left in the returned metadata: the card line carries the card's
+  // cost (failed attempts included) and total elapsed, and each step below it
+  // carries the step's actor and, when Factory recorded one, the step's time.
+  const bodyLines = [];
+  if (lines.length > 0) {
+    for (const line of lines) {
+      bodyLines.push(line.text);
+      for (const step of line.steps) bodyLines.push(`  • ${step.text}`);
+    }
+  } else {
+    bodyLines.push('No cards were accepted this week.');
+  }
+
+  // An uncorrelated span can no longer carry an unknown cost (that fails closed
+  // above), so its dollars are never printed as `$0.00`. When it does carry a
+  // known numeric cost (which the assertion forbids today), show it; otherwise
+  // report the count alone rather than inventing a zero.
+  const uncorrelatedLine = uncorrelated.length > 0
+    ? `${uncorrelated.length} trace(s) not matched to a card${
+        uncorrelatedUsd > 0 ? `, totalling ${usd(uncorrelatedUsd)}` : ' (no recorded cost)'
+      }.`
+    : null;
+
   const body = [
     `Monday note — week ending ${to.slice(0, 10)}`,
     '',
-    ...(lines.length > 0 ? lines.map((line) => line.text) : ['No cards were accepted this week.']),
-    ...(uncorrelated.length > 0
-      ? ['', `Not matched to a card: ${usd(uncorrelatedUsd)} across ${uncorrelated.length} traces.`]
-      : []),
+    ...bodyLines,
+    ...(uncorrelatedLine ? ['', uncorrelatedLine] : []),
     '',
     `Total model spend: ${usd(totalUsd)} across ${weekCards.length} cards${spentPhrase ? ` (${spentPhrase})` : ''}.`,
     '',

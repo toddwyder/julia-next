@@ -139,7 +139,7 @@ test('a quiet week posts its Discussion and tells Todd it was quiet', async () =
 test('a trace whose cost is missing fails closed: nothing is posted or notified', async () => {
   const discussions = fakeDiscussions();
   const notifications = fakeNotifications();
-  const noCost = { ...SPANS[0], id: 's-nocost', sessionId: 'session-140', costUsd: undefined };
+  const noCost = { ...SPANS[0], id: 's-nocost', sessionId: 'session-140', spanType: 'model_generation', attributes: { model: 'x' } };
 
   await assert.rejects(
     () => runMondayNote({

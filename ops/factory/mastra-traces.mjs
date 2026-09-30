@@ -129,6 +129,26 @@ function spanPhase(span) {
   return 'build';
 }
 
+/**
+ * The span types Mastra bills. Any model span is cost-bearing even when its
+ * `costContext` is absent, so a missing cost on one is a failed read, never a
+ * free run. `@mastra/core` `SpanType` (observability/types/tracing).
+ */
+const MODEL_SPAN_TYPES = new Set(['model_generation', 'model_step', 'model_inference']);
+
+/**
+ * Is this span one that should carry a cost? A model span is cost-bearing by
+ * type; a span that carries `costContext` is cost-bearing by its own payload.
+ * Everything else (tool, RAG, processor, generic) is not billed, so it is not
+ * required to have a numeric cost.
+ */
+function isCostBearing(span) {
+  const type = span.spanType ?? span.type;
+  if (typeof type === 'string' && MODEL_SPAN_TYPES.has(type)) return true;
+  const attributes = isObject(span.attributes) ? span.attributes : {};
+  return isObject(attributes.costContext);
+}
+
 function failedOutcome(span) {
   if (span.error !== undefined && span.error !== null) return 'failed-attempt';
   const status = typeof span.status === 'string' ? span.status.toLowerCase() : '';
@@ -166,6 +186,9 @@ export function normalizeTraceSpans(spans = [], { cards = [] } = {}) {
       actor: 'Factory',
       startedAt: toIso(span.startedAt ?? span.startTime),
       endedAt: toIso(span.endedAt ?? span.endTime),
+      // Whether Mastra bills this span. A cost-bearing span with no numeric
+      // cost is a failed read, never a free run; the note fails closed on it.
+      costBearing: isCostBearing(span),
       costUsd: spanCostUsd(span),
       outcome: failedOutcome(span) ?? 'passed',
     };

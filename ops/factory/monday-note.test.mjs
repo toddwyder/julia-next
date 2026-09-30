@@ -77,6 +77,37 @@ test('each step is named with its actor, not just the card total', () => {
   );
 });
 
+test('the rendered body visibly contains every card step, its actor, its time, the card cost and the total elapsed', () => {
+  // Returned metadata is not enough: Todd reads the posted Discussion body, so
+  // every step the note knows about must appear there, with the actor who did
+  // it and the step's own time when Factory recorded one. The card line must
+  // carry the card's cost (failed attempts included) and the total elapsed.
+  const note = buildMondayNote({ cards: [stagedCard], traces: traces.filter((trace) => trace.card === 140), ...WEEK });
+
+  for (const step of note.lines[0].steps) {
+    assert.ok(note.body.includes(step.text), `body is missing step line: ${step.text}`);
+  }
+  // The actor and the step time are in the body, not only in metadata.
+  assert.match(note.body, /plan — Factory — \$0\.40 — 15m/);
+  assert.match(note.body, /build — Factory — \$5\.60 — 3h 15m — 1 failed attempt/);
+  assert.match(note.body, /#140 Monday note — \$6\.60 — 4h 12m — 1 failed attempt — Done by Factory/);
+});
+
+test('the body names a hand-moved step with the person, not Factory', () => {
+  const byHand = {
+    ...stagedCard,
+    number: 142,
+    stageHistory: [
+      { stage: 'planning', enteredAt: '2026-09-23T09:00:00Z', exitedAt: '2026-09-23T09:30:00Z', by: 'agent:run-1', exitedBy: 'agent:run-1' },
+      { stage: 'done', enteredAt: '2026-09-23T09:30:00Z', by: 'todd', exitedBy: 'todd' },
+    ],
+  };
+  const note = buildMondayNote({ cards: [byHand], traces: [], ...WEEK });
+
+  assert.match(note.body, /done — Todd/);
+  assert.match(note.body, /not all by Factory: Todd done/);
+});
+
 test('a step moved by hand names the person, not Factory', () => {
   const byHand = {
     ...stagedCard,
@@ -182,17 +213,50 @@ test('a correlated trace with no numeric estimated cost fails closed, never beco
   );
 });
 
-test('an uncorrelated span with no numeric cost is reported, not silently dropped, and does not fail', () => {
-  // A non-model span (no estimated cost) that names no card cannot inflate a
-  // card total, so it is listed as uncorrelated at $0.00 rather than failing the
-  // whole note.
-  const orphanNoCost = { id: 's9', card: null, correlated: false, phase: 'build', startedAt: '2026-09-22T10:00:00Z', endedAt: '2026-09-22T10:30:00Z', costUsd: null, outcome: 'passed' };
+test('an uncorrelated cost-bearing span with no numeric cost fails closed', () => {
+  // The old behaviour listed this as "$0.00 not matched to a card". A model
+  // span whose cost Mastra did not record is a failed read: it must not be
+  // shown as free, and it must not be dropped. The whole note fails.
+  const orphanModel = {
+    id: 's10',
+    card: null,
+    correlated: false,
+    costBearing: true,
+    phase: 'build',
+    startedAt: '2026-09-22T10:00:00Z',
+    endedAt: '2026-09-22T10:30:00Z',
+    costUsd: null,
+    outcome: 'passed',
+  };
   const card140Traces = traces.filter((trace) => trace.card === 140);
-  const note = buildMondayNote({ cards: [stagedCard], traces: [...card140Traces, orphanNoCost], ...WEEK });
+
+  assert.throws(
+    () => buildMondayNote({ cards: [stagedCard], traces: [...card140Traces, orphanModel], ...WEEK }),
+    /cost|correlat/i,
+  );
+});
+
+test('an unlabelled uncorrelated span with no numeric cost is treated as cost-bearing and fails closed', () => {
+  // A normalised record always declares `costBearing`. Anything that does not
+  // (a hand-shaped span) cannot be proven free, so it fails closed too.
+  const unlabelled = { id: 's11', card: null, correlated: false, phase: 'build', startedAt: '2026-09-22T10:00:00Z', endedAt: '2026-09-22T10:30:00Z', costUsd: null, outcome: 'passed' };
+  const card140Traces = traces.filter((trace) => trace.card === 140);
+
+  assert.throws(
+    () => buildMondayNote({ cards: [stagedCard], traces: [...card140Traces, unlabelled], ...WEEK }),
+    /cost|correlat/i,
+  );
+});
+
+test('a non-cost-bearing span with no cost may be uncorrelated without printing $0.00', () => {
+  // A tool/RAG/processor span with no costContext is not billed. It can be
+  // uncorrelated, but the body must never invent a $0.00 spend for it.
+  const toolSpan = { id: 's12', card: null, correlated: false, costBearing: false, phase: 'build', startedAt: '2026-09-22T10:00:00Z', endedAt: '2026-09-22T10:30:00Z', costUsd: null, outcome: 'passed' };
+  const card140Traces = traces.filter((trace) => trace.card === 140);
+  const note = buildMondayNote({ cards: [stagedCard], traces: [...card140Traces, toolSpan], ...WEEK });
 
   assert.equal(note.totalUsd, 6.6);
-  assert.equal(note.uncorrelatedUsd, 0);
-  assert.match(note.body, /[Nn]ot matched to a card/);
+  assert.doesNotMatch(note.body, /Not matched to a card: \$0\.00/);
 });
 
 test('a numeric zero estimated cost is valid and never fails the note', () => {

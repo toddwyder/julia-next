@@ -164,6 +164,31 @@ test('a span with no cost is reported as unknown, not as zero', () => {
   assert.equal(record.costUsd, null);
 });
 
+test('a model span is marked cost-bearing even when Mastra recorded no cost', () => {
+  // The note must fail closed on this: it is a billed span whose cost read
+  // failed, so treating it as free would publish a wrong total.
+  const noCost = { ...generationSpan, attributes: { model: 'x' } };
+  const [record] = normalizeTraceSpans([noCost]);
+
+  assert.equal(record.costBearing, true);
+  assert.equal(record.costUsd, null);
+});
+
+test('a costContext payload marks a span cost-bearing whatever its type', () => {
+  const toolWithCost = { ...generationSpan, spanType: 'tool_call', attributes: { costContext: { estimatedCost: 0.1 } } };
+  const [record] = normalizeTraceSpans([toolWithCost]);
+
+  assert.equal(record.costBearing, true);
+});
+
+test('a non-model span with no costContext is not cost-bearing', () => {
+  const tool = { ...generationSpan, spanType: 'tool_call', attributes: { tool: 'grep' } };
+  const [record] = normalizeTraceSpans([tool]);
+
+  assert.equal(record.costBearing, false);
+  assert.equal(record.costUsd, null);
+});
+
 function FROM_ISO(value) {
   return new Date(Date.parse(value)).toISOString();
 }
