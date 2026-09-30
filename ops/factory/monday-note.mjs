@@ -50,6 +50,17 @@ function firstStepByHand(movements) {
   return (movements ?? []).slice(1).find((movement) => movement.by !== 'factory');
 }
 
+/**
+ * A card belongs to a week when it entered the board inside `[from, to)`; a
+ * trace belongs when it started in the same window. Everything else is another
+ * week's note, so the same card is never counted in two weeks (CONTEXT.md
+ * "Monday note": the weekly summary).
+ */
+function within(instant, from, to) {
+  const at = Date.parse(instant);
+  return at >= Date.parse(from) && at < Date.parse(to);
+}
+
 function cardLine(card, cardTraces) {
   const costUsd = cardTraces.reduce((sum, trace) => sum + (trace.costUsd ?? 0), 0);
   const failedAttempts = cardTraces.filter((trace) => trace.outcome === 'failed-attempt').length;
@@ -75,10 +86,12 @@ function cardLine(card, cardTraces) {
  *            totalUsd: number, failedAttempts: number}}
  */
 export function buildMondayNote({ cards = [], traces = [], from, to }) {
-  const lines = cards.map((card) =>
+  const weekCards = cards.filter((card) => within(card.enteredAt, from, to));
+  const weekTraces = traces.filter((trace) => within(trace.startedAt, from, to));
+  const lines = weekCards.map((card) =>
     cardLine(
       card,
-      traces.filter((trace) => trace.card === card.number),
+      weekTraces.filter((trace) => trace.card === card.number),
     ),
   );
   const totalUsd = lines.reduce((sum, line) => sum + line.costUsd, 0);
@@ -90,7 +103,7 @@ export function buildMondayNote({ cards = [], traces = [], from, to }) {
     '',
     ...(lines.length > 0 ? lines.map((line) => line.text) : ['No cards were accepted this week.']),
     '',
-    `Total model spend: ${usd(totalUsd)} across ${cards.length} cards${spentPhrase ? ` (${spentPhrase})` : ''}.`,
+    `Total model spend: ${usd(totalUsd)} across ${weekCards.length} cards${spentPhrase ? ` (${spentPhrase})` : ''}.`,
     '',
     "Costs are read from Mastra's traces for this Factory project and Factory's own card records. Sessions run outside Factory (Codex, GPT, or Claude sessions started by hand) are not counted and never appear here.",
   ].join('\n');

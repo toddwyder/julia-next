@@ -64,6 +64,33 @@ test('each card gets one line with its trace cost, failed attempts, elapsed time
   assert.equal(note.failedAttempts, 1);
 });
 
+test('a card or trace outside the week window is left out of that week\'s note', () => {
+  const earlierCard = {
+    number: 139,
+    title: 'Last week\'s card',
+    enteredAt: '2026-09-19T09:00:00Z',
+    doneAt: '2026-09-19T10:00:00Z',
+    movements: [
+      { at: '2026-09-19T09:00:00Z', by: 'todd', what: 'started the card' },
+      { at: '2026-09-19T10:00:00Z', by: 'factory', what: 'merged the pull request' },
+    ],
+  };
+  const earlierTrace = { id: 's0', card: 139, phase: 'build', startedAt: '2026-09-19T09:05:00Z', endedAt: '2026-09-19T09:55:00Z', costUsd: 5, outcome: 'passed' };
+  // A trace for this week's card that landed after the week closed, plus a
+  // stale trace for the earlier card attached to this week's card number.
+  const afterWeekTrace = { id: 's6', card: 140, phase: 'review', startedAt: '2026-09-29T09:05:00Z', endedAt: '2026-09-29T09:55:00Z', costUsd: 9, outcome: 'failed-attempt' };
+
+  const note = buildMondayNote({
+    cards: [earlierCard, factoryCard],
+    traces: [...traces, earlierTrace, afterWeekTrace],
+    ...WEEK,
+  });
+
+  assert.deepEqual(note.lines.map((line) => line.number), [140]);
+  assert.equal(note.totalUsd, 6.6);
+  assert.equal(note.failedAttempts, 1);
+});
+
 test('the note says where the costs came from and that outside-Factory sessions are excluded', () => {
   const note = buildMondayNote({ cards: [factoryCard, handMovedCard], traces, ...WEEK });
 
