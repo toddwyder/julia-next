@@ -61,8 +61,10 @@ never retried.
 
 Operator check (read-only; run as `julia-factory`, never from the Factory sandbox):
 
-1. Confirm the supported retention is still configured: both storage backends in
-   `/var/lib/julia-factory/app/src/mastra/index.ts` pass `retention: DEFAULT_RETENTION`.
+1. The `DEFAULT_RETENTION` configuration is guarded by
+   `ops/factory/trace-retention.test.mjs`; a fresh CI run proves both storage backends still set
+   it. On the server, confirm the deployed
+   `/var/lib/julia-factory/app/src/mastra/index.ts` matches the repository copy.
 2. Record the store size:
    `sudo -u julia-factory du -h /var/lib/julia-factory/.local/share/mastracode/observability.duckdb`.
    Read traces through Mastra's own API (`npx mastra api trace list --url <factory>`), not a
