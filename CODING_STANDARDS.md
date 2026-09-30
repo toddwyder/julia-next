@@ -2,7 +2,8 @@
 
 - Read the framework's official docs before coding; post a framework map (need → framework feature → docs link) on the card.
 - Start from the framework's own example and change as little as possible.
-- Run `npm run lint:framework`. Hand-built progress files, retry or wait loops, and controller code over 400 lines need an ESLint skip comment with a reason and docs link, and must be listed on JUL-115.
+- Run `npm run lint:framework`. Hand-built progress files, retry or wait loops, and controller code over 400 lines need an ESLint skip comment with a reason and docs link, and must be listed on JUL-115. A test waits on the framework's own completion signal (a terminal event), never by polling a value; use the test runner's own timeout as the bound.
+- A classification or verdict over a record reads the whole record, never a filtered view built for display (for example, "Done by Factory" reads every card step, not only the week's visible steps).
 - Use the built-in feature of Factory, Mastra, or GitHub before building a workaround. If one is missing, state the gap, docs checked, and consequence to Todd before changing code.
 - A production check must measure the real artifact (a real file, a real API), never an injected fake; if the supported config cannot control the artifact, prove that and fail closed instead of reporting success.
 - Never render an unknown measurement as zero (a missing cost is not `$0.00`); fail the report closed and let a real numeric zero stay zero.

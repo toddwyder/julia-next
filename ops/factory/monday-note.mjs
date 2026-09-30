@@ -178,11 +178,16 @@ const STAGE_LABEL = {
  */
 function cardSteps(card) {
   if (Array.isArray(card.stageHistory) && card.stageHistory.length > 0) {
-    return card.stageHistory.map((entry) => ({
+    return card.stageHistory.map((entry, index) => ({
       stage: STAGE_LABEL[entry.stage] ?? entry.stage,
       by: entry.exitedBy ?? entry.by,
       startedAt: entry.enteredAt ?? null,
       endedAt: entry.exitedAt ?? null,
+      // The first entry's `by` is the actor who moved the card out of Intake
+      // (Factory's `acceptedAt` gesture), i.e. the genuine initial Intake. It
+      // is retained separately because `by` above may name the later actor who
+      // closed the stage; a hand move on that step is still a hand move.
+      intakeBy: index === 0 ? entry.by : null,
     }));
   }
   const movements = card.movements ?? [];
@@ -191,7 +196,29 @@ function cardSteps(card) {
     by: movement.by,
     startedAt: movement.at ?? null,
     endedAt: movements[index + 1]?.at ?? card.doneAt ?? null,
+    // The first movement is Todd's Intake tap that starts the card.
+    intakeBy: index === 0 ? movement.by : null,
   }));
+}
+
+/**
+ * Whether every step after the genuine initial Intake was done by Factory.
+ *
+ * The classification is about the card's own steps, not the slice a note shows
+ * for one week: a card accepted earlier can carry a hand move from an earlier
+ * week, and a week's filtered steps can start with a hand move, so reading only
+ * the filtered list both misses hand moves and mis-slices the first step. The
+ * genuine initial Intake is the card's first step -- Todd's tap that starts it --
+ * and only that actor on that step is exempt; every other non-Factory actor on
+ * any step is a hand move.
+ */
+function doneByFactoryFor(allSteps) {
+  const intake = allSteps[0];
+  const byHand = allSteps.find((step) => {
+    if (isFactoryActor(step.by)) return false;
+    return !(step === intake && step.by === intake.intakeBy);
+  });
+  return { byHand, doneByFactory: byHand === undefined };
 }
 
 /**
@@ -315,8 +342,7 @@ function cardLine(card, cardTraces, { acceptedInWeek = true, from, to } = {}) {
       : 0;
   }
 
-  const byHand = steps.slice(1).find((step) => !isFactoryActor(step.by));
-  const doneByFactory = byHand === undefined;
+  const { byHand, doneByFactory } = doneByFactoryFor(allSteps);
   const parts = [`#${card.number} ${card.title}`, usd(costUsd), duration(elapsedMs)];
   const failedPhrase = failedAttemptPhrase(failedAttempts);
   if (failedPhrase) parts.push(failedPhrase);

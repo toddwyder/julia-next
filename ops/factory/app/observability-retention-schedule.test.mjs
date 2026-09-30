@@ -56,25 +56,50 @@ async function bootWithWorkflow(workflow = observabilityRetentionWorkflow) {
   return { mastra, storage, pubsub };
 }
 
-/** Make the one registered schedule due, then fire one scheduler tick. */
-async function fireDueSchedule(mastra, storage) {
+/**
+ * The framework's own completion signal for a schedule-fired run.
+ *
+ * On a tick the scheduler publishes `workflow.start` on the `workflows` topic,
+ * and the framework's event processor publishes the terminal `workflow.end` on
+ * the same topic once the run finishes. Subscribing before the tick and
+ * awaiting that terminal event is the signal that the run is done -- the same
+ * event the framework itself uses to mark a run complete -- so the test never
+ * polls. The event's `runId` proves it is the run this fire started.
+ *
+ * @param {import('@mastra/core/events').EventEmitterPubSub} pubsub
+ * @returns {Promise<{started: Promise<string>, ended: Promise<object>}>}
+ */
+async function workflowRunCompletion(pubsub) {
+  let resolveStarted;
+  let resolveEnded;
+  const started = new Promise((resolve) => { resolveStarted = resolve; });
+  const ended = new Promise((resolve) => { resolveEnded = resolve; });
+  await pubsub.subscribe('workflows', (event) => {
+    if (event.type === 'workflow.start') resolveStarted(event.runId);
+    // `workflow.end` on the `workflows` topic is terminal for the run the
+    // scheduler claimed; the per-run watch topics are for streaming consumers.
+    if (event.type === 'workflow.end') resolveEnded(event);
+  });
+  return { started, ended };
+}
+
+/**
+ * Make the one registered schedule due, fire one tick, and await the
+ * framework's terminal event for the run it claimed. Returns the store and the
+ * terminal event, so a caller can read the run the framework finished.
+ */
+async function fireDueSchedule(mastra, storage, pubsub) {
+  const completion = await workflowRunCompletion(pubsub);
   const schedulesStore = await storage.getStore('schedules');
   const rows = await schedulesStore.listSchedules();
   assert.equal(rows.length, 1, 'startWorkers() must register exactly one declarative schedule');
   const row = rows[0];
   await schedulesStore.updateScheduleNextFire(row.id, row.nextFireAt, Date.now() - 1000, Date.now(), 'test-claim');
   await mastra.scheduler.tick();
-  return schedulesStore;
-}
-
-/** Wait until `predicate` is true or the timeout elapses. */
-async function waitFor(predicate, timeoutMs = 3000) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (predicate()) return true;
-    await new Promise((resolve) => setTimeout(resolve, 20));
-  }
-  return predicate();
+  const runId = await completion.started;
+  const end = await completion.ended;
+  assert.equal(end.runId, runId, 'the terminal event must belong to the run this tick started');
+  return { schedulesStore, runId, end };
 }
 
 test('startWorkers() registers the workflow declarative schedule with the production cron', async (t) => {
@@ -102,27 +127,29 @@ test('the scheduler the framework starts is running after startWorkers()', async
   assert.equal(mastra.scheduler.isRunning, true);
 });
 
-test('a due schedule fires the workflow, and its step reaches the configured prune target', async (t) => {
+// `timeout` is the test runner's own bound, so a missing framework completion
+// signal fails the test instead of hanging; it is not a hand-built wait loop.
+test('a due schedule fires the workflow, and its step reaches the configured prune target', { timeout: 10_000 }, async (t) => {
   const recorder = recordingTarget();
   setObservabilityPruneTarget(recorder.target);
-  const { mastra, storage } = await bootWithWorkflow();
+  const { mastra, storage, pubsub } = await bootWithWorkflow();
   t.after(() => mastra.stopWorkers());
 
-  await fireDueSchedule(mastra, storage);
-  const reached = await waitFor(() => recorder.calls.length > 0);
+  // Await the framework's terminal event, not a poll: when `workflow.end`
+  // arrives the run is complete, so the step has already reached the target.
+  await fireDueSchedule(mastra, storage, pubsub);
 
-  assert.ok(reached, 'the scheduled workflow step never reached the configured prune target');
   assert.equal(recorder.calls.length, 1, 'the prune target must be called exactly once per fire');
 });
 
-test('the scheduled step reports the real prune result and records a trigger', async (t) => {
+test('the scheduled step reports the real prune result and records a trigger', { timeout: 10_000 }, async (t) => {
   const recorder = recordingTarget();
   setObservabilityPruneTarget(recorder.target);
-  const { mastra, storage } = await bootWithWorkflow();
+  const { mastra, storage, pubsub } = await bootWithWorkflow();
   t.after(() => mastra.stopWorkers());
 
-  const schedulesStore = await fireDueSchedule(mastra, storage);
-  await waitFor(() => recorder.calls.length > 0);
+  const { schedulesStore } = await fireDueSchedule(mastra, storage, pubsub);
+  assert.equal(recorder.calls.length, 1, 'the terminal run must have reached the prune target');
 
   const history = await schedulesStore.listTriggers?.(await schedulesStore.listSchedules().then((r) => r[0].id));
   // Trigger recording is best-effort in the framework; assert it when present,

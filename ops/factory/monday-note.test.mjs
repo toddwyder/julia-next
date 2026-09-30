@@ -391,6 +391,60 @@ test('a card accepted earlier is included in the week its cost and failed attemp
   assert.equal(note.lines[0].elapsedMs, 3 * 60 * 60 * 1000);
 });
 
+test('a card accepted earlier still says not all by Factory when Todd moved a step by hand before the week', () => {
+  // The classification is about every step after Todd's Intake tap, whether or
+  // not that step falls in the week being reported. This card entered last
+  // week; Todd closed its plan stage by hand (a hand move on a later step, not
+  // his Intake tap), then Factory built this week. The week's visible steps are
+  // all Factory, but the card is not "Done by Factory" -- reading only the
+  // filtered week steps would wrongly claim it was.
+  const card = {
+    number: 302,
+    title: 'Hand move last week',
+    enteredAt: '2026-09-19T09:00:00Z',
+    doneAt: '2026-09-23T10:00:00Z',
+    stageHistory: [
+      // `by` is the Intake move (Factory's first processing stage); `exitedBy`
+      // is Todd closing that stage himself -- a hand move, not the Intake tap.
+      { stage: 'planning', enteredAt: '2026-09-19T09:00:00Z', exitedAt: '2026-09-19T09:15:00Z', by: 'agent:r1', exitedBy: 'todd' },
+      { stage: 'execute', enteredAt: '2026-09-23T09:00:00Z', exitedAt: '2026-09-23T09:30:00Z', by: 'agent:r2', exitedBy: 'agent:r2' },
+    ],
+  };
+  const buildTrace = { id: 'b', card: 302, phase: 'build', startedAt: '2026-09-23T09:05:00Z', endedAt: '2026-09-23T09:25:00Z', costUsd: 2, outcome: 'passed' };
+
+  const note = buildMondayNote({ cards: [card], traces: [buildTrace], ...WEEK });
+
+  assert.equal(note.lines[0].doneByFactory, false);
+  assert.match(note.body, /not all by Factory: Todd/);
+});
+
+test('a card accepted earlier says not all by Factory when Todd acts in the week', () => {
+  // The reviewer's case: a card accepted before the week where Todd's hand move
+  // is the first step the week shows, then Factory builds. The week's filtered
+  // steps start with Todd's move, not with the Intake tap, so slicing the
+  // filtered list drops the one hand move and falsely reports "Done by
+  // Factory". Classification must read all the card's steps.
+  const card = {
+    number: 303,
+    title: 'Todd approves plan in week',
+    enteredAt: '2026-09-19T09:00:00Z',
+    doneAt: '2026-09-23T10:00:00Z',
+    stageHistory: [
+      { stage: 'planning', enteredAt: '2026-09-19T09:00:00Z', exitedAt: '2026-09-19T09:15:00Z', by: 'agent:r1', exitedBy: 'agent:r1' },
+      // Todd closes the planning stage by hand in the week; the next stage
+      // enters in the week too, so the filtered week steps start with Todd.
+      { stage: 'planning', enteredAt: '2026-09-23T09:00:00Z', exitedAt: '2026-09-23T09:15:00Z', by: 'agent:r1', exitedBy: 'todd' },
+      { stage: 'execute', enteredAt: '2026-09-23T09:15:00Z', exitedAt: '2026-09-23T09:30:00Z', by: 'agent:r2', exitedBy: 'agent:r2' },
+    ],
+  };
+  const weekTrace = { id: 'w', card: 303, phase: 'build', startedAt: '2026-09-23T09:16:00Z', endedAt: '2026-09-23T09:28:00Z', costUsd: 1, outcome: 'passed' };
+
+  const note = buildMondayNote({ cards: [card], traces: [weekTrace], ...WEEK });
+
+  assert.equal(note.lines[0].doneByFactory, false);
+  assert.match(note.body, /not all by Factory: Todd/);
+});
+
 test('a card with no cost or activity in the week is left out even when it entered earlier', () => {
   const staleCard = {
     number: 201,
