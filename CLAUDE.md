@@ -18,8 +18,8 @@ what real use shows is lacking.
 
 Factory's Work and Review boards and Needs attention list show progress; do not drive a card through
 Linear or manually move its Factory stage. The plan is saved with the pull request. Todd tries
-product changes on the live app after merge and can request a revert. GitHub auto-merge is enabled
-for the repository, but Julia PRs are not yet armed to merge automatically after Factory review.
+product changes on the live app after merge and can request a revert. For Julia cards, Factory's
+reviewer merges the PR when its review passes and CI is green, then moves its Review card to Done.
 An agent outside Factory may merge its own setup or document-only pull request via the publisher
 App pinned to the reviewed head, never a Factory card.
 

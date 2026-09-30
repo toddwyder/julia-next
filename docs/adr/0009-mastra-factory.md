@@ -17,9 +17,9 @@ Todd's 2026-09-29 decision removes the pre-merge product acceptance step. He tes
 changes on the live app after merge. If he rejects a change, revert the merge and return the
 card to Factory.
 
-GitHub repository auto-merge is enabled. It still requires a merge condition and must be
-selected for each pull request. No supported configuration currently arms Julia pull requests
-automatically after CI and Factory's review, so this part of the route remains open in #139.
+For Julia cards, Factory's reviewer merges the PR after its review passes and CI is green.
+Factory's Review card then reaches Done, which is Todd's handoff for live UAT. No
+pre-merge product approval is required.
 
 The laptop operator maintains Factory, server, repository, and GitHub setup. It does not
 build, review, move, or merge Factory cards by hand or use Factory's GitHub credentials.

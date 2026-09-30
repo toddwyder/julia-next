@@ -3,8 +3,8 @@
 This file provides guidance to coding agents working in this repository, including Mastra
 Factory's build sessions. GitHub issues enter Factory's Intake; Todd starts them, and Factory plans,
 builds and reviews. Todd tests product changes on the live app after merge and can request a revert.
-GitHub auto-merge is enabled for the repository, but Julia PRs are not yet armed to merge
-automatically after Factory review. An outside agent may merge only its own setup or documentation PR through
+For Julia cards, Factory's reviewer merges the PR when its review passes and CI is green, then
+moves its Review card to Done for Todd's live UAT. An outside agent may merge only its own setup or documentation PR through
 the publisher App pinned to the reviewed head, never a Factory card. Keep SSH and sudo
 outside the Factory sandbox; an authorized operator uses the laptop's Tailscale route.
 See `docs/agents/work-execution.md` and `docs/adr/0009-mastra-factory.md`.
