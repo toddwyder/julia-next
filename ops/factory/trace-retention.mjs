@@ -14,17 +14,18 @@
 // runs it for you".) `DEFAULT_RETENTION` keeps `observability.spans` for 14
 // days (`@mastra/code-sdk` utils/storage-maintenance).
 //
-// What this module does NOT do: it never deletes rows, and it never claims a
-// bounded store from a config that cannot bound it. The repository entry now
+// What this module does NOT do: it never deletes rows. The repository entry
 // composes the DuckDB observability domain with `retention: DEFAULT_RETENTION`
-// (`app/src/mastra/observability-store.ts`) and prunes it on a schedule
-// (`app/src/mastra/observability-retention.ts`), which is the supported path.
-// Whether that code has been deployed is a separate question from what this
-// repository holds, so the scheduled check still does the one thing verifiable
-// on the server -- stat the real DuckDB file and its WAL and fail visibly when
-// it is over budget or when the deployed process has not declared the supported
-// DuckDB retention in place -- rather than reporting a false all-clear from
-// config alone.
+// (`app/src/mastra/observability-store.ts`) and runs the real prune on a
+// schedule and on demand (`app/src/mastra/observability-retention.ts` +
+// `app/src/mastra/observability-retention-route.ts`). Because `prune()` is
+// age-based and never reclaims disk, it cannot promise a byte cap; this module
+// is the explicit size-budget guard. It measures the real DuckDB file + WAL and
+// the free disk, and decides the safe action: routine retained prune, an
+// emergency tighter-price `maxAge` + `CHECKPOINT`, or failing closed before the
+// disk can fill. The systemd route runs the actual prune through the app's
+// signed route (`ops/factory/trace-prune-request.mjs`); this program stays a
+// read-only diagnostic and never writes.
 import { statSync, statfsSync } from 'node:fs';
 
 /** The DuckDB file Factory's observability exporter writes (change log, 2026-09-28). */
@@ -115,7 +116,8 @@ export function measureStore(dbPath = OBSERVABILITY_DUCKDB_PATH, now = Date.now(
 /**
  * The verdict for one measurement. `duckdbRetentionConfigured` must be true only
  * when supported DuckDB retention is actually wired (see the module header);
- * otherwise a small file today is not evidence of a bounded store.
+ * otherwise a small file today is not evidence of a bounded store. Kept for the
+ * wired-source guard; the size-budget guard is `planRetentionAction`.
  */
 export function checkTraceStore({ measured, budgetBytes = DEFAULT_TRACE_BUDGET_BYTES, duckdbRetentionConfigured }) {
   const overBudget = measured.bytes > budgetBytes;
@@ -210,8 +212,7 @@ export function planRetentionAction({
 
 /**
  * One scheduled check: measure, verdict, print, and fail visibly when not ok.
- * Returning a non-zero exit from `main()` is what makes the systemd run show
- * up red in the journal; nothing is retried or deleted here.
+ * Kept for the wired-source guard; it never deletes rows.
  */
 export function runTraceRetentionCheck({
   dbPath = OBSERVABILITY_DUCKDB_PATH,
@@ -229,13 +230,33 @@ export function runTraceRetentionCheck({
   return result;
 }
 
+/**
+ * One read-only diagnostic pass: measure, classify the safe action, print, and
+ * exit non-zero when the store needs attention. This program never prunes --
+ * the systemd route does that by calling the running app (see
+ * `trace-prune-request.mjs`) -- so it is safe to run by hand any time.
+ */
+export function runTraceRetentionDiagnostic({
+  dbPath = OBSERVABILITY_DUCKDB_PATH,
+  budgetBytes = DEFAULT_TRACE_BUDGET_BYTES,
+  now = Date.now(),
+  log = console.log,
+} = {}) {
+  const measured = measureStore(dbPath, now);
+  const plan = planRetentionAction({ measured, budgetBytes, freeBytes: measureFreeBytes(dbPath) });
+  log(
+    `trace-retention path=${measured.path} exists=${measured.exists} bytes=${measured.bytes} ` +
+      `over_budget=${plan.overBudget} action=${plan.action} ok=${plan.ok}`,
+  );
+  log(plan.message);
+  return plan;
+}
+
 if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
-  // The scheduled check fails visibly until the deployed process declares the
-  // supported DuckDB retention is in place (the shipped
-  // `julia-factory-trace-retention.service` sets MASTRACODE_DUCKDB_RETENTION=1;
-  // a deploy that has not shipped the retention code sets it back to 0). Over
-  // budget always fails.
-  const configured = process.env.MASTRACODE_DUCKDB_RETENTION === '1';
-  const result = runTraceRetentionCheck({ duckdbRetentionConfigured: configured });
-  process.exit(result.ok ? 0 : 1);
+  // A clean, under-budget diagnostic exits 0. An over-budget store, a store that
+  // needs an operator to free disk, or a missing store exits non-zero so a hand
+  // run is visible; there is no env flag pretending the deployed process has
+  // retention configured.
+  const result = runTraceRetentionDiagnostic();
+  process.exit(result.ok && !result.overBudget ? 0 : 1);
 }

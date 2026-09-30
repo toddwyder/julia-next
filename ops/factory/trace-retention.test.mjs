@@ -8,16 +8,16 @@
 //     `reference-storage-retention.md`: "DuckDB | prune() | Observability
 //     spans, metrics, logs, scores, and feedback").
 //   - `DEFAULT_RETENTION` sets `observability.spans: { maxAge: '14d' }`
-//     (`@mastra/code-sdk` utils/storage-maintenance).
-//   - The Factory entry in this repo passes `DEFAULT_RETENTION` only to the Pg
-//     and LibSQL backends. Nothing in the repo configures the DuckDB
-//     observability store or its retention, so that config provably does NOT
-//     bound the DuckDB file. Reporting "bounded" from it would be deceptive.
+//     (`@mastra/code-sdk` utils/storage-maintenance) and is wired into the
+//     DuckDB observability domain in `app/src/mastra/observability-store.ts`.
+//   - `prune()` is age-based and, per Mastra's own docs, never reclaims disk,
+//     so it cannot enforce a byte budget. The guard does: over budget it applies
+//     a tighter supported `maxAge` (PruneOptions.retention) and the documented
+//     DuckDB `CHECKPOINT`, and fails closed before disk exhaustion.
 //
-// So the module does the one thing that can be honestly measured -- stat the
-// real DuckDB file and its WAL -- and fails visibly when the store is over
-// budget or when no supported DuckDB retention is configured. It never deletes
-// rows itself.
+// So these tests cover the size-budget guard (`planRetentionAction`,
+// `requiredFreeBytes`, the read-only diagnostic) and the wired source. It never
+// deletes rows itself.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
@@ -34,6 +34,7 @@ import {
   planRetentionAction,
   requiredFreeBytes,
   measureFreeBytes,
+  runTraceRetentionDiagnostic,
 } from './trace-retention.mjs';
 
 test('the default budget and window match the supported retention', () => {
@@ -97,6 +98,31 @@ test('a missing store is not planned for any delete', () => {
     freeBytes: 30 * 1024 * 1024 * 1024,
   });
 
+  assert.equal(plan.action, 'none');
+  assert.equal(plan.ok, false);
+});
+
+test('the hand diagnostic classifies a real small fixture file as routine and does not delete it', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'trace-diag-'));
+  try {
+    const db = join(dir, 'observability.duckdb');
+    writeFileSync(db, Buffer.alloc(2 * 1024 * 1024));
+    const lines = [];
+
+    const plan = runTraceRetentionDiagnostic({ dbPath: db, budgetBytes: 5 * 1024 * 1024 * 1024, log: (l) => lines.push(l) });
+
+    assert.equal(plan.action, 'routine-prune');
+    assert.equal(plan.ok, true);
+    assert.ok(lines.some((l) => l.includes('action=routine-prune')));
+    // The diagnostic is read-only: the fixture is still there, unchanged.
+    assert.equal(readFileSync(db).length, 2 * 1024 * 1024);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('the hand diagnostic exits non-zero (plan not ok) for a missing store', () => {
+  const plan = runTraceRetentionDiagnostic({ dbPath: '/nonexistent/observability.duckdb', log: () => {} });
   assert.equal(plan.action, 'none');
   assert.equal(plan.ok, false);
 });

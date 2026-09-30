@@ -31,7 +31,7 @@ not ok 1 - ops/factory/trace-retention.test.mjs
 # pass 0
 # fail 1
 == trace-retention.mjs: shipped (green) ==
-# pass 13
+# pass 15
 # fail 0
 == trace-prune-request.mjs: guard (module removed) ==
 not ok 1 - ops/factory/trace-prune-request.test.mjs

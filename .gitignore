@@ -15,3 +15,6 @@ ops/factory/app/src/mastra/public/factory/
 # card's working copy. Ignored so the working copy still removes cleanly (Orca
 # refuses to remove one holding an untracked file, measured 23 Sep).
 .julia/
+
+# Throwaway work tree the guard-reversion script rebuilds (#140).
+.artifacts/guard-issue-140/guard2/
