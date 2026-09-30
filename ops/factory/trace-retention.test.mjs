@@ -99,6 +99,17 @@ test('a small store with no supported DuckDB retention configured is not reporte
   assert.match(result.message, /DuckDB.*retention|retention.*DuckDB|not configured/i);
 });
 
+test('a missing store is not reported ok: there is nothing to have bounded', () => {
+  const result = checkTraceStore({
+    measured: { exists: false, bytes: 0, oldestAgeMs: null },
+    budgetBytes: DEFAULT_TRACE_BUDGET_BYTES,
+    duckdbRetentionConfigured: true,
+  });
+
+  assert.equal(result.ok, false);
+  assert.match(result.message, /not found|missing|no store/i);
+});
+
 test('the repo entry does not configure DuckDB retention, so the check must not treat it as configured', () => {
   // This is the proved fact: `DEFAULT_RETENTION` reaches only the Pg and LibSQL
   // Factory storage constructors in the entry, and no DuckDBStore/observability

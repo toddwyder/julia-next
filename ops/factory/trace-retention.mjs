@@ -72,10 +72,12 @@ export function measureStore(dbPath = OBSERVABILITY_DUCKDB_PATH, now = Date.now(
  */
 export function checkTraceStore({ measured, budgetBytes = DEFAULT_TRACE_BUDGET_BYTES, duckdbRetentionConfigured }) {
   const overBudget = measured.bytes > budgetBytes;
-  const bounded = !overBudget && duckdbRetentionConfigured === true;
+  const bounded = measured.exists === true && !overBudget && duckdbRetentionConfigured === true;
 
   let message;
-  if (overBudget) {
+  if (!measured.exists) {
+    message = `observability store not found at ${measured.path}; no store to have bounded`;
+  } else if (overBudget) {
     message = `observability store is over budget: ${measured.bytes} bytes > ${budgetBytes} bytes`;
   } else if (duckdbRetentionConfigured !== true) {
     message =
