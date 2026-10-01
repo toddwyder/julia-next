@@ -18,11 +18,13 @@ It gets its row when it is built.
 
 What we needed, the framework feature that covers it, and the local source that proves it. Only
 local sources (repository docs and pinned package paths) are cited; gaps are stated as gaps.
+The existing [Mastra intended-use audit](../../docs/research/mastra-intended-use-audit.md) records
+the observability route and storage findings this map builds on.
 
 | Need | Framework feature | Local source |
 |---|---|---|
 | Weekly cost from traces | Authenticated Mastra observability light-list, light-timeline and single-span routes under `/api/observability/traces`; `CompositeAuth` keeps WorkOS sign-in and adds a GET-only `SimpleAuth` trace reader | `app/src/mastra/cost-note-auth.ts`; `app/cost-note-auth.test.mjs`; pinned `@mastra/core` server auth and observability route schemas |
-| What-you-pay pricing per model/provider | Single source of truth price table (`ops/factory/price-table.mjs`) tracking fresh input, cached input, output rates, provider pay factors, source URLs, and checked dates | `ops/factory/price-table.mjs`; `docs/research/agent-cost-primary-sources.md` |
+| What-you-pay pricing per model/provider | Single source of truth price table (`ops/factory/price-table.mjs`) tracking fresh input, cached input, output rates, provider pay factors, source URLs, and checked dates | `ops/factory/price-table.mjs` and each entry's provider `sourceUrl` |
 | Card steps, actors and effort | Factory `work_items.stage_history` (`by` / `exitedBy`) and `mastra_messages` phase signals (`Runtime: model=?, reasoning-setting=?`) | `@mastra/factory` `dist/storage/domains/work-items/base.d.ts` (`WorkItemRow`, `WorkItemStageEntry`, `isAgentActor`) |
 | Card ↔ trace correlation | `work_items.sessions` maps session id → card; spans carry `sessionId`; step split correlated by `stage_history` timestamps | same `work-items/base.d.ts`; `@mastra/core` `LightSpanRecord`; `ops/factory/mastra-traces.mjs` |
 | Publish the note | GitHub Issues REST API (`POST /repos/{owner}/{repo}/issues` with labels `factory:machine`, `cost-note`) | `ops/factory/monday-note-adapters.mjs`; [GitHub Issues REST API](https://docs.github.com/en/rest/issues/issues#create-an-issue) |
@@ -68,7 +70,9 @@ Todd as a public GitHub Issue: Factory's own card records and Mastra's trace cos
   the model steps/run driver. Prompt bodies and tool schemas are discarded. The price table records provider rates,
   cache rates, source dates and payment factors. Direct DeepSeek peak/off-peak prices use the call's
   start time, including the verified October 1–7 holiday. An unknown price window, model or token
-  count is a named gap; dollar amounts beside gaps are explicitly known subtotals.
+  count is a named gap; dollar amounts beside gaps are explicitly known subtotals. Unknown cache
+  read rates and cache-write TTL pricing are gaps too. The supported DuckDB `memoryLimit: '4GB'`
+  permits the retained-root query on the live store; the default 2GB limit failed that query.
 
 Each card line carries every step with its actor, model breakdown, effort level beside thinking tokens,
 the card's summed what-you-pay cost **including failed attempts**, and elapsed time. The card drivers
