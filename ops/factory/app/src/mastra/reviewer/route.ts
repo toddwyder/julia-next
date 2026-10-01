@@ -31,10 +31,10 @@ export const reviewerRoute = registerApiRoute('/julia/review-pr', {
         return { fileReviews: result.result.fileReviews, skippedFiles: result.result.skippedFiles };
       };
       const result = await reviewPullRequest(input.owner, input.repo, input.pullNumber, input.headSha, { runBatchedReview });
-      return c.json(result);
+      return c.text(JSON.stringify(result), 200, { 'Content-Type': 'application/json' });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Review failed';
-      return c.json({ error: message }, 503);
+      return c.text(JSON.stringify({ error: message }), 503, { 'Content-Type': 'application/json' });
     }
   },
 });
