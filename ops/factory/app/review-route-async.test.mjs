@@ -29,6 +29,24 @@ test('status route authenticates the job id and reports failed jobs', async () =
   }
 });
 
+test('status route preserves a canceled job status', async () => {
+  process.env.JULIA_REVIEW_ROUTE_SECRET = 'status-secret';
+  const mastra = { getWorkflow: () => ({
+    getWorkflowRunById: async () => ({ status: 'canceled' }),
+  }) };
+  const handler = await reviewerStatusRoute.createHandler({ mastra });
+  const signature = createHmac('sha256', 'status-secret').update('job-2').digest('hex');
+  try {
+    const response = await handler({
+      req: { param: () => 'job-2', header: () => signature },
+      json: (payload, status = 200) => ({ payload, status }),
+    });
+    assert.equal(response.payload.status, 'canceled');
+  } finally {
+    delete process.env.JULIA_REVIEW_ROUTE_SECRET;
+  }
+});
+
 test('GitHub action polls signed status every 30 seconds and submits the reviewed head', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'cross-maker-action-'));
   const eventFile = join(directory, 'event.json');

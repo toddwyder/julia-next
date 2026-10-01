@@ -586,6 +586,7 @@ test('the route runs the real supported prReviewWorkflow for a large PR', async 
     const result = await waitForReview(mastra, response.payload.jobId);
     assert.equal(result.verdict, 'APPROVE');
     assert.equal(result.headSha, HEAD);
+    assert.equal(result.criteria.length, 2, 'the completed job retains criterion evidence');
     // The route actually ran the workflow's batched file review, and the
     // criterion prompt saw only findings, never the giant diff.
     assert.ok(prompts.some((prompt) => prompt.includes('Files to Review') || prompt.includes('Batch ')));

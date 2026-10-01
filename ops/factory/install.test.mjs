@@ -112,6 +112,7 @@ test('a clean install carries every app module the entry point imports, so check
   for (const required of [
     'src/mastra/observability-store',
     'src/mastra/observability-retention',
+    'src/mastra/reviewer/workflows/cross-maker-review-workflow',
   ]) {
     assert.ok(graph.has(required), `entry point no longer imports ${required}`);
     assert.ok(

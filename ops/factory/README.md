@@ -216,6 +216,7 @@ bash /path/to/julia-next/ops/factory/install.sh /var/lib/julia-factory/app
 The installer copies `ops/factory/app/{package.json,package-lock.json,tsconfig.json}`,
 `ops/factory/app/src/mastra/{index,local-sandbox}.ts`, and the two project overrides in
 `ops/factory/app/src/mastra/public/factory-skills/{factory-plan,factory-review}/SKILL.md`
+plus the asynchronous Cross-maker workflow imported by `index.ts`
 into the service directory before `npm ci`; it never copies `.env`, databases or
 runtime workspaces. The versioned lockfile pins the deployed dependencies; it does
 not upgrade them. Factory 0.17.2 loads project-local `factory-skills` before its

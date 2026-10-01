@@ -29,13 +29,13 @@ while (true) {
   });
   if (!statusResponse.ok) throw new Error(`Mastra reviewer status returned HTTP ${statusResponse.status}: ${await statusResponse.text()}`);
   const job = await statusResponse.json();
-  if (job.status === 'failed') throw new Error(`Mastra reviewer failed: ${job.error ?? 'unknown error'}`);
   if (job.status === 'success') {
     review = job.verdict;
     break;
   }
-  if (job.status !== 'running') throw new Error('Mastra reviewer returned an invalid job status.');
-  console.log(`Cross-maker review job ${jobId} is still running`);
+  if (!['pending', 'running', 'waiting'].includes(job.status))
+    throw new Error(`Mastra reviewer stopped with status ${job.status}: ${job.error ?? 'unknown error'}`);
+  console.log(`Cross-maker review job ${jobId} is ${job.status}`);
 }
 if (!['APPROVE', 'REQUEST_CHANGES'].includes(review.verdict) || review.headSha !== headSha || !review.body)
   throw new Error('Mastra reviewer returned an invalid or stale verdict.');

@@ -46,10 +46,10 @@ export const reviewerStatusRoute = registerApiRoute('/julia/review-pr/:jobId', {
       if (!run) return c.json({ error: 'Review job not found' }, 404);
       if (run.status === 'success') return c.json({ status: 'success', verdict: run.result });
       if (!['pending', 'running', 'waiting'].includes(run.status)) {
-        console.error(`Cross-maker review failed: job=${jobId} status=${run.status} error=${run.error?.message ?? 'unknown'}`);
-        return c.json({ status: 'failed', error: run.error?.message ?? 'Review failed' });
+        console.error(`Cross-maker review stopped: job=${jobId} status=${run.status} error=${run.error?.message ?? 'unknown'}`);
+        return c.json({ status: run.status, error: run.error?.message ?? 'Review stopped' });
       }
-      return c.json({ status: 'running' });
+      return c.json({ status: run.status });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Review status unavailable';
       return c.json({ error: message }, 503);
