@@ -50,7 +50,7 @@ import {
   duckdbObservabilityConfig,
 } from './observability-store.js';
 import { observabilityRetentionWorkflow, setObservabilityPruneTarget } from './observability-retention.js';
-import { filterIssueForIntake, MACHINE_PULL_REQUESTS } from './github-intake-rules.js';
+import { filterIssueForIntake, MACHINE_PULL_REQUESTS } from './github-intake-rules';
 
 /**
  * Parse a positive-integer env knob; anything else means "use the default".
