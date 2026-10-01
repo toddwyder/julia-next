@@ -94,8 +94,18 @@ export const tracesRoute = registerApiRoute('/julia/observability/traces', {
         return c.json({ error: 'Observability storage not configured' }, 503);
       }
 
+      const args: any = { pagination };
+      if (startedAt) {
+        const filterStartedAt: any = {};
+        if (startedAt.start) filterStartedAt.start = new Date(startedAt.start);
+        if (startedAt.end) filterStartedAt.end = new Date(startedAt.end);
+        if (startedAt.startExclusive !== undefined) filterStartedAt.startExclusive = startedAt.startExclusive;
+        if (startedAt.endExclusive !== undefined) filterStartedAt.endExclusive = startedAt.endExclusive;
+        args.filters = { startedAt: filterStartedAt };
+      }
+
       if (typeof obsStore.listTraces === 'function') {
-        const result = await obsStore.listTraces({ startedAt, pagination });
+        const result = await obsStore.listTraces(args);
         return c.json(result);
       }
 
