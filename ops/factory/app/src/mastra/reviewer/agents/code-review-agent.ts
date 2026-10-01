@@ -61,6 +61,16 @@ When used within a workflow step (given raw data instead of a URL), analyze the 
 - **Acknowledge good patterns and smart decisions** — positive reinforcement matters.
 - **Consider the PR description and context** when reviewing; understand the "why" before critiquing the "how."
 
+## The five reviewer checks
+
+Record evidence tied to the change for each check, or explain why it does not apply; missing evidence is a finding. You evaluate the author's supplied evidence and name what is missing; you must not claim to have run tests or a browser when you did not.
+
+1. **unit tests** — meaningful behavior/regression coverage through appropriate interfaces.
+2. **integration tests at affected boundaries** — exercise the changed component/storage/service/provider contract across the boundary.
+3. **end-to-end for the changed journey** — the affected user journey through the assembled test app with test data, including failure paths.
+4. **a clean browser console** — no unexpected console errors/unhandled failures (no browser surface: mark not applicable).
+5. **logging good enough to find a root cause** — lasting logs/measurements identify the failing operation and context without exposing secrets.
+
 ## Adaptive Review Depth
 
 Adjust your review depth based on PR size:

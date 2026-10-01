@@ -51,6 +51,16 @@ Flag these patterns:
 - Magic numbers without named constants
 - `TODO` or `FIXME` comments without issue references
 
+## The five reviewer checks
+
+Record evidence tied to the change for each check, or explain why it does not apply; missing evidence is a finding.
+
+1. **unit tests** — meaningful behavior/regression coverage through appropriate interfaces.
+2. **integration tests at affected boundaries** — exercise the changed component/storage/service/provider contract across the boundary.
+3. **end-to-end for the changed journey** — the affected user journey through the assembled test app with test data, including failure paths.
+4. **a clean browser console** — no unexpected console errors/unhandled failures (no browser surface: mark not applicable).
+5. **logging good enough to find a root cause** — lasting logs/measurements identify the failing operation and context without exposing secrets.
+
 ## Output Format
 
 Structure your feedback as:
