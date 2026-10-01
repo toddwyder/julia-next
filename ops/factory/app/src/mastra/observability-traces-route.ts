@@ -114,16 +114,26 @@ export const tracesRoute = registerApiRoute('/julia/observability/traces', {
         const allRawSpans: any[] = [];
         if (typeof obsStore.getTrace === 'function') {
           for (const t of rawTraces) {
-            const parentSessionId = t.sessionId ?? t.attributes?.sessionId ?? t.attributes?.conversationId ?? t.attributes?.threadId ?? null;
-            const parentThreadId = t.attributes?.threadId ?? t.attributes?.conversationId ?? null;
-            const parentResourceId = t.attributes?.resourceId ?? null;
             try {
               const full = await obsStore.getTrace({ traceId: t.traceId });
               if (Array.isArray(full?.spans) && full.spans.length > 0) {
+                let parentSessionId = t.sessionId ?? t.attributes?.sessionId ?? t.attributes?.conversationId ?? t.attributes?.threadId ?? null;
+                let parentThreadId = t.attributes?.threadId ?? t.attributes?.conversationId ?? null;
+                let parentResourceId = t.attributes?.resourceId ?? null;
+                let parentConversationId = t.attributes?.conversationId ?? null;
+
+                for (const s of full.spans) {
+                  if (!parentSessionId) parentSessionId = s.sessionId ?? s.attributes?.sessionId ?? s.attributes?.conversationId ?? s.attributes?.threadId ?? null;
+                  if (!parentThreadId) parentThreadId = s.attributes?.threadId ?? s.attributes?.conversationId ?? null;
+                  if (!parentConversationId) parentConversationId = s.attributes?.conversationId ?? null;
+                  if (!parentResourceId) parentResourceId = s.attributes?.resourceId ?? null;
+                }
+
                 for (const s of full.spans) {
                   s.sessionId = s.sessionId ?? parentSessionId;
                   if (!s.attributes) s.attributes = {};
                   if (!s.attributes.sessionId && parentSessionId) s.attributes.sessionId = parentSessionId;
+                  if (!s.attributes.conversationId && parentConversationId) s.attributes.conversationId = parentConversationId;
                   if (!s.attributes.threadId && parentThreadId) s.attributes.threadId = parentThreadId;
                   if (!s.attributes.resourceId && parentResourceId) s.attributes.resourceId = parentResourceId;
                   allRawSpans.push(s);

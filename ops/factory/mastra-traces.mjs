@@ -141,7 +141,7 @@ function spanPhase(span) {
 /**
  * The span types Mastra bills.
  */
-const MODEL_SPAN_TYPES = new Set(['model_generation', 'model_step', 'model_inference']);
+const MODEL_SPAN_TYPES = new Set(['model_generation', 'model_step', 'model_inference', 'memory_operation']);
 
 /**
  * Is this span one that should carry a cost?
@@ -150,7 +150,10 @@ function isCostBearing(span) {
   const type = span.spanType ?? span.type;
   if (typeof type === 'string' && MODEL_SPAN_TYPES.has(type)) return true;
   const attributes = isObject(span.attributes) ? span.attributes : {};
-  return isObject(attributes.costContext) || isObject(attributes.usage);
+  if (isObject(attributes.costContext) || isObject(attributes.usage)) return true;
+  if (typeof attributes.inputTokens === 'number' || typeof attributes.outputTokens === 'number') return true;
+  if (typeof span.name === 'string' && (span.name.startsWith('llm:') || span.name.startsWith('memory:'))) return true;
+  return false;
 }
 
 function failedOutcome(span) {
@@ -169,12 +172,24 @@ function failedOutcome(span) {
 export function normalizeTraceSpans(spans = [], { cards = [] } = {}) {
   const cardBySession = new Map();
   for (const card of cards) {
+    if (card.number) {
+      cardBySession.set(String(card.number), card.number);
+      cardBySession.set(`pr-${card.number}`, card.number);
+      cardBySession.set(`issue-${card.number}`, card.number);
+      cardBySession.set(`factory/pr-${card.number}`, card.number);
+      cardBySession.set(`factory/issue-${card.number}`, card.number);
+    }
     if (card.sessions && typeof card.sessions === 'object') {
       for (const [key, value] of Object.entries(card.sessions)) {
         cardBySession.set(key, card.number);
         if (value && typeof value === 'object') {
           if (value.sessionId) cardBySession.set(value.sessionId, card.number);
           if (value.threadId) cardBySession.set(value.threadId, card.number);
+          if (value.branch) {
+            cardBySession.set(value.branch, card.number);
+            const branchMatch = value.branch.match(/(?:pr|issue)[/-]?(\d+)/i);
+            if (branchMatch) cardBySession.set(branchMatch[1], card.number);
+          }
         } else if (typeof value === 'string' && value) {
           cardBySession.set(value, card.number);
         }
@@ -185,6 +200,7 @@ export function normalizeTraceSpans(spans = [], { cards = [] } = {}) {
         if (stage && typeof stage === 'object') {
           if (stage.sessionId) cardBySession.set(stage.sessionId, card.number);
           if (stage.threadId) cardBySession.set(stage.threadId, card.number);
+          if (stage.branch) cardBySession.set(stage.branch, card.number);
         }
       }
     }
@@ -193,19 +209,50 @@ export function normalizeTraceSpans(spans = [], { cards = [] } = {}) {
   return spans.map((span) => {
     const attributes = isObject(span.attributes) ? span.attributes : {};
     const costContext = isObject(attributes.costContext) ? attributes.costContext : {};
-    const usage = isObject(attributes.usage) ? attributes.usage : null;
+    const usage =
+      isObject(attributes.usage)
+        ? attributes.usage
+        : (typeof attributes.inputTokens === 'number' || typeof attributes.outputTokens === 'number'
+            ? {
+                inputTokens: attributes.inputTokens,
+                outputTokens: attributes.outputTokens,
+                cachedInputTokens: attributes.cachedInputTokens,
+                reasoningTokens: attributes.reasoningTokens,
+                inputDetails: attributes.inputDetails,
+                outputDetails: attributes.outputDetails,
+              }
+            : null);
 
     const sessionId =
       span.sessionId ??
       span.scope?.sessionId ??
       span.metadata?.sessionId ??
       attributes.sessionId ??
+      attributes.conversationId ??
       attributes.threadId ??
       attributes['thread.id'] ??
       null;
-    const card = sessionId !== null ? cardBySession.get(sessionId) ?? null : null;
 
-    const model = attributes.model ?? attributes.responseModel ?? costContext.model ?? null;
+    let card = null;
+    if (sessionId !== null) {
+      card = cardBySession.get(sessionId) ?? null;
+      if (card === null) {
+        const numMatch = String(sessionId).match(/(?:pr|issue)[/-]?(\d+)/i);
+        if (numMatch) {
+          card = cardBySession.get(numMatch[1]) ?? null;
+        }
+      }
+    }
+
+    const modelMatch = typeof span.name === 'string' ? span.name.match(/^llm:\s*['"]?([^'"]+)['"]?/) : null;
+    const model =
+      attributes.model ??
+      attributes.responseModel ??
+      attributes.selectedModel ??
+      attributes['ai.model.id'] ??
+      costContext.model ??
+      (modelMatch ? modelMatch[1] : null);
+
     const provider = attributes.provider ?? costContext.provider ?? (model ? getModelPrice(model)?.provider : null) ?? null;
     const effortLevel = attributes.effort ?? attributes.effortLevel ?? span.metadata?.effort ?? null;
 
