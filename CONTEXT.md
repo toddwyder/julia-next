@@ -216,9 +216,9 @@ missing.
 _Avoid_: Second opinion, sign-off, approval
 
 **Gate**:
-What a pull request passes before GitHub asks Todd to review it: the robot checks on GitHub's
-own runners, Factory's code review, and the adversarial review. A failed gate is a bounce back to
-the builder.
+The checks a pull request passes before merge: CI on GitHub's runners, Factory's review, and the
+cross-maker review, all on the same head. A failed gate bounces the work back to the builder.
+There is no pre-merge Todd approval.
 _Avoid_: Review, QA, approval
 
 **Bounce**:
@@ -243,8 +243,8 @@ _Avoid_: Style guide, conventions, lint rules
 
 **Exceptions list**:
 The one list of every place we built our own piece instead of using Factory's, Mastra's, or
-GitHub's, each with the gap it fills and when it can go. Only Todd can change it; a required
-check rejects custom machinery that is not on it.
+GitHub's, each with the gap it fills, its approval evidence, and when it can go. It records
+existing approved pieces; the rejection check that would enforce it is not built yet.
 _Avoid_: Workarounds, patches, customisations
 
 **Rehearsal copy**:
@@ -253,7 +253,7 @@ card's steps on it before he accepts. Real Julia is never involved.
 _Avoid_: Preview, staging, test environment
 
 **UAT**:
-Todd using the rehearsal copy the way a household member would, following the card's steps,
+Todd using the live app after merge the way a household member would, following the card's steps,
 then accepting or sending it back. Only things a user would do: tap, type, read the screen.
 Never a console, log, terminal, developer tool, or copying between tools. Technical checking
 is the robot's job and happens before UAT.

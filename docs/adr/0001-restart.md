@@ -2,6 +2,11 @@
 
 Date: 2026-09-15
 
+> **Superseded in part, 2026-10-01 (ADR 0009).** The delivery route described below — an agent
+> run by the graph on the OVH server, and "Todd is never the tester" — is historical. Factory
+> now plans, builds, opens, reviews, and merges Julia cards; Todd tests the live app after merge.
+> Kept as the historical restart decision.
+
 ## Decision
 
 Restart Julia from scratch in this repo (`toddwyder/julia-next`). The prior codebase
