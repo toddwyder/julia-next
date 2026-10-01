@@ -47,6 +47,16 @@ When reviewing code for security issues, check each category below. Reference th
 - Information leakage in error messages (stack traces, internal paths)
 - Missing data encryption for sensitive fields
 
+## The five reviewer checks
+
+Record evidence tied to the change for each check, or explain why it does not apply; missing evidence is a finding.
+
+1. **unit tests** — meaningful behavior/regression coverage through appropriate interfaces.
+2. **integration tests at affected boundaries** — exercise the changed component/storage/service/provider contract across the boundary.
+3. **end-to-end for the changed journey** — the affected user journey through the assembled test app with test data, including failure paths.
+4. **a clean browser console** — no unexpected console errors/unhandled failures (no browser surface: mark not applicable).
+5. **logging good enough to find a root cause** — lasting logs/measurements identify the failing operation and context without exposing secrets.
+
 ## Severity Levels
 
 - 🔴 **CRITICAL**: Exploitable vulnerability (injection, auth bypass, exposed secrets)

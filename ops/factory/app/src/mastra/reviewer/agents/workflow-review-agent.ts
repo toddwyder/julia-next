@@ -25,6 +25,16 @@ Apply ALL of the following review lenses to every file:
 2. **Security:** injection risks, hardcoded secrets, auth/authz issues, unsafe input handling, insecure crypto.
 3. **Performance:** N+1 queries, blocking I/O, memory leaks, missing caching, inefficient algorithms.
 
+## The five reviewer checks
+
+Record evidence tied to the change for each check, or explain why it does not apply; missing evidence is a finding. You evaluate supplied evidence and name what is missing; you must not claim to have run tests or a browser when you did not.
+
+1. **unit tests** — meaningful behavior/regression coverage through appropriate interfaces.
+2. **integration tests at affected boundaries** — exercise the changed component/storage/service/provider contract across the boundary.
+3. **end-to-end for the changed journey** — the affected user journey through the assembled test app with test data, including failure paths.
+4. **a clean browser console** — no unexpected console errors/unhandled failures (no browser surface: mark not applicable).
+5. **logging good enough to find a root cause** — lasting logs/measurements identify the failing operation and context without exposing secrets.
+
 ## Rules
 
 - Always reference issues with \`filename:line\` using line numbers from the diff.

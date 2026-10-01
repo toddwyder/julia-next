@@ -1,14 +1,28 @@
 # Coding standards
 
-- Read the framework's official docs before coding; post a framework map (need → framework feature → docs link) on the card.
+Post-build reviewer guidance. The reviewer checks the completed change and records evidence tied
+to the change, or explains why a check does not apply; missing evidence is not a pass.
+
+## Reviewer checks
+
+1. **unit tests** — meaningful behavior and regression coverage for affected code through appropriate interfaces. Check the assertions actually detect the relevant failure; mocked provider responses alone cannot prove provider behavior.
+2. **integration tests at affected boundaries** — exercise the changed component, storage, service, or model-provider contract across the relevant boundary, preferring existing deterministic fixtures or record/replay. Do not require production credentials or uncontrolled paid calls.
+3. **end-to-end for the changed journey** — verify the affected user journey through the assembled test application with test data, including relevant failure paths, tied to the reviewed revision. Todd's live UAT does not substitute for this check.
+4. **a clean browser console** — during the affected journey, no unexpected console errors or unhandled failures. Changes with no browser surface may be marked not applicable with a reason.
+5. **logging good enough to find a root cause** — lasting logs/measurements identify the failing operation and useful context, connect related events, and expose no secrets. Inspect failure-path evidence; temporary debugging or a silent non-zero exit is insufficient.
+
+## Framework and design (reviewer checks)
+
+- Read the framework's official docs before coding and post a framework map (need → framework feature → docs link) on the card.
 - Start from the framework's own example and change as little as possible.
-- Run `npm run lint:framework`. Hand-built progress files, retry or wait loops, and controller code over 400 lines need an ESLint skip comment with a reason and docs link, and must be listed on JUL-115. A test waits on the framework's own completion signal (a terminal event), never by polling a value; use the test runner's own timeout as the bound.
-- A classification or verdict over a record reads the whole record, never a filtered view built for display (for example, "Done by Factory" reads every card step, not only the week's visible steps). A review verdict likewise accounts for every changed file: a file the reviewer skipped is named with evidence, and a skipped reviewable file fails the verdict closed rather than being dropped. Every changed reviewable file must be named in the review result; a file absent from both the reviewed and skipped lists fails the verdict closed.
-- A verdict or approval over a mutable revision re-reads the revision after the deciding agent (and any batched reviewer) finishes, not only before it starts, so a change landed mid-decision cannot be approved under a stale result.
-- A bounded prompt batch checks each individual item against the batch budget, not only the running total: an item too large to fit is never placed in a batch that exceeds the bound; it is marked unreviewed and fails the verdict closed with evidence.
-- Use the built-in feature of Factory, Mastra, or GitHub before building a workaround. If one is missing, state the gap, docs checked, and consequence to Todd before changing code.
-- A production check must measure the real artifact (a real file, a real API), never an injected fake; if the supported config cannot control the artifact, prove that and fail closed instead of reporting success.
-- Never render an unknown measurement as zero (a missing cost is not `$0.00`); fail the report closed and let a real numeric zero stay zero.
-- A scheduled operational action must run the real supported feature, not a read-only check behind a flag that claims the feature is configured.
-- When review identifies a rule that should apply to all future code, fix it and add one plain line here in the same PR.
-- The install file list must carry every app source module the entry point imports (transitively), and a test must prove a clean install leaves no unresolved local import before `check`/`build`.
+- Run `npm run lint:framework`. Hand-built progress files, retry or wait loops, and controller code over 400 lines are refused unless skipped with an ESLint comment that gives a reason and docs link, and listed on JUL-115.
+- Use the built-in feature of Factory, Mastra, or GitHub before building a workaround; if one is missing, state the gap, the docs checked, and the consequence.
+
+## Integrity (reviewer checks that protect approval and merge)
+
+- A classification or verdict reads the whole record, never a filtered view built for display. A review verdict accounts for every changed file; a skipped reviewable file fails the verdict closed.
+- A verdict or approval over a mutable revision re-reads the revision after the deciding agent finishes, so a change landed mid-decision cannot be approved under a stale result.
+- A bounded prompt batch checks each individual item against the batch budget; an oversized item fails the verdict closed with evidence.
+- A production check measures the real artifact, never an injected fake; an unknown measurement is not reported as zero.
+- A scheduled operational action runs the real supported feature, not a read-only check behind a flag that claims the feature is configured.
+- The install file list carries every app source module the entry point imports, and a clean-install check proves no unresolved local import before `check`/`build`.

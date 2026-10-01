@@ -2,6 +2,10 @@
 
 Date: 2026-09-15
 
+> **Superseded, 2026-10-01 (ADR 0009).** The "gate before Todd" and the recording/evidence
+> gates described here are retired: Factory's review merges the PR and Todd tests the live app
+> after merge. Kept as the historical evidence definition.
+
 > **Note, 2026-09-21 (JUL-98). Partly superseded by [The route](https://linear.app/julia-next/document/the-route-one-description-of-how-a-change-reaches-real-julia-88d1f95bbbfa).**
 > The route is now the one description of how a change reaches Real Julia, and where this
 > record disagrees with it, the route wins. What the route replaces here:

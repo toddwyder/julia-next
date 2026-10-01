@@ -1,37 +1,30 @@
 # AGENTS.md
 
-This file provides guidance to coding agents working in this repository, including Mastra
-Factory's build sessions. GitHub issues enter Factory's Intake; Todd starts them, and Factory plans,
-builds and reviews. Todd tests product changes on the live app after merge and can request a revert.
-For Julia cards, Factory's reviewer merges the PR when its review passes and CI is green, then
-moves its Review card to Done for Todd's live UAT. Open PRs stay outside Done. An outside agent
-may merge only its own setup or documentation PR through
-the publisher App pinned to the reviewed head, never a Factory card. Keep SSH and sudo
-outside the Factory sandbox; an authorized operator uses the laptop's Tailscale route.
-See `docs/agents/work-execution.md` and `docs/adr/0009-mastra-factory.md`.
+GitHub issues enter Factory's Intake; Todd starts them, and Factory plans, builds and reviews.
+Todd tests product changes on the live app after merge and can request a revert. For Julia cards,
+Factory's reviewer merges the PR when its review passes and CI is green, then moves its Review card
+to Done for Todd's live UAT. Open PRs stay outside Done. An agent outside Factory may merge only
+its own setup or documentation PR through the publisher App pinned to the reviewed head, never a
+Factory card. Keep SSH and sudo outside the Factory sandbox; an authorized operator uses the
+laptop's Tailscale route.
 
-## Building a card
+## Building and reviewing
 
-1. Follow the approved plan. Build test-first with `.claude/skills/tdd/SKILL.md`: one behaviour
-   test at a seam the plan names, shown failing, then the minimal code, then the full suite green.
-2. Add the lasting observability the plan names (logs and measurements that stay in the code),
-   not temporary debugging.
-3. Follow [CODING_STANDARDS.md](CODING_STANDARDS.md). When a review sends work back for something that should apply to
-   all future code, fix it and add one plain line to `CODING_STANDARDS.md` in the same pull
-   request.
-4. The pull request description starts with a plain-language **Try it** section for Todd: what
-   changed and how to try it on the live app after merge. No code, logs or technical tools in it.
+Follow the approved plan; it answers the questions skills ask (scope, seams, acceptance criteria,
+verification, observability). Build test-first with `.claude/skills/tdd/SKILL.md`; review with
+`.claude/skills/code-review/SKILL.md` against [CODING_STANDARDS.md](CODING_STANDARDS.md). The
+reviewer records evidence for the five checks in `CODING_STANDARDS.md`, or explains why a check
+does not apply.
 
-## Use the product, not a workaround
+## Authorization and blockers
 
-Use the built-in feature of Factory, Mastra, or GitHub for anything they already do. Before any
-custom script, workaround, or change to Mastra's code, stop and state the gap, the docs checked
-(with links), and what breaks without it; Todd decides. Approved pieces are listed in
-`ops/factory/README.md`.
+Keep Todd's start authorization and explicit model/spend choices. Never ask Todd for an exception
+or workaround approval. If an authorization boundary or platform limit blocks the next required
+action, park the card through Factory's existing card/Needs attention route with one line explaining
+why.
 
-## Framework-first rules (JUL-116)
+## Server and domain
 
-1. Read the framework's official docs before writing code, and post a framework map (need → framework feature → docs link) on the card.
-2. Start from the framework's own example and change as little as possible.
-3. `npm run lint:framework` must pass. Hand-built progress files, retry or wait loops, and controller code over 400 lines are refused unless skipped with an ESLint comment that gives a reason and a docs link, and listed on JUL-115.
-4. Before proposing to build anything, name the existing tools checked and why they don't fit.
+Keep SSH and sudo outside the Factory sandbox; an authorized operator uses the laptop's Tailscale
+route. See `docs/agents/server-runbook.md`. Domain model: `CONTEXT.md`; decisions: `docs/adr/`;
+routes: `docs/agents/work-execution.md` and `docs/adr/0009-mastra-factory.md`.
