@@ -94,7 +94,7 @@ export const tracesRoute = registerApiRoute('/julia/observability/traces', {
         return c.json({ error: 'Observability storage not configured' }, 503);
       }
 
-      const args: any = { pagination };
+      const args: any = { mode: 'page', pagination };
       if (startedAt) {
         const filterStartedAt: any = {};
         if (startedAt.start) filterStartedAt.start = new Date(startedAt.start);
@@ -106,7 +106,13 @@ export const tracesRoute = registerApiRoute('/julia/observability/traces', {
 
       if (typeof obsStore.listTraces === 'function') {
         const result = await obsStore.listTraces(args);
-        return c.json(result);
+        const spans = Array.isArray(result?.spans) ? result.spans : (Array.isArray(result) ? result : []);
+        const paginationRes = result?.pagination ?? {
+          page: pagination.page,
+          perPage: pagination.perPage,
+          hasMore: result?.delta?.hasMore ?? (spans.length >= pagination.perPage),
+        };
+        return c.json({ spans, pagination: paginationRes });
       }
 
       return c.json({ error: 'Observability storage does not support listTraces' }, 501);
