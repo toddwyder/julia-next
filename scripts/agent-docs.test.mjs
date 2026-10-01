@@ -79,3 +79,21 @@ test('the exceptions list marks the #140 entry approved by Todd, citing GitHub #
   assert.match(row, /#140/);
   assert.doesNotMatch(row, /proposed|awaiting Todd|pending Todd/i);
 });
+
+test('post-build reviewer checks and the plan-answers/park policy replace stop-and-ask builder gates', () => {
+  const standards = read('CODING_STANDARDS.md');
+  const checks = [
+    'unit tests',
+    'integration tests at affected boundaries',
+    'end-to-end for the changed journey',
+    'a clean browser console',
+    'logging good enough to find a root cause',
+  ];
+  for (const name of checks) {
+    assert.ok(standards.includes(name), `CODING_STANDARDS.md must name the reviewer check: "${name}"`);
+  }
+  const we = read('docs/agents/work-execution.md');
+  assert.match(we, /approved plan|plan supplies|agreed seams/i);
+  assert.match(we, /park the card|park.*with one line/i);
+  assert.doesNotMatch(we, /ask Todd for an exception|ask Todd for.*workaround/i);
+});
