@@ -195,6 +195,7 @@ test('a missing required skill leaves an existing install untouched', () => {
     'package.json', 'package-lock.json', 'tsconfig.json', 'src/mastra/index.ts', 'src/mastra/local-sandbox.ts',
     'src/mastra/observability-store.ts', 'src/mastra/observability-retention.ts',
     'src/mastra/observability-traces-route.ts',
+    'src/mastra/github-intake-rules.ts',
     'src/mastra/public/factory-skills/factory-plan/SKILL.md',
   ]) {
     const destination = resolve(source, file);
