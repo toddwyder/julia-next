@@ -36,3 +36,19 @@ export const REVIEW_DEPTH_INSTRUCTIONS = `- **Small PRs (1–${SMALL_PR_MAX} fil
 - **Large PRs (${MEDIUM_PR_MAX + 1}+ files):** Provide a high-level architecture review. Focus only on critical issues — bugs, security vulnerabilities, and major design concerns.`;
 
 export const MIN_DELETION_ONLY_LINES = 50;
+
+export const REVIEWER_CHECKS = [
+  'unit tests',
+  'integration tests at affected boundaries',
+  'end-to-end for the changed journey',
+  'a clean browser console',
+  'logging good enough to find a root cause',
+] as const;
+
+export const REVIEWER_CHECKS_INSTRUCTIONS = `Record evidence tied to the change for each check, or explain why it does not apply; missing evidence is a finding.
+
+1. **unit tests** — meaningful behavior/regression coverage through appropriate interfaces.
+2. **integration tests at affected boundaries** — exercise the changed component/storage/service/provider contract across the boundary.
+3. **end-to-end for the changed journey** — the affected user journey through the assembled test app with test data, including failure paths.
+4. **a clean browser console** — no unexpected console errors/unhandled failures (no browser surface: mark not applicable).
+5. **logging good enough to find a root cause** — lasting logs/measurements identify the failing operation and context without exposing secrets.`;
