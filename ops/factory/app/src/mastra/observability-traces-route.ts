@@ -9,7 +9,8 @@ import { registerApiRoute } from '@mastra/core/server';
 
 function isLoopbackHost(host: string | undefined): boolean {
   if (!host) return false;
-  const hostname = host.split(':')[0].toLowerCase();
+  const parts = host.split(':');
+  const hostname = parts[0]?.toLowerCase();
   return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '[::1]';
 }
 
@@ -28,8 +29,9 @@ export const tracesRoute = registerApiRoute('/julia/observability/traces', {
       const host = c.req.header('host');
       const forwardedFor = c.req.header('x-forwarded-for');
       const realIp = c.req.header('x-real-ip');
+      const firstForwarded = forwardedFor ? forwardedFor.split(',')[0]?.trim() : undefined;
 
-      if (!isLoopbackHost(host) || (forwardedFor && !isLoopbackIp(forwardedFor.split(',')[0])) || (realIp && !isLoopbackIp(realIp))) {
+      if (!isLoopbackHost(host) || (forwardedFor && !isLoopbackIp(firstForwarded)) || (realIp && !isLoopbackIp(realIp))) {
         return c.json({ error: 'Forbidden: loopback access only' }, 403);
       }
 
