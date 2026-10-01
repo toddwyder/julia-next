@@ -11,6 +11,7 @@ files=(
   src/mastra/observability-store.ts
   src/mastra/observability-retention.ts
   src/mastra/observability-traces-route.ts
+  src/mastra/github-intake-rules.ts
   src/mastra/public/factory-skills/factory-plan/SKILL.md
   src/mastra/public/factory-skills/factory-review/SKILL.md
 )
@@ -52,5 +53,5 @@ install -D -m 0644 "$patch_dir/trace-retention.mjs" "$app_dir/ops/factory/trace-
 install -D -m 0644 "$patch_dir/factory-cards.mjs" "$app_dir/ops/factory/factory-cards.mjs"
 install -D -m 0644 "$patch_dir/factory-cards.sql" "$app_dir/ops/factory/factory-cards.sql"
 install -D -m 0644 "$patch_dir/run-psql.mjs" "$app_dir/ops/factory/run-psql.mjs"
+install -D -m 0644 "$patch_dir/github-intake-rules.mjs" "$app_dir/ops/factory/github-intake-rules.mjs"
 printf 'Factory install, WorkOS regression, typecheck and build passed in %s\n' "$app_dir"
-
