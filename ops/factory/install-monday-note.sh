@@ -15,23 +15,6 @@ if [[ ${EUID} -ne 0 || $# -ne 2 ]]; then
   exit 2
 fi
 
-# Preserve a provisioned trace token while adding newly required defaults.
-python3 - "$config_dir/config.env" "$project_id" <<'PY'
-import pathlib, sys
-path = pathlib.Path(sys.argv[1])
-text = path.read_text()
-keys = {line.split('=', 1)[0] for line in text.splitlines() if '=' in line and not line.startswith('#')}
-defaults = {
-    'MONDAY_NOTE_PROJECT_ID': sys.argv[2],
-    'MONDAY_NOTE_DATABASE': 'julia_factory_trial',
-    'MONDAY_NOTE_FACTORY_URL': 'http://127.0.0.1:4111',
-    'MONDAY_NOTE_TRACE_TOKEN': '',
-    'MONDAY_NOTE_GITHUB_OWNER': 'toddwyder',
-    'MONDAY_NOTE_GITHUB_REPO': 'julia-next',
-    'MONDAY_NOTE_USE_PUBLISHER_APP': '1',
-}
-path.write_text(text.rstrip() + '\n' + ''.join(f'{key}={value}\n' for key, value in defaults.items() if key not in keys))
-PY
 app_dir=$(realpath -- "$1")
 project_id=$2
 patch_dir=$(cd -- "$(dirname -- "$0")" && pwd)
@@ -57,6 +40,24 @@ EOF
   chmod 0640 "$config_dir/config.env"
 fi
 
+# Preserve a provisioned trace token while adding newly required defaults.
+python3 - "$config_dir/config.env" "$project_id" <<'PY'
+import pathlib, sys
+path = pathlib.Path(sys.argv[1])
+text = path.read_text()
+keys = {line.split('=', 1)[0] for line in text.splitlines() if '=' in line and not line.startswith('#')}
+defaults = {
+    'MONDAY_NOTE_PROJECT_ID': sys.argv[2],
+    'MONDAY_NOTE_DATABASE': 'julia_factory_trial',
+    'MONDAY_NOTE_FACTORY_URL': 'http://127.0.0.1:4111',
+    'MONDAY_NOTE_TRACE_TOKEN': '',
+    'MONDAY_NOTE_GITHUB_OWNER': 'toddwyder',
+    'MONDAY_NOTE_GITHUB_REPO': 'julia-next',
+    'MONDAY_NOTE_USE_PUBLISHER_APP': '1',
+}
+path.write_text(text.rstrip() + '\n' + ''.join(f'{key}={value}\n' for key, value in defaults.items() if key not in keys))
+PY
+
 # The publisher keeps its existing App credential. It gets only SELECT on the
 # same Factory record tables used by the approved read-only wait watcher.
 sudo -u postgres psql -v ON_ERROR_STOP=1 -d julia_factory_trial <<'SQL'
@@ -67,8 +68,8 @@ DO $$ BEGIN
 END $$;
 GRANT CONNECT ON DATABASE julia_factory_trial TO "orchestrator-svc";
 GRANT USAGE ON SCHEMA public TO "orchestrator-svc";
-GRANT SELECT ON work_items, mastra_messages TO "orchestrator-svc";
-ALTER ROLE "orchestrator-svc" SET default_transaction_read_only = on;
+GRANT SELECT ON work_items, mastra_messages, factory_run_bindings TO "orchestrator-svc";
+ALTER ROLE "orchestrator-svc" IN DATABASE julia_factory_trial SET default_transaction_read_only = on;
 SQL
 
 # Root-owned copies: the signing process must never execute builder-writable

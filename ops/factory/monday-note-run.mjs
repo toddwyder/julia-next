@@ -38,7 +38,7 @@ export const DEFAULT_MAX_BACKFILL_WEEKS = 8;
  * A read failure propagates and nothing is posted. When the week already has
  * its published issue/discussion, `publishMondayNote` posts nothing.
  */
-export async function runMondayNote({ now, readCards, readSpans, issues, discussions, notifications }) {
+export async function runMondayNote({ now, readCards, readSpans, issues, discussions, notifications, projectId }) {
   const window = previousWeekWindow({ now });
 
   // Before the first Monday after observability switch-on there is no completed
@@ -53,7 +53,7 @@ export async function runMondayNote({ now, readCards, readSpans, issues, discuss
   // posted. If either read throws, the caller sees the failure and stops.
   const cards = await readCards();
   const spans = await readSpans({ from: window.from, to: window.to });
-  const traces = normalizeTraceSpans(spans, { cards });
+  const traces = normalizeTraceSpans(spans, { cards, projectId });
 
   const note = buildMondayNote({ cards, traces, from: window.from, to: window.to });
   const result = await publishMondayNote({ note, issues, discussions, notifications });
@@ -84,6 +84,7 @@ export async function runMondayNoteBackfill({
   issues,
   discussions,
   notifications,
+  projectId,
   maxWeeksPerRun = DEFAULT_MAX_BACKFILL_WEEKS,
   log = console.log,
 }) {
@@ -113,7 +114,7 @@ export async function runMondayNoteBackfill({
   const published = [];
   for (const week of batch) {
     const spans = await readSpans({ from: week.from, to: week.to });
-    const traces = normalizeTraceSpans(spans, { cards });
+    const traces = normalizeTraceSpans(spans, { cards, projectId });
     const note = buildMondayNote({ cards, traces, ...week });
     const url = await postMondayNote({ note, issues, discussions, publisher });
     published.push({ from: week.from, to: week.to, title: note.title, url, quiet: note.quiet, cards: note.lines.length, totalUsd: note.totalUsd });
@@ -178,8 +179,8 @@ async function main() {
       : previousWeekWindow({ now: new Date().toISOString() });
     if (!Number.isFinite(Date.parse(window.from)) || !Number.isFinite(Date.parse(window.to)) || Date.parse(window.from) > Date.parse(window.to)) throw new Error('Invalid dry-run window');
     const cards = await readFactoryCards({ config, runPsql });
-    const spans = await readTraceSpans({ factoryUrl, token, from: window.from, to: window.to });
-    const note = buildMondayNote({ cards, traces: normalizeTraceSpans(spans, { cards }), ...window });
+    const spans = await readTraceSpans({ factoryUrl, token, from: window.from, to: window.to, log: console.error });
+    const note = buildMondayNote({ cards, traces: normalizeTraceSpans(spans, { cards, projectId: config.project_id }), ...window });
     console.log(note.body);
     return;
   }
@@ -193,8 +194,9 @@ async function main() {
   await runMondayNoteBackfill({
     now: new Date().toISOString(),
     readCards: () => readFactoryCards({ config, runPsql }),
-    readSpans: ({ from, to }) => readTraceSpans({ factoryUrl, token, from, to }),
+    readSpans: ({ from, to }) => readTraceSpans({ factoryUrl, token, from, to, log: console.log }),
     issues,
+    projectId: config.project_id,
   });
 }
 

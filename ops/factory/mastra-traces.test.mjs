@@ -2,7 +2,7 @@
 // through Mastra's observability route and calculate what-you-pay pricing.
 //
 // The supported surface is the one the pinned `mastra` CLI wraps:
-//   GET <factory>/julia/observability/traces (or /api/observability/traces)
+//   GET <factory>/api/observability/traces
 //
 // Tests verify:
 //   - Token breakdown into fresh input, cached input, output, thinking tokens
@@ -88,6 +88,14 @@ test('trace authentication failures are visible and never fall back to an unauth
   assert.equal(fake.calls.length, 1);
 });
 
+test('transport and malformed JSON failures identify the read operation without exposing credentials', async () => {
+  const options = { factoryUrl: 'https://factory.example', token: 'secret-reader', from: FROM, to: TO };
+  await assert.rejects(readTraceSpans({ ...options, fetchImpl: async () => { throw new TypeError('secret-reader'); } }), error =>
+    /Mastra trace read \/api\/observability\/traces\/light transport failed/.test(error.message) && !error.message.includes('secret-reader'));
+  await assert.rejects(readTraceSpans({ ...options, fetchImpl: async () => ({ ok: true, json: async () => { throw new SyntaxError('secret-reader'); } }) }),
+    /Mastra trace read \/api\/observability\/traces\/light returned invalid JSON/);
+});
+
 test('partial trace pagination fails closed', async () => {
   const fake = fakeFetch(() => jsonResponse({ spans: [], pagination: { page: 0, hasMore: true } }));
   await assert.rejects(readTraceSpans({ factoryUrl: 'https://factory.example', token: 'test-reader', from: FROM, to: TO, fetchImpl: fake.fetch }), /incomplete/);
@@ -100,7 +108,7 @@ test('a generation span normalises with token breakdown and what-you-pay pricing
   assert.equal(record.traceId, 'trace-a');
   assert.equal(record.card, 140);
   assert.equal(record.sessionId, 'session-140');
-  assert.equal(record.phase, 'build');
+  assert.equal(record.phase, null);
   assert.equal(record.startedAt, FROM_ISO(generationSpan.startedAt));
   assert.equal(record.endedAt, FROM_ISO(generationSpan.endedAt));
   assert.equal(record.model, 'deepseek/deepseek-v4-flash');
@@ -192,4 +200,20 @@ test('bundled estimates cannot replace missing counts and aggregate model spans 
   assert.equal(records[1].costBearing, false);
   assert.equal(records[2].costUsd, null);
   assert.equal(records[2].gap, 'no_token_count');
+});
+
+test('a generation root with an inference child bills the hydrated leaf once', async () => {
+  const root = { ...generationSpan, spanId: 'root', attributes: undefined, metadata: { threadId: 'session-140' } };
+  const leaf = { ...generationSpan, spanId: 'leaf', parentSpanId: 'root', spanType: 'model_inference' };
+  const fake = fakeFetch(url => {
+    if (new URL(url).pathname === '/api/observability/traces/light') return jsonResponse({ spans: [root], pagination: { page: 0, hasMore: false } });
+    if (url.endsWith('/trace-a/light')) return jsonResponse({ spans: [root, { ...leaf, attributes: undefined }] });
+    if (url.endsWith('/spans/leaf')) return jsonResponse({ span: leaf });
+    throw new Error('Unexpected request');
+  });
+  const spans = await readTraceSpans({ factoryUrl: 'https://factory.example', token: 'reader', from: FROM, to: TO, fetchImpl: fake.fetch });
+  const records = normalizeTraceSpans(spans, { cards: [{ number: 140, sessions: { 'session-140': {} } }] });
+  assert.equal(records.filter(x => x.costBearing).length, 1);
+  assert.equal(records.find(x => x.costBearing).id, 'leaf');
+  assert.ok(records.find(x => x.costBearing).costUsd > 0);
 });

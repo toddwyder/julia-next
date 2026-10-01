@@ -82,7 +82,7 @@ test('a run names a card accepted in an earlier week when its cost and failed at
   };
   const spans = [
     { id: 'old', sessionId: 'session-141', startedAt: '2026-09-27T09:00:00Z', endedAt: '2026-09-27T09:15:00Z', attributes: { costContext: { estimatedCost: 99, costUnit: 'usd' } } },
-    { id: 'new', sessionId: 'session-141', startedAt: '2026-09-28T10:00:00Z', endedAt: '2026-09-28T13:00:00Z', spanType: 'model_generation', status: 'error', attributes: { model: 'anthropic/claude-3-7-sonnet', provider: 'anthropic', usage: { inputTokens: 600000, outputTokens: 20000 } } },
+    { id: 'new', sessionId: 'session-141', startedAt: '2026-09-28T10:00:00Z', endedAt: '2026-09-28T13:00:00Z', spanType: 'model_generation', status: 'error', attributes: { model: 'anthropic/claude-sonnet-4-6', provider: 'anthropic', usage: { inputTokens: 600000, outputTokens: 20000 } } },
   ];
   const discussions = fakeDiscussions();
   const notifications = fakeNotifications();

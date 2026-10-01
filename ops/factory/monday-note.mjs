@@ -126,13 +126,13 @@ export function assertCostsAreCorrelated(weekTraces, weekCardNumbers) {
     // unknown and fails closed rather than being assumed free.
     const costBearing = trace.costBearing !== false;
 
-    if (!correlated && costBearing) {
+    if (!correlated && costBearing && !trace.projectOverhead) {
       throw new Error(
         `Trace ${trace.id ?? '(no id)'} is cost-bearing but is not correlated to a card in this week; ` +
           'refusing to publish a total that may be wrong',
       );
     }
-    if (correlated && costBearing && !costKnown && !hasNamedGaps) {
+    if ((correlated || trace.projectOverhead) && costBearing && !costKnown && !hasNamedGaps) {
       throw new Error(
         `Trace ${trace.id ?? '(no id)'} is correlated to card ${trace.card} but has no numeric estimated cost; ` +
           'refusing to report it as $0.00',
@@ -194,6 +194,10 @@ function cardSteps(card) {
       // is retained separately because `by` above may name the later actor who
       // closed the stage; a hand move on that step is still a hand move.
       intakeBy: index === 0 ? entry.by : null,
+      boardStep: true,
+      phaseSnapshots: (card.phaseSnapshots ?? []).filter(snapshot =>
+        Date.parse(snapshot.at) >= Date.parse(entry.enteredAt) &&
+        (!entry.exitedAt || Date.parse(snapshot.at) < Date.parse(entry.exitedAt))),
     }));
   }
   const movements = card.movements ?? [];
@@ -280,8 +284,9 @@ function stepLine(step, stepTraces) {
   const failedAttempts = stepTraces.filter((trace) => trace.outcome === 'failed-attempt').length;
   const elapsedMs = step.startedAt && step.endedAt ? Date.parse(step.endedAt) - Date.parse(step.startedAt) : null;
   const thinkingTokens = stepTraces.reduce((sum, trace) => sum + (trace.tokens?.thinking ?? 0), 0);
-  const recordedEffortTrace = stepTraces.find((trace) => trace.effort !== null && trace.effort !== undefined);
-  const effort = recordedEffortTrace ? recordedEffortTrace.effort : (step.effort ?? 'no recorded effort');
+  const recordedEffort = [...new Set([...stepTraces.map(trace => trace.effortLevel ?? trace.effort),
+    ...(step.phaseSnapshots ?? []).map(snapshot => snapshot.effort), step.effort].filter(Boolean))];
+  const effort = recordedEffort.length ? recordedEffort.join(', ') : 'no recorded effort';
 
   // Group models used in this step
   const modelMap = new Map();
@@ -307,14 +312,15 @@ function stepLine(step, stepTraces) {
     }
     const entry = modelMap.get(key);
     entry.traces.push(trace);
-    if (trace.whatYouPayCost !== null && trace.whatYouPayCost !== undefined) {
-      entry.whatYouPayCost += trace.whatYouPayCost;
+    const knownCost = trace.whatYouPayCost ?? trace.costUsd;
+    if (knownCost !== null && knownCost !== undefined) {
+      entry.whatYouPayCost += knownCost;
       entry.hasKnownCost = true;
     } else {
       if (trace.namedGaps?.some((g) => g.startsWith('unpriced_model'))) {
         entry.unpriced = true;
       }
-      if (trace.namedGaps?.includes('no_token_count')) {
+      if (trace.namedGaps?.some(gap => ['no_token_count', 'invalid_token_count'].includes(gap))) {
         entry.noTokenCount = true;
       }
     }
@@ -326,6 +332,7 @@ function stepLine(step, stepTraces) {
     entry.output += trace.tokens?.output ?? 0;
     entry.thinking += trace.tokens?.thinking ?? 0;
     entry.total += trace.tokens?.total ?? 0;
+    if (!trace.tokens) entry.noTokenCount = true;
   }
 
   const modelLines = [];
@@ -342,8 +349,13 @@ function stepLine(step, stepTraces) {
   if (elapsedMs !== null && elapsedMs >= 0) parts.push(duration(elapsedMs));
   const failedPhrase = failedAttemptPhrase(failedAttempts);
   if (failedPhrase) parts.push(failedPhrase);
-  parts.push(`effort: ${effort} (${stepTraces.some(trace => trace.costBearing !== false) ? formatTokens(thinkingTokens) : 'no token count'} thinking tokens)`);
-  if (modelMap.size === 0) modelLines.push('    - model: no recorded model calls');
+  const tokensComplete = stepTraces.some(trace => trace.costBearing !== false) &&
+    !stepTraces.some(trace => trace.costBearing !== false && (!trace.tokens || trace.namedGaps?.includes('no_token_count') || trace.namedGaps?.includes('invalid_token_count')));
+  parts.push(`effort: ${effort} (${tokensComplete ? formatTokens(thinkingTokens) : 'no token count'} thinking tokens)`);
+  if (modelMap.size === 0) {
+    const models = [...new Set((step.phaseSnapshots ?? []).map(snapshot => snapshot.model).filter(Boolean))];
+    modelLines.push(...(models.length ? models.map(model => `    - ${model}: no recorded model calls (no token count)`) : ['    - model: no recorded model calls']));
+  }
 
   return {
     stage: step.stage,
@@ -377,6 +389,9 @@ function tracesByStep(steps, cardTraces) {
         if (start !== null && start <= at) index = i;
       }
     }
+    if (index >= 0 && steps[index].boardStep &&
+      ((steps[index].endedAt && Date.parse(steps[index].endedAt) <= at) ||
+       (trace.costBearing !== false && trace.phase && steps[index].stage !== trace.phase))) index = -1;
     (index >= 0 ? buckets[index] : unattached).push(trace);
   }
   return { buckets, unattached };
@@ -418,7 +433,11 @@ function cardLine(card, cardTraces, { acceptedInWeek = true, from, to } = {}) {
     { stage: 'other Factory work', by: 'factory', startedAt: null, endedAt: null },
     unattached,
   );
-  if (unattached.length > 0) stepLines.push(unattachedLine);
+  if (unattached.length > 0) {
+    const phases = [...new Set(unattached.map(trace => trace.phase ?? 'other Factory work'))];
+    for (const phase of phases) stepLines.push(stepLine({ stage: `${phase} (no recorded board step)`, by: 'factory' },
+      unattached.filter(trace => (trace.phase ?? 'other Factory work') === phase)));
+  }
 
   const costUsd = cardTraces.reduce((sum, trace) => sum + (trace.whatYouPayCost ?? trace.costUsd ?? 0), 0);
   const faceCostUsd = cardTraces.reduce((sum, trace) => sum + (trace.faceCost ?? trace.whatYouPayCost ?? trace.costUsd ?? 0), 0);
@@ -426,7 +445,7 @@ function cardLine(card, cardTraces, { acceptedInWeek = true, from, to } = {}) {
   const enteredAt = card.enteredAt ?? allSteps[0]?.startedAt ?? card.createdAt;
   const lastStep = steps.at(-1);
   const doneAsOfWeek = card.doneAt && Date.parse(card.doneAt) < Date.parse(to) ? card.doneAt : null;
-  const rawEnd = doneAsOfWeek ?? lastStep?.endedAt ?? lastStep?.startedAt ?? enteredAt;
+  const rawEnd = doneAsOfWeek ?? lastStep?.endedAt ?? (['done', 'canceled'].includes(lastStep?.stage) ? lastStep.startedAt : lastStep ? to : enteredAt);
   const endedAt = rawEnd && Date.parse(rawEnd) > Date.parse(to) ? to : rawEnd;
   let elapsedMs;
   if (acceptedInWeek) {
@@ -465,10 +484,10 @@ function cardLine(card, cardTraces, { acceptedInWeek = true, from, to } = {}) {
   const { byHand, doneByFactory } = doneByFactoryFor(allSteps);
   const reference = String(card.number).startsWith('PR-') ? `PR #${String(card.number).slice(3)}`
     : String(card.number).startsWith('Factory-') ? `Factory card ${String(card.number).slice(8)}` : `#${card.number}`;
-  const parts = [`${reference} ${card.title}`, costDisplay(cardTraces, costUsd), duration(elapsedMs)];
+  const parts = [`${reference} ${card.title}`, costDisplay(cardTraces, costUsd), card.recordMissing ? 'no recorded card elapsed time' : duration(elapsedMs)];
   const failedPhrase = failedAttemptPhrase(failedAttempts);
   if (failedPhrase) parts.push(failedPhrase);
-  parts.push(doneByFactory ? 'Done by Factory' : `not all by Factory: ${actorName(byHand.by)} ${byHand.stage}`);
+  parts.push(doneByFactory ? (doneAsOfWeek || allSteps.at(-1)?.stage === 'done' ? 'Done by Factory' : 'Factory work') : `not all by Factory: ${actorName(byHand.by)} ${byHand.stage}`);
 
   // Drivers calculation
   const totalStepsCount = steps.length;
@@ -480,9 +499,18 @@ function cardLine(card, cardTraces, { acceptedInWeek = true, from, to } = {}) {
   const reviewRounds = steps.filter((step) => step.stage === 'review').length;
   const waitsOnTodd = countWaitsOnTodd(allSteps);
 
-  const tokensKnown = cardTraces.some(trace => trace.costBearing !== false) && !cardTraces.some(trace => trace.namedGaps?.includes('no_token_count'));
-  const tokenDrivers = tokensKnown ? `${formatTokens(avgTokensPerStep)} avg tokens/step, ${cachedShare}% cached input` : 'tokens/step: no token count, cached input: no token count';
-  const driversText = `  Drivers: ${totalStepsCount} step${totalStepsCount === 1 ? '' : 's'}, ${tokenDrivers}, ${reviewRounds} review round${reviewRounds === 1 ? '' : 's'}, ${failedAttempts} failed attempt${failedAttempts === 1 ? '' : 's'}, ${waitsOnTodd} wait${waitsOnTodd === 1 ? '' : 's'} on Todd outside UAT`;
+  const tokensKnown = cardTraces.some(trace => trace.costBearing !== false) && !cardTraces.some(trace => trace.costBearing !== false && (!trace.tokens || trace.namedGaps?.includes('no_token_count') || trace.namedGaps?.includes('invalid_token_count')));
+  const tokenDrivers = tokensKnown ? `${totalStepsCount ? formatTokens(avgTokensPerStep) + ' avg input tokens/board step' : 'tokens/board step: no recorded board step count'}, ${cachedShare}% cached input` : 'tokens/step: no token count, cached input: no token count';
+  const reviewDriver = card.recordMissing || unattached.some(trace => trace.phase === 'review' && trace.costBearing !== false)
+    ? 'review rounds: no recorded review round count' : `${reviewRounds} review round${reviewRounds === 1 ? '' : 's'}`;
+  const modelSteps = cardTraces.filter(trace => trace.modelStep && trace.runId);
+  const runs = new Set(cardTraces.filter(trace => trace.costBearing && trace.runId).map(trace => trace.runId));
+  const runDrivers = modelSteps.length && runs.size
+    ? `${(modelSteps.length / runs.size).toFixed(1)} model steps/run (${modelSteps.length} steps, ${runs.size} runs), ${tokensKnown ? formatTokens(Math.round(totalInputTokens / modelSteps.length)) + ' avg input tokens/model step' : 'tokens/model step: no token count'}`
+    : 'steps/run: no recorded run count, tokens/run step: no recorded run step count';
+  const boardDrivers = card.recordMissing ? 'board steps: no recorded stage history' : `${totalStepsCount} step${totalStepsCount === 1 ? '' : 's'} (board history)`;
+  const waitDriver = card.recordMissing ? 'waits on Todd: no recorded stage history' : `${waitsOnTodd} wait${waitsOnTodd === 1 ? '' : 's'} on Todd outside UAT`;
+  const driversText = `  Drivers: ${boardDrivers}, ${runDrivers}, ${tokenDrivers}, ${reviewDriver}, ${failedAttempts} failed attempt${failedAttempts === 1 ? '' : 's'}, ${waitDriver}`;
 
   return {
     number: card.number,
@@ -543,11 +571,14 @@ export function buildMondayNote({ cards = [], traces = [], from, to }) {
   // Cost correlation is enforced above, so an uncorrelated span here has no
   // numeric cost: it is summed and reported (at $0.00) rather than silently
   // dropped, and it can never widen a card's total.
-  const uncorrelated = weekTraces.filter((trace) => trace.card === null || !weekNumbers.has(trace.card));
+  const overhead = weekTraces.filter(trace => trace.projectOverhead);
+  const overheadUsd = overhead.reduce((sum, trace) => sum + (trace.whatYouPayCost ?? 0), 0);
+  const uncorrelated = weekTraces.filter((trace) => !trace.projectOverhead && (trace.card === null || !weekNumbers.has(trace.card)));
   const uncorrelatedUsd = uncorrelated.reduce((sum, trace) => sum + (trace.whatYouPayCost ?? trace.costUsd ?? 0), 0);
   const cardUsd = lines.reduce((sum, line) => sum + line.costUsd, 0);
-  const faceTotalUsd = lines.reduce((sum, line) => sum + (line.faceCostUsd ?? line.costUsd), 0);
-  const totalUsd = cardUsd + uncorrelatedUsd;
+  const faceTotalUsd = lines.reduce((sum, line) => sum + (line.faceCostUsd ?? line.costUsd), 0)
+    + overhead.reduce((sum, trace) => sum + (trace.faceCost ?? trace.whatYouPayCost ?? 0), 0);
+  const totalUsd = cardUsd + uncorrelatedUsd + overheadUsd;
   const failedAttempts = lines.reduce((sum, line) => sum + line.failedAttempts, 0);
   const spentPhrase = failedAttemptPhrase(failedAttempts);
 
@@ -555,8 +586,8 @@ export function buildMondayNote({ cards = [], traces = [], from, to }) {
   const providerTotals = {};
   const providerTraces = {};
   for (const trace of weekTraces) {
-    if (!trace.provider || trace.costBearing === false) continue;
-    const provider = trace.provider;
+    if (trace.costBearing === false) continue;
+    const provider = trace.provider ?? 'no recorded provider';
     if (!providerTotals[provider]) {
       providerTotals[provider] = { whatYouPayCost: 0, faceCost: 0 };
       providerTraces[provider] = [];
@@ -622,6 +653,17 @@ export function buildMondayNote({ cards = [], traces = [], from, to }) {
     `  • Unpriced models: ${unpricedModelCount} call(s)`,
     `  • No token count: ${noTokenCountCount} call(s)`,
   ];
+  const otherGaps = {};
+  for (const trace of weekTraces.filter(trace => trace.costBearing !== false)) {
+    for (const gap of trace.namedGaps ?? []) {
+      if (!['no_token_count', 'unpriced_model', 'no_recorded_effort'].includes(gap)) otherGaps[gap] = (otherGaps[gap] ?? 0) + 1;
+    }
+  }
+  for (const [gap, count] of Object.entries(otherGaps)) namedGapLines.push(`  • ${gap.replaceAll('_', ' ')}: ${count} call(s)`);
+  const missingCallCards = weekCards.filter(card => !weekTraces.some(trace => trace.card === card.number && trace.costBearing !== false)).length;
+  if (missingCallCards) namedGapLines.push(`  • No recorded model calls: ${missingCallCards} card(s)`);
+  const totalDisplay = weekCards.length === 0 && weekTraces.length === 0 ? usd(0)
+    : `${costDisplay(weekTraces, totalUsd)}${missingCallCards && weekTraces.some(trace => trace.costBearing !== false) ? ' + no recorded model calls' : ''}`;
 
   // The body is what Todd reads, so every fact the note computed is written
   // here, not left in the returned metadata.
@@ -657,13 +699,15 @@ export function buildMondayNote({ cards = [], traces = [], from, to }) {
     `Monday note — week ending ${to.slice(0, 10)}`,
     '',
     ...bodyLines,
+    ...(overhead.length ? ['', `Factory project overhead (supervisor and memory): ${costDisplay(overhead, overheadUsd)}`,
+      ...stepLine({ stage: 'project overhead', by: 'factory' }, overhead).modelLines] : []),
     ...(uncorrelatedLine ? ['', uncorrelatedLine] : []),
     '',
     ...providerLines,
     '',
     ...namedGapLines,
     '',
-    `Total model spend: ${weekCards.length === 0 && weekTraces.length === 0 ? usd(0) : weekCards.some(card => !weekTraces.some(trace => trace.card === card.number && trace.costBearing !== false)) ? `${totalUsd > 0 ? usd(totalUsd) + ' known subtotal + ' : ''}no recorded model calls` : costDisplay(weekTraces, totalUsd)} across ${weekCards.length} cards${spentPhrase ? ` (${spentPhrase})` : ''}.`,
+    `Total model spend: ${totalDisplay} across ${weekCards.length} cards${spentPhrase ? ` (${spentPhrase})` : ''}.`,
     '',
     "Costs are read from Mastra's traces for this Factory project and Factory's own card records. Sessions run outside Factory (Codex, GPT, or Claude sessions started by hand) are not counted and never appear here.",
   ].join('\n');

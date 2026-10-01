@@ -60,13 +60,14 @@ Todd as a public GitHub Issue: Factory's own card records and Mastra's trace cos
 
 - **Cards** come from `ops/factory/factory-cards.mjs` over the same read-only PostgreSQL route the
   wait watcher uses (`install-wait-alerts.sh`'s peer role; `factory-cards.sql` is read-only and
-  scoped to `work_items` and phase signals in `mastra_messages`). Factory's `stage_history` gives each step's actor (`by` / `exitedBy`) and
+  scoped to `work_items`, retained `factory_run_bindings`, and phase signals in `mastra_messages`). Factory's `stage_history` gives each step's actor (`by` / `exitedBy`) and
   stage intervals (`enteredAt`/`exitedAt`).
-- **Costs** come from authenticated Mastra light roots/timelines and individual model-generation
-  spans. The reader fetches each aggregate generation once, excluding its nested inference/step
-  records. Prompt bodies and tool schemas are discarded. The price table records provider rates,
+- **Costs** come from authenticated Mastra light roots/timelines and individual model-inference
+  spans. Aggregate generation/step totals are excluded when inference children exist, so token
+  rates and long-context thresholds apply once per actual call. Step records and run IDs supply
+  the model steps/run driver. Prompt bodies and tool schemas are discarded. The price table records provider rates,
   cache rates, source dates and payment factors. Direct DeepSeek peak/off-peak prices use the call's
-  start time, including the verified 2026-10-01?07 holiday. An unknown price window, model or token
+  start time, including the verified October 1–7 holiday. An unknown price window, model or token
   count is a named gap; dollar amounts beside gaps are explicitly known subtotals.
 
 Each card line carries every step with its actor, model breakdown, effort level beside thinking tokens,
@@ -75,6 +76,10 @@ line highlights the primary cost and time drivers. Weekly provider totals summar
 and named gaps (e.g. missing tokens, unpriced models, unrecorded effort) are explicitly itemized. A quiet
 week says so. Sessions run **outside Factory** — Codex, GPT, or Claude sessions started by hand — are not
 Factory cards and are not counted; the note says so on its face.
+
+When a card row is gone but Factory retains its run binding, the note uses that recorded UUID and
+names the missing title, elapsed time and stage history. It never invents an issue number or a wait
+count. Calls on this project's supervisor thread appear separately as project overhead.
 
 Each week is `[from, to)`, computed from the switch-on Monday (`OBSERVABILITY_START`, 2026-09-28).
 `completedWeeks` lists every full week, and the weekly job **backfills** each one that has no GitHub Issue
@@ -95,7 +100,7 @@ Operator installation:
 1. Install the app with `bash ops/factory/install.sh /var/lib/julia-factory/app`.
 2. Run `sudo bash ops/factory/install-monday-note.sh /var/lib/julia-factory/app <PROJECT_ID>`.
    It installs root-owned job modules under `/opt/julia-factory-monday-note`, grants the existing
-   publisher account SELECT on the two record tables, and enables the Monday timer. Re-run it after
+   publisher account SELECT on the three record tables, and enables the Monday timer. Re-run it after
    job updates. It preserves existing configuration and sends nothing during installation.
 3. Provision one random `MONDAY_NOTE_TRACE_TOKEN` in both `/etc/julia-factory/factory.env` and
    `/etc/julia-factory-monday-note/config.env`, then restart the app. The supported auth composition

@@ -58,6 +58,8 @@ export function normalizeWorkItemRows(rows = []) {
       stageHistory,
       sessions: row.sessions ?? {},
       phaseSnapshots: row.phase_snapshots ?? [],
+      recordMissing: row.record_missing ?? false,
+      sessionBindings: row.session_bindings ?? [],
       acceptedAt: row.accepted_at ?? null,
       createdAt: row.created_at ?? null,
       enteredAt: row.accepted_at ?? stageHistory[0]?.enteredAt ?? row.created_at ?? null,

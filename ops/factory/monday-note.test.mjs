@@ -12,6 +12,36 @@ import { buildMondayNote, publishMondayNote, MONDAY_NOTE_CATEGORY, previousWeekW
 
 const WEEK = { from: '2026-09-21T00:00:00Z', to: '2026-09-28T00:00:00Z' };
 
+test('invalid token breakdowns stay gaps and project overhead contributes to face totals', () => {
+  const invalid = { id: 'invalid', card: 180, startedAt: '2026-09-22T10:00:00Z', phase: 'build', costBearing: true,
+    model: 'broken-count', provider: 'deepseek', namedGaps: ['invalid_token_count'], tokens: { freshInput: 0, cachedInput: 500, output: 10, thinking: 0 } };
+  const overhead = { id: 'overhead', card: null, projectOverhead: true, startedAt: invalid.startedAt, costBearing: true,
+    model: 'measured', provider: 'openai', whatYouPayCost: 0, faceCost: 5, tokens: { freshInput: 100, cachedInput: 0, output: 10, thinking: 0 } };
+  const note = buildMondayNote({ cards: [{ number: 180, title: 'Invalid', enteredAt: invalid.startedAt }], traces: [invalid, overhead], ...WEEK });
+  assert.match(note.body, /broken-count \(deepseek\): invalid token count \(no token count\)/);
+  assert.doesNotMatch(note.body, /500 cached/);
+  assert.equal(note.faceTotalUsd, 5);
+});
+
+test('missing usage and missing board phase remain gaps beside a recorded reviewer call', () => {
+  const note = buildMondayNote({ cards: [{ number: 'PR-184', title: 'Open review', enteredAt: '2026-09-22T09:00:00Z',
+    stageHistory: [{ stage: 'intake', by: 'factory', enteredAt: '2026-09-22T09:00:00Z' }] }],
+    traces: [{ id: 'missing-usage', card: 'PR-184', startedAt: '2026-09-22T10:00:00Z',
+      phase: 'review', costBearing: true, model: 'deepseek-v4-pro', provider: 'deepseek', namedGaps: ['no_token_count'] }], ...WEEK });
+  assert.doesNotMatch(note.body, /0 thinking tokens|Done by Factory/);
+  assert.match(note.body, /review.*no recorded board step/);
+  assert.match(note.body, /no token count thinking tokens/);
+  assert.match(note.body, /steps\/run: no recorded run count/);
+});
+
+test('a phase snapshot supplies effort even when its model traces are missing', () => {
+  const note = buildMondayNote({ cards: [{ number: 180, title: 'Recorded phase', enteredAt: '2026-09-22T09:00:00Z',
+    stageHistory: [{ stage: 'planning', by: 'factory', enteredAt: '2026-09-22T09:00:00Z', exitedAt: '2026-09-22T10:00:00Z' }],
+    phaseSnapshots: [{ threadId: 'thread', at: '2026-09-22T09:10:00Z', effort: 'high', model: 'openai/gpt-6-sol', phase: 'Planning' }]
+  }], traces: [], ...WEEK });
+  assert.match(note.body, /effort: high/);
+});
+
 test('a card with no recorded model calls shows named gaps at card, step, effort and token drivers', () => {
   const note = buildMondayNote({ cards: [{ number: 180, title: 'Unmeasured', enteredAt: '2026-09-22T09:00:00Z',
     stageHistory: [{ stage: 'execute', by: 'factory', enteredAt: '2026-09-22T09:00:00Z' }] }], traces: [], ...WEEK });
@@ -79,9 +109,9 @@ test('each step is named with its actor, not just the card total', () => {
   assert.deepEqual(
     note.lines[0].steps.map((step) => step.text),
     [
-      'plan — Factory — $0.40 — 15m — effort: no recorded effort (0 thinking tokens)',
-      'build — Factory — $5.60 — 3h 15m — 1 failed attempt — effort: no recorded effort (0 thinking tokens)',
-      'review — Factory — $0.60 — 40m — effort: no recorded effort (0 thinking tokens)',
+      'plan — Factory — $0.40 — 15m — effort: no recorded effort (no token count thinking tokens)',
+      'build — Factory — $5.60 — 3h 15m — 1 failed attempt — effort: no recorded effort (no token count thinking tokens)',
+      'review — Factory — $0.60 — 40m — effort: no recorded effort (no token count thinking tokens)',
       'done — Factory — no recorded model calls — effort: no recorded effort (no token count thinking tokens)',
     ],
   );

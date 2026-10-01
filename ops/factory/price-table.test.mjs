@@ -7,11 +7,26 @@ import {
   calculateModelCost,
 } from './price-table.mjs';
 
+test('OpenRouter advertises its own current rates and does not invent a cache discount', () => {
+  const price = getModelPrice('openrouter/deepseek/deepseek-chat');
+  assert.equal(price.freshInputPerMillion, .2574);
+  assert.equal(price.outputPerMillion, 1.0287);
+  assert.equal(price.cachedInputPerMillion, null);
+  const result = calculateModelCost({ model: 'openrouter/deepseek/deepseek-chat', usage: { inputTokens: 1000, outputTokens: 100, cachedInputTokens: 500 } });
+  assert.equal(result.error, 'no_cached_input_price');
+});
+
+test('an unverified wrapper model or cache-write TTL remains a price gap', () => {
+  assert.equal(getModelPrice('gpt-4o', 'commandcode'), null);
+  const result = calculateModelCost({ model: 'anthropic/claude-sonnet-4-6', usage: { inputTokens: 1000, outputTokens: 100, inputDetails: { cacheWrite: 500 } } });
+  assert.equal(result.error, 'no_cache_write_price_context');
+});
+
 test('price table entries have required schema: fresh, cached, output, provider, payFactor, sourceUrl, dateChecked', () => {
   assert.ok(Object.keys(PRICE_TABLE).length > 0);
   for (const [modelId, entry] of Object.entries(PRICE_TABLE)) {
     assert.equal(typeof entry.freshInputPerMillion, 'number', `${modelId} missing freshInputPerMillion`);
-    assert.equal(typeof entry.cachedInputPerMillion, 'number', `${modelId} missing cachedInputPerMillion`);
+    assert.ok(entry.cachedInputPerMillion === null || typeof entry.cachedInputPerMillion === 'number', `${modelId} missing cachedInputPerMillion`);
     assert.equal(typeof entry.outputPerMillion, 'number', `${modelId} missing outputPerMillion`);
     assert.equal(typeof entry.provider, 'string', `${modelId} missing provider`);
     assert.equal(typeof entry.payFactor, 'number', `${modelId} missing payFactor`);
@@ -40,7 +55,7 @@ test('DeepSeek Pro rates include thinking tokens as output rate', () => {
 });
 
 test('Command Code provider applies 1/7 pay factor ($10 buys $70 credit)', () => {
-  const cc = getModelPrice('commandcode/claude-3-7-sonnet');
+  const cc = getModelPrice('commandcode/deepseek-v4-pro');
   assert.ok(cc);
   assert.equal(cc.provider, 'commandcode');
   assert.equal(cc.payFactor, 10 / 70);
@@ -73,8 +88,7 @@ test('calculateModelCost calculates fresh input, cached input, output and what-y
   assert.equal(result.cachedInputTokens, 800000);
   assert.equal(result.outputTokens, 100000);
   assert.equal(result.thinkingTokens, 20000);
-  // face cost = (200k * 0.27 / 1M) + (800k * 0.07 / 1M) + (100k * 1.10 / 1M)
-  // = 0.054 + 0.056 + 0.11 = 0.22
+  // Off-peak face cost: .132 + .0176 + .198 = .3476.
   assert.equal(Math.round(result.faceCostUsd * 1000) / 1000, 0.348);
   assert.equal(Math.round(result.whatYouPayUsd * 1000) / 1000, 0.348);
   assert.equal(result.provider, 'deepseek');
@@ -83,7 +97,7 @@ test('calculateModelCost calculates fresh input, cached input, output and what-y
 test('calculateModelCost applies Command Code pay factor', () => {
   const result = calculateModelCost({
     startedAt: '2026-09-28T12:00:00Z',
-    model: 'commandcode/claude-3-7-sonnet',
+    model: 'commandcode/deepseek-v4-pro',
     usage: {
       inputTokens: 1000000,
       cachedInputTokens: 0,
@@ -93,10 +107,10 @@ test('calculateModelCost applies Command Code pay factor', () => {
 
   assert.equal(result.ok, true);
   assert.equal(result.provider, 'commandcode');
-  // Face cost for claude-3-7-sonnet: 1M * 3.00/1M + 100k * 15.00/1M = 3.00 + 1.50 = 4.50
-  assert.equal(result.faceCostUsd, 4.50);
-  // What you pay = 4.50 * (10 / 70) = 0.642857...
-  assert.equal(Math.round(result.whatYouPayUsd * 100) / 100, 0.64);
+  // Verified Command Code Pro face cost: .66 + .198 = .858.
+  assert.ok(Math.abs(result.faceCostUsd - .858) < 1e-12);
+  // Apply the credit payment factor once.
+  assert.equal(Math.round(result.whatYouPayUsd * 100) / 100, 0.12);
 });
 
 test('calculateModelCost reports subscription what-you-pay as $0 while retaining tokens and face cost', () => {
@@ -145,7 +159,7 @@ test('OpenRouter models are present in price table with 1.0 pay factor', () => {
   assert.equal(orDeepSeek.provider, 'openrouter');
   assert.equal(orDeepSeek.payFactor, 1.0);
 
-  const orClaude = getModelPrice('openrouter/anthropic/claude-3.5-sonnet');
+  const orClaude = getModelPrice('openrouter/openai/gpt-4o');
   assert.ok(orClaude);
   assert.equal(orClaude.provider, 'openrouter');
 });
@@ -155,7 +169,7 @@ test('getModelPrice disambiguates bare model names to canonical provider over wr
   assert.ok(gpt);
   assert.equal(gpt.provider, 'openai'); // canonical provider, not commandcode
 
-  const claude = getModelPrice('claude-3-5-sonnet');
+  const claude = getModelPrice('claude-sonnet-4-6');
   assert.ok(claude);
   assert.equal(claude.provider, 'anthropic');
 });
@@ -175,7 +189,7 @@ test('Mastra output tokens include thinking; the output rate bills them once', (
   assert.equal(result.ok, true);
   assert.equal(result.outputTokens, 10000); // 4k + 6k
   assert.equal(result.thinkingTokens, 6000);
-  // (20k * 0.55/1M) + (80k * 0.14/1M) + (10k * 2.19/1M) = 0.011 + 0.0112 + 0.0219 = 0.0441
+  // Thinking tokens are already included in the 10k output total.
   assert.equal(Math.round(result.whatYouPayUsd * 10000) / 10000, 0.0348);
 });
 

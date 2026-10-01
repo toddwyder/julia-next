@@ -51,8 +51,7 @@ export function createIssuesClient({ fetchImpl = fetch, token, owner, repo }) {
           },
         });
         if (!res.ok) {
-          const body = await res.text();
-          throw new Error(`GitHub Issues API error: ${res.status} ${body}`);
+          throw new Error(`GitHub Issues API error: ${res.status} while finding note ${title}`);
         }
         const issues = await res.json();
         if (!Array.isArray(issues)) {
@@ -84,8 +83,7 @@ export function createIssuesClient({ fetchImpl = fetch, token, owner, repo }) {
         body: JSON.stringify({ title, body, labels }),
       });
       if (!res.ok) {
-        const errBody = await res.text();
-        throw new Error(`GitHub Issues API error: ${res.status} ${errBody}`);
+        throw new Error(`GitHub Issues API error: ${res.status} while publishing note ${title}`);
       }
       const issue = await res.json();
       return {

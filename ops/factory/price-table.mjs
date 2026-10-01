@@ -48,45 +48,29 @@ export const PRICE_TABLE = {
     peakMultiplier: 2,
   },
 
-  // Command Code (1/7 of face value)
-  'commandcode/claude-3-7-sonnet': {
-    freshInputPerMillion: 3.00,
-    cachedInputPerMillion: 0.30,
-    outputPerMillion: 15.00,
-    provider: 'commandcode',
-    payFactor: 10 / 70,
-    sourceUrl: 'https://www.anthropic.com/pricing',
-    dateChecked: '2026-10-01',
+  // Command Code's own advertised rates, paid from discounted credits.
+  'commandcode/deepseek-v4-pro': {
+    freshInputPerMillion: .66, cachedInputPerMillion: .022, outputPerMillion: 1.98,
+    provider: 'commandcode', payFactor: 10 / 70,
+    sourceUrl: 'https://commandcode.ai/models', dateChecked: '2026-10-01', peakMultiplier: 2,
   },
-  'commandcode/claude-3-5-sonnet': {
-    freshInputPerMillion: 3.00,
-    cachedInputPerMillion: 0.30,
-    outputPerMillion: 15.00,
-    provider: 'commandcode',
-    payFactor: 10 / 70,
-    sourceUrl: 'https://www.anthropic.com/pricing',
-    dateChecked: '2026-10-01',
-  },
-  'commandcode/gpt-4o': {
-    freshInputPerMillion: 2.50,
-    cachedInputPerMillion: 1.25,
-    outputPerMillion: 10.00,
-    provider: 'commandcode',
-    payFactor: 10 / 70,
-    sourceUrl: 'https://developers.openai.com/api/docs/pricing',
-    dateChecked: '2026-10-01',
-  },
-  'commandcode/deepseek-chat': {
-    freshInputPerMillion: 0.27,
-    cachedInputPerMillion: 0.07,
-    outputPerMillion: 1.10,
-    provider: 'commandcode',
-    payFactor: 10 / 70,
-    sourceUrl: 'https://api-docs.deepseek.com/quick_start/pricing',
-    dateChecked: '2026-10-01',
+  'commandcode/deepseek-v4-flash': {
+    freshInputPerMillion: .15, cachedInputPerMillion: .003, outputPerMillion: .6,
+    provider: 'commandcode', payFactor: 10 / 70,
+    sourceUrl: 'https://commandcode.ai/models', dateChecked: '2026-10-01', peakMultiplier: 2,
   },
 
   // OpenAI Subscriptions / Codex Sign-in (what-you-pay = $0)
+  'openai/gpt-6-sol': {
+    freshInputPerMillion: 2,
+    cachedInputPerMillion: .2,
+    outputPerMillion: 10,
+    provider: 'openai',
+    payFactor: 0,
+    sourceUrl: 'https://developers.openai.com/api/docs/models/gpt-6-sol',
+    dateChecked: '2026-10-01',
+    longContextThreshold: 272000,
+  },
   'openai/gpt-4o': {
     freshInputPerMillion: 2.50,
     cachedInputPerMillion: 1.25,
@@ -144,70 +128,30 @@ export const PRICE_TABLE = {
     dateChecked: '2026-10-01',
   },
 
-  // Anthropic Direct API
-  'anthropic/claude-3-7-sonnet': {
-    freshInputPerMillion: 3.00,
-    cachedInputPerMillion: 0.30,
-    outputPerMillion: 15.00,
-    provider: 'anthropic',
-    payFactor: 1.0,
-    sourceUrl: 'https://www.anthropic.com/pricing',
-    dateChecked: '2026-10-01',
-  },
-  'anthropic/claude-3-5-sonnet': {
-    freshInputPerMillion: 3.00,
-    cachedInputPerMillion: 0.30,
-    outputPerMillion: 15.00,
-    provider: 'anthropic',
-    payFactor: 1.0,
-    sourceUrl: 'https://www.anthropic.com/pricing',
-    dateChecked: '2026-10-01',
-  },
-  'anthropic/claude-3-5-haiku': {
-    freshInputPerMillion: 0.80,
-    cachedInputPerMillion: 0.08,
-    outputPerMillion: 4.00,
-    provider: 'anthropic',
-    payFactor: 1.0,
-    sourceUrl: 'https://www.anthropic.com/pricing',
-    dateChecked: '2026-10-01',
-  },
-  'anthropic/claude-3-opus': {
-    freshInputPerMillion: 15.00,
-    cachedInputPerMillion: 1.50,
-    outputPerMillion: 75.00,
-    provider: 'anthropic',
-    payFactor: 1.0,
-    sourceUrl: 'https://www.anthropic.com/pricing',
-    dateChecked: '2026-10-01',
+  // Anthropic Direct API. Retired models with unverified current rates are gaps.
+  'anthropic/claude-sonnet-4-6': {
+    freshInputPerMillion: 3, cachedInputPerMillion: .30, outputPerMillion: 15,
+    provider: 'anthropic', payFactor: 1,
+    sourceUrl: 'https://platform.claude.com/docs/en/about-claude/pricing', dateChecked: '2026-10-01',
   },
 
   // OpenRouter (1.0 pay factor)
   'openrouter/deepseek/deepseek-chat': {
-    freshInputPerMillion: 0.27,
-    cachedInputPerMillion: 0.07,
-    outputPerMillion: 1.10,
+    freshInputPerMillion: .2574,
+    cachedInputPerMillion: null,
+    outputPerMillion: 1.0287,
     provider: 'openrouter',
     payFactor: 1.0,
-    sourceUrl: 'https://openrouter.ai/models',
+    sourceUrl: 'https://openrouter.ai/api/v1/models',
     dateChecked: '2026-10-01',
   },
   'openrouter/deepseek/deepseek-r1': {
-    freshInputPerMillion: 0.55,
-    cachedInputPerMillion: 0.14,
-    outputPerMillion: 2.19,
+    freshInputPerMillion: .70,
+    cachedInputPerMillion: null,
+    outputPerMillion: 2.50,
     provider: 'openrouter',
     payFactor: 1.0,
-    sourceUrl: 'https://openrouter.ai/models',
-    dateChecked: '2026-10-01',
-  },
-  'openrouter/anthropic/claude-3.5-sonnet': {
-    freshInputPerMillion: 3.00,
-    cachedInputPerMillion: 0.30,
-    outputPerMillion: 15.00,
-    provider: 'openrouter',
-    payFactor: 1.0,
-    sourceUrl: 'https://openrouter.ai/models',
+    sourceUrl: 'https://openrouter.ai/api/v1/models',
     dateChecked: '2026-10-01',
   },
   'openrouter/openai/gpt-4o': {
@@ -216,7 +160,7 @@ export const PRICE_TABLE = {
     outputPerMillion: 10.00,
     provider: 'openrouter',
     payFactor: 1.0,
-    sourceUrl: 'https://openrouter.ai/models',
+    sourceUrl: 'https://openrouter.ai/api/v1/models',
     dateChecked: '2026-10-01',
   },
 };
@@ -231,23 +175,22 @@ const CANONICAL_PREFIXES = [
 /**
  * Find model price entry by model ID or normalized name and optional provider.
  */
-export function getModelPrice(modelId, provider) {
+export function getModelPrice(modelId, provider, priceTable = PRICE_TABLE) {
   if (!modelId || typeof modelId !== 'string') return null;
   const normalized = modelId.toLowerCase().trim();
 
   if (provider) {
     const prov = provider.toLowerCase().trim();
     const bare = normalized.replace(/^[^/]+\//, '');
-    const qualified = PRICE_TABLE[`${prov}/${normalized}`] ?? PRICE_TABLE[`${prov}/${bare}`];
+    const qualified = priceTable[`${prov}/${normalized}`] ?? priceTable[`${prov}/${bare}`];
     if (qualified) return qualified;
-    if (prov === 'commandcode') return getModelPrice(normalized);
     // An explicit transport provider must not borrow another provider's rate.
     if (!normalized.startsWith(`${prov}/`)) return null;
   }
-  if (PRICE_TABLE[normalized]) return PRICE_TABLE[normalized];
+  if (priceTable[normalized]) return priceTable[normalized];
   if (!normalized.includes('/')) {
     const canonical = CANONICAL_PREFIXES.find(({ test }) => test(normalized));
-    return canonical ? PRICE_TABLE[`${canonical.prefix}${normalized}`] ?? null : null;
+    return canonical ? priceTable[`${canonical.prefix}${normalized}`] ?? null : null;
   }
   return null;
 }
@@ -271,7 +214,7 @@ export function getModelPrice(modelId, provider) {
  *   provider?: string,
  * }} input
  */
-export function calculateModelCost({ model, usage, provider: requestedProvider, startedAt }) {
+export function calculateModelCost({ model, usage, provider: requestedProvider, startedAt, priceTable = PRICE_TABLE }) {
   if (!usage || typeof usage !== 'object') {
     return { ok: false, error: 'no_token_count', model };
   }
@@ -294,7 +237,7 @@ export function calculateModelCost({ model, usage, provider: requestedProvider, 
     return { ok: false, error: 'invalid_token_count', model, freshInputTokens, cachedInputTokens, outputTokens, thinkingTokens };
   }
 
-  const priceEntry = getModelPrice(model, requestedProvider);
+  const priceEntry = getModelPrice(model, requestedProvider, priceTable);
   if (!priceEntry) {
     return {
       ok: false,
@@ -305,6 +248,14 @@ export function calculateModelCost({ model, usage, provider: requestedProvider, 
       outputTokens,
       thinkingTokens,
     };
+  }
+
+  if (cachedInputTokens > 0 && !Number.isFinite(priceEntry.cachedInputPerMillion)) {
+    return { ok: false, error: 'no_cached_input_price', model, freshInputTokens, cachedInputTokens, outputTokens, thinkingTokens };
+  }
+  // A cache write can use different TTL rates. Missing write pricing is a gap.
+  if ((usage.inputDetails?.cacheWrite ?? 0) > 0) {
+    return { ok: false, error: 'no_cache_write_price_context', model, freshInputTokens, cachedInputTokens, outputTokens, thinkingTokens };
   }
 
   const provider = requestedProvider ?? priceEntry.provider;
@@ -322,9 +273,9 @@ export function calculateModelCost({ model, usage, provider: requestedProvider, 
     const weekday = at.getUTCDay() >= 1 && at.getUTCDay() <= 5;
     if (weekday && !holiday && ((hour >= 1 && hour < 4) || (hour >= 6 && hour < 10))) rateFactor = priceEntry.peakMultiplier;
   }
-  const longContext = model.includes('gemini-2.5-pro') && totalInput > 200000;
+  const longContext = totalInput > (priceEntry.longContextThreshold ?? (model.includes('gemini-2.5-pro') ? 200000 : Infinity));
   const freshCost = (freshInputTokens / 1_000_000) * priceEntry.freshInputPerMillion * rateFactor * (longContext ? 2 : 1);
-  const cachedCost = (cachedInputTokens / 1_000_000) * priceEntry.cachedInputPerMillion * rateFactor * (longContext ? 2 : 1);
+  const cachedCost = (cachedInputTokens / 1_000_000) * (priceEntry.cachedInputPerMillion ?? 0) * rateFactor * (longContext ? 2 : 1);
   const outputCost = (outputTokens / 1_000_000) * priceEntry.outputPerMillion * rateFactor * (longContext ? 1.5 : 1);
   const faceCostUsd = freshCost + cachedCost + outputCost;
   const whatYouPayUsd = faceCostUsd * payFactor;

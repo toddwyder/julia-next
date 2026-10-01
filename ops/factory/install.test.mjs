@@ -9,7 +9,10 @@ const root = resolve(import.meta.dirname, '../..');
 const installer = resolve(import.meta.dirname, 'install.sh');
 
 test('the installed Mastra auth contract restricts the cost reader and preserves WorkOS', () => {
-  const result = spawnSync(process.execPath, ['--experimental-strip-types', '--import', './register-typescript-esm.mjs', '--test', 'cost-note-auth.test.mjs'], {
+  for (const file of ['cost-note-auth.test.mjs', 'cost-note-storage.test.mjs']) {
+    assert.ok(existsSync(resolve(root, 'ops/factory/app', file)), `required boundary test ${file} is missing`);
+  }
+  const result = spawnSync(process.execPath, ['--experimental-strip-types', '--import', './register-typescript-esm.mjs', '--test', 'cost-note-auth.test.mjs', 'cost-note-storage.test.mjs'], {
     cwd: resolve(root, 'ops/factory/app'), encoding: 'utf8',
   });
   assert.equal(result.status, 0, result.stdout + result.stderr);

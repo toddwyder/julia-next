@@ -16,7 +16,7 @@
 //   - no_token_count (when a model span lacks usage/tokens)
 //   - unpriced_model (when a model is not listed in price table)
 
-import { calculateModelCost, getModelPrice } from './price-table.mjs';
+import { calculateModelCost, getModelPrice, PRICE_TABLE } from './price-table.mjs';
 
 /** Supported authenticated observability routes in pinned Mastra. */
 export const MASTRA_TRACE_ROUTE = '/api/observability/traces';
@@ -37,15 +37,23 @@ export async function readTraceSpans({ factoryUrl, token, from, to, fetchImpl = 
   async function get(path, query) {
     const url = new URL(`${base}${MASTRA_TRACE_ROUTE}${path}`);
     if (query) for (const [key, value] of Object.entries(query)) url.searchParams.set(key, typeof value === 'object' ? JSON.stringify(value) : String(value));
-    const response = await fetchImpl(url.toString(), { method: 'GET', headers: { Authorization: `Bearer ${token}` }, redirect: 'error', signal: AbortSignal.timeout(120000) });
+    let response;
+    try {
+      response = await fetchImpl(url.toString(), { method: 'GET', headers: { Authorization: `Bearer ${token}` }, redirect: 'error', signal: AbortSignal.timeout(120000) });
+    } catch (error) {
+      throw new Error(`Mastra trace read ${url.pathname} transport failed (${error?.name ?? 'Error'})`);
+    }
     if (!response.ok) throw new Error(`Mastra trace read ${url.pathname} returned HTTP ${response.status}`);
-    return response.json();
+    try { return await response.json(); }
+    catch { throw new Error(`Mastra trace read ${url.pathname} returned invalid JSON`); }
   }
   const collected = [];
   const seen = new Set();
   for (let page = 0; page < MAX_PAGES; page += 1) {
     const body = await get('/light', {
-      startedAt: { start: from, end: to, startExclusive: false, endExclusive: true },
+      // Roots can start before this week and contain calls inside it. Read all
+      // retained roots before the end, then window calls by their own start.
+      startedAt: { end: to, endExclusive: true },
       page, perPage: pageSize,
     });
     if (!isObject(body) || !Array.isArray(body.spans)) throw new Error('Mastra trace list did not include a spans array');
@@ -58,29 +66,51 @@ export async function readTraceSpans({ factoryUrl, token, from, to, fetchImpl = 
       const trace = await get(`/${encodeURIComponent(root.traceId)}/light`);
       if (!Array.isArray(trace.spans) || trace.spans.length === 0) throw new Error(`Mastra trace ${root.traceId} has no timeline spans`);
       const { inputPreview, outputPreview, input, output, ...safeRoot } = root;
+      delete safeRoot.requestContext;
+      safeRoot.metadata = Object.fromEntries(Object.entries(safeRoot.metadata ?? {}).filter(([key]) => ['threadId', 'sessionId', 'runId', 'factory_stage', 'effort'].includes(key)));
       const details = [safeRoot];
       const timeline = new Map(trace.spans.map(span => [span.spanId, span]));
+      const aggregates = new Set();
+      for (const inference of trace.spans.filter(span => span.spanType === 'model_inference')) {
+        const visited = new Set();
+        for (let parent = timeline.get(inference.parentSpanId); parent && !visited.has(parent.spanId); parent = timeline.get(parent.parentSpanId)) {
+          visited.add(parent.spanId);
+          if (parent.spanType === 'model_generation' || parent.spanType === 'model_step') aggregates.add(parent.spanId);
+        }
+      }
       for (const span of trace.spans) {
         if (!isCostBearing(span)) continue;
-        let billedByParent = false;
-        const visited = new Set();
-        for (let parent = timeline.get(span.parentSpanId); parent && !visited.has(parent.spanId); parent = timeline.get(parent.parentSpanId)) {
-          visited.add(parent.spanId);
-          if (parent.spanType === 'model_generation') billedByParent = true;
+        const at = Date.parse(span.startedAt);
+        if (!Number.isFinite(at) || at < Date.parse(from) || at >= Date.parse(to)) continue;
+        if (aggregates.has(span.spanId)) {
+          if (span.spanType === 'model_step') details.push({
+            traceId: root.traceId, spanId: span.spanId, parentSpanId: span.parentSpanId,
+            spanType: span.spanType, startedAt: span.startedAt, endedAt: span.endedAt,
+            includedInGeneration: true,
+          });
+          continue;
         }
-        if (billedByParent) continue;
         const result = await get(`/${encodeURIComponent(root.traceId)}/spans/${encodeURIComponent(span.spanId)}`);
         if (!result.span?.spanId) throw new Error(`Mastra span ${span.spanId} returned no span detail`);
         // Keep only cost and identity fields; prompt text never enters reports.
         const { input, output, ...record } = result.span;
+        delete record.requestContext;
+        record.metadata = Object.fromEntries(Object.entries(record.metadata ?? {}).filter(([key]) => ['threadId', 'sessionId', 'runId', 'factory_stage', 'effort'].includes(key)));
+        record.attributes = { ...record.attributes,
+          effort: record.attributes?.effort ?? record.attributes?.parameters?.reasoning?.effort ??
+            record.attributes?.parameters?.reasoningEffort ?? record.attributes?.parameters?.reasoning_effort };
+        if (record.error !== null && record.error !== undefined) record.error = { message: 'model call failed; details retained on server' };
         // Provider/tool schemas are also unnecessary to cost accounting.
         record.attributes = Object.fromEntries(Object.entries(record.attributes ?? {}).filter(([key]) =>
           ['model', 'responseModel', 'selectedModel', 'provider', 'usage', 'costContext', 'inputTokens', 'outputTokens', 'cachedInputTokens', 'reasoningTokens', 'inputDetails', 'outputDetails', 'effort', 'effortLevel', 'sessionId', 'conversationId', 'threadId'].includes(key)));
         details.push(record);
       }
-      const parent = details.find(span => span.spanId === root.spanId) ?? root;
+      if (aggregates.has(root.spanId)) safeRoot.includedInGeneration = true;
+      const distinct = [...new Map(details.map(span => [span.spanId, span])).values()];
+      const parent = distinct.find(span => span.spanId === root.spanId) ?? root;
       const identity = parent.threadId ?? parent.metadata?.threadId ?? parent.attributes?.threadId ?? parent.attributes?.conversationId ?? parent.metadata?.sessionId;
-      for (const span of details) collected.push({ ...span, threadId: span.threadId ?? identity });
+      for (const span of distinct) collected.push({ ...span, threadId: span.threadId ?? identity,
+        factoryPhase: spanPhase(root), runId: root.runId ?? root.metadata?.runId ?? null });
     }
     if (!pagination.hasMore) return collected;
     log(`mastra-traces page=${page} roots=${seen.size} spans=${collected.length}`);
@@ -112,7 +142,7 @@ function spanPhase(span) {
   }
   if (haystack.includes('plan')) return 'plan';
   if (haystack.includes('review')) return 'review';
-  return 'build';
+  return null;
 }
 
 /**
@@ -146,9 +176,16 @@ function failedOutcome(span) {
  * @param {Array<object>} spans
  * @param {{cards?: Array<{number: number, sessions?: Record<string, unknown>, stageHistory?: Array<object>}>}} options
  */
-export function normalizeTraceSpans(spans = [], { cards = [] } = {}) {
+export function normalizeTraceSpans(spans = [], { cards = [], priceTable = PRICE_TABLE, projectId } = {}) {
   const cardBySession = new Map();
+  const bindingsBySession = new Map();
   for (const card of cards) {
+    for (const binding of card.sessionBindings ?? []) {
+      for (const id of [binding.threadId, binding.sessionId].filter(Boolean)) {
+        cardBySession.set(id, card.number);
+        bindingsBySession.set(id, [...(bindingsBySession.get(id) ?? []), binding]);
+      }
+    }
     if (card.number) {
       const reference = String(card.number).toLowerCase();
       if (/^pr-\d+$/.test(reference)) {
@@ -237,7 +274,9 @@ export function normalizeTraceSpans(spans = [], { cards = [] } = {}) {
       costContext.model ??
       (modelMatch ? modelMatch[1] : null);
 
-    const provider = attributes.provider ?? costContext.provider ?? (model ? getModelPrice(model)?.provider : null) ?? null;
+    const rawProvider = attributes.provider ?? costContext.provider ?? (model ? getModelPrice(model, undefined, priceTable)?.provider : null) ?? null;
+    // AI SDK records the OpenAI API transport as its provider identifier.
+    const provider = typeof rawProvider === 'string' ? rawProvider.replace(/^openai\.(?:responses|chat)$/, 'openai') : rawProvider;
     const snapshot = cards.find(item => item.number === card)?.phaseSnapshots
       ?.filter(item => item.threadId === sessionId && Date.parse(item.at) <= Date.parse(span.startedAt ?? span.startTime))
       .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))[0];
@@ -247,9 +286,12 @@ export function normalizeTraceSpans(spans = [], { cards = [] } = {}) {
     const seenParents = new Set();
     for (let parent = spansById.get(span.parentSpanId); parent && !seenParents.has(parent.spanId); parent = spansById.get(parent.parentSpanId)) {
       seenParents.add(parent.spanId);
-      if (parent.spanType === 'model_generation' && (span.spanType === 'model_step' || span.spanType === 'model_inference')) aggregateParent = true;
+      if (parent.spanType === 'model_generation' && !parent.includedInGeneration && (span.spanType === 'model_step' || span.spanType === 'model_inference')) aggregateParent = true;
     }
-    const costBearing = isCostBearing(span) && !aggregateParent;
+    const binding = bindingsBySession.get(sessionId)?.filter(item => Date.parse(item.at) <= Date.parse(span.startedAt ?? span.startTime))
+      .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))[0];
+    const recordedPhase = snapshot?.phase ? spanPhase({ name: snapshot.phase }) : binding?.role === 'work' ? 'build' : binding?.role;
+    const costBearing = isCostBearing(span) && !aggregateParent && !span.includedInGeneration;
     let costResult = null;
     let costUsd = null;
     let faceCostUsd = null;
@@ -257,7 +299,7 @@ export function normalizeTraceSpans(spans = [], { cards = [] } = {}) {
 
     if (costBearing) {
       if (usage && model) {
-        costResult = calculateModelCost({ model, usage, provider, startedAt: span.startedAt ?? span.startTime });
+        costResult = calculateModelCost({ model, usage, provider, startedAt: span.startedAt ?? span.startTime, priceTable });
         if (costResult.ok) {
           costUsd = costResult.whatYouPayUsd;
           faceCostUsd = costResult.faceCostUsd;
@@ -265,7 +307,7 @@ export function normalizeTraceSpans(spans = [], { cards = [] } = {}) {
           gap = costResult.error;
         }
       } else {
-        gap = 'no_token_count';
+        gap = usage && !model ? 'no_recorded_model' : 'no_token_count';
       }
     }
 
@@ -291,8 +333,11 @@ export function normalizeTraceSpans(spans = [], { cards = [] } = {}) {
       traceId: span.traceId ?? null,
       sessionId,
       card,
+      projectOverhead: Boolean(projectId && sessionId === `factory-supervisor:${projectId}`),
       correlated: card !== null,
-      phase: spanPhase(span),
+      phase: span.factoryPhase ?? recordedPhase ?? spanPhase(span),
+      runId: span.runId ?? null,
+      modelStep: span.spanType === 'model_step',
       actor: 'Factory',
       startedAt: toIso(span.startedAt ?? span.startTime),
       endedAt: toIso(span.endedAt ?? span.endTime),
@@ -313,9 +358,12 @@ export function normalizeTraceSpans(spans = [], { cards = [] } = {}) {
       totalTokens,
       cachedShare,
       gap,
-      namedGaps: gap ? [gap] : [],
+      namedGaps: [...new Set([
+        ...(gap ? [gap] : []),
+        ...(costBearing && model && !getModelPrice(model, provider, priceTable) ? ['unpriced_model'] : []),
+        ...(costBearing && !model ? ['no_recorded_model'] : []),
+      ])],
       outcome: failedOutcome(span) ?? 'passed',
     };
   });
 }
-
