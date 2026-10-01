@@ -89,8 +89,7 @@ export async function readTraceSpans({ factoryUrl, from, to, fetchImpl = fetch, 
         return collected;
       }
     } catch (err) {
-      if (isLastRoute) throw err;
-      // If error on first route, try fallback
+      throw err;
     }
   }
 
