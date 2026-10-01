@@ -42,7 +42,8 @@ import type { IMastraAuthProvider } from '@mastra/core/server';
 import { codeReviewAgent } from './reviewer/agents/code-review-agent';
 import { workflowReviewAgent } from './reviewer/agents/workflow-review-agent';
 import { prReviewWorkflow } from './reviewer/workflows/pr-review-workflow';
-import { reviewerRoute } from './reviewer/route';
+import { reviewerRoute, reviewerStatusRoute } from './reviewer/route';
+import { crossMakerReviewWorkflow } from './reviewer/workflows/cross-maker-review-workflow';
 import {
   composeStorageWithObservability,
   createDuckDBStore,
@@ -499,10 +500,10 @@ setObservabilityPruneTarget({
 export const mastra = new Mastra({
   ...preparedArgs,
   agents: { ...preparedArgs.agents, codeReviewAgent, workflowReviewAgent },
-  workflows: { ...preparedArgs.workflows, prReviewWorkflow, observabilityRetentionWorkflow },
+  workflows: { ...preparedArgs.workflows, prReviewWorkflow, crossMakerReviewWorkflow, observabilityRetentionWorkflow },
   server: {
     ...preparedArgs.server,
-    apiRoutes: [...(preparedArgs.server?.apiRoutes ?? []), reviewerRoute],
+    apiRoutes: [...(preparedArgs.server?.apiRoutes ?? []), reviewerRoute, reviewerStatusRoute],
   },
   storage: composedStorage,
   pubsub: preparedArgs.pubsub,

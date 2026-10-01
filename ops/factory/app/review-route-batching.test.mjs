@@ -22,13 +22,26 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { reviewPullRequest } from './src/mastra/reviewer/review-pr.ts';
-import { reviewerRoute } from './src/mastra/reviewer/route.ts';
+import { reviewerRoute, reviewerStatusRoute } from './src/mastra/reviewer/route.ts';
 import { prReviewWorkflow } from './src/mastra/reviewer/workflows/pr-review-workflow.ts';
+import { crossMakerReviewWorkflow } from './src/mastra/reviewer/workflows/cross-maker-review-workflow.ts';
+import './review-route-async.test.mjs';
 
 const OWNER = 'toddwyder';
 const REPO = 'julia-next';
 const PULL = 176;
 const HEAD = 'abc123';
+
+async function waitForReview(mastra, jobId) {
+  const workflow = mastra.getWorkflow('crossMakerReviewWorkflow');
+  for (let attempt = 0; attempt < 200; attempt++) {
+    const run = await workflow.getWorkflowRunById(jobId);
+    if (run?.status === 'success') return run.result;
+    if (run?.status === 'failed') throw new Error(run.error?.message ?? 'Review failed');
+    await new Promise(resolve => setTimeout(resolve, 25));
+  }
+  throw new Error(`Review job ${jobId} did not finish`);
+}
 
 /** A diff comfortably over the route's 180,000-char single-prompt limit. */
 function largeDiff() {
@@ -445,7 +458,7 @@ test('a file larger than the batch budget is returned as skipped and fails the r
   process.env.JULIA_REVIEW_ROUTE_SECRET = secret;
   try {
     const mastra = new Mastra({
-      workflows: { prReviewWorkflow },
+      workflows: { prReviewWorkflow, crossMakerReviewWorkflow },
       agents: { workflowReviewAgent, codeReviewAgent },
       storage: new InMemoryStore(),
       pubsub: new EventEmitterPubSub(),
@@ -464,10 +477,21 @@ test('a file larger than the batch budget is returned as skipped and fails the r
     };
 
     const response = await handler(context);
-    assert.equal(response.status, 200, JSON.stringify(response.payload));
-    assert.equal(response.payload.verdict, 'REQUEST_CHANGES', 'an oversized unreviewed file must fail the verdict closed');
-    assert.match(response.payload.body, /big\.ts/, 'the body names the file that could not be batched');
-    assert.match(response.payload.body, /not reviewed|unreviewed|fail closed/i);
+    assert.equal(response.status, 202, JSON.stringify(response.payload));
+    const result = await waitForReview(mastra, response.payload.jobId);
+    const statusHandler = await reviewerStatusRoute.createHandler({ mastra });
+    const statusSignature = createHmac('sha256', secret).update(response.payload.jobId).digest('hex');
+    const statusResponse = await statusHandler({ ...context, req: {
+      ...context.req,
+      param: () => response.payload.jobId,
+      header: () => statusSignature,
+    } });
+    assert.equal(statusResponse.status, 200);
+    assert.equal(statusResponse.payload.status, 'success');
+    assert.equal(statusResponse.payload.verdict.verdict, 'REQUEST_CHANGES');
+    assert.equal(result.verdict, 'REQUEST_CHANGES', 'an oversized unreviewed file must fail the verdict closed');
+    assert.match(result.body, /big\.ts/, 'the body names the file that could not be batched');
+    assert.match(result.body, /not reviewed|unreviewed|fail closed/i);
     // No agent prompt may contain the oversized diff; the point of the budget.
     assert.ok(!prompts.some((prompt) => prompt.includes('x'.repeat(1000))));
 
@@ -539,7 +563,7 @@ test('the route runs the real supported prReviewWorkflow for a large PR', async 
   process.env.JULIA_REVIEW_ROUTE_SECRET = secret;
   try {
     const mastra = new Mastra({
-      workflows: { prReviewWorkflow },
+      workflows: { prReviewWorkflow, crossMakerReviewWorkflow },
       agents: { workflowReviewAgent, codeReviewAgent },
       storage: new InMemoryStore(),
       pubsub: new EventEmitterPubSub(),
@@ -558,10 +582,10 @@ test('the route runs the real supported prReviewWorkflow for a large PR', async 
     };
 
     const response = await handler(context);
-    assert.equal(response.status, 200, JSON.stringify(response.payload));
-    assert.equal(response.payload.verdict, 'APPROVE');
-    assert.equal(response.payload.headSha, HEAD);
-    assert.equal(response.payload.criteria.length, 2);
+    assert.equal(response.status, 202, JSON.stringify(response.payload));
+    const result = await waitForReview(mastra, response.payload.jobId);
+    assert.equal(result.verdict, 'APPROVE');
+    assert.equal(result.headSha, HEAD);
     // The route actually ran the workflow's batched file review, and the
     // criterion prompt saw only findings, never the giant diff.
     assert.ok(prompts.some((prompt) => prompt.includes('Files to Review') || prompt.includes('Batch ')));

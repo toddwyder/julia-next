@@ -16,7 +16,27 @@ const response = await fetch('https://julia-factory.tail91f394.ts.net/julia/revi
   body,
 });
 if (!response.ok) throw new Error(`Mastra reviewer returned HTTP ${response.status}: ${await response.text()}`);
-const review = await response.json();
+const { jobId } = await response.json();
+if (!/^[a-zA-Z0-9-]{1,100}$/.test(jobId ?? '')) throw new Error('Mastra reviewer returned an invalid job id.');
+console.log(`Cross-maker review job ${jobId} started for ${headSha}`);
+let review;
+// eslint-disable-next-line no-constant-condition -- #190 requires a 30-second status poll; GitHub Actions has no native watcher for a custom Mastra route. https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjobstimeout-minutes
+while (true) {
+  await new Promise(resolve => setTimeout(resolve, 30_000));
+  const statusSignature = createHmac('sha256', process.env.JULIA_REVIEW_ROUTE_SECRET).update(jobId).digest('hex');
+  const statusResponse = await fetch(`https://julia-factory.tail91f394.ts.net/julia/review-pr/${jobId}`, {
+    headers: { 'x-julia-review-signature': statusSignature },
+  });
+  if (!statusResponse.ok) throw new Error(`Mastra reviewer status returned HTTP ${statusResponse.status}: ${await statusResponse.text()}`);
+  const job = await statusResponse.json();
+  if (job.status === 'failed') throw new Error(`Mastra reviewer failed: ${job.error ?? 'unknown error'}`);
+  if (job.status === 'success') {
+    review = job.verdict;
+    break;
+  }
+  if (job.status !== 'running') throw new Error('Mastra reviewer returned an invalid job status.');
+  console.log(`Cross-maker review job ${jobId} is still running`);
+}
 if (!['APPROVE', 'REQUEST_CHANGES'].includes(review.verdict) || review.headSha !== headSha || !review.body)
   throw new Error('Mastra reviewer returned an invalid or stale verdict.');
 

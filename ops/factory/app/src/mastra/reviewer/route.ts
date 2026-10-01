@@ -1,6 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { registerApiRoute } from '@mastra/core/server';
-import { reviewPullRequest } from './review-pr';
 
 export function validReviewSignature(body: string, signature: string | undefined, secret: string | undefined): boolean {
   if (!secret || !signature || !/^[a-f0-9]{64}$/.test(signature)) return false;
@@ -23,17 +22,36 @@ export const reviewerRoute = registerApiRoute('/julia/review-pr', {
     if (!input.owner || !input.repo || !input.pullNumber || !input.headSha)
       return c.json({ error: 'Missing pull request identity' }, 400);
     try {
-      const runBatchedReview = async ({ owner, repo, pullNumber }: { owner: string; repo: string; pullNumber: number }) => {
-        const workflow = mastra.getWorkflow('prReviewWorkflow');
-        const run = await workflow.createRun();
-        const result = await run.start({ inputData: { owner, repo, pullNumber } });
-        if (result.status !== 'success') throw new Error('Batched PR review workflow did not complete.');
-        return { fileReviews: result.result.fileReviews, skippedFiles: result.result.skippedFiles };
-      };
-      const result = await reviewPullRequest(input.owner, input.repo, input.pullNumber, input.headSha, { runBatchedReview });
-      return c.json(result);
+      const workflow = mastra.getWorkflow('crossMakerReviewWorkflow');
+      const run = await workflow.createRun();
+      const { runId } = await run.startAsync({ inputData: input });
+      console.info(`Cross-maker review started: job=${runId} pr=${input.owner}/${input.repo}#${input.pullNumber} head=${input.headSha}`);
+      return c.json({ jobId: runId }, 202);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Review failed';
+      return c.json({ error: message }, 503);
+    }
+  },
+});
+
+export const reviewerStatusRoute = registerApiRoute('/julia/review-pr/:jobId', {
+  method: 'GET',
+  requiresAuth: false,
+  createHandler: async ({ mastra }) => async c => {
+    const jobId = c.req.param('jobId');
+    if (!validReviewSignature(jobId, c.req.header('x-julia-review-signature'), process.env.JULIA_REVIEW_ROUTE_SECRET))
+      return c.json({ error: 'Unauthorized' }, 401);
+    try {
+      const run = await mastra.getWorkflow('crossMakerReviewWorkflow').getWorkflowRunById(jobId);
+      if (!run) return c.json({ error: 'Review job not found' }, 404);
+      if (run.status === 'success') return c.json({ status: 'success', verdict: run.result });
+      if (!['pending', 'running', 'waiting'].includes(run.status)) {
+        console.error(`Cross-maker review failed: job=${jobId} status=${run.status} error=${run.error?.message ?? 'unknown'}`);
+        return c.json({ status: 'failed', error: run.error?.message ?? 'Review failed' });
+      }
+      return c.json({ status: 'running' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Review status unavailable';
       return c.json({ error: message }, 503);
     }
   },
