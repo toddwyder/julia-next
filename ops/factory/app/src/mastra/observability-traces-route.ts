@@ -110,8 +110,27 @@ export const tracesRoute = registerApiRoute('/julia/observability/traces', {
 
       if (queryFn) {
         const result = await queryFn(args);
-        const rawSpans = Array.isArray(result?.spans) ? result.spans : (Array.isArray(result) ? result : []);
-        const spans = rawSpans.map((s: any) => ({
+        const rawTraces = Array.isArray(result?.spans) ? result.spans : (Array.isArray(result) ? result : []);
+        const allRawSpans: any[] = [];
+        if (typeof obsStore.getTrace === 'function') {
+          const fetchedTraces = await Promise.all(
+            rawTraces.map(async (t: any) => {
+              try {
+                const full = await obsStore.getTrace({ traceId: t.traceId });
+                return Array.isArray(full?.spans) && full.spans.length > 0 ? full.spans : [t];
+              } catch {
+                return [t];
+              }
+            })
+          );
+          for (const traceSpans of fetchedTraces) {
+            allRawSpans.push(...traceSpans);
+          }
+        } else {
+          allRawSpans.push(...rawTraces);
+        }
+
+        const spans = allRawSpans.map((s: any) => ({
           id: s.id,
           traceId: s.traceId,
           spanId: s.spanId,
@@ -128,7 +147,7 @@ export const tracesRoute = registerApiRoute('/julia/observability/traces', {
         const paginationRes = result?.pagination ?? {
           page: curPage,
           perPage: curPerPage,
-          hasMore: result?.delta?.hasMore ?? (spans.length >= curPerPage),
+          hasMore: result?.delta?.hasMore ?? (rawTraces.length >= curPerPage),
         };
         return c.json({ spans, pagination: paginationRes });
       }

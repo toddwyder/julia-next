@@ -50,8 +50,7 @@ import {
   duckdbObservabilityConfig,
 } from './observability-store.js';
 import { observabilityRetentionWorkflow, setObservabilityPruneTarget } from './observability-retention.js';
-
-
+import { filterIssueForIntake, MACHINE_PULL_REQUESTS } from './github-intake-rules.js';
 
 /**
  * Parse a positive-integer env knob; anything else means "use the default".
@@ -188,22 +187,12 @@ const githubPrivateKey = process.env.GITHUB_APP_PRIVATE_KEY?.trim();
 const githubClientId = process.env.GITHUB_APP_CLIENT_ID?.trim();
 const githubClientSecret = process.env.GITHUB_APP_CLIENT_SECRET?.trim();
 const githubAppSlug = process.env.GITHUB_APP_SLUG?.trim();
-// Existing machine issues and their PRs remain open in GitHub, but Factory
-// must never re-import them during GitHub's periodic source poll. New machine
-// issues carry the factory:machine label; publisher App PRs are always setup.
-const machineIssues = new Set([1, 136, 137, 138, 139, 140, 144, 146, 148, 151, 152, 154, 156, 158]);
-const machinePullRequests = new Set([131, 134, 135, 141, 142, 143, 145, 147, 149, 150, 153, 155, 157, 159]);
-// Stock pullRequestOpened materializes a Review card in Intake. Auto-start
-// starts eligible runs only after a card enters Reviewing. Factory-authored
-// Julia PRs enter that phase through the supported GitHub event rule.
-const githubRules = {
+export const githubRules = {
   issueOpened: (context: Parameters<typeof defaultGithubRules.issueOpened>[0]) => {
-    if (context.issue && (machineIssues.has(context.issue.number) ||
-        context.issue.labels?.includes('factory:machine'))) return undefined;
-    return defaultGithubRules.issueOpened(context);
+    return filterIssueForIntake(context, defaultGithubRules.issueOpened);
   },
   pullRequestOpened: (context: Parameters<typeof defaultGithubRules.pullRequestOpened>[0]) => {
-    if (context.pullRequest && (machinePullRequests.has(context.pullRequest.number) ||
+    if (context.pullRequest && (MACHINE_PULL_REQUESTS.has(context.pullRequest.number) ||
         context.pullRequest.author === 'julia-graph-publisher[bot]' ||
         (context.actor.type === 'github' && context.actor.login === 'julia-graph-publisher[bot]'))) {
       return undefined;

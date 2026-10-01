@@ -56,10 +56,19 @@ export async function readTraceSpans({ factoryUrl, from, to, fetchImpl = fetch, 
         url.searchParams.set('startedAt', JSON.stringify({ start: from, end: to, startExclusive: false, endExclusive: true }));
         url.searchParams.set('pagination', JSON.stringify({ page, perPage: pageSize }));
 
-        const response = await fetchImpl(url.toString(), { method: 'GET' });
+        let response;
+        try {
+          response = await fetchImpl(url.toString(), { method: 'GET' });
+        } catch (fetchErr) {
+          if (!isLastRoute && page === 0) {
+            break;
+          }
+          throw fetchErr;
+        }
+
         if (!response.ok) {
-          if (response.status === 404 && !isLastRoute && page === 0) {
-            // Route not found, try fallback
+          if (!isLastRoute && page === 0) {
+            // Route not found or failed, try fallback
             break;
           }
           throw new Error(`Mastra trace list returned HTTP ${response.status}`);
@@ -67,6 +76,9 @@ export async function readTraceSpans({ factoryUrl, from, to, fetchImpl = fetch, 
 
         const body = await response.json();
         if (!isObject(body) || !Array.isArray(body.spans)) {
+          if (!isLastRoute && page === 0) {
+            break;
+          }
           throw new Error(
             'Mastra trace list response did not include a spans array; refusing to read cost from an unsupported shape',
           );
@@ -89,6 +101,9 @@ export async function readTraceSpans({ factoryUrl, from, to, fetchImpl = fetch, 
         return collected;
       }
     } catch (err) {
+      if (!isLastRoute) {
+        continue;
+      }
       throw err;
     }
   }
@@ -149,22 +164,46 @@ function failedOutcome(span) {
  * Normalise raw spans into the records the note builds on.
  *
  * @param {Array<object>} spans
- * @param {{cards?: Array<{number: number, sessions?: Record<string, unknown>}>}} options
+ * @param {{cards?: Array<{number: number, sessions?: Record<string, unknown>, stageHistory?: Array<object>}>}} options
  */
 export function normalizeTraceSpans(spans = [], { cards = [] } = {}) {
   const cardBySession = new Map();
   for (const card of cards) {
-    for (const sessionId of Object.keys(card.sessions ?? {})) {
-      cardBySession.set(sessionId, card.number);
+    if (card.sessions && typeof card.sessions === 'object') {
+      for (const [key, value] of Object.entries(card.sessions)) {
+        cardBySession.set(key, card.number);
+        if (value && typeof value === 'object') {
+          if (value.sessionId) cardBySession.set(value.sessionId, card.number);
+          if (value.threadId) cardBySession.set(value.threadId, card.number);
+        } else if (typeof value === 'string' && value) {
+          cardBySession.set(value, card.number);
+        }
+      }
+    }
+    if (Array.isArray(card.stageHistory)) {
+      for (const stage of card.stageHistory) {
+        if (stage && typeof stage === 'object') {
+          if (stage.sessionId) cardBySession.set(stage.sessionId, card.number);
+          if (stage.threadId) cardBySession.set(stage.threadId, card.number);
+        }
+      }
     }
   }
 
   return spans.map((span) => {
-    const sessionId = span.sessionId ?? span.scope?.sessionId ?? span.metadata?.sessionId ?? null;
-    const card = sessionId !== null ? cardBySession.get(sessionId) ?? null : null;
     const attributes = isObject(span.attributes) ? span.attributes : {};
     const costContext = isObject(attributes.costContext) ? attributes.costContext : {};
     const usage = isObject(attributes.usage) ? attributes.usage : null;
+
+    const sessionId =
+      span.sessionId ??
+      span.scope?.sessionId ??
+      span.metadata?.sessionId ??
+      attributes.sessionId ??
+      attributes.threadId ??
+      attributes['thread.id'] ??
+      null;
+    const card = sessionId !== null ? cardBySession.get(sessionId) ?? null : null;
 
     const model = attributes.model ?? attributes.responseModel ?? costContext.model ?? null;
     const provider = attributes.provider ?? costContext.provider ?? (model ? getModelPrice(model)?.provider : null) ?? null;

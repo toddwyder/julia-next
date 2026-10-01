@@ -16,6 +16,7 @@ import { resolve } from 'node:path';
 import { normalizeTraceSpans } from './mastra-traces.mjs';
 import { buildMondayNote, publishMondayNote } from './monday-note.mjs';
 import { createIssuesClient, COST_NOTE_LABELS } from './monday-note-adapters.mjs';
+import { filterIssueForIntake } from './github-intake-rules.mjs';
 
 const fixturePath = resolve(import.meta.dirname, 'fixtures/captured-records.json');
 const { cards: integrationCards, spans: integrationSpans } = JSON.parse(readFileSync(fixturePath, 'utf8'));
@@ -126,15 +127,11 @@ test('integration: end-to-end flow handles fresh, cached, thinking, unpriced and
 });
 
 test('intake rule: GitHub issue with factory:machine label is ignored by Factory intake', async () => {
-  // Verify that an issue with label 'factory:machine' returns undefined (ignored by Factory Intake)
-  const rule = (issue) => {
-    if (issue.labels?.includes('factory:machine')) return undefined;
-    return { type: 'upsertLinkedWorkItem', stage: 'intake' };
-  };
+  const defaultRule = (ctx) => ({ type: 'upsertLinkedWorkItem', stage: 'intake', issue: ctx.issue });
 
-  const costNoteIssue = { number: 185, labels: ['factory:machine', 'cost-note'], title: 'Monday note' };
-  const humanIssue = { number: 186, labels: ['feature'], title: 'Add feature' };
+  const costNoteCtx = { issue: { number: 185, labels: ['factory:machine', 'cost-note'], title: 'Monday note' } };
+  const humanCtx = { issue: { number: 186, labels: ['feature'], title: 'Add feature' } };
 
-  assert.equal(rule(costNoteIssue), undefined, 'cost note issue with factory:machine must be ignored by intake');
-  assert.deepEqual(rule(humanIssue), { type: 'upsertLinkedWorkItem', stage: 'intake' }, 'regular issue enters intake');
+  assert.equal(filterIssueForIntake(costNoteCtx, defaultRule), undefined, 'cost note issue with factory:machine must be ignored by intake');
+  assert.deepEqual(filterIssueForIntake(humanCtx, defaultRule), { type: 'upsertLinkedWorkItem', stage: 'intake', issue: humanCtx.issue }, 'regular issue enters intake');
 });
