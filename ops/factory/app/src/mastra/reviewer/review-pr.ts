@@ -14,6 +14,21 @@ const verdictSchema = z.object({
   findings: z.array(z.string()),
 });
 
+export function parseVerdictOutput(answer: any): z.infer<typeof verdictSchema> {
+  if (answer?.object) return verdictSchema.parse(answer.object);
+  if (typeof answer?.text === 'string' && answer.text.trim()) {
+    let raw = answer.text.trim();
+    const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (jsonMatch) raw = jsonMatch[1]!.trim();
+    try {
+      return verdictSchema.parse(JSON.parse(raw));
+    } catch {
+      // Fall through
+    }
+  }
+  return verdictSchema.parse(answer?.object);
+}
+
 export type ReviewVerdict = z.infer<typeof verdictSchema> & { headSha: string; body: string };
 
 /** The single-prompt diff length above which the supported batched workflow takes over. */
@@ -249,10 +264,10 @@ export async function reviewPullRequest(
           findings,
           memory,
         })
-      : verdictSchema.parse((await codeReviewAgent.generate(prompt, {
+      : parseVerdictOutput(await codeReviewAgent.generate(prompt, {
           structuredOutput: { schema: verdictSchema },
           memory,
-        })).object);
+        }));
     // The criterion verdict agent is the last work before the verdict is
     // returned, so re-read the head AFTER it completes: a commit pushed while
     // it was thinking must not be approved under the verdict it just produced.
@@ -288,5 +303,5 @@ export async function reviewPullRequest(
   const finalResponse = await githubFetch(`/repos/${owner}/${repo}/pulls/${pullNumber}`);
   const final = await finalResponse.json() as { head: { sha: string } };
   if (final.head.sha !== expectedHead) throw new Error('PR head changed during review.');
-  return finalize(criteria, verdictSchema.parse(answer.object), expectedHead, [], files.map(file => file.filename));
+  return finalize(criteria, parseVerdictOutput(answer), expectedHead, [], files.map(file => file.filename));
 }
