@@ -1,0 +1,126 @@
+{
+  "cards": [
+    {
+      "number": 180,
+      "title": "Weekly cost note: each Factory card priced at what Todd pays",
+      "board": "review",
+      "stages": ["done"],
+      "stageHistory": [
+        { "by": "factory-rule-dispatcher", "stage": "planning", "enteredAt": "2026-09-28T09:00:00.000Z", "exitedAt": "2026-09-28T09:30:00.000Z", "exitedBy": "factory-rule-dispatcher" },
+        { "by": "factory-rule-dispatcher", "stage": "execute", "enteredAt": "2026-09-28T09:30:00.000Z", "exitedAt": "2026-09-28T12:00:00.000Z", "exitedBy": "factory-rule-dispatcher" },
+        { "by": "factory-rule-dispatcher", "stage": "review", "enteredAt": "2026-09-28T12:00:00.000Z", "exitedAt": "2026-09-28T12:45:00.000Z", "exitedBy": "factory-rule-dispatcher" },
+        { "by": "factory-rule-dispatcher", "stage": "done", "enteredAt": "2026-09-28T13:00:00.000Z" }
+      ],
+      "sessions": { "session-180": { "sessionId": "session-180", "threadId": "t180" } },
+      "acceptedAt": "2026-09-28T09:00:00.000Z",
+      "createdAt": "2026-09-28T09:00:00.000Z",
+      "enteredAt": "2026-09-28T09:00:00.000Z"
+    }
+  ],
+  "spans": [
+    {
+      "id": "span-fresh-captured",
+      "traceId": "963855b604c495c5bfaa9e44c452e837",
+      "spanId": "1d7f61f3faf363eb",
+      "sessionId": "session-180",
+      "name": "generate_plan",
+      "spanType": "model_generation",
+      "status": "success",
+      "startedAt": "2026-09-28T09:05:00.000Z",
+      "endedAt": "2026-09-28T09:20:00.000Z",
+      "attributes": {
+        "model": "deepseek/deepseek-chat",
+        "provider": "deepseek",
+        "usage": {
+          "inputTokens": 10000,
+          "outputTokens": 1000,
+          "totalTokens": 11000
+        }
+      }
+    },
+    {
+      "id": "span-cached-captured",
+      "traceId": "cc2c7c9e99003fc4f5ce8a1e65ccca0d",
+      "spanId": "1d8aba911843c38f",
+      "sessionId": "session-180",
+      "name": "execute_build_cached",
+      "spanType": "model_generation",
+      "status": "success",
+      "startedAt": "2026-09-28T09:35:00.000Z",
+      "endedAt": "2026-09-28T10:15:00.000Z",
+      "attributes": {
+        "model": "deepseek/deepseek-chat",
+        "provider": "deepseek",
+        "usage": {
+          "inputTokens": 50000,
+          "outputTokens": 2000,
+          "totalTokens": 52000,
+          "inputDetails": {
+            "cacheRead": 45000
+          }
+        }
+      }
+    },
+    {
+      "id": "span-thinking-captured",
+      "traceId": "adfd784bc04ce07967e1c21565a5b8cc",
+      "spanId": "7eef5a6ba3fa4573",
+      "sessionId": "session-180",
+      "name": "execute_build_reasoning",
+      "spanType": "model_generation",
+      "status": "success",
+      "startedAt": "2026-09-28T10:20:00.000Z",
+      "endedAt": "2026-09-28T11:45:00.000Z",
+      "attributes": {
+        "model": "deepseek/deepseek-reasoner",
+        "provider": "deepseek",
+        "usage": {
+          "inputTokens": 100000,
+          "outputTokens": 10000,
+          "totalTokens": 110000,
+          "inputDetails": {
+            "cacheRead": 80000
+          },
+          "outputDetails": {
+            "reasoning": 6000
+          }
+        }
+      }
+    },
+    {
+      "id": "span-unpriced-captured",
+      "traceId": "527adb4a0a2c63ff979e57ab11f547de",
+      "spanId": "dc580b022dd28edd",
+      "sessionId": "session-180",
+      "name": "review_experimental",
+      "spanType": "model_generation",
+      "status": "success",
+      "startedAt": "2026-09-28T12:05:00.000Z",
+      "endedAt": "2026-09-28T12:20:00.000Z",
+      "attributes": {
+        "model": "custom/experimental-v1",
+        "provider": "custom-ai",
+        "usage": {
+          "inputTokens": 15000,
+          "outputTokens": 1500,
+          "totalTokens": 16500
+        }
+      }
+    },
+    {
+      "id": "span-no-tokens-captured",
+      "traceId": "b3f908f1fae37021d27f56cfc56e7531",
+      "spanId": "9b71dc5882b921c6",
+      "sessionId": "session-180",
+      "name": "review_final",
+      "spanType": "model_generation",
+      "status": "success",
+      "startedAt": "2026-09-28T12:25:00.000Z",
+      "endedAt": "2026-09-28T12:40:00.000Z",
+      "attributes": {
+        "model": "openai/gpt-4o",
+        "provider": "openai"
+      }
+    }
+  ]
+}

@@ -604,6 +604,8 @@ export function buildMondayNote({ cards = [], traces = [], from, to }) {
       }
       providerLines.push(line);
     }
+  } else {
+    providerLines.push('  • (no billable provider usage)');
   }
 
   const namedGapLines = [
@@ -648,7 +650,10 @@ export function buildMondayNote({ cards = [], traces = [], from, to }) {
     '',
     ...bodyLines,
     ...(uncorrelatedLine ? ['', uncorrelatedLine] : []),
-    ...(lines.length > 0 ? ['', ...providerLines, '', ...namedGapLines] : []),
+    '',
+    ...providerLines,
+    '',
+    ...namedGapLines,
     '',
     `Total model spend: ${usd(totalUsd)} across ${weekCards.length} cards${spentPhrase ? ` (${spentPhrase})` : ''}.`,
     '',
