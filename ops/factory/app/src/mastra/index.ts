@@ -472,6 +472,13 @@ const preparedArgs = await factory.prepare();
 // store that cannot be opened fails the boot loudly rather than silently writing
 // unbounded traces.
 const observabilityDuckDB = await createDuckDBStore(duckdbObservabilityConfig());
+try {
+  await observabilityDuckDB.db.execute('SET preserve_insertion_order=false;');
+  await observabilityDuckDB.db.execute("SET max_memory='4GB';");
+  await observabilityDuckDB.db.execute('SET threads=2;');
+} catch {
+  // best effort settings
+}
 const observabilityDomain = await observabilityDuckDB.getStore('observability');
 if (!observabilityDomain) {
   throw new Error('DuckDB observability store did not expose an observability domain');

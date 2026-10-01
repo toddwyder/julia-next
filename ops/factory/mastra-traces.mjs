@@ -25,8 +25,8 @@ export const MASTRA_INTERNAL_TRACE_ROUTE = '/julia/observability/traces';
 /** The observability route the pinned `mastra api trace list` command calls. */
 export const MASTRA_TRACE_ROUTE = '/api/observability/traces';
 
-const PAGE_SIZE = 100;
-const MAX_PAGES = 200;
+const PAGE_SIZE = 25;
+const MAX_PAGES = 500;
 
 function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
