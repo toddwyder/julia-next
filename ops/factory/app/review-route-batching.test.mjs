@@ -25,7 +25,6 @@ import { reviewPullRequest } from './src/mastra/reviewer/review-pr.ts';
 import { reviewerRoute, reviewerStatusRoute } from './src/mastra/reviewer/route.ts';
 import { prReviewWorkflow } from './src/mastra/reviewer/workflows/pr-review-workflow.ts';
 import { crossMakerReviewWorkflow } from './src/mastra/reviewer/workflows/cross-maker-review-workflow.ts';
-import './review-route-async.test.mjs';
 
 const OWNER = 'toddwyder';
 const REPO = 'julia-next';
