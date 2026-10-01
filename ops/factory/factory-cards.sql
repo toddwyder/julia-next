@@ -16,6 +16,19 @@ SELECT jsonb_build_object(
   'stages', w.stages,
   'stage_history', w.stage_history,
   'sessions', w.sessions,
+  -- Only the phase runtime fields leave the message store; never prompt text.
+  'phase_snapshots', COALESCE((
+    SELECT jsonb_agg(jsonb_build_object(
+      'threadId', m.thread_id, 'at', m."createdAt",
+      'effort', (regexp_match(m.content, 'Runtime: model=[a-zA-Z0-9/._-]+, reasoning-setting=([a-zA-Z0-9_-]+)'))[1],
+      'model', (regexp_match(m.content, 'Runtime: model=([a-zA-Z0-9/._-]+), reasoning-setting='))[1]
+    ) ORDER BY m."createdAt")
+    FROM mastra_messages m
+    WHERE m.thread_id IN (SELECT value->>'threadId' FROM jsonb_each(w.sessions))
+      AND m.role = 'signal' AND m.type = 'factory-phase'
+      AND m.content LIKE '%Factory %phase:%'
+      AND m.content LIKE '%Runtime: model=%reasoning-setting=%'
+  ), '[]'::jsonb),
   'accepted_at', w.accepted_at,
   'created_at', w.created_at,
   'external_source', w.external_source

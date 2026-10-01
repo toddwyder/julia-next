@@ -57,6 +57,7 @@ export function normalizeWorkItemRows(rows = []) {
       stages: Array.isArray(row.stages) ? row.stages : [],
       stageHistory,
       sessions: row.sessions ?? {},
+      phaseSnapshots: row.phase_snapshots ?? [],
       acceptedAt: row.accepted_at ?? null,
       createdAt: row.created_at ?? null,
       enteredAt: row.accepted_at ?? stageHistory[0]?.enteredAt ?? row.created_at ?? null,

@@ -82,7 +82,7 @@ test('a run names a card accepted in an earlier week when its cost and failed at
   };
   const spans = [
     { id: 'old', sessionId: 'session-141', startedAt: '2026-09-27T09:00:00Z', endedAt: '2026-09-27T09:15:00Z', attributes: { costContext: { estimatedCost: 99, costUnit: 'usd' } } },
-    { id: 'new', sessionId: 'session-141', startedAt: '2026-09-28T10:00:00Z', endedAt: '2026-09-28T13:00:00Z', spanType: 'model_generation', status: 'error', attributes: { costContext: { estimatedCost: 2, costUnit: 'usd' } } },
+    { id: 'new', sessionId: 'session-141', startedAt: '2026-09-28T10:00:00Z', endedAt: '2026-09-28T13:00:00Z', spanType: 'model_generation', status: 'error', attributes: { model: 'anthropic/claude-3-7-sonnet', provider: 'anthropic', usage: { inputTokens: 600000, outputTokens: 20000 } } },
   ];
   const discussions = fakeDiscussions();
   const notifications = fakeNotifications();
@@ -96,10 +96,10 @@ test('a run names a card accepted in an earlier week when its cost and failed at
   });
 
   const body = discussions.calls.posted[0].body;
-  assert.match(body, /#141 Continued card — \$2\.00/);
+  assert.match(body, /#141 Continued card — \$2\.10/);
   assert.match(body, /1 failed attempt/);
   assert.doesNotMatch(body, /\$99/);
-  assert.equal(result.note.totalUsd, 2);
+  assert.ok(Math.abs(result.note.totalUsd - 2.1) < 1e-12);
   assert.equal(result.note.failedAttempts, 1);
 });
 
@@ -433,4 +433,3 @@ test('runMondayNoteBackfill backfills missing weeks over GitHub issues', async (
   ]);
   assert.equal(issues.calls.posted.length, 2);
 });
-

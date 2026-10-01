@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # One-time root setup to install the Monday note timer.
-# Normal ops/factory/install.sh refreshes the program copies into the app.
+# Re-run this root installer after updates to refresh the signing job's copies.
 #
 # Installing the unit is safe and sends nothing: the Monday note service runs
 # only when /etc/julia-factory-monday-note/config.env exists, and this script
-# writes a mode-0600 placeholder that the operator fills in.
+# writes a mode-0640 placeholder that the operator fills in.
 #
 # Trace retention has no systemd unit. The app's own Mastra scheduler runs the
 # supported DuckDB prune daily (declared by observabilityRetentionWorkflow), in
@@ -14,6 +14,24 @@ if [[ ${EUID} -ne 0 || $# -ne 2 ]]; then
   echo 'Usage (root): install-monday-note.sh APP_DIR PROJECT_ID' >&2
   exit 2
 fi
+
+# Preserve a provisioned trace token while adding newly required defaults.
+python3 - "$config_dir/config.env" "$project_id" <<'PY'
+import pathlib, sys
+path = pathlib.Path(sys.argv[1])
+text = path.read_text()
+keys = {line.split('=', 1)[0] for line in text.splitlines() if '=' in line and not line.startswith('#')}
+defaults = {
+    'MONDAY_NOTE_PROJECT_ID': sys.argv[2],
+    'MONDAY_NOTE_DATABASE': 'julia_factory_trial',
+    'MONDAY_NOTE_FACTORY_URL': 'http://127.0.0.1:4111',
+    'MONDAY_NOTE_TRACE_TOKEN': '',
+    'MONDAY_NOTE_GITHUB_OWNER': 'toddwyder',
+    'MONDAY_NOTE_GITHUB_REPO': 'julia-next',
+    'MONDAY_NOTE_USE_PUBLISHER_APP': '1',
+}
+path.write_text(text.rstrip() + '\n' + ''.join(f'{key}={value}\n' for key, value in defaults.items() if key not in keys))
+PY
 app_dir=$(realpath -- "$1")
 project_id=$2
 patch_dir=$(cd -- "$(dirname -- "$0")" && pwd)
@@ -22,28 +40,52 @@ test -f "$app_dir/ops/factory/monday-note-run.mjs"
 test -f "$app_dir/ops/factory/factory-cards.sql"
 
 config_dir=/etc/julia-factory-monday-note
-install -d -m 0750 -o root -g julia-factory "$config_dir"
+install -d -m 0750 -o root -g orchestrator-svc "$config_dir"
 if [[ ! -e $config_dir/config.env ]]; then
   cat > "$config_dir/config.env" <<EOF
 # Fill these in as root, then start julia-factory-monday-note.timer.
 # Never put these values in an issue, a log, or the repository.
 MONDAY_NOTE_PROJECT_ID=$project_id
 MONDAY_NOTE_DATABASE=julia_factory_trial
-MONDAY_NOTE_FACTORY_URL=https://julia-factory.tail91f394.ts.net
+MONDAY_NOTE_FACTORY_URL=http://127.0.0.1:4111
+MONDAY_NOTE_TRACE_TOKEN=
 MONDAY_NOTE_GITHUB_OWNER=toddwyder
 MONDAY_NOTE_GITHUB_REPO=julia-next
-MONDAY_NOTE_GITHUB_TOKEN=
+MONDAY_NOTE_USE_PUBLISHER_APP=1
 EOF
-  chown root:julia-factory "$config_dir/config.env"
+  chown root:orchestrator-svc "$config_dir/config.env"
   chmod 0640 "$config_dir/config.env"
 fi
+
+# The publisher keeps its existing App credential. It gets only SELECT on the
+# same Factory record tables used by the approved read-only wait watcher.
+sudo -u postgres psql -v ON_ERROR_STOP=1 -d julia_factory_trial <<'SQL'
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'orchestrator-svc') THEN
+    CREATE ROLE "orchestrator-svc" LOGIN NOINHERIT;
+  END IF;
+END $$;
+GRANT CONNECT ON DATABASE julia_factory_trial TO "orchestrator-svc";
+GRANT USAGE ON SCHEMA public TO "orchestrator-svc";
+GRANT SELECT ON work_items, mastra_messages TO "orchestrator-svc";
+ALTER ROLE "orchestrator-svc" SET default_transaction_read_only = on;
+SQL
+
+# Root-owned copies: the signing process must never execute builder-writable
+# modules. Preserve repo-relative imports of the existing publisher helper.
+note_dir=/opt/julia-factory-monday-note
+for file in monday-note.mjs monday-note-run.mjs monday-note-adapters.mjs mastra-traces.mjs price-table.mjs factory-cards.mjs factory-cards.sql run-psql.mjs; do
+  install -D -m 0644 -o root -g root "$patch_dir/$file" "$note_dir/ops/factory/$file"
+done
+install -D -m 0644 -o root -g root "$patch_dir/../../scripts/publish-via-github-app.mjs" "$note_dir/scripts/publish-via-github-app.mjs"
+chown root:orchestrator-svc "$config_dir/config.env"
+chmod 0640 "$config_dir/config.env"
 
 install -m 0644 "$patch_dir/julia-factory-monday-note.service" /etc/systemd/system/
 install -m 0644 "$patch_dir/julia-factory-monday-note.timer" /etc/systemd/system/
 
 systemctl daemon-reload
 # The Monday note timer is enabled but stays inert until config.env has the
-# GitHub token filled in.
+# trace-reader token filled in.
 systemctl enable julia-factory-monday-note.timer
-echo "Monday note timer installed. It will not post until $config_dir/config.env is filled in (token), then: systemctl start julia-factory-monday-note.timer"
-
+echo "Monday note timer installed. Set the trace-reader token in $config_dir/config.env, then: systemctl start julia-factory-monday-note.timer"

@@ -23,19 +23,19 @@ test('price table entries have required schema: fresh, cached, output, provider,
 test('DeepSeek rates correctly distinguish cached input from fresh input (fixes Mastra bundled bug)', () => {
   const v4 = getModelPrice('deepseek/deepseek-v4-pro');
   assert.ok(v4);
-  assert.equal(v4.freshInputPerMillion, 0.27);
-  assert.equal(v4.cachedInputPerMillion, 0.07);
-  assert.equal(v4.outputPerMillion, 1.10);
+  assert.equal(v4.freshInputPerMillion, 0.66);
+  assert.equal(v4.cachedInputPerMillion, 0.022);
+  assert.equal(v4.outputPerMillion, 1.98);
   assert.equal(v4.payFactor, 1.0);
   assert.ok(v4.cachedInputPerMillion < v4.freshInputPerMillion);
 });
 
-test('DeepSeek reasoner / R1 rates include thinking tokens as output rate', () => {
-  const r1 = getModelPrice('deepseek/deepseek-reasoner');
+test('DeepSeek Pro rates include thinking tokens as output rate', () => {
+  const r1 = getModelPrice('deepseek/deepseek-v4-pro');
   assert.ok(r1);
-  assert.equal(r1.freshInputPerMillion, 0.55);
-  assert.equal(r1.cachedInputPerMillion, 0.14);
-  assert.equal(r1.outputPerMillion, 2.19);
+  assert.equal(r1.freshInputPerMillion, 0.66);
+  assert.equal(r1.cachedInputPerMillion, 0.022);
+  assert.equal(r1.outputPerMillion, 1.98);
   assert.equal(r1.payFactor, 1.0);
 });
 
@@ -58,6 +58,7 @@ test('Subscriptions (ChatGPT/Codex, Gemini) have what-you-pay payFactor 0', () =
 
 test('calculateModelCost calculates fresh input, cached input, output and what-you-pay cost', () => {
   const result = calculateModelCost({
+    startedAt: '2026-09-28T12:00:00Z',
     model: 'deepseek/deepseek-v4-pro',
     usage: {
       inputTokens: 1000000,
@@ -74,13 +75,14 @@ test('calculateModelCost calculates fresh input, cached input, output and what-y
   assert.equal(result.thinkingTokens, 20000);
   // face cost = (200k * 0.27 / 1M) + (800k * 0.07 / 1M) + (100k * 1.10 / 1M)
   // = 0.054 + 0.056 + 0.11 = 0.22
-  assert.equal(Math.round(result.faceCostUsd * 1000) / 1000, 0.22);
-  assert.equal(Math.round(result.whatYouPayUsd * 1000) / 1000, 0.22);
+  assert.equal(Math.round(result.faceCostUsd * 1000) / 1000, 0.348);
+  assert.equal(Math.round(result.whatYouPayUsd * 1000) / 1000, 0.348);
   assert.equal(result.provider, 'deepseek');
 });
 
 test('calculateModelCost applies Command Code pay factor', () => {
   const result = calculateModelCost({
+    startedAt: '2026-09-28T12:00:00Z',
     model: 'commandcode/claude-3-7-sonnet',
     usage: {
       inputTokens: 1000000,
@@ -99,6 +101,7 @@ test('calculateModelCost applies Command Code pay factor', () => {
 
 test('calculateModelCost reports subscription what-you-pay as $0 while retaining tokens and face cost', () => {
   const result = calculateModelCost({
+    startedAt: '2026-09-28T12:00:00Z',
     model: 'openai/gpt-4o',
     usage: {
       inputTokens: 1000000,
@@ -115,6 +118,7 @@ test('calculateModelCost reports subscription what-you-pay as $0 while retaining
 
 test('calculateModelCost returns unpriced model named gap when model is not in price table', () => {
   const result = calculateModelCost({
+    startedAt: '2026-09-28T12:00:00Z',
     model: 'unknown/some-experimental-model',
     usage: { inputTokens: 100, outputTokens: 50 },
   });
@@ -126,6 +130,7 @@ test('calculateModelCost returns unpriced model named gap when model is not in p
 
 test('calculateModelCost returns no token count named gap when usage is missing or has no tokens', () => {
   const result = calculateModelCost({
+    startedAt: '2026-09-28T12:00:00Z',
     model: 'deepseek/deepseek-v4-pro',
     usage: null,
   });
@@ -155,13 +160,14 @@ test('getModelPrice disambiguates bare model names to canonical provider over wr
   assert.equal(claude.provider, 'anthropic');
 });
 
-test('calculateModelCost ensures thinking tokens are billed at output rate when separate from output', () => {
+test('Mastra output tokens include thinking; the output rate bills them once', () => {
   const result = calculateModelCost({
-    model: 'deepseek/deepseek-reasoner',
+    startedAt: '2026-09-28T12:00:00Z',
+    model: 'deepseek/deepseek-v4-pro',
     usage: {
       inputTokens: 100000,
       cachedInputTokens: 80000,
-      outputTokens: 4000, // raw text output
+      outputTokens: 10000, // Mastra/AI SDK total output includes reasoning
       reasoningTokens: 6000, // separate reasoning tokens (total 10k output)
     },
   });
@@ -170,5 +176,17 @@ test('calculateModelCost ensures thinking tokens are billed at output rate when 
   assert.equal(result.outputTokens, 10000); // 4k + 6k
   assert.equal(result.thinkingTokens, 6000);
   // (20k * 0.55/1M) + (80k * 0.14/1M) + (10k * 2.19/1M) = 0.011 + 0.0112 + 0.0219 = 0.0441
-  assert.equal(Math.round(result.whatYouPayUsd * 10000) / 10000, 0.0441);
+  assert.equal(Math.round(result.whatYouPayUsd * 10000) / 10000, 0.0348);
+});
+
+test('DeepSeek Pro pricing follows UTC peak windows and the October public holiday', () => {
+  const usage = { inputTokens: 1000000, outputTokens: 1000000, cachedInputTokens: 0 };
+  assert.equal(calculateModelCost({ model: 'deepseek/deepseek-v4-pro', usage, startedAt: '2026-09-28T02:00:00Z' }).whatYouPayUsd, 5.28);
+  assert.equal(calculateModelCost({ model: 'deepseek/deepseek-v4-pro', usage, startedAt: '2026-09-28T12:00:00Z' }).whatYouPayUsd, 2.64);
+  assert.equal(calculateModelCost({ model: 'deepseek/deepseek-v4-pro', usage, startedAt: '2026-10-01T02:00:00Z' }).whatYouPayUsd, 2.64);
+});
+
+test('partial or impossible usage is a named gap instead of a fabricated free half of a call', () => {
+  assert.equal(calculateModelCost({ model: 'openai/gpt-4o', usage: { inputTokens: 100 } }).error, 'no_token_count');
+  assert.equal(calculateModelCost({ model: 'openai/gpt-4o', usage: { inputTokens: 100, outputTokens: 5, cachedInputTokens: 200 } }).error, 'invalid_token_count');
 });

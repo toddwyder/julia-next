@@ -16,7 +16,6 @@ import { resolve } from 'node:path';
 import { normalizeTraceSpans } from './mastra-traces.mjs';
 import { buildMondayNote, publishMondayNote } from './monday-note.mjs';
 import { createIssuesClient, COST_NOTE_LABELS } from './monday-note-adapters.mjs';
-import { filterIssueForIntake } from './github-intake-rules.mjs';
 
 const fixturePath = resolve(import.meta.dirname, 'fixtures/captured-records.json');
 const { cards: integrationCards, spans: integrationSpans } = JSON.parse(readFileSync(fixturePath, 'utf8'));
@@ -128,10 +127,17 @@ test('integration: end-to-end flow handles fresh, cached, thinking, unpriced and
 
 test('intake rule: GitHub issue with factory:machine label is ignored by Factory intake', async () => {
   const defaultRule = (ctx) => ({ type: 'upsertLinkedWorkItem', stage: 'intake', issue: ctx.issue });
+  // Execute the existing rule from the app entry; there is no copied rule or
+  // new production filter module. This seam avoids booting Factory in CI.
+  const source = readFileSync(new URL('./app/src/mastra/index.ts', import.meta.url), 'utf8');
+  const machineIssues = source.match(/const machineIssues = .*;/)?.[0];
+  const body = source.match(/issueOpened: .*=> \{([\s\S]*?)\n  \},\n  pullRequestOpened:/)?.[1];
+  assert.ok(machineIssues && body, 'the app Intake rule must be available');
+  const issueOpened = new Function('defaultGithubRules', `${machineIssues}\nreturn context => {${body}};`)({ issueOpened: defaultRule });
 
   const costNoteCtx = { issue: { number: 185, labels: ['factory:machine', 'cost-note'], title: 'Monday note' } };
   const humanCtx = { issue: { number: 186, labels: ['feature'], title: 'Add feature' } };
 
-  assert.equal(filterIssueForIntake(costNoteCtx, defaultRule), undefined, 'cost note issue with factory:machine must be ignored by intake');
-  assert.deepEqual(filterIssueForIntake(humanCtx, defaultRule), { type: 'upsertLinkedWorkItem', stage: 'intake', issue: humanCtx.issue }, 'regular issue enters intake');
+  assert.equal(issueOpened(costNoteCtx), undefined, 'cost note issue with factory:machine must be ignored by intake');
+  assert.deepEqual(issueOpened(humanCtx), { type: 'upsertLinkedWorkItem', stage: 'intake', issue: humanCtx.issue }, 'regular issue enters intake');
 });

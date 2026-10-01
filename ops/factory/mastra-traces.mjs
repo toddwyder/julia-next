@@ -3,8 +3,7 @@
 // price table.
 //
 // The supported surfaces:
-//   1. Factory internal route: GET <factory>/julia/observability/traces (requiresAuth: false)
-//   2. Pinned Mastra route:   GET <factory>/api/observability/traces
+//   Pinned authenticated Mastra routes under /api/observability/traces
 //
 // Token breakdown:
 //   - fresh input tokens: input - cached
@@ -19,12 +18,8 @@
 
 import { calculateModelCost, getModelPrice } from './price-table.mjs';
 
-/** Internal authenticated/unauthenticated localhost route. */
-export const MASTRA_INTERNAL_TRACE_ROUTE = '/julia/observability/traces';
-
-/** The observability route the pinned `mastra api trace list` command calls. */
+/** Supported authenticated observability routes in pinned Mastra. */
 export const MASTRA_TRACE_ROUTE = '/api/observability/traces';
-
 const PAGE_SIZE = 20;
 const MAX_PAGES = 500;
 
@@ -32,83 +27,65 @@ function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-/**
- * Read the trace spans for `[from, to)` through the supported route.
- * Attempts the internal `/julia/observability/traces` route first; falls back
- * to `/api/observability/traces` if 404 or unsupported.
- *
- * @returns {Promise<Array<object>>} raw span records as the store returned them
+/** List light roots/timelines, then hydrate individual billable spans and roots.
+ * Reading full trace trees buffers every prompt; these supported routes keep
+ * each request bounded to one span. No unauthenticated fallback is allowed.
  */
-export async function readTraceSpans({ factoryUrl, from, to, fetchImpl = fetch, pageSize = PAGE_SIZE }) {
+export async function readTraceSpans({ factoryUrl, token, from, to, fetchImpl = fetch, pageSize = PAGE_SIZE, log = () => {} }) {
+  if (!token?.trim()) throw new Error('MONDAY_NOTE_TRACE_TOKEN is required to read authenticated traces');
   const base = factoryUrl.replace(/\/$/, '');
-  const candidateRoutes = [MASTRA_INTERNAL_TRACE_ROUTE, MASTRA_TRACE_ROUTE];
-
-  for (let r = 0; r < candidateRoutes.length; r += 1) {
-    const route = candidateRoutes[r];
-    const isLastRoute = r === candidateRoutes.length - 1;
-
-    try {
-      const collected = [];
-      let routeAccepted = false;
-
-      for (let page = 0; page < MAX_PAGES; page += 1) {
-        const url = new URL(`${base}${route}`);
-        url.searchParams.set('startedAt', JSON.stringify({ start: from, end: to, startExclusive: false, endExclusive: true }));
-        url.searchParams.set('pagination', JSON.stringify({ page, perPage: pageSize }));
-
-        let response;
-        try {
-          response = await fetchImpl(url.toString(), { method: 'GET' });
-        } catch (fetchErr) {
-          if (!isLastRoute && page === 0) {
-            break;
-          }
-          throw fetchErr;
-        }
-
-        if (!response.ok) {
-          if (!isLastRoute && page === 0) {
-            // Route not found or failed, try fallback
-            break;
-          }
-          throw new Error(`Mastra trace list returned HTTP ${response.status}`);
-        }
-
-        const body = await response.json();
-        if (!isObject(body) || !Array.isArray(body.spans)) {
-          if (!isLastRoute && page === 0) {
-            break;
-          }
-          throw new Error(
-            'Mastra trace list response did not include a spans array; refusing to read cost from an unsupported shape',
-          );
-        }
-
-        routeAccepted = true;
-        collected.push(...body.spans);
-
-        const pagination = body.pagination;
-        if (!isObject(pagination) || typeof pagination.hasMore !== 'boolean' || pagination.page !== page) {
-          throw new Error('Mastra trace list returned an unusable pagination object');
-        }
-        if (!pagination.hasMore) return collected;
-        if (body.spans.length === 0 || page === MAX_PAGES - 1) {
-          throw new Error('Mastra trace list pagination was incomplete; refusing a partial cost report');
-        }
-      }
-
-      if (routeAccepted) {
-        return collected;
-      }
-    } catch (err) {
-      if (!isLastRoute) {
-        continue;
-      }
-      throw err;
-    }
+  async function get(path, query) {
+    const url = new URL(`${base}${MASTRA_TRACE_ROUTE}${path}`);
+    if (query) for (const [key, value] of Object.entries(query)) url.searchParams.set(key, typeof value === 'object' ? JSON.stringify(value) : String(value));
+    const response = await fetchImpl(url.toString(), { method: 'GET', headers: { Authorization: `Bearer ${token}` }, redirect: 'error', signal: AbortSignal.timeout(120000) });
+    if (!response.ok) throw new Error(`Mastra trace read ${url.pathname} returned HTTP ${response.status}`);
+    return response.json();
   }
-
-  throw new Error('Mastra trace list exceeded pagination limit; refusing a partial cost report');
+  const collected = [];
+  const seen = new Set();
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    const body = await get('/light', {
+      startedAt: { start: from, end: to, startExclusive: false, endExclusive: true },
+      page, perPage: pageSize,
+    });
+    if (!isObject(body) || !Array.isArray(body.spans)) throw new Error('Mastra trace list did not include a spans array');
+    const pagination = body.pagination;
+    if (!isObject(pagination) || typeof pagination.hasMore !== 'boolean' || pagination.page !== page) throw new Error('Mastra trace list returned an unusable pagination object');
+    if (pagination.hasMore && (body.spans.length === 0 || page === MAX_PAGES - 1)) throw new Error('Mastra trace pagination was incomplete; refusing a partial report');
+    for (const root of body.spans) {
+      if (!root.traceId || seen.has(root.traceId)) continue;
+      seen.add(root.traceId);
+      const trace = await get(`/${encodeURIComponent(root.traceId)}/light`);
+      if (!Array.isArray(trace.spans) || trace.spans.length === 0) throw new Error(`Mastra trace ${root.traceId} has no timeline spans`);
+      const { inputPreview, outputPreview, input, output, ...safeRoot } = root;
+      const details = [safeRoot];
+      const timeline = new Map(trace.spans.map(span => [span.spanId, span]));
+      for (const span of trace.spans) {
+        if (!isCostBearing(span)) continue;
+        let billedByParent = false;
+        const visited = new Set();
+        for (let parent = timeline.get(span.parentSpanId); parent && !visited.has(parent.spanId); parent = timeline.get(parent.parentSpanId)) {
+          visited.add(parent.spanId);
+          if (parent.spanType === 'model_generation') billedByParent = true;
+        }
+        if (billedByParent) continue;
+        const result = await get(`/${encodeURIComponent(root.traceId)}/spans/${encodeURIComponent(span.spanId)}`);
+        if (!result.span?.spanId) throw new Error(`Mastra span ${span.spanId} returned no span detail`);
+        // Keep only cost and identity fields; prompt text never enters reports.
+        const { input, output, ...record } = result.span;
+        // Provider/tool schemas are also unnecessary to cost accounting.
+        record.attributes = Object.fromEntries(Object.entries(record.attributes ?? {}).filter(([key]) =>
+          ['model', 'responseModel', 'selectedModel', 'provider', 'usage', 'costContext', 'inputTokens', 'outputTokens', 'cachedInputTokens', 'reasoningTokens', 'inputDetails', 'outputDetails', 'effort', 'effortLevel', 'sessionId', 'conversationId', 'threadId'].includes(key)));
+        details.push(record);
+      }
+      const parent = details.find(span => span.spanId === root.spanId) ?? root;
+      const identity = parent.threadId ?? parent.metadata?.threadId ?? parent.attributes?.threadId ?? parent.attributes?.conversationId ?? parent.metadata?.sessionId;
+      for (const span of details) collected.push({ ...span, threadId: span.threadId ?? identity });
+    }
+    if (!pagination.hasMore) return collected;
+    log(`mastra-traces page=${page} roots=${seen.size} spans=${collected.length}`);
+  }
+  throw new Error('Mastra trace list exceeded pagination limit');
 }
 
 function toIso(value) {
@@ -141,7 +118,7 @@ function spanPhase(span) {
 /**
  * The span types Mastra bills.
  */
-const MODEL_SPAN_TYPES = new Set(['model_generation', 'model_step', 'model_inference', 'memory_operation']);
+const MODEL_SPAN_TYPES = new Set(['model_generation', 'model_step', 'model_inference']);
 
 /**
  * Is this span one that should carry a cost?
@@ -152,7 +129,7 @@ function isCostBearing(span) {
   const attributes = isObject(span.attributes) ? span.attributes : {};
   if (isObject(attributes.costContext) || isObject(attributes.usage)) return true;
   if (typeof attributes.inputTokens === 'number' || typeof attributes.outputTokens === 'number') return true;
-  if (typeof span.name === 'string' && (span.name.startsWith('llm:') || span.name.startsWith('memory:'))) return true;
+  if (typeof span.name === 'string' && span.name.startsWith('llm:')) return true;
   return false;
 }
 
@@ -173,6 +150,11 @@ export function normalizeTraceSpans(spans = [], { cards = [] } = {}) {
   const cardBySession = new Map();
   for (const card of cards) {
     if (card.number) {
+      const reference = String(card.number).toLowerCase();
+      if (/^pr-\d+$/.test(reference)) {
+        cardBySession.set(reference, card.number);
+        cardBySession.set(`factory/${reference}`, card.number);
+      }
       cardBySession.set(String(card.number), card.number);
       cardBySession.set(`pr-${card.number}`, card.number);
       cardBySession.set(`issue-${card.number}`, card.number);
@@ -181,7 +163,7 @@ export function normalizeTraceSpans(spans = [], { cards = [] } = {}) {
     }
     if (card.sessions && typeof card.sessions === 'object') {
       for (const [key, value] of Object.entries(card.sessions)) {
-        cardBySession.set(key, card.number);
+        if (!['triage', 'plan', 'work', 'review'].includes(key)) cardBySession.set(key, card.number);
         if (value && typeof value === 'object') {
           if (value.sessionId) cardBySession.set(value.sessionId, card.number);
           if (value.threadId) cardBySession.set(value.threadId, card.number);
@@ -206,6 +188,7 @@ export function normalizeTraceSpans(spans = [], { cards = [] } = {}) {
     }
   }
 
+  const spansById = new Map(spans.map(span => [span.spanId ?? span.id, span]));
   return spans.map((span) => {
     const attributes = isObject(span.attributes) ? span.attributes : {};
     const costContext = isObject(attributes.costContext) ? attributes.costContext : {};
@@ -225,6 +208,7 @@ export function normalizeTraceSpans(spans = [], { cards = [] } = {}) {
 
     const sessionId =
       span.sessionId ??
+      span.threadId ??
       span.scope?.sessionId ??
       span.metadata?.sessionId ??
       attributes.sessionId ??
@@ -237,9 +221,9 @@ export function normalizeTraceSpans(spans = [], { cards = [] } = {}) {
     if (sessionId !== null) {
       card = cardBySession.get(sessionId) ?? null;
       if (card === null) {
-        const numMatch = String(sessionId).match(/(?:pr|issue)[/-]?(\d+)/i);
+        const numMatch = String(sessionId).match(/(?:^|\/)(pr|issue)[/-]?(\d+)(?:-|$)/i);
         if (numMatch) {
-          card = cardBySession.get(numMatch[1]) ?? null;
+          card = cardBySession.get(`${numMatch[1].toLowerCase()}-${numMatch[2]}`) ?? null;
         }
       }
     }
@@ -254,9 +238,18 @@ export function normalizeTraceSpans(spans = [], { cards = [] } = {}) {
       (modelMatch ? modelMatch[1] : null);
 
     const provider = attributes.provider ?? costContext.provider ?? (model ? getModelPrice(model)?.provider : null) ?? null;
-    const effortLevel = attributes.effort ?? attributes.effortLevel ?? span.metadata?.effort ?? null;
+    const snapshot = cards.find(item => item.number === card)?.phaseSnapshots
+      ?.filter(item => item.threadId === sessionId && Date.parse(item.at) <= Date.parse(span.startedAt ?? span.startTime))
+      .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))[0];
+    const effortLevel = attributes.effort ?? attributes.effortLevel ?? span.metadata?.effort ?? snapshot?.effort ?? null;
 
-    const costBearing = isCostBearing(span);
+    let aggregateParent = false;
+    const seenParents = new Set();
+    for (let parent = spansById.get(span.parentSpanId); parent && !seenParents.has(parent.spanId); parent = spansById.get(parent.parentSpanId)) {
+      seenParents.add(parent.spanId);
+      if (parent.spanType === 'model_generation' && (span.spanType === 'model_step' || span.spanType === 'model_inference')) aggregateParent = true;
+    }
+    const costBearing = isCostBearing(span) && !aggregateParent;
     let costResult = null;
     let costUsd = null;
     let faceCostUsd = null;
@@ -264,17 +257,13 @@ export function normalizeTraceSpans(spans = [], { cards = [] } = {}) {
 
     if (costBearing) {
       if (usage && model) {
-        costResult = calculateModelCost({ model, usage, provider });
+        costResult = calculateModelCost({ model, usage, provider, startedAt: span.startedAt ?? span.startTime });
         if (costResult.ok) {
           costUsd = costResult.whatYouPayUsd;
           faceCostUsd = costResult.faceCostUsd;
         } else {
           gap = costResult.error;
         }
-      } else if (typeof costContext.estimatedCost === 'number' && Number.isFinite(costContext.estimatedCost)) {
-        // Fallback when estimatedCost is pre-attached
-        costUsd = costContext.estimatedCost;
-        faceCostUsd = costContext.estimatedCost;
       } else {
         gap = 'no_token_count';
       }

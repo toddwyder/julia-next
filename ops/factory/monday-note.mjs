@@ -2,8 +2,8 @@
 //
 // One program, two inputs, one text. The inputs are Factory's own card records
 // (the card moves and who made them) and Mastra's trace cost data; the output
-// is the plain summary Todd reads, posted as a GitHub Discussion in the
-// "Monday notes" category so it never lands in Factory's Intake.
+// is the plain summary Todd reads, posted as a public GitHub Issue with
+// factory:machine and cost-note labels so it stays outside Factory Intake.
 //
 // Pure generation only: no network, no storage, no schedule. The publisher and
 // the notification live in `publishMondayNote` over injected adapters, and the
@@ -13,7 +13,7 @@
 // observability exporter wrote, failed attempts included (CONTEXT.md "Monday
 // note").
 
-/** The GitHub Discussions category the note is published in. */
+/** Legacy adapter category; production publishes GitHub Issues. */
 export const MONDAY_NOTE_CATEGORY = 'Monday notes';
 
 /**
@@ -55,7 +55,17 @@ function usd(value) {
   return `$${value.toFixed(2)}`;
 }
 
-/** The Discussion title for a week; one title per week is the dedupe key. */
+function costDisplay(traces, knownCost) {
+  const calls = traces.filter(trace => trace.costBearing !== false);
+  if (calls.length === 0) return 'no recorded model calls';
+  const gaps = [...new Set(calls.flatMap(trace => trace.namedGaps ?? []).filter(gap => gap !== 'no_recorded_effort'))];
+  if (gaps.length === 0) return usd(knownCost);
+  const names = gaps.map(gap => gap.replaceAll('_', ' ')).join(', ');
+  return calls.some(trace => Number.isFinite(trace.whatYouPayCost ?? trace.costUsd) && !(trace.namedGaps ?? []).some(gap => gap !== 'no_recorded_effort'))
+    ? `${usd(knownCost)} known subtotal + ${names}` : names;
+}
+
+/** The Issue title for a week; one title per week is the dedupe key. */
 export function noteTitle(to) {
   return `Monday note — week ending ${to.slice(0, 10)}`;
 }
@@ -276,11 +286,11 @@ function stepLine(step, stepTraces) {
   // Group models used in this step
   const modelMap = new Map();
   for (const trace of stepTraces) {
-    if (!trace.model) continue;
+    if (trace.costBearing === false) continue;
     const key = `${trace.model}|${trace.provider ?? ''}`;
     if (!modelMap.has(key)) {
       modelMap.set(key, {
-        model: trace.model,
+        model: trace.model ?? 'no recorded model',
         provider: trace.provider ?? 'unknown',
         whatYouPayCost: 0,
         faceCost: 0,
@@ -292,9 +302,11 @@ function stepLine(step, stepTraces) {
         hasKnownCost: false,
         unpriced: false,
         noTokenCount: false,
+        traces: [],
       });
     }
     const entry = modelMap.get(key);
+    entry.traces.push(trace);
     if (trace.whatYouPayCost !== null && trace.whatYouPayCost !== undefined) {
       entry.whatYouPayCost += trace.whatYouPayCost;
       entry.hasKnownCost = true;
@@ -320,23 +332,18 @@ function stepLine(step, stepTraces) {
   for (const m of modelMap.values()) {
     const inTotal = m.freshInput + m.cachedInput;
     const cachedShare = inTotal > 0 ? Math.round((m.cachedInput / inTotal) * 100) : 0;
-    let costDisplay = usd(m.whatYouPayCost);
-    if (!m.hasKnownCost) {
-      if (m.unpriced) costDisplay = 'unpriced';
-      else if (m.noTokenCount) costDisplay = 'no token count';
-    }
+    const display = costDisplay(m.traces, m.whatYouPayCost);
     modelLines.push(
-      `    - ${m.model} (${m.provider}): ${costDisplay} (${formatTokens(m.freshInput)} fresh, ${formatTokens(m.cachedInput)} cached [${cachedShare}% cached], ${formatTokens(m.output)} out [${formatTokens(m.thinking)} thinking])`
+      `    - ${m.model} (${m.provider}): ${display} (${m.noTokenCount ? 'no token count' : `${formatTokens(m.freshInput)} fresh, ${formatTokens(m.cachedInput)} cached [${cachedShare}% cached], ${formatTokens(m.output)} out [${formatTokens(m.thinking)} thinking]`})`
     );
   }
 
-  const parts = [`${step.stage} — ${actorName(step.by)} — ${usd(costUsd)}`];
+  const parts = [`${step.stage} — ${actorName(step.by)} — ${costDisplay(stepTraces, costUsd)}`];
   if (elapsedMs !== null && elapsedMs >= 0) parts.push(duration(elapsedMs));
   const failedPhrase = failedAttemptPhrase(failedAttempts);
   if (failedPhrase) parts.push(failedPhrase);
-  if (stepTraces.length > 0 && modelMap.size > 0) {
-    parts.push(`effort: ${effort} (${formatTokens(thinkingTokens)} thinking tokens)`);
-  }
+  parts.push(`effort: ${effort} (${stepTraces.some(trace => trace.costBearing !== false) ? formatTokens(thinkingTokens) : 'no token count'} thinking tokens)`);
+  if (modelMap.size === 0) modelLines.push('    - model: no recorded model calls');
 
   return {
     stage: step.stage,
@@ -458,7 +465,7 @@ function cardLine(card, cardTraces, { acceptedInWeek = true, from, to } = {}) {
   const { byHand, doneByFactory } = doneByFactoryFor(allSteps);
   const reference = String(card.number).startsWith('PR-') ? `PR #${String(card.number).slice(3)}`
     : String(card.number).startsWith('Factory-') ? `Factory card ${String(card.number).slice(8)}` : `#${card.number}`;
-  const parts = [`${reference} ${card.title}`, usd(costUsd), duration(elapsedMs)];
+  const parts = [`${reference} ${card.title}`, costDisplay(cardTraces, costUsd), duration(elapsedMs)];
   const failedPhrase = failedAttemptPhrase(failedAttempts);
   if (failedPhrase) parts.push(failedPhrase);
   parts.push(doneByFactory ? 'Done by Factory' : `not all by Factory: ${actorName(byHand.by)} ${byHand.stage}`);
@@ -473,7 +480,9 @@ function cardLine(card, cardTraces, { acceptedInWeek = true, from, to } = {}) {
   const reviewRounds = steps.filter((step) => step.stage === 'review').length;
   const waitsOnTodd = countWaitsOnTodd(allSteps);
 
-  const driversText = `  Drivers: ${totalStepsCount} step${totalStepsCount === 1 ? '' : 's'}, ${formatTokens(avgTokensPerStep)} avg tokens/step, ${cachedShare}% cached input, ${reviewRounds} review round${reviewRounds === 1 ? '' : 's'}, ${failedAttempts} failed attempt${failedAttempts === 1 ? '' : 's'}, ${waitsOnTodd} wait${waitsOnTodd === 1 ? '' : 's'} on Todd outside UAT`;
+  const tokensKnown = cardTraces.some(trace => trace.costBearing !== false) && !cardTraces.some(trace => trace.namedGaps?.includes('no_token_count'));
+  const tokenDrivers = tokensKnown ? `${formatTokens(avgTokensPerStep)} avg tokens/step, ${cachedShare}% cached input` : 'tokens/step: no token count, cached input: no token count';
+  const driversText = `  Drivers: ${totalStepsCount} step${totalStepsCount === 1 ? '' : 's'}, ${tokenDrivers}, ${reviewRounds} review round${reviewRounds === 1 ? '' : 's'}, ${failedAttempts} failed attempt${failedAttempts === 1 ? '' : 's'}, ${waitsOnTodd} wait${waitsOnTodd === 1 ? '' : 's'} on Todd outside UAT`;
 
   return {
     number: card.number,
@@ -544,20 +553,19 @@ export function buildMondayNote({ cards = [], traces = [], from, to }) {
 
   // Provider totals in what-you-pay dollars and face cost
   const providerTotals = {};
+  const providerTraces = {};
   for (const trace of weekTraces) {
-    if (!trace.provider) continue;
+    if (!trace.provider || trace.costBearing === false) continue;
     const provider = trace.provider;
     if (!providerTotals[provider]) {
       providerTotals[provider] = { whatYouPayCost: 0, faceCost: 0 };
+      providerTraces[provider] = [];
     }
     const wyp = trace.whatYouPayCost ?? trace.costUsd ?? 0;
     const face = trace.faceCost ?? trace.whatYouPayCost ?? trace.costUsd ?? 0;
     providerTotals[provider].whatYouPayCost += wyp;
     providerTotals[provider].faceCost += face;
-  }
-  for (const p of Object.keys(providerTotals)) {
-    providerTotals[p].whatYouPayCost = Math.round(providerTotals[p].whatYouPayCost * 100) / 100;
-    providerTotals[p].faceCost = Math.round(providerTotals[p].faceCost * 100) / 100;
+    providerTraces[provider].push(trace);
   }
 
   // Named gaps collection
@@ -567,7 +575,7 @@ export function buildMondayNote({ cards = [], traces = [], from, to }) {
 
   for (const line of lines) {
     for (const step of line.steps) {
-      if (step.effort === 'no recorded effort' && step.models && step.models.length > 0) {
+      if (step.effort === 'no recorded effort') {
         noRecordedEffortCount += 1;
       }
     }
@@ -596,11 +604,11 @@ export function buildMondayNote({ cards = [], traces = [], from, to }) {
       const isDiscounted = entry.whatYouPayCost < entry.faceCost && entry.whatYouPayCost > 0;
       let line = `  • ${p}`;
       if (isSub) {
-        line += ` (subscription): ${usd(entry.whatYouPayCost)} (face value ${usd(entry.faceCost)})`;
+        line += ` (subscription): ${costDisplay(providerTraces[p], entry.whatYouPayCost)} (face value ${costDisplay(providerTraces[p], entry.faceCost)})`;
       } else if (isDiscounted) {
-        line += `: ${usd(entry.whatYouPayCost)} (face value ${usd(entry.faceCost)})`;
+        line += `: ${costDisplay(providerTraces[p], entry.whatYouPayCost)} (face value ${costDisplay(providerTraces[p], entry.faceCost)})`;
       } else {
-        line += `: ${usd(entry.whatYouPayCost)}`;
+        line += `: ${costDisplay(providerTraces[p], entry.whatYouPayCost)}`;
       }
       providerLines.push(line);
     }
@@ -655,7 +663,7 @@ export function buildMondayNote({ cards = [], traces = [], from, to }) {
     '',
     ...namedGapLines,
     '',
-    `Total model spend: ${usd(totalUsd)} across ${weekCards.length} cards${spentPhrase ? ` (${spentPhrase})` : ''}.`,
+    `Total model spend: ${weekCards.length === 0 && weekTraces.length === 0 ? usd(0) : weekCards.some(card => !weekTraces.some(trace => trace.card === card.number && trace.costBearing !== false)) ? `${totalUsd > 0 ? usd(totalUsd) + ' known subtotal + ' : ''}no recorded model calls` : costDisplay(weekTraces, totalUsd)} across ${weekCards.length} cards${spentPhrase ? ` (${spentPhrase})` : ''}.`,
     '',
     "Costs are read from Mastra's traces for this Factory project and Factory's own card records. Sessions run outside Factory (Codex, GPT, or Claude sessions started by hand) are not counted and never appear here.",
   ].join('\n');
@@ -713,4 +721,3 @@ export async function postMondayNote({ note, issues, publisher, discussions }) {
   const postResult = await client.post({ title: note.title, body: note.body });
   return postResult.url;
 }
-

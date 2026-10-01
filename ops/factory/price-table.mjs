@@ -18,58 +18,34 @@
 export const PRICE_TABLE = {
   // DeepSeek Direct API
   'deepseek/deepseek-v4-pro': {
-    freshInputPerMillion: 0.27,
-    cachedInputPerMillion: 0.07,
-    outputPerMillion: 1.10,
+    freshInputPerMillion: .66,
+    cachedInputPerMillion: .022,
+    outputPerMillion: 1.98,
     provider: 'deepseek',
     payFactor: 1.0,
     sourceUrl: 'https://api-docs.deepseek.com/quick_start/pricing',
     dateChecked: '2026-10-01',
+    peakMultiplier: 2,
   },
   'deepseek/deepseek-v4-flash': {
-    freshInputPerMillion: 0.27,
-    cachedInputPerMillion: 0.07,
-    outputPerMillion: 1.10,
+    freshInputPerMillion: .15,
+    cachedInputPerMillion: .003,
+    outputPerMillion: .6,
     provider: 'deepseek',
     payFactor: 1.0,
     sourceUrl: 'https://api-docs.deepseek.com/quick_start/pricing',
     dateChecked: '2026-10-01',
+    peakMultiplier: 2,
   },
   'deepseek/deepseek-flash': {
-    freshInputPerMillion: 0.27,
-    cachedInputPerMillion: 0.07,
-    outputPerMillion: 1.10,
+    freshInputPerMillion: .15,
+    cachedInputPerMillion: .003,
+    outputPerMillion: .6,
     provider: 'deepseek',
     payFactor: 1.0,
     sourceUrl: 'https://api-docs.deepseek.com/quick_start/pricing',
     dateChecked: '2026-10-01',
-  },
-  'deepseek/deepseek-chat': {
-    freshInputPerMillion: 0.27,
-    cachedInputPerMillion: 0.07,
-    outputPerMillion: 1.10,
-    provider: 'deepseek',
-    payFactor: 1.0,
-    sourceUrl: 'https://api-docs.deepseek.com/quick_start/pricing',
-    dateChecked: '2026-10-01',
-  },
-  'deepseek/deepseek-reasoner': {
-    freshInputPerMillion: 0.55,
-    cachedInputPerMillion: 0.14,
-    outputPerMillion: 2.19,
-    provider: 'deepseek',
-    payFactor: 1.0,
-    sourceUrl: 'https://api-docs.deepseek.com/quick_start/pricing',
-    dateChecked: '2026-10-01',
-  },
-  'deepseek/deepseek-r1': {
-    freshInputPerMillion: 0.55,
-    cachedInputPerMillion: 0.14,
-    outputPerMillion: 2.19,
-    provider: 'deepseek',
-    payFactor: 1.0,
-    sourceUrl: 'https://api-docs.deepseek.com/quick_start/pricing',
-    dateChecked: '2026-10-01',
+    peakMultiplier: 2,
   },
 
   // Command Code (1/7 of face value)
@@ -97,7 +73,7 @@ export const PRICE_TABLE = {
     outputPerMillion: 10.00,
     provider: 'commandcode',
     payFactor: 10 / 70,
-    sourceUrl: 'https://openai.com/api/pricing/',
+    sourceUrl: 'https://developers.openai.com/api/docs/pricing',
     dateChecked: '2026-10-01',
   },
   'commandcode/deepseek-chat': {
@@ -111,22 +87,13 @@ export const PRICE_TABLE = {
   },
 
   // OpenAI Subscriptions / Codex Sign-in (what-you-pay = $0)
-  'openai/gpt-6-sol': {
-    freshInputPerMillion: 2.50,
-    cachedInputPerMillion: 1.25,
-    outputPerMillion: 10.00,
-    provider: 'openai',
-    payFactor: 0.0,
-    sourceUrl: 'https://openai.com/api/pricing/',
-    dateChecked: '2026-10-01',
-  },
   'openai/gpt-4o': {
     freshInputPerMillion: 2.50,
     cachedInputPerMillion: 1.25,
     outputPerMillion: 10.00,
     provider: 'openai',
     payFactor: 0.0,
-    sourceUrl: 'https://openai.com/api/pricing/',
+    sourceUrl: 'https://developers.openai.com/api/docs/pricing',
     dateChecked: '2026-10-01',
   },
   'openai/gpt-4o-mini': {
@@ -135,7 +102,7 @@ export const PRICE_TABLE = {
     outputPerMillion: 0.60,
     provider: 'openai',
     payFactor: 0.0,
-    sourceUrl: 'https://openai.com/api/pricing/',
+    sourceUrl: 'https://developers.openai.com/api/docs/pricing',
     dateChecked: '2026-10-01',
   },
   'openai/o1': {
@@ -144,7 +111,7 @@ export const PRICE_TABLE = {
     outputPerMillion: 60.00,
     provider: 'openai',
     payFactor: 0.0,
-    sourceUrl: 'https://openai.com/api/pricing/',
+    sourceUrl: 'https://developers.openai.com/api/docs/pricing',
     dateChecked: '2026-10-01',
   },
   'openai/o3-mini': {
@@ -153,54 +120,27 @@ export const PRICE_TABLE = {
     outputPerMillion: 4.40,
     provider: 'openai',
     payFactor: 0.0,
-    sourceUrl: 'https://openai.com/api/pricing/',
-    dateChecked: '2026-10-01',
-  },
-  'openai/codex': {
-    freshInputPerMillion: 2.50,
-    cachedInputPerMillion: 1.25,
-    outputPerMillion: 10.00,
-    provider: 'openai',
-    payFactor: 0.0,
-    sourceUrl: 'https://openai.com/api/pricing/',
+    sourceUrl: 'https://developers.openai.com/api/docs/pricing',
     dateChecked: '2026-10-01',
   },
 
   // Google Subscriptions (Gemini) (what-you-pay = $0)
   'google/gemini-2.5-flash': {
-    freshInputPerMillion: 0.10,
-    cachedInputPerMillion: 0.025,
-    outputPerMillion: 0.40,
+    freshInputPerMillion: .30,
+    cachedInputPerMillion: .03,
+    outputPerMillion: 2.50,
     provider: 'google',
     payFactor: 0.0,
-    sourceUrl: 'https://ai.google.dev/pricing',
+    sourceUrl: 'https://ai.google.dev/gemini-api/docs/pricing',
     dateChecked: '2026-10-01',
   },
   'google/gemini-2.5-pro': {
     freshInputPerMillion: 1.25,
-    cachedInputPerMillion: 0.3125,
-    outputPerMillion: 5.00,
+    cachedInputPerMillion: .125,
+    outputPerMillion: 10.00,
     provider: 'google',
     payFactor: 0.0,
-    sourceUrl: 'https://ai.google.dev/pricing',
-    dateChecked: '2026-10-01',
-  },
-  'google/gemini-1.5-flash': {
-    freshInputPerMillion: 0.075,
-    cachedInputPerMillion: 0.01875,
-    outputPerMillion: 0.30,
-    provider: 'google',
-    payFactor: 0.0,
-    sourceUrl: 'https://ai.google.dev/pricing',
-    dateChecked: '2026-10-01',
-  },
-  'google/gemini-1.5-pro': {
-    freshInputPerMillion: 1.25,
-    cachedInputPerMillion: 0.3125,
-    outputPerMillion: 5.00,
-    provider: 'google',
-    payFactor: 0.0,
-    sourceUrl: 'https://ai.google.dev/pricing',
+    sourceUrl: 'https://ai.google.dev/gemini-api/docs/pricing',
     dateChecked: '2026-10-01',
   },
 
@@ -297,37 +237,18 @@ export function getModelPrice(modelId, provider) {
 
   if (provider) {
     const prov = provider.toLowerCase().trim();
-    if (PRICE_TABLE[`${prov}/${normalized}`]) return PRICE_TABLE[`${prov}/${normalized}`];
-    const withoutPrefix = normalized.replace(/^[^/]+\//, '');
-    if (PRICE_TABLE[`${prov}/${withoutPrefix}`]) return PRICE_TABLE[`${prov}/${withoutPrefix}`];
+    const bare = normalized.replace(/^[^/]+\//, '');
+    const qualified = PRICE_TABLE[`${prov}/${normalized}`] ?? PRICE_TABLE[`${prov}/${bare}`];
+    if (qualified) return qualified;
+    if (prov === 'commandcode') return getModelPrice(normalized);
+    // An explicit transport provider must not borrow another provider's rate.
+    if (!normalized.startsWith(`${prov}/`)) return null;
   }
-
-  const direct = PRICE_TABLE[normalized];
-  if (direct) return direct;
-
-  // Try canonical provider prefix if bare model name
+  if (PRICE_TABLE[normalized]) return PRICE_TABLE[normalized];
   if (!normalized.includes('/')) {
-    for (const { prefix, test } of CANONICAL_PREFIXES) {
-      if (test(normalized) && PRICE_TABLE[`${prefix}${normalized}`]) {
-        return PRICE_TABLE[`${prefix}${normalized}`];
-      }
-    }
+    const canonical = CANONICAL_PREFIXES.find(({ test }) => test(normalized));
+    return canonical ? PRICE_TABLE[`${canonical.prefix}${normalized}`] ?? null : null;
   }
-
-  // Exact suffix match on canonical providers first
-  for (const [key, entry] of Object.entries(PRICE_TABLE)) {
-    if (entry.provider !== 'commandcode' && (key.endsWith(`/${normalized}`) || key.replace(/^[^/]+\//, '') === normalized)) {
-      return entry;
-    }
-  }
-
-  // Fallback match
-  for (const [key, entry] of Object.entries(PRICE_TABLE)) {
-    if (key === normalized || key.endsWith(`/${normalized}`) || key.replace(/^[^/]+\//, '') === normalized) {
-      return entry;
-    }
-  }
-
   return null;
 }
 
@@ -350,7 +271,7 @@ export function getModelPrice(modelId, provider) {
  *   provider?: string,
  * }} input
  */
-export function calculateModelCost({ model, usage, provider: requestedProvider }) {
+export function calculateModelCost({ model, usage, provider: requestedProvider, startedAt }) {
   if (!usage || typeof usage !== 'object') {
     return { ok: false, error: 'no_token_count', model };
   }
@@ -358,7 +279,7 @@ export function calculateModelCost({ model, usage, provider: requestedProvider }
   const rawInput = usage.inputTokens ?? usage.promptTokens;
   const rawOutput = usage.outputTokens ?? usage.completionTokens;
 
-  if (typeof rawInput !== 'number' && typeof rawOutput !== 'number') {
+  if (typeof rawInput !== 'number' || typeof rawOutput !== 'number') {
     return { ok: false, error: 'no_token_count', model };
   }
 
@@ -367,7 +288,11 @@ export function calculateModelCost({ model, usage, provider: requestedProvider }
   const freshInputTokens = Math.max(0, totalInput - cachedInputTokens);
   const rawOutputTokens = rawOutput ?? 0;
   const thinkingTokens = usage.reasoningTokens ?? usage.outputDetails?.reasoning ?? 0;
-  const outputTokens = rawOutputTokens >= thinkingTokens ? rawOutputTokens : (rawOutputTokens + thinkingTokens);
+  // Mastra's normalized AI SDK output is the total, including reasoning.
+  const outputTokens = rawOutputTokens;
+  if (![totalInput, cachedInputTokens, outputTokens, thinkingTokens].every(value => Number.isSafeInteger(value) && value >= 0) || cachedInputTokens > totalInput || thinkingTokens > outputTokens) {
+    return { ok: false, error: 'invalid_token_count', model, freshInputTokens, cachedInputTokens, outputTokens, thinkingTokens };
+  }
 
   const priceEntry = getModelPrice(model, requestedProvider);
   if (!priceEntry) {
@@ -385,9 +310,22 @@ export function calculateModelCost({ model, usage, provider: requestedProvider }
   const provider = requestedProvider ?? priceEntry.provider;
   const payFactor = requestedProvider === 'commandcode' ? (10 / 70) : priceEntry.payFactor;
 
-  const freshCost = (freshInputTokens / 1_000_000) * priceEntry.freshInputPerMillion;
-  const cachedCost = (cachedInputTokens / 1_000_000) * priceEntry.cachedInputPerMillion;
-  const outputCost = (outputTokens / 1_000_000) * priceEntry.outputPerMillion;
+  let rateFactor = 1;
+  if (priceEntry.peakMultiplier) {
+    const at = new Date(startedAt);
+    // Verified calendar covers observability switch-on through end of 2026.
+    // Future calendars and earlier price regimes are explicitly unmeasured.
+    if (!Number.isFinite(at.getTime()) || at < new Date('2026-09-28T00:00:00Z') || at >= new Date('2027-01-01T00:00:00Z')) return { ok: false, error: 'no_price_window', model, freshInputTokens, cachedInputTokens, outputTokens, thinkingTokens };
+    const day = at.toISOString().slice(0, 10);
+    const holiday = day >= '2026-10-01' && day <= '2026-10-07';
+    const hour = at.getUTCHours();
+    const weekday = at.getUTCDay() >= 1 && at.getUTCDay() <= 5;
+    if (weekday && !holiday && ((hour >= 1 && hour < 4) || (hour >= 6 && hour < 10))) rateFactor = priceEntry.peakMultiplier;
+  }
+  const longContext = model.includes('gemini-2.5-pro') && totalInput > 200000;
+  const freshCost = (freshInputTokens / 1_000_000) * priceEntry.freshInputPerMillion * rateFactor * (longContext ? 2 : 1);
+  const cachedCost = (cachedInputTokens / 1_000_000) * priceEntry.cachedInputPerMillion * rateFactor * (longContext ? 2 : 1);
+  const outputCost = (outputTokens / 1_000_000) * priceEntry.outputPerMillion * rateFactor * (longContext ? 1.5 : 1);
   const faceCostUsd = freshCost + cachedCost + outputCost;
   const whatYouPayUsd = faceCostUsd * payFactor;
 

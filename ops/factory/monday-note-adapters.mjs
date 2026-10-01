@@ -6,6 +6,20 @@
 // and Todd can view them without signing in, and Factory intake ignores them.
 
 const GITHUB_REST_URL = 'https://api.github.com';
+import { getPublisherInstallationToken, loadPublisherCredentialFile } from '../../scripts/publish-via-github-app.mjs';
+
+/** Reuse the trusted publisher App; mint a fresh short-lived token each run. */
+export async function createPublisherIssuesClient({ env = process.env, fetchImpl = fetch,
+  loadCredential = loadPublisherCredentialFile, tokenImpl = getPublisherInstallationToken } = {}) {
+  const owner = env.MONDAY_NOTE_GITHUB_OWNER;
+  const repo = env.MONDAY_NOTE_GITHUB_REPO;
+  if (`${owner}/${repo}` !== 'toddwyder/julia-next') throw new Error('Monday note publisher is restricted to toddwyder/julia-next');
+  // Signing keys stay in this trusted object, never in process.env or psql.
+  const credentials = {};
+  loadCredential(undefined, credentials);
+  const token = await tokenImpl({ ...credentials, JULIA_PUBLISHER_OWNER: owner, JULIA_PUBLISHER_REPO: repo });
+  return createIssuesClient({ token, owner, repo, fetchImpl });
+}
 
 /** Default labels for cost note issues so Factory intake ignores them. */
 export const COST_NOTE_LABELS = ['factory:machine', 'cost-note'];

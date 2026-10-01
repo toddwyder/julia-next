@@ -12,6 +12,16 @@ import { buildMondayNote, publishMondayNote, MONDAY_NOTE_CATEGORY, previousWeekW
 
 const WEEK = { from: '2026-09-21T00:00:00Z', to: '2026-09-28T00:00:00Z' };
 
+test('a card with no recorded model calls shows named gaps at card, step, effort and token drivers', () => {
+  const note = buildMondayNote({ cards: [{ number: 180, title: 'Unmeasured', enteredAt: '2026-09-22T09:00:00Z',
+    stageHistory: [{ stage: 'execute', by: 'factory', enteredAt: '2026-09-22T09:00:00Z' }] }], traces: [], ...WEEK });
+  assert.doesNotMatch(note.body, /\$0\.00/);
+  assert.match(note.body, /no recorded model calls/);
+  assert.match(note.body, /effort: no recorded effort/);
+  assert.match(note.body, /tokens\/step: no token count/);
+  assert.match(note.body, /cached input: no token count/);
+});
+
 // A card Todd starts the normal way: his one Intake tap, then Factory does the rest.
 const factoryCard = {
   number: 140,
@@ -69,10 +79,10 @@ test('each step is named with its actor, not just the card total', () => {
   assert.deepEqual(
     note.lines[0].steps.map((step) => step.text),
     [
-      'plan — Factory — $0.40 — 15m',
-      'build — Factory — $5.60 — 3h 15m — 1 failed attempt',
-      'review — Factory — $0.60 — 40m',
-      'done — Factory — $0.00',
+      'plan — Factory — $0.40 — 15m — effort: no recorded effort (0 thinking tokens)',
+      'build — Factory — $5.60 — 3h 15m — 1 failed attempt — effort: no recorded effort (0 thinking tokens)',
+      'review — Factory — $0.60 — 40m — effort: no recorded effort (0 thinking tokens)',
+      'done — Factory — no recorded model calls — effort: no recorded effort (no token count thinking tokens)',
     ],
   );
 });
@@ -120,8 +130,8 @@ test('a step moved by hand names the person, not Factory', () => {
   const note = buildMondayNote({ cards: [byHand], traces: [], ...WEEK });
 
   assert.deepEqual(note.lines[0].steps.map((step) => step.text), [
-    'plan — Factory — $0.00 — 30m',
-    'done — Todd — $0.00',
+    'plan — Factory — no recorded model calls — 30m — effort: no recorded effort (no token count thinking tokens)',
+    'done — Todd — no recorded model calls — effort: no recorded effort (no token count thinking tokens)',
   ]);
   assert.equal(note.lines[0].doneByFactory, false);
 });
@@ -780,7 +790,7 @@ test('named gaps (no token count, unpriced model, no recorded effort) are report
   assert.match(note.body, /unknown\/model-xyz \(custom\): unpriced/);
   assert.match(note.body, /deepseek\/deepseek-uncounted \(deepseek\): no token count/);
   assert.match(note.body, /Named gaps:/);
-  assert.match(note.body, /• No recorded effort: 3 step\(s\)/);
+  assert.match(note.body, /• No recorded effort: 4 step\(s\)/);
   assert.match(note.body, /• Unpriced models: 1 call\(s\)/);
   assert.match(note.body, /• No token count: 1 call\(s\)/);
 });
@@ -802,4 +812,3 @@ test('waits on Todd outside UAT correctly counts non-Factory actor steps between
   assert.equal(note.lines[0].waitsOnTodd, 1);
   assert.match(note.body, /1 wait on Todd outside UAT/);
 });
-

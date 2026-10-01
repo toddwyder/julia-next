@@ -28,6 +28,7 @@ import { RedisStreamsPubSub } from '@mastra/redis-streams';
 import { getDatabasePath } from '@mastra/code-sdk/utils/project';
 import { DEFAULT_RETENTION } from '@mastra/code-sdk/utils/storage-maintenance';
 import { MastraAuthWorkos } from '@mastra/auth-workos';
+import { costNoteAuth } from './cost-note-auth.js';
 import { createFactorySecretEncryption, MastraFactory } from '@mastra/factory';
 import { GithubIntegration } from '@mastra/factory/integrations/github/integration';
 import { defaultGithubRules } from '@mastra/factory/integrations/github/default-rules';
@@ -43,14 +44,12 @@ import { codeReviewAgent } from './reviewer/agents/code-review-agent';
 import { workflowReviewAgent } from './reviewer/agents/workflow-review-agent';
 import { prReviewWorkflow } from './reviewer/workflows/pr-review-workflow';
 import { reviewerRoute } from './reviewer/route';
-import { tracesRoute } from './observability-traces-route.js';
 import {
   composeStorageWithObservability,
   createDuckDBStore,
   duckdbObservabilityConfig,
 } from './observability-store.js';
 import { observabilityRetentionWorkflow, setObservabilityPruneTarget } from './observability-retention.js';
-import { filterIssueForIntake, MACHINE_PULL_REQUESTS } from './github-intake-rules';
 
 /**
  * Parse a positive-integer env knob; anything else means "use the default".
@@ -162,7 +161,7 @@ if (authDisabled) {
     );
   }
 } else if (workosConfigured) {
-  auth = new MastraAuthWorkos({ fetchMemberships: true });
+  auth = costNoteAuth(new MastraAuthWorkos({ fetchMemberships: true }), process.env.MONDAY_NOTE_TRACE_TOKEN);
 }
 const secretEncryption = auth === null ? undefined : credentialEncryption();
 
@@ -187,12 +186,22 @@ const githubPrivateKey = process.env.GITHUB_APP_PRIVATE_KEY?.trim();
 const githubClientId = process.env.GITHUB_APP_CLIENT_ID?.trim();
 const githubClientSecret = process.env.GITHUB_APP_CLIENT_SECRET?.trim();
 const githubAppSlug = process.env.GITHUB_APP_SLUG?.trim();
-export const githubRules = {
+// Existing machine issues and their PRs remain open in GitHub, but Factory
+// must never re-import them during GitHub's periodic source poll. New machine
+// issues carry the factory:machine label; publisher App PRs are always setup.
+const machineIssues = new Set([1, 136, 137, 138, 139, 140, 144, 146, 148, 151, 152, 154, 156, 158]);
+const machinePullRequests = new Set([131, 134, 135, 141, 142, 143, 145, 147, 149, 150, 153, 155, 157, 159]);
+// Stock pullRequestOpened materializes a Review card in Intake. Auto-start
+// starts eligible runs only after a card enters Reviewing. Factory-authored
+// Julia PRs enter that phase through the supported GitHub event rule.
+const githubRules = {
   issueOpened: (context: Parameters<typeof defaultGithubRules.issueOpened>[0]) => {
-    return filterIssueForIntake(context, defaultGithubRules.issueOpened);
+    if (context.issue && (machineIssues.has(context.issue.number) ||
+        context.issue.labels?.includes('factory:machine'))) return undefined;
+    return defaultGithubRules.issueOpened(context);
   },
   pullRequestOpened: (context: Parameters<typeof defaultGithubRules.pullRequestOpened>[0]) => {
-    if (context.pullRequest && (MACHINE_PULL_REQUESTS.has(context.pullRequest.number) ||
+    if (context.pullRequest && (machinePullRequests.has(context.pullRequest.number) ||
         context.pullRequest.author === 'julia-graph-publisher[bot]' ||
         (context.actor.type === 'github' && context.actor.login === 'julia-graph-publisher[bot]'))) {
       return undefined;
@@ -494,9 +503,8 @@ export const mastra = new Mastra({
   workflows: { ...preparedArgs.workflows, prReviewWorkflow, observabilityRetentionWorkflow },
   server: {
     ...preparedArgs.server,
-    apiRoutes: [...(preparedArgs.server?.apiRoutes ?? []), reviewerRoute, tracesRoute],
+    apiRoutes: [...(preparedArgs.server?.apiRoutes ?? []), reviewerRoute],
   },
-
   storage: composedStorage,
   pubsub: preparedArgs.pubsub,
   workers: preparedArgs.workers,

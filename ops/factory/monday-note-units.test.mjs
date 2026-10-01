@@ -20,7 +20,7 @@ test('the Monday note post is a weekly timer that runs the production entrypoint
   assert.match(service, /EnvironmentFile=\/etc\/julia-factory-monday-note\/config\.env/);
   // Inert until an operator fills the config in: no accidental post on install.
   assert.match(service, /ConditionPathExists=\/etc\/julia-factory-monday-note\/config\.env/);
-  assert.match(timer, /OnCalendar=Mon 08:00/);
+  assert.match(timer, /OnCalendar=Mon \*-\*-\* 08:00:00 UTC/);
   assert.match(timer, /Persistent=true/);
   assert.match(timer, /Unit=julia-factory-monday-note\.service/);
 });
@@ -49,7 +49,8 @@ test('the installer installs the Monday note unit, writes a placeholder config w
     assert.match(installer, new RegExp(unit.replace(/\./g, '\\.')));
   }
   assert.match(installer, /chmod 0640/);
-  assert.match(installer, /MONDAY_NOTE_GITHUB_TOKEN=$/m, 'the token placeholder must be empty');
+  assert.match(installer, /MONDAY_NOTE_TRACE_TOKEN=$/m, 'the trace token placeholder must be empty');
+  assert.match(installer, /MONDAY_NOTE_USE_PUBLISHER_APP=1/m, 'each run mints a fresh App token');
   assert.doesNotMatch(installer, /MONDAY_NOTE_DISCORD_WEBHOOK/, 'Discord webhook placeholder is retired in issue 180');
   assert.match(installer, /systemctl enable julia-factory-monday-note\.timer/);
 });

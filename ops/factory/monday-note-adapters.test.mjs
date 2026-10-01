@@ -5,6 +5,26 @@
 // (URL, method, headers, JSON body) and asserting on it.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createPublisherIssuesClient } from './monday-note-adapters.mjs';
+
+test('the scheduled Issues client mints a fresh repository-scoped publisher token without exporting signing credentials', async () => {
+  const env = { MONDAY_NOTE_GITHUB_OWNER: 'toddwyder', MONDAY_NOTE_GITHUB_REPO: 'julia-next' };
+  const client = await createPublisherIssuesClient({ env,
+    loadCredential: (_path, credentials) => { credentials.JULIA_PUBLISHER_APP_ID = 'test-app'; credentials.JULIA_PUBLISHER_APP_PRIVATE_KEY = 'signing-secret'; },
+    tokenImpl: async credentials => {
+      assert.equal(credentials.JULIA_PUBLISHER_OWNER, 'toddwyder');
+      assert.equal(credentials.JULIA_PUBLISHER_REPO, 'julia-next');
+      return 'fresh-installation-token';
+    },
+    fetchImpl: async (_url, options) => {
+      assert.equal(options.headers.Authorization, 'Bearer fresh-installation-token');
+      assert.doesNotMatch(JSON.stringify(options), /signing-secret/);
+      return { ok: true, json: async () => [] };
+    },
+  });
+  assert.equal(await client.find({ title: 'Unpublished week' }), null);
+  assert.equal(env.JULIA_PUBLISHER_APP_PRIVATE_KEY, undefined);
+});
 
 import { createIssuesClient } from './monday-note-adapters.mjs';
 

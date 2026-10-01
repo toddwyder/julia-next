@@ -10,8 +10,7 @@ files=(
   # or `npm run check` and `npm run build` cannot resolve them.
   src/mastra/observability-store.ts
   src/mastra/observability-retention.ts
-  src/mastra/observability-traces-route.ts
-  src/mastra/github-intake-rules.ts
+  src/mastra/cost-note-auth.ts
   src/mastra/public/factory-skills/factory-plan/SKILL.md
   src/mastra/public/factory-skills/factory-review/SKILL.md
 )
@@ -48,10 +47,10 @@ install -D -m 0644 "$patch_dir/price-table.mjs" "$app_dir/ops/factory/price-tabl
 install -D -m 0644 "$patch_dir/monday-note.mjs" "$app_dir/ops/factory/monday-note.mjs"
 install -D -m 0644 "$patch_dir/monday-note-run.mjs" "$app_dir/ops/factory/monday-note-run.mjs"
 install -D -m 0644 "$patch_dir/monday-note-adapters.mjs" "$app_dir/ops/factory/monday-note-adapters.mjs"
+install -D -m 0644 "$patch_dir/../../scripts/publish-via-github-app.mjs" "$app_dir/scripts/publish-via-github-app.mjs"
 install -D -m 0644 "$patch_dir/mastra-traces.mjs" "$app_dir/ops/factory/mastra-traces.mjs"
 install -D -m 0644 "$patch_dir/trace-retention.mjs" "$app_dir/ops/factory/trace-retention.mjs"
 install -D -m 0644 "$patch_dir/factory-cards.mjs" "$app_dir/ops/factory/factory-cards.mjs"
 install -D -m 0644 "$patch_dir/factory-cards.sql" "$app_dir/ops/factory/factory-cards.sql"
 install -D -m 0644 "$patch_dir/run-psql.mjs" "$app_dir/ops/factory/run-psql.mjs"
-install -D -m 0644 "$patch_dir/github-intake-rules.mjs" "$app_dir/ops/factory/github-intake-rules.mjs"
 printf 'Factory install, WorkOS regression, typecheck and build passed in %s\n' "$app_dir"

@@ -1,16 +1,8 @@
 #!/usr/bin/env node
-// monday-note-run.mjs -- issue #140: the production entrypoint a systemd timer
-// runs. It reads Factory's card records and Mastra's trace costs and posts the
-// "Monday notes" Discussions, backfilling every missed full week and telling
-// Todd once per run.
-//
-// Every seam is injected so `runMondayNoteBackfill` (and the single-week
-// `runMondayNote`) are testable without a database, GitHub, Discord or the
-// Factory API:
-//   - `readCards`   -> ops/factory/factory-cards.mjs (read-only Factory records)
-//   - `readSpans`   -> ops/factory/mastra-traces.mjs (Mastra's observability API)
-//   - `discussions` -> ops/factory/monday-note-adapters.mjs (GitHub GraphQL)
-//   - `notifications` -> Discord wait-alert webhook
+// monday-note-run.mjs -- issue #180: the weekly systemd entrypoint.
+// Reads Factory cards and authenticated Mastra billing spans, then publishes
+// public GitHub Issues for missed completed weeks. Database, trace reads and
+// publishing are injected at the external boundaries for verification.
 //
 // `main()` is the only place real clients and the real clock are wired, and it
 // reads its configuration from the environment the timer's unit file sets. A
@@ -19,6 +11,7 @@
 // entrypoint runs the backfill, so a multi-week outage produces all the missing
 // notes, bounded per invocation.
 import { readFactoryCards } from './factory-cards.mjs';
+import { pathToFileURL } from 'node:url';
 import { readTraceSpans, normalizeTraceSpans } from './mastra-traces.mjs';
 import {
   MONDAY_NOTE_CATEGORY,
@@ -29,7 +22,7 @@ import {
   publishMondayNote,
   previousWeekWindow,
 } from './monday-note.mjs';
-import { createIssuesClient } from './monday-note-adapters.mjs';
+import { createIssuesClient, createPublisherIssuesClient } from './monday-note-adapters.mjs';
 
 /**
  * How many missed weeks one invocation publishes before stopping. A long outage
@@ -68,7 +61,7 @@ export async function runMondayNote({ now, readCards, readSpans, issues, discuss
   // The one line that stays in the journal, so the weekly record is auditable.
   console.log(
     `monday-note week=${window.from}..${window.to} cards=${note.lines.length} ` +
-      `spend_usd=${note.totalUsd.toFixed(2)} posted=${result.posted} url=${result.url ?? ''}`,
+      `known_spend_usd=${note.totalUsd.toFixed(6)} token_gaps=${note.namedGaps.noTokenCount} unpriced_calls=${note.namedGaps.unpricedModels} posted=${result.posted} url=${result.url ?? ''}`,
   );
   return { ...result, note, window };
 }
@@ -126,7 +119,7 @@ export async function runMondayNoteBackfill({
     published.push({ from: week.from, to: week.to, title: note.title, url, quiet: note.quiet, cards: note.lines.length, totalUsd: note.totalUsd });
     log(
       `monday-note week=${week.from}..${week.to} cards=${note.lines.length} ` +
-        `spend_usd=${note.totalUsd.toFixed(2)} posted=true url=${url}`,
+        `known_spend_usd=${note.totalUsd.toFixed(6)} token_gaps=${note.namedGaps.noTokenCount} unpriced_calls=${note.namedGaps.unpricedModels} posted=true url=${url}`,
     );
   }
 
@@ -171,13 +164,21 @@ async function main() {
   };
 
   const factoryUrl = process.env.MONDAY_NOTE_FACTORY_URL?.trim() || (isDryRun ? 'http://127.0.0.1:4111' : requiredEnv('MONDAY_NOTE_FACTORY_URL'));
+  const token = requiredEnv('MONDAY_NOTE_TRACE_TOKEN');
 
   // `--dry-run` reads both sources and prints the note without posting,
   // so an operator can check a week before the timer ever fires.
   if (isDryRun) {
-    const window = previousWeekWindow({ now: new Date().toISOString() });
+    // An operator may preview the current partial week; scheduled publication
+    // continues to use completed weeks only.
+    const fromArg = process.argv.indexOf('--from');
+    const toArg = process.argv.indexOf('--to');
+    const window = fromArg >= 0 && toArg >= 0
+      ? { from: process.argv[fromArg + 1], to: process.argv[toArg + 1] }
+      : previousWeekWindow({ now: new Date().toISOString() });
+    if (!Number.isFinite(Date.parse(window.from)) || !Number.isFinite(Date.parse(window.to)) || Date.parse(window.from) > Date.parse(window.to)) throw new Error('Invalid dry-run window');
     const cards = await readFactoryCards({ config, runPsql });
-    const spans = await readTraceSpans({ factoryUrl, from: window.from, to: window.to });
+    const spans = await readTraceSpans({ factoryUrl, token, from: window.from, to: window.to });
     const note = buildMondayNote({ cards, traces: normalizeTraceSpans(spans, { cards }), ...window });
     console.log(note.body);
     return;
@@ -185,22 +186,21 @@ async function main() {
 
   const owner = requiredEnv('MONDAY_NOTE_GITHUB_OWNER');
   const repo = requiredEnv('MONDAY_NOTE_GITHUB_REPO');
-  const token = requiredEnv('MONDAY_NOTE_GITHUB_TOKEN');
-
-  const issues = createIssuesClient({ token, owner, repo });
+  const issues = process.env.MONDAY_NOTE_USE_PUBLISHER_APP === '1'
+    ? await createPublisherIssuesClient()
+    : createIssuesClient({ token: requiredEnv('MONDAY_NOTE_GITHUB_TOKEN'), owner, repo });
 
   await runMondayNoteBackfill({
     now: new Date().toISOString(),
     readCards: () => readFactoryCards({ config, runPsql }),
-    readSpans: ({ from, to }) => readTraceSpans({ factoryUrl, from, to }),
+    readSpans: ({ from, to }) => readTraceSpans({ factoryUrl, token, from, to }),
     issues,
   });
 }
 
-if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((error) => {
     console.error(`monday-note: failed: ${error.message}`);
     process.exit(1);
   });
 }
-

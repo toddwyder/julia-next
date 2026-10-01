@@ -8,6 +8,13 @@ import { test } from 'node:test';
 const root = resolve(import.meta.dirname, '../..');
 const installer = resolve(import.meta.dirname, 'install.sh');
 
+test('the installed Mastra auth contract restricts the cost reader and preserves WorkOS', () => {
+  const result = spawnSync(process.execPath, ['--experimental-strip-types', '--import', './register-typescript-esm.mjs', '--test', 'cost-note-auth.test.mjs'], {
+    cwd: resolve(root, 'ops/factory/app'), encoding: 'utf8',
+  });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+});
+
 /**
  * Every local (`./`) import in a TypeScript/JavaScript module, as the bare
  * module specifier without its extension: `./observability-store.js` ->
@@ -194,8 +201,7 @@ test('a missing required skill leaves an existing install untouched', () => {
   for (const file of [
     'package.json', 'package-lock.json', 'tsconfig.json', 'src/mastra/index.ts', 'src/mastra/local-sandbox.ts',
     'src/mastra/observability-store.ts', 'src/mastra/observability-retention.ts',
-    'src/mastra/observability-traces-route.ts',
-    'src/mastra/github-intake-rules.ts',
+    'src/mastra/cost-note-auth.ts',
     'src/mastra/public/factory-skills/factory-plan/SKILL.md',
   ]) {
     const destination = resolve(source, file);
