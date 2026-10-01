@@ -33,7 +33,6 @@ MONDAY_NOTE_FACTORY_URL=https://julia-factory.tail91f394.ts.net
 MONDAY_NOTE_GITHUB_OWNER=toddwyder
 MONDAY_NOTE_GITHUB_REPO=julia-next
 MONDAY_NOTE_GITHUB_TOKEN=
-MONDAY_NOTE_DISCORD_WEBHOOK=
 EOF
   chown root:julia-factory "$config_dir/config.env"
   chmod 0640 "$config_dir/config.env"

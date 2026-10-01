@@ -162,12 +162,7 @@ function requiredEnv(name) {
  * environment the timer unit sets from the root-owned config, never from argv.
  */
 async function main() {
-  const owner = requiredEnv('MONDAY_NOTE_GITHUB_OWNER');
-  const repo = requiredEnv('MONDAY_NOTE_GITHUB_REPO');
-  const token = requiredEnv('MONDAY_NOTE_GITHUB_TOKEN');
-  const factoryUrl = requiredEnv('MONDAY_NOTE_FACTORY_URL');
-
-  const issues = createIssuesClient({ token, owner, repo });
+  const isDryRun = process.argv.includes('--dry-run');
 
   const { runPsql } = await import('./run-psql.mjs');
   const config = {
@@ -175,9 +170,11 @@ async function main() {
     project_id: requiredEnv('MONDAY_NOTE_PROJECT_ID'),
   };
 
+  const factoryUrl = process.env.MONDAY_NOTE_FACTORY_URL?.trim() || (isDryRun ? 'http://127.0.0.1:4111' : requiredEnv('MONDAY_NOTE_FACTORY_URL'));
+
   // `--dry-run` reads both sources and prints the note without posting,
   // so an operator can check a week before the timer ever fires.
-  if (process.argv.includes('--dry-run')) {
+  if (isDryRun) {
     const window = previousWeekWindow({ now: new Date().toISOString() });
     const cards = await readFactoryCards({ config, runPsql });
     const spans = await readTraceSpans({ factoryUrl, from: window.from, to: window.to });
@@ -185,6 +182,12 @@ async function main() {
     console.log(note.body);
     return;
   }
+
+  const owner = requiredEnv('MONDAY_NOTE_GITHUB_OWNER');
+  const repo = requiredEnv('MONDAY_NOTE_GITHUB_REPO');
+  const token = requiredEnv('MONDAY_NOTE_GITHUB_TOKEN');
+
+  const issues = createIssuesClient({ token, owner, repo });
 
   await runMondayNoteBackfill({
     now: new Date().toISOString(),
