@@ -162,8 +162,8 @@ function requiredEnv(name) {
  * environment the timer unit sets from the root-owned config, never from argv.
  */
 async function main() {
-  const owner = process.env.MONDAY_NOTE_GITHUB_OWNER?.trim() || 'toddwyder';
-  const repo = process.env.MONDAY_NOTE_GITHUB_REPO?.trim() || 'julia-next';
+  const owner = requiredEnv('MONDAY_NOTE_GITHUB_OWNER');
+  const repo = requiredEnv('MONDAY_NOTE_GITHUB_REPO');
   const token = requiredEnv('MONDAY_NOTE_GITHUB_TOKEN');
   const factoryUrl = requiredEnv('MONDAY_NOTE_FACTORY_URL');
 

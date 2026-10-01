@@ -745,8 +745,8 @@ test('named gaps (no token count, unpriced model, no recorded effort) are report
       endedAt: '2026-09-22T12:10:00Z',
       provider: 'custom',
       model: 'unknown/model-xyz',
-      whatYouPayCost: 0.00,
-      faceCost: 0.00,
+      whatYouPayCost: null,
+      faceCost: null,
       costUsd: 0.00,
       payFactor: 1.0,
       tokens: { freshInput: 1000, cachedInput: 0, output: 100, thinking: 0, total: 1100 },
@@ -762,9 +762,9 @@ test('named gaps (no token count, unpriced model, no recorded effort) are report
       startedAt: '2026-09-22T12:10:00Z',
       endedAt: '2026-09-22T12:20:00Z',
       provider: 'deepseek',
-      model: 'deepseek/deepseek-chat',
-      whatYouPayCost: 0.00,
-      faceCost: 0.00,
+      model: 'deepseek/deepseek-uncounted',
+      whatYouPayCost: null,
+      faceCost: null,
       costUsd: 0.00,
       payFactor: 1.0,
       tokens: { freshInput: 0, cachedInput: 0, output: 0, thinking: 0, total: 0 },
@@ -777,6 +777,8 @@ test('named gaps (no token count, unpriced model, no recorded effort) are report
 
   const note = buildMondayNote({ cards: [stagedCard], traces: traceWithGaps, ...WEEK });
 
+  assert.match(note.body, /unknown\/model-xyz \(custom\): unpriced/);
+  assert.match(note.body, /deepseek\/deepseek-uncounted \(deepseek\): no token count/);
   assert.match(note.body, /Named gaps:/);
   assert.match(note.body, /• No recorded effort: 3 step\(s\)/);
   assert.match(note.body, /• Unpriced models: 1 call\(s\)/);

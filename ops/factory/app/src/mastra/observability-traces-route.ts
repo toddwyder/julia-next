@@ -3,14 +3,36 @@
  *
  * Exposes Mastra's DuckDB observability storage domain to local programs
  * (e.g. `ops/factory/monday-note-run.mjs`) without requiring WorkOS session auth.
+ * Restricted to loopback callers only and pagination is capped.
  */
 import { registerApiRoute } from '@mastra/core/server';
+
+function isLoopbackHost(host: string | undefined): boolean {
+  if (!host) return false;
+  const hostname = host.split(':')[0].toLowerCase();
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '[::1]';
+}
+
+function isLoopbackIp(ip: string | undefined): boolean {
+  if (!ip) return true;
+  const trimmed = ip.trim().toLowerCase();
+  return trimmed === '127.0.0.1' || trimmed === '::1' || trimmed === '::ffff:127.0.0.1' || trimmed === 'localhost';
+}
 
 export const tracesRoute = registerApiRoute('/julia/observability/traces', {
   method: 'GET',
   requiresAuth: false,
   createHandler: async ({ mastra }) => async (c) => {
     try {
+      // Loopback access restriction: only local callers on the host machine are permitted
+      const host = c.req.header('host');
+      const forwardedFor = c.req.header('x-forwarded-for');
+      const realIp = c.req.header('x-real-ip');
+
+      if (!isLoopbackHost(host) || (forwardedFor && !isLoopbackIp(forwardedFor.split(',')[0])) || (realIp && !isLoopbackIp(realIp))) {
+        return c.json({ error: 'Forbidden: loopback access only' }, 403);
+      }
+
       const startedAtParam = c.req.query('startedAt');
       const paginationParam = c.req.query('pagination');
 
@@ -26,10 +48,15 @@ export const tracesRoute = registerApiRoute('/julia/observability/traces', {
       }
       if (paginationParam) {
         try {
-          pagination = JSON.parse(paginationParam);
+          const parsed = JSON.parse(paginationParam);
+          const page = Math.max(0, Number(parsed.page) || 0);
+          const perPage = Math.min(Math.max(1, Number(parsed.perPage) || 50), 100);
+          pagination = { page, perPage };
         } catch {
           return c.json({ error: 'Invalid pagination query param' }, 400);
         }
+      } else {
+        pagination = { page: 0, perPage: 50 };
       }
 
       const storage = mastra.getStorage();

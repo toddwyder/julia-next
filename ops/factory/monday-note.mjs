@@ -197,7 +197,7 @@ function cardSteps(card) {
     stage: movement.what ?? movement.stage ?? 'step',
     by: movement.by,
     enteredBy: movement.by,
-    exitedBy: null,
+    exitedBy: movements[index + 1]?.by ?? null,
     startedAt: movement.at ?? null,
     endedAt: movements[index + 1]?.at ?? card.doneAt ?? null,
     // The first movement is Todd's Intake tap that starts the card.
@@ -212,7 +212,6 @@ function cardSteps(card) {
  * Any non-Factory actor on any step between intake and done is a wait on Todd outside UAT.
  */
 function countWaitsOnTodd(allSteps) {
-  const intake = allSteps[0];
   let count = 0;
   for (let i = 0; i < allSteps.length; i += 1) {
     const step = allSteps[i];
@@ -296,11 +295,26 @@ function stepLine(step, stepTraces) {
         output: 0,
         thinking: 0,
         total: 0,
+        hasKnownCost: false,
+        unpriced: false,
+        noTokenCount: false,
       });
     }
     const entry = modelMap.get(key);
-    entry.whatYouPayCost += trace.whatYouPayCost ?? trace.costUsd ?? 0;
-    entry.faceCost += trace.faceCost ?? trace.whatYouPayCost ?? trace.costUsd ?? 0;
+    if (trace.whatYouPayCost !== null && trace.whatYouPayCost !== undefined) {
+      entry.whatYouPayCost += trace.whatYouPayCost;
+      entry.hasKnownCost = true;
+    } else {
+      if (trace.namedGaps?.some((g) => g.startsWith('unpriced_model'))) {
+        entry.unpriced = true;
+      }
+      if (trace.namedGaps?.includes('no_token_count')) {
+        entry.noTokenCount = true;
+      }
+    }
+    if (trace.faceCost !== null && trace.faceCost !== undefined) {
+      entry.faceCost += trace.faceCost;
+    }
     entry.freshInput += trace.tokens?.freshInput ?? 0;
     entry.cachedInput += trace.tokens?.cachedInput ?? 0;
     entry.output += trace.tokens?.output ?? 0;
@@ -312,8 +326,13 @@ function stepLine(step, stepTraces) {
   for (const m of modelMap.values()) {
     const inTotal = m.freshInput + m.cachedInput;
     const cachedShare = inTotal > 0 ? Math.round((m.cachedInput / inTotal) * 100) : 0;
+    let costDisplay = usd(m.whatYouPayCost);
+    if (!m.hasKnownCost) {
+      if (m.unpriced) costDisplay = 'unpriced';
+      else if (m.noTokenCount) costDisplay = 'no token count';
+    }
     modelLines.push(
-      `    - ${m.model} (${m.provider}): ${usd(m.whatYouPayCost)} (${formatTokens(m.freshInput)} fresh, ${formatTokens(m.cachedInput)} cached [${cachedShare}% cached], ${formatTokens(m.output)} out [${formatTokens(m.thinking)} thinking])`
+      `    - ${m.model} (${m.provider}): ${costDisplay} (${formatTokens(m.freshInput)} fresh, ${formatTokens(m.cachedInput)} cached [${cachedShare}% cached], ${formatTokens(m.output)} out [${formatTokens(m.thinking)} thinking])`
     );
   }
 
