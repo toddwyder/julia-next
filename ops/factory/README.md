@@ -216,6 +216,7 @@ bash /path/to/julia-next/ops/factory/install.sh /var/lib/julia-factory/app
 The installer copies `ops/factory/app/{package.json,package-lock.json,tsconfig.json}`,
 `ops/factory/app/src/mastra/{index,local-sandbox}.ts`, and the two project overrides in
 `ops/factory/app/src/mastra/public/factory-skills/{factory-plan,factory-review}/SKILL.md`
+plus the asynchronous Cross-maker workflow imported by `index.ts`
 into the service directory before `npm ci`; it never copies `.env`, databases or
 runtime workspaces. The versioned lockfile pins the deployed dependencies; it does
 not upgrade them. Factory 0.17.2 loads project-local `factory-skills` before its
@@ -356,8 +357,10 @@ sudo -u julia-factory python3 /var/lib/julia-factory/app/ops/factory/wait-alerts
 The reviewer is based on Mastra's Apache-2.0 `template-github-review-agent`
 at commit `15f09d4e6fe2230153e1c4551a72250b1b5c009e`. Its agents, workflow,
 GitHub readers, workspace skills, and observational memory live in
-`app/src/mastra/reviewer/`. A signed GitHub `pull_request_target` action calls
-the app's supported `registerApiRoute` endpoint. The action submits a
+`app/src/mastra/reviewer/`. A signed GitHub `pull_request_target` action starts
+a stored Mastra review workflow through `POST /julia/review-pr`, then polls
+`GET /julia/review-pr/:jobId` every 30 seconds until the verdict is ready. Each
+status request signs the job id with the same route secret. The action submits a
 commit-bound GitHub review as `github-actions[bot]`, the accepted reviewer
 identity for this project. It checks out only the base branch and never
 executes PR code.
