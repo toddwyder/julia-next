@@ -79,13 +79,13 @@ export const tracesRoute = registerApiRoute('/julia/observability/traces', {
         try {
           const parsed = JSON.parse(paginationParam);
           const page = Math.max(0, Number(parsed.page) || 0);
-          const perPage = Math.min(Math.max(1, Number(parsed.perPage) || 50), 100);
+          const perPage = Math.min(Math.max(1, Number(parsed.perPage) || 20), 50);
           pagination = { page, perPage };
         } catch {
           return c.json({ error: 'Invalid pagination query param' }, 400);
         }
       } else {
-        pagination = { page: 0, perPage: 50 };
+        pagination = { page: 0, perPage: 20 };
       }
 
       const storage = mastra.getStorage();
@@ -113,18 +113,17 @@ export const tracesRoute = registerApiRoute('/julia/observability/traces', {
         const rawTraces = Array.isArray(result?.spans) ? result.spans : (Array.isArray(result) ? result : []);
         const allRawSpans: any[] = [];
         if (typeof obsStore.getTrace === 'function') {
-          const fetchedTraces = await Promise.all(
-            rawTraces.map(async (t: any) => {
-              try {
-                const full = await obsStore.getTrace({ traceId: t.traceId });
-                return Array.isArray(full?.spans) && full.spans.length > 0 ? full.spans : [t];
-              } catch {
-                return [t];
+          for (const t of rawTraces) {
+            try {
+              const full = await obsStore.getTrace({ traceId: t.traceId });
+              if (Array.isArray(full?.spans) && full.spans.length > 0) {
+                allRawSpans.push(...full.spans);
+              } else {
+                allRawSpans.push(t);
               }
-            })
-          );
-          for (const traceSpans of fetchedTraces) {
-            allRawSpans.push(...traceSpans);
+            } catch {
+              allRawSpans.push(t);
+            }
           }
         } else {
           allRawSpans.push(...rawTraces);
