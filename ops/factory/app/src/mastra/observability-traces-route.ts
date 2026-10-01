@@ -105,8 +105,19 @@ export const tracesRoute = registerApiRoute('/julia/observability/traces', {
       }
 
       if (typeof obsStore.listTraces === 'function') {
-        const result = await obsStore.listTraces(args);
-        const spans = Array.isArray(result?.spans) ? result.spans : (Array.isArray(result) ? result : []);
+        const rawSpans = Array.isArray(result?.spans) ? result.spans : (Array.isArray(result) ? result : []);
+        const spans = rawSpans.map((s: any) => ({
+          id: s.id,
+          traceId: s.traceId,
+          spanId: s.spanId,
+          sessionId: s.sessionId,
+          name: s.name,
+          spanType: s.spanType,
+          status: s.status,
+          startedAt: s.startedAt,
+          endedAt: s.endedAt,
+          attributes: s.attributes,
+        }));
         const curPage = pagination?.page ?? 0;
         const curPerPage = pagination?.perPage ?? 50;
         const paginationRes = result?.pagination ?? {
