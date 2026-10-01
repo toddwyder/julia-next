@@ -21,7 +21,7 @@ local sources (repository docs and pinned package paths) are cited; gaps are sta
 
 | Need | Framework feature | Local source |
 |---|---|---|
-| Weekly cost from traces | Internal Mastra observability route `GET /julia/observability/traces` (exposes `obsStore.listTraces` directly without WorkOS auth) + Mastra full observability route `GET /api/observability/traces` | `app/src/mastra/observability-traces-route.ts`; `mastra@1.31.3` `dist/index.js` "api trace" command; `@mastra/core` observability route schema |
+| Weekly cost from traces | Internal Mastra observability route `GET /julia/observability/traces` (exposes `obsStore.listTraces` directly without WorkOS auth) + Mastra full observability route `GET /api/observability/traces` | `app/src/mastra/observability-traces-route.ts`; `mastra@1.31.3` `dist/index.js` "api trace" command; `@mastra/core` observability route schema; `docs/research/mastra-intended-use-audit.md` |
 | What-you-pay pricing per model/provider | Single source of truth price table (`ops/factory/price-table.mjs`) tracking fresh input, cached input, output rates, provider pay factors, source URLs, and checked dates | `ops/factory/price-table.mjs`; `docs/research/agent-cost-primary-sources.md` |
 | Card steps and actors | Factory `work_items.stage_history` (`by` / `exitedBy`) | `@mastra/factory` `dist/storage/domains/work-items/base.d.ts` (`WorkItemRow`, `WorkItemStageEntry`, `isAgentActor`) |
 | Card ↔ trace correlation | `work_items.sessions` maps session id → card; spans carry `sessionId`; step split correlated by `stage_history` timestamps | same `work-items/base.d.ts`; `@mastra/core` `LightSpanRecord`; `ops/factory/mastra-traces.mjs` |
@@ -84,9 +84,10 @@ week still appears in the week its work ran: the note includes a card that enter
 cost/activity in it, and attributes to that card only the week's own traces and failed attempts.
 
 `publishMondayNote({ note, issues })` posts one week's note as a GitHub Issue labeled `factory:machine`
-and `cost-note`. The backfill posts each missing week. Because the issue carries the `factory:machine`
-label, it is public without sign-in, accessible to Claude, and ignored by Factory intake. Discord and
-Discussions delivery are retired.
+and `cost-note` (retiring the earlier Discussion in the "Monday notes" category and Discord webhook).
+The backfill posts each missing week. Because the issue carries the `factory:machine` label, it is public
+without sign-in, accessible to Claude, and ignored by Factory intake. Discord and Discussions delivery are
+retired.
 
 Operator actions (nothing is sent by this repository):
 
