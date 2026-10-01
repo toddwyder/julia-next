@@ -42,6 +42,17 @@ test('a phase snapshot supplies effort even when its model traces are missing', 
   assert.match(note.body, /effort: high/);
 });
 
+test('backfilled weeks exclude future effort and model snapshots', () => {
+  const note = buildMondayNote({ cards: [{ number: 180, title: 'Open build', enteredAt: '2026-09-22T09:00:00Z',
+    stageHistory: [{ stage: 'execute', by: 'factory', enteredAt: '2026-09-22T09:00:00Z' }],
+    phaseSnapshots: [
+      { at: '2026-09-22T09:01:00Z', effort: 'off', model: 'then-model' },
+      { at: '2026-09-29T09:00:00Z', effort: 'high', model: 'future-model' },
+    ] }], traces: [], ...WEEK });
+  assert.match(note.body, /effort: off/);
+  assert.doesNotMatch(note.body, /effort: off, high|future-model/);
+});
+
 test('a card with no recorded model calls shows named gaps at card, step, effort and token drivers', () => {
   const note = buildMondayNote({ cards: [{ number: 180, title: 'Unmeasured', enteredAt: '2026-09-22T09:00:00Z',
     stageHistory: [{ stage: 'execute', by: 'factory', enteredAt: '2026-09-22T09:00:00Z' }] }], traces: [], ...WEEK });

@@ -424,6 +424,11 @@ function cardLine(card, cardTraces, { acceptedInWeek = true, from, to } = {}) {
       );
   const boundedSteps = steps.map((step) => ({
     ...step,
+    phaseSnapshots: [
+      ...(step.phaseSnapshots ?? []).filter(snapshot => Date.parse(snapshot.at) < Date.parse(from))
+        .sort((a, b) => Date.parse(a.at) - Date.parse(b.at)).slice(-1),
+      ...(step.phaseSnapshots ?? []).filter(snapshot => within(snapshot.at, from, to)),
+    ],
     startedAt: step.startedAt && Date.parse(step.startedAt) < Date.parse(from) ? from : step.startedAt,
     endedAt: step.endedAt && Date.parse(step.endedAt) > Date.parse(to) ? to : step.endedAt,
   }));
