@@ -29,7 +29,7 @@ import {
   publishMondayNote,
   previousWeekWindow,
 } from './monday-note.mjs';
-import { createIssuesClient, createDiscussionsClient, createDiscordNotifier } from './monday-note-adapters.mjs';
+import { createIssuesClient } from './monday-note-adapters.mjs';
 
 /**
  * How many missed weeks one invocation publishes before stopping. A long outage
@@ -169,18 +169,14 @@ async function main() {
 
   const issues = createIssuesClient({ token, owner, repo });
 
-  // Discord notifier is optional / retired in Issue #180
-  const webhookUrl = process.env.MONDAY_NOTE_DISCORD_WEBHOOK?.trim();
-  const notifications = webhookUrl ? createDiscordNotifier({ webhookUrl }) : null;
-
   const { runPsql } = await import('./run-psql.mjs');
   const config = {
     database: process.env.MONDAY_NOTE_DATABASE ?? 'julia_factory_trial',
     project_id: requiredEnv('MONDAY_NOTE_PROJECT_ID'),
   };
 
-  // `--dry-run` reads both sources and prints the note without posting or
-  // notifying, so an operator can check a week before the timer ever fires.
+  // `--dry-run` reads both sources and prints the note without posting,
+  // so an operator can check a week before the timer ever fires.
   if (process.argv.includes('--dry-run')) {
     const window = previousWeekWindow({ now: new Date().toISOString() });
     const cards = await readFactoryCards({ config, runPsql });
@@ -195,7 +191,6 @@ async function main() {
     readCards: () => readFactoryCards({ config, runPsql }),
     readSpans: ({ from, to }) => readTraceSpans({ factoryUrl, from, to }),
     issues,
-    notifications,
   });
 }
 

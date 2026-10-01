@@ -241,20 +241,87 @@ export const PRICE_TABLE = {
     sourceUrl: 'https://www.anthropic.com/pricing',
     dateChecked: '2026-10-01',
   },
+
+  // OpenRouter (1.0 pay factor)
+  'openrouter/deepseek/deepseek-chat': {
+    freshInputPerMillion: 0.27,
+    cachedInputPerMillion: 0.07,
+    outputPerMillion: 1.10,
+    provider: 'openrouter',
+    payFactor: 1.0,
+    sourceUrl: 'https://openrouter.ai/models',
+    dateChecked: '2026-10-01',
+  },
+  'openrouter/deepseek/deepseek-r1': {
+    freshInputPerMillion: 0.55,
+    cachedInputPerMillion: 0.14,
+    outputPerMillion: 2.19,
+    provider: 'openrouter',
+    payFactor: 1.0,
+    sourceUrl: 'https://openrouter.ai/models',
+    dateChecked: '2026-10-01',
+  },
+  'openrouter/anthropic/claude-3.5-sonnet': {
+    freshInputPerMillion: 3.00,
+    cachedInputPerMillion: 0.30,
+    outputPerMillion: 15.00,
+    provider: 'openrouter',
+    payFactor: 1.0,
+    sourceUrl: 'https://openrouter.ai/models',
+    dateChecked: '2026-10-01',
+  },
+  'openrouter/openai/gpt-4o': {
+    freshInputPerMillion: 2.50,
+    cachedInputPerMillion: 1.25,
+    outputPerMillion: 10.00,
+    provider: 'openrouter',
+    payFactor: 1.0,
+    sourceUrl: 'https://openrouter.ai/models',
+    dateChecked: '2026-10-01',
+  },
 };
 
+const CANONICAL_PREFIXES = [
+  { prefix: 'openai/', test: (m) => /^(gpt-|o1|o3|chatgpt)/i.test(m) },
+  { prefix: 'anthropic/', test: (m) => /^claude/i.test(m) },
+  { prefix: 'deepseek/', test: (m) => /^deepseek/i.test(m) },
+  { prefix: 'google/', test: (m) => /^gemini/i.test(m) },
+];
+
 /**
- * Find model price entry by model ID or normalized name.
+ * Find model price entry by model ID or normalized name and optional provider.
  */
-export function getModelPrice(modelId) {
+export function getModelPrice(modelId, provider) {
   if (!modelId || typeof modelId !== 'string') return null;
-  const direct = PRICE_TABLE[modelId];
+  const normalized = modelId.toLowerCase().trim();
+
+  if (provider) {
+    const prov = provider.toLowerCase().trim();
+    if (PRICE_TABLE[`${prov}/${normalized}`]) return PRICE_TABLE[`${prov}/${normalized}`];
+    const withoutPrefix = normalized.replace(/^[^/]+\//, '');
+    if (PRICE_TABLE[`${prov}/${withoutPrefix}`]) return PRICE_TABLE[`${prov}/${withoutPrefix}`];
+  }
+
+  const direct = PRICE_TABLE[normalized];
   if (direct) return direct;
 
-  const normalized = modelId.toLowerCase().trim();
-  if (PRICE_TABLE[normalized]) return PRICE_TABLE[normalized];
+  // Try canonical provider prefix if bare model name
+  if (!normalized.includes('/')) {
+    for (const { prefix, test } of CANONICAL_PREFIXES) {
+      if (test(normalized) && PRICE_TABLE[`${prefix}${normalized}`]) {
+        return PRICE_TABLE[`${prefix}${normalized}`];
+      }
+    }
+  }
 
-  // Try matching with provider prefix (e.g. 'deepseek-flash' -> 'deepseek/deepseek-flash')
+  // Exact suffix match on canonical providers first
+  for (const [key, entry] of Object.entries(PRICE_TABLE)) {
+    if (entry.provider !== 'commandcode' && (key.endsWith(`/${normalized}`) || key.replace(/^[^/]+\//, '') === normalized)) {
+      return entry;
+    }
+  }
+
+  // Fallback match
   for (const [key, entry] of Object.entries(PRICE_TABLE)) {
     if (key === normalized || key.endsWith(`/${normalized}`) || key.replace(/^[^/]+\//, '') === normalized) {
       return entry;
@@ -298,10 +365,11 @@ export function calculateModelCost({ model, usage, provider: requestedProvider }
   const totalInput = rawInput ?? 0;
   const cachedInputTokens = usage.cachedInputTokens ?? usage.inputDetails?.cacheRead ?? 0;
   const freshInputTokens = Math.max(0, totalInput - cachedInputTokens);
-  const outputTokens = rawOutput ?? 0;
+  const rawOutputTokens = rawOutput ?? 0;
   const thinkingTokens = usage.reasoningTokens ?? usage.outputDetails?.reasoning ?? 0;
+  const outputTokens = rawOutputTokens >= thinkingTokens ? rawOutputTokens : (rawOutputTokens + thinkingTokens);
 
-  const priceEntry = getModelPrice(model);
+  const priceEntry = getModelPrice(model, requestedProvider);
   if (!priceEntry) {
     return {
       ok: false,

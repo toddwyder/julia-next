@@ -116,22 +116,16 @@ export function assertCostsAreCorrelated(weekTraces, weekCardNumbers) {
     // unknown and fails closed rather than being assumed free.
     const costBearing = trace.costBearing !== false;
 
+    if (!correlated && costBearing) {
+      throw new Error(
+        `Trace ${trace.id ?? '(no id)'} is cost-bearing but is not correlated to a card in this week; ` +
+          'refusing to publish a total that may be wrong',
+      );
+    }
     if (correlated && costBearing && !costKnown && !hasNamedGaps) {
       throw new Error(
         `Trace ${trace.id ?? '(no id)'} is correlated to card ${trace.card} but has no numeric estimated cost; ` +
           'refusing to report it as $0.00',
-      );
-    }
-    if (!correlated && costBearing && !costKnown) {
-      throw new Error(
-        `Trace ${trace.id ?? '(no id)'} has no numeric estimated cost and is not correlated to a card in this week; ` +
-          'refusing to publish a note that could hide a cost as $0.00',
-      );
-    }
-    if (!correlated && costKnown && cost > 0) {
-      throw new Error(
-        `Trace ${trace.id ?? '(no id)'} carries a cost (${cost}) but is not correlated to a card in this week; ` +
-          'refusing to publish a total that may be wrong',
       );
     }
   }

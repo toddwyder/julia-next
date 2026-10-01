@@ -15,9 +15,20 @@ function isLoopbackHost(host: string | undefined): boolean {
 }
 
 function isLoopbackIp(ip: string | undefined): boolean {
-  if (!ip) return true;
+  if (!ip) return false;
   const trimmed = ip.trim().toLowerCase();
-  return trimmed === '127.0.0.1' || trimmed === '::1' || trimmed === '::ffff:127.0.0.1' || trimmed === 'localhost';
+  return (
+    trimmed === '127.0.0.1' ||
+    trimmed === '::1' ||
+    trimmed === '::ffff:127.0.0.1' ||
+    trimmed === 'localhost'
+  );
+}
+
+function getSocketRemoteAddress(c: any): string | undefined {
+  const nodeReq = c.env?.incoming ?? (c.req as any)?.raw;
+  const socket = nodeReq?.socket ?? nodeReq?.client;
+  return socket?.remoteAddress;
 }
 
 export const tracesRoute = registerApiRoute('/julia/observability/traces', {
@@ -25,13 +36,29 @@ export const tracesRoute = registerApiRoute('/julia/observability/traces', {
   requiresAuth: false,
   createHandler: async ({ mastra }) => async (c) => {
     try {
-      // Loopback access restriction: only local callers on the host machine are permitted
+      // Loopback access restriction: only local callers on the host machine are permitted.
+      // Check underlying TCP socket first if available to prevent Host/X-Forwarded spoofing.
+      const socketIp = getSocketRemoteAddress(c);
+      if (socketIp && !isLoopbackIp(socketIp)) {
+        return c.json({ error: 'Forbidden: loopback access only' }, 403);
+      }
+
       const host = c.req.header('host');
       const forwardedFor = c.req.header('x-forwarded-for');
       const realIp = c.req.header('x-real-ip');
-      const firstForwarded = forwardedFor ? forwardedFor.split(',')[0]?.trim() : undefined;
 
-      if (!isLoopbackHost(host) || (forwardedFor && !isLoopbackIp(firstForwarded)) || (realIp && !isLoopbackIp(realIp))) {
+      if (!isLoopbackHost(host)) {
+        return c.json({ error: 'Forbidden: loopback access only' }, 403);
+      }
+
+      if (forwardedFor) {
+        const ips = forwardedFor.split(',').map((s) => s.trim());
+        if (!ips.every((ip) => isLoopbackIp(ip))) {
+          return c.json({ error: 'Forbidden: loopback access only' }, 403);
+        }
+      }
+
+      if (realIp && !isLoopbackIp(realIp)) {
         return c.json({ error: 'Forbidden: loopback access only' }, 403);
       }
 

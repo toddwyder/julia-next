@@ -133,3 +133,42 @@ test('calculateModelCost returns no token count named gap when usage is missing 
   assert.equal(result.ok, false);
   assert.equal(result.error, 'no_token_count');
 });
+
+test('OpenRouter models are present in price table with 1.0 pay factor', () => {
+  const orDeepSeek = getModelPrice('openrouter/deepseek/deepseek-chat');
+  assert.ok(orDeepSeek);
+  assert.equal(orDeepSeek.provider, 'openrouter');
+  assert.equal(orDeepSeek.payFactor, 1.0);
+
+  const orClaude = getModelPrice('openrouter/anthropic/claude-3.5-sonnet');
+  assert.ok(orClaude);
+  assert.equal(orClaude.provider, 'openrouter');
+});
+
+test('getModelPrice disambiguates bare model names to canonical provider over wrappers', () => {
+  const gpt = getModelPrice('gpt-4o');
+  assert.ok(gpt);
+  assert.equal(gpt.provider, 'openai'); // canonical provider, not commandcode
+
+  const claude = getModelPrice('claude-3-5-sonnet');
+  assert.ok(claude);
+  assert.equal(claude.provider, 'anthropic');
+});
+
+test('calculateModelCost ensures thinking tokens are billed at output rate when separate from output', () => {
+  const result = calculateModelCost({
+    model: 'deepseek/deepseek-reasoner',
+    usage: {
+      inputTokens: 100000,
+      cachedInputTokens: 80000,
+      outputTokens: 4000, // raw text output
+      reasoningTokens: 6000, // separate reasoning tokens (total 10k output)
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.outputTokens, 10000); // 4k + 6k
+  assert.equal(result.thinkingTokens, 6000);
+  // (20k * 0.55/1M) + (80k * 0.14/1M) + (10k * 2.19/1M) = 0.011 + 0.0112 + 0.0219 = 0.0441
+  assert.equal(Math.round(result.whatYouPayUsd * 10000) / 10000, 0.0441);
+});
