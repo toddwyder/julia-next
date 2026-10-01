@@ -114,10 +114,20 @@ export const tracesRoute = registerApiRoute('/julia/observability/traces', {
         const allRawSpans: any[] = [];
         if (typeof obsStore.getTrace === 'function') {
           for (const t of rawTraces) {
+            const parentSessionId = t.sessionId ?? t.attributes?.sessionId ?? t.attributes?.conversationId ?? t.attributes?.threadId ?? null;
+            const parentThreadId = t.attributes?.threadId ?? t.attributes?.conversationId ?? null;
+            const parentResourceId = t.attributes?.resourceId ?? null;
             try {
               const full = await obsStore.getTrace({ traceId: t.traceId });
               if (Array.isArray(full?.spans) && full.spans.length > 0) {
-                allRawSpans.push(...full.spans);
+                for (const s of full.spans) {
+                  s.sessionId = s.sessionId ?? parentSessionId;
+                  if (!s.attributes) s.attributes = {};
+                  if (!s.attributes.sessionId && parentSessionId) s.attributes.sessionId = parentSessionId;
+                  if (!s.attributes.threadId && parentThreadId) s.attributes.threadId = parentThreadId;
+                  if (!s.attributes.resourceId && parentResourceId) s.attributes.resourceId = parentResourceId;
+                  allRawSpans.push(s);
+                }
               } else {
                 allRawSpans.push(t);
               }
