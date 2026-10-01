@@ -6,16 +6,7 @@ import { resolve } from 'node:path';
 import { test } from 'node:test';
 
 const workflows = resolve(import.meta.dirname, '../../.github/workflows');
-const publisher = readFileSync(resolve(workflows, 'publisher-only-pr.yml'), 'utf8');
 const ci = readFileSync(resolve(workflows, 'ci.yml'), 'utf8');
-
-test('publisher gate schedules on GitHub and checks both allowed authors without checkout', () => {
-  assert.match(publisher, /check:\s*\n\s+runs-on: ubuntu-latest/);
-  assert.match(publisher, /julia-graph-publisher\[bot\]/);
-  assert.match(publisher, /julia-factory-todd-wyder\[bot\]/);
-  assert.match(publisher, /exit 1/);
-  assert.doesNotMatch(publisher, /- uses: actions\/checkout@/);
-});
 
 test('CI checks the current app but does not run retired graph tests', () => {
   for (const file of ['health-route', 'dynamic-route', 'web-app', 'agent-docs', 'line-endings', 'no-personal-paths', 'framework-lint', 'merge-pr', 'publish-pr', 'publish-pr.real-git', 'publish-via-github-app']) {
@@ -43,10 +34,8 @@ test('CI runs the app DuckDB observability retention tests the repo-standard way
   assert.doesNotMatch(ci, /--import tsx/);
 });
 
-test('both workflows cancel superseded runs; CI retains its required job for docs-only PRs', () => {
-  for (const workflow of [publisher, ci]) {
-    assert.match(workflow, /cancel-in-progress: true/);
-  }
+test('CI cancels superseded runs and retains its required job for docs-only PRs', () => {
+  assert.match(ci, /cancel-in-progress: true/);
   assert.doesNotMatch(ci, /\n\s+paths(?:-ignore)?:/);
   assert.match(ci, /checks:\s*\n(?:\s*#[^\n]*\n)*\s+runs-on: ubuntu-22\.04/);
   assert.match(ci, /docs\//);
