@@ -56,11 +56,12 @@ export function observabilityDuckDBPath(env: NodeJS.ProcessEnv = process.env): s
 }
 
 /** The pure config `new DuckDBStore(...)` receives. Kept data-only for tests. */
-export function duckdbObservabilityConfig(): { id: string; path: string; retention: RetentionConfig } {
+export function duckdbObservabilityConfig(): { id: string; path: string; retention: RetentionConfig; memoryLimit?: string } {
   return {
     id: DUCKDB_OBSERVABILITY_ID,
     path: observabilityDuckDBPath(),
     retention: duckdbObservabilityRetention(),
+    memoryLimit: '4GB',
   };
 }
 
