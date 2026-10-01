@@ -44,6 +44,7 @@ install -m 0644 "$patch_dir/julia-factory-monday-note.timer" /etc/systemd/system
 
 systemctl daemon-reload
 # The Monday note timer is enabled but stays inert until config.env has the
-# GitHub token and Discord webhook filled in.
+# GitHub token filled in.
 systemctl enable julia-factory-monday-note.timer
-echo "Monday note timer installed. It will not post until $config_dir/config.env is filled in (token and webhook), then: systemctl start julia-factory-monday-note.timer"
+echo "Monday note timer installed. It will not post until $config_dir/config.env is filled in (token), then: systemctl start julia-factory-monday-note.timer"
+

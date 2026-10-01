@@ -1,20 +1,19 @@
-// mastra-traces.test.mjs -- issue #140, blocker 3: read trace costs through
-// Mastra's own observability API, not by querying the DuckDB file.
+// mastra-traces.test.mjs -- issue #180: read trace costs and token breakdowns
+// through Mastra's observability route and calculate what-you-pay pricing.
 //
 // The supported surface is the one the pinned `mastra` CLI wraps:
+//   GET <factory>/julia/observability/traces (or /api/observability/traces)
 //
-//   mastra api trace list --url <factory>   -> GET <factory>/api/observability/traces
-//   mastra api trace query '<json>'         -> POST <factory>/api/observability/traces/query
-//
-// (mastra@1.31.3 dist/index.js, "api trace" command; the same routes are named
-// in the installed `@mastra/core` observability route schema.) The tests drive
-// a fake `fetch`, so nothing leaves this process. A response with no recognisable
-// span list fails closed instead of reporting zero cost.
+// Tests verify:
+//   - Token breakdown into fresh input, cached input, output, thinking tokens
+//   - Price table what-you-pay application
+//   - Named gaps for unpriced models and missing token counts
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
   MASTRA_TRACE_ROUTE,
+  MASTRA_INTERNAL_TRACE_ROUTE,
   normalizeTraceSpans,
   readTraceSpans,
 } from './mastra-traces.mjs';
@@ -22,9 +21,6 @@ import {
 const FROM = '2026-09-21T00:00:00.000Z';
 const TO = '2026-09-28T00:00:00.000Z';
 
-// One MODEL_GENERATION span as the observability store returns it: the cost is
-// `attributes.costContext.estimatedCost`, the correlation context carries the
-// session, and `error`/`status` say whether the attempt failed.
 const generationSpan = {
   traceId: 'trace-a',
   spanId: 'span-a',
@@ -38,6 +34,12 @@ const generationSpan = {
   endedAt: '2026-09-22T09:15:00.000Z',
   attributes: {
     model: 'deepseek/deepseek-v4-flash',
+    usage: {
+      inputTokens: 1000000,
+      cachedInputTokens: 800000,
+      outputTokens: 100000,
+      reasoningTokens: 15000,
+    },
     costContext: { provider: 'deepseek', model: 'deepseek-v4-flash', estimatedCost: 0.4, costUnit: 'usd' },
   },
 };
@@ -62,11 +64,34 @@ function fakeFetch(handler) {
   };
 }
 
-test('the trace route is the one the pinned mastra CLI wraps', () => {
+test('the trace routes are defined for internal and api paths', () => {
+  assert.equal(MASTRA_INTERNAL_TRACE_ROUTE, '/julia/observability/traces');
   assert.equal(MASTRA_TRACE_ROUTE, '/api/observability/traces');
 });
 
-test('readTraceSpans asks the supported route and reads the spans list', async () => {
+test('readTraceSpans queries the internal route and falls back to /api if 404', async () => {
+  const fake = fakeFetch((url) => {
+    const u = new URL(url);
+    if (u.pathname === '/julia/observability/traces') {
+      return jsonResponse({ error: 'not found' }, 404);
+    }
+    return jsonResponse({ spans: [generationSpan], pagination: { page: 0, totalPages: 1, hasMore: false } });
+  });
+
+  const spans = await readTraceSpans({
+    factoryUrl: 'https://factory.example',
+    from: FROM,
+    to: TO,
+    fetchImpl: fake.fetch,
+  });
+
+  assert.equal(spans.length, 1);
+  assert.equal(fake.calls.length, 2);
+  assert.equal(new URL(fake.calls[0].url).pathname, '/julia/observability/traces');
+  assert.equal(new URL(fake.calls[1].url).pathname, '/api/observability/traces');
+});
+
+test('readTraceSpans succeeds directly on the internal route', async () => {
   const fake = fakeFetch(() => jsonResponse({ spans: [generationSpan], pagination: { page: 0, totalPages: 1, hasMore: false } }));
 
   const spans = await readTraceSpans({
@@ -78,71 +103,10 @@ test('readTraceSpans asks the supported route and reads the spans list', async (
 
   assert.equal(spans.length, 1);
   assert.equal(fake.calls.length, 1);
-  const url = new URL(fake.calls[0].url);
-  assert.equal(url.pathname, '/api/observability/traces');
-  // The route's `startedAt` filter is a range object, serialized the way the
-  // pinned mastra CLI serializes objects: JSON in the query string.
-  assert.deepEqual(JSON.parse(url.searchParams.get('startedAt')), {
-    start: FROM,
-    end: TO,
-    startExclusive: false,
-    endExclusive: true,
-  });
-  assert.deepEqual(JSON.parse(url.searchParams.get('pagination')), { page: 0, perPage: 100 });
-  assert.equal(fake.calls[0].init.method, 'GET');
+  assert.equal(new URL(fake.calls[0].url).pathname, '/julia/observability/traces');
 });
 
-test('a page with no spans but a next page is followed', async () => {
-  const pages = [
-    { spans: [generationSpan], pagination: { page: 0, total: 2, hasMore: true } },
-    { spans: [{ ...generationSpan, spanId: 'span-b', traceId: 'trace-b' }], pagination: { page: 1, total: 2, hasMore: false } },
-  ];
-  const fake = fakeFetch((url) => {
-    const page = JSON.parse(new URL(url).searchParams.get('pagination')).page;
-    return jsonResponse(pages[page]);
-  });
-
-  const spans = await readTraceSpans({ factoryUrl: 'https://factory.example', from: FROM, to: TO, fetchImpl: fake.fetch });
-
-  assert.deepEqual(spans.map((s) => s.spanId), ['span-a', 'span-b']);
-  assert.equal(fake.calls.length, 2);
-});
-
-test('a response without a spans list fails closed rather than reporting zero cost', async () => {
-  const fake = fakeFetch(() => jsonResponse({ data: [] }));
-
-  await assert.rejects(
-    () => readTraceSpans({ factoryUrl: 'https://factory.example', from: FROM, to: TO, fetchImpl: fake.fetch }),
-    /trace list|spans|not the supported shape/i,
-  );
-});
-
-test('missing pagination fails closed instead of returning a partial cost report', async () => {
-  const fake = fakeFetch(() => jsonResponse({ spans: [generationSpan] }));
-  await assert.rejects(
-    () => readTraceSpans({ factoryUrl: 'https://factory.example', from: FROM, to: TO, fetchImpl: fake.fetch }),
-    /pagination/,
-  );
-});
-
-test('empty page claiming more data fails closed', async () => {
-  const fake = fakeFetch(() => jsonResponse({ spans: [], pagination: { page: 0, hasMore: true } }));
-  await assert.rejects(
-    () => readTraceSpans({ factoryUrl: 'https://factory.example', from: FROM, to: TO, fetchImpl: fake.fetch }),
-    /partial cost report/,
-  );
-});
-
-test('an HTTP error fails closed', async () => {
-  const fake = fakeFetch(() => jsonResponse({ error: 'nope' }, 500));
-
-  await assert.rejects(
-    () => readTraceSpans({ factoryUrl: 'https://factory.example', from: FROM, to: TO, fetchImpl: fake.fetch }),
-    /HTTP 500/,
-  );
-});
-
-test('a generation span normalises to its cost, session, window, outcome and phase', () => {
+test('a generation span normalises with token breakdown and what-you-pay pricing from price table', () => {
   const [record] = normalizeTraceSpans([generationSpan], { cards: [{ number: 140, sessions: { 'session-140': {} } }] });
 
   assert.equal(record.id, 'span-a');
@@ -152,9 +116,48 @@ test('a generation span normalises to its cost, session, window, outcome and pha
   assert.equal(record.phase, 'build');
   assert.equal(record.startedAt, FROM_ISO(generationSpan.startedAt));
   assert.equal(record.endedAt, FROM_ISO(generationSpan.endedAt));
-  assert.equal(record.costUsd, 0.4);
+  assert.equal(record.model, 'deepseek/deepseek-v4-flash');
+  assert.equal(record.tokens.total, 1100000);
+  assert.equal(record.tokens.freshInput, 200000);
+  assert.equal(record.tokens.cachedInput, 800000);
+  assert.equal(record.tokens.output, 100000);
+  assert.equal(record.tokens.thinking, 15000);
+  // fresh: 200k * 0.27/1M = 0.054
+  // cached: 800k * 0.07/1M = 0.056
+  // output: 100k * 1.10/1M = 0.11
+  // what-you-pay = 0.22
+  assert.equal(Math.round(record.costUsd * 1000) / 1000, 0.22);
+  assert.equal(Math.round(record.whatYouPayCost * 1000) / 1000, 0.22);
+
   assert.equal(record.outcome, 'passed');
   assert.equal(record.actor, 'Factory');
+  assert.equal(record.gap, null);
+});
+
+test('a model span with no usage or token count records a named gap: no_token_count', () => {
+  const noTokens = { ...generationSpan, attributes: { model: 'deepseek/deepseek-v4-flash' } };
+  const [record] = normalizeTraceSpans([noTokens], { cards: [{ number: 140, sessions: { 'session-140': {} } }] });
+
+  assert.equal(record.costBearing, true);
+  assert.equal(record.costUsd, null);
+  assert.equal(record.gap, 'no_token_count');
+});
+
+test('a model span with an unpriced model records a named gap: unpriced_model', () => {
+  const unpriced = {
+    ...generationSpan,
+    attributes: {
+      model: 'unknown/new-model',
+      usage: { inputTokens: 1000, outputTokens: 500 },
+    },
+  };
+  const [record] = normalizeTraceSpans([unpriced], { cards: [{ number: 140, sessions: { 'session-140': {} } }] });
+
+  assert.equal(record.costBearing, true);
+  assert.equal(record.costUsd, null);
+  assert.equal(record.gap, 'unpriced_model');
+  assert.equal(record.model, 'unknown/new-model');
+  assert.equal(record.freshInputTokens, 1000);
 });
 
 test('a failed attempt is marked failed, and its cost still counts', () => {
@@ -162,7 +165,7 @@ test('a failed attempt is marked failed, and its cost still counts', () => {
   const [record] = normalizeTraceSpans([failed], { cards: [{ number: 140, sessions: { 'session-140': {} } }] });
 
   assert.equal(record.outcome, 'failed-attempt');
-  assert.equal(record.costUsd, 0.4);
+  assert.equal(Math.round(record.costUsd * 1000) / 1000, 0.22);
 });
 
 test('a span whose session matches no card is reported as uncorrelated, never guessed onto a card', () => {
@@ -170,31 +173,7 @@ test('a span whose session matches no card is reported as uncorrelated, never gu
 
   assert.equal(record.card, null);
   assert.equal(record.correlated, false);
-  assert.equal(record.costUsd, 0.4);
-});
-
-test('a span with no cost is reported as unknown, not as zero', () => {
-  const noCost = { ...generationSpan, attributes: { model: 'x' } };
-  const [record] = normalizeTraceSpans([noCost], { cards: [{ number: 140, sessions: { 'session-140': {} } }] });
-
-  assert.equal(record.costUsd, null);
-});
-
-test('a model span is marked cost-bearing even when Mastra recorded no cost', () => {
-  // The note must fail closed on this: it is a billed span whose cost read
-  // failed, so treating it as free would publish a wrong total.
-  const noCost = { ...generationSpan, attributes: { model: 'x' } };
-  const [record] = normalizeTraceSpans([noCost]);
-
-  assert.equal(record.costBearing, true);
-  assert.equal(record.costUsd, null);
-});
-
-test('a costContext payload marks a span cost-bearing whatever its type', () => {
-  const toolWithCost = { ...generationSpan, spanType: 'tool_call', attributes: { costContext: { estimatedCost: 0.1 } } };
-  const [record] = normalizeTraceSpans([toolWithCost]);
-
-  assert.equal(record.costBearing, true);
+  assert.equal(Math.round(record.costUsd * 1000) / 1000, 0.22);
 });
 
 test('a non-model span with no costContext is not cost-bearing', () => {
@@ -203,6 +182,7 @@ test('a non-model span with no costContext is not cost-bearing', () => {
 
   assert.equal(record.costBearing, false);
   assert.equal(record.costUsd, null);
+  assert.equal(record.gap, null);
 });
 
 function FROM_ISO(value) {

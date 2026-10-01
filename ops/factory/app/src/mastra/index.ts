@@ -43,12 +43,15 @@ import { codeReviewAgent } from './reviewer/agents/code-review-agent';
 import { workflowReviewAgent } from './reviewer/agents/workflow-review-agent';
 import { prReviewWorkflow } from './reviewer/workflows/pr-review-workflow';
 import { reviewerRoute } from './reviewer/route';
+import { tracesRoute } from './observability-traces-route.js';
 import {
   composeStorageWithObservability,
   createDuckDBStore,
   duckdbObservabilityConfig,
 } from './observability-store.js';
 import { observabilityRetentionWorkflow, setObservabilityPruneTarget } from './observability-retention.js';
+
+
 
 /**
  * Parse a positive-integer env knob; anything else means "use the default".
@@ -502,8 +505,9 @@ export const mastra = new Mastra({
   workflows: { ...preparedArgs.workflows, prReviewWorkflow, observabilityRetentionWorkflow },
   server: {
     ...preparedArgs.server,
-    apiRoutes: [...(preparedArgs.server?.apiRoutes ?? []), reviewerRoute],
+    apiRoutes: [...(preparedArgs.server?.apiRoutes ?? []), reviewerRoute, tracesRoute],
   },
+
   storage: composedStorage,
   pubsub: preparedArgs.pubsub,
   workers: preparedArgs.workers,

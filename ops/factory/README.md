@@ -9,7 +9,7 @@ Todd adds or removes an entry. Anything custom that is not listed here is not ap
 |---|---|---|---|
 | 1 | WorkOS cookie identity fix in `@mastra/auth-workos` 1.6.5 | Default platform sign-in rejects our self-hosted address; the WorkOS cookie path drops the organization ([#25252](https://github.com/mastra-ai/mastra/issues/25252)) | #25252 ships in a Mastra release |
 | 2 | Factory wait watcher and Discord webhook | Stock Factory 0.17.2 shows waits in the web app but does not send phone and Windows alerts when Todd is away ([Mastra request #25378](https://github.com/mastra-ai/mastra/issues/25378)); public ntfy.sh exhausted its daily quota (42908), and the private ntfy PWA did not register desktop Web Push | Remove when Mastra adds its own alerts |
-| 3 | Monday note and bounded trace retention (`ops/factory/monday-note*.mjs`, `ops/factory/mastra-traces.mjs`, `ops/factory/factory-cards.mjs`, `ops/factory/trace-retention.mjs`, `app/src/mastra/observability-store.ts`, `app/src/mastra/observability-retention.ts`) — **approved for GitHub #140 (Todd, 2026-09-30)** | Factory 0.17.2 has no weekly cost summary, and the observability store grew to 1.7 GB after about ten hours (change log, 2026-09-28). The note posts one Discussion in the "Monday notes" category and notifies Todd; retention runs Mastra's supported DuckDB retention + CHECKPOINT on the framework's own daily schedule, from a size guard. Neither deletes rows or moves cards by hand. See **Monday note** and **Bounded trace storage** below | Remove when Factory ships its own weekly cost summary and bounded trace retention |
+| 3 | Monday cost note, price table, and bounded trace retention (`ops/factory/monday-note*.mjs`, `ops/factory/price-table.mjs`, `ops/factory/mastra-traces.mjs`, `ops/factory/factory-cards.mjs`, `ops/factory/trace-retention.mjs`, `app/src/mastra/observability-traces-route.ts`, `app/src/mastra/observability-store.ts`, `app/src/mastra/observability-retention.ts`) — **approved for GitHub #180 (Todd, 2026-10-01, superseding #140)** | Factory 0.17.2 has no weekly cost summary with real what-you-pay rates per provider/model, and the observability store grew to 1.7 GB after about ten hours (change log, 2026-09-28). The note computes what Todd actually pays (single source of truth price table, step/model breakdown, effort alongside thinking tokens, card drivers, provider weekly totals, named gaps) and posts one public GitHub Issue (`factory:machine,cost-note`) per completed week; retention runs Mastra's supported DuckDB retention + CHECKPOINT on the framework's own daily schedule, from a size guard. Neither deletes rows or moves cards by hand. See **Monday note** and **Bounded trace storage** below | Remove when Factory ships its own weekly cost summary and bounded trace retention |
 
 Approved by ADR 0009 but not built yet: the check that rejects unapproved custom machinery.
 It gets its row when it is built.
@@ -21,12 +21,11 @@ local sources (repository docs and pinned package paths) are cited; gaps are sta
 
 | Need | Framework feature | Local source |
 |---|---|---|
-| Weekly cost from traces | Mastra full observability route `GET /api/observability/traces` (the CLI's `mastra api trace list --verbose --url <factory>` route; the non-verbose `/light` route omits cost) | `mastra@1.31.3` `dist/index.js` "api trace" command; `@mastra/core` observability route schema; `docs/research/mastra-intended-use-audit.md` |
-| Cost per model span | `attributes.costContext.estimatedCost` on model-generation spans | `@mastra/core` `observability/types/metrics.d.ts` (`CostContext`) and `types/tracing.d.ts` |
+| Weekly cost from traces | Internal Mastra observability route `GET /julia/observability/traces` (exposes `obsStore.listTraces` directly without WorkOS auth) + Mastra full observability route `GET /api/observability/traces` | `app/src/mastra/observability-traces-route.ts`; `mastra@1.31.3` `dist/index.js` "api trace" command; `@mastra/core` observability route schema |
+| What-you-pay pricing per model/provider | Single source of truth price table (`ops/factory/price-table.mjs`) tracking fresh input, cached input, output rates, provider pay factors, source URLs, and checked dates | `ops/factory/price-table.mjs`; `docs/research/agent-cost-primary-sources.md` |
 | Card steps and actors | Factory `work_items.stage_history` (`by` / `exitedBy`) | `@mastra/factory` `dist/storage/domains/work-items/base.d.ts` (`WorkItemRow`, `WorkItemStageEntry`, `isAgentActor`) |
-| Card ↔ trace correlation | `work_items.sessions` maps session id → card; spans carry `sessionId` | same `work-items/base.d.ts`; `@mastra/core` `LightSpanRecord`) |
-| Publish the note | GitHub Discussions GraphQL API (the repo's injected-fetch provider pattern) | `scripts/linear-cli.mjs` (`linearGraphQL` seam); `ops/factory/monday-note-adapters.mjs`; [GitHub Discussions GraphQL](https://docs.github.com/en/graphql/reference/objects#discussion) |
-| Notify Todd | Discord channel webhook, `?wait=true` | installed `ops/factory/wait-alerts.py`; `ops/factory/README.md` *Discord delivery*; [Discord webhook execute](https://discord.com/developers/docs/resources/webhook#execute-webhook) |
+| Card ↔ trace correlation | `work_items.sessions` maps session id → card; spans carry `sessionId`; step split correlated by `stage_history` timestamps | same `work-items/base.d.ts`; `@mastra/core` `LightSpanRecord`; `ops/factory/mastra-traces.mjs` |
+| Publish the note | GitHub Issues REST API (`POST /repos/{owner}/{repo}/issues` with labels `factory:machine`, `cost-note`) | `ops/factory/monday-note-adapters.mjs`; [GitHub Issues REST API](https://docs.github.com/en/rest/issues/issues#create-an-issue) |
 | Bound DuckDB storage | Mastra opt-in `retention` + `store.prune()`; DuckDB prunes observability spans and the documented `CHECKPOINT` reclaims the freed rows | `@mastra/duckdb` `dist/storage/index.d.ts` (`DuckDBStoreConfig.retention`, `prune()`); bundled `dist/docs/references/reference-storage-retention.md`; [Storage / retention](https://mastra.ai/docs/storage) |
 | Run the prune on a schedule | Mastra workflow `schedule: { cron }` (the scheduler auto-registers the workflow's declarative schedule and fires it through the event processor) | `app/src/mastra/observability-retention.ts`; `app/observability-retention-schedule.test.mjs`; [Scheduled workflows](https://mastra.ai/docs/workflows/scheduled-workflows) |
 | Enforce a byte budget | The guard around supported retention: tighter `PruneOptions.retention` + `CHECKPOINT`, failing closed when the disk lacks headroom | `app/src/mastra/observability-retention.ts`; `ops/factory/trace-retention.mjs`; [Storage / reclaiming disk](https://mastra.ai/docs/storage) |
@@ -50,52 +49,44 @@ local sources (repository docs and pinned package paths) are cited; gaps are sta
   its own. The guard handles that: it measures the file + WAL and the free disk, applies a tighter
   supported `maxAge` when over budget, runs the documented DuckDB `CHECKPOINT`, and fails closed
   when there is not enough free disk to do so safely. See **Bounded trace storage**.
-- There is no supported API that lists a card's model cost directly; cost is correlated from the
-  trace `sessionId` against `work_items.sessions`. A cost-bearing trace whose session matches no
-  card fails the note closed, never guessed onto one and never shown as `$0.00`.
+- Factory does not store per-step or per-session effort levels in `work_items.sessions` or traces
+  (effort is only assigned at triage). Per-step effort is absent and reported as a named gap
+  (`no recorded effort`), while thinking tokens are displayed alongside it.
 
 ## Monday note
 
 Once a week, `ops/factory/monday-note-run.mjs` reads two sources and posts one plain summary for
-Todd: Factory's own card records and Mastra's trace cost data.
+Todd as a public GitHub Issue: Factory's own card records and Mastra's trace cost data.
 
 - **Cards** come from `ops/factory/factory-cards.mjs` over the same read-only PostgreSQL route the
   wait watcher uses (`install-wait-alerts.sh`'s peer role; `factory-cards.sql` is read-only and
-  scoped to `work_items`). Factory's `stage_history` gives each step's actor (`by` / `exitedBy`).
-- **Costs** come from `ops/factory/mastra-traces.mjs` over Mastra's own observability route
-  (`GET /api/observability/traces`, the full route the CLI's
-  `mastra api trace list --verbose` uses). The reader never queries DuckDB by hand, pages through
-  the store, and fails closed on any unexpected shape instead of reporting `$0.00`.
+  scoped to `work_items`). Factory's `stage_history` gives each step's actor (`by` / `exitedBy`) and
+  stage intervals (`enteredAt`/`exitedAt`).
+- **Costs** come from `ops/factory/mastra-traces.mjs` over Mastra's internal traces route
+  (`GET /julia/observability/traces`) or the full route (`GET /api/observability/traces`). Traces are
+  priced via the single source of truth price table (`ops/factory/price-table.mjs`), which reflects
+  what Todd actually pays per provider (e.g. DeepSeek fresh/cached, Codex OAuth subscription factor 0,
+  OpenRouter factor 1).
 
-Each card line carries every step with its actor, the card's summed trace cost **including failed
-attempts**, and how long it took, and the **Discussion body prints those same step lines** under the
-card — Todd reads the body, not the returned metadata. A step with no actor or no cost time is still
-printed (a model span with no cost fails the whole note closed). Whether every step after Todd's
-Intake tap was done by Factory or by hand is read from the actors, not agent narrative (CONTEXT.md
-"Done by Factory"). A cost-bearing span that matches no card fails the note closed rather than being
-printed as `$0.00`; a non-cost-bearing span that matches no card is reported by count with no dollar
-figure. A quiet week says so. Sessions run **outside Factory** — Codex, GPT, or Claude sessions
-started by hand — are not Factory cards and are not counted; the note says so on its own face.
+Each card line carries every step with its actor, model breakdown, effort level beside thinking tokens,
+the card's summed what-you-pay cost **including failed attempts**, and elapsed time. The card drivers
+line highlights the primary cost and time drivers. Weekly provider totals summarize spend per provider,
+and named gaps (e.g. missing tokens, unpriced models, unrecorded effort) are explicitly itemized. A quiet
+week says so. Sessions run **outside Factory** — Codex, GPT, or Claude sessions started by hand — are not
+Factory cards and are not counted; the note says so on its face.
 
 Each week is `[from, to)`, computed from the switch-on Monday (`OBSERVABILITY_START`, 2026-09-28).
-Before the first Monday after switch-on there is no completed week, so no note is produced for that
-partial slice; the first note is minted on the first Monday after switch-on and its one full week
-covers every card since observability started. `completedWeeks` lists every full week, and the weekly
-job **backfills** each one that has no Discussion yet, oldest first, bounded per invocation, so a
-multi-week outage produces all the missing notes instead of only the latest one. The dedupe cursor is
-GitHub Discussions itself: a week is missing exactly when no Discussion carries its title, and
-`find` pages through every discussion so an older note is still found. A card is named at most once
-per note, and a trace is counted in exactly one note (the week it started in), so no cost or failed
-attempt is double-counted. A card accepted in an earlier week still appears in the week its work ran:
-the note includes a card that entered the week **or** that has cost/activity in it, and attributes to
-that card only the week's own traces and failed attempts (its elapsed time is the week's activity
-window, not its whole lifetime).
+`completedWeeks` lists every full week, and the weekly job **backfills** each one that has no GitHub Issue
+yet, oldest first, bounded per invocation. The dedupe cursor is GitHub Issues labeled `factory:machine`
+and `cost-note`: a week is missing exactly when no issue carries its title. A card is named at most once
+per note, and a trace is counted in exactly one note (the week it started in). A card accepted in an earlier
+week still appears in the week its work ran: the note includes a card that entered the week **or** that has
+cost/activity in it, and attributes to that card only the week's own traces and failed attempts.
 
-`publishMondayNote({ note, discussions, notifications })` posts one week's note as a GitHub Discussion
-in the **Monday notes** category and tells Todd through the Discord wait-alert webhook. The backfill
-posts each missing week and notifies **once per invocation**, never once per week; a run with nothing
-missing posts and notifies nothing, so a repeated timer fire cannot send the note twice. Discussions
-are not ingested by Factory, so the note never lands in Intake.
+`publishMondayNote({ note, issues })` posts one week's note as a GitHub Issue labeled `factory:machine`
+and `cost-note`. The backfill posts each missing week. Because the issue carries the `factory:machine`
+label, it is public without sign-in, accessible to Claude, and ignored by Factory intake. Discord and
+Discussions delivery are retired.
 
 Operator actions (nothing is sent by this repository):
 
@@ -104,18 +95,16 @@ Operator actions (nothing is sent by this repository):
 2. Run the one-time root setup once:
    `sudo bash "$(pwd -P)/ops/factory/install-monday-note.sh" /var/lib/julia-factory/app <PROJECT_ID>`.
    It installs the Monday note timer and writes a mode-0640 placeholder
-   `/etc/julia-factory-monday-note/config.env` with **empty** token and webhook values. The Monday
+   `/etc/julia-factory-monday-note/config.env` with **empty** token values. The Monday
    note service stays inert while the config file is empty (its unit has
    `ConditionPathExists=/etc/julia-factory-monday-note/config.env`), so installing sends nothing.
    Retention needs no unit: the app's own Mastra schedule prunes it.
-3. Add the GitHub Discussions token (a token that can create discussions in the repo's **Monday
-   notes** category) and the Discord channel webhook URL to that root-owned config, then
-   `sudo systemctl start julia-factory-monday-note.timer`. Never put any value in an issue, a log, or
-   the repository.
+3. Add the GitHub token (with issues write permission) to that root-owned config:
+   `GITHUB_TOKEN=ghp_...`, then `sudo systemctl start julia-factory-monday-note.timer`.
+   Never put any value in an issue, a log, or the repository.
 4. Preview a week without posting: `sudo -u julia-factory /usr/bin/node
    /var/lib/julia-factory/app/ops/factory/monday-note-run.mjs --dry-run`. It reads both sources and
-   prints the note. The timer itself backfills every missed week (oldest first, bounded per run), so
-   a multi-week outage fills in on the next fire rather than losing the weeks.
+   prints the note. The timer itself backfills every missed week (oldest first, bounded per run).
 
 ## Bounded trace storage
 

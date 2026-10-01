@@ -175,25 +175,24 @@ test('a quiet week posts its Discussion and tells Todd it was quiet', async () =
   assert.equal(notifications.sent[0].body, 'Quiet week.');
 });
 
-test('a trace whose cost is missing fails closed: nothing is posted or notified', async () => {
+test('a trace whose token count is missing records a named gap and the note still publishes', async () => {
   const discussions = fakeDiscussions();
   const notifications = fakeNotifications();
   const noCost = { ...SPANS[0], id: 's-nocost', sessionId: 'session-140', spanType: 'model_generation', attributes: { model: 'x' } };
 
-  await assert.rejects(
-    () => runMondayNote({
-      now: '2026-10-05T08:00:00Z',
-      readCards: async () => CARDS,
-      readSpans: async () => [noCost],
-      discussions,
-      notifications,
-    }),
-    /cost/i,
-  );
+  const result = await runMondayNote({
+    now: '2026-10-05T08:00:00Z',
+    readCards: async () => CARDS,
+    readSpans: async () => [noCost],
+    discussions,
+    notifications,
+  });
 
-  assert.equal(discussions.calls.posted.length, 0);
-  assert.equal(notifications.sent.length, 0);
+  assert.equal(result.posted, true);
+  assert.equal(discussions.calls.posted.length, 1);
+  assert.match(discussions.calls.posted[0].body, /• No token count: 1 call\(s\)/);
 });
+
 
 test('a cost-bearing span that matches no card fails closed: nothing is posted or notified', async () => {
   const discussions = fakeDiscussions();
@@ -370,3 +369,68 @@ test('a failed read during backfill fails closed: nothing is posted or notified'
   assert.equal(discussions.calls.posted.length, 0);
   assert.equal(notifications.sent.length, 0);
 });
+
+// --- Issue #180: GitHub Issues route (retired Discord notification)
+
+function fakeIssues({ existing = null } = {}) {
+  const calls = { found: [], posted: [] };
+  const issues = new Map();
+  if (existing) {
+    for (const [title, item] of Object.entries(existing)) {
+      issues.set(title, item);
+    }
+  }
+  return {
+    calls,
+    find: async ({ title }) => {
+      calls.found.push(title);
+      return issues.get(title) ?? null;
+    },
+    post: async ({ title, body }) => {
+      calls.posted.push({ title, body });
+      const item = { id: 100 + calls.posted.length, number: 200 + calls.posted.length, title, url: `https://github.com/o/r/issues/${200 + calls.posted.length}` };
+      issues.set(title, item);
+      return item;
+    },
+  };
+}
+
+test('runMondayNote publishes to GitHub issues with factory:machine label and does not require Discord', async () => {
+  const issues = fakeIssues();
+
+  const result = await runMondayNote({
+    now: '2026-10-05T08:00:00Z',
+    readCards: async () => CARDS,
+    readSpans: async () => SPANS,
+    issues,
+  });
+
+  assert.equal(result.posted, true);
+  assert.equal(issues.calls.posted.length, 1);
+  assert.match(issues.calls.posted[0].title, /Monday note — week ending 2026-10-05/);
+  assert.match(issues.calls.posted[0].body, /#140 Monday note/);
+  assert.match(result.url, /https:\/\/github\.com\/o\/r\/issues\/201/);
+});
+
+test('runMondayNoteBackfill backfills missing weeks over GitHub issues', async () => {
+  const issues = fakeIssues({
+    existing: {
+      'Monday note — week ending 2026-10-05': { id: 100, number: 180, title: 'Monday note — week ending 2026-10-05', url: 'https://github.com/o/r/issues/180' },
+    },
+  });
+
+  const result = await runMondayNoteBackfill({
+    now: '2026-10-19T09:00:00Z',
+    readCards: async () => CARDS,
+    readSpans: async () => SPANS,
+    issues,
+  });
+
+  assert.equal(result.posted, true);
+  assert.deepEqual(result.published.map((p) => p.title), [
+    'Monday note — week ending 2026-10-12',
+    'Monday note — week ending 2026-10-19',
+  ]);
+  assert.equal(issues.calls.posted.length, 2);
+});
+

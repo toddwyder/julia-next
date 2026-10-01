@@ -29,13 +29,13 @@ import {
   publishMondayNote,
   previousWeekWindow,
 } from './monday-note.mjs';
-import { createDiscussionsClient, createDiscordNotifier } from './monday-note-adapters.mjs';
+import { createIssuesClient, createDiscussionsClient, createDiscordNotifier } from './monday-note-adapters.mjs';
 
 /**
  * How many missed weeks one invocation publishes before stopping. A long outage
  * (or first install) is a backlog, not a reason to hold one process open for
  * hours; the next timer fire continues from the first week still missing. The
- * Discussion lookup by title is the cursor, so this bound never skips a week.
+ * lookup by title is the cursor, so this bound never skips a week.
  */
 export const DEFAULT_MAX_BACKFILL_WEEKS = 8;
 
@@ -43,13 +43,13 @@ export const DEFAULT_MAX_BACKFILL_WEEKS = 8;
  * Run one Monday note for the week before `now`.
  *
  * A read failure propagates and nothing is posted. When the week already has
- * its Discussion, `publishMondayNote` posts and notifies nothing.
+ * its published issue/discussion, `publishMondayNote` posts nothing.
  */
-export async function runMondayNote({ now, readCards, readSpans, discussions, notifications }) {
+export async function runMondayNote({ now, readCards, readSpans, issues, discussions, notifications }) {
   const window = previousWeekWindow({ now });
 
   // Before the first Monday after observability switch-on there is no completed
-  // week. Posting a "quiet week" then would create a Discussion that the first
+  // week. Posting a "quiet week" then would create an issue that the first
   // real note cannot replace, so the run is a no-op.
   if (window.from === window.to) {
     console.log(`monday-note week=${window.from}..${window.to} skipped=no-completed-week`);
@@ -63,10 +63,9 @@ export async function runMondayNote({ now, readCards, readSpans, discussions, no
   const traces = normalizeTraceSpans(spans, { cards });
 
   const note = buildMondayNote({ cards, traces, from: window.from, to: window.to });
-  const result = await publishMondayNote({ note, discussions, notifications });
+  const result = await publishMondayNote({ note, issues, discussions, notifications });
 
-  // The one line that stays in the journal, so the weekly record is auditable
-  // even when the Discussion read fails later.
+  // The one line that stays in the journal, so the weekly record is auditable.
   console.log(
     `monday-note week=${window.from}..${window.to} cards=${note.lines.length} ` +
       `spend_usd=${note.totalUsd.toFixed(2)} posted=${result.posted} url=${result.url ?? ''}`,
@@ -77,22 +76,19 @@ export async function runMondayNote({ now, readCards, readSpans, discussions, no
 /**
  * Backfill every missed complete Monday-to-Monday week, oldest first.
  *
- * The dedupe cursor is GitHub Discussions itself: a week is missing when no
- * Discussion carries its title. That makes the run idempotent and safe across a
+ * The dedupe cursor is GitHub Issues itself: a week is missing when no
+ * issue carries its title. That makes the run idempotent and safe across a
  * multi-week outage -- every week from observability switch-on to the last
  * completed week is produced exactly once, however many Mondays were missed.
  * The batch is bounded so one invocation never runs unbounded; the next fire
  * finds the same missing weeks and continues, because a published week now has
- * its Discussion and is skipped.
- *
- * Todd is told once per invocation, not once per backfilled week: a backlog is
- * one event. A re-run that finds nothing missing notifies nothing, so the note
- * is never sent twice.
+ * its issue and is skipped.
  */
 export async function runMondayNoteBackfill({
   now,
   readCards,
   readSpans,
+  issues,
   discussions,
   notifications,
   maxWeeksPerRun = DEFAULT_MAX_BACKFILL_WEEKS,
@@ -104,6 +100,9 @@ export async function runMondayNoteBackfill({
     return { posted: false, published: [], reason: 'no completed week' };
   }
 
+  const publisher = issues ?? discussions;
+  if (!publisher) throw new Error('runMondayNoteBackfill requires an issues or discussions client');
+
   // Read the cards once: the same snapshot is spliced into every week's note.
   const cards = await readCards();
 
@@ -112,7 +111,8 @@ export async function runMondayNoteBackfill({
   const missing = [];
   for (const week of weeks) {
     const title = noteTitle(week.to);
-    const existing = await discussions.find({ category: MONDAY_NOTE_CATEGORY, title });
+    const query = (publisher === discussions) ? { category: MONDAY_NOTE_CATEGORY, title } : { title };
+    const existing = await publisher.find(query);
     if (!existing) missing.push(week);
   }
 
@@ -122,7 +122,7 @@ export async function runMondayNoteBackfill({
     const spans = await readSpans({ from: week.from, to: week.to });
     const traces = normalizeTraceSpans(spans, { cards });
     const note = buildMondayNote({ cards, traces, ...week });
-    const url = await postMondayNote({ note, discussions });
+    const url = await postMondayNote({ note, issues, discussions, publisher });
     published.push({ from: week.from, to: week.to, title: note.title, url, quiet: note.quiet, cards: note.lines.length, totalUsd: note.totalUsd });
     log(
       `monday-note week=${week.from}..${week.to} cards=${note.lines.length} ` +
@@ -130,10 +130,8 @@ export async function runMondayNoteBackfill({
     );
   }
 
-  // One notification for the whole invocation. The newest note is the one Todd
-  // wants to open; the count tells him a backlog was drained. If nothing was
-  // missing, nothing is sent -- a repeated fire cannot notify twice.
-  if (published.length > 0) {
+  // One notification if a notifier is provided (legacy support).
+  if (published.length > 0 && notifications?.notify) {
     const newest = published.at(-1);
     const body = published.length === 1
       ? (newest.quiet ? 'Quiet week.' : `${newest.cards} card(s), ${newest.totalUsd.toFixed(2)} USD`)
@@ -160,18 +158,20 @@ function requiredEnv(name) {
 }
 
 /**
- * The real wiring. GitHub token, repository and Discord webhook come from the
+ * The real wiring. GitHub token and repository come from the
  * environment the timer unit sets from the root-owned config, never from argv.
  */
 async function main() {
-  const owner = requiredEnv('MONDAY_NOTE_GITHUB_OWNER');
-  const repo = requiredEnv('MONDAY_NOTE_GITHUB_REPO');
+  const owner = process.env.MONDAY_NOTE_GITHUB_OWNER?.trim() || 'toddwyder';
+  const repo = process.env.MONDAY_NOTE_GITHUB_REPO?.trim() || 'julia-next';
   const token = requiredEnv('MONDAY_NOTE_GITHUB_TOKEN');
-  const webhookUrl = requiredEnv('MONDAY_NOTE_DISCORD_WEBHOOK');
   const factoryUrl = requiredEnv('MONDAY_NOTE_FACTORY_URL');
 
-  const discussions = createDiscussionsClient({ token, owner, repo });
-  const notifications = createDiscordNotifier({ webhookUrl });
+  const issues = createIssuesClient({ token, owner, repo });
+
+  // Discord notifier is optional / retired in Issue #180
+  const webhookUrl = process.env.MONDAY_NOTE_DISCORD_WEBHOOK?.trim();
+  const notifications = webhookUrl ? createDiscordNotifier({ webhookUrl }) : null;
 
   const { runPsql } = await import('./run-psql.mjs');
   const config = {
@@ -194,7 +194,7 @@ async function main() {
     now: new Date().toISOString(),
     readCards: () => readFactoryCards({ config, runPsql }),
     readSpans: ({ from, to }) => readTraceSpans({ factoryUrl, from, to }),
-    discussions,
+    issues,
     notifications,
   });
 }
@@ -205,3 +205,4 @@ if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
     process.exit(1);
   });
 }
+

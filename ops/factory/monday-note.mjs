@@ -90,33 +90,33 @@ function duration(ms) {
   return `${minutes}m`;
 }
 
+/** `1.2M`, `45.2k`, `500`, `0` -- human-readable token counts. */
+export function formatTokens(n) {
+  if (n === null || n === undefined || !Number.isFinite(n) || n === 0) return '0';
+  if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+  return `${n}`;
+}
+
 /**
  * Cost correlation is never guessed and never turned into `$0.00`.
  *
  * A span is cost-bearing when Mastra's own record says it is a model span
  * (`normalizeTraceSpans` sets `costBearing`) or when it already carries a
  * numeric cost. Every cost-bearing span in the week must both name a card in
- * this note and carry a numeric `estimatedCost`:
- *
- *   - cost-bearing, no numeric cost  -> failed read, fail closed (never `$0.00`);
- *   - cost-bearing, no card in week  -> correlation failure, fail closed;
- *   - a span whose `costBearing` is unknown (not a normalised record) is
- *     treated as cost-bearing, so an unlabelled span can never slip through.
- *
- * Numeric zero is valid -- a real free model call is `0`, not missing. A span
- * Mastra does not bill (a tool, RAG, processor or generic span with no
- * `costContext`) is not cost-bearing and does not have to carry a cost.
+ * this note and carry a numeric `estimatedCost` or a named gap.
  */
 export function assertCostsAreCorrelated(weekTraces, weekCardNumbers) {
   for (const trace of weekTraces) {
-    const cost = trace.costUsd;
+    const cost = trace.whatYouPayCost ?? trace.costUsd;
     const costKnown = typeof cost === 'number' && Number.isFinite(cost);
+    const hasNamedGaps = Array.isArray(trace.namedGaps) && trace.namedGaps.length > 0;
     const correlated = trace.card !== null && trace.card !== undefined && weekCardNumbers.has(trace.card);
     // `true` is cost-bearing; `false` is provably not; anything else is
     // unknown and fails closed rather than being assumed free.
     const costBearing = trace.costBearing !== false;
 
-    if (correlated && costBearing && !costKnown) {
+    if (correlated && costBearing && !costKnown && !hasNamedGaps) {
       throw new Error(
         `Trace ${trace.id ?? '(no id)'} is correlated to card ${trace.card} but has no numeric estimated cost; ` +
           'refusing to report it as $0.00',
@@ -128,7 +128,7 @@ export function assertCostsAreCorrelated(weekTraces, weekCardNumbers) {
           'refusing to publish a note that could hide a cost as $0.00',
       );
     }
-    if (!correlated && costKnown) {
+    if (!correlated && costKnown && cost > 0) {
       throw new Error(
         `Trace ${trace.id ?? '(no id)'} carries a cost (${cost}) but is not correlated to a card in this week; ` +
           'refusing to publish a total that may be wrong',
@@ -182,6 +182,7 @@ function cardSteps(card) {
       stage: STAGE_LABEL[entry.stage] ?? entry.stage,
       by: entry.exitedBy ?? entry.by,
       enteredBy: entry.by,
+      exitedBy: entry.exitedBy,
       startedAt: entry.enteredAt ?? null,
       endedAt: entry.exitedAt ?? null,
       // The first entry's `by` is the actor who moved the card out of Intake
@@ -195,11 +196,38 @@ function cardSteps(card) {
   return movements.map((movement, index) => ({
     stage: movement.what ?? movement.stage ?? 'step',
     by: movement.by,
+    enteredBy: movement.by,
+    exitedBy: null,
     startedAt: movement.at ?? null,
     endedAt: movements[index + 1]?.at ?? card.doneAt ?? null,
     // The first movement is Todd's Intake tap that starts the card.
     intakeBy: index === 0 ? movement.by : null,
   }));
+}
+
+/**
+ * Count times the card waited on Todd outside UAT (CONTEXT.md).
+ *
+ * The initial intake tap is the start gesture, and testing in `done` is live UAT.
+ * Any non-Factory actor on any step between intake and done is a wait on Todd outside UAT.
+ */
+function countWaitsOnTodd(allSteps) {
+  const intake = allSteps[0];
+  let count = 0;
+  for (let i = 0; i < allSteps.length; i += 1) {
+    const step = allSteps[i];
+    if (step.stage === 'done') continue;
+    if (i === 0) {
+      if (step.exitedBy && !isFactoryActor(step.exitedBy) && step.exitedBy !== step.intakeBy) {
+        count += 1;
+      }
+      continue;
+    }
+    if (!isFactoryActor(step.enteredBy) || !isFactoryActor(step.by) || (step.exitedBy && !isFactoryActor(step.exitedBy))) {
+      count += 1;
+    }
+  }
+  return count;
 }
 
 /**
@@ -244,15 +272,72 @@ function traceStartedAt(trace) {
 }
 
 function stepLine(step, stepTraces) {
-  const costUsd = stepTraces.reduce((sum, trace) => sum + (trace.costUsd ?? 0), 0);
+  const costUsd = stepTraces.reduce((sum, trace) => sum + (trace.whatYouPayCost ?? trace.costUsd ?? 0), 0);
+  const faceCostUsd = stepTraces.reduce((sum, trace) => sum + (trace.faceCost ?? trace.whatYouPayCost ?? trace.costUsd ?? 0), 0);
   const failedAttempts = stepTraces.filter((trace) => trace.outcome === 'failed-attempt').length;
   const elapsedMs = step.startedAt && step.endedAt ? Date.parse(step.endedAt) - Date.parse(step.startedAt) : null;
+  const thinkingTokens = stepTraces.reduce((sum, trace) => sum + (trace.tokens?.thinking ?? 0), 0);
+  const recordedEffortTrace = stepTraces.find((trace) => trace.effort !== null && trace.effort !== undefined);
+  const effort = recordedEffortTrace ? recordedEffortTrace.effort : (step.effort ?? 'no recorded effort');
+
+  // Group models used in this step
+  const modelMap = new Map();
+  for (const trace of stepTraces) {
+    if (!trace.model) continue;
+    const key = `${trace.model}|${trace.provider ?? ''}`;
+    if (!modelMap.has(key)) {
+      modelMap.set(key, {
+        model: trace.model,
+        provider: trace.provider ?? 'unknown',
+        whatYouPayCost: 0,
+        faceCost: 0,
+        freshInput: 0,
+        cachedInput: 0,
+        output: 0,
+        thinking: 0,
+        total: 0,
+      });
+    }
+    const entry = modelMap.get(key);
+    entry.whatYouPayCost += trace.whatYouPayCost ?? trace.costUsd ?? 0;
+    entry.faceCost += trace.faceCost ?? trace.whatYouPayCost ?? trace.costUsd ?? 0;
+    entry.freshInput += trace.tokens?.freshInput ?? 0;
+    entry.cachedInput += trace.tokens?.cachedInput ?? 0;
+    entry.output += trace.tokens?.output ?? 0;
+    entry.thinking += trace.tokens?.thinking ?? 0;
+    entry.total += trace.tokens?.total ?? 0;
+  }
+
+  const modelLines = [];
+  for (const m of modelMap.values()) {
+    const inTotal = m.freshInput + m.cachedInput;
+    const cachedShare = inTotal > 0 ? Math.round((m.cachedInput / inTotal) * 100) : 0;
+    modelLines.push(
+      `    - ${m.model} (${m.provider}): ${usd(m.whatYouPayCost)} (${formatTokens(m.freshInput)} fresh, ${formatTokens(m.cachedInput)} cached [${cachedShare}% cached], ${formatTokens(m.output)} out [${formatTokens(m.thinking)} thinking])`
+    );
+  }
 
   const parts = [`${step.stage} — ${actorName(step.by)} — ${usd(costUsd)}`];
   if (elapsedMs !== null && elapsedMs >= 0) parts.push(duration(elapsedMs));
   const failedPhrase = failedAttemptPhrase(failedAttempts);
   if (failedPhrase) parts.push(failedPhrase);
-  return { stage: step.stage, by: step.by, costUsd, elapsedMs, failedAttempts, text: parts.join(' — ') };
+  if (stepTraces.length > 0 && modelMap.size > 0) {
+    parts.push(`effort: ${effort} (${formatTokens(thinkingTokens)} thinking tokens)`);
+  }
+
+  return {
+    stage: step.stage,
+    by: step.by,
+    costUsd,
+    faceCostUsd,
+    elapsedMs,
+    failedAttempts,
+    effort,
+    thinkingTokens,
+    models: Array.from(modelMap.values()),
+    modelLines,
+    text: parts.join(' — '),
+  };
 }
 
 /**
@@ -315,7 +400,8 @@ function cardLine(card, cardTraces, { acceptedInWeek = true, from, to } = {}) {
   );
   if (unattached.length > 0) stepLines.push(unattachedLine);
 
-  const costUsd = cardTraces.reduce((sum, trace) => sum + (trace.costUsd ?? 0), 0);
+  const costUsd = cardTraces.reduce((sum, trace) => sum + (trace.whatYouPayCost ?? trace.costUsd ?? 0), 0);
+  const faceCostUsd = cardTraces.reduce((sum, trace) => sum + (trace.faceCost ?? trace.whatYouPayCost ?? trace.costUsd ?? 0), 0);
   const failedAttempts = cardTraces.filter((trace) => trace.outcome === 'failed-attempt').length;
   const enteredAt = card.enteredAt ?? allSteps[0]?.startedAt ?? card.createdAt;
   const lastStep = steps.at(-1);
@@ -364,13 +450,28 @@ function cardLine(card, cardTraces, { acceptedInWeek = true, from, to } = {}) {
   if (failedPhrase) parts.push(failedPhrase);
   parts.push(doneByFactory ? 'Done by Factory' : `not all by Factory: ${actorName(byHand.by)} ${byHand.stage}`);
 
+  // Drivers calculation
+  const totalStepsCount = steps.length;
+  const totalFreshInput = cardTraces.reduce((sum, trace) => sum + (trace.tokens?.freshInput ?? 0), 0);
+  const totalCachedInput = cardTraces.reduce((sum, trace) => sum + (trace.tokens?.cachedInput ?? 0), 0);
+  const totalInputTokens = totalFreshInput + totalCachedInput;
+  const avgTokensPerStep = totalStepsCount > 0 ? Math.round(totalInputTokens / totalStepsCount) : 0;
+  const cachedShare = totalInputTokens > 0 ? Math.round((totalCachedInput / totalInputTokens) * 100) : 0;
+  const reviewRounds = steps.filter((step) => step.stage === 'review').length;
+  const waitsOnTodd = countWaitsOnTodd(allSteps);
+
+  const driversText = `  Drivers: ${totalStepsCount} step${totalStepsCount === 1 ? '' : 's'}, ${formatTokens(avgTokensPerStep)} avg tokens/step, ${cachedShare}% cached input, ${reviewRounds} review round${reviewRounds === 1 ? '' : 's'}, ${failedAttempts} failed attempt${failedAttempts === 1 ? '' : 's'}, ${waitsOnTodd} wait${waitsOnTodd === 1 ? '' : 's'} on Todd outside UAT`;
+
   return {
     number: card.number,
     costUsd,
+    faceCostUsd,
     elapsedMs,
     failedAttempts,
     doneByFactory,
+    waitsOnTodd,
     steps: stepLines,
+    driversText,
     text: parts.join(' — '),
   };
 }
@@ -380,7 +481,8 @@ function cardLine(card, cardTraces, { acceptedInWeek = true, from, to } = {}) {
  *
  * @param {{cards?: Array, traces?: Array, from: string, to: string}} input
  * @returns {{title: string, body: string, quiet: boolean, lines: Array,
- *            totalUsd: number, failedAttempts: number}}
+ *            totalUsd: number, faceTotalUsd: number, providerTotals: Object,
+ *            namedGaps: Object, failedAttempts: number}}
  */
 export function buildMondayNote({ cards = [], traces = [], from, to }) {
   // A card's week is measured from when it entered observability: the first
@@ -420,21 +522,99 @@ export function buildMondayNote({ cards = [], traces = [], from, to }) {
   // numeric cost: it is summed and reported (at $0.00) rather than silently
   // dropped, and it can never widen a card's total.
   const uncorrelated = weekTraces.filter((trace) => trace.card === null || !weekNumbers.has(trace.card));
-  const uncorrelatedUsd = uncorrelated.reduce((sum, trace) => sum + (trace.costUsd ?? 0), 0);
+  const uncorrelatedUsd = uncorrelated.reduce((sum, trace) => sum + (trace.whatYouPayCost ?? trace.costUsd ?? 0), 0);
   const cardUsd = lines.reduce((sum, line) => sum + line.costUsd, 0);
+  const faceTotalUsd = lines.reduce((sum, line) => sum + (line.faceCostUsd ?? line.costUsd), 0);
   const totalUsd = cardUsd + uncorrelatedUsd;
   const failedAttempts = lines.reduce((sum, line) => sum + line.failedAttempts, 0);
   const spentPhrase = failedAttemptPhrase(failedAttempts);
 
+  // Provider totals in what-you-pay dollars and face cost
+  const providerTotals = {};
+  for (const trace of weekTraces) {
+    if (!trace.provider) continue;
+    const provider = trace.provider;
+    if (!providerTotals[provider]) {
+      providerTotals[provider] = { whatYouPayCost: 0, faceCost: 0 };
+    }
+    const wyp = trace.whatYouPayCost ?? trace.costUsd ?? 0;
+    const face = trace.faceCost ?? trace.whatYouPayCost ?? trace.costUsd ?? 0;
+    providerTotals[provider].whatYouPayCost += wyp;
+    providerTotals[provider].faceCost += face;
+  }
+  for (const p of Object.keys(providerTotals)) {
+    providerTotals[p].whatYouPayCost = Math.round(providerTotals[p].whatYouPayCost * 100) / 100;
+    providerTotals[p].faceCost = Math.round(providerTotals[p].faceCost * 100) / 100;
+  }
+
+  // Named gaps collection
+  let noRecordedEffortCount = 0;
+  let unpricedModelCount = 0;
+  let noTokenCountCount = 0;
+
+  for (const line of lines) {
+    for (const step of line.steps) {
+      if (step.effort === 'no recorded effort' && step.models && step.models.length > 0) {
+        noRecordedEffortCount += 1;
+      }
+    }
+  }
+
+  for (const trace of weekTraces) {
+    const gaps = trace.namedGaps ?? [];
+    for (const gap of gaps) {
+      if (gap.startsWith('unpriced_model')) unpricedModelCount += 1;
+      if (gap === 'no_token_count') noTokenCountCount += 1;
+    }
+  }
+
+  const namedGaps = {
+    noRecordedEffort: noRecordedEffortCount,
+    unpricedModels: unpricedModelCount,
+    noTokenCount: noTokenCountCount,
+  };
+
+  const providerLines = ['Provider weekly totals (what-you-pay):'];
+  const providerNames = Object.keys(providerTotals);
+  if (providerNames.length > 0) {
+    for (const p of providerNames) {
+      const entry = providerTotals[p];
+      const isSub = p === 'openai' || p === 'gemini' || (entry.whatYouPayCost === 0 && entry.faceCost > 0);
+      const isDiscounted = entry.whatYouPayCost < entry.faceCost && entry.whatYouPayCost > 0;
+      let line = `  • ${p}`;
+      if (isSub) {
+        line += ` (subscription): ${usd(entry.whatYouPayCost)} (face value ${usd(entry.faceCost)})`;
+      } else if (isDiscounted) {
+        line += `: ${usd(entry.whatYouPayCost)} (face value ${usd(entry.faceCost)})`;
+      } else {
+        line += `: ${usd(entry.whatYouPayCost)}`;
+      }
+      providerLines.push(line);
+    }
+  }
+
+  const namedGapLines = [
+    'Named gaps:',
+    `  • No recorded effort: ${noRecordedEffortCount} step(s)`,
+    `  • Unpriced models: ${unpricedModelCount} call(s)`,
+    `  • No token count: ${noTokenCountCount} call(s)`,
+  ];
+
   // The body is what Todd reads, so every fact the note computed is written
-  // here, not left in the returned metadata: the card line carries the card's
-  // cost (failed attempts included) and total elapsed, and each step below it
-  // carries the step's actor and, when Factory recorded one, the step's time.
+  // here, not left in the returned metadata.
   const bodyLines = [];
   if (lines.length > 0) {
     for (const line of lines) {
       bodyLines.push(line.text);
-      for (const step of line.steps) bodyLines.push(`  • ${step.text}`);
+      for (const step of line.steps) {
+        bodyLines.push(`  • ${step.text}`);
+        for (const mLine of step.modelLines ?? []) {
+          bodyLines.push(mLine);
+        }
+      }
+      if (line.driversText) {
+        bodyLines.push(line.driversText);
+      }
     }
   } else {
     bodyLines.push('No cards were accepted this week.');
@@ -455,6 +635,7 @@ export function buildMondayNote({ cards = [], traces = [], from, to }) {
     '',
     ...bodyLines,
     ...(uncorrelatedLine ? ['', uncorrelatedLine] : []),
+    ...(lines.length > 0 ? ['', ...providerLines, '', ...namedGapLines] : []),
     '',
     `Total model spend: ${usd(totalUsd)} across ${weekCards.length} cards${spentPhrase ? ` (${spentPhrase})` : ''}.`,
     '',
@@ -467,6 +648,9 @@ export function buildMondayNote({ cards = [], traces = [], from, to }) {
     quiet: lines.length === 0,
     lines,
     totalUsd,
+    faceTotalUsd,
+    providerTotals,
+    namedGaps,
     uncorrelatedUsd,
     failedAttempts,
     from,
@@ -474,29 +658,41 @@ export function buildMondayNote({ cards = [], traces = [], from, to }) {
   };
 }
 
+
 /**
- * Publish the note and tell Todd, through whatever adapters the caller passes.
+ * Publish the note through whatever adapter the caller passes (Issue #180: GitHub Issues).
  *
- * `discussions` is GitHub's own Discussion publisher and `notifications` is the
- * phone notification; both are the only places the outside world is touched, so
- * tests drive them with fakes. A run for a week that already has its Discussion
- * posts and notifies nothing: the weekly timer may fire twice, and Todd must
- * never get the same note twice.
+ * `issues` (or `publisher`) is the GitHub Issues publisher. `discussions` and `notifications`
+ * are supported for backwards compatibility with earlier tests.
  */
-export async function publishMondayNote({ note, discussions, notifications }) {
-  const existing = await discussions.find({ category: MONDAY_NOTE_CATEGORY, title: note.title });
+export async function publishMondayNote({ note, issues, publisher, discussions, notifications }) {
+  const client = issues ?? publisher ?? discussions;
+  if (!client) throw new Error('publishMondayNote requires an issues or publisher client');
+
+  const findQuery = (client === discussions) ? { category: MONDAY_NOTE_CATEGORY, title: note.title } : { title: note.title };
+  const existing = await client.find(findQuery);
   if (existing) return { posted: false, reason: 'already published', url: existing.url };
 
-  const url = await postMondayNote({ note, discussions });
-  await notifications.notify({ title: note.title, body: note.quiet ? 'Quiet week.' : note.lines[0].text, url });
+  const url = await postMondayNote({ note, issues, publisher, discussions });
+  if (notifications?.notify) {
+    await notifications.notify({ title: note.title, body: note.quiet ? 'Quiet week.' : note.lines[0]?.text ?? '', url });
+  }
   return { posted: true, url };
 }
 
 /**
- * Create the Discussion for a note that is known not to have one yet. Split out
- * so the backfill can publish several weeks and still tell Todd exactly once.
+ * Create the Issue or Discussion for a note that is known not to have one yet.
  */
-export async function postMondayNote({ note, discussions }) {
-  const discussion = await discussions.post({ category: MONDAY_NOTE_CATEGORY, title: note.title, body: note.body });
-  return discussion.url;
+export async function postMondayNote({ note, issues, publisher, discussions }) {
+  const client = issues ?? publisher ?? discussions;
+  if (!client) throw new Error('postMondayNote requires an issues or publisher client');
+
+  if (client === discussions) {
+    const discussion = await discussions.post({ category: MONDAY_NOTE_CATEGORY, title: note.title, body: note.body });
+    return discussion.url;
+  }
+
+  const postResult = await client.post({ title: note.title, body: note.body });
+  return postResult.url;
 }
+

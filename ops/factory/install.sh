@@ -10,6 +10,7 @@ files=(
   # or `npm run check` and `npm run build` cannot resolve them.
   src/mastra/observability-store.ts
   src/mastra/observability-retention.ts
+  src/mastra/observability-traces-route.ts
   src/mastra/public/factory-skills/factory-plan/SKILL.md
   src/mastra/public/factory-skills/factory-review/SKILL.md
 )
@@ -41,9 +42,8 @@ python3 "$patch_dir/apply-install-patches.py" "$app_dir"
 node "$patch_dir/workos-cookie-identity.check.mjs" "$app_dir/.mastra/output"
 install -D -m 0644 "$patch_dir/wait-alerts.py" "$app_dir/ops/factory/wait-alerts.py"
 install -D -m 0644 "$patch_dir/wait-alerts.sql" "$app_dir/ops/factory/wait-alerts.sql"
-# Issue #140: the Monday note, plus the read-only trace-retention diagnostic
-# and the card reader the note shares. Retention itself is pruned by the app's
-# own Mastra scheduler (no systemd trigger).
+# Issue #180: weekly cost note, price table, traces reader, and card reader.
+install -D -m 0644 "$patch_dir/price-table.mjs" "$app_dir/ops/factory/price-table.mjs"
 install -D -m 0644 "$patch_dir/monday-note.mjs" "$app_dir/ops/factory/monday-note.mjs"
 install -D -m 0644 "$patch_dir/monday-note-run.mjs" "$app_dir/ops/factory/monday-note-run.mjs"
 install -D -m 0644 "$patch_dir/monday-note-adapters.mjs" "$app_dir/ops/factory/monday-note-adapters.mjs"
@@ -53,3 +53,4 @@ install -D -m 0644 "$patch_dir/factory-cards.mjs" "$app_dir/ops/factory/factory-
 install -D -m 0644 "$patch_dir/factory-cards.sql" "$app_dir/ops/factory/factory-cards.sql"
 install -D -m 0644 "$patch_dir/run-psql.mjs" "$app_dir/ops/factory/run-psql.mjs"
 printf 'Factory install, WorkOS regression, typecheck and build passed in %s\n' "$app_dir"
+
