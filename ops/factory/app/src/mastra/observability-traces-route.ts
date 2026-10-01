@@ -107,10 +107,12 @@ export const tracesRoute = registerApiRoute('/julia/observability/traces', {
       if (typeof obsStore.listTraces === 'function') {
         const result = await obsStore.listTraces(args);
         const spans = Array.isArray(result?.spans) ? result.spans : (Array.isArray(result) ? result : []);
+        const curPage = pagination?.page ?? 0;
+        const curPerPage = pagination?.perPage ?? 50;
         const paginationRes = result?.pagination ?? {
-          page: pagination.page,
-          perPage: pagination.perPage,
-          hasMore: result?.delta?.hasMore ?? (spans.length >= pagination.perPage),
+          page: curPage,
+          perPage: curPerPage,
+          hasMore: result?.delta?.hasMore ?? (spans.length >= curPerPage),
         };
         return c.json({ spans, pagination: paginationRes });
       }
