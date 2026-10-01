@@ -68,6 +68,7 @@ test('the installer copies the issue #140 Monday note and retention programs int
   });
   assert.equal(result.status, 0, result.stderr);
   for (const file of [
+    'ops/factory/price-table.mjs',
     'ops/factory/monday-note.mjs',
     'ops/factory/monday-note-run.mjs',
     'ops/factory/monday-note-adapters.mjs',
@@ -193,6 +194,7 @@ test('a missing required skill leaves an existing install untouched', () => {
   for (const file of [
     'package.json', 'package-lock.json', 'tsconfig.json', 'src/mastra/index.ts', 'src/mastra/local-sandbox.ts',
     'src/mastra/observability-store.ts', 'src/mastra/observability-retention.ts',
+    'src/mastra/observability-traces-route.ts',
     'src/mastra/public/factory-skills/factory-plan/SKILL.md',
   ]) {
     const destination = resolve(source, file);
