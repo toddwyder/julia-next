@@ -52,8 +52,8 @@ export const tracesRoute = registerApiRoute('/julia/observability/traces', {
       }
 
       if (forwardedFor) {
-        const ips = forwardedFor.split(',').map((s) => s.trim());
-        if (!ips.every((ip) => isLoopbackIp(ip))) {
+        const ips = forwardedFor.split(',').map((s: string) => s.trim());
+        if (!ips.every((ip: string) => isLoopbackIp(ip))) {
           return c.json({ error: 'Forbidden: loopback access only' }, 403);
         }
       }
