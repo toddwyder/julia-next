@@ -13,7 +13,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import {
-  writeFileSync, mkdtempSync, chmodSync, rmSync,
+  readFileSync, writeFileSync, mkdtempSync, chmodSync, rmSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -261,7 +261,8 @@ async function main() {
     } else if (action === 'open') {
       const [owner, repo] = args.repo.split('/');
       const result = await openPullRequest({
-        owner, repo, head: args.head, base: args.base || 'main', title: args.title, body: args.body || '',
+        owner, repo, head: args.head, base: args.base || 'main', title: args.title,
+        body: args['body-file'] ? readFileSync(args['body-file'], 'utf8') : args.body || '',
         draft: args.draft === 'true',
       });
       console.log(JSON.stringify(result));
@@ -271,7 +272,7 @@ async function main() {
       console.log(JSON.stringify(result));
     } else {
       console.error('usage: node publish-pr.mjs push --repo <owner/name> --branch <name> [--cwd <path>]');
-      console.error('       node publish-pr.mjs open --repo <owner/name> --head <branch> --base <branch> --title <text> --body <text> [--draft true]');
+      console.error('       node publish-pr.mjs open --repo <owner/name> --head <branch> --base <branch> --title <text> (--body <text> | --body-file <path>) [--draft true]');
       console.error('       node publish-pr.mjs ready --repo <owner/name> --number <pr-number> --sha <reviewed-head-sha>');
       process.exitCode = 2;
       return;
