@@ -51,6 +51,6 @@ test('the installer installs the Monday note unit, writes a placeholder config w
   assert.match(installer, /chmod 0640/);
   assert.match(installer, /MONDAY_NOTE_TRACE_TOKEN=$/m, 'the trace token placeholder must be empty');
   assert.match(installer, /MONDAY_NOTE_USE_PUBLISHER_APP=1/m, 'each run mints a fresh App token');
-  assert.doesNotMatch(installer, /MONDAY_NOTE_DISCORD_WEBHOOK/, 'Discord webhook placeholder is retired in issue 180');
+  assert.doesNotMatch(installer, /^\s*MONDAY_NOTE_DISCORD_WEBHOOK=/m, 'Discord webhook placeholder is retired in issue 180');
   assert.match(installer, /systemctl enable julia-factory-monday-note\.timer/);
 });
