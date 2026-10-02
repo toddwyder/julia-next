@@ -226,6 +226,15 @@ test('bundled estimates cannot replace missing counts and aggregate model spans 
   assert.equal(records[2].gap, 'no_token_count');
 });
 
+test('raw aggregate generation and step leave the inference leaf billable', () => {
+  const generation = { ...generationSpan, spanId: 'generation' };
+  const step = { ...generationSpan, spanId: 'step', parentSpanId: 'generation', spanType: 'model_step' };
+  const inference = { ...generationSpan, spanId: 'inference', parentSpanId: 'step', spanType: 'model_inference' };
+  const records = normalizeTraceSpans([generation, step, inference]);
+  assert.deepEqual(records.filter(record => record.costBearing).map(record => record.id), ['inference']);
+  assert.ok(records[2].costUsd > 0);
+});
+
 test('a generation root with an inference child bills the hydrated leaf once', async () => {
   const root = { ...generationSpan, spanId: 'root', attributes: undefined, metadata: { threadId: 'session-140' } };
   const leaf = { ...generationSpan, spanId: 'leaf', parentSpanId: 'root', spanType: 'model_inference' };

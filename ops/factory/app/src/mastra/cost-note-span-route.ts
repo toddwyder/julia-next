@@ -17,12 +17,12 @@ export function costOnlySpan(span: Record<string, any>) {
   const effort = span.attributes?.parameters?.reasoning?.effort ??
     span.attributes?.parameters?.reasoningEffort ?? span.attributes?.parameters?.reasoning_effort;
   if (!attributes.effort && typeof effort === 'string' && /^[a-zA-Z0-9_-]{1,32}$/.test(effort)) attributes.effort = effort;
-  attributes.usage = pick(span.attributes?.usage, [
+  const usage = pick(span.attributes?.usage, [
     'inputTokens', 'promptTokens', 'cachedInputTokens', 'outputTokens', 'completionTokens', 'reasoningTokens',
   ]);
-  const usage = span.attributes?.usage;
-  if (usage?.inputDetails) (attributes.usage as Record<string, unknown>).inputDetails = pick(usage.inputDetails, ['cacheRead', 'cacheWrite']);
-  if (usage?.outputDetails) (attributes.usage as Record<string, unknown>).outputDetails = pick(usage.outputDetails, ['reasoning']);
+  if (span.attributes?.usage?.inputDetails) usage.inputDetails = pick(span.attributes.usage.inputDetails, ['cacheRead', 'cacheWrite']);
+  if (span.attributes?.usage?.outputDetails) usage.outputDetails = pick(span.attributes.usage.outputDetails, ['reasoning']);
+  if (Object.keys(usage).length) attributes.usage = usage;
   attributes.costContext = pick(span.attributes?.costContext, ['model', 'provider']);
   attributes.inputDetails = pick(span.attributes?.inputDetails, ['cacheRead', 'cacheWrite']);
   attributes.outputDetails = pick(span.attributes?.outputDetails, ['reasoning']);
@@ -42,12 +42,15 @@ function logReadError(error: unknown, traceId: string) {
     code: typeof code === 'string' && /^[A-Z0-9_]{1,40}$/.test(code) ? code : undefined })} failed`);
 }
 
+const validId = (id: string) => /^[A-Za-z0-9_-]{1,128}$/.test(id);
+
 export const costNoteSpanRoute = registerApiRoute('/julia/cost-traces/:traceId/spans/:spanId', {
   method: 'GET',
   requiresAuth: true,
   createHandler: async ({ mastra }) => async c => {
     const traceId = c.req.param('traceId');
     const spanId = c.req.param('spanId');
+    if (!validId(traceId) || !validId(spanId)) return c.json({ error: 'Invalid span ID' }, 400);
     try {
       const store = await mastra.getStorage()?.getStore('observability');
       if (!store) return c.json({ error: 'Observability storage unavailable' }, 503);
@@ -68,7 +71,7 @@ export const costNoteSpanBatchRoute = registerApiRoute('/julia/cost-traces/:trac
   createHandler: async ({ mastra }) => async c => {
     const traceId = c.req.param('traceId');
     const ids: string[] = c.req.query('ids')?.split(',') ?? [];
-    if (!ids.length || ids.length > 20 || ids.some(id => !/^[A-Za-z0-9_-]{1,128}$/.test(id)) || new Set(ids).size !== ids.length) {
+    if (!validId(traceId) || !ids.length || ids.length > 20 || ids.some(id => !validId(id)) || new Set(ids).size !== ids.length) {
       return c.json({ error: 'Invalid span IDs' }, 400);
     }
     try {

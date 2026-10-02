@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { costOnlySpan, costNoteSpanRoute, costNoteSpanBatchRoute } from './src/mastra/cost-note-span-route.ts';
+import { normalizeTraceSpans } from '../mastra-traces.mjs';
 
 test('cost note span projection excludes prompts and unrelated attributes', () => {
   const span = costOnlySpan({ traceId: 't', spanId: 's', spanType: 'model_inference',
@@ -36,6 +37,19 @@ test('cost projection preserves a model from a safe llm name and reasoning effor
   assert.equal(span.attributes.model, 'deepseek/deepseek-v4-pro');
   assert.equal(span.attributes.effort, 'high');
   assert.equal(JSON.stringify(span).includes('private'), false);
+});
+
+test('top-level-only token counts remain available for pricing', () => {
+  const span = costOnlySpan({ spanId: 's', attributes: {
+    model: 'deepseek-v4-flash', provider: 'deepseek', inputTokens: 120, outputTokens: 30,
+  } });
+  assert.equal(Object.hasOwn(span.attributes, 'usage'), false);
+  assert.equal(span.attributes.inputTokens, 120);
+  assert.equal(span.attributes.outputTokens, 30);
+  const [priced] = normalizeTraceSpans([{ ...span, traceId: 't', spanType: 'model_inference',
+    startedAt: '2026-09-29T12:00:00Z' }]);
+  assert.ok(priced.costUsd > 0);
+  assert.equal(priced.gap, null);
 });
 
 test('cost route reports missing storage and spans without returning data', async () => {
@@ -84,4 +98,15 @@ test('batch cost route returns ordered projections and bounds reads', async () =
   assert.equal(JSON.stringify(response.body).includes('private'), false);
   assert.equal((await handler(context(Array(21).fill('id').join(',')))).status, 400);
   assert.equal(calls.length, 2);
+  assert.equal((await handler({ ...context('one'), req: { param: () => '../bad', query: () => 'one' } })).status, 400);
+  assert.equal(calls.length, 2);
+});
+
+test('single cost route rejects invalid storage identifiers before lookup', async () => {
+  let accessed = false;
+  const handler = await costNoteSpanRoute.createHandler({ mastra: { getStorage: () => { accessed = true; return undefined; } } });
+  const response = await handler({ req: { param: key => key === 'traceId' ? 'bad/trace' : 'span' },
+    json: (body, status = 200) => ({ body, status }) });
+  assert.equal(response.status, 400);
+  assert.equal(accessed, false);
 });

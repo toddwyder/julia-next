@@ -250,11 +250,19 @@ export function normalizeTraceSpans(spans = [], { cards = [], priceTable = PRICE
   }
 
   const spansById = new Map(spans.map(span => [span.spanId ?? span.id, span]));
+  const inferenceAncestors = new Set();
+  for (const child of spans.filter(span => span.spanType === 'model_inference')) {
+    const visited = new Set();
+    for (let parent = spansById.get(child.parentSpanId); parent && !visited.has(parent.spanId); parent = spansById.get(parent.parentSpanId)) {
+      visited.add(parent.spanId);
+      if (parent.spanType === 'model_generation' || parent.spanType === 'model_step') inferenceAncestors.add(parent.spanId);
+    }
+  }
   return spans.map((span) => {
     const attributes = isObject(span.attributes) ? span.attributes : {};
     const costContext = isObject(attributes.costContext) ? attributes.costContext : {};
     const usage =
-      isObject(attributes.usage)
+      isObject(attributes.usage) && Object.keys(attributes.usage).length > 0
         ? attributes.usage
         : (typeof attributes.inputTokens === 'number' || typeof attributes.outputTokens === 'number'
             ? {
@@ -310,13 +318,13 @@ export function normalizeTraceSpans(spans = [], { cards = [], priceTable = PRICE
     const seenParents = new Set();
     for (let parent = spansById.get(span.parentSpanId); parent && !seenParents.has(parent.spanId); parent = spansById.get(parent.parentSpanId)) {
       seenParents.add(parent.spanId);
-      if (parent.spanType === 'model_generation' && !parent.includedInGeneration && (span.spanType === 'model_step' || span.spanType === 'model_inference')) aggregateParent = true;
+      if (parent.spanType === 'model_generation' && span.spanType === 'model_step') aggregateParent = true;
     }
     const binding = bindingsBySession.get(sessionId)?.filter(item => Date.parse(item.at) <= Date.parse(span.startedAt ?? span.startTime))
       .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))[0];
     const recordedPhase = snapshot?.phase ? recordedFactoryPhase(snapshot.phase) :
       binding?.role ? recordedFactoryPhase(binding.role) : null;
-    const costBearing = isCostBearing(span) && !aggregateParent && !span.includedInGeneration;
+    const costBearing = isCostBearing(span) && !aggregateParent && !inferenceAncestors.has(span.spanId) && !span.includedInGeneration;
     let costResult = null;
     let costUsd = null;
     let faceCostUsd = null;
