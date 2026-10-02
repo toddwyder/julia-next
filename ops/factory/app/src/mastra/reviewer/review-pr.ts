@@ -18,13 +18,18 @@ export const verdictSchema = z.object({
 function parseVerdictOutput(answer: { object?: unknown; text?: string }): z.infer<typeof verdictSchema> {
   if (answer.object !== undefined) return verdictSchema.parse(answer.object);
   const text = answer.text?.trim();
-  if (!text) throw new Error('Reviewer returned no structured verdict or text');
+  if (!text) throw Object.assign(new Error('Reviewer returned no structured verdict or text'), { code: 'VERDICT_EMPTY' });
   const fenced = text.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  let parsed: unknown;
   try {
-    return verdictSchema.parse(JSON.parse(fenced ? fenced[1]! : text));
+    parsed = JSON.parse(fenced ? fenced[1]! : text);
   } catch {
-    throw new Error('Reviewer returned text without a schema-valid verdict');
+    throw Object.assign(new Error('Reviewer text verdict is not JSON'), { code: 'VERDICT_JSON_INVALID' });
   }
+  const result = verdictSchema.safeParse(parsed);
+  if (!result.success)
+    throw Object.assign(new Error('Reviewer text verdict failed schema validation'), { code: 'VERDICT_SCHEMA_INVALID' });
+  return result.data;
 }
 
 export type ReviewVerdict = z.infer<typeof verdictSchema> & { headSha: string; body: string };

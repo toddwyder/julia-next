@@ -201,7 +201,22 @@ test('a batched review refuses text without a complete verdict', async () => {
   try {
     await assert.rejects(() => reviewPullRequest(OWNER, REPO, PULL, HEAD, {
       runBatchedReview: async () => ({ fileReviews: [{ filename: 'big.ts', issues: [] }], skippedFiles: [] }),
-    }), /text without a schema-valid verdict/);
+    }), { code: 'VERDICT_SCHEMA_INVALID', message: 'Reviewer text verdict failed schema validation' });
+  } finally {
+    codeReviewAgent.generate = originalGenerate;
+    restoreFetch();
+  }
+});
+
+test('a batched review identifies malformed JSON without exposing model text', async () => {
+  const { codeReviewAgent } = await import('./src/mastra/reviewer/agents/code-review-agent.ts');
+  const originalGenerate = codeReviewAgent.generate;
+  const restoreFetch = stubGitHubFetch();
+  codeReviewAgent.generate = async () => ({ object: undefined, text: '{private response' });
+  try {
+    await assert.rejects(() => reviewPullRequest(OWNER, REPO, PULL, HEAD, {
+      runBatchedReview: async () => ({ fileReviews: [{ filename: 'big.ts', issues: [] }], skippedFiles: [] }),
+    }), { code: 'VERDICT_JSON_INVALID', message: 'Reviewer text verdict is not JSON' });
   } finally {
     codeReviewAgent.generate = originalGenerate;
     restoreFetch();
@@ -1260,7 +1275,7 @@ test('status closes a running job left by an earlier server process', async () =
   }
 });
 
-test('action sees a failed real HTTP workflow and submits no GitHub review', async () => {
+test('action sees a schema-invalid verdict fail the real HTTP workflow and submits no GitHub review', async () => {
   const { Hono } = await import('hono');
   const { Mastra } = await import('@mastra/core/mastra');
   const { InMemoryStore } = await import('@mastra/core/storage');
@@ -1278,7 +1293,7 @@ test('action sees a failed real HTTP workflow and submits no GitHub review', asy
   process.env.GITHUB_REPOSITORY = 'toddwyder/julia-next';
   process.env.GITHUB_TOKEN = 'test-token';
   process.env.JULIA_REVIEW_ROUTE_SECRET = 'assembled-secret';
-  codeReviewAgent.generate = async () => { throw new Error('Provider unavailable'); };
+  codeReviewAgent.generate = async () => ({ object: undefined, text: '{"verdict":"APPROVE"}' });
   const mastra = new Mastra({
     workflows: { crossMakerReviewWorkflow, prReviewWorkflow }, agents: { codeReviewAgent },
     storage: new InMemoryStore(), pubsub: new EventEmitterPubSub(), logger: false,
