@@ -109,6 +109,25 @@ test('partial trace pagination fails closed', async () => {
   await assert.rejects(readTraceSpans({ factoryUrl: 'https://factory.example', token: 'test-reader', from: FROM, to: TO, fetchImpl: fake.fetch }), /incomplete/);
 });
 
+test('a listed root without a trace identity stops publication', async () => {
+  const fake = fakeFetch(() => jsonResponse({
+    spans: [{ spanId: 'root', spanType: 'agent_run', startedAt: FROM }],
+    pagination: { page: 0, hasMore: false },
+  }));
+  await assert.rejects(readTraceSpans({ factoryUrl: 'https://factory.example', token: 'reader', from: FROM, to: TO, fetchImpl: fake.fetch }), /trace identity|traceId/i);
+});
+
+test('a billable timeline span with no start time stops publication', async () => {
+  const root = { traceId: 'trace-a', spanId: 'root', spanType: 'agent_run', startedAt: FROM };
+  const fake = fakeFetch(url => {
+    const pathname = new URL(url).pathname;
+    if (pathname.endsWith('/traces/light')) return jsonResponse({ spans: [root], pagination: { page: 0, hasMore: false } });
+    if (pathname.endsWith('/trace-a/light')) return jsonResponse({ spans: [root, { ...generationSpan, startedAt: undefined }] });
+    throw new Error(`Unexpected route ${pathname}`);
+  });
+  await assert.rejects(readTraceSpans({ factoryUrl: 'https://factory.example', token: 'reader', from: FROM, to: TO, fetchImpl: fake.fetch }), /start time|startedAt/i);
+});
+
 test('a generation span normalises with token breakdown and what-you-pay pricing from price table', () => {
   const [record] = normalizeTraceSpans([generationSpan], { cards: [{ number: 140, sessions: { 'session-140': {} } }] });
 

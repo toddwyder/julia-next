@@ -121,7 +121,9 @@ Operator installation:
    /opt/julia-factory-monday-note/ops/factory/monday-note-run.mjs --dry-run
    --from 2026-09-28T00:00:00Z --to <UTC_END>`. Explicit windows are only accepted for dry runs.
 5. Start `julia-factory-monday-note.timer`. It fires Mondays at 08:00 UTC and backfills completed
-   weeks. Each invocation mints a fresh short-lived installation token through the existing
+   weeks while their start times remain inside the standing 14-day trace retention window. An
+   expired missing week stops publication and logs a failure rather than reporting erased costs as
+   a quiet week. Each invocation mints a fresh short-lived installation token through the existing
    publisher App credential; the Factory process never receives that signing key.
 
 Delivery uses public GitHub Issues only. The original Factory intake rule already excludes the

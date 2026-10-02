@@ -73,7 +73,10 @@ export async function readTraceSpans({ factoryUrl, token, from, to, fetchImpl = 
     if (!isObject(pagination) || typeof pagination.hasMore !== 'boolean' || pagination.page !== page) throw new Error('Mastra trace list returned an unusable pagination object');
     if (pagination.hasMore && (body.spans.length === 0 || page === MAX_PAGES - 1)) throw new Error('Mastra trace pagination was incomplete; refusing a partial report');
     for (const root of body.spans) {
-      if (!root.traceId || seen.has(root.traceId)) continue;
+      if (!isObject(root) || typeof root.traceId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(root.traceId)) {
+        throw new Error('Mastra trace list returned a root without a valid trace identity');
+      }
+      if (seen.has(root.traceId)) continue;
       seen.add(root.traceId);
       const trace = await get(`/${encodeURIComponent(root.traceId)}/light`);
       if (!Array.isArray(trace.spans) || trace.spans.length === 0) throw new Error(`Mastra trace ${root.traceId} has no timeline spans`);
@@ -94,7 +97,8 @@ export async function readTraceSpans({ factoryUrl, token, from, to, fetchImpl = 
       for (const span of trace.spans) {
         if (!isCostBearing(span)) continue;
         const at = Date.parse(span.startedAt);
-        if (!Number.isFinite(at) || at < fromMs || at >= toMs) continue;
+        if (!Number.isFinite(at)) throw new Error(`Mastra trace ${root.traceId} has a billable span without a valid start time`);
+        if (at < fromMs || at >= toMs) continue;
         if (aggregates.has(span.spanId)) {
           if (span.spanType === 'model_step') details.push({
             traceId: root.traceId, spanId: span.spanId, parentSpanId: span.parentSpanId,

@@ -272,6 +272,7 @@ test('a multi-week outage backfills every missed week, oldest first, exactly onc
 
   const result = await runMondayNoteBackfill({
     now: '2026-10-19T09:00:00Z',
+    traceRetentionDays: 100,
     readCards: async () => CARDS,
     readSpans: async ({ from, to }) => { windows.push(`${from}..${to}`); return SPANS; },
     discussions,
@@ -291,6 +292,19 @@ test('a multi-week outage backfills every missed week, oldest first, exactly onc
   // One notification for the backlog, not one per week.
   assert.equal(notifications.sent.length, 1);
   assert.match(notifications.sent[0].body, /2 missed weeks backfilled/);
+});
+
+test('an expired missing week fails before reading traces or posting a misleading note', async () => {
+  const issues = fakeIssues();
+  let traceReads = 0;
+  await assert.rejects(() => runMondayNoteBackfill({
+    now: '2026-10-19T09:00:00Z',
+    readCards: async () => CARDS,
+    readSpans: async () => { traceReads += 1; return []; },
+    issues,
+  }), /retention|expired/i);
+  assert.equal(traceReads, 0);
+  assert.equal(issues.calls.posted.length, 0);
 });
 
 test('re-running the backfill posts and notifies nothing when no week is missing', async () => {
@@ -324,6 +338,7 @@ test('a long outage is bounded per run and the next run continues without skippi
 
   const first = await runMondayNoteBackfill({
     now: '2026-12-07T09:00:00Z',
+    traceRetentionDays: 100,
     readCards: async () => CARDS,
     readSpans: async ({ from }) => { seen.push(from); return SPANS; },
     discussions,
@@ -337,6 +352,7 @@ test('a long outage is bounded per run and the next run continues without skippi
 
   const second = await runMondayNoteBackfill({
     now: '2026-12-07T09:00:00Z',
+    traceRetentionDays: 100,
     readCards: async () => CARDS,
     readSpans: async ({ from }) => { seen.push(from); return SPANS; },
     discussions,
@@ -358,6 +374,7 @@ test('a failed read during backfill fails closed: nothing is posted or notified'
   await assert.rejects(
     () => runMondayNoteBackfill({
       now: '2026-10-19T09:00:00Z',
+      traceRetentionDays: 100,
       readCards: async () => CARDS,
       readSpans: async () => { throw new Error('Mastra trace list returned HTTP 500'); },
       discussions,
@@ -421,6 +438,7 @@ test('runMondayNoteBackfill backfills missing weeks over GitHub issues', async (
 
   const result = await runMondayNoteBackfill({
     now: '2026-10-19T09:00:00Z',
+    traceRetentionDays: 100,
     readCards: async () => CARDS,
     readSpans: async () => SPANS,
     issues,

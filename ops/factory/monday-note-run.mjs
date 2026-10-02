@@ -31,6 +31,7 @@ import { createIssuesClient, createPublisherIssuesClient } from './monday-note-a
  * lookup by title is the cursor, so this bound never skips a week.
  */
 export const DEFAULT_MAX_BACKFILL_WEEKS = 8;
+export const TRACE_RETENTION_DAYS = 14;
 
 /**
  * Run one Monday note for the week before `now`.
@@ -86,6 +87,7 @@ export async function runMondayNoteBackfill({
   notifications,
   projectId,
   maxWeeksPerRun = DEFAULT_MAX_BACKFILL_WEEKS,
+  traceRetentionDays = TRACE_RETENTION_DAYS,
   log = console.log,
 }) {
   const weeks = completedWeeks({ now });
@@ -111,6 +113,12 @@ export async function runMondayNoteBackfill({
   }
 
   const batch = missing.slice(0, maxWeeksPerRun);
+  // The DuckDB store prunes spans by age. An empty read of an expired week
+  // cannot distinguish a quiet week from erased measurements.
+  const oldestRetained = Date.parse(now) - traceRetentionDays * 24 * 60 * 60 * 1000;
+  if (batch.some(week => Date.parse(week.from) <= oldestRetained)) {
+    throw new Error('Monday note cannot backfill an expired week: trace retention may have erased its costs');
+  }
   const published = [];
   for (const week of batch) {
     const spans = await readSpans({ from: week.from, to: week.to });
