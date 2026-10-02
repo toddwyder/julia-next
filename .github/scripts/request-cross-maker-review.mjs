@@ -35,8 +35,7 @@ async function cancelJob() {
     console.error(`Could not cancel Cross-maker job ${jobId}: request failed`);
   }
 }
-// GitHub sends SIGINT to the step's entry process on cancellation. The
-// workflow uses `exec node` so this handler can release the paid server run.
+// Cancel the paid server run when Node receives an action cancellation signal.
 // https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-cancellation
 if (process.env.GITHUB_ACTIONS === 'true' && process.argv[1]
     && import.meta.url === pathToFileURL(process.argv[1]).href) {

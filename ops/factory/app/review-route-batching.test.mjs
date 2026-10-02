@@ -34,7 +34,7 @@ import { crossMakerReviewWorkflow } from './src/mastra/reviewer/workflows/cross-
 const OWNER = 'toddwyder';
 const REPO = 'julia-next';
 const PULL = 176;
-const HEAD = 'abc123';
+const HEAD = 'a'.repeat(40);
 
 async function waitForReview(mastra, jobId) {
   const workflow = mastra.getWorkflow('crossMakerReviewWorkflow');
@@ -909,6 +909,7 @@ test('signed start rejects an invalid pull request before creating a job', async
     for (const input of [
       { owner: 'toddwyder', repo: 'julia-next', pullNumber: '184', headSha: 'abc123' },
       { owner: 'someone-else', repo: 'julia-next', pullNumber: 184, headSha: 'abc123' },
+      { owner: 'toddwyder', repo: 'julia-next', pullNumber: 184, headSha: 'bad-head' },
     ]) {
       const body = JSON.stringify(input);
       const signature = createHmac('sha256', secret).update(body).digest('hex');
@@ -1069,7 +1070,7 @@ test('starting a newer review cancels an active review for the same PR', async (
     },
   };
   const handler = await reviewerRoute.createHandler({ mastra: { getWorkflow: () => workflow } });
-  const body = JSON.stringify({ owner: 'toddwyder', repo: 'julia-next', pullNumber: 184, headSha: 'new-head' });
+  const body = JSON.stringify({ owner: 'toddwyder', repo: 'julia-next', pullNumber: 184, headSha: 'b'.repeat(40) });
   const signature = createHmac('sha256', 'dedupe-secret').update(body).digest('hex');
   try {
     const response = await handler({

@@ -43,7 +43,7 @@ export const reviewerRoute = registerApiRoute('/julia/review-pr', {
       console.info(`Cross-maker review started: job=${runId} pr=${input.owner}/${input.repo}#${input.pullNumber} head=${input.headSha}`);
       return c.json({ jobId: runId }, 202);
     } catch (error) {
-      console.error(`Cross-maker review start failed: pr=${input.owner}/${input.repo}#${input.pullNumber} type=${safeErrorType(error)}`);
+      console.error(`Cross-maker review start failed: pr=${input.owner}/${input.repo}#${input.pullNumber} type=${safeErrorType(error)}`, error);
       return c.json({ error: 'Review could not start' }, 503);
     }
   },
@@ -71,12 +71,12 @@ export const reviewerStatusRoute = registerApiRoute('/julia/review-pr/:jobId', {
         return c.json({ status: 'canceled', error: 'Review interrupted by server restart' });
       }
       if (!['pending', 'running', 'waiting'].includes(run.status)) {
-        console.error(`Cross-maker review stopped: job=${jobId} status=${run.status} type=${safeErrorType(run.error)}`);
+        console.error(`Cross-maker review stopped: job=${jobId} status=${run.status} type=${safeErrorType(run.error)}`, run.error);
         return c.json({ status: run.status, error: 'Review job failed' });
       }
       return c.json({ status: run.status });
     } catch (error) {
-      console.error(`Cross-maker review status failed: job=${jobId} type=${safeErrorType(error)}`);
+      console.error(`Cross-maker review status failed: job=${jobId} type=${safeErrorType(error)}`, error);
       return c.json({ error: 'Review status unavailable' }, 503);
     }
   },
@@ -97,8 +97,8 @@ export const reviewerCancelRoute = registerApiRoute('/julia/review-pr/:jobId', {
       await (await workflow.createRun({ runId: jobId })).cancel();
       console.info(`Cross-maker review canceled: job=${jobId}`);
       return c.json({ status: 'canceled' });
-    } catch {
-      console.error(`Cross-maker review cancellation failed: job=${jobId}`);
+    } catch (error) {
+      console.error(`Cross-maker review cancellation failed: job=${jobId} type=${safeErrorType(error)}`, error);
       return c.json({ error: 'Review cancellation unavailable' }, 503);
     }
   },

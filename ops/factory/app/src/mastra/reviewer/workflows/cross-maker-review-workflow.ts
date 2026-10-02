@@ -6,7 +6,7 @@ export const reviewInput = z.object({
   owner: z.literal('toddwyder'),
   repo: z.literal('julia-next'),
   pullNumber: z.number().int().positive().refine(Number.isSafeInteger),
-  headSha: z.string().min(1),
+  headSha: z.string().regex(/^[a-f0-9]{40}$/i),
 });
 
 const reviewOutput = verdictSchema.extend({
@@ -22,7 +22,9 @@ const reviewStep = createStep({
     const runBatchedReview: RunBatchedReview = async ({ owner, repo, pullNumber }) => {
       const workflow = mastra.getWorkflow('prReviewWorkflow');
       const run = await workflow.createRun();
-      const cancelNested = () => { void run.cancel(); };
+      const cancelNested = () => {
+        void run.cancel().catch(error => console.error('Cross-maker nested review cancellation failed', error));
+      };
       abortSignal.addEventListener('abort', cancelNested, { once: true });
       let result;
       try {

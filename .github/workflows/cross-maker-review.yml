@@ -16,7 +16,6 @@ jobs:
   review:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
         with:
@@ -29,4 +28,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           JULIA_REVIEW_ROUTE_SECRET: ${{ secrets.JULIA_REVIEW_ROUTE_SECRET }}
-        run: exec node .github/scripts/request-cross-maker-review.mjs
+        run: node .github/scripts/request-cross-maker-review.mjs
