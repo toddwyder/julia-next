@@ -42,7 +42,7 @@ import type { IMastraAuthProvider } from '@mastra/core/server';
 import { codeReviewAgent } from './reviewer/agents/code-review-agent';
 import { workflowReviewAgent } from './reviewer/agents/workflow-review-agent';
 import { prReviewWorkflow } from './reviewer/workflows/pr-review-workflow';
-import { reviewerRoute, reviewerStatusRoute } from './reviewer/route';
+import { reviewerRoute, reviewerStatusRoute, reviewerCancelRoute } from './reviewer/route';
 import { crossMakerReviewWorkflow } from './reviewer/workflows/cross-maker-review-workflow';
 import {
   composeStorageWithObservability,
@@ -503,7 +503,7 @@ export const mastra = new Mastra({
   workflows: { ...preparedArgs.workflows, prReviewWorkflow, crossMakerReviewWorkflow, observabilityRetentionWorkflow },
   server: {
     ...preparedArgs.server,
-    apiRoutes: [...(preparedArgs.server?.apiRoutes ?? []), reviewerRoute, reviewerStatusRoute],
+    apiRoutes: [...(preparedArgs.server?.apiRoutes ?? []), reviewerRoute, reviewerStatusRoute, reviewerCancelRoute],
   },
   storage: composedStorage,
   pubsub: preparedArgs.pubsub,

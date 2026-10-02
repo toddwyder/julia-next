@@ -24,6 +24,7 @@ import { createHmac } from 'node:crypto';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { inspect } from 'node:util';
 import test from 'node:test';
 
 import { reviewPullRequest } from './src/mastra/reviewer/review-pr.ts';
@@ -34,7 +35,7 @@ import { crossMakerReviewWorkflow } from './src/mastra/reviewer/workflows/cross-
 const OWNER = 'toddwyder';
 const REPO = 'julia-next';
 const PULL = 176;
-const HEAD = 'abc123';
+const HEAD = 'a'.repeat(40);
 
 async function waitForReview(mastra, jobId) {
   const workflow = mastra.getWorkflow('crossMakerReviewWorkflow');
@@ -603,6 +604,58 @@ test('the route runs the real supported prReviewWorkflow for a large PR', async 
   }
 });
 
+test('canceling a large review aborts the nested file-review model call', async () => {
+  const { Mastra } = await import('@mastra/core/mastra');
+  const { InMemoryStore } = await import('@mastra/core/storage');
+  const { EventEmitterPubSub } = await import('@mastra/core/events');
+  const { workflowReviewAgent } = await import('./src/mastra/reviewer/agents/workflow-review-agent.ts');
+  const { codeReviewAgent } = await import('./src/mastra/reviewer/agents/code-review-agent.ts');
+  const { reviewerCancelRoute } = await import('./src/mastra/reviewer/route.ts');
+  const restoreFetch = stubGitHubFetch({ fileCount: 40 });
+  const originalGenerate = workflowReviewAgent.generate;
+  process.env.JULIA_REVIEW_ROUTE_SECRET = 'large-cancel-secret';
+  let agentStarted;
+  const started = new Promise(resolve => { agentStarted = resolve; });
+  let signalReceived;
+  const aborted = new Promise(resolve => { signalReceived = resolve; });
+  workflowReviewAgent.generate = async (_prompt, options) => {
+    agentStarted();
+    return new Promise((_resolve, reject) => {
+      options.abortSignal?.addEventListener('abort', () => {
+        signalReceived();
+        reject(new Error('Nested provider request aborted'));
+      }, { once: true });
+    });
+  };
+  const mastra = new Mastra({
+    workflows: { prReviewWorkflow, crossMakerReviewWorkflow },
+    agents: { workflowReviewAgent, codeReviewAgent }, storage: new InMemoryStore(),
+    pubsub: new EventEmitterPubSub(), logger: false,
+  });
+  const startHandler = await reviewerRoute.createHandler({ mastra });
+  const cancelHandler = await reviewerCancelRoute.createHandler({ mastra });
+  const body = JSON.stringify({ owner: OWNER, repo: REPO, pullNumber: PULL, headSha: HEAD });
+  try {
+    const start = await startHandler({
+      req: { text: async () => body, header: () => createHmac('sha256', 'large-cancel-secret').update(body).digest('hex') },
+      json: (payload, status = 200) => ({ payload, status }),
+    });
+    assert.equal(start.status, 202);
+    await started;
+    const jobId = start.payload.jobId;
+    const cancel = await cancelHandler({
+      req: { param: () => jobId, header: () => createHmac('sha256', 'large-cancel-secret').update(jobId).digest('hex') },
+      json: (payload, status = 200) => ({ payload, status }),
+    });
+    assert.equal(cancel.payload.status, 'canceled');
+    await Promise.race([aborted, new Promise((_, reject) => setTimeout(() => reject(new Error('Nested model call was not aborted')), 2000))]);
+  } finally {
+    restoreFetch();
+    workflowReviewAgent.generate = originalGenerate;
+    delete process.env.JULIA_REVIEW_ROUTE_SECRET;
+  }
+});
+
 test('a small PR keeps the original single-prompt path', async () => {
   const { codeReviewAgent } = await import('./src/mastra/reviewer/agents/code-review-agent.ts');
   const originalCodeGenerate = codeReviewAgent.generate;
@@ -670,8 +723,11 @@ test('the single-prompt path rechecks the head after its criterion verdict agent
 test('status route authenticates the job id and reports failed jobs', async () => {
   const secret = 'status-secret';
   process.env.JULIA_REVIEW_ROUTE_SECRET = secret;
+  const originalError = console.error;
+  const logs = [];
+  console.error = (...args) => { logs.push(args.map(arg => inspect(arg)).join(' ')); };
   const mastra = { getWorkflow: () => ({
-    getWorkflowRunById: async () => ({ status: 'failed', error: { message: 'model unavailable' } }),
+    getWorkflowRunById: async () => ({ status: 'failed', error: { message: 'provider token=secret123', code: 'RATE_LIMIT', status: 429 } }),
   }) };
   const handler = await reviewerStatusRoute.createHandler({ mastra });
   const context = signature => ({
@@ -683,8 +739,12 @@ test('status route authenticates the job id and reports failed jobs', async () =
     const signature = createHmac('sha256', secret).update('job-1').digest('hex');
     const response = await handler(context(signature));
     assert.equal(response.status, 200);
-    assert.deepEqual(response.payload, { status: 'failed', error: 'model unavailable' });
+    assert.deepEqual(response.payload, { status: 'failed', error: 'Review job failed' });
+    assert.match(logs.join('\n'), /job=job-1 status=failed/);
+    assert.match(logs.join('\n'), /code=RATE_LIMIT statusCode=429/);
+    assert.doesNotMatch(logs.join('\n'), /secret123/);
   } finally {
+    console.error = originalError;
     delete process.env.JULIA_REVIEW_ROUTE_SECRET;
   }
 });
@@ -839,5 +899,389 @@ test('signed start returns a job before a review lasting over three minutes fini
     globalThis.fetch = originalFetch;
     codeReviewAgent.generate = originalGenerate;
     delete process.env.JULIA_REVIEW_ROUTE_SECRET;
+  }
+});
+
+test('signed start rejects an invalid pull request before creating a job', async () => {
+  const secret = 'validation-secret';
+  process.env.JULIA_REVIEW_ROUTE_SECRET = secret;
+  const mastra = { getWorkflow: () => { throw new Error('A workflow must not start'); } };
+  const handler = await reviewerRoute.createHandler({ mastra });
+  try {
+    for (const input of [
+      { owner: 'toddwyder', repo: 'julia-next', pullNumber: '184', headSha: 'abc123' },
+      { owner: 'someone-else', repo: 'julia-next', pullNumber: 184, headSha: 'abc123' },
+      { owner: 'toddwyder', repo: 'julia-next', pullNumber: 184, headSha: 'bad-head' },
+    ]) {
+      const body = JSON.stringify(input);
+      const signature = createHmac('sha256', secret).update(body).digest('hex');
+      const response = await handler({
+        req: { text: async () => body, header: () => signature },
+        json: (payload, status = 200) => ({ payload, status }),
+      });
+      assert.equal(response.status, 400);
+    }
+  } finally {
+    delete process.env.JULIA_REVIEW_ROUTE_SECRET;
+  }
+});
+
+test('action reports a missing completed verdict clearly', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'cross-maker-missing-verdict-'));
+  const eventFile = join(directory, 'event.json');
+  await writeFile(eventFile, JSON.stringify({ pull_request: { number: 184, head: { sha: 'a'.repeat(40) } } }));
+  const originalFetch = globalThis.fetch;
+  const originalTimer = globalThis.setTimeout;
+  const originalEnv = { ...process.env };
+  process.env.GITHUB_EVENT_PATH = eventFile;
+  process.env.GITHUB_REPOSITORY = 'toddwyder/julia-next';
+  process.env.GITHUB_TOKEN = 'test-token';
+  process.env.JULIA_REVIEW_ROUTE_SECRET = 'test-secret';
+  let calls = 0;
+  globalThis.setTimeout = callback => { queueMicrotask(callback); return 0; };
+  globalThis.fetch = async () => {
+    calls += 1;
+    if (calls === 1) return Response.json({ jobId: 'missing-result' }, { status: 202 });
+    if (calls === 2) return Response.json({ status: 'success' });
+    throw new Error('Unexpected request');
+  };
+  try {
+    await assert.rejects(import('../../../.github/scripts/request-cross-maker-review.mjs?missing-verdict'),
+      /invalid or stale verdict/i);
+    assert.equal(calls, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+    globalThis.setTimeout = originalTimer;
+    for (const key of ['GITHUB_EVENT_PATH', 'GITHUB_REPOSITORY', 'GITHUB_TOKEN', 'JULIA_REVIEW_ROUTE_SECRET']) {
+      if (originalEnv[key] === undefined) delete process.env[key];
+      else process.env[key] = originalEnv[key];
+    }
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('action reports a failed job without echoing upstream error text', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'cross-maker-failed-job-'));
+  const eventFile = join(directory, 'event.json');
+  await writeFile(eventFile, JSON.stringify({ pull_request: { number: 184, head: { sha: 'a'.repeat(40) } } }));
+  const originalFetch = globalThis.fetch;
+  const originalTimer = globalThis.setTimeout;
+  const originalEnv = { ...process.env };
+  process.env.GITHUB_EVENT_PATH = eventFile;
+  process.env.GITHUB_REPOSITORY = 'toddwyder/julia-next';
+  process.env.GITHUB_TOKEN = 'test-token';
+  process.env.JULIA_REVIEW_ROUTE_SECRET = 'test-secret';
+  let calls = 0;
+  globalThis.setTimeout = callback => { queueMicrotask(callback); return 0; };
+  globalThis.fetch = async () => {
+    calls += 1;
+    if (calls === 1) return Response.json({ jobId: 'failed-job' }, { status: 202 });
+    if (calls === 2) return Response.json({ status: 'failed', error: 'provider token=secret123' });
+    throw new Error('Unexpected request');
+  };
+  try {
+    await assert.rejects(import('../../../.github/scripts/request-cross-maker-review.mjs?failed-job'),
+      error => /failed-job.*failed/.test(error.message) && !error.message.includes('secret123'));
+  } finally {
+    globalThis.fetch = originalFetch;
+    globalThis.setTimeout = originalTimer;
+    for (const key of ['GITHUB_EVENT_PATH', 'GITHUB_REPOSITORY', 'GITHUB_TOKEN', 'JULIA_REVIEW_ROUTE_SECRET']) {
+      if (originalEnv[key] === undefined) delete process.env[key];
+      else process.env[key] = originalEnv[key];
+    }
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('action stops a stalled review after 30 minutes and cancels its job', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'cross-maker-timeout-'));
+  const eventFile = join(directory, 'event.json');
+  await writeFile(eventFile, JSON.stringify({ pull_request: { number: 184, head: { sha: 'a'.repeat(40) } } }));
+  const originalFetch = globalThis.fetch;
+  const originalTimer = globalThis.setTimeout;
+  const originalEnv = { ...process.env };
+  process.env.GITHUB_EVENT_PATH = eventFile;
+  process.env.GITHUB_REPOSITORY = 'toddwyder/julia-next';
+  process.env.GITHUB_TOKEN = 'test-token';
+  process.env.JULIA_REVIEW_ROUTE_SECRET = 'test-secret';
+  let polls = 0;
+  let waits = 0;
+  let cancel;
+  globalThis.setTimeout = callback => { waits += 1; queueMicrotask(callback); return 0; };
+  globalThis.fetch = async (url, options = {}) => {
+    if (options.method === 'POST') return Response.json({ jobId: 'stalled-job' }, { status: 202 });
+    if (options.method === 'DELETE') { cancel = { url: String(url), options }; return Response.json({ status: 'canceled' }); }
+    polls += 1;
+    return Response.json({ status: 'running' });
+  };
+  try {
+    await assert.rejects(import('../../../.github/scripts/request-cross-maker-review.mjs?stalled-job'),
+      /did not finish within 30 minutes/i);
+    assert.equal(waits, 60);
+    assert.equal(polls, 60);
+    assert.match(cancel.url, /\/julia\/review-pr\/stalled-job$/);
+    assert.equal(cancel.options.headers['x-julia-review-signature'],
+      createHmac('sha256', 'test-secret').update('stalled-job').digest('hex'));
+  } finally {
+    globalThis.fetch = originalFetch;
+    globalThis.setTimeout = originalTimer;
+    for (const key of ['GITHUB_EVENT_PATH', 'GITHUB_REPOSITORY', 'GITHUB_TOKEN', 'JULIA_REVIEW_ROUTE_SECRET']) {
+      if (originalEnv[key] === undefined) delete process.env[key];
+      else process.env[key] = originalEnv[key];
+    }
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('action cancels a review when a status request times out', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'cross-maker-status-hang-'));
+  const eventFile = join(directory, 'event.json');
+  await writeFile(eventFile, JSON.stringify({ pull_request: { number: 184, head: { sha: 'a'.repeat(40) } } }));
+  const originalFetch = globalThis.fetch;
+  const originalTimer = globalThis.setTimeout;
+  const originalTimeout = AbortSignal.timeout;
+  const originalEnv = { ...process.env };
+  process.env.GITHUB_EVENT_PATH = eventFile;
+  process.env.GITHUB_REPOSITORY = 'toddwyder/julia-next';
+  process.env.GITHUB_TOKEN = 'test-token';
+  process.env.JULIA_REVIEW_ROUTE_SECRET = 'test-secret';
+  let polls = 0;
+  let canceled = false;
+  globalThis.setTimeout = callback => { queueMicrotask(callback); return 0; };
+  AbortSignal.timeout = () => AbortSignal.abort();
+  globalThis.fetch = async (_url, options = {}) => {
+    if (options.method === 'POST') return Response.json({ jobId: 'hanging-job' }, { status: 202 });
+    if (options.method === 'DELETE') { canceled = true; return Response.json({ status: 'canceled' }); }
+    polls += 1;
+    if (options.signal?.aborted) throw new DOMException('The operation was aborted', 'TimeoutError');
+    return Response.json({ status: 'running' });
+  };
+  try {
+    await assert.rejects(import('../../../.github/scripts/request-cross-maker-review.mjs?status-hang'),
+      /status request failed or timed out/i);
+    assert.equal(polls, 1);
+    assert.equal(canceled, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+    globalThis.setTimeout = originalTimer;
+    AbortSignal.timeout = originalTimeout;
+    for (const key of ['GITHUB_EVENT_PATH', 'GITHUB_REPOSITORY', 'GITHUB_TOKEN', 'JULIA_REVIEW_ROUTE_SECRET']) {
+      if (originalEnv[key] === undefined) delete process.env[key];
+      else process.env[key] = originalEnv[key];
+    }
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('signed DELETE cancels an active review job', async () => {
+  const { reviewerCancelRoute } = await import('./src/mastra/reviewer/route.ts');
+  process.env.JULIA_REVIEW_ROUTE_SECRET = 'cancel-secret';
+  let canceled = false;
+  const workflow = {
+    getWorkflowRunById: async () => ({ status: canceled ? 'canceled' : 'running' }),
+    createRun: async ({ runId }) => ({ cancel: async () => { assert.equal(runId, 'job-1'); canceled = true; } }),
+  };
+  const handler = await reviewerCancelRoute.createHandler({ mastra: { getWorkflow: () => workflow } });
+  const context = signature => ({
+    req: { param: () => 'job-1', header: () => signature },
+    json: (payload, status = 200) => ({ payload, status }),
+  });
+  try {
+    assert.equal((await handler(context('bad'))).status, 401);
+    assert.equal(canceled, false);
+    const signature = createHmac('sha256', 'cancel-secret').update('job-1').digest('hex');
+    assert.deepEqual((await handler(context(signature))).payload, { status: 'canceled' });
+    assert.equal(canceled, true);
+  } finally {
+    delete process.env.JULIA_REVIEW_ROUTE_SECRET;
+  }
+});
+
+test('starting a newer review cancels an active review for the same PR', async () => {
+  process.env.JULIA_REVIEW_ROUTE_SECRET = 'dedupe-secret';
+  const events = [];
+  const workflow = {
+    listActiveWorkflowRuns: async () => ({ runs: [
+      { runId: 'old-job', resourceId: 'toddwyder/julia-next#184' },
+      { runId: 'other-pr-job', resourceId: 'toddwyder/julia-next#185' },
+    ] }),
+    createRun: async options => {
+      if (options.runId) return { cancel: async () => events.push(`cancel:${options.runId}`) };
+      events.push(`create:${options.resourceId}`);
+      return { startAsync: async () => { events.push('start:new-job'); return { runId: 'new-job' }; } };
+    },
+  };
+  const handler = await reviewerRoute.createHandler({ mastra: { getWorkflow: () => workflow } });
+  const body = JSON.stringify({ owner: 'toddwyder', repo: 'julia-next', pullNumber: 184, headSha: 'b'.repeat(40) });
+  const signature = createHmac('sha256', 'dedupe-secret').update(body).digest('hex');
+  try {
+    const response = await handler({
+      req: { text: async () => body, header: () => signature },
+      json: (payload, status = 200) => ({ payload, status }),
+    });
+    assert.equal(response.status, 202);
+    assert.deepEqual(response.payload, { jobId: 'new-job' });
+    assert.deepEqual(events, ['cancel:old-job', 'create:toddwyder/julia-next#184', 'start:new-job']);
+  } finally {
+    delete process.env.JULIA_REVIEW_ROUTE_SECRET;
+  }
+});
+
+test('canceling through HTTP aborts the active model call', async () => {
+  const { Hono } = await import('hono');
+  const { Mastra } = await import('@mastra/core/mastra');
+  const { InMemoryStore } = await import('@mastra/core/storage');
+  const { EventEmitterPubSub } = await import('@mastra/core/events');
+  const { codeReviewAgent } = await import('./src/mastra/reviewer/agents/code-review-agent.ts');
+  const { reviewerCancelRoute } = await import('./src/mastra/reviewer/route.ts');
+  const secret = 'abort-secret';
+  const headSha = 'b'.repeat(40);
+  const originalFetch = globalThis.fetch;
+  const originalGenerate = codeReviewAgent.generate;
+  process.env.JULIA_REVIEW_ROUTE_SECRET = secret;
+  globalThis.fetch = async url => {
+    const path = String(url);
+    if (path.includes('/pulls/184/files?')) return Response.json([{
+      filename: 'src/recipe.ts', status: 'modified', additions: 1, deletions: 0, changes: 1, patch: '+fix',
+    }]);
+    if (path.endsWith('/pulls/184')) return Response.json({
+      title: 'Recipe fix', body: 'Closes #200', head: { sha: headSha },
+    });
+    if (path.endsWith('/issues/200')) return Response.json({
+      body: '## Acceptance criteria\n- [ ] Recipe fix works',
+    });
+    throw new Error(`Unexpected GitHub request ${path}`);
+  };
+  let signalReceived;
+  const aborted = new Promise(resolve => { signalReceived = resolve; });
+  let agentStarted;
+  const started = new Promise(resolve => { agentStarted = resolve; });
+  codeReviewAgent.generate = async (_prompt, options) => {
+    agentStarted();
+    return new Promise((_resolve, reject) => {
+      options.abortSignal?.addEventListener('abort', () => {
+        signalReceived();
+        reject(new Error('Provider request aborted'));
+      }, { once: true });
+    });
+  };
+  const mastra = new Mastra({
+    workflows: { crossMakerReviewWorkflow, prReviewWorkflow },
+    agents: { codeReviewAgent }, storage: new InMemoryStore(),
+    pubsub: new EventEmitterPubSub(), logger: false,
+  });
+  const app = new Hono();
+  app.post('/julia/review-pr', await reviewerRoute.createHandler({ mastra }));
+  app.get('/julia/review-pr/:jobId', await reviewerStatusRoute.createHandler({ mastra }));
+  app.delete('/julia/review-pr/:jobId', await reviewerCancelRoute.createHandler({ mastra }));
+  const body = JSON.stringify({ owner: 'toddwyder', repo: 'julia-next', pullNumber: 184, headSha });
+  try {
+    const start = await app.request('/julia/review-pr', {
+      method: 'POST', headers: { 'x-julia-review-signature': createHmac('sha256', secret).update(body).digest('hex') }, body,
+    });
+    assert.equal(start.status, 202);
+    const { jobId } = await start.json();
+    await started;
+    const signature = createHmac('sha256', secret).update(jobId).digest('hex');
+    const cancel = await app.request(`/julia/review-pr/${jobId}`, {
+      method: 'DELETE', headers: { 'x-julia-review-signature': signature },
+    });
+    assert.equal(cancel.status, 200);
+    assert.equal((await cancel.json()).status, 'canceled');
+    await Promise.race([
+      aborted,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Model call was not aborted')), 2000)),
+    ]);
+    const status = await app.request(`/julia/review-pr/${jobId}`, {
+      headers: { 'x-julia-review-signature': signature },
+    });
+    assert.equal((await status.json()).status, 'canceled');
+  } finally {
+    globalThis.fetch = originalFetch;
+    codeReviewAgent.generate = originalGenerate;
+    delete process.env.JULIA_REVIEW_ROUTE_SECRET;
+  }
+});
+
+test('status closes a running job left by an earlier server process', async () => {
+  process.env.JULIA_REVIEW_ROUTE_SECRET = 'restart-secret';
+  let canceled = false;
+  const workflow = {
+    getWorkflowRunById: async () => ({ status: 'running', createdAt: new Date(0) }),
+    createRun: async () => ({ cancel: async () => { canceled = true; } }),
+  };
+  const handler = await reviewerStatusRoute.createHandler({ mastra: { getWorkflow: () => workflow } });
+  const signature = createHmac('sha256', 'restart-secret').update('old-job').digest('hex');
+  try {
+    const response = await handler({
+      req: { param: () => 'old-job', header: () => signature },
+      json: (payload, status = 200) => ({ payload, status }),
+    });
+    assert.equal(canceled, true);
+    assert.deepEqual(response.payload, { status: 'canceled', error: 'Review interrupted by server restart' });
+  } finally {
+    delete process.env.JULIA_REVIEW_ROUTE_SECRET;
+  }
+});
+
+test('action sees a failed real HTTP workflow and submits no GitHub review', async () => {
+  const { Hono } = await import('hono');
+  const { Mastra } = await import('@mastra/core/mastra');
+  const { InMemoryStore } = await import('@mastra/core/storage');
+  const { EventEmitterPubSub } = await import('@mastra/core/events');
+  const { codeReviewAgent } = await import('./src/mastra/reviewer/agents/code-review-agent.ts');
+  const directory = await mkdtemp(join(tmpdir(), 'cross-maker-assembled-failure-'));
+  const eventFile = join(directory, 'event.json');
+  const headSha = 'c'.repeat(40);
+  await writeFile(eventFile, JSON.stringify({ pull_request: { number: 184, head: { sha: headSha } } }));
+  const originalFetch = globalThis.fetch;
+  const originalTimer = globalThis.setTimeout;
+  const originalGenerate = codeReviewAgent.generate;
+  const originalEnv = { ...process.env };
+  process.env.GITHUB_EVENT_PATH = eventFile;
+  process.env.GITHUB_REPOSITORY = 'toddwyder/julia-next';
+  process.env.GITHUB_TOKEN = 'test-token';
+  process.env.JULIA_REVIEW_ROUTE_SECRET = 'assembled-secret';
+  codeReviewAgent.generate = async () => { throw new Error('Provider unavailable'); };
+  const mastra = new Mastra({
+    workflows: { crossMakerReviewWorkflow, prReviewWorkflow }, agents: { codeReviewAgent },
+    storage: new InMemoryStore(), pubsub: new EventEmitterPubSub(), logger: false,
+  });
+  const app = new Hono();
+  app.post('/julia/review-pr', await reviewerRoute.createHandler({ mastra }));
+  app.get('/julia/review-pr/:jobId', await reviewerStatusRoute.createHandler({ mastra }));
+  app.delete('/julia/review-pr/:jobId', await (await import('./src/mastra/reviewer/route.ts')).reviewerCancelRoute.createHandler({ mastra }));
+  let reviewsSubmitted = 0;
+  const waits = [];
+  globalThis.setTimeout = (callback, delay) => { waits.push(delay); return originalTimer(callback, 5); };
+  globalThis.fetch = async (url, options = {}) => {
+    const path = String(url);
+    if (path.startsWith('https://julia-factory.tail91f394.ts.net/')) return app.request(new Request(path, options));
+    if (path.includes('/pulls/184/files?')) return Response.json([{
+      filename: 'src/recipe.ts', status: 'modified', additions: 1, deletions: 0, changes: 1, patch: '+fix',
+    }]);
+    if (path.endsWith('/pulls/184')) return Response.json({
+      title: 'Recipe fix', body: 'Closes #200', head: { sha: headSha },
+    });
+    if (path.endsWith('/issues/200')) return Response.json({
+      body: '## Acceptance criteria\n- [ ] Recipe fix works',
+    });
+    if (path.endsWith('/pulls/184/reviews')) { reviewsSubmitted += 1; return Response.json({ state: 'APPROVED' }); }
+    throw new Error(`Unexpected request ${path}`);
+  };
+  try {
+    await assert.rejects(import('../../../.github/scripts/request-cross-maker-review.mjs?assembled-failure'),
+      /job .* stopped with status failed/);
+    assert.equal(reviewsSubmitted, 0);
+    assert.ok(waits.includes(30_000));
+  } finally {
+    globalThis.fetch = originalFetch;
+    globalThis.setTimeout = originalTimer;
+    codeReviewAgent.generate = originalGenerate;
+    for (const key of ['GITHUB_EVENT_PATH', 'GITHUB_REPOSITORY', 'GITHUB_TOKEN', 'JULIA_REVIEW_ROUTE_SECRET']) {
+      if (originalEnv[key] === undefined) delete process.env[key];
+      else process.env[key] = originalEnv[key];
+    }
+    await rm(directory, { recursive: true, force: true });
   }
 });

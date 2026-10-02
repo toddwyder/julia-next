@@ -360,7 +360,11 @@ GitHub readers, workspace skills, and observational memory live in
 `app/src/mastra/reviewer/`. A signed GitHub `pull_request_target` action starts
 a stored Mastra review workflow through `POST /julia/review-pr`, then polls
 `GET /julia/review-pr/:jobId` every 30 seconds until the verdict is ready. Each
-status request signs the job id with the same route secret. The action submits a
+status request signs the job id with the same route secret. The action stops
+after 30 minutes and cancels the server run through signed
+`DELETE /julia/review-pr/:jobId`; a superseding review for the same PR cancels
+the older run as well. An interrupted run is reported as canceled after a
+server restart. The action submits a
 commit-bound GitHub review as `github-actions[bot]`, the accepted reviewer
 identity for this project. It checks out only the base branch and never
 executes PR code.
