@@ -14,7 +14,9 @@ WITH note_items AS (
          'work', '[]'::jsonb, '[]'::jsonb,
          jsonb_object_agg(b.thread_id, jsonb_build_object('threadId', b.thread_id, 'sessionId', b.session_id)),
          '{}'::jsonb, min(b.created_at), min(b.created_at), NULL::jsonb, true
-  FROM factory_run_bindings b
+  FROM (SELECT DISTINCT ON (thread_id, work_item_id) * FROM factory_run_bindings
+        WHERE factory_project_id = :'project_id'
+        ORDER BY thread_id, work_item_id, created_at DESC) b
   WHERE b.factory_project_id = :'project_id'
     AND NOT EXISTS (SELECT 1 FROM work_items current_card WHERE current_card.id::text = b.work_item_id)
   GROUP BY b.work_item_id

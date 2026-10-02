@@ -45,6 +45,8 @@ python3 - "$config_dir/config.env" "$project_id" <<'PY'
 import pathlib, sys
 path = pathlib.Path(sys.argv[1])
 text = path.read_text()
+retired = {'MONDAY_NOTE_GITHUB_TOKEN', 'MONDAY_NOTE_DISCORD_WEBHOOK'}
+text = '\n'.join(line for line in text.splitlines() if line.split('=', 1)[0] not in retired) + '\n'
 keys = {line.split('=', 1)[0] for line in text.splitlines() if '=' in line and not line.startswith('#')}
 defaults = {
     'MONDAY_NOTE_PROJECT_ID': sys.argv[2],

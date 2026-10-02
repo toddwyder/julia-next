@@ -192,6 +192,14 @@ test('live Factory PR references match top-level thread identity and recorded ph
   assert.equal(record.effort, 'high');
 });
 
+test('recorded phase snapshot takes precedence over a root phase label', () => {
+  const span = { ...generationSpan, sessionId: undefined, threadId: 'live-thread', factoryPhase: 'review' };
+  const [record] = normalizeTraceSpans([span], { cards: [{ number: 'PR-184',
+    sessions: { work: { threadId: 'live-thread' } },
+    phaseSnapshots: [{ threadId: 'live-thread', at: '2026-09-29T08:59:00Z', phase: 'build', effort: 'high' }] }] });
+  assert.equal(record.phase, 'build');
+});
+
 test('bundled estimates cannot replace missing counts and aggregate model spans are never billed twice', () => {
   const parent = { ...generationSpan, spanId: 'generation' };
   const child = { ...generationSpan, spanId: 'step', parentSpanId: 'generation', spanType: 'model_step' };

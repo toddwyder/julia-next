@@ -200,6 +200,13 @@ test('DeepSeek Pro pricing follows UTC peak windows and the October public holid
   assert.equal(calculateModelCost({ model: 'deepseek/deepseek-v4-pro', usage, startedAt: '2026-10-01T02:00:00Z' }).whatYouPayUsd, 2.64);
 });
 
+test('an unverified future DeepSeek price window is a named gap, never a stale dollar amount', () => {
+  const result = calculateModelCost({ model: 'deepseek/deepseek-v4-pro',
+    usage: { inputTokens: 1000, outputTokens: 100 }, startedAt: '2027-01-01T02:00:00Z' });
+  assert.equal(result.ok, false);
+  assert.equal(result.error, 'no_price_window');
+});
+
 test('partial or impossible usage is a named gap instead of a fabricated free half of a call', () => {
   assert.equal(calculateModelCost({ model: 'openai/gpt-4o', usage: { inputTokens: 100 } }).error, 'no_token_count');
   assert.equal(calculateModelCost({ model: 'openai/gpt-4o', usage: { inputTokens: 100, outputTokens: 5, cachedInputTokens: 200 } }).error, 'invalid_token_count');

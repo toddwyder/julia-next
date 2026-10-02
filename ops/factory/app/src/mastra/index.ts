@@ -29,6 +29,7 @@ import { getDatabasePath } from '@mastra/code-sdk/utils/project';
 import { DEFAULT_RETENTION } from '@mastra/code-sdk/utils/storage-maintenance';
 import { MastraAuthWorkos } from '@mastra/auth-workos';
 import { costNoteAuth } from './cost-note-auth.js';
+import { costNoteSpanRoute } from './cost-note-span-route.js';
 import { createFactorySecretEncryption, MastraFactory } from '@mastra/factory';
 import { GithubIntegration } from '@mastra/factory/integrations/github/integration';
 import { defaultGithubRules } from '@mastra/factory/integrations/github/default-rules';
@@ -503,7 +504,7 @@ export const mastra = new Mastra({
   workflows: { ...preparedArgs.workflows, prReviewWorkflow, observabilityRetentionWorkflow },
   server: {
     ...preparedArgs.server,
-    apiRoutes: [...(preparedArgs.server?.apiRoutes ?? []), reviewerRoute],
+    apiRoutes: [...(preparedArgs.server?.apiRoutes ?? []), reviewerRoute, costNoteSpanRoute],
   },
   storage: composedStorage,
   pubsub: preparedArgs.pubsub,

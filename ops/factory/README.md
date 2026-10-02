@@ -9,7 +9,7 @@ Todd adds or removes an entry. Anything custom that is not listed here is not ap
 |---|---|---|---|
 | 1 | WorkOS cookie identity fix in `@mastra/auth-workos` 1.6.5 | Default platform sign-in rejects our self-hosted address; the WorkOS cookie path drops the organization ([#25252](https://github.com/mastra-ai/mastra/issues/25252)) | #25252 ships in a Mastra release |
 | 2 | Factory wait watcher and Discord webhook | Stock Factory 0.17.2 shows waits in the web app but does not send phone and Windows alerts when Todd is away ([Mastra request #25378](https://github.com/mastra-ai/mastra/issues/25378)); public ntfy.sh exhausted its daily quota (42908), and the private ntfy PWA did not register desktop Web Push | Remove when Mastra adds its own alerts |
-| 3 | Monday cost note, price table, and bounded trace retention (`ops/factory/monday-note*.mjs`, `ops/factory/price-table.mjs`, `ops/factory/mastra-traces.mjs`, `ops/factory/factory-cards.mjs`, `ops/factory/trace-retention.mjs`, `app/src/mastra/cost-note-auth.ts`, `app/src/mastra/observability-store.ts`, `app/src/mastra/observability-retention.ts`) — **approved for GitHub #180 (Todd, 2026-10-01, superseding #140)** | Factory 0.17.2 has no weekly cost summary with real what-you-pay rates per provider/model, and the observability store grew to 1.7 GB after about ten hours (change log, 2026-09-28). The note computes what Todd actually pays (single source of truth price table, step/model breakdown, effort alongside thinking tokens, card drivers, provider weekly totals, named gaps) and posts one public GitHub Issue (`factory:machine,cost-note`) per completed week; retention runs Mastra's supported DuckDB retention + CHECKPOINT on the framework's own daily schedule, from a size guard. Neither deletes rows or moves cards by hand. See **Monday note** and **Bounded trace storage** below | Remove when Factory ships its own weekly cost summary and bounded trace retention |
+| 3 | Monday cost note, price table, and bounded trace retention (`ops/factory/monday-note*.mjs`, `ops/factory/price-table.mjs`, `ops/factory/mastra-traces.mjs`, `ops/factory/factory-cards.mjs`, `ops/factory/trace-retention.mjs`, `app/src/mastra/cost-note-auth.ts`, `app/src/mastra/cost-note-span-route.ts`, `app/src/mastra/observability-store.ts`, `app/src/mastra/observability-retention.ts`) — **approved for GitHub #180 (Todd, 2026-10-01, superseding #140)** | Factory 0.17.2 has no weekly cost summary with real what-you-pay rates per provider/model, and the observability store grew to 1.7 GB after about ten hours (change log, 2026-09-28). The note computes what Todd actually pays (single source of truth price table, step/model breakdown, effort alongside thinking tokens, card drivers, provider weekly totals, named gaps) and posts one public GitHub Issue (`factory:machine,cost-note`) per completed week; retention runs Mastra's supported DuckDB retention + CHECKPOINT on the framework's own daily schedule, from a size guard. Neither deletes rows or moves cards by hand. See **Monday note** and **Bounded trace storage** below | Remove when Factory ships its own weekly cost summary and bounded trace retention |
 
 Approved by ADR 0009 but not built yet: the check that rejects unapproved custom machinery.
 It gets its row when it is built.
@@ -65,7 +65,8 @@ Todd as a public GitHub Issue: Factory's own card records and Mastra's trace cos
   scoped to `work_items`, retained `factory_run_bindings`, and phase signals in `mastra_messages`). Factory's `stage_history` gives each step's actor (`by` / `exitedBy`) and
   stage intervals (`enteredAt`/`exitedAt`).
 - **Costs** come from authenticated Mastra light roots/timelines and individual model-inference
-  spans. Aggregate generation/step totals are excluded when inference children exist, so token
+  spans through the authenticated cost-only projection route. The timer token cannot read full
+  span payloads. Aggregate generation/step totals are excluded when inference children exist, so token
   rates and long-context thresholds apply once per actual call. Step records and run IDs supply
   the model steps/run driver. Prompt bodies and tool schemas are discarded. The price table records provider rates,
   cache rates, source dates and payment factors. Direct DeepSeek peak/off-peak prices use the call's
@@ -73,6 +74,7 @@ Todd as a public GitHub Issue: Factory's own card records and Mastra's trace cos
   count is a named gap; dollar amounts beside gaps are explicitly known subtotals. Unknown cache
   read rates and cache-write TTL pricing are gaps too. The supported DuckDB `memoryLimit: '4GB'`
   permits the retained-root query on the live store; the default 2GB limit failed that query.
+  `MASTRA_DUCKDB_MEMORY_LIMIT` can lower or raise that per-query limit for the host.
 
 Each card line carries every step with its actor, model breakdown, effort level beside thinking tokens,
 the card's summed what-you-pay cost **including failed attempts**, and elapsed time. The card drivers
@@ -108,7 +110,7 @@ Operator installation:
    job updates. It preserves existing configuration and sends nothing during installation.
 3. Provision one random `MONDAY_NOTE_TRACE_TOKEN` in both `/etc/julia-factory/factory.env` and
    `/etc/julia-factory-monday-note/config.env`, then restart the app. The supported auth composition
-   restricts this token to observability GET routes. Keep the root-owned config mode 0640 and group
+   restricts this token to light observability GET routes and the redacted cost-span route. Keep the root-owned config mode 0640 and group
    `orchestrator-svc`. Never print tokens or place them in the repository or an issue.
 4. Preview live data as the publisher account with `sudo -u orchestrator-svc node
    --env-file=/etc/julia-factory-monday-note/config.env

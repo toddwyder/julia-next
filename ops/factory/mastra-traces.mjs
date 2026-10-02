@@ -35,7 +35,7 @@ export async function readTraceSpans({ factoryUrl, token, from, to, fetchImpl = 
   if (!token?.trim()) throw new Error('MONDAY_NOTE_TRACE_TOKEN is required to read authenticated traces');
   const base = factoryUrl.replace(/\/$/, '');
   async function get(path, query) {
-    const url = new URL(`${base}${MASTRA_TRACE_ROUTE}${path}`);
+    const url = new URL(`${base}${path.startsWith('/julia/') ? path : MASTRA_TRACE_ROUTE + path}`);
     if (query) for (const [key, value] of Object.entries(query)) url.searchParams.set(key, typeof value === 'object' ? JSON.stringify(value) : String(value));
     let response;
     try {
@@ -90,7 +90,7 @@ export async function readTraceSpans({ factoryUrl, token, from, to, fetchImpl = 
           });
           continue;
         }
-        const result = await get(`/${encodeURIComponent(root.traceId)}/spans/${encodeURIComponent(span.spanId)}`);
+        const result = await get(`/julia/cost-traces/${encodeURIComponent(root.traceId)}/spans/${encodeURIComponent(span.spanId)}`);
         if (!result.span?.spanId) throw new Error(`Mastra span ${span.spanId} returned no span detail`);
         // Keep only cost and identity fields; prompt text never enters reports.
         const { input, output, ...record } = result.span;
@@ -335,7 +335,7 @@ export function normalizeTraceSpans(spans = [], { cards = [], priceTable = PRICE
       card,
       projectOverhead: Boolean(projectId && sessionId === `factory-supervisor:${projectId}`),
       correlated: card !== null,
-      phase: span.factoryPhase ?? recordedPhase ?? spanPhase(span),
+      phase: recordedPhase ?? span.factoryPhase ?? spanPhase(span),
       runId: span.runId ?? null,
       modelStep: span.spanType === 'model_step',
       actor: 'Factory',

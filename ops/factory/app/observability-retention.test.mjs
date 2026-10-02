@@ -32,6 +32,8 @@ test('the DuckDB observability config carries the supported retention and the co
   assert.equal(config.retention.observability.spans.maxAge, '14d');
   // The path is the same one @mastra/code-sdk writes, so app and prune agree.
   assert.match(config.path, /observability\.duckdb$/);
+  assert.equal(config.memoryLimit, '4GB');
+  assert.equal(duckdbObservabilityConfig({ MASTRA_DUCKDB_MEMORY_LIMIT: '3GB' }).memoryLimit, '3GB');
 });
 
 test('MASTRA_OBSERVABILITY_DB_PATH overrides the DuckDB path without a second copy', () => {

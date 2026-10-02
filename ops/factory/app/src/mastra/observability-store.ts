@@ -56,12 +56,14 @@ export function observabilityDuckDBPath(env: NodeJS.ProcessEnv = process.env): s
 }
 
 /** The pure config `new DuckDBStore(...)` receives. Kept data-only for tests. */
-export function duckdbObservabilityConfig(): { id: string; path: string; retention: RetentionConfig; memoryLimit?: string } {
+export function duckdbObservabilityConfig(env: NodeJS.ProcessEnv = process.env): { id: string; path: string; retention: RetentionConfig; memoryLimit?: string } {
+  const memoryLimit = env.MASTRA_DUCKDB_MEMORY_LIMIT?.trim() || '4GB';
+  if (!/^[1-9]\d*(?:MB|GB)$/.test(memoryLimit)) throw new Error('MASTRA_DUCKDB_MEMORY_LIMIT must be a positive MB or GB value');
   return {
     id: DUCKDB_OBSERVABILITY_ID,
-    path: observabilityDuckDBPath(),
+    path: observabilityDuckDBPath(env),
     retention: duckdbObservabilityRetention(),
-    memoryLimit: '4GB',
+    memoryLimit,
   };
 }
 

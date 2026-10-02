@@ -11,6 +11,7 @@ files=(
   src/mastra/observability-store.ts
   src/mastra/observability-retention.ts
   src/mastra/cost-note-auth.ts
+  src/mastra/cost-note-span-route.ts
   src/mastra/public/factory-skills/factory-plan/SKILL.md
   src/mastra/public/factory-skills/factory-review/SKILL.md
 )

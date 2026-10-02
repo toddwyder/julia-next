@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { DuckDBStore } from '@mastra/duckdb';
 import { readTraceSpans, normalizeTraceSpans } from '../mastra-traces.mjs';
+import { costOnlySpan } from './src/mastra/cost-note-span-route.ts';
 
 test('native DuckDB retains a model call in this week when its root began last week', async () => {
   const store = new DuckDBStore({ id: 'cost-window-test', path: ':memory:' });
@@ -20,13 +21,16 @@ test('native DuckDB retains a model call in this week when its root began last w
     assert.equal(oldQuery.spans.length, 0, 'root-only weekly filtering really omits the crossing call');
     const fetchImpl = async url => {
       const u = new URL(url);
-      const route = u.pathname.replace('/api/observability/traces', '');
+      const route = u.pathname.replace('/api/observability/traces', '').replace('/julia/cost-traces', '');
       let body;
       if (route === '/light') {
         const dateRange = JSON.parse(u.searchParams.get('startedAt'));
         body = await observability.listTracesLight({ filters: { startedAt: dateRange }, pagination: { page: Number(u.searchParams.get('page')), perPage: Number(u.searchParams.get('perPage')) } });
       } else if (route === '/crossing/light') body = await observability.getTraceLight({ traceId: 'crossing' });
-      else if (route === '/crossing/spans/call') body = await observability.getSpan({ traceId: 'crossing', spanId: 'call' });
+      else if (route === '/crossing/spans/call') {
+        const result = await observability.getSpan({ traceId: 'crossing', spanId: 'call' });
+        body = { span: costOnlySpan(result.span) };
+      }
       else throw new Error(`Unexpected route ${route}`);
       return new Response(JSON.stringify(body));
     };
