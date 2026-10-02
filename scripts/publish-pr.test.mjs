@@ -208,6 +208,38 @@ test('openPullRequest mints a token, opens the PR via the REST API, and returns 
   assert.ok(!JSON.stringify(result).includes('ghs_super-secret-token'));
 });
 
+test('openPullRequest can create a draft for machine work', async () => {
+  let request;
+  await openPullRequest({
+    owner: 'toddwyder', repo: 'julia-next', head: 'machine/async-cross-maker', base: 'main',
+    title: 'Make Cross-maker review asynchronous', body: 'Refs #182', draft: true,
+    fetchImpl: async (_, init) => {
+      request = JSON.parse(init.body);
+      return { ok: true, json: async () => ({ html_url: 'https://github.com/toddwyder/julia-next/pull/200', number: 200 }) };
+    },
+    tokenImpl: async () => 'test-token',
+  });
+  assert.equal(request.draft, true);
+});
+
+test('readyPullRequest marks only the pinned draft head ready through the publisher App', async () => {
+  const { readyPullRequest } = await import('./publish-pr.mjs');
+  const sha = 'a'.repeat(40);
+  const calls = [];
+  const result = await readyPullRequest({
+    owner: 'toddwyder', repo: 'julia-next', number: 200, expectedHeadSha: sha,
+    tokenImpl: async () => 'test-token',
+    fetchImpl: async (url, init) => {
+      calls.push({ url, init });
+      if (calls.length === 1) return { ok: true, json: async () => ({ draft: true, node_id: 'PR_node', head: { sha } }) };
+      return { ok: true, json: async () => ({ data: { markPullRequestReadyForReview: { pullRequest: { isDraft: false } } } }) };
+    },
+  });
+  assert.equal(result.ready, true);
+  assert.equal(calls[1].url, 'https://api.github.com/graphql');
+  assert.equal(JSON.parse(calls[1].init.body).variables.id, 'PR_node');
+});
+
 test('openPullRequest rejects a repo outside the approved publisher targets', async () => {
   await assert.rejects(
     () => openPullRequest({

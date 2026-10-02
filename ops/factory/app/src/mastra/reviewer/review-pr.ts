@@ -4,7 +4,7 @@ import { codeReviewAgent } from './agents/code-review-agent';
 import { fileReviewSchema } from './lib/schemas';
 import { SKIP_PATTERNS, MIN_DELETION_ONLY_LINES } from './lib/review-config';
 
-const verdictSchema = z.object({
+export const verdictSchema = z.object({
   verdict: z.enum(['APPROVE', 'REQUEST_CHANGES']),
   criteria: z.array(z.object({
     number: z.number().int(),
@@ -89,6 +89,7 @@ export type DecideVerdict = (input: {
 export interface ReviewDependencies {
   runBatchedReview: RunBatchedReview;
   decideVerdict?: DecideVerdict;
+  abortSignal?: AbortSignal;
 }
 
 export function acceptanceCriteria(issueBody: string): string[] {
@@ -252,6 +253,7 @@ export async function reviewPullRequest(
       : verdictSchema.parse((await codeReviewAgent.generate(prompt, {
           structuredOutput: { schema: verdictSchema },
           memory,
+          abortSignal: deps.abortSignal,
         })).object);
     // The criterion verdict agent is the last work before the verdict is
     // returned, so re-read the head AFTER it completes: a commit pushed while
@@ -282,6 +284,7 @@ export async function reviewPullRequest(
   const answer = await codeReviewAgent.generate(prompt, {
     structuredOutput: { schema: verdictSchema },
     memory,
+    abortSignal: deps?.abortSignal,
   });
   // As on the batched path, re-read the head after the criterion verdict agent
   // so a commit pushed while it ran cannot be approved under the stale verdict.

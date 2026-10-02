@@ -13,7 +13,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import {
-  writeFileSync, mkdtempSync, chmodSync, rmSync,
+  readFileSync, writeFileSync, mkdtempSync, chmodSync, rmSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -189,6 +189,7 @@ export async function openPullRequest({
   base,
   title,
   body,
+  draft = false,
   env = process.env,
   fetchImpl = fetch,
   tokenImpl = getPublisherInstallationToken,
@@ -202,13 +203,42 @@ export async function openPullRequest({
       Accept: 'application/vnd.github+json',
       'content-type': 'application/json',
     },
-    body: JSON.stringify({ head, base, title, body }),
+    body: JSON.stringify({ head, base, title, body, draft }),
   });
   const parsed = await res.json();
   if (!res.ok) {
     throw new Error(`open PR failed (HTTP ${res.status}): ${parsed.message ?? JSON.stringify(parsed)}`);
   }
   return { url: parsed.html_url, number: parsed.number };
+}
+
+export async function readyPullRequest({
+  owner, repo, number, expectedHeadSha,
+  env = process.env, fetchImpl = fetch, tokenImpl = getPublisherInstallationToken,
+}) {
+  assertApproved(owner, repo);
+  if (!Number.isSafeInteger(number) || number < 1 || !/^[0-9a-f]{40}$/i.test(expectedHeadSha ?? ''))
+    throw new Error('A PR number and pinned 40-character head SHA are required.');
+  const token = await tokenImpl({ ...env, JULIA_PUBLISHER_OWNER: owner, JULIA_PUBLISHER_REPO: repo });
+  const headers = { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' };
+  const currentResponse = await fetchImpl(`https://api.github.com/repos/${owner}/${repo}/pulls/${number}`, { headers });
+  if (!currentResponse.ok) throw new Error(`Cannot read draft PR (HTTP ${currentResponse.status})`);
+  const current = await currentResponse.json();
+  if (current.head?.sha !== expectedHeadSha) throw new Error('PR head changed before ready for review.');
+  if (!current.draft || !current.node_id) throw new Error('PR is not a draft or has no node id.');
+  const response = await fetchImpl('https://api.github.com/graphql', {
+    method: 'POST',
+    headers: { ...headers, 'content-type': 'application/json' },
+    body: JSON.stringify({
+      query: 'mutation($id: ID!) { markPullRequestReadyForReview(input: {pullRequestId: $id}) { pullRequest { isDraft } } }',
+      variables: { id: current.node_id },
+    }),
+  });
+  if (!response.ok) throw new Error(`Could not mark PR ready (HTTP ${response.status})`);
+  const result = await response.json();
+  if (result.errors?.length || result.data?.markPullRequestReadyForReview?.pullRequest?.isDraft !== false)
+    throw new Error('GitHub did not mark the PR ready for review.');
+  return { ready: true, number, headSha: expectedHeadSha };
 }
 
 function parseArgs(argv) {
@@ -231,12 +261,19 @@ async function main() {
     } else if (action === 'open') {
       const [owner, repo] = args.repo.split('/');
       const result = await openPullRequest({
-        owner, repo, head: args.head, base: args.base || 'main', title: args.title, body: args.body || '',
+        owner, repo, head: args.head, base: args.base || 'main', title: args.title,
+        body: args['body-file'] ? readFileSync(args['body-file'], 'utf8') : args.body || '',
+        draft: args.draft === 'true',
       });
+      console.log(JSON.stringify(result));
+    } else if (action === 'ready') {
+      const [owner, repo] = args.repo.split('/');
+      const result = await readyPullRequest({ owner, repo, number: Number(args.number), expectedHeadSha: args.sha });
       console.log(JSON.stringify(result));
     } else {
       console.error('usage: node publish-pr.mjs push --repo <owner/name> --branch <name> [--cwd <path>]');
-      console.error('       node publish-pr.mjs open --repo <owner/name> --head <branch> --base <branch> --title <text> --body <text>');
+      console.error('       node publish-pr.mjs open --repo <owner/name> --head <branch> --base <branch> --title <text> (--body <text> | --body-file <path>) [--draft true]');
+      console.error('       node publish-pr.mjs ready --repo <owner/name> --number <pr-number> --sha <reviewed-head-sha>');
       process.exitCode = 2;
       return;
     }

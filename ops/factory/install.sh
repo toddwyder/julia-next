@@ -12,6 +12,9 @@ files=(
   src/mastra/observability-retention.ts
   src/mastra/cost-note-auth.ts
   src/mastra/cost-note-span-route.ts
+  # Issue #190: index.ts imports the asynchronous cross-maker workflow.
+  # Keep it in the explicit install manifest even though the reviewer tree is copied below.
+  src/mastra/reviewer/workflows/cross-maker-review-workflow.ts
   src/mastra/public/factory-skills/factory-plan/SKILL.md
   src/mastra/public/factory-skills/factory-review/SKILL.md
 )

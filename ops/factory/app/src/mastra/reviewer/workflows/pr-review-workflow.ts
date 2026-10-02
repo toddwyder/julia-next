@@ -134,7 +134,7 @@ const reviewFiles = createStep({
   description: 'Review files using the code review agent (batched for large PRs)',
   inputSchema: categorizedSchema,
   outputSchema: reviewedSchema,
-  execute: async ({ inputData, mastra }) => {
+  execute: async ({ inputData, mastra, abortSignal }) => {
     const { owner, repo, pullNumber, pr, reviewableFiles, skippedFiles } = inputData;
     const agent = mastra.getAgentById('workflow-review-agent');
 
@@ -186,6 +186,7 @@ For EACH file, return an entry with the filename and an array of issues found (e
     async function reviewBatch(batch: FileEntry[], idx: number) {
       const response = await agent.generate(buildPrompt(batch, idx), {
         structuredOutput: { schema: z.array(fileReviewSchema) },
+        abortSignal,
       });
       return response.object ?? [];
     }
@@ -218,7 +219,7 @@ const aggregateFindings = createStep({
   description: 'Synthesize per-file reviews into a cohesive PR review summary',
   inputSchema: reviewedSchema,
   outputSchema: reviewOutputSchema,
-  execute: async ({ inputData, mastra }) => {
+  execute: async ({ inputData, mastra, abortSignal }) => {
     const { pr, fileReviews, skippedFiles } = inputData;
     const agent = mastra.getAgentById('workflow-review-agent');
 
@@ -256,6 +257,7 @@ Rules:
 
     const response = await agent.generate(prompt, {
       structuredOutput: { schema: aggregateSummarySchema },
+      abortSignal,
     });
 
     const summary = response.object ?? {
