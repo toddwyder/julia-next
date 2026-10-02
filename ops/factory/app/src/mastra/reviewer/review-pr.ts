@@ -14,6 +14,19 @@ export const verdictSchema = z.object({
   findings: z.array(z.string()),
 });
 
+/** Mastra may return a schema-valid verdict as text without populating `object`. */
+function parseVerdictOutput(answer: { object?: unknown; text?: string }): z.infer<typeof verdictSchema> {
+  if (answer.object !== undefined) return verdictSchema.parse(answer.object);
+  const text = answer.text?.trim();
+  if (!text) throw new Error('Reviewer returned no structured verdict or text');
+  const fenced = text.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  try {
+    return verdictSchema.parse(JSON.parse(fenced ? fenced[1]! : text));
+  } catch {
+    throw new Error('Reviewer returned text without a schema-valid verdict');
+  }
+}
+
 export type ReviewVerdict = z.infer<typeof verdictSchema> & { headSha: string; body: string };
 
 /** The single-prompt diff length above which the supported batched workflow takes over. */
@@ -250,11 +263,11 @@ export async function reviewPullRequest(
           findings,
           memory,
         })
-      : verdictSchema.parse((await codeReviewAgent.generate(prompt, {
+      : parseVerdictOutput(await codeReviewAgent.generate(prompt, {
           structuredOutput: { schema: verdictSchema },
           memory,
           abortSignal: deps.abortSignal,
-        })).object);
+        }));
     // The criterion verdict agent is the last work before the verdict is
     // returned, so re-read the head AFTER it completes: a commit pushed while
     // it was thinking must not be approved under the verdict it just produced.
@@ -291,5 +304,5 @@ export async function reviewPullRequest(
   const finalResponse = await githubFetch(`/repos/${owner}/${repo}/pulls/${pullNumber}`);
   const final = await finalResponse.json() as { head: { sha: string } };
   if (final.head.sha !== expectedHead) throw new Error('PR head changed during review.');
-  return finalize(criteria, verdictSchema.parse(answer.object), expectedHead, [], files.map(file => file.filename));
+  return finalize(criteria, parseVerdictOutput(answer), expectedHead, [], files.map(file => file.filename));
 }

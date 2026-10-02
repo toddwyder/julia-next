@@ -173,6 +173,41 @@ test('a large PR is reviewed through the supported batched workflow, not refused
   }
 });
 
+test('a batched review accepts a schema-valid verdict returned as model text', async () => {
+  const { codeReviewAgent } = await import('./src/mastra/reviewer/agents/code-review-agent.ts');
+  const originalGenerate = codeReviewAgent.generate;
+  const restoreFetch = stubGitHubFetch();
+  codeReviewAgent.generate = async () => ({
+    object: undefined,
+    text: '```json\n{"verdict":"APPROVE","criteria":[{"number":1,"result":"met","evidence":"gate passes"},{"number":2,"result":"met","evidence":"nothing weakened"}],"findings":[]}\n```',
+  });
+  try {
+    const verdict = await reviewPullRequest(OWNER, REPO, PULL, HEAD, {
+      runBatchedReview: async () => ({ fileReviews: [{ filename: 'big.ts', issues: [] }], skippedFiles: [] }),
+    });
+    assert.equal(verdict.verdict, 'APPROVE');
+    assert.equal(verdict.headSha, HEAD);
+  } finally {
+    codeReviewAgent.generate = originalGenerate;
+    restoreFetch();
+  }
+});
+
+test('a batched review refuses text without a complete verdict', async () => {
+  const { codeReviewAgent } = await import('./src/mastra/reviewer/agents/code-review-agent.ts');
+  const originalGenerate = codeReviewAgent.generate;
+  const restoreFetch = stubGitHubFetch();
+  codeReviewAgent.generate = async () => ({ object: undefined, text: '{"verdict":"APPROVE"}' });
+  try {
+    await assert.rejects(() => reviewPullRequest(OWNER, REPO, PULL, HEAD, {
+      runBatchedReview: async () => ({ fileReviews: [{ filename: 'big.ts', issues: [] }], skippedFiles: [] }),
+    }), /text without a schema-valid verdict/);
+  } finally {
+    codeReviewAgent.generate = originalGenerate;
+    restoreFetch();
+  }
+});
+
 test('a large PR whose verdict misses a criterion is still REQUEST_CHANGES', async () => {
   const restore = stubGitHubFetch();
   try {
@@ -518,7 +553,7 @@ test('a file larger than the batch budget is returned as skipped and fails the r
   }
 });
 
-test('the route runs the real supported prReviewWorkflow for a large PR', async () => {
+test('the route completes the real batched workflow with a text-only schema-valid verdict', async () => {
   const { Mastra } = await import('@mastra/core/mastra');
   const { InMemoryStore } = await import('@mastra/core/storage');
   const { EventEmitterPubSub } = await import('@mastra/core/events');
@@ -554,14 +589,15 @@ test('the route runs the real supported prReviewWorkflow for a large PR', async 
     return { object: filenames.map((filename) => ({ filename, issues: [] })) };
   };
   codeReviewAgent.generate = async () => ({
-    object: {
+    object: undefined,
+    text: JSON.stringify({
       verdict: 'APPROVE',
       criteria: [
         { number: 1, result: 'met', evidence: 'gate passes' },
         { number: 2, result: 'met', evidence: 'nothing weakened' },
       ],
       findings: [],
-    },
+    }),
   });
 
   const secret = 'test-review-secret';
