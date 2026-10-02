@@ -15,6 +15,7 @@ const response = await fetch('https://julia-factory.tail91f394.ts.net/julia/revi
   method: 'POST',
   headers: { 'content-type': 'application/json', 'x-julia-review-signature': signature },
   body,
+  signal: AbortSignal.timeout(30_000),
 });
 if (!response.ok) throw new Error(`Mastra reviewer start returned HTTP ${response.status}`);
 const { jobId } = await response.json();
@@ -48,22 +49,37 @@ if (process.env.GITHUB_ACTIONS === 'true' && process.argv[1]
   process.once('SIGINT', stop);
   process.once('SIGTERM', stop);
 }
-// 60 polls at 30 seconds each bound the action's wait to roughly 30 minutes.
-for (let attempt = 0; attempt < 60; attempt++) {
-  await new Promise(resolve => setTimeout(resolve, 30_000));
-  const statusResponse = await fetch(jobUrl, {
-    headers: { 'x-julia-review-signature': statusSignature },
-  });
-  if (!statusResponse.ok) throw new Error(`Mastra reviewer status returned HTTP ${statusResponse.status} for job ${jobId}`);
-  const job = await statusResponse.json();
-  if (job.status === 'success') {
-    completed = true;
-    review = job.verdict;
-    break;
+// Bound elapsed wall time even when individual status requests are slow.
+const deadline = Date.now() + 30 * 60_000;
+try {
+  for (let attempt = 0; attempt < 60; attempt++) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
+    await new Promise(resolve => setTimeout(resolve, Math.min(30_000, remaining)));
+    if (Date.now() >= deadline) break;
+    let statusResponse;
+    try {
+      statusResponse = await fetch(jobUrl, {
+        headers: { 'x-julia-review-signature': statusSignature },
+        signal: AbortSignal.timeout(Math.min(30_000, Math.max(1, deadline - Date.now()))),
+      });
+    } catch {
+      throw new Error(`Cross-maker review job ${jobId} status request failed or timed out`);
+    }
+    if (!statusResponse.ok) throw new Error(`Mastra reviewer status returned HTTP ${statusResponse.status} for job ${jobId}`);
+    const job = await statusResponse.json();
+    if (job.status === 'success') {
+      completed = true;
+      review = job.verdict;
+      break;
+    }
+    if (!['pending', 'running', 'waiting'].includes(job.status))
+      throw new Error(`Mastra reviewer job ${jobId} stopped with status ${job.status}`);
+    console.log(`Cross-maker review job ${jobId} is ${job.status}`);
   }
-  if (!['pending', 'running', 'waiting'].includes(job.status))
-    throw new Error(`Mastra reviewer job ${jobId} stopped with status ${job.status}`);
-  console.log(`Cross-maker review job ${jobId} is ${job.status}`);
+} catch (error) {
+  await cancelJob();
+  throw error;
 }
 if (!completed) {
   await cancelJob();

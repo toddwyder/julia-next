@@ -1033,6 +1033,46 @@ test('action stops a stalled review after 30 minutes and cancels its job', async
   }
 });
 
+test('action cancels a review when a status request times out', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'cross-maker-status-hang-'));
+  const eventFile = join(directory, 'event.json');
+  await writeFile(eventFile, JSON.stringify({ pull_request: { number: 184, head: { sha: 'a'.repeat(40) } } }));
+  const originalFetch = globalThis.fetch;
+  const originalTimer = globalThis.setTimeout;
+  const originalTimeout = AbortSignal.timeout;
+  const originalEnv = { ...process.env };
+  process.env.GITHUB_EVENT_PATH = eventFile;
+  process.env.GITHUB_REPOSITORY = 'toddwyder/julia-next';
+  process.env.GITHUB_TOKEN = 'test-token';
+  process.env.JULIA_REVIEW_ROUTE_SECRET = 'test-secret';
+  let polls = 0;
+  let canceled = false;
+  globalThis.setTimeout = callback => { queueMicrotask(callback); return 0; };
+  AbortSignal.timeout = () => AbortSignal.abort();
+  globalThis.fetch = async (_url, options = {}) => {
+    if (options.method === 'POST') return Response.json({ jobId: 'hanging-job' }, { status: 202 });
+    if (options.method === 'DELETE') { canceled = true; return Response.json({ status: 'canceled' }); }
+    polls += 1;
+    if (options.signal?.aborted) throw new DOMException('The operation was aborted', 'TimeoutError');
+    return Response.json({ status: 'running' });
+  };
+  try {
+    await assert.rejects(import('../../../.github/scripts/request-cross-maker-review.mjs?status-hang'),
+      /status request failed or timed out/i);
+    assert.equal(polls, 1);
+    assert.equal(canceled, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+    globalThis.setTimeout = originalTimer;
+    AbortSignal.timeout = originalTimeout;
+    for (const key of ['GITHUB_EVENT_PATH', 'GITHUB_REPOSITORY', 'GITHUB_TOKEN', 'JULIA_REVIEW_ROUTE_SECRET']) {
+      if (originalEnv[key] === undefined) delete process.env[key];
+      else process.env[key] = originalEnv[key];
+    }
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test('signed DELETE cancels an active review job', async () => {
   const { reviewerCancelRoute } = await import('./src/mastra/reviewer/route.ts');
   process.env.JULIA_REVIEW_ROUTE_SECRET = 'cancel-secret';
