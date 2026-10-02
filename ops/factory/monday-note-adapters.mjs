@@ -6,7 +6,7 @@
 // and Todd can view them without signing in, and Factory intake ignores them.
 
 const GITHUB_REST_URL = 'https://api.github.com';
-import { getPublisherInstallationToken, loadPublisherCredentialFile } from '../../scripts/publish-via-github-app.mjs';
+import { getPublisherInstallationToken, loadPublisherCredentialFile, DEFAULT_PUBLISHER_CREDENTIAL_FILE } from '../../scripts/publish-via-github-app.mjs';
 
 /** Reuse the trusted publisher App; mint a fresh short-lived token each run. */
 export async function createPublisherIssuesClient({ env = process.env, fetchImpl = fetch,
@@ -16,7 +16,7 @@ export async function createPublisherIssuesClient({ env = process.env, fetchImpl
   if (`${owner}/${repo}` !== 'toddwyder/julia-next') throw new Error('Monday note publisher is restricted to toddwyder/julia-next');
   // Signing keys stay in this trusted object, never in process.env or psql.
   const credentials = {};
-  loadCredential(undefined, credentials);
+  loadCredential(DEFAULT_PUBLISHER_CREDENTIAL_FILE, credentials);
   const token = await tokenImpl({ ...credentials, JULIA_PUBLISHER_OWNER: owner, JULIA_PUBLISHER_REPO: repo });
   return createIssuesClient({ token, owner, repo, fetchImpl });
 }

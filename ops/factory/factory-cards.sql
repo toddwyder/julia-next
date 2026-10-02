@@ -5,7 +5,7 @@ BEGIN TRANSACTION READ ONLY;
 WITH note_items AS (
   SELECT id, title, board, stages, stage_history, sessions, metadata,
          accepted_at, created_at, external_source, false AS record_missing
-  FROM work_items
+  FROM julia_monday_work_items
   WHERE factory_project_id = :'project_id' AND board IN ('work', 'review')
   UNION ALL
   -- Factory retains run bindings after a card record disappears. Keep their
@@ -14,11 +14,11 @@ WITH note_items AS (
          'work', '[]'::jsonb, '[]'::jsonb,
          jsonb_object_agg(b.thread_id, jsonb_build_object('threadId', b.thread_id, 'sessionId', b.session_id)),
          '{}'::jsonb, min(b.created_at), min(b.created_at), NULL::jsonb, true
-  FROM (SELECT DISTINCT ON (thread_id, work_item_id) * FROM factory_run_bindings
+  FROM (SELECT DISTINCT ON (thread_id, work_item_id) * FROM julia_monday_run_bindings
         WHERE factory_project_id = :'project_id'
         ORDER BY thread_id, work_item_id, created_at DESC) b
   WHERE b.factory_project_id = :'project_id'
-    AND NOT EXISTS (SELECT 1 FROM work_items current_card WHERE current_card.id::text = b.work_item_id)
+    AND NOT EXISTS (SELECT 1 FROM julia_monday_work_items current_card WHERE current_card.id::text = b.work_item_id)
   GROUP BY b.work_item_id
 )
 SELECT jsonb_build_object(
@@ -38,7 +38,7 @@ SELECT jsonb_build_object(
   'sessions', w.sessions,
   'session_bindings', COALESCE((SELECT jsonb_agg(jsonb_build_object(
     'threadId', b.thread_id, 'sessionId', b.session_id, 'role', b.role, 'at', b.created_at
-  )) FROM factory_run_bindings b WHERE b.work_item_id = w.id::text
+  )) FROM julia_monday_run_bindings b WHERE b.work_item_id = w.id::text
       AND b.factory_project_id = :'project_id'), '[]'::jsonb),
   -- Only the phase runtime fields leave the message store; never prompt text.
   'phase_snapshots', COALESCE((
@@ -49,7 +49,7 @@ SELECT jsonb_build_object(
     FROM julia_monday_phase_snapshots m
     WHERE m.thread_id IN (
       SELECT value->>'threadId' FROM jsonb_each(w.sessions)
-      UNION SELECT b.thread_id FROM factory_run_bindings b
+      UNION SELECT b.thread_id FROM julia_monday_run_bindings b
         WHERE b.work_item_id = w.id::text AND b.factory_project_id = :'project_id'
     )
   ), '[]'::jsonb),

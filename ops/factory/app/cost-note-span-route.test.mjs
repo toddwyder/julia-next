@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { costOnlySpan, costNoteSpanRoute } from './src/mastra/cost-note-span-route.ts';
+import { costOnlySpan, costNoteSpanRoute, costNoteSpanBatchRoute } from './src/mastra/cost-note-span-route.ts';
 
 test('cost note span projection excludes prompts and unrelated attributes', () => {
   const span = costOnlySpan({ traceId: 't', spanId: 's', spanType: 'model_inference',
@@ -62,9 +62,26 @@ test('cost route logs failed storage reads without leaking storage error text', 
     const response = await handler(context);
     assert.equal(response.status, 503);
     assert.equal(JSON.stringify(response).includes('private prompt'), false);
-    assert.match(logs.join(' '), /cost span read.*trace-t.*span-s/);
+    assert.match(logs.join(' '), /cost span read.*trace-t.*Error/);
     assert.equal(logs.join(' ').includes('private prompt'), false);
   } finally {
     console.error = original;
   }
+});
+
+test('batch cost route returns ordered projections and bounds reads', async () => {
+  const calls = [];
+  const handler = await costNoteSpanBatchRoute.createHandler({ mastra: { getStorage: () => ({
+    getStore: async () => ({ getSpan: async ({ spanId }) => { calls.push(spanId); return { span: {
+      traceId: 't', spanId, attributes: { model: 'deepseek-v4-flash' }, input: 'private prompt',
+    } }; } }),
+  }) } });
+  const context = ids => ({ req: { param: () => 't', query: () => ids }, json: (body, status = 200) => ({ body, status }) });
+  const response = await handler(context('one,two'));
+  assert.equal(response.status, 200);
+  assert.deepEqual(calls, ['one', 'two']);
+  assert.deepEqual(response.body.spans.map(span => span.spanId), calls);
+  assert.equal(JSON.stringify(response.body).includes('private'), false);
+  assert.equal((await handler(context(Array(21).fill('id').join(',')))).status, 400);
+  assert.equal(calls.length, 2);
 });

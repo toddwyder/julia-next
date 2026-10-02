@@ -11,7 +11,7 @@ export function costNoteAuth(workos: IMastraAuthProvider, token?: string): IMast
     authorizeUser: (_user, request) => {
       const web = request instanceof Request ? request : request.raw;
       return Boolean(web && web.method === 'GET' &&
-        /^(?:\/api\/observability\/traces\/(?:light|[^/]+\/light)|\/julia\/cost-traces\/[^/]+\/spans\/[^/]+)$/.test(new URL(web.url, 'http://localhost').pathname));
+        /^(?:\/api\/observability\/traces\/(?:light|[^/]+\/light)|\/julia\/cost-traces\/[^/]+\/spans(?:\/[^/]+)?)$/.test(new URL(web.url, 'http://localhost').pathname));
     },
   });
   return new CompositeAuth([reader, workos]);

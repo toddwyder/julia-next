@@ -10,7 +10,7 @@ import { createPublisherIssuesClient } from './monday-note-adapters.mjs';
 test('the scheduled Issues client mints a fresh repository-scoped publisher token without exporting signing credentials', async () => {
   const env = { MONDAY_NOTE_GITHUB_OWNER: 'toddwyder', MONDAY_NOTE_GITHUB_REPO: 'julia-next' };
   const client = await createPublisherIssuesClient({ env,
-    loadCredential: (_path, credentials) => { credentials.JULIA_PUBLISHER_APP_ID = 'test-app'; credentials.JULIA_PUBLISHER_APP_PRIVATE_KEY = 'signing-secret'; },
+    loadCredential: (path, credentials) => { assert.equal(path, '/etc/orchestrator-svc/.env.publisher'); credentials.JULIA_PUBLISHER_APP_ID = 'test-app'; credentials.JULIA_PUBLISHER_APP_PRIVATE_KEY = 'signing-secret'; },
     tokenImpl: async credentials => {
       assert.equal(credentials.JULIA_PUBLISHER_OWNER, 'toddwyder');
       assert.equal(credentials.JULIA_PUBLISHER_REPO, 'julia-next');

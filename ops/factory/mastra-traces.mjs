@@ -27,9 +27,9 @@ function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-/** List light roots/timelines, then hydrate individual billable spans and roots.
+/** List light roots/timelines, then hydrate billable spans in bounded batches.
  * Reading full trace trees buffers every prompt; these supported routes keep
- * each request bounded to one span. No unauthenticated fallback is allowed.
+ * each response bounded to twenty cost-only spans. No unauthenticated fallback is allowed.
  */
 export async function readTraceSpans({ factoryUrl, token, from, to, fetchImpl = fetch, pageSize = PAGE_SIZE, log = () => {} }) {
   if (!token?.trim()) throw new Error('MONDAY_NOTE_TRACE_TOKEN is required to read authenticated traces');
@@ -74,6 +74,7 @@ export async function readTraceSpans({ factoryUrl, token, from, to, fetchImpl = 
       delete safeRoot.requestContext;
       safeRoot.metadata = Object.fromEntries(Object.entries(safeRoot.metadata ?? {}).filter(([key]) => ['threadId', 'sessionId', 'runId', 'factory_stage', 'effort'].includes(key)));
       const details = [safeRoot];
+      const billableIds = [];
       const timeline = new Map(trace.spans.map(span => [span.spanId, span]));
       const aggregates = new Set();
       for (const inference of trace.spans.filter(span => span.spanType === 'model_inference')) {
@@ -95,20 +96,29 @@ export async function readTraceSpans({ factoryUrl, token, from, to, fetchImpl = 
           });
           continue;
         }
-        const result = await get(`/julia/cost-traces/${encodeURIComponent(root.traceId)}/spans/${encodeURIComponent(span.spanId)}`);
-        if (!result.span?.spanId) throw new Error(`Mastra span ${span.spanId} returned no span detail`);
-        // Keep only cost and identity fields; prompt text never enters reports.
-        const { input, output, ...record } = result.span;
-        delete record.requestContext;
-        record.metadata = Object.fromEntries(Object.entries(record.metadata ?? {}).filter(([key]) => ['threadId', 'sessionId', 'runId', 'factory_stage', 'effort'].includes(key)));
-        record.attributes = { ...record.attributes,
-          effort: record.attributes?.effort ?? record.attributes?.parameters?.reasoning?.effort ??
-            record.attributes?.parameters?.reasoningEffort ?? record.attributes?.parameters?.reasoning_effort };
-        if (record.error !== null && record.error !== undefined) record.error = { message: 'model call failed; details retained on server' };
-        // Provider/tool schemas are also unnecessary to cost accounting.
-        record.attributes = Object.fromEntries(Object.entries(record.attributes ?? {}).filter(([key]) =>
-          ['model', 'responseModel', 'selectedModel', 'provider', 'usage', 'costContext', 'inputTokens', 'outputTokens', 'cachedInputTokens', 'reasoningTokens', 'inputDetails', 'outputDetails', 'effort', 'effortLevel', 'sessionId', 'conversationId', 'threadId'].includes(key)));
-        details.push(record);
+        billableIds.push(span.spanId);
+      }
+      for (let offset = 0; offset < billableIds.length; offset += 20) {
+        const ids = billableIds.slice(offset, offset + 20);
+        const result = await get(`/julia/cost-traces/${encodeURIComponent(root.traceId)}/spans`, { ids: ids.join(',') });
+        if (!Array.isArray(result.spans) || result.spans.length !== ids.length ||
+          result.spans.some((span, index) => span?.spanId !== ids[index])) {
+          throw new Error(`Mastra trace ${root.traceId} returned incomplete span details`);
+        }
+        for (const costSpan of result.spans) {
+          // Keep only cost and identity fields; prompt text never enters reports.
+          const { input, output, ...record } = costSpan;
+          delete record.requestContext;
+          record.metadata = Object.fromEntries(Object.entries(record.metadata ?? {}).filter(([key]) => ['threadId', 'sessionId', 'runId', 'factory_stage', 'effort'].includes(key)));
+          record.attributes = { ...record.attributes,
+            effort: record.attributes?.effort ?? record.attributes?.parameters?.reasoning?.effort ??
+              record.attributes?.parameters?.reasoningEffort ?? record.attributes?.parameters?.reasoning_effort };
+          if (record.error !== null && record.error !== undefined) record.error = { message: 'model call failed; details retained on server' };
+          // Provider/tool schemas are also unnecessary to cost accounting.
+          record.attributes = Object.fromEntries(Object.entries(record.attributes ?? {}).filter(([key]) =>
+            ['model', 'responseModel', 'selectedModel', 'provider', 'usage', 'costContext', 'inputTokens', 'outputTokens', 'cachedInputTokens', 'reasoningTokens', 'inputDetails', 'outputDetails', 'effort', 'effortLevel', 'sessionId', 'conversationId', 'threadId'].includes(key)));
+          details.push(record);
+        }
       }
       if (aggregates.has(root.spanId)) safeRoot.includedInGeneration = true;
       const distinct = [...new Map(details.map(span => [span.spanId, span])).values()];

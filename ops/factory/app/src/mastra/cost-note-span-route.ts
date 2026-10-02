@@ -35,6 +35,13 @@ export function costOnlySpan(span: Record<string, any>) {
   };
 }
 
+function logReadError(error: unknown, traceId: string) {
+  const kind = error instanceof Error ? error.name : 'UnknownError';
+  const code = (error as { code?: unknown })?.code;
+  console.error(`[cost span read] ${JSON.stringify({ traceId, kind: /^[A-Za-z]{1,40}$/.test(kind) ? kind : 'Error',
+    code: typeof code === 'string' && /^[A-Z0-9_]{1,40}$/.test(code) ? code : undefined })} failed`);
+}
+
 export const costNoteSpanRoute = registerApiRoute('/julia/cost-traces/:traceId/spans/:spanId', {
   method: 'GET',
   requiresAuth: true,
@@ -47,8 +54,31 @@ export const costNoteSpanRoute = registerApiRoute('/julia/cost-traces/:traceId/s
       const result = await store.getSpan({ traceId, spanId });
       if (!result?.span) return c.json({ error: 'Span not found' }, 404);
       return c.json({ span: costOnlySpan(result.span) });
-    } catch {
-      console.error(`[cost span read] ${JSON.stringify({ traceId, spanId })} failed`);
+    } catch (error) {
+      logReadError(error, traceId);
+      return c.json({ error: 'Cost span read failed' }, 503);
+    }
+  },
+});
+
+/** One bounded request per timeline batch; only projected cost fields leave Factory. */
+export const costNoteSpanBatchRoute = registerApiRoute('/julia/cost-traces/:traceId/spans', {
+  method: 'GET',
+  requiresAuth: true,
+  createHandler: async ({ mastra }) => async c => {
+    const traceId = c.req.param('traceId');
+    const ids: string[] = c.req.query('ids')?.split(',') ?? [];
+    if (!ids.length || ids.length > 20 || ids.some(id => !/^[A-Za-z0-9_-]{1,128}$/.test(id)) || new Set(ids).size !== ids.length) {
+      return c.json({ error: 'Invalid span IDs' }, 400);
+    }
+    try {
+      const store = await mastra.getStorage()?.getStore('observability');
+      if (!store) return c.json({ error: 'Observability storage unavailable' }, 503);
+      const results = await Promise.all(ids.map(spanId => store.getSpan({ traceId, spanId })));
+      if (results.some(result => !result?.span)) return c.json({ error: 'Span not found' }, 404);
+      return c.json({ spans: results.map(result => costOnlySpan(result!.span)) });
+    } catch (error) {
+      logReadError(error, traceId);
       return c.json({ error: 'Cost span read failed' }, 503);
     }
   },

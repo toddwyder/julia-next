@@ -75,7 +75,7 @@ test('authenticated light timelines hydrate model calls and retain parent identi
       return jsonResponse({ spans: [root], pagination: { page: 0, hasMore: false } });
     }
     if (u.pathname === '/api/observability/traces/trace-a/light') return jsonResponse({ spans: [root, { ...generationSpan, attributes: undefined }] });
-    if (u.pathname.endsWith('/spans/span-a')) return jsonResponse({ span: generationSpan });
+    if (u.pathname.endsWith('/spans') && u.searchParams.get('ids') === 'span-a') return jsonResponse({ spans: [generationSpan] });
     throw new Error(`Unexpected route ${u.pathname}`);
   });
   const spans = await readTraceSpans({ factoryUrl: 'https://factory.example', token: 'test-reader', from: FROM, to: TO, fetchImpl: fake.fetch });
@@ -217,7 +217,7 @@ test('a generation root with an inference child bills the hydrated leaf once', a
   const fake = fakeFetch(url => {
     if (new URL(url).pathname === '/api/observability/traces/light') return jsonResponse({ spans: [root], pagination: { page: 0, hasMore: false } });
     if (url.endsWith('/trace-a/light')) return jsonResponse({ spans: [root, { ...leaf, attributes: undefined }] });
-    if (url.endsWith('/spans/leaf')) return jsonResponse({ span: leaf });
+    if (new URL(url).pathname.endsWith('/spans') && new URL(url).searchParams.get('ids') === 'leaf') return jsonResponse({ spans: [leaf] });
     throw new Error('Unexpected request');
   });
   const spans = await readTraceSpans({ factoryUrl: 'https://factory.example', token: 'reader', from: FROM, to: TO, fetchImpl: fake.fetch });
@@ -225,4 +225,26 @@ test('a generation root with an inference child bills the hydrated leaf once', a
   assert.equal(records.filter(x => x.costBearing).length, 1);
   assert.equal(records.find(x => x.costBearing).id, 'leaf');
   assert.ok(records.find(x => x.costBearing).costUsd > 0);
+});
+
+test('twenty one calls use two bounded cost-only requests and reject incomplete batches', async () => {
+  const root = { traceId: 'trace-a', spanId: 'root', spanType: 'agent_run', startedAt: FROM };
+  const leaves = Array.from({ length: 21 }, (_, index) => ({ ...generationSpan,
+    spanId: `leaf-${index}`, spanType: 'model_inference', parentSpanId: 'root' }));
+  const fake = fakeFetch(url => {
+    const u = new URL(url);
+    if (u.pathname.endsWith('/traces/light')) return jsonResponse({ spans: [root], pagination: { page: 0, hasMore: false } });
+    if (u.pathname.endsWith('/trace-a/light')) return jsonResponse({ spans: [root, ...leaves.map(({ attributes, ...leaf }) => leaf)] });
+    if (u.pathname.endsWith('/spans')) return jsonResponse({ spans: u.searchParams.get('ids').split(',').map(id => leaves.find(leaf => leaf.spanId === id)) });
+    throw new Error(`Unexpected request ${u.pathname}`);
+  });
+  const options = { factoryUrl: 'https://factory.example', token: 'reader', from: FROM, to: TO, fetchImpl: fake.fetch };
+  assert.equal((await readTraceSpans(options)).filter(span => span.spanType === 'model_inference').length, 21);
+  const batches = fake.calls.filter(({ url }) => new URL(url).pathname.endsWith('/spans'));
+  assert.deepEqual(batches.map(({ url }) => new URL(url).searchParams.get('ids').split(',').length), [20, 1]);
+  await assert.rejects(readTraceSpans({ ...options, fetchImpl: async (url, init) => {
+    const response = await fake.fetch(url, init);
+    if (new URL(url).pathname.endsWith('/spans')) return jsonResponse({ spans: [] });
+    return response;
+  } }), /incomplete span details/);
 });

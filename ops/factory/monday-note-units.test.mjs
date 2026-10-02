@@ -63,4 +63,8 @@ test('the publisher receives phase signals through a projected view, not full me
   assert.match(installer, /GRANT SELECT ON julia_monday_phase_snapshots TO "orchestrator-svc"/);
   assert.match(cards, /FROM julia_monday_phase_snapshots m/);
   assert.doesNotMatch(cards, /FROM mastra_messages m/);
+  assert.match(installer, /REVOKE SELECT ON work_items, factory_run_bindings FROM "orchestrator-svc"/);
+  assert.match(installer, /GRANT SELECT ON julia_monday_work_items, julia_monday_run_bindings/);
+  assert.match(cards, /FROM julia_monday_work_items/);
+  assert.match(cards, /FROM julia_monday_run_bindings/);
 });

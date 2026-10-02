@@ -10,7 +10,7 @@ test('cost-note token authenticates only read-only trace requests; WorkOS still 
   };
   const auth = costNoteAuth(workos, 'test-cost-token');
   const request = (path, method = 'GET') => new Request(`http://localhost${path}`, { method });
-  for (const path of ['/api/observability/traces/light', '/api/observability/traces/t/light', '/julia/cost-traces/t/spans/s']) {
+  for (const path of ['/api/observability/traces/light', '/api/observability/traces/t/light', '/julia/cost-traces/t/spans/s', '/julia/cost-traces/t/spans?ids=s']) {
     const user = await auth.authenticateToken('test-cost-token', request(path));
     assert.ok(user);
     assert.equal(await auth.authorizeUser(user, request(path)), true);

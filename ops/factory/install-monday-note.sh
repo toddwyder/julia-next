@@ -62,7 +62,7 @@ PY
 
 # The publisher keeps its existing App credential. Expose only parsed phase
 # fields from messages; the role cannot query prompt or tool-call bodies.
-sudo -u postgres psql -v ON_ERROR_STOP=1 -d julia_factory_trial <<'SQL'
+sudo -u postgres psql -v ON_ERROR_STOP=1 -v project_id="$project_id" -d julia_factory_trial <<'SQL'
 BEGIN;
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'orchestrator-svc') THEN
@@ -79,13 +79,46 @@ CREATE OR REPLACE VIEW julia_monday_phase_snapshots WITH (security_barrier = tru
   FROM mastra_messages m
   WHERE m.role = 'signal' AND m.type = 'factory-phase'
     AND m.content LIKE '%Factory %phase:%'
-    AND m.content LIKE '%Runtime: model=%reasoning-setting=%';
+    AND m.content LIKE '%Runtime: model=%reasoning-setting=%'
+    AND (EXISTS (SELECT 1 FROM factory_run_bindings b
+      WHERE b.factory_project_id = :'project_id' AND b.thread_id = m.thread_id)
+      OR EXISTS (SELECT 1 FROM work_items w,
+        LATERAL jsonb_each(COALESCE(w.sessions, '{}'::jsonb)) session_entry
+        WHERE w.factory_project_id = :'project_id'
+          AND (session_entry.key = m.thread_id OR session_entry.value->>'threadId' = m.thread_id)));
 REVOKE SELECT ON mastra_messages FROM "orchestrator-svc";
-GRANT SELECT ON work_items, factory_run_bindings TO "orchestrator-svc";
+# Keep the publisher inside this project and expose only report fields.
+CREATE OR REPLACE VIEW julia_monday_work_items WITH (security_barrier = true) AS
+  SELECT id, title, board, stages,
+    COALESCE((SELECT jsonb_agg(jsonb_build_object(
+      'stage', entry->>'stage', 'by', entry->>'by', 'exitedBy', entry->>'exitedBy',
+      'enteredAt', entry->>'enteredAt', 'exitedAt', entry->>'exitedAt',
+      'sessionId', entry->>'sessionId', 'threadId', entry->>'threadId',
+      'branch', entry->>'branch'))
+      FROM jsonb_array_elements(COALESCE(stage_history, '[]'::jsonb)) entry), '[]'::jsonb) AS stage_history,
+    COALESCE((SELECT jsonb_object_agg(key, CASE WHEN jsonb_typeof(value) = 'object'
+      THEN jsonb_build_object('sessionId', value->>'sessionId',
+        'threadId', value->>'threadId', 'branch', value->>'branch')
+      ELSE value END)
+      FROM jsonb_each(COALESCE(sessions, '{}'::jsonb))), '{}'::jsonb) AS sessions,
+    jsonb_build_object('number', metadata->>'number') AS metadata,
+    accepted_at, created_at,
+    jsonb_build_object('externalId', external_source->>'externalId') AS external_source,
+    factory_project_id
+  FROM work_items WHERE factory_project_id = :'project_id';
+CREATE OR REPLACE VIEW julia_monday_run_bindings WITH (security_barrier = true) AS
+  SELECT work_item_id, thread_id, session_id, role, created_at, factory_project_id
+  FROM factory_run_bindings WHERE factory_project_id = :'project_id';
+REVOKE SELECT ON work_items, factory_run_bindings FROM "orchestrator-svc";
+GRANT SELECT ON julia_monday_work_items, julia_monday_run_bindings TO "orchestrator-svc";
 GRANT SELECT ON julia_monday_phase_snapshots TO "orchestrator-svc";
 DO $$ BEGIN
   IF has_table_privilege('orchestrator-svc', 'mastra_messages', 'SELECT') THEN
     RAISE EXCEPTION 'Monday note publisher still has raw message SELECT';
+  END IF;
+  IF has_table_privilege('orchestrator-svc', 'work_items', 'SELECT') OR
+     has_table_privilege('orchestrator-svc', 'factory_run_bindings', 'SELECT') THEN
+    RAISE EXCEPTION 'Monday note publisher still has raw card SELECT';
   END IF;
 END $$;
 ALTER ROLE "orchestrator-svc" IN DATABASE julia_factory_trial SET default_transaction_read_only = on;

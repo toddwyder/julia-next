@@ -4,13 +4,13 @@
     "source": "Authenticated pinned Mastra API and read-only PostgreSQL on Julia Factory trial; prompt bodies removed",
     "scenarios": {
       "cached": "84ef5094c89dd9d8",
-      "priceFault": "84ef5094c89dd9d8",
       "thinking": "398caaadad090624",
       "noTokens": "2735869e280a5cd8",
-      "fresh": "109eae17f7b04097"
+      "fresh": "109eae17f7b04097",
+      "unpriced": "1fa3ddca2c5dfa32"
     },
     "freshCase": "Actual fresh-input-dominated call; the provider also recorded a cached prefix.",
-    "unpricedCase": "Replay unchanged captured GPT-6 Sol against a deliberately incomplete price table; production includes the verified price."
+    "unpricedCase": "Actual captured gpt-5.4-mini call with missing token count; the model has no verified price entry."
   },
   "cards": [
     {
@@ -78,6 +78,114 @@
       "acceptedAt": "2026-09-29T16:39:21.785+00:00",
       "createdAt": "2026-09-29T16:39:21.785+00:00",
       "enteredAt": "2026-09-29T16:39:21.785+00:00"
+    },
+    {
+      "number": "Factory-8af4c68d-9d92-4ae2-8b60-1ff7b7ebfd5c",
+      "title": "no recorded card title (retained Factory run binding)",
+      "board": "work",
+      "stages": [],
+      "stageHistory": [],
+      "sessions": {
+        "f5830314-9da6-4f01-a696-1db26de74672": {
+          "threadId": "f5830314-9da6-4f01-a696-1db26de74672",
+          "sessionId": "f5830314-9da6-4f01-a696-1db26de74672"
+        }
+      },
+      "phaseSnapshots": [
+        {
+          "at": "2026-09-29T17:37:58.004",
+          "model": "openai/gpt-6-sol",
+          "phase": "Reviewing",
+          "effort": "off",
+          "threadId": "f5830314-9da6-4f01-a696-1db26de74672"
+        },
+        {
+          "at": "2026-09-29T17:39:16.866",
+          "model": "openai/gpt-6-sol",
+          "phase": "Reviewing",
+          "effort": "off",
+          "threadId": "f5830314-9da6-4f01-a696-1db26de74672"
+        },
+        {
+          "at": "2026-09-29T17:42:35.713",
+          "model": "openai/gpt-6-sol",
+          "phase": "Reviewing",
+          "effort": "off",
+          "threadId": "f5830314-9da6-4f01-a696-1db26de74672"
+        },
+        {
+          "at": "2026-09-29T17:44:14.568",
+          "model": "openai/gpt-6-sol",
+          "phase": "Reviewing",
+          "effort": "off",
+          "threadId": "f5830314-9da6-4f01-a696-1db26de74672"
+        },
+        {
+          "at": "2026-09-29T17:46:29.201",
+          "model": "openai/gpt-6-sol",
+          "phase": "Reviewing",
+          "effort": "off",
+          "threadId": "f5830314-9da6-4f01-a696-1db26de74672"
+        },
+        {
+          "at": "2026-09-29T18:01:44.483",
+          "model": "openai/gpt-6-sol",
+          "phase": "Reviewing",
+          "effort": "off",
+          "threadId": "f5830314-9da6-4f01-a696-1db26de74672"
+        },
+        {
+          "at": "2026-09-29T18:03:35.873",
+          "model": "openai/gpt-6-sol",
+          "phase": "Reviewing",
+          "effort": "off",
+          "threadId": "f5830314-9da6-4f01-a696-1db26de74672"
+        },
+        {
+          "at": "2026-09-29T18:06:00.918",
+          "model": "openai/gpt-6-sol",
+          "phase": "Reviewing",
+          "effort": "off",
+          "threadId": "f5830314-9da6-4f01-a696-1db26de74672"
+        },
+        {
+          "at": "2026-09-29T18:13:29.148",
+          "model": "openai/gpt-6-sol",
+          "phase": "Reviewing",
+          "effort": "off",
+          "threadId": "f5830314-9da6-4f01-a696-1db26de74672"
+        },
+        {
+          "at": "2026-09-29T18:16:26.562",
+          "model": "openai/gpt-6-sol",
+          "phase": "Reviewing",
+          "effort": "off",
+          "threadId": "f5830314-9da6-4f01-a696-1db26de74672"
+        }
+      ],
+      "sessionBindings": [
+        {
+          "at": "2026-09-29T17:37:56.144+00:00",
+          "role": "review",
+          "threadId": "f5830314-9da6-4f01-a696-1db26de74672",
+          "sessionId": "f5830314-9da6-4f01-a696-1db26de74672"
+        },
+        {
+          "at": "2026-09-29T18:00:03.208+00:00",
+          "role": "review",
+          "threadId": "f5830314-9da6-4f01-a696-1db26de74672",
+          "sessionId": "f5830314-9da6-4f01-a696-1db26de74672"
+        },
+        {
+          "at": "2026-09-29T18:13:16.771+00:00",
+          "role": "review",
+          "threadId": "f5830314-9da6-4f01-a696-1db26de74672",
+          "sessionId": "f5830314-9da6-4f01-a696-1db26de74672"
+        }
+      ],
+      "acceptedAt": "2026-09-29T17:37:56.144+00:00",
+      "createdAt": "2026-09-29T17:37:56.144+00:00",
+      "enteredAt": "2026-09-29T17:37:56.144+00:00"
     }
   ],
   "spans": [
@@ -296,6 +404,53 @@
       "createdAt": "2026-10-01T19:16:53.362Z",
       "updatedAt": null,
       "factoryPhase": "review"
+    },
+    {
+      "traceId": "41c77038fded7449601ad5693f108f52",
+      "spanId": "1fa3ddca2c5dfa32",
+      "name": "inference: 0",
+      "spanType": "model_inference",
+      "parentSpanId": "7973a18673a83f07",
+      "isEvent": false,
+      "startedAt": "2026-09-29T17:40:35.770Z",
+      "endedAt": "2026-09-29T17:40:35.778Z",
+      "experimentId": null,
+      "entityType": "agent",
+      "entityId": "subagent-explore",
+      "entityName": "Explore Subagent",
+      "entityVersionId": null,
+      "parentEntityVersionId": null,
+      "rootEntityVersionId": null,
+      "userId": null,
+      "organizationId": null,
+      "resourceId": "f5830314-9da6-4f01-a696-1db26de74672",
+      "runId": "9da4fb34-dff8-4ebd-a69a-2de9712a6c8a",
+      "sessionId": null,
+      "threadId": "f5830314-9da6-4f01-a696-1db26de74672",
+      "requestId": null,
+      "environment": "production",
+      "source": null,
+      "serviceName": null,
+      "attributes": {
+        "model": "gpt-5.4-mini",
+        "provider": "openai",
+        "usage": {},
+        "responseModel": "gpt-5.4-mini"
+      },
+      "metadata": {
+        "runId": "2775d830-0261-40f4-9c1e-b8555f8dcd3b",
+        "resourceId": "f5830314-9da6-4f01-a696-1db26de74672",
+        "threadId": "f5830314-9da6-4f01-a696-1db26de74672",
+        "environment": "production"
+      },
+      "tags": null,
+      "scope": null,
+      "links": null,
+      "error": null,
+      "requestContext": null,
+      "createdAt": "2026-09-29T17:40:35.770Z",
+      "updatedAt": null,
+      "factoryPhase": null
     }
   ]
 }

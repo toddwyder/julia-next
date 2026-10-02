@@ -13,9 +13,9 @@ const fixture = JSON.parse(readFileSync(new URL('./fixtures/captured-records.jso
 const { cards, spans, provenance } = fixture;
 const WEEK = { from: '2026-09-28T00:00:00Z', to: '2026-10-05T00:00:00Z' };
 
-test('captured fresh, cached, thinking and failed no-token calls reach the public Issues adapter', async () => {
+test('captured fresh, cached, thinking, unpriced and failed no-token calls reach the public Issues adapter', async () => {
   const traces = normalizeTraceSpans(spans, { cards });
-  assert.equal(traces.length, 4);
+  assert.equal(traces.length, 5);
   const scenario = name => traces.find(trace => trace.id === provenance.scenarios[name]);
   assert.deepEqual(scenario('fresh').tokens, { freshInput: 51497, cachedInput: 4096, output: 4162, thinking: 2276, total: 59755 });
   assert.ok(Math.abs(scenario('fresh').whatYouPayCost - .010234038) < 1e-12);
@@ -27,16 +27,21 @@ test('captured fresh, cached, thinking and failed no-token calls reach the publi
   assert.equal(scenario('thinking').tokens.thinking, 304);
   assert.deepEqual(scenario('noTokens').namedGaps, ['no_token_count']);
   assert.equal(scenario('noTokens').whatYouPayCost, null);
+  assert.equal(scenario('unpriced').model, 'gpt-5.4-mini');
+  assert.ok(scenario('unpriced').namedGaps.includes('unpriced_model'));
+  assert.ok(scenario('unpriced').namedGaps.includes('no_token_count'));
 
   const note = buildMondayNote({ cards, traces, ...WEEK });
-  assert.equal(note.lines.length, 2);
+  assert.equal(note.lines.length, 3);
   assert.match(note.body, /review .*no recorded board step/);
   assert.match(note.body, /deepseek-v4-flash \(deepseek\)/);
   assert.match(note.body, /gpt-6-sol \(openai\)/);
   assert.match(note.body, /effort:.*no token count thinking tokens/);
   assert.match(note.body, /Provider weekly totals \(what-you-pay\):/);
+  assert.match(note.body, /gpt-5\.4-mini \(openai\).*unpriced model/);
+  assert.match(note.body, /Unpriced models: 1 call\(s\)/);
   assert.match(note.body, /deepseek: \$0\.01 known subtotal \+ no token count/);
-  assert.match(note.body, /No token count: 1 call\(s\)/);
+  assert.match(note.body, /No token count: 2 call\(s\)/);
 
   const requests = [];
   const fetchImpl = async (url, init) => {
@@ -55,10 +60,10 @@ test('captured fresh, cached, thinking and failed no-token calls reach the publi
   assert.deepEqual(sent.labels, COST_NOTE_LABELS);
 });
 
-test('a captured model with a missing price line is a counted gap and keeps its real tokens', () => {
+test('a price-table fault on a captured priced model is a counted gap and keeps its real tokens', () => {
   const priceTable = { ...PRICE_TABLE };
   delete priceTable['openai/gpt-6-sol'];
-  const span = spans.find(span => span.spanId === provenance.scenarios.priceFault);
+  const span = spans.find(span => span.spanId === provenance.scenarios.cached);
   const traces = normalizeTraceSpans([span], { cards, priceTable });
   assert.deepEqual(traces[0].namedGaps, ['unpriced_model']);
   assert.equal(traces[0].tokens.cachedInput, 59904);

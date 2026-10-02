@@ -23,7 +23,7 @@ the observability route and storage findings this map builds on.
 
 | Need | Framework feature | Local source |
 |---|---|---|
-| Weekly cost from traces | Authenticated Mastra observability light-list, light-timeline and single-span routes under `/api/observability/traces`; `CompositeAuth` keeps WorkOS sign-in and adds a GET-only `SimpleAuth` trace reader | `app/src/mastra/cost-note-auth.ts`; `app/cost-note-auth.test.mjs`; pinned `@mastra/core` server auth and observability route schemas |
+| Weekly cost from traces | Authenticated Mastra light-list/light-timeline routes and a bounded cost-only batch route; `CompositeAuth` keeps WorkOS sign-in and adds a GET-only `SimpleAuth` trace reader | `app/src/mastra/cost-note-auth.ts`; `app/cost-note-auth.test.mjs`; pinned `@mastra/core` server auth and observability route schemas |
 | What-you-pay pricing per model/provider | Single source of truth price table (`ops/factory/price-table.mjs`) tracking fresh input, cached input, output rates, provider pay factors, source URLs, and checked dates | `ops/factory/price-table.mjs` and each entry's provider `sourceUrl` |
 | Card steps, actors and effort | Factory `work_items.stage_history` (`by` / `exitedBy`) and `mastra_messages` phase signals (`Runtime: model=?, reasoning-setting=?`) | `@mastra/factory` `dist/storage/domains/work-items/base.d.ts` (`WorkItemRow`, `WorkItemStageEntry`, `isAgentActor`) |
 | Card ↔ trace correlation | `work_items.sessions` maps session id → card; spans carry `sessionId`; step split correlated by `stage_history` timestamps | same `work-items/base.d.ts`; `@mastra/core` `LightSpanRecord`; `ops/factory/mastra-traces.mjs` |
@@ -61,11 +61,11 @@ Once a week, `ops/factory/monday-note-run.mjs` reads two sources and posts one p
 Todd as a public GitHub Issue: Factory's own card records and Mastra's trace cost data.
 
 - **Cards** come from `ops/factory/factory-cards.mjs` over a read-only PostgreSQL peer route.
-  `factory-cards.sql` reads `work_items`, retained `factory_run_bindings`, and a projected
-  `julia_monday_phase_snapshots` view. The publisher has no SELECT grant on raw `mastra_messages`.
+  `factory-cards.sql` reads project-scoped projected card, binding, and phase views.
+  The publisher has no SELECT grant on the three raw tables.
   Factory's `stage_history` gives each step's actor (`by` / `exitedBy`) and
   stage intervals (`enteredAt`/`exitedAt`).
-- **Costs** come from authenticated Mastra light roots/timelines and individual model-inference
+- **Costs** come from authenticated Mastra light roots/timelines and batches of up to 20 model-inference
   spans through the authenticated cost-only projection route. The timer token cannot read full
   span payloads. Aggregate generation/step totals are excluded when inference children exist, so token
   rates and long-context thresholds apply once per actual call. Step records and run IDs supply
@@ -109,7 +109,7 @@ Operator installation:
 1. Install the app with `bash ops/factory/install.sh /var/lib/julia-factory/app`.
 2. Run `sudo bash ops/factory/install-monday-note.sh /var/lib/julia-factory/app <PROJECT_ID>`.
    It installs root-owned job modules under `/opt/julia-factory-monday-note`, grants the existing
-   publisher account SELECT on card/binding tables and the phase-only view, and enables the Monday timer. Re-run it after
+   publisher account SELECT on project-scoped card, binding and phase views, and enables the Monday timer. Re-run it after
    job updates. It preserves existing configuration and sends nothing during installation.
 3. Provision one random `MONDAY_NOTE_TRACE_TOKEN` in both `/etc/julia-factory/factory.env` and
    `/etc/julia-factory-monday-note/config.env`, then restart the app. The supported auth composition
