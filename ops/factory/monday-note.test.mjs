@@ -12,6 +12,70 @@ import { buildMondayNote, publishMondayNote, MONDAY_NOTE_CATEGORY, previousWeekW
 
 const WEEK = { from: '2026-09-21T00:00:00Z', to: '2026-09-28T00:00:00Z' };
 
+test('invalid token breakdowns stay gaps and project overhead contributes to face totals', () => {
+  const invalid = { id: 'invalid', card: 180, startedAt: '2026-09-22T10:00:00Z', phase: 'build', costBearing: true,
+    model: 'broken-count', provider: 'deepseek', namedGaps: ['invalid_token_count'], tokens: { freshInput: 0, cachedInput: 500, output: 10, thinking: 0 } };
+  const overhead = { id: 'overhead', card: null, projectOverhead: true, startedAt: invalid.startedAt, costBearing: true,
+    model: 'measured', provider: 'openai', whatYouPayCost: 0, faceCost: 5, tokens: { freshInput: 100, cachedInput: 0, output: 10, thinking: 0 } };
+  const note = buildMondayNote({ cards: [{ number: 180, title: 'Invalid', enteredAt: invalid.startedAt }], traces: [invalid, overhead], ...WEEK });
+  assert.match(note.body, /broken-count \(deepseek\): invalid token count \(no token count\)/);
+  assert.doesNotMatch(note.body, /500 cached/);
+  assert.equal(note.faceTotalUsd, 5);
+});
+
+test('a review trace with a card identity is charged once, not again as overhead', () => {
+  const at = '2026-09-22T10:00:00Z';
+  const trace = { id: 'review', card: 'PR-184', projectOverhead: true, startedAt: at,
+    phase: 'review', costBearing: true, model: 'deepseek-v4-pro', provider: 'deepseek',
+    whatYouPayCost: 1.25, faceCost: 1.25,
+    tokens: { freshInput: 1000, cachedInput: 0, output: 100, thinking: 0 } };
+  const note = buildMondayNote({ cards: [{ number: 'PR-184', title: 'Review', enteredAt: at }],
+    traces: [trace], ...WEEK });
+  assert.equal(note.totalUsd, 1.25);
+  assert.equal(note.providerTotals.deepseek.whatYouPayCost, note.totalUsd);
+  assert.doesNotMatch(note.body, /Factory project overhead/);
+});
+
+test('missing usage and missing board phase remain gaps beside a recorded reviewer call', () => {
+  const note = buildMondayNote({ cards: [{ number: 'PR-184', title: 'Open review', enteredAt: '2026-09-22T09:00:00Z',
+    stageHistory: [{ stage: 'intake', by: 'factory', enteredAt: '2026-09-22T09:00:00Z' }] }],
+    traces: [{ id: 'missing-usage', card: 'PR-184', startedAt: '2026-09-22T10:00:00Z',
+      phase: 'review', costBearing: true, model: 'deepseek-v4-pro', provider: 'deepseek', namedGaps: ['no_token_count'] }], ...WEEK });
+  assert.doesNotMatch(note.body, /0 thinking tokens|Done by Factory/);
+  assert.match(note.body, /review.*no recorded board step/);
+  assert.match(note.body, /no token count thinking tokens/);
+  assert.match(note.body, /steps\/run: no recorded run count/);
+});
+
+test('a phase snapshot supplies effort even when its model traces are missing', () => {
+  const note = buildMondayNote({ cards: [{ number: 180, title: 'Recorded phase', enteredAt: '2026-09-22T09:00:00Z',
+    stageHistory: [{ stage: 'planning', by: 'factory', enteredAt: '2026-09-22T09:00:00Z', exitedAt: '2026-09-22T10:00:00Z' }],
+    phaseSnapshots: [{ threadId: 'thread', at: '2026-09-22T09:10:00Z', effort: 'high', model: 'openai/gpt-6-sol', phase: 'Planning' }]
+  }], traces: [], ...WEEK });
+  assert.match(note.body, /effort: high/);
+});
+
+test('backfilled weeks exclude future effort and model snapshots', () => {
+  const note = buildMondayNote({ cards: [{ number: 180, title: 'Open build', enteredAt: '2026-09-22T09:00:00Z',
+    stageHistory: [{ stage: 'execute', by: 'factory', enteredAt: '2026-09-22T09:00:00Z' }],
+    phaseSnapshots: [
+      { at: '2026-09-22T09:01:00Z', effort: 'off', model: 'then-model' },
+      { at: '2026-09-29T09:00:00Z', effort: 'high', model: 'future-model' },
+    ] }], traces: [], ...WEEK });
+  assert.match(note.body, /effort: off/);
+  assert.doesNotMatch(note.body, /effort: off, high|future-model/);
+});
+
+test('a card with no recorded model calls shows named gaps at card, step, effort and token drivers', () => {
+  const note = buildMondayNote({ cards: [{ number: 180, title: 'Unmeasured', enteredAt: '2026-09-22T09:00:00Z',
+    stageHistory: [{ stage: 'execute', by: 'factory', enteredAt: '2026-09-22T09:00:00Z' }] }], traces: [], ...WEEK });
+  assert.doesNotMatch(note.body, /\$0\.00/);
+  assert.match(note.body, /no recorded model calls/);
+  assert.match(note.body, /effort: no recorded effort/);
+  assert.match(note.body, /tokens\/step: no token count/);
+  assert.match(note.body, /cached input: no token count/);
+});
+
 // A card Todd starts the normal way: his one Intake tap, then Factory does the rest.
 const factoryCard = {
   number: 140,
@@ -69,10 +133,10 @@ test('each step is named with its actor, not just the card total', () => {
   assert.deepEqual(
     note.lines[0].steps.map((step) => step.text),
     [
-      'plan — Factory — $0.40 — 15m',
-      'build — Factory — $5.60 — 3h 15m — 1 failed attempt',
-      'review — Factory — $0.60 — 40m',
-      'done — Factory — $0.00',
+      'plan — Factory — $0.40 — 15m — effort: no recorded effort (no token count thinking tokens)',
+      'build — Factory — $5.60 — 3h 15m — 1 failed attempt — effort: no recorded effort (no token count thinking tokens)',
+      'review — Factory — $0.60 — 40m — effort: no recorded effort (no token count thinking tokens)',
+      'done — Factory — no recorded model calls — effort: no recorded effort (no token count thinking tokens)',
     ],
   );
 });
@@ -120,8 +184,8 @@ test('a step moved by hand names the person, not Factory', () => {
   const note = buildMondayNote({ cards: [byHand], traces: [], ...WEEK });
 
   assert.deepEqual(note.lines[0].steps.map((step) => step.text), [
-    'plan — Factory — $0.00 — 30m',
-    'done — Todd — $0.00',
+    'plan — Factory — no recorded model calls — 30m — effort: no recorded effort (no token count thinking tokens)',
+    'done — Todd — no recorded model calls — effort: no recorded effort (no token count thinking tokens)',
   ]);
   assert.equal(note.lines[0].doneByFactory, false);
 });
@@ -610,4 +674,195 @@ test('a second run for the same week posts and notifies nothing', async () => {
   assert.equal(discussions.calls.posted.length, 0);
   assert.equal(notifications.sent.length, 0);
   assert.deepEqual(result, { posted: false, reason: 'already published', url: DISCUSSION_URL });
+});
+
+// --- Issue #180 tests: what-you-pay cost, step/model breakdown, effort, drivers, provider totals, named gaps
+
+const richTraces = [
+  {
+    id: 't1',
+    card: 140,
+    phase: 'plan',
+    startedAt: '2026-09-22T09:00:00Z',
+    endedAt: '2026-09-22T09:15:00Z',
+    provider: 'deepseek',
+    model: 'deepseek/deepseek-chat',
+    whatYouPayCost: 0.05,
+    faceCost: 0.05,
+    costUsd: 0.05,
+    payFactor: 1.0,
+    tokens: { freshInput: 10000, cachedInput: 40000, output: 2000, thinking: 0, total: 52000 },
+    effort: null,
+    namedGaps: ['no_recorded_effort'],
+    outcome: 'passed',
+    costBearing: true,
+  },
+  {
+    id: 't2',
+    card: 140,
+    phase: 'build',
+    startedAt: '2026-09-22T09:15:00Z',
+    endedAt: '2026-09-22T10:57:00Z',
+    provider: 'deepseek',
+    model: 'deepseek/deepseek-reasoner',
+    whatYouPayCost: 0.30,
+    faceCost: 0.30,
+    costUsd: 0.30,
+    payFactor: 1.0,
+    tokens: { freshInput: 20000, cachedInput: 80000, output: 10000, thinking: 4000, total: 110000 },
+    effort: null,
+    namedGaps: ['no_recorded_effort'],
+    outcome: 'failed-attempt',
+    costBearing: true,
+  },
+  {
+    id: 't3',
+    card: 140,
+    phase: 'build',
+    startedAt: '2026-09-22T10:57:00Z',
+    endedAt: '2026-09-22T12:30:00Z',
+    provider: 'commandcode',
+    model: 'anthropic/claude-3-7-sonnet',
+    whatYouPayCost: 0.20,
+    faceCost: 1.40,
+    costUsd: 0.20,
+    payFactor: 10 / 70,
+    tokens: { freshInput: 5000, cachedInput: 20000, output: 3000, thinking: 1000, total: 28000 },
+    effort: null,
+    namedGaps: ['no_recorded_effort'],
+    outcome: 'passed',
+    costBearing: true,
+  },
+  {
+    id: 't4',
+    card: 140,
+    phase: 'review',
+    startedAt: '2026-09-22T12:30:00Z',
+    endedAt: '2026-09-22T13:10:00Z',
+    provider: 'openai',
+    model: 'openai/gpt-4o',
+    whatYouPayCost: 0.00,
+    faceCost: 0.15,
+    costUsd: 0.00,
+    payFactor: 0.0,
+    tokens: { freshInput: 1000, cachedInput: 4000, output: 500, thinking: 0, total: 5500 },
+    effort: null,
+    namedGaps: ['no_recorded_effort'],
+    outcome: 'passed',
+    costBearing: true,
+  },
+];
+
+test('the note displays what-you-pay cost, step breakdown with model split, and effort beside thinking tokens', () => {
+  const note = buildMondayNote({ cards: [stagedCard], traces: richTraces, ...WEEK });
+
+  assert.equal(note.lines[0].costUsd, 0.55); // 0.05 + 0.30 + 0.20 + 0.00
+  assert.equal(note.lines[0].faceCostUsd, 1.90); // 0.05 + 0.30 + 1.40 + 0.15
+  assert.equal(note.totalUsd, 0.55);
+
+  // Model breakdown lines under steps
+  assert.match(note.body, /deepseek\/deepseek-chat \(deepseek\): \$0\.05/);
+  assert.match(note.body, /deepseek\/deepseek-reasoner \(deepseek\): \$0\.30/);
+  assert.match(note.body, /anthropic\/claude-3-7-sonnet \(commandcode\): \$0\.20/);
+  assert.match(note.body, /openai\/gpt-4o \(openai\): \$0\.00/);
+
+  // Effort level beside thinking tokens
+  assert.match(note.body, /effort: no recorded effort \(0 thinking tokens\)/);
+  assert.match(note.body, /effort: no recorded effort \(5\.0k thinking tokens\)/); // build step total: 4k + 1k
+});
+
+test('the card line displays drivers: steps, tokens sent per step, cached share, review rounds, failed attempts, waits on Todd outside UAT', () => {
+  const note = buildMondayNote({ cards: [stagedCard], traces: richTraces, ...WEEK });
+
+  // 4 steps in stagedCard (planning, execute, review, done). Total input tokens = 10k+40k + 20k+80k + 5k+20k + 1k+4k = 180k.
+  // Cached input = 40k+80k+20k+4k = 144k (80% cached).
+  assert.match(note.body, /Drivers: 4 steps/);
+  assert.match(note.body, /80% cached input/);
+  assert.match(note.body, /1 review round/);
+  assert.match(note.body, /1 failed attempt/);
+  assert.match(note.body, /0 waits on Todd outside UAT/);
+});
+
+test('the note reports weekly totals per provider in what-you-pay dollars', () => {
+  const note = buildMondayNote({ cards: [stagedCard], traces: richTraces, ...WEEK });
+
+  assert.deepEqual(note.providerTotals, {
+    deepseek: { whatYouPayCost: 0.35, faceCost: 0.35 },
+    commandcode: { whatYouPayCost: 0.20, faceCost: 1.40 },
+    openai: { whatYouPayCost: 0.00, faceCost: 0.15 },
+  });
+
+  assert.match(note.body, /Provider weekly totals \(what-you-pay\):/);
+  assert.match(note.body, /• deepseek: \$0\.35/);
+  assert.match(note.body, /• commandcode: \$0\.20 \(face value \$1\.40\)/);
+  assert.match(note.body, /• openai \(subscription\): \$0\.00 \(face value \$0\.15\)/);
+});
+
+test('named gaps (no token count, unpriced model, no recorded effort) are reported by name and count, and the rest of the note prints without throwing', () => {
+  const traceWithGaps = [
+    ...richTraces,
+    {
+      id: 't-unpriced',
+      card: 140,
+      phase: 'build',
+      startedAt: '2026-09-22T12:00:00Z',
+      endedAt: '2026-09-22T12:10:00Z',
+      provider: 'custom',
+      model: 'unknown/model-xyz',
+      whatYouPayCost: null,
+      faceCost: null,
+      costUsd: 0.00,
+      payFactor: 1.0,
+      tokens: { freshInput: 1000, cachedInput: 0, output: 100, thinking: 0, total: 1100 },
+      effort: null,
+      namedGaps: ['unpriced_model:unknown/model-xyz', 'no_recorded_effort'],
+      outcome: 'passed',
+      costBearing: true,
+    },
+    {
+      id: 't-notokens',
+      card: 140,
+      phase: 'build',
+      startedAt: '2026-09-22T12:10:00Z',
+      endedAt: '2026-09-22T12:20:00Z',
+      provider: 'deepseek',
+      model: 'deepseek/deepseek-uncounted',
+      whatYouPayCost: null,
+      faceCost: null,
+      costUsd: 0.00,
+      payFactor: 1.0,
+      tokens: { freshInput: 0, cachedInput: 0, output: 0, thinking: 0, total: 0 },
+      effort: null,
+      namedGaps: ['no_token_count', 'no_recorded_effort'],
+      outcome: 'passed',
+      costBearing: true,
+    },
+  ];
+
+  const note = buildMondayNote({ cards: [stagedCard], traces: traceWithGaps, ...WEEK });
+
+  assert.match(note.body, /unknown\/model-xyz \(custom\): unpriced/);
+  assert.match(note.body, /deepseek\/deepseek-uncounted \(deepseek\): no token count/);
+  assert.match(note.body, /Named gaps:/);
+  assert.match(note.body, /• No recorded effort: 4 step\(s\)/);
+  assert.match(note.body, /• Unpriced models: 1 call\(s\)/);
+  assert.match(note.body, /• No token count: 1 call\(s\)/);
+});
+
+test('waits on Todd outside UAT correctly counts non-Factory actor steps between intake and done', () => {
+  const cardWithIntervention = {
+    ...stagedCard,
+    number: 145,
+    stageHistory: [
+      { stage: 'triage', enteredAt: '2026-09-22T09:00:00Z', exitedAt: '2026-09-22T09:05:00Z', by: 'todd', exitedBy: 'todd' },
+      { stage: 'planning', enteredAt: '2026-09-22T09:05:00Z', exitedAt: '2026-09-22T09:30:00Z', by: 'agent:r1', exitedBy: 'todd' }, // Todd intervention: wait #1
+      { stage: 'execute', enteredAt: '2026-09-22T09:30:00Z', exitedAt: '2026-09-22T10:30:00Z', by: 'agent:r2', exitedBy: 'agent:r2' },
+      { stage: 'done', enteredAt: '2026-09-22T10:30:00Z', by: 'agent:r2' },
+    ],
+  };
+
+  const note = buildMondayNote({ cards: [cardWithIntervention], traces: [], ...WEEK });
+
+  assert.equal(note.lines[0].waitsOnTodd, 1);
+  assert.match(note.body, /1 wait on Todd outside UAT/);
 });

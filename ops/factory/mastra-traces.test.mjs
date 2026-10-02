@@ -1,15 +1,13 @@
-// mastra-traces.test.mjs -- issue #140, blocker 3: read trace costs through
-// Mastra's own observability API, not by querying the DuckDB file.
+// mastra-traces.test.mjs -- issue #180: read trace costs and token breakdowns
+// through Mastra's observability route and calculate what-you-pay pricing.
 //
 // The supported surface is the one the pinned `mastra` CLI wraps:
+//   GET <factory>/api/observability/traces
 //
-//   mastra api trace list --url <factory>   -> GET <factory>/api/observability/traces
-//   mastra api trace query '<json>'         -> POST <factory>/api/observability/traces/query
-//
-// (mastra@1.31.3 dist/index.js, "api trace" command; the same routes are named
-// in the installed `@mastra/core` observability route schema.) The tests drive
-// a fake `fetch`, so nothing leaves this process. A response with no recognisable
-// span list fails closed instead of reporting zero cost.
+// Tests verify:
+//   - Token breakdown into fresh input, cached input, output, thinking tokens
+//   - Price table what-you-pay application
+//   - Named gaps for unpriced models and missing token counts
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -19,12 +17,9 @@ import {
   readTraceSpans,
 } from './mastra-traces.mjs';
 
-const FROM = '2026-09-21T00:00:00.000Z';
-const TO = '2026-09-28T00:00:00.000Z';
+const FROM = '2026-09-28T00:00:00.000Z';
+const TO = '2026-10-05T00:00:00.000Z';
 
-// One MODEL_GENERATION span as the observability store returns it: the cost is
-// `attributes.costContext.estimatedCost`, the correlation context carries the
-// session, and `error`/`status` say whether the attempt failed.
 const generationSpan = {
   traceId: 'trace-a',
   spanId: 'span-a',
@@ -34,10 +29,16 @@ const generationSpan = {
   entityName: 'code-sdk',
   sessionId: 'session-140',
   threadId: 'thread-140',
-  startedAt: '2026-09-22T09:00:00.000Z',
-  endedAt: '2026-09-22T09:15:00.000Z',
+  startedAt: '2026-09-29T09:00:00.000Z',
+  endedAt: '2026-09-29T09:15:00.000Z',
   attributes: {
     model: 'deepseek/deepseek-v4-flash',
+    usage: {
+      inputTokens: 1000000,
+      cachedInputTokens: 800000,
+      outputTokens: 100000,
+      reasoningTokens: 15000,
+    },
     costContext: { provider: 'deepseek', model: 'deepseek-v4-flash', estimatedCost: 0.4, costUnit: 'usd' },
   },
 };
@@ -62,99 +63,123 @@ function fakeFetch(handler) {
   };
 }
 
-test('the trace route is the one the pinned mastra CLI wraps', () => {
-  assert.equal(MASTRA_TRACE_ROUTE, '/api/observability/traces');
+test('authenticated light timelines hydrate model calls and retain parent identity without full trace payloads', async () => {
+  const root = { traceId: 'trace-a', spanId: 'root', spanType: 'agent_run', startedAt: generationSpan.startedAt, metadata: { threadId: 'session-140' } };
+  const fake = fakeFetch((url, init) => {
+    assert.equal(init.headers.Authorization, 'Bearer test-reader');
+    const u = new URL(url);
+    if (u.pathname === '/api/observability/traces/light') {
+      assert.equal(u.searchParams.get('page'), '0');
+      assert.equal(u.searchParams.get('perPage'), '20');
+      assert.equal(JSON.parse(u.searchParams.get('startedAt')).start, '2026-08-29T00:00:00.000Z');
+      return jsonResponse({ spans: [root], pagination: { page: 0, hasMore: false } });
+    }
+    if (u.pathname === '/api/observability/traces/trace-a/light') return jsonResponse({ spans: [root, { ...generationSpan, attributes: undefined }] });
+    if (u.pathname.endsWith('/spans') && u.searchParams.get('ids') === 'span-a') return jsonResponse({ spans: [generationSpan] });
+    throw new Error(`Unexpected route ${u.pathname}`);
+  });
+  const spans = await readTraceSpans({ factoryUrl: 'https://factory.example', token: 'test-reader', from: FROM, to: TO, fetchImpl: fake.fetch });
+  assert.equal(spans.filter(span => span.spanType === 'model_generation').length, 1);
+  assert.equal(spans.find(span => span.spanId === 'span-a').attributes.usage.inputTokens, 1000000);
 });
 
-test('readTraceSpans asks the supported route and reads the spans list', async () => {
-  const fake = fakeFetch(() => jsonResponse({ spans: [generationSpan], pagination: { page: 0, totalPages: 1, hasMore: false } }));
-
-  const spans = await readTraceSpans({
-    factoryUrl: 'https://factory.example',
-    from: FROM,
-    to: TO,
-    fetchImpl: fake.fetch,
-  });
-
-  assert.equal(spans.length, 1);
+test('trace authentication failures are visible and never fall back to an unauthenticated route', async () => {
+  const fake = fakeFetch(() => jsonResponse({ error: 'unauthorized' }, 401));
+  await assert.rejects(readTraceSpans({ factoryUrl: 'https://factory.example', token: 'wrong', from: FROM, to: TO, fetchImpl: fake.fetch }), /HTTP 401/);
   assert.equal(fake.calls.length, 1);
-  const url = new URL(fake.calls[0].url);
-  assert.equal(url.pathname, '/api/observability/traces');
-  // The route's `startedAt` filter is a range object, serialized the way the
-  // pinned mastra CLI serializes objects: JSON in the query string.
-  assert.deepEqual(JSON.parse(url.searchParams.get('startedAt')), {
-    start: FROM,
-    end: TO,
-    startExclusive: false,
-    endExclusive: true,
-  });
-  assert.deepEqual(JSON.parse(url.searchParams.get('pagination')), { page: 0, perPage: 100 });
-  assert.equal(fake.calls[0].init.method, 'GET');
 });
 
-test('a page with no spans but a next page is followed', async () => {
-  const pages = [
-    { spans: [generationSpan], pagination: { page: 0, total: 2, hasMore: true } },
-    { spans: [{ ...generationSpan, spanId: 'span-b', traceId: 'trace-b' }], pagination: { page: 1, total: 2, hasMore: false } },
-  ];
-  const fake = fakeFetch((url) => {
-    const page = JSON.parse(new URL(url).searchParams.get('pagination')).page;
-    return jsonResponse(pages[page]);
-  });
-
-  const spans = await readTraceSpans({ factoryUrl: 'https://factory.example', from: FROM, to: TO, fetchImpl: fake.fetch });
-
-  assert.deepEqual(spans.map((s) => s.spanId), ['span-a', 'span-b']);
-  assert.equal(fake.calls.length, 2);
+test('invalid report end fails before reading and cannot produce a quiet report', async () => {
+  const fake = fakeFetch(() => { throw new Error('unexpected request'); });
+  await assert.rejects(readTraceSpans({ factoryUrl: 'https://factory.example', token: 'reader', from: FROM, to: 'invalid', fetchImpl: fake.fetch }), /end time is invalid/);
+  await assert.rejects(readTraceSpans({ factoryUrl: 'https://factory.example', token: 'reader', from: FROM, to: FROM, fetchImpl: fake.fetch }), /end time is invalid/);
+  assert.equal(fake.calls.length, 0);
 });
 
-test('a response without a spans list fails closed rather than reporting zero cost', async () => {
-  const fake = fakeFetch(() => jsonResponse({ data: [] }));
-
-  await assert.rejects(
-    () => readTraceSpans({ factoryUrl: 'https://factory.example', from: FROM, to: TO, fetchImpl: fake.fetch }),
-    /trace list|spans|not the supported shape/i,
-  );
+test('transport and malformed JSON failures identify the read operation without exposing credentials', async () => {
+  const options = { factoryUrl: 'https://factory.example', token: 'secret-reader', from: FROM, to: TO };
+  await assert.rejects(readTraceSpans({ ...options, fetchImpl: async () => { throw new TypeError('secret-reader'); } }), error =>
+    /Mastra trace read \/api\/observability\/traces\/light transport failed/.test(error.message) && !error.message.includes('secret-reader'));
+  await assert.rejects(readTraceSpans({ ...options, fetchImpl: async () => ({ ok: true, json: async () => { throw new SyntaxError('secret-reader'); } }) }),
+    /Mastra trace read \/api\/observability\/traces\/light returned invalid JSON/);
 });
 
-test('missing pagination fails closed instead of returning a partial cost report', async () => {
-  const fake = fakeFetch(() => jsonResponse({ spans: [generationSpan] }));
-  await assert.rejects(
-    () => readTraceSpans({ factoryUrl: 'https://factory.example', from: FROM, to: TO, fetchImpl: fake.fetch }),
-    /pagination/,
-  );
-});
-
-test('empty page claiming more data fails closed', async () => {
+test('partial trace pagination fails closed', async () => {
   const fake = fakeFetch(() => jsonResponse({ spans: [], pagination: { page: 0, hasMore: true } }));
-  await assert.rejects(
-    () => readTraceSpans({ factoryUrl: 'https://factory.example', from: FROM, to: TO, fetchImpl: fake.fetch }),
-    /partial cost report/,
-  );
+  await assert.rejects(readTraceSpans({ factoryUrl: 'https://factory.example', token: 'test-reader', from: FROM, to: TO, fetchImpl: fake.fetch }), /incomplete/);
 });
 
-test('an HTTP error fails closed', async () => {
-  const fake = fakeFetch(() => jsonResponse({ error: 'nope' }, 500));
-
-  await assert.rejects(
-    () => readTraceSpans({ factoryUrl: 'https://factory.example', from: FROM, to: TO, fetchImpl: fake.fetch }),
-    /HTTP 500/,
-  );
+test('a listed root without a trace identity stops publication', async () => {
+  const fake = fakeFetch(() => jsonResponse({
+    spans: [{ spanId: 'root', spanType: 'agent_run', startedAt: FROM }],
+    pagination: { page: 0, hasMore: false },
+  }));
+  await assert.rejects(readTraceSpans({ factoryUrl: 'https://factory.example', token: 'reader', from: FROM, to: TO, fetchImpl: fake.fetch }), /trace identity|traceId/i);
 });
 
-test('a generation span normalises to its cost, session, window, outcome and phase', () => {
+test('a billable timeline span with no start time stops publication', async () => {
+  const root = { traceId: 'trace-a', spanId: 'root', spanType: 'agent_run', startedAt: FROM };
+  const fake = fakeFetch(url => {
+    const pathname = new URL(url).pathname;
+    if (pathname.endsWith('/traces/light')) return jsonResponse({ spans: [root], pagination: { page: 0, hasMore: false } });
+    if (pathname.endsWith('/trace-a/light')) return jsonResponse({ spans: [root, { ...generationSpan, startedAt: undefined }] });
+    throw new Error(`Unexpected route ${pathname}`);
+  });
+  await assert.rejects(readTraceSpans({ factoryUrl: 'https://factory.example', token: 'reader', from: FROM, to: TO, fetchImpl: fake.fetch }), /start time|startedAt/i);
+});
+
+test('a generation span normalises with token breakdown and what-you-pay pricing from price table', () => {
   const [record] = normalizeTraceSpans([generationSpan], { cards: [{ number: 140, sessions: { 'session-140': {} } }] });
 
   assert.equal(record.id, 'span-a');
   assert.equal(record.traceId, 'trace-a');
   assert.equal(record.card, 140);
   assert.equal(record.sessionId, 'session-140');
-  assert.equal(record.phase, 'build');
+  assert.equal(record.phase, null);
   assert.equal(record.startedAt, FROM_ISO(generationSpan.startedAt));
   assert.equal(record.endedAt, FROM_ISO(generationSpan.endedAt));
-  assert.equal(record.costUsd, 0.4);
+  assert.equal(record.model, 'deepseek/deepseek-v4-flash');
+  assert.equal(record.tokens.total, 1100000);
+  assert.equal(record.tokens.freshInput, 200000);
+  assert.equal(record.tokens.cachedInput, 800000);
+  assert.equal(record.tokens.output, 100000);
+  assert.equal(record.tokens.thinking, 15000);
+  // fresh: 200k * 0.27/1M = 0.054
+  // cached: 800k * 0.07/1M = 0.056
+  // output: 100k * 1.10/1M = 0.11
+  // what-you-pay = 0.185
+  assert.equal(Math.round(record.costUsd * 1000) / 1000, 0.185);
+  assert.equal(Math.round(record.whatYouPayCost * 1000) / 1000, 0.185);
+
   assert.equal(record.outcome, 'passed');
   assert.equal(record.actor, 'Factory');
+  assert.equal(record.gap, null);
+});
+
+test('a model span with no usage or token count records a named gap: no_token_count', () => {
+  const noTokens = { ...generationSpan, attributes: { model: 'deepseek/deepseek-v4-flash' } };
+  const [record] = normalizeTraceSpans([noTokens], { cards: [{ number: 140, sessions: { 'session-140': {} } }] });
+
+  assert.equal(record.costBearing, true);
+  assert.equal(record.costUsd, null);
+  assert.equal(record.gap, 'no_token_count');
+});
+
+test('a model span with an unpriced model records a named gap: unpriced_model', () => {
+  const unpriced = {
+    ...generationSpan,
+    attributes: {
+      model: 'unknown/new-model',
+      usage: { inputTokens: 1000, outputTokens: 500 },
+    },
+  };
+  const [record] = normalizeTraceSpans([unpriced], { cards: [{ number: 140, sessions: { 'session-140': {} } }] });
+
+  assert.equal(record.costBearing, true);
+  assert.equal(record.costUsd, null);
+  assert.equal(record.gap, 'unpriced_model');
+  assert.equal(record.model, 'unknown/new-model');
+  assert.equal(record.freshInputTokens, 1000);
 });
 
 test('a failed attempt is marked failed, and its cost still counts', () => {
@@ -162,7 +187,7 @@ test('a failed attempt is marked failed, and its cost still counts', () => {
   const [record] = normalizeTraceSpans([failed], { cards: [{ number: 140, sessions: { 'session-140': {} } }] });
 
   assert.equal(record.outcome, 'failed-attempt');
-  assert.equal(record.costUsd, 0.4);
+  assert.equal(Math.round(record.costUsd * 1000) / 1000, 0.185);
 });
 
 test('a span whose session matches no card is reported as uncorrelated, never guessed onto a card', () => {
@@ -170,31 +195,7 @@ test('a span whose session matches no card is reported as uncorrelated, never gu
 
   assert.equal(record.card, null);
   assert.equal(record.correlated, false);
-  assert.equal(record.costUsd, 0.4);
-});
-
-test('a span with no cost is reported as unknown, not as zero', () => {
-  const noCost = { ...generationSpan, attributes: { model: 'x' } };
-  const [record] = normalizeTraceSpans([noCost], { cards: [{ number: 140, sessions: { 'session-140': {} } }] });
-
-  assert.equal(record.costUsd, null);
-});
-
-test('a model span is marked cost-bearing even when Mastra recorded no cost', () => {
-  // The note must fail closed on this: it is a billed span whose cost read
-  // failed, so treating it as free would publish a wrong total.
-  const noCost = { ...generationSpan, attributes: { model: 'x' } };
-  const [record] = normalizeTraceSpans([noCost]);
-
-  assert.equal(record.costBearing, true);
-  assert.equal(record.costUsd, null);
-});
-
-test('a costContext payload marks a span cost-bearing whatever its type', () => {
-  const toolWithCost = { ...generationSpan, spanType: 'tool_call', attributes: { costContext: { estimatedCost: 0.1 } } };
-  const [record] = normalizeTraceSpans([toolWithCost]);
-
-  assert.equal(record.costBearing, true);
+  assert.equal(Math.round(record.costUsd * 1000) / 1000, 0.185);
 });
 
 test('a non-model span with no costContext is not cost-bearing', () => {
@@ -203,8 +204,111 @@ test('a non-model span with no costContext is not cost-bearing', () => {
 
   assert.equal(record.costBearing, false);
   assert.equal(record.costUsd, null);
+  assert.equal(record.gap, null);
 });
 
 function FROM_ISO(value) {
   return new Date(Date.parse(value)).toISOString();
 }
+
+test('live Factory PR references match top-level thread identity and recorded phase effort', () => {
+  const span = { ...generationSpan, sessionId: undefined, threadId: 'live-thread' };
+  const [record] = normalizeTraceSpans([span], { cards: [{ number: 'PR-133', sessions: { review: { threadId: 'live-thread' } },
+    phaseSnapshots: [{ threadId: 'live-thread', at: '2026-09-29T08:59:00Z', stage: 'review', effort: 'high', model: 'deepseek/deepseek-v4-flash' }] }] });
+  assert.equal(record.card, 'PR-133');
+  assert.equal(record.effort, 'high');
+});
+
+test('recorded phase snapshot takes precedence over a root phase label', () => {
+  const span = { ...generationSpan, sessionId: undefined, threadId: 'live-thread', factoryPhase: 'review' };
+  const [record] = normalizeTraceSpans([span], { cards: [{ number: 'PR-184',
+    sessions: { work: { threadId: 'live-thread' } },
+    sessionBindings: [{ threadId: 'live-thread', sessionId: 'live-thread', role: 'review', at: '2026-09-29T08:58:00Z' }],
+    phaseSnapshots: [{ threadId: 'live-thread', at: '2026-09-29T08:59:00Z', phase: 'build', effort: 'high' }] }] });
+  assert.equal(record.phase, 'build');
+  for (const phase of ['work', 'execute', 'executing', 'building']) {
+    const [variant] = normalizeTraceSpans([span], { cards: [{ number: 'PR-184',
+      sessions: { work: { threadId: 'live-thread' } },
+      sessionBindings: [{ threadId: 'live-thread', role: 'review', at: '2026-09-29T08:58:00Z' }],
+      phaseSnapshots: [{ threadId: 'live-thread', at: '2026-09-29T08:59:00Z', phase }] }] });
+    assert.equal(variant.phase, 'build', `recorded ${phase} must beat the review root`);
+  }
+});
+
+test('bundled estimates cannot replace missing counts and aggregate model spans are never billed twice', () => {
+  const parent = { ...generationSpan, spanId: 'generation' };
+  const child = { ...generationSpan, spanId: 'step', parentSpanId: 'generation', spanType: 'model_step' };
+  const missing = { ...generationSpan, spanId: 'missing', attributes: { model: 'deepseek/deepseek-v4-flash', costContext: { estimatedCost: 10 } } };
+  const records = normalizeTraceSpans([parent, child, missing]);
+  assert.equal(records[1].costBearing, false);
+  assert.equal(records[2].costUsd, null);
+  assert.equal(records[2].gap, 'no_token_count');
+});
+
+test('raw aggregate generation and step leave the inference leaf billable', () => {
+  const generation = { ...generationSpan, spanId: 'generation' };
+  const step = { ...generationSpan, spanId: 'step', parentSpanId: 'generation', spanType: 'model_step' };
+  const inference = { ...generationSpan, spanId: 'inference', parentSpanId: 'step', spanType: 'model_inference' };
+  const records = normalizeTraceSpans([generation, step, inference]);
+  assert.deepEqual(records.filter(record => record.costBearing).map(record => record.id), ['inference']);
+  assert.ok(records[2].costUsd > 0);
+});
+
+test('a generation root with an inference child bills the hydrated leaf once', async () => {
+  const root = { ...generationSpan, spanId: 'root', attributes: undefined, metadata: { threadId: 'session-140' } };
+  const leaf = { ...generationSpan, spanId: 'leaf', parentSpanId: 'root', spanType: 'model_inference' };
+  const fake = fakeFetch(url => {
+    if (new URL(url).pathname === '/api/observability/traces/light') return jsonResponse({ spans: [root], pagination: { page: 0, hasMore: false } });
+    if (url.endsWith('/trace-a/light')) return jsonResponse({ spans: [root, { ...leaf, attributes: undefined }] });
+    if (new URL(url).pathname.endsWith('/spans') && new URL(url).searchParams.get('ids') === 'leaf') return jsonResponse({ spans: [leaf] });
+    throw new Error('Unexpected request');
+  });
+  const spans = await readTraceSpans({ factoryUrl: 'https://factory.example', token: 'reader', from: FROM, to: TO, fetchImpl: fake.fetch });
+  const records = normalizeTraceSpans(spans, { cards: [{ number: 140, sessions: { 'session-140': {} } }] });
+  assert.equal(records.filter(x => x.costBearing).length, 1);
+  assert.equal(records.find(x => x.costBearing).id, 'leaf');
+  assert.ok(records.find(x => x.costBearing).costUsd > 0);
+});
+
+for (const name of ["workflow run: 'cross-maker-review'", "workflow run: 'pr-review-workflow'", "agent run: 'code-review-agent'"]) {
+test(`${name} with no card identity is project review overhead`, async () => {
+  const root = { traceId: 'trace-a', spanId: 'root', name,
+    spanType: 'workflow_run', startedAt: generationSpan.startedAt };
+  const inference = { ...generationSpan, spanId: 'leaf', parentSpanId: 'root', spanType: 'model_inference',
+    threadId: null, sessionId: null, metadata: {} };
+  const fake = fakeFetch(url => {
+    const u = new URL(url);
+    if (u.pathname.endsWith('/traces/light')) return jsonResponse({ spans: [root], pagination: { page: 0, hasMore: false } });
+    if (u.pathname.endsWith('/trace-a/light')) return jsonResponse({ spans: [root, { ...inference, attributes: undefined }] });
+    if (u.pathname.endsWith('/spans')) return jsonResponse({ spans: [inference] });
+    throw new Error(`Unexpected request ${u.pathname}`);
+  });
+  const spans = await readTraceSpans({ factoryUrl: 'https://factory.example', token: 'reader', from: FROM, to: TO, fetchImpl: fake.fetch });
+  const [record] = normalizeTraceSpans(spans.filter(span => span.spanId === 'leaf'));
+  assert.equal(record.card, null);
+  assert.equal(record.projectOverhead, true);
+  assert.ok(record.costUsd > 0);
+});
+}
+
+test('twenty one calls use two bounded cost-only requests and reject incomplete batches', async () => {
+  const root = { traceId: 'trace-a', spanId: 'root', spanType: 'agent_run', startedAt: FROM };
+  const leaves = Array.from({ length: 21 }, (_, index) => ({ ...generationSpan,
+    spanId: `leaf-${index}`, spanType: 'model_inference', parentSpanId: 'root' }));
+  const fake = fakeFetch(url => {
+    const u = new URL(url);
+    if (u.pathname.endsWith('/traces/light')) return jsonResponse({ spans: [root], pagination: { page: 0, hasMore: false } });
+    if (u.pathname.endsWith('/trace-a/light')) return jsonResponse({ spans: [root, ...leaves.map(({ attributes, ...leaf }) => leaf)] });
+    if (u.pathname.endsWith('/spans')) return jsonResponse({ spans: u.searchParams.get('ids').split(',').map(id => leaves.find(leaf => leaf.spanId === id)) });
+    throw new Error(`Unexpected request ${u.pathname}`);
+  });
+  const options = { factoryUrl: 'https://factory.example', token: 'reader', from: FROM, to: TO, fetchImpl: fake.fetch };
+  assert.equal((await readTraceSpans(options)).filter(span => span.spanType === 'model_inference').length, 21);
+  const batches = fake.calls.filter(({ url }) => new URL(url).pathname.endsWith('/spans'));
+  assert.deepEqual(batches.map(({ url }) => new URL(url).searchParams.get('ids').split(',').length), [20, 1]);
+  await assert.rejects(readTraceSpans({ ...options, fetchImpl: async (url, init) => {
+    const response = await fake.fetch(url, init);
+    if (new URL(url).pathname.endsWith('/spans')) return jsonResponse({ spans: [] });
+    return response;
+  } }), /incomplete span details/);
+});

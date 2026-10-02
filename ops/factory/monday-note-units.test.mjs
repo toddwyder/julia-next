@@ -20,7 +20,7 @@ test('the Monday note post is a weekly timer that runs the production entrypoint
   assert.match(service, /EnvironmentFile=\/etc\/julia-factory-monday-note\/config\.env/);
   // Inert until an operator fills the config in: no accidental post on install.
   assert.match(service, /ConditionPathExists=\/etc\/julia-factory-monday-note\/config\.env/);
-  assert.match(timer, /OnCalendar=Mon 08:00/);
+  assert.match(timer, /OnCalendar=Mon \*-\*-\* 08:00:00 UTC/);
   assert.match(timer, /Persistent=true/);
   assert.match(timer, /Unit=julia-factory-monday-note\.service/);
 });
@@ -49,7 +49,25 @@ test('the installer installs the Monday note unit, writes a placeholder config w
     assert.match(installer, new RegExp(unit.replace(/\./g, '\\.')));
   }
   assert.match(installer, /chmod 0640/);
-  assert.match(installer, /MONDAY_NOTE_GITHUB_TOKEN=$/m, 'the token placeholder must be empty');
-  assert.match(installer, /MONDAY_NOTE_DISCORD_WEBHOOK=$/m, 'the webhook placeholder must be empty');
+  assert.match(installer, /MONDAY_NOTE_TRACE_TOKEN=$/m, 'the trace token placeholder must be empty');
+  assert.match(installer, /MONDAY_NOTE_USE_PUBLISHER_APP=1/m, 'each run mints a fresh App token');
+  assert.doesNotMatch(installer, /^\s*MONDAY_NOTE_DISCORD_WEBHOOK=/m, 'Discord webhook placeholder is retired in issue 180');
   assert.match(installer, /systemctl enable julia-factory-monday-note\.timer/);
+});
+
+test('the publisher receives phase signals through a projected view, not full message rows', () => {
+  const installer = read('install-monday-note.sh');
+  const cards = read('factory-cards.sql');
+  assert.match(installer, /CREATE OR REPLACE VIEW julia_monday_phase_snapshots/);
+  assert.match(installer, /REVOKE SELECT ON mastra_messages FROM "orchestrator-svc"/);
+  assert.match(installer, /GRANT SELECT ON julia_monday_phase_snapshots TO "orchestrator-svc"/);
+  assert.match(cards, /FROM julia_monday_phase_snapshots m/);
+  assert.doesNotMatch(cards, /FROM mastra_messages m/);
+  assert.match(installer, /REVOKE SELECT ON work_items, factory_run_bindings FROM "orchestrator-svc"/);
+  assert.match(installer, /GRANT SELECT ON julia_monday_work_items, julia_monday_run_bindings/);
+  assert.match(installer, /-v database="\$database" -d "\$database"/);
+  assert.match(installer, /GRANT CONNECT ON DATABASE %I/);
+  assert.match(installer, /ALTER ROLE .* IN DATABASE %I SET default_transaction_read_only/);
+  assert.match(cards, /FROM julia_monday_work_items/);
+  assert.match(cards, /FROM julia_monday_run_bindings/);
 });

@@ -8,6 +8,16 @@ import { test } from 'node:test';
 const root = resolve(import.meta.dirname, '../..');
 const installer = resolve(import.meta.dirname, 'install.sh');
 
+test('the installed Mastra auth contract restricts the cost reader and preserves WorkOS', () => {
+  for (const file of ['cost-note-auth.test.mjs', 'cost-note-span-route.test.mjs', 'cost-note-storage.test.mjs']) {
+    assert.ok(existsSync(resolve(root, 'ops/factory/app', file)), `required boundary test ${file} is missing`);
+  }
+  const result = spawnSync(process.execPath, ['--experimental-strip-types', '--import', './register-typescript-esm.mjs', '--test', 'cost-note-auth.test.mjs', 'cost-note-span-route.test.mjs', 'cost-note-storage.test.mjs'], {
+    cwd: resolve(root, 'ops/factory/app'), encoding: 'utf8',
+  });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+});
+
 /**
  * Every local (`./`) import in a TypeScript/JavaScript module, as the bare
  * module specifier without its extension: `./observability-store.js` ->
@@ -68,6 +78,7 @@ test('the installer copies the issue #140 Monday note and retention programs int
   });
   assert.equal(result.status, 0, result.stderr);
   for (const file of [
+    'ops/factory/price-table.mjs',
     'ops/factory/monday-note.mjs',
     'ops/factory/monday-note-run.mjs',
     'ops/factory/monday-note-adapters.mjs',
@@ -194,6 +205,7 @@ test('a missing required skill leaves an existing install untouched', () => {
   for (const file of [
     'package.json', 'package-lock.json', 'tsconfig.json', 'src/mastra/index.ts', 'src/mastra/local-sandbox.ts',
     'src/mastra/observability-store.ts', 'src/mastra/observability-retention.ts',
+    'src/mastra/cost-note-auth.ts', 'src/mastra/cost-note-span-route.ts',
     'src/mastra/reviewer/workflows/cross-maker-review-workflow.ts',
     'src/mastra/public/factory-skills/factory-plan/SKILL.md',
   ]) {

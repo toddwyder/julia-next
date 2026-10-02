@@ -30,7 +30,8 @@ const row = {
 
 test('the read is one read-only query against the Factory work-items table', () => {
   assert.match(FACTORY_CARDS_SQL, /BEGIN TRANSACTION READ ONLY/);
-  assert.match(FACTORY_CARDS_SQL, /FROM work_items/);
+  assert.match(FACTORY_CARDS_SQL, /FROM julia_monday_work_items/);
+  assert.doesNotMatch(FACTORY_CARDS_SQL, /work_item_id::uuid/, 'retained non-UUID IDs must remain reportable');
   assert.match(FACTORY_CARDS_SQL, /stage_history|stages/);
   assert.match(FACTORY_CARDS_SQL, /'review'/);
   assert.match(FACTORY_CARDS_SQL, /github-pr:/);

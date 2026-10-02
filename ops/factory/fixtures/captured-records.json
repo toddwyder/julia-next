@@ -1,0 +1,456 @@
+{
+  "provenance": {
+    "capturedAt": "2026-10-01T20:44:31.865Z",
+    "source": "Authenticated pinned Mastra API and read-only PostgreSQL on Julia Factory trial; prompt bodies removed",
+    "scenarios": {
+      "cached": "84ef5094c89dd9d8",
+      "thinking": "398caaadad090624",
+      "noTokens": "2735869e280a5cd8",
+      "fresh": "109eae17f7b04097",
+      "unpriced": "1fa3ddca2c5dfa32"
+    },
+    "freshCase": "Actual fresh-input-dominated call; the provider also recorded a cached prefix.",
+    "unpricedCase": "Actual captured gpt-5.4-mini call with missing token count; the model has no verified price entry."
+  },
+  "cards": [
+    {
+      "number": "PR-184",
+      "title": "feat(factory): weekly what-you-pay cost note and price table (Closes #180)",
+      "board": "review",
+      "stages": [
+        "intake"
+      ],
+      "stageHistory": [
+        {
+          "by": "factory-rule-dispatcher",
+          "stage": "intake",
+          "enteredAt": "2026-10-01T12:39:41.752Z"
+        }
+      ],
+      "sessions": {},
+      "phaseSnapshots": [],
+      "recordMissing": false,
+      "sessionBindings": [],
+      "acceptedAt": null,
+      "createdAt": "2026-10-01T12:39:41.752+00:00",
+      "enteredAt": "2026-10-01T12:39:41.752Z"
+    },
+    {
+      "number": "Factory-f30264d6-510b-4347-b793-ebfa7e038632",
+      "title": "no recorded card title (retained Factory run binding)",
+      "board": "work",
+      "stages": [],
+      "stageHistory": [],
+      "sessions": {
+        "01aa12ec-cca7-4c7c-ad7b-e08ba2b993c6": {
+          "threadId": "01aa12ec-cca7-4c7c-ad7b-e08ba2b993c6",
+          "sessionId": "01aa12ec-cca7-4c7c-ad7b-e08ba2b993c6"
+        }
+      },
+      "phaseSnapshots": [],
+      "recordMissing": true,
+      "sessionBindings": [
+        {
+          "at": "2026-09-29T16:39:21.785+00:00",
+          "role": "triage",
+          "threadId": "01aa12ec-cca7-4c7c-ad7b-e08ba2b993c6",
+          "sessionId": "01aa12ec-cca7-4c7c-ad7b-e08ba2b993c6"
+        },
+        {
+          "at": "2026-09-29T16:44:43.542+00:00",
+          "role": "plan",
+          "threadId": "01aa12ec-cca7-4c7c-ad7b-e08ba2b993c6",
+          "sessionId": "01aa12ec-cca7-4c7c-ad7b-e08ba2b993c6"
+        },
+        {
+          "at": "2026-09-29T16:51:29.557+00:00",
+          "role": "work",
+          "threadId": "01aa12ec-cca7-4c7c-ad7b-e08ba2b993c6",
+          "sessionId": "01aa12ec-cca7-4c7c-ad7b-e08ba2b993c6"
+        },
+        {
+          "at": "2026-09-29T17:44:07.609+00:00",
+          "role": "triage",
+          "threadId": "01aa12ec-cca7-4c7c-ad7b-e08ba2b993c6",
+          "sessionId": "01aa12ec-cca7-4c7c-ad7b-e08ba2b993c6"
+        }
+      ],
+      "acceptedAt": "2026-09-29T16:39:21.785+00:00",
+      "createdAt": "2026-09-29T16:39:21.785+00:00",
+      "enteredAt": "2026-09-29T16:39:21.785+00:00"
+    },
+    {
+      "number": "Factory-8af4c68d-9d92-4ae2-8b60-1ff7b7ebfd5c",
+      "title": "no recorded card title (retained Factory run binding)",
+      "board": "work",
+      "stages": [],
+      "stageHistory": [],
+      "sessions": {
+        "f5830314-9da6-4f01-a696-1db26de74672": {
+          "threadId": "f5830314-9da6-4f01-a696-1db26de74672",
+          "sessionId": "f5830314-9da6-4f01-a696-1db26de74672"
+        }
+      },
+      "phaseSnapshots": [
+        {
+          "at": "2026-09-29T17:37:58.004",
+          "model": "openai/gpt-6-sol",
+          "phase": "Reviewing",
+          "effort": "off",
+          "threadId": "f5830314-9da6-4f01-a696-1db26de74672"
+        },
+        {
+          "at": "2026-09-29T17:39:16.866",
+          "model": "openai/gpt-6-sol",
+          "phase": "Reviewing",
+          "effort": "off",
+          "threadId": "f5830314-9da6-4f01-a696-1db26de74672"
+        },
+        {
+          "at": "2026-09-29T17:42:35.713",
+          "model": "openai/gpt-6-sol",
+          "phase": "Reviewing",
+          "effort": "off",
+          "threadId": "f5830314-9da6-4f01-a696-1db26de74672"
+        },
+        {
+          "at": "2026-09-29T17:44:14.568",
+          "model": "openai/gpt-6-sol",
+          "phase": "Reviewing",
+          "effort": "off",
+          "threadId": "f5830314-9da6-4f01-a696-1db26de74672"
+        },
+        {
+          "at": "2026-09-29T17:46:29.201",
+          "model": "openai/gpt-6-sol",
+          "phase": "Reviewing",
+          "effort": "off",
+          "threadId": "f5830314-9da6-4f01-a696-1db26de74672"
+        },
+        {
+          "at": "2026-09-29T18:01:44.483",
+          "model": "openai/gpt-6-sol",
+          "phase": "Reviewing",
+          "effort": "off",
+          "threadId": "f5830314-9da6-4f01-a696-1db26de74672"
+        },
+        {
+          "at": "2026-09-29T18:03:35.873",
+          "model": "openai/gpt-6-sol",
+          "phase": "Reviewing",
+          "effort": "off",
+          "threadId": "f5830314-9da6-4f01-a696-1db26de74672"
+        },
+        {
+          "at": "2026-09-29T18:06:00.918",
+          "model": "openai/gpt-6-sol",
+          "phase": "Reviewing",
+          "effort": "off",
+          "threadId": "f5830314-9da6-4f01-a696-1db26de74672"
+        },
+        {
+          "at": "2026-09-29T18:13:29.148",
+          "model": "openai/gpt-6-sol",
+          "phase": "Reviewing",
+          "effort": "off",
+          "threadId": "f5830314-9da6-4f01-a696-1db26de74672"
+        },
+        {
+          "at": "2026-09-29T18:16:26.562",
+          "model": "openai/gpt-6-sol",
+          "phase": "Reviewing",
+          "effort": "off",
+          "threadId": "f5830314-9da6-4f01-a696-1db26de74672"
+        }
+      ],
+      "sessionBindings": [
+        {
+          "at": "2026-09-29T17:37:56.144+00:00",
+          "role": "review",
+          "threadId": "f5830314-9da6-4f01-a696-1db26de74672",
+          "sessionId": "f5830314-9da6-4f01-a696-1db26de74672"
+        },
+        {
+          "at": "2026-09-29T18:00:03.208+00:00",
+          "role": "review",
+          "threadId": "f5830314-9da6-4f01-a696-1db26de74672",
+          "sessionId": "f5830314-9da6-4f01-a696-1db26de74672"
+        },
+        {
+          "at": "2026-09-29T18:13:16.771+00:00",
+          "role": "review",
+          "threadId": "f5830314-9da6-4f01-a696-1db26de74672",
+          "sessionId": "f5830314-9da6-4f01-a696-1db26de74672"
+        }
+      ],
+      "acceptedAt": "2026-09-29T17:37:56.144+00:00",
+      "createdAt": "2026-09-29T17:37:56.144+00:00",
+      "enteredAt": "2026-09-29T17:37:56.144+00:00"
+    }
+  ],
+  "spans": [
+    {
+      "traceId": "6f631eac1a97e5114b21aef0ab08c0d6",
+      "spanId": "84ef5094c89dd9d8",
+      "name": "inference: 44",
+      "spanType": "model_inference",
+      "parentSpanId": "7a353b06da3b6111",
+      "isEvent": false,
+      "startedAt": "2026-09-29T18:01:55.375Z",
+      "endedAt": "2026-09-29T18:01:59.471Z",
+      "experimentId": null,
+      "entityType": "agent",
+      "entityId": "code-agent",
+      "entityName": "Code Agent",
+      "entityVersionId": null,
+      "parentEntityVersionId": null,
+      "rootEntityVersionId": null,
+      "userId": null,
+      "organizationId": null,
+      "resourceId": "01aa12ec-cca7-4c7c-ad7b-e08ba2b993c6",
+      "runId": "8405ea82-e07c-4007-be45-aaa261abfe96",
+      "sessionId": null,
+      "threadId": "01aa12ec-cca7-4c7c-ad7b-e08ba2b993c6",
+      "requestId": null,
+      "environment": "production",
+      "source": null,
+      "serviceName": null,
+      "attributes": {
+        "model": "gpt-6-sol",
+        "provider": "openai.responses",
+        "responseModel": "gpt-6-sol",
+        "usage": {
+          "inputTokens": 73399,
+          "outputTokens": 14,
+          "inputDetails": {
+            "cacheRead": 59904,
+            "cacheWrite": 0,
+            "text": 13495
+          },
+          "outputDetails": {
+            "reasoning": 0,
+            "text": 14
+          }
+        }
+      },
+      "metadata": {
+        "runId": "8405ea82-e07c-4007-be45-aaa261abfe96",
+        "resourceId": "01aa12ec-cca7-4c7c-ad7b-e08ba2b993c6",
+        "threadId": "01aa12ec-cca7-4c7c-ad7b-e08ba2b993c6",
+        "environment": "production"
+      },
+      "tags": null,
+      "scope": null,
+      "links": null,
+      "error": null,
+      "createdAt": "2026-09-29T18:01:55.375Z",
+      "updatedAt": null,
+      "factoryPhase": null
+    },
+    {
+      "traceId": "6f631eac1a97e5114b21aef0ab08c0d6",
+      "spanId": "398caaadad090624",
+      "name": "inference: 2",
+      "spanType": "model_inference",
+      "parentSpanId": "ca034466d772228c",
+      "isEvent": false,
+      "startedAt": "2026-09-29T17:55:04.513Z",
+      "endedAt": "2026-09-29T17:55:15.631Z",
+      "experimentId": null,
+      "entityType": "agent",
+      "entityId": "code-agent",
+      "entityName": "Code Agent",
+      "entityVersionId": null,
+      "parentEntityVersionId": null,
+      "rootEntityVersionId": null,
+      "userId": null,
+      "organizationId": null,
+      "resourceId": "01aa12ec-cca7-4c7c-ad7b-e08ba2b993c6",
+      "runId": "8405ea82-e07c-4007-be45-aaa261abfe96",
+      "sessionId": null,
+      "threadId": "01aa12ec-cca7-4c7c-ad7b-e08ba2b993c6",
+      "requestId": null,
+      "environment": "production",
+      "source": null,
+      "serviceName": null,
+      "attributes": {
+        "model": "gpt-6-sol",
+        "provider": "openai.responses",
+        "responseModel": "gpt-6-sol",
+        "usage": {
+          "inputTokens": 84857,
+          "outputTokens": 475,
+          "inputDetails": {
+            "cacheRead": 81280,
+            "cacheWrite": 0,
+            "text": 3577
+          },
+          "outputDetails": {
+            "reasoning": 304,
+            "text": 171
+          }
+        }
+      },
+      "metadata": {
+        "runId": "8405ea82-e07c-4007-be45-aaa261abfe96",
+        "resourceId": "01aa12ec-cca7-4c7c-ad7b-e08ba2b993c6",
+        "threadId": "01aa12ec-cca7-4c7c-ad7b-e08ba2b993c6",
+        "environment": "production"
+      },
+      "tags": null,
+      "scope": null,
+      "links": null,
+      "error": null,
+      "createdAt": "2026-09-29T17:55:04.513Z",
+      "updatedAt": null,
+      "factoryPhase": null
+    },
+    {
+      "traceId": "df50983d826fb4e6954087d4d94d9452",
+      "spanId": "2735869e280a5cd8",
+      "name": "inference: 0",
+      "spanType": "model_inference",
+      "parentSpanId": "81b0994a290bc7a9",
+      "isEvent": false,
+      "startedAt": "2026-10-01T19:13:07.667Z",
+      "endedAt": null,
+      "experimentId": null,
+      "entityType": "agent",
+      "entityId": "code-review-agent",
+      "entityName": "GitHub PR Code Reviewer",
+      "entityVersionId": null,
+      "parentEntityVersionId": null,
+      "rootEntityVersionId": null,
+      "userId": null,
+      "organizationId": null,
+      "resourceId": "julia-cross-maker-reviewer",
+      "runId": "a9fbc5b0-2499-4813-8e1f-3077f54f6287",
+      "sessionId": null,
+      "threadId": "pr-184-81ff3e8098652614c8dd41de3a1e1964d8499d63",
+      "requestId": null,
+      "environment": "production",
+      "source": null,
+      "serviceName": null,
+      "attributes": {
+        "model": "deepseek-v4-pro",
+        "provider": "deepseek"
+      },
+      "metadata": {
+        "runId": "a9fbc5b0-2499-4813-8e1f-3077f54f6287",
+        "resourceId": "julia-cross-maker-reviewer",
+        "threadId": "pr-184-81ff3e8098652614c8dd41de3a1e1964d8499d63",
+        "environment": "production"
+      },
+      "tags": null,
+      "scope": null,
+      "links": null,
+      "error": null,
+      "createdAt": "2026-10-01T19:13:07.667Z",
+      "updatedAt": null,
+      "factoryPhase": "review"
+    },
+    {
+      "traceId": "6fc5332bff2fe6235fc371de64a41bbc",
+      "spanId": "109eae17f7b04097",
+      "name": "inference: 0",
+      "spanType": "model_inference",
+      "parentSpanId": "fd86a3841391621c",
+      "isEvent": false,
+      "startedAt": "2026-10-01T19:16:53.362Z",
+      "endedAt": "2026-10-01T19:17:11.396Z",
+      "experimentId": null,
+      "entityType": "agent",
+      "entityId": "observational-memory-observer",
+      "entityName": "Observer",
+      "entityVersionId": null,
+      "parentEntityVersionId": null,
+      "rootEntityVersionId": null,
+      "userId": null,
+      "organizationId": null,
+      "resourceId": "julia-cross-maker-reviewer",
+      "runId": "1d0406e9-7266-4aac-8ecf-d71b5ef81566",
+      "sessionId": null,
+      "threadId": "pr-184-81ff3e8098652614c8dd41de3a1e1964d8499d63",
+      "requestId": null,
+      "environment": "production",
+      "source": null,
+      "serviceName": null,
+      "attributes": {
+        "model": "deepseek-v4-flash",
+        "provider": "deepseek",
+        "usage": {
+          "inputTokens": 55593,
+          "outputTokens": 4162,
+          "inputDetails": {
+            "cacheRead": 4096,
+            "text": 51497
+          },
+          "outputDetails": {
+            "reasoning": 2276,
+            "text": 1886
+          }
+        }
+      },
+      "metadata": {
+        "runId": "1d0406e9-7266-4aac-8ecf-d71b5ef81566",
+        "resourceId": "julia-cross-maker-reviewer",
+        "threadId": "pr-184-81ff3e8098652614c8dd41de3a1e1964d8499d63",
+        "environment": "production"
+      },
+      "tags": null,
+      "scope": null,
+      "links": null,
+      "error": null,
+      "createdAt": "2026-10-01T19:16:53.362Z",
+      "updatedAt": null,
+      "factoryPhase": "review"
+    },
+    {
+      "traceId": "41c77038fded7449601ad5693f108f52",
+      "spanId": "1fa3ddca2c5dfa32",
+      "name": "inference: 0",
+      "spanType": "model_inference",
+      "parentSpanId": "7973a18673a83f07",
+      "isEvent": false,
+      "startedAt": "2026-09-29T17:40:35.770Z",
+      "endedAt": "2026-09-29T17:40:35.778Z",
+      "experimentId": null,
+      "entityType": "agent",
+      "entityId": "subagent-explore",
+      "entityName": "Explore Subagent",
+      "entityVersionId": null,
+      "parentEntityVersionId": null,
+      "rootEntityVersionId": null,
+      "userId": null,
+      "organizationId": null,
+      "resourceId": "f5830314-9da6-4f01-a696-1db26de74672",
+      "runId": "9da4fb34-dff8-4ebd-a69a-2de9712a6c8a",
+      "sessionId": null,
+      "threadId": "f5830314-9da6-4f01-a696-1db26de74672",
+      "requestId": null,
+      "environment": "production",
+      "source": null,
+      "serviceName": null,
+      "attributes": {
+        "model": "gpt-5.4-mini",
+        "provider": "openai",
+        "usage": {},
+        "responseModel": "gpt-5.4-mini"
+      },
+      "metadata": {
+        "runId": "2775d830-0261-40f4-9c1e-b8555f8dcd3b",
+        "resourceId": "f5830314-9da6-4f01-a696-1db26de74672",
+        "threadId": "f5830314-9da6-4f01-a696-1db26de74672",
+        "environment": "production"
+      },
+      "tags": null,
+      "scope": null,
+      "links": null,
+      "error": null,
+      "requestContext": null,
+      "createdAt": "2026-09-29T17:40:35.770Z",
+      "updatedAt": null,
+      "factoryPhase": null
+    }
+  ]
+}

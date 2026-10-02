@@ -1,18 +1,19 @@
 [Unit]
-Description=Post the weekly Factory Monday note and notify Todd
+Description=Post the weekly Factory cost note to GitHub issues
 After=network-online.target postgresql.service julia-factory-trial.service
 Wants=network-online.target
 ConditionPathExists=/etc/julia-factory-monday-note/config.env
 
 [Service]
 Type=oneshot
-User=julia-factory
-Group=julia-factory
-# The token and webhook come from the root-owned config, never argv.
+User=orchestrator-svc
+Group=orchestrator-svc
+# The trace-reader token comes from root-owned config. The existing publisher
+# helper mints a fresh GitHub App installation token in-process on each run.
 EnvironmentFile=/etc/julia-factory-monday-note/config.env
-ExecStart=/usr/bin/node /var/lib/julia-factory/app/ops/factory/monday-note-run.mjs
+ExecStart=/usr/bin/node /opt/julia-factory-monday-note/ops/factory/monday-note-run.mjs
+
 ProtectSystem=strict
 ProtectHome=true
-ReadOnlyPaths=/var/lib/julia-factory/.local/share/mastracode
 NoNewPrivileges=true
 PrivateTmp=true
