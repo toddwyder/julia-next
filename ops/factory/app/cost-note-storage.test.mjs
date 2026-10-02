@@ -27,9 +27,10 @@ test('native DuckDB retains a model call in this week when its root began last w
         const dateRange = JSON.parse(u.searchParams.get('startedAt'));
         body = await observability.listTracesLight({ filters: { startedAt: dateRange }, pagination: { page: Number(u.searchParams.get('page')), perPage: Number(u.searchParams.get('perPage')) } });
       } else if (route === '/crossing/light') body = await observability.getTraceLight({ traceId: 'crossing' });
-      else if (route === '/crossing/spans/call') {
+      else if (route === '/crossing/spans') {
+        assert.equal(u.searchParams.get('ids'), 'call');
         const result = await observability.getSpan({ traceId: 'crossing', spanId: 'call' });
-        body = { span: costOnlySpan(result.span) };
+        body = { spans: [costOnlySpan(result.span)] };
       }
       else throw new Error(`Unexpected route ${route}`);
       return new Response(JSON.stringify(body));
