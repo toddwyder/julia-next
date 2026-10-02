@@ -23,7 +23,8 @@ const reviewStep = createStep({
       const workflow = mastra.getWorkflow('prReviewWorkflow');
       const run = await workflow.createRun();
       const cancelNested = () => {
-        void run.cancel().catch(error => console.error('Cross-maker nested review cancellation failed', error));
+        void run.cancel().catch(error => console.error('Cross-maker nested review cancellation failed',
+          error instanceof Error ? error.name : 'Error'));
       };
       abortSignal.addEventListener('abort', cancelNested, { once: true });
       let result;

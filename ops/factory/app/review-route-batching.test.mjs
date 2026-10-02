@@ -24,6 +24,7 @@ import { createHmac } from 'node:crypto';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { inspect } from 'node:util';
 import test from 'node:test';
 
 import { reviewPullRequest } from './src/mastra/reviewer/review-pr.ts';
@@ -724,9 +725,9 @@ test('status route authenticates the job id and reports failed jobs', async () =
   process.env.JULIA_REVIEW_ROUTE_SECRET = secret;
   const originalError = console.error;
   const logs = [];
-  console.error = message => { logs.push(String(message)); };
+  console.error = (...args) => { logs.push(args.map(arg => inspect(arg)).join(' ')); };
   const mastra = { getWorkflow: () => ({
-    getWorkflowRunById: async () => ({ status: 'failed', error: { message: 'provider token=secret123' } }),
+    getWorkflowRunById: async () => ({ status: 'failed', error: { message: 'provider token=secret123', code: 'RATE_LIMIT', status: 429 } }),
   }) };
   const handler = await reviewerStatusRoute.createHandler({ mastra });
   const context = signature => ({
@@ -740,6 +741,7 @@ test('status route authenticates the job id and reports failed jobs', async () =
     assert.equal(response.status, 200);
     assert.deepEqual(response.payload, { status: 'failed', error: 'Review job failed' });
     assert.match(logs.join('\n'), /job=job-1 status=failed/);
+    assert.match(logs.join('\n'), /code=RATE_LIMIT statusCode=429/);
     assert.doesNotMatch(logs.join('\n'), /secret123/);
   } finally {
     console.error = originalError;

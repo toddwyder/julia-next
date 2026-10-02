@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { registerApiRoute } from '@mastra/core/server';
 import { reviewInput } from './workflows/cross-maker-review-workflow';
 
@@ -7,6 +7,17 @@ const serverStartedAt = Date.now();
 function safeErrorType(error: unknown): string {
   const name = error && typeof error === 'object' && 'name' in error ? String(error.name) : '';
   return /^[A-Za-z][A-Za-z0-9]{0,63}$/.test(name) ? name : 'Error';
+}
+
+function safeErrorDetails(error: unknown): string {
+  const value = error && typeof error === 'object' ? error as Record<string, unknown> : {};
+  const code = typeof value.code === 'string' && /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(value.code)
+    ? value.code : 'unknown';
+  const statusCode = typeof value.status === 'number' && Number.isInteger(value.status)
+    && value.status >= 100 && value.status <= 599 ? value.status : 'unknown';
+  const fingerprint = typeof value.message === 'string'
+    ? createHash('sha256').update(value.message).digest('hex').slice(0, 12) : 'none';
+  return `type=${safeErrorType(error)} code=${code} statusCode=${statusCode} fingerprint=${fingerprint}`;
 }
 
 export function validReviewSignature(body: string, signature: string | undefined, secret: string | undefined): boolean {
@@ -43,7 +54,7 @@ export const reviewerRoute = registerApiRoute('/julia/review-pr', {
       console.info(`Cross-maker review started: job=${runId} pr=${input.owner}/${input.repo}#${input.pullNumber} head=${input.headSha}`);
       return c.json({ jobId: runId }, 202);
     } catch (error) {
-      console.error(`Cross-maker review start failed: pr=${input.owner}/${input.repo}#${input.pullNumber} type=${safeErrorType(error)}`, error);
+      console.error(`Cross-maker review start failed: pr=${input.owner}/${input.repo}#${input.pullNumber} ${safeErrorDetails(error)}`);
       return c.json({ error: 'Review could not start' }, 503);
     }
   },
@@ -71,12 +82,12 @@ export const reviewerStatusRoute = registerApiRoute('/julia/review-pr/:jobId', {
         return c.json({ status: 'canceled', error: 'Review interrupted by server restart' });
       }
       if (!['pending', 'running', 'waiting'].includes(run.status)) {
-        console.error(`Cross-maker review stopped: job=${jobId} status=${run.status} type=${safeErrorType(run.error)}`, run.error);
+        console.error(`Cross-maker review stopped: job=${jobId} status=${run.status} ${safeErrorDetails(run.error)}`);
         return c.json({ status: run.status, error: 'Review job failed' });
       }
       return c.json({ status: run.status });
     } catch (error) {
-      console.error(`Cross-maker review status failed: job=${jobId} type=${safeErrorType(error)}`, error);
+      console.error(`Cross-maker review status failed: job=${jobId} ${safeErrorDetails(error)}`);
       return c.json({ error: 'Review status unavailable' }, 503);
     }
   },
@@ -98,7 +109,7 @@ export const reviewerCancelRoute = registerApiRoute('/julia/review-pr/:jobId', {
       console.info(`Cross-maker review canceled: job=${jobId}`);
       return c.json({ status: 'canceled' });
     } catch (error) {
-      console.error(`Cross-maker review cancellation failed: job=${jobId} type=${safeErrorType(error)}`, error);
+      console.error(`Cross-maker review cancellation failed: job=${jobId} ${safeErrorDetails(error)}`);
       return c.json({ error: 'Review cancellation unavailable' }, 503);
     }
   },
