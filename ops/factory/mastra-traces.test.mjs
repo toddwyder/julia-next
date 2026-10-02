@@ -89,6 +89,13 @@ test('trace authentication failures are visible and never fall back to an unauth
   assert.equal(fake.calls.length, 1);
 });
 
+test('invalid report end fails before reading and cannot produce a quiet report', async () => {
+  const fake = fakeFetch(() => { throw new Error('unexpected request'); });
+  await assert.rejects(readTraceSpans({ factoryUrl: 'https://factory.example', token: 'reader', from: FROM, to: 'invalid', fetchImpl: fake.fetch }), /end time is invalid/);
+  await assert.rejects(readTraceSpans({ factoryUrl: 'https://factory.example', token: 'reader', from: FROM, to: FROM, fetchImpl: fake.fetch }), /end time is invalid/);
+  assert.equal(fake.calls.length, 0);
+});
+
 test('transport and malformed JSON failures identify the read operation without exposing credentials', async () => {
   const options = { factoryUrl: 'https://factory.example', token: 'secret-reader', from: FROM, to: TO };
   await assert.rejects(readTraceSpans({ ...options, fetchImpl: async () => { throw new TypeError('secret-reader'); } }), error =>
@@ -197,8 +204,16 @@ test('recorded phase snapshot takes precedence over a root phase label', () => {
   const span = { ...generationSpan, sessionId: undefined, threadId: 'live-thread', factoryPhase: 'review' };
   const [record] = normalizeTraceSpans([span], { cards: [{ number: 'PR-184',
     sessions: { work: { threadId: 'live-thread' } },
+    sessionBindings: [{ threadId: 'live-thread', sessionId: 'live-thread', role: 'review', at: '2026-09-29T08:58:00Z' }],
     phaseSnapshots: [{ threadId: 'live-thread', at: '2026-09-29T08:59:00Z', phase: 'build', effort: 'high' }] }] });
   assert.equal(record.phase, 'build');
+  for (const phase of ['work', 'execute', 'executing', 'building']) {
+    const [variant] = normalizeTraceSpans([span], { cards: [{ number: 'PR-184',
+      sessions: { work: { threadId: 'live-thread' } },
+      sessionBindings: [{ threadId: 'live-thread', role: 'review', at: '2026-09-29T08:58:00Z' }],
+      phaseSnapshots: [{ threadId: 'live-thread', at: '2026-09-29T08:59:00Z', phase }] }] });
+    assert.equal(variant.phase, 'build', `recorded ${phase} must beat the review root`);
+  }
 });
 
 test('bundled estimates cannot replace missing counts and aggregate model spans are never billed twice', () => {

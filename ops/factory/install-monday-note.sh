@@ -60,16 +60,30 @@ defaults = {
 path.write_text(text.rstrip() + '\n' + ''.join(f'{key}={value}\n' for key, value in defaults.items() if key not in keys))
 PY
 
+database=$(python3 - "$config_dir/config.env" <<'PY'
+import pathlib, re, sys
+values = {}
+for line in pathlib.Path(sys.argv[1]).read_text().splitlines():
+    if '=' in line and not line.startswith('#'):
+        key, value = line.split('=', 1)
+        values[key] = value
+database = values.get('MONDAY_NOTE_DATABASE', '')
+if not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', database):
+    raise SystemExit('Invalid Monday note database name')
+print(database)
+PY
+)
+
 # The publisher keeps its existing App credential. Expose only parsed phase
 # fields from messages; the role cannot query prompt or tool-call bodies.
-sudo -u postgres psql -v ON_ERROR_STOP=1 -v project_id="$project_id" -d julia_factory_trial <<'SQL'
+sudo -u postgres psql -v ON_ERROR_STOP=1 -v project_id="$project_id" -v database="$database" -d "$database" <<'SQL'
 BEGIN;
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'orchestrator-svc') THEN
     CREATE ROLE "orchestrator-svc" LOGIN NOINHERIT;
   END IF;
 END $$;
-GRANT CONNECT ON DATABASE julia_factory_trial TO "orchestrator-svc";
+SELECT format('GRANT CONNECT ON DATABASE %I TO "orchestrator-svc"', :'database') \gexec
 GRANT USAGE ON SCHEMA public TO "orchestrator-svc";
 CREATE OR REPLACE VIEW julia_monday_phase_snapshots WITH (security_barrier = true) AS
   SELECT m.thread_id, m."createdAt" AS created_at,
@@ -87,7 +101,7 @@ CREATE OR REPLACE VIEW julia_monday_phase_snapshots WITH (security_barrier = tru
         WHERE w.factory_project_id = :'project_id'
           AND (session_entry.key = m.thread_id OR session_entry.value->>'threadId' = m.thread_id)));
 REVOKE SELECT ON mastra_messages FROM "orchestrator-svc";
-# Keep the publisher inside this project and expose only report fields.
+-- Keep the publisher inside this project and expose only report fields.
 CREATE OR REPLACE VIEW julia_monday_work_items WITH (security_barrier = true) AS
   SELECT id, title, board, stages,
     COALESCE((SELECT jsonb_agg(jsonb_build_object(
@@ -121,7 +135,7 @@ DO $$ BEGIN
     RAISE EXCEPTION 'Monday note publisher still has raw card SELECT';
   END IF;
 END $$;
-ALTER ROLE "orchestrator-svc" IN DATABASE julia_factory_trial SET default_transaction_read_only = on;
+SELECT format('ALTER ROLE "orchestrator-svc" IN DATABASE %I SET default_transaction_read_only = on', :'database') \gexec
 COMMIT;
 SQL
 

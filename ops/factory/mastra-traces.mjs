@@ -35,6 +35,8 @@ export async function readTraceSpans({ factoryUrl, token, from, to, fetchImpl = 
   if (!token?.trim()) throw new Error('MONDAY_NOTE_TRACE_TOKEN is required to read authenticated traces');
   const fromMs = Date.parse(from);
   if (!Number.isFinite(fromMs)) throw new Error('Monday note start time is invalid');
+  const toMs = Date.parse(to);
+  if (!Number.isFinite(toMs) || toMs <= fromMs) throw new Error('Monday note end time is invalid');
   // The supported store retains spans for 14 days. Thirty days includes roots
   // opened before this week while bounding the weekly scan and HTTP reads.
   const rootStart = new Date(fromMs - 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -87,7 +89,7 @@ export async function readTraceSpans({ factoryUrl, token, from, to, fetchImpl = 
       for (const span of trace.spans) {
         if (!isCostBearing(span)) continue;
         const at = Date.parse(span.startedAt);
-        if (!Number.isFinite(at) || at < Date.parse(from) || at >= Date.parse(to)) continue;
+        if (!Number.isFinite(at) || at < fromMs || at >= toMs) continue;
         if (aggregates.has(span.spanId)) {
           if (span.spanType === 'model_step') details.push({
             traceId: root.traceId, spanId: span.spanId, parentSpanId: span.parentSpanId,
@@ -146,6 +148,13 @@ const PHASE_BY_STAGE = {
   execute: 'build',
   review: 'review',
 };
+
+function recordedFactoryPhase(value) {
+  const phase = String(value ?? '').trim().toLowerCase();
+  return ({ intake: 'triage', triage: 'triage', planning: 'plan', plan: 'plan',
+    execute: 'build', executing: 'build', work: 'build', working: 'build', build: 'build', building: 'build',
+    review: 'review', reviewing: 'review' })[phase] ?? null;
+}
 
 /**
  * Map a span's name/entity onto a Factory phase.
@@ -305,7 +314,8 @@ export function normalizeTraceSpans(spans = [], { cards = [], priceTable = PRICE
     }
     const binding = bindingsBySession.get(sessionId)?.filter(item => Date.parse(item.at) <= Date.parse(span.startedAt ?? span.startTime))
       .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))[0];
-    const recordedPhase = snapshot?.phase ? spanPhase({ name: snapshot.phase }) : binding?.role === 'work' ? 'build' : binding?.role;
+    const recordedPhase = snapshot?.phase ? recordedFactoryPhase(snapshot.phase) :
+      binding?.role ? recordedFactoryPhase(binding.role) : null;
     const costBearing = isCostBearing(span) && !aggregateParent && !span.includedInGeneration;
     let costResult = null;
     let costUsd = null;

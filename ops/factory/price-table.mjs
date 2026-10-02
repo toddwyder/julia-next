@@ -269,6 +269,8 @@ export function calculateModelCost({ model, usage, provider: requestedProvider, 
     if (!Number.isFinite(at.getTime()) || at < new Date('2026-09-28T00:00:00Z') || at >= new Date('2027-01-01T00:00:00Z')) return { ok: false, error: 'no_price_window', model, freshInputTokens, cachedInputTokens, outputTokens, thinkingTokens };
     const day = at.toISOString().slice(0, 10);
     const holiday = day >= '2026-10-01' && day <= '2026-10-07';
+    // DeepSeek explicitly defines 01:00-04:00 and 06:00-10:00 in UTC:
+    // https://api-docs.deepseek.com/quick_start/pricing/ (pricing footnote 2).
     const hour = at.getUTCHours();
     const weekday = at.getUTCDay() >= 1 && at.getUTCDay() <= 5;
     if (weekday && !holiday && ((hour >= 1 && hour < 4) || (hour >= 6 && hour < 10))) rateFactor = priceEntry.peakMultiplier;
