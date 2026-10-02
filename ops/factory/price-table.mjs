@@ -180,7 +180,7 @@ export function getModelPrice(modelId, provider, priceTable = PRICE_TABLE) {
   const normalized = modelId.toLowerCase().trim();
 
   if (provider) {
-    const prov = provider.toLowerCase().trim();
+    const prov = provider.toLowerCase().trim().replace(/^openai\.(responses|chat)$/, 'openai');
     const bare = normalized.replace(/^[^/]+\//, '');
     const qualified = priceTable[`${prov}/${normalized}`] ?? priceTable[`${prov}/${bare}`];
     if (qualified) return qualified;
@@ -215,6 +215,9 @@ export function getModelPrice(modelId, provider, priceTable = PRICE_TABLE) {
  * }} input
  */
 export function calculateModelCost({ model, usage, provider: requestedProvider, startedAt, priceTable = PRICE_TABLE }) {
+  requestedProvider = typeof requestedProvider === 'string'
+    ? requestedProvider.toLowerCase().trim().replace(/^openai\.(responses|chat)$/, 'openai')
+    : requestedProvider;
   if (!usage || typeof usage !== 'object') {
     return { ok: false, error: 'no_token_count', model };
   }

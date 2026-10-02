@@ -3,14 +3,14 @@
 -- wait watcher uses; the project id is passed with -v project_id=...
 BEGIN TRANSACTION READ ONLY;
 WITH note_items AS (
-  SELECT id, title, board, stages, stage_history, sessions, metadata,
+  SELECT id::text AS id, title, board, stages, stage_history, sessions, metadata,
          accepted_at, created_at, external_source, false AS record_missing
   FROM julia_monday_work_items
   WHERE factory_project_id = :'project_id' AND board IN ('work', 'review')
   UNION ALL
   -- Factory retains run bindings after a card record disappears. Keep their
   -- actual work-item IDs; never guess an issue number or silently drop spend.
-  SELECT b.work_item_id::uuid, 'no recorded card title (retained Factory run binding)',
+  SELECT b.work_item_id, 'no recorded card title (retained Factory run binding)',
          'work', '[]'::jsonb, '[]'::jsonb,
          jsonb_object_agg(b.thread_id, jsonb_build_object('threadId', b.thread_id, 'sessionId', b.session_id)),
          '{}'::jsonb, min(b.created_at), min(b.created_at), NULL::jsonb, true

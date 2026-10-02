@@ -251,6 +251,27 @@ test('a generation root with an inference child bills the hydrated leaf once', a
   assert.ok(records.find(x => x.costBearing).costUsd > 0);
 });
 
+for (const name of ["workflow run: 'cross-maker-review'", "workflow run: 'pr-review-workflow'", "agent run: 'code-review-agent'"]) {
+test(`${name} with no card identity is project review overhead`, async () => {
+  const root = { traceId: 'trace-a', spanId: 'root', name,
+    spanType: 'workflow_run', startedAt: generationSpan.startedAt };
+  const inference = { ...generationSpan, spanId: 'leaf', parentSpanId: 'root', spanType: 'model_inference',
+    threadId: null, sessionId: null, metadata: {} };
+  const fake = fakeFetch(url => {
+    const u = new URL(url);
+    if (u.pathname.endsWith('/traces/light')) return jsonResponse({ spans: [root], pagination: { page: 0, hasMore: false } });
+    if (u.pathname.endsWith('/trace-a/light')) return jsonResponse({ spans: [root, { ...inference, attributes: undefined }] });
+    if (u.pathname.endsWith('/spans')) return jsonResponse({ spans: [inference] });
+    throw new Error(`Unexpected request ${u.pathname}`);
+  });
+  const spans = await readTraceSpans({ factoryUrl: 'https://factory.example', token: 'reader', from: FROM, to: TO, fetchImpl: fake.fetch });
+  const [record] = normalizeTraceSpans(spans.filter(span => span.spanId === 'leaf'));
+  assert.equal(record.card, null);
+  assert.equal(record.projectOverhead, true);
+  assert.ok(record.costUsd > 0);
+});
+}
+
 test('twenty one calls use two bounded cost-only requests and reject incomplete batches', async () => {
   const root = { traceId: 'trace-a', spanId: 'root', spanType: 'agent_run', startedAt: FROM };
   const leaves = Array.from({ length: 21 }, (_, index) => ({ ...generationSpan,

@@ -22,6 +22,11 @@ import { calculateModelCost, getModelPrice, PRICE_TABLE } from './price-table.mj
 export const MASTRA_TRACE_ROUTE = '/api/observability/traces';
 const PAGE_SIZE = 20;
 const MAX_PAGES = 500;
+const REVIEW_OVERHEAD_ROOTS = new Set([
+  "workflow run: 'cross-maker-review'",
+  "workflow run: 'pr-review-workflow'",
+  "agent run: 'code-review-agent'",
+]);
 
 function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -127,7 +132,8 @@ export async function readTraceSpans({ factoryUrl, token, from, to, fetchImpl = 
       const parent = distinct.find(span => span.spanId === root.spanId) ?? root;
       const identity = parent.threadId ?? parent.metadata?.threadId ?? parent.attributes?.threadId ?? parent.attributes?.conversationId ?? parent.metadata?.sessionId;
       for (const span of distinct) collected.push({ ...span, threadId: span.threadId ?? identity,
-        factoryPhase: spanPhase(root), runId: root.runId ?? root.metadata?.runId ?? null });
+        factoryPhase: spanPhase(root), runId: root.runId ?? root.metadata?.runId ?? null,
+        projectOverhead: REVIEW_OVERHEAD_ROOTS.has(root.name) });
     }
     if (!pagination.hasMore) return collected;
     log(`mastra-traces page=${page} roots=${seen.size} spans=${collected.length}`);
@@ -366,7 +372,7 @@ export function normalizeTraceSpans(spans = [], { cards = [], priceTable = PRICE
       traceId: span.traceId ?? null,
       sessionId,
       card,
-      projectOverhead: Boolean(projectId && sessionId === `factory-supervisor:${projectId}`),
+      projectOverhead: Boolean(span.projectOverhead || (projectId && sessionId === `factory-supervisor:${projectId}`)),
       correlated: card !== null,
       phase: recordedPhase ?? span.factoryPhase ?? spanPhase(span),
       runId: span.runId ?? null,

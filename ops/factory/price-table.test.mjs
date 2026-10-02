@@ -200,6 +200,15 @@ test('DeepSeek Pro pricing follows UTC peak windows and the October public holid
   assert.equal(calculateModelCost({ model: 'deepseek/deepseek-v4-pro', usage, startedAt: '2026-10-01T02:00:00Z' }).whatYouPayUsd, 2.64);
 });
 
+test('direct pricing maps OpenAI AI SDK transport providers to OpenAI rates', () => {
+  const usage = { inputTokens: 1000, outputTokens: 100 };
+  for (const provider of ['openai.responses', 'openai.chat']) {
+    const result = calculateModelCost({ model: 'gpt-6-sol', provider, usage });
+    assert.equal(result.ok, true);
+    assert.equal(result.provider, 'openai');
+  }
+});
+
 test('an unverified future DeepSeek price window is a named gap, never a stale dollar amount', () => {
   const result = calculateModelCost({ model: 'deepseek/deepseek-v4-pro',
     usage: { inputTokens: 1000, outputTokens: 100 }, startedAt: '2027-01-01T02:00:00Z' });

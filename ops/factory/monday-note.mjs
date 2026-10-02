@@ -576,7 +576,8 @@ export function buildMondayNote({ cards = [], traces = [], from, to }) {
   // Cost correlation is enforced above, so an uncorrelated span here has no
   // numeric cost: it is summed and reported (at $0.00) rather than silently
   // dropped, and it can never widen a card's total.
-  const overhead = weekTraces.filter(trace => trace.projectOverhead);
+  const overhead = weekTraces.filter(trace => trace.projectOverhead &&
+    (trace.card === null || !weekNumbers.has(trace.card)));
   const overheadUsd = overhead.reduce((sum, trace) => sum + (trace.whatYouPayCost ?? 0), 0);
   const uncorrelated = weekTraces.filter((trace) => !trace.projectOverhead && (trace.card === null || !weekNumbers.has(trace.card)));
   const uncorrelatedUsd = uncorrelated.reduce((sum, trace) => sum + (trace.whatYouPayCost ?? trace.costUsd ?? 0), 0);
@@ -704,7 +705,7 @@ export function buildMondayNote({ cards = [], traces = [], from, to }) {
     `Monday note — week ending ${to.slice(0, 10)}`,
     '',
     ...bodyLines,
-    ...(overhead.length ? ['', `Factory project overhead (supervisor and memory): ${costDisplay(overhead, overheadUsd)}`,
+    ...(overhead.length ? ['', `Factory project overhead (supervisor, reviewer and memory): ${costDisplay(overhead, overheadUsd)}`,
       ...stepLine({ stage: 'project overhead', by: 'factory' }, overhead).modelLines] : []),
     ...(uncorrelatedLine ? ['', uncorrelatedLine] : []),
     '',

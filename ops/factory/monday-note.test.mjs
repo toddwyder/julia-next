@@ -23,6 +23,19 @@ test('invalid token breakdowns stay gaps and project overhead contributes to fac
   assert.equal(note.faceTotalUsd, 5);
 });
 
+test('a review trace with a card identity is charged once, not again as overhead', () => {
+  const at = '2026-09-22T10:00:00Z';
+  const trace = { id: 'review', card: 'PR-184', projectOverhead: true, startedAt: at,
+    phase: 'review', costBearing: true, model: 'deepseek-v4-pro', provider: 'deepseek',
+    whatYouPayCost: 1.25, faceCost: 1.25,
+    tokens: { freshInput: 1000, cachedInput: 0, output: 100, thinking: 0 } };
+  const note = buildMondayNote({ cards: [{ number: 'PR-184', title: 'Review', enteredAt: at }],
+    traces: [trace], ...WEEK });
+  assert.equal(note.totalUsd, 1.25);
+  assert.equal(note.providerTotals.deepseek.whatYouPayCost, note.totalUsd);
+  assert.doesNotMatch(note.body, /Factory project overhead/);
+});
+
 test('missing usage and missing board phase remain gaps beside a recorded reviewer call', () => {
   const note = buildMondayNote({ cards: [{ number: 'PR-184', title: 'Open review', enteredAt: '2026-09-22T09:00:00Z',
     stageHistory: [{ stage: 'intake', by: 'factory', enteredAt: '2026-09-22T09:00:00Z' }] }],

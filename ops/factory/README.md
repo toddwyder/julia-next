@@ -77,7 +77,8 @@ Todd as a public GitHub Issue: Factory's own card records and Mastra's trace cos
   count is a named gap; dollar amounts beside gaps are explicitly known subtotals. Unknown cache
   read rates and cache-write TTL pricing are gaps too. The supported DuckDB `memoryLimit: '4GB'`
   permits the retained-root query on the live store; the default 2GB limit failed that query.
-  `MASTRA_DUCKDB_MEMORY_LIMIT` can lower or raise that per-query limit for the host.
+  `MASTRA_DUCKDB_MEMORY_LIMIT` can lower or raise that per-query limit for the host;
+  use a positive integer followed by uppercase `MB` or `GB` (for example, `4GB`).
 
 Each card line carries every step with its actor, model breakdown, effort level beside thinking tokens,
 the card's summed what-you-pay cost **including failed attempts**, and elapsed time. The card drivers

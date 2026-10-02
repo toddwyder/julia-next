@@ -77,7 +77,8 @@ export const costNoteSpanBatchRoute = registerApiRoute('/julia/cost-traces/:trac
     try {
       const store = await mastra.getStorage()?.getStore('observability');
       if (!store) return c.json({ error: 'Observability storage unavailable' }, 503);
-      const results = await Promise.all(ids.map(spanId => store.getSpan({ traceId, spanId })));
+      const results = [];
+      for (const spanId of ids) results.push(await store.getSpan({ traceId, spanId }));
       if (results.some(result => !result?.span)) return c.json({ error: 'Span not found' }, 404);
       return c.json({ spans: results.map(result => costOnlySpan(result!.span)) });
     } catch (error) {

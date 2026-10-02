@@ -110,3 +110,23 @@ test('single cost route rejects invalid storage identifiers before lookup', asyn
   assert.equal(response.status, 400);
   assert.equal(accessed, false);
 });
+
+test('batch cost route reads backend spans serially to avoid DuckDB contention', async () => {
+  let active = 0;
+  let maximum = 0;
+  const handler = await costNoteSpanBatchRoute.createHandler({ mastra: { getStorage: () => ({
+    getStore: async () => ({ getSpan: async ({ spanId }) => {
+      active += 1;
+      maximum = Math.max(maximum, active);
+      await new Promise(resolve => setTimeout(resolve, 5));
+      active -= 1;
+      return { span: { spanId, traceId: 't', attributes: { model: 'deepseek-v4-flash' } } };
+    } }),
+  }) } });
+  const ids = Array.from({ length: 9 }, (_, index) => `span-${index}`);
+  const response = await handler({ req: { param: () => 't', query: () => ids.join(',') },
+    json: (body, status = 200) => ({ body, status }) });
+  assert.equal(response.status, 200);
+  assert.deepEqual(response.body.spans.map(span => span.spanId), ids);
+  assert.equal(maximum, 1);
+});
