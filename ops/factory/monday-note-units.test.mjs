@@ -54,3 +54,13 @@ test('the installer installs the Monday note unit, writes a placeholder config w
   assert.doesNotMatch(installer, /^\s*MONDAY_NOTE_DISCORD_WEBHOOK=/m, 'Discord webhook placeholder is retired in issue 180');
   assert.match(installer, /systemctl enable julia-factory-monday-note\.timer/);
 });
+
+test('the publisher receives phase signals through a projected view, not full message rows', () => {
+  const installer = read('install-monday-note.sh');
+  const cards = read('factory-cards.sql');
+  assert.match(installer, /CREATE OR REPLACE VIEW julia_monday_phase_snapshots/);
+  assert.match(installer, /REVOKE SELECT ON mastra_messages FROM "orchestrator-svc"/);
+  assert.match(installer, /GRANT SELECT ON julia_monday_phase_snapshots TO "orchestrator-svc"/);
+  assert.match(cards, /FROM julia_monday_phase_snapshots m/);
+  assert.doesNotMatch(cards, /FROM mastra_messages m/);
+});

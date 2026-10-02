@@ -33,6 +33,11 @@ function isObject(value) {
  */
 export async function readTraceSpans({ factoryUrl, token, from, to, fetchImpl = fetch, pageSize = PAGE_SIZE, log = () => {} }) {
   if (!token?.trim()) throw new Error('MONDAY_NOTE_TRACE_TOKEN is required to read authenticated traces');
+  const fromMs = Date.parse(from);
+  if (!Number.isFinite(fromMs)) throw new Error('Monday note start time is invalid');
+  // The supported store retains spans for 14 days. Thirty days includes roots
+  // opened before this week while bounding the weekly scan and HTTP reads.
+  const rootStart = new Date(fromMs - 30 * 24 * 60 * 60 * 1000).toISOString();
   const base = factoryUrl.replace(/\/$/, '');
   async function get(path, query) {
     const url = new URL(`${base}${path.startsWith('/julia/') ? path : MASTRA_TRACE_ROUTE + path}`);
@@ -51,9 +56,9 @@ export async function readTraceSpans({ factoryUrl, token, from, to, fetchImpl = 
   const seen = new Set();
   for (let page = 0; page < MAX_PAGES; page += 1) {
     const body = await get('/light', {
-      // Roots can start before this week and contain calls inside it. Read all
-      // retained roots before the end, then window calls by their own start.
-      startedAt: { end: to, endExclusive: true },
+      // Roots can start before this week and contain calls inside it. Window
+      // calls by their own start after loading a bounded set of retained roots.
+      startedAt: { start: rootStart, end: to, endExclusive: true },
       page, perPage: pageSize,
     });
     if (!isObject(body) || !Array.isArray(body.spans)) throw new Error('Mastra trace list did not include a spans array');

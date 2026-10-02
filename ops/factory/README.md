@@ -60,15 +60,18 @@ the observability route and storage findings this map builds on.
 Once a week, `ops/factory/monday-note-run.mjs` reads two sources and posts one plain summary for
 Todd as a public GitHub Issue: Factory's own card records and Mastra's trace cost data.
 
-- **Cards** come from `ops/factory/factory-cards.mjs` over the same read-only PostgreSQL route the
-  wait watcher uses (`install-wait-alerts.sh`'s peer role; `factory-cards.sql` is read-only and
-  scoped to `work_items`, retained `factory_run_bindings`, and phase signals in `mastra_messages`). Factory's `stage_history` gives each step's actor (`by` / `exitedBy`) and
+- **Cards** come from `ops/factory/factory-cards.mjs` over a read-only PostgreSQL peer route.
+  `factory-cards.sql` reads `work_items`, retained `factory_run_bindings`, and a projected
+  `julia_monday_phase_snapshots` view. The publisher has no SELECT grant on raw `mastra_messages`.
+  Factory's `stage_history` gives each step's actor (`by` / `exitedBy`) and
   stage intervals (`enteredAt`/`exitedAt`).
 - **Costs** come from authenticated Mastra light roots/timelines and individual model-inference
   spans through the authenticated cost-only projection route. The timer token cannot read full
   span payloads. Aggregate generation/step totals are excluded when inference children exist, so token
   rates and long-context thresholds apply once per actual call. Step records and run IDs supply
-  the model steps/run driver. Prompt bodies and tool schemas are discarded. The price table records provider rates,
+  the model steps/run driver. Prompt bodies and tool schemas are discarded.
+  Root scans begin 30 days before the report week, wider than the store's 14-day span retention,
+  and pagination fails closed rather than publishing an incomplete read. The price table records provider rates,
   cache rates, source dates and payment factors. Direct DeepSeek peak/off-peak prices use the call's
   start time, including the verified October 1–7 holiday. An unknown price window, model or token
   count is a named gap; dollar amounts beside gaps are explicitly known subtotals. Unknown cache
@@ -106,7 +109,7 @@ Operator installation:
 1. Install the app with `bash ops/factory/install.sh /var/lib/julia-factory/app`.
 2. Run `sudo bash ops/factory/install-monday-note.sh /var/lib/julia-factory/app <PROJECT_ID>`.
    It installs root-owned job modules under `/opt/julia-factory-monday-note`, grants the existing
-   publisher account SELECT on the three record tables, and enables the Monday timer. Re-run it after
+   publisher account SELECT on card/binding tables and the phase-only view, and enables the Monday timer. Re-run it after
    job updates. It preserves existing configuration and sends nothing during installation.
 3. Provision one random `MONDAY_NOTE_TRACE_TOKEN` in both `/etc/julia-factory/factory.env` and
    `/etc/julia-factory-monday-note/config.env`, then restart the app. The supported auth composition

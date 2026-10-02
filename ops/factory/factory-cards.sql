@@ -43,20 +43,15 @@ SELECT jsonb_build_object(
   -- Only the phase runtime fields leave the message store; never prompt text.
   'phase_snapshots', COALESCE((
     SELECT jsonb_agg(jsonb_build_object(
-      'threadId', m.thread_id, 'at', m."createdAt",
-      'phase', (regexp_match(m.content, 'Factory [a-zA-Z_-]+ phase: ([a-zA-Z]+)'))[1],
-      'effort', (regexp_match(m.content, 'Runtime: model=[a-zA-Z0-9/._-]+, reasoning-setting=([a-zA-Z0-9_-]+)'))[1],
-      'model', (regexp_match(m.content, 'Runtime: model=([a-zA-Z0-9/._-]+), reasoning-setting='))[1]
-    ) ORDER BY m."createdAt")
-    FROM mastra_messages m
+      'threadId', m.thread_id, 'at', m.created_at,
+      'phase', m.phase, 'effort', m.effort, 'model', m.model
+    ) ORDER BY m.created_at)
+    FROM julia_monday_phase_snapshots m
     WHERE m.thread_id IN (
       SELECT value->>'threadId' FROM jsonb_each(w.sessions)
       UNION SELECT b.thread_id FROM factory_run_bindings b
         WHERE b.work_item_id = w.id::text AND b.factory_project_id = :'project_id'
     )
-      AND m.role = 'signal' AND m.type = 'factory-phase'
-      AND m.content LIKE '%Factory %phase:%'
-      AND m.content LIKE '%Runtime: model=%reasoning-setting=%'
   ), '[]'::jsonb),
   'accepted_at', w.accepted_at,
   'created_at', w.created_at,

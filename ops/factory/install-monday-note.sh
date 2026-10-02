@@ -60,9 +60,10 @@ defaults = {
 path.write_text(text.rstrip() + '\n' + ''.join(f'{key}={value}\n' for key, value in defaults.items() if key not in keys))
 PY
 
-# The publisher keeps its existing App credential. It gets only SELECT on the
-# same Factory record tables used by the approved read-only wait watcher.
+# The publisher keeps its existing App credential. Expose only parsed phase
+# fields from messages; the role cannot query prompt or tool-call bodies.
 sudo -u postgres psql -v ON_ERROR_STOP=1 -d julia_factory_trial <<'SQL'
+BEGIN;
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'orchestrator-svc') THEN
     CREATE ROLE "orchestrator-svc" LOGIN NOINHERIT;
@@ -70,8 +71,25 @@ DO $$ BEGIN
 END $$;
 GRANT CONNECT ON DATABASE julia_factory_trial TO "orchestrator-svc";
 GRANT USAGE ON SCHEMA public TO "orchestrator-svc";
-GRANT SELECT ON work_items, mastra_messages, factory_run_bindings TO "orchestrator-svc";
+CREATE OR REPLACE VIEW julia_monday_phase_snapshots WITH (security_barrier = true) AS
+  SELECT m.thread_id, m."createdAt" AS created_at,
+    (regexp_match(m.content, 'Factory [a-zA-Z_-]+ phase: ([a-zA-Z]+)'))[1] AS phase,
+    (regexp_match(m.content, 'Runtime: model=[a-zA-Z0-9/._-]+, reasoning-setting=([a-zA-Z0-9_-]+)'))[1] AS effort,
+    (regexp_match(m.content, 'Runtime: model=([a-zA-Z0-9/._-]+), reasoning-setting='))[1] AS model
+  FROM mastra_messages m
+  WHERE m.role = 'signal' AND m.type = 'factory-phase'
+    AND m.content LIKE '%Factory %phase:%'
+    AND m.content LIKE '%Runtime: model=%reasoning-setting=%';
+REVOKE SELECT ON mastra_messages FROM "orchestrator-svc";
+GRANT SELECT ON work_items, factory_run_bindings TO "orchestrator-svc";
+GRANT SELECT ON julia_monday_phase_snapshots TO "orchestrator-svc";
+DO $$ BEGIN
+  IF has_table_privilege('orchestrator-svc', 'mastra_messages', 'SELECT') THEN
+    RAISE EXCEPTION 'Monday note publisher still has raw message SELECT';
+  END IF;
+END $$;
 ALTER ROLE "orchestrator-svc" IN DATABASE julia_factory_trial SET default_transaction_read_only = on;
+COMMIT;
 SQL
 
 # Root-owned copies: the signing process must never execute builder-writable

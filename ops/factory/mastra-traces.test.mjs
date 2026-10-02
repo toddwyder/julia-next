@@ -71,6 +71,7 @@ test('authenticated light timelines hydrate model calls and retain parent identi
     if (u.pathname === '/api/observability/traces/light') {
       assert.equal(u.searchParams.get('page'), '0');
       assert.equal(u.searchParams.get('perPage'), '20');
+      assert.equal(JSON.parse(u.searchParams.get('startedAt')).start, '2026-08-29T00:00:00.000Z');
       return jsonResponse({ spans: [root], pagination: { page: 0, hasMore: false } });
     }
     if (u.pathname === '/api/observability/traces/trace-a/light') return jsonResponse({ spans: [root, { ...generationSpan, attributes: undefined }] });
