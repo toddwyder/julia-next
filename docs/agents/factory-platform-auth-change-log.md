@@ -308,3 +308,51 @@ After the new GitHub rules were live, the operator removed the ten recreated
 machine cards using Factory's `WorkItemsStorage.delete` operation. Four done
 Julia history cards remained. A future GitHub poll and the next natural Julia
 wait still need observation before #148 closes.
+
+## 2026-10-03: Stock Factory model jobs and pick-builder setup (issue #206)
+
+Factory's model jobs are configured entirely through stock Factory and Mastra
+settings outside the repository. Changing a model requires no code changes or
+application rebuilds.
+
+### Model jobs: locations and modification procedures
+
+- **Builder**:
+  - *Where it is set*: Factory project configuration in PostgreSQL
+    (`factory_projects.default_model_id`).
+  - *How to change it*: Run `node scripts/pick-builder.mjs <builder-model>`,
+    which updates the Factory project default model and pairs the reviewer helper
+    in one atomic step.
+
+- **Reviewer helper**:
+  - *Where it is set*: Mastra settings file
+    (`~/.local/share/mastracode/settings.json`, under
+    `models.subagentModels.default`). Applies to every new Factory session.
+  - *How to change it*: Automatically managed by `pick-builder`. Given a builder
+    choice, the script selects the first model on the server's ranked reviewer
+    list that is from a different company/maker than the builder, and writes it to
+    the settings file.
+
+- **Memory model**:
+  - *Where it is set*: Factory memory settings in PostgreSQL (`memory_settings`
+    table, `observer_model_id` and `reflector_model_id`), or via Factory's API
+    endpoint `PUT /web/config/om/:role/model`.
+  - *How to change it*: Update the `memory_settings` table records or call the
+    Factory memory configuration endpoint.
+
+- **Reviewer list**:
+  - *Where it is set*: Server-side configuration file outside the repository
+    (`/var/lib/julia-factory/reviewer-list.json` or `FACTORY_REVIEWER_LIST` in
+    `/etc/julia-factory/factory.env`).
+  - *How to change it*: Edit the JSON array in the server-side configuration
+    file or update the environment variable to reorder, add, or remove models.
+
+- **Connections**:
+  - *Where it is set*: Factory custom providers table (`custom_providers` in
+    PostgreSQL) for OpenAI-compatible gateway endpoints; Factory provider
+    credentials table (`model_provider_credentials` in PostgreSQL) for
+    subscription OAuth sign-ins.
+  - *How to change it*: Register new custom providers via Factory's custom
+    provider storage, or initiate and complete the provider device-code OAuth
+    flow.
+
