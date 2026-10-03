@@ -6,4 +6,3 @@
 import { register } from 'node:module';
 
 register('./typescript-esm-loader.mjs', import.meta.url);
-

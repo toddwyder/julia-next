@@ -369,15 +369,14 @@ commit-bound GitHub review as `github-actions[bot]`, the accepted reviewer
 identity for this project. It checks out only the base branch and never
 executes PR code.
 
-The service needs `DEEPSEEK_API_KEY`, `COMMANDCODE_API_KEY`, and `JULIA_REVIEW_ROUTE_SECRET`. Set the
-same route secret as a GitHub Actions repository secret. Model settings are centralized
-in `/etc/julia-factory/factory.env` with no hidden code defaults (startup fails loudly if missing):
-- `JULIA_BUILDER_MODEL`: Factory builder model (`deepseek/deepseek-v4-pro`).
-- `JULIA_REVIEWER_MODELS`: ordered comma-separated list of reviewer models (`moonshotai/Kimi-K2.7-Code`).
-  Startup rejects any reviewer model whose maker matches the builder maker, judging the maker rather than the route.
-- `JULIA_CHEAP_MODEL`: low-cost model for observational memory, per-card retro (#187), Monday note rework/upgrade (#196), and e2e steps (#197) (`deepseek/deepseek-v4-flash`).
-- `JULIA_FALLBACK_MODEL`: fallback model when Command Code quota is hit (#207) (`deepseek/deepseek-v4-pro` on direct key).
-Add `github-actions[bot]` to `MASTRACODE_GITHUB_AUTHORIZED_BOTS` so Factory's GitHub rule forwards a
+The service needs `DEEPSEEK_API_KEY` and `JULIA_REVIEW_ROUTE_SECRET`. Set the
+same route secret as a GitHub Actions repository secret. Optional
+`JULIA_REVIEWER_MODELS` is an ordered comma-separated list of Mastra
+`provider/model` IDs, starting with `deepseek/deepseek-v4-pro`;
+`JULIA_BUILDER_MODEL` defaults to `openai/gpt-6-sol`. Startup rejects any
+reviewer model from the builder's provider. Observational memory uses
+`deepseek/deepseek-v4-flash`. Add `github-actions[bot]` to
+`MASTRACODE_GITHUB_AUTHORIZED_BOTS` so Factory's GitHub rule forwards a
 requested change to its Work session. GitHub Actions must allow approval
 reviews in this repository's workflow permissions.
 

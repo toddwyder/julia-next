@@ -27,17 +27,10 @@ import { join } from 'node:path';
 import { inspect } from 'node:util';
 import test from 'node:test';
 
-// Test fixtures for review-route-batching:
-process.env.JULIA_BUILDER_MODEL = 'test-provider/test-builder-model';
-process.env.JULIA_REVIEWER_MODELS = 'test-reviewer-provider/test-reviewer-model';
-process.env.JULIA_CHEAP_MODEL = 'test-provider/test-cheap-model';
-process.env.JULIA_FALLBACK_MODEL = 'test-provider/test-fallback-model';
-
-const { reviewPullRequest } = await import('./src/mastra/reviewer/review-pr.ts');
-const { reviewerRoute, reviewerStatusRoute } = await import('./src/mastra/reviewer/route.ts');
-const { prReviewWorkflow } = await import('./src/mastra/reviewer/workflows/pr-review-workflow.ts');
-const { crossMakerReviewWorkflow } = await import('./src/mastra/reviewer/workflows/cross-maker-review-workflow.ts');
-
+import { reviewPullRequest } from './src/mastra/reviewer/review-pr.ts';
+import { reviewerRoute, reviewerStatusRoute } from './src/mastra/reviewer/route.ts';
+import { prReviewWorkflow } from './src/mastra/reviewer/workflows/pr-review-workflow.ts';
+import { crossMakerReviewWorkflow } from './src/mastra/reviewer/workflows/cross-maker-review-workflow.ts';
 
 const OWNER = 'toddwyder';
 const REPO = 'julia-next';
