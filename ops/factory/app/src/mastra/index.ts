@@ -50,14 +50,6 @@ import {
   duckdbObservabilityConfig,
 } from './observability-store.js';
 import { observabilityRetentionWorkflow, setObservabilityPruneTarget } from './observability-retention.js';
-import { validateModelSettings, formatModelReadback } from './reviewer/model-choice';
-import { syncFactoryProjectModel } from './factory-model-sync';
-
-// Centralized model settings validation at startup: fails loudly on missing or invalid configuration
-// and outputs clean live readback with zero keys exposed.
-const modelSettings = validateModelSettings();
-console.log(formatModelReadback(modelSettings));
-
 
 /**
  * Parse a positive-integer env knob; anything else means "use the default".
@@ -532,10 +524,3 @@ export const mastra = new Mastra({
 // instance's storage) and start its workers. Runs at module load via top-level
 // await, so the deployer imports a fully-booted instance.
 await factory.finalize();
-
-// Synchronize centralized builder model to Factory projects storage
-try {
-  await syncFactoryProjectModel(storage);
-} catch (error) {
-  console.warn('[Models] Failed to sync factory project default model:', error);
-}

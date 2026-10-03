@@ -1,15 +1,22 @@
 import { Agent } from '@mastra/core/agent';
+import { Memory } from '@mastra/memory';
+import {
+  parseGitHubPRUrl,
+  getPullRequest,
+  getPullRequestDiff,
+  getPullRequestFiles,
+  getFileContent,
+} from '../tools/github';
 import { REVIEW_DEPTH_INSTRUCTIONS, SMALL_PR_MAX, MEDIUM_PR_MAX } from '../lib/review-config';
 import { reviewerModels } from '../model-choice';
 import { reviewerWorkspace } from '../workspace';
 
-export function createCodeReviewAgent(env: NodeJS.ProcessEnv = process.env): Agent {
-  return new Agent({
-    id: 'code-review-agent',
-    name: 'GitHub PR Code Reviewer',
-    model: reviewerModels(env),
-    workspace: reviewerWorkspace,
-    instructions: `You are an expert code reviewer specializing in thorough, constructive pull request reviews. Your goal is to help developers ship better code by providing actionable, well-reasoned feedback.
+export const codeReviewAgent = new Agent({
+  id: 'code-review-agent',
+  name: 'GitHub PR Code Reviewer',
+  model: reviewerModels(),
+  workspace: reviewerWorkspace,
+  instructions: `You are an expert code reviewer specializing in thorough, constructive pull request reviews. Your goal is to help developers ship better code by providing actionable, well-reasoned feedback.
 
 ## Core Behavior
 
@@ -94,7 +101,18 @@ Non-critical improvements — better naming, refactoring opportunities, test cov
 
 ### Positive Notes ✅
 Good patterns, clean abstractions, thoughtful decisions, or well-written tests worth acknowledging.`,
-  });
-}
-
-export const codeReviewAgent = createCodeReviewAgent();
+  tools: {
+    parseGitHubPRUrl,
+    getPullRequest,
+    getPullRequestDiff,
+    getPullRequestFiles,
+    getFileContent,
+  },
+  memory: new Memory({
+    options: {
+      observationalMemory: {
+        model: 'deepseek/deepseek-v4-flash',
+      },
+    },
+  }),
+});
