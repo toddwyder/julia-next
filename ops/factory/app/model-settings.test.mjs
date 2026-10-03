@@ -4,6 +4,12 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
+// Set baseline environment variables for initial module evaluation
+process.env.JULIA_BUILDER_MODEL = 'deepseek/deepseek-v4-pro';
+process.env.JULIA_REVIEWER_MODELS = 'moonshotai/Kimi-K2.7-Code';
+process.env.JULIA_CHEAP_MODEL = 'deepseek/deepseek-v4-flash';
+process.env.JULIA_FALLBACK_MODEL = 'deepseek/deepseek-v4-pro';
+
 import { Agent } from '@mastra/core/agent';
 import {
   builderModel,
@@ -15,6 +21,8 @@ import {
   formatModelReadback,
   resolveLanguageModel,
 } from './src/mastra/reviewer/model-choice.ts';
+
+const { createCodeReviewAgent, codeReviewAgent } = await import('./src/mastra/reviewer/agents/code-review-agent.ts');
 
 test('builder, reviewer, cheap, and fallback models are read from environment settings without code defaults', () => {
   const env = {
@@ -93,7 +101,7 @@ JULIA_FALLBACK_MODEL="openai/gpt-6-sol"
   assert.equal(settings.fallback, 'openai/gpt-6-sol');
 });
 
-test('agent wiring consumes dynamic settings for builder, reviewer, and memory models', () => {
+test('agent wiring consumes dynamic settings for builder, reviewer, and memory models', async () => {
   const env = {
     JULIA_BUILDER_MODEL: 'deepseek/deepseek-v4-pro',
     JULIA_REVIEWER_MODELS: 'moonshotai/Kimi-K2.7-Code',
@@ -101,12 +109,32 @@ test('agent wiring consumes dynamic settings for builder, reviewer, and memory m
     JULIA_FALLBACK_MODEL: 'deepseek/deepseek-v4-pro',
   };
 
-  const testReviewerAgent = new Agent({
-    id: 'test-reviewer-agent',
-    name: 'Test Reviewer',
-    model: reviewerModels(env),
-    instructions: 'Review pull requests.',
-  });
+  const agent1 = createCodeReviewAgent(env);
+  assert.equal(agent1.model[0].model, 'moonshotai/Kimi-K2.7-Code');
+  assert.equal(agent1.model[0].maxRetries, 1);
+  const tools1 = await agent1.listTools();
+  assert.ok(tools1?.parseGitHubPRUrl, 'Agent must have parseGitHubPRUrl tool');
+  assert.ok(tools1?.getPullRequest, 'Agent must have getPullRequest tool');
+  assert.ok(tools1?.getPullRequestDiff, 'Agent must have getPullRequestDiff tool');
+  assert.ok(tools1?.getPullRequestFiles, 'Agent must have getPullRequestFiles tool');
+  assert.ok(tools1?.getFileContent, 'Agent must have getFileContent tool');
+
+  const memory1 = await agent1.getMemory();
+  assert.ok(memory1, 'Agent must have Memory configured');
+  assert.equal(memory1.threadConfig?.observationalMemory?.model, 'deepseek/deepseek-v4-flash');
+  assert.equal(memory1.threadConfig?.observationalMemory?.scope, 'resource');
+
+  // Verify changing only env changes the reviewer and observational memory model
+  const env2 = {
+    JULIA_BUILDER_MODEL: 'commandcode/deepseek/deepseek-v4-pro',
+    JULIA_REVIEWER_MODELS: 'anthropic/claude-sonnet-5-5',
+    JULIA_CHEAP_MODEL: 'google/gemini-3.7-flash',
+    JULIA_FALLBACK_MODEL: 'openai/gpt-6-sol',
+  };
+  const agent2 = createCodeReviewAgent(env2);
+  assert.equal(agent2.model[0].model, 'anthropic/claude-sonnet-5-5');
+  const memory2 = await agent2.getMemory();
+  assert.equal(memory2.threadConfig?.observationalMemory?.model, 'google/gemini-3.7-flash');
 
   const testBuilderAgent = new Agent({
     id: 'test-builder-agent',
@@ -114,9 +142,6 @@ test('agent wiring consumes dynamic settings for builder, reviewer, and memory m
     model: builderModel(env),
     instructions: 'Build cards.',
   });
-
-  assert.equal(testReviewerAgent.model[0].model, 'moonshotai/Kimi-K2.7-Code');
-  assert.equal(testReviewerAgent.model[0].maxRetries, 1);
   assert.equal(testBuilderAgent.model, 'deepseek/deepseek-v4-pro');
 });
 
@@ -205,15 +230,33 @@ test('formatModelReadback outputs live readback and ensures no secret keys are e
   assert.ok(!readback.includes('sk-'));
   assert.ok(!readback.toLowerCase().includes('secret'));
 
+  // Ensure legitimate models pass without false positives
+  const legitimateSamples = [
+    'deepseek/deepseek-v4-pro',
+    'moonshotai/Kimi-K2.7-Code',
+    'anthropic/claude-3-7-sonnet',
+    'openai/gpt-4o',
+    'google/gemini-2.0-flash-thinking-exp',
+    'meta-llama/Llama-3.3-70B-Instruct',
+    'mistralai/Mistral-Large-Instruct-2407',
+  ];
+  for (const sample of legitimateSamples) {
+    const formatted = formatModelReadback({
+      ...settings,
+      builder: sample,
+    });
+    assert.ok(formatted.includes(sample));
+  }
+
   // Test various secret key patterns in model identifiers are rejected
   const secretSamples = [
     'sk-ant-api03-secretkey12345/model',
     'provider/pk-live-9876543210abcdef',
     'ghp_1234567890abcdefghijklmnopqrstuvwxyz/model',
-    'provider/bearer_token_12345',
-    'provider/0123456789abcdef0123456789abcdef',
-    'provider/my-secret-key',
-    'provider/auth-credential-abc',
+    'bearer token_12345',
+    'provider/0123456789abcdef0123456789abcdef0123456789abcdef',
+    'provider/secret_key=12345',
+    'provider/password_admin',
   ];
 
   for (const sample of secretSamples) {

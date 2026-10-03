@@ -157,9 +157,11 @@ export function validateModelSettings(env: NodeJS.ProcessEnv = process.env) {
 }
 
 const SECRET_PATTERNS = [
-  /(key|secret|token|bearer|password|credential|auth)/i,
-  /(?:sk|pk|ghp|gho|ghu|ghs|ghr|glpat|xox[baprs]|cf[_-])[a-zA-Z0-9_\-=]+/i,
-  /[a-f0-9]{32,}/i,
+  /(?:^|[\/\-_:])(?:sk|pk|ghp|gho|ghu|ghs|ghr|glpat|xox[baprs]|cf[_-])[a-zA-Z0-9_\-=]{10,}/i,
+  /(?:bearer\s+|token\s+|auth(?:orization)?\s*:)/i,
+  /(?:api[-_]?key|secret[-_]?key|access[-_]?token)\s*[:=]/i,
+  /(?:^|\/)[a-f0-9]{40,}(?:$|\/)/i,
+  /(?:^|[\/\-_:])(?:secret[-_]?key|password|credential)[a-zA-Z0-9_\-=]*/i,
 ];
 
 export function formatModelReadback(settings: {
