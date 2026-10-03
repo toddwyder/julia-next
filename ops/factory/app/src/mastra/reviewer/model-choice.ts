@@ -101,7 +101,7 @@ export function resolveLanguageModel(modelId: string, env: NodeJS.ProcessEnv = p
   }
   if (env.COMMANDCODE_API_KEY?.trim() && !env.MASTRA_DISABLE_COMMANDCODE_ROUTER) {
     const baseURL = env.COMMANDCODE_BASE_URL?.trim() || 'https://api.commandcode.ai/provider/v1';
-    const targetModel = trimmed.replace(/^(?:commandcode|openrouter|proxy|gateway)\//i, '') as `${string}/${string}`;
+    const targetModel = (trimmed.startsWith('commandcode/') ? trimmed : `commandcode/${trimmed}`) as `${string}/${string}`;
     return {
       id: targetModel,
       url: baseURL,
