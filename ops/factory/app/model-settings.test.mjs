@@ -438,3 +438,46 @@ test('Factory startup and index entry point consumes model settings dynamically'
   assert.ok(readback.includes('reviewer: commandcode/moonshotai/Kimi-K2.7-Code'));
 });
 
+test('syncFactoryProjectModel synchronizes builder model to Factory project storage without code rebuild', async () => {
+  const { syncFactoryProjectModel } = await import('./src/mastra/factory-model-sync.ts');
+  const { LibSQLFactoryStorage } = await import('@mastra/libsql');
+  const { FactoryProjectsStorage } = await import('@mastra/factory/storage/domains/projects/base');
+  const { DEFAULT_RETENTION } = await import('@mastra/code-sdk/utils/storage-maintenance');
+
+  const storage = new LibSQLFactoryStorage({
+    id: 'test-sync-storage',
+    url: 'file::memory:',
+    retention: DEFAULT_RETENTION,
+  });
+  await storage.init();
+  const projects = storage.registerDomain(new FactoryProjectsStorage());
+  await projects.ensureReady();
+
+  const p1 = await projects.create({ orgId: 'org1', userId: 'user1', input: { name: 'proj1' } });
+  assert.equal(p1.defaultModelId, null);
+
+  // Sync initial builder model
+  const env1 = {
+    JULIA_BUILDER_MODEL: 'deepseek/deepseek-v4-pro',
+    JULIA_REVIEWER_MODELS: 'moonshotai/Kimi-K2.7-Code',
+    JULIA_CHEAP_MODEL: 'deepseek/deepseek-v4-flash',
+    JULIA_FALLBACK_MODEL: 'deepseek/deepseek-v4-pro',
+  };
+  const count1 = await syncFactoryProjectModel(storage, env1);
+  assert.equal(count1, 1);
+  const updated1 = await projects.get({ orgId: 'org1', id: p1.id });
+  assert.equal(updated1.defaultModelId, 'deepseek/deepseek-v4-pro');
+
+  // Change only settings and sync again with NO code build
+  const env2 = {
+    JULIA_BUILDER_MODEL: 'commandcode/deepseek/deepseek-v4-pro',
+    JULIA_REVIEWER_MODELS: 'moonshotai/Kimi-K2.7-Code',
+    JULIA_CHEAP_MODEL: 'deepseek/deepseek-v4-flash',
+    JULIA_FALLBACK_MODEL: 'deepseek/deepseek-v4-pro',
+  };
+  const count2 = await syncFactoryProjectModel(storage, env2);
+  assert.equal(count2, 1);
+  const updated2 = await projects.get({ orgId: 'org1', id: p1.id });
+  assert.equal(updated2.defaultModelId, 'commandcode/deepseek/deepseek-v4-pro');
+});
+

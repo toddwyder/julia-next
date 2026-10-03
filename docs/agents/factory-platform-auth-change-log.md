@@ -336,8 +336,8 @@ Part of #185. Centralized the four Factory and Cross-maker model settings into a
    Added verified `moonshotai/Kimi-K2.7-Code` (context length 256,000) obtained live from Command Code's `/models` endpoint on the server.
 4. **Command Code router support & agent wiring:**
    `resolveLanguageModel()` in `model-choice.ts` connects model requests to Command Code's OpenAI-compatible completions API when `COMMANDCODE_API_KEY` is present. `codeReviewAgent` wires `reviewerModels()` and wraps `cheapModel()` for observational memory.
-5. **Startup validation and live readback:**
-   `validateModelSettings()` runs on Factory boot in `index.ts`, printing `[Models] Configured models - builder: ..., reviewer: ..., cheap: ..., fallback: ...` without exposing any keys.
+5. **Startup validation, builder model sync, and live readback:**
+   `validateModelSettings()` runs on Factory boot in `index.ts`, printing `[Models] Configured models - builder: ..., reviewer: ..., cheap: ..., fallback: ...` without exposing any keys. Furthermore, `syncFactoryProjectModel(storage)` runs during Factory initialization to update `factory_projects.default_model_id` in storage directly from `builderModel()`, guaranteeing that changing only the server environment setting updates Factory's project builder model without any code builds or manual database edits.
 6. **Added comprehensive test coverage in `ops/factory/app/model-settings.test.mjs`:**
-   Verifies that changing settings updates all four models with no code rebuild, missing settings fail loudly, agent wiring consumes choices dynamically, live readback ensures secret-safety, maker check judges the maker across routes, and `pi-models.commandcode.json` contains the verified Kimi model.
+   Verifies that changing settings updates all four models with no code rebuild, missing settings fail loudly, agent wiring consumes choices dynamically, `syncFactoryProjectModel` updates Factory project storage, live readback ensures secret-safety, maker check judges the maker across routes, and `pi-models.commandcode.json` contains the verified Kimi model.
 
