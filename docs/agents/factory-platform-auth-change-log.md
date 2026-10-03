@@ -335,7 +335,7 @@ Part of #185. Centralized the four Factory and Cross-maker model settings into a
 3. **Updated `ops/service-dropbox/pi-models.commandcode.json`:**
    Added verified `moonshotai/Kimi-K2.7-Code` (context length 256,000) obtained live from Command Code's `/models` endpoint on the server.
 4. **Command Code router support & agent wiring:**
-   `resolveLanguageModel()` in `model-choice.ts` connects model requests to Command Code's OpenAI-compatible completions API when `COMMANDCODE_API_KEY` is present. `codeReviewAgent` wires `reviewerModels()` and wraps `cheapModel()` for observational memory.
+   `resolveLanguageModel()` in `model-choice.ts` connects model requests to Command Code's OpenAI-compatible completions API when `COMMANDCODE_API_KEY` is present. `codeReviewAgent` and `workflowReviewAgent` wire `reviewerModels()` directly, supporting dynamic configuration across runs. Observational memory across Factory sessions uses `DEFAULT_OM_MODEL_ID` configured to cheap model.
 5. **Startup validation, builder model sync, and live readback:**
    `validateModelSettings()` runs on Factory boot in `index.ts`, printing `[Models] Configured models - builder: ..., reviewer: ..., cheap: ..., fallback: ...` without exposing any keys. Furthermore, `syncFactoryProjectModel(storage)` runs during Factory initialization to update `factory_projects.default_model_id` in storage directly from `builderModel()`, guaranteeing that changing only the server environment setting updates Factory's project builder model without any code builds or manual database edits.
 6. **Added comprehensive test coverage in `ops/factory/app/model-settings.test.mjs`:**

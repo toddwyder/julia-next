@@ -375,6 +375,8 @@ test('no hidden model defaults exist across the entire app source tree', () => {
     /JULIA_FALLBACK_MODEL\s*(?:\?\?|\|\|)\s*['"`]/,
     /DEFAULT_REVIEWER_MODELS\s*=/,
     /DEFAULT_BUILDER_MODEL\s*=/,
+    /['"]openai\/gpt-6-sol['"]/,
+    /['"]deepseek\/deepseek-v4-pro['"]/,
   ];
 
   for (const file of sourceFiles) {
