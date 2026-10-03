@@ -8,6 +8,47 @@ import { test } from 'node:test';
 const root = resolve(import.meta.dirname, '../..');
 const installer = resolve(import.meta.dirname, 'install.sh');
 
+/** Convert a host path to the path the `bash` on PATH sees (identity off Windows; /mnt/<drive>/... under WSL). */
+function toBashPath(path) {
+  if (process.platform !== 'win32') return path;
+  const match = /^([A-Za-z]):[\\/](.*)$/.exec(path);
+  if (!match) return path.replaceAll('\\', '/');
+  return `/mnt/${match[1].toLowerCase()}/${match[2].replaceAll('\\', '/')}`;
+}
+
+const shellQuote = (value) => `'${String(value).replaceAll("'", `'\\''`)}'`;
+
+/**
+ * Run `bash <script> <args>` with stub commands from `bin` first on PATH.
+ * On Windows the only `bash` is WSL's, which cannot take Windows paths or a
+ * `;`-separated PATH, so paths are converted and the stubs are copied into a
+ * WSL-native directory (the Windows drive does not carry the execute bit).
+ */
+function runBash(script, args, { cwd, bin, env = {} } = {}) {
+  if (process.platform !== 'win32') {
+    return spawnSync('bash', [script, ...args], {
+      cwd,
+      env: { ...process.env, ...(bin ? { PATH: `${bin}:${process.env.PATH}` } : {}), ...env },
+      encoding: 'utf8',
+    });
+  }
+  const assignments = Object.entries(env).map(([key, value]) => `${key}=${shellQuote(toBashPath(value))}`);
+  const steps = [
+    'stubs=$(mktemp -d)',
+    ...(bin ? [`cp ${shellQuote(toBashPath(bin))}/* "$stubs"/`, 'chmod +x "$stubs"/*'] : []),
+    ...(cwd ? [`cd ${shellQuote(toBashPath(cwd))}`] : []),
+    `${assignments.join(' ')} PATH="$stubs:$PATH" bash ${[script, ...args].map((arg) => shellQuote(toBashPath(arg))).join(' ')} < /dev/null`,
+  ];
+  // The script goes in on stdin: WSL's launcher re-expands $ in argv before bash sees it.
+  return spawnSync('bash', [], { input: `set -e\n${steps.join('\n')}\n`, encoding: 'utf8' });
+}
+
+/** Write executable `sh` stubs; mode is applied at creation so no chmod process is needed. */
+function writeStubs(bin, bodyFor) {
+  for (const command of ['npm', 'python3', 'node']) {
+    writeFileSync(resolve(bin, command), bodyFor(command), { mode: 0o755 });
+  }
+}
 /**
  * Every local (`./`) import in a TypeScript/JavaScript module, as the bare
  * module specifier without its extension: `./observability-store.js` ->
@@ -56,16 +97,8 @@ test('the installer copies the issue #140 Monday note and retention programs int
   const bin = resolve(tmp, 'bin');
   mkdirSync(target);
   mkdirSync(bin);
-  for (const command of ['npm', 'python3', 'node']) {
-    const stub = resolve(bin, command);
-    writeFileSync(stub, `#!/bin/sh\nif [ '${command}' = npm ] && [ "$1" = build ]; then mkdir -p .mastra/output; fi\n`);
-    spawnSync('chmod', ['+x', stub]);
-  }
-  const result = spawnSync('bash', [installer, target], {
-    cwd: tmp,
-    env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
-    encoding: 'utf8',
-  });
+  writeStubs(bin, (command) => `#!/bin/sh\nif [ '${command}' = npm ] && [ "$1" = build ]; then mkdir -p .mastra/output; fi\n`);
+  const result = runBash(installer, [target], { cwd: tmp, bin });
   assert.equal(result.status, 0, result.stderr);
   for (const file of [
     'ops/factory/monday-note.mjs',
@@ -93,16 +126,8 @@ test('a clean install carries every app module the entry point imports, so check
   const log = resolve(tmp, 'commands.log');
   mkdirSync(target);
   mkdirSync(bin);
-  for (const command of ['npm', 'python3', 'node']) {
-    const stub = resolve(bin, command);
-    writeFileSync(stub, `#!/bin/sh\nprintf '%s %s\\n' '${command}' "$*" >> "$STUB_LOG"\nif [ '${command}' = npm ] && [ "$1" = build ]; then mkdir -p .mastra/output; fi\n`);
-    spawnSync('chmod', ['+x', stub]);
-  }
-  const result = spawnSync('bash', [installer, target], {
-    cwd: tmp,
-    env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, STUB_LOG: log },
-    encoding: 'utf8',
-  });
+  writeStubs(bin, (command) => `#!/bin/sh\nprintf '%s %s\\n' '${command}' "$*" >> "$STUB_LOG"\nif [ '${command}' = npm ] && [ "$1" = build ]; then mkdir -p .mastra/output; fi\n`);
+  const result = runBash(installer, [target], { cwd: tmp, bin, env: { STUB_LOG: log } });
   assert.equal(result.status, 0, result.stderr);
 
   const sourceApp = resolve(root, 'ops/factory/app');
@@ -144,16 +169,8 @@ test('a repo-sourced install preserves service secrets and applies the WorkOS pa
   mkdirSync(bin);
   writeFileSync(resolve(target, '.env'), 'KEEP_THIS_SECRET=fixture\n');
   writeFileSync(resolve(target, 'runtime.db'), 'existing state');
-  for (const command of ['npm', 'python3', 'node']) {
-    const stub = resolve(bin, command);
-    writeFileSync(stub, `#!/bin/sh\nprintf '%s %s\\n' '${command}' "$*" >> "$STUB_LOG"\nif [ '${command}' = npm ] && [ "$1" = build ]; then mkdir -p .mastra/output; fi\n`);
-    spawnSync('chmod', ['+x', stub]);
-  }
-  const result = spawnSync('bash', [installer, target], {
-    cwd: tmp,
-    env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, STUB_LOG: log },
-    encoding: 'utf8',
-  });
+  writeStubs(bin, (command) => `#!/bin/sh\nprintf '%s %s\\n' '${command}' "$*" >> "$STUB_LOG"\nif [ '${command}' = npm ] && [ "$1" = build ]; then mkdir -p .mastra/output; fi\n`);
+  const result = runBash(installer, [target], { cwd: tmp, bin, env: { STUB_LOG: log } });
   assert.equal(result.status, 0, result.stderr);
   for (const file of [
     'package.json', 'package-lock.json', 'tsconfig.json', 'src/mastra/index.ts', 'src/mastra/local-sandbox.ts',
@@ -166,19 +183,15 @@ test('a repo-sourced install preserves service secrets and applies the WorkOS pa
   assert.equal(readFileSync(resolve(target, 'runtime.db'), 'utf8'), 'existing state');
   assert.equal(readFileSync(log, 'utf8').trim(), [
     'npm ci',
-    `python3 ${resolve(import.meta.dirname, 'apply-install-patches.py')} ${target}`,
-    `node ${resolve(import.meta.dirname, 'workos-cookie-identity.check.mjs')} ${target}`,
+    `python3 ${toBashPath(resolve(import.meta.dirname, 'apply-install-patches.py'))} ${toBashPath(target)}`,
+    `node ${toBashPath(resolve(import.meta.dirname, 'workos-cookie-identity.check.mjs'))} ${toBashPath(target)}`,
     'npm run check',
     'npm run build',
-    `python3 ${resolve(import.meta.dirname, 'apply-install-patches.py')} ${target}`,
-    `node ${resolve(import.meta.dirname, 'workos-cookie-identity.check.mjs')} ${target}/.mastra/output`,
+    `python3 ${toBashPath(resolve(import.meta.dirname, 'apply-install-patches.py'))} ${toBashPath(target)}`,
+    `node ${toBashPath(resolve(import.meta.dirname, 'workos-cookie-identity.check.mjs'))} ${toBashPath(target)}/.mastra/output`,
   ].join('\n'));
   const plan = resolve(target, 'src/mastra/public/factory-skills/factory-plan/SKILL.md');
-  writeFileSync(plan, 'stale plan');  const repeated = spawnSync('bash', [installer, target], {
-    cwd: tmp,
-    env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, STUB_LOG: log },
-    encoding: 'utf8',
-  });
+  writeFileSync(plan, 'stale plan');  const repeated = runBash(installer, [target], { cwd: tmp, bin, env: { STUB_LOG: log } });
   assert.equal(repeated.status, 0, repeated.stderr);
   assert.equal(readFileSync(plan, 'utf8'), readFileSync(resolve(root, 'ops/factory/app/src/mastra/public/factory-skills/factory-plan/SKILL.md'), 'utf8'));
   assert.equal(readFileSync(resolve(target, '.env'), 'utf8'), 'KEEP_THIS_SECRET=fixture\n');
@@ -195,7 +208,6 @@ test('a missing required skill leaves an existing install untouched', () => {
     'package.json', 'package-lock.json', 'tsconfig.json', 'src/mastra/index.ts', 'src/mastra/local-sandbox.ts',
     'src/mastra/observability-store.ts', 'src/mastra/observability-retention.ts',
     'src/mastra/reviewer/workflows/cross-maker-review-workflow.ts',
-    'src/mastra/factory-model-sync.ts',
     'src/mastra/public/factory-skills/factory-plan/SKILL.md',
   ]) {
     const destination = resolve(source, file);
@@ -206,9 +218,7 @@ test('a missing required skill leaves an existing install untouched', () => {
   const bin = resolve(tmp, 'bin');
   mkdirSync(bin);
   writeFileSync(resolve(bin, 'npm'), '#!/bin/sh\nexit 9\n', { mode: 0o755 });
-  const result = spawnSync('bash', [resolve(tmp, 'install.sh'), target], {
-    encoding: 'utf8', env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
-  });
+  const result = runBash(resolve(tmp, 'install.sh'), [target], { bin });
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /missing Factory source.*factory-review\/SKILL\.md/i);
   assert.equal(readFileSync(resolve(target, 'package.json'), 'utf8'), 'existing manifest');
@@ -220,7 +230,7 @@ test('an incomplete repository source leaves an existing install untouched', () 
   mkdirSync(target);
   writeFileSync(resolve(target, 'package.json'), 'existing manifest');
   copyFileSync(installer, resolve(tmp, 'install.sh'));
-  const result = spawnSync('bash', [resolve(tmp, 'install.sh'), target], { encoding: 'utf8' });
+  const result = runBash(resolve(tmp, 'install.sh'), [target]);
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /missing Factory source/i);
   assert.equal(readFileSync(resolve(target, 'package.json'), 'utf8'), 'existing manifest');
