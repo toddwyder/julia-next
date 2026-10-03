@@ -28,10 +28,10 @@ import { inspect } from 'node:util';
 import test from 'node:test';
 
 // Test fixtures for review-route-batching:
-process.env.JULIA_BUILDER_MODEL ??= 'test-provider/test-builder-model';
-process.env.JULIA_REVIEWER_MODELS ??= 'test-reviewer-provider/test-reviewer-model';
-process.env.JULIA_CHEAP_MODEL ??= 'test-provider/test-cheap-model';
-process.env.JULIA_FALLBACK_MODEL ??= 'test-provider/test-fallback-model';
+process.env.JULIA_BUILDER_MODEL = 'test-provider/test-builder-model';
+process.env.JULIA_REVIEWER_MODELS = 'test-reviewer-provider/test-reviewer-model';
+process.env.JULIA_CHEAP_MODEL = 'test-provider/test-cheap-model';
+process.env.JULIA_FALLBACK_MODEL = 'test-provider/test-fallback-model';
 
 const { reviewPullRequest } = await import('./src/mastra/reviewer/review-pr.ts');
 const { reviewerRoute, reviewerStatusRoute } = await import('./src/mastra/reviewer/route.ts');

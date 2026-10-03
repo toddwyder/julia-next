@@ -376,12 +376,20 @@ test('no hidden model defaults exist across the entire app source tree', () => {
     }
   }
 
-  // Also check register-typescript-esm.mjs
+  // Also check register-typescript-esm.mjs and test files
   const registerContent = readFileSync(new URL('./register-typescript-esm.mjs', import.meta.url), 'utf8');
   assert.ok(!registerContent.includes('JULIA_BUILDER_MODEL'), 'register-typescript-esm.mjs must not set default model env vars');
   assert.ok(!registerContent.includes('JULIA_REVIEWER_MODELS'), 'register-typescript-esm.mjs must not set default model env vars');
   assert.ok(!registerContent.includes('JULIA_CHEAP_MODEL'), 'register-typescript-esm.mjs must not set default model env vars');
   assert.ok(!registerContent.includes('JULIA_FALLBACK_MODEL'), 'register-typescript-esm.mjs must not set default model env vars');
+
+  const batchingTestContent = readFileSync(new URL('./review-route-batching.test.mjs', import.meta.url), 'utf8');
+  for (const pattern of forbiddenDefaultPatterns) {
+    assert.ok(
+      !pattern.test(batchingTestContent),
+      `review-route-batching.test.mjs contains hidden default assignment: ${pattern}`,
+    );
+  }
 });
 
 test('pi-models.commandcode.json contains moonshotai/Kimi-K2.7-Code', () => {
@@ -408,5 +416,25 @@ test('resolveLanguageModel routes via Command Code OpenAI-compatible gateway whe
 
   const plainModel = resolveLanguageModel('moonshotai/Kimi-K2.7-Code', {});
   assert.equal(plainModel, 'moonshotai/Kimi-K2.7-Code');
+});
+
+test('Factory startup and index entry point consumes model settings dynamically', () => {
+  const customEnv = {
+    JULIA_BUILDER_MODEL: 'commandcode/deepseek/deepseek-v4-pro',
+    JULIA_REVIEWER_MODELS: 'commandcode/moonshotai/Kimi-K2.7-Code',
+    JULIA_CHEAP_MODEL: 'commandcode/deepseek/deepseek-v4-flash',
+    JULIA_FALLBACK_MODEL: 'deepseek/deepseek-v4-pro',
+  };
+
+  // Verifies validateModelSettings validates all 4 settings and builderModel returns project model choice
+  const validated = validateModelSettings(customEnv);
+  assert.equal(validated.builder, 'commandcode/deepseek/deepseek-v4-pro');
+  assert.deepEqual(validated.reviewerModels, ['commandcode/moonshotai/Kimi-K2.7-Code']);
+  assert.equal(validated.cheap, 'commandcode/deepseek/deepseek-v4-flash');
+  assert.equal(validated.fallback, 'deepseek/deepseek-v4-pro');
+
+  const readback = formatModelReadback(validated);
+  assert.ok(readback.includes('builder: commandcode/deepseek/deepseek-v4-pro'));
+  assert.ok(readback.includes('reviewer: commandcode/moonshotai/Kimi-K2.7-Code'));
 });
 

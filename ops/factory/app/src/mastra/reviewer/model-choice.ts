@@ -141,16 +141,13 @@ export function reviewerModels(env: NodeJS.ProcessEnv = process.env): Array<{ mo
 
 export function validateModelSettings(env: NodeJS.ProcessEnv = process.env) {
   const builder = builderModel(env);
-  reviewerModels(env);
+  const reviewers = reviewerModels(env);
   const cheap = cheapModel(env);
   const fallback = fallbackModel(env);
-  const rawReviewers = env.JULIA_REVIEWER_MODELS?.trim()
-    .split(',')
-    .map(value => value.trim())
-    .filter(Boolean) ?? [];
+  const reviewerModelIds = env.JULIA_REVIEWER_MODELS!.split(',').map(m => m.trim()).filter(Boolean);
   return {
     builder,
-    reviewerModels: rawReviewers,
+    reviewerModels: reviewerModelIds,
     cheap,
     fallback,
   };
