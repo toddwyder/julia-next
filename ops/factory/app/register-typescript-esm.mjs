@@ -6,3 +6,9 @@
 import { register } from 'node:module';
 
 register('./typescript-esm-loader.mjs', import.meta.url);
+
+// Test environment default settings for Mastra Factory models:
+process.env.JULIA_BUILDER_MODEL ??= 'deepseek/deepseek-v4-pro';
+process.env.JULIA_REVIEWER_MODELS ??= 'moonshotai/Kimi-K2.7-Code';
+process.env.JULIA_CHEAP_MODEL ??= 'deepseek/deepseek-v4-flash';
+process.env.JULIA_FALLBACK_MODEL ??= 'deepseek/deepseek-v4-pro';

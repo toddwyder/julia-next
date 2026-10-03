@@ -7,7 +7,8 @@
       "authHeader": true,
       "models": [
         { "id": "deepseek/deepseek-v4-pro", "contextWindow": 1000000, "maxTokens": 384000 },
-        { "id": "deepseek/deepseek-v4-flash", "contextWindow": 1000000, "maxTokens": 384000 }
+        { "id": "deepseek/deepseek-v4-flash", "contextWindow": 1000000, "maxTokens": 384000 },
+        { "id": "moonshotai/Kimi-K2.7-Code", "contextWindow": 256000, "maxTokens": 256000 }
       ]
     }
   }
