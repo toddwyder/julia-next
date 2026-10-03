@@ -139,11 +139,28 @@ export async function updateFactoryProjectModel(builderModel, options = {}) {
     throw new Error('DATABASE_URL is not configured for updating Factory project model');
   }
 
-  // Use dynamic import so dependencies remain optional in test environments
+  // Use dynamic import and createRequire fallback so dependencies resolve across test and server environments
   let pg;
   try {
     pg = await import('pg');
   } catch {
+    const { createRequire } = await import('node:module');
+    const searchPaths = [
+      process.cwd(),
+      '/var/lib/julia-factory/app/package.json',
+    ];
+    for (const p of searchPaths) {
+      try {
+        const req = createRequire(p);
+        pg = req('pg');
+        if (pg) break;
+      } catch {
+        // continue
+      }
+    }
+  }
+
+  if (!pg) {
     throw new Error("Package 'pg' is required to update Factory project model");
   }
 
