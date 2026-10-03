@@ -4,6 +4,9 @@ Date: 2026-09-15
 
 Status: accepted; amended 2026-09-16 to name the sync service.
 
+> **Superseded in part, 2026-10-03 (ADR 0010).** Julia's data moves to Firestore on Firebase's
+> free Spark plan. PowerSync and the Postgres database (Supabase) below are retired.
+
 > **Note, 2026-09-21 (JUL-98). Partly superseded by [The route](https://linear.app/julia-next/document/the-route-one-description-of-how-a-change-reaches-real-julia-88d1f95bbbfa).**
 > The route is now the one description of how a change reaches Real Julia, and where this
 > record disagrees with it, the route wins. What the route replaces here:
