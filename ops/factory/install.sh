@@ -13,6 +13,8 @@ files=(
   # Issue #190: index.ts imports the asynchronous cross-maker workflow.
   # Keep it in the explicit install manifest even though the reviewer tree is copied below.
   src/mastra/reviewer/workflows/cross-maker-review-workflow.ts
+  # Issue #206: index.ts imports factory project model sync
+  src/mastra/factory-model-sync.ts
   src/mastra/public/factory-skills/factory-plan/SKILL.md
   src/mastra/public/factory-skills/factory-review/SKILL.md
 )

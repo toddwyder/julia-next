@@ -308,3 +308,36 @@ After the new GitHub rules were live, the operator removed the ten recreated
 machine cards using Factory's `WorkItemsStorage.delete` operation. Four done
 Julia history cards remained. A future GitHub poll and the next natural Julia
 wait still need observation before #148 closes.
+
+# 2026-10-03: Centralize Factory builder, reviewer, cheap and fallback model settings (#206)
+
+Part of #185. Centralized the four Factory and Cross-maker model settings into a single server-side settings source (`/etc/julia-factory/factory.env`).
+
+## Settings source and jobs
+
+- **Settings source location:** `/etc/julia-factory/factory.env` (root-owned, mode `0600`).
+- **Four jobs and their consumers:**
+  1. **Builder (`JULIA_BUILDER_MODEL`):** `deepseek/deepseek-v4-pro` through Command Code. Consumed as Factory's project builder model.
+  2. **Reviewer (`JULIA_REVIEWER_MODELS`):** `moonshotai/Kimi-K2.7-Code` through Command Code. Consumed by the Cross-maker reviewer agents (`codeReviewAgent`, `workflowReviewAgent`) and workflows (`prReviewWorkflow`, `crossMakerReviewWorkflow`).
+  3. **Cheap model (`JULIA_CHEAP_MODEL`):** `deepseek/deepseek-v4-flash` through Command Code. Consumed by:
+     - Observational memory across Factory sessions (`DEFAULT_OM_MODEL_ID`)
+     - Per-card retro (#187)
+     - Monday cost note rework grouping and upgrade lines (#196)
+     - `e2e` agent steps (#197)
+  4. **Fallback model (`JULIA_FALLBACK_MODEL`):** `deepseek/deepseek-v4-pro` on direct DeepSeek key. Consumed by quota fallback (#207) when Command Code 5-hour or weekly cap is hit to switch to direct key.
+
+## Changes made
+
+1. **Removed hidden code defaults in `ops/factory/app/src/mastra/reviewer/model-choice.ts` and loader:**
+   Removed `'openai/gpt-6-sol'` and `'deepseek/deepseek-v4-pro'` defaults and removed loader defaults in `register-typescript-esm.mjs`. Missing settings fail loudly at startup with clear error messages (`JULIA_BUILDER_MODEL`, `JULIA_REVIEWER_MODELS`, `JULIA_CHEAP_MODEL`, `JULIA_FALLBACK_MODEL`).
+2. **Fixed maker check:**
+   Replaced naive slash splitting with `modelMaker()` which strips gateway prefixes (`commandcode/`, `openrouter/`, etc.) and maps model names to canonical makers. This ensures builder DeepSeek + reviewer Kimi passes even when both use `commandcode/` routing, while rejecting same-maker pairs.
+3. **Updated `ops/service-dropbox/pi-models.commandcode.json`:**
+   Added verified `moonshotai/Kimi-K2.7-Code` (context length 256,000) obtained live from Command Code's `/models` endpoint on the server.
+4. **Command Code router support & agent wiring:**
+   `resolveLanguageModel()` in `model-choice.ts` connects model requests to Command Code's OpenAI-compatible completions API when `COMMANDCODE_API_KEY` is present. `codeReviewAgent` and `workflowReviewAgent` wire `reviewerModels()` directly, supporting dynamic configuration across runs. Observational memory across Factory sessions uses `DEFAULT_OM_MODEL_ID` configured to cheap model.
+5. **Startup validation, builder model sync, and live readback:**
+   `validateModelSettings()` runs on Factory boot in `index.ts`, printing `[Models] Configured models - builder: ..., reviewer: ..., cheap: ..., fallback: ...` without exposing any keys. Furthermore, `syncFactoryProjectModel(storage)` runs during Factory initialization to update `factory_projects.default_model_id` in storage directly from `builderModel()`, guaranteeing that changing only the server environment setting updates Factory's project builder model without any code builds or manual database edits.
+6. **Added comprehensive test coverage in `ops/factory/app/model-settings.test.mjs`:**
+   Verifies that changing settings updates all four models with no code rebuild, missing settings fail loudly, agent wiring consumes choices dynamically, `syncFactoryProjectModel` updates Factory project storage, live readback ensures secret-safety, maker check judges the maker across routes, and `pi-models.commandcode.json` contains the verified Kimi model.
+
