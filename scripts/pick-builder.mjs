@@ -223,26 +223,37 @@ export async function updateFactoryProjectModel(builderModel, options = {}) {
       throw new Error('DATABASE_URL is not configured for updating Factory project model');
     }
 
-    const { createRequire } = await import('node:module');
     let PgFactoryStorage;
     let FactoryProjectsStorage;
 
     try {
       const pgModule = await import('@mastra/pg');
       PgFactoryStorage = pgModule.PgFactoryStorage;
+    } catch {
+      for (const p of [
+        '/var/lib/julia-factory/app/node_modules/@mastra/pg/dist/index.js',
+        '/var/lib/julia-factory/app/node_modules/@mastra/pg/dist/index.cjs',
+      ]) {
+        try {
+          const pgMod = await import(p);
+          PgFactoryStorage = pgMod.PgFactoryStorage;
+          if (PgFactoryStorage) break;
+        } catch {}
+      }
+    }
+
+    try {
       const projectsModule = await import('@mastra/factory/storage/domains/projects/base');
       FactoryProjectsStorage = projectsModule.FactoryProjectsStorage;
     } catch {
-      const searchPaths = [
-        process.cwd(),
-        '/var/lib/julia-factory/app/package.json',
-      ];
-      for (const p of searchPaths) {
+      for (const p of [
+        '/var/lib/julia-factory/app/node_modules/@mastra/factory/dist/storage/domains/projects/base.js',
+        '/var/lib/julia-factory/app/node_modules/@mastra/factory/dist/storage/domains/projects/base.cjs',
+      ]) {
         try {
-          const req = createRequire(p);
-          PgFactoryStorage = req('@mastra/pg').PgFactoryStorage;
-          FactoryProjectsStorage = req('@mastra/factory/storage/domains/projects/base').FactoryProjectsStorage;
-          if (PgFactoryStorage && FactoryProjectsStorage) break;
+          const projMod = await import(p);
+          FactoryProjectsStorage = projMod.FactoryProjectsStorage;
+          if (FactoryProjectsStorage) break;
         } catch {}
       }
     }
