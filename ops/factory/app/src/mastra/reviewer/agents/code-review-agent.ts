@@ -8,7 +8,7 @@ import {
   getFileContent,
 } from '../tools/github';
 import { REVIEW_DEPTH_INSTRUCTIONS, SMALL_PR_MAX, MEDIUM_PR_MAX } from '../lib/review-config';
-import { reviewerModels, cheapModel } from '../model-choice';
+import { reviewerModels, cheapModel, resolveLanguageModel } from '../model-choice';
 import { reviewerWorkspace } from '../workspace';
 
 export const codeReviewAgent = new Agent({
@@ -111,7 +111,7 @@ Good patterns, clean abstractions, thoughtful decisions, or well-written tests w
   memory: new Memory({
     options: {
       observationalMemory: {
-        model: cheapModel(),
+        model: resolveLanguageModel(cheapModel()),
       },
     },
   }),

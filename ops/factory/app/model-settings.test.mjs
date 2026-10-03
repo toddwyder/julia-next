@@ -15,7 +15,9 @@ import {
   modelMaker,
   validateModelSettings,
   formatModelReadback,
+  resolveLanguageModel,
 } from './src/mastra/reviewer/model-choice.ts';
+
 
 test('builder, reviewer, cheap, and fallback models are read from environment settings without code defaults', () => {
   const env = {
@@ -283,3 +285,21 @@ test('pi-models.commandcode.json contains moonshotai/Kimi-K2.7-Code', () => {
   assert.ok(kimi, 'moonshotai/Kimi-K2.7-Code must be defined in pi-models.commandcode.json');
   assert.equal(kimi.contextWindow, 256000);
 });
+
+test('resolveLanguageModel routes via Command Code OpenAI-compatible gateway when key is present', () => {
+  const envWithKey = {
+    COMMANDCODE_API_KEY: 'test-cc-key',
+    COMMANDCODE_BASE_URL: 'https://api.commandcode.ai/provider/v1',
+  };
+  const model = resolveLanguageModel('moonshotai/Kimi-K2.7-Code', envWithKey);
+  assert.equal(typeof model, 'object');
+  assert.equal(model.modelId, 'moonshotai/Kimi-K2.7-Code');
+
+  const routedModel = resolveLanguageModel('commandcode/moonshotai/Kimi-K2.7-Code', envWithKey);
+  assert.equal(typeof routedModel, 'object');
+  assert.equal(routedModel.modelId, 'moonshotai/Kimi-K2.7-Code');
+
+  const plainModel = resolveLanguageModel('moonshotai/Kimi-K2.7-Code', {});
+  assert.equal(plainModel, 'moonshotai/Kimi-K2.7-Code');
+});
+

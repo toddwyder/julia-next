@@ -1,4 +1,7 @@
+import { createOpenAI } from '@ai-sdk/openai';
+
 const KNOWN_GATEWAYS = new Set(['commandcode', 'openrouter', 'litellm', 'proxy', 'custom', 'gateway']);
+
 
 const MAKER_PATTERNS: Array<{ pattern: RegExp; maker: string }> = [
   { pattern: /^(deepseek)/i, maker: 'deepseek' },
@@ -85,7 +88,23 @@ export function fallbackModel(env: NodeJS.ProcessEnv = process.env): string {
   return fallback;
 }
 
-export function reviewerModels(env: NodeJS.ProcessEnv = process.env) {
+export type ResolvedModel = `${string}/${string}` | any;
+
+export function resolveLanguageModel(modelId: string, env: NodeJS.ProcessEnv = process.env): ResolvedModel {
+  if (env.COMMANDCODE_API_KEY?.trim() && !env.MASTRA_DISABLE_COMMANDCODE_ROUTER) {
+    const baseURL = env.COMMANDCODE_BASE_URL?.trim() || 'https://api.commandcode.ai/provider/v1';
+    const openai = createOpenAI({
+      baseURL,
+      apiKey: env.COMMANDCODE_API_KEY.trim(),
+    });
+    const targetModel = modelId.replace(/^commandcode\//i, '');
+    return openai.chat(targetModel);
+  }
+  return modelId as `${string}/${string}`;
+}
+
+export function reviewerModels(env: NodeJS.ProcessEnv = process.env): Array<{ model: ResolvedModel; maxRetries: number }> {
+
   const builder = builderModel(env);
   const builderMaker = modelMaker(builder);
   const rawReviewers = env.JULIA_REVIEWER_MODELS?.trim();
@@ -107,17 +126,24 @@ export function reviewerModels(env: NodeJS.ProcessEnv = process.env) {
       );
     }
   }
-  return models.map(model => ({ model: model as `${string}/${string}`, maxRetries: 1 }));
+  return models.map(model => ({
+    model: resolveLanguageModel(model, env),
+    maxRetries: 1,
+  }));
 }
 
 export function validateModelSettings(env: NodeJS.ProcessEnv = process.env) {
   const builder = builderModel(env);
-  const reviewers = reviewerModels(env);
+  reviewerModels(env);
   const cheap = cheapModel(env);
   const fallback = fallbackModel(env);
+  const rawReviewers = env.JULIA_REVIEWER_MODELS?.trim()
+    .split(',')
+    .map(value => value.trim())
+    .filter(Boolean) ?? [];
   return {
     builder,
-    reviewerModels: reviewers.map(r => r.model),
+    reviewerModels: rawReviewers,
     cheap,
     fallback,
   };
@@ -137,4 +163,5 @@ export function formatModelReadback(settings: {
   }
   return `[Models] Configured models - builder: ${settings.builder}, reviewer: ${settings.reviewerModels.join(', ')}, cheap: ${settings.cheap}, fallback: ${settings.fallback}`;
 }
+
 
