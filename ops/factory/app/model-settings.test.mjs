@@ -4,11 +4,11 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
-// Set baseline environment variables for initial module evaluation
-process.env.JULIA_BUILDER_MODEL = 'deepseek/deepseek-v4-pro';
-process.env.JULIA_REVIEWER_MODELS = 'moonshotai/Kimi-K2.7-Code';
-process.env.JULIA_CHEAP_MODEL = 'deepseek/deepseek-v4-flash';
-process.env.JULIA_FALLBACK_MODEL = 'deepseek/deepseek-v4-pro';
+// Initialize test environment dynamically
+process.env.JULIA_BUILDER_MODEL = 'test-builder-vendor/test-builder-model';
+process.env.JULIA_REVIEWER_MODELS = 'test-reviewer-vendor/test-reviewer-model';
+process.env.JULIA_CHEAP_MODEL = 'test-cheap-vendor/test-cheap-model';
+process.env.JULIA_FALLBACK_MODEL = 'test-fallback-vendor/test-fallback-model';
 
 import { Agent } from '@mastra/core/agent';
 import {
@@ -23,6 +23,7 @@ import {
 } from './src/mastra/reviewer/model-choice.ts';
 
 const { createCodeReviewAgent, codeReviewAgent } = await import('./src/mastra/reviewer/agents/code-review-agent.ts');
+const { createWorkflowReviewAgent, workflowReviewAgent } = await import('./src/mastra/reviewer/agents/workflow-review-agent.ts');
 
 test('builder, reviewer, cheap, and fallback models are read from environment settings without code defaults', () => {
   const env = {
@@ -113,7 +114,11 @@ test('agent wiring consumes dynamic settings for builder and reviewer models', a
   assert.equal(agent1.model[0].model, 'moonshotai/Kimi-K2.7-Code');
   assert.equal(agent1.model[0].maxRetries, 1);
 
-  // Verify changing only env changes the reviewer model
+  const wfAgent1 = createWorkflowReviewAgent(env);
+  assert.equal(wfAgent1.model[0].model, 'moonshotai/Kimi-K2.7-Code');
+  assert.equal(wfAgent1.model[0].maxRetries, 1);
+
+  // Verify changing only env changes the reviewer model across agents
   const env2 = {
     JULIA_BUILDER_MODEL: 'commandcode/deepseek/deepseek-v4-pro',
     JULIA_REVIEWER_MODELS: 'anthropic/claude-sonnet-5-5',
@@ -123,6 +128,9 @@ test('agent wiring consumes dynamic settings for builder and reviewer models', a
   const agent2 = createCodeReviewAgent(env2);
   assert.equal(agent2.model[0].model, 'anthropic/claude-sonnet-5-5');
 
+  const wfAgent2 = createWorkflowReviewAgent(env2);
+  assert.equal(wfAgent2.model[0].model, 'anthropic/claude-sonnet-5-5');
+
   const testBuilderAgent = new Agent({
     id: 'test-builder-agent',
     name: 'Test Builder',
@@ -130,6 +138,22 @@ test('agent wiring consumes dynamic settings for builder and reviewer models', a
     instructions: 'Build cards.',
   });
   assert.equal(testBuilderAgent.model, 'deepseek/deepseek-v4-pro');
+
+  // Verify agents fail to initialize if builder and reviewer share the same maker
+  const sameMakerEnv = {
+    JULIA_BUILDER_MODEL: 'deepseek/deepseek-v4-pro',
+    JULIA_REVIEWER_MODELS: 'commandcode/deepseek/deepseek-v4-flash',
+    JULIA_CHEAP_MODEL: 'deepseek/deepseek-v4-flash',
+    JULIA_FALLBACK_MODEL: 'deepseek/deepseek-v4-pro',
+  };
+  assert.throws(
+    () => createCodeReviewAgent(sameMakerEnv),
+    /must be from a different maker than the builder \(deepseek\)/,
+  );
+  assert.throws(
+    () => createWorkflowReviewAgent(sameMakerEnv),
+    /must be from a different maker than the builder \(deepseek\)/,
+  );
 });
 
 test('missing JULIA_BUILDER_MODEL fails loudly with no hidden code default', () => {
@@ -380,7 +404,17 @@ test('no hidden model defaults exist across the entire app source tree', () => {
 });
 
 test('pi-models.commandcode.json contains moonshotai/Kimi-K2.7-Code', () => {
-  const content = readFileSync(new URL('../../service-dropbox/pi-models.commandcode.json', import.meta.url), 'utf8');
+  const filePath = new URL('../../service-dropbox/pi-models.commandcode.json', import.meta.url);
+  let content;
+  try {
+    content = readFileSync(filePath, 'utf8');
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      // Running inside standalone installed app directory where service-dropbox is not deployed
+      return;
+    }
+    throw err;
+  }
   const parsed = JSON.parse(content);
   const models = parsed.providers?.commandcode?.models ?? [];
   const kimi = models.find(m => m.id === 'moonshotai/Kimi-K2.7-Code');

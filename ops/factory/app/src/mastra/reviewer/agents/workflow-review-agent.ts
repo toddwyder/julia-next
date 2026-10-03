@@ -6,16 +6,16 @@ import { reviewerWorkspace } from '../workspace';
  * Lightweight reviewer used exclusively by the PR review workflow.
  *
  * Key differences from the main `codeReviewAgent`:
- * - Uses Haiku (faster, cheaper) instead of Sonnet.
  * - Has NO tools — the workflow feeds it data directly.
  * - Focused instructions for structured review output only.
  */
-export const workflowReviewAgent = new Agent({
-  id: 'workflow-review-agent',
-  name: 'Workflow PR Reviewer',
-  model: reviewerModels(),
-  workspace: reviewerWorkspace,
-  instructions: `You are an expert code reviewer. You receive PR file diffs and contents from a workflow and return structured review findings.
+export function createWorkflowReviewAgent(env: NodeJS.ProcessEnv = process.env): Agent {
+  return new Agent({
+    id: 'workflow-review-agent',
+    name: 'Workflow PR Reviewer',
+    model: reviewerModels(env),
+    workspace: reviewerWorkspace,
+    instructions: `You are an expert code reviewer. You receive PR file diffs and contents from a workflow and return structured review findings.
 
 ## Review Focus
 
@@ -42,4 +42,7 @@ Record evidence tied to the change for each check, or explain why it does not ap
 - Acknowledge good patterns when you see them (use the "positive" severity).
 - Be concise — the workflow aggregates your output across multiple batches.
 - When the review depth says "HIGH-LEVEL", skip minor style issues entirely.`,
-});
+  });
+}
+
+export const workflowReviewAgent = createWorkflowReviewAgent();
