@@ -311,31 +311,32 @@ wait still need observation before #148 closes.
 
 # 2026-10-03: Centralize Factory builder, reviewer, cheap and fallback model settings (#206)
 
-Part of #185. Configured the four model jobs using Factory's stock settings mechanisms and the Cross-maker reviewer environment, deleting the custom model copier (`factory-model-sync.ts`). Changing a model afterwards is a settings change with zero code rebuild.
+Part of #185. Configured the four model jobs using Factory's stock settings mechanisms and the Cross-maker reviewer environment, deleting the custom model copier (`factory-model-sync.ts`). Changing a model afterwards is a settings change with zero code rebuild. Per #206, no model ID, provider endpoint, or model choice appears in repository code, config files, or docs; values live only in Factory's own settings and server-side settings (starting values in #185 "Starting settings").
 
 ## Stock mechanisms per job: where each is set and how to change it
 
-| Job | Stock mechanism & setting location | Current / starting value | How to change it | Consuming components |
-|---|---|---|---|---|
-| **Builder** | Factory project model: `factory_projects.default_model_id` in PostgreSQL storage, naming a registered custom provider | `command-code/deepseek/deepseek-v4-pro` | Update project model in Factory UI or via SQL: `UPDATE factory_projects SET default_model_id = '<new-model>' WHERE name = 'julia-next';` (no code rebuild or restart required) | Factory work sessions, planning, coding |
-| **Command Code route** | Factory custom-providers store: `custom_providers` table in PostgreSQL | Provider ID `command-code`, Base URL `https://api.commandcode.ai/provider/v1`, API key from environment / credential store, models: `deepseek/deepseek-v4-pro`, `deepseek/deepseek-v4-flash`, `moonshotai/Kimi-K2.7-Code` | Update provider or models in Factory UI or `custom_providers` table. Available to every organisation without restarting Factory. | Factory builder execution, routing requests to Command Code |
-| **Cheap model** | Factory memory-model setting: `memory_settings` table (and `DEFAULT_OM_MODEL_ID` in `/etc/julia-factory/factory.env`) | `deepseek/deepseek-v4-flash` | Factory API `PUT /web/config/om/:role/model` or update `memory_settings` table / `DEFAULT_OM_MODEL_ID` in `factory.env` | Observational memory across Factory sessions, per-card retro (#187), Monday cost note rework grouping (#196), e2e steps (#197) |
-| **Fallback model** | `@mastra/code-sdk` pack fallbacks: `settings.models.packFallbacks` in `/var/lib/julia-factory/.local/share/mastracode/settings.json` (and `JULIA_FALLBACK_MODEL` in `/etc/julia-factory/factory.env`) | `deepseek/deepseek-v4-pro` (direct key) | Update `settings.models.packFallbacks` in `settings.json` or `JULIA_FALLBACK_MODEL` in `factory.env` | Quota fallback (#207) when Command Code quota is exhausted |
-| **Reviewer** | Reviewer environment setting: `JULIA_REVIEWER_MODELS` in `/etc/julia-factory/factory.env` | `moonshotai/Kimi-K2.7-Code` | Update `JULIA_REVIEWER_MODELS` in `/etc/julia-factory/factory.env` and restart service (`systemctl restart julia-factory-trial.service`) | Cross-maker reviewer agents (`codeReviewAgent`, `workflowReviewAgent`) and workflows (`prReviewWorkflow`, `crossMakerReviewWorkflow`) |
+| Job | Stock mechanism & setting location | How to change it | Consuming components |
+|---|---|---|---|
+| **Builder** | Factory project model: `factory_projects.default_model_id` in PostgreSQL storage, naming a registered custom provider | Update project model in Factory UI or via SQL: `UPDATE factory_projects SET default_model_id = '<registered-provider>/<model-id>' WHERE name = 'julia-next';` (no code rebuild or restart required) | Factory work sessions, planning, coding |
+| **Provider route** | Factory custom-providers store: `custom_providers` table in PostgreSQL | Update provider endpoint, API key reference, or models in Factory UI or `custom_providers` table. Available to every organisation without restarting Factory. | Factory builder execution, routing requests to provider |
+| **Cheap model** | Factory memory-model setting: `memory_settings` table (and `DEFAULT_OM_MODEL_ID` / `JULIA_CHEAP_MODEL` in `/etc/julia-factory/factory.env`) | Factory API `PUT /web/config/om/:role/model` or update `memory_settings` table / `DEFAULT_OM_MODEL_ID` in `factory.env` | Observational memory across Factory sessions, per-card retro (#187), Monday cost note rework grouping (#196), e2e steps (#197) |
+| **Fallback model** | `@mastra/code-sdk` pack fallbacks: `settings.models.packFallbacks` in `/var/lib/julia-factory/.local/share/mastracode/settings.json` (and `JULIA_FALLBACK_MODEL` in `/etc/julia-factory/factory.env`) | Update `settings.models.packFallbacks` in `settings.json` or `JULIA_FALLBACK_MODEL` in `factory.env` | Quota fallback (#207) when provider quota is exhausted |
+| **Reviewer** | Reviewer environment setting: `JULIA_REVIEWER_MODELS` in `/etc/julia-factory/factory.env` | Update `JULIA_REVIEWER_MODELS` in `/etc/julia-factory/factory.env` and restart service (`systemctl restart julia-factory-trial.service`) | Cross-maker reviewer agents (`codeReviewAgent`, `workflowReviewAgent`) and workflows (`prReviewWorkflow`, `crossMakerReviewWorkflow`) |
 
 ## Changes made
 
 1. **Deleted custom copier (`factory-model-sync.ts`):**
    Removed `ops/factory/app/src/mastra/factory-model-sync.ts`, its startup hook in `index.ts`, and manifest entries in `install.sh`. No custom code copies model IDs into Factory storage.
 2. **Reviewer reads builder directly from Factory project setting:**
-   The cross-maker reviewer check dynamically reads `default_model_id` from Factory project storage via `getFactoryBuilderModel(storage)`. `modelMaker()` strips gateway prefixes (`command-code/`, `openrouter/`, etc.) and determines the canonical maker (e.g. DeepSeek vs Moonshot/Kimi). Same-maker pairs are rejected; different-maker pairs pass regardless of route.
+   The cross-maker reviewer check dynamically reads `default_model_id` from Factory project storage via `getFactoryBuilderModel(storage)`. `modelMaker()` strips gateway prefixes (`command-code/`, `openrouter/`, etc.) and determines the canonical maker across routes. Same-maker pairs are rejected; different-maker pairs pass regardless of route.
 3. **Restored code-review agent GitHub tools and memory:**
    `codeReviewAgent` keeps all GitHub tools (`parseGitHubPRUrl`, `getPullRequest`, `getPullRequestDiff`, `getPullRequestFiles`, `getFileContent`) and observational memory, backed by verified tests.
 4. **Secret-safe validation and error handling:**
    `SettingValidationError` explicitly suppresses `cause` and formats error messages to never leak secret or setting values into messages, causes, stack traces, or logs.
-5. **Verified Kimi model ID:**
-   Added verified `moonshotai/Kimi-K2.7-Code` from Command Code's `/models` endpoint to `ops/service-dropbox/pi-models.commandcode.json`.
+5. **No model values or endpoints in repository:**
+   Code, tests, and documentation contain no live model IDs or provider endpoints. Tests use made-up identifiers. Changing an endpoint or model on the server takes effect with no PR or install.
 6. **Cross-platform tests and CI gate:**
    - Updated `ops/factory/install.test.mjs` to execute portably across Windows (Git Bash path conversion) and Linux.
    - Pinned `ops/factory/app/model-settings.test.mjs` to required Factory test suite in `.github/workflows/ci.yml`.
+
 

@@ -5,11 +5,11 @@ import { fileURLToPath } from 'node:url';
 import util from 'node:util';
 import test from 'node:test';
 
-// Initialize test environment dynamically
-process.env.JULIA_BUILDER_MODEL = 'command-code/deepseek/deepseek-v4-pro';
-process.env.JULIA_REVIEWER_MODELS = 'moonshotai/Kimi-K2.7-Code';
-process.env.JULIA_CHEAP_MODEL = 'deepseek/deepseek-v4-flash';
-process.env.JULIA_FALLBACK_MODEL = 'deepseek/deepseek-v4-pro';
+// Initialize test environment dynamically using made-up test model IDs
+process.env.JULIA_BUILDER_MODEL = 'command-code/test-maker-alpha/test-builder-model';
+process.env.JULIA_REVIEWER_MODELS = 'test-maker-beta/test-reviewer-model';
+process.env.JULIA_CHEAP_MODEL = 'test-maker-alpha/test-cheap-model';
+process.env.JULIA_FALLBACK_MODEL = 'test-maker-alpha/test-fallback-model';
 
 import { Agent } from '@mastra/core/agent';
 import {
@@ -45,64 +45,64 @@ test('no code of ours copies model choices into Factory storage; the copier and 
 });
 
 test('the maker check rejects a same-maker builder/reviewer pair, reading the builder from Factory', async () => {
-  // Read builder model from a Factory project object
+  // Read builder model from a Factory project object using made-up model IDs
   const factoryProject = {
     id: 'proj-1',
     name: 'julia-next',
-    defaultModelId: 'command-code/deepseek/deepseek-v4-pro',
+    defaultModelId: 'command-code/test-maker-alpha/test-builder-model',
   };
   const builder = await getFactoryBuilderModel(factoryProject);
-  assert.equal(builder, 'command-code/deepseek/deepseek-v4-pro');
-  assert.equal(modelMaker(builder), 'deepseek');
+  assert.equal(builder, 'command-code/test-maker-alpha/test-builder-model');
+  assert.equal(modelMaker(builder), 'test-maker-alpha');
 
-  // Different maker (DeepSeek builder + Kimi reviewer) passes
-  const passed = reviewerModels({ JULIA_REVIEWER_MODELS: 'moonshotai/Kimi-K2.7-Code' }, builder);
+  // Different maker (test-maker-alpha builder + test-maker-beta reviewer) passes
+  const passed = reviewerModels({ JULIA_REVIEWER_MODELS: 'test-maker-beta/test-reviewer-model' }, builder);
   assert.equal(passed.length, 1);
-  assert.equal(passed[0].model, 'moonshotai/Kimi-K2.7-Code');
+  assert.equal(passed[0].model, 'test-maker-beta/test-reviewer-model');
 
-  // Same maker (DeepSeek builder + DeepSeek reviewer) fails
+  // Same maker (test-maker-alpha builder + test-maker-alpha reviewer) fails
   assert.throws(
-    () => reviewerModels({ JULIA_REVIEWER_MODELS: 'deepseek/deepseek-v4-flash' }, builder),
-    /must be from a different maker than the builder \(deepseek\)/,
+    () => reviewerModels({ JULIA_REVIEWER_MODELS: 'test-maker-alpha/test-reviewer-backup' }, builder),
+    /must be from a different maker than the builder \(test-maker-alpha\)/,
   );
 
   // Same maker across routes (command-code builder + commandcode reviewer) fails
   assert.throws(
-    () => reviewerModels({ JULIA_REVIEWER_MODELS: 'commandcode/deepseek/deepseek-v4-pro' }, builder),
-    /must be from a different maker than the builder \(deepseek\)/,
+    () => reviewerModels({ JULIA_REVIEWER_MODELS: 'commandcode/test-maker-alpha/test-reviewer-backup' }, builder),
+    /must be from a different maker than the builder \(test-maker-alpha\)/,
   );
 });
 
 test('changing the builder in Factory setting updates the builder model and triggers maker check without code rebuild', async () => {
-  // First state: Factory project default model is DeepSeek
+  // First state: Factory project default model is maker alpha
   let factoryProject = {
     id: 'proj-1',
     name: 'julia-next',
-    defaultModelId: 'command-code/deepseek/deepseek-v4-pro',
+    defaultModelId: 'command-code/test-maker-alpha/test-builder-model',
   };
   let builder = await getFactoryBuilderModel(factoryProject);
-  assert.equal(modelMaker(builder), 'deepseek');
+  assert.equal(modelMaker(builder), 'test-maker-alpha');
 
-  // Kimi reviewer passes with DeepSeek builder
-  assert.doesNotThrow(() => reviewerModels({ JULIA_REVIEWER_MODELS: 'moonshotai/Kimi-K2.7-Code' }, builder));
+  // Maker-beta reviewer passes with maker-alpha builder
+  assert.doesNotThrow(() => reviewerModels({ JULIA_REVIEWER_MODELS: 'test-maker-beta/test-reviewer-model' }, builder));
 
-  // Second state: Operator updates Factory project default model to Kimi in Factory settings
+  // Second state: Operator updates Factory project default model to maker-beta in Factory settings
   factoryProject = {
     id: 'proj-1',
     name: 'julia-next',
-    defaultModelId: 'command-code/moonshotai/Kimi-K2.7-Code',
+    defaultModelId: 'command-code/test-maker-beta/test-builder-model',
   };
   builder = await getFactoryBuilderModel(factoryProject);
-  assert.equal(modelMaker(builder), 'moonshot');
+  assert.equal(modelMaker(builder), 'test-maker-beta');
 
-  // Kimi reviewer now FAILS with Kimi builder, with zero code change
+  // Maker-beta reviewer now FAILS with maker-beta builder, with zero code change
   assert.throws(
-    () => reviewerModels({ JULIA_REVIEWER_MODELS: 'moonshotai/Kimi-K2.7-Code' }, builder),
-    /must be from a different maker than the builder \(moonshot\)/,
+    () => reviewerModels({ JULIA_REVIEWER_MODELS: 'test-maker-beta/test-reviewer-model' }, builder),
+    /must be from a different maker than the builder \(test-maker-beta\)/,
   );
 
-  // DeepSeek reviewer now PASSES with Kimi builder
-  assert.doesNotThrow(() => reviewerModels({ JULIA_REVIEWER_MODELS: 'commandcode/deepseek/deepseek-v4-pro' }, builder));
+  // Maker-alpha reviewer now PASSES with maker-beta builder
+  assert.doesNotThrow(() => reviewerModels({ JULIA_REVIEWER_MODELS: 'commandcode/test-maker-alpha/test-reviewer-model' }, builder));
 });
 
 test('rejected settings never print their value, including through an error cause (tested with a fake secret)', () => {
@@ -123,7 +123,7 @@ test('rejected settings never print their value, including through an error caus
 
   // Test rejected builder model containing a secret
   try {
-    reviewerModels({ JULIA_REVIEWER_MODELS: 'moonshotai/Kimi-K2.7-Code' }, fakeGitHubSecret);
+    reviewerModels({ JULIA_REVIEWER_MODELS: 'test-maker-beta/test-reviewer-model' }, fakeGitHubSecret);
     assert.fail('should have thrown');
   } catch (err) {
     assert.ok(err instanceof Error);
@@ -143,24 +143,25 @@ test('rejected settings never print their value, including through an error caus
 });
 
 test('provider boundary: builder route through Command Code vs fallback through direct key', () => {
-  const builder = 'command-code/deepseek/deepseek-v4-pro';
-  const fallback = 'deepseek/deepseek-v4-pro';
+  const builder = 'command-code/test-maker-alpha/test-builder-model';
+  const fallback = 'test-maker-alpha/test-direct-fallback';
 
   // Builder routes to Command Code custom provider
   const builderFirstSegment = builder.split('/')[0];
   assert.equal(builderFirstSegment, 'command-code');
 
-  // Fallback routes directly to DeepSeek key
+  // Fallback routes directly to provider key
   const fallbackFirstSegment = fallback.split('/')[0];
-  assert.equal(fallbackFirstSegment, 'deepseek');
+  assert.equal(fallbackFirstSegment, 'test-maker-alpha');
 
   assert.notEqual(builderFirstSegment, fallbackFirstSegment, 'Builder and fallback must have distinct routes');
 });
 
 test('code review agent keeps its GitHub tools and its memory', async () => {
   const agent = createCodeReviewAgent({
-    JULIA_REVIEWER_MODELS: 'moonshotai/Kimi-K2.7-Code',
-    JULIA_BUILDER_MODEL: 'command-code/deepseek/deepseek-v4-pro',
+    JULIA_REVIEWER_MODELS: 'test-maker-beta/test-reviewer-model',
+    JULIA_BUILDER_MODEL: 'command-code/test-maker-alpha/test-builder-model',
+    JULIA_CHEAP_MODEL: 'test-maker-alpha/test-cheap-model',
   });
 
   // Tools restored
@@ -179,40 +180,36 @@ test('code review agent keeps its GitHub tools and its memory', async () => {
 });
 
 test('modelMaker extracts canonical maker ignoring gateway/route prefixes', () => {
-  // Direct models
-  assert.equal(modelMaker('deepseek/deepseek-v4-pro'), 'deepseek');
-  assert.equal(modelMaker('moonshotai/Kimi-K2.7-Code'), 'moonshot');
-  assert.equal(modelMaker('openai/gpt-6-sol'), 'openai');
-  assert.equal(modelMaker('anthropic/claude-sonnet-5-5'), 'anthropic');
-  assert.equal(modelMaker('google/gemini-3.7-flash'), 'google');
+  // Direct made-up test models
+  assert.equal(modelMaker('test-maker-alpha/test-model-1'), 'test-maker-alpha');
+  assert.equal(modelMaker('test-maker-beta/test-model-2'), 'test-maker-beta');
+  assert.equal(modelMaker('vendor-gamma/test-model-3'), 'vendor-gamma');
 
   // Routed through command-code custom provider
-  assert.equal(modelMaker('command-code/deepseek/deepseek-v4-pro'), 'deepseek');
-  assert.equal(modelMaker('command-code/moonshotai/Kimi-K2.7-Code'), 'moonshot');
+  assert.equal(modelMaker('command-code/test-maker-alpha/test-model-1'), 'test-maker-alpha');
+  assert.equal(modelMaker('command-code/test-maker-beta/test-model-2'), 'test-maker-beta');
 
   // Routed through commandcode gateway
-  assert.equal(modelMaker('commandcode/deepseek/deepseek-v4-pro'), 'deepseek');
-  assert.equal(modelMaker('commandcode/moonshotai/Kimi-K2.7-Code'), 'moonshot');
-  assert.equal(modelMaker('commandcode/deepseek-v4-pro'), 'deepseek');
-  assert.equal(modelMaker('commandcode/Kimi-K2.7-Code'), 'moonshot');
+  assert.equal(modelMaker('commandcode/test-maker-alpha/test-model-1'), 'test-maker-alpha');
+  assert.equal(modelMaker('commandcode/test-maker-beta/test-model-2'), 'test-maker-beta');
 
   // Other gateways
-  assert.equal(modelMaker('openrouter/deepseek/deepseek-r1'), 'deepseek');
-  assert.equal(modelMaker('openrouter/openai/gpt-4o'), 'openai');
+  assert.equal(modelMaker('openrouter/test-maker-alpha/test-model-1'), 'test-maker-alpha');
+  assert.equal(modelMaker('openrouter/test-maker-beta/test-model-2'), 'test-maker-beta');
 });
 
 test('formatModelReadback formats models cleanly and safely without exposing secrets', () => {
   const settings = {
-    builder: 'command-code/deepseek/deepseek-v4-pro',
-    reviewerModels: ['moonshotai/Kimi-K2.7-Code'],
-    cheap: 'deepseek/deepseek-v4-flash',
-    fallback: 'deepseek/deepseek-v4-pro',
+    builder: 'command-code/test-maker-alpha/test-builder-model',
+    reviewerModels: ['test-maker-beta/test-reviewer-model'],
+    cheap: 'test-maker-alpha/test-cheap-model',
+    fallback: 'test-maker-alpha/test-fallback-model',
   };
 
   const readback = formatModelReadback(settings);
   assert.equal(
     readback,
-    '[Models] Configured models - builder: command-code/deepseek/deepseek-v4-pro, reviewer: moonshotai/Kimi-K2.7-Code, cheap: deepseek/deepseek-v4-flash, fallback: deepseek/deepseek-v4-pro',
+    '[Models] Configured models - builder: command-code/test-maker-alpha/test-builder-model, reviewer: test-maker-beta/test-reviewer-model, cheap: test-maker-alpha/test-cheap-model, fallback: test-maker-alpha/test-fallback-model',
   );
 
   // Assert rejected if model identifier contains a secret pattern
@@ -222,23 +219,7 @@ test('formatModelReadback formats models cleanly and safely without exposing sec
   );
 });
 
-test('pi-models.commandcode.json contains moonshotai/Kimi-K2.7-Code', () => {
-  const filePath = new URL('../../service-dropbox/pi-models.commandcode.json', import.meta.url);
-  let content;
-  try {
-    content = readFileSync(filePath, 'utf8');
-  } catch (err) {
-    if (err.code === 'ENOENT') return;
-    throw err;
-  }
-  const parsed = JSON.parse(content);
-  const models = parsed.providers?.commandcode?.models ?? [];
-  const kimi = models.find(m => m.id === 'moonshotai/Kimi-K2.7-Code');
-  assert.ok(kimi, 'moonshotai/Kimi-K2.7-Code must be defined in pi-models.commandcode.json');
-  assert.equal(kimi.contextWindow, 256000);
-});
-
-test('no hidden model defaults exist across the entire app source tree', () => {
+test('no hidden model defaults or live model endpoints exist across the entire app source tree', () => {
   function getAllSourceFiles(dir) {
     const files = [];
     const entries = readdirSync(dir);
@@ -258,7 +239,7 @@ test('no hidden model defaults exist across the entire app source tree', () => {
   const sourceFiles = getAllSourceFiles(srcDir);
   assert.ok(sourceFiles.length > 5, 'Must find source files under src');
 
-  const forbiddenDefaultPatterns = [
+  const forbiddenPatterns = [
     /JULIA_BUILDER_MODEL\s*(?:\?\?|\|\|)\s*['"`]/,
     /JULIA_REVIEWER_MODELS\s*(?:\?\?|\|\|)\s*['"`]/,
     /JULIA_CHEAP_MODEL\s*(?:\?\?|\|\|)\s*['"`]/,
@@ -266,14 +247,18 @@ test('no hidden model defaults exist across the entire app source tree', () => {
     /DEFAULT_REVIEWER_MODELS\s*=/,
     /DEFAULT_BUILDER_MODEL\s*=/,
     /['"]openai\/gpt-6-sol['"]/,
+    /['"]deepseek\/deepseek-v4-pro['"]/,
+    /['"]deepseek\/deepseek-v4-flash['"]/,
+    /['"]moonshotai\/Kimi-K2\.7-Code['"]/,
+    /api\.commandcode\.ai/,
   ];
 
   for (const file of sourceFiles) {
     const content = readFileSync(file, 'utf8');
-    for (const pattern of forbiddenDefaultPatterns) {
+    for (const pattern of forbiddenPatterns) {
       assert.ok(
         !pattern.test(content),
-        `File ${file} contains hidden model default pattern: ${pattern}`,
+        `File ${file} contains forbidden model default or endpoint pattern: ${pattern}`,
       );
     }
   }

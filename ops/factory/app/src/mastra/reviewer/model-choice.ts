@@ -19,7 +19,6 @@ const MAKER_PATTERNS: Array<{ pattern: RegExp; maker: string }> = [
 
 export const COMMAND_CODE_PROVIDER_NAME = 'Command Code';
 export const COMMAND_CODE_PROVIDER_ID = 'command-code';
-export const COMMAND_CODE_DEFAULT_URL = 'https://api.commandcode.ai/provider/v1';
 
 export const SETTING_NAMES = {
   builder: 'JULIA_BUILDER_MODEL',
@@ -172,9 +171,10 @@ function commandCodeModelConfig(modelId: string, env: NodeJS.ProcessEnv): Resolv
   if (!apiKey) {
     throw new SettingValidationError('COMMANDCODE_API_KEY is required when a Command Code model route is configured.');
   }
+  const url = env.COMMANDCODE_BASE_URL?.trim();
   return {
     id: `commandcode/${withoutCommandCodePrefix(modelId)}` as `${string}/${string}`,
-    url: env.COMMANDCODE_BASE_URL?.trim() || COMMAND_CODE_DEFAULT_URL,
+    ...(url ? { url } : {}),
     apiKey,
   };
 }
@@ -191,7 +191,10 @@ export function resolveLanguageModel(modelId: string, env: NodeJS.ProcessEnv = p
 }
 
 export function cheapMemoryModel(env: NodeJS.ProcessEnv = process.env): ResolvedModel {
-  const cheap = env.JULIA_CHEAP_MODEL?.trim() || env.DEFAULT_OM_MODEL_ID?.trim() || 'deepseek/deepseek-v4-flash';
+  const cheap = env.JULIA_CHEAP_MODEL?.trim() || env.DEFAULT_OM_MODEL_ID?.trim();
+  if (!cheap) {
+    throw new SettingValidationError('JULIA_CHEAP_MODEL or DEFAULT_OM_MODEL_ID is required and must not be empty.');
+  }
   rejectCredentialLike('JULIA_CHEAP_MODEL', cheap, env);
   return isCommandCodeRoute(cheap) ? commandCodeModelConfig(cheap, env) : (cheap as `${string}/${string}`);
 }
