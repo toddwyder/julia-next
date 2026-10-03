@@ -1,7 +1,6 @@
 import { Agent } from '@mastra/core/agent';
-import { Memory } from '@mastra/memory';
 import { REVIEW_DEPTH_INSTRUCTIONS, SMALL_PR_MAX, MEDIUM_PR_MAX } from '../lib/review-config';
-import { reviewerModels, cheapModel, resolveLanguageModel } from '../model-choice';
+import { reviewerModels } from '../model-choice';
 import { reviewerWorkspace } from '../workspace';
 
 export const codeReviewAgent = new Agent({
@@ -94,12 +93,4 @@ Non-critical improvements — better naming, refactoring opportunities, test cov
 
 ### Positive Notes ✅
 Good patterns, clean abstractions, thoughtful decisions, or well-written tests worth acknowledging.`,
-  memory: new Memory({
-    options: {
-      observationalMemory: {
-        model: resolveLanguageModel(cheapModel()),
-        scope: 'resource',
-      },
-    },
-  }),
 });
