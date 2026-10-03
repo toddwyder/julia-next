@@ -328,13 +328,16 @@ Part of #185. Centralized the four Factory and Cross-maker model settings into a
 
 ## Changes made
 
-1. **Removed hidden code defaults in `ops/factory/app/src/mastra/reviewer/model-choice.ts`:**
-   Removed `'openai/gpt-6-sol'` and `'deepseek/deepseek-v4-pro'` defaults. Missing settings fail loudly with clear error messages (`JULIA_BUILDER_MODEL`, `JULIA_REVIEWER_MODELS`, `JULIA_CHEAP_MODEL`, `JULIA_FALLBACK_MODEL`).
+1. **Removed hidden code defaults in `ops/factory/app/src/mastra/reviewer/model-choice.ts` and loader:**
+   Removed `'openai/gpt-6-sol'` and `'deepseek/deepseek-v4-pro'` defaults and removed loader defaults in `register-typescript-esm.mjs`. Missing settings fail loudly at startup with clear error messages (`JULIA_BUILDER_MODEL`, `JULIA_REVIEWER_MODELS`, `JULIA_CHEAP_MODEL`, `JULIA_FALLBACK_MODEL`).
 2. **Fixed maker check:**
    Replaced naive slash splitting with `modelMaker()` which strips gateway prefixes (`commandcode/`, `openrouter/`, etc.) and maps model names to canonical makers. This ensures builder DeepSeek + reviewer Kimi passes even when both use `commandcode/` routing, while rejecting same-maker pairs.
 3. **Updated `ops/service-dropbox/pi-models.commandcode.json`:**
    Added verified `moonshotai/Kimi-K2.7-Code` (context length 256,000) obtained live from Command Code's `/models` endpoint on the server.
-4. **Updated `code-review-agent.ts`:**
-   Observational memory now dynamically reads `cheapModel()` instead of hardcoded `'deepseek/deepseek-v4-flash'`.
-5. **Added test coverage in `ops/factory/app/model-settings.test.mjs`:**
-   Verifies that changing settings updates all four models with no code rebuild, missing settings fail loudly, maker check judges the maker across routes, and `pi-models.commandcode.json` contains the verified Kimi model.
+4. **Command Code router support & agent wiring:**
+   `resolveLanguageModel()` in `model-choice.ts` connects model requests to Command Code's OpenAI-compatible completions API when `COMMANDCODE_API_KEY` is present. `codeReviewAgent` wires `reviewerModels()` and wraps `cheapModel()` for observational memory.
+5. **Startup validation and live readback:**
+   `validateModelSettings()` runs on Factory boot in `index.ts`, printing `[Models] Configured models - builder: ..., reviewer: ..., cheap: ..., fallback: ...` without exposing any keys.
+6. **Added comprehensive test coverage in `ops/factory/app/model-settings.test.mjs`:**
+   Verifies that changing settings updates all four models with no code rebuild, missing settings fail loudly, agent wiring consumes choices dynamically, live readback ensures secret-safety, maker check judges the maker across routes, and `pi-models.commandcode.json` contains the verified Kimi model.
+
