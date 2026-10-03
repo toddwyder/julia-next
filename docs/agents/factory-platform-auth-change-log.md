@@ -321,31 +321,28 @@ application rebuilds.
   - *Where it is set*: Factory project configuration in PostgreSQL
     (`factory_projects.default_model_id`).
   - *How to change it*: Run `node scripts/pick-builder.mjs <builder-model>`,
-    which updates the Factory project default model and pairs the reviewer helper
-    in one atomic step.
+    which updates the Factory project default model for the named project and
+    pairs the reviewer helper with rollback on failure and readback verification.
 
 - **Reviewer helper**:
   - *Where it is set*: Mastra settings file
     (`~/.local/share/mastracode/settings.json`, under
-    `models.subagentModels.default`). Applies to every new Factory session.
+    `models.subagentModels.<type>`). Applies to every new Factory session.
   - *How to change it*: Automatically managed by `pick-builder`. Given a builder
     choice, the script selects the first model on the server's ranked reviewer
-    list that is from a different company/maker than the builder, and writes it to
-    the settings file.
+    list that is from a different declared company than the builder, and writes it
+    to the reviewing helper type in the settings file (never `default`).
 
 - **Memory model**:
-  - *Where it is set*: Factory memory settings in PostgreSQL (`memory_settings`
-    table, `observer_model_id` and `reflector_model_id`), or via Factory's API
-    endpoint `PUT /web/config/om/:role/model`.
-  - *How to change it*: Update the `memory_settings` table records or call the
-    Factory memory configuration endpoint.
+  - *Where it is set*: Factory memory configuration.
+  - *How to change it*: Call Factory's supported API endpoint
+    `PUT /web/config/om/:role/model`.
 
 - **Reviewer list**:
   - *Where it is set*: Server-side configuration file outside the repository
-    (`/var/lib/julia-factory/reviewer-list.json` or `FACTORY_REVIEWER_LIST` in
-    `/etc/julia-factory/factory.env`).
+    (`/var/lib/julia-factory/reviewer-settings.json` or `FACTORY_MODEL_JOBS_CONFIG`).
   - *How to change it*: Edit the JSON array in the server-side configuration
-    file or update the environment variable to reorder, add, or remove models.
+    file to declare models and their respective companies (`{ model, company }`).
 
 - **Connections**:
   - *Where it is set*: Factory custom providers table (`custom_providers` in
@@ -355,4 +352,3 @@ application rebuilds.
   - *How to change it*: Register new custom providers via Factory's custom
     provider storage, or initiate and complete the provider device-code OAuth
     flow.
-
