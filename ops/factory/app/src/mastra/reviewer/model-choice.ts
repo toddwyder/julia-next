@@ -161,12 +161,15 @@ const SECRET_PATTERNS = [
   /(?:^|[\/\-_:])(?:secret[-_]?key|password|credential)[a-zA-Z0-9_\-=]*/i,
 ];
 
-export function formatModelReadback(settings: {
-  builder: string;
-  reviewerModels: string[];
-  cheap: string;
-  fallback: string;
-}): string {
+export function formatModelReadback(
+  settings: {
+    builder: string;
+    reviewerModels: string[];
+    cheap: string;
+    fallback: string;
+  },
+  env: NodeJS.ProcessEnv = process.env,
+): string {
   const allModels = [settings.builder, ...settings.reviewerModels, settings.cheap, settings.fallback];
   for (const m of allModels) {
     for (const pat of SECRET_PATTERNS) {
@@ -175,7 +178,22 @@ export function formatModelReadback(settings: {
       }
     }
   }
-  return `[Models] Configured models - builder: ${settings.builder}, reviewer: ${settings.reviewerModels.join(', ')}, cheap: ${settings.cheap}, fallback: ${settings.fallback}`;
+
+  // Cross-check against actual environment secrets to guarantee zero secret leakage
+  const envSecrets = Object.entries(env)
+    .filter(([k, v]) => Boolean(v?.trim()) && /(?:KEY|SECRET|TOKEN|PASSWORD|AUTH|CREDENTIAL)/i.test(k))
+    .map(([, v]) => v!.trim())
+    .filter(v => v.length >= 8);
+
+  const formatted = `[Models] Configured models - builder: ${settings.builder}, reviewer: ${settings.reviewerModels.join(', ')}, cheap: ${settings.cheap}, fallback: ${settings.fallback}`;
+
+  for (const secret of envSecrets) {
+    if (formatted.includes(secret)) {
+      throw new Error('Environment secret value detected in model readback output');
+    }
+  }
+
+  return formatted;
 }
 
 

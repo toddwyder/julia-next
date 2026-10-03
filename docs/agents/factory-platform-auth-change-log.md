@@ -320,7 +320,7 @@ Part of #185. Centralized the four Factory and Cross-maker model settings into a
   1. **Builder (`JULIA_BUILDER_MODEL`):** `deepseek/deepseek-v4-pro` through Command Code. Consumed as Factory's project builder model.
   2. **Reviewer (`JULIA_REVIEWER_MODELS`):** `moonshotai/Kimi-K2.7-Code` through Command Code. Consumed by the Cross-maker reviewer agents (`codeReviewAgent`, `workflowReviewAgent`) and workflows (`prReviewWorkflow`, `crossMakerReviewWorkflow`).
   3. **Cheap model (`JULIA_CHEAP_MODEL`):** `deepseek/deepseek-v4-flash` through Command Code. Consumed by:
-     - Observational memory in `codeReviewAgent` and Factory memory settings (`DEFAULT_OM_MODEL_ID`)
+     - Observational memory across Factory sessions (`DEFAULT_OM_MODEL_ID`)
      - Per-card retro (#187)
      - Monday cost note rework grouping and upgrade lines (#196)
      - `e2e` agent steps (#197)
