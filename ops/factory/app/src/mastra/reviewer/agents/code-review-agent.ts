@@ -98,6 +98,7 @@ Good patterns, clean abstractions, thoughtful decisions, or well-written tests w
     options: {
       observationalMemory: {
         model: resolveLanguageModel(cheapModel()),
+        scope: 'resource',
       },
     },
   }),
