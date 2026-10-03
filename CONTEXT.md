@@ -285,6 +285,37 @@ The per-card line, read from Factory's own audit records, saying whether every s
 Factory's agents or by Todd. Anything else means someone went around the product.
 _Avoid_: Compliance, audit trail (in anything Todd reads)
 
+**Model job**:
+A role a model fills in Factory: the builder, the reviewer helper, or the memory model. Cards,
+docs and code name the job, never the model. Each job's model is a setting in Factory or
+Mastra, changed with no card, code or install, because models change all the time.
+_Avoid_: Naming a specific model anywhere but the settings
+
+**Builder**:
+The model that writes a card's code. Chosen when the card starts, from how much quota each
+connection has left; one setting has the default.
+_Avoid_: Coder, worker model
+
+**Reviewer helper**:
+The model Factory's review hands the adversarial review to. Always from a different company
+than the builder.
+_Avoid_: Second reviewer, review model
+
+**Reviewer list**:
+The ranked list of models the reviewer helper is chosen from. Whenever the builder changes, the
+reviewer helper becomes the first model on the list from a different company than the builder.
+Edit the list to add, drop or reorder models; the rule stays.
+_Avoid_: Reviewer pairing table
+
+**Memory model**:
+The cheap model Factory uses to summarize long sessions.
+_Avoid_: OM model, observer model
+
+**Connection**:
+An account Factory may send model calls to: a subscription sign-in or a provider's key. Held in
+Factory's own settings, never in the repository.
+_Avoid_: Provider config, key file
+
 **Backup**:
 The folder in Todd's Google Drive that mirrors the household: a readable text file per
 recipe, menus and the shopping list as text, and one machine file for restoring. Refreshed
