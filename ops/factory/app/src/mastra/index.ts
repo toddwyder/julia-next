@@ -50,6 +50,13 @@ import {
   duckdbObservabilityConfig,
 } from './observability-store.js';
 import { observabilityRetentionWorkflow, setObservabilityPruneTarget } from './observability-retention.js';
+import { validateModelSettings, formatModelReadback } from './reviewer/model-choice';
+
+// Centralized model settings validation at startup: fails loudly on missing or invalid configuration
+// and outputs clean live readback with zero keys exposed.
+const modelSettings = validateModelSettings();
+console.log(formatModelReadback(modelSettings));
+
 
 /**
  * Parse a positive-integer env knob; anything else means "use the default".

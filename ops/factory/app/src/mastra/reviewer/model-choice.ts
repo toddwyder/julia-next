@@ -122,3 +122,19 @@ export function validateModelSettings(env: NodeJS.ProcessEnv = process.env) {
     fallback,
   };
 }
+
+export function formatModelReadback(settings: {
+  builder: string;
+  reviewerModels: string[];
+  cheap: string;
+  fallback: string;
+}): string {
+  const allModels = [settings.builder, ...settings.reviewerModels, settings.cheap, settings.fallback];
+  for (const m of allModels) {
+    if (/(key|secret|token|bearer|password)/i.test(m) || /^sk-[a-zA-Z0-9_-]+/i.test(m)) {
+      throw new Error(`Potential secret key detected in model identifier: "${m}"`);
+    }
+  }
+  return `[Models] Configured models - builder: ${settings.builder}, reviewer: ${settings.reviewerModels.join(', ')}, cheap: ${settings.cheap}, fallback: ${settings.fallback}`;
+}
+
