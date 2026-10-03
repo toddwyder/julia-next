@@ -1,5 +1,5 @@
 import { createOpenAI, type OpenAIProvider } from '@ai-sdk/openai';
-import type { LanguageModelV1 } from 'ai';
+import type { LanguageModel } from 'ai';
 
 const KNOWN_GATEWAYS = new Set(['commandcode', 'openrouter', 'litellm', 'proxy', 'custom', 'gateway']);
 
@@ -99,7 +99,7 @@ export function fallbackModel(env: NodeJS.ProcessEnv = process.env): string {
   return fallback;
 }
 
-export type ResolvedModel = `${string}/${string}` | LanguageModelV1;
+export type ResolvedModel = `${string}/${string}` | LanguageModel;
 
 export function resolveLanguageModel(modelId: string, env: NodeJS.ProcessEnv = process.env): ResolvedModel {
   const trimmed = modelId.trim();
