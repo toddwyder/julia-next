@@ -1,6 +1,14 @@
 import { Agent } from '@mastra/core/agent';
+import { Memory } from '@mastra/memory';
+import {
+  parseGitHubPRUrl,
+  getPullRequest,
+  getPullRequestDiff,
+  getPullRequestFiles,
+  getFileContent,
+} from '../tools/github';
 import { REVIEW_DEPTH_INSTRUCTIONS, SMALL_PR_MAX, MEDIUM_PR_MAX } from '../lib/review-config';
-import { reviewerModels } from '../model-choice';
+import { cheapMemoryModel, reviewerModels } from '../model-choice';
 import { reviewerWorkspace } from '../workspace';
 
 export function createCodeReviewAgent(env: NodeJS.ProcessEnv = process.env): Agent {
@@ -94,6 +102,21 @@ Non-critical improvements — better naming, refactoring opportunities, test cov
 
 ### Positive Notes ✅
 Good patterns, clean abstractions, thoughtful decisions, or well-written tests worth acknowledging.`,
+    tools: {
+      parseGitHubPRUrl,
+      getPullRequest,
+      getPullRequestDiff,
+      getPullRequestFiles,
+      getFileContent,
+    },
+    // Observational memory follows the cheap-model setting, as it did before #206 (which moved it off a hard-coded id).
+    memory: new Memory({
+      options: {
+        observationalMemory: {
+          model: cheapMemoryModel(env),
+        },
+      },
+    }),
   });
 }
 

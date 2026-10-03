@@ -1,506 +1,516 @@
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import test from 'node:test';
 
-// Initialize test environment dynamically
-process.env.JULIA_BUILDER_MODEL = 'test-builder-vendor/test-builder-model';
-process.env.JULIA_REVIEWER_MODELS = 'test-reviewer-vendor/test-reviewer-model';
-process.env.JULIA_CHEAP_MODEL = 'test-cheap-vendor/test-cheap-model';
-process.env.JULIA_FALLBACK_MODEL = 'test-fallback-vendor/test-fallback-model';
+// Keep the SDK's settings/auth lookups away from the developer's real home directory.
+const isolatedHome = mkdtempSync(join(tmpdir(), 'julia-model-settings-home-'));
+process.env.HOME = isolatedHome;
+process.env.USERPROFILE = isolatedHome;
 
-import { Agent } from '@mastra/core/agent';
+// Initialize test environment dynamically
+process.env.JULIA_BUILDER_MODEL = 'command-code/test-builder-vendor/test-builder-model';
+process.env.JULIA_REVIEWER_MODELS = 'test-reviewer-vendor/test-reviewer-model';
+process.env.JULIA_CHEAP_MODEL = 'command-code/test-cheap-vendor/test-cheap-model';
+process.env.JULIA_FALLBACK_MODEL = 'test-fallback-vendor/test-fallback-model';
+process.env.COMMANDCODE_API_KEY = 'test-commandcode-credential-0001';
+
 import {
   builderModel,
   reviewerModels,
   cheapModel,
+  cheapMemoryModel,
   fallbackModel,
   modelMaker,
   validateModelSettings,
   formatModelReadback,
   resolveLanguageModel,
+  commandCodeProviderModels,
+  COMMAND_CODE_PROVIDER_ID,
+  COMMAND_CODE_PROVIDER_NAME,
 } from './src/mastra/reviewer/model-choice.ts';
 
-const { createCodeReviewAgent, codeReviewAgent } = await import('./src/mastra/reviewer/agents/code-review-agent.ts');
-const { createWorkflowReviewAgent, workflowReviewAgent } = await import('./src/mastra/reviewer/agents/workflow-review-agent.ts');
+const { createCodeReviewAgent } = await import('./src/mastra/reviewer/agents/code-review-agent.ts');
+const { createWorkflowReviewAgent } = await import('./src/mastra/reviewer/agents/workflow-review-agent.ts');
 
-test('builder, reviewer, cheap, and fallback models are read from environment settings without code defaults', () => {
-  const env = {
-    JULIA_BUILDER_MODEL: 'deepseek/deepseek-v4-pro',
-    JULIA_REVIEWER_MODELS: 'moonshotai/Kimi-K2.7-Code',
-    JULIA_CHEAP_MODEL: 'deepseek/deepseek-v4-flash',
-    JULIA_FALLBACK_MODEL: 'deepseek/deepseek-v4-pro',
-  };
+const appDir = fileURLToPath(new URL('.', import.meta.url));
 
-  assert.equal(builderModel(env), 'deepseek/deepseek-v4-pro');
-  assert.deepEqual(reviewerModels(env), [
-    { model: 'moonshotai/Kimi-K2.7-Code', maxRetries: 1 },
-  ]);
-  assert.equal(cheapModel(env), 'deepseek/deepseek-v4-flash');
-  assert.equal(fallbackModel(env), 'deepseek/deepseek-v4-pro');
+/** The starting settings from issue #185 ("Starting settings"). */
+const STARTING = {
+  JULIA_BUILDER_MODEL: 'command-code/deepseek/deepseek-v4-pro',
+  JULIA_REVIEWER_MODELS: 'commandcode/moonshotai/Kimi-K2.7-Code',
+  JULIA_CHEAP_MODEL: 'command-code/deepseek/deepseek-v4-flash',
+  JULIA_FALLBACK_MODEL: 'deepseek/deepseek-v4-pro',
+  COMMANDCODE_API_KEY: 'fake-commandcode-credential-aaaa1111',
+};
 
-  const settings = validateModelSettings(env);
-  assert.equal(settings.builder, 'deepseek/deepseek-v4-pro');
-  assert.deepEqual(settings.reviewerModels, ['moonshotai/Kimi-K2.7-Code']);
-  assert.equal(settings.cheap, 'deepseek/deepseek-v4-flash');
-  assert.equal(settings.fallback, 'deepseek/deepseek-v4-pro');
+// ---------------------------------------------------------------------------
+// Settings: one place, no code defaults, route-distinct builder and fallback
+// ---------------------------------------------------------------------------
+
+test('the four jobs are read from environment settings with no code defaults', () => {
+  assert.equal(builderModel(STARTING), 'command-code/deepseek/deepseek-v4-pro');
+  assert.equal(cheapModel(STARTING), 'command-code/deepseek/deepseek-v4-flash');
+  assert.equal(fallbackModel(STARTING), 'deepseek/deepseek-v4-pro');
+  assert.deepEqual(validateModelSettings(STARTING), {
+    builder: 'command-code/deepseek/deepseek-v4-pro',
+    reviewerModels: ['commandcode/moonshotai/Kimi-K2.7-Code'],
+    cheap: 'command-code/deepseek/deepseek-v4-flash',
+    fallback: 'deepseek/deepseek-v4-pro',
+  });
 });
 
-test('changing only environment settings updates all four model choices with no code rebuild', () => {
-  // Simulate reading directly from server settings file (/etc/julia-factory/factory.env)
-  function parseEnvContent(raw) {
-    const parsed = {};
-    for (const line of raw.split('\n')) {
-      const idx = line.indexOf('=');
-      if (idx > 0) {
-        const k = line.slice(0, idx).trim();
-        let v = line.slice(idx + 1).trim();
-        if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
-          v = v.slice(1, -1);
-        }
-        parsed[k] = v;
-      }
-    }
-    return parsed;
+test('the builder is a Command Code custom-provider id and the fallback is an explicit direct route', () => {
+  assert.equal(COMMAND_CODE_PROVIDER_NAME, 'Command Code');
+  assert.equal(COMMAND_CODE_PROVIDER_ID, 'command-code');
+  assert.ok(builderModel(STARTING).startsWith(`${COMMAND_CODE_PROVIDER_ID}/`));
+  assert.ok(!fallbackModel(STARTING).startsWith(`${COMMAND_CODE_PROVIDER_ID}/`));
+
+  // A fallback that would be sent back to Command Code is refused, whichever spelling reaches it.
+  for (const viaCommandCode of ['command-code/deepseek/deepseek-v4-pro', 'commandcode/deepseek/deepseek-v4-pro']) {
+    assert.throws(
+      () => fallbackModel({ ...STARTING, JULIA_FALLBACK_MODEL: viaCommandCode }),
+      /JULIA_FALLBACK_MODEL must name a direct provider route, not Command Code/,
+    );
   }
-
-  const factoryEnvContent1 = `
-JULIA_BUILDER_MODEL="deepseek/deepseek-v4-pro"
-JULIA_REVIEWER_MODELS="moonshotai/Kimi-K2.7-Code"
-JULIA_CHEAP_MODEL="deepseek/deepseek-v4-flash"
-JULIA_FALLBACK_MODEL="deepseek/deepseek-v4-pro"
-`;
-  const env1 = parseEnvContent(factoryEnvContent1);
-  assert.equal(builderModel(env1), 'deepseek/deepseek-v4-pro');
-  assert.equal(reviewerModels(env1)[0].model, 'moonshotai/Kimi-K2.7-Code');
-  assert.equal(cheapModel(env1), 'deepseek/deepseek-v4-flash');
-  assert.equal(fallbackModel(env1), 'deepseek/deepseek-v4-pro');
-
-  const factoryEnvContent2 = `
-JULIA_BUILDER_MODEL="commandcode/moonshotai/Kimi-K2.7-Code"
-JULIA_REVIEWER_MODELS="commandcode/deepseek/deepseek-v4-pro,anthropic/claude-sonnet-5-5"
-JULIA_CHEAP_MODEL="google/gemini-3.7-flash"
-JULIA_FALLBACK_MODEL="openai/gpt-6-sol"
-`;
-  const env2 = parseEnvContent(factoryEnvContent2);
-  assert.equal(builderModel(env2), 'commandcode/moonshotai/Kimi-K2.7-Code');
-  assert.deepEqual(reviewerModels(env2), [
-    { model: 'commandcode/deepseek/deepseek-v4-pro', maxRetries: 1 },
-    { model: 'anthropic/claude-sonnet-5-5', maxRetries: 1 },
-  ]);
-  assert.equal(cheapModel(env2), 'google/gemini-3.7-flash');
-  assert.equal(fallbackModel(env2), 'openai/gpt-6-sol');
-
-  const settings = validateModelSettings(env2);
-  assert.equal(settings.builder, 'commandcode/moonshotai/Kimi-K2.7-Code');
-  assert.deepEqual(settings.reviewerModels, [
-    'commandcode/deepseek/deepseek-v4-pro',
-    'anthropic/claude-sonnet-5-5',
-  ]);
-  assert.equal(settings.cheap, 'google/gemini-3.7-flash');
-  assert.equal(settings.fallback, 'openai/gpt-6-sol');
+  // The fallback is a different provider route from the builder.
+  assert.throws(
+    () => validateModelSettings({ ...STARTING, JULIA_BUILDER_MODEL: 'deepseek/deepseek-v4-pro' }),
+    /JULIA_BUILDER_MODEL and JULIA_FALLBACK_MODEL must use different provider routes/,
+  );
 });
 
-test('agent wiring consumes dynamic settings for builder and reviewer models', async () => {
-  const env = {
-    JULIA_BUILDER_MODEL: 'deepseek/deepseek-v4-pro',
+test('a Command Code builder or cheap model needs the Command Code key; a direct one does not', () => {
+  const { COMMANDCODE_API_KEY: _omitted, ...withoutKey } = STARTING;
+  assert.throws(() => validateModelSettings(withoutKey), /COMMANDCODE_API_KEY is required/);
+  const direct = {
+    ...withoutKey,
+    JULIA_BUILDER_MODEL: 'anthropic/claude-sonnet-5-5',
+    JULIA_CHEAP_MODEL: 'google/gemini-3.7-flash',
     JULIA_REVIEWER_MODELS: 'moonshotai/Kimi-K2.7-Code',
-    JULIA_CHEAP_MODEL: 'deepseek/deepseek-v4-flash',
-    JULIA_FALLBACK_MODEL: 'deepseek/deepseek-v4-pro',
   };
+  assert.equal(validateModelSettings(direct).builder, 'anthropic/claude-sonnet-5-5');
+});
 
-  const agent1 = createCodeReviewAgent(env);
-  assert.equal(agent1.model[0].model, 'moonshotai/Kimi-K2.7-Code');
-  assert.equal(agent1.model[0].maxRetries, 1);
+test('the Command Code provider lists exactly the bare models the settings route through it', () => {
+  assert.deepEqual(commandCodeProviderModels(STARTING).sort(), ['deepseek/deepseek-v4-flash', 'deepseek/deepseek-v4-pro']);
+  assert.deepEqual(
+    commandCodeProviderModels({ ...STARTING, JULIA_CHEAP_MODEL: 'google/gemini-3.7-flash' }),
+    ['deepseek/deepseek-v4-pro'],
+  );
+});
 
-  const wfAgent1 = createWorkflowReviewAgent(env);
-  assert.equal(wfAgent1.model[0].model, 'moonshotai/Kimi-K2.7-Code');
-  assert.equal(wfAgent1.model[0].maxRetries, 1);
+test('missing or malformed settings fail loudly and name only the setting', () => {
+  const required = ['JULIA_BUILDER_MODEL', 'JULIA_REVIEWER_MODELS', 'JULIA_CHEAP_MODEL', 'JULIA_FALLBACK_MODEL'];
+  for (const name of required) {
+    const { [name]: _removed, ...rest } = STARTING;
+    assert.throws(() => validateModelSettings(rest), new RegExp(`${name} is required`));
+  }
+  for (const name of ['JULIA_BUILDER_MODEL', 'JULIA_CHEAP_MODEL', 'JULIA_FALLBACK_MODEL']) {
+    assert.throws(() => validateModelSettings({ ...STARTING, [name]: 'no-slash-here' }), new RegExp(`${name} must use a provider/model identifier`));
+  }
+});
 
-  // Verify changing only env changes the reviewer model across agents
+test('a rejected setting never echoes its value, including a key pasted into it', () => {
+  const fakeSecret = 'sk-fakefakefakefake0123456789zzzz';
+  const probes = [
+    ['JULIA_BUILDER_MODEL', `command-code/${fakeSecret}`],
+    ['JULIA_BUILDER_MODEL', fakeSecret],
+    ['JULIA_CHEAP_MODEL', `command-code/${fakeSecret}`],
+    ['JULIA_FALLBACK_MODEL', `deepseek/${fakeSecret}`],
+    ['JULIA_FALLBACK_MODEL', `command-code/deepseek/${fakeSecret}`],
+    ['JULIA_REVIEWER_MODELS', `moonshotai/Kimi-K2.7-Code,vendor/${fakeSecret}`],
+    ['JULIA_REVIEWER_MODELS', `deepseek/${fakeSecret}`], // same maker as the builder
+  ];
+  for (const [name, value] of probes) {
+    let caught;
+    try {
+      validateModelSettings({ ...STARTING, [name]: value });
+    } catch (error) {
+      caught = error;
+    }
+    assert.ok(caught, `${name}=${value.replace(fakeSecret, '<secret>')} must be rejected`);
+    assert.ok(!String(caught.message).includes(fakeSecret), `${name}: error message leaked the value`);
+    assert.ok(!String(caught.stack).includes(fakeSecret), `${name}: error stack leaked the value`);
+    assert.match(caught.message, new RegExp(name));
+  }
+  assert.throws(() => modelMaker(` / `), (error) => !String(error.message).includes('/ '));
+});
+
+test('formatModelReadback names the four settings and refuses to print a secret', () => {
+  const settings = validateModelSettings(STARTING);
+  assert.equal(
+    formatModelReadback(settings, STARTING),
+    '[Models] Configured models - builder: command-code/deepseek/deepseek-v4-pro, reviewer: commandcode/moonshotai/Kimi-K2.7-Code, cheap: command-code/deepseek/deepseek-v4-flash, fallback: deepseek/deepseek-v4-pro',
+  );
+  const fakeSecret = 'ghp_1234567890abcdefghijklmnopqrstuvwxyz';
+  assert.throws(
+    () => formatModelReadback({ ...settings, builder: `command-code/${fakeSecret}` }, STARTING),
+    (error) => /JULIA_BUILDER_MODEL/.test(error.message) && !error.message.includes(fakeSecret),
+  );
+  // An environment secret that ended up inside a model id is also refused without printing it.
+  assert.throws(
+    () => formatModelReadback({ ...settings, cheap: `command-code/${STARTING.COMMANDCODE_API_KEY}` }, STARTING),
+    (error) => !error.message.includes(STARTING.COMMANDCODE_API_KEY),
+  );
+});
+
+test('modelMaker looks through route prefixes so the maker check holds for any route', () => {
+  assert.equal(modelMaker('deepseek/deepseek-v4-pro'), 'deepseek');
+  assert.equal(modelMaker('moonshotai/Kimi-K2.7-Code'), 'moonshot');
+  assert.equal(modelMaker('command-code/deepseek/deepseek-v4-pro'), 'deepseek');
+  assert.equal(modelMaker('commandcode/moonshotai/Kimi-K2.7-Code'), 'moonshot');
+  assert.equal(modelMaker('openrouter/openai/gpt-4o'), 'openai');
+});
+
+test('the maker check accepts a different-maker pair and rejects a same-maker pair on any route', () => {
+  assert.equal(reviewerModels(STARTING).length, 1);
+  for (const sameMaker of [
+    'commandcode/deepseek/deepseek-v4-flash',
+    'deepseek/deepseek-v4-flash',
+    'command-code/deepseek/deepseek-v4-flash',
+    'moonshotai/Kimi-K2.7-Code,deepseek/deepseek-v4-flash',
+  ]) {
+    assert.throws(
+      () => reviewerModels({ ...STARTING, JULIA_REVIEWER_MODELS: sameMaker }),
+      /must be from a different maker than the builder/,
+    );
+  }
+});
+
+test('changing only the settings moves the builder, reviewer and cheap consumers with no code change', async () => {
   const env2 = {
-    JULIA_BUILDER_MODEL: 'commandcode/deepseek/deepseek-v4-pro',
+    JULIA_BUILDER_MODEL: 'command-code/moonshotai/Kimi-K2.7-Code',
     JULIA_REVIEWER_MODELS: 'anthropic/claude-sonnet-5-5',
     JULIA_CHEAP_MODEL: 'google/gemini-3.7-flash',
     JULIA_FALLBACK_MODEL: 'openai/gpt-6-sol',
   };
-  const agent2 = createCodeReviewAgent(env2);
-  assert.equal(agent2.model[0].model, 'anthropic/claude-sonnet-5-5');
+  // No Command Code key here: reviewer ids stay direct, so the new reviewer id is visible as set.
+  assert.equal(builderModel(env2), 'command-code/moonshotai/Kimi-K2.7-Code');
+  assert.equal(cheapModel(env2), 'google/gemini-3.7-flash');
+  assert.equal(fallbackModel(env2), 'openai/gpt-6-sol');
 
-  const wfAgent2 = createWorkflowReviewAgent(env2);
-  assert.equal(wfAgent2.model[0].model, 'anthropic/claude-sonnet-5-5');
-
-  const testBuilderAgent = new Agent({
-    id: 'test-builder-agent',
-    name: 'Test Builder',
-    model: builderModel(env),
-    instructions: 'Build cards.',
-  });
-  assert.equal(testBuilderAgent.model, 'deepseek/deepseek-v4-pro');
-
-  // Verify agents fail to initialize if builder and reviewer share the same maker
-  const sameMakerEnv = {
-    JULIA_BUILDER_MODEL: 'deepseek/deepseek-v4-pro',
-    JULIA_REVIEWER_MODELS: 'commandcode/deepseek/deepseek-v4-flash',
-    JULIA_CHEAP_MODEL: 'deepseek/deepseek-v4-flash',
-    JULIA_FALLBACK_MODEL: 'deepseek/deepseek-v4-pro',
-  };
-  assert.throws(
-    () => createCodeReviewAgent(sameMakerEnv),
-    /must be from a different maker than the builder \(deepseek\)/,
-  );
-  assert.throws(
-    () => createWorkflowReviewAgent(sameMakerEnv),
-    /must be from a different maker than the builder \(deepseek\)/,
-  );
+  const [reviewerBefore] = createCodeReviewAgent(STARTING).model;
+  const [reviewerAfter] = createCodeReviewAgent(env2).model;
+  assert.notDeepEqual(reviewerBefore.model, reviewerAfter.model);
+  assert.equal(reviewerAfter.model, 'anthropic/claude-sonnet-5-5');
+  assert.equal(createWorkflowReviewAgent(env2).model[0].model, 'anthropic/claude-sonnet-5-5');
+  assert.throws(() => createCodeReviewAgent({ ...env2, JULIA_REVIEWER_MODELS: 'moonshotai/Kimi-K2.7-Code' }), /different maker/);
 });
 
-test('missing JULIA_BUILDER_MODEL fails loudly with no hidden code default', () => {
-  const env = {
-    JULIA_REVIEWER_MODELS: 'moonshotai/Kimi-K2.7-Code',
-    JULIA_CHEAP_MODEL: 'deepseek/deepseek-v4-flash',
-    JULIA_FALLBACK_MODEL: 'deepseek/deepseek-v4-pro',
-  };
-  assert.throws(
-    () => builderModel(env),
-    /JULIA_BUILDER_MODEL is required/,
-  );
-  assert.throws(
-    () => reviewerModels(env),
-    /JULIA_BUILDER_MODEL is required/,
-  );
-  assert.throws(
-    () => validateModelSettings(env),
-    /JULIA_BUILDER_MODEL is required/,
-  );
-});
-
-test('missing JULIA_REVIEWER_MODELS fails loudly with no hidden code default', () => {
-  const env = {
-    JULIA_BUILDER_MODEL: 'deepseek/deepseek-v4-pro',
-    JULIA_CHEAP_MODEL: 'deepseek/deepseek-v4-flash',
-    JULIA_FALLBACK_MODEL: 'deepseek/deepseek-v4-pro',
-  };
-  assert.throws(
-    () => reviewerModels(env),
-    /JULIA_REVIEWER_MODELS is required/,
-  );
-  assert.throws(
-    () => validateModelSettings(env),
-    /JULIA_REVIEWER_MODELS is required/,
-  );
-});
-
-test('missing JULIA_CHEAP_MODEL fails loudly', () => {
-  const env = {
-    JULIA_BUILDER_MODEL: 'deepseek/deepseek-v4-pro',
-    JULIA_REVIEWER_MODELS: 'moonshotai/Kimi-K2.7-Code',
-    JULIA_FALLBACK_MODEL: 'deepseek/deepseek-v4-pro',
-  };
-  assert.throws(
-    () => cheapModel(env),
-    /JULIA_CHEAP_MODEL is required/,
-  );
-  assert.throws(
-    () => validateModelSettings(env),
-    /JULIA_CHEAP_MODEL is required/,
-  );
-});
-
-test('missing JULIA_FALLBACK_MODEL fails loudly', () => {
-  const env = {
-    JULIA_BUILDER_MODEL: 'deepseek/deepseek-v4-pro',
-    JULIA_REVIEWER_MODELS: 'moonshotai/Kimi-K2.7-Code',
-    JULIA_CHEAP_MODEL: 'deepseek/deepseek-v4-flash',
-  };
-  assert.throws(
-    () => fallbackModel(env),
-    /JULIA_FALLBACK_MODEL is required/,
-  );
-  assert.throws(
-    () => validateModelSettings(env),
-    /JULIA_FALLBACK_MODEL is required/,
-  );
-});
-
-test('formatModelReadback outputs live readback and ensures no secret keys are exposed', () => {
-  const settings = {
-    builder: 'deepseek/deepseek-v4-pro',
-    reviewerModels: ['moonshotai/Kimi-K2.7-Code'],
-    cheap: 'deepseek/deepseek-v4-flash',
-    fallback: 'deepseek/deepseek-v4-pro',
-  };
-
-  const readback = formatModelReadback(settings);
-  assert.equal(
-    readback,
-    '[Models] Configured models - builder: deepseek/deepseek-v4-pro, reviewer: moonshotai/Kimi-K2.7-Code, cheap: deepseek/deepseek-v4-flash, fallback: deepseek/deepseek-v4-pro',
-  );
-  // Ensure no API keys or secret patterns are leaked
-  assert.ok(!readback.includes('sk-'));
-  assert.ok(!readback.toLowerCase().includes('secret'));
-
-  // Ensure legitimate models pass without false positives
-  const legitimateSamples = [
-    'deepseek/deepseek-v4-pro',
-    'moonshotai/Kimi-K2.7-Code',
-    'anthropic/claude-3-7-sonnet',
-    'openai/gpt-4o',
-    'google/gemini-2.0-flash-thinking-exp',
-    'meta-llama/Llama-3.3-70B-Instruct',
-    'mistralai/Mistral-Large-Instruct-2407',
-  ];
-  for (const sample of legitimateSamples) {
-    const formatted = formatModelReadback({
-      ...settings,
-      builder: sample,
-    });
-    assert.ok(formatted.includes(sample));
-  }
-
-  // Test various secret key patterns in model identifiers are rejected
-  const secretSamples = [
-    'sk-ant-api03-secretkey12345/model',
-    'provider/pk-live-9876543210abcdef',
-    'ghp_1234567890abcdefghijklmnopqrstuvwxyz/model',
-    'bearer token_12345',
-    'provider/0123456789abcdef0123456789abcdef0123456789abcdef',
-    'provider/secret_key=12345',
-    'provider/password_admin',
-  ];
-
-  for (const sample of secretSamples) {
-    assert.throws(
-      () => formatModelReadback({
-        ...settings,
-        builder: sample,
-      }),
-      /Potential secret key detected/,
-      `Should reject secret sample: ${sample}`,
-    );
-  }
-});
-
-test('modelMaker extracts canonical maker ignoring gateway/route prefixes', () => {
-  // Direct models
-  assert.equal(modelMaker('deepseek/deepseek-v4-pro'), 'deepseek');
-  assert.equal(modelMaker('moonshotai/Kimi-K2.7-Code'), 'moonshot');
-  assert.equal(modelMaker('openai/gpt-6-sol'), 'openai');
-  assert.equal(modelMaker('anthropic/claude-sonnet-5-5'), 'anthropic');
-  assert.equal(modelMaker('google/gemini-3.7-flash'), 'google');
-
-  // Routed through commandcode gateway
-  assert.equal(modelMaker('commandcode/deepseek/deepseek-v4-pro'), 'deepseek');
-  assert.equal(modelMaker('commandcode/moonshotai/Kimi-K2.7-Code'), 'moonshot');
-  assert.equal(modelMaker('commandcode/deepseek-v4-pro'), 'deepseek');
-  assert.equal(modelMaker('commandcode/Kimi-K2.7-Code'), 'moonshot');
-  assert.equal(modelMaker('commandcode/claude-sonnet-5-5'), 'anthropic');
-  assert.equal(modelMaker('commandcode/gpt-6-sol'), 'openai');
-
-  // Other gateways
-  assert.equal(modelMaker('openrouter/deepseek/deepseek-r1'), 'deepseek');
-  assert.equal(modelMaker('openrouter/openai/gpt-4o'), 'openai');
-});
-
-test('maker check passes when builder and reviewer are different makers through the same route', () => {
-  const env = {
-    JULIA_BUILDER_MODEL: 'commandcode/deepseek/deepseek-v4-pro',
-    JULIA_REVIEWER_MODELS: 'commandcode/moonshotai/Kimi-K2.7-Code',
-    JULIA_CHEAP_MODEL: 'commandcode/deepseek/deepseek-v4-flash',
-    JULIA_FALLBACK_MODEL: 'deepseek/deepseek-v4-pro',
-  };
-  const result = reviewerModels(env);
-  assert.equal(result.length, 1);
-  assert.equal(result[0].model, 'commandcode/moonshotai/Kimi-K2.7-Code');
-});
-
-test('maker check rejects same-maker builder and reviewer even when routed differently or identically', () => {
-  // Both on commandcode route, same maker (deepseek)
-  const envSameRoute = {
-    JULIA_BUILDER_MODEL: 'commandcode/deepseek/deepseek-v4-pro',
-    JULIA_REVIEWER_MODELS: 'commandcode/deepseek/deepseek-v4-flash',
-  };
-  assert.throws(
-    () => reviewerModels(envSameRoute),
-    /must be from a different maker than the builder/,
-  );
-
-  // One direct, one routed, same maker (deepseek)
-  const envMixedRoute = {
-    JULIA_BUILDER_MODEL: 'deepseek/deepseek-v4-pro',
-    JULIA_REVIEWER_MODELS: 'commandcode/deepseek-v4-flash',
-  };
-  assert.throws(
-    () => reviewerModels(envMixedRoute),
-    /must be from a different maker than the builder/,
-  );
-
-  // Reviewer backup list containing a same-maker model
-  const envBackupSameMaker = {
-    JULIA_BUILDER_MODEL: 'deepseek/deepseek-v4-pro',
-    JULIA_REVIEWER_MODELS: 'moonshotai/Kimi-K2.7-Code,deepseek/deepseek-v4-flash',
-  };
-  assert.throws(
-    () => reviewerModels(envBackupSameMaker),
-    /must be from a different maker than the builder/,
-  );
-});
-
-test('no hidden model defaults exist across the entire app source tree', () => {
-  // Recursively collect all .ts and .js source files under ops/factory/app/src
-  function getAllSourceFiles(dir) {
+test('no hidden model defaults exist across the app source tree', () => {
+  function sourceFiles(dir) {
     const files = [];
-    const entries = readdirSync(dir);
-    for (const entry of entries) {
+    for (const entry of readdirSync(dir)) {
       const fullPath = join(dir, entry);
-      const stat = statSync(fullPath);
-      if (stat.isDirectory()) {
-        files.push(...getAllSourceFiles(fullPath));
-      } else if (fullPath.endsWith('.ts') || fullPath.endsWith('.js') || fullPath.endsWith('.mjs')) {
-        files.push(fullPath);
-      }
+      if (statSync(fullPath).isDirectory()) files.push(...sourceFiles(fullPath));
+      else if (/\.(ts|js|mjs)$/.test(fullPath)) files.push(fullPath);
     }
     return files;
   }
-
-  const srcDir = fileURLToPath(new URL('./src', import.meta.url));
-  const sourceFiles = getAllSourceFiles(srcDir);
-  assert.ok(sourceFiles.length > 5, 'Must find source files under src');
-
-  const forbiddenDefaultPatterns = [
-    /JULIA_BUILDER_MODEL\s*(?:\?\?|\|\|)\s*['"`]/,
-    /JULIA_REVIEWER_MODELS\s*(?:\?\?|\|\|)\s*['"`]/,
-    /JULIA_CHEAP_MODEL\s*(?:\?\?|\|\|)\s*['"`]/,
-    /JULIA_FALLBACK_MODEL\s*(?:\?\?|\|\|)\s*['"`]/,
+  const files = sourceFiles(join(appDir, 'src'));
+  assert.ok(files.length > 5, 'Must find source files under src');
+  const forbidden = [
+    /JULIA_(?:BUILDER|REVIEWER|CHEAP|FALLBACK)_MODELS?\s*(?:\?\?|\|\|)\s*['"`]/,
     /DEFAULT_REVIEWER_MODELS\s*=/,
     /DEFAULT_BUILDER_MODEL\s*=/,
     /['"]openai\/gpt-6-sol['"]/,
-    /['"]deepseek\/deepseek-v4-pro['"]/,
+    /['"]deepseek\/deepseek-v4-(?:pro|flash)['"]/,
+    /['"]deepseek\/deepseek-flash['"]/,
   ];
-
-  for (const file of sourceFiles) {
+  for (const file of [...files, join(appDir, 'register-typescript-esm.mjs'), join(appDir, 'review-route-batching.test.mjs')]) {
     const content = readFileSync(file, 'utf8');
-    for (const pattern of forbiddenDefaultPatterns) {
-      assert.ok(
-        !pattern.test(content),
-        `File ${file} contains hidden model default pattern: ${pattern}`,
-      );
-    }
+    for (const pattern of forbidden) assert.ok(!pattern.test(content), `${file} contains hidden model default: ${pattern}`);
   }
+});
 
-  // Also check register-typescript-esm.mjs and test files
-  const registerContent = readFileSync(new URL('./register-typescript-esm.mjs', import.meta.url), 'utf8');
-  assert.ok(!registerContent.includes('JULIA_BUILDER_MODEL'), 'register-typescript-esm.mjs must not set default model env vars');
-  assert.ok(!registerContent.includes('JULIA_REVIEWER_MODELS'), 'register-typescript-esm.mjs must not set default model env vars');
-  assert.ok(!registerContent.includes('JULIA_CHEAP_MODEL'), 'register-typescript-esm.mjs must not set default model env vars');
-  assert.ok(!registerContent.includes('JULIA_FALLBACK_MODEL'), 'register-typescript-esm.mjs must not set default model env vars');
+// ---------------------------------------------------------------------------
+// Provider boundary: the pinned @mastra/code-sdk decides which provider key is used
+// ---------------------------------------------------------------------------
 
-  const batchingTestContent = readFileSync(new URL('./review-route-batching.test.mjs', import.meta.url), 'utf8');
-  for (const pattern of forbiddenDefaultPatterns) {
-    assert.ok(
-      !pattern.test(batchingTestContent),
-      `review-route-batching.test.mjs contains hidden default assignment: ${pattern}`,
+test('provider boundary: the builder goes through Command Code and the fallback through the direct DeepSeek key', async () => {
+  const { setCustomProvidersSource } = await import('@mastra/code-sdk/agents/custom-provider-source');
+  const { resolveModel } = await import('@mastra/code-sdk/agents/model');
+  const { commandCodeProviderRecord } = await import('./src/mastra/factory-model-sync.ts');
+
+  const calls = [];
+  const realFetch = globalThis.fetch;
+  const savedDeepSeekKey = process.env.DEEPSEEK_API_KEY;
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url: String(url), authorization: new Headers(init?.headers).get('authorization') });
+    return new Response(
+      JSON.stringify({
+        id: 'chatcmpl-test', object: 'chat.completion', created: 0, model: 'test',
+        choices: [{ index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+      }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
     );
+  };
+  process.env.DEEPSEEK_API_KEY = 'fake-direct-deepseek-credential';
+  // The record Factory's custom-providers store would hold after startup sync.
+  const record = commandCodeProviderRecord({ ...STARTING, COMMANDCODE_BASE_URL: 'https://commandcode.test/provider/v1' });
+  setCustomProvidersSource(() => [record]);
+  const prompt = [{ role: 'user', content: [{ type: 'text', text: 'hello' }] }];
+  try {
+    await resolveModel(builderModel(STARTING)).doGenerate({ prompt });
+    await resolveModel(fallbackModel(STARTING)).doGenerate({ prompt });
+  } finally {
+    globalThis.fetch = realFetch;
+    setCustomProvidersSource(undefined);
+    if (savedDeepSeekKey === undefined) delete process.env.DEEPSEEK_API_KEY;
+    else process.env.DEEPSEEK_API_KEY = savedDeepSeekKey;
   }
+
+  assert.deepEqual(calls, [
+    { url: 'https://commandcode.test/provider/v1/chat/completions', authorization: `Bearer ${STARTING.COMMANDCODE_API_KEY}` },
+    { url: 'https://api.deepseek.com/chat/completions', authorization: 'Bearer fake-direct-deepseek-credential' },
+  ]);
+});
+
+test('the builder id without a registered Command Code provider would hit the direct key (the #215 defect)', async () => {
+  const { resolveModel } = await import('@mastra/code-sdk/agents/model');
+  const calls = [];
+  const realFetch = globalThis.fetch;
+  const saved = process.env.DEEPSEEK_API_KEY;
+  globalThis.fetch = async (url) => {
+    calls.push(String(url));
+    return new Response(JSON.stringify({ choices: [{ index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } }), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  process.env.DEEPSEEK_API_KEY = 'fake-direct-deepseek-credential';
+  try {
+    // The bare builder id #215 stored; it must never be what the builder setting becomes.
+    await resolveModel('deepseek/deepseek-v4-pro').doGenerate({ prompt: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }] });
+  } finally {
+    globalThis.fetch = realFetch;
+    if (saved === undefined) delete process.env.DEEPSEEK_API_KEY;
+    else process.env.DEEPSEEK_API_KEY = saved;
+  }
+  assert.deepEqual(calls, ['https://api.deepseek.com/chat/completions']);
+  assert.ok(builderModel(STARTING).startsWith('command-code/'));
+});
+
+test('Command Code reviewer and cheap-memory models are routed to its OpenAI-compatible endpoint', () => {
+  const env = { COMMANDCODE_API_KEY: 'fake-key-for-routing-0001', COMMANDCODE_BASE_URL: 'https://commandcode.test/provider/v1' };
+  assert.deepEqual(resolveLanguageModel('moonshotai/Kimi-K2.7-Code', env), {
+    id: 'commandcode/moonshotai/Kimi-K2.7-Code',
+    url: 'https://commandcode.test/provider/v1',
+    apiKey: 'fake-key-for-routing-0001',
+  });
+  assert.equal(resolveLanguageModel('moonshotai/Kimi-K2.7-Code', {}), 'moonshotai/Kimi-K2.7-Code');
+  assert.deepEqual(cheapMemoryModel({ ...STARTING, ...env }), {
+    id: 'commandcode/deepseek/deepseek-v4-flash',
+    url: 'https://commandcode.test/provider/v1',
+    apiKey: 'fake-key-for-routing-0001',
+  });
+  assert.equal(cheapMemoryModel({ ...STARTING, JULIA_CHEAP_MODEL: 'google/gemini-3.7-flash' }), 'google/gemini-3.7-flash');
+});
+
+// ---------------------------------------------------------------------------
+// Cheap setting reaches the assembled consumer: observational memory
+// ---------------------------------------------------------------------------
+
+function loadCheapModelEnvInFreshProcess(settings) {
+  const entry = pathToFileURL(join(appDir, 'src/mastra/cheap-model-env.ts')).href;
+  const constants = '@mastra/code-sdk/constants';
+  const script = `await import(${JSON.stringify(entry)}); const { DEFAULT_OM_MODEL_ID } = await import(${JSON.stringify(constants)}); process.stdout.write(DEFAULT_OM_MODEL_ID);`;
+  return spawnSync(
+    process.execPath,
+    ['--experimental-strip-types', '--import', './register-typescript-esm.mjs', '--input-type=module', '-e', script],
+    { cwd: appDir, env: { PATH: process.env.PATH, HOME: isolatedHome, USERPROFILE: isolatedHome, DEFAULT_OM_MODEL_ID: 'stale/server-env-value', ...settings }, encoding: 'utf8' },
+  );
+}
+
+test('observational memory reads the cheap setting, so a settings-only change reaches it', () => {
+  const first = loadCheapModelEnvInFreshProcess(STARTING);
+  assert.equal(first.status, 0, first.stderr);
+  assert.equal(first.stdout, 'command-code/deepseek/deepseek-v4-flash');
+
+  const second = loadCheapModelEnvInFreshProcess({ ...STARTING, JULIA_CHEAP_MODEL: 'google/gemini-3.7-flash' });
+  assert.equal(second.status, 0, second.stderr);
+  assert.equal(second.stdout, 'google/gemini-3.7-flash');
+
+  const { JULIA_CHEAP_MODEL: _removed, ...noCheap } = STARTING;
+  const missing = loadCheapModelEnvInFreshProcess(noCheap);
+  assert.notEqual(missing.status, 0);
+  assert.match(missing.stderr, /JULIA_CHEAP_MODEL is required/);
+});
+
+test('startup refuses to run if observational memory is not using the cheap setting', async () => {
+  const { assertObservationalMemoryUsesCheapModel } = await import('./src/mastra/cheap-model-env.ts');
+  assert.doesNotThrow(() => assertObservationalMemoryUsesCheapModel('command-code/deepseek/deepseek-v4-flash', STARTING));
+  assert.throws(
+    () => assertObservationalMemoryUsesCheapModel('deepseek/deepseek-flash', STARTING),
+    (error) => /observational memory/i.test(error.message) && /JULIA_CHEAP_MODEL/.test(error.message) && !error.message.includes('deepseek-flash'),
+  );
+  const index = readFileSync(join(appDir, 'src/mastra/index.ts'), 'utf8');
+  const firstImport = index.split('\n').find((line) => line.startsWith('import '));
+  assert.equal(firstImport, "import './cheap-model-env';", 'the cheap-model env must load before any SDK module reads DEFAULT_OM_MODEL_ID');
+});
+
+// ---------------------------------------------------------------------------
+// Reviewer keeps its capabilities
+// ---------------------------------------------------------------------------
+
+test('the code review agent keeps its GitHub tools and its memory, and memory follows the cheap setting', async () => {
+  const agent = createCodeReviewAgent({ ...STARTING, COMMANDCODE_BASE_URL: 'https://commandcode.test/provider/v1' });
+  const tools = await agent.listTools();
+  assert.deepEqual(
+    Object.keys(tools).sort(),
+    ['getFileContent', 'getPullRequest', 'getPullRequestDiff', 'getPullRequestFiles', 'parseGitHubPRUrl'],
+  );
+  const memory = await agent.getMemory();
+  assert.ok(memory, 'the code review agent must keep observational memory');
+  const observational = memory.getMergedThreadConfig({}).observationalMemory;
+  assert.deepEqual(observational.model, {
+    id: 'commandcode/deepseek/deepseek-v4-flash',
+    url: 'https://commandcode.test/provider/v1',
+    apiKey: STARTING.COMMANDCODE_API_KEY,
+  });
+
+  const changed = createCodeReviewAgent({ ...STARTING, JULIA_CHEAP_MODEL: 'google/gemini-3.7-flash' });
+  const changedMemory = await changed.getMemory();
+  assert.equal(changedMemory.getMergedThreadConfig({}).observationalMemory.model, 'google/gemini-3.7-flash');
+});
+
+// ---------------------------------------------------------------------------
+// Startup sync: scoped to unset projects, keeps explicit choices, stops startup on failure
+// ---------------------------------------------------------------------------
+
+async function newStores() {
+  const { LibSQLFactoryStorage } = await import('@mastra/libsql');
+  const { FactoryProjectsStorage } = await import('@mastra/factory/storage/domains/projects/base');
+  const { CustomProvidersStorage } = await import('@mastra/factory/storage/domains/custom-providers/base');
+  const { DEFAULT_RETENTION } = await import('@mastra/code-sdk/utils/storage-maintenance');
+  const storage = new LibSQLFactoryStorage({ id: `test-sync-${Math.random()}`, url: 'file::memory:', retention: DEFAULT_RETENTION });
+  await storage.init();
+  const projects = storage.registerDomain(new FactoryProjectsStorage());
+  const providers = storage.registerDomain(new CustomProvidersStorage());
+  await projects.ensureReady();
+  await providers.ensureReady();
+  return { storage, projects, providers };
+}
+
+function memoryLedger(initial = null) {
+  let value = initial;
+  return { read: async () => value, write: async (next) => { value = next; }, get value() { return value; } };
+}
+
+test('sync registers the Command Code provider for each organisation and sets unset projects to the builder', async () => {
+  const { syncFactoryModelSettings, commandCodeProviderRecord } = await import('./src/mastra/factory-model-sync.ts');
+  const { storage, projects, providers } = await newStores();
+  const a = await projects.create({ orgId: 'org-a', userId: 'user-a', input: { name: 'a' } });
+  const b = await projects.create({ orgId: 'org-b', userId: 'user-b', input: { name: 'b' } });
+
+  const result = await syncFactoryModelSettings(storage, STARTING, memoryLedger());
+  assert.deepEqual(result, { projectsUpdated: 2, projectsKept: 0, providersWritten: 2 });
+  assert.equal((await projects.get({ orgId: 'org-a', id: a.id })).defaultModelId, 'command-code/deepseek/deepseek-v4-pro');
+  assert.equal((await projects.get({ orgId: 'org-b', id: b.id })).defaultModelId, 'command-code/deepseek/deepseek-v4-pro');
+
+  const expected = commandCodeProviderRecord(STARTING);
+  for (const orgId of ['org-a', 'org-b']) {
+    const [row] = await providers.list({ orgId });
+    assert.equal(row.providerId, 'command-code');
+    assert.equal(row.name, 'Command Code');
+    assert.equal(row.url, expected.url);
+    assert.equal(row.apiKey, STARTING.COMMANDCODE_API_KEY);
+    assert.deepEqual([...row.models].sort(), ['deepseek/deepseek-v4-flash', 'deepseek/deepseek-v4-pro']);
+  }
+
+  // Running again changes nothing.
+  assert.deepEqual(await syncFactoryModelSettings(storage, STARTING, memoryLedger('command-code/deepseek/deepseek-v4-pro')), {
+    projectsUpdated: 0, projectsKept: 0, providersWritten: 0,
+  });
+});
+
+test('sync keeps a project that explicitly chose its own model', async () => {
+  const { syncFactoryModelSettings } = await import('./src/mastra/factory-model-sync.ts');
+  const { storage, projects } = await newStores();
+  const explicit = await projects.create({ orgId: 'org-a', userId: 'u', input: { name: 'explicit', defaultModelId: 'anthropic/claude-sonnet-5-5' } });
+  const unset = await projects.create({ orgId: 'org-a', userId: 'u', input: { name: 'unset' } });
+
+  const result = await syncFactoryModelSettings(storage, STARTING, memoryLedger());
+  assert.equal(result.projectsUpdated, 1);
+  assert.equal(result.projectsKept, 1);
+  assert.equal((await projects.get({ orgId: 'org-a', id: explicit.id })).defaultModelId, 'anthropic/claude-sonnet-5-5');
+  assert.equal((await projects.get({ orgId: 'org-a', id: unset.id })).defaultModelId, 'command-code/deepseek/deepseek-v4-pro');
+
+  // Still kept after the builder setting changes: only values the sync itself wrote are replaced.
+  const changed = { ...STARTING, JULIA_BUILDER_MODEL: 'command-code/moonshotai/Kimi-K2.7-Code', JULIA_REVIEWER_MODELS: 'openai/gpt-6-sol' };
+  const ledger = memoryLedger('command-code/deepseek/deepseek-v4-pro');
+  const second = await syncFactoryModelSettings(storage, changed, ledger);
+  assert.equal(second.projectsUpdated, 1);
+  assert.equal((await projects.get({ orgId: 'org-a', id: explicit.id })).defaultModelId, 'anthropic/claude-sonnet-5-5');
+  assert.equal((await projects.get({ orgId: 'org-a', id: unset.id })).defaultModelId, 'command-code/moonshotai/Kimi-K2.7-Code');
+  assert.equal(ledger.value, 'command-code/moonshotai/Kimi-K2.7-Code');
+});
+
+test('sync repairs the bare id the earlier release wrote, which would have used the direct key', async () => {
+  const { syncFactoryModelSettings } = await import('./src/mastra/factory-model-sync.ts');
+  const { storage, projects } = await newStores();
+  const legacy = await projects.create({ orgId: 'org-a', userId: 'u', input: { name: 'legacy', defaultModelId: 'deepseek/deepseek-v4-pro' } });
+  const result = await syncFactoryModelSettings(storage, STARTING, memoryLedger());
+  assert.equal(result.projectsUpdated, 1);
+  assert.equal((await projects.get({ orgId: 'org-a', id: legacy.id })).defaultModelId, 'command-code/deepseek/deepseek-v4-pro');
+});
+
+test('a sync failure stops startup, is logged with its step, and logs no key', async () => {
+  const { runStartupModelSync } = await import('./src/mastra/factory-model-sync.ts');
+  const { storage, projects } = await newStores();
+  await projects.create({ orgId: 'org-a', userId: 'u', input: { name: 'a' } });
+  projects.listAll = async () => { throw new Error(`database refused ${STARTING.COMMANDCODE_API_KEY}`); };
+
+  const lines = [];
+  const log = { info: (line) => lines.push(['info', line]), error: (line) => lines.push(['error', line]) };
+  await assert.rejects(
+    runStartupModelSync(storage, STARTING, memoryLedger(), log),
+    (error) => /Model settings sync failed at step "list projects"/.test(error.message) && !error.message.includes(STARTING.COMMANDCODE_API_KEY),
+  );
+  const logged = JSON.stringify(lines);
+  assert.match(logged, /list projects/);
+  assert.ok(!logged.includes(STARTING.COMMANDCODE_API_KEY), 'the failure log must not contain the key');
+
+  // Missing storage domains fail loudly rather than being created without encryption.
+  const bare = { hasDomain: () => false, getDomain: () => { throw new Error('missing'); } };
+  await assert.rejects(runStartupModelSync(bare, STARTING, memoryLedger(), log), /Model settings sync failed at step "open stores"/);
+
+  // Bad settings stop startup before any store is touched.
+  const { JULIA_FALLBACK_MODEL: _removed, ...incomplete } = STARTING;
+  await assert.rejects(runStartupModelSync(storage, incomplete, memoryLedger(), log), /JULIA_FALLBACK_MODEL is required/);
+});
+
+test('the entry point runs the sync before Factory starts work and does not swallow its failure', () => {
+  const index = readFileSync(join(appDir, 'src/mastra/index.ts'), 'utf8');
+  const syncAt = index.indexOf('await runStartupModelSync(');
+  const finalizeAt = index.indexOf('await factory.finalize()');
+  assert.ok(syncAt > 0 && finalizeAt > syncAt, 'sync must complete before factory.finalize() starts workers');
+  const around = index.slice(Math.max(0, syncAt - 80), syncAt + 160);
+  assert.ok(!/\btry\b|\.catch\(/.test(around), 'the startup sync must not be wrapped in a handler that continues');
+});
+
+test('the file ledger remembers the last synced builder across restarts', async () => {
+  const { createFileLedger } = await import('./src/mastra/factory-model-sync.ts');
+  const path = join(mkdtempSync(join(tmpdir(), 'julia-ledger-')), 'ledger.json');
+  const ledger = createFileLedger(path);
+  assert.equal(await ledger.read(), null);
+  await ledger.write('command-code/deepseek/deepseek-v4-pro');
+  assert.equal(await createFileLedger(path).read(), 'command-code/deepseek/deepseek-v4-pro');
+  writeFileSync(path, '{not json');
+  await assert.rejects(createFileLedger(path).read(), /ledger/i);
 });
 
 test('pi-models.commandcode.json contains moonshotai/Kimi-K2.7-Code', () => {
-  const filePath = new URL('../../service-dropbox/pi-models.commandcode.json', import.meta.url);
   let content;
   try {
-    content = readFileSync(filePath, 'utf8');
-  } catch (err) {
-    if (err.code === 'ENOENT') {
-      // Running inside standalone installed app directory where service-dropbox is not deployed
-      return;
-    }
-    throw err;
+    content = readFileSync(new URL('../../service-dropbox/pi-models.commandcode.json', import.meta.url), 'utf8');
+  } catch (error) {
+    if (error.code === 'ENOENT') return; // standalone installed app directory
+    throw error;
   }
-  const parsed = JSON.parse(content);
-  const models = parsed.providers?.commandcode?.models ?? [];
-  const kimi = models.find(m => m.id === 'moonshotai/Kimi-K2.7-Code');
+  const kimi = (JSON.parse(content).providers?.commandcode?.models ?? []).find((model) => model.id === 'moonshotai/Kimi-K2.7-Code');
   assert.ok(kimi, 'moonshotai/Kimi-K2.7-Code must be defined in pi-models.commandcode.json');
   assert.equal(kimi.contextWindow, 256000);
 });
-
-test('resolveLanguageModel routes via Command Code OpenAI-compatible gateway when key is present', () => {
-  const envWithKey = {
-    COMMANDCODE_API_KEY: 'test-cc-key',
-    COMMANDCODE_BASE_URL: 'https://api.commandcode.ai/provider/v1',
-  };
-  const model = resolveLanguageModel('moonshotai/Kimi-K2.7-Code', envWithKey);
-  assert.equal(typeof model, 'object');
-  assert.equal(model.id, 'commandcode/moonshotai/Kimi-K2.7-Code');
-
-  const routedModel = resolveLanguageModel('commandcode/moonshotai/Kimi-K2.7-Code', envWithKey);
-  assert.equal(typeof routedModel, 'object');
-  assert.equal(routedModel.id, 'commandcode/moonshotai/Kimi-K2.7-Code');
-
-  const plainModel = resolveLanguageModel('moonshotai/Kimi-K2.7-Code', {});
-  assert.equal(plainModel, 'moonshotai/Kimi-K2.7-Code');
-});
-
-test('Factory startup and index entry point consumes model settings dynamically', () => {
-  const customEnv = {
-    JULIA_BUILDER_MODEL: 'commandcode/deepseek/deepseek-v4-pro',
-    JULIA_REVIEWER_MODELS: 'commandcode/moonshotai/Kimi-K2.7-Code',
-    JULIA_CHEAP_MODEL: 'commandcode/deepseek/deepseek-v4-flash',
-    JULIA_FALLBACK_MODEL: 'deepseek/deepseek-v4-pro',
-  };
-
-  // Verifies validateModelSettings validates all 4 settings and builderModel returns project model choice
-  const validated = validateModelSettings(customEnv);
-  assert.equal(validated.builder, 'commandcode/deepseek/deepseek-v4-pro');
-  assert.deepEqual(validated.reviewerModels, ['commandcode/moonshotai/Kimi-K2.7-Code']);
-  assert.equal(validated.cheap, 'commandcode/deepseek/deepseek-v4-flash');
-  assert.equal(validated.fallback, 'deepseek/deepseek-v4-pro');
-
-  const readback = formatModelReadback(validated);
-  assert.ok(readback.includes('builder: commandcode/deepseek/deepseek-v4-pro'));
-  assert.ok(readback.includes('reviewer: commandcode/moonshotai/Kimi-K2.7-Code'));
-});
-
-test('syncFactoryProjectModel synchronizes builder model to Factory project storage without code rebuild', async () => {
-  const { syncFactoryProjectModel } = await import('./src/mastra/factory-model-sync.ts');
-  const { LibSQLFactoryStorage } = await import('@mastra/libsql');
-  const { FactoryProjectsStorage } = await import('@mastra/factory/storage/domains/projects/base');
-  const { DEFAULT_RETENTION } = await import('@mastra/code-sdk/utils/storage-maintenance');
-
-  const storage = new LibSQLFactoryStorage({
-    id: 'test-sync-storage',
-    url: 'file::memory:',
-    retention: DEFAULT_RETENTION,
-  });
-  await storage.init();
-  const projects = storage.registerDomain(new FactoryProjectsStorage());
-  await projects.ensureReady();
-
-  const p1 = await projects.create({ orgId: 'org1', userId: 'user1', input: { name: 'proj1' } });
-  assert.equal(p1.defaultModelId, null);
-
-  // Sync initial builder model
-  const env1 = {
-    JULIA_BUILDER_MODEL: 'deepseek/deepseek-v4-pro',
-    JULIA_REVIEWER_MODELS: 'moonshotai/Kimi-K2.7-Code',
-    JULIA_CHEAP_MODEL: 'deepseek/deepseek-v4-flash',
-    JULIA_FALLBACK_MODEL: 'deepseek/deepseek-v4-pro',
-  };
-  const count1 = await syncFactoryProjectModel(storage, env1);
-  assert.equal(count1, 1);
-  const updated1 = await projects.get({ orgId: 'org1', id: p1.id });
-  assert.equal(updated1.defaultModelId, 'deepseek/deepseek-v4-pro');
-
-  // Change only settings and sync again with NO code build
-  const env2 = {
-    JULIA_BUILDER_MODEL: 'commandcode/deepseek/deepseek-v4-pro',
-    JULIA_REVIEWER_MODELS: 'moonshotai/Kimi-K2.7-Code',
-    JULIA_CHEAP_MODEL: 'deepseek/deepseek-v4-flash',
-    JULIA_FALLBACK_MODEL: 'deepseek/deepseek-v4-pro',
-  };
-  const count2 = await syncFactoryProjectModel(storage, env2);
-  assert.equal(count2, 1);
-  const updated2 = await projects.get({ orgId: 'org1', id: p1.id });
-  assert.equal(updated2.defaultModelId, 'commandcode/deepseek/deepseek-v4-pro');
-});
-

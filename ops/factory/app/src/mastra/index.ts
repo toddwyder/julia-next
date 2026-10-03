@@ -17,6 +17,9 @@
  * the server.
  */
 
+// Must stay the first import: it applies JULIA_CHEAP_MODEL to the SDK's observational-memory default
+// before any SDK module reads DEFAULT_OM_MODEL_ID (see cheap-model-env.ts).
+import './cheap-model-env';
 import { Mastra } from '@mastra/core/mastra';
 import { Observability, MastraStorageExporter, SensitiveDataFilter } from '@mastra/observability';
 import { LibSQLFactoryStorage } from '@mastra/libsql';
@@ -27,6 +30,7 @@ import { E2BSandbox, createRepoTemplate as createE2BRepoTemplate } from '@mastra
 import { RedisStreamsPubSub } from '@mastra/redis-streams';
 import { getDatabasePath } from '@mastra/code-sdk/utils/project';
 import { DEFAULT_RETENTION } from '@mastra/code-sdk/utils/storage-maintenance';
+import { DEFAULT_OM_MODEL_ID } from '@mastra/code-sdk/constants';
 import { MastraAuthWorkos } from '@mastra/auth-workos';
 import { createFactorySecretEncryption, MastraFactory } from '@mastra/factory';
 import { GithubIntegration } from '@mastra/factory/integrations/github/integration';
@@ -51,12 +55,15 @@ import {
 } from './observability-store.js';
 import { observabilityRetentionWorkflow, setObservabilityPruneTarget } from './observability-retention.js';
 import { validateModelSettings, formatModelReadback } from './reviewer/model-choice';
-import { syncFactoryProjectModel } from './factory-model-sync';
+import { createFileLedger, runStartupModelSync } from './factory-model-sync';
+import { assertObservationalMemoryUsesCheapModel } from './cheap-model-env';
 
 // Centralized model settings validation at startup: fails loudly on missing or invalid configuration
 // and outputs clean live readback with zero keys exposed.
 const modelSettings = validateModelSettings();
 console.log(formatModelReadback(modelSettings));
+// Observational memory is the cheap model's consumer today; fail startup if the SDK did not pick it up.
+assertObservationalMemoryUsesCheapModel(DEFAULT_OM_MODEL_ID);
 
 
 /**
@@ -470,6 +477,10 @@ export const factory = new MastraFactory({
 
 const preparedArgs = await factory.prepare();
 
+// Model settings reach Factory's own stores (Command Code custom provider, project model) BEFORE
+// finalize() starts workers, so no run can start on a stale model. A failure throws and stops startup.
+await runStartupModelSync(storage, process.env, createFileLedger(`${getDatabasePath()}.julia-model-sync.json`));
+
 // Bounded observability storage (JUL-140). Factory's own default storage keeps
 // every non-observability domain; the DuckDB observability domain is layered on
 // top with supported retention, exactly as Mastra documents:
@@ -532,10 +543,3 @@ export const mastra = new Mastra({
 // instance's storage) and start its workers. Runs at module load via top-level
 // await, so the deployer imports a fully-booted instance.
 await factory.finalize();
-
-// Synchronize centralized builder model to Factory projects storage
-try {
-  await syncFactoryProjectModel(storage);
-} catch (error) {
-  console.warn('[Models] Failed to sync factory project default model:', error);
-}
