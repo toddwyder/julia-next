@@ -1,14 +1,6 @@
 import { Agent } from '@mastra/core/agent';
-import { Memory } from '@mastra/memory';
-import {
-  parseGitHubPRUrl,
-  getPullRequest,
-  getPullRequestDiff,
-  getPullRequestFiles,
-  getFileContent,
-} from '../tools/github';
 import { REVIEW_DEPTH_INSTRUCTIONS, SMALL_PR_MAX, MEDIUM_PR_MAX } from '../lib/review-config';
-import { reviewerModels, cheapModel, resolveLanguageModel } from '../model-choice';
+import { reviewerModels } from '../model-choice';
 import { reviewerWorkspace } from '../workspace';
 
 export function createCodeReviewAgent(env: NodeJS.ProcessEnv = process.env): Agent {
@@ -17,21 +9,6 @@ export function createCodeReviewAgent(env: NodeJS.ProcessEnv = process.env): Age
     name: 'GitHub PR Code Reviewer',
     model: reviewerModels(env),
     workspace: reviewerWorkspace,
-    tools: {
-      parseGitHubPRUrl,
-      getPullRequest,
-      getPullRequestDiff,
-      getPullRequestFiles,
-      getFileContent,
-    },
-    memory: new Memory({
-      options: {
-        observationalMemory: {
-          model: resolveLanguageModel(cheapModel(env), env),
-          scope: 'resource',
-        },
-      },
-    }),
     instructions: `You are an expert code reviewer specializing in thorough, constructive pull request reviews. Your goal is to help developers ship better code by providing actionable, well-reasoned feedback.
 
 ## Core Behavior

@@ -101,7 +101,7 @@ JULIA_FALLBACK_MODEL="openai/gpt-6-sol"
   assert.equal(settings.fallback, 'openai/gpt-6-sol');
 });
 
-test('agent wiring consumes dynamic settings for builder, reviewer, and memory models', async () => {
+test('agent wiring consumes dynamic settings for builder and reviewer models', async () => {
   const env = {
     JULIA_BUILDER_MODEL: 'deepseek/deepseek-v4-pro',
     JULIA_REVIEWER_MODELS: 'moonshotai/Kimi-K2.7-Code',
@@ -112,19 +112,8 @@ test('agent wiring consumes dynamic settings for builder, reviewer, and memory m
   const agent1 = createCodeReviewAgent(env);
   assert.equal(agent1.model[0].model, 'moonshotai/Kimi-K2.7-Code');
   assert.equal(agent1.model[0].maxRetries, 1);
-  const tools1 = await agent1.listTools();
-  assert.ok(tools1?.parseGitHubPRUrl, 'Agent must have parseGitHubPRUrl tool');
-  assert.ok(tools1?.getPullRequest, 'Agent must have getPullRequest tool');
-  assert.ok(tools1?.getPullRequestDiff, 'Agent must have getPullRequestDiff tool');
-  assert.ok(tools1?.getPullRequestFiles, 'Agent must have getPullRequestFiles tool');
-  assert.ok(tools1?.getFileContent, 'Agent must have getFileContent tool');
 
-  const memory1 = await agent1.getMemory();
-  assert.ok(memory1, 'Agent must have Memory configured');
-  assert.equal(memory1.threadConfig?.observationalMemory?.model, 'deepseek/deepseek-v4-flash');
-  assert.equal(memory1.threadConfig?.observationalMemory?.scope, 'resource');
-
-  // Verify changing only env changes the reviewer and observational memory model
+  // Verify changing only env changes the reviewer model
   const env2 = {
     JULIA_BUILDER_MODEL: 'commandcode/deepseek/deepseek-v4-pro',
     JULIA_REVIEWER_MODELS: 'anthropic/claude-sonnet-5-5',
@@ -133,8 +122,6 @@ test('agent wiring consumes dynamic settings for builder, reviewer, and memory m
   };
   const agent2 = createCodeReviewAgent(env2);
   assert.equal(agent2.model[0].model, 'anthropic/claude-sonnet-5-5');
-  const memory2 = await agent2.getMemory();
-  assert.equal(memory2.threadConfig?.observationalMemory?.model, 'google/gemini-3.7-flash');
 
   const testBuilderAgent = new Agent({
     id: 'test-builder-agent',
