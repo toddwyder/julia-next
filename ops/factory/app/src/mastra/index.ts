@@ -50,10 +50,9 @@ import {
   duckdbObservabilityConfig,
 } from './observability-store.js';
 import { observabilityRetentionWorkflow, setObservabilityPruneTarget } from './observability-retention.js';
-import { validateModelSettings, formatModelReadback } from './reviewer/model-choice';
-import { syncFactoryProjectModel } from './factory-model-sync';
+import { validateModelSettings, formatModelReadback, getFactoryBuilderModel, SettingValidationError } from './reviewer/model-choice';
 
-// Centralized model settings validation at startup: fails loudly on missing or invalid configuration
+// Model settings validation at startup: fails loudly on missing or invalid configuration
 // and outputs clean live readback with zero keys exposed.
 const modelSettings = validateModelSettings();
 console.log(formatModelReadback(modelSettings));
@@ -533,9 +532,15 @@ export const mastra = new Mastra({
 // await, so the deployer imports a fully-booted instance.
 await factory.finalize();
 
-// Synchronize centralized builder model to Factory projects storage
+// Validate reviewer model against Factory's stored project builder model
 try {
-  await syncFactoryProjectModel(storage);
+  const factoryBuilder = await getFactoryBuilderModel(storage);
+  if (factoryBuilder) {
+    validateModelSettings(process.env, { builderModel: factoryBuilder });
+  }
 } catch (error) {
-  console.warn('[Models] Failed to sync factory project default model:', error);
+  if (error instanceof SettingValidationError) {
+    throw error;
+  }
+  console.warn('[Models] Factory project model lookup notice:', error instanceof Error ? error.message : error);
 }
