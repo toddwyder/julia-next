@@ -1,7 +1,7 @@
-import { createOpenAI } from '@ai-sdk/openai';
+import { createOpenAI, type OpenAIProvider } from '@ai-sdk/openai';
+import type { LanguageModelV1 } from 'ai';
 
 const KNOWN_GATEWAYS = new Set(['commandcode', 'openrouter', 'litellm', 'proxy', 'custom', 'gateway']);
-
 
 const MAKER_PATTERNS: Array<{ pattern: RegExp; maker: string }> = [
   { pattern: /^(deepseek)/i, maker: 'deepseek' },
@@ -18,6 +18,17 @@ const MAKER_PATTERNS: Array<{ pattern: RegExp; maker: string }> = [
   { pattern: /^(mistral|codestral|pixtral)/i, maker: 'mistral' },
   { pattern: /^(cohere|command-r)/i, maker: 'cohere' },
 ];
+
+let cachedProvider: { baseURL: string; apiKey: string; provider: OpenAIProvider } | null = null;
+
+function getCachedCommandCodeProvider(baseURL: string, apiKey: string): OpenAIProvider {
+  if (cachedProvider && cachedProvider.baseURL === baseURL && cachedProvider.apiKey === apiKey) {
+    return cachedProvider.provider;
+  }
+  const provider = createOpenAI({ baseURL, apiKey });
+  cachedProvider = { baseURL, apiKey, provider };
+  return provider;
+}
 
 /**
  * Extract the canonical AI maker / model family from a model identifier,
@@ -88,23 +99,23 @@ export function fallbackModel(env: NodeJS.ProcessEnv = process.env): string {
   return fallback;
 }
 
-export type ResolvedModel = `${string}/${string}` | any;
+export type ResolvedModel = `${string}/${string}` | LanguageModelV1;
 
 export function resolveLanguageModel(modelId: string, env: NodeJS.ProcessEnv = process.env): ResolvedModel {
+  const trimmed = modelId.trim();
+  if (!trimmed.includes('/')) {
+    throw new Error(`Model identifier must use a provider/model format: "${modelId}"`);
+  }
   if (env.COMMANDCODE_API_KEY?.trim() && !env.MASTRA_DISABLE_COMMANDCODE_ROUTER) {
     const baseURL = env.COMMANDCODE_BASE_URL?.trim() || 'https://api.commandcode.ai/provider/v1';
-    const openai = createOpenAI({
-      baseURL,
-      apiKey: env.COMMANDCODE_API_KEY.trim(),
-    });
-    const targetModel = modelId.replace(/^commandcode\//i, '');
+    const openai = getCachedCommandCodeProvider(baseURL, env.COMMANDCODE_API_KEY.trim());
+    const targetModel = trimmed.replace(/^(?:commandcode|openrouter|proxy|gateway)\//i, '');
     return openai.chat(targetModel);
   }
-  return modelId as `${string}/${string}`;
+  return trimmed as `${string}/${string}`;
 }
 
 export function reviewerModels(env: NodeJS.ProcessEnv = process.env): Array<{ model: ResolvedModel; maxRetries: number }> {
-
   const builder = builderModel(env);
   const builderMaker = modelMaker(builder);
   const rawReviewers = env.JULIA_REVIEWER_MODELS?.trim();
@@ -149,6 +160,12 @@ export function validateModelSettings(env: NodeJS.ProcessEnv = process.env) {
   };
 }
 
+const SECRET_PATTERNS = [
+  /(key|secret|token|bearer|password|credential|auth)/i,
+  /(?:sk|pk|ghp|gho|ghu|ghs|ghr|glpat|xox[baprs]|cf[_-])[a-zA-Z0-9_\-=]+/i,
+  /[a-f0-9]{32,}/i,
+];
+
 export function formatModelReadback(settings: {
   builder: string;
   reviewerModels: string[];
@@ -157,8 +174,10 @@ export function formatModelReadback(settings: {
 }): string {
   const allModels = [settings.builder, ...settings.reviewerModels, settings.cheap, settings.fallback];
   for (const m of allModels) {
-    if (/(key|secret|token|bearer|password)/i.test(m) || /^sk-[a-zA-Z0-9_-]+/i.test(m)) {
-      throw new Error(`Potential secret key detected in model identifier: "${m}"`);
+    for (const pat of SECRET_PATTERNS) {
+      if (pat.test(m)) {
+        throw new Error(`Potential secret key detected in model identifier: "${m}"`);
+      }
     }
   }
   return `[Models] Configured models - builder: ${settings.builder}, reviewer: ${settings.reviewerModels.join(', ')}, cheap: ${settings.cheap}, fallback: ${settings.fallback}`;

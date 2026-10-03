@@ -1,9 +1,7 @@
-// model-settings.test.mjs -- verifies centralized model settings for builder,
-// reviewer, cheap, and fallback jobs, without hidden code defaults, and
-// verifies that maker checks judge the maker rather than the route.
-
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 import { Agent } from '@mastra/core/agent';
@@ -17,7 +15,6 @@ import {
   formatModelReadback,
   resolveLanguageModel,
 } from './src/mastra/reviewer/model-choice.ts';
-
 
 test('builder, reviewer, cheap, and fallback models are read from environment settings without code defaults', () => {
   const env = {
@@ -42,23 +39,42 @@ test('builder, reviewer, cheap, and fallback models are read from environment se
 });
 
 test('changing only environment settings updates all four model choices with no code rebuild', () => {
-  const env1 = {
-    JULIA_BUILDER_MODEL: 'deepseek/deepseek-v4-pro',
-    JULIA_REVIEWER_MODELS: 'moonshotai/Kimi-K2.7-Code',
-    JULIA_CHEAP_MODEL: 'deepseek/deepseek-v4-flash',
-    JULIA_FALLBACK_MODEL: 'deepseek/deepseek-v4-pro',
-  };
+  // Simulate reading directly from server settings file (/etc/julia-factory/factory.env)
+  function parseEnvContent(raw) {
+    const parsed = {};
+    for (const line of raw.split('\n')) {
+      const idx = line.indexOf('=');
+      if (idx > 0) {
+        const k = line.slice(0, idx).trim();
+        let v = line.slice(idx + 1).trim();
+        if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+          v = v.slice(1, -1);
+        }
+        parsed[k] = v;
+      }
+    }
+    return parsed;
+  }
+
+  const factoryEnvContent1 = `
+JULIA_BUILDER_MODEL="deepseek/deepseek-v4-pro"
+JULIA_REVIEWER_MODELS="moonshotai/Kimi-K2.7-Code"
+JULIA_CHEAP_MODEL="deepseek/deepseek-v4-flash"
+JULIA_FALLBACK_MODEL="deepseek/deepseek-v4-pro"
+`;
+  const env1 = parseEnvContent(factoryEnvContent1);
   assert.equal(builderModel(env1), 'deepseek/deepseek-v4-pro');
   assert.equal(reviewerModels(env1)[0].model, 'moonshotai/Kimi-K2.7-Code');
   assert.equal(cheapModel(env1), 'deepseek/deepseek-v4-flash');
   assert.equal(fallbackModel(env1), 'deepseek/deepseek-v4-pro');
 
-  const env2 = {
-    JULIA_BUILDER_MODEL: 'commandcode/moonshotai/Kimi-K2.7-Code',
-    JULIA_REVIEWER_MODELS: 'commandcode/deepseek/deepseek-v4-pro,anthropic/claude-sonnet-5-5',
-    JULIA_CHEAP_MODEL: 'google/gemini-3.7-flash',
-    JULIA_FALLBACK_MODEL: 'openai/gpt-6-sol',
-  };
+  const factoryEnvContent2 = `
+JULIA_BUILDER_MODEL="commandcode/moonshotai/Kimi-K2.7-Code"
+JULIA_REVIEWER_MODELS="commandcode/deepseek/deepseek-v4-pro,anthropic/claude-sonnet-5-5"
+JULIA_CHEAP_MODEL="google/gemini-3.7-flash"
+JULIA_FALLBACK_MODEL="openai/gpt-6-sol"
+`;
+  const env2 = parseEnvContent(factoryEnvContent2);
   assert.equal(builderModel(env2), 'commandcode/moonshotai/Kimi-K2.7-Code');
   assert.deepEqual(reviewerModels(env2), [
     { model: 'commandcode/deepseek/deepseek-v4-pro', maxRetries: 1 },
@@ -85,7 +101,6 @@ test('agent wiring consumes dynamic settings for builder, reviewer, and memory m
     JULIA_FALLBACK_MODEL: 'deepseek/deepseek-v4-pro',
   };
 
-  // Instantiate agent wiring using the resolved model choices
   const testReviewerAgent = new Agent({
     id: 'test-reviewer-agent',
     name: 'Test Reviewer',
@@ -190,14 +205,27 @@ test('formatModelReadback outputs live readback and ensures no secret keys are e
   assert.ok(!readback.includes('sk-'));
   assert.ok(!readback.toLowerCase().includes('secret'));
 
-  // Test that secret keys in model identifiers are rejected
-  assert.throws(
-    () => formatModelReadback({
-      ...settings,
-      builder: 'sk-ant-api03-secretkey12345/model',
-    }),
-    /Potential secret key detected/,
-  );
+  // Test various secret key patterns in model identifiers are rejected
+  const secretSamples = [
+    'sk-ant-api03-secretkey12345/model',
+    'provider/pk-live-9876543210abcdef',
+    'ghp_1234567890abcdefghijklmnopqrstuvwxyz/model',
+    'provider/bearer_token_12345',
+    'provider/0123456789abcdef0123456789abcdef',
+    'provider/my-secret-key',
+    'provider/auth-credential-abc',
+  ];
+
+  for (const sample of secretSamples) {
+    assert.throws(
+      () => formatModelReadback({
+        ...settings,
+        builder: sample,
+      }),
+      /Potential secret key detected/,
+      `Should reject secret sample: ${sample}`,
+    );
+  }
 });
 
 test('modelMaker extracts canonical maker ignoring gateway/route prefixes', () => {
@@ -265,16 +293,52 @@ test('maker check rejects same-maker builder and reviewer even when routed diffe
   );
 });
 
-test('no hidden model defaults exist in register-typescript-esm.mjs or model-choice.ts', () => {
+test('no hidden model defaults exist across the entire app source tree', () => {
+  // Recursively collect all .ts and .js source files under ops/factory/app/src
+  function getAllSourceFiles(dir) {
+    const files = [];
+    const entries = readdirSync(dir);
+    for (const entry of entries) {
+      const fullPath = join(dir, entry);
+      const stat = statSync(fullPath);
+      if (stat.isDirectory()) {
+        files.push(...getAllSourceFiles(fullPath));
+      } else if (fullPath.endsWith('.ts') || fullPath.endsWith('.js') || fullPath.endsWith('.mjs')) {
+        files.push(fullPath);
+      }
+    }
+    return files;
+  }
+
+  const srcDir = fileURLToPath(new URL('./src', import.meta.url));
+  const sourceFiles = getAllSourceFiles(srcDir);
+  assert.ok(sourceFiles.length > 5, 'Must find source files under src');
+
+  const forbiddenDefaultPatterns = [
+    /JULIA_BUILDER_MODEL\s*(?:\?\?|\|\|)\s*['"`]/,
+    /JULIA_REVIEWER_MODELS\s*(?:\?\?|\|\|)\s*['"`]/,
+    /JULIA_CHEAP_MODEL\s*(?:\?\?|\|\|)\s*['"`]/,
+    /JULIA_FALLBACK_MODEL\s*(?:\?\?|\|\|)\s*['"`]/,
+    /DEFAULT_REVIEWER_MODELS\s*=/,
+    /DEFAULT_BUILDER_MODEL\s*=/,
+  ];
+
+  for (const file of sourceFiles) {
+    const content = readFileSync(file, 'utf8');
+    for (const pattern of forbiddenDefaultPatterns) {
+      assert.ok(
+        !pattern.test(content),
+        `File ${file} contains hidden model default pattern: ${pattern}`,
+      );
+    }
+  }
+
+  // Also check register-typescript-esm.mjs
   const registerContent = readFileSync(new URL('./register-typescript-esm.mjs', import.meta.url), 'utf8');
   assert.ok(!registerContent.includes('JULIA_BUILDER_MODEL'), 'register-typescript-esm.mjs must not set default model env vars');
   assert.ok(!registerContent.includes('JULIA_REVIEWER_MODELS'), 'register-typescript-esm.mjs must not set default model env vars');
   assert.ok(!registerContent.includes('JULIA_CHEAP_MODEL'), 'register-typescript-esm.mjs must not set default model env vars');
   assert.ok(!registerContent.includes('JULIA_FALLBACK_MODEL'), 'register-typescript-esm.mjs must not set default model env vars');
-
-  const modelChoiceContent = readFileSync(new URL('./src/mastra/reviewer/model-choice.ts', import.meta.url), 'utf8');
-  assert.ok(!modelChoiceContent.includes("'openai/gpt-6-sol'"), 'model-choice.ts must not have hardcoded gpt-6-sol default');
-  assert.ok(!modelChoiceContent.includes("'deepseek/deepseek-v4-pro'"), 'model-choice.ts must not have hardcoded deepseek default');
 });
 
 test('pi-models.commandcode.json contains moonshotai/Kimi-K2.7-Code', () => {
