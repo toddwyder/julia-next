@@ -1,6 +1,3 @@
-import { createOpenAI, type OpenAIProvider } from '@ai-sdk/openai';
-import type { LanguageModel } from 'ai';
-
 const KNOWN_GATEWAYS = new Set(['commandcode', 'openrouter', 'litellm', 'proxy', 'custom', 'gateway']);
 
 const MAKER_PATTERNS: Array<{ pattern: RegExp; maker: string }> = [
@@ -18,17 +15,6 @@ const MAKER_PATTERNS: Array<{ pattern: RegExp; maker: string }> = [
   { pattern: /^(mistral|codestral|pixtral)/i, maker: 'mistral' },
   { pattern: /^(cohere|command-r)/i, maker: 'cohere' },
 ];
-
-let cachedProvider: { baseURL: string; apiKey: string; provider: OpenAIProvider } | null = null;
-
-function getCachedCommandCodeProvider(baseURL: string, apiKey: string): OpenAIProvider {
-  if (cachedProvider && cachedProvider.baseURL === baseURL && cachedProvider.apiKey === apiKey) {
-    return cachedProvider.provider;
-  }
-  const provider = createOpenAI({ baseURL, apiKey });
-  cachedProvider = { baseURL, apiKey, provider };
-  return provider;
-}
 
 /**
  * Extract the canonical AI maker / model family from a model identifier,
@@ -99,7 +85,14 @@ export function fallbackModel(env: NodeJS.ProcessEnv = process.env): string {
   return fallback;
 }
 
-export type ResolvedModel = `${string}/${string}` | LanguageModel;
+export type ResolvedModel =
+  | `${string}/${string}`
+  | {
+      id: `${string}/${string}`;
+      url?: string;
+      apiKey?: string;
+      headers?: Record<string, string>;
+    };
 
 export function resolveLanguageModel(modelId: string, env: NodeJS.ProcessEnv = process.env): ResolvedModel {
   const trimmed = modelId.trim();
@@ -108,9 +101,12 @@ export function resolveLanguageModel(modelId: string, env: NodeJS.ProcessEnv = p
   }
   if (env.COMMANDCODE_API_KEY?.trim() && !env.MASTRA_DISABLE_COMMANDCODE_ROUTER) {
     const baseURL = env.COMMANDCODE_BASE_URL?.trim() || 'https://api.commandcode.ai/provider/v1';
-    const openai = getCachedCommandCodeProvider(baseURL, env.COMMANDCODE_API_KEY.trim());
-    const targetModel = trimmed.replace(/^(?:commandcode|openrouter|proxy|gateway)\//i, '');
-    return openai.chat(targetModel);
+    const targetModel = trimmed.replace(/^(?:commandcode|openrouter|proxy|gateway)\//i, '') as `${string}/${string}`;
+    return {
+      id: targetModel,
+      url: baseURL,
+      apiKey: env.COMMANDCODE_API_KEY.trim(),
+    };
   }
   return trimmed as `${string}/${string}`;
 }

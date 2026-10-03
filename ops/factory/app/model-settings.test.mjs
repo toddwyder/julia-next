@@ -357,11 +357,11 @@ test('resolveLanguageModel routes via Command Code OpenAI-compatible gateway whe
   };
   const model = resolveLanguageModel('moonshotai/Kimi-K2.7-Code', envWithKey);
   assert.equal(typeof model, 'object');
-  assert.equal(model.modelId, 'moonshotai/Kimi-K2.7-Code');
+  assert.equal(model.id, 'moonshotai/Kimi-K2.7-Code');
 
   const routedModel = resolveLanguageModel('commandcode/moonshotai/Kimi-K2.7-Code', envWithKey);
   assert.equal(typeof routedModel, 'object');
-  assert.equal(routedModel.modelId, 'moonshotai/Kimi-K2.7-Code');
+  assert.equal(routedModel.id, 'moonshotai/Kimi-K2.7-Code');
 
   const plainModel = resolveLanguageModel('moonshotai/Kimi-K2.7-Code', {});
   assert.equal(plainModel, 'moonshotai/Kimi-K2.7-Code');
