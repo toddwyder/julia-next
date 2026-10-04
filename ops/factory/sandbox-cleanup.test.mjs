@@ -386,6 +386,25 @@ test('a failed fetch keeps the sandbox', () => {
   }
 });
 
+test('a commit on a GitHub branch is eligible despite a narrow fetch rule', () => {
+  const fixture = setupRepository();
+  try {
+    git(fixture.checkout, 'checkout', '-b', 'card-branch');
+    writeFileSync(join(fixture.checkout, 'card.txt'), 'saved on GitHub branch\n');
+    git(fixture.checkout, 'add', 'card.txt');
+    git(fixture.checkout, 'commit', '-m', 'card work');
+    git(fixture.checkout, 'push', fixture.remote, 'card-branch');
+    git(fixture.checkout, 'config', 'remote.origin.fetch', '+refs/heads/main:refs/remotes/origin/main');
+    git(fixture.checkout, 'fetch', 'origin');
+
+    const result = assessSandbox({ sessionId: 'session-123', sandboxRoot: fixture.root, sessionRoot: fixture.sessionRoot, inspection: inspectionWithoutIdle() });
+    assert.equal(result.decision, 'eligible');
+    assert.equal(git(fixture.checkout, 'config', '--get', 'remote.origin.fetch').trim(), '+refs/heads/main:refs/remotes/origin/main');
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
 test('a commit on a remote branch that GitHub has since deleted is kept', () => {
   const fixture = setupRepository();
   try {
@@ -394,7 +413,8 @@ test('a commit on a remote branch that GitHub has since deleted is kept', () => 
     git(fixture.checkout, 'add', '.');
     git(fixture.checkout, 'commit', '-m', 'card work');
     git(fixture.checkout, 'push', fixture.remote, 'card-branch');
-    git(fixture.checkout, 'fetch', fixture.remote, 'card-branch:refs/remotes/origin/card-branch');
+    git(fixture.checkout, 'config', 'remote.origin.fetch', '+refs/heads/main:refs/remotes/origin/main');
+    git(fixture.checkout, 'fetch', 'origin');
     assert.equal(assessSandbox({ sessionId: 'session-123', sandboxRoot: fixture.root, sessionRoot: fixture.sessionRoot, inspection: inspectionWithoutIdle() }).decision, 'eligible');
     git(fixture.root, '--git-dir', fixture.remote, 'branch', '-D', 'card-branch');
     const result = assessSandbox({ sessionId: 'session-123', sandboxRoot: fixture.root, sessionRoot: fixture.sessionRoot, inspection: inspectionWithoutIdle() });

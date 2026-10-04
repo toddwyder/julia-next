@@ -183,10 +183,11 @@ function recoverableGate({ sessionRoot }) {
     const checkout = checkoutRoot(sessionRoot);
     const origin = git(checkout, ['config', '--get', 'remote.origin.url']).trim();
     if (!/(^|[/:])github\.com([/:]|$)/i.test(origin)) return fail('origin is not a GitHub remote');
-    // Remote records go stale: a merge that landed after the last fetch looks
-    // unsaved, and a branch deleted on GitHub still looks saved. A failed fetch
-    // keeps the sandbox.
-    git(checkout, ['fetch', 'origin', '--prune']);
+    // Factory uses a main-only fetch rule in its sandboxes. Override it for
+    // this command only so every live GitHub branch can preserve a commit;
+    // --prune makes a branch deleted on GitHub stop counting. This does not
+    // modify the sandbox's saved remote configuration.
+    git(checkout, ['fetch', '--no-tags', '--prune', 'origin', '+refs/heads/*:refs/remotes/origin/*']);
     const commits = git(checkout, ['rev-list', 'HEAD', '--branches', '--not', 'origin/main']).trim().split('\n').filter(Boolean);
     for (const commit of commits) {
       const branches = git(checkout, ['branch', '-r', '--contains', commit]).split('\n').map(line => line.trim()).filter(Boolean);

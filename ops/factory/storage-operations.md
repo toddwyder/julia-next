@@ -59,9 +59,11 @@ Revisit them after several cards of observed peak disk use.
      untracked file, non-allowlisted ignored file, submodule, Git LFS
      pointer, or symlink pointing outside the root fails this gate and keeps
      the sandbox.
-   - **Recoverable content:** every commit is on a GitHub branch, or every file
-     post-image (or deletion) from an otherwise-unbranched commit appears
-     somewhere in `origin/main` history for that path. An unknown answer fails.
+   - **Recoverable content:** every commit is on a currently live GitHub branch
+     (the gate fetches and prunes all remote heads for this check, without
+     changing the sandbox's saved Git settings), or every file post-image (or
+     deletion) from an otherwise-unbranched commit appears somewhere in
+     `origin/main` history for that path. An unknown answer fails.
 
    Resolve the absolute, symlink-free immediate child of
    `/var/lib/julia-factory/sandboxes` and remove only that root. A failed check
