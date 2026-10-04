@@ -1,4 +1,4 @@
-import test from 'node:test';
+﻿import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   existsSync,
@@ -13,7 +13,13 @@ import { execFileSync, spawn } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { assessSandbox, defaultInspection, retireSandbox } from './sandbox-cleanup.mjs';
+import {
+  assessSandbox,
+  defaultInspection,
+  findDueSessions,
+  retireSandbox,
+  SANDBOX_ROOT,
+} from './sandbox-cleanup.mjs';
 
 function git(cwd, ...args) {
   return execFileSync('git', args, { cwd, encoding: 'utf8' });
@@ -30,19 +36,16 @@ function setupRepository({ nested = true } = {}) {
   git(checkout, 'init', '--initial-branch=main');
   git(checkout, 'config', 'user.email', 'test@example.com');
   git(checkout, 'config', 'user.name', 'Test');
-  writeFileSync(join(checkout, '.gitignore'), 'ops/factory/app/node_modules/\n.julia/builder-evidence/\n');
+  writeFileSync(join(checkout, '.gitignore'), 'ops/factory/app/node_modules/\nignored-logs/\n');
   writeFileSync(join(checkout, 'package.json'), '{}\n');
+  mkdirSync(join(checkout, 'ops', 'julia-runner'), { recursive: true });
+  writeFileSync(join(checkout, 'ops', 'julia-runner', 'README.md'), '# Runner\n');
   git(checkout, 'add', '.');
   git(checkout, 'commit', '-m', 'base');
   git(checkout, 'remote', 'add', 'origin', remote);
   git(checkout, 'push', '-u', 'origin', 'main');
   git(root, '--git-dir', remote, 'symbolic-ref', 'HEAD', 'refs/heads/main');
-  // The bare repository above is a real remote for this fixture. Keep its
-  // fetched origin/main ref, then present the production GitHub URL that the
-  // evaluator verifies without making a network request during retirement.
   git(checkout, 'remote', 'set-url', 'origin', 'https://github.com/example/julia-next.git');
-  // Git rewrites this URL to the local bare remote, so the gate's fetch is real
-  // and needs no network.
   git(checkout, 'config', `url.${remote}.insteadOf`, 'https://github.com/example/julia-next.git');
   return { root, remote, sessionRoot, checkout };
 }
@@ -51,7 +54,7 @@ function inspectionWithoutIdle() {
   return { ...defaultInspection(), idle: () => ({ ok: true }) };
 }
 
-test('real Git fixtures keep changed tracked files, untracked files, and ignored logs, but allow nested dependency caches', () => {
+test('real Git fixtures keep changed tracked files, untracked files, and non-allowlisted ignored logs, but allow nested dependency caches', () => {
   const fixture = setupRepository();
   try {
     writeFileSync(join(fixture.checkout, 'package.json'), '{"changed":true}\n');
@@ -62,14 +65,80 @@ test('real Git fixtures keep changed tracked files, untracked files, and ignored
     assert.equal(assessSandbox({ sessionId: 'session-123', sandboxRoot: fixture.root, sessionRoot: fixture.sessionRoot, inspection: inspectionWithoutIdle() }).gate, 'clean-git');
     rmSync(join(fixture.checkout, 'unsaved.txt'));
 
-    mkdirSync(join(fixture.checkout, '.julia', 'builder-evidence'), { recursive: true });
-    writeFileSync(join(fixture.checkout, '.julia', 'builder-evidence', 'run.log'), 'keep me\n');
+    mkdirSync(join(fixture.checkout, 'ignored-logs'), { recursive: true });
+    writeFileSync(join(fixture.checkout, 'ignored-logs', 'run.log'), 'keep me\n');
     assert.match(assessSandbox({ sessionId: 'session-123', sandboxRoot: fixture.root, sessionRoot: fixture.sessionRoot, inspection: inspectionWithoutIdle() }).reason, /allow-list/);
-    rmSync(join(fixture.checkout, '.julia'), { recursive: true });
+    rmSync(join(fixture.checkout, 'ignored-logs'), { recursive: true });
 
     mkdirSync(join(fixture.checkout, 'ops', 'factory', 'app', 'node_modules'), { recursive: true });
     writeFileSync(join(fixture.checkout, 'ops', 'factory', 'app', 'node_modules', 'cache'), 'rebuildable\n');
     assert.equal(assessSandbox({ sessionId: 'session-123', sandboxRoot: fixture.root, sessionRoot: fixture.sessionRoot, inspection: inspectionWithoutIdle() }).decision, 'eligible');
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('each allowed Factory working folder is eligible and deleted when deletion is enabled', () => {
+  const fixture = setupRepository();
+  try {
+    // 1. .artifacts/ (all subfolders)
+    mkdirSync(join(fixture.checkout, '.artifacts', 'factory-review'), { recursive: true });
+    writeFileSync(join(fixture.checkout, '.artifacts', 'factory-review', 'findings.md'), 'review notes\n');
+
+    // 2. .julia/
+    mkdirSync(join(fixture.checkout, '.julia', 'builder-evidence'), { recursive: true });
+    writeFileSync(join(fixture.checkout, '.julia', 'builder-evidence', 'run.log'), 'test logs\n');
+
+    // 3. test-results/
+    mkdirSync(join(fixture.checkout, 'test-results'), { recursive: true });
+    writeFileSync(join(fixture.checkout, 'test-results', 'junit.xml'), '<results/>\n');
+
+    // 4. __pycache__/ (both untracked and nested)
+    mkdirSync(join(fixture.checkout, 'ops', 'julia-runner', '__pycache__'), { recursive: true });
+    writeFileSync(join(fixture.checkout, 'ops', 'julia-runner', '__pycache__', 'runner.pyc'), 'binary cache\n');
+
+    // All four folders present with files, none are tracked. Sandbox must be eligible.
+    const result = assessSandbox({ sessionId: 'session-123', sandboxRoot: fixture.root, sessionRoot: fixture.sessionRoot, inspection: inspectionWithoutIdle() });
+    assert.equal(result.decision, 'eligible');
+
+    // When retired with allowDelete: true, session root is completely removed.
+    const retirement = retireSandbox({
+      sessionId: 'session-123',
+      sandboxRoot: fixture.root,
+      sessionRoot: fixture.sessionRoot,
+      inspection: inspectionWithoutIdle(),
+      allowDelete: true,
+    });
+    assert.equal(retirement.decision, 'delete');
+    assert.equal(existsSync(fixture.sessionRoot), false);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('a changed tracked file inside .artifacts/ still keeps the sandbox (e0652dbb case)', () => {
+  const fixture = setupRepository();
+  const planPath = join(fixture.checkout, '.artifacts', 'plans', 'issue-136.md');
+  try {
+    mkdirSync(join(fixture.checkout, '.artifacts', 'plans'), { recursive: true });
+    writeFileSync(planPath, '# Issue 136 Plan\nInitial tracked version\n');
+    git(fixture.checkout, 'add', '.artifacts/plans/issue-136.md');
+    git(fixture.checkout, 'commit', '-m', 'track issue-136 plan');
+    git(fixture.checkout, 'push', 'origin', 'main');
+
+    // Modify the tracked file
+    writeFileSync(planPath, '# Issue 136 Plan\nModified version\n');
+    const modifiedResult = assessSandbox({ sessionId: 'session-123', sandboxRoot: fixture.root, sessionRoot: fixture.sessionRoot, inspection: inspectionWithoutIdle() });
+    assert.equal(modifiedResult.decision, 'keep');
+    assert.equal(modifiedResult.gate, 'clean-git');
+    assert.match(modifiedResult.reason, /changed tracked file.*issue-136\.md/);
+
+    // Staged deletion of the tracked file (as in e0652dbb)
+    git(fixture.checkout, 'rm', '-f', '.artifacts/plans/issue-136.md');
+    const deletedResult = assessSandbox({ sessionId: 'session-123', sandboxRoot: fixture.root, sessionRoot: fixture.sessionRoot, inspection: inspectionWithoutIdle() });
+    assert.equal(deletedResult.decision, 'keep');
+    assert.equal(deletedResult.gate, 'clean-git');
+    assert.match(deletedResult.reason, /changed tracked file.*issue-136\.md/);
   } finally {
     rmSync(fixture.root, { recursive: true, force: true });
   }
@@ -255,5 +324,23 @@ test('a commit on a remote branch that GitHub has since deleted is kept', () => 
     assert.equal(result.gate, 'recoverable-content');
   } finally {
     rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('findDueSessions filters kept sessions by retryAt timestamp against log', () => {
+  const root = mkdtempSync(join(tmpdir(), 'sandbox-due-'));
+  const session1 = join(root, 'session-1');
+  const session2 = join(root, 'session-2');
+  const logFile = join(root, 'cleanup.ndjson');
+  mkdirSync(session1);
+  mkdirSync(session2);
+  try {
+    const past = new Date(Date.now() - 10000).toISOString();
+    const future = new Date(Date.now() + 60000).toISOString();
+    writeFileSync(logFile, `${JSON.stringify({ sessionId: 'session-1', decision: 'keep', retryAt: past })}\n${JSON.stringify({ sessionId: 'session-2', decision: 'keep', retryAt: future })}\n`);
+    const due = findDueSessions({ sandboxRoot: root, logPath: logFile });
+    assert.deepEqual(due.map(s => s.sessionId), ['session-1']);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });

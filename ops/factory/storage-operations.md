@@ -1,4 +1,4 @@
-# Factory storage operations
+﻿# Factory storage operations
 
 This is the operating process for the self-hosted Factory on the 72 GB OVH
 root disk. The Factory operator owns the checks and cleanup. This runbook
@@ -48,19 +48,50 @@ Revisit them after several cards of observed peak disk use.
 
    - **Idle:** no process runs in the root and no file is open there. Check
      again immediately before deletion.
-   - **Clean Git state:** tracked files are unchanged and untracked files are
-     absent. Ignored files must be only in the named rebuildable allow-list:
-     dependency folders, build output, and caches. Logs are never allowed.
-     Submodules, Git LFS pointers, and symlinks outside the root fail this
-     gate.
+   - **Clean Git state:** tracked files are unchanged. Ignored files must be
+     only in the named dependency/build/cache allow-list (`node_modules`,
+     `.cache`, `.next`, `.npm`, `.pnpm-store`, `build`, `dist`) or Factory
+     working folders. Factory's own working folders do not block deletion
+     whether ignored or untracked: `.artifacts/` (all subfolders), `.julia/`,
+     `test-results/`, and `__pycache__/` (including untracked python bytecode
+     such as `ops/julia-runner/__pycache__/`). Loss of their contents is
+     accepted. Any changed tracked file (even under `.artifacts/`), other
+     untracked file, non-allowlisted ignored file, submodule, Git LFS
+     pointer, or symlink pointing outside the root fails this gate and keeps
+     the sandbox.
    - **Recoverable content:** every commit is on a GitHub branch, or every file
      changed by an otherwise-unbranched commit matches `origin/main`. An
      unknown answer fails.
 
    Resolve the absolute, symlink-free immediate child of
    `/var/lib/julia-factory/sandboxes` and remove only that root. A failed check
-   or removal keeps it. Re-test kept roots after one day and list any still
-   failing. The default command is dry-run only:
+   or removal keeps it.
+
+   **Retirement hook (stock `teardownCommand`):** Factory invokes
+   `projectRepository.teardownCommand` inside the repository checkout
+   (`entry.workdir`) upon session retirement (`@mastra/factory`
+   `dist/sandbox/session-retirement.js`). The retirement hook is:
+
+   ```sh
+   node ops/factory/sandbox-cleanup.mjs --session-root .. \
+     --log /var/lib/julia-factory/sandbox-cleanup.ndjson
+   ```
+
+   **One-day re-test:** Sandboxes kept at retirement are re-tested 24 hours
+   later. Run the re-test daily:
+
+   ```sh
+   node ops/factory/sandbox-cleanup.mjs --retest \
+     --sandbox-root /var/lib/julia-factory/sandboxes \
+     --log /var/lib/julia-factory/sandbox-cleanup.ndjson
+   ```
+
+   Kept roots whose `retryAt` timestamp has elapsed are evaluated again. If a
+   sandbox now passes, it is deleted (when `--allow-delete` is enabled) or
+   logged as `would-delete`. Any sandbox that still fails is logged with a
+   refreshed `retryAt` and printed to stderr with its failed gate and reason.
+
+   **Dry-run audit over all sandboxes:**
 
    ```sh
    node ops/factory/sandbox-cleanup.mjs --all \
@@ -68,8 +99,8 @@ Revisit them after several cards of observed peak disk use.
      --log /var/lib/julia-factory/sandbox-cleanup.ndjson
    ```
 
-   Do not enable deletion until the approved exceptions-list entry and the
-   operator's live dry-run evidence exist.
+   Do not enable deletion (`--allow-delete`) until the approved exceptions-list
+   entry and the operator's live dry-run evidence exist.
 3. **Weekly:** review sandbox sizes and identify completed sandboxes with
    repeatable caches. Review DuckDB growth and trace completeness. Decide
    whether the current free-space trend can accommodate another week of work.

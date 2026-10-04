@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+﻿#!/usr/bin/env node
 // Sandbox retirement cleanup is deliberately dry-run-only. Enabling real
 // deletion is a separate operator action after the exceptions-list approval.
 import { appendFileSync, existsSync, lstatSync, readdirSync, readFileSync, realpathSync, rmSync } from 'node:fs';
@@ -9,6 +9,12 @@ export const SANDBOX_ROOT = '/var/lib/julia-factory/sandboxes';
 export const RETEST_AFTER_MS = 24 * 60 * 60 * 1000;
 export const ALLOWED_IGNORED_DIRECTORY_NAMES = new Set([
   'node_modules', '.cache', '.next', '.npm', '.pnpm-store', 'build', 'dist',
+]);
+
+// Factory-created working files that do not block deletion per operator decision:
+// .artifacts/ (all subfolders), .julia/, test-results/, and __pycache__/ (whether ignored or untracked).
+export const ALLOWED_FACTORY_WORKING_DIRECTORY_NAMES = new Set([
+  '.artifacts', '.julia', 'test-results', '__pycache__',
 ]);
 
 const pass = () => ({ ok: true });
@@ -81,19 +87,21 @@ function idleGate({ sessionRoot }) {
   try {
     // /proc lets us see the child process's cwd and descriptors before lsof;
     // it also gives a deterministic same-user test on the Linux Factory host.
-    for (const pid of readdirSync('/proc').filter(name => /^\d+$/.test(name))) {
-      try {
-        if (within(sessionRoot, realpathSync(`/proc/${pid}/cwd`))) return fail(`process ${pid} runs in the session root`);
-        for (const fd of readdirSync(`/proc/${pid}/fd`)) {
-          try {
-            if (within(sessionRoot, realpathSync(`/proc/${pid}/fd/${fd}`))) return fail(`process ${pid} has an open file in the session root`);
-          } catch {
-            // The descriptor may close between directory enumeration and read.
+    if (existsSync('/proc')) {
+      for (const pid of readdirSync('/proc').filter(name => /^\d+$/.test(name))) {
+        try {
+          if (within(sessionRoot, realpathSync(`/proc/${pid}/cwd`))) return fail(`process ${pid} runs in the session root`);
+          for (const fd of readdirSync(`/proc/${pid}/fd`)) {
+            try {
+              if (within(sessionRoot, realpathSync(`/proc/${pid}/fd/${fd}`))) return fail(`process ${pid} has an open file in the session root`);
+            } catch {
+              // The descriptor may close between directory enumeration and read.
+            }
           }
+        } catch {
+          // Another account's process may be unreadable. lsof below is the
+          // complete host-wide check; inability to run it fails closed.
         }
-      } catch {
-        // Another account's process may be unreadable. lsof below is the
-        // complete host-wide check; inability to run it fails closed.
       }
     }
     try {
@@ -112,8 +120,16 @@ function git(checkout, args) {
   return run('git', args, { cwd: checkout });
 }
 
+function pathHasAllowedSegment(path, allowedSet) {
+  return path.replaceAll('\\', '/').split('/').filter(Boolean).some(segment => allowedSet.has(segment));
+}
+
 function allowedIgnoredPath(path) {
-  return path.replaceAll('\\', '/').split('/').filter(Boolean).some(segment => ALLOWED_IGNORED_DIRECTORY_NAMES.has(segment));
+  return pathHasAllowedSegment(path, ALLOWED_IGNORED_DIRECTORY_NAMES) || pathHasAllowedSegment(path, ALLOWED_FACTORY_WORKING_DIRECTORY_NAMES);
+}
+
+function allowedUntrackedPath(path) {
+  return pathHasAllowedSegment(path, ALLOWED_FACTORY_WORKING_DIRECTORY_NAMES);
 }
 
 function gitGate({ sessionRoot }) {
@@ -127,6 +143,7 @@ function gitGate({ sessionRoot }) {
       const path = entry.slice(3);
       if (code === '!!' && allowedIgnoredPath(path)) continue;
       if (code === '!!') return fail(`ignored path outside allow-list: ${path}`);
+      if (code === '??' && allowedUntrackedPath(path)) continue;
       if (code === '??') return fail(`untracked non-ignored file: ${path}`);
       return fail(`changed tracked file: ${path}`);
     }
@@ -239,17 +256,40 @@ export function discoverSandboxSessions(sandboxRoot = SANDBOX_ROOT) {
   });
 }
 
+export function findDueSessions({ sandboxRoot = SANDBOX_ROOT, logPath = null }) {
+  const sessions = discoverSandboxSessions(sandboxRoot);
+  if (!logPath || !existsSync(logPath)) return sessions;
+  const lines = readFileSync(logPath, 'utf8').trim().split('\n').filter(Boolean);
+  const latestBySession = new Map();
+  for (const line of lines) {
+    try {
+      const event = JSON.parse(line);
+      if (event.sessionId) latestBySession.set(event.sessionId, event);
+    } catch {}
+  }
+  const now = Date.now();
+  return sessions.filter(session => {
+    const last = latestBySession.get(session.sessionId);
+    if (!last || last.decision !== 'keep') return true;
+    if (!last.retryAt) return true;
+    return new Date(last.retryAt).getTime() <= now;
+  });
+}
+
 function parseArgs(argv) {
-  const args = { sandboxRoot: SANDBOX_ROOT, sessionRoot: null, all: false, logPath: null };
+  const args = { sandboxRoot: SANDBOX_ROOT, sessionRoot: null, all: false, logPath: null, allowDelete: false, retest: false };
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
     if (value === '--sandbox-root') args.sandboxRoot = argv[++index];
     else if (value === '--session-root') args.sessionRoot = argv[++index];
     else if (value === '--all') args.all = true;
     else if (value === '--log') args.logPath = argv[++index];
+    else if (value === '--allow-delete') args.allowDelete = true;
+    else if (value === '--retest') args.retest = true;
     else throw new Error(`unknown argument: ${value}`);
   }
-  if (args.all === Boolean(args.sessionRoot)) throw new Error('usage: sandbox-cleanup.mjs (--session-root PATH | --all) [--sandbox-root PATH] [--log PATH]');
+  const modes = [args.all, Boolean(args.sessionRoot), args.retest].filter(Boolean).length;
+  if (modes !== 1) throw new Error('usage: sandbox-cleanup.mjs (--session-root PATH | --all | --retest) [--sandbox-root PATH] [--log PATH] [--allow-delete]');
   return args;
 }
 
@@ -260,9 +300,20 @@ if (import.meta.main) {
       if (args.logPath) appendFileSync(args.logPath, `${JSON.stringify(event)}\n`, { encoding: 'utf8', mode: 0o600 });
       process.stdout.write(`${JSON.stringify(event)}\n`);
     };
-    const sessions = args.all ? discoverSandboxSessions(args.sandboxRoot) : [{ sessionId: args.sessionRoot.split('/').filter(Boolean).at(-1), sandboxRoot: args.sandboxRoot, sessionRoot: args.sessionRoot }];
-    const events = sessions.map(session => retireSandbox({ ...session, log }));
-    process.exitCode = args.all ? 0 : events[0].decision === 'keep' ? 1 : 0;
+    const sessions = args.retest
+      ? findDueSessions({ sandboxRoot: args.sandboxRoot, logPath: args.logPath })
+      : args.all
+        ? discoverSandboxSessions(args.sandboxRoot)
+        : [{ sessionId: resolve(args.sessionRoot).split(/[/\\]/).filter(Boolean).at(-1), sandboxRoot: args.sandboxRoot, sessionRoot: resolve(args.sessionRoot) }];
+    const events = sessions.map(session => retireSandbox({ ...session, allowDelete: args.allowDelete, log }));
+    if (args.retest) {
+      for (const event of events) {
+        if (event.decision === 'keep') {
+          process.stderr.write(`still failing: ${event.sessionId} (${event.gate}: ${event.reason})\n`);
+        }
+      }
+    }
+    process.exitCode = (args.all || args.retest) ? 0 : events[0].decision === 'keep' ? 1 : 0;
   } catch (error) {
     process.stderr.write(`sandbox-cleanup: ${error.message}\n`);
     process.exitCode = 2;
