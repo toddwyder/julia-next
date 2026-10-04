@@ -3,13 +3,17 @@
 Post-build reviewer guidance. The reviewer checks the completed change and records evidence tied
 to the change, or explains why a check does not apply; missing evidence is not a pass.
 
+## Build
+
+Build test-first with `.claude/skills/tdd/SKILL.md`.
+
 ## Reviewer checks
 
 1. **unit tests** — meaningful behavior and regression coverage for affected code through appropriate interfaces. Check the assertions actually detect the relevant failure; mocked provider responses alone cannot prove provider behavior.
-2. **integration tests at affected boundaries** — exercise the changed component, storage, service, or model-provider contract across the relevant boundary, preferring existing deterministic fixtures or record/replay. Do not require production credentials or uncontrolled paid calls.
-3. **end-to-end for the changed journey** — verify the affected user journey through the assembled test application with test data, including relevant failure paths, tied to the reviewed revision. Todd's live UAT does not substitute for this check.
+2. **integration tests at affected boundaries** — when a connection between two services is built or changed, test it against the real service; do not substitute a fake or stand-in for that test. Every integration test joins the regression suite, and the whole suite runs on every pull request, which cannot merge until it passes.
+3. **end-to-end for the changed journey** — when the change has a user-facing surface, verify the affected user journey end to end, including relevant failure paths, tied to the reviewed revision. A change with no user-facing surface is marked not applicable with a reason. Todd's live UAT does not substitute for this check.
 4. **a clean browser console** — during the affected journey, no unexpected console errors or unhandled failures. Changes with no browser surface may be marked not applicable with a reason.
-5. **logging good enough to find a root cause** — lasting logs/measurements identify the failing operation and useful context, connect related events, and expose no secrets. Inspect failure-path evidence; temporary debugging or a silent non-zero exit is insufficient.
+5. **logging good enough to find a root cause** — lasting logs/measurements identify the failing operation and useful context, connect related events, and expose no secrets. Inspect failure-path evidence; temporary debugging or a silent non-zero exit is insufficient. Each connection between services records its own trace; a connection whose trace shows errors or calls to the wrong account fails.
 
 ## Framework and design (reviewer checks)
 
