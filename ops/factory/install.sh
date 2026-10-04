@@ -55,4 +55,7 @@ install -D -m 0644 "$patch_dir/trace-retention.mjs" "$app_dir/ops/factory/trace-
 install -D -m 0644 "$patch_dir/factory-cards.mjs" "$app_dir/ops/factory/factory-cards.mjs"
 install -D -m 0644 "$patch_dir/factory-cards.sql" "$app_dir/ops/factory/factory-cards.sql"
 install -D -m 0644 "$patch_dir/run-psql.mjs" "$app_dir/ops/factory/run-psql.mjs"
+# The retirement helper is dry-run-only; installation does not configure the
+# Factory teardown hook or grant any deletion capability.
+install -D -m 0755 "$patch_dir/sandbox-cleanup.mjs" "$app_dir/ops/factory/sandbox-cleanup.mjs"
 printf 'Factory install, WorkOS regression, typecheck and build passed in %s\n' "$app_dir"
