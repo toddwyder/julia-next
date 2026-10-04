@@ -147,8 +147,12 @@ function isGitHubBranch(branch) {
 function recoverableGate({ sessionRoot }) {
   try {
     const checkout = checkoutRoot(sessionRoot);
-    const origin = git(checkout, ['remote', 'get-url', 'origin']).trim();
+    const origin = git(checkout, ['config', '--get', 'remote.origin.url']).trim();
     if (!/(^|[/:])github\.com([/:]|$)/i.test(origin)) return fail('origin is not a GitHub remote');
+    // Remote records go stale: a merge that landed after the last fetch looks
+    // unsaved, and a branch deleted on GitHub still looks saved. A failed fetch
+    // keeps the sandbox.
+    git(checkout, ['fetch', 'origin', '--prune']);
     const commits = git(checkout, ['rev-list', 'HEAD', '--branches', '--not', 'origin/main']).trim().split('\n').filter(Boolean);
     const pathsToMatch = new Set();
     for (const commit of commits) {

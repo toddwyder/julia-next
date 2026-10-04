@@ -41,6 +41,9 @@ function setupRepository({ nested = true } = {}) {
   // fetched origin/main ref, then present the production GitHub URL that the
   // evaluator verifies without making a network request during retirement.
   git(checkout, 'remote', 'set-url', 'origin', 'https://github.com/example/julia-next.git');
+  // Git rewrites this URL to the local bare remote, so the gate's fetch is real
+  // and needs no network.
+  git(checkout, 'config', `url.${remote}.insteadOf`, 'https://github.com/example/julia-next.git');
   return { root, remote, sessionRoot, checkout };
 }
 
@@ -102,9 +105,7 @@ test('a squash-merged local commit is eligible when every changed file matches o
     git(mergeCheckout, 'commit', '-m', 'squash merge');
     git(mergeCheckout, 'push', 'origin', 'main');
 
-    git(fixture.checkout, 'remote', 'set-url', 'origin', fixture.remote);
-    git(fixture.checkout, 'fetch', 'origin', 'main');
-    git(fixture.checkout, 'remote', 'set-url', 'origin', 'https://github.com/example/julia-next.git');
+    // No manual fetch: the merge landed after the sandbox's last fetch.
     assert.equal(assessSandbox({ sessionId: 'session-123', sandboxRoot: fixture.root, sessionRoot: fixture.sessionRoot, inspection: inspectionWithoutIdle() }).decision, 'eligible');
   } finally {
     rmSync(fixture.root, { recursive: true, force: true });
@@ -133,6 +134,7 @@ test('real open-file and cwd processes in the session root keep the sandbox', as
   if (process.platform !== 'linux') return t.skip('/proc inspection is a Linux server check');
   const fixture = setupRepository();
   const openFile = join(fixture.sessionRoot, 'open.txt');
+  writeFileSync(openFile, 'open\n');
   const openChild = spawn(process.execPath, ['-e', 'const fs=require("fs"); fs.openSync(process.argv[1], "r"); process.stdout.write("ready"); setInterval(()=>{}, 1000)', openFile], { cwd: tmpdir() });
   let cwdChild;
   try {
@@ -221,6 +223,37 @@ test('a filesystem refusal to remove an eligible root is logged as a keep', (t) 
     assert.match(result.reason, /could not remove/);
   } finally {
     chmodSync(fixture.root, 0o700);
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('a failed fetch keeps the sandbox', () => {
+  const fixture = setupRepository();
+  try {
+    git(fixture.checkout, 'config', `url.${join(fixture.root, 'missing.git')}.insteadOf`, 'https://github.com/example/julia-next.git');
+    git(fixture.checkout, 'config', '--unset', `url.${fixture.remote}.insteadOf`);
+    const result = assessSandbox({ sessionId: 'session-123', sandboxRoot: fixture.root, sessionRoot: fixture.sessionRoot, inspection: inspectionWithoutIdle() });
+    assert.equal(result.gate, 'recoverable-content');
+    assert.match(result.reason, /cannot prove recoverable content/);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('a commit on a remote branch that GitHub has since deleted is kept', () => {
+  const fixture = setupRepository();
+  try {
+    git(fixture.checkout, 'checkout', '-b', 'card-branch');
+    writeFileSync(join(fixture.checkout, 'card.txt'), 'only on the deleted branch\n');
+    git(fixture.checkout, 'add', '.');
+    git(fixture.checkout, 'commit', '-m', 'card work');
+    git(fixture.checkout, 'push', fixture.remote, 'card-branch');
+    git(fixture.checkout, 'fetch', fixture.remote, 'card-branch:refs/remotes/origin/card-branch');
+    assert.equal(assessSandbox({ sessionId: 'session-123', sandboxRoot: fixture.root, sessionRoot: fixture.sessionRoot, inspection: inspectionWithoutIdle() }).decision, 'eligible');
+    git(fixture.root, '--git-dir', fixture.remote, 'branch', '-D', 'card-branch');
+    const result = assessSandbox({ sessionId: 'session-123', sandboxRoot: fixture.root, sessionRoot: fixture.sessionRoot, inspection: inspectionWithoutIdle() });
+    assert.equal(result.gate, 'recoverable-content');
+  } finally {
     rmSync(fixture.root, { recursive: true, force: true });
   }
 });
