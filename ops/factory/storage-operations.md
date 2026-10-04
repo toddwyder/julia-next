@@ -60,8 +60,8 @@ Revisit them after several cards of observed peak disk use.
      pointer, or symlink pointing outside the root fails this gate and keeps
      the sandbox.
    - **Recoverable content:** every commit is on a GitHub branch, or every file
-     changed by an otherwise-unbranched commit matches `origin/main`. An
-     unknown answer fails.
+     post-image (or deletion) from an otherwise-unbranched commit appears
+     somewhere in `origin/main` history for that path. An unknown answer fails.
 
    Resolve the absolute, symlink-free immediate child of
    `/var/lib/julia-factory/sandboxes` and remove only that root. A failed check

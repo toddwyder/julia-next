@@ -152,7 +152,7 @@ test('a local-only commit is kept even when the sandbox has a real origin remote
     git(fixture.checkout, 'commit', '-m', 'local only');
     const result = assessSandbox({ sessionId: 'session-123', sandboxRoot: fixture.root, sessionRoot: fixture.sessionRoot, inspection: inspectionWithoutIdle() });
     assert.equal(result.gate, 'recoverable-content');
-    assert.match(result.reason, /differs from origin\/main/);
+    assert.match(result.reason, /does not appear in origin\/main history/);
   } finally {
     rmSync(fixture.root, { recursive: true, force: true });
   }
@@ -176,6 +176,83 @@ test('a squash-merged local commit is eligible when every changed file matches o
 
     // No manual fetch: the merge landed after the sandbox's last fetch.
     assert.equal(assessSandbox({ sessionId: 'session-123', sandboxRoot: fixture.root, sessionRoot: fixture.sessionRoot, inspection: inspectionWithoutIdle() }).decision, 'eligible');
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('a squash-merged file remains eligible after main changes that path again', () => {
+  const fixture = setupRepository();
+  const mergeCheckout = join(fixture.root, 'squash-merge');
+  try {
+    writeFileSync(join(fixture.checkout, 'squashed.txt'), 'saved content\n');
+    git(fixture.checkout, 'add', 'squashed.txt');
+    git(fixture.checkout, 'commit', '-m', 'local branch commit');
+
+    git(fixture.root, 'clone', fixture.remote, mergeCheckout);
+    git(mergeCheckout, 'config', 'user.email', 'test@example.com');
+    git(mergeCheckout, 'config', 'user.name', 'Test');
+    writeFileSync(join(mergeCheckout, 'squashed.txt'), 'saved content\n');
+    git(mergeCheckout, 'add', 'squashed.txt');
+    git(mergeCheckout, 'commit', '-m', 'squash merge');
+    writeFileSync(join(mergeCheckout, 'squashed.txt'), 'later main content\n');
+    git(mergeCheckout, 'add', 'squashed.txt');
+    git(mergeCheckout, 'commit', '-m', 'later main change');
+    git(mergeCheckout, 'push', 'origin', 'main');
+
+    const result = assessSandbox({ sessionId: 'session-123', sandboxRoot: fixture.root, sessionRoot: fixture.sessionRoot, inspection: inspectionWithoutIdle() });
+    assert.equal(result.decision, 'eligible');
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('a file content that never appeared in main history is kept', () => {
+  const fixture = setupRepository();
+  const mergeCheckout = join(fixture.root, 'main-change');
+  try {
+    writeFileSync(join(fixture.checkout, 'unmerged.txt'), 'local-only content\n');
+    git(fixture.checkout, 'add', 'unmerged.txt');
+    git(fixture.checkout, 'commit', '-m', 'local-only content');
+
+    git(fixture.root, 'clone', fixture.remote, mergeCheckout);
+    git(mergeCheckout, 'config', 'user.email', 'test@example.com');
+    git(mergeCheckout, 'config', 'user.name', 'Test');
+    writeFileSync(join(mergeCheckout, 'unmerged.txt'), 'different main content\n');
+    git(mergeCheckout, 'add', 'unmerged.txt');
+    git(mergeCheckout, 'commit', '-m', 'different main content');
+    git(mergeCheckout, 'push', 'origin', 'main');
+
+    const result = assessSandbox({ sessionId: 'session-123', sandboxRoot: fixture.root, sessionRoot: fixture.sessionRoot, inspection: inspectionWithoutIdle() });
+    assert.equal(result.decision, 'keep');
+    assert.equal(result.gate, 'recoverable-content');
+    assert.match(result.reason, /does not appear in origin\/main history/);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('a deletion is eligible when main history contains the same deletion', () => {
+  const fixture = setupRepository();
+  const mergeCheckout = join(fixture.root, 'main-deletion');
+  try {
+    writeFileSync(join(fixture.checkout, 'deleted.txt'), 'remove me\n');
+    git(fixture.checkout, 'add', 'deleted.txt');
+    git(fixture.checkout, 'commit', '-m', 'add deletable file');
+    git(fixture.checkout, 'push', 'origin', 'main');
+
+    git(fixture.checkout, 'rm', 'deleted.txt');
+    git(fixture.checkout, 'commit', '-m', 'local deletion');
+
+    git(fixture.root, 'clone', fixture.remote, mergeCheckout);
+    git(mergeCheckout, 'config', 'user.email', 'test@example.com');
+    git(mergeCheckout, 'config', 'user.name', 'Test');
+    git(mergeCheckout, 'rm', 'deleted.txt');
+    git(mergeCheckout, 'commit', '-m', 'main deletion');
+    git(mergeCheckout, 'push', 'origin', 'main');
+
+    const result = assessSandbox({ sessionId: 'session-123', sandboxRoot: fixture.root, sessionRoot: fixture.sessionRoot, inspection: inspectionWithoutIdle() });
+    assert.equal(result.decision, 'eligible');
   } finally {
     rmSync(fixture.root, { recursive: true, force: true });
   }

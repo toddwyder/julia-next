@@ -161,6 +161,23 @@ function isGitHubBranch(branch) {
   return branch.startsWith('origin/') && branch !== 'origin/HEAD';
 }
 
+function contentAppearsInMainHistory(checkout, commit, path) {
+  const deletedByCommit = git(checkout, ['diff-tree', '--no-commit-id', '--diff-filter=D', '--name-only', '-r', '--root', commit, '--', path]).trim() === path;
+  if (deletedByCommit) {
+    return Boolean(git(checkout, ['log', '--format=%H', '--diff-filter=D', 'origin/main', '--', path]).trim());
+  }
+
+  const blob = git(checkout, ['rev-parse', `${commit}:${path}`]).trim();
+  const mainCommits = git(checkout, ['log', '--format=%H', 'origin/main', '--', path]).trim().split('\n').filter(Boolean);
+  return mainCommits.some(mainCommit => {
+    try {
+      return git(checkout, ['rev-parse', `${mainCommit}:${path}`]).trim() === blob;
+    } catch {
+      return false;
+    }
+  });
+}
+
 function recoverableGate({ sessionRoot }) {
   try {
     const checkout = checkoutRoot(sessionRoot);
@@ -171,17 +188,17 @@ function recoverableGate({ sessionRoot }) {
     // keeps the sandbox.
     git(checkout, ['fetch', 'origin', '--prune']);
     const commits = git(checkout, ['rev-list', 'HEAD', '--branches', '--not', 'origin/main']).trim().split('\n').filter(Boolean);
-    const pathsToMatch = new Set();
     for (const commit of commits) {
       const branches = git(checkout, ['branch', '-r', '--contains', commit]).split('\n').map(line => line.trim()).filter(Boolean);
       if (branches.some(isGitHubBranch)) continue;
-      for (const path of git(checkout, ['diff-tree', '--no-commit-id', '--name-only', '-r', '--root', commit]).split('\n').filter(Boolean)) pathsToMatch.add(path);
-    }
-    // A squash merge replaces the original commits, so none are contained by
-    // the surviving remote branch. It is still recoverable if every path those
-    // commits changed now has the exact same content in origin/main.
-    for (const path of pathsToMatch) {
-      if (git(checkout, ['diff', '--name-only', 'origin/main', '--', path]).trim()) return fail(`content changed by an unbranched commit differs from origin/main: ${path}`);
+      for (const path of git(checkout, ['diff-tree', '--no-commit-id', '--name-only', '-r', '--root', commit]).split('\n').filter(Boolean)) {
+        // A squash merge replaces the original commit, and main can later
+        // change that path. Its exact post-image (or deletion) must have
+        // appeared in main history; the current tip is irrelevant.
+        if (!contentAppearsInMainHistory(checkout, commit, path)) {
+          return fail(`content from an unbranched commit does not appear in origin/main history: ${path}`);
+        }
+      }
     }
     return pass();
   } catch (error) {
