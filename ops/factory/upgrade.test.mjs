@@ -56,6 +56,19 @@ test('the Factory installer pins the 0.19.1 release family without the retired W
   assert.doesNotMatch(read('ops/factory/install.sh'), /apply-install-patches|workos-cookie-identity\.check/);
 });
 
+test('the Factory operations record reflects the installed 0.19.1 release and stable exception references', () => {
+  const readme = read('ops/factory/README.md');
+
+  assert.doesNotMatch(readme, /0\.17\.2|workos-cookie-identity|mastra-ai\/mastra#25252|WorkOS patch/i);
+  assert.match(readme, /\| 2 \| Factory wait watcher and Discord webhook/);
+  assert.match(readme, /\| 3 \| Monday note and bounded trace retention/);
+  assert.match(readme, /\| 4 \| Safe sandbox retirement evaluator and cleanup/);
+  assert.match(readme, /Factory 0\.19\.1 loads project-local `factory-skills`/);
+  assert.match(readme, /Factory \*\*0\.19\.1\*\* scans both `\.claude\/skills` and `\.agents\/skills`/);
+  assert.doesNotMatch(read('ops/factory/factory-cards.sql'), /0\.17\.2/);
+  assert.doesNotMatch(read('ops/factory/wait-alerts.sql'), /0\.17\.2/);
+});
+
 test('the Factory-visible Pocock skills are pinned to 1.3.1 and use the repository glossary', () => {
   const lock = JSON.parse(read('skills-lock.json'));
   const packageLock = JSON.parse(read('ops/factory/app/package-lock.json'));

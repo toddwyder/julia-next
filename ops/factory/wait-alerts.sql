@@ -1,4 +1,4 @@
--- Factory 0.17.2 wait snapshot. Read-only; keep in step with its attention providers.
+-- Factory 0.19.1 wait snapshot. Read-only; keep in step with its attention providers.
 BEGIN TRANSACTION READ ONLY;
 WITH pending_tools AS (
   SELECT DISTINCT ON (b.session_id, p.part->'toolInvocation'->>'toolCallId')
