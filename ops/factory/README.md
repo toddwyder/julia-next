@@ -392,6 +392,9 @@ criterion evidence. If the workflow skips a reviewable file (an unreviewed
 deletion-only source change), the route fails closed: it can never return
 APPROVE, and the verdict body names the unreviewed material. Files skipped by
 the shared non-reviewable patterns (locks, binaries, build output, snapshots)
-are recorded as findings with evidence but do not block approval. Mastra's
+are recorded as findings with evidence but do not block approval. If Mastra
+returns the criterion verdict as text without a structured object, the route
+accepts only a complete JSON verdict that passes the same schema; empty or
+invalid text fails the job without submitting a GitHub review. Mastra's
 storage exporter records its spans with the Factory
 traces. The Action never receives the DeepSeek key.
