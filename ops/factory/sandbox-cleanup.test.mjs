@@ -1,4 +1,4 @@
-﻿import test from 'node:test';
+import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   existsSync,
@@ -17,6 +17,8 @@ import {
   assessRetiredSession,
   assessSandbox,
   defaultInspection,
+  defaultLookupFactorySession,
+  evaluateSessionRetirement,
   findDueSessions,
   parseArgs,
   retireRetiredSandbox,
@@ -784,4 +786,209 @@ test('--min-retired-age-hours 0 allows immediate evaluation of freshly retired s
   } finally {
     rmSync(fixture.root, { recursive: true, force: true });
   }
+});
+
+test('a session with no matching work item is skipped as not retired and never deleted', () => {
+  const fixture = setupRepository();
+  try {
+    const lookupFactorySession = () => ({
+      found: true,
+      folderId: 'session-123',
+      sessionId: 'session-123',
+      workItems: [],
+    });
+    const result = assessRetiredSession({
+      sessionId: 'session-123',
+      sandboxRoot: fixture.root,
+      sessionRoot: fixture.sessionRoot,
+      lookupFactorySession,
+      inspection: inspectionWithoutIdle(),
+    });
+    assert.equal(result.decision, 'skip');
+    assert.equal(result.reason, 'not retired');
+
+    const retirement = retireRetiredSandbox({
+      sessionId: 'session-123',
+      sandboxRoot: fixture.root,
+      sessionRoot: fixture.sessionRoot,
+      lookupFactorySession,
+      inspection: inspectionWithoutIdle(),
+      allowDelete: true,
+    });
+    assert.equal(retirement.decision, 'skip');
+    assert.equal(retirement.reason, 'not retired');
+    assert.equal(existsSync(fixture.sessionRoot), true);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('a session with revoked binding only and no work item is not retired and never deleted', () => {
+  const fixture = setupRepository();
+  try {
+    const lookupFactorySession = () => ({
+      found: true,
+      folderId: 'session-123',
+      sessionId: 'session-123',
+      bindingStatus: 'revoked',
+      workItems: [],
+    });
+    const result = assessRetiredSession({
+      sessionId: 'session-123',
+      sandboxRoot: fixture.root,
+      sessionRoot: fixture.sessionRoot,
+      lookupFactorySession,
+      inspection: inspectionWithoutIdle(),
+    });
+    assert.equal(result.decision, 'skip');
+    assert.equal(result.reason, 'not retired');
+
+    const retirement = retireRetiredSandbox({
+      sessionId: 'session-123',
+      sandboxRoot: fixture.root,
+      sessionRoot: fixture.sessionRoot,
+      lookupFactorySession,
+      inspection: inspectionWithoutIdle(),
+      allowDelete: true,
+    });
+    assert.equal(retirement.decision, 'skip');
+    assert.equal(retirement.reason, 'not retired');
+    assert.equal(existsSync(fixture.sessionRoot), true);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('a session matching two work items where one is active is skipped as not retired', () => {
+  const fixture = setupRepository();
+  const now = Date.now();
+  try {
+    const lookupFactorySession = () => ({
+      found: true,
+      folderId: 'session-123',
+      sessionId: 'session-123',
+      workItems: [
+        {
+          id: 'wi-1',
+          title: 'Finished work item',
+          stages: ['done'],
+          stageHistory: [{ stage: 'done', enteredAt: new Date(now - 72 * 60 * 60 * 1000).toISOString() }],
+        },
+        {
+          id: 'wi-2',
+          title: 'In-review work item',
+          stages: ['review'],
+          stageHistory: [{ stage: 'review', enteredAt: new Date(now - 2 * 60 * 60 * 1000).toISOString() }],
+        },
+      ],
+    });
+    const result = assessRetiredSession({
+      sessionId: 'session-123',
+      sandboxRoot: fixture.root,
+      sessionRoot: fixture.sessionRoot,
+      lookupFactorySession,
+      inspection: inspectionWithoutIdle(),
+    });
+    assert.equal(result.decision, 'skip');
+    assert.equal(result.reason, 'not retired');
+
+    const retirement = retireRetiredSandbox({
+      sessionId: 'session-123',
+      sandboxRoot: fixture.root,
+      sessionRoot: fixture.sessionRoot,
+      lookupFactorySession,
+      inspection: inspectionWithoutIdle(),
+      allowDelete: true,
+    });
+    assert.equal(retirement.decision, 'skip');
+    assert.equal(existsSync(fixture.sessionRoot), true);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('a reopened card that was finished again waits from its newest Done timestamp', () => {
+  const fixture = setupRepository();
+  const now = Date.now();
+  try {
+    // Finished initially 48h ago, reopened to review 20h ago, finished again 6h ago
+    const initialDone = new Date(now - 48 * 60 * 60 * 1000).toISOString();
+    const reopenedReview = new Date(now - 20 * 60 * 60 * 1000).toISOString();
+    const newestDone = new Date(now - 6 * 60 * 60 * 1000).toISOString();
+
+    const lookupFactorySession = () => ({
+      found: true,
+      folderId: 'session-123',
+      sessionId: 'session-123',
+      workItems: [
+        {
+          id: 'wi-reopened',
+          title: 'Card reopened and finished again',
+          stages: ['done'],
+          stageHistory: [
+            { stage: 'done', enteredAt: initialDone },
+            { stage: 'review', enteredAt: reopenedReview },
+            { stage: 'done', enteredAt: newestDone },
+          ],
+        },
+      ],
+    });
+
+    // With 24h min age, 6h < 24h, so it must be skipped despite the 48h initial done
+    const result = assessRetiredSession({
+      sessionId: 'session-123',
+      sandboxRoot: fixture.root,
+      sessionRoot: fixture.sessionRoot,
+      minRetiredAgeHours: 24,
+      now,
+      lookupFactorySession,
+      inspection: inspectionWithoutIdle(),
+    });
+    assert.equal(result.decision, 'skip');
+    assert.match(result.reason, /retired under minimum age: 6\.0h < 24h/);
+    assert.equal(result.retiredAt, newestDone);
+
+    // If evaluated with min age 4h, 6h >= 4h, so it passes age check
+    const mature = assessRetiredSession({
+      sessionId: 'session-123',
+      sandboxRoot: fixture.root,
+      sessionRoot: fixture.sessionRoot,
+      minRetiredAgeHours: 4,
+      now,
+      lookupFactorySession,
+      inspection: inspectionWithoutIdle(),
+    });
+    assert.equal(mature.decision, 'eligible');
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('substring-only match is rejected and not matched as exact session id', () => {
+  // Verify evaluateSessionRetirement ignores partial or missing workItems
+  const noMatch = evaluateSessionRetirement({
+    found: false,
+    reason: 'no matching session',
+    workItems: [],
+  });
+  assert.equal(noMatch.retired, false);
+  assert.equal(noMatch.decision, 'skip');
+  assert.equal(noMatch.reason, 'no matching session');
+
+  // Verify query execution handles targetId lookup without substring false positives
+  let capturedSql = '';
+  const mockRunCommand = (cmd, args) => {
+    capturedSql = args.join(' ');
+    // Return empty json as Postgres would if no exact match
+    return JSON.stringify({
+      found: false,
+      folderId: 'sess-1',
+      sessionId: 'sess-1',
+      branch: null,
+      workItems: [],
+    });
+  };
+  const lookup = defaultLookupFactorySession('sess-1', { runCommand: mockRunCommand });
+  assert.equal(lookup.found, false);
+  assert.match(capturedSql, /s\.value->>'sessionId' = t\.session_id/);
 });
