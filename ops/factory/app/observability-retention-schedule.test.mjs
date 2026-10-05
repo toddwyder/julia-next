@@ -19,7 +19,6 @@ import { readFileSync } from 'node:fs';
 
 import { Mastra } from '@mastra/core/mastra';
 import { InMemoryStore } from '@mastra/core/storage';
-import { EventEmitterPubSub } from '@mastra/core/events';
 import {
   OBSERVABILITY_PRUNE_CRON,
   observabilityRetentionWorkflow,
@@ -29,12 +28,17 @@ import {
 /** Build the prune target the app entry sets, recording each call. */
 function recordingTarget() {
   const calls = [];
+  let resolvePruned;
+  const pruned = new Promise((resolve) => { resolvePruned = resolve; });
   return {
     calls,
+    pruned,
     target: {
       prune: async (options) => {
         calls.push(options);
-        return [{ domain: 'observability', table: 'spans', deleted: 7, done: true }];
+        const result = [{ domain: 'observability', table: 'spans', deleted: 7, done: true }];
+        resolvePruned(result);
+        return result;
       },
     },
   };
@@ -42,64 +46,32 @@ function recordingTarget() {
 
 async function bootWithWorkflow(workflow = observabilityRetentionWorkflow) {
   const storage = new InMemoryStore();
-  const pubsub = new EventEmitterPubSub();
   const mastra = new Mastra({
     workflows: { observabilityRetentionWorkflow: workflow },
     storage,
-    pubsub,
     logger: false,
     // A short tick so the test does not wait the production ten seconds; the
     // scheduler code path is identical.
     schedulerConfig: { tickIntervalMs: 50 },
   });
   await mastra.startWorkers();
-  return { mastra, storage, pubsub };
+  return { mastra, storage };
 }
 
 /**
- * The framework's own completion signal for a schedule-fired run.
- *
- * On a tick the scheduler publishes `workflow.start` on the `workflows` topic,
- * and the framework's event processor publishes the terminal `workflow.end` on
- * the same topic once the run finishes. Subscribing before the tick and
- * awaiting that terminal event is the signal that the run is done -- the same
- * event the framework itself uses to mark a run complete -- so the test never
- * polls. The event's `runId` proves it is the run this fire started.
- *
- * @param {import('@mastra/core/events').EventEmitterPubSub} pubsub
- * @returns {Promise<{started: Promise<string>, ended: Promise<object>}>}
+ * Make the one registered schedule due and fire one tick. Default-engine
+ * schedule execution does not publish an evented `workflow.end`; callers await
+ * the real prune target instead, which resolves only after the workflow step
+ * invokes it.
  */
-async function workflowRunCompletion(pubsub) {
-  let resolveStarted;
-  let resolveEnded;
-  const started = new Promise((resolve) => { resolveStarted = resolve; });
-  const ended = new Promise((resolve) => { resolveEnded = resolve; });
-  await pubsub.subscribe('workflows', (event) => {
-    if (event.type === 'workflow.start') resolveStarted(event.runId);
-    // `workflow.end` on the `workflows` topic is terminal for the run the
-    // scheduler claimed; the per-run watch topics are for streaming consumers.
-    if (event.type === 'workflow.end') resolveEnded(event);
-  });
-  return { started, ended };
-}
-
-/**
- * Make the one registered schedule due, fire one tick, and await the
- * framework's terminal event for the run it claimed. Returns the store and the
- * terminal event, so a caller can read the run the framework finished.
- */
-async function fireDueSchedule(mastra, storage, pubsub) {
-  const completion = await workflowRunCompletion(pubsub);
+async function fireDueSchedule(mastra, storage) {
   const schedulesStore = await storage.getStore('schedules');
   const rows = await schedulesStore.listSchedules();
   assert.equal(rows.length, 1, 'startWorkers() must register exactly one declarative schedule');
   const row = rows[0];
   await schedulesStore.updateScheduleNextFire(row.id, row.nextFireAt, Date.now() - 1000, Date.now(), 'test-claim');
   await mastra.scheduler.tick();
-  const runId = await completion.started;
-  const end = await completion.ended;
-  assert.equal(end.runId, runId, 'the terminal event must belong to the run this tick started');
-  return { schedulesStore, runId, end };
+  return { schedulesStore };
 }
 
 test('startWorkers() registers the workflow declarative schedule with the production cron', async (t) => {
@@ -132,12 +104,11 @@ test('the scheduler the framework starts is running after startWorkers()', async
 test('a due schedule fires the workflow, and its step reaches the configured prune target', { timeout: 10_000 }, async (t) => {
   const recorder = recordingTarget();
   setObservabilityPruneTarget(recorder.target);
-  const { mastra, storage, pubsub } = await bootWithWorkflow();
+  const { mastra, storage } = await bootWithWorkflow();
   t.after(() => mastra.stopWorkers());
 
-  // Await the framework's terminal event, not a poll: when `workflow.end`
-  // arrives the run is complete, so the step has already reached the target.
-  await fireDueSchedule(mastra, storage, pubsub);
+  await fireDueSchedule(mastra, storage);
+  await recorder.pruned;
 
   assert.equal(recorder.calls.length, 1, 'the prune target must be called exactly once per fire');
 });
@@ -145,11 +116,12 @@ test('a due schedule fires the workflow, and its step reaches the configured pru
 test('the scheduled step reports the real prune result and records a trigger', { timeout: 10_000 }, async (t) => {
   const recorder = recordingTarget();
   setObservabilityPruneTarget(recorder.target);
-  const { mastra, storage, pubsub } = await bootWithWorkflow();
+  const { mastra, storage } = await bootWithWorkflow();
   t.after(() => mastra.stopWorkers());
 
-  const { schedulesStore } = await fireDueSchedule(mastra, storage, pubsub);
-  assert.equal(recorder.calls.length, 1, 'the terminal run must have reached the prune target');
+  const { schedulesStore } = await fireDueSchedule(mastra, storage);
+  await recorder.pruned;
+  assert.equal(recorder.calls.length, 1, 'the scheduled run must have reached the prune target');
 
   const history = await schedulesStore.listTriggers?.(await schedulesStore.listSchedules().then((r) => r[0].id));
   // Trigger recording is best-effort in the framework; assert it when present,
