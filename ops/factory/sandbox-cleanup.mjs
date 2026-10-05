@@ -312,26 +312,107 @@ export function findDueSessions({ sandboxRoot = SANDBOX_ROOT, logPath = null }) 
 }
 
 
+export function evaluateSessionRetirement(record) {
+  if (!record || !record.found) {
+    return { retired: false, decision: 'skip', reason: record?.reason || 'no matching session' };
+  }
+
+  let workItems = [];
+  if (Array.isArray(record.workItems)) {
+    workItems = record.workItems;
+  } else if (Array.isArray(record.stages)) {
+    workItems = [{
+      id: record.workItemId || 'legacy-item',
+      stages: record.stages,
+      stageHistory: record.stageHistory || (record.retiredAt ? [{ stage: record.stages[0], enteredAt: record.retiredAt }] : []),
+      updatedAt: record.retiredAt,
+    }];
+  }
+
+  if (workItems.length === 0) {
+    return { retired: false, decision: 'skip', reason: 'not retired' };
+  }
+
+  const isTerminal = stage => stage === 'done' || stage === 'canceled';
+
+  for (const item of workItems) {
+    const stages = Array.isArray(item.stages) ? item.stages : [];
+    if (!stages.some(isTerminal)) {
+      return { retired: false, decision: 'skip', reason: 'not retired' };
+    }
+  }
+
+  let latestTerminalMs = 0;
+  let latestTerminalIso = null;
+
+  for (const item of workItems) {
+    const history = Array.isArray(item.stageHistory) ? item.stageHistory : [];
+    for (const entry of history) {
+      if (entry && isTerminal(entry.stage) && entry.enteredAt) {
+        const time = new Date(entry.enteredAt).getTime();
+        if (!Number.isNaN(time) && time > latestTerminalMs) {
+          latestTerminalMs = time;
+          latestTerminalIso = entry.enteredAt;
+        }
+      }
+    }
+    if (!latestTerminalIso && item.updatedAt) {
+      const time = new Date(item.updatedAt).getTime();
+      if (!Number.isNaN(time) && time > latestTerminalMs) {
+        latestTerminalMs = time;
+        latestTerminalIso = item.updatedAt;
+      }
+    }
+  }
+
+  if (!latestTerminalIso) {
+    return { retired: false, decision: 'skip', reason: 'no retirement timestamp' };
+  }
+
+  return {
+    retired: true,
+    retiredAt: latestTerminalIso,
+    workItems,
+  };
+}
+
 export function defaultLookupFactorySession(targetId, { dbName = process.env.PGDATABASE || 'julia_factory_trial', runCommand = run } = {}) {
   if (!/^[a-zA-Z0-9_-]+$/.test(targetId)) return { found: false, reason: 'invalid target id' };
   const sql = `
+WITH matched_scs AS (
+  SELECT id::text AS folder_id, session_id::text AS session_id, branch
+  FROM source_control_sessions
+  WHERE id::text = '${targetId}' OR session_id::text = '${targetId}'
+),
+target_ids AS (
+  SELECT folder_id, session_id, branch FROM matched_scs
+  UNION ALL
+  SELECT '${targetId}'::text, '${targetId}'::text, NULL::text
+  WHERE NOT EXISTS (SELECT 1 FROM matched_scs)
+)
 SELECT json_build_object(
-  'found', true,
-  'folderId', scs.id,
-  'sessionId', scs.session_id,
-  'branch', scs.branch,
-  'workItemId', wi.id,
-  'stages', wi.stages,
-  'retiredAt', COALESCE(
-    (SELECT jsonb_path_query_first(wi.stage_history, '$[*] ? (@.stage == "done" || @.stage == "canceled")')->>'enteredAt'),
-    (SELECT to_char(frb.revoked_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') FROM factory_run_bindings frb WHERE frb.session_id = scs.session_id AND frb.status = 'revoked' ORDER BY frb.created_at DESC LIMIT 1)
-  ),
-  'bindingStatus', (SELECT frb.status FROM factory_run_bindings frb WHERE frb.session_id = scs.session_id ORDER BY frb.created_at DESC LIMIT 1)
-)::text
-FROM source_control_sessions scs
-LEFT JOIN work_items wi ON scs.session_id IS NOT NULL AND wi.sessions::text LIKE concat('%', scs.session_id, '%')
-WHERE scs.id::text = '${targetId}' OR scs.session_id::text = '${targetId}'
-LIMIT 1;
+  'found', (EXISTS (SELECT 1 FROM matched_scs) OR EXISTS (
+    SELECT 1 FROM work_items wi, jsonb_each(wi.sessions) s, target_ids t
+    WHERE s.value->>'sessionId' = t.session_id OR s.value->>'sessionId' = t.folder_id
+  )),
+  'folderId', (SELECT folder_id FROM target_ids LIMIT 1),
+  'sessionId', (SELECT session_id FROM target_ids LIMIT 1),
+  'branch', (SELECT branch FROM target_ids LIMIT 1),
+  'workItems', COALESCE((
+    SELECT json_agg(json_build_object(
+      'id', wi.id,
+      'title', wi.title,
+      'stages', wi.stages,
+      'stageHistory', wi.stage_history,
+      'updatedAt', to_char(wi.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+    ))
+    FROM (
+      SELECT DISTINCT wi.id, wi.title, wi.stages, wi.stage_history, wi.updated_at
+      FROM work_items wi, jsonb_each(wi.sessions) s, target_ids t
+      WHERE s.value->>'sessionId' = t.session_id OR s.value->>'sessionId' = t.folder_id
+    ) wi
+  ), '[]'::json)
+)::text;
   `.trim();
   try {
     const args = ['-d', dbName, '-t', '-A', '-c', sql];
@@ -356,16 +437,11 @@ export function assessRetiredSession({
   if (!record || !record.found) {
     return { sessionId, sessionRoot, decision: 'skip', gate: null, reason: record?.reason || 'no matching session' };
   }
-  const isRetired = Array.isArray(record.stages)
-    ? record.stages.some(s => s === 'done' || s === 'canceled')
-    : record.bindingStatus === 'revoked';
-  if (!isRetired) {
-    return { sessionId, sessionRoot, decision: 'skip', gate: null, reason: 'not retired' };
+  const evalResult = evaluateSessionRetirement(record);
+  if (!evalResult.retired) {
+    return { sessionId, sessionRoot, decision: 'skip', gate: null, reason: evalResult.reason };
   }
-  if (!record.retiredAt) {
-    return { sessionId, sessionRoot, decision: 'skip', gate: null, reason: 'no retirement timestamp' };
-  }
-  const retiredTime = new Date(record.retiredAt).getTime();
+  const retiredTime = new Date(evalResult.retiredAt).getTime();
   if (Number.isNaN(retiredTime)) {
     return { sessionId, sessionRoot, decision: 'skip', gate: null, reason: 'invalid retirement timestamp' };
   }
@@ -377,7 +453,7 @@ export function assessRetiredSession({
       decision: 'skip',
       gate: null,
       reason: `retired under minimum age: ${ageHours.toFixed(1)}h < ${minRetiredAgeHours}h`,
-      retiredAt: record.retiredAt,
+      retiredAt: evalResult.retiredAt,
     };
   }
   return assessSandbox({ sessionId, sandboxRoot, sessionRoot, inspection });
