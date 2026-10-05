@@ -10,7 +10,7 @@
 // schedule belongs to a systemd timer, exactly like the wait watcher.
 //
 // Costs are never agent-reported: they are summed from the trace records the
-// observability exporter wrote, failed attempts included (CONTEXT.md "Monday
+// observability exporter wrote, failed attempts included (GLOSSARY.md "Monday
 // note").
 
 /** The GitHub Discussions category the note is published in. */
@@ -226,7 +226,7 @@ function doneByFactoryFor(allSteps) {
  * A card belongs to a week when it entered the board inside `[from, to)` OR when
  * its work (a trace) ran in the same window; a trace belongs when it started in
  * the window. A card is named at most once per note, and each trace lands in
- * exactly one week, so no cost or failed attempt is counted twice (CONTEXT.md
+ * exactly one week, so no cost or failed attempt is counted twice (GLOSSARY.md
  * "Monday note": the weekly summary). The first note's window starts at
  * observability switch-on, so it covers every card since then.
  */

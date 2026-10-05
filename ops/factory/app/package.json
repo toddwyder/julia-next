@@ -1,7 +1,7 @@
 {
   "name": "julia-factory-trial",
   "version": "0.1.0",
-  "description": "Mastra Factory: an agent-powered software delivery environment. Intake GitHub/Linear issues, work them with coding agents, and ship pull requests \u2014 all from your own deployable web app.",
+  "description": "Mastra Factory: an agent-powered software delivery environment. Intake GitHub/Linear issues, work them with coding agents, and ship pull requests — all from your own deployable web app.",
   "private": true,
   "type": "module",
   "license": "Apache-2.0",
@@ -15,19 +15,19 @@
     "deploy": "mastra deploy"
   },
   "dependencies": {
-    "@mastra/auth-workos": "1.6.5",
-    "@mastra/code-sdk": "1.8.3",
-    "@mastra/core": "1.71.0",
+    "@mastra/auth-workos": "1.6.6",
+    "@mastra/code-sdk": "1.10.1",
+    "@mastra/core": "1.74.0",
+    "@mastra/duckdb": "1.12.1",
     "@mastra/e2b": "0.12.1",
-    "@mastra/factory": "0.17.2",
-    "@mastra/libsql": "1.23.3",
-    "@mastra/pg": "1.27.1",
+    "@mastra/factory": "0.19.1",
+    "@mastra/libsql": "1.25.0",
+    "@mastra/memory": "1.35.0",
+    "@mastra/observability": "1.18.3",
+    "@mastra/pg": "1.29.0",
     "@mastra/platform-workspace": "1.6.1",
     "@mastra/redis-streams": "0.5.1",
-    "zod": "^4.3.6",
-    "@mastra/memory": "1.32.1",
-    "@mastra/observability": "1.18.1",
-    "@mastra/duckdb": "1.11.1"
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "22.20.1",

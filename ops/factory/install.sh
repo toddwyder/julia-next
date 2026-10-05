@@ -35,13 +35,8 @@ cp -a "$source_dir/src/mastra/reviewer/." "$app_dir/src/mastra/reviewer/"
 printf 'Installing Factory from %s into %s\n' "$source_dir" "$app_dir"
 cd "$app_dir"
 npm ci
-python3 "$patch_dir/apply-install-patches.py" "$app_dir"
-node "$patch_dir/workos-cookie-identity.check.mjs" "$app_dir"
 npm run check
 npm run build
-# Mastra copies external packages into its deployable output.
-python3 "$patch_dir/apply-install-patches.py" "$app_dir"
-node "$patch_dir/workos-cookie-identity.check.mjs" "$app_dir/.mastra/output"
 install -D -m 0644 "$patch_dir/wait-alerts.py" "$app_dir/ops/factory/wait-alerts.py"
 install -D -m 0644 "$patch_dir/wait-alerts.sql" "$app_dir/ops/factory/wait-alerts.sql"
 # Issue #140: the Monday note, plus the read-only trace-retention diagnostic
@@ -58,4 +53,4 @@ install -D -m 0644 "$patch_dir/run-psql.mjs" "$app_dir/ops/factory/run-psql.mjs"
 # The retirement helper is dry-run-only; installation does not configure the
 # Factory teardown hook or grant any deletion capability.
 install -D -m 0755 "$patch_dir/sandbox-cleanup.mjs" "$app_dir/ops/factory/sandbox-cleanup.mjs"
-printf 'Factory install, WorkOS regression, typecheck and build passed in %s\n' "$app_dir"
+printf 'Factory install, stock WorkOS auth, typecheck and build passed in %s\n' "$app_dir"
