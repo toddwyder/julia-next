@@ -39,6 +39,7 @@ const generationSpan = {
   attributes: {
     model: 'deepseek/deepseek-v4-flash',
     costContext: { provider: 'deepseek', model: 'deepseek-v4-flash', estimatedCost: 0.4, costUnit: 'usd' },
+    usage: { inputTokens: 100, outputTokens: 40, inputTokenDetails: { cacheRead: 20 }, outputTokenDetails: { reasoning: 7 } },
   },
 };
 
@@ -153,6 +154,9 @@ test('a generation span normalises to its cost, session, window, outcome and pha
   assert.equal(record.startedAt, FROM_ISO(generationSpan.startedAt));
   assert.equal(record.endedAt, FROM_ISO(generationSpan.endedAt));
   assert.equal(record.costUsd, 0.4);
+  assert.equal(record.provider, 'deepseek');
+  assert.equal(record.model, 'deepseek-v4-flash');
+  assert.deepEqual(record.usage, { freshInputTokens: 80, cachedInputTokens: 20, outputTokens: 40, thinkingTokens: 7 });
   assert.equal(record.outcome, 'passed');
   assert.equal(record.actor, 'Factory');
 });
@@ -178,6 +182,13 @@ test('a span with no cost is reported as unknown, not as zero', () => {
   const [record] = normalizeTraceSpans([noCost], { cards: [{ number: 140, sessions: { 'session-140': {} } }] });
 
   assert.equal(record.costUsd, null);
+});
+
+test('a span without complete usage is an explicit gap, never zero tokens', () => {
+  const noUsage = { ...generationSpan, attributes: { ...generationSpan.attributes, usage: { inputTokens: 100 } } };
+  const [record] = normalizeTraceSpans([noUsage]);
+
+  assert.equal(record.usage, null);
 });
 
 test('a model span is marked cost-bearing even when Mastra recorded no cost', () => {

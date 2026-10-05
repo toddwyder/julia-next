@@ -76,6 +76,7 @@ jobs:
             ops/factory/skills.test.mjs ops/factory/monday-note.test.mjs \
             ops/factory/monday-note-run.test.mjs ops/factory/monday-note-adapters.test.mjs \
             ops/factory/monday-note-units.test.mjs ops/factory/mastra-traces.test.mjs \
+            ops/factory/mastra-session-messages.test.mjs ops/factory/issue-cost-records.test.mjs \
             ops/factory/factory-cards.test.mjs ops/factory/trace-retention.test.mjs
 
       - name: Install application dependencies

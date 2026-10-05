@@ -56,6 +56,7 @@ independent audits, never from an agent's report. A weekly summary shows what ea
 29. As Todd, I want to open Mastra's Studio to see traces and memory, so that I can check what an agent actually did.
 30. As an operator agent, I want the Factory project's own source kept in this repository, so that every change to Factory's setup has history and review.
 31. As an operator agent, I want CI to run only the checks that matter for the current code, so that runs are fast and a retired graph test cannot block every pull request.
+32. As Todd, I want one saved structured cost record for each completed Factory or laptop issue, including per-model cost and tokens, stages, waits, rescues, fallback marks and named gaps, so that a later Monday note can use durable evidence after raw traces are retired. The record is idempotent; an unmatched review remains an unmatched cost, never a guessed issue match. See GitHub #196 (approved design, 2026-10-02) and #211 (first slice).
 
 ## Implementation Decisions
 
