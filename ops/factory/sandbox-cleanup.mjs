@@ -311,8 +311,147 @@ export function findDueSessions({ sandboxRoot = SANDBOX_ROOT, logPath = null }) 
   });
 }
 
-function parseArgs(argv) {
-  const args = { sandboxRoot: SANDBOX_ROOT, sessionRoot: null, all: false, logPath: null, allowDelete: false, retest: false };
+
+export function defaultLookupFactorySession(targetId, { dbName = process.env.PGDATABASE || 'julia_factory_trial', runCommand = run } = {}) {
+  if (!/^[a-zA-Z0-9_-]+$/.test(targetId)) return { found: false, reason: 'invalid target id' };
+  const sql = `
+SELECT json_build_object(
+  'found', true,
+  'folderId', scs.id,
+  'sessionId', scs.session_id,
+  'branch', scs.branch,
+  'workItemId', wi.id,
+  'stages', wi.stages,
+  'retiredAt', COALESCE(
+    (SELECT jsonb_path_query_first(wi.stage_history, '$[*] ? (@.stage == "done" || @.stage == "canceled")')->>'enteredAt'),
+    (SELECT to_char(frb.revoked_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') FROM factory_run_bindings frb WHERE frb.session_id = scs.session_id AND frb.status = 'revoked' ORDER BY frb.created_at DESC LIMIT 1)
+  ),
+  'bindingStatus', (SELECT frb.status FROM factory_run_bindings frb WHERE frb.session_id = scs.session_id ORDER BY frb.created_at DESC LIMIT 1)
+)::text
+FROM source_control_sessions scs
+LEFT JOIN work_items wi ON scs.session_id IS NOT NULL AND wi.sessions::text LIKE concat('%', scs.session_id, '%')
+WHERE scs.id::text = '${targetId}' OR scs.session_id::text = '${targetId}'
+LIMIT 1;
+  `.trim();
+  try {
+    const args = ['-d', dbName, '-t', '-A', '-c', sql];
+    const output = runCommand('psql', args).trim();
+    if (!output) return { found: false, reason: 'no matching session' };
+    return JSON.parse(output);
+  } catch (error) {
+    return { found: false, reason: `factory query failed: ${error.message}` };
+  }
+}
+
+export function assessRetiredSession({
+  sessionId,
+  sandboxRoot = SANDBOX_ROOT,
+  sessionRoot,
+  minRetiredAgeHours = 24,
+  now = Date.now(),
+  lookupFactorySession = defaultLookupFactorySession,
+  inspection = defaultInspection(),
+}) {
+  const record = lookupFactorySession(sessionId);
+  if (!record || !record.found) {
+    return { sessionId, sessionRoot, decision: 'skip', gate: null, reason: record?.reason || 'no matching session' };
+  }
+  const isRetired = Array.isArray(record.stages)
+    ? record.stages.some(s => s === 'done' || s === 'canceled')
+    : record.bindingStatus === 'revoked';
+  if (!isRetired) {
+    return { sessionId, sessionRoot, decision: 'skip', gate: null, reason: 'not retired' };
+  }
+  if (!record.retiredAt) {
+    return { sessionId, sessionRoot, decision: 'skip', gate: null, reason: 'no retirement timestamp' };
+  }
+  const retiredTime = new Date(record.retiredAt).getTime();
+  if (Number.isNaN(retiredTime)) {
+    return { sessionId, sessionRoot, decision: 'skip', gate: null, reason: 'invalid retirement timestamp' };
+  }
+  const ageHours = (now - retiredTime) / (1000 * 60 * 60);
+  if (ageHours < minRetiredAgeHours) {
+    return {
+      sessionId,
+      sessionRoot,
+      decision: 'skip',
+      gate: null,
+      reason: `retired under minimum age: ${ageHours.toFixed(1)}h < ${minRetiredAgeHours}h`,
+      retiredAt: record.retiredAt,
+    };
+  }
+  return assessSandbox({ sessionId, sandboxRoot, sessionRoot, inspection });
+}
+
+export function retireRetiredSandbox({
+  sessionId,
+  sandboxRoot = SANDBOX_ROOT,
+  sessionRoot,
+  minRetiredAgeHours = 24,
+  now = Date.now(),
+  lookupFactorySession = defaultLookupFactorySession,
+  inspection,
+  allowDelete = false,
+  remove = rmSync,
+  log = () => {},
+}) {
+  const configuredInspection = inspection ?? defaultInspection();
+  const assessment = assessRetiredSession({
+    sessionId,
+    sandboxRoot,
+    sessionRoot,
+    minRetiredAgeHours,
+    now,
+    lookupFactorySession,
+    inspection: configuredInspection,
+  });
+  if (assessment.decision === 'skip') {
+    return emit({ ...assessment, checkedAt: new Date(now).toISOString() }, log);
+  }
+  if (assessment.decision === 'keep') {
+    return keep(assessment, log);
+  }
+  if (!allowDelete) {
+    return emit({ ...assessment, decision: 'would-delete', checkedAt: new Date(now).toISOString() }, log);
+  }
+  const final = assessRetiredSession({
+    sessionId,
+    sandboxRoot,
+    sessionRoot,
+    minRetiredAgeHours,
+    now,
+    lookupFactorySession,
+    inspection: configuredInspection,
+  });
+  if (final.decision === 'skip') return emit({ ...final, checkedAt: new Date(now).toISOString() }, log);
+  if (final.decision === 'keep') return keep(final, log);
+  try {
+    const finalIdle = configuredInspection.idle({ sessionId, sandboxRoot, sessionRoot });
+    if (!finalIdle?.ok) return keep({ ...final, gate: 'idle', reason: finalIdle?.reason ?? 'unknown idle check result' }, log);
+  } catch (error) {
+    return keep({ ...final, gate: 'idle', reason: error.message || String(error) }, log);
+  }
+  try {
+    remove(sessionRoot, { recursive: true, force: false, maxRetries: 0 });
+    if (existsSync(sessionRoot)) throw new Error('session root still exists after remove');
+    return emit({ ...final, decision: 'delete', checkedAt: new Date(now).toISOString() }, log);
+  } catch (error) {
+    return keep({ ...final, gate: 'target', reason: `could not remove session root: ${error.message}` }, log);
+  }
+}
+
+export function parseArgs(argv) {
+  const args = {
+    sandboxRoot: SANDBOX_ROOT,
+    sessionRoot: null,
+    all: false,
+    logPath: null,
+    allowDelete: false,
+    retest: false,
+    retired: false,
+    minRetiredAgeHours: 24,
+    only: null,
+  };
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
     if (value === '--sandbox-root') args.sandboxRoot = argv[++index];
@@ -321,10 +460,15 @@ function parseArgs(argv) {
     else if (value === '--log') args.logPath = argv[++index];
     else if (value === '--allow-delete') args.allowDelete = true;
     else if (value === '--retest') args.retest = true;
+    else if (value === '--retired') args.retired = true;
+    else if (value === '--min-retired-age-hours') args.minRetiredAgeHours = parseFloat(argv[++index]);
+    else if (value === '--only') args.only = argv[++index];
     else throw new Error(`unknown argument: ${value}`);
   }
-  const modes = [args.all, Boolean(args.sessionRoot), args.retest].filter(Boolean).length;
-  if (modes !== 1) throw new Error('usage: sandbox-cleanup.mjs (--session-root PATH | --all | --retest) [--sandbox-root PATH] [--log PATH] [--allow-delete]');
+  const modes = [args.all, Boolean(args.sessionRoot), args.retest, args.retired].filter(Boolean).length;
+  if (modes !== 1) {
+    throw new Error('usage: sandbox-cleanup.mjs (--session-root PATH | --all | --retest | --retired) [--sandbox-root PATH] [--log PATH] [--allow-delete] [--min-retired-age-hours HOURS] [--only SESSION_ID]');
+  }
   return args;
 }
 
@@ -335,20 +479,43 @@ if (import.meta.main) {
       if (args.logPath) appendFileSync(args.logPath, `${JSON.stringify(event)}\n`, { encoding: 'utf8', mode: 0o600 });
       process.stdout.write(`${JSON.stringify(event)}\n`);
     };
-    const sessions = args.retest
-      ? findDueSessions({ sandboxRoot: args.sandboxRoot, logPath: args.logPath })
-      : args.all
-        ? discoverSandboxSessions(args.sandboxRoot)
-        : [{ sessionId: resolve(args.sessionRoot).split(/[/\\]/).filter(Boolean).at(-1), sandboxRoot: args.sandboxRoot, sessionRoot: resolve(args.sessionRoot) }];
-    const events = sessions.map(session => retireSandbox({ ...session, allowDelete: args.allowDelete, log }));
-    if (args.retest) {
+    if (args.retired) {
+      let sessions = discoverSandboxSessions(args.sandboxRoot);
+      if (args.only) {
+        sessions = sessions.filter(s => s.sessionId === args.only || s.sessionRoot.endsWith(args.only));
+      }
+      const events = sessions.map(session =>
+        retireRetiredSandbox({
+          ...session,
+          minRetiredAgeHours: args.minRetiredAgeHours,
+          allowDelete: args.allowDelete,
+          log,
+        })
+      );
       for (const event of events) {
         if (event.decision === 'keep') {
-          process.stderr.write(`still failing: ${event.sessionId} (${event.gate}: ${event.reason})\n`);
+          process.stderr.write(`failing gate: ${event.sessionId} (${event.gate}: ${event.reason})\n`);
+        } else if (event.decision === 'skip') {
+          process.stderr.write(`skipped: ${event.sessionId} (${event.reason})\n`);
         }
       }
+      process.exitCode = 0;
+    } else {
+      const sessions = args.retest
+        ? findDueSessions({ sandboxRoot: args.sandboxRoot, logPath: args.logPath })
+        : args.all
+          ? discoverSandboxSessions(args.sandboxRoot)
+          : [{ sessionId: resolve(args.sessionRoot).split(/[\/\\]/).filter(Boolean).at(-1), sandboxRoot: args.sandboxRoot, sessionRoot: resolve(args.sessionRoot) }];
+      const events = sessions.map(session => retireSandbox({ ...session, allowDelete: args.allowDelete, log }));
+      if (args.retest) {
+        for (const event of events) {
+          if (event.decision === 'keep') {
+            process.stderr.write(`still failing: ${event.sessionId} (${event.gate}: ${event.reason})\n`);
+          }
+        }
+      }
+      process.exitCode = (args.all || args.retest) ? 0 : events[0].decision === 'keep' ? 1 : 0;
     }
-    process.exitCode = (args.all || args.retest) ? 0 : events[0].decision === 'keep' ? 1 : 0;
   } catch (error) {
     process.stderr.write(`sandbox-cleanup: ${error.message}\n`);
     process.exitCode = 2;

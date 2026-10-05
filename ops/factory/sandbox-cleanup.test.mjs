@@ -14,9 +14,12 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 import {
+  assessRetiredSession,
   assessSandbox,
   defaultInspection,
   findDueSessions,
+  parseArgs,
+  retireRetiredSandbox,
   retireSandbox,
   SANDBOX_ROOT,
 } from './sandbox-cleanup.mjs';
@@ -562,6 +565,222 @@ test('--session-root mode exits 0 when the sandbox is eligible', (t) => {
     const stdout = execFileSync(process.execPath, [script, '--session-root', fixture.sessionRoot, '--sandbox-root', fixture.root], { stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8' });
     const event = JSON.parse(stdout.trim());
     assert.equal(event.decision, 'would-delete');
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+
+test('parseArgs supports --retired mode, --min-retired-age-hours, and --only', () => {
+  const defaultRetired = parseArgs(['--retired']);
+  assert.equal(defaultRetired.retired, true);
+  assert.equal(defaultRetired.minRetiredAgeHours, 24);
+  assert.equal(defaultRetired.only, null);
+
+  const customized = parseArgs(['--retired', '--min-retired-age-hours', '12', '--only', 'sess-1', '--allow-delete']);
+  assert.equal(customized.retired, true);
+  assert.equal(customized.minRetiredAgeHours, 12);
+  assert.equal(customized.only, 'sess-1');
+  assert.equal(customized.allowDelete, true);
+
+  assert.throws(() => parseArgs(['--retired', '--all']), /usage/);
+  assert.throws(() => parseArgs(['--retired', '--retest']), /usage/);
+});
+
+test('an active session is skipped as not retired and never deleted', () => {
+  const fixture = setupRepository();
+  try {
+    const lookupFactorySession = () => ({
+      found: true,
+      stages: ['planning'],
+      bindingStatus: 'active',
+      retiredAt: null,
+    });
+    const result = assessRetiredSession({
+      sessionId: 'session-123',
+      sandboxRoot: fixture.root,
+      sessionRoot: fixture.sessionRoot,
+      lookupFactorySession,
+      inspection: inspectionWithoutIdle(),
+    });
+    assert.equal(result.decision, 'skip');
+    assert.equal(result.reason, 'not retired');
+
+    const retirement = retireRetiredSandbox({
+      sessionId: 'session-123',
+      sandboxRoot: fixture.root,
+      sessionRoot: fixture.sessionRoot,
+      lookupFactorySession,
+      inspection: inspectionWithoutIdle(),
+      allowDelete: true,
+    });
+    assert.equal(retirement.decision, 'skip');
+    assert.equal(existsSync(fixture.sessionRoot), true);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('a retired-under-one-day session is skipped and never deleted', () => {
+  const fixture = setupRepository();
+  const now = Date.now();
+  try {
+    const lookupFactorySession = () => ({
+      found: true,
+      stages: ['done'],
+      bindingStatus: 'revoked',
+      retiredAt: new Date(now - 12 * 60 * 60 * 1000).toISOString(), // 12 hours ago
+    });
+    const result = assessRetiredSession({
+      sessionId: 'session-123',
+      sandboxRoot: fixture.root,
+      sessionRoot: fixture.sessionRoot,
+      minRetiredAgeHours: 24,
+      now,
+      lookupFactorySession,
+      inspection: inspectionWithoutIdle(),
+    });
+    assert.equal(result.decision, 'skip');
+    assert.match(result.reason, /retired under minimum age/);
+
+    const retirement = retireRetiredSandbox({
+      sessionId: 'session-123',
+      sandboxRoot: fixture.root,
+      sessionRoot: fixture.sessionRoot,
+      minRetiredAgeHours: 24,
+      now,
+      lookupFactorySession,
+      inspection: inspectionWithoutIdle(),
+      allowDelete: true,
+    });
+    assert.equal(retirement.decision, 'skip');
+    assert.equal(existsSync(fixture.sessionRoot), true);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('a retired session that fails a gate is kept with its gate', () => {
+  const fixture = setupRepository();
+  const now = Date.now();
+  try {
+    writeFileSync(join(fixture.checkout, 'package.json'), '{"changed":true}\n');
+    const lookupFactorySession = () => ({
+      found: true,
+      stages: ['done'],
+      bindingStatus: 'revoked',
+      retiredAt: new Date(now - 48 * 60 * 60 * 1000).toISOString(), // 48 hours ago
+    });
+    const result = assessRetiredSession({
+      sessionId: 'session-123',
+      sandboxRoot: fixture.root,
+      sessionRoot: fixture.sessionRoot,
+      minRetiredAgeHours: 24,
+      now,
+      lookupFactorySession,
+      inspection: inspectionWithoutIdle(),
+    });
+    assert.equal(result.decision, 'keep');
+    assert.equal(result.gate, 'clean-git');
+
+    const retirement = retireRetiredSandbox({
+      sessionId: 'session-123',
+      sandboxRoot: fixture.root,
+      sessionRoot: fixture.sessionRoot,
+      minRetiredAgeHours: 24,
+      now,
+      lookupFactorySession,
+      inspection: inspectionWithoutIdle(),
+      allowDelete: true,
+    });
+    assert.equal(retirement.decision, 'keep');
+    assert.equal(retirement.gate, 'clean-git');
+    assert.equal(existsSync(fixture.sessionRoot), true);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('a folder with no Factory record is listed as no matching session and never deleted', () => {
+  const fixture = setupRepository();
+  try {
+    const lookupFactorySession = () => ({
+      found: false,
+      reason: 'no matching session',
+    });
+    const result = assessRetiredSession({
+      sessionId: 'orphan-folder',
+      sandboxRoot: fixture.root,
+      sessionRoot: fixture.sessionRoot,
+      lookupFactorySession,
+      inspection: inspectionWithoutIdle(),
+    });
+    assert.equal(result.decision, 'skip');
+    assert.equal(result.reason, 'no matching session');
+
+    const retirement = retireRetiredSandbox({
+      sessionId: 'orphan-folder',
+      sandboxRoot: fixture.root,
+      sessionRoot: fixture.sessionRoot,
+      lookupFactorySession,
+      inspection: inspectionWithoutIdle(),
+      allowDelete: true,
+    });
+    assert.equal(retirement.decision, 'skip');
+    assert.equal(retirement.reason, 'no matching session');
+    assert.equal(existsSync(fixture.sessionRoot), true);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('a retired session over min age with passing gates is deleted when allowDelete is true', () => {
+  const fixture = setupRepository();
+  const now = Date.now();
+  try {
+    const lookupFactorySession = () => ({
+      found: true,
+      stages: ['done'],
+      bindingStatus: 'revoked',
+      retiredAt: new Date(now - 48 * 60 * 60 * 1000).toISOString(),
+    });
+    const retirement = retireRetiredSandbox({
+      sessionId: 'session-123',
+      sandboxRoot: fixture.root,
+      sessionRoot: fixture.sessionRoot,
+      minRetiredAgeHours: 24,
+      now,
+      lookupFactorySession,
+      inspection: inspectionWithoutIdle(),
+      allowDelete: true,
+    });
+    assert.equal(retirement.decision, 'delete');
+    assert.equal(existsSync(fixture.sessionRoot), false);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('--min-retired-age-hours 0 allows immediate evaluation of freshly retired session', () => {
+  const fixture = setupRepository();
+  const now = Date.now();
+  try {
+    const lookupFactorySession = () => ({
+      found: true,
+      stages: ['done'],
+      bindingStatus: 'revoked',
+      retiredAt: new Date(now - 60 * 1000).toISOString(), // 1 minute ago
+    });
+    const result = assessRetiredSession({
+      sessionId: 'session-123',
+      sandboxRoot: fixture.root,
+      sessionRoot: fixture.sessionRoot,
+      minRetiredAgeHours: 0,
+      now,
+      lookupFactorySession,
+      inspection: inspectionWithoutIdle(),
+    });
+    assert.equal(result.decision, 'eligible');
   } finally {
     rmSync(fixture.root, { recursive: true, force: true });
   }

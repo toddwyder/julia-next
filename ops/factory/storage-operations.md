@@ -71,25 +71,41 @@ Revisit them after several cards of observed peak disk use.
    `/var/lib/julia-factory/sandboxes` and remove only that root. A failed check
    or removal keeps it.
 
-   **Retirement hook (stock `teardownCommand`):** Factory invokes
-   `projectRepository.teardownCommand` inside the repository checkout
-   (`entry.workdir`) upon session retirement (`@mastra/factory`
-   `dist/sandbox/session-retirement.js:105-119`). The retirement hook is:
+   **Host-side cleanup of retired sessions (`--retired` mode):**
+   Cleanup runs host-side, not inside the containerized session checkout.
+   Factory executes its stock `teardownCommand` inside a `bwrap` container
+   where the session root is a bind mount point, the teardown shell PID 1
+   runs in the checkout (failing `idleGate`), and `/var/lib/julia-factory` is a
+   private tmpfs mount invisible to the host log. Accordingly, `teardownCommand`
+   is unset on the repository.
+
+   Automated cleanup runs daily from the host systemd timer via `--retired` mode:
 
    ```sh
-   node ops/factory/sandbox-cleanup.mjs --session-root .. \
+   node ops/factory/sandbox-cleanup.mjs --retired \
+     --sandbox-root /var/lib/julia-factory/sandboxes \
+     --allow-delete \
      --log /var/lib/julia-factory/sandbox-cleanup.ndjson
    ```
 
-   In `--session-root` mode, `sandbox-cleanup.mjs` exits 1 when a sandbox is
-   kept (and 0 when eligible/deleted). Factory's retirement coordinator runs
-   `teardownCommand` in a `try...catch` block (lines 105-114); a non-zero exit
-   logs a warning (`Factory teardown command failed`) and proceeds directly to
-   releasing the session sandbox (lines 115-119) without blocking, failing, or
-   retrying retirement.
+   The `--retired` mode lists every folder under the sandbox root, joins each
+   to Factory's PostgreSQL records (`source_control_sessions`, `work_items`, and
+   `factory_run_bindings`), and acts only on sessions Factory records as retired
+   (terminal stages `done` or `canceled`) for at least 24 hours
+   (`--min-retired-age-hours 24` default).
+   
+   - Not retired, or no matching session record: skipped and listed, never deleted.
+   - Retired under minimum age: skipped until the required interval elapses.
+   - Retired and eligible by age: the standard four safety gates (`target`,
+     `idle`, `clean-git`, and `recoverable-content`) are evaluated. If all pass,
+     the root is removed (when `--allow-delete` is enabled) or logged as `would-delete`.
+   - Failing any gate: logged as `keep` with its gate, reason, and refreshed `retryAt`.
 
-   **One-day re-test:** Sandboxes kept at retirement are re-tested 24 hours
-   later. Run the re-test daily:
+   For one-pass operator testing or single-session proofs, the mode supports:
+   - `--only <sessionId>`: restricts evaluation to the specified session folder.
+   - `--min-retired-age-hours <hours>`: overrides the retirement age threshold (e.g. `0` for freshly retired cards).
+
+   **Legacy re-test of kept sessions (`--retest` mode):**
 
    ```sh
    node ops/factory/sandbox-cleanup.mjs --retest \
