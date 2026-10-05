@@ -11,7 +11,7 @@ import {
 } from 'node:fs';
 import { execFileSync, spawn } from 'node:child_process';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 import {
   assessSandbox,
@@ -439,5 +439,130 @@ test('findDueSessions filters kept sessions by retryAt timestamp against log', (
     assert.deepEqual(due.map(s => s.sessionId), ['session-1']);
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('a repository with stashed changes fails clean-git gate', () => {
+  const fixture = setupRepository();
+  try {
+    writeFileSync(join(fixture.checkout, 'stash.txt'), 'stash-me\n');
+    git(fixture.checkout, 'add', 'stash.txt');
+    git(fixture.checkout, 'stash', 'push', '-m', 'wip');
+    const result = assessSandbox({ sessionId: 'session-123', sandboxRoot: fixture.root, sessionRoot: fixture.sessionRoot, inspection: inspectionWithoutIdle() });
+    assert.equal(result.gate, 'clean-git');
+    assert.match(result.reason, /stash/);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('a repository with multiple worktrees fails clean-git gate', () => {
+  const fixture = setupRepository();
+  const extraWorktree = join(fixture.root, 'extra-worktree');
+  try {
+    git(fixture.checkout, 'worktree', 'add', '-b', 'extra-branch', extraWorktree);
+    const result = assessSandbox({ sessionId: 'session-123', sandboxRoot: fixture.root, sessionRoot: fixture.sessionRoot, inspection: inspectionWithoutIdle() });
+    assert.equal(result.gate, 'clean-git');
+    assert.match(result.reason, /multiple worktrees/);
+  } finally {
+    try { git(fixture.checkout, 'worktree', 'remove', '--force', extraWorktree); } catch {}
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('a local tag pointing at an unbranched commit fails clean-git gate', () => {
+  const fixture = setupRepository();
+  try {
+    writeFileSync(join(fixture.checkout, 'tagged.txt'), 'tagged work\n');
+    git(fixture.checkout, 'add', 'tagged.txt');
+    git(fixture.checkout, 'commit', '-m', 'tagged commit');
+    git(fixture.checkout, 'tag', 'local-tag');
+    const result = assessSandbox({ sessionId: 'session-123', sandboxRoot: fixture.root, sessionRoot: fixture.sessionRoot, inspection: inspectionWithoutIdle() });
+    assert.equal(result.gate, 'clean-git');
+    assert.match(result.reason, /local tag/);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('a local tag pointing at a commit on a GitHub branch passes clean-git gate', () => {
+  const fixture = setupRepository();
+  try {
+    git(fixture.checkout, 'tag', 'safe-tag', 'main');
+    const result = assessSandbox({ sessionId: 'session-123', sandboxRoot: fixture.root, sessionRoot: fixture.sessionRoot, inspection: inspectionWithoutIdle() });
+    assert.equal(result.decision, 'eligible');
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('findDueSessions skips sessions with no log entry', () => {
+  const root = mkdtempSync(join(tmpdir(), 'sandbox-due-no-log-'));
+  const session1 = join(root, 'session-logged');
+  const session2 = join(root, 'session-unlogged');
+  const logFile = join(root, 'cleanup.ndjson');
+  mkdirSync(session1);
+  mkdirSync(session2);
+  try {
+    const past = new Date(Date.now() - 10000).toISOString();
+    writeFileSync(logFile, `${JSON.stringify({ sessionId: 'session-logged', decision: 'keep', retryAt: past })}\n`);
+    const due = findDueSessions({ sandboxRoot: root, logPath: logFile });
+    assert.deepEqual(due.map(s => s.sessionId), ['session-logged']);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('findDueSessions skips sessions whose latest log entry is not a keep', () => {
+  const root = mkdtempSync(join(tmpdir(), 'sandbox-due-not-keep-'));
+  const session1 = join(root, 'session-kept');
+  const session2 = join(root, 'session-deleted');
+  const session3 = join(root, 'session-would-delete');
+  const logFile = join(root, 'cleanup.ndjson');
+  mkdirSync(session1);
+  mkdirSync(session2);
+  mkdirSync(session3);
+  try {
+    const past = new Date(Date.now() - 10000).toISOString();
+    writeFileSync(logFile, [
+      JSON.stringify({ sessionId: 'session-kept', decision: 'keep', retryAt: past }),
+      JSON.stringify({ sessionId: 'session-deleted', decision: 'delete', checkedAt: past }),
+      JSON.stringify({ sessionId: 'session-would-delete', decision: 'would-delete', checkedAt: past }),
+    ].join('\n') + '\n');
+    const due = findDueSessions({ sandboxRoot: root, logPath: logFile });
+    assert.deepEqual(due.map(s => s.sessionId), ['session-kept']);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('--session-root mode exits 1 when the sandbox is kept', (t) => {
+  if (process.platform !== 'linux') return t.skip('CLI execution with default inspection requires Linux lsof');
+  const fixture = setupRepository();
+  try {
+    writeFileSync(join(fixture.checkout, 'dirty.txt'), 'dirty\n');
+    const script = resolve('ops/factory/sandbox-cleanup.mjs');
+    let exitCode = 0;
+    try {
+      execFileSync(process.execPath, [script, '--session-root', fixture.sessionRoot, '--sandbox-root', fixture.root], { stdio: 'pipe' });
+    } catch (error) {
+      exitCode = error.status;
+    }
+    assert.equal(exitCode, 1);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('--session-root mode exits 0 when the sandbox is eligible', (t) => {
+  if (process.platform !== 'linux') return t.skip('CLI execution with default inspection requires Linux lsof');
+  const fixture = setupRepository();
+  try {
+    const script = resolve('ops/factory/sandbox-cleanup.mjs');
+    const stdout = execFileSync(process.execPath, [script, '--session-root', fixture.sessionRoot, '--sandbox-root', fixture.root], { stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8' });
+    const event = JSON.parse(stdout.trim());
+    assert.equal(event.decision, 'would-delete');
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
   }
 });

@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env node
+#!/usr/bin/env node
 // Sandbox retirement cleanup is deliberately dry-run-only. Enabling real
 // deletion is a separate operator action after the exceptions-list approval.
 import { appendFileSync, existsSync, lstatSync, readdirSync, readFileSync, realpathSync, rmSync } from 'node:fs';
@@ -132,12 +132,29 @@ function allowedUntrackedPath(path) {
   return pathHasAllowedSegment(path, ALLOWED_FACTORY_WORKING_DIRECTORY_NAMES);
 }
 
+function isGitHubBranch(branch) {
+  return branch.startsWith('origin/') && branch !== 'origin/HEAD';
+}
+
+function fetchGitHubBranches(checkout) {
+  const origin = git(checkout, ['config', '--get', 'remote.origin.url']).trim();
+  if (!/(^|[/:])github\.com([/:]|$)/i.test(origin)) throw new Error('origin is not a GitHub remote');
+  // Factory uses a main-only fetch rule in its sandboxes. Override it for
+  // this command only so every live GitHub branch can preserve a commit;
+  // --prune makes a branch deleted on GitHub stop counting. This does not
+  // modify the sandbox's saved remote configuration.
+  git(checkout, ['fetch', '--no-tags', '--prune', 'origin', '+refs/heads/*:refs/remotes/origin/*']);
+}
+
 function gitGate({ sessionRoot }) {
   try {
     const links = symlinkGate(sessionRoot);
     if (!links.ok) return links;
     const checkout = checkoutRoot(sessionRoot);
     if (git(checkout, ['rev-parse', '--is-inside-work-tree']).trim() !== 'true') return fail('checkout is not a Git work tree');
+    const worktrees = git(checkout, ['worktree', 'list', '--porcelain']).split('\n').filter(line => line.startsWith('worktree '));
+    if (worktrees.length > 1) return fail('multiple worktrees present');
+    if (git(checkout, ['stash', 'list']).trim()) return fail('git stash is not empty');
     for (const entry of git(checkout, ['status', '--porcelain=v1', '--ignored=matching', '-z']).split('\0').filter(Boolean)) {
       const code = entry.slice(0, 2);
       const path = entry.slice(3);
@@ -147,6 +164,17 @@ function gitGate({ sessionRoot }) {
       if (code === '??') return fail(`untracked non-ignored file: ${path}`);
       return fail(`changed tracked file: ${path}`);
     }
+    const tags = git(checkout, ['tag', '-l']).trim().split('\n').filter(Boolean);
+    if (tags.length > 0) {
+      fetchGitHubBranches(checkout);
+      for (const tag of tags) {
+        const commit = git(checkout, ['rev-parse', `${tag}^{commit}`]).trim();
+        const branches = git(checkout, ['branch', '-r', '--contains', commit]).split('\n').map(line => line.trim()).filter(Boolean);
+        if (!branches.some(isGitHubBranch)) {
+          return fail(`local tag points at a commit no GitHub branch contains: ${tag}`);
+        }
+      }
+    }
     if (git(checkout, ['submodule', 'status', '--recursive']).trim()) return fail('submodule present');
     for (const file of git(checkout, ['ls-files', '-z']).split('\0').filter(Boolean)) {
       if (readFileSync(join(checkout, file), 'utf8').slice(0, 128).startsWith('version https://git-lfs.github.com/spec/v1')) return fail(`Git LFS pointer: ${file}`);
@@ -155,10 +183,6 @@ function gitGate({ sessionRoot }) {
   } catch (error) {
     return fail(`cannot verify clean Git state: ${error.message}`);
   }
-}
-
-function isGitHubBranch(branch) {
-  return branch.startsWith('origin/') && branch !== 'origin/HEAD';
 }
 
 function contentAppearsInMainHistory(checkout, commit, path) {
@@ -181,13 +205,7 @@ function contentAppearsInMainHistory(checkout, commit, path) {
 function recoverableGate({ sessionRoot }) {
   try {
     const checkout = checkoutRoot(sessionRoot);
-    const origin = git(checkout, ['config', '--get', 'remote.origin.url']).trim();
-    if (!/(^|[/:])github\.com([/:]|$)/i.test(origin)) return fail('origin is not a GitHub remote');
-    // Factory uses a main-only fetch rule in its sandboxes. Override it for
-    // this command only so every live GitHub branch can preserve a commit;
-    // --prune makes a branch deleted on GitHub stop counting. This does not
-    // modify the sandbox's saved remote configuration.
-    git(checkout, ['fetch', '--no-tags', '--prune', 'origin', '+refs/heads/*:refs/remotes/origin/*']);
+    fetchGitHubBranches(checkout);
     const commits = git(checkout, ['rev-list', 'HEAD', '--branches', '--not', 'origin/main']).trim().split('\n').filter(Boolean);
     for (const commit of commits) {
       const branches = git(checkout, ['branch', '-r', '--contains', commit]).split('\n').map(line => line.trim()).filter(Boolean);
@@ -275,8 +293,8 @@ export function discoverSandboxSessions(sandboxRoot = SANDBOX_ROOT) {
 }
 
 export function findDueSessions({ sandboxRoot = SANDBOX_ROOT, logPath = null }) {
+  if (!logPath || !existsSync(logPath)) return [];
   const sessions = discoverSandboxSessions(sandboxRoot);
-  if (!logPath || !existsSync(logPath)) return sessions;
   const lines = readFileSync(logPath, 'utf8').trim().split('\n').filter(Boolean);
   const latestBySession = new Map();
   for (const line of lines) {
@@ -288,8 +306,7 @@ export function findDueSessions({ sandboxRoot = SANDBOX_ROOT, logPath = null }) 
   const now = Date.now();
   return sessions.filter(session => {
     const last = latestBySession.get(session.sessionId);
-    if (!last || last.decision !== 'keep') return true;
-    if (!last.retryAt) return true;
+    if (!last || last.decision !== 'keep' || !last.retryAt) return false;
     return new Date(last.retryAt).getTime() <= now;
   });
 }

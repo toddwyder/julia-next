@@ -57,8 +57,10 @@ Revisit them after several cards of observed peak disk use.
      such as `ops/julia-runner/__pycache__/`). Loss of their contents is
      accepted. Any changed tracked file (even under `.artifacts/`), other
      untracked file, non-allowlisted ignored file, submodule, Git LFS
-     pointer, or symlink pointing outside the root fails this gate and keeps
-     the sandbox.
+     pointer, non-empty git stash (`git stash list`), multiple worktrees
+     (`git worktree list`), local tag pointing to a commit not contained in
+     any GitHub branch, or symlink pointing outside the root fails this gate
+     and keeps the sandbox.
    - **Recoverable content:** every commit is on a currently live GitHub branch
      (the gate fetches and prunes all remote heads for this check, without
      changing the sandbox's saved Git settings), or every file post-image (or
@@ -72,12 +74,19 @@ Revisit them after several cards of observed peak disk use.
    **Retirement hook (stock `teardownCommand`):** Factory invokes
    `projectRepository.teardownCommand` inside the repository checkout
    (`entry.workdir`) upon session retirement (`@mastra/factory`
-   `dist/sandbox/session-retirement.js`). The retirement hook is:
+   `dist/sandbox/session-retirement.js:105-119`). The retirement hook is:
 
    ```sh
    node ops/factory/sandbox-cleanup.mjs --session-root .. \
      --log /var/lib/julia-factory/sandbox-cleanup.ndjson
    ```
+
+   In `--session-root` mode, `sandbox-cleanup.mjs` exits 1 when a sandbox is
+   kept (and 0 when eligible/deleted). Factory's retirement coordinator runs
+   `teardownCommand` in a `try...catch` block (lines 105-114); a non-zero exit
+   logs a warning (`Factory teardown command failed`) and proceeds directly to
+   releasing the session sandbox (lines 115-119) without blocking, failing, or
+   retrying retirement.
 
    **One-day re-test:** Sandboxes kept at retirement are re-tested 24 hours
    later. Run the re-test daily:
@@ -88,10 +97,12 @@ Revisit them after several cards of observed peak disk use.
      --log /var/lib/julia-factory/sandbox-cleanup.ndjson
    ```
 
-   Kept roots whose `retryAt` timestamp has elapsed are evaluated again. If a
-   sandbox now passes, it is deleted (when `--allow-delete` is enabled) or
-   logged as `would-delete`. Any sandbox that still fails is logged with a
-   refreshed `retryAt` and printed to stderr with its failed gate and reason.
+   Kept roots whose latest log entry is a `keep` decision and whose `retryAt`
+   timestamp has elapsed are evaluated again. Sessions with no prior log entry
+   or whose latest entry is not a keep are skipped. If a sandbox now passes, it
+   is deleted (when `--allow-delete` is enabled) or logged as `would-delete`.
+   Any sandbox that still fails is logged with a refreshed `retryAt` and
+   printed to stderr with its failed gate and reason.
 
    **Dry-run audit over all sandboxes:**
 
