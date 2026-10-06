@@ -61,8 +61,7 @@ export async function runIssueCostCapture({
   normalizeTraces = normalizeTraceSpans, readMessages, readFallbackReasons = readPackFallbackReasons, saveRecord,
 } = {}) {
   const input = parseCaptureArguments(argv);
-  const factoryUrl = requiredEnv(env, 'ISSUE_COST_CAPTURE_FACTORY_URL');
-  const config = { database: env.ISSUE_COST_CAPTURE_DATABASE ?? 'julia_factory_trial', project_id: requiredEnv(env, 'ISSUE_COST_CAPTURE_PROJECT_ID') };
+  const config = { database: env.ISSUE_COST_CAPTURE_DATABASE ?? 'julia_factory_trial', project_id: env.ISSUE_COST_CAPTURE_PROJECT_ID?.trim() };
   const github = githubClient({ env, fetchImpl });
   const pullReader = readPullRequest ?? github.readPullRequest;
   const saver = saveRecord ?? ((record) => saveIssueCostRecord({ record, database: config.database, runPsql }));
@@ -84,6 +83,8 @@ export async function runIssueCostCapture({
     return saved;
   }
 
+  const factoryUrl = requiredEnv(env, 'ISSUE_COST_CAPTURE_FACTORY_URL');
+  if (!config.project_id) throw new Error('ISSUE_COST_CAPTURE_PROJECT_ID is required');
   const cards = await (readCards ?? (() => readFactoryCards({ config, runPsql })))();
   const card = cards.find((candidate) => candidate.number === issue.number);
   if (!card?.enteredAt) throw new Error(`Factory card #${issue.number} has no capture start time`);
