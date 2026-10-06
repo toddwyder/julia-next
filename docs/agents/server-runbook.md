@@ -14,6 +14,11 @@ there is a live route.
   `sudo -u <account>`.
 - **Keep SSH and sudo outside the Factory sandbox.** An authorized operator uses the laptop's
   Tailscale route; never copy a private key into Factory or request one in chat.
+- **On a machine card the laptop agent is the operator.** A laptop agent working a
+  `factory:machine` card is the authorized operator and may use this route for read-only server
+  work (logs, files and read-only commands) without asking Todd. A server change (install,
+  restart, configuration or writing sudo command) needs the card's approval. A Factory builder is
+  never the operator.
 
 ## Factory service (Mastra Factory — current route)
 
