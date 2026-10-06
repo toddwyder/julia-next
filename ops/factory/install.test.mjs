@@ -198,13 +198,41 @@ test('a root-run install hands the Mastra build to the app directory owner', () 
   // Live installs are authorized through sudo, while the long-running service
   // is julia-factory. The generated .mastra tree must therefore be built by
   // the app owner; otherwise a later service-account rebuild cannot replace it.
-  const source = readFileSync(installer, 'utf8');
-  assert.match(source, /app_owner=.*stat.*%U/);
-  assert.match(source, /chown -R .*app_dir/);
-  assert.match(source, /runuser -u .*"\$@"/);
-  assert.match(source, /run_as_app_owner npm ci/);
-  assert.match(source, /run_as_app_owner npm run check/);
-  assert.match(source, /run_as_app_owner npm run build/);
+  const tmp = mkdtempSync(resolve(tmpdir(), 'julia-factory-root-install-'));
+  const target = resolve(tmp, 'target');
+  const bin = resolve(tmp, 'bin');
+  const log = resolve(tmp, 'commands.log');
+  mkdirSync(target);
+  mkdirSync(bin);
+  writeFileSync(resolve(bin, 'id'), '#!/bin/sh\necho 0\n', { mode: 0o755 });
+  writeFileSync(resolve(bin, 'stat'), '#!/bin/sh\necho julia-factory\n', { mode: 0o755 });
+  writeFileSync(resolve(bin, 'chown'), '#!/bin/sh\nprintf "chown %s\\n" "$*" >> "$STUB_LOG"\n', { mode: 0o755 });
+  writeFileSync(resolve(bin, 'runuser'), `#!/bin/sh
+test "$1" = -u && test "$2" = julia-factory && test "$3" = -- || exit 19
+printf 'runuser %s %s\\n' "$2" "$*" >> "$STUB_LOG"
+shift 3
+SERVICE_OWNER=julia-factory "$@"
+`, { mode: 0o755 });
+  writeFileSync(resolve(bin, 'npm'), `#!/bin/sh
+printf 'npm %s owner=%s\\n' "$*" "$SERVICE_OWNER" >> "$STUB_LOG"
+if [ "$1" = run ] && [ "$2" = build ]; then
+  mkdir -p .mastra/output
+  printf 'built-by=%s\\n' "$SERVICE_OWNER" > .mastra/output/index.mjs
+fi
+`, { mode: 0o755 });
+
+  const result = installWithBash(installer, target, {
+    cwd: tmp,
+    env: { ...process.env, PATH: `${bashPath(bin)}:${process.env.PATH}`, STUB_LOG: log },
+    encoding: 'utf8',
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(readFileSync(resolve(target, '.mastra/output/index.mjs'), 'utf8'), 'built-by=julia-factory\n');
+  const commands = readFileSync(log, 'utf8');
+  assert.match(commands, /chown -R julia-factory:julia-factory/);
+  assert.equal((commands.match(/runuser julia-factory/g) ?? []).length, 3);
+  assert.match(commands, /npm run build owner=julia-factory/);
 });
 
 test('a missing required skill leaves an existing install untouched', () => {
