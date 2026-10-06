@@ -40,11 +40,9 @@ there is a live route.
 | Account | Role | Access |
 | --- | --- | --- |
 | `ubuntu` | Server administrator — installation channel only, not a day-to-day identity | Passwordless sudo |
-| `orchestrator-svc` | Publisher — holds the publisher credential, merges via the publisher App | Narrow exact-command sudo only (`/etc/sudoers.d/orchestrator-svc-checkout-sync` and `-ops`) |
-| `runner` | Builder — writes in its own worktree, commits locally | Cannot read the publisher credential or publish |
+| `orchestrator-svc` | Service operator — maintains the deployed checkout | Narrow exact-command sudo only (`/etc/sudoers.d/orchestrator-svc-checkout-sync` and `-ops`) |
+| `runner` | Builder — writes in its own worktree and commits locally | No sudo access |
 
-- Verified live: `runner` cannot read `/etc/orchestrator-svc/.env.publisher` (permission denied).
-  Builders never gain the publisher credential or the whole orchestrator group.
 - SSH, sudo, and credential-adjacent operations stay outside the Factory sandbox and are done by
   an authorized operator, not a builder.
 
@@ -55,26 +53,20 @@ there is a live route.
   shell string, so it never appears in `argv` and is never printed.
 - **Never `cat` a drop-box secret file directly.** These are raw, non-`KEY=VALUE` tokens; a bare
   `cat` echoes the full value into whatever captured the command's output. Use `readSecret()`.
-- Never print raw secret files. Publisher and access-check logs record sanitized
+- Never print raw secret files. Service and access-check logs record sanitized
   action/outcome/commit evidence — never credentials, OAuth URLs/codes, pairing material, or raw
   credential-bearing subprocess output.
 - After any `groupadd`/`usermod -aG` that a seat's secret access depends on, verify secret
   access again — supplementary groups are fixed at daemon start and are not re-read live.
 
-## Publisher secrecy and scope
+## GitHub write boundaries
 
-- Every GitHub write — branch push, PR open, merge — goes through the publisher scripts
-  (`scripts/publish-pr.mjs`, `scripts/merge-pr.mjs`) as the `julia-graph-publisher` App, pinned to
-  the reviewed head.
-- An outside agent merges only its own setup or documentation PR through the publisher App, never
-  a Factory card. There is no blanket or wildcard merge grant.
-- The App's private key lives at `/etc/orchestrator-svc/.env.publisher` on the server (owner
-  `orchestrator-svc:orchestrator-svc`, mode 600, parent dir mode 700), and at
-  `C:\Julia\.env.publisher.local` on the laptop, loaded via Node's `--env-file`. Keep keys, JWTs,
-  and installation tokens inside this trusted process; never expose their values in output,
-  prompts, tickets, artifacts, or logs.
-- The publisher App has no `workflows` permission, so it cannot edit `.github/workflows/*` —
-  deliberately, not a bug to work around. Scope tokens to the intended repository and App.
+- For machine cards, the laptop operator uses ordinary authorized GitHub access to push branches,
+  open pull requests, and merge once CI is green.
+- Factory cards remain built, reviewed, and merged by Factory under the Factory-card process in
+  `docs/agents/work-execution.md`.
+- Keep credentials, tokens, and other authentication material inside their trusted process; never
+  expose their values in output, prompts, tickets, artifacts, or logs.
 
 ## Data and checkout ownership
 
