@@ -92,7 +92,7 @@ jobs:
           node --experimental-strip-types --test ops/factory/app/local-sandbox.test.mjs
           (cd ops/factory/app && node --experimental-strip-types --import ./register-typescript-esm.mjs \
             --test observability-retention.test.mjs observability-retention-schedule.test.mjs \
-            review-route-batching.test.mjs)
+            )
           npm run check --prefix ops/factory/app
 
       - name: Run current application and installation tests

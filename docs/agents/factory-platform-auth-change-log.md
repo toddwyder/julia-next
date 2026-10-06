@@ -1,5 +1,18 @@
 # Factory platform sign-in setup: change list
 
+## 2026-10-06: Factory-only Review starts (issue #194)
+
+Inspected `@mastra/factory` 0.19.1's installed Review board and rule types. Its
+supported Review-stage `onEnter` rule starts the `review` role; Factory's
+central role model settings select that run's model. The retired custom
+cross-maker reviewer, its signed route, its GitHub Action launcher, tests,
+workspace skills, and reviewer-specific environment settings were removed.
+GitHub's `pullRequestUpdated` rule is disabled so pushes cannot start or
+re-enter review; the next Factory build round must move its card into Review.
+The free CI workflow remains active. The obsolete
+`JULIA_REVIEW_ROUTE_SECRET` repository secret must be removed by the authorized
+repository-secret operator after this merged revision is installed.
+
 ## 2026-10-05: retired WorkOS identity exception
 
 Factory 0.19.1 uses the upstream `@mastra/auth-workos` 1.6.6 package without

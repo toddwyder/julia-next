@@ -17,8 +17,8 @@ Without those, the next card can go wrong the same way, and Todd would not know.
 ## Solution
 
 Factory's standard board runs every card, and Julia's rules go into Factory's supported places:
-its planning and review instructions, a separate cross-maker review agent built from Mastra's own
-example, and GitHub's own branch rules. Todd starts a card with one tap, tries the rehearsal copy,
+its planning and review instructions and GitHub's own branch rules. Factory's Review-stage run is
+the sole review start. Todd starts a card with one tap, tries the rehearsal copy,
 and approves or requests changes in one sentence; approval merges. Locks, not habits, stop agents
 merging or building workarounds, and Todd's assurance comes from Factory's own records and
 independent audits, never from an agent's report. A weekly summary shows what each card cost.
@@ -73,14 +73,10 @@ independent audits, never from an agent's report. A weekly summary shows what ea
   build step is left stock: it follows the approved plan and `AGENTS.md`.
 - **Coding standards.** Start `CODING_STANDARDS.md` with a short seed taken from the existing
   framework-first rules; it grows only through review send-backs.
-- **Cross-maker review agent.** Built from Mastra's `template-github-review-agent`, keeping its
-  workspace skills and observational memory, with its model and ordered backups as settings
-  (DeepSeek to start; always a different maker than the builder). The template is chat-based: it
-  neither reacts to pull requests nor posts GitHub reviews on its own. The ticket must find
-  Mastra's own supported way to trigger it on a pull request and post a real GitHub review under
-  its own GitHub App identity, trusted through Factory's `MASTRACODE_GITHUB_AUTHORIZED_BOTS`, so
-  Factory's existing rule sends "Request changes" to the builder. If Mastra has no supported way,
-  the agent stops and brings Todd the gap as a proposed exception.
+- **Review-stage reviewer.** Factory's stock Review-board entry rule starts its `review` role when
+  a Factory-authored pull request enters Review. The central role model setting selects the
+  reviewer. GitHub push and PR lifecycle events never start a paid review; a later build round
+  explicitly re-enters Review.
 - **GitHub side.** A branch ruleset on `main`: pull request required, Todd's approval required,
   required status checks (CI, publisher check, unapproved-machinery check), no bypass. Auto-merge
   enabled on the repository. Code owners: Todd owns the exceptions list and the Factory ops
