@@ -52,6 +52,55 @@ test('captures a finished Factory card from the in-process stores, and names una
   assert.ok(lines.includes('issue-cost-capture event=captured issue=163'));
 });
 
+test('captures fallback marks from every page of a long Factory session', async () => {
+  const writes = [];
+  const pages = [
+    { messages: [{ parts: [{ type: 'text', text: 'first page' }] }], total: 351, page: 0, perPage: 100, hasMore: true },
+    { messages: [{ parts: [{ type: 'data-mastracode-pack-fallback', data: { reason: 'pool-exhausted' } }] }], total: 351, page: 1, perPage: 100, hasMore: true },
+    { messages: [{ parts: [{ type: 'text', text: 'third page' }] }], total: 351, page: 2, perPage: 100, hasMore: true },
+    { messages: [{ parts: [{ type: 'data-mastracode-pack-fallback', data: { reason: 'persistent-outage' } }] }], total: 351, page: 3, perPage: 100, hasMore: false },
+  ];
+  const calls = [];
+
+  await captureFinishedFactoryCards({
+    projectId: '49b0ea94-d24b-43d7-8ce1-618cb61c5188',
+    projects: { listAll: async () => [{ id: '49b0ea94-d24b-43d7-8ce1-618cb61c5188', orgId: 'org-1' }] },
+    workItems: { list: async () => [{
+      title: 'Long session card', stages: ['done'], externalSource: { externalId: 'github-issue:163' },
+      sessions: { builder: { sessionId: 'session-163', threadId: 'thread-163' } },
+    }] },
+    observability: { listTraces: async () => ({ pagination: { hasMore: false }, spans: [] }) },
+    memory: { listMessages: async (input) => { calls.push(input); return pages[input.page]; } },
+    database: { any: async () => [], one: async (_sql, values) => { writes.push(values); return { record: values[1] }; } },
+    log: () => {},
+  });
+
+  assert.deepEqual(calls.map(({ page, perPage, orderBy }) => ({ page, perPage, orderBy })), [
+    { page: 0, perPage: 100, orderBy: { field: 'createdAt', direction: 'DESC' } },
+    { page: 1, perPage: 100, orderBy: { field: 'createdAt', direction: 'DESC' } },
+    { page: 2, perPage: 100, orderBy: { field: 'createdAt', direction: 'DESC' } },
+    { page: 3, perPage: 100, orderBy: { field: 'createdAt', direction: 'DESC' } },
+  ]);
+  const record = JSON.parse(writes[0][2]);
+  assert.equal(record.fallbacks.poolExhausted, 1);
+  assert.equal(record.fallbacks.persistentOutage, 1);
+});
+
+test('names the session and failed page when a paginated message read fails', async () => {
+  const lines = [];
+  await captureFinishedFactoryCards({
+    projectId: '49b0ea94-d24b-43d7-8ce1-618cb61c5188',
+    projects: { listAll: async () => [{ id: '49b0ea94-d24b-43d7-8ce1-618cb61c5188', orgId: 'org-1' }] },
+    workItems: { list: async () => [{ title: 'Read failure card', stages: ['done'], externalSource: { externalId: 'github-issue:163' }, sessions: { builder: { sessionId: 'session-163', threadId: 'thread-163' } } }] },
+    observability: { listTraces: async () => ({ pagination: { hasMore: false }, spans: [] }) },
+    memory: { listMessages: async ({ page }) => page === 0 ? { messages: [], total: 351, page, perPage: 100, hasMore: true } : Promise.reject(new Error('database unavailable')) },
+    database: { any: async () => [], one: async () => ({ record: {} }) },
+    log: (line) => lines.push(line),
+  });
+
+  assert.ok(lines.some((line) => line.includes('message read failed for session session-163 page 1: database unavailable')));
+});
+
 test('a card capture failure is logged and never prevents the retention prune', async () => {
   const lines = [];
   const target = { prune: async () => [{ domain: 'observability', table: 'spans', deleted: 1, done: true }] };
