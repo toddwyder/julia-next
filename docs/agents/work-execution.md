@@ -38,6 +38,9 @@ Factory; the Factory GitHub rules exclude the known machine issues and their PRs
 `factory:machine` label, and publisher App PRs from intake. Build on a branch, get a review from a
 different AI company, and merge the reviewed head through the publisher App.
 
+A documentation-only pull request (only `docs/` or Markdown files) needs no different-maker
+review; Todd decided this on 2026-10-05. Code pull requests still do.
+
 ## Models
 
 Models are settings, never fixed in documents: the builder in Factory's model settings, the
