@@ -116,6 +116,12 @@ const pruneOutput = z.object({
 });
 
 let pruneTarget: ObservabilityPruner | null = null;
+let costCapture: (() => Promise<void>) | null = null;
+
+/** Bind the in-process cost reader after Factory has composed its stores. */
+export function setIssueCostCapture(capture: () => Promise<void>): void {
+  costCapture = capture;
+}
 
 /**
  * Give the scheduled step the DuckDB store to prune. `index.ts` calls this
@@ -235,11 +241,21 @@ export async function runObservabilityRetention({
  */
 export async function runObservabilityPrune({
   target = pruneTarget,
+  capture = costCapture ?? undefined,
   log = console.log,
 }: {
   target?: ObservabilityPruner | null;
+  /** Capture is deliberately isolated: cost evidence must not delay retention. */
+  capture?: () => Promise<void>;
   log?: (message: string) => void;
 } = {}): Promise<{ pruned: PruneResult[] }> {
+  if (capture) {
+    try {
+      await capture();
+    } catch (error) {
+      log(`issue-cost-capture event=failed issue=unknown error=${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
   const { pruned } = await runObservabilityRetention({ target, log });
   return { pruned };
 }

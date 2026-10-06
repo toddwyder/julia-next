@@ -10,6 +10,7 @@ files=(
   # or `npm run check` and `npm run build` cannot resolve them.
   src/mastra/observability-store.ts
   src/mastra/observability-retention.ts
+  src/mastra/issue-cost-capture.ts
   # Issue #190: index.ts imports the asynchronous cross-maker workflow.
   # Keep it in the explicit install manifest even though the reviewer tree is copied below.
   src/mastra/reviewer/workflows/cross-maker-review-workflow.ts
@@ -53,10 +54,6 @@ install -D -m 0644 "$patch_dir/run-psql.mjs" "$app_dir/ops/factory/run-psql.mjs"
 # Issue #211: the executable capture entry point and every local module it
 # imports. Keep this manifest explicit so a clean server install cannot leave
 # the command with an unresolved local import.
-install -D -m 0755 "$patch_dir/issue-cost-capture.mjs" "$app_dir/ops/factory/issue-cost-capture.mjs"
-install -D -m 0644 "$patch_dir/issue-cost-records.mjs" "$app_dir/ops/factory/issue-cost-records.mjs"
-install -D -m 0644 "$patch_dir/mastra-session-messages.mjs" "$app_dir/ops/factory/mastra-session-messages.mjs"
-install -D -m 0644 "$patch_dir/local-factory-readers.mjs" "$app_dir/ops/factory/local-factory-readers.mjs"
 # The retirement helper is dry-run-only; installation does not configure the
 # Factory teardown hook or grant any deletion capability.
 install -D -m 0755 "$patch_dir/sandbox-cleanup.mjs" "$app_dir/ops/factory/sandbox-cleanup.mjs"

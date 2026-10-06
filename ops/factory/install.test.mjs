@@ -87,10 +87,6 @@ test('the installer copies the issue #140 Monday note and retention programs int
     'ops/factory/trace-retention.mjs',
     'ops/factory/factory-cards.mjs',
     'ops/factory/factory-cards.sql',
-    'ops/factory/issue-cost-capture.mjs',
-    'ops/factory/issue-cost-records.mjs',
-    'ops/factory/mastra-session-messages.mjs',
-    'ops/factory/local-factory-readers.mjs',
     'ops/factory/run-psql.mjs',
   ]) {
     assert.equal(readFileSync(resolve(target, file), 'utf8'), readFileSync(resolve(root, 'ops/factory', file.split('/').pop()), 'utf8'), file);
@@ -207,6 +203,7 @@ test('a missing required skill leaves an existing install untouched', () => {
   for (const file of [
     'package.json', 'package-lock.json', 'tsconfig.json', 'src/mastra/index.ts', 'src/mastra/local-sandbox.ts',
     'src/mastra/observability-store.ts', 'src/mastra/observability-retention.ts',
+    'src/mastra/issue-cost-capture.ts',
     'src/mastra/reviewer/workflows/cross-maker-review-workflow.ts',
     'src/mastra/public/factory-skills/factory-plan/SKILL.md',
   ]) {
