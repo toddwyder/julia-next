@@ -15,13 +15,13 @@ const execFileAsync = promisify(execFile);
  * variables are passed through, so the subprocess cannot pick up an ambient
  * connection or write setting.
  */
-export async function runPsql({ args, env }) {
+export async function runPsql({ args, env, stdin }) {
   const passthrough = {};
   for (const [key, value] of Object.entries(env ?? {})) {
     if (key === 'PATH' || key.startsWith('PG') || key === 'PGOPTIONS') passthrough[key] = value;
   }
   try {
-    const { stdout, stderr } = await execFileAsync('psql', args, { env: passthrough, maxBuffer: 64 * 1024 * 1024 });
+    const { stdout, stderr } = await execFileAsync('psql', args, { env: passthrough, input: stdin, maxBuffer: 64 * 1024 * 1024 });
     return { stdout, stderr, status: 0 };
   } catch (error) {
     return { stdout: error.stdout ?? '', stderr: error.stderr ?? error.message, status: error.code ?? 1 };
