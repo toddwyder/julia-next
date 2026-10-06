@@ -117,11 +117,13 @@ const pruneOutput = z.object({
 
 let pruneTarget: ObservabilityPruner | null = null;
 let costCapture: (() => Promise<void>) | null = null;
+let priceRefresh: (() => Promise<void>) | null = null;
 
 /** Bind the in-process cost reader after Factory has composed its stores. */
 export function setIssueCostCapture(capture: () => Promise<void>): void {
   costCapture = capture;
 }
+export function setModelPriceRefresh(refresh: () => Promise<void>): void { priceRefresh = refresh; }
 
 /**
  * Give the scheduled step the DuckDB store to prune. `index.ts` calls this
@@ -255,6 +257,9 @@ export async function runObservabilityPrune({
     } catch (error) {
       log(`issue-cost-capture event=failed issue=unknown error=${error instanceof Error ? error.message : String(error)}`);
     }
+  }
+  if (priceRefresh) {
+    try { await priceRefresh(); } catch (error) { log(`model-price-refresh event=failed error=${error instanceof Error ? error.message : String(error)}`); }
   }
   const { pruned } = await runObservabilityRetention({ target, log });
   return { pruned };

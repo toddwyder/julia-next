@@ -19,6 +19,17 @@ import {
   setObservabilityPruneTarget,
 } from './src/mastra/observability-retention.ts';
 import { captureFinishedFactoryCards } from './src/mastra/issue-cost-capture.ts';
+import { OPENROUTER_MODELS_URL, refreshModelPrices } from './src/mastra/model-price-refresh.ts';
+
+test('refreshes only changed prices from a real OpenRouter response shape', async () => {
+  const calls = [];
+  await refreshModelPrices({
+    database: { any: async (sql, values) => { calls.push([sql, values]); if (sql.startsWith('SELECT DISTINCT')) return [{ provider: 'openai', model: 'gpt-5' }]; if (sql.startsWith('SELECT usd')) return []; return []; } },
+    fetchImpl: async (url) => { assert.equal(url, OPENROUTER_MODELS_URL); return { ok: true, status: 200, json: async () => ({ data: [{ id: 'openai/gpt-5', pricing: { prompt: '0.00000125', completion: '0.00001', input_cache_read: '0.000000125', input_cache_write: '0.00000125', internal_reasoning: '0.00001' } }] }) }; },
+    now: new Date('2026-10-06T00:00:00Z'), log: () => {},
+  });
+  assert.equal(calls.filter(([sql]) => sql.startsWith('INSERT')).length, 5);
+});
 
 test('records every trace page by provider, model, and effort with named unknown token fields', async () => {
   const writes = [];

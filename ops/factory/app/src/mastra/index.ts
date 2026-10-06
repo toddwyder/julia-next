@@ -50,8 +50,9 @@ import {
   createDuckDBStore,
   duckdbObservabilityConfig,
 } from './observability-store.js';
-import { observabilityRetentionWorkflow, setIssueCostCapture, setObservabilityPruneTarget } from './observability-retention.js';
+import { observabilityRetentionWorkflow, setIssueCostCapture, setModelPriceRefresh, setObservabilityPruneTarget } from './observability-retention.js';
 import { captureFinishedFactoryCards } from './issue-cost-capture.js';
+import { refreshModelPrices } from './model-price-refresh.js';
 
 /**
  * Parse a positive-integer env knob; anything else means "use the default".
@@ -504,6 +505,11 @@ setIssueCostCapture(async () => {
     currentModeDefault: (mode) => resolveDefaultThinkingLevel(loadSettings(), mode).level,
     database: database as never,
   });
+});
+setModelPriceRefresh(async () => {
+  const database = (storage.getMastraStorage() as unknown as { db?: { any: Function } }).db;
+  if (!database) throw new Error('Factory Postgres client is not available for price refresh');
+  await refreshModelPrices({ database: database as never });
 });
 
 // Construct the server-owned Mastra HERE so the `new Mastra(...)` literal lives
