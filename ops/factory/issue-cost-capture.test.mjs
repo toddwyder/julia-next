@@ -55,7 +55,37 @@ test('the production GitHub boundary uses the linked issue from the pull request
     },
   });
   assert.equal(saved.identity.issueNumber, 211);
-  assert.equal(requests.length, 2);
+  assert.deepEqual(requests, [
+    'https://api.github.com/repos/toddwyder/julia-next/pulls/238',
+    'https://api.github.com/repos/toddwyder/julia-next/issues/238/timeline',
+  ]);
+});
+
+test('the production GitHub boundary resolves a Factory card linked pull request before reading it', async () => {
+  const requests = [];
+  await runIssueCostCapture({
+    argv: ['--factory-card', '211'],
+    env: { ISSUE_COST_CAPTURE_FACTORY_URL: 'https://factory.example', ISSUE_COST_CAPTURE_PROJECT_ID: 'project' },
+    fetchImpl: async (url) => {
+      requests.push(url);
+      const bodies = {
+        'https://api.github.com/repos/toddwyder/julia-next/issues/211': { number: 211, title: 'Cost record', state: 'closed', closed_at: '2026-10-06T12:00:00Z' },
+        'https://api.github.com/repos/toddwyder/julia-next/issues/211/timeline': [{ event: 'cross-referenced', source: { issue: { number: 237, pull_request: {} } } }],
+        'https://api.github.com/repos/toddwyder/julia-next/pulls/237': { number: 237, commits: [] },
+        'https://api.github.com/repos/toddwyder/julia-next/issues/237/timeline': [],
+      };
+      return { ok: true, json: async () => bodies[url] };
+    },
+    readCards: async () => [{ number: 211, enteredAt: '2026-10-06T10:00:00Z', sessions: {} }],
+    readSpans: async () => [], normalizeTraces: () => [], readMessages: async () => [], readFallbackReasons: () => [],
+    saveRecord: async (record) => record, write: () => {}, log: () => {}, now: () => '2026-10-06T13:00:00Z',
+  });
+  assert.deepEqual(requests, [
+    'https://api.github.com/repos/toddwyder/julia-next/issues/211',
+    'https://api.github.com/repos/toddwyder/julia-next/issues/211/timeline',
+    'https://api.github.com/repos/toddwyder/julia-next/pulls/237',
+    'https://api.github.com/repos/toddwyder/julia-next/issues/237/timeline',
+  ]);
 });
 
 test('the capture command rejects ambiguous input and a laptop pull request without exactly one linked issue', async () => {
