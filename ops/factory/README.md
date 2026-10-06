@@ -37,6 +37,11 @@ local sources (repository docs and pinned package paths) are cited; gaps are sta
 | Read persisted fallback marks | Mastra memory `GET /memory/threads/:threadId/messages`, which calls memory `listMessages` | `mastra@1.31.3` `dist/commands/api/route-metadata.generated.d.ts:851-861`; `@mastra/factory@0.17.2` `dist/factory.js:440-446`; `ops/factory/mastra-session-messages.mjs` |
 | Save a per-issue cost snapshot | Existing Factory PostgreSQL database | `ops/factory/issue-cost-records.migration.sql`; proposed exception #5 above |
 
+The #211 capture seam writes structured `issue-cost-record event=...` lines to
+the Factory service journal for card, trace, message, save and failure paths.
+They name issue and thread context but never a prompt or message body, so a
+failed supported read can be traced to its boundary without exposing session content.
+
 **Gaps this card could not close through supported config (stated, not invented):**
 
 - The supported DuckDB observability retention is wired in source

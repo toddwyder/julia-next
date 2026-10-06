@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildIssueCostRecord, buildUnmatchedReviewCostRecord, saveIssueCostRecord } from './issue-cost-records.mjs';
+import { buildIssueCostRecord, buildUnmatchedReviewCostRecord, captureIssueCostRecord, saveIssueCostRecord } from './issue-cost-records.mjs';
 
 const factoryIssue = { number: 211, title: 'Store structured cost records', outcome: 'done', completedAt: '2026-10-05T12:00:00.000Z' };
 const factoryCard = {
@@ -42,6 +42,30 @@ test('missing usage is a named gap rather than zero tokens', () => {
   assert.equal(record.cost.byProviderModel[0].freshInputTokens, null);
 });
 
+test('a missing monetary cost leaves aggregate cost unknown rather than writing zero', () => {
+  const record = buildIssueCostRecord({ issue: factoryIssue, kind: 'factory', card: factoryCard, traces: [{ ...tracedBuild, costUsd: null }] });
+
+  assert.equal(record.cost.totalUsd, null);
+  assert.ok(record.gaps.includes('trace trace-1: cost unavailable'));
+});
+
+test('a Factory record carries waits, non-bot commit rescues, review rounds and dated rework lines', () => {
+  const record = buildIssueCostRecord({
+    issue: factoryIssue, kind: 'factory', card: { ...factoryCard, waits: [{ startedAt: '2026-10-05T10:20:00Z', endedAt: '2026-10-05T10:30:00Z', reason: 'Todd approval' }] },
+    pullRequest: { number: 300, commits: [
+      { sha: 'factory', author: { login: 'julia-factory[bot]' }, committedAt: '2026-10-05T10:20:00Z' },
+      { sha: 'rescue', author: { login: 'operator' }, committedAt: '2026-10-05T10:25:00Z' },
+    ] },
+    factoryBotLogin: 'julia-factory[bot]', traces: [tracedBuild], reviewRounds: [{ number: 1, outcome: 'changes-requested' }],
+    rework: [{ at: '2026-10-05T11:01:00Z', reason: 'Reviewer timed out before a verdict' }],
+  });
+
+  assert.deepEqual(record.waits, [{ startedAt: '2026-10-05T10:20:00Z', endedAt: '2026-10-05T10:30:00Z', reason: 'Todd approval' }]);
+  assert.deepEqual(record.rescues, [{ sha: 'rescue', actor: 'operator', committedAt: '2026-10-05T10:25:00Z' }]);
+  assert.deepEqual(record.reviewRounds, [{ number: 1, outcome: 'changes-requested' }]);
+  assert.deepEqual(record.rework, [{ at: '2026-10-05T11:01:00Z', reason: 'Reviewer timed out before a verdict' }]);
+});
+
 test('a repeated save writes the issue record once and returns the stored row', async () => {
   const record = buildIssueCostRecord({ issue: factoryIssue, kind: 'factory', card: factoryCard, traces: [tracedBuild] });
   const commands = [];
@@ -54,7 +78,7 @@ test('a repeated save writes the issue record once and returns the stored row', 
 
   assert.equal(commands.length, 1);
   assert.ok(commands[0].args.includes('ON_ERROR_STOP=1'));
-  assert.match(commands[0].args.join(' '), /ON CONFLICT \(record_key\) DO NOTHING/);
+  assert.match(commands[0].args.join(' '), /ON CONFLICT \(record_key\) DO UPDATE/);
   assert.deepEqual(saved, record);
 });
 
@@ -64,4 +88,22 @@ test('a review trace without an issue becomes an unmatched cost record, never a 
   assert.equal(record.recordKey, 'unmatched-review:review-trace');
   assert.equal(record.identity.kind, 'unmatched-review');
   assert.equal(record.cost.totalUsd, 0.42);
+});
+
+test('capture wiring reads a Factory card, its traces and every session message before saving one record', async () => {
+  const calls = [];
+  const saved = await captureIssueCostRecord({
+    issue: factoryIssue, kind: 'factory', from: '2026-10-05T00:00:00Z', to: '2026-10-06T00:00:00Z', factoryBotLogin: 'julia-factory[bot]',
+    readCards: async () => [{ ...factoryCard, number: 211, sessions: { one: { threadId: 'thread-1', resourceId: 'project' } } }],
+    readSpans: async () => [{ id: 'raw', sessionId: 'one' }],
+    normalizeTraces: () => [tracedBuild],
+    readMessages: async (input) => { calls.push(input); return [{ parts: [{ type: 'data-mastracode-pack-fallback', data: { reason: 'pool-exhausted' } }] }]; },
+    readFallbackReasons: (messages) => messages.flatMap((message) => message.parts.map((part) => part.data.reason)),
+    saveRecord: async (record) => record,
+  });
+
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0], { threadId: 'thread-1', resourceId: 'project' });
+  assert.equal(saved.fallbacks.poolExhausted, 1);
+  assert.equal(saved.cost.totalUsd, 0.42);
 });
