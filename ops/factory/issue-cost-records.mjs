@@ -127,6 +127,10 @@ export async function captureIssueCostRecord({
       log(`issue-cost-record event=read-traces issue=${issue.number} from=${from} to=${to}`);
       const spans = await readSpans({ from, to });
       traces = normalizeTraces(spans, { cards: [card] });
+      if (readPullRequest) {
+        log(`issue-cost-record event=read-pull-request issue=${issue.number}`);
+        pullRequest = await readPullRequest({ issueNumber: issue.number });
+      }
       for (const session of Object.values(card.sessions ?? {})) {
         if (!session?.threadId) throw new Error(`Factory card #${issue.number} has a session without a thread id`);
         log(`issue-cost-record event=read-messages issue=${issue.number} thread=${session.threadId}`);
