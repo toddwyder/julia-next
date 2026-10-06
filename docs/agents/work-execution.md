@@ -25,9 +25,11 @@ record shows whether every step was done by Factory or by Todd.
 
 - Sets up and looks after Factory, Mastra, GitHub and Vercel settings, writes specs and documents,
   and runs product-use audits.
-- Merges its own setup or document pull requests through the publisher App (`merge-pr.mjs`, pinned
-  to the reviewed head); it never builds, reviews, moves, or merges a Factory card and never uses
-  Factory's GitHub keys.
+- For a machine card, uses the laptop's ordinary signed-in access: `git push` the branch, `gh pr
+  create`, then `gh pr merge --squash` once CI is green. The publisher App and
+  `scripts/publish-pr.mjs` / `scripts/merge-pr.mjs` are for the Factory-card route only and must
+  not be used for machine cards. It never builds, reviews, moves, or merges a Factory card and
+  never uses Factory's GitHub keys.
 - Approved custom pieces go on the exceptions list in `ops/factory/README.md`.
 
 ## Machine cards
@@ -36,8 +38,11 @@ Keep machine-card GitHub issues open while working, label new ones `factory:mach
 and do not send them to Factory; the Factory GitHub rules exclude the known machine issues and
 their PRs, the `factory:machine` label, and publisher App PRs from intake.
 
-1. On a machine card the laptop agent is the operator: builds, merges with ordinary access once CI
-   is green, installs on the server, proves it with its own read-back, and closes the card.
+1. On a machine card the laptop agent is the operator: builds, uses its ordinary signed-in access
+   to `git push` the branch, `gh pr create`, and `gh pr merge --squash` once CI is green, installs
+   on the server, proves it with its own read-back, and closes the card. The publisher App and
+   `scripts/publish-pr.mjs` / `scripts/merge-pr.mjs` are for the Factory-card route only and must
+   not be used for machine cards.
 2. Read-only server work needs no approval. A server change a card calls for is allowed: note the
    current state first and restore it if the read-back fails.
 3. Every machine PR is built test-first with Pocock's `/tdd` (the branch history shows a failing

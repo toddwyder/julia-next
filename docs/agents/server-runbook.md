@@ -61,8 +61,10 @@ there is a live route.
 
 ## GitHub write boundaries
 
-- For machine cards, the laptop operator uses ordinary authorized GitHub access to push branches,
-  open pull requests, and merge once CI is green.
+- For machine cards, the laptop operator uses its ordinary signed-in access to `git push` the
+  branch, `gh pr create`, then `gh pr merge --squash` once CI is green. The publisher App and
+  `scripts/publish-pr.mjs` / `scripts/merge-pr.mjs` are for the Factory-card route only and must
+  not be used for machine cards.
 - Factory cards remain built, reviewed, and merged by Factory under the Factory-card process in
   `docs/agents/work-execution.md`.
 - Keep credentials, tokens, and other authentication material inside their trusted process; never
