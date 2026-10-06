@@ -50,6 +50,12 @@ install -D -m 0644 "$patch_dir/trace-retention.mjs" "$app_dir/ops/factory/trace-
 install -D -m 0644 "$patch_dir/factory-cards.mjs" "$app_dir/ops/factory/factory-cards.mjs"
 install -D -m 0644 "$patch_dir/factory-cards.sql" "$app_dir/ops/factory/factory-cards.sql"
 install -D -m 0644 "$patch_dir/run-psql.mjs" "$app_dir/ops/factory/run-psql.mjs"
+# Issue #211: the executable capture entry point and every local module it
+# imports. Keep this manifest explicit so a clean server install cannot leave
+# the command with an unresolved local import.
+install -D -m 0755 "$patch_dir/issue-cost-capture.mjs" "$app_dir/ops/factory/issue-cost-capture.mjs"
+install -D -m 0644 "$patch_dir/issue-cost-records.mjs" "$app_dir/ops/factory/issue-cost-records.mjs"
+install -D -m 0644 "$patch_dir/mastra-session-messages.mjs" "$app_dir/ops/factory/mastra-session-messages.mjs"
 # The retirement helper is dry-run-only; installation does not configure the
 # Factory teardown hook or grant any deletion capability.
 install -D -m 0755 "$patch_dir/sandbox-cleanup.mjs" "$app_dir/ops/factory/sandbox-cleanup.mjs"

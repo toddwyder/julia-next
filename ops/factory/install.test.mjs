@@ -87,6 +87,10 @@ test('the installer copies the issue #140 Monday note and retention programs int
     'ops/factory/trace-retention.mjs',
     'ops/factory/factory-cards.mjs',
     'ops/factory/factory-cards.sql',
+    'ops/factory/issue-cost-capture.mjs',
+    'ops/factory/issue-cost-records.mjs',
+    'ops/factory/mastra-session-messages.mjs',
+    'ops/factory/run-psql.mjs',
   ]) {
     assert.equal(readFileSync(resolve(target, file), 'utf8'), readFileSync(resolve(root, 'ops/factory', file.split('/').pop()), 'utf8'), file);
   }
