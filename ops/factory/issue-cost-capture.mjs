@@ -45,7 +45,7 @@ function githubClient({ env, fetchImpl = fetch }) {
       // GitHub's issue timeline is the API-backed PR-to-issue relation. It is
       // deliberately required to be singular rather than guessing from text.
       const timeline = await api(`/repos/${owner}/${repo}/issues/${number}/timeline`);
-      const linked = timeline.filter((event) => event.event === 'cross-referenced' && event.source?.issue?.pull_request)
+      const linked = timeline.filter((event) => event.event === 'cross-referenced' && event.source?.issue && !event.source.issue.pull_request)
         .map((event) => event.source.issue).filter((issue) => issue.number !== number);
       const closingIssues = [...new Map(linked.map((issue) => [issue.number, issue])).values()].map((issue) => ({
         number: issue.number, title: issue.title, state: issue.state?.toUpperCase(), closedAt: issue.closed_at,

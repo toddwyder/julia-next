@@ -44,6 +44,20 @@ test('the capture command resolves a laptop pull request to its one linked issue
   assert.equal(saved.source.pullRequestNumber, 238);
 });
 
+test('the production GitHub boundary uses the linked issue from the pull request timeline', async () => {
+  const requests = [];
+  const saved = await runIssueCostCapture({
+    argv: ['--laptop-pr', '238'], env: {}, write: () => {}, log: () => {}, saveRecord: async (record) => record,
+    fetchImpl: async (url) => {
+      requests.push(url);
+      const body = url.endsWith('/pulls/238') ? { number: 238, commits: [] } : [{ event: 'cross-referenced', source: { issue: { number: 211, title: 'Cost record', state: 'closed', closed_at: '2026-10-06T12:00:00Z' } } }];
+      return { ok: true, json: async () => body };
+    },
+  });
+  assert.equal(saved.identity.issueNumber, 211);
+  assert.equal(requests.length, 2);
+});
+
 test('the capture command rejects ambiguous input and a laptop pull request without exactly one linked issue', async () => {
   assert.throws(() => parseCaptureArguments(['--factory-card', '211', '--laptop-pr', '238']), /usage:/);
   await assert.rejects(
