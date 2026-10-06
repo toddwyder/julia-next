@@ -45,10 +45,10 @@ test('captures a finished Factory card from the in-process stores, and names una
   });
 
   assert.equal(writes.length, 1);
-  assert.equal(writes[0][0], 163);
-  assert.equal(writes[0][1].cost.totalUsd, 0.25);
-  assert.ok(writes[0][1].gaps.includes('trace span-163: usage unavailable'));
-  assert.equal(writes[0][1].fallbacks.poolExhausted, 1);
+  assert.equal(writes[0][1], 163);
+  assert.equal(JSON.parse(writes[0][2]).cost.totalUsd, 0.25);
+  assert.ok(JSON.parse(writes[0][2]).gaps.includes('trace span-163: usage unavailable'));
+  assert.equal(JSON.parse(writes[0][2]).fallbacks.poolExhausted, 1);
   assert.ok(lines.includes('issue-cost-capture event=captured issue=163'));
 });
 

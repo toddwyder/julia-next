@@ -49,7 +49,8 @@ import {
   createDuckDBStore,
   duckdbObservabilityConfig,
 } from './observability-store.js';
-import { observabilityRetentionWorkflow, setObservabilityPruneTarget } from './observability-retention.js';
+import { observabilityRetentionWorkflow, setIssueCostCapture, setObservabilityPruneTarget } from './observability-retention.js';
+import { captureFinishedFactoryCards } from './issue-cost-capture.js';
 
 /**
  * Parse a positive-integer env knob; anything else means "use the default".
@@ -490,6 +491,20 @@ const composedStorage = composeStorageWithObservability({
 setObservabilityPruneTarget({
   prune: (options) => observabilityDuckDB.prune(options),
   checkpoint: () => observabilityDuckDB.db.execute('CHECKPOINT'),
+});
+setIssueCostCapture(async () => {
+  const memory = await preparedArgs.storage?.getStore('memory');
+  if (!memory) throw new Error('Factory memory store is not available for cost capture');
+  const database = (storage.getMastraStorage() as unknown as { db?: { any: Function; one: Function } }).db;
+  if (!database) throw new Error('Factory Postgres client is not available for cost capture');
+  await captureFinishedFactoryCards({
+    projectId: process.env.ISSUE_COST_CAPTURE_PROJECT_ID ?? '49b0ea94-d24b-43d7-8ce1-618cb61c5188',
+    projects: storage.getDomain('factory-projects') as never,
+    workItems: storage.getDomain('work-items') as never,
+    observability: observabilityDomain as never,
+    memory: memory as never,
+    database: database as never,
+  });
 });
 
 // Construct the server-owned Mastra HERE so the `new Mastra(...)` literal lives
