@@ -28,6 +28,21 @@ test('the capture command saves a finished Factory card and prints its stored re
   assert.deepEqual(output, [JSON.stringify(saved)]);
 });
 
+test('the capture command finds a Factory card whose database issue number is a string', async () => {
+  const saved = await runIssueCostCapture({
+    argv: ['--factory-card', '163'],
+    env: { ISSUE_COST_CAPTURE_FACTORY_URL: 'https://factory.example', ISSUE_COST_CAPTURE_PROJECT_ID: 'project' },
+    readIssue: async (number) => ({ number, title: 'Install Julia on a phone', state: 'closed', closed_at: '2026-09-30T00:00:00Z' }),
+    readCards: async () => [{ number: '163', enteredAt: '2026-09-29T23:01:10Z', sessions: {} }],
+    readSpans: async () => [], normalizeTraces: () => [], readMessages: async () => [], readFallbackReasons: () => [],
+    readPullRequest: async () => ({ number: 165, commits: [] }), saveRecord: async (record) => record,
+    now: () => '2026-10-06T13:00:00Z', write: () => {}, log: () => {},
+  });
+
+  assert.equal(saved.identity.issueNumber, 163);
+  assert.equal(saved.identity.kind, 'factory');
+});
+
 test('the capture command resolves a laptop pull request to its one linked issue', async () => {
   const reads = [];
   const saved = await runIssueCostCapture({
