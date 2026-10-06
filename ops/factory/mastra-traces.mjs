@@ -105,6 +105,33 @@ function spanCostUsd(span) {
   return cost;
 }
 
+function finiteUsage(value) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+/**
+ * Mastra's UsageStats carries fresh input, cache-read, output and reasoning
+ * detail. Keep an absent or malformed usage object as `null`: #211 records a
+ * named gap rather than silently reporting zero tokens.
+ */
+function spanUsage(span) {
+  const attributes = isObject(span.attributes) ? span.attributes : {};
+  const usage = isObject(attributes.usage) ? attributes.usage : isObject(span.usage) ? span.usage : null;
+  if (!usage) return null;
+  const input = finiteUsage(usage.inputTokens ?? usage.input);
+  const cached = finiteUsage(usage.inputTokenDetails?.cacheRead ?? usage.cachedInputTokens);
+  const output = finiteUsage(usage.outputTokens ?? usage.output);
+  const thinking = finiteUsage(usage.outputTokenDetails?.reasoning ?? usage.reasoningTokens);
+  if ([input, cached, output, thinking].some((value) => value === null) || input < cached) return null;
+  return { freshInputTokens: input - cached, cachedInputTokens: cached, outputTokens: output, thinkingTokens: thinking };
+}
+
+function spanProviderModel(span) {
+  const attributes = isObject(span.attributes) ? span.attributes : {};
+  const costContext = isObject(attributes.costContext) ? attributes.costContext : {};
+  return { provider: costContext.provider ?? attributes.provider ?? null, model: costContext.model ?? attributes.model ?? null };
+}
+
 /** Factory's working phases, so a trace reads as "plan" / "build" / "review". */
 const PHASE_BY_STAGE = {
   triage: 'triage',
@@ -189,6 +216,8 @@ export function normalizeTraceSpans(spans = [], { cards = [] } = {}) {
       // cost is a failed read, never a free run; the note fails closed on it.
       costBearing: isCostBearing(span),
       costUsd: spanCostUsd(span),
+      ...spanProviderModel(span),
+      usage: spanUsage(span),
       outcome: failedOutcome(span) ?? 'passed',
     };
   });
