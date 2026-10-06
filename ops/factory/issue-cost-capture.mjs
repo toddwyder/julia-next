@@ -2,7 +2,7 @@
 // Runnable #211 capture seam. It only reads Factory, Mastra and GitHub, then
 // delegates the one idempotent database write to issue-cost-records.mjs.
 import { captureIssueCostRecord, saveIssueCostRecord } from './issue-cost-records.mjs';
-import { readFactoryCards } from './factory-cards.mjs';
+import { isFactoryCardForIssue, readFactoryCards } from './factory-cards.mjs';
 import { readTraceSpans, normalizeTraceSpans } from './mastra-traces.mjs';
 import { readPackFallbackReasons, readSessionMessages } from './mastra-session-messages.mjs';
 import { runPsql } from './run-psql.mjs';
@@ -101,8 +101,9 @@ export async function runIssueCostCapture({
   const factoryUrl = requiredEnv(env, 'ISSUE_COST_CAPTURE_FACTORY_URL');
   if (!config.project_id) throw new Error('ISSUE_COST_CAPTURE_PROJECT_ID is required');
   const cards = await (readCards ?? (() => readFactoryCards({ config, runPsql })))();
-  const card = cards.find((candidate) => candidate.number === issue.number);
-  if (!card?.enteredAt) throw new Error(`Factory card #${issue.number} has no capture start time`);
+  const card = cards.find((candidate) => isFactoryCardForIssue(candidate, issue.number));
+  if (!card) throw new Error(`Factory card #${issue.number} was not found in the captured card read`);
+  if (!card.enteredAt) throw new Error(`Factory card #${issue.number} has no capture start time`);
   const saved = await captureIssueCostRecord({
     issue, kind: 'factory', from: card.enteredAt, to: now(), factoryBotLogin: env.ISSUE_COST_CAPTURE_FACTORY_BOT_LOGIN ?? null,
     readCards: async () => cards,

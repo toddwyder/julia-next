@@ -3,6 +3,8 @@
 // history and fallback marks; finalization, retros and trace deletion belong to
 // later cards.
 
+import { isFactoryCardForIssue } from './factory-cards.mjs';
+
 export const ISSUE_COST_RECORDS_TABLE = 'factory_issue_cost_records';
 
 function finite(value) {
@@ -123,7 +125,7 @@ export async function captureIssueCostRecord({
     if (kind === 'factory') {
       log(`issue-cost-record event=read-cards issue=${issue.number}`);
       const cards = await readCards();
-      card = cards.find((candidate) => candidate.number === issue.number);
+      card = cards.find((candidate) => isFactoryCardForIssue(candidate, issue.number));
       if (!card) throw new Error(`Factory card #${issue.number} was not found in the captured card read`);
       log(`issue-cost-record event=read-traces issue=${issue.number} from=${from} to=${to}`);
       const spans = await readSpans({ from, to });

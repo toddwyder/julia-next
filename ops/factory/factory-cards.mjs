@@ -37,6 +37,11 @@ function psqlArgs(config) {
  */
 export const FACTORY_CARDS_SQL = readFileSync(new URL('./factory-cards.sql', import.meta.url), 'utf8');
 
+/** Match a numeric GitHub issue to Factory's SQL-derived card reference. */
+export function isFactoryCardForIssue(card, issueNumber) {
+  return Number(card?.number) === issueNumber;
+}
+
 /**
  * Map the database snapshot to the card shape `buildMondayNote` reads. A row
  * with no GitHub issue number cannot be named in the note, so it is skipped
