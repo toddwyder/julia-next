@@ -57,6 +57,7 @@ export function buildIssueCostRecord({ issue, kind, card = {}, pullRequest = {},
   if (!Number.isSafeInteger(issue?.number) || issue.number <= 0) throw new Error('Issue cost record requires a positive issue number');
   if (!['factory', 'laptop'].includes(kind)) throw new Error('Issue cost record kind must be factory or laptop');
   const { rows, gaps } = aggregateTraces(traces);
+  const totalUsd = kind === 'laptop' && traces.length === 0 ? null : sumKnown(rows.map((row) => row.costUsd));
   const stages = (kind === 'factory' ? card.stageHistory ?? [] : []).map((entry) => ({
     stage: stageName(entry.stage), actor: entry.exitedBy ?? entry.by ?? 'unknown', durationMs: elapsedMs(entry),
     effort: entry.effort ?? null, stepCount: entry.stepCount ?? null,
@@ -81,7 +82,7 @@ export function buildIssueCostRecord({ issue, kind, card = {}, pullRequest = {},
   return {
     version: 1,
     identity: { issueNumber: issue.number, title: String(issue.title ?? ''), kind, outcome: issue.outcome ?? 'unknown', completedAt: issue.completedAt ?? null },
-    cost: { totalUsd: sumKnown(rows.map((row) => row.costUsd)), faceValueUsd: sumKnown(rows.map((row) => row.costUsd)), byProviderModel: rows },
+    cost: { totalUsd, faceValueUsd: totalUsd, byProviderModel: rows },
     stages,
     waits, rescues, reviewRounds, rework,
     fallbacks: fallbackCounts,
@@ -126,7 +127,7 @@ export async function captureIssueCostRecord({
       if (!card) throw new Error(`Factory card #${issue.number} was not found in the captured card read`);
       log(`issue-cost-record event=read-traces issue=${issue.number} from=${from} to=${to}`);
       const spans = await readSpans({ from, to });
-      traces = normalizeTraces(spans, { cards: [card] });
+      traces = normalizeTraces(spans, { cards: [card] }).filter((trace) => trace.card === issue.number);
       if (readPullRequest) {
         log(`issue-cost-record event=read-pull-request issue=${issue.number}`);
         pullRequest = await readPullRequest({ issueNumber: issue.number });
