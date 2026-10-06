@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readLocalSessionMessages, readLocalTraceSpans } from './local-factory-readers.mjs';
 
 test('the local readers reconstruct trace data and fallback-message content without HTTP', async () => {
+  let messageArgs;
   const spans = await readLocalTraceSpans({
     from: '2026-09-29T00:00:00Z', to: '2026-10-07T00:00:00Z',
     runQuery: async ({ parameters }) => {
@@ -12,11 +13,12 @@ test('the local readers reconstruct trace data and fallback-message content with
     },
   });
   const messages = await readLocalSessionMessages({
-    threadId: 'thread-1',
-    runPsql: async () => ({ status: 0, stdout: '{"content":{"parts":[{"type":"data-mastracode-pack-fallback","data":{"reason":"pool-exhausted"}}]}}\n' }),
+    threadId: 'thread-1', resourceId: 'resource-1',
+    runPsql: async ({ args }) => { messageArgs = args; return { status: 0, stdout: '{"content":{"parts":[{"type":"data-mastracode-pack-fallback","data":{"reason":"pool-exhausted"}}]}}\n' }; },
   });
 
   assert.equal(spans[0].attributes.costContext.estimatedCost, 0.12);
   assert.equal(spans[0].sessionId, 'session-1');
   assert.deepEqual(messages[0].content.parts[0].data, { reason: 'pool-exhausted' });
+  assert.ok(messageArgs.includes('resource_id=resource-1'));
 });
