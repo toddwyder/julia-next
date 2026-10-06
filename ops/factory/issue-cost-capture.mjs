@@ -101,7 +101,7 @@ export async function runIssueCostCapture({
   const factoryUrl = requiredEnv(env, 'ISSUE_COST_CAPTURE_FACTORY_URL');
   if (!config.project_id) throw new Error('ISSUE_COST_CAPTURE_PROJECT_ID is required');
   const cards = await (readCards ?? (() => readFactoryCards({ config, runPsql })))();
-  const card = cards.find((candidate) => candidate.number === issue.number);
+  const card = cards.find((candidate) => Number(candidate.number) === issue.number);
   if (!card?.enteredAt) throw new Error(`Factory card #${issue.number} has no capture start time`);
   const saved = await captureIssueCostRecord({
     issue, kind: 'factory', from: card.enteredAt, to: now(), factoryBotLogin: env.ISSUE_COST_CAPTURE_FACTORY_BOT_LOGIN ?? null,
