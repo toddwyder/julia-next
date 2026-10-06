@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, copyFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, statSync, writeFileSync, copyFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, posix, resolve } from 'node:path';
 import { test } from 'node:test';
@@ -8,16 +9,40 @@ import { test } from 'node:test';
 const root = resolve(import.meta.dirname, '../..');
 const installer = resolve(import.meta.dirname, 'install.sh');
 
-// Node passes native Windows paths to a child process verbatim. This machine's
-// `bash` is WSL, so translate fixture paths to WSL notation before asking Bash
-// to execute the installer. On Unix this is intentionally a no-op.
+// Use Git Bash on Windows so the fixture PATH resolves its command stubs rather
+// than WSL's real npm. Git Bash accepts drive-letter paths with slash separators.
+const bash = process.platform === 'win32' ? 'C:/Program Files/Git/bin/bash.exe' : 'bash';
+
 function bashPath(path) {
   if (process.platform !== 'win32') return path;
-  return path.replaceAll('\\', '/').replace(/^([A-Za-z]):/, (_, drive) => `/mnt/${drive.toLowerCase()}`);
+  return path.replaceAll('\\', '/').replace(/^([A-Za-z]):/, (_, drive) => `/${drive.toLowerCase()}`);
+}
+
+function bashEnvironmentPath(path) {
+  if (process.platform !== 'win32') return path;
+  return path
+    .replaceAll('\\', '/')
+    .replace(/([A-Za-z]):\//g, (_, drive) => `/${drive.toLowerCase()}/`)
+    .replaceAll(';', ':');
 }
 
 function installWithBash(installerPath, target, options = {}) {
-  return spawnSync('bash', [bashPath(installerPath), bashPath(target)], options);
+  const { systemctl = true, ...spawnOptions } = options;
+  if (!systemctl) return spawnSync(bash, [bashPath(installerPath), bashPath(target)], spawnOptions);
+  const shim = resolve(dirname(target), 'installer-systemctl-bin');
+  mkdirSync(shim, { recursive: true });
+  writeFileSync(resolve(shim, 'systemctl'), `#!/bin/sh
+case "$1" in
+  restart|is-active) exit 0 ;;
+  show) pwd ;;
+  *) exit 17 ;;
+esac
+`, { mode: 0o755 });
+  const env = spawnOptions.env ?? process.env;
+  return spawnSync(bash, [bashPath(installerPath), bashPath(target)], {
+    ...spawnOptions,
+    env: { ...env, PATH: `${bashPath(shim)}:${bashEnvironmentPath(env.PATH)}` },
+  });
 }
 
 /**
@@ -202,8 +227,20 @@ test('a root-run install hands the Mastra build to the app directory owner', () 
   const target = resolve(tmp, 'target');
   const bin = resolve(tmp, 'bin');
   const log = resolve(tmp, 'commands.log');
+  const rootShellEnv = resolve(tmp, 'root-shell-env.sh');
   mkdirSync(target);
   mkdirSync(bin);
+  writeFileSync(rootShellEnv, `
+id() { echo 0; }
+stat() { echo julia-factory; }
+chown() { printf 'chown %s\\n' "$*" >> "$STUB_LOG"; }
+runuser() {
+  test "$1" = -u && test "$2" = julia-factory && test "$3" = -- || return 19
+  printf 'runuser %s %s\\n' "$2" "$*" >> "$STUB_LOG"
+  shift 3
+  SERVICE_OWNER=julia-factory "$@"
+}
+`);
   writeFileSync(resolve(bin, 'id'), '#!/bin/sh\necho 0\n', { mode: 0o755 });
   writeFileSync(resolve(bin, 'stat'), '#!/bin/sh\necho julia-factory\n', { mode: 0o755 });
   writeFileSync(resolve(bin, 'chown'), '#!/bin/sh\nprintf "chown %s\\n" "$*" >> "$STUB_LOG"\n', { mode: 0o755 });
@@ -223,7 +260,7 @@ fi
 
   const result = installWithBash(installer, target, {
     cwd: tmp,
-    env: { ...process.env, PATH: `${bashPath(bin)}:${process.env.PATH}`, STUB_LOG: log },
+    env: { ...process.env, PATH: `${bashPath(bin)}:${process.env.PATH}`, STUB_LOG: log, BASH_ENV: bashPath(rootShellEnv) },
     encoding: 'utf8',
   });
 
@@ -274,4 +311,84 @@ test('an incomplete repository source leaves an existing install untouched', () 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /missing Factory source/i);
   assert.equal(readFileSync(resolve(target, 'package.json'), 'utf8'), 'existing manifest');
+});
+
+test('an install marks the deployed commit and verifies the restarted service uses that marked app', () => {
+  const tmp = mkdtempSync(resolve(tmpdir(), 'julia-factory-version-marker-'));
+  const target = resolve(tmp, 'target');
+  const bin = resolve(tmp, 'bin');
+  const log = resolve(tmp, 'commands.log');
+  mkdirSync(target);
+  mkdirSync(bin);
+  for (const command of ['npm', 'python3', 'node']) {
+    writeFileSync(resolve(bin, command), `#!/bin/sh\nif [ '${command}' = npm ] && [ \"$1\" = build ]; then mkdir -p .mastra/output; fi\n`, { mode: 0o755 });
+  }
+  writeFileSync(resolve(bin, 'systemctl'), `#!/bin/sh
+printf '%s %s\\n' systemctl \"$*\" >> \"$STUB_LOG\"
+case \"$1\" in
+  restart) exit 0 ;;
+  is-active) exit 0 ;;
+  show) realpath \"$FACTORY_APP_DIR\" ;;
+  *) exit 17 ;;
+esac
+`, { mode: 0o755 });
+
+  const result = installWithBash(installer, target, {
+    cwd: tmp,
+    env: {
+      ...process.env,
+      PATH: `${bashPath(bin)}:${process.env.PATH}`,
+      STUB_LOG: log,
+      FACTORY_APP_DIR: bashPath(target),
+    },
+    encoding: 'utf8',
+    systemctl: false,
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(
+    readFileSync(resolve(target, 'BUILD_COMMIT'), 'utf8').trim(),
+    execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
+  );
+  assert.match(readFileSync(log, 'utf8'), /systemctl restart julia-factory-trial\.service/);
+  assert.match(readFileSync(log, 'utf8'), /systemctl is-active --quiet julia-factory-trial\.service/);
+  assert.match(readFileSync(log, 'utf8'), /systemctl show julia-factory-trial\.service --property=WorkingDirectory --value/);
+});
+
+test('a failed post-restart version check restores the previous app and restarts it', () => {
+  const tmp = mkdtempSync(resolve(tmpdir(), 'julia-factory-version-rollback-'));
+  const target = resolve(tmp, 'target');
+  const bin = resolve(tmp, 'bin');
+  const log = resolve(tmp, 'commands.log');
+  mkdirSync(target);
+  const originalMode = statSync(target).mode & 0o777;
+  mkdirSync(bin);
+  writeFileSync(resolve(target, 'BUILD_COMMIT'), 'previous-commit\n');
+  writeFileSync(resolve(target, 'keep-after-rollback'), 'previous app bytes\n');
+  for (const command of ['npm', 'python3', 'node']) {
+    writeFileSync(resolve(bin, command), `#!/bin/sh\nif [ '${command}' = npm ] && [ \"$1\" = build ]; then mkdir -p .mastra/output; fi\n`, { mode: 0o755 });
+  }
+  writeFileSync(resolve(bin, 'systemctl'), `#!/bin/sh
+printf '%s %s\\n' systemctl \"$*\" >> \"$STUB_LOG\"
+case \"$1\" in
+  restart) exit 0 ;;
+  is-active) exit 0 ;;
+  show) printf '%s\\n' /wrong/app ;;
+  *) exit 17 ;;
+esac
+`, { mode: 0o755 });
+
+  const result = installWithBash(installer, target, {
+    cwd: tmp,
+    env: { ...process.env, PATH: `${bashPath(bin)}:${process.env.PATH}`, STUB_LOG: log },
+    encoding: 'utf8',
+    systemctl: false,
+  });
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /Factory install verification failed: service working directory/);
+  assert.equal(readFileSync(resolve(target, 'BUILD_COMMIT'), 'utf8'), 'previous-commit\n');
+  assert.equal(readFileSync(resolve(target, 'keep-after-rollback'), 'utf8'), 'previous app bytes\n');
+  assert.equal(statSync(target).mode & 0o777, originalMode, 'rollback preserves the previous app directory mode');
+  assert.equal((readFileSync(log, 'utf8').match(/systemctl restart julia-factory-trial\.service/g) ?? []).length, 2);
 });
