@@ -3,6 +3,19 @@ set -euo pipefail
 app_dir="$(realpath "$1")"
 patch_dir="$(cd -- "$(dirname -- "$0")" && pwd)"
 source_dir="$patch_dir/app"
+app_owner="$(stat -c '%U' "$app_dir")"
+app_group="$(stat -c '%G' "$app_dir")"
+
+# The operator deploys through sudo, but the Factory process runs as the owner
+# of its app directory. Build as that owner so the generated .mastra output is
+# replaceable by the running service on a later Mastra rebuild.
+run_as_app_owner() {
+  if [[ "$(id -u)" -eq 0 ]]; then
+    runuser -u "$app_owner" -- "$@"
+  else
+    "$@"
+  fi
+}
 files=(
   package.json package-lock.json tsconfig.json src/mastra/index.ts src/mastra/local-sandbox.ts
   # Issue #140: the app-side bounded observability store and its scheduled
@@ -35,9 +48,12 @@ mkdir -p "$app_dir/src/mastra/reviewer"
 cp -a "$source_dir/src/mastra/reviewer/." "$app_dir/src/mastra/reviewer/"
 printf 'Installing Factory from %s into %s\n' "$source_dir" "$app_dir"
 cd "$app_dir"
-npm ci
-npm run check
-npm run build
+if [[ "$(id -u)" -eq 0 ]]; then
+  chown -R "$app_owner:$app_group" "$app_dir"
+fi
+run_as_app_owner npm ci
+run_as_app_owner npm run check
+run_as_app_owner npm run build
 install -D -m 0644 "$patch_dir/wait-alerts.py" "$app_dir/ops/factory/wait-alerts.py"
 install -D -m 0644 "$patch_dir/wait-alerts.sql" "$app_dir/ops/factory/wait-alerts.sql"
 # Issue #140: the Monday note, plus the read-only trace-retention diagnostic
