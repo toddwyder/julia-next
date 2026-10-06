@@ -43,6 +43,24 @@ test('the capture command finds a Factory card whose database issue number is a 
   assert.equal(saved.identity.kind, 'factory');
 });
 
+test('the capture command distinguishes a missing Factory card from a card without a capture start time', async () => {
+  const options = {
+    argv: ['--factory-card', '163'],
+    env: { ISSUE_COST_CAPTURE_FACTORY_URL: 'https://factory.example', ISSUE_COST_CAPTURE_PROJECT_ID: 'project' },
+    readIssue: async (number) => ({ number, title: 'Install Julia on a phone', state: 'closed', closed_at: '2026-09-30T00:00:00Z' }),
+    write: () => {}, log: () => {},
+  };
+
+  await assert.rejects(
+    () => runIssueCostCapture({ ...options, readCards: async () => [] }),
+    /was not found in the captured card read/,
+  );
+  await assert.rejects(
+    () => runIssueCostCapture({ ...options, readCards: async () => [{ number: '163', sessions: {} }] }),
+    /has no capture start time/,
+  );
+});
+
 test('the capture command resolves a laptop pull request to its one linked issue', async () => {
   const reads = [];
   const saved = await runIssueCostCapture({
