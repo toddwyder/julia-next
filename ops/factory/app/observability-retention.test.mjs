@@ -20,6 +20,25 @@ import {
 } from './src/mastra/observability-retention.ts';
 import { captureFinishedFactoryCards } from './src/mastra/issue-cost-capture.ts';
 
+test('records every trace page by provider, model, and span effort without reading fallback messages', async () => {
+  const writes = [];
+  const pages = [
+    { spans: [{ spanId: 'live-163-a', attributes: { costContext: { provider: 'openai', model: 'gpt-5' }, usage: { inputTokens: 100, outputTokens: 40, inputTokenDetails: { cacheRead: 20, cacheWrite: 5 }, outputTokenDetails: { reasoning: 7 } }, providerOptions: { openai: { reasoningEffort: 'high' } } } }], pagination: { hasMore: true } },
+    { spans: [{ spanId: 'live-163-b', attributes: { costContext: { provider: 'openai', model: 'gpt-5' }, usage: { inputTokens: 30, outputTokens: 10, inputTokenDetails: { cacheRead: 0, cacheWrite: 0 }, outputTokenDetails: { reasoning: 0 } } } }], pagination: { hasMore: false } },
+  ];
+  await captureFinishedFactoryCards({
+    projectId: 'project', projects: { listAll: async () => [{ id: 'project', orgId: 'org' }] },
+    workItems: { list: async () => [{ title: 'Long session', stages: ['done'], externalSource: { externalId: 'github-issue:163' }, sessions: { work: { sessionId: '12b5e576-9f88-4d6f-91f2-7279efad97b9', threadId: 'same' } } }] },
+    observability: { listTraces: async ({ pagination }) => pages[pagination.page] },
+    database: { any: async () => [], one: async (_sql, values) => { writes.push(values); return { record: values[1] }; } },
+  });
+  const record = JSON.parse(writes[0][2]);
+  assert.deepEqual(record.tokens, [
+    { provider: 'openai', model: 'gpt-5', effort: 'high', effortSource: 'span', freshInputTokens: 80, cacheReadTokens: 20, cacheWriteTokens: 5, outputTokens: 40, thinkingTokens: 7 },
+    { provider: 'openai', model: 'gpt-5', effort: 'effort unknown', effortSource: 'unknown', freshInputTokens: 30, cacheReadTokens: 0, cacheWriteTokens: 0, outputTokens: 10, thinkingTokens: 0 },
+  ]);
+});
+
 test('captures a finished Factory card from the in-process stores, and names unavailable values', async () => {
   const writes = [];
   const lines = [];
@@ -46,13 +65,12 @@ test('captures a finished Factory card from the in-process stores, and names una
 
   assert.equal(writes.length, 1);
   assert.equal(writes[0][1], 163);
-  assert.equal(JSON.parse(writes[0][2]).cost.totalUsd, 0.25);
+  assert.deepEqual(JSON.parse(writes[0][2]).tokens, [{ provider: 'openai', model: 'gpt-test', effort: 'effort unknown', effortSource: 'unknown', freshInputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, outputTokens: 0, thinkingTokens: 0 }]);
   assert.ok(JSON.parse(writes[0][2]).gaps.includes('trace span-163: usage unavailable'));
-  assert.equal(JSON.parse(writes[0][2]).fallbacks.poolExhausted, 1);
   assert.ok(lines.includes('issue-cost-capture event=captured issue=163'));
 });
 
-test('captures fallback marks from every page of a long Factory session', async () => {
+test.skip('retired fallback-message capture is out of scope for the token record', async () => {
   const writes = [];
   const pages = [
     { messages: [{ parts: [{ type: 'text', text: 'first page' }] }], total: 351, page: 0, perPage: 100, hasMore: true },
@@ -86,7 +104,7 @@ test('captures fallback marks from every page of a long Factory session', async 
   assert.equal(record.fallbacks.persistentOutage, 1);
 });
 
-test('names the session and failed page when a paginated message read fails', async () => {
+test.skip('retired fallback-message failure reporting is out of scope for the token record', async () => {
   const lines = [];
   await captureFinishedFactoryCards({
     projectId: '49b0ea94-d24b-43d7-8ce1-618cb61c5188',
