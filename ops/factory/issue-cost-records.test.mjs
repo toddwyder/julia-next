@@ -32,7 +32,8 @@ test('a laptop record names its subscription builder gap and does not invent a t
 
   assert.equal(record.identity.kind, 'laptop');
   assert.ok(record.gaps.includes('builder: subscription, quota only'));
-  assert.equal(record.cost.totalUsd, 0);
+  assert.equal(record.cost.totalUsd, null);
+  assert.equal(record.cost.faceValueUsd, null);
 });
 
 test('missing usage is a named gap rather than zero tokens', () => {
@@ -96,7 +97,7 @@ test('capture wiring reads a Factory card, its traces and every session message 
     issue: factoryIssue, kind: 'factory', from: '2026-10-05T00:00:00Z', to: '2026-10-06T00:00:00Z', factoryBotLogin: 'julia-factory[bot]',
     readCards: async () => [{ ...factoryCard, number: 211, sessions: { one: { threadId: 'thread-1', resourceId: 'project' } } }],
     readSpans: async () => [{ id: 'raw', sessionId: 'one' }],
-    normalizeTraces: () => [tracedBuild],
+    normalizeTraces: () => [tracedBuild, { ...tracedBuild, id: 'other-card', card: 999, correlated: true, costUsd: 5 }],
     readMessages: async (input) => { calls.push(input); return [{ parts: [{ type: 'data-mastracode-pack-fallback', data: { reason: 'pool-exhausted' } }] }]; },
     readFallbackReasons: (messages) => messages.flatMap((message) => message.parts.map((part) => part.data.reason)),
     readPullRequest: async () => ({ number: 300, commits: [{ sha: 'rescue', author: { login: 'operator' }, committedAt: '2026-10-05T10:25:00Z' }] }),
