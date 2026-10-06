@@ -499,7 +499,7 @@ setIssueCostCapture(async () => {
   if (!database) throw new Error('Factory Postgres client is not available for cost capture');
   await captureFinishedFactoryCards({
     projectId: process.env.ISSUE_COST_CAPTURE_PROJECT_ID ?? '49b0ea94-d24b-43d7-8ce1-618cb61c5188',
-    projects: storage.getDomain('factory-projects') as never,
+    projects: storage.getDomain('projects') as never,
     workItems: storage.getDomain('work-items') as never,
     observability: observabilityDomain as never,
     memory: memory as never,
