@@ -86,6 +86,21 @@ test('captures fallback marks from every page of a long Factory session', async 
   assert.equal(record.fallbacks.persistentOutage, 1);
 });
 
+test('names the session and failed page when a paginated message read fails', async () => {
+  const lines = [];
+  await captureFinishedFactoryCards({
+    projectId: '49b0ea94-d24b-43d7-8ce1-618cb61c5188',
+    projects: { listAll: async () => [{ id: '49b0ea94-d24b-43d7-8ce1-618cb61c5188', orgId: 'org-1' }] },
+    workItems: { list: async () => [{ title: 'Read failure card', stages: ['done'], externalSource: { externalId: 'github-issue:163' }, sessions: { builder: { sessionId: 'session-163', threadId: 'thread-163' } } }] },
+    observability: { listTraces: async () => ({ pagination: { hasMore: false }, spans: [] }) },
+    memory: { listMessages: async ({ page }) => page === 0 ? { messages: [], total: 351, page, perPage: 100, hasMore: true } : Promise.reject(new Error('database unavailable')) },
+    database: { any: async () => [], one: async () => ({ record: {} }) },
+    log: (line) => lines.push(line),
+  });
+
+  assert.ok(lines.some((line) => line.includes('message read failed for session session-163 page 1: database unavailable')));
+});
+
 test('a card capture failure is logged and never prevents the retention prune', async () => {
   const lines = [];
   const target = { prune: async () => [{ domain: 'observability', table: 'spans', deleted: 1, done: true }] };
