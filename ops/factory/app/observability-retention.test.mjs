@@ -18,6 +18,52 @@ import {
   runObservabilityRetention,
   setObservabilityPruneTarget,
 } from './src/mastra/observability-retention.ts';
+import { captureFinishedFactoryCards } from './src/mastra/issue-cost-capture.ts';
+
+test('captures a finished Factory card from the in-process stores, and names unavailable values', async () => {
+  const writes = [];
+  const lines = [];
+  await captureFinishedFactoryCards({
+    projectId: '49b0ea94-d24b-43d7-8ce1-618cb61c5188',
+    projects: { listAll: async () => [{ id: '49b0ea94-d24b-43d7-8ce1-618cb61c5188', orgId: 'org-1' }] },
+    workItems: { list: async () => [{
+      title: 'A finished card', stages: ['done'],
+      externalSource: { externalId: 'github-issue:163' },
+      stageHistory: [{ stage: 'done', enteredAt: '2026-10-06T10:00:00.000Z', by: 'agent:reviewer' }],
+      sessions: { builder: { sessionId: 'session-163', threadId: 'thread-163', branch: 'main', startedBy: 'agent:builder' } },
+    }] },
+    observability: { listTraces: async () => ({ pagination: { hasMore: false }, spans: [{
+      spanId: 'span-163', sessionId: 'session-163', name: 'execute', spanType: 'model_generation',
+      attributes: { costContext: { estimatedCost: 0.25, provider: 'openai', model: 'gpt-test' } },
+    }] }) },
+    memory: { listMessages: async ({ resourceId }) => {
+      assert.equal(resourceId, 'session-163');
+      return { messages: [{ parts: [{ type: 'data-mastracode-pack-fallback', data: { reason: 'pool-exhausted' } }] }], hasMore: false };
+    } },
+    database: { any: async () => [], one: async (_sql, values) => { writes.push(values); return { record: values[1] }; } },
+    log: (line) => lines.push(line),
+  });
+
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0][0], 163);
+  assert.equal(writes[0][1].cost.totalUsd, 0.25);
+  assert.ok(writes[0][1].gaps.includes('trace span-163: usage unavailable'));
+  assert.equal(writes[0][1].fallbacks.poolExhausted, 1);
+  assert.ok(lines.includes('issue-cost-capture event=captured issue=163'));
+});
+
+test('a card capture failure is logged and never prevents the retention prune', async () => {
+  const lines = [];
+  const target = { prune: async () => [{ domain: 'observability', table: 'spans', deleted: 1, done: true }] };
+  setObservabilityPruneTarget(target);
+  const output = await runObservabilityPrune({
+    capture: async () => { throw new Error('trace read failed'); },
+    log: (line) => lines.push(line),
+  });
+
+  assert.equal(output.pruned[0].deleted, 1);
+  assert.ok(lines.some((line) => line.includes('issue-cost-capture event=failed issue=unknown error=trace read failed')));
+});
 
 test('the DuckDB observability config carries the supported retention and the code-sdk path', () => {
   const config = duckdbObservabilityConfig();
