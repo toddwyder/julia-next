@@ -42,6 +42,20 @@ async function spansForSessions(observability: CaptureDependencies['observabilit
   return spans;
 }
 
+async function messagesForSession(memory: CaptureDependencies['memory'], session: { sessionId: string; threadId: string }) {
+  const messages: any[] = [];
+  for (let page = 0; ; page += 1) {
+    let result: any;
+    try {
+      result = await memory.listMessages({ threadId: session.threadId, resourceId: session.sessionId, page, perPage: 100, orderBy: { field: 'createdAt', direction: 'DESC' } });
+    } catch (error) {
+      throw new Error(`message read failed for session ${session.sessionId} page ${page}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    messages.push(...result.messages);
+    if (!result.hasMore) return messages;
+  }
+}
+
 function recordFor(card: Card, number: number, spans: Array<Record<string, any>>, fallbackReasons: string[]) {
   const gaps: string[] = [];
   let totalUsd: number | null = 0;
@@ -74,9 +88,7 @@ export async function captureFinishedFactoryCards({ projectId, projects, workIte
       const spans = await spansForSessions(observability, sessions.map((session) => session.sessionId));
       const reasons: string[] = [];
       for (const session of sessions) {
-        const page = await memory.listMessages({ threadId: session.threadId, resourceId: session.sessionId, page: 0, perPage: 100, orderBy: { field: 'createdAt', direction: 'DESC' } });
-        if (page.hasMore) throw new Error(`message pagination for session ${session.sessionId} is incomplete`);
-        for (const part of page.messages.flatMap((message: any) => message.parts ?? [])) if (part.type === 'data-mastracode-pack-fallback' && (part.data?.reason === 'pool-exhausted' || part.data?.reason === 'persistent-outage')) reasons.push(part.data.reason);
+        for (const part of (await messagesForSession(memory, session)).flatMap((message: any) => message.parts ?? [])) if (part.type === 'data-mastracode-pack-fallback' && (part.data?.reason === 'pool-exhausted' || part.data?.reason === 'persistent-outage')) reasons.push(part.data.reason);
       }
       const record = recordFor(card, number, spans, reasons);
       const saved = await database.one('INSERT INTO factory_issue_cost_records (record_key, issue_number, record) VALUES ($1, $2, $3::jsonb) ON CONFLICT (record_key) DO UPDATE SET record = EXCLUDED.record WHERE factory_issue_cost_records.record IS DISTINCT FROM EXCLUDED.record RETURNING record', [`issue:${number}`, number, JSON.stringify(record)]);
