@@ -43,6 +43,18 @@ test('the capture command finds a Factory card whose database issue number is a 
   assert.equal(saved.identity.kind, 'factory');
 });
 
+test('the Factory capture no longer requires a Factory HTTP URL when local readers are supplied', async () => {
+  const saved = await runIssueCostCapture({
+    argv: ['--factory-card', '163'], env: { ISSUE_COST_CAPTURE_PROJECT_ID: 'project' },
+    readIssue: async (number) => ({ number, title: 'Install Julia on a phone', state: 'closed' }),
+    readCards: async () => [{ number: '163', enteredAt: '2026-09-29T23:01:10Z', sessions: {} }],
+    readSpans: async () => [], normalizeTraces: () => [], readMessages: async () => [], readFallbackReasons: () => [],
+    readPullRequest: async () => ({ number: 165, commits: [] }), saveRecord: async (record) => record,
+    now: () => '2026-10-06T13:00:00Z', write: () => {}, log: () => {},
+  });
+  assert.equal(saved.identity.issueNumber, 163);
+});
+
 test('the capture command distinguishes a missing Factory card from a card without a capture start time', async () => {
   const options = {
     argv: ['--factory-card', '163'],
