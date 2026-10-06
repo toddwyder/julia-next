@@ -30,6 +30,7 @@ there is a live route.
 - Installed versions are pinned: Factory 0.19.1, `@mastra/auth-workos` 1.6.6, core 1.74.0, SDK
   1.10.1. The aligned direct storage and memory packages are recorded in
   `ops/factory/app/package.json`.
+- **Read the running Factory commit (look only):** `sudo sh -c 'app="$(systemctl show julia-factory-trial.service --property=WorkingDirectory --value)"; systemctl is-active --quiet julia-factory-trial.service && cat "$app/BUILD_COMMIT"'`. The installer writes this marker from the checkout's full Git commit and verifies it after restart.
 - The WorkOS cookie-identity install patch was removed after the 1.6.6 upgrade. See
   `ops/factory/README.md` for the current approved-exceptions list and the installer.
 - The normal Git identity is the verified Factory App bot, not a person; the Factory App is
