@@ -99,6 +99,7 @@ test('capture wiring reads a Factory card, its traces and every session message 
     normalizeTraces: () => [tracedBuild],
     readMessages: async (input) => { calls.push(input); return [{ parts: [{ type: 'data-mastracode-pack-fallback', data: { reason: 'pool-exhausted' } }] }]; },
     readFallbackReasons: (messages) => messages.flatMap((message) => message.parts.map((part) => part.data.reason)),
+    readPullRequest: async () => ({ number: 300, commits: [{ sha: 'rescue', author: { login: 'operator' }, committedAt: '2026-10-05T10:25:00Z' }] }),
     saveRecord: async (record) => record,
   });
 
@@ -106,4 +107,5 @@ test('capture wiring reads a Factory card, its traces and every session message 
   assert.deepEqual(calls[0], { threadId: 'thread-1', resourceId: 'project' });
   assert.equal(saved.fallbacks.poolExhausted, 1);
   assert.equal(saved.cost.totalUsd, 0.42);
+  assert.deepEqual(saved.rescues, [{ sha: 'rescue', actor: 'operator', committedAt: '2026-10-05T10:25:00Z' }]);
 });
