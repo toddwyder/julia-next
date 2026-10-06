@@ -22,6 +22,10 @@ test('CI runs the Monday note and trace retention tests that issue #140 adds', (
   }
 });
 
+test('CI runs the issue-cost capture regression suite', () => {
+  assert.match(ci, /ops\/factory\/issue-cost-capture\.test\.mjs/);
+});
+
 test('CI runs the app DuckDB observability retention tests the repo-standard way', () => {
   // The app's TypeScript tests are runnable with Node's built-in type stripping
   // plus the repo's `.js` -> `.ts` resolve hook, the same mechanism CI already
