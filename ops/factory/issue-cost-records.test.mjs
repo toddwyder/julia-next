@@ -70,8 +70,8 @@ test('a Factory record carries waits, non-bot commit rescues, review rounds and 
 test('a repeated save writes the issue record once and returns the stored row', async () => {
   const record = buildIssueCostRecord({ issue: factoryIssue, kind: 'factory', card: factoryCard, traces: [tracedBuild] });
   const commands = [];
-  const runPsql = async ({ args }) => {
-    commands.push({ args });
+  const runPsql = async ({ args, stdin }) => {
+    commands.push({ args, stdin });
     return { status: 0, stdout: `${JSON.stringify(record)}\n`, stderr: '' };
   };
 
@@ -79,7 +79,8 @@ test('a repeated save writes the issue record once and returns the stored row', 
 
   assert.equal(commands.length, 1);
   assert.ok(commands[0].args.includes('ON_ERROR_STOP=1'));
-  assert.match(commands[0].args.join(' '), /ON CONFLICT \(record_key\) DO UPDATE/);
+  assert.deepEqual(commands[0].args.slice(-2), ['-f', '-']);
+  assert.match(commands[0].stdin, /ON CONFLICT \(record_key\) DO UPDATE/);
   assert.deepEqual(saved, record);
 });
 
