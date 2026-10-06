@@ -12,4 +12,5 @@ CREATE TABLE IF NOT EXISTS factory_issue_cost_records (
     (record_key LIKE 'unmatched-review:%' AND issue_number IS NULL AND record->'identity'->>'kind' = 'unmatched-review')
   )
 );
+GRANT SELECT, INSERT, UPDATE ON factory_issue_cost_records TO "julia-factory";
 COMMIT;

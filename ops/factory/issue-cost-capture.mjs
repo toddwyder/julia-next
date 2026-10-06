@@ -3,8 +3,9 @@
 // delegates the one idempotent database write to issue-cost-records.mjs.
 import { captureIssueCostRecord, saveIssueCostRecord } from './issue-cost-records.mjs';
 import { isFactoryCardForIssue, readFactoryCards } from './factory-cards.mjs';
-import { readTraceSpans, normalizeTraceSpans } from './mastra-traces.mjs';
-import { readPackFallbackReasons, readSessionMessages } from './mastra-session-messages.mjs';
+import { normalizeTraceSpans } from './mastra-traces.mjs';
+import { readPackFallbackReasons } from './mastra-session-messages.mjs';
+import { readLocalSessionMessages, readLocalTraceSpans } from './local-factory-readers.mjs';
 import { runPsql } from './run-psql.mjs';
 
 function positiveInteger(value, label) {
@@ -19,12 +20,6 @@ export function parseCaptureArguments(argv) {
   }
   const value = positiveInteger(argv[1], argv[0]);
   return argv[0] === '--factory-card' ? { kind: 'factory', issueNumber: value } : { kind: 'laptop', pullRequestNumber: value };
-}
-
-function requiredEnv(env, name) {
-  const value = env[name]?.trim();
-  if (!value) throw new Error(`${name} is required`);
-  return value;
 }
 
 function githubClient({ env, fetchImpl = fetch, log = console.error }) {
@@ -98,7 +93,6 @@ export async function runIssueCostCapture({
     return printSaved(saved, write);
   }
 
-  const factoryUrl = requiredEnv(env, 'ISSUE_COST_CAPTURE_FACTORY_URL');
   if (!config.project_id) throw new Error('ISSUE_COST_CAPTURE_PROJECT_ID is required');
   const cards = await (readCards ?? (() => readFactoryCards({ config, runPsql })))();
   const card = cards.find((candidate) => isFactoryCardForIssue(candidate, issue.number));
@@ -107,9 +101,9 @@ export async function runIssueCostCapture({
   const saved = await captureIssueCostRecord({
     issue, kind: 'factory', from: card.enteredAt, to: now(), factoryBotLogin: env.ISSUE_COST_CAPTURE_FACTORY_BOT_LOGIN ?? null,
     readCards: async () => cards,
-    readSpans: readSpans ?? ((window) => readTraceSpans({ factoryUrl, ...window, fetchImpl })),
+    readSpans: readSpans ?? readLocalTraceSpans,
     normalizeTraces,
-    readMessages: readMessages ?? ((session) => readSessionMessages({ factoryUrl, ...session, fetchImpl })),
+    readMessages: readMessages ?? readLocalSessionMessages,
     readFallbackReasons, readPullRequest: pullReader, saveRecord: saver, log,
   });
   return printSaved(saved, write);
