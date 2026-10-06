@@ -3,10 +3,12 @@
 GitHub issues enter Factory's Intake; Todd starts them, and Factory plans, builds and reviews.
 Todd tests product changes on the live app after merge and can request a revert. For Julia cards,
 Factory's reviewer merges the PR when its review passes and CI is green, then moves its Review card
-to Done for Todd's live UAT. Open PRs stay outside Done. An agent outside Factory may merge only
-its own setup or documentation PR through the publisher App pinned to the reviewed head, never a
-Factory card. Keep SSH and sudo outside the Factory sandbox; an authorized operator uses the
-laptop's Tailscale route.
+to Done for Todd's live UAT. Open PRs stay outside Done. An agent outside Factory never merges a
+Factory card. For a machine card, the laptop agent uses its ordinary signed-in access: `git push`
+the branch, `gh pr create`, then `gh pr merge --squash` once CI is green. The publisher App and
+`scripts/publish-pr.mjs` / `scripts/merge-pr.mjs` are for the Factory-card route only and must not
+be used for machine cards. Keep SSH and sudo outside the Factory sandbox; an authorized operator
+uses the laptop's Tailscale route.
 
 ## Building and reviewing
 
