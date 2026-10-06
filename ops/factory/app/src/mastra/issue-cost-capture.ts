@@ -35,9 +35,11 @@ function usage(attributes: Record<string, any>): Record<string, number> | null {
 async function spansForSessions(observability: CaptureDependencies['observability'], sessionIds: string[]) {
   const spans: Array<Record<string, any>> = [];
   for (const sessionId of sessionIds) {
-    const page = await observability.listTraces({ filters: { sessionId }, pagination: { page: 0, perPage: 100 } });
-    spans.push(...page.spans);
-    if (page.pagination?.hasMore) throw new Error(`trace pagination for session ${sessionId} is incomplete`);
+    for (let page = 0; ; page += 1) {
+      const result = await observability.listTraces({ filters: { sessionId }, pagination: { page, perPage: 100 } });
+      spans.push(...result.spans);
+      if (!result.pagination?.hasMore) break;
+    }
   }
   return spans;
 }
@@ -56,23 +58,32 @@ async function messagesForSession(memory: CaptureDependencies['memory'], session
   }
 }
 
-function recordFor(card: Card, number: number, spans: Array<Record<string, any>>, fallbackReasons: string[]) {
+function effortFor(span: Record<string, any>) {
+  const options = span.attributes?.providerOptions ?? span.attributes?.parameters ?? {};
+  const nested: any = Object.values(options).find((v: any) => v?.reasoningEffort ?? v?.thinkingLevel);
+  const value = options.reasoningEffort ?? options.thinkingLevel ?? nested?.reasoningEffort ?? nested?.thinkingLevel;
+  return typeof value === 'string' ? { effort: value, effortSource: 'span' } : { effort: 'effort unknown', effortSource: 'unknown' };
+}
+
+function recordFor(card: Card, number: number, spans: Array<Record<string, any>>) {
   const gaps: string[] = [];
-  let totalUsd: number | null = 0;
-  const byProviderModel = spans.map((span) => {
+  const tokens = new Map<string, any>();
+  for (const span of spans) {
     const attributes = span.attributes && typeof span.attributes === 'object' ? span.attributes : {};
-    const cost = attributes.costContext?.estimatedCost;
-    const traceUsage = usage(attributes);
-    if (!Number.isFinite(cost)) { totalUsd = null; gaps.push(`trace ${span.spanId ?? span.id ?? '(no id)'}: cost unavailable`); }
-    else if (totalUsd !== null) totalUsd += cost;
-    if (!traceUsage) gaps.push(`trace ${span.spanId ?? span.id ?? '(no id)'}: usage unavailable`);
-    return { stage: 'build', provider: attributes.costContext?.provider ?? 'unknown', model: attributes.costContext?.model ?? 'unknown', costUsd: Number.isFinite(cost) ? cost : null,
-      freshInputTokens: traceUsage?.freshInputTokens ?? null, cachedInputTokens: traceUsage?.cachedInputTokens ?? null, outputTokens: traceUsage?.outputTokens ?? null, thinkingTokens: traceUsage?.thinkingTokens ?? null };
-  });
+    const detail = attributes.usage?.inputTokenDetails ?? {};
+    const read = detail.cacheRead ?? 0, write = detail.cacheWrite ?? 0;
+    const fresh = Number.isFinite(attributes.usage?.inputTokens) ? attributes.usage.inputTokens - read : null;
+    const output = attributes.usage?.outputTokens, thinking = attributes.usage?.outputTokenDetails?.reasoning ?? 0;
+    const effort = effortFor(span), provider = attributes.costContext?.provider ?? 'unknown', model = attributes.costContext?.model ?? 'unknown';
+    const key = `${provider}|${model}|${effort.effort}|${effort.effortSource}`;
+    const row = tokens.get(key) ?? { provider, model, ...effort, freshInputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, outputTokens: 0, thinkingTokens: 0 };
+    if (![fresh, read, write, output, thinking].every(Number.isFinite)) gaps.push(`trace ${span.spanId ?? span.id ?? '(no id)'}: usage unavailable`);
+    else { row.freshInputTokens += fresh; row.cacheReadTokens += read; row.cacheWriteTokens += write; row.outputTokens += output; row.thinkingTokens += thinking; }
+    tokens.set(key, row);
+  }
   const completedAt = card.stageHistory?.find((entry) => entry.stage === 'done')?.enteredAt ?? null;
-  return { version: 1, identity: { issueNumber: number, title: card.title, kind: 'factory', outcome: 'done', completedAt },
-    cost: { totalUsd, faceValueUsd: totalUsd, byProviderModel }, stages: card.stageHistory ?? [], waits: [], rescues: [], reviewRounds: [], rework: [],
-    fallbacks: { poolExhausted: fallbackReasons.filter((reason) => reason === 'pool-exhausted').length, persistentOutage: fallbackReasons.filter((reason) => reason === 'persistent-outage').length }, gaps: [...new Set(gaps)], source: { traceCount: spans.length, pullRequestNumber: null } };
+  if (!Object.keys(card.sessions ?? {}).length) gaps.push('no-sessions-on-card');
+  return { version: 2, identity: { issueNumber: number, title: card.title, kind: 'factory', outcome: 'done', completedAt }, tokens: [...tokens.values()], gaps: [...new Set(gaps)], source: { traceCount: spans.length } };
 }
 
 export async function captureFinishedFactoryCards({ projectId, projects, workItems, observability, memory, database, log = console.log }: CaptureDependencies): Promise<void> {
@@ -83,14 +94,9 @@ export async function captureFinishedFactoryCards({ projectId, projects, workIte
     const number = issueNumber(card);
     if (!number || !card.stages.includes('done')) continue;
     try {
-      if ((await database.any('SELECT issue_number FROM factory_issue_cost_records WHERE issue_number = $1', [number])).length) { log(`issue-cost-capture event=skipped issue=${number} reason=already-saved`); continue; }
       const sessions = Object.values(card.sessions ?? {});
       const spans = await spansForSessions(observability, sessions.map((session) => session.sessionId));
-      const reasons: string[] = [];
-      for (const session of sessions) {
-        for (const part of (await messagesForSession(memory, session)).flatMap((message: any) => message.parts ?? [])) if (part.type === 'data-mastracode-pack-fallback' && (part.data?.reason === 'pool-exhausted' || part.data?.reason === 'persistent-outage')) reasons.push(part.data.reason);
-      }
-      const record = recordFor(card, number, spans, reasons);
+      const record = recordFor(card, number, spans);
       const saved = await database.one('INSERT INTO factory_issue_cost_records (record_key, issue_number, record) VALUES ($1, $2, $3::jsonb) ON CONFLICT (record_key) DO UPDATE SET record = EXCLUDED.record WHERE factory_issue_cost_records.record IS DISTINCT FROM EXCLUDED.record RETURNING record', [`issue:${number}`, number, JSON.stringify(record)]);
       if (!saved.record) throw new Error('saved cost record was not read back');
       log(`issue-cost-capture event=captured issue=${number}`);
