@@ -123,7 +123,7 @@ export async function captureIssueCostRecord({
     if (kind === 'factory') {
       log(`issue-cost-record event=read-cards issue=${issue.number}`);
       const cards = await readCards();
-      card = cards.find((candidate) => candidate.number === issue.number);
+      card = cards.find((candidate) => Number(candidate.number) === issue.number);
       if (!card) throw new Error(`Factory card #${issue.number} was not found in the captured card read`);
       log(`issue-cost-record event=read-traces issue=${issue.number} from=${from} to=${to}`);
       const spans = await readSpans({ from, to });
