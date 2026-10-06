@@ -56,6 +56,7 @@ install -D -m 0644 "$patch_dir/run-psql.mjs" "$app_dir/ops/factory/run-psql.mjs"
 install -D -m 0755 "$patch_dir/issue-cost-capture.mjs" "$app_dir/ops/factory/issue-cost-capture.mjs"
 install -D -m 0644 "$patch_dir/issue-cost-records.mjs" "$app_dir/ops/factory/issue-cost-records.mjs"
 install -D -m 0644 "$patch_dir/mastra-session-messages.mjs" "$app_dir/ops/factory/mastra-session-messages.mjs"
+install -D -m 0644 "$patch_dir/local-factory-readers.mjs" "$app_dir/ops/factory/local-factory-readers.mjs"
 # The retirement helper is dry-run-only; installation does not configure the
 # Factory teardown hook or grant any deletion capability.
 install -D -m 0755 "$patch_dir/sandbox-cleanup.mjs" "$app_dir/ops/factory/sandbox-cleanup.mjs"
