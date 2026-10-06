@@ -32,14 +32,25 @@ record shows whether every step was done by Factory or by Todd.
 
 ## Machine cards
 
-The laptop agent owns Factory, server, repository, and GitHub setup directly. Keep these GitHub
-issues open while working, label new ones `factory:machine` at creation, and do not send them to
-Factory; the Factory GitHub rules exclude the known machine issues and their PRs, the
-`factory:machine` label, and publisher App PRs from intake. Build on a branch, get a review from a
-different AI company, and merge the reviewed head through the publisher App.
+Keep machine-card GitHub issues open while working, label new ones `factory:machine` at creation,
+and do not send them to Factory; the Factory GitHub rules exclude the known machine issues and
+their PRs, the `factory:machine` label, and publisher App PRs from intake.
 
-A documentation-only pull request (only `docs/` or Markdown files) needs no different-maker
-review; Todd decided this on 2026-10-05. Code pull requests still do.
+1. On a machine card the laptop agent is the operator: builds, merges with ordinary access once CI
+   is green, installs on the server, proves it with its own read-back, and closes the card.
+2. Read-only server work needs no approval. A server change a card calls for is allowed: note the
+   current state first and restore it if the read-back fails.
+3. Every machine PR is built test-first with Pocock's `/tdd` (the branch history shows a failing
+   test committed before the code that passes it) and checked with Pocock's `/code-review` against
+   `CODING_STANDARDS.md`, with the card as the spec. The PR body holds the review output, and each
+   finding is marked fixed or deliberately left. If this evidence is missing the card is PARKED.
+4. Stop only for: a step with no way back; spending Todd has not approved; or a credential or
+   permission the agent does not hold. Then PARK with one line and move on. Never ask Todd for a
+   workaround.
+5. A new rule is added only after the thing it prevents has actually happened.
+
+Julia cards are unchanged: Factory builds, reviews and merges them. Keep the disabled
+GitHub-triggered review workflow disabled and keep the sandbox isolation tests in CI.
 
 ## Models
 
