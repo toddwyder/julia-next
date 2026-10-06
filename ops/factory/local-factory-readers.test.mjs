@@ -14,11 +14,12 @@ test('the local readers reconstruct trace data and fallback-message content with
   });
   const messages = await readLocalSessionMessages({
     threadId: 'thread-1', resourceId: 'resource-1',
-    runPsql: async ({ args }) => { messageArgs = args; return { status: 0, stdout: '{"content":{"parts":[{"type":"data-mastracode-pack-fallback","data":{"reason":"pool-exhausted"}}]}}\n' }; },
+    runPsql: async ({ args, stdin }) => { messageArgs = args; assert.match(stdin, /:'thread_id'/); return { status: 0, stdout: '{"content":{"parts":[{"type":"data-mastracode-pack-fallback","data":{"reason":"pool-exhausted"}}]}}\n' }; },
   });
 
   assert.equal(spans[0].attributes.costContext.estimatedCost, 0.12);
   assert.equal(spans[0].sessionId, 'session-1');
   assert.deepEqual(messages[0].content.parts[0].data, { reason: 'pool-exhausted' });
   assert.ok(messageArgs.includes('resource_id=resource-1'));
+  assert.deepEqual(messageArgs.slice(-2), ['-f', '-']);
 });

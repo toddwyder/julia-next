@@ -41,7 +41,8 @@ export async function readLocalTraceSpans({ from, to, runQuery = queryDuckdb }) 
 export async function readLocalSessionMessages({ threadId, resourceId, runPsql: executePsql = runPsql, database = 'julia_factory_trial' }) {
   if (!threadId) throw new Error('Local message read requires a thread id');
   const result = await executePsql({
-    args: ['-X', '-q', '-A', '-t', '-v', 'ON_ERROR_STOP=1', '-v', `thread_id=${threadId}`, '-v', `resource_id=${resourceId ?? ''}`, '-d', database, '-c', "BEGIN TRANSACTION READ ONLY; SELECT jsonb_build_object('content', content::jsonb)::text FROM mastra_messages WHERE thread_id = :'thread_id' AND (:" + "'resource_id' = '' OR \"resourceId\" = :'resource_id') ORDER BY \"createdAtZ\", id; COMMIT;"],
+    args: ['-X', '-q', '-A', '-t', '-v', 'ON_ERROR_STOP=1', '-v', `thread_id=${threadId}`, '-v', `resource_id=${resourceId ?? ''}`, '-d', database, '-f', '-'],
+    stdin: "BEGIN TRANSACTION READ ONLY; SELECT jsonb_build_object('content', content::jsonb)::text FROM mastra_messages WHERE thread_id = :'thread_id' AND (:'resource_id' = '' OR \"resourceId\" = :'resource_id') ORDER BY \"createdAtZ\", id; COMMIT;",
     env: { ...process.env, PGOPTIONS: '-c default_transaction_read_only=on' },
   });
   if ((result?.status ?? 0) !== 0) throw new Error(`Could not read Factory session messages: ${(result?.stderr ?? '').trim()}`);

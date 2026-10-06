@@ -165,7 +165,8 @@ export async function saveIssueCostRecord({ record, database, runPsql }) {
   if (!key) throw new Error('Cannot save an unmatched review without a stable record key');
   const statement = `INSERT INTO ${ISSUE_COST_RECORDS_TABLE} (record_key, issue_number, record) VALUES (:'record_key', NULLIF(:'issue_number', '')::bigint, :'record_json'::jsonb) ON CONFLICT (record_key) DO UPDATE SET record = EXCLUDED.record WHERE ${ISSUE_COST_RECORDS_TABLE}.record IS DISTINCT FROM EXCLUDED.record; SELECT record::text FROM ${ISSUE_COST_RECORDS_TABLE} WHERE record_key = :'record_key';`;
   const result = await runPsql({
-    args: ['-X', '-q', '-A', '-t', '-v', 'ON_ERROR_STOP=1', '-v', `record_key=${key}`, '-v', `issue_number=${unmatched ? '' : issueNumber}`, '-v', `record_json=${JSON.stringify(record)}`, '-d', database, '-c', statement],
+    args: ['-X', '-q', '-A', '-t', '-v', 'ON_ERROR_STOP=1', '-v', `record_key=${key}`, '-v', `issue_number=${unmatched ? '' : issueNumber}`, '-v', `record_json=${JSON.stringify(record)}`, '-d', database, '-f', '-'],
+    stdin: statement,
     env: process.env,
   });
   if ((result?.status ?? 0) !== 0) throw new Error(`Could not save issue cost record: ${(result?.stderr ?? '').trim()}`);
