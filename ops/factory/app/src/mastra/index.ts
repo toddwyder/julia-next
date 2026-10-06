@@ -26,6 +26,7 @@ import { PlatformSandbox, createRepoTemplate as createPlatformRepoTemplate } fro
 import { E2BSandbox, createRepoTemplate as createE2BRepoTemplate } from '@mastra/e2b';
 import { RedisStreamsPubSub } from '@mastra/redis-streams';
 import { getDatabasePath } from '@mastra/code-sdk/utils/project';
+import { loadSettings, resolveDefaultThinkingLevel } from '@mastra/code-sdk/onboarding/settings';
 import { DEFAULT_RETENTION } from '@mastra/code-sdk/utils/storage-maintenance';
 import { MastraAuthWorkos } from '@mastra/auth-workos';
 import { createFactorySecretEncryption, MastraFactory } from '@mastra/factory';
@@ -493,8 +494,6 @@ setObservabilityPruneTarget({
   checkpoint: () => observabilityDuckDB.db.execute('CHECKPOINT'),
 });
 setIssueCostCapture(async () => {
-  const memory = await preparedArgs.storage?.getStore('memory');
-  if (!memory) throw new Error('Factory memory store is not available for cost capture');
   const database = (storage.getMastraStorage() as unknown as { db?: { any: Function; one: Function } }).db;
   if (!database) throw new Error('Factory Postgres client is not available for cost capture');
   await captureFinishedFactoryCards({
@@ -502,7 +501,7 @@ setIssueCostCapture(async () => {
     projects: storage.getDomain('projects') as never,
     workItems: storage.getDomain('work-items') as never,
     observability: observabilityDomain as never,
-    memory: memory as never,
+    currentModeDefault: (mode) => resolveDefaultThinkingLevel(loadSettings(), mode).level,
     database: database as never,
   });
 });

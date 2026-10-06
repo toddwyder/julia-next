@@ -20,26 +20,28 @@ import {
 } from './src/mastra/observability-retention.ts';
 import { captureFinishedFactoryCards } from './src/mastra/issue-cost-capture.ts';
 
-test('records every trace page by provider, model, and span effort without reading fallback messages', async () => {
+test('records every trace page by provider, model, and effort with named unknown token fields', async () => {
   const writes = [];
   const pages = [
-    { spans: [{ spanId: 'live-163-a', attributes: { costContext: { provider: 'openai', model: 'gpt-5' }, usage: { inputTokens: 100, outputTokens: 40, inputTokenDetails: { cacheRead: 20, cacheWrite: 5 }, outputTokenDetails: { reasoning: 7 } }, providerOptions: { openai: { reasoningEffort: 'high' } } } }], pagination: { hasMore: true } },
-    { spans: [{ spanId: 'live-163-b', attributes: { costContext: { provider: 'openai', model: 'gpt-5' }, usage: { inputTokens: 30, outputTokens: 10, inputTokenDetails: { cacheRead: 0, cacheWrite: 0 }, outputTokenDetails: { reasoning: 0 } } } }], pagination: { hasMore: false } },
+    { spans: [{ spanId: 'live-163-a', sessionId: '12b5e576-9f88-4d6f-91f2-7279efad97b9', attributes: { costContext: { provider: 'openai', model: 'gpt-5' }, usage: { inputTokens: 100, outputTokens: 40, inputTokenDetails: { cacheRead: 20, cacheWrite: 5 }, outputTokenDetails: { reasoning: 7 } }, providerOptions: { openai: { reasoningEffort: 'high' } } } }], pagination: { hasMore: true } },
+    // #163-style Mastra model span: usage can omit cacheWrite and the span can
+    // omit providerOptions.  Those are named unknowns rather than zeroes.
+    { spans: [{ spanId: 'live-163-b', sessionId: '12b5e576-9f88-4d6f-91f2-7279efad97b9', attributes: { costContext: { provider: 'openai', model: 'gpt-5' }, usage: { inputTokens: 30, outputTokens: 10, inputTokenDetails: { cacheRead: 0 } } } }], pagination: { hasMore: false } },
   ];
   await captureFinishedFactoryCards({
     projectId: 'project', projects: { listAll: async () => [{ id: 'project', orgId: 'org' }] },
-    workItems: { list: async () => [{ title: 'Long session', stages: ['done'], externalSource: { externalId: 'github-issue:163' }, sessions: { work: { sessionId: '12b5e576-9f88-4d6f-91f2-7279efad97b9', threadId: 'same' } } }] },
+    workItems: { list: async () => [{ title: 'Long session', stages: ['done'], externalSource: { externalId: 'github-issue:163' }, sessions: { work: { sessionId: '12b5e576-9f88-4d6f-91f2-7279efad97b9', threadId: 'same', thinkingLevel: 'medium' } } }] },
     observability: { listTraces: async ({ pagination }) => pages[pagination.page] },
     database: { any: async () => [], one: async (_sql, values) => { writes.push(values); return { record: values[1] }; } },
   });
   const record = JSON.parse(writes[0][2]);
   assert.deepEqual(record.tokens, [
     { provider: 'openai', model: 'gpt-5', effort: 'high', effortSource: 'span', freshInputTokens: 80, cacheReadTokens: 20, cacheWriteTokens: 5, outputTokens: 40, thinkingTokens: 7 },
-    { provider: 'openai', model: 'gpt-5', effort: 'effort unknown', effortSource: 'unknown', freshInputTokens: 30, cacheReadTokens: 0, cacheWriteTokens: 0, outputTokens: 10, thinkingTokens: 0 },
+    { provider: 'openai', model: 'gpt-5', effort: 'medium', effortSource: 'session', freshInputTokens: 30, cacheReadTokens: 0, cacheWriteTokens: 'unknown', outputTokens: 10, thinkingTokens: 'unknown' },
   ]);
 });
 
-test('captures a finished Factory card from the in-process stores, and names unavailable values', async () => {
+test('captures a finished Factory card from the in-process stores and names unavailable values', async () => {
   const writes = [];
   const lines = [];
   await captureFinishedFactoryCards({
@@ -55,69 +57,30 @@ test('captures a finished Factory card from the in-process stores, and names una
       spanId: 'span-163', sessionId: 'session-163', name: 'execute', spanType: 'model_generation',
       attributes: { costContext: { estimatedCost: 0.25, provider: 'openai', model: 'gpt-test' } },
     }] }) },
-    memory: { listMessages: async ({ resourceId }) => {
-      assert.equal(resourceId, 'session-163');
-      return { messages: [{ parts: [{ type: 'data-mastracode-pack-fallback', data: { reason: 'pool-exhausted' } }] }], hasMore: false };
-    } },
     database: { any: async () => [], one: async (_sql, values) => { writes.push(values); return { record: values[1] }; } },
     log: (line) => lines.push(line),
   });
 
   assert.equal(writes.length, 1);
   assert.equal(writes[0][1], 163);
-  assert.deepEqual(JSON.parse(writes[0][2]).tokens, [{ provider: 'openai', model: 'gpt-test', effort: 'effort unknown', effortSource: 'unknown', freshInputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, outputTokens: 0, thinkingTokens: 0 }]);
-  assert.ok(JSON.parse(writes[0][2]).gaps.includes('trace span-163: usage unavailable'));
+  assert.deepEqual(JSON.parse(writes[0][2]).tokens, [{ provider: 'openai', model: 'gpt-test', effort: 'effort unknown', effortSource: 'unknown', freshInputTokens: 'unknown', cacheReadTokens: 'unknown', cacheWriteTokens: 'unknown', outputTokens: 'unknown', thinkingTokens: 'unknown' }]);
   assert.ok(lines.includes('issue-cost-capture event=captured issue=163'));
 });
 
-test.skip('retired fallback-message capture is out of scope for the token record', async () => {
+test('labels the current Factory mode default when a saved effort is absent', async () => {
   const writes = [];
-  const pages = [
-    { messages: [{ parts: [{ type: 'text', text: 'first page' }] }], total: 351, page: 0, perPage: 100, hasMore: true },
-    { messages: [{ parts: [{ type: 'data-mastracode-pack-fallback', data: { reason: 'pool-exhausted' } }] }], total: 351, page: 1, perPage: 100, hasMore: true },
-    { messages: [{ parts: [{ type: 'text', text: 'third page' }] }], total: 351, page: 2, perPage: 100, hasMore: true },
-    { messages: [{ parts: [{ type: 'data-mastracode-pack-fallback', data: { reason: 'persistent-outage' } }] }], total: 351, page: 3, perPage: 100, hasMore: false },
-  ];
-  const calls = [];
-
   await captureFinishedFactoryCards({
-    projectId: '49b0ea94-d24b-43d7-8ce1-618cb61c5188',
-    projects: { listAll: async () => [{ id: '49b0ea94-d24b-43d7-8ce1-618cb61c5188', orgId: 'org-1' }] },
-    workItems: { list: async () => [{
-      title: 'Long session card', stages: ['done'], externalSource: { externalId: 'github-issue:163' },
-      sessions: { builder: { sessionId: 'session-163', threadId: 'thread-163' } },
-    }] },
-    observability: { listTraces: async () => ({ pagination: { hasMore: false }, spans: [] }) },
-    memory: { listMessages: async (input) => { calls.push(input); return pages[input.page]; } },
+    projectId: 'project', projects: { listAll: async () => [{ id: 'project', orgId: 'org' }] },
+    workItems: { list: async () => [{ title: 'Default effort', stages: ['done'], externalSource: { externalId: 'github-issue:164' }, sessions: { work: { sessionId: 'session-164', threadId: 'thread-164', mode: 'build' } } }] },
+    observability: { listTraces: async () => ({ pagination: { hasMore: false }, spans: [{ sessionId: 'session-164', attributes: { costContext: { provider: 'openai', model: 'gpt-test' }, usage: { inputTokens: 1, outputTokens: 1, inputTokenDetails: { cacheRead: 0, cacheWrite: 0 }, outputTokenDetails: { reasoning: 0 } } } }] }) },
+    currentModeDefault: (mode) => mode === 'build' ? 'high' : undefined,
     database: { any: async () => [], one: async (_sql, values) => { writes.push(values); return { record: values[1] }; } },
-    log: () => {},
   });
-
-  assert.deepEqual(calls.map(({ page, perPage, orderBy }) => ({ page, perPage, orderBy })), [
-    { page: 0, perPage: 100, orderBy: { field: 'createdAt', direction: 'DESC' } },
-    { page: 1, perPage: 100, orderBy: { field: 'createdAt', direction: 'DESC' } },
-    { page: 2, perPage: 100, orderBy: { field: 'createdAt', direction: 'DESC' } },
-    { page: 3, perPage: 100, orderBy: { field: 'createdAt', direction: 'DESC' } },
-  ]);
-  const record = JSON.parse(writes[0][2]);
-  assert.equal(record.fallbacks.poolExhausted, 1);
-  assert.equal(record.fallbacks.persistentOutage, 1);
+  const [token] = JSON.parse(writes[0][2]).tokens;
+  assert.equal(token.effort, 'high');
+  assert.equal(token.effortSource, 'current-default (may differ from run time)');
 });
 
-test.skip('retired fallback-message failure reporting is out of scope for the token record', async () => {
-  const lines = [];
-  await captureFinishedFactoryCards({
-    projectId: '49b0ea94-d24b-43d7-8ce1-618cb61c5188',
-    projects: { listAll: async () => [{ id: '49b0ea94-d24b-43d7-8ce1-618cb61c5188', orgId: 'org-1' }] },
-    workItems: { list: async () => [{ title: 'Read failure card', stages: ['done'], externalSource: { externalId: 'github-issue:163' }, sessions: { builder: { sessionId: 'session-163', threadId: 'thread-163' } } }] },
-    observability: { listTraces: async () => ({ pagination: { hasMore: false }, spans: [] }) },
-    memory: { listMessages: async ({ page }) => page === 0 ? { messages: [], total: 351, page, perPage: 100, hasMore: true } : Promise.reject(new Error('database unavailable')) },
-    database: { any: async () => [], one: async () => ({ record: {} }) },
-    log: (line) => lines.push(line),
-  });
-
-  assert.ok(lines.some((line) => line.includes('message read failed for session session-163 page 1: database unavailable')));
-});
 
 test('a card capture failure is logged and never prevents the retention prune', async () => {
   const lines = [];
