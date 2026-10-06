@@ -19,14 +19,19 @@ neither deletes traces nor publishes the Monday note.
 
 ## Capture command
 
-After the migration, run the installed command as the PostgreSQL operator. It
-prints the saved JSON row only after the write and readback succeed:
+After the migration, run the installed command as the Factory service account.
+It opens the server-owned DuckDB trace store with DuckDB's `READ_ONLY` access
+mode and reads Factory's PostgreSQL message store in a read-only transaction;
+it then writes and reads back one cost row through the service account's narrow
+table grant. This avoids a human WorkOS sign-in for the protected HTTP routes.
+It is an operational coupling to Mastra's local `span_events` and
+`mastra_messages` schemas: keep the regression tests and live proof, and revise
+this reader if a Factory/Mastra upgrade changes either schema.
 
 ```sh
-sudo -u postgres env ISSUE_COST_CAPTURE_FACTORY_URL=https://julia-factory.tail91f394.ts.net \
-  ISSUE_COST_CAPTURE_PROJECT_ID=<project-id> \
+sudo -u julia-factory env ISSUE_COST_CAPTURE_PROJECT_ID=<project-id> \
   node /var/lib/julia-factory/app/ops/factory/issue-cost-capture.mjs --factory-card <issue-number>
-sudo -u postgres node /var/lib/julia-factory/app/ops/factory/issue-cost-capture.mjs --laptop-pr <pr-number>
+sudo -u julia-factory node /var/lib/julia-factory/app/ops/factory/issue-cost-capture.mjs --laptop-pr <pr-number>
 ```
 
 The laptop PR must have exactly one GitHub issue relation in its timeline; the
@@ -39,8 +44,5 @@ classification. The Factory capture's time window starts at the card's entered
 time and ends when the command runs; it reads the supported trace and message
 routes, then writes its idempotent record.
 
-Fallback marks are read through Mastra's supported `GET
-/memory/threads/:threadId/messages` route. The pinned CLI names it in
-`ops/factory/app/node_modules/mastra/dist/commands/api/route-metadata.generated.d.ts:851-861`;
-Factory itself delegates its message reader to memory `listMessages` at
-`ops/factory/app/node_modules/@mastra/factory/dist/factory.js:440-446`.
+Fallback marks are read from `mastra_messages`, filtered by both thread and
+resource id, without printing message bodies.
