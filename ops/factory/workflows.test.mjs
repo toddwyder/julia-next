@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
@@ -32,6 +32,15 @@ test('CI runs the app DuckDB observability retention tests the repo-standard way
   assert.match(ci, /observability-retention\.test\.mjs/);
   assert.match(ci, /observability-retention-schedule\.test\.mjs/);
   assert.doesNotMatch(ci, /--import tsx/);
+});
+
+test('only Factory Review can start a paid code review', () => {
+  assert.equal(existsSync(resolve(workflows, 'cross-maker-review.yml')), false,
+    'a GitHub pull-request event must not start a paid review');
+  assert.equal(existsSync(resolve(import.meta.dirname, '../../.github/scripts/request-cross-maker-review.mjs')), false,
+    'the GitHub Action review launcher must be retired with its workflow');
+  assert.doesNotMatch(ci, /review-route-batching\.test\.mjs/,
+    'CI must not retain the retired GitHub-action reviewer suite');
 });
 
 test('CI cancels superseded runs and retains its required job for docs-only PRs', () => {
