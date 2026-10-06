@@ -36,8 +36,8 @@ test('records every trace page by provider, model, and effort with named unknown
   });
   const record = JSON.parse(writes[0][2]);
   assert.deepEqual(record.tokens, [
-    { provider: 'openai', model: 'gpt-5', effort: 'high', effortSource: 'span', freshInputTokens: 80, cacheReadTokens: 20, cacheWriteTokens: 5, outputTokens: 40, thinkingTokens: 7 },
-    { provider: 'openai', model: 'gpt-5', effort: 'medium', effortSource: 'session', freshInputTokens: 30, cacheReadTokens: 0, cacheWriteTokens: 'unknown', outputTokens: 10, thinkingTokens: 'unknown' },
+    { provider: 'openai', model: 'gpt-5', effort: 'high', effortSources: ['span'], freshInputTokens: 80, cacheReadTokens: 20, cacheWriteTokens: 5, outputTokens: 40, thinkingTokens: 7 },
+    { provider: 'openai', model: 'gpt-5', effort: 'medium', effortSources: ['session'], freshInputTokens: 30, cacheReadTokens: 0, cacheWriteTokens: 'unknown', outputTokens: 10, thinkingTokens: 'unknown' },
   ]);
 });
 
@@ -63,7 +63,7 @@ test('captures a finished Factory card from the in-process stores and names unav
 
   assert.equal(writes.length, 1);
   assert.equal(writes[0][1], 163);
-  assert.deepEqual(JSON.parse(writes[0][2]).tokens, [{ provider: 'openai', model: 'gpt-test', effort: 'effort unknown', effortSource: 'unknown', freshInputTokens: 'unknown', cacheReadTokens: 'unknown', cacheWriteTokens: 'unknown', outputTokens: 'unknown', thinkingTokens: 'unknown' }]);
+  assert.deepEqual(JSON.parse(writes[0][2]).tokens, [{ provider: 'openai', model: 'gpt-test', effort: 'effort unknown', effortSources: ['unknown'], freshInputTokens: 'unknown', cacheReadTokens: 'unknown', cacheWriteTokens: 'unknown', outputTokens: 'unknown', thinkingTokens: 'unknown' }]);
   assert.ok(lines.includes('issue-cost-capture event=captured issue=163'));
 });
 
@@ -78,7 +78,29 @@ test('labels the current Factory mode default when a saved effort is absent', as
   });
   const [token] = JSON.parse(writes[0][2]).tokens;
   assert.equal(token.effort, 'high');
-  assert.equal(token.effortSource, 'current-default (may differ from run time)');
+  assert.deepEqual(token.effortSources, ['current-default (may differ from run time)']);
+});
+
+test('marks a finished card with no session reference as no-sessions-on-card', async () => {
+  const writes = [];
+  await captureFinishedFactoryCards({
+    projectId: 'project', projects: { listAll: async () => [{ id: 'project', orgId: 'org' }] },
+    workItems: { list: async () => [{ title: 'No session', stages: ['done'], externalSource: { externalId: 'github-issue:230' } }] },
+    observability: { listTraces: async () => { throw new Error('must not list traces without a session'); } },
+    database: { any: async () => [], one: async (_sql, values) => { writes.push(values); return { record: values[1] }; } },
+  });
+  assert.equal(JSON.parse(writes[0][2]).source.sessionStatus, 'no-sessions-on-card');
+});
+
+test('logs the session and page when a later trace page fails', async () => {
+  const lines = [];
+  await captureFinishedFactoryCards({
+    projectId: 'project', projects: { listAll: async () => [{ id: 'project', orgId: 'org' }] },
+    workItems: { list: async () => [{ title: 'Trace failure', stages: ['done'], externalSource: { externalId: 'github-issue:163' }, sessions: { work: { sessionId: 'session-163', threadId: 'thread-163' } } }] },
+    observability: { listTraces: async ({ pagination }) => pagination.page === 0 ? { spans: [], pagination: { hasMore: true } } : Promise.reject(new Error('store unavailable')) },
+    database: { any: async () => [], one: async () => ({ record: {} }) }, log: (line) => lines.push(line),
+  });
+  assert.ok(lines.some((line) => line.includes('trace read failed: session session-163 page 1: store unavailable')));
 });
 
 

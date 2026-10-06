@@ -27,7 +27,12 @@ async function spansForSessions(observability: CaptureDependencies['observabilit
   const spans: Array<Record<string, any>> = [];
   for (const sessionId of sessionIds) {
     for (let page = 0; ; page += 1) {
-      const result = await observability.listTraces({ filters: { sessionId }, pagination: { page, perPage: 100 } });
+      let result: any;
+      try {
+        result = await observability.listTraces({ filters: { sessionId }, pagination: { page, perPage: 100 } });
+      } catch (error) {
+        throw new Error(`session ${sessionId} page ${page}: ${error instanceof Error ? error.message : String(error)}`);
+      }
       spans.push(...result.spans);
       if (!result.pagination?.hasMore) break;
     }
@@ -46,7 +51,7 @@ function effortFor(span: Record<string, any>, session: NonNullable<Card['session
 }
 
 type TokenValue = number | 'unknown';
-type TokenRow = { provider: string; model: string; effort: string; effortSource: string; freshInputTokens: TokenValue; cacheReadTokens: TokenValue; cacheWriteTokens: TokenValue; outputTokens: TokenValue; thinkingTokens: TokenValue };
+type TokenRow = { provider: string; model: string; effort: string; effortSources: string[]; freshInputTokens: TokenValue; cacheReadTokens: TokenValue; cacheWriteTokens: TokenValue; outputTokens: TokenValue; thinkingTokens: TokenValue };
 
 function addToken(row: TokenRow, field: keyof Pick<TokenRow, 'freshInputTokens' | 'cacheReadTokens' | 'cacheWriteTokens' | 'outputTokens' | 'thinkingTokens'>, value: unknown) {
   if (!Number.isFinite(value)) row[field] = 'unknown';
@@ -67,8 +72,9 @@ function recordFor(card: Card, number: number, spans: Array<Record<string, any>>
     const output = attributes.usage?.outputTokens;
     const thinking = attributes.usage?.outputTokenDetails?.reasoning;
     const effort = effortFor(span, sessionById.get(span.sessionId), currentModeDefault), provider = attributes.costContext?.provider ?? 'unknown', model = attributes.costContext?.model ?? 'unknown';
-    const key = `${provider}|${model}|${effort.effort}|${effort.effortSource}`;
-    const row: TokenRow = tokens.get(key) ?? { provider, model, ...effort, freshInputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, outputTokens: 0, thinkingTokens: 0 };
+    const key = `${provider}|${model}|${effort.effort}`;
+    const row: TokenRow = tokens.get(key) ?? { provider, model, effort: effort.effort, effortSources: [], freshInputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, outputTokens: 0, thinkingTokens: 0 };
+    if (!row.effortSources.includes(effort.effortSource)) row.effortSources.push(effort.effortSource);
     addToken(row, 'freshInputTokens', fresh);
     addToken(row, 'cacheReadTokens', read);
     addToken(row, 'cacheWriteTokens', write);
@@ -77,8 +83,8 @@ function recordFor(card: Card, number: number, spans: Array<Record<string, any>>
     tokens.set(key, row);
   }
   const completedAt = card.stageHistory?.find((entry) => entry.stage === 'done')?.enteredAt ?? null;
-  if (!Object.keys(card.sessions ?? {}).length) gaps.push('no-sessions-on-card');
-  return { version: 2, identity: { issueNumber: number, title: card.title, kind: 'factory', outcome: 'done', completedAt }, tokens: [...tokens.values()], gaps: [...new Set(gaps)], source: { traceCount: spans.length } };
+  const sessionStatus = Object.keys(card.sessions ?? {}).length ? 'sessions-captured' : 'no-sessions-on-card';
+  return { version: 2, identity: { issueNumber: number, title: card.title, kind: 'factory', outcome: 'done', completedAt }, tokens: [...tokens.values()], gaps: [...new Set(gaps)], source: { traceCount: spans.length, sessionStatus } };
 }
 
 export async function captureFinishedFactoryCards({ projectId, projects, workItems, observability, currentModeDefault, database, log = console.log }: CaptureDependencies): Promise<void> {
@@ -90,7 +96,12 @@ export async function captureFinishedFactoryCards({ projectId, projects, workIte
     if (!number || !card.stages.includes('done')) continue;
     try {
       const sessions = Object.values(card.sessions ?? {});
-      const spans = await spansForSessions(observability, sessions.map((session) => session.sessionId));
+      let spans: Array<Record<string, any>>;
+      try {
+        spans = await spansForSessions(observability, sessions.map((session) => session.sessionId));
+      } catch (error) {
+        throw new Error(`trace read failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
       const record = recordFor(card, number, spans, currentModeDefault);
       const saved = await database.one('INSERT INTO factory_issue_cost_records (record_key, issue_number, record) VALUES ($1, $2, $3::jsonb) ON CONFLICT (record_key) DO UPDATE SET record = EXCLUDED.record WHERE factory_issue_cost_records.record IS DISTINCT FROM EXCLUDED.record RETURNING record', [`issue:${number}`, number, JSON.stringify(record)]);
       if (!saved.record) throw new Error('saved cost record was not read back');
