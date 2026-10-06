@@ -1,4 +1,4 @@
--- Factory 0.17.2 work_items snapshot for the Monday note. Read-only; keep in
+-- Factory 0.19.1 work_items snapshot for the Monday note. Read-only; keep in
 -- step with the board's own columns. Run as the read-only Factory role the
 -- wait watcher uses; the project id is passed with -v project_id=...
 BEGIN TRANSACTION READ ONLY;

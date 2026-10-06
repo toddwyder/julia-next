@@ -27,11 +27,11 @@ there is a live route.
   HTTPS Funnel, with WorkOS login protection.
 - The root-owned, mode-600 `/etc/julia-factory/factory.env` holds service configuration; never
   put credential values there.
-- Installed versions are pinned: Factory 0.17.2, `@mastra/auth-workos` 1.6.5, core 1.71.0, SDK
-  1.8.3. Do not upgrade them for this trial.
-- Version- and hash-guarded install patches are idempotent and removable; the only installed
-  Mastra package change is the WorkOS cookie-identity fix (mastra-ai/mastra#25252). See
-  `ops/factory/README.md` for the approved-exceptions list and the installer.
+- Installed versions are pinned: Factory 0.19.1, `@mastra/auth-workos` 1.6.6, core 1.74.0, SDK
+  1.10.1. The aligned direct storage and memory packages are recorded in
+  `ops/factory/app/package.json`.
+- The WorkOS cookie-identity install patch was removed after the 1.6.6 upgrade. See
+  `ops/factory/README.md` for the current approved-exceptions list and the installer.
 - The normal Git identity is the verified Factory App bot, not a person; the Factory App is
   restricted to `julia-next`.
 

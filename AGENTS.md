@@ -26,5 +26,5 @@ why.
 ## Server and domain
 
 Keep SSH and sudo outside the Factory sandbox; an authorized operator uses the laptop's Tailscale
-route. See `docs/agents/server-runbook.md`. Domain model: `CONTEXT.md`; decisions: `docs/adr/`;
+route. See `docs/agents/server-runbook.md`. Domain model: `GLOSSARY.md`; decisions: `docs/adr/`;
 routes: `docs/agents/work-execution.md` and `docs/adr/0009-mastra-factory.md`.

@@ -7,10 +7,9 @@ Todd adds or removes an entry. Anything custom that is not listed here is not ap
 
 | # | Exception | Gap it fills | Remove when |
 |---|---|---|---|
-| 1 | WorkOS cookie identity fix in `@mastra/auth-workos` 1.6.5 | Default platform sign-in rejects our self-hosted address; the WorkOS cookie path drops the organization ([#25252](https://github.com/mastra-ai/mastra/issues/25252)) | #25252 ships in a Mastra release |
-| 2 | Factory wait watcher and Discord webhook | Stock Factory 0.17.2 shows waits in the web app but does not send phone and Windows alerts when Todd is away ([Mastra request #25378](https://github.com/mastra-ai/mastra/issues/25378)); public ntfy.sh exhausted its daily quota (42908), and the private ntfy PWA did not register desktop Web Push | Remove when Mastra adds its own alerts |
-| 3 | Monday note and bounded trace retention (`ops/factory/monday-note*.mjs`, `ops/factory/mastra-traces.mjs`, `ops/factory/factory-cards.mjs`, `ops/factory/trace-retention.mjs`, `app/src/mastra/observability-store.ts`, `app/src/mastra/observability-retention.ts`) — **approved for GitHub #140 (Todd, 2026-09-30)** | Factory 0.17.2 has no weekly cost summary, and the observability store grew to 1.7 GB after about ten hours (change log, 2026-09-28). The note posts one Discussion in the "Monday notes" category and notifies Todd; retention runs Mastra's supported DuckDB retention + CHECKPOINT on the framework's own daily schedule, from a size guard. Neither deletes rows or moves cards by hand. See **Monday note** and **Bounded trace storage** below | Remove when Factory ships its own weekly cost summary and bounded trace retention |
-| 4 | Safe sandbox retirement evaluator and cleanup (`ops/factory/sandbox-cleanup.mjs`) | Stock Factory 0.17.2 leaves completed local-sandbox workspaces until manual intervention. The evaluator applies fail-closed idle, clean-Git and recoverable-content gates through the stock `teardownCommand` and a daily re-test. It never removes unverified roots. | Factory provides automated safe local-sandbox retirement and lifecycle cleanup |
+| 2 | Factory wait watcher and Discord webhook | Stock Factory has no phone and Windows alerts when Todd is away ([Mastra request #25378](https://github.com/mastra-ai/mastra/issues/25378)); public ntfy.sh exhausted its daily quota (42908), and the private ntfy PWA did not register desktop Web Push | Remove when Mastra adds its own alerts |
+| 3 | Monday note and bounded trace retention (`ops/factory/monday-note*.mjs`, `ops/factory/mastra-traces.mjs`, `ops/factory/factory-cards.mjs`, `ops/factory/trace-retention.mjs`, `app/src/mastra/observability-store.ts`, `app/src/mastra/observability-retention.ts`) — **approved for GitHub #140 (Todd, 2026-09-30)** | Factory has no weekly cost summary, and the observability store grew to 1.7 GB after about ten hours (change log, 2026-09-28). The note posts one Discussion in the "Monday notes" category and notifies Todd; retention runs Mastra's supported DuckDB retention + CHECKPOINT on the framework's own daily schedule, from a size guard. Neither deletes rows or moves cards by hand. See **Monday note** and **Bounded trace storage** below | Remove when Factory ships its own weekly cost summary and bounded trace retention |
+| 4 | Safe sandbox retirement evaluator and cleanup (`ops/factory/sandbox-cleanup.mjs`) | Stock Factory leaves completed local-sandbox workspaces until manual intervention. The evaluator applies fail-closed idle, clean-Git and recoverable-content gates through the stock `teardownCommand` and a daily re-test. It never removes unverified roots. | Factory provides automated safe local-sandbox retirement and lifecycle cleanup |
 
 Approved by ADR 0009 but not built yet: the check that rejects unapproved custom machinery.
 It gets its row when it is built.
@@ -72,7 +71,7 @@ Each card line carries every step with its actor, the card's summed trace cost *
 attempts**, and how long it took, and the **Discussion body prints those same step lines** under the
 card — Todd reads the body, not the returned metadata. A step with no actor or no cost time is still
 printed (a model span with no cost fails the whole note closed). Whether every step after Todd's
-Intake tap was done by Factory or by hand is read from the actors, not agent narrative (CONTEXT.md
+Intake tap was done by Factory or by hand is read from the actors, not agent narrative (GLOSSARY.md
 "Done by Factory"). A cost-bearing span that matches no card fails the note closed rather than being
 printed as `$0.00`; a non-cost-bearing span that matches no card is reported by count with no dollar
 figure. A quiet week says so. Sessions run **outside Factory** — Codex, GPT, or Claude sessions
@@ -194,10 +193,9 @@ by `ops/factory/app/observability-retention.test.mjs`.
 
 ## Installation
 
-Approved exception #1 restores the pinned `@mastra/auth-workos` 1.6.5 cookie
-identity fix described in [mastra-ai/mastra#25252](https://github.com/mastra-ai/mastra/issues/25252).
-It is the only installed Mastra package code change. See
-`docs/agents/factory-platform-auth-change-log.md` for the complete change list.
+The deployed Factory dependencies are pinned in the versioned lockfile; no installed
+Mastra package code is patched. See `docs/agents/factory-platform-auth-change-log.md`
+for the complete change list.
 
 When replacing the ntfy watcher, stop its timer before copying the new watcher:
 `sudo systemctl stop julia-factory-wait-alerts.timer`. The new service uses a
@@ -220,15 +218,13 @@ The installer copies `ops/factory/app/{package.json,package-lock.json,tsconfig.j
 plus the asynchronous Cross-maker workflow imported by `index.ts`
 into the service directory before `npm ci`; it never copies `.env`, databases or
 runtime workspaces. The versioned lockfile pins the deployed dependencies; it does
-not upgrade them. Factory 0.17.2 loads project-local `factory-skills` before its
+not upgrade them. Factory 0.19.1 loads project-local `factory-skills` before its
 bundled skills; Mastra's build places the overrides under `.mastra/output/factory-skills`.
 After installing and restarting, verify precedence in Factory's Settings › Skills
 or a fresh bound session; a staged build alone proves packaging, not live activation.
-The Factory UI is supplied by Mastra's build, not committed as generated assets. The WorkOS
-patch checks version and original SHA-256 and rejects unexpected files. It applies
-before build and checks the copied deployment dependency afterward. Repeat
-application is safe. Back up the service directory before a live install and
-restart the service only after checks succeed.
+The Factory UI is supplied by Mastra's build, not committed as generated assets.
+Back up the service directory before a live install and restart the service only
+after checks succeed.
 
 **Issue #146 deployment gate:** The local-provider configuration requires native
 `bubblewrap` with `nativeSandbox.allowNetwork: true`. Todd approved general internet
@@ -242,13 +238,6 @@ Git credentials, and record commands/results and accepted network scope in the
 change log and PR. Roll back if the service fails to start or isolation is bypassed;
 never print key or database contents. #144 owns the retired Orca reachability check
 and does not block #146.
-
-The installer runs `workos-cookie-identity.check.mjs` against both package copies.
-Its fixture checks one membership, an explicit organization choice, and no
-membership without using a real account.
-
-Remove the exception when #25252 ships in a Mastra release. Review that release,
-remove this patch and installer hook, then reinstall and build from the lockfile.
 
 Personal and factory-wide observer/reflector settings select `deepseek/deepseek-flash`
 (2026-09-28), with `DEFAULT_OM_MODEL_ID` set to the same model in the environment. Mastra
@@ -268,9 +257,9 @@ Run these only as the dedicated service account. They persist for fresh
 sandboxes and do not authorize publishing. Removal is `git config --global
 --unset user.name` and the corresponding `user.email` command for that account.
 
-Factory **0.17.2** scans both `.claude/skills` and `.agents/skills` as local
-sources. The earlier package patch selecting one root was removed so WorkOS is
-the only Mastra code exception. Skill-loading repair is separate work.
+Factory **0.19.1** scans both `.claude/skills` and `.agents/skills` as local
+sources. The earlier package patch selecting one root was removed. Skill-loading
+repair is separate work.
 
 The supported GitHub event-rule overrides in `app/src/mastra/index.ts` keep
 machine issues and publisher App PRs off Factory's Work and Review boards.

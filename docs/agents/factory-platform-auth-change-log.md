@@ -1,5 +1,12 @@
 # Factory platform sign-in setup: change list
 
+## 2026-10-05: retired WorkOS identity exception
+
+Factory 0.19.1 uses the upstream `@mastra/auth-workos` 1.6.6 package without
+the former cookie-identity patch or its installer verification. The approved
+exception was removed after the dependency upgrade; the historical entries
+below remain an account of the earlier installation.
+
 Date: 2026-09-27. Scope: authentication setup after the completed JUL-183 trial. No second trial was started.
 
 ## Every change made

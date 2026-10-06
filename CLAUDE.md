@@ -33,5 +33,5 @@ Details and the account table are in `docs/agents/server-runbook.md`.
 
 ## Domain and tracker
 
-Domain model: `CONTEXT.md`. Decisions: `docs/adr/`. New work goes in GitHub issues, where Factory's
+Domain model: `GLOSSARY.md`. Decisions: `docs/adr/`. New work goes in GitHub issues, where Factory's
 Intake picks it up; Linear is read-only history. See `docs/agents/issue-tracker.md`.
