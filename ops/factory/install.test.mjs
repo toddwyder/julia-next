@@ -194,6 +194,19 @@ test('a repo-sourced install preserves service secrets and builds stock WorkOS a
   assert.equal(readFileSync(resolve(target, 'runtime.db'), 'utf8'), 'existing state');
 });
 
+test('a root-run install hands the Mastra build to the app directory owner', () => {
+  // Live installs are authorized through sudo, while the long-running service
+  // is julia-factory. The generated .mastra tree must therefore be built by
+  // the app owner; otherwise a later service-account rebuild cannot replace it.
+  const source = readFileSync(installer, 'utf8');
+  assert.match(source, /app_owner=.*stat.*%U/);
+  assert.match(source, /chown -R .*app_dir/);
+  assert.match(source, /runuser -u .*"\$@"/);
+  assert.match(source, /run_as_app_owner npm ci/);
+  assert.match(source, /run_as_app_owner npm run check/);
+  assert.match(source, /run_as_app_owner npm run build/);
+});
+
 test('a missing required skill leaves an existing install untouched', () => {
   const tmp = mkdtempSync(resolve(tmpdir(), 'julia-factory-missing-skill-'));
   const target = resolve(tmp, 'target');
