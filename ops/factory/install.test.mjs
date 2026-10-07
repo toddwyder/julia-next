@@ -87,7 +87,7 @@ function resolveLocalGraph(appDir, entryRel) {
   return seen;
 }
 
-test('the installer copies the issue #140 Monday note and retention programs into the app', () => {
+test('the installer copies trace retention without the retired Monday-note programs', () => {
   const tmp = mkdtempSync(resolve(tmpdir(), 'julia-factory-install-140-'));
   const target = resolve(tmp, 'target');
   const bin = resolve(tmp, 'bin');
@@ -105,17 +105,11 @@ test('the installer copies the issue #140 Monday note and retention programs int
   });
   assert.equal(result.status, 0, result.stderr);
   for (const file of [
-    'ops/factory/monday-note.mjs',
-    'ops/factory/monday-note-run.mjs',
-    'ops/factory/monday-note-adapters.mjs',
-    'ops/factory/mastra-traces.mjs',
     'ops/factory/trace-retention.mjs',
-    'ops/factory/factory-cards.mjs',
-    'ops/factory/factory-cards.sql',
-    'ops/factory/run-psql.mjs',
   ]) {
     assert.equal(readFileSync(resolve(target, file), 'utf8'), readFileSync(resolve(root, 'ops/factory', file.split('/').pop()), 'utf8'), file);
   }
+  assert.equal(existsSync(resolve(target, 'ops/factory/monday-note-run.mjs')), false);
 });
 
 test('a clean install carries only the Factory review surface the entry point imports, so check and build resolve it', () => {
