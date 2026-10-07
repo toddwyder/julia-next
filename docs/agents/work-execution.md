@@ -71,6 +71,19 @@ acceptance criteria, verification, and lasting observability. When a skill asks 
 seams, the plan's seams are the agreed seams; do not ask Todd again. Resolve routine
 implementation details from code and history and record a concise assumption.
 
+### Runtime dependency matrix
+
+Any Factory plan or laptop brief for a change that runs on the server or touches a database must
+include a `## Runtime dependency matrix`. The plan is not approved without it. For every boundary
+the change crosses, include one row naming the principal (the identity the deployed service
+actually runs as), the backing store or API, read or write mode, the fixture that exercises the
+boundary in tests, and the proof command that shows it works on the real server.
+
+This comes from #211: unit tests covered code paths but not the deployed path, and unstated
+runtime dependencies later surfaced as a missing entry point, HTTP sign-in Factory does not
+support, the wrong Factory project, missing database permissions, and trace pages that were never
+followed. Use those as the worked example; a generic matrix does not make a plan executable.
+
 Never ask Todd for an exception or workaround approval. If an authorization boundary or platform
 limit blocks the next required action, park the card through Factory's existing card/Needs
 attention route with one line explaining why.
