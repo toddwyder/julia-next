@@ -2,7 +2,7 @@
 
 ## Exceptions list
 
-Every custom piece is recorded here; only Todd adds or removes an entry.
+Every custom piece is recorded here. Only Todd adds or removes an entry.
 
 | # | Exception | Gap it fills | Remove when |
 |---|---|---|---|
