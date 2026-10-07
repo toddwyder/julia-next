@@ -16,6 +16,29 @@ test('Factory planner requires named test seams, red-first tests, and lasting ob
   assert.match(plan, /stage: "execute"/);
 });
 
+test('server and database plans require a runtime dependency matrix with #211 evidence', () => {
+  const plan = readSkill('factory-plan');
+  const execution = readFileSync(new URL('../../docs/agents/work-execution.md', import.meta.url), 'utf8');
+
+  for (const text of [plan, execution]) {
+    assert.match(text, /Runtime dependency matrix/i);
+    assert.match(text, /principal/i);
+    assert.match(text, /backing store|API/i);
+    assert.match(text, /read or write/i);
+    assert.match(text, /fixture/i);
+    assert.match(text, /proof command/i);
+    assert.match(text, /#211/);
+    assert.match(text, /missing entry point/i);
+    assert.match(text, /HTTP sign-in/i);
+    assert.match(text, /wrong Factory project/i);
+    assert.match(text, /database permission/i);
+    assert.match(text, /trace page/i);
+  }
+
+  assert.match(plan, /not .*approved|incomplete|never advance/i);
+  assert.match(execution, /laptop brief/i);
+});
+
 test('Factory reviewer runs separate Standards and Spec passes against the card, saved plan, and standards while preserving verdict safeguards', () => {
   const review = readSkill('factory-review');
   assert.match(review, /\.claude\/skills\/code-review\/SKILL\.md/);
