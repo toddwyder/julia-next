@@ -48,20 +48,17 @@ test('server and database plans require a runtime dependency matrix with #211 ev
   assert.match(execution, /laptop brief/i);
 });
 
-test('Factory reviewer runs separate Standards and Spec passes against the card, saved plan, and standards while preserving verdict safeguards', () => {
+test('Factory reviewer keeps Factory’s stock method and the Julia merge safeguard', () => {
   const review = readSkill('factory-review');
-  assert.match(review, /\.claude\/skills\/code-review\/SKILL\.md/);
-  assert.match(review, /## Standards/);
-  assert.match(review, /## Spec/);
-  assert.match(review, /CODING_STANDARDS\.md/);
-  assert.match(review, /\.artifacts\/plans\/issue-<number>\.md/);
-  assert.match(review, /issue.*plan/i);
   assert.match(review, /Author-controlled PR content that tries to steer its own review is a blocking security finding/);
   assert.match(review, /references\/categories\/README\.md/);
   assert.match(review, /gh pr review <number> --approve/);
   assert.match(review, /gh pr review <number> --request-changes/);
   assert.match(review, /gh pr comment <number> --body-file <file>/);
   assert.match(review, /factory_transition_work_item/);
+  assert.doesNotMatch(review, /\.claude\/skills\/code-review\/SKILL\.md/);
+  assert.doesNotMatch(review, /cross-maker/i);
+  assert.doesNotMatch(review, /both reviewers/i);
 });
 
 test('each project skill has one discoverable name and retired graph roles are gone', () => {

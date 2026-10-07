@@ -118,7 +118,7 @@ test('the installer copies the issue #140 Monday note and retention programs int
   }
 });
 
-test('a clean install carries every app module the entry point imports, so check and build resolve them', () => {
+test('a clean install carries only the Factory review surface the entry point imports, so check and build resolve it', () => {
   // The install copies a fixed file list, then runs `npm run check` and
   // `npm run build` in the app. The entry point imports local app modules
   // (the DuckDB observability store and the retention workflow); if any of
@@ -145,12 +145,11 @@ test('a clean install carries every app module the entry point imports, so check
 
   const sourceApp = resolve(root, 'ops/factory/app');
   const graph = resolveLocalGraph(sourceApp, 'src/mastra/index.ts');
-  // The graph actually reached the new retention modules; otherwise the test
-  // could pass on an install that silently lost them.
+  // The graph reaches the stock Factory review skill and retention modules;
+  // the retired cross-maker route must not remain reachable from the deploy.
   for (const required of [
     'src/mastra/observability-store',
     'src/mastra/observability-retention',
-    'src/mastra/reviewer/workflows/cross-maker-review-workflow',
   ]) {
     assert.ok(graph.has(required), `entry point no longer imports ${required}`);
     assert.ok(
@@ -158,6 +157,7 @@ test('a clean install carries every app module the entry point imports, so check
       `a clean install left ${required}.ts missing; npm run check/build cannot resolve it`,
     );
   }
+  assert.ok(!graph.has('src/mastra/reviewer/workflows/cross-maker-review-workflow'));
 
   // Every resolved local module is present in the install, so tsc/mastra build
   // have no unresolved local import.
@@ -179,6 +179,8 @@ test('a repo-sourced install preserves service secrets and builds stock WorkOS a
   const bin = resolve(tmp, 'bin');
   const log = resolve(tmp, 'commands.log');
   mkdirSync(target);
+  mkdirSync(resolve(target, 'src/mastra/reviewer'), { recursive: true });
+  writeFileSync(resolve(target, 'src/mastra/reviewer/retired-route.ts'), 'retired reviewer');
   mkdirSync(bin);
   writeFileSync(resolve(target, '.env'), 'KEEP_THIS_SECRET=fixture\n');
   writeFileSync(resolve(target, 'runtime.db'), 'existing state');
@@ -202,6 +204,7 @@ test('a repo-sourced install preserves service secrets and builds stock WorkOS a
   }
   assert.equal(readFileSync(resolve(target, '.env'), 'utf8'), 'KEEP_THIS_SECRET=fixture\n');
   assert.equal(readFileSync(resolve(target, 'runtime.db'), 'utf8'), 'existing state');
+  assert.equal(existsSync(resolve(target, 'src/mastra/reviewer')), false, 'install removes the retired reviewer tree');
   assert.equal(readFileSync(log, 'utf8').trim(), [
     'npm ci',
     'npm run check',
@@ -282,7 +285,6 @@ test('a missing required skill leaves an existing install untouched', () => {
     'package.json', 'package-lock.json', 'tsconfig.json', 'src/mastra/index.ts', 'src/mastra/local-sandbox.ts',
     'src/mastra/observability-store.ts', 'src/mastra/observability-retention.ts',
     'src/mastra/issue-cost-capture.ts', 'src/mastra/model-price-refresh.ts',
-    'src/mastra/reviewer/workflows/cross-maker-review-workflow.ts',
     'src/mastra/public/factory-skills/factory-plan/SKILL.md',
   ]) {
     const destination = resolve(source, file);

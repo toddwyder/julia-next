@@ -40,11 +40,6 @@ import { PlatformJiraIntegration } from '@mastra/factory/integrations/platform/j
 import { LinearIntegration } from '@mastra/factory/integrations/linear/integration';
 import { SlackIntegration } from '@mastra/factory/integrations/slack/integration';
 import type { IMastraAuthProvider } from '@mastra/core/server';
-import { codeReviewAgent } from './reviewer/agents/code-review-agent';
-import { workflowReviewAgent } from './reviewer/agents/workflow-review-agent';
-import { prReviewWorkflow } from './reviewer/workflows/pr-review-workflow';
-import { reviewerRoute, reviewerStatusRoute, reviewerCancelRoute } from './reviewer/route';
-import { crossMakerReviewWorkflow } from './reviewer/workflows/cross-maker-review-workflow';
 import {
   composeStorageWithObservability,
   createDuckDBStore,
@@ -519,12 +514,7 @@ setModelPriceRefresh(async () => {
 // properties explicit so deploy builds can statically detect the worker topology.
 export const mastra = new Mastra({
   ...preparedArgs,
-  agents: { ...preparedArgs.agents, codeReviewAgent, workflowReviewAgent },
-  workflows: { ...preparedArgs.workflows, prReviewWorkflow, crossMakerReviewWorkflow, observabilityRetentionWorkflow },
-  server: {
-    ...preparedArgs.server,
-    apiRoutes: [...(preparedArgs.server?.apiRoutes ?? []), reviewerRoute, reviewerStatusRoute, reviewerCancelRoute],
-  },
+  workflows: { ...preparedArgs.workflows, observabilityRetentionWorkflow },
   storage: composedStorage,
   pubsub: preparedArgs.pubsub,
   workers: preparedArgs.workers,
