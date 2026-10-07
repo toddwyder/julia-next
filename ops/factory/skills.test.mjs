@@ -20,6 +20,7 @@ test('Factory planner assigns the build skill from the triage card type', () => 
   const plan = readSkill('factory-plan');
 
   assert.match(plan, /feature card.*\.claude\/skills\/implement\/SKILL\.md/i);
+  assert.match(plan, /feature card.*\.claude\/skills\/implement\/SKILL\.md.*\.claude\/skills\/tdd\/SKILL\.md.*plan's agreed seams.*\.claude\/skills\/code-review\/SKILL\.md/i);
   assert.match(plan, /defect card.*\.claude\/skills\/diagnosing-bugs\/SKILL\.md/i);
   assert.match(plan, /defect card.*\.claude\/skills\/code-review\/SKILL\.md/i);
 });
