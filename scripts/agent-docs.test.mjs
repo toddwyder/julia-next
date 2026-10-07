@@ -25,7 +25,11 @@ test('agent instructions use GitHub issues and Factory boards, with live UAT aft
     assert.match(text, /Todd/);
     assert.doesNotMatch(text, /Tick as you go|Finish the card/);
     assert.match(text, /publisher App/);
-    assert.match(text, /\.claude\/skills\/tdd\/SKILL\.md/);
+    if (path === 'CLAUDE.md') {
+      assert.match(text, /feature cards, Factory's plan names only `\.claude\/skills\/implement\/SKILL\.md`; that skill\s+already runs TDD at the planned seams and one code-review/i);
+    } else {
+      assert.match(text, /\.claude\/skills\/tdd\/SKILL\.md/);
+    }
   }
   assert.match(read('CLAUDE.md'), /reviewer merges the PR/);
   assert.doesNotMatch(read('CLAUDE.md'), /close a Linear feature card|throwaway Linear card|Default label vocabulary \(/);
