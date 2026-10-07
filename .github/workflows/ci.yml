@@ -14,6 +14,18 @@ jobs:
     # ubuntu-latest rejects the bubblewrap command on the hosted runner.
     # Run the actual sandbox behavior tests on GitHub's Ubuntu 22.04 VM.
     runs-on: ubuntu-22.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
     permissions:
       contents: read
     steps:
@@ -78,6 +90,16 @@ jobs:
             ops/factory/monday-note-units.test.mjs ops/factory/mastra-traces.test.mjs \
             \
             ops/factory/factory-cards.test.mjs ops/factory/trace-retention.test.mjs
+
+      - name: Run face-value PostgreSQL integration test
+        if: steps.changes.outputs.docs_only != 'true'
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          python3 ops/factory/model-face-values.sql.test.py "$DATABASE_URL"
 
       - name: Install application dependencies
         if: steps.changes.outputs.docs_only != 'true'
