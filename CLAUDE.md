@@ -5,8 +5,8 @@
 Cards are built and reviewed by Mastra Factory, the way its makers intend (ADR 0009). A card
 starts only when Todd taps it in Factory's Intake column. The plan is saved with the pull request.
 For Julia cards, Factory's reviewer runs through Factory's configured different-maker review helper;
-the trace must prove that maker differs from the builder's before its verdict can pass. Factory then
-merges the PR when its review passes and CI is green, and moves its Review card to Done for Todd's
+the trace must prove that maker differs from the builder's before its verdict can pass. Factory's
+reviewer merges the PR when its review passes and CI is green, and moves its Review card to Done for Todd's
 live UAT. Open PRs stay outside Done. An agent outside
 Factory does not build, review, move, or merge a Factory card.
 The publisher App remains limited to the Factory-card route; machine-card GitHub writes use
