@@ -1,14 +1,20 @@
 # AGENTS.md
 
-GitHub issues enter Factory's Intake; Todd starts them, and Factory plans, builds and reviews.
-Todd tests product changes on the live app after merge and can request a revert. For Julia cards,
-Factory's reviewer merges the PR when its review passes and CI is green, then moves its Review card
-to Done for Todd's live UAT. Open PRs stay outside Done. An agent outside Factory never merges a
-Factory card. For a machine card, the laptop agent uses its ordinary signed-in access: `git push`
-the branch, `gh pr create`, then `gh pr merge --squash` once CI is green. The publisher App and
-`scripts/publish-pr.mjs` / `scripts/merge-pr.mjs` are for the Factory-card route only and must not
-be used for machine cards. Keep SSH and sudo outside the Factory sandbox; an authorized operator
-uses the laptop's Tailscale route.
+Mastra Factory is **PAUSED**, not removed. Its code and server service stay as they are; do not
+start Factory cards or alter that route. In the retained, inactive Factory route, its reviewer merges the PR
+only after review passes and CI is green.
+
+New Julia and machine cards live in Linear. Linear owns cards, requirements, acceptance criteria,
+and status; GitHub owns code, commits, pull requests, and CI; Run files own execution state. The
+intended route is the adapted JUL-122 runner, started on Todd's Windows laptop with `$init JUL-nnn`.
+The adapted runner and `$init` wrapper are pending implementation and verification. This
+documentation checkpoint does not authorize starting delivery through them. The adapted runner's
+complete test suite must pass on Todd's Windows laptop before it is used for delivery. UAT means
+Todd testing the Vercel preview before merge, following the card's steps as a household member would.
+
+GitHub issues and Factory's publisher App remain historical Factory infrastructure. The publisher
+App and `scripts/publish-pr.mjs` / `scripts/merge-pr.mjs` must not be used for Linear cards. Keep
+SSH and sudo outside the Factory sandbox; an authorized operator uses the laptop's Tailscale route.
 
 ## Building and reviewing
 
@@ -22,8 +28,8 @@ does not apply.
 
 Keep Todd's start authorization and explicit model/spend choices. Never ask Todd for an exception
 or workaround approval. If an authorization boundary or platform limit blocks the next required
-action, park the card through Factory's existing card/Needs attention route with one line explaining
-why.
+action, park the Linear card with one line explaining why; do not use Factory's Needs attention
+route while Factory is paused.
 
 ## Server and domain
 
