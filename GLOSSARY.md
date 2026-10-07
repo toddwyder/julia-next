@@ -253,11 +253,27 @@ card's steps on it before he accepts. Real Julia is never involved.
 _Avoid_: Preview, staging, test environment
 
 **UAT**:
-Todd using the live app after merge the way a household member would, following the card's steps,
-then accepting or sending it back. Only things a user would do: tap, type, read the screen.
+Todd testing the Vercel preview before merge the way a household member would, following the
+Linear card's steps, then accepting or sending it back. Only things a user would do: tap, type,
+read the screen.
 Never a console, log, terminal, developer tool, or copying between tools. Technical checking
 is the robot's job and happens before UAT.
 _Avoid_: QA, testing, verification (for Todd's part)
+
+**Mastra Factory**:
+The existing Factory code and server service. It is **PAUSED**, not removed: leave it in place but
+do not start new cards through it. The intended replacement route is the adapted JUL-122 runner,
+started on Todd's Windows laptop with `$init JUL-nnn`; both that runner and its route are pending
+implementation and verification.
+_Avoid_: Retired, deleted, active card runner
+
+**Delivery ownership**:
+New Julia and machine cards live in Linear. Linear owns cards, requirements, acceptance criteria,
+and status. GitHub owns code, commits, pull requests, and CI. Run files own execution state. The
+adapted JUL-122 runner, started on Todd's Windows laptop with `$init JUL-nnn`, is the intended
+route. The adapted runner and `$init` wrapper are pending implementation and verification. This
+documentation checkpoint does not authorize starting delivery through them. The adapted runner's
+complete test suite must pass on Todd's Windows laptop before it is used for delivery.
 
 **Test data**:
 The one permanent set of Julia data that every rehearsal copy shares. Set up once; never

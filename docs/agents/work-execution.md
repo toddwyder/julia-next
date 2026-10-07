@@ -1,9 +1,16 @@
 # How card work runs
 
-Julia cards are built and reviewed by Mastra Factory. Server and machine work runs from the
-laptop. Decisions are in `docs/adr/0009-mastra-factory.md` and issue #148.
+Mastra Factory is **PAUSED**, not removed. Its code and server service stay as they are. New Julia
+and machine cards live in Linear: Linear owns cards, requirements, acceptance criteria, and status;
+GitHub owns code, commits, pull requests, and CI; Run files own execution state. The intended route
+is the adapted JUL-122 runner, started on Todd's Windows laptop with `$init JUL-nnn`. The adapted
+runner and `$init` wrapper are pending implementation and verification. This documentation
+checkpoint does not authorize starting delivery through them. The adapted runner's complete test
+suite must pass on Todd's Windows laptop before it is used for delivery. UAT means Todd testing the
+Vercel preview before merge by following the card's household-facing steps, not testing the live app
+after merge.
 
-## Factory runs Julia cards
+## Paused Factory route (historical, not for new cards)
 
 1. A GitHub issue lands in Factory's Intake column and waits; it starts only when Todd taps it.
 2. Factory's planning step writes the plan; it names the seams and the failing tests written
@@ -20,7 +27,7 @@ laptop. Decisions are in `docs/adr/0009-mastra-factory.md` and issue #148.
 Progress is Factory's Work and Review boards and its Needs attention list. Each card's audit
 record shows whether every step was done by Factory or by Todd.
 
-## What an agent outside Factory does
+## Historical Factory support (not for new cards)
 
 - Sets up and looks after Factory, Mastra, GitHub and Vercel settings, writes specs and documents,
   and runs product-use audits.
@@ -31,7 +38,7 @@ record shows whether every step was done by Factory or by Todd.
   never uses Factory's GitHub keys.
 - Approved custom pieces go on the exceptions list in `ops/factory/README.md`.
 
-## Machine cards
+## Historical machine-card route (not for new cards)
 
 Keep machine-card GitHub issues open while working, label new ones `factory:machine` at creation,
 and do not send them to Factory; the Factory GitHub rules exclude the known machine issues and
@@ -53,10 +60,13 @@ their PRs, the `factory:machine` label, and publisher App PRs from intake.
    workaround.
 5. A new rule is added only after the thing it prevents has actually happened.
 
-Julia cards are unchanged: Factory builds, reviews and merges them. The retired GitHub-triggered
-Cross-maker workflow is absent; keep the sandbox isolation tests in CI.
+The Factory code, server service, publisher App, and scripts remain in place but are inactive for
+new work. Do not start, move, or merge a Factory card while Factory is paused. Do not use the
+publisher App or `scripts/publish-pr.mjs` / `scripts/merge-pr.mjs` for Linear cards.
 
-## Models
+## Historical Factory model settings
+
+These settings describe the paused Factory route and do not apply to new Linear cards.
 
 Models are settings, never fixed in documents: the builder and Factory review helper are selected
 in Factory's settings, and the memory observer/reflector is selected in Factory's memory settings.
@@ -84,5 +94,5 @@ support, the wrong Factory project, missing database permissions, and trace page
 followed. Use those as the worked example; a generic matrix does not make a plan executable.
 
 Never ask Todd for an exception or workaround approval. If an authorization boundary or platform
-limit blocks the next required action, park the card through Factory's existing card/Needs
-attention route with one line explaining why.
+limit blocks the next required action, park the Linear card with one line explaining why. Factory's
+Needs attention route is inactive while Factory is paused.

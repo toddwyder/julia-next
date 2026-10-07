@@ -1,28 +1,28 @@
 # CLAUDE.md
 
-## Factory does the work
+## Delivery route
 
-Cards are built and reviewed by Mastra Factory, the way its makers intend (ADR 0009). A card
-starts only when Todd taps it in Factory's Intake column. The plan is saved with the pull request.
-For Julia cards, Factory's reviewer runs through Factory's configured different-maker review helper;
-the trace must prove that maker differs from the builder's before its verdict can pass. Factory's
-reviewer merges the PR when its review passes and CI is green, and moves its Review card to Done for Todd's
-live UAT. Open PRs stay outside Done. An agent outside
-Factory does not build, review, move, or merge a Factory card.
-The publisher App remains limited to the Factory-card route; machine-card GitHub writes use
-ordinary authorized access as documented in `docs/agents/work-execution.md`.
+Mastra Factory is **PAUSED**, not removed. Leave its code and server service in place, but do not
+start or move Factory cards. In the retained, inactive Factory flow, its reviewer merges the PR only
+when review passes and CI is green. For feature cards, Factory's plan names only `.claude/skills/implement/SKILL.md`; that skill
+already runs TDD at the planned seams and one code-review. This is retained documentation for the
+paused route.
 
-For feature cards, Factory's plan names only `.claude/skills/implement/SKILL.md`; that skill
-already runs TDD at the planned seams and one code-review. For defect cards, it names
-`.claude/skills/diagnosing-bugs/SKILL.md`, then `.claude/skills/code-review/SKILL.md`. See
-`docs/agents/work-execution.md` and `docs/adr/0009-mastra-factory.md`.
+New Julia and machine cards live in Linear. Linear owns cards, requirements, acceptance criteria,
+and status; GitHub owns code, commits, pull requests, and CI; Run files own execution state. The
+intended delivery route is the adapted JUL-122 runner, started on Todd's Windows laptop with
+`$init JUL-nnn`. The adapted runner and `$init` wrapper are pending implementation and verification.
+This documentation checkpoint does not authorize starting delivery through them. The adapted
+runner's complete test suite must pass on Todd's Windows laptop before it is used for delivery. UAT
+means Todd testing the Vercel preview before merge, using only the card's household-facing steps.
+The publisher App remains limited to the paused Factory-card route.
 
 ## Authorization and blockers
 
 Keep Todd's start authorization and explicit model/spend choices. Never ask Todd for an exception
 or workaround approval. If an authorization boundary or platform limit blocks the next required
-action, park the card through Factory's existing card/Needs attention route with one line explaining
-why.
+action, park the Linear card with one line explaining why. Do not use Factory's Needs attention
+route while Factory is paused.
 
 ## Reaching the server
 
@@ -37,5 +37,7 @@ Details and the account table are in `docs/agents/server-runbook.md`.
 
 ## Domain and tracker
 
-Domain model: `GLOSSARY.md`. Decisions: `docs/adr/`. New work goes in GitHub issues, where Factory's
-Intake picks it up; Linear is read-only history. See `docs/agents/issue-tracker.md`.
+Domain model: `GLOSSARY.md`. Decisions: `docs/adr/`. New Julia and machine work goes in Linear;
+Linear owns cards, requirements, acceptance criteria, and status. GitHub owns code, commits, pull
+requests, and CI. Run files own execution state. GitHub issues are not the active card tracker
+while Factory is paused.
