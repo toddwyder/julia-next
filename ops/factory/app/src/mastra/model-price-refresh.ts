@@ -1,4 +1,4 @@
-/** Refresh public OpenRouter token prices for models Factory has actually used. */
+/** Refresh public OpenRouter token prices for configured and observed Factory models. */
 export const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
 export const MODEL_ID_MAP: Record<string, string> = {
   'openai/gpt-6-sol': 'openai/gpt-6-sol',
@@ -10,6 +10,7 @@ const priceFields = { freshInputTokens: 'prompt', cacheReadTokens: 'input_cache_
 
 type Database = { any(sql: string, values?: unknown[]): Promise<Array<Record<string, unknown>>> };
 type Fetch = (url: string) => Promise<{ ok: boolean; status: number; json(): Promise<any> }>;
+type ModelCandidate = { provider: string; model: string; routerId: string | undefined };
 
 export async function refreshModelPrices({ database, fetchImpl = fetch, now = new Date(), log = console.log }: { database: Database; fetchImpl?: Fetch; now?: Date; log?: (line: string) => void }): Promise<void> {
   let response: Awaited<ReturnType<Fetch>>;
@@ -17,9 +18,16 @@ export async function refreshModelPrices({ database, fetchImpl = fetch, now = ne
   catch (error) { log(`model-price-refresh event=failed error=${error instanceof Error ? error.message : String(error)}`); return; }
   let payload: any;
   try { payload = await response.json(); } catch (error) { log(`model-price-refresh event=failed error=invalid-model-list`); return; }
+  const models = new Map<string, ModelCandidate>(Object.entries(MODEL_ID_MAP).map(([key, routerId]) => {
+    const separator = key.indexOf('/');
+    return [key, { provider: key.slice(0, separator), model: key.slice(separator + 1), routerId }];
+  }));
   const used = await database.any("SELECT DISTINCT token->>'provider' provider, token->>'model' model FROM factory_issue_cost_records CROSS JOIN LATERAL jsonb_array_elements(record->'tokens') token");
   for (const row of used) {
-    const provider = String(row.provider), model = String(row.model), routerId = MODEL_ID_MAP[`${provider}/${model}`];
+    const provider = String(row.provider), model = String(row.model), key = `${provider}/${model}`;
+    models.set(key, { provider, model, routerId: MODEL_ID_MAP[key] });
+  }
+  for (const { provider, model, routerId } of models.values()) {
     const remote = routerId && payload.data?.find((item: any) => item.id === routerId);
     if (!remote) { log(`model-price-refresh event=price-unknown provider=${provider} model=${model}`); continue; }
     for (const [tokenType, field] of Object.entries(priceFields)) {

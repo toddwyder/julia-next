@@ -48,6 +48,16 @@ test('refreshes only changed prices from a real OpenRouter response shape', asyn
   assert.equal(calls.filter(([sql]) => sql.startsWith('INSERT')).length, 5);
 });
 
+test('refreshes configured model prices before any captured token rows exist', async () => {
+  const calls = [];
+  await refreshModelPrices({
+    database: { any: async (sql, values) => { calls.push([sql, values]); return []; } },
+    fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ data: [{ id: 'openai/gpt-6-sol', pricing: { prompt: '0.000002', completion: '0.00001', input_cache_read: '0.0000002', input_cache_write: '0.0000025', internal_reasoning: '0.00001' } }] }) }),
+    now: new Date('2026-10-07T04:00:00Z'), log: () => {},
+  });
+  assert.equal(calls.filter(([sql]) => sql.startsWith('INSERT')).length, 5);
+});
+
 test('reports a configured model as price-unknown when OpenRouter has no exact mapping', async () => {
   const lines = [];
   await refreshModelPrices({
