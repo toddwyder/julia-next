@@ -16,6 +16,16 @@ test('Factory planner requires named test seams, red-first tests, and lasting ob
   assert.match(plan, /stage: "execute"/);
 });
 
+test('Factory planner hands builders the delivery contract for builds and review repairs', () => {
+  const plan = readSkill('factory-plan');
+
+  assert.match(plan, /git rev-parse --show-toplevel/);
+  assert.match(plan, /while-active follow-up/i);
+  assert.match(plan, /task list.*not.*completion/i);
+  assert.match(plan, /open.*pull request.*push.*existing pull-request branch/i);
+  assert.match(plan, /park.*concrete blocker/i);
+});
+
 test('Factory planner assigns the build skill from the triage card type', () => {
   const plan = readSkill('factory-plan');
 
