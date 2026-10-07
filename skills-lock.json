@@ -113,6 +113,13 @@
       "skillPath": "skills/engineering/pr/SKILL.md",
       "computedHash": "e6e63bada1f038e0b5488f8b62f77ebbd36c97669ddc5afaffcd17f974709f9a"
     },
+    "pre-plan": {
+      "source": "toddwyder/julia-next",
+      "sourceType": "github",
+      "ref": "d250fb51",
+      "skillPath": ".claude/skills/pre-plan/SKILL.md",
+      "computedHash": "cea366558d5fe6218f37a685d8bafccb2400362ea58dfe9f6ecf87b73e432f48"
+    },
     "prototype": {
       "source": "mattpocock/skills",
       "sourceType": "github",

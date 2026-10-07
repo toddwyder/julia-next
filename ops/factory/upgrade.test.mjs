@@ -83,7 +83,21 @@ test('the Factory-visible Pocock skills are pinned to 1.3.1 and use the reposito
   assert.ok(!('implement-spec' in lock.skills));
   assert.ok(!('resolving-merge-conflicts' in lock.skills));
 
+  assert.deepEqual(lock.skills['pre-plan'], {
+    source: 'toddwyder/julia-next',
+    sourceType: 'github',
+    ref: 'd250fb51',
+    skillPath: '.claude/skills/pre-plan/SKILL.md',
+    computedHash: 'cea366558d5fe6218f37a685d8bafccb2400362ea58dfe9f6ecf87b73e432f48',
+  });
+  assert.equal(
+    skillHash(fileURLToPath(new URL('.claude/skills/pre-plan/', root))),
+    lock.skills['pre-plan'].computedHash,
+    'repository-owned pre-plan must match its protected lock entry',
+  );
+
   for (const [name, entry] of Object.entries(lock.skills)) {
+    if (entry.source !== 'mattpocock/skills') continue;
     assert.equal(entry.ref, 'v1.3.1', `${name} must be pinned to the requested release`);
     for (const skillRoot of ['.claude/skills']) {
       const skill = new URL(`${skillRoot}/${name}/SKILL.md`, root);
