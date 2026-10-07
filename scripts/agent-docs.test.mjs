@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 const read = (relativePath) => readFileSync(new URL(`../${relativePath}`, import.meta.url), 'utf8');
 
@@ -96,4 +96,18 @@ test('post-build reviewer checks and the plan-answers/park policy replace stop-a
   assert.match(we, /approved plan|plan supplies|agreed seams/i);
   assert.match(we, /park the card|park.*with one line/i);
   assert.match(we, /Never ask Todd for an exception/i);
+});
+
+test('the repository-owned pre-plan skill survives Pocock skill upgrades', () => {
+  assert.ok(
+    existsSync(new URL('../.claude/skills/pre-plan/SKILL.md', import.meta.url)),
+    'repository-owned pre-plan skill must not be removed by a Pocock skill upgrade',
+  );
+  assert.deepEqual(JSON.parse(read('skills-lock.json')).skills['pre-plan'], {
+    source: 'toddwyder/julia-next',
+    sourceType: 'github',
+    ref: 'd250fb51',
+    skillPath: '.claude/skills/pre-plan/SKILL.md',
+    computedHash: 'cea366558d5fe6218f37a685d8bafccb2400362ea58dfe9f6ecf87b73e432f48',
+  });
 });
