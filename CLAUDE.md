@@ -10,9 +10,9 @@ Factory does not build, review, move, or merge a Factory card.
 The publisher App remains limited to the Factory-card route; machine-card GitHub writes use
 ordinary authorized access as documented in `docs/agents/work-execution.md`.
 
-Factory builds test-first with `.claude/skills/tdd/SKILL.md` and reviews with
-`.claude/skills/code-review/SKILL.md` against `CODING_STANDARDS.md`. See
-`docs/agents/work-execution.md` and `docs/adr/0009-mastra-factory.md`.
+Factory's plan names `.claude/skills/implement/SKILL.md` for feature cards and
+`.claude/skills/diagnosing-bugs/SKILL.md`, then `.claude/skills/code-review/SKILL.md`, for
+defect cards. See `docs/agents/work-execution.md` and `docs/adr/0009-mastra-factory.md`.
 
 ## Authorization and blockers
 
