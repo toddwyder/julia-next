@@ -39,15 +39,8 @@ test('agent instructions use GitHub issues and Factory boards, with live UAT aft
   assert.match(read('docs/agents/work-execution.md'), /Needs attention/);
 });
 
-test('the Factory README documents the Monday note and the supported bounded-trace procedure', () => {
+test('the Factory README documents the supported bounded-trace procedure without a Monday note', () => {
   const readme = read('ops/factory/README.md');
-  // The note and its exclusion: costs come from Mastra traces, never agent reports,
-  // and hand-run Codex/GPT/Claude sessions are outside Factory and never counted.
-  assert.match(readme, /## Monday note/);
-  assert.match(readme, /Mastra's trace cost data/);
-  assert.match(readme, /outside Factory/);
-  assert.match(readme, /Codex, GPT, or Claude/);
-  assert.match(readme, /Discussion.*Monday notes/);
   // Bounded storage: name the supported retention (DEFAULT_RETENTION on the
   // storage backends) and the operator check that reads the DuckDB store.
   assert.match(readme, /## Bounded trace storage/);
@@ -56,6 +49,7 @@ test('the Factory README documents the Monday note and the supported bounded-tra
   assert.match(readme, /never deletes|does not delete/);
   assert.doesNotMatch(readme, /enforceRetention/);
   assert.doesNotMatch(readme, /selectExpiredSpans|runTraceCleanup/);
+  assert.doesNotMatch(readme, /## Monday note/);
 });
 
 test('the Factory README carries a framework map with local sources and states the gaps', () => {
@@ -72,16 +66,10 @@ test('the Factory README carries a framework map with local sources and states t
   assert.match(readme, /no supported|not supported|cannot be configured|fail(s)? closed/i);
 });
 
-test('the exceptions list marks the #140 entry approved by Todd, citing GitHub #140', () => {
+test('the exceptions list no longer contains the retired Monday note', () => {
   const readme = read('ops/factory/README.md');
   assert.match(readme, /Only\s+Todd adds or removes an entry/);
-  // Issue #140: Todd approved this entry (2026-09-30); the row must name the
-  // approval and the card, and must no longer read as merely proposed.
-  const row = readme.split('\n').find((line) => line.includes('#140') || (line.includes('Monday note') && line.startsWith('|')));
-  assert.ok(row, 'expected a row mentioning the Monday note / #140');
-  assert.match(row, /approved/i);
-  assert.match(row, /#140/);
-  assert.doesNotMatch(row, /proposed|awaiting Todd|pending Todd/i);
+  assert.doesNotMatch(readme, /Monday note/);
 });
 
 test('post-build reviewer checks and the plan-answers/park policy replace stop-and-ask builder gates', () => {

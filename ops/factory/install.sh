@@ -95,17 +95,8 @@ run_as_app_owner npm run check
 run_as_app_owner npm run build
 install -D -m 0644 "$patch_dir/wait-alerts.py" "$app_dir/ops/factory/wait-alerts.py"
 install -D -m 0644 "$patch_dir/wait-alerts.sql" "$app_dir/ops/factory/wait-alerts.sql"
-# Issue #140: the Monday note, plus the read-only trace-retention diagnostic
-# and the card reader the note shares. Retention itself is pruned by the app's
-# own Mastra scheduler (no systemd trigger).
-install -D -m 0644 "$patch_dir/monday-note.mjs" "$app_dir/ops/factory/monday-note.mjs"
-install -D -m 0644 "$patch_dir/monday-note-run.mjs" "$app_dir/ops/factory/monday-note-run.mjs"
-install -D -m 0644 "$patch_dir/monday-note-adapters.mjs" "$app_dir/ops/factory/monday-note-adapters.mjs"
-install -D -m 0644 "$patch_dir/mastra-traces.mjs" "$app_dir/ops/factory/mastra-traces.mjs"
+# Retention itself is pruned by the app's own Mastra scheduler (no systemd trigger).
 install -D -m 0644 "$patch_dir/trace-retention.mjs" "$app_dir/ops/factory/trace-retention.mjs"
-install -D -m 0644 "$patch_dir/factory-cards.mjs" "$app_dir/ops/factory/factory-cards.mjs"
-install -D -m 0644 "$patch_dir/factory-cards.sql" "$app_dir/ops/factory/factory-cards.sql"
-install -D -m 0644 "$patch_dir/run-psql.mjs" "$app_dir/ops/factory/run-psql.mjs"
 # Issue #211: the executable capture entry point and every local module it
 # imports. Keep this manifest explicit so a clean server install cannot leave
 # the command with an unresolved local import.
