@@ -61,6 +61,8 @@ files=(
   src/mastra/observability-retention.ts
   src/mastra/issue-cost-capture.ts
   src/mastra/model-price-refresh.ts
+  src/mastra/push-routes.ts src/mastra/push-store.ts src/mastra/push-sender.ts
+  push-send.mjs register-typescript-esm.mjs typescript-esm-loader.mjs
   src/mastra/public/factory-skills/factory-plan/SKILL.md
   src/mastra/public/factory-skills/factory-review/SKILL.md
 )
@@ -70,6 +72,10 @@ for file in "${files[@]}"; do
     exit 1
   fi
 done
+if [[ ! -f "$patch_dir/push.migration.sql" ]]; then
+  echo "missing Factory source: $patch_dir/push.migration.sql" >&2
+  exit 1
+fi
 install_commit="$(git -C "$repo_dir" rev-parse HEAD)"
 backup_dir="$(mktemp -d "${app_dir}.before-install.XXXXXX")"
 chown --reference="$app_dir" "$backup_dir"
@@ -95,6 +101,7 @@ run_as_app_owner npm run check
 run_as_app_owner npm run build
 install -D -m 0644 "$patch_dir/wait-alerts.py" "$app_dir/ops/factory/wait-alerts.py"
 install -D -m 0644 "$patch_dir/wait-alerts.sql" "$app_dir/ops/factory/wait-alerts.sql"
+install -D -m 0644 "$patch_dir/push.migration.sql" "$app_dir/ops/factory/push.migration.sql"
 # Retention itself is pruned by the app's own Mastra scheduler (no systemd trigger).
 install -D -m 0644 "$patch_dir/trace-retention.mjs" "$app_dir/ops/factory/trace-retention.mjs"
 # Issue #211: the executable capture entry point and every local module it

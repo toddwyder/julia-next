@@ -152,6 +152,9 @@ test('a clean install carries only the Factory review surface the entry point im
     );
   }
   assert.ok(!graph.has('src/mastra/reviewer/workflows/cross-maker-review-workflow'));
+  for (const file of ['push-send.mjs', 'register-typescript-esm.mjs', 'typescript-esm-loader.mjs', 'src/mastra/push-sender.ts', 'src/mastra/push-store.ts', 'src/mastra/push-routes.ts', 'ops/factory/push.migration.sql']) {
+    assert.ok(existsSync(resolve(target, file)), `install is missing sender asset ${file}`);
+  }
 
   // Every resolved local module is present in the install, so tsc/mastra build
   // have no unresolved local import.
@@ -279,6 +282,8 @@ test('a missing required skill leaves an existing install untouched', () => {
     'package.json', 'package-lock.json', 'tsconfig.json', 'src/mastra/index.ts', 'src/mastra/local-sandbox.ts',
     'src/mastra/observability-store.ts', 'src/mastra/observability-retention.ts',
     'src/mastra/issue-cost-capture.ts', 'src/mastra/model-price-refresh.ts',
+    'src/mastra/push-routes.ts', 'src/mastra/push-store.ts', 'src/mastra/push-sender.ts',
+    'push-send.mjs', 'register-typescript-esm.mjs', 'typescript-esm-loader.mjs',
     'src/mastra/public/factory-skills/factory-plan/SKILL.md',
   ]) {
     const destination = resolve(source, file);

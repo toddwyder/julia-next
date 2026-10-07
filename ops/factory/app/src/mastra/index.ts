@@ -29,7 +29,10 @@ import { getDatabasePath } from '@mastra/code-sdk/utils/project';
 import { loadSettings, resolveDefaultThinkingLevel } from '@mastra/code-sdk/onboarding/settings';
 import { DEFAULT_RETENTION } from '@mastra/code-sdk/utils/storage-maintenance';
 import { MastraAuthWorkos } from '@mastra/auth-workos';
-import { createFactorySecretEncryption, MastraFactory } from '@mastra/factory';
+import { createFactoryRouteAuth, createFactorySecretEncryption, MastraFactory } from '@mastra/factory';
+import { Pool } from 'pg';
+import { createPushRoutes } from './push-routes.js';
+import { PushStore } from './push-store.js';
 import { GithubIntegration } from '@mastra/factory/integrations/github/integration';
 import { defaultGithubRules } from '@mastra/factory/integrations/github/default-rules';
 import { GitLabIntegration } from '@mastra/factory/integrations/gitlab/integration';
@@ -459,6 +462,36 @@ export const factory = new MastraFactory({
 });
 
 const preparedArgs = await factory.prepare();
+const pushPublicKey = process.env.WEB_PUSH_PUBLIC_KEY?.trim();
+const pushEncryptionKey = process.env.WEB_PUSH_ENCRYPTION_KEY?.trim();
+const pushOrigins = process.env.WEB_PUSH_ALLOWED_ORIGINS?.trim();
+const pushRecipientUserId = process.env.WEB_PUSH_RECIPIENT_USER_ID?.trim();
+if (pushPublicKey || pushEncryptionKey || pushOrigins || pushRecipientUserId) {
+  const pushOrigin = process.env.MASTRACODE_PUBLIC_URL;
+  if (!pushPublicKey || !pushEncryptionKey || !pushOrigins || !pushRecipientUserId || !databaseUrl || !pushOrigin || !auth || !preparedArgs.server) {
+    throw new Error('Web Push requires PUBLIC_KEY, ENCRYPTION_KEY, ALLOWED_ORIGINS, RECIPIENT_USER_ID, DATABASE_URL, authenticated WorkOS and MASTRACODE_PUBLIC_URL');
+  }
+  const key = Buffer.from(pushEncryptionKey, 'base64');
+  if (key.length !== 32 || key.toString('base64') !== pushEncryptionKey) throw new Error('WEB_PUSH_ENCRYPTION_KEY must be base64-encoded 32 bytes');
+  if (!/^[A-Za-z0-9_-]{80,100}$/.test(pushPublicKey)) throw new Error('WEB_PUSH_PUBLIC_KEY must be a VAPID public key');
+  const allowedOrigins = pushOrigins.split(',').map(value => {
+    const url = new URL(value.trim());
+    if (url.protocol !== 'https:' || url.origin !== value.trim()) throw new Error('WEB_PUSH_ALLOWED_ORIGINS must contain HTTPS origins');
+    return url.origin;
+  });
+  const db = new Pool({ connectionString: databaseUrl });
+  preparedArgs.server.apiRoutes = [
+    ...(preparedArgs.server.apiRoutes ?? []),
+    ...createPushRoutes({
+      auth: createFactoryRouteAuth(auth),
+      store: new PushStore(db, key),
+      origin: new URL(pushOrigin).origin,
+      recipientUserId: pushRecipientUserId,
+      publicKey: pushPublicKey,
+      allowedOrigins,
+    }),
+  ];
+}
 
 // Bounded observability storage (JUL-140). Factory's own default storage keeps
 // every non-observability domain; the DuckDB observability domain is layered on
