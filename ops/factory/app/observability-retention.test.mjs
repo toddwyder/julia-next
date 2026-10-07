@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import test from 'node:test';
 import {
   duckdbObservabilityConfig,
@@ -19,16 +21,41 @@ import {
   setObservabilityPruneTarget,
 } from './src/mastra/observability-retention.ts';
 import { captureFinishedFactoryCards } from './src/mastra/issue-cost-capture.ts';
-import { OPENROUTER_MODELS_URL, refreshModelPrices } from './src/mastra/model-price-refresh.ts';
+import { MODEL_ID_MAP, OPENROUTER_MODELS_URL, refreshModelPrices } from './src/mastra/model-price-refresh.ts';
+
+const savedOpenRouterModels = JSON.parse(readFileSync(resolve(import.meta.dirname, 'fixtures/openrouter-models-2026-10-06.json'), 'utf8'));
+
+test('maps every configured Factory model only to an exact ID in the saved OpenRouter list', () => {
+  const expected = {
+    'openai/gpt-6-sol': 'openai/gpt-6-sol',
+    'moonshotai/Kimi-K2.7-Code': 'moonshotai/kimi-k2.7-code',
+    'deepseek/deepseek-v4-pro': 'deepseek/deepseek-v4-pro',
+    'command-code/deepseek/deepseek-v4-flash': 'deepseek/deepseek-v4-flash',
+  };
+  assert.deepEqual(MODEL_ID_MAP, expected);
+  const savedIds = new Set(savedOpenRouterModels.data.map((model) => model.id));
+  for (const routerId of Object.values(MODEL_ID_MAP)) assert.ok(savedIds.has(routerId), `${routerId} must be an exact saved OpenRouter ID`);
+  assert.equal(MODEL_ID_MAP['deepseek/deepseek-flash'], undefined, 'OpenRouter has no exact listing for this Factory configuration ID');
+});
 
 test('refreshes only changed prices from a real OpenRouter response shape', async () => {
   const calls = [];
   await refreshModelPrices({
-    database: { any: async (sql, values) => { calls.push([sql, values]); if (sql.startsWith('SELECT DISTINCT')) return [{ provider: 'openai', model: 'gpt-5' }]; if (sql.startsWith('SELECT usd')) return []; return []; } },
-    fetchImpl: async (url) => { assert.equal(url, OPENROUTER_MODELS_URL); return { ok: true, status: 200, json: async () => ({ data: [{ id: 'openai/gpt-5', pricing: { prompt: '0.00000125', completion: '0.00001', input_cache_read: '0.000000125', input_cache_write: '0.00000125', internal_reasoning: '0.00001' } }] }) }; },
+    database: { any: async (sql, values) => { calls.push([sql, values]); if (sql.startsWith('SELECT DISTINCT')) return [{ provider: 'openai', model: 'gpt-6-sol' }]; if (sql.startsWith('SELECT usd')) return []; return []; } },
+    fetchImpl: async (url) => { assert.equal(url, OPENROUTER_MODELS_URL); return { ok: true, status: 200, json: async () => ({ data: [{ id: 'openai/gpt-6-sol', pricing: { prompt: '0.000002', completion: '0.00001', input_cache_read: '0.0000002', input_cache_write: '0.0000025', internal_reasoning: '0.00001' } }] }) }; },
     now: new Date('2026-10-06T00:00:00Z'), log: () => {},
   });
   assert.equal(calls.filter(([sql]) => sql.startsWith('INSERT')).length, 5);
+});
+
+test('reports a configured model as price-unknown when OpenRouter has no exact mapping', async () => {
+  const lines = [];
+  await refreshModelPrices({
+    database: { any: async (sql) => sql.startsWith('SELECT DISTINCT') ? [{ provider: 'deepseek', model: 'deepseek-flash' }] : [] },
+    fetchImpl: async () => ({ ok: true, status: 200, json: async () => savedOpenRouterModels }),
+    log: (line) => lines.push(line),
+  });
+  assert.deepEqual(lines, ['model-price-refresh event=price-unknown provider=deepseek model=deepseek-flash', 'model-price-refresh event=completed']);
 });
 
 test('records every trace page by provider, model, and effort with named unknown token fields', async () => {

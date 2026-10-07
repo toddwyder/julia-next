@@ -1,7 +1,10 @@
 /** Refresh public OpenRouter token prices for models Factory has actually used. */
 export const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
 export const MODEL_ID_MAP: Record<string, string> = {
-  'openai/gpt-5': 'openai/gpt-5',
+  'openai/gpt-6-sol': 'openai/gpt-6-sol',
+  'moonshotai/Kimi-K2.7-Code': 'moonshotai/kimi-k2.7-code',
+  'deepseek/deepseek-v4-pro': 'deepseek/deepseek-v4-pro',
+  'command-code/deepseek/deepseek-v4-flash': 'deepseek/deepseek-v4-flash',
 };
 const priceFields = { freshInputTokens: 'prompt', cacheReadTokens: 'input_cache_read', cacheWriteTokens: 'input_cache_write', outputTokens: 'completion', thinkingTokens: 'internal_reasoning' } as const;
 
