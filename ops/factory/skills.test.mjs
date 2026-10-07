@@ -16,6 +16,14 @@ test('Factory planner requires named test seams, red-first tests, and lasting ob
   assert.match(plan, /stage: "execute"/);
 });
 
+test('Factory planner assigns the build skill from the triage card type', () => {
+  const plan = readSkill('factory-plan');
+
+  assert.match(plan, /feature card.*\.claude\/skills\/implement\/SKILL\.md/i);
+  assert.match(plan, /defect card.*\.claude\/skills\/diagnosing-bugs\/SKILL\.md/i);
+  assert.match(plan, /defect card.*\.claude\/skills\/code-review\/SKILL\.md/i);
+});
+
 test('server and database plans require a runtime dependency matrix with #211 evidence', () => {
   const plan = readSkill('factory-plan');
   const execution = readFileSync(new URL('../../docs/agents/work-execution.md', import.meta.url), 'utf8');
