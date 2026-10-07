@@ -61,9 +61,6 @@ files=(
   src/mastra/observability-retention.ts
   src/mastra/issue-cost-capture.ts
   src/mastra/model-price-refresh.ts
-  # Issue #190: index.ts imports the asynchronous cross-maker workflow.
-  # Keep it in the explicit install manifest even though the reviewer tree is copied below.
-  src/mastra/reviewer/workflows/cross-maker-review-workflow.ts
   src/mastra/public/factory-skills/factory-plan/SKILL.md
   src/mastra/public/factory-skills/factory-review/SKILL.md
 )
@@ -73,22 +70,21 @@ for file in "${files[@]}"; do
     exit 1
   fi
 done
-if [[ ! -d "$source_dir/src/mastra/reviewer/workspace/skills" ]]; then
-  echo "missing Mastra reviewer template and workspace skills" >&2
-  exit 1
-fi
 install_commit="$(git -C "$repo_dir" rev-parse HEAD)"
 backup_dir="$(mktemp -d "${app_dir}.before-install.XXXXXX")"
 chown --reference="$app_dir" "$backup_dir"
 chmod --reference="$app_dir" "$backup_dir"
 cp -a -- "$app_dir/." "$backup_dir/"
 backup_ready=true
+# #182 retired the standalone Cross-maker route. It was previously copied
+# beneath this exact app directory; remove only that known tree after a
+# rollback copy exists, so a failed install restores it with the rest of app.
+retired_reviewer_dir="$app_dir/src/mastra/reviewer"
+rm -rf -- "$retired_reviewer_dir"
 for file in "${files[@]}"; do
   mkdir -p "$(dirname -- "$app_dir/$file")"
   cp -- "$source_dir/$file" "$app_dir/$file"
 done
-mkdir -p "$app_dir/src/mastra/reviewer"
-cp -a "$source_dir/src/mastra/reviewer/." "$app_dir/src/mastra/reviewer/"
 printf 'Installing Factory from %s into %s\n' "$source_dir" "$app_dir"
 cd "$app_dir"
 if [[ "$(id -u)" -eq 0 ]]; then

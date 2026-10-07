@@ -216,8 +216,8 @@ missing.
 _Avoid_: Second opinion, sign-off, approval
 
 **Gate**:
-The checks a pull request passes before merge: CI on GitHub's runners, Factory's review, and the
-cross-maker review, all on the same head. A failed gate bounces the work back to the builder.
+The checks a pull request passes before merge: CI on GitHub's runners and Factory's different-maker
+review, both on the same head. A failed gate bounces the work back to the builder.
 There is no pre-merge Todd approval.
 _Avoid_: Review, QA, approval
 

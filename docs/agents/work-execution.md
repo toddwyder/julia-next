@@ -11,10 +11,9 @@ laptop. Decisions are in `docs/adr/0009-mastra-factory.md` and issue #148.
    is saved in the pull request.
 3. Factory's build step follows the approved plan and opens a pull request with a plain-language
    "Try it" section.
-4. Factory's review step runs `.claude/skills/code-review/SKILL.md` against `CODING_STANDARDS.md`
-   and the plan, records evidence for the five checks in `CODING_STANDARDS.md`, then publishes a
-   verdict. When review passes and CI is green, the Factory reviewer merges the Julia PR. An open
-   PR stays outside Done.
+4. Factory's stock review step runs on its configured reviewer helper, whose maker must differ from
+   the builder's and be visible in the review trace. It publishes the sole verdict. When that review
+   passes and CI is green, the Factory reviewer merges the Julia PR. An open PR stays outside Done.
 5. Todd tries the live app after merge; if he rejects the change, revert it and return the card to
    Factory.
 
@@ -54,15 +53,15 @@ their PRs, the `factory:machine` label, and publisher App PRs from intake.
    workaround.
 5. A new rule is added only after the thing it prevents has actually happened.
 
-Julia cards are unchanged: Factory builds, reviews and merges them. Keep the disabled
-GitHub-triggered review workflow disabled and keep the sandbox isolation tests in CI.
+Julia cards are unchanged: Factory builds, reviews and merges them. The retired GitHub-triggered
+Cross-maker workflow is absent; keep the sandbox isolation tests in CI.
 
 ## Models
 
-Models are settings, never fixed in documents: the builder in Factory's model settings, the
-separate reviewer in its own settings, and the memory observer/reflector in Factory's memory
-settings. Follow an explicit model choice from Todd; do not substitute models without his approval.
-The reviewer is always from a different maker than the builder.
+Models are settings, never fixed in documents: the builder and Factory review helper are selected
+in Factory's settings, and the memory observer/reflector is selected in Factory's memory settings.
+Follow an explicit model choice from Todd; do not substitute models without his approval. The review
+helper is always from a different maker than the builder, and missing trace evidence fails review.
 
 ## Plan answers and blockers
 

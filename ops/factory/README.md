@@ -224,7 +224,6 @@ bash /path/to/julia-next/ops/factory/install.sh /var/lib/julia-factory/app
 The installer copies `ops/factory/app/{package.json,package-lock.json,tsconfig.json}`,
 `ops/factory/app/src/mastra/{index,local-sandbox}.ts`, and the two project overrides in
 `ops/factory/app/src/mastra/public/factory-skills/{factory-plan,factory-review}/SKILL.md`
-plus the asynchronous Cross-maker workflow imported by `index.ts`
 into the service directory before `npm ci`; it never copies `.env`, databases or
 runtime workspaces. The versioned lockfile pins the deployed dependencies; it does
 not upgrade them. Factory 0.19.1 loads project-local `factory-skills` before its
@@ -350,49 +349,3 @@ Inspect current waits without publishing:
 ```sh
 sudo -u julia-factory python3 /var/lib/julia-factory/app/ops/factory/wait-alerts.py --dry-run
 ```
-
-## Cross-maker PR reviewer
-
-The reviewer is based on Mastra's Apache-2.0 `template-github-review-agent`
-at commit `15f09d4e6fe2230153e1c4551a72250b1b5c009e`. Its agents, workflow,
-GitHub readers, workspace skills, and observational memory live in
-`app/src/mastra/reviewer/`. A signed GitHub `pull_request_target` action starts
-a stored Mastra review workflow through `POST /julia/review-pr`, then polls
-`GET /julia/review-pr/:jobId` every 30 seconds until the verdict is ready. Each
-status request signs the job id with the same route secret. The action stops
-after 30 minutes and cancels the server run through signed
-`DELETE /julia/review-pr/:jobId`; a superseding review for the same PR cancels
-the older run as well. An interrupted run is reported as canceled after a
-server restart. The action submits a
-commit-bound GitHub review as `github-actions[bot]`, the accepted reviewer
-identity for this project. It checks out only the base branch and never
-executes PR code.
-
-The service needs `DEEPSEEK_API_KEY` and `JULIA_REVIEW_ROUTE_SECRET`. Set the
-same route secret as a GitHub Actions repository secret. Optional
-`JULIA_REVIEWER_MODELS` is an ordered comma-separated list of Mastra
-`provider/model` IDs, starting with `deepseek/deepseek-v4-pro`;
-`JULIA_BUILDER_MODEL` defaults to `openai/gpt-6-sol`. Startup rejects any
-reviewer model from the builder's provider. Observational memory uses
-`deepseek/deepseek-v4-flash`. Add `github-actions[bot]` to
-`MASTRACODE_GITHUB_AUTHORIZED_BOTS` so Factory's GitHub rule forwards a
-requested change to its Work session. GitHub Actions must allow approval
-reviews in this repository's workflow permissions.
-
-The route reads only public Julia-next PRs and their linked GitHub issues. A
-PR must say `Closes #N`; the issue must have an Acceptance criteria checklist.
-A PR whose diff is over 180,000 characters is reviewed through the registered
-`prReviewWorkflow`, which feeds the reviewer agent bounded file batches and
-hands the criterion verdict only the batched findings -- never the whole diff
-([Mastra workflows](https://mastra.ai/docs/workflows/overview)). The reviewer
-refuses a changed head (checked before and after the batched review) or missing
-criterion evidence. If the workflow skips a reviewable file (an unreviewed
-deletion-only source change), the route fails closed: it can never return
-APPROVE, and the verdict body names the unreviewed material. Files skipped by
-the shared non-reviewable patterns (locks, binaries, build output, snapshots)
-are recorded as findings with evidence but do not block approval. If Mastra
-returns the criterion verdict as text without a structured object, the route
-accepts only a complete JSON verdict that passes the same schema; empty or
-invalid text fails the job without submitting a GitHub review. Mastra's
-storage exporter records its spans with the Factory
-traces. The Action never receives the DeepSeek key.
