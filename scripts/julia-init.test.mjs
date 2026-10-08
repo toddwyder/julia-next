@@ -231,6 +231,23 @@ test('the command wrapper asks only for stale roles and retains the other rememb
   assert.equal(result.configuration.reviewer.identity, 'openai-reviewer');
 });
 
+test('saved-run flags and blank prompt answers leave classified refusal events', async (t) => {
+  const { directory, settingsPath } = await fixture(t);
+  const stateDirectory = join(directory, 'runs');
+  await runInit('$init JUL-195', { settingsPath, stateDirectory });
+  await assert.rejects(runInit('$init JUL-195 --builder anthropic-builder low', { settingsPath, stateDirectory }), /already has a saved configuration/);
+
+  await writeFile(join(stateDirectory, 'defaults.json'), `${JSON.stringify({ builder: { model: 'anthropic-builder', thinking: 'low' } })}\n`);
+  await assert.rejects(
+    runInitCli('$init JUL-196', { settingsPath, stateDirectory, ask: async () => '' }),
+    /requires an exact model name/,
+  );
+
+  const events = await readFile(join(stateDirectory, 'events.jsonl'), 'utf8');
+  assert.match(events, /"reason":"saved-run-does-not-accept-flags"/);
+  assert.match(events, /"reason":"invalid-command"/);
+});
+
 test('an API-routed model snapshot keeps routing metadata and only an auth reference', async (t) => {
   const apiConnection = {
     route: 'api', provider: 'Command Code', endpoint: 'https://models.example.invalid/v1',

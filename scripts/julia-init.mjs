@@ -143,7 +143,12 @@ export async function runInit(command, {
   const runPath = join(stateDirectory, `${issueId}.json`);
   const saved = await readJson(runPath, { read });
   if (saved) {
-    if (Object.keys(choices).length) reject(`run ${issueId} already has a saved configuration; resume without role flags`);
+    if (Object.keys(choices).length) {
+      const event = { event: 'selection-refused', issueId, reason: 'saved-run-does-not-accept-flags', roles: Object.keys(choices) };
+      await recordEvent(eventsPath, event, writers);
+      logger(event);
+      reject(`run ${issueId} already has a saved configuration; resume without role flags`);
+    }
     const event = { event: 'resume', issueId, builder: saved.configuration.builder.identity, reviewer: saved.configuration.reviewer.identity };
     await recordEvent(eventsPath, event, writers);
     logger(event);
@@ -185,7 +190,12 @@ export async function runInitCli(command, { ask, ...options } = {}) {
     let amended = command;
     for (const role of error.roles) {
       const answer = await ask(role);
-      if (!String(answer).trim()) reject(`--${role} requires an exact model name or ID followed by a thinking level`);
+      if (!String(answer).trim()) {
+        const event = { event: 'selection-refused', issueId: parseInitCommand(command).issueId, reason: 'invalid-command', roles: [role] };
+        await recordEvent(join(options.stateDirectory ?? '.julia/runs', 'events.jsonl'), event, options);
+        options.logger?.(event);
+        reject(`--${role} requires an exact model name or ID followed by a thinking level`);
+      }
       amended += ` --${role} ${answer}`;
     }
     return runInit(amended, options);
