@@ -171,7 +171,7 @@ test('rejects builder and reviewer models from the same maker', () => {
 });
 
 test('compares maker identities without casing or surrounding whitespace', () => {
-  for (const maker of ['anthropic', 'Anthropic ']) {
+  for (const maker of ['anthropic', 'Anthropic ', ' Anthropic ']) {
     assert.throws(
       () => validateDeliveryToolSettings({
         ...valid,
