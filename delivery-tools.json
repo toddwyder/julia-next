@@ -1,12 +1,24 @@
 {
-  "builder": {
-    "tool": "Claude Code",
-    "model": "claude-opus-4-6",
-    "maker": "Anthropic"
-  },
-  "reviewer": {
-    "tool": "Codex",
-    "model": "gpt-5.5",
-    "maker": "OpenAI"
-  }
+  "catalog": [
+    {
+      "id": "anthropic-builder",
+      "displayName": "Anthropic builder placeholder",
+      "executableModelId": "placeholder-anthropic-builder",
+      "maker": "Anthropic",
+      "harness": "claude-code",
+      "thinking": { "supported": ["low", "high"], "default": "high" },
+      "connection": { "route": "native", "provider": null, "endpoint": null, "protocol": null, "authReference": null }
+    },
+    {
+      "id": "openai-reviewer",
+      "displayName": "OpenAI reviewer placeholder",
+      "executableModelId": "placeholder-openai-reviewer",
+      "maker": "OpenAI",
+      "harness": "codex",
+      "thinking": { "supported": false, "default": null },
+      "connection": { "route": "native", "provider": null, "endpoint": null, "protocol": null, "authReference": null }
+    }
+  ],
+  "builder": { "model": "anthropic-builder", "thinking": "high" },
+  "reviewer": { "model": "openai-reviewer", "thinking": null }
 }
