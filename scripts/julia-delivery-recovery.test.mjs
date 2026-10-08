@@ -83,15 +83,15 @@ test('findings and the repair count survive a restart: one build, then three rep
   const result = await runDelivery({ ...run, runPath }, adapters(0));
   assert.equal(result.outcome, 'park');
   assert.match(result.reason, /initial build and three repairs/);
-  assert.equal(builds, 4, 'one build and three repairs, the interrupted repair included');
+  assert.equal(builds, 5, 'one build and three repairs, with the spent repair resumed once');
   assert.match(prompts[2], /Finding 1: test missing/, 'the builder after the restart repairs the saved findings');
   assert.match(prompts[2], /previous builder for this work was interrupted/);
   const final = await savedState(statePath);
   assert.equal(final.repairsUsed, 3);
-  assert.deepEqual(final.findings.map(({ round }) => round), [0, 2, 3]);
+  assert.deepEqual(final.findings.map(({ round }) => round), [0, 1, 2, 3]);
   const again = await runDelivery({ ...run, runPath }, adapters(0));
   assert.deepEqual(again, result, 'a finished run answers with its saved result');
-  assert.equal(builds, 4, 'and starts no further builder');
+  assert.equal(builds, 5, 'and starts no further builder');
 });
 
 test('a builder left running by a dead runner is stopped before another builder starts', async (t) => {
@@ -109,7 +109,7 @@ test('a builder left running by a dead runner is stopped before another builder 
   assert.equal(oldBuilderAtRelaunch, null, 'the old builder was gone before the new one started');
   assert.equal(result.outcome, 'pass');
   const state = await savedState(statePath);
-  assert.equal(state.repairsUsed, 1, 'finishing an interrupted build costs a repair');
+  assert.equal(state.repairsUsed, 0, 'finishing the same interrupted build does not consume a repair');
   assert.match(state.actions[0].handling, /was stopped/);
   assert.equal(state.actions[0].status, 'interrupted');
 });
@@ -234,7 +234,7 @@ test('a runner process killed mid-build is replaced by one that stops its orphan
   assert.equal(result.outcome, 'pass');
   assert.equal(reads, 0, 'the new runner works from the saved approved input');
   const state = await savedState(statePath);
-  assert.deepEqual([state.restarts, state.repairsUsed, state.actions[0].status], [1, 1, 'interrupted']);
+  assert.deepEqual([state.restarts, state.repairsUsed, state.actions[0].status], [1, 0, 'interrupted']);
 });
 
 function gitRepo(root, name) {
@@ -247,22 +247,27 @@ function gitRepo(root, name) {
 
 test('a restart continues only in its own worktree and branch, and keeps the interrupted builder\'s partial changes', { timeout: 60000 }, async (t) => {
   const { root, runPath, statePath } = await runFiles(t);
-  const own = gitRepo(root, 'own'); const other = gitRepo(root, 'other');
-  const partial = join(own.path, 'half-written.txt');
-  const options = (worktree, launch) => ({ runPath, worktree, readCard: async () => card, launch });
+  const source = gitRepo(root, 'source'); const other = gitRepo(root, 'other');
+  await import('node:fs/promises').then(async ({ mkdir }) => { await mkdir(join(source.path, '.claude/skills/implement'), { recursive: true }); });
+  await writeFile(join(source.path, '.claude/skills/implement/SKILL.md'), 'fixture canonical instructions');
+  source.inRepo('add', '-A'); source.inRepo('-c', 'user.name=test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'instructions');
+  const path = resolve(root, 'JUL-196-worktree').toLowerCase();
+  const own = { path, inRepo: (...args) => { const r = spawnSync('git', ['-C', path, ...args], { encoding: 'utf8' }); assert.equal(r.status, 0, r.stderr); return r.stdout.trim(); } };
+  const partial = join(path, 'half-written.txt');
+  const options = (worktree, launch) => ({ authorization, repoRoot: source.path, base: source.inRepo('rev-parse', 'HEAD'), runPath, worktree, readCard: async () => card, launch });
   const dying = async (role, request) => { await request.started(deadWorker()); await writeFile(partial, 'half'); throw new Error('runner died during build'); };
   await assert.rejects(startDelivery('JUL-196', configuration, options(own.path, dying)), /died during build/);
   const saved = await savedState(statePath);
-  assert.deepEqual([saved.worktree.branch, saved.worktree.startCommit], ['work', own.inRepo('rev-parse', 'HEAD')]);
+  assert.deepEqual([saved.worktree.branch, saved.worktree.startCommit], ['runner/card-196', own.inRepo('rev-parse', 'HEAD')]);
   let launches = 0;
   const elsewhere = await startDelivery('JUL-196', configuration, options(other.path, async () => { launches += 1; }));
   assert.equal(elsewhere.unsafe, true);
   assert.match(elsewhere.reason, /this run belongs to worktree/);
   own.inRepo('checkout', '-q', '--detach');
   const detached = await startDelivery('JUL-196', configuration, options(own.path, async () => { launches += 1; }));
-  assert.match(detached.reason, /not the run's branch work/);
+  assert.match(detached.reason, /not the run's branch runner\/card-196/);
   assert.equal(launches, 0, 'no worker starts in the wrong place');
-  own.inRepo('checkout', '-q', 'work');
+  own.inRepo('checkout', '-q', 'runner/card-196');
   let nextBuilder = null;
   const result = await startDelivery('JUL-196', configuration, options(own.path, async (role, request) => {
     nextBuilder = { partial: existsSync(partial) ? await readFile(partial, 'utf8') : null, prompt: request.prompt };
@@ -270,8 +275,8 @@ test('a restart continues only in its own worktree and branch, and keeps the int
   }));
   assert.equal(nextBuilder.partial, 'half', 'the partial change is still in the worktree');
   assert.match(nextBuilder.prompt, /partial changes are still in the worktree/);
-  // The fixture repository has no origin/main, so the real candidate check parks the run; the worktree guards let it through.
-  assert.match(result.reason, /candidate has no immutable commit/);
+  // The fixture has no agreed seam tests; candidate checks refuse it after recovery.
+  assert.match(result.reason, /candidate drifted or is dirty/);
 });
 
 // The last window a runner can die in: the review passed and the candidate was
@@ -356,4 +361,15 @@ test('resuming a spent repair preserves one used and two remaining without charg
   assert.equal(state.repairsUsed, 1);
   assert.equal(3 - state.repairsUsed, 2);
   assert.equal(state.actions.filter(a => a.kind === 'build' && a.round === 1).length, 2);
+});
+
+
+test('a live worker without a recorded creation time cannot be replaced or mistaken for PID reuse', async t => {
+  const { runPath, statePath } = await runFiles(t);
+  const adapters = { readCard: async () => card, candidate: goodCandidate, processes: { started: () => null, stop: () => assert.fail('unknown owner must not be killed') }, launch: async (_role, request) => { await request.started({ pid: 12345 }); throw new Error('interrupted with unknown creation time'); } };
+  await assert.rejects(runDelivery({ ...run, runPath }, adapters), /unknown creation time/);
+  const result = await runDelivery({ ...run, runPath }, { ...adapters, processes: { started: () => 'live-process', stop: () => assert.fail('unknown owner must not be killed') }, launch: () => assert.fail('unknown worker must not overlap replacement') });
+  assert.equal(result.unsafe, true);
+  assert.match(result.reason, /creation time|identity/);
+  assert.equal((await savedState(statePath)).actions[0].status, 'started');
 });
