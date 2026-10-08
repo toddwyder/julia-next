@@ -5,23 +5,42 @@
 import { spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { mkdir, open, readFile, rename } from 'node:fs/promises';
+import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises';
 import { dirname } from 'node:path';
+import { setTimeout as pause } from 'node:timers/promises';
 
 export const sha256 = (text) => createHash('sha256').update(text).digest('hex');
 export const jsonText = (value) => `${JSON.stringify(value, null, 2)}\n`;
 
 // A reader sees the old file or the new one, never half of either: the text
 // is flushed to a temporary file first and renamed over the target.
-async function replaceFile(path, text) {
+async function replaceFile(path, text, { open: openFile = open, rename: renameFile = rename, platform = process.platform, wait = pause } = {}) {
   await mkdir(dirname(path), { recursive: true });
   const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`;
-  const handle = await open(temporary, 'w');
-  try { await handle.writeFile(text); await handle.sync(); } finally { await handle.close(); }
-  await rename(temporary, path);
+  const handle = await openFile(temporary, 'wx');
+  let replaced = false; let failed;
+  try {
+    try { await handle.writeFile(text); await handle.sync(); } finally { await handle.close(); }
+    // fs.rename has no retry option: https://nodejs.org/api/fs.html#fspromisesrenameoldpath-newpath
+    // Retry only Windows sharing/permission failures, at most six attempts and
+    // 775 ms of backoff. Permanent permissions still fail; never unlink the target.
+    for (let attempt = 0; attempt < 6; attempt++) {
+      try { await renameFile(temporary, path); replaced = true; return; }
+      catch (error) {
+        if (platform !== 'win32' || !['EPERM', 'EACCES', 'EBUSY'].includes(error.code) || attempt === 5) throw error;
+        await wait(25 * 2 ** attempt);
+      }
+    }
+  } catch (error) { failed = error; throw error; }
+  finally {
+    if (!replaced) {
+      try { await unlink(temporary); }
+      catch (error) { if (error.code !== 'ENOENT') { if (failed) failed.cleanupError = error; else throw error; } }
+    }
+  }
 }
 
-export async function saveJson(path, value) { await replaceFile(path, jsonText(value)); }
+export async function saveJson(path, value, io) { await replaceFile(path, jsonText(value), io); }
 
 // The file's exact text, or null when it was never written. Any other read
 // failure is thrown: an unreadable run file is not the same as a new run.

@@ -1,7 +1,7 @@
 // julia-delivery-interrupt-runner.mjs -- one real runner process for the
 // real-worker interruption proof (JUL-196 step 7).
 // Usage: node julia-delivery-interrupt-runner.mjs <proofDir>. It runs the real
-// runDelivery with OS process fixtures (or a real Claude BUILDER) in a disposable repository
+// runDelivery with OS process fixtures (or an opt-in native BUILDER) in a disposable repository
 // owned by the proof. julia-delivery-interrupt.test.mjs starts it, kills it
 // while a worker is active, and starts it again.
 //
@@ -51,7 +51,9 @@ async function fixture(role, request) {
 const launch = async (role, request) => {
   if (role === 'builder') {
     if (plan.processFixture) return fixture(role, request);
-    if (process.env.JUL196_CLAUDE_QUOTA_BLOCKED === '1') throw new Error('Claude integration quota-blocked (JUL196_CLAUDE_QUOTA_BLOCKED=1)');
+    if (configuration.builder.harness === 'codex') {
+      if (!plan.realCodexBuilder || process.env.JUL196_CODEX_REAL_PROOF !== '1') throw new Error('real Codex builder proof requires explicit JUL196_CODEX_REAL_PROOF=1 and a Codex plan');
+    } else if (process.env.JUL196_CLAUDE_QUOTA_BLOCKED === '1') throw new Error('Claude integration quota-blocked (JUL196_CLAUDE_QUOTA_BLOCKED=1)');
     return real('builder', request);
   }
   // NEVER use productionLauncher for reviewers in tests, regardless of plan.

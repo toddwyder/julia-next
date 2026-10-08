@@ -1,15 +1,17 @@
 // JUL-196 interruption regression: kill actual runner processes while an OS
 // child is active, then restart on the same run files. Reviewers are ALWAYS
 // deterministic process fixtures, never paid providers. Claude builder cases
-// retain real integration coverage with an explicit quota-blocked skip.
+// retain real integration coverage with an explicit quota-blocked skip. Native
+// Codex builder coverage requires explicit operator opt-in; never a real reviewer.
 //
-// It is part of the ordinary regression run on Windows, where the delivery
-// route runs. A scenario is skipped only when the platform or an installed
-// worker it needs is missing, and the skip says which.
+// Deterministic cases join ordinary regression. Real Claude cases honor quota
+// blocking, and the paid Codex builder case is skipped unless opted in.
 //
 //   node --test --test-reporter=spec scripts/julia-delivery-interrupt.test.mjs
 //
 // Optional environment:
+//   JUL196_CODEX_REAL_PROOF=1    OPERATOR ONLY: enable the real gpt-6.1-sol / high
+//                                initial-build interruption and recovery proof.
 //   JUL196_PROOF_EVIDENCE_DIR    save each scenario's review-safe evidence file
 //                                (real-proof-<scenario>.json) in this directory
 //                                and keep the scenario's disposable directory,
@@ -34,10 +36,12 @@ import { test } from 'node:test';
 import { spawn, spawnSync } from 'node:child_process';
 import { copyFile, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { randomUUID } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { processStarted, saveJson, sha256, stopProcessTree } from './julia-delivery-state.mjs';
+import { nativeBuilderEvidence } from './julia-delivery-proof-evidence.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const evidenceDir = process.env.JUL196_PROOF_EVIDENCE_DIR ? resolve(process.env.JUL196_PROOF_EVIDENCE_DIR) : null;
@@ -59,8 +63,10 @@ function missing(...workers) {
 
 const native = { route: 'native', provider: null, endpoint: null, protocol: null, authReference: null };
 // A scenario whose verdicts are scripted does not name a real reviewer model.
-const configurationFor = () => ({
-  builder: { identity: 'anthropic-builder', model: builderModel, maker: 'Anthropic', harness: 'claude-code', thinking: 'high', connection: native },
+const configurationFor = (plan) => ({
+  builder: plan.realCodexBuilder
+    ? { identity: 'openai-builder', model: 'gpt-6.1-sol', maker: 'OpenAI', harness: 'codex', thinking: 'high', connection: { ...native, provider: 'openai' } }
+    : { identity: 'anthropic-builder', model: builderModel, maker: 'Anthropic', harness: 'claude-code', thinking: 'high', connection: native },
   reviewer: { identity: 'fixture-reviewer', model: 'scripted-stand-in', maker: 'Fixture', harness: 'fixture', thinking: null, connection: native },
 });
 const description = [
@@ -78,16 +84,25 @@ const card = { identifier: 'JUL-196', title: 'Recovery proof (disposable)', stat
 async function prepare(name, plan) {
   const proofDir = await mkdtemp(join(tmpdir(), `jul196-real-proof-${name}-`));
   const worktree = join(proofDir, 'worktree');
-  const configuration = configurationFor();
+  const configuration = configurationFor(plan);
   await mkdir(join(worktree, '.agents', 'skills', 'implement'), { recursive: true });
   await copyFile(resolve(here, '../.agents/skills/implement/SKILL.md'), join(worktree, '.agents', 'skills', 'implement', 'SKILL.md'));
   const git = (...args) => { const result = spawnSync('git', ['-C', worktree, ...args], { encoding: 'utf8' }); assert.equal(result.status, 0, result.stderr); return result.stdout.trim(); };
   spawnSync('git', ['init', '-q', '-b', 'work', worktree], { encoding: 'utf8' });
   git('add', '-A'); git('-c', 'user.name=jul196-proof', '-c', 'user.email=proof@example.invalid', 'commit', '-q', '-m', 'start');
   const approvedPath = join(proofDir, 'runs', 'JUL-196-approved.json');
-  await saveJson(approvedPath, { card, configuration, issueId: 'JUL-196', savedBy: 'julia-delivery-interrupt.test.mjs (no Linear read)' });
+  const marker = `partial ${randomUUID()}`;
+  const proofCard = plan.realCodexBuilder ? { ...card, description: [
+    'Disposable native Codex recovery proof. Read this SAVED approved input and the canonical .agents/skills/implement/SKILL.md using a local terminal command that prints their full contents before writing anything.',
+    'These bounded instructions override the skill: do not commit, review, run tests, use network/MCP/Linear, or change any file except proof.txt.',
+    `If the runner says the previous builder was interrupted: read existing proof.txt, preserve its two lines byte-for-byte, append exactly recovered on a third line, and finish. Do not sleep during recovery.`,
+    `Otherwise use a local Node command to write exactly ${JSON.stringify(`JUL-196 recovery proof\n${marker}\n`)} to proof.txt, then keep that SAME command running with setTimeout(()=>{},300000). Do not finish or shorten this wait: the parent will interrupt your runner while you are working.`,
+    '## Acceptance criteria',
+    `- [ ] proof.txt preserves its first line JUL-196 recovery proof and second line ${marker}; recovery appends recovered on a third line.`,
+  ].join('\n') } : card;
+  await saveJson(approvedPath, { card: proofCard, configuration, issueId: 'JUL-196', savedBy: 'julia-delivery-interrupt.test.mjs (no Linear read)' });
   await saveJson(join(proofDir, 'plan.json'), { issueId: 'JUL-196', worktree, configuration, checkWhen: '^JUL-196 recovery proof', ...plan });
-  return { proofDir, worktree, configuration, git, statePath: join(proofDir, 'runs', 'JUL-196-state.json'), approvedHash: sha256(await readFile(approvedPath, 'utf8')), approvedPath };
+  return { proofDir, worktree, configuration, git, marker, statePath: join(proofDir, 'runs', 'JUL-196-state.json'), approvedHash: sha256(await readFile(approvedPath, 'utf8')), approvedPath };
 }
 
 function startRunner(proofDir) {
@@ -119,15 +134,25 @@ async function interruptAndResume(t, name, key, plan) {
   });
   const runner = () => { const started = startRunner(proof.proofDir); runners.push(started); return started; };
   const first = runner();
-  let open = null;
+  let open = null; let partialAtKill = null; let nativeAtKill = [];
   const deadline = Date.now() + (plan.processFixture ? 30000 : 10 * 60 * 1000);
   while (!open && Date.now() < deadline) {
     const state = await readState(proof.statePath);
     open = state?.actions.find((action) => action.key === key && action.status === 'started' && action.worker) ?? null;
+    if (open && plan.realCodexBuilder) {
+      partialAtKill = await readFile(join(proof.worktree, 'proof.txt'), 'utf8').catch(() => null);
+      nativeAtKill = await nativeBuilderEvidence(proof);
+      if (partialAtKill !== `JUL-196 recovery proof\n${proof.marker}\n` || !nativeAtKill.some(session => session.canonicalSavedRead && session.noLinearCalls && session.provider === 'openai' && session.models.length === 1 && session.models[0] === 'gpt-6.1-sol' && session.efforts.length === 1 && session.efforts[0] === 'high')) open = null;
+    }
     if (state?.result) break;
+    if (first.child.exitCode !== null || first.child.signalCode !== null) break;
     if (!open) await wait(500);
   }
-  assert.ok(open, `the run reached ${key} with a recorded worker (${first.stderr()})`);
+  if (!open && plan.realCodexBuilder) {
+    const reason = 'native Codex did not reach a live recorded worker with the exact partial file, actual canonical/saved-input reads, and OpenAI gpt-6.1-sol/high metadata; interruption was not proved and no recovery was launched';
+    await saveJson(join(evidenceDir ?? proof.proofDir, `real-proof-${name}-refusal.json`), { scenario: name, reason, partialAtKill, nativeAtKill, runnerExitCode: first.child.exitCode, runnerSignal: first.child.signalCode, stderr: first.stderr(), proofDir: proof.proofDir, reviewer: 'deterministic fixture; no live reviewer' });
+  }
+  assert.ok(open, `${plan.realCodexBuilder ? 'native partial-work and session-evidence checkpoint was not reached; no interruption proof' : `the run reached ${key} with a recorded worker`} (${first.stderr()})`);
   await wait(plan.processFixture ? 100 : killAfterMs);
   const workerActiveAtKill = processStarted(open.worker.pid) === open.worker.started;
   assert.ok(workerActiveAtKill, `the real ${open.role} (process ${open.worker.pid}) was still working when its runner was killed`);
@@ -142,14 +167,16 @@ async function interruptAndResume(t, name, key, plan) {
   const exit = await second.exited;
   const state = await readState(proof.statePath);
   const result = second.result();
+  const nativeAfter = plan.realCodexBuilder ? await nativeBuilderEvidence(proof) : [];
   const evidence = {
     scenario: name, test: 'scripts/julia-delivery-interrupt.test.mjs', interruptedAction: key, configuration: proof.configuration, killedAt, killAfterMs, workerActiveAtKill, workerAfterKill, partialChangesAtRestart: partialChanges,
     secondRunnerExit: exit, result, restarts: state?.restarts, repairsUsed: state?.repairsUsed, stage: state?.stage,
     approvedInputUnchanged: sha256(await readFile(proof.approvedPath, 'utf8')) === proof.approvedHash && state?.approved.sha256 === proof.approvedHash,
     worktree: state?.worktree, worktreeBeforeRestart: interrupted?.worktree, findingsBeforeRestart: interrupted?.findings ?? [], findingsAfter: state?.findings ?? [],
     resumedFixtureActions: second.fixtures(),
+    partialAtKill, nativeAtKill, nativeAfter,
     actions: state ? journal(state) : null, proofTxt: await readFile(join(proof.worktree, 'proof.txt'), 'utf8').catch(() => null),
-    builder: plan.processFixture ? 'deterministic OS process fixture (not provider integration)' : 'real Claude builder',
+    builder: plan.processFixture ? 'deterministic OS process fixture (not provider integration)' : plan.realCodexBuilder ? 'real native Codex builder (operator opt-in)' : 'real Claude builder',
     reviewer: 'deterministic fixture / scripted verdict (not provider integration or a review)', candidate: 'disposable snapshot and content check (not the JUL-122 checks)',
     proofDir: proof.proofDir, savedAt: new Date().toISOString(),
   };
@@ -159,7 +186,7 @@ async function interruptAndResume(t, name, key, plan) {
   assert.equal(state.worktree.path, proof.worktree);
   assert.deepEqual(state.worktree, interrupted.worktree, 'restart kept exactly the same worktree identity');
   t.diagnostic(`${name}: ${result.outcome}${result.reason ? ` (${result.reason})` : ''}; repairs used ${state.repairsUsed}; worker ${workerAfterKill}`);
-  return { evidence, state, interrupted, passed: () => { finished = true; } };
+  return { evidence, state, interrupted, proof, passed: () => { finished = true; } };
 }
 
 const oneWorkerAtATime = (state) => {
@@ -225,5 +252,39 @@ test('deterministic review process fixture: interruption parks without another r
   assert.match(evidence.result.reason, /review.*interrupted.*not.*retr/i);
   assert.match(state.actions.at(-1).handling, /had already exited|was stopped/);
   assert.notEqual(processStarted(state.actions.at(-1).worker.pid), state.actions.at(-1).worker.started);
+  passed();
+});
+
+test('opt-in real Codex builder: interrupted initial build recovers partial work with native OpenAI metadata and fixture review', {
+  skip: process.env.JUL196_CODEX_REAL_PROOF !== '1' ? 'operator opt-in required: JUL196_CODEX_REAL_PROOF=1; no paid builder in ordinary suite' : missing('codex.exe'),
+  timeout: 20 * 60 * 1000,
+}, async t => {
+  const { evidence, state, proof, passed } = await interruptAndResume(t, 'codex-build', 'build:0', { realCodexBuilder: true, passWhen: '^JUL-196 recovery proof\\r?\\npartial [0-9a-f-]+\\r?\\nrecovered\\r?\\n$' });
+  assert.equal(evidence.approvedInputUnchanged, true);
+  assert.equal(evidence.workerActiveAtKill, true);
+  assert.equal(evidence.partialAtKill, `JUL-196 recovery proof\n${proof.marker}\n`);
+  assert.equal(evidence.proofTxt, `${evidence.partialAtKill}recovered\n`, 'native recovery preserved the initial partial work');
+  assert.deepEqual([state.restarts, state.repairsUsed, state.actions[0].status], [1, 1, 'interrupted']);
+  oneWorkerAtATime(state);
+  assert.equal(evidence.result.outcome, 'pass', JSON.stringify(evidence.result));
+  const completed = state.actions.find(action => action.key === 'build:1' && action.status === 'done');
+  assert.deepEqual(completed.outcome.observed, { harness: 'codex', model: 'gpt-6.1-sol', maker: 'OpenAI' });
+  const launchEvidence = JSON.parse(await readFile(completed.outcome.outputPath, 'utf8'));
+  assert.equal(launchEvidence.identityEvidence.provider, 'openai');
+  assert.equal(launchEvidence.identityEvidence.effort, 'high');
+  assert.equal(launchEvidence.cwd, proof.worktree);
+  assert.match(launchEvidence.command, /codex\.exe$/i);
+  assert.equal(launchEvidence.args[launchEvidence.args.indexOf('-s') + 1], 'workspace-write');
+  assert.ok(evidence.nativeAfter.length >= 2, 'initial and recovered native sessions are distinct');
+  for (const session of evidence.nativeAfter) {
+    assert.equal(session.provider, 'openai');
+    assert.deepEqual(session.models, ['gpt-6.1-sol']);
+    assert.deepEqual(session.efforts, ['high']);
+    assert.equal(session.canonicalSavedRead, true, 'actual tool output proves canonical skill and saved approved input read');
+    assert.equal(session.noLinearCalls, true);
+  }
+  assert.equal(new Set(evidence.nativeAfter.map(session => session.thread)).size, evidence.nativeAfter.length);
+  assert.equal(state.actions.filter(action => action.kind === 'review').length, 1);
+  assert.match(evidence.reviewer, /fixture.*not provider integration/i);
   passed();
 });
