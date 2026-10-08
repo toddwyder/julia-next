@@ -79,6 +79,8 @@ export async function captureDeliveryCandidate({ issueId, runPath, workspace, ca
   const { path, repository, branch, startCommit: base } = workspace;
   const evidencePath = join(dirname(resolve(runPath)), `${issueId}-candidate-round-${round}.json`);
   const evidence = { base, round, commit: null, clean: false, checks: { pass: false }, redProof: { pass: false }, runs: [], evidencePath };
+  if (await loadText(evidencePath) != null) return { ...evidence, checks: { pass: false, error: 'existing candidate evidence is preserved; interrupted capture/checks cannot be retried under stale evidence' } };
+
   const drift = commit => git(path, 'rev-parse', 'HEAD') !== commit || git(path, 'branch', '--show-current') !== branch || Boolean(git(path, 'status', '--porcelain'));
   try {
     await prepareDeliveryWorkspace({ issueId, runPath, repoRoot: workspace.source, worktree: path, saved: workspace });
