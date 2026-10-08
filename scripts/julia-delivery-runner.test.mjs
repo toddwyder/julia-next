@@ -5,7 +5,7 @@ import { productionLauncher, runDelivery as deliver, startDelivery, workerPrompt
 import { processStarted } from './julia-delivery-state.mjs';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { mkdir } from 'node:fs/promises';
@@ -189,13 +189,16 @@ test('reads an authorized card once, persists its approved input, then hands onl
 });
 
 test('failed checks, candidate drift, same-maker reviews, and malformed verdicts fail closed before PASS', async () => {
-  const base = { readCard: async () => card, save: async () => {}, launch: async () => ({ exitCode: 0, observed: { harness: 'claude-code', model: 'x', maker: 'Anthropic' } }) };
+  const base = { readCard: async () => card, save: async () => {}, launch: async role => { assert.equal(role, 'builder', 'invalid candidates cannot dispatch review'); return { exitCode: 0, observed: configuration.builder }; } };
   for (const candidate of [
     { commit: 'a'.repeat(40), clean: true, checks: { pass: false } },
     { commit: 'a'.repeat(40), clean: false, checks: { pass: true } },
+    { commit: 'a'.repeat(40), clean: 'true', checks: { pass: true } },
+    { commit: 'a'.repeat(40), clean: true, checks: { pass: 'PASS' } },
   ]) {
     const result = await runDelivery({ issueId: 'JUL-196', configuration, runPath: 'C:/runs/JUL-196.json' }, { ...base, candidate: async () => candidate });
     assert.equal(result.outcome, 'park');
+    assert.match(result.reason, /candidate/);
   }
 });
 
@@ -218,10 +221,10 @@ test('a review fail returns findings for repair, and the initial build plus thre
 test('resume uses the saved approved card without another Linear read, and records a terminal refusal', async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'jul196-')); t.after(() => import('node:fs/promises').then(({ rm }) => rm(root, { recursive: true, force: true })));
   const runPath = join(root, 'JUL-196.json');
-  await writeFile(join(root, 'JUL-196-approved.json'), JSON.stringify({ card, configuration }));
+  await writeFile(join(root, 'JUL-196-approved.json'), JSON.stringify({ card, configuration, authorization }));
   const result = await startDelivery('JUL-196', configuration, { runPath, worktree: root, readCard: async () => { throw new Error('must not read Linear'); } });
   assert.equal(result.outcome, 'park');
-  assert.match(await readFile(join(root, 'JUL-196-state.json'), 'utf8'), /worker launcher|checks failed|worktree/);
+  assert.match(await readFile(join(root, 'JUL-196-state.json'), 'utf8'), /existing unrelated working copy/);
 });
 
 test('a PASS is refused if the post-review candidate read drifts', async () => {
@@ -248,12 +251,20 @@ test('Ready and triage approval do not authorize workspace or worker side effect
 });
 
 
-test('authorized production adapter prepares isolation and freezes additions/deletions with checked evidence', async t => {
+async function candidateFixture(t) {
   const { spawnSync } = await import('node:child_process');
   const { rm, mkdir } = await import('node:fs/promises');
   const { git } = await import('./julia-minimal-runner-checks.mjs');
   const root = await mkdtemp(join(tmpdir(), 'jul201-git-'));
-  t.after(() => rm(root, { recursive: true, force: true }));
+  t.after(async () => {
+    if (process.env.JUL201_EVIDENCE_DIR) {
+      const { cp, mkdir } = await import('node:fs/promises');
+      const target = join(process.env.JUL201_EVIDENCE_DIR, root.split(/[\\/]/).at(-1));
+      await mkdir(process.env.JUL201_EVIDENCE_DIR, { recursive: true });
+      await cp(root, target, { recursive: true });
+    }
+    await rm(root, { recursive: true, force: true });
+  });
   const source = join(root, 'source');
   assert.equal(spawnSync('git', ['init', '-q', '-b', 'main', source]).status, 0);
   await mkdir(join(source, '.claude/skills/implement'), { recursive: true });
@@ -265,6 +276,12 @@ test('authorized production adapter prepares isolation and freezes additions/del
   git(source, '-c', 'user.name=fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'base');
   const base = git(source, 'rev-parse', 'HEAD');
   const runPath = join(root, 'runs/JUL-196.json');
+  return { root, source, base, runPath, git };
+}
+
+test('authorized production adapter prepares isolation and freezes additions/deletions with checked evidence', async t => {
+  const { source, base, runPath, git } = await candidateFixture(t);
+  const { rm } = await import('node:fs/promises');
   const calls = []; let builderPath;
   const result = await startDelivery('JUL-196', configuration, {
     authorization, repoRoot: source, base, runPath,
@@ -296,4 +313,89 @@ test('authorized production adapter prepares isolation and freezes additions/del
   assert.equal(git(source, 'rev-parse', 'HEAD'), base);
   assert.equal(git(source, 'status', '--porcelain'), '');
   assert.equal(await readFile(join(source, 'deleted.txt'), 'utf8'), 'original');
+});
+
+
+test('failed, ambiguous, red-proof and drifted checks cannot reach a reviewer and retain raw evidence and source edits', async t => {
+  for (const kind of ['suite failure', 'ambiguous', 'no red', 'source drift', 'review drift']) {
+    await t.test(kind, async t => {
+      const { runPath, source, base, git } = await candidateFixture(t);
+      let builderPath, reviews = 0;
+      const result = await startDelivery('JUL-196', configuration, {
+        authorization, repoRoot: source, base, runPath,
+        readCard: async () => ({ ...card, description: card.description + '\n## Seams\n`scripts/seam.test.mjs`' }),
+        test: async ({ worktree, run }) => {
+          if (kind === 'source drift' && run === 'suite') await writeFile(join(builderPath, 'unfinished.txt'), 'preserve me');
+          const status = kind === 'ambiguous' ? null : kind === 'suite failure' && run === 'suite' ? 1 : run === 'files' && git(worktree, 'rev-parse', 'HEAD') === base && kind !== 'no red' ? 1 : 0;
+          return { status, output: `raw ${kind} ${run}` };
+        },
+        launch: async (role, request) => {
+          if (role === 'builder') {
+            builderPath = request.worktree;
+            await writeFile(join(builderPath, 'scripts/seam.test.mjs'), 'regression');
+            return { exitCode: 0, observed: configuration.builder };
+          }
+          reviews++;
+          await writeFile(join(builderPath, 'after-review.txt'), 'leave unfinished');
+          const handoff = JSON.parse(await readFile(request.handoffPath, 'utf8'));
+          return { exitCode: 0, observed: configuration.reviewer, text: `VERDICT: PASS\nCOMMIT: ${handoff.candidate.commit}` };
+        },
+      });
+      assert.equal(result.outcome, 'park');
+      assert.equal(reviews, kind === 'review drift' ? 1 : 0);
+      const evidence = JSON.parse(await readFile(join(dirname(runPath), 'JUL-196-candidate-round-0.json'), 'utf8'));
+      assert.ok(evidence.runs.length);
+      assert.match(evidence.runs[0].output, /raw/);
+      if (kind === 'source drift') assert.equal(await readFile(join(builderPath, 'unfinished.txt'), 'utf8'), 'preserve me');
+      if (kind === 'review drift') assert.equal(await readFile(join(builderPath, 'after-review.txt'), 'utf8'), 'leave unfinished');
+      assert.equal(git(source, 'status', '--porcelain'), '');
+    });
+  }
+});
+
+test('protected originals, aliases and foreign working copies are refused before fixture dispatch', { skip: process.platform !== 'win32' && 'Windows original-checkout junction protection' }, async t => {
+  const { symlink, rm } = await import('node:fs/promises');
+  const root = await mkdtemp(join(tmpdir(), 'jul201-protection-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const alias = join(root, 'alias');
+  await symlink('C:/Dev/julia-next', alias, 'junction');
+  for (const worktree of ['C:/Dev/julia-next', 'C:/Dev/julia-next-jul196', alias, root]) {
+    const result = await startDelivery('JUL-196', configuration, { authorization, worktree, runPath: join(root, 'runs/JUL-196.json'), readCard: async () => card, launch: async () => assert.fail('protected or foreign workspace cannot dispatch') });
+    assert.equal(result.outcome, 'park');
+    assert.match(result.reason, /protected original|existing unrelated/);
+  }
+});
+
+
+test('literal $init drives the authorized fixture journey and restarting reuses all saved inputs', async t => {
+  const { runInit } = await import('./julia-init.mjs');
+  const { source, base, runPath, git } = await candidateFixture(t);
+  const settingsPath = join(dirname(runPath), 'settings.json');
+  await mkdir(dirname(runPath), { recursive: true });
+  const catalog = Object.values(configuration).map(chosen => ({ id: chosen.identity, displayName: chosen.identity, executableModelId: chosen.model, maker: chosen.maker, harness: chosen.harness, thinking: { supported: chosen.thinking ? [chosen.thinking] : false, default: chosen.thinking }, connection: { route: 'native', provider: null, endpoint: null, protocol: null, authReference: null } }));
+  await writeFile(settingsPath, JSON.stringify({ catalog, builder: { model: 'claude', thinking: 'high' }, reviewer: { model: 'codex', thinking: null } }));
+  let reads = 0, builds = 0, delivery;
+  const dispatch = async (selected, context) => {
+    const saved = JSON.parse(await readFile(context.runPath, 'utf8'));
+    assert.deepEqual(saved.authorization.configuration, selected);
+    delivery = await startDelivery(context.issueId, selected, {
+      ...context, repoRoot: source, base,
+      readCard: async () => { reads++; return { ...card, description: card.description + '\n## Seams\n`scripts/seam.test.mjs`' }; },
+      test: async ({ worktree, run }) => ({ status: run === 'files' && git(worktree, 'rev-parse', 'HEAD') === base ? 1 : 0, output: 'literal journey fixture check' }),
+      launch: async (role, request) => {
+        if (role === 'builder') { builds++; await writeFile(join(request.worktree, 'scripts/seam.test.mjs'), 'regression'); return { exitCode: 0, observed: selected.builder }; }
+        const handoff = JSON.parse(await readFile(request.handoffPath, 'utf8'));
+        return { exitCode: 0, observed: selected.reviewer, text: `VERDICT: PASS\nCOMMIT: ${handoff.candidate.commit}` };
+      },
+    });
+  };
+  const first = await runInit('$init JUL-196', { authorization, settingsPath, stateDirectory: dirname(runPath), dispatch });
+  assert.equal(delivery.outcome, 'pass', delivery.reason);
+  await writeFile(settingsPath, '{}');
+  await runInit('$init JUL-196', { settingsPath, stateDirectory: dirname(runPath), dispatch });
+  assert.equal(reads, 1);
+  assert.equal(builds, 1);
+  const approved = JSON.parse(await readFile(join(dirname(runPath), 'JUL-196-approved.json'), 'utf8'));
+  assert.deepEqual(approved.configuration, first.configuration);
+  assert.deepEqual(approved.authorization.spending, authorization.spending);
 });
