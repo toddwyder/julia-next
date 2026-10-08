@@ -4,6 +4,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { getIssue } from './linear-cli.mjs';
 import { git, runChecks, localTester } from './julia-minimal-runner-checks.mjs';
 import { LIMITS, runLimited } from '../ops/julia-runner/time-limit.mjs';
@@ -52,21 +53,46 @@ function park(reason, round = null) { return { outcome: 'park', reason, round };
 
 // The JUL-122 time limiter owns the child process group; this adapter only
 // maps the saved catalog harnesses to their unattended command lines.
+function claudeCommand() {
+  if (process.platform !== 'win32') return 'claude';
+  // npm's Windows shim is a batch file, not a CreateProcess executable.
+  // Prefer a native installation, then the native binary behind the npm shim.
+  const native = spawnSync('where.exe', ['claude.exe'], { encoding: 'utf8', windowsHide: true });
+  if (native.status === 0) return native.stdout.trim().split(/\r?\n/)[0];
+  const shim = spawnSync('where.exe', ['claude.cmd'], { encoding: 'utf8', windowsHide: true });
+  for (const path of (shim.stdout ?? '').trim().split(/\r?\n/).filter(Boolean)) {
+    const executable = join(dirname(path), 'node_modules', '@anthropic-ai', 'claude-code', 'bin', 'claude.exe');
+    if (existsSync(executable)) return executable;
+  }
+  throw new Error('Installed Claude Code native executable was not found');
+}
+
 export function productionLauncher(worktree) {
   return async (role, request) => {
     const configured = request.configuration;
-    const command = configured.harness === 'claude-code' ? 'claude' : configured.harness === 'codex' ? 'codex' : null;
-    const args = configured.harness === 'claude-code' ? ['-p', '--model', configured.model, request.prompt]
+    const command = configured.harness === 'claude-code' ? claudeCommand() : configured.harness === 'codex' ? 'codex' : null;
+    const args = configured.harness === 'claude-code' ? ['-p', '--model', configured.model, '--effort', configured.thinking ?? 'high', '--output-format', 'stream-json', '--verbose', '--permission-mode', 'acceptEdits', '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}', '--tools', 'Read,Edit,Write,Bash,Glob,Grep,Skill', '--allowedTools', 'Read,Edit,Write,Glob,Grep,Skill,Bash(node --test *),Bash(git status *),Bash(git diff *)']
       : configured.harness === 'codex' ? ['exec', '-m', configured.model, '-s', 'read-only', '--skip-git-repo-check', '-'] : [];
     if (!command) return { exitCode: 2, observed: null, text: `unsupported harness ${configured.harness}` };
     let output = ''; let error = '';
-    const result = await runLimited(command, args, { cwd: role === 'builder' ? worktree : undefined, stdio: ['pipe', 'pipe', 'pipe'] }, {
+    const startedAt = new Date().toISOString();
+    const result = await runLimited(command, args, { cwd: role === 'builder' ? worktree : undefined, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true }, {
       seconds: LIMITS.builder.fallback,
-      started: (child) => { child.stdout.on('data', (chunk) => { output += chunk; }); child.stderr.on('data', (chunk) => { error += chunk; }); if (configured.harness === 'codex') child.stdin.end(request.prompt); },
+      started: (child) => { child.stdout.on('data', (chunk) => { output += chunk; }); child.stderr.on('data', (chunk) => { error += chunk; }); child.stdin.on('error', () => {}); child.stdin.end(request.prompt); },
     });
     const observed = /^OBSERVED:\s*(\{.*\})$/m.exec(output)?.[1];
     let identity = null; try { identity = observed && JSON.parse(observed); } catch { /* fail closed below */ }
-    return { exitCode: result.stopped ? 124 : result.code ?? 1, observed: identity, text: output || error, outputPath: null, timedOut: result.stopped };
+    if (configured.harness === 'claude-code') {
+      const events = output.split(/\r?\n/).flatMap(line => { try { return [JSON.parse(line)]; } catch { return []; } });
+      const init = events.find(event => event.type === 'system' && event.subtype === 'init');
+      const model = events.find(event => event.type === 'assistant')?.message?.model ?? init?.model;
+      if (model) identity = { harness: 'claude-code', model, maker: 'Anthropic' };
+    }
+    const finishedAt = new Date().toISOString();
+    const exitCode = result.stopped ? 124 : result.code ?? 1;
+    // The worker's own streams are the evidence; nothing here is summarised.
+    if (request.outputPath) await fileSave(request.outputPath, { role, configured, observed: identity, exitCode, timedOut: result.stopped, startedAt, finishedAt, stdout: output, stderr: error });
+    return { exitCode, observed: identity, text: output || error || result.error?.message || '', outputPath: request.outputPath ?? null, timedOut: result.stopped };
   };
 }
 

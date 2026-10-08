@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { runDelivery, startDelivery, workerPrompt } from './julia-delivery-runner.mjs';
+import { productionLauncher, runDelivery, startDelivery, workerPrompt } from './julia-delivery-runner.mjs';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -11,6 +11,30 @@ const configuration = {
   reviewer: { identity: 'codex', model: 'gpt-review', maker: 'OpenAI', harness: 'codex', thinking: null, connection: { route: 'native' } },
 };
 const card = { identifier: 'JUL-196', title: 'A card', state: { name: 'Ready', type: 'unstarted' }, description: '## Acceptance criteria\n\n- [ ] It works.' };
+
+test('Windows production launcher gets a response from installed Claude Code and persists its evidence', { skip: process.platform !== 'win32', timeout: 120000 }, async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'jul196-')); t.after(() => import('node:fs/promises').then(({ rm }) => rm(root, { recursive: true, force: true })));
+  const outputPath = join(root, 'evidence', 'JUL-196-builder-round-1.json');
+  const builder = { ...configuration.builder, model: 'opus' };
+  const before = Date.now();
+  const result = await productionLauncher(process.cwd())('builder', {
+    configuration: builder, outputPath,
+    prompt: 'Reply with exactly JUL-196 runner launch OK. Do not use tools or change any files.',
+  });
+  const after = Date.now();
+  assert.equal(result.exitCode, 0, result.text);
+  assert.match(result.text, /JUL-196 runner launch OK/);
+  assert.equal(result.outputPath, outputPath);
+  const evidence = JSON.parse(await readFile(outputPath, 'utf8'));
+  assert.match(evidence.stdout, /JUL-196 runner launch OK/);
+  assert.equal(typeof evidence.stderr, 'string');
+  assert.deepEqual(evidence.configured, builder);
+  assert.equal(evidence.observed.harness, 'claude-code');
+  assert.equal(evidence.observed.maker, 'Anthropic');
+  assert.match(evidence.observed.model, /opus/);
+  assert.equal(evidence.exitCode, 0);
+  assert.ok(before <= Date.parse(evidence.startedAt) && Date.parse(evidence.startedAt) <= Date.parse(evidence.finishedAt) && Date.parse(evidence.finishedAt) <= after, `${evidence.startedAt} .. ${evidence.finishedAt}`);
+});
 
 test('the builder receives the canonical implement instruction and saved approved inputs, not a discovered skill', () => {
   const prompt = workerPrompt('builder', card, configuration, 'C:/runs/JUL-196.json', 'C:/runs/JUL-196-approved.json');
