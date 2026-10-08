@@ -73,3 +73,52 @@ test('native proof rejects a corrupt interior session record instead of silently
   ].join('\n'));
   await assert.rejects(nativeBuilderEvidence({ worktree, marker: 'partial marker' }, { root }), /corrupt native session/i);
 });
+
+test('native proof reads matched native content-block arrays using only explicit string text blocks', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'jul196-native-blocks-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const worktree = join(root, 'worktree');
+  const records = [
+    { type: 'session_meta', payload: { id: 'fixture', cwd: worktree, model_provider: 'openai' } },
+    { type: 'turn_context', payload: { model: 'gpt-6.1-sol', effort: 'high' } },
+    { type: 'response_item', payload: { type: 'custom_tool_call', call_id: 'skill', name: 'exec', input: 'Get-Content .agents/skills/implement/SKILL.md' } },
+    { type: 'response_item', payload: { type: 'custom_tool_call_output', call_id: 'skill', output: [
+      { type: 'text', text: 'terminal result header' },
+      { type: 'image', text: 'untrusted image text', image_url: 'fixture' },
+      { type: 'input_text', text: 'Implement the work described by the user in the spec or tickets.' },
+    ] } },
+    { type: 'response_item', payload: { type: 'custom_tool_call', call_id: 'approved', name: 'exec', input: 'Get-Content C:\\proof\\runs\\JUL-196-approved.json' } },
+    { type: 'response_item', payload: { type: 'custom_tool_call_output', call_id: 'approved', output: [{ type: 'input_text', text: 'partial unique-content-block-marker' }] } },
+  ];
+  await writeFile(join(root, 'rollout-fixture.jsonl'), records.map(record => JSON.stringify(record)).join('\n'));
+  const [evidence] = await nativeBuilderEvidence({ worktree, marker: 'partial unique-content-block-marker' }, { root });
+  assert.equal(evidence.canonicalSavedRead, true);
+  assert.deepEqual(evidence.readCallIds, ['skill', 'approved']);
+  assert.deepEqual(evidence.models, ['gpt-6.1-sol']);
+  assert.deepEqual(evidence.efforts, ['high']);
+  assert.equal(evidence.provider, 'openai');
+});
+
+test('native proof rejects objects, image-only or malformed blocks, unmatched outputs and assistant prose as read evidence', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'jul196-native-invalid-blocks-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const worktree = join(root, 'worktree');
+  const text = 'Implement the work described by the user\npartial marker';
+  for (const payload of [
+    { type: 'custom_tool_call_output', call_id: 'read', output: { type: 'text', text } },
+    { type: 'custom_tool_call_output', call_id: 'read', output: [{ type: 'image', text }] },
+    { type: 'custom_tool_call_output', call_id: 'read', output: [{ type: 'input_image', text }] },
+    { type: 'custom_tool_call_output', call_id: 'read', output: [null, text, { text }, { type: 'text', text: { text } }] },
+    { type: 'custom_tool_call_output', call_id: 'unmatched', output: [{ type: 'text', text }] },
+    { type: 'message', role: 'assistant', call_id: 'read', output: [{ type: 'text', text }], content: [{ type: 'text', text }] },
+  ]) {
+    const records = [
+      { type: 'session_meta', payload: { id: 'fixture', cwd: worktree, model_provider: 'openai' } },
+      { type: 'response_item', payload: { type: 'custom_tool_call', call_id: 'read', name: 'exec', input: 'Get-Content .agents/skills/implement/SKILL.md JUL-196-approved.json' } },
+      { type: 'response_item', payload },
+    ];
+    await writeFile(join(root, 'rollout-fixture.jsonl'), records.map(record => JSON.stringify(record)).join('\n'));
+    const [evidence] = await nativeBuilderEvidence({ worktree, marker: 'partial marker' }, { root });
+    assert.equal(evidence.canonicalSavedRead, false);
+  }
+});

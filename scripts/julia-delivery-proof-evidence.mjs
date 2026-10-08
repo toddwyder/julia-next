@@ -4,6 +4,10 @@ import { readFile, readdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 
+const toolOutputText = output => typeof output === 'string' ? output : Array.isArray(output)
+  ? output.filter(block => block && ['text', 'input_text'].includes(block.type) && typeof block.text === 'string').map(block => block.text).join('\n')
+  : '';
+
 export async function nativeBuilderEvidence(proof, { root = join(process.env.CODEX_HOME || join(homedir(), '.codex'), 'sessions') } = {}) {
   const paths = [];
   const walk = async directory => {
@@ -32,8 +36,8 @@ export async function nativeBuilderEvidence(proof, { root = join(process.env.COD
     const responses = records.filter(event => event.type === 'response_item' && ['function_call_output', 'custom_tool_call_output'].includes(event.payload?.type)).map(event => event.payload);
     const read = (file, expected) => calls.find(call => {
       const args = String(call.arguments ?? call.input).replaceAll('\\\\', '/').replaceAll('\\', '/');
-      const output = responses.find(response => response.call_id === call.call_id)?.output;
-      return args.includes(file) && typeof output === 'string' && output.includes(expected);
+      const output = toolOutputText(responses.find(response => response.call_id === call.call_id)?.output);
+      return args.includes(file) && output.includes(expected);
     });
     const skillRead = read('.agents/skills/implement/SKILL.md', 'Implement the work described by the user');
     const approvedRead = read('JUL-196-approved.json', proof.marker);
