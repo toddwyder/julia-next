@@ -4,12 +4,13 @@
 // retain real integration coverage with an explicit quota-blocked skip. Native
 // Codex builder coverage requires explicit operator opt-in; never a real reviewer.
 //
-// Deterministic cases join ordinary regression. Real Claude cases honor quota
-// blocking, and the paid Codex builder case is skipped unless opted in.
+// Deterministic cases join ordinary regression. Real builder cases require
+// explicit operator opt-in; Claude also honors quota blocking.
 //
 //   node --test --test-reporter=spec scripts/julia-delivery-interrupt.test.mjs
 //
 // Optional environment:
+//   JUL196_CLAUDE_REAL_PROOF=1   OPERATOR ONLY: enable real Claude integration.
 //   JUL196_CODEX_REAL_PROOF=1    OPERATOR ONLY: enable the real gpt-6.1-sol / high
 //                                initial-build interruption and recovery proof.
 //   JUL196_PROOF_EVIDENCE_DIR    save each scenario's review-safe evidence file
@@ -55,6 +56,7 @@ const { NODE_TEST_CONTEXT: _context, ...env } = process.env;
 // failure of the scenario, never a skip.
 const installed = (name) => spawnSync('where.exe', [name], { stdio: 'ignore', windowsHide: true }).status === 0;
 function missing(...workers) {
+  if (workers.includes('claude') && process.env.JUL196_CLAUDE_REAL_PROOF !== '1') return 'operator opt-in required: JUL196_CLAUDE_REAL_PROOF=1; no provider call in ordinary suite';
   if (process.env.JUL196_CLAUDE_QUOTA_BLOCKED === '1' && workers.includes('claude')) return 'Claude real integration quota-blocked: JUL196_CLAUDE_QUOTA_BLOCKED=1; historical results retained';
   if (process.platform !== 'win32') return `the delivery route and its real workers are on Windows; this is ${process.platform}`;
   const absent = workers.filter((worker) => !installed(worker));
@@ -86,7 +88,9 @@ async function prepare(name, plan) {
   const worktree = join(proofDir, 'worktree');
   const configuration = configurationFor(plan);
   await mkdir(join(worktree, '.agents', 'skills', 'implement'), { recursive: true });
-  await copyFile(resolve(here, '../.agents/skills/implement/SKILL.md'), join(worktree, '.agents', 'skills', 'implement', 'SKILL.md'));
+  // The tracked skill supplies the fixture's canonical worker path. A clean
+  // checkout has no machine-local .agents alias (the historical proof did).
+  await copyFile(resolve(here, '../.claude/skills/implement/SKILL.md'), join(worktree, '.agents', 'skills', 'implement', 'SKILL.md'));
   const git = (...args) => { const result = spawnSync('git', ['-C', worktree, ...args], { encoding: 'utf8' }); assert.equal(result.status, 0, result.stderr); return result.stdout.trim(); };
   spawnSync('git', ['init', '-q', '-b', 'work', worktree], { encoding: 'utf8' });
   git('add', '-A'); git('-c', 'user.name=jul196-proof', '-c', 'user.email=proof@example.invalid', 'commit', '-q', '-m', 'start');
