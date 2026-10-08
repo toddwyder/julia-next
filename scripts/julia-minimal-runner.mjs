@@ -50,8 +50,9 @@ export function pinWorktree({ repoRoot, worktree, branch, base, fetch = true }) 
 }
 
 // Shared fresh-worktree setup, from the checked revision's own lockfile.
-export function installDependencies(worktree) {
+export function installDependencies(worktree, progress = () => {}) {
   if (!existsSync(join(worktree, 'package-lock.json')) || existsSync(join(worktree, 'node_modules'))) return { status: 0, output: '', skipped: true };
+  progress('Installing dependencies (npm ci) from the start commit');
   const result = spawnSync('npm', ['ci', '--no-audit', '--no-fund'], { cwd: worktree, encoding: 'utf8', shell: process.platform === 'win32', windowsHide: true, timeout: 300000, maxBuffer: 64 * 1024 * 1024 });
   return { status: result.status, output: `${result.stdout ?? ''}${result.stderr ?? ''}`, error: result.error?.message ?? null, skipped: false };
 }
@@ -122,7 +123,7 @@ export async function runIssue(issueId, { base, repoRoot, worktreeRoot, adapters
   const relay = (worker) => (line) => progress(`${worker}: ${line}`);
   // A fresh worktree has no dependencies. They come from the start commit's own
   // lockfile (trusted code on main), installed once, before Gemini's turn.
-  const install = installDependencies(worktree);
+  const install = installDependencies(worktree, progress);
   if (install.status !== 0) return blocked(`npm ci failed in the new worktree (exit ${install.status}): ${String(install.output).trim().split('\n').at(-1)}`);
 
   const head = () => git(worktree, 'rev-parse', 'HEAD');

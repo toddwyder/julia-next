@@ -18,11 +18,11 @@ export function git(cwd, ...args) {
 // test files inside the worktree.
 export const TEST_RUNS = {
   lint: { command: 'npm', args: ['run', 'lint:framework'] },
-  runnerSuite: { command: 'node', args: ['scripts/julia-runner-suite.mjs'] },
   suite: { command: 'node', args: ['--test', '--test-reporter=spec', 'scripts/*.test.mjs'] },
   // The spec reporter always: Node 22 prints TAP off a terminal, and the
   // regression comparison reads the spec reporter's "✖ name" lines.
   files: { command: 'node', args: ['--test', '--test-reporter=spec'] },
+  runnerSuite: { command: 'node', args: ['scripts/julia-runner-suite.mjs'] },
 };
 
 export function testCommand({ run, files = [] }) {
