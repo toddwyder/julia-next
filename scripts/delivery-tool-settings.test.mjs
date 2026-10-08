@@ -142,11 +142,46 @@ test('rejects incomplete API connections and native routes with applicable field
   );
 });
 
+test('rejects API endpoint credentials without exposing them', () => {
+  for (const endpoint of [
+    'https://username@example.invalid/v1',
+    'https://username:password@example.invalid/v1',
+  ]) {
+    assert.throws(
+      () => validateDeliveryToolSettings({ ...valid, catalog: [{ ...catalog[0], connection: { ...apiConnection, endpoint } }, catalog[1]] }),
+      (error) => {
+        assert.match(error.message, /API connection endpoint must not contain credentials/);
+        assert.doesNotMatch(error.message, /username|password/);
+        return true;
+      },
+    );
+  }
+
+  assert.doesNotThrow(() => validateDeliveryToolSettings({
+    ...valid,
+    catalog: [{ ...catalog[0], connection: apiConnection }, catalog[1]],
+  }));
+});
+
 test('rejects builder and reviewer models from the same maker', () => {
   assert.throws(
     () => validateDeliveryToolSettings({ ...valid, reviewer: { model: 'anthropic-builder', thinking: 'high' } }),
     /builder and reviewer both resolve to maker "Anthropic"/,
   );
+});
+
+test('compares maker identities without casing or surrounding whitespace', () => {
+  for (const maker of ['anthropic', 'Anthropic ']) {
+    assert.throws(
+      () => validateDeliveryToolSettings({
+        ...valid,
+        catalog: [catalog[0], { ...catalog[1], maker }],
+      }),
+      /builder and reviewer both resolve to maker "Anthropic"/,
+    );
+  }
+
+  assert.doesNotThrow(() => validateDeliveryToolSettings(valid));
 });
 
 test('accepts a compatible catalog addition without validator changes', () => {

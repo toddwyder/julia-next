@@ -18,12 +18,16 @@ function nonEmptyString(value) {
   return typeof value === 'string' && value.trim() !== '';
 }
 
-function isHttpUrl(value) {
+function canonicalMaker(value) {
+  return value.trim().toLowerCase();
+}
+
+function parseHttpUrl(value) {
   try {
     const url = new URL(value);
-    return url.protocol === 'http:' || url.protocol === 'https:';
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -69,7 +73,9 @@ function validateConnection(connection, label) {
   for (const field of CONNECTION_FIELDS) {
     if (!nonEmptyString(connection[field])) reject(`${label} API connection requires ${field}`);
   }
-  if (!isHttpUrl(connection.endpoint)) reject(`${label} API connection endpoint must be an absolute HTTP(S) URL`);
+  const endpoint = parseHttpUrl(connection.endpoint);
+  if (!endpoint) reject(`${label} API connection endpoint must be an absolute HTTP(S) URL`);
+  if (endpoint.username || endpoint.password) reject(`${label} API connection endpoint must not contain credentials`);
 }
 
 function validateCatalog(catalog) {
@@ -120,7 +126,7 @@ export function validateDeliveryToolSettings(settings) {
   checkKeys(settings, ['catalog', ...ROLES], 'settings');
   const catalog = validateCatalog(settings.catalog);
   const resolved = Object.fromEntries(ROLES.map((role) => [role, validateRole(role, settings[role], catalog)]));
-  if (resolved.builder.model.maker === resolved.reviewer.model.maker) {
+  if (canonicalMaker(resolved.builder.model.maker) === canonicalMaker(resolved.reviewer.model.maker)) {
     reject(`builder and reviewer both resolve to maker ${JSON.stringify(resolved.builder.model.maker)}; they must use different makers`);
   }
   return resolved;
