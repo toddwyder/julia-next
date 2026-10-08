@@ -58,6 +58,6 @@ test('the required checks context summarizes selected gates without hiding skipp
   for (const job of ['changes', 'baseline', 'julia-init-windows', 'factory', 'database', 'web', 'docs-policy']) {
     assert.ok(checks.includes(job), `checks does not account for ${job}`);
   }
-  assert.match(checks, /success\|skipped/, 'checks must reject a failed or cancelled gate');
+  assert.match(checks, /case "\$result" in[\s\S]*success\)[\s\S]*skipped\)/, 'checks must reject a failed or cancelled gate');
   assert.match(checks, /not applicable/, 'checks must disclose skipped gates instead of presenting them as completed');
 });
