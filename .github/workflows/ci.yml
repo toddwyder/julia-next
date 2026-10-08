@@ -182,3 +182,33 @@ jobs:
             scripts/no-personal-paths.test.mjs scripts/personal-paths.test.mjs scripts/merge-pr.test.mjs \
             scripts/publish-pr.test.mjs scripts/publish-pr.real-git.test.mjs \
             scripts/publish-via-github-app.test.mjs
+
+  checks:
+    needs: [changes, baseline, julia-init-windows, factory, database, web, docs-policy]
+    if: always()
+    runs-on: ubuntu-22.04
+    env:
+      GATE_CHANGES: ${{ needs.changes.result }}
+      GATE_BASELINE: ${{ needs.baseline.result }}
+      GATE_JULIA_INIT_WINDOWS: ${{ needs.julia-init-windows.result }}
+      GATE_FACTORY: ${{ needs.factory.result }}
+      GATE_DATABASE: ${{ needs.database.result }}
+      GATE_WEB: ${{ needs.web.result }}
+      GATE_DOCS_POLICY: ${{ needs.docs-policy.result }}
+    steps:
+      - name: Verify selected gates completed
+        run: |
+          set -euo pipefail
+          gates=(changes baseline julia-init-windows factory database web docs-policy)
+          results=("$GATE_CHANGES" "$GATE_BASELINE" "$GATE_JULIA_INIT_WINDOWS" "$GATE_FACTORY" "$GATE_DATABASE" "$GATE_WEB" "$GATE_DOCS_POLICY")
+          status=0
+          for index in "${!gates[@]}"; do
+            gate="${gates[$index]}"
+            result="${results[$index]}"
+            case "$result" in
+              success) echo "$gate completed successfully" ;;
+              skipped) echo "$gate not applicable (skipped)" ;;
+              *) echo "::error::$gate ended with $result"; status=1 ;;
+            esac
+          done
+          exit "$status"

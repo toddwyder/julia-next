@@ -50,3 +50,14 @@ test('CI cancels superseded runs and routes each focused job through changes', (
   assert.match(baseline, /scripts\/ci-routing\.test\.mjs/);
   assert.match(baseline, /scripts\/line-endings\.test\.mjs/);
 });
+
+test('the required checks context summarizes selected gates without hiding skipped jobs', () => {
+  const checks = ci.match(/\n  checks:\n[\s\S]*$/)?.[0];
+  assert.ok(checks, 'missing stable checks aggregation job');
+  assert.match(checks, /if: always\(\)/);
+  for (const job of ['changes', 'baseline', 'julia-init-windows', 'factory', 'database', 'web', 'docs-policy']) {
+    assert.ok(checks.includes(job), `checks does not account for ${job}`);
+  }
+  assert.match(checks, /success\|skipped/, 'checks must reject a failed or cancelled gate');
+  assert.match(checks, /not applicable/, 'checks must disclose skipped gates instead of presenting them as completed');
+});
