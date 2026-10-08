@@ -11,12 +11,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import {
   parseArgs, DEFAULT_INTERVAL_SECONDS, runLoop, runOnce, startup, stepsForCard, resolveBuild, USAGE, main, carryCard,
 } from '../graph/controller/main.mjs';
 import {
   readControllerState, writeControllerState, emptyControllerState, assertStatePathIsWritable, defaultStatePath,
+  ORCHESTRATOR_CHECKOUT,
 } from '../graph/controller/state.mjs';
 import { recordStart, CRASH_STARTS_THRESHOLD } from '../graph/controller/crash-loop.mjs';
 import { createRequestLedger, ORCHESTRATOR_ENVIRONMENT } from '../graph/controller/wiring.mjs';
@@ -47,6 +48,66 @@ test('one-shot and loop are both real modes, and neither is the default', () => 
 // State: never in the checkout
 // ---------------------------------------------------------------------------
 
+test('state protection refuses nested paths in a native checkout with spaces', () => {
+  const checkout = resolve('protected checkout');
+  assert.throws(
+    () => assertStatePathIsWritable(join(checkout, 'nested', 'state.json'), { checkout }),
+    /read-only/,
+  );
+});
+
+test('state protection normalizes checkout roots, relative paths and dot segments', () => {
+  const checkout = 'protected checkout/unused/../';
+  for (const statePath of [
+    'protected checkout',
+    'protected checkout/',
+    'protected checkout/nested/../state.json',
+    resolve('protected checkout/nested/deeper/state.json'),
+    'protected checkout/..hidden/state.json',
+  ]) {
+    assert.throws(() => assertStatePathIsWritable(statePath, { checkout }), /read-only/, statePath);
+  }
+});
+
+test('state protection permits external paths, ancestors and shared-prefix siblings', () => {
+  const checkout = 'protected checkout';
+  for (const statePath of [
+    'external/state.json',
+    '.',
+    'protected checkout-sibling/state.json',
+    'protected checkout/../external/state.json',
+  ]) {
+    assert.equal(assertStatePathIsWritable(statePath, { checkout }), resolve(statePath));
+  }
+});
+
+test('Windows state protection handles mixed separators, drive case and UNC paths', { skip: process.platform !== 'win32' }, () => {
+  for (const [checkout, statePath] of [
+    ['C:\\Protected Checkout\\', 'c:/protected checkout'],
+    ['C:/Protected Checkout/unused/..', 'c:\\PROTECTED CHECKOUT\\nested/state.json'],
+    ['\\\\server\\share\\checkout\\', '//SERVER/share/checkout/nested/state.json'],
+  ]) {
+    assert.throws(() => assertStatePathIsWritable(statePath, { checkout }), /read-only/);
+  }
+  for (const [checkout, statePath] of [
+    ['C:/checkout', 'D:/checkout/state.json'],
+    ['C:/checkout', 'C:/checkout-sibling/state.json'],
+    ['//server/share/checkout', '//server/other/checkout/state.json'],
+  ]) {
+    assert.equal(assertStatePathIsWritable(statePath, { checkout }), resolve(statePath));
+  }
+});
+
+test('state writes refuse the protected root and nested paths before filesystem effects', () => {
+  for (const statePath of [ORCHESTRATOR_CHECKOUT, `${ORCHESTRATOR_CHECKOUT}/nested/../state.json`]) {
+    assert.throws(() => writeControllerState(emptyControllerState(), {
+      statePath,
+      mkdirImpl: () => assert.fail('a refused path must not create a directory'),
+      writeFileImpl: () => assert.fail('a refused path must not write state'),
+    }), /read-only/);
+  }
+});
+
 test('the controller refuses to keep state inside its own read-only checkout', () => {
   assert.throws(
     () => assertStatePathIsWritable('/srv/orchestrator-svc/julia-next/graph/controller/state.json'),
@@ -54,8 +115,19 @@ test('the controller refuses to keep state inside its own read-only checkout', (
   );
   // And the default never is.
   const path = defaultStatePath({ env: { XDG_STATE_HOME: '/home/orchestrator-svc/.local/state' } });
-  assert.equal(path, '/home/orchestrator-svc/.local/state/julia-next/controller.json');
+  assert.equal(path, process.platform === 'win32'
+    ? '\\home\\orchestrator-svc\\.local\\state\\julia-next\\controller.json'
+    : '/home/orchestrator-svc/.local/state/julia-next/controller.json');
   assert.doesNotThrow(() => assertStatePathIsWritable(path));
+});
+
+test('the native default state path uses XDG or home and refuses a protected XDG location', () => {
+  const home = resolve('external home');
+  const fallback = defaultStatePath({ env: { XDG_STATE_HOME: ' ' }, homedir: () => home });
+  assert.equal(fallback, join(home, '.local', 'state', 'julia-next', 'controller.json'));
+  assert.doesNotThrow(() => assertStatePathIsWritable(fallback));
+  const protectedDefault = defaultStatePath({ env: { XDG_STATE_HOME: ORCHESTRATOR_CHECKOUT } });
+  assert.throws(() => assertStatePathIsWritable(protectedDefault), /read-only/);
 });
 
 test('state round-trips, and a missing or corrupt file is an EMPTY state rather than a crash on first start', () => {
@@ -595,4 +667,3 @@ test('the attempt count round-trips the state file -- a dropped one would make t
     rmSync(dir, { recursive: true, force: true });
   }
 });
-

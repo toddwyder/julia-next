@@ -55,7 +55,7 @@
 // -- there is no other place a reader could pick it up.
 
 import os from 'node:os';
-import { join, resolve } from 'node:path';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 
 export const ORCHESTRATOR_CHECKOUT = '/srv/orchestrator-svc/julia-next';
@@ -80,7 +80,11 @@ export function emptyControllerState() {
 // has already done a cycle's work it is about to lose.
 export function assertStatePathIsWritable(statePath, { checkout = ORCHESTRATOR_CHECKOUT } = {}) {
   const full = resolve(statePath);
-  if (full === checkout || full.startsWith(`${checkout}/`)) {
+  const protectedRoot = resolve(checkout);
+  const fromCheckout = relative(protectedRoot, full);
+  // Native path semantics normalize both sides, including Windows separators
+  // and case. A text prefix alone would also refuse shared-prefix siblings.
+  if (fromCheckout === '' || (fromCheckout !== '..' && !fromCheckout.startsWith(`..${sep}`) && !isAbsolute(fromCheckout))) {
     throw new Error(
       `controller state: refusing to keep state at ${full} -- ${checkout} is root-owned and read-only to orchestrator-svc, so the controller must never write into its own checkout (set XDG_STATE_HOME instead)`,
     );
