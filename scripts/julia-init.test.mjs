@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -11,6 +11,25 @@ import { parseInitCommand, runInit, runInitCli } from './julia-init.mjs';
 
 const execFileAsync = promisify(execFile);
 const initScript = fileURLToPath(new URL('./julia-init.mjs', import.meta.url));
+
+function runCli(arguments_, { cwd, input = '' } = {}) {
+  return new Promise((done, fail) => {
+    const child = spawn(process.execPath, [initScript, ...arguments_], { cwd });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.setEncoding('utf8').on('data', (chunk) => { stdout += chunk; });
+    child.stderr.setEncoding('utf8').on('data', (chunk) => {
+      stderr += chunk;
+      if (input && stderr.includes('$init needs')) {
+        child.stdin.end(input);
+        input = '';
+      }
+    });
+    child.on('error', fail);
+    child.on('close', (code) => done({ code, stdout, stderr }));
+    if (!input) child.stdin.end();
+  });
+}
 
 const nativeConnection = {
   route: 'native', provider: null, endpoint: null, protocol: null, authReference: null,
@@ -94,6 +113,21 @@ test('the command-line entry point receives literal $init, writes the run file, 
   );
 });
 
+test('the command-line entry point prompts for a stale role and saves its replacement', async (t) => {
+  const { directory } = await fixture(t);
+  await mkdir(join(directory, '.julia', 'runs'), { recursive: true });
+  await writeFile(join(directory, '.julia', 'runs', 'defaults.json'), `${JSON.stringify({
+    builder: { model: 'anthropic-builder', thinking: 'low' }, reviewer: { model: 'gone', thinking: null },
+  })}\n`);
+
+  const result = await runCli(['$init JUL-198'], { cwd: directory, input: 'openai-reviewer none\n' });
+
+  assert.equal(result.code, 0);
+  assert.match(result.stderr, /\$init needs reviewer/);
+  assert.equal(JSON.parse(result.stdout).configuration.builder.thinking, 'low');
+  assert.equal(JSON.parse(result.stdout).configuration.reviewer.identity, 'openai-reviewer');
+});
+
 test('uses remembered defaults when neither role is supplied and updates each role independently', async (t) => {
   const { directory, settingsPath } = await fixture(t);
   const stateDirectory = join(directory, 'runs');
@@ -138,6 +172,9 @@ test('rejects malformed, unknown, unsupported, ambiguous, and same-maker selecti
     runInit('$init JUL-196 --reviewer "openai-reviewer" none', { settingsPath, stateDirectory }),
     /ambiguous/,
   );
+  const events = await readFile(join(stateDirectory, 'events.jsonl'), 'utf8');
+  assert.match(events, /"event":"selection-refused"/);
+  assert.match(events, /"reason":"invalid-selection"/);
 });
 
 test('a stale remembered default asks for that role while retaining the other valid role', async (t) => {
@@ -160,6 +197,7 @@ test('a stale remembered default asks for that role while retaining the other va
       return true;
     },
   );
+  assert.match(await readFile(join(stateDirectory, 'events.jsonl'), 'utf8'), /"reason":"missing-or-stale-selection"/);
 });
 
 test('a missing remembered role asks for input instead of silently substituting a settings default', async (t) => {

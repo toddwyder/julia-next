@@ -23,6 +23,15 @@ function reject(message) {
   throw new Error(`$init: ${message}`);
 }
 
+function refusalReason(error) {
+  if (error instanceof SelectionRequiredError) return 'missing-or-stale-selection';
+  if (error.message.startsWith('$init:')) return 'invalid-command';
+  if (/model reference .* is unknown|catalog reference .* is ambiguous|thinking .* is not supported|does not support thinking|must use different makers/.test(error.message)) {
+    return 'invalid-selection';
+  }
+  return 'invalid-settings';
+}
+
 function tokenize(command) {
   if (typeof command !== 'string') reject('command must be text');
   const tokens = [];
@@ -120,9 +129,18 @@ export async function runInit(command, {
   read = readFile,
   ...writers
 } = {}) {
-  const { issueId, choices } = parseInitCommand(command);
-  const runPath = join(stateDirectory, `${issueId}.json`);
   const eventsPath = join(stateDirectory, 'events.jsonl');
+  let parsed;
+  try {
+    parsed = parseInitCommand(command);
+  } catch (error) {
+    const event = { event: 'selection-refused', issueId: null, reason: refusalReason(error) };
+    await recordEvent(eventsPath, event, writers);
+    logger(event);
+    throw error;
+  }
+  const { issueId, choices } = parsed;
+  const runPath = join(stateDirectory, `${issueId}.json`);
   const saved = await readJson(runPath, { read });
   if (saved) {
     if (Object.keys(choices).length) reject(`run ${issueId} already has a saved configuration; resume without role flags`);
@@ -141,7 +159,7 @@ export async function runInit(command, {
   try {
     ({ selected, resolved } = resolveSelections(settings, defaults, choices));
   } catch (error) {
-    const event = { event: 'selection-refused', issueId, roles: error.roles ?? [] };
+    const event = { event: 'selection-refused', issueId, reason: refusalReason(error), roles: error.roles ?? [] };
     await recordEvent(eventsPath, event, writers);
     logger(event);
     throw error;
