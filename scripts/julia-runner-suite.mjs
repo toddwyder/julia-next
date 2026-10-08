@@ -24,7 +24,7 @@ const HISTORICAL_TESTS = new Set([
 // do not recurse into .julia's saved copies or mutate them to make discovery pass.
 const GENERATED = new Set(['.git', '.julia', '.next', '.mastra', '.artifacts', 'node_modules', 'test-results', 'playwright-report']);
 const IMPORT_SPECIFIER = /(?:from\s*|import\s*\(?\s*)['"]([^'"]+)['"]/g;
-const RUNNER_MODULE = /julia-(?:init|delivery|graph-model|minimal-runner|runner)|delivery-tool-settings|acceptance-check|linear-cli|effort|seat-labels|seat-table|verify-reviewer-worktree|line-endings|no-personal-paths|personal-paths|ops\/julia-runner\/|ops\/service-dropbox\/(?:run-agy-seat|run-pi-seat|read-secret)/;
+const RUNNER_MODULE = /julia-(?:init|delivery|graph-model|minimal-runner|runner)|delivery-tool-settings|acceptance-check|linear-cli|effort|seat-labels|seat-table|verify-reviewer-worktree|line-endings|no-personal-paths|personal-paths|ops\/julia-runner\/|run-agy-seat|run-pi-seat|read-secret/;
 
 function importsRunnerModule(text) {
   return [...text.matchAll(IMPORT_SPECIFIER)].some(([, path]) => !path.endsWith('.test.mjs') && RUNNER_MODULE.test(path));
