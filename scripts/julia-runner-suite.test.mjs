@@ -76,3 +76,14 @@ test('new unwrapped shared safety regressions are discovered beside their import
     'tests/new-evidence-safety.test.mjs', 'tests/new-transport-safety.test.mjs',
   ]);
 });
+
+test('shared regressions run directly once while known historical controller journeys retain their separate lane', (t) => {
+  const root = fixture(t, {
+    'graph/seat-table.test.mjs': "import './seat-table.mjs';",
+    'scripts/seat-table.test.mjs': "import '../graph/seat-table.test.mjs';",
+    'scripts/bad-submissions.test.mjs': "import './acceptance-check.mjs';",
+    'scripts/controller-carry.test.mjs': "import './linear-cli.mjs';",
+    'tests/new-shared-safety.test.mjs': "import '../scripts/acceptance-check.mjs';",
+  });
+  assert.deepEqual(discoverRunnerTests(root), ['graph/seat-table.test.mjs', 'tests/new-shared-safety.test.mjs']);
+});
