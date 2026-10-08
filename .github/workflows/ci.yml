@@ -10,7 +10,81 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-22.04
+    outputs:
+      baseline: ${{ steps.routes.outputs.baseline }}
+      julia_init_windows: ${{ steps.routes.outputs.julia_init_windows }}
+      factory: ${{ steps.routes.outputs.factory }}
+      database: ${{ steps.routes.outputs.database }}
+      web: ${{ steps.routes.outputs.web }}
+      docs_policy: ${{ steps.routes.outputs.docs_policy }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.2
+      - name: Select CI gates from changed paths
+        id: routes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$BASE_SHA" ]] && git cat-file -e "$BASE_SHA^{commit}"; then
+            routes="$(node scripts/ci-routing.mjs --github-output "$BASE_SHA" "$HEAD_SHA")"
+            echo "Changed paths:"
+            git diff --name-status --no-renames "$BASE_SHA" "$HEAD_SHA"
+            echo "Selected gates:"
+            printf '%s\n' "$routes"
+            printf '%s\n' "$routes" >> "$GITHUB_OUTPUT"
+          else
+            echo "Changed paths unavailable; selecting every gate."
+            echo "Selected gates: all"
+            printf '%s\n' baseline=true julia_init_windows=true factory=true database=true web=true docs_policy=true >> "$GITHUB_OUTPUT"
+          fi
+
+  baseline:
+    needs: changes
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.2
+      - name: Test CI gate routing
+        run: node --test scripts/ci-routing.test.mjs
+      - name: Check repository line endings
+        run: node --test scripts/line-endings.test.mjs
+      - name: Syntax-check changed scripts and operations modules
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$BASE_SHA" ]] && git cat-file -e "$BASE_SHA^{commit}"; then
+            node scripts/ci-routing.mjs --syntax-check "$BASE_SHA" "$HEAD_SHA"
+          else
+            find scripts ops -name '*.mjs' -print0 | xargs -0 -n1 node --check
+          fi
+      - name: Builder client must never read the Axiom credential
+        run: |
+          set -euo pipefail
+          if grep -rE 'process\.env\.AXIOM_(TOKEN|DATASET)' scripts/; then
+            echo "::error::builder-side script under scripts/ reads an Axiom credential env var directly"
+            exit 1
+          fi
+          echo "OK: no Axiom credential read under scripts/"
+
   julia-init-windows:
+    needs: changes
+    if: needs.changes.outputs.julia_init_windows == 'true'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,9 +94,33 @@ jobs:
       - name: Test literal-dollar model selection without workers
         run: node --test scripts/delivery-tool-settings.test.mjs scripts/julia-init.test.mjs
 
-  checks:
-    # ubuntu-latest rejects the bubblewrap command on the hosted runner.
-    # Run the actual sandbox behavior tests on GitHub's Ubuntu 22.04 VM.
+  factory:
+    needs: changes
+    if: needs.changes.outputs.factory == 'true'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.2
+      - name: Run Factory workflows, skills, and retention tests
+        run: node --test ops/factory/workflows.test.mjs ops/factory/skills.test.mjs ops/factory/trace-retention.test.mjs
+      - name: Run Factory sandbox isolation tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap
+          npm ci --prefix ops/factory/app
+          node --experimental-strip-types --test ops/factory/app/local-sandbox.test.mjs
+          (cd ops/factory/app && node --experimental-strip-types --import ./register-typescript-esm.mjs \
+            --test observability-retention.test.mjs observability-retention-schedule.test.mjs \
+            review-route-batching.test.mjs)
+          npm run check --prefix ops/factory/app
+      - name: Run Factory installation tests
+        run: node --test ops/factory/install.test.mjs
+
+  database:
+    needs: changes
+    if: needs.changes.outputs.database == 'true'
     runs-on: ubuntu-22.04
     services:
       postgres:
@@ -36,69 +134,9 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
-    permissions:
-      contents: read
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Detect documentation-only PR
-        id: changes
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-          docs_only=false
-          if [[ -n "$BASE_SHA" && -n "$HEAD_SHA" ]] &&
-             git cat-file -e "$BASE_SHA^{commit}" && git cat-file -e "$HEAD_SHA^{commit}"; then
-            docs_only=true
-            while IFS= read -r -d '' path; do
-              if [[ ! "$path" =~ ^docs/.+\.md$ ]]; then docs_only=false; break; fi
-            done < <(git diff --name-only -z --no-renames "$BASE_SHA" "$HEAD_SHA")
-            if ! git diff --quiet --diff-filter=D "$BASE_SHA" "$HEAD_SHA" -- ||
-               git diff --quiet "$BASE_SHA" "$HEAD_SHA" --; then
-              docs_only=false
-            fi
-          fi
-          echo "docs_only=$docs_only" >> "$GITHUB_OUTPUT"
-          echo "Documentation-only PR: $docs_only"
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22.23.2
-
-      - name: Syntax-check all scripts
-        run: |
-          set -euo pipefail
-          status=0
-          while IFS= read -r -d '' f; do
-            echo "checking $f"
-            node --check "$f" || status=1
-          done < <(find scripts ops -name '*.mjs' -print0)
-          exit $status
-
-      - name: Builder client must never read the Axiom credential
-        run: |
-          set -euo pipefail
-          # Scripts must not read the retired relay's Axiom credentials.
-          if grep -rE 'process\.env\.AXIOM_(TOKEN|DATASET)' scripts/; then
-            echo "::error::builder-side script under scripts/ reads an Axiom credential env var directly"
-            exit 1
-          fi
-          echo "OK: no Axiom credential read under scripts/"
-
-      - name: Run documentation and policy tests
-        run: |
-          node --test scripts/agent-docs.test.mjs scripts/line-endings.test.mjs \
-            scripts/no-personal-paths.test.mjs scripts/merge-pr.test.mjs \
-            scripts/publish-pr.test.mjs scripts/publish-pr.real-git.test.mjs \
-            scripts/publish-via-github-app.test.mjs ops/factory/workflows.test.mjs \
-            ops/factory/skills.test.mjs ops/factory/trace-retention.test.mjs
-
       - name: Run face-value PostgreSQL integration test
-        if: steps.changes.outputs.docs_only != 'true'
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
         run: |
@@ -107,40 +145,40 @@ jobs:
           sudo apt-get install -y postgresql-client
           python3 ops/factory/model-face-values.sql.test.py "$DATABASE_URL"
 
+  web:
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.2
       - name: Install application dependencies
-        if: steps.changes.outputs.docs_only != 'true'
         run: npm ci
-
-      - name: Run Factory sandbox isolation tests
-        if: steps.changes.outputs.docs_only != 'true'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y bubblewrap
-          npm ci --prefix ops/factory/app
-          node --experimental-strip-types --test ops/factory/app/local-sandbox.test.mjs
-          (cd ops/factory/app && node --experimental-strip-types --import ./register-typescript-esm.mjs \
-            --test observability-retention.test.mjs observability-retention-schedule.test.mjs \
-            review-route-batching.test.mjs)
-          npm run check --prefix ops/factory/app
-
-      - name: Run current application and installation tests
-        if: steps.changes.outputs.docs_only != 'true'
-        run: |
-          node --test scripts/health-route.test.mjs scripts/dynamic-route.test.mjs \
-            scripts/web-app.test.mjs scripts/framework-lint.test.mjs \
-            scripts/personal-paths.test.mjs scripts/delivery-tool-settings.test.mjs \
-            scripts/julia-init.test.mjs \
-            ops/factory/install.test.mjs
-
+      - name: Run current application tests
+        run: node --test scripts/health-route.test.mjs scripts/dynamic-route.test.mjs scripts/web-app.test.mjs scripts/framework-lint.test.mjs
       - name: Install Chromium
-        if: steps.changes.outputs.docs_only != 'true'
         run: npx playwright install chromium
       - name: Run browser tests
-        if: steps.changes.outputs.docs_only != 'true'
         run: npx playwright test
       - name: Lint framework code
-        if: steps.changes.outputs.docs_only != 'true'
         run: npm run lint:framework
       - name: Build application
-        if: steps.changes.outputs.docs_only != 'true'
         run: npm run build
+
+  docs-policy:
+    needs: changes
+    if: needs.changes.outputs.docs_policy == 'true'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.2
+      - name: Run documentation and policy tests
+        run: |
+          node --test scripts/agent-docs.test.mjs \
+            scripts/no-personal-paths.test.mjs scripts/personal-paths.test.mjs scripts/merge-pr.test.mjs \
+            scripts/publish-pr.test.mjs scripts/publish-pr.real-git.test.mjs \
+            scripts/publish-via-github-app.test.mjs
