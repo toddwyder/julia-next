@@ -62,6 +62,8 @@ jobs:
         run: node --test scripts/ci-routing.test.mjs
       - name: Check repository line endings
         run: node --test scripts/line-endings.test.mjs
+      - name: Test bad-submissions rejection gates on POSIX
+        run: node --test scripts/bad-submissions.test.mjs
       - name: Syntax-check changed scripts and operations modules
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
@@ -93,6 +95,8 @@ jobs:
           node-version: 22.23.2
       - name: Test active runner and shared safety regressions without provider calls
         run: node scripts/julia-runner-suite.mjs
+      - name: Test bad-submissions rejection gates on Windows
+        run: node --test scripts/bad-submissions.test.mjs
 
   factory:
     needs: changes
