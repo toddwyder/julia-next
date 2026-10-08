@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { runDelivery, workerPrompt } from './julia-delivery-runner.mjs';
+import { runDelivery, startDelivery, workerPrompt } from './julia-delivery-runner.mjs';
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const configuration = {
   builder: { identity: 'claude', model: 'claude-sonnet', maker: 'Anthropic', harness: 'claude-code', thinking: 'high', connection: { route: 'native' } },
@@ -55,4 +58,24 @@ test('a review fail returns findings for repair and three unsuccessful rounds pa
   });
   assert.equal(result.outcome, 'park');
   assert.equal(builds, 3);
+});
+
+test('resume uses the saved approved card without another Linear read, and records a terminal refusal', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'jul196-')); t.after(() => import('node:fs/promises').then(({ rm }) => rm(root, { recursive: true, force: true })));
+  const runPath = join(root, 'JUL-196.json');
+  await writeFile(join(root, 'JUL-196-approved.json'), JSON.stringify({ card, configuration }));
+  const result = await startDelivery('JUL-196', configuration, { runPath, worktree: root, readCard: async () => { throw new Error('must not read Linear'); } });
+  assert.equal(result.outcome, 'park');
+  assert.match(await readFile(join(root, 'JUL-196-state.json'), 'utf8'), /worker launcher|checks failed|worktree/);
+});
+
+test('a PASS is refused if the post-review candidate read drifts', async () => {
+  let reads = 0;
+  const result = await runDelivery({ issueId: 'JUL-196', configuration, runPath: 'C:/runs/JUL-196.json' }, {
+    readCard: async () => card, save: async () => {}, prepareWorktree: async () => ({ ok: true }),
+    candidate: async () => (++reads === 1 ? { commit: 'a'.repeat(40), clean: true, checks: { pass: true } } : { commit: 'b'.repeat(40), clean: true, checks: { pass: true } }),
+    launch: async (role) => role === 'builder' ? { exitCode: 0, observed: { harness: 'claude-code', model: 'claude-sonnet', maker: 'Anthropic' } } : { exitCode: 0, observed: { harness: 'codex', model: 'gpt-review', maker: 'OpenAI' }, text: `VERDICT: PASS\nCOMMIT: ${'a'.repeat(40)}` },
+  });
+  assert.equal(result.outcome, 'park');
+  assert.match(result.reason, /changed after review/);
 });
