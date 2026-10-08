@@ -1,0 +1,12 @@
+{
+  "builder": {
+    "tool": "Claude Code",
+    "model": "claude-opus-4-6",
+    "maker": "Anthropic"
+  },
+  "reviewer": {
+    "tool": "Codex",
+    "model": "gpt-5.5",
+    "maker": "OpenAI"
+  }
+}
