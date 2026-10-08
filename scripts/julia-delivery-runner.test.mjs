@@ -232,3 +232,15 @@ test('a PASS is refused if the post-review candidate read drifts', async () => {
   assert.equal(result.outcome, 'park');
   assert.match(result.reason, /changed after review/);
 });
+
+
+test('Ready and triage approval do not authorize workspace or worker side effects', async () => {
+  let effects = 0;
+  const result = await runDelivery({ issueId: 'JUL-196', configuration, runPath: 'C:/runs/JUL-196.json' }, {
+    save: async () => {}, readCard: async () => card,
+    prepareWorktree: async () => { effects++; return { ok: true }; },
+    launch: async () => { effects++; }, candidate: async () => { effects++; },
+  });
+  assert.equal(effects, 0);
+  assert.match(result.reason, /explicit.*authorization/i);
+});
