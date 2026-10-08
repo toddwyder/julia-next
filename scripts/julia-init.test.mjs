@@ -1,10 +1,16 @@
+import { execFile } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { parseInitCommand, runInit } from './julia-init.mjs';
+import { parseInitCommand, runInit, runInitCli } from './julia-init.mjs';
+
+const execFileAsync = promisify(execFile);
+const initScript = fileURLToPath(new URL('./julia-init.mjs', import.meta.url));
 
 const nativeConnection = {
   route: 'native', provider: null, endpoint: null, protocol: null, authReference: null,
@@ -70,6 +76,22 @@ test('literal $init selects both roles, persists defaults, and fake-dispatches a
   const saved = JSON.parse(await readFile(join(directory, 'runs', 'JUL-195.json'), 'utf8'));
   assert.deepEqual(saved.configuration, result.configuration);
   assert.doesNotMatch(JSON.stringify(saved), /secret|api.?key|token/i);
+  const events = await readFile(join(directory, 'runs', 'events.jsonl'), 'utf8');
+  assert.match(events, /"event":"selection-saved"/);
+  assert.match(events, /"builder":"anthropic-builder"/);
+  assert.match(events, /"reviewer":"openai-reviewer"/);
+});
+
+test('the command-line entry point receives literal $init, writes the run file, and rejects /init', async (t) => {
+  const { directory } = await fixture(t);
+  const { stdout } = await execFileAsync(process.execPath, [initScript, '$init JUL-199 --builder anthropic-builder low --reviewer openai-reviewer none'], { cwd: directory });
+
+  assert.equal(JSON.parse(stdout).issueId, 'JUL-199');
+  assert.deepEqual(JSON.parse(await readFile(join(directory, '.julia', 'runs', 'JUL-199.json'), 'utf8')).configuration.builder.thinking, 'low');
+  await assert.rejects(
+    execFileAsync(process.execPath, [initScript, '/init JUL-199'], { cwd: directory }),
+    /literal \$init command/,
+  );
 });
 
 test('uses remembered defaults when neither role is supplied and updates each role independently', async (t) => {
@@ -138,6 +160,37 @@ test('a stale remembered default asks for that role while retaining the other va
       return true;
     },
   );
+});
+
+test('a missing remembered role asks for input instead of silently substituting a settings default', async (t) => {
+  const { directory, settingsPath } = await fixture(t);
+  const stateDirectory = join(directory, 'runs');
+  await mkdir(stateDirectory, { recursive: true });
+  await writeFile(join(stateDirectory, 'defaults.json'), `${JSON.stringify({ builder: { model: 'anthropic-builder', thinking: 'low' } })}\n`);
+
+  await assert.rejects(
+    runInit('$init JUL-195', { settingsPath, stateDirectory }),
+    (error) => error.name === 'SelectionRequiredError' && error.roles.length === 1 && error.roles[0] === 'reviewer',
+  );
+});
+
+test('the command wrapper asks only for stale roles and retains the other remembered role', async (t) => {
+  const { directory, settingsPath } = await fixture(t);
+  const stateDirectory = join(directory, 'runs');
+  await mkdir(stateDirectory, { recursive: true });
+  await writeFile(join(stateDirectory, 'defaults.json'), `${JSON.stringify({
+    builder: { model: 'anthropic-builder', thinking: 'low' }, reviewer: { model: 'missing', thinking: null },
+  })}\n`);
+  const asked = [];
+
+  const result = await runInitCli('$init JUL-195', {
+    settingsPath, stateDirectory,
+    ask: async (role) => { asked.push(role); return 'openai-reviewer none'; },
+  });
+
+  assert.deepEqual(asked, ['reviewer']);
+  assert.equal(result.configuration.builder.thinking, 'low');
+  assert.equal(result.configuration.reviewer.identity, 'openai-reviewer');
 });
 
 test('an API-routed model snapshot keeps routing metadata and only an auth reference', async (t) => {

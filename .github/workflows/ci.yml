@@ -10,6 +10,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  julia-init-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.2
+      - name: Test literal-dollar model selection without workers
+        run: node --test scripts/delivery-tool-settings.test.mjs scripts/julia-init.test.mjs
+
   checks:
     # ubuntu-latest rejects the bubblewrap command on the hosted runner.
     # Run the actual sandbox behavior tests on GitHub's Ubuntu 22.04 VM.

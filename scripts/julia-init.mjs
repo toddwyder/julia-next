@@ -1,7 +1,8 @@
 // The local `$init` selection wrapper.  It only selects and records the two
 // model jobs; JUL-196 owns real worker startup and handoff.
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
+import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 
 import { validateDeliveryToolSettings } from './delivery-tool-settings.mjs';
@@ -67,6 +68,11 @@ async function writeJson(path, value, { mkdirImpl = mkdir, write = writeFile, re
   await renameImpl(temporary, path);
 }
 
+async function recordEvent(path, event, { mkdirImpl = mkdir, append = appendFile } = {}) {
+  await mkdirImpl(dirname(path), { recursive: true });
+  await append(path, `${JSON.stringify(event)}\n`);
+}
+
 function snapshot(resolved) {
   return Object.fromEntries(['builder', 'reviewer'].map((role) => {
     const { model, thinking } = resolved[role];
@@ -92,8 +98,8 @@ function isStaleChoice(choice, catalog) {
 
 function resolveSelections(settings, defaults, explicit) {
   const selected = {
-    builder: explicit.builder ?? defaults?.builder ?? settings.builder,
-    reviewer: explicit.reviewer ?? defaults?.reviewer ?? settings.reviewer,
+    builder: explicit.builder ?? (defaults === null ? settings.builder : defaults?.builder),
+    reviewer: explicit.reviewer ?? (defaults === null ? settings.reviewer : defaults?.reviewer),
   };
   try {
     return { selected, resolved: validateDeliveryToolSettings({ catalog: settings.catalog, ...selected }) };
@@ -116,10 +122,13 @@ export async function runInit(command, {
 } = {}) {
   const { issueId, choices } = parseInitCommand(command);
   const runPath = join(stateDirectory, `${issueId}.json`);
+  const eventsPath = join(stateDirectory, 'events.jsonl');
   const saved = await readJson(runPath, { read });
   if (saved) {
     if (Object.keys(choices).length) reject(`run ${issueId} already has a saved configuration; resume without role flags`);
-    logger({ event: 'resume', issueId });
+    const event = { event: 'resume', issueId, builder: saved.configuration.builder.identity, reviewer: saved.configuration.reviewer.identity };
+    await recordEvent(eventsPath, event, writers);
+    logger(event);
     await dispatch(saved.configuration);
     return { issueId, configuration: saved.configuration, resumed: true };
   }
@@ -132,7 +141,9 @@ export async function runInit(command, {
   try {
     ({ selected, resolved } = resolveSelections(settings, defaults, choices));
   } catch (error) {
-    logger({ event: 'selection-refused', issueId, reason: error.message });
+    const event = { event: 'selection-refused', issueId, roles: error.roles ?? [] };
+    await recordEvent(eventsPath, event, writers);
+    logger(event);
     throw error;
   }
 
@@ -141,22 +152,43 @@ export async function runInit(command, {
   // so an invalid pair can neither mutate defaults nor partially start work.
   await writeJson(defaultsPath, selected, writers);
   await writeJson(runPath, { issueId, configuration }, writers);
-  logger({ event: 'selection-saved', issueId, builder: configuration.builder.identity, reviewer: configuration.reviewer.identity });
+  const event = { event: 'selection-saved', issueId, builder: configuration.builder.identity, reviewer: configuration.reviewer.identity };
+  await recordEvent(eventsPath, event, writers);
+  logger(event);
   await dispatch(configuration);
   return { issueId, configuration, resumed: false };
+}
+
+export async function runInitCli(command, { ask, ...options } = {}) {
+  try {
+    return await runInit(command, options);
+  } catch (error) {
+    if (!(error instanceof SelectionRequiredError) || !ask) throw error;
+    let amended = command;
+    for (const role of error.roles) {
+      const answer = await ask(role);
+      if (!String(answer).trim()) reject(`--${role} requires an exact model name or ID followed by a thinking level`);
+      amended += ` --${role} ${answer}`;
+    }
+    return runInit(amended, options);
+  }
 }
 
 // This diagnostic entry point deliberately supplies no real dispatcher. It
 // makes the selection/run-file behaviour testable on a Windows laptop; JUL-196
 // will provide real startup and handoff after consuming the saved snapshot.
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const prompts = createInterface({ input: process.stdin, output: process.stderr });
   try {
-    const result = await runInit(process.argv.slice(2).join(' '), {
+    const result = await runInitCli(process.argv.slice(2).join(' '), {
       logger: (event) => console.error(JSON.stringify(event)),
+      ask: (role) => prompts.question(`$init needs ${role}; enter its exact model name or ID and thinking level: `),
     });
     console.log(JSON.stringify(result));
   } catch (error) {
     console.error(error.message);
     process.exitCode = 1;
+  } finally {
+    prompts.close();
   }
 }
