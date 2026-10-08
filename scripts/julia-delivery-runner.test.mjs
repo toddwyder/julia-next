@@ -427,3 +427,27 @@ test('production candidate uses real local Node checks and actual red/green asse
   });
   assert.equal(result.outcome, 'pass', result.reason);
 });
+
+
+test('interrupted candidate checks retain their completed raw evidence unchanged on restart', async t => {
+  const { spawnSync } = await import('node:child_process');
+  const { source, base, runPath } = await candidateFixture(t);
+  const code = `import { startDelivery } from ${JSON.stringify(new URL('./julia-delivery-runner.mjs', import.meta.url).href)};
+    import { writeFile } from 'node:fs/promises'; import { join } from 'node:path';
+    const options = JSON.parse(process.env.FIXTURE_INPUT); let checks = 0;
+    await startDelivery('JUL-196', options.configuration, { ...options,
+      readCard: async () => options.card,
+      launch: async (role, request) => { if (role !== 'builder') throw new Error('no reviewer'); await writeFile(join(request.worktree, 'scripts/seam.test.mjs'), 'new regression'); return { exitCode: 0, observed: options.configuration.builder }; },
+      test: async () => { if (++checks === 2) process.exit(42); return { status: 0, output: 'completed check before interruption' }; },
+    });`;
+  const { NODE_TEST_CONTEXT: _context, ...env } = process.env;
+  const options = { authorization, configuration, repoRoot: source, base, runPath, card: { ...card, description: card.description + '\n## Seams\n`scripts/seam.test.mjs`' } };
+  const child = spawnSync(process.execPath, ['--input-type=module', '-e', code], { cwd: source, env: { ...env, FIXTURE_INPUT: JSON.stringify(options) }, encoding: 'utf8' });
+  assert.equal(child.status, 42, child.stderr);
+  const evidencePath = join(dirname(runPath), 'JUL-196-candidate-round-0.json');
+  const before = await readFile(evidencePath, 'utf8');
+  assert.match(before, /completed check before interruption/);
+  const result = await startDelivery('JUL-196', configuration, { ...options, readCard: () => assert.fail('restart cannot reread Linear'), launch: () => assert.fail('finished builder cannot rerun'), test: () => assert.fail('uncertain checks cannot rerun') });
+  assert.equal(result.outcome, 'park');
+  assert.equal(await readFile(evidencePath, 'utf8'), before);
+});
