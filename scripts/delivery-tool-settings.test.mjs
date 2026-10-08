@@ -136,6 +136,10 @@ test('rejects incomplete API connections and native routes with applicable field
     () => validateDeliveryToolSettings({ ...valid, catalog: [{ ...catalog[0], connection: { ...nativeConnection, provider: 'Command Code' } }, catalog[1]] }),
     /catalog entry "anthropic-builder" native connection must explicitly use null for provider/,
   );
+  assert.throws(
+    () => validateDeliveryToolSettings({ ...valid, catalog: [{ ...catalog[0], connection: { ...apiConnection, endpoint: 'not-an-endpoint' } }, catalog[1]] }),
+    /catalog entry "anthropic-builder" API connection endpoint must be an absolute HTTP\(S\) URL/,
+  );
 });
 
 test('rejects builder and reviewer models from the same maker', () => {

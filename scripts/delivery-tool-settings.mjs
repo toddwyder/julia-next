@@ -18,6 +18,15 @@ function nonEmptyString(value) {
   return typeof value === 'string' && value.trim() !== '';
 }
 
+function isHttpUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 function checkKeys(value, allowed, context) {
   const extra = Object.keys(value).find((key) => !allowed.includes(key));
   if (extra) reject(`${context} contains unsupported setting "${extra}"`);
@@ -60,6 +69,7 @@ function validateConnection(connection, label) {
   for (const field of CONNECTION_FIELDS) {
     if (!nonEmptyString(connection[field])) reject(`${label} API connection requires ${field}`);
   }
+  if (!isHttpUrl(connection.endpoint)) reject(`${label} API connection endpoint must be an absolute HTTP(S) URL`);
 }
 
 function validateCatalog(catalog) {
