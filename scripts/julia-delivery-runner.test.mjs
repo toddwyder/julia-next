@@ -399,3 +399,31 @@ test('literal $init drives the authorized fixture journey and restarting reuses 
   assert.deepEqual(approved.configuration, first.configuration);
   assert.deepEqual(approved.authorization.spending, authorization.spending);
 });
+
+
+test('production candidate uses real local Node checks and actual red/green assertions without a provider', async t => {
+  const { source, runPath, git } = await candidateFixture(t);
+  await writeFile(join(source, 'package.json'), JSON.stringify({ type: 'module', scripts: { 'lint:framework': 'node --check value.mjs' } }));
+  await writeFile(join(source, 'value.mjs'), 'export const value = 1;');
+  await writeFile(join(source, 'scripts/seam.test.mjs'), "import assert from 'node:assert/strict'; import { value } from '../value.mjs'; assert.equal(value, 1);");
+  await writeFile(join(source, 'scripts/julia-runner-suite.mjs'), await readFile(new URL('./julia-runner-suite.mjs', import.meta.url), 'utf8'));
+  git(source, 'add', '-A'); git(source, '-c', 'user.name=fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'real checks base');
+  const base = git(source, 'rev-parse', 'HEAD');
+  const result = await startDelivery('JUL-196', configuration, {
+    authorization, repoRoot: source, base, runPath,
+    readCard: async () => ({ ...card, description: card.description + '\n## Seams\n`scripts/seam.test.mjs`' }),
+    launch: async (role, request) => {
+      if (role === 'builder') {
+        await writeFile(join(request.worktree, 'value.mjs'), 'export const value = 2;');
+        await writeFile(join(request.worktree, 'scripts/seam.test.mjs'), "import assert from 'node:assert/strict'; import { value } from '../value.mjs'; assert.equal(value, 2);");
+        return { exitCode: 0, observed: configuration.builder };
+      }
+      const handoff = JSON.parse(await readFile(request.handoffPath, 'utf8'));
+      assert.deepEqual(handoff.candidate.runs.map(run => run.status), [0, 1, 0, 0]);
+      assert.match(handoff.candidate.runs[1].output, /1 !== 2/);
+      assert.match(handoff.candidate.runs[3].output, /Runner suite: 1 files/);
+      return { exitCode: 0, observed: configuration.reviewer, text: `VERDICT: PASS\nCOMMIT: ${handoff.candidate.commit}` };
+    },
+  });
+  assert.equal(result.outcome, 'pass', result.reason);
+});

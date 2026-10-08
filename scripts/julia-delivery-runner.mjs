@@ -7,8 +7,9 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { isDeepStrictEqual } from 'node:util';
 import { getIssue } from './linear-cli.mjs';
-import { git, runChecks, localTester } from './julia-minimal-runner-checks.mjs';
+import { localTester } from './julia-minimal-runner-checks.mjs';
 import { acquireRunLock, jsonText, loadText, processStarted, saveJson, sha256, stopProcessTree } from './julia-delivery-state.mjs';
+import { assertDeliveryPath, prepareDeliveryWorkspace, captureDeliveryCandidate } from './julia-delivery-candidate.mjs';
 import { LIMITS, runLimited } from '../ops/julia-runner/time-limit.mjs';
 
 const SHA = /^[0-9a-f]{40}$/i;
@@ -18,10 +19,22 @@ const SHA = /^[0-9a-f]{40}$/i;
 export const MAX_REPAIRS = 3;
 const SCHEMA = 1;
 
+// Authorization is an operator input, separate from tracker readiness. Spending
+// names both roles explicitly; the exact resolved configuration is saved with it.
+export function authorizationReason(authorization, issueId, configuration) {
+  if (!authorization || authorization.explicitStart !== true || authorization.issueId !== issueId || (typeof authorization.authorizedBy !== 'string' || !authorization.authorizedBy.trim())) return 'explicit start authorization for this issue is required';
+  for (const role of ['builder', 'reviewer']) {
+    const spend = authorization.spending?.[role];
+    if (!spend || !['subscription', 'paid', 'fixture'].includes(spend.mode) || !Number.isFinite(spend.maxUsd) || spend.maxUsd < 0) return `explicit ${role} spending choice is required`;
+    if (spend.mode !== 'paid' && spend.maxUsd !== 0) return `${role} non-paid spending must have a zero dollar limit`;
+  }
+  if (authorization.configuration && !isDeepStrictEqual(authorization.configuration, plain(configuration))) return 'authorization names a different builder/reviewer configuration';
+  return null;
+}
+
 function refusal(card) {
   if (!card || card.identifier == null) return 'Linear did not return a card';
   if (card.identifier !== card.expectedId) return `Linear returned ${card.identifier}, not the requested card`;
-  if (card.state?.name !== 'Ready') return `card is not authorized to start (state: ${card.state?.name ?? 'unknown'})`;
   if (!/^##\s+Acceptance criteria\s*$/mi.test(card.description ?? '')) return 'card has no approved acceptance criteria';
   return null;
 }
@@ -35,7 +48,7 @@ export function workerPrompt(role, card, configuration, runPath, approvedPath, f
   const common = `Issue: ${card.identifier}\nSaved run: ${runPath}\nApproved input: ${approvedPath}\nConfigured ${role}: ${JSON.stringify(chosen)}`;
   // A builder that follows an interrupted one inherits its unfinished edits; it is told so, never left to guess.
   const resumed = interrupted ? '\n\nThe previous builder for this work was interrupted before it finished. Its partial changes are still in the worktree: inspect them first (git status, git diff) and finish the work from there. Do not discard them or start over.' : '';
-  if (role === 'builder') return `${common}\n\nExplicitly read and follow .agents/skills/implement/SKILL.md for ${card.identifier}. The approved requirements are only in ${approvedPath}; do not reread Linear. Work only in the prepared isolated worktree.${resumed}${findings ? `\n\nRepair these review findings:\n${findings}` : ''}`;
+  if (role === 'builder') return `${common}\n\nExplicitly read and follow .claude/skills/implement/SKILL.md for ${card.identifier}. The approved requirements are only in ${approvedPath}; do not reread Linear. Work only in the prepared isolated worktree.${resumed}${findings ? `\n\nRepair these review findings:\n${findings}` : ''}`;
   return `${common}\n\nReview the changed, checked immutable candidate named in the saved handoff file only, in one fresh session. Keep Standards and Spec separate in the report. You are independent of the builder and must not receive its conversation. Save and reuse this review for this candidate; no polling or retry after an ambiguous or failing call, and no unchanged rereview. End with exactly VERDICT: PASS or VERDICT: FAIL, and name the reviewed 40-character commit.`;
 }
 
@@ -173,7 +186,9 @@ const plain = (value) => JSON.parse(JSON.stringify(value));
 
 // Why this start may not continue a saved record, or null.
 function recordMismatch(record, issueId, configuration) {
+  if (!Number.isInteger(record.repairsUsed) || record.repairsUsed < 0 || record.repairsUsed > MAX_REPAIRS || record.round < record.repairsUsed || record.round > MAX_REPAIRS + 1 || !Array.isArray(record.actions) || record.actions.filter(action => action?.status === 'started').length > 1) return 'the saved repair budget or action journal is invalid';
   if (record.schema !== SCHEMA || !Array.isArray(record.actions) || !Array.isArray(record.findings) || !Number.isInteger(record.round) || typeof record.approved?.sha256 !== 'string') return 'the saved run state is not in a form this runner wrote';
+  if (record.actions.some(action => !action || !['build', 'candidate', 'review', 'verify'].includes(action.kind) || !['started', 'done', 'interrupted', 'stale', 'uncertain'].includes(action.status) || !Number.isInteger(action.round) || action.round < 0 || action.round > MAX_REPAIRS || action.key !== `${action.kind}:${action.round}` || (action.worker != null && (!Number.isInteger(action.worker.pid) || action.worker.pid <= 0 || (action.worker.started != null && typeof action.worker.started !== 'string'))))) return 'the saved action journal is invalid';
   if (record.issueId !== issueId) return `the saved run state belongs to ${record.issueId}, not ${issueId}`;
   if (!isDeepStrictEqual(record.configuration, plain(configuration))) return 'the saved run was started with a different builder/reviewer configuration';
   return null;
@@ -189,7 +204,8 @@ async function settleWorker(action, processes) {
   const { pid, started } = action.worker;
   try {
     let seen = await processes.started(pid);
-    if (!started || seen !== started) return { handling: seen ? `worker ${pid} had already exited; that process id now belongs to another process, which was left alone` : `worker ${pid} had already exited` };
+    if (!started && seen) return { unsafe: `the earlier ${action.role} (process ${pid}) has no recorded creation time, so its identity cannot be proved` };
+    if (seen !== started || !seen) return { handling: seen ? `worker ${pid} had already exited; that process id now belongs to another process, which was left alone` : `worker ${pid} had already exited` };
     await processes.stop(pid);
     for (let checks = 0; checks < 40 && seen === started; checks += 1) { await pause(250); seen = await processes.started(pid); }
     if (seen === started) return { unsafe: `the earlier ${action.role} (process ${pid}) is still running and could not be stopped` };
@@ -197,7 +213,7 @@ async function settleWorker(action, processes) {
   } catch (error) { return { unsafe: `could not tell whether the earlier ${action.role} (process ${pid}) is still running: ${error.message}` }; }
 }
 
-export async function runDelivery({ issueId, configuration, runPath }, { readCard, save = fileSave, load, lock, launch, candidate, prepareWorktree = async () => ({ ok: true }), preflight = () => null, processes = { started: processStarted, stop: stopProcessTree } }) {
+export async function runDelivery({ issueId, configuration, runPath, authorization }, { readCard, save = fileSave, load, lock, launch, candidate, prepareWorktree = async () => ({ ok: true }), preflight = () => null, processes = { started: processStarted, stop: stopProcessTree } }) {
   // Run files are either all real or all injected: a test that keeps them in
   // memory has no earlier run to load and no second process to lock out.
   load ??= save === fileSave ? loadText : async () => null;
@@ -246,8 +262,9 @@ export async function runDelivery({ issueId, configuration, runPath }, { readCar
           return await finish(unsafe('review was interrupted; its provider outcome is ambiguous and is not retried', open.round));
         }
         open.status = 'interrupted';
-        // An interrupted build is not retried for free: the next builder is the next round.
-        if (open.kind === 'build') record.round = open.round + 1;
+        // Continue the same spent build/repair; restarting does not buy or
+        // consume another repair. Its attempt and interrupted evidence remain.
+        if (open.kind === 'build') record.round = open.round;
       }
       // A candidate nobody has reviewed yet is read again: the worktree was unwatched while the runner was down.
       const reviewed = record.actions.some((action) => action.kind === 'review' && action.round === record.round && action.status === 'done');
@@ -271,18 +288,23 @@ export async function runDelivery({ issueId, configuration, runPath }, { readCar
       if (approved.configuration && !isDeepStrictEqual(approved.configuration, plain(configuration))) return await stop('the saved approved input was approved for a different builder/reviewer configuration');
       card = { ...approved.card, expectedId: issueId };
     } else {
+      const unauthorized = authorizationReason(authorization, issueId, configuration);
+      if (unauthorized) return await stop(unauthorized);
       // The single read is deliberately before any worktree or worker operation.
       card = { ...await readCard(issueId), expectedId: issueId };
     }
+    const approvedAuthorization = approvedText == null ? authorization : JSON.parse(approvedText).authorization;
+    const unauthorized = authorizationReason(approvedAuthorization, issueId, configuration);
+    if (unauthorized) return await stop(unauthorized);
     const invalid = refusal(card);
     if (invalid) return await stop(invalid);
     let approvedHash = approvedText == null ? null : sha256(approvedText);
     if (approvedText == null) {
-      const approved = { card, configuration, ...approvedInput(card, configuration) };
+      const approved = { card, configuration, authorization: { ...authorization, configuration: plain(configuration) }, ...approvedInput(card, configuration) };
       approvedHash = sha256(jsonText(approved));
       await save(approvedPath, approved);
     }
-    let prepared; try { prepared = await prepareWorktree({ issueId, configuration, runPath, saved: record?.worktree ?? null }); } catch (error) { prepared = { ok: false, reason: error.message }; }
+    let prepared; try { prepared = await prepareWorktree({ issueId, configuration, runPath, card, saved: record?.worktree ?? null }); } catch (error) { prepared = { ok: false, reason: error.message }; }
     if (!prepared?.ok) return await stop(prepared?.reason ?? 'could not prepare isolated worktree');
     if (record?.worktree?.path && prepared.worktree?.path && record.worktree.path !== prepared.worktree.path) return await refuse(`this run belongs to worktree ${record.worktree.path}, not ${prepared.worktree.path}`, record.round);
     if (!record) { record = newRecord({ issueId, configuration, approvedPath, approvedHash, worktree: prepared.worktree ?? null }); await persist(); }
@@ -309,13 +331,13 @@ export async function runDelivery({ issueId, configuration, runPath }, { readCar
 
     for (let round = record.round; round <= MAX_REPAIRS; round += 1) {
       const findings = record.findings.at(-1)?.text ?? null;
-      const interrupted = record.actions.some((action) => action.kind === 'build' && action.round === round - 1 && action.status === 'interrupted');
+      const interrupted = record.actions.some((action) => action.kind === 'build' && action.round === round && action.status === 'interrupted');
       const evidence = (role, attempt) => join(directory, `${issueId}-${role}-round-${round}${attempt > 1 ? `-attempt-${attempt}` : ''}.json`);
       const builder = await act('build', round, 'builder', (started, attempt) => launch('builder', { prompt: workerPrompt('builder', card, configuration, runPath, approvedPath, findings, interrupted), configuration: configuration.builder, round, started, outputPath: evidence('builder', attempt) }));
       const builderIdentity = validObserved('builder', configuration.builder, builder.observed);
       if (builder.exitCode !== 0 || builderIdentity) return await finish(park(builderIdentity ?? `builder exited ${builder.exitCode}`, round));
-      const current = await act('candidate', round, null, () => candidate({ round }));
-      if (!SHA.test(current?.commit ?? '') || !current.clean || !current.checks?.pass) return await finish(park(!SHA.test(current?.commit ?? '') ? 'candidate has no immutable commit' : !current.clean ? 'candidate drifted or is dirty' : 'candidate checks failed', round));
+      const current = await act('candidate', round, null, () => candidate({ round, previous: record.actions.findLast(action => action.kind === 'candidate' && action.round === round && action.status === 'stale')?.outcome }));
+      if (!SHA.test(current?.commit ?? '') || current.clean !== true || current.checks?.pass !== true) return await finish(park(!SHA.test(current?.commit ?? '') ? 'candidate has no immutable commit' : current.clean !== true ? 'candidate drifted or is dirty' : 'candidate checks failed', round));
       if (!isDone('review', round) && record.findings.some(finding => finding.commit === current.commit)) return await finish(park('unchanged candidate: saved review findings require changed checked code before another review', round));
       const handoffPath = join(directory, `${issueId}-handoff-round-${round}.json`);
       const handoff = { issueId, round, approvedPath, candidate: current, builder: { configured: configuration.builder, observed: builder.observed, exitCode: builder.exitCode, outputPath: builder.outputPath ?? null }, createdAt: now() };
@@ -327,8 +349,8 @@ export async function runDelivery({ issueId, configuration, runPath }, { readCar
       await save(handoffPath, { ...handoff, reviewer: { configured: configuration.reviewer, observed: reviewer.observed, exitCode: reviewer.exitCode, outputPath: reviewer.outputPath ?? null, verdict: verdict.verdict ?? null }, result: verdict.error ?? verdict.verdict });
       if (reviewer.exitCode !== 0 || reviewerIdentity || verdict.error) return await finish(park(reviewerIdentity ?? verdict.error ?? `reviewer exited ${reviewer.exitCode}`, round));
       if (verdict.verdict === 'PASS') {
-        const afterReview = await act('verify', round, null, () => candidate({ round, afterReview: true }));
-        if (afterReview?.commit !== current.commit || !afterReview.clean || !afterReview.checks?.pass) return await finish(park('candidate changed after review', round));
+        const afterReview = await act('verify', round, null, () => candidate({ round, afterReview: true, previous: current }));
+        if (afterReview?.commit !== current.commit || afterReview.clean !== true || afterReview.checks?.pass !== true) return await finish(park('candidate changed after review', round));
         return await finish({ outcome: 'pass', commit: current.commit, handoffPath });
       }
       // Findings are kept in the record, so a restart repairs the same findings and never forgets a round.
@@ -338,31 +360,42 @@ export async function runDelivery({ issueId, configuration, runPath }, { readCar
   } finally { await held.release(); }
 }
 
-// A thin production adapter. A Windows operator supplies a pre-created,
-// isolated worktree; tests use injected adapters and do not start real workers.
-export async function startDelivery(issueId, configuration, { runPath = join('.julia', 'runs', `${issueId}.json`), worktree = process.env.JULIA_DELIVERY_WORKTREE, readCard = (id) => getIssue(id, { apiKey: process.env.LINEAR_API_KEY }), launch } = {}) {
-  launch ??= productionLauncher(worktree);
-  const candidate = async () => {
-    try {
-      const commit = git(worktree, 'rev-parse', 'HEAD'); const clean = !git(worktree, 'status', '--porcelain');
-      const branch = git(worktree, 'branch', '--show-current');
-      const base = git(worktree, 'merge-base', 'HEAD', 'origin/main');
-      const checks = await runChecks({ worktree, branch, base, test: localTester });
-      return { commit, clean, checks };
-    } catch (error) { return { commit: null, clean: false, checks: { pass: false, error: error.message } }; }
+// Production uses the same controller with JUL-122 Git/check preparation.
+export async function startDelivery(issueId, configuration, {
+  runPath = join(homedir(), '.julia', 'runs', `${issueId}.json`),
+  worktree = process.env.JULIA_DELIVERY_WORKTREE,
+  repoRoot = process.cwd(), base, authorization,
+  readCard = (id) => getIssue(id, { apiKey: process.env.LINEAR_API_KEY }),
+  launch, test = request => localTester(request.run === 'suite' ? { ...request, run: 'runnerSuite' } : request),
+} = {}) {
+  // Protect run files as well as builder source, before locking or any writes.
+  assertDeliveryPath(runPath);
+  let workspace, approvedCard, instructions;
+  const prepareWorktree = async ({ saved, card }) => {
+    const prepared = await prepareDeliveryWorkspace({ issueId, runPath, repoRoot, base, worktree, saved });
+    workspace = prepared.worktree; approvedCard = card; instructions = prepared.instructions;
+    return prepared;
   };
-  // The JUL-122 worktree guards, without its resume-time reset: a resumed
-  // delivery keeps whatever an interrupted builder left behind. A run is tied
-  // to one worktree, one branch and the commit it started from.
-  const prepareWorktree = async ({ saved }) => {
-    if (spawnSync('git', ['-C', worktree, 'rev-parse', '--is-inside-work-tree'], { encoding: 'utf8' }).stdout?.trim() !== 'true') return { ok: false, reason: 'configured worktree is not a git worktree' };
-    const path = resolve(git(worktree, 'rev-parse', '--show-toplevel')); const branch = git(worktree, 'branch', '--show-current');
-    if (!saved) return { ok: true, worktree: { path, branch, startCommit: git(worktree, 'rev-parse', 'HEAD') } };
-    if (saved.path !== path) return { ok: false, reason: `this run belongs to worktree ${saved.path}, not ${path}` };
-    if (saved.branch !== branch) return { ok: false, reason: `the worktree is on ${branch || 'a detached commit'}, not the run's branch ${saved.branch}; a check may have been interrupted while the worktree was switched` };
-    if (spawnSync('git', ['-C', worktree, 'merge-base', '--is-ancestor', saved.startCommit, 'HEAD']).status !== 0) return { ok: false, reason: `the worktree no longer grows from the run's start commit ${saved.startCommit}` };
-    return { ok: true, worktree: saved };
+  const launchWorker = async (role, request) => {
+    const worker = launch ?? productionLauncher(workspace.path);
+    return worker(role, { ...request, worktree: workspace.path,
+      prompt: role === 'builder' ? `${request.prompt}\n\nPinned canonical implementation instructions:\n${instructions}` : request.prompt });
   };
-  const preflight = () => (worktree ? null : 'JULIA_DELIVERY_WORKTREE is required; no worker was launched');
-  return runDelivery({ issueId, configuration, runPath }, { readCard, launch, candidate, prepareWorktree, preflight });
+  let fixed = null;
+  const candidate = async ({ round, afterReview, previous }) => {
+    if (afterReview || previous) {
+      fixed = previous ?? fixed;
+      // Never commit/recheck new source changes under a reviewed SHA.
+      const { git } = await import('./julia-minimal-runner-checks.mjs');
+      const clean = git(workspace.path, 'rev-parse', 'HEAD') === fixed.commit && !git(workspace.path, 'status', '--porcelain') && git(workspace.path, 'branch', '--show-current') === workspace.branch;
+      try {
+        const raw = await loadText(fixed.evidencePath);
+        const matches = raw && isDeepStrictEqual(JSON.parse(raw), fixed);
+        return { ...fixed, clean: clean && Boolean(matches) };
+      } catch (error) { return { ...fixed, clean: false, checks: { pass: false, error: error.message } }; }
+    }
+    fixed = await captureDeliveryCandidate({ issueId, runPath, workspace, card: approvedCard, test, round });
+    return fixed;
+  };
+  return runDelivery({ issueId, configuration, runPath, authorization }, { readCard, launch: launchWorker, candidate, prepareWorktree });
 }

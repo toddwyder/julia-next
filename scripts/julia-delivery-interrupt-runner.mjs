@@ -33,7 +33,7 @@ const real = productionLauncher(worktree);
 async function fixture(role, request) {
   const hang = plan.interruptAction === `${role === 'builder' ? 'build' : 'review'}:${request.round}` && !request.outputPath.includes('-attempt-');
   const before = await proofText();
-  const text = role === 'builder' ? (before || 'JUL-196 recovery proof\npartial\n') + (request.round && !before.includes('repaired\n') ? 'repaired\n' : '') : null;
+  const text = role === 'builder' ? (before || 'JUL-196 recovery proof\npartial\n') + ((request.round || request.outputPath.includes('-attempt-')) && !before.includes('repaired\n') ? 'repaired\n' : '') : null;
   let output = '';
   const program = `let input=''; process.stdin.on('data', x => input+=x); process.stdin.on('end', () => { const p=JSON.parse(input); if(p.text) require('node:fs').writeFileSync(p.path,p.text); console.log('deterministic process fixture'); if(p.hang) setInterval(()=>{},1000); });`;
   const result = await runLimited(process.execPath, ['-e', program], { cwd: worktree, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true }, {

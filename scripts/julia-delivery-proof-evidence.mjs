@@ -39,7 +39,7 @@ export async function nativeBuilderEvidence(proof, { root = join(process.env.COD
       const output = toolOutputText(responses.find(response => response.call_id === call.call_id)?.output);
       return args.includes(file) && output.includes(expected);
     });
-    const skillRead = read('.agents/skills/implement/SKILL.md', 'Implement the work described by the user');
+    const skillRead = read('.claude/skills/implement/SKILL.md', 'Implement the work described by the user') ?? read('.agents/skills/implement/SKILL.md', 'Implement the work described by the user');
     const approvedRead = read('JUL-196-approved.json', proof.marker);
     evidence.push({ path, thread: meta.id, provider: meta.model_provider, models: [...new Set(turns.map(turn => turn.model))], efforts: [...new Set(turns.map(turn => turn.reasoning_effort ?? turn.effort))],
       canonicalSavedRead: Boolean(skillRead && approvedRead), readCallIds: [skillRead?.call_id, approvedRead?.call_id].filter(Boolean),
