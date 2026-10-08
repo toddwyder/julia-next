@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { productionLauncher, runDelivery, startDelivery, workerPrompt } from './julia-delivery-runner.mjs';
+import { productionLauncher, runDelivery as deliver, startDelivery, workerPrompt } from './julia-delivery-runner.mjs';
 import { processStarted } from './julia-delivery-state.mjs';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -14,6 +14,8 @@ const configuration = {
   builder: { identity: 'claude', model: 'claude-sonnet', maker: 'Anthropic', harness: 'claude-code', thinking: 'high', connection: { route: 'native' } },
   reviewer: { identity: 'codex', model: 'gpt-review', maker: 'OpenAI', harness: 'codex', thinking: null, connection: { route: 'native' } },
 };
+const authorization = { issueId: 'JUL-196', explicitStart: true, authorizedBy: 'fixture operator', spending: { builder: { mode: 'fixture', maxUsd: 0 }, reviewer: { mode: 'fixture', maxUsd: 0 } } };
+const runDelivery = (input, adapters) => deliver({ authorization, ...input }, adapters);
 const card = { identifier: 'JUL-196', title: 'A card', state: { name: 'Ready', type: 'unstarted' }, description: '## Acceptance criteria\n\n- [ ] It works.' };
 
 test('Windows production launcher gets a response from installed Claude Code and persists its evidence', { skip: process.env.JUL196_CLAUDE_REAL_PROOF !== '1' ? 'operator opt-in required: JUL196_CLAUDE_REAL_PROOF=1; no provider call in ordinary suite' : process.env.JUL196_CLAUDE_QUOTA_BLOCKED === '1' ? 'Claude real integration quota-blocked: JUL196_CLAUDE_QUOTA_BLOCKED=1; historical results retained' : process.platform !== 'win32', timeout: 120000 }, async (t) => {
@@ -156,7 +158,7 @@ test('Codex identity fails closed for absent, foreign-provider, wrong-thread, co
 
 test('the builder receives the canonical implement instruction and saved approved inputs, not a discovered skill', () => {
   const prompt = workerPrompt('builder', card, configuration, 'C:/runs/JUL-196.json', 'C:/runs/JUL-196-approved.json');
-  assert.match(prompt, /\.agents\/skills\/implement\/SKILL\.md/);
+  assert.match(prompt, /\.claude\/skills\/implement\/SKILL\.md/);
   assert.match(prompt, /C:\/runs\/JUL-196-approved\.json/);
   assert.match(prompt, /JUL-196/);
 });
@@ -236,11 +238,62 @@ test('a PASS is refused if the post-review candidate read drifts', async () => {
 
 test('Ready and triage approval do not authorize workspace or worker side effects', async () => {
   let effects = 0;
-  const result = await runDelivery({ issueId: 'JUL-196', configuration, runPath: 'C:/runs/JUL-196.json' }, {
+  const result = await deliver({ issueId: 'JUL-196', configuration, runPath: 'C:/runs/JUL-196.json' }, {
     save: async () => {}, readCard: async () => card,
     prepareWorktree: async () => { effects++; return { ok: true }; },
     launch: async () => { effects++; }, candidate: async () => { effects++; },
   });
   assert.equal(effects, 0);
   assert.match(result.reason, /explicit.*authorization/i);
+});
+
+
+test('authorized production adapter prepares isolation and freezes additions/deletions with checked evidence', async t => {
+  const { spawnSync } = await import('node:child_process');
+  const { rm, mkdir } = await import('node:fs/promises');
+  const { git } = await import('./julia-minimal-runner-checks.mjs');
+  const root = await mkdtemp(join(tmpdir(), 'jul201-git-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const source = join(root, 'source');
+  assert.equal(spawnSync('git', ['init', '-q', '-b', 'main', source]).status, 0);
+  await mkdir(join(source, '.claude/skills/implement'), { recursive: true });
+  await writeFile(join(source, '.claude/skills/implement/SKILL.md'), 'Canonical fixture implementation instructions');
+  await writeFile(join(source, 'deleted.txt'), 'original');
+  await mkdir(join(source, 'scripts'));
+  await writeFile(join(source, 'scripts/seam.test.mjs'), 'old test');
+  git(source, 'add', '-A');
+  git(source, '-c', 'user.name=fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'base');
+  const base = git(source, 'rev-parse', 'HEAD');
+  const runPath = join(root, 'runs/JUL-196.json');
+  const calls = []; let builderPath;
+  const result = await startDelivery('JUL-196', configuration, {
+    authorization, repoRoot: source, base, runPath,
+    readCard: async () => ({ ...card, description: card.description + '\n## Seams\n`scripts/seam.test.mjs`' }),
+    test: async ({ worktree, run }) => ({ status: run === 'files' && git(worktree, 'rev-parse', 'HEAD') === base ? 1 : 0, output: 'deterministic check output' }),
+    launch: async (role, request) => {
+      calls.push(role);
+      if (role === 'builder') {
+        builderPath = request.worktree;
+        assert.notEqual(builderPath, source);
+        assert.match(request.prompt, /Canonical fixture implementation instructions/);
+        await writeFile(join(builderPath, 'added.txt'), 'new');
+        await rm(join(builderPath, 'deleted.txt'));
+        await writeFile(join(builderPath, 'scripts/seam.test.mjs'), 'regression test');
+        return { exitCode: 0, observed: configuration.builder };
+      }
+      const handoff = JSON.parse(await readFile(request.handoffPath, 'utf8'));
+      assert.equal(handoff.candidate.base, base);
+      assert.match(handoff.candidate.diff, /added.txt/);
+      assert.match(handoff.candidate.diff, /deleted.txt/);
+      assert.equal(handoff.candidate.redProof.pass, true);
+      assert.ok(handoff.candidate.evidencePath);
+      assert.equal(git(builderPath, 'status', '--porcelain'), '');
+      return { exitCode: 0, observed: configuration.reviewer, text: `VERDICT: PASS\nCOMMIT: ${handoff.candidate.commit}` };
+    },
+  });
+  assert.equal(result.outcome, 'pass', result.reason);
+  assert.deepEqual(calls, ['builder', 'reviewer']);
+  assert.equal(git(source, 'rev-parse', 'HEAD'), base);
+  assert.equal(git(source, 'status', '--porcelain'), '');
+  assert.equal(await readFile(join(source, 'deleted.txt'), 'utf8'), 'original');
 });
