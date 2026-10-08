@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { getIssue } from './linear-cli.mjs';
 import { git, runChecks, localTester } from './julia-minimal-runner-checks.mjs';
+import { LIMITS, runLimited } from '../ops/julia-runner/time-limit.mjs';
 
 const SHA = /^[0-9a-f]{40}$/i;
 const MAX_ROUNDS = 3;
@@ -48,6 +49,26 @@ async function fileSave(path, value) {
 }
 
 function park(reason, round = null) { return { outcome: 'park', reason, round }; }
+
+// The JUL-122 time limiter owns the child process group; this adapter only
+// maps the saved catalog harnesses to their unattended command lines.
+export function productionLauncher(worktree) {
+  return async (role, request) => {
+    const configured = request.configuration;
+    const command = configured.harness === 'claude-code' ? 'claude' : configured.harness === 'codex' ? 'codex' : null;
+    const args = configured.harness === 'claude-code' ? ['-p', '--model', configured.model, request.prompt]
+      : configured.harness === 'codex' ? ['exec', '-m', configured.model, '-s', 'read-only', '--skip-git-repo-check', '-'] : [];
+    if (!command) return { exitCode: 2, observed: null, text: `unsupported harness ${configured.harness}` };
+    let output = ''; let error = '';
+    const result = await runLimited(command, args, { cwd: role === 'builder' ? worktree : undefined, stdio: ['pipe', 'pipe', 'pipe'] }, {
+      seconds: LIMITS.builder.fallback,
+      started: (child) => { child.stdout.on('data', (chunk) => { output += chunk; }); child.stderr.on('data', (chunk) => { error += chunk; }); if (configured.harness === 'codex') child.stdin.end(request.prompt); },
+    });
+    const observed = /^OBSERVED:\s*(\{.*\})$/m.exec(output)?.[1];
+    let identity = null; try { identity = observed && JSON.parse(observed); } catch { /* fail closed below */ }
+    return { exitCode: result.stopped ? 124 : result.code ?? 1, observed: identity, text: output || error, outputPath: null, timedOut: result.stopped };
+  };
+}
 
 export async function runDelivery({ issueId, configuration, runPath, approved = null }, { readCard, save = fileSave, launch, candidate, prepareWorktree = async () => ({ ok: true }) }) {
   const statePath = join(dirname(runPath), `${issueId}-state.json`);
@@ -96,7 +117,7 @@ export async function startDelivery(issueId, configuration, { runPath = join('.j
   if (!worktree) return state(park('JULIA_DELIVERY_WORKTREE is required; no worker was launched'));
   let approved = null;
   try { approved = JSON.parse(await readFile(join(dirname(runPath), `${issueId}-approved.json`), 'utf8')); } catch { /* a new run reads Linear below */ }
-  if (!launch) return state(park('no verified worker launcher is configured; no worker was launched'));
+  launch ??= productionLauncher(worktree);
   const candidate = async () => {
     try {
       const commit = git(worktree, 'rev-parse', 'HEAD'); const clean = !git(worktree, 'status', '--porcelain');
