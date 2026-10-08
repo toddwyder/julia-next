@@ -33,7 +33,60 @@ test('Windows production launcher gets a response from installed Claude Code and
   assert.equal(evidence.observed.maker, 'Anthropic');
   assert.match(evidence.observed.model, /opus/);
   assert.equal(evidence.exitCode, 0);
+  assert.equal(evidence.error, null);
+  assert.equal(evidence.signal, null);
+  assert.match(evidence.command, /claude/i);
+  assert.equal(evidence.cwd, process.cwd());
   assert.ok(before <= Date.parse(evidence.startedAt) && Date.parse(evidence.startedAt) <= Date.parse(evidence.finishedAt) && Date.parse(evidence.finishedAt) <= after, `${evidence.startedAt} .. ${evidence.finishedAt}`);
+});
+
+test('a worker that cannot start leaves its root cause in the saved evidence', { timeout: 30000 }, async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'jul196-')); t.after(() => import('node:fs/promises').then(({ rm }) => rm(root, { recursive: true, force: true })));
+  const outputPath = join(root, 'evidence', 'JUL-196-builder-round-1.json');
+  const worktree = join(root, 'worktree-that-disappeared');
+  const builder = { ...configuration.builder, model: 'opus' };
+  const result = await productionLauncher(worktree)('builder', { configuration: builder, outputPath, prompt: 'This worker never starts.' });
+  assert.equal(result.exitCode, 1, result.text);
+  assert.equal(result.timedOut, false);
+  assert.equal(result.outputPath, outputPath);
+  const evidence = JSON.parse(await readFile(outputPath, 'utf8'));
+  assert.equal(evidence.error.operation, 'start worker');
+  assert.equal(evidence.error.code, 'ENOENT');
+  assert.match(evidence.error.message, /ENOENT/);
+  assert.match(evidence.command, /claude/i);
+  assert.equal(evidence.cwd, worktree);
+  assert.equal(evidence.signal, null);
+  assert.equal(evidence.exitCode, 1);
+  assert.equal(evidence.observed, null);
+  assert.deepEqual([evidence.stdout, evidence.stderr], ['', '']);
+  assert.deepEqual(evidence.configured, builder);
+});
+
+test('Windows production launcher saves why installed Claude Code could not be found', { skip: process.platform !== 'win32', timeout: 30000 }, async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'jul196-')); t.after(() => import('node:fs/promises').then(({ rm }) => rm(root, { recursive: true, force: true })));
+  const outputPath = join(root, 'evidence', 'JUL-196-builder-round-1.json');
+  const builder = { ...configuration.builder, model: 'opus' };
+  // where.exe still runs from System32, but no Claude installation is on this PATH.
+  const path = process.env.PATH; t.after(() => { process.env.PATH = path; });
+  process.env.PATH = join(process.env.SystemRoot, 'System32');
+  const result = await productionLauncher(root)('builder', { configuration: builder, outputPath, prompt: 'This worker is never found.' });
+  process.env.PATH = path;
+  assert.equal(result.exitCode, 1, result.text);
+  assert.match(result.text, /Claude Code native executable was not found/);
+  assert.equal(result.observed, null);
+  assert.equal(result.timedOut, false);
+  assert.equal(result.outputPath, outputPath);
+  const evidence = JSON.parse(await readFile(outputPath, 'utf8'));
+  assert.equal(evidence.error.operation, 'find claude-code executable');
+  assert.equal(evidence.error.code, null);
+  assert.match(evidence.error.message, /Claude Code native executable was not found/);
+  assert.equal(evidence.command, null);
+  assert.equal(evidence.cwd, root);
+  assert.equal(evidence.signal, null);
+  assert.equal(evidence.exitCode, 1);
+  assert.equal(evidence.observed, null);
+  assert.deepEqual(evidence.configured, builder);
+  assert.ok(Date.parse(evidence.startedAt) <= Date.parse(evidence.finishedAt), `${evidence.startedAt} .. ${evidence.finishedAt}`);
 });
 
 test('the builder receives the canonical implement instruction and saved approved inputs, not a discovered skill', () => {

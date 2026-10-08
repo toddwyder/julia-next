@@ -51,6 +51,12 @@ async function fileSave(path, value) {
 
 function park(reason, round = null) { return { outcome: 'park', reason, round }; }
 
+// What a failed launch leaves in the evidence. Only the code and message are
+// kept: the raw error also carries the stack and the full command line.
+function failure(operation, error) {
+  return error ? { operation, code: error.code ?? null, message: String(error.message ?? error) } : null;
+}
+
 // The JUL-122 time limiter owns the child process group; this adapter only
 // maps the saved catalog harnesses to their unattended command lines.
 function claudeCommand() {
@@ -70,16 +76,21 @@ function claudeCommand() {
 export function productionLauncher(worktree) {
   return async (role, request) => {
     const configured = request.configuration;
-    const command = configured.harness === 'claude-code' ? claudeCommand() : configured.harness === 'codex' ? 'codex' : null;
+    const cwd = role === 'builder' ? worktree : process.cwd();
+    const startedAt = new Date().toISOString();
+    // A worker whose executable cannot be found is recorded like one that could not be started.
+    let command = null; let failed = null;
+    try { command = configured.harness === 'claude-code' ? claudeCommand() : configured.harness === 'codex' ? 'codex' : null; }
+    catch (cause) { failed = failure(`find ${configured.harness} executable`, cause); }
     const args = configured.harness === 'claude-code' ? ['-p', '--model', configured.model, '--effort', configured.thinking ?? 'high', '--output-format', 'stream-json', '--verbose', '--permission-mode', 'acceptEdits', '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}', '--tools', 'Read,Edit,Write,Bash,Glob,Grep,Skill', '--allowedTools', 'Read,Edit,Write,Glob,Grep,Skill,Bash(node --test *),Bash(git status *),Bash(git diff *)']
       : configured.harness === 'codex' ? ['exec', '-m', configured.model, '-s', 'read-only', '--skip-git-repo-check', '-'] : [];
-    if (!command) return { exitCode: 2, observed: null, text: `unsupported harness ${configured.harness}` };
+    if (!command && !failed) return { exitCode: 2, observed: null, text: `unsupported harness ${configured.harness}` };
     let output = ''; let error = '';
-    const startedAt = new Date().toISOString();
-    const result = await runLimited(command, args, { cwd: role === 'builder' ? worktree : undefined, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true }, {
+    const result = failed ? { code: null, signal: null, stopped: false } : await runLimited(command, args, { cwd, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true }, {
       seconds: LIMITS.builder.fallback,
       started: (child) => { child.stdout.on('data', (chunk) => { output += chunk; }); child.stderr.on('data', (chunk) => { error += chunk; }); child.stdin.on('error', () => {}); child.stdin.end(request.prompt); },
     });
+    failed ??= failure('start worker', result.error);
     const observed = /^OBSERVED:\s*(\{.*\})$/m.exec(output)?.[1];
     let identity = null; try { identity = observed && JSON.parse(observed); } catch { /* fail closed below */ }
     if (configured.harness === 'claude-code') {
@@ -91,8 +102,8 @@ export function productionLauncher(worktree) {
     const finishedAt = new Date().toISOString();
     const exitCode = result.stopped ? 124 : result.code ?? 1;
     // The worker's own streams are the evidence; nothing here is summarised.
-    if (request.outputPath) await fileSave(request.outputPath, { role, configured, observed: identity, exitCode, timedOut: result.stopped, startedAt, finishedAt, stdout: output, stderr: error });
-    return { exitCode, observed: identity, text: output || error || result.error?.message || '', outputPath: request.outputPath ?? null, timedOut: result.stopped };
+    if (request.outputPath) await fileSave(request.outputPath, { role, configured, observed: identity ?? null, command, cwd, exitCode, signal: result.signal ?? null, timedOut: result.stopped, error: failed, startedAt, finishedAt, stdout: output, stderr: error });
+    return { exitCode, observed: identity ?? null, text: output || error || failed?.message || '', outputPath: request.outputPath ?? null, timedOut: result.stopped };
   };
 }
 
