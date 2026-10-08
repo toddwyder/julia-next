@@ -4,9 +4,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { checkEvidence } from './acceptance-check.mjs';
 
@@ -22,10 +23,10 @@ function readJson(path) {
   return JSON.parse(readFileSync(path, 'utf8'));
 }
 
-function runCheck(checkPath) {
+function runCheck(checkPath, testArgs = []) {
   const env = { ...process.env };
   delete env.NODE_TEST_CONTEXT;
-  return spawnSync(process.execPath, ['--test', checkPath], {
+  return spawnSync(process.execPath, ['--test', ...testArgs, checkPath], {
     encoding: 'utf8',
     env,
   });
@@ -48,6 +49,22 @@ test('each expected.json has a valid refusedBy and non-empty reason', () => {
       `${name}: reason must not be empty`,
     );
   }
+});
+
+test('work-mismatch assertions execute from a fixture path with spaces and a URL fragment character', (t) => {
+  const root = mkdtempSync(resolve(tmpdir(), 'julia bad submissions #'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  cpSync(resolve(SCRIPTS_DIR, 'bad-submissions.test.mjs'), resolve(root, 'scripts/bad-submissions.test.mjs'));
+  cpSync(resolve(SCRIPTS_DIR, 'acceptance-check.mjs'), resolve(root, 'scripts/acceptance-check.mjs'));
+  cpSync(FIXTURES_DIR, resolve(root, 'graph/fixtures/bad-submissions'), { recursive: true });
+
+  // Run the existing behavioral assertions, without recursively running this test.
+  const result = runCheck(resolve(root, 'scripts/bad-submissions.test.mjs'), [
+    '--test-reporter=spec', '--test-name-pattern=^work-mismatch:',
+  ]);
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.match(result.stdout, /pass 1\b/);
+  assert.match(result.stdout, /fail 0\b/);
 });
 
 test('tests-fail: check fails in child process, evidence passes acceptance-check', () => {
@@ -146,7 +163,7 @@ test('work-mismatch: check passes, acceptance-check passes, module makes one req
   );
 
   // The module only fetches the address (exactly one request) and gives no per-step results
-  const { smokeWalk } = await import(resolve(dir, 'smoke-walk.mjs'));
+  const { smokeWalk } = await import(pathToFileURL(resolve(dir, 'smoke-walk.mjs')).href);
   const requests = [];
   const mockFetch = async (url) => {
     requests.push(url);
