@@ -373,3 +373,17 @@ test('a live worker without a recorded creation time cannot be replaced or mista
   assert.match(result.reason, /creation time|identity/);
   assert.equal((await savedState(statePath)).actions[0].status, 'started');
 });
+
+
+test('invalid journal entries and exhausted repair budgets stop durably without replacement', async t => {
+  for (const mutation of [state => { state.actions.push(null); }, state => { state.repairsUsed = 4; }]) {
+    const { runPath, statePath, root } = await runFiles(t);
+    await assert.rejects(runDelivery({ ...run, runPath }, { readCard: async () => card, candidate: goodCandidate, launch: async (_role, request) => { await request.started(deadWorker()); throw new Error('interrupted'); } }), /interrupted/);
+    const state = await savedState(statePath); mutation(state); await writeFile(statePath, JSON.stringify(state));
+    const result = await runDelivery({ ...run, runPath }, { readCard: () => assert.fail('invalid state cannot reread Linear'), candidate: () => assert.fail('invalid state cannot create a candidate'), launch: () => assert.fail('invalid state cannot replace a worker') });
+    assert.equal(result.unsafe, true);
+    assert.match(result.reason, /invalid/);
+    assert.deepEqual(await savedState(statePath), state);
+    assert.equal(JSON.parse(await readFile(join(root, 'JUL-196-refusal.json'), 'utf8')).result.unsafe, true);
+  }
+});
