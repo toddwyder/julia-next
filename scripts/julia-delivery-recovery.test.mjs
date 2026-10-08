@@ -387,3 +387,15 @@ test('invalid journal entries and exhausted repair budgets stop durably without 
     assert.equal(JSON.parse(await readFile(join(root, 'JUL-196-refusal.json'), 'utf8')).result.unsafe, true);
   }
 });
+
+
+test('a live run lock with missing process creation identity cannot be taken over', async t => {
+  const { root } = await runFiles(t);
+  const path = join(root, 'lock.json');
+  const held = { pid: process.pid, started: null, token: '11111111-1111-4111-8111-111111111111' };
+  await writeFile(path, JSON.stringify(held));
+  const result = await acquireRunLock(path);
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /identity.*missing/);
+  assert.deepEqual(JSON.parse(await readFile(path, 'utf8')), held);
+});
