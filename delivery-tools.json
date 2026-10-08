@@ -2,8 +2,8 @@
   "catalog": [
     {
       "id": "anthropic-builder",
-      "displayName": "Anthropic builder placeholder",
-      "executableModelId": "placeholder-anthropic-builder",
+      "displayName": "Claude Code Opus",
+      "executableModelId": "opus",
       "maker": "Anthropic",
       "harness": "claude-code",
       "thinking": { "supported": ["low", "high"], "default": "high" },

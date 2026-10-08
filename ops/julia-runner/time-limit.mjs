@@ -37,11 +37,21 @@ export function runLimited(command, args, options, {
   return new Promise((resolve) => {
     let stopped = false;
     let grace = null;
-    const child = spawnFn(command, args, { ...options, detached: true });
+    let child;
+    try { child = spawnFn(command, args, { ...options, detached: process.platform !== 'win32' }); }
+    catch (error) { resolve({ code: null, signal: null, stopped: false, error }); return; }
     started(child);
-    const signalGroup = (signal) => { try { kill(-child.pid, signal); } catch { /* the group is gone */ } };
+    const signalGroup = (signal) => {
+      if (process.platform === 'win32') {
+        if (!child.pid) return;
+        const stopper = spawn('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
+        stopper.on('error', () => { try { child.kill(); } catch { /* already gone */ } });
+        return;
+      }
+      try { kill(-child.pid, signal); } catch { /* the group is gone */ }
+    };
     const sweep = () => {
-      if (!SWEPT_ACCOUNTS.includes(account)) return;
+      if (process.platform === 'win32' || !SWEPT_ACCOUNTS.includes(account)) return;
       try { kill(-1, 'SIGKILL'); } catch { /* nothing left to kill */ }
     };
     const limit = setTimeout(() => {

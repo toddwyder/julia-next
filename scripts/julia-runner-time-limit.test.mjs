@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 
 import { answerWithin, MAX_OUTPUT } from '../ops/julia-runner/run-tests.mjs';
 import { LIMITS, limitSeconds, runLimited, STOPPED_EXIT, stoppedLine } from '../ops/julia-runner/time-limit.mjs';
@@ -41,6 +42,21 @@ async function runForever({ ignoreTerm = false, seconds = 0.4, graceMs = 300, ac
   });
   return { result, swept, pids: out.trim().split(/\s+/).map(Number) };
 }
+
+test('Windows time limit stops the worker and its child process', { skip: process.platform !== 'win32', timeout: 15000 }, async (t) => {
+  let out = ''; let pid;
+  t.after(() => { if (pid) spawnSync('taskkill.exe', ['/PID', String(pid), '/T', '/F'], { windowsHide: true }); });
+  const completion = runLimited(process.execPath, ['-e', worker()], { stdio: ['ignore', 'pipe', 'ignore'] }, {
+    seconds: 1, graceMs: 100,
+    started: child => { pid = child.pid; child.stdout.on('data', chunk => { out += chunk; }); },
+  });
+  let deadline;
+  const result = await Promise.race([completion, new Promise((_, reject) => { deadline = setTimeout(() => reject(new Error('Windows worker survived its time limit')), 5000); })]).finally(() => clearTimeout(deadline));
+  assert.equal(result.stopped, true);
+  const pids = out.trim().split(/\s+/).map(Number);
+  assert.equal(pids.length, 2);
+  for (const workerPid of pids) assert.ok(await until(() => !alive(workerPid)), `process ${workerPid} is gone`);
+});
 
 test('a worker past its limit is stopped, and so is the child it started', linuxOnly, async () => {
   const { result, swept, pids } = await runForever();

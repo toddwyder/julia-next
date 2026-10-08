@@ -1,5 +1,5 @@
 // smoke-walk.check.mjs: tests for smokeWalk.
-// Named *.check.mjs so CI's glob and test-wrappers.test.mjs ignore it.
+// Named *.check.mjs so test discovery does not execute this deliberate fixture.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { smokeWalk } from './smoke-walk.mjs';

@@ -101,6 +101,13 @@ test('literal $init selects both roles, persists defaults, and fake-dispatches a
   assert.match(events, /"reviewer":"openai-reviewer"/);
 });
 
+test('dispatch receives the issue and immutable run-file path needed by the JUL-196 runner', async (t) => {
+  const { directory, settingsPath } = await fixture(t);
+  let dispatchContext;
+  await runInit('$init JUL-196', { settingsPath, stateDirectory: join(directory, 'runs'), dispatch: async (_configuration, context) => { dispatchContext = context; } });
+  assert.deepEqual(dispatchContext, { issueId: 'JUL-196', runPath: join(directory, 'runs', 'JUL-196.json'), resumed: false });
+});
+
 test('the command-line entry point receives literal $init, writes the run file, and rejects /init', async (t) => {
   const { directory } = await fixture(t);
   const { stdout } = await execFileAsync(process.execPath, [initScript, '$init JUL-199 --builder anthropic-builder low --reviewer openai-reviewer none'], { cwd: directory });

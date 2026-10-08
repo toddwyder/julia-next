@@ -6,6 +6,7 @@ import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 
 import { validateDeliveryToolSettings } from './delivery-tool-settings.mjs';
+import { startDelivery } from './julia-delivery-runner.mjs';
 
 const ROLE_FLAGS = Object.freeze({ '--builder': 'builder', '--reviewer': 'reviewer' });
 const ISSUE_ID = /^[A-Z][A-Z0-9]*-\d+$/;
@@ -152,7 +153,7 @@ export async function runInit(command, {
     const event = { event: 'resume', issueId, builder: saved.configuration.builder.identity, reviewer: saved.configuration.reviewer.identity };
     await recordEvent(eventsPath, event, writers);
     logger(event);
-    await dispatch(saved.configuration);
+    await dispatch(saved.configuration, { issueId, runPath, resumed: true });
     return { issueId, configuration: saved.configuration, resumed: true };
   }
 
@@ -178,7 +179,7 @@ export async function runInit(command, {
   const event = { event: 'selection-saved', issueId, builder: configuration.builder.identity, reviewer: configuration.reviewer.identity };
   await recordEvent(eventsPath, event, writers);
   logger(event);
-  await dispatch(configuration);
+  await dispatch(configuration, { issueId, runPath, resumed: false });
   return { issueId, configuration, resumed: false };
 }
 
@@ -209,6 +210,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const prompts = createInterface({ input: process.stdin, output: process.stderr });
   try {
     const result = await runInitCli(process.argv.slice(2).join(' '), {
+      dispatch: (configuration, { issueId, runPath }) => startDelivery(issueId, configuration, { runPath }),
       logger: (event) => console.error(JSON.stringify(event)),
       ask: (role) => prompts.question(`$init needs ${role}; enter its exact model name or ID and thinking level: `),
     });
