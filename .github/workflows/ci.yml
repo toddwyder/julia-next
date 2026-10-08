@@ -119,6 +119,7 @@ jobs:
           node --test scripts/health-route.test.mjs scripts/dynamic-route.test.mjs \
             scripts/web-app.test.mjs scripts/framework-lint.test.mjs \
             scripts/personal-paths.test.mjs scripts/delivery-tool-settings.test.mjs \
+            scripts/julia-init.test.mjs \
             ops/factory/install.test.mjs
 
       - name: Install Chromium
