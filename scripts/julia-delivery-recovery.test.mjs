@@ -11,7 +11,7 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { runDelivery, startDelivery } from './julia-delivery-runner.mjs';
-import { processStarted } from './julia-delivery-state.mjs';
+import { acquireRunLock, loadText, processStarted, saveJson } from './julia-delivery-state.mjs';
 
 const configuration = {
   builder: { identity: 'claude', model: 'claude-sonnet', maker: 'Anthropic', harness: 'claude-code', thinking: 'high', connection: { route: 'native' } },
@@ -270,4 +270,63 @@ test('a restart continues only in its own worktree and branch, and keeps the int
   assert.match(nextBuilder.prompt, /partial changes are still in the worktree/);
   // The fixture repository has no origin/main, so the real candidate check parks the run; the worktree guards let it through.
   assert.match(result.reason, /candidate has no immutable commit/);
+});
+
+// The last window a runner can die in: the review passed and the candidate was
+// verified, but the final result never reached the run file. The worktree is a
+// real git repository, so what the restarted runner measures is what is there.
+test('a restart between the passed verification and the saved result measures the candidate again before it records a PASS', { timeout: 120000 }, async (t) => {
+  const restartedAfter = async (change) => {
+    const { root, runPath, statePath } = await runFiles(t);
+    const worktree = gitRepo(root, 'worktree');
+    const reviewed = worktree.inRepo('rev-parse', 'HEAD');
+    let reads = 0; let launches = 0;
+    const adapters = {
+      readCard: async () => card,
+      candidate: async () => { reads += 1; return { commit: worktree.inRepo('rev-parse', 'HEAD'), clean: !worktree.inRepo('status', '--porcelain'), checks: { pass: true } }; },
+      launch: async (role, request) => {
+        launches += 1;
+        await request.started(deadWorker());
+        return role === 'builder' ? { exitCode: 0, observed: builderSeen } : { exitCode: 0, observed: reviewerSeen, text: `VERDICT: PASS\nCOMMIT: ${reviewed}` };
+      },
+    };
+    // Every run file is really written, except the one write that would have finished the run.
+    const dyingSave = async (path, value) => { if (path === statePath && value.result) throw new Error('runner died before the result was saved'); await saveJson(path, value); };
+    await assert.rejects(runDelivery({ ...run, runPath }, { ...adapters, save: dyingSave, load: loadText, lock: acquireRunLock }), /died before the result was saved/);
+    const interrupted = await savedState(statePath);
+    assert.deepEqual([interrupted.result, interrupted.actions.at(-1).key, interrupted.actions.at(-1).status], [null, 'verify:0', 'done'], 'the runner stopped with the verification saved and no result');
+    assert.deepEqual([reads, launches], [2, 2]);
+    await change(worktree);
+    const result = await runDelivery({ ...run, runPath }, adapters);
+    const again = await runDelivery({ ...run, runPath }, adapters);
+    return { result, again, reviewed, readsAfterRestart: reads - 2, launchesAfterRestart: launches - 2, state: await savedState(statePath) };
+  };
+  const verifications = (state) => state.actions.filter((action) => action.key === 'verify:0').map(({ attempt, status }) => [attempt, status]);
+
+  await t.test('the worktree moved on to another commit: the reviewed commit is not passed', async () => {
+    const { result, again, state, readsAfterRestart, launchesAfterRestart } = await restartedAfter((worktree) => worktree.inRepo('-c', 'user.name=test', '-c', 'user.email=test@example.invalid', 'commit', '-q', '--allow-empty', '-m', 'landed while the runner was down'));
+    assert.equal(result.outcome, 'park', JSON.stringify(result));
+    assert.match(result.reason, /candidate changed after review/);
+    assert.equal(readsAfterRestart, 1, 'the candidate was measured again after the restart');
+    assert.equal(launchesAfterRestart, 0, 'the finished build and review were not run again');
+    assert.deepEqual(state.result, result, 'the refusal is the saved result');
+    assert.deepEqual(again, result);
+  });
+
+  await t.test('uncommitted edits were left in the worktree: the reviewed commit is not passed', async () => {
+    const { result, state, readsAfterRestart } = await restartedAfter((worktree) => writeFile(join(worktree.path, 'left-behind.txt'), 'edited while the runner was down'));
+    assert.equal(result.outcome, 'park', JSON.stringify(result));
+    assert.match(result.reason, /candidate changed after review/);
+    assert.equal(readsAfterRestart, 1);
+    assert.deepEqual(state.result, result);
+  });
+
+  await t.test('nothing changed: the PASS is recorded from a fresh measurement, and the finished run then answers from its saved result', async () => {
+    const { result, again, reviewed, state, readsAfterRestart, launchesAfterRestart } = await restartedAfter(async () => {});
+    assert.deepEqual([result.outcome, result.commit], ['pass', reviewed]);
+    assert.equal(readsAfterRestart, 1, 'measured once by the restarted runner, and not again by the start after it finished');
+    assert.equal(launchesAfterRestart, 0);
+    assert.deepEqual(verifications(state), [[1, 'stale'], [2, 'done']], 'the earlier verification is kept in the journal, marked as not relied on');
+    assert.deepEqual(again, result);
+  });
 });

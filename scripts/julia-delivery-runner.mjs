@@ -214,6 +214,8 @@ export async function runDelivery({ issueId, configuration, runPath }, { readCar
       const reviewed = record.actions.some((action) => action.kind === 'review' && action.round === record.round && action.status === 'done');
       for (const action of record.actions) {
         if (action.kind === 'candidate' && action.round === record.round && action.status === 'done' && !reviewed) { action.status = 'stale'; action.handling = 'read again after the restart'; }
+        // A verification is never carried across a restart, for the same reason: the runner that records a PASS measures the reviewed candidate itself.
+        if (action.kind === 'verify' && action.status === 'done') { action.status = 'stale'; action.handling = 'measured again after the restart'; }
       }
       await persist();
     }
