@@ -17,11 +17,12 @@ const configuration = {
   builder: { identity: 'claude', model: 'claude-sonnet', maker: 'Anthropic', harness: 'claude-code', thinking: 'high', connection: { route: 'native' } },
   reviewer: { identity: 'codex', model: 'gpt-review', maker: 'OpenAI', harness: 'codex', thinking: null, connection: { route: 'native' } },
 };
+const authorization = { issueId: 'JUL-196', explicitStart: true, authorizedBy: 'fixture operator', spending: { builder: { mode: 'fixture', maxUsd: 0 }, reviewer: { mode: 'fixture', maxUsd: 0 } } };
 const card = { identifier: 'JUL-196', title: 'A card', state: { name: 'Ready', type: 'unstarted' }, description: '## Acceptance criteria\n\n- [ ] It works.' };
 const COMMIT = 'a'.repeat(40);
 const builderSeen = { harness: 'claude-code', model: 'claude-sonnet', maker: 'Anthropic' };
 const reviewerSeen = { harness: 'codex', model: 'gpt-review', maker: 'OpenAI' };
-const run = { issueId: 'JUL-196', configuration };
+const run = { issueId: 'JUL-196', configuration, authorization };
 
 async function runFiles(t) {
   const root = await mkdtemp(join(tmpdir(), 'jul196-recovery-'));
@@ -196,7 +197,7 @@ const runnerSource = (runnerUrl) => [
   "  console.log('WORKER ' + worker.pid);",
   '  await new Promise(() => {});',
   '};',
-  'const inputs = { issueId: process.env.RUN_ISSUE, configuration: JSON.parse(process.env.RUN_CONFIGURATION), runPath: process.env.RUN_PATH };',
+  'const inputs = { authorization: JSON.parse(process.env.RUN_AUTHORIZATION), issueId: process.env.RUN_ISSUE, configuration: JSON.parse(process.env.RUN_CONFIGURATION), runPath: process.env.RUN_PATH };',
   'await runDelivery(inputs, { readCard: async () => JSON.parse(process.env.RUN_CARD), candidate: async () => null, launch });',
 ].join('\n');
 
@@ -209,7 +210,7 @@ test('a runner process killed mid-build is replaced by one that stops its orphan
   const { NODE_TEST_CONTEXT: _context, ...env } = process.env;
   const source = runnerSource(pathToFileURL(resolve('scripts/julia-delivery-runner.mjs')).href);
   const runner = spawn(process.execPath, ['--input-type=module', '-e', source], {
-    env: { ...env, RUN_ISSUE: 'JUL-196', RUN_PATH: runPath, RUN_CONFIGURATION: JSON.stringify(configuration), RUN_CARD: JSON.stringify(card) },
+    env: { ...env, RUN_AUTHORIZATION: JSON.stringify(authorization), RUN_ISSUE: 'JUL-196', RUN_PATH: runPath, RUN_CONFIGURATION: JSON.stringify(configuration), RUN_CARD: JSON.stringify(card) },
     stdio: ['ignore', 'pipe', 'inherit'],
   });
   let workerPid = null;
@@ -330,4 +331,29 @@ test('a restart between the passed verification and the saved result measures th
     assert.deepEqual(verifications(state), [[1, 'stale'], [2, 'done']], 'the earlier verification is kept in the journal, marked as not relied on');
     assert.deepEqual(again, result);
   });
+});
+
+
+test('resuming a spent repair preserves one used and two remaining without charging twice', async t => {
+  const { runPath, statePath } = await runFiles(t);
+  let builds = 0;
+  const adapters = {
+    readCard: async () => card,
+    candidate: async () => ({ commit: String(builds).padStart(40, 'b'), clean: true, checks: { pass: true } }),
+    launch: async (role, request) => {
+      if (role === 'reviewer') return builds === 1 ? { exitCode: 0, observed: reviewerSeen, text: 'VERDICT: FAIL\nrepair this finding' } : { ...pass, text: `VERDICT: PASS\nCOMMIT: ${String(builds).padStart(40, 'b')}` };
+      await request.started(deadWorker());
+      builds++;
+      if (builds === 2) throw new Error('repair interrupted');
+      return { exitCode: 0, observed: builderSeen };
+    },
+  };
+  await assert.rejects(runDelivery({ ...run, runPath }, adapters), /repair interrupted/);
+  assert.equal((await savedState(statePath)).repairsUsed, 1);
+  const result = await runDelivery({ ...run, runPath }, adapters);
+  assert.equal(result.outcome, 'pass');
+  const state = await savedState(statePath);
+  assert.equal(state.repairsUsed, 1);
+  assert.equal(3 - state.repairsUsed, 2);
+  assert.equal(state.actions.filter(a => a.kind === 'build' && a.round === 1).length, 2);
 });
