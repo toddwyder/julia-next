@@ -4,6 +4,7 @@ import { selectCIGates } from './ci-routing.mjs';
 
 test('routes representative changed paths to their focused CI gates', () => {
   assert.deepEqual(selectCIGates(['scripts/julia-init.mjs']), ['baseline', 'julia-init-windows']);
+  assert.deepEqual(selectCIGates(['docs/agents/init.md']), ['baseline', 'julia-init-windows', 'docs-policy']);
   assert.deepEqual(selectCIGates(['ops/factory/app/local-sandbox.test.mjs']), ['baseline', 'factory']);
   assert.deepEqual(selectCIGates(['app/recipes/page.tsx']), ['baseline', 'web']);
   assert.deepEqual(selectCIGates(['app/removed-page.tsx']), ['baseline', 'web']);

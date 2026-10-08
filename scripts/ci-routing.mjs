@@ -3,7 +3,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 const GATES = ['baseline', 'julia-init-windows', 'factory', 'database', 'web', 'docs-policy'];
 
 const GATE_PATHS = {
-  'julia-init-windows': [/^scripts\/(?:julia-init|delivery-tool-settings)/, /^delivery-tools\.json$/, /^docs\/agents\/work-execution\.md$/],
+  'julia-init-windows': [/^scripts\/(?:julia-init|delivery-tool-settings)/, /^delivery-tools\.json$/, /^docs\/agents\/(?:init|work-execution)\.md$/],
   factory: [/^ops\/factory\//, /^scripts\/factory-/],
   database: [/^ops\/factory\/model-face-values\./],
   web: [/^(?:app|lib)\//, /^(?:next\.config|playwright\.config)/, /^tests\//, /^scripts\/(?:health-route|dynamic-route|web-app|framework-lint)\./],
