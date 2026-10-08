@@ -1,8 +1,7 @@
-// julia-delivery-interrupt.test.mjs -- the real-worker interruption proof for
-// the delivery runner (JUL-196 step 7). Each scenario starts a real runner
-// process, kills it while a real worker is active (installed Claude Code, or
-// the real codex reviewer), starts a new runner on the same run files, and
-// checks what the restart did.
+// JUL-196 interruption regression: kill actual runner processes while an OS
+// child is active, then restart on the same run files. Reviewers are ALWAYS
+// deterministic process fixtures, never paid providers. Claude builder cases
+// retain real integration coverage with an explicit quota-blocked skip.
 //
 // It is part of the ordinary regression run on Windows, where the delivery
 // route runs. A scenario is skipped only when the platform or an installed
@@ -21,7 +20,6 @@
 //                                Code reports for the saved `opus` builder. The
 //                                runner parks a builder whose observed model is
 //                                not its configured one. Effort is the saved `high`.
-//   JUL196_PROOF_REVIEWER_MODEL  default gpt-6.1-sol, the exact OpenAI model id.
 //   JUL196_PROOF_KILL_AFTER_MS   default 1000: how long the worker has been
 //                                recorded as running when its runner is killed.
 //
@@ -30,8 +28,7 @@
 // stand-ins, and the evidence labels both: the candidate step is a disposable
 // snapshot and content check (not the JUL-122 checks), and the build and
 // repair scenarios script the reviewer's verdict to drive the recovery (a
-// scripted verdict is not a review). The review scenario starts the real
-// codex reviewer.
+// scripted verdict is not a review). No scenario starts a real reviewer.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { spawn, spawnSync } from 'node:child_process';
@@ -40,12 +37,11 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { processStarted, saveJson, sha256 } from './julia-delivery-state.mjs';
+import { processStarted, saveJson, sha256, stopProcessTree } from './julia-delivery-state.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const evidenceDir = process.env.JUL196_PROOF_EVIDENCE_DIR ? resolve(process.env.JUL196_PROOF_EVIDENCE_DIR) : null;
 const builderModel = process.env.JUL196_PROOF_BUILDER_MODEL ?? 'claude-opus-5-5';
-const reviewerModel = process.env.JUL196_PROOF_REVIEWER_MODEL ?? 'gpt-6.1-sol';
 const killAfterMs = Number(process.env.JUL196_PROOF_KILL_AFTER_MS ?? 1000);
 const wait = (ms) => new Promise((done) => { setTimeout(done, ms); });
 const { NODE_TEST_CONTEXT: _context, ...env } = process.env;
@@ -55,6 +51,7 @@ const { NODE_TEST_CONTEXT: _context, ...env } = process.env;
 // failure of the scenario, never a skip.
 const installed = (name) => spawnSync('where.exe', [name], { stdio: 'ignore', windowsHide: true }).status === 0;
 function missing(...workers) {
+  if (process.env.JUL196_CLAUDE_QUOTA_BLOCKED === '1' && workers.includes('claude')) return 'Claude real integration quota-blocked: JUL196_CLAUDE_QUOTA_BLOCKED=1; historical results retained';
   if (process.platform !== 'win32') return `the delivery route and its real workers are on Windows; this is ${process.platform}`;
   const absent = workers.filter((worker) => !installed(worker));
   return absent.length ? `not installed on this machine: ${absent.join(', ')}` : false;
@@ -62,9 +59,9 @@ function missing(...workers) {
 
 const native = { route: 'native', provider: null, endpoint: null, protocol: null, authReference: null };
 // A scenario whose verdicts are scripted does not name a real reviewer model.
-const configurationFor = (realReviewer) => ({
+const configurationFor = () => ({
   builder: { identity: 'anthropic-builder', model: builderModel, maker: 'Anthropic', harness: 'claude-code', thinking: 'high', connection: native },
-  reviewer: { identity: 'openai-reviewer', model: realReviewer ? reviewerModel : 'scripted-stand-in', maker: 'OpenAI', harness: 'codex', thinking: null, connection: native },
+  reviewer: { identity: 'fixture-reviewer', model: 'scripted-stand-in', maker: 'Fixture', harness: 'fixture', thinking: null, connection: native },
 });
 const description = [
   'This is a disposable recovery proof, not product work. Do exactly this and nothing else:',
@@ -81,7 +78,7 @@ const card = { identifier: 'JUL-196', title: 'Recovery proof (disposable)', stat
 async function prepare(name, plan) {
   const proofDir = await mkdtemp(join(tmpdir(), `jul196-real-proof-${name}-`));
   const worktree = join(proofDir, 'worktree');
-  const configuration = configurationFor(Boolean(plan.realReviewer));
+  const configuration = configurationFor();
   await mkdir(join(worktree, '.agents', 'skills', 'implement'), { recursive: true });
   await copyFile(resolve(here, '../.agents/skills/implement/SKILL.md'), join(worktree, '.agents', 'skills', 'implement', 'SKILL.md'));
   const git = (...args) => { const result = spawnSync('git', ['-C', worktree, ...args], { encoding: 'utf8' }); assert.equal(result.status, 0, result.stderr); return result.stdout.trim(); };
@@ -98,7 +95,7 @@ function startRunner(proofDir) {
   let out = ''; let err = '';
   child.stdout.on('data', (chunk) => { out += chunk; }); child.stderr.on('data', (chunk) => { err += chunk; });
   const exited = new Promise((done) => { child.on('exit', (code, signal) => done({ code, signal })); });
-  return { child, exited, result: () => { const line = /^RESULT (.*)$/m.exec(out)?.[1]; return line ? JSON.parse(line) : null; }, stderr: () => err.slice(-2000) };
+  return { child, exited, fixtures: () => [...out.matchAll(/^FIXTURE (.*)$/gm)].map(match => JSON.parse(match[1])), result: () => { const line = /^RESULT (.*)$/m.exec(out)?.[1]; return line ? JSON.parse(line) : null; }, stderr: () => err.slice(-2000) };
 }
 
 const readState = async (statePath) => { try { return JSON.parse(await readFile(statePath, 'utf8')); } catch { return null; } };
@@ -112,6 +109,10 @@ async function interruptAndResume(t, name, key, plan) {
   t.after(async () => {
     // Only the runner processes this scenario started itself are ever stopped here.
     for (const { child } of runners) if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+    const state = await readState(proof.statePath);
+    for (const action of state?.actions ?? []) {
+      if (action.worker && processStarted(action.worker.pid) === action.worker.started) stopProcessTree(action.worker.pid);
+    }
     // Removing the disposable directory is housekeeping: a directory that will not go is reported, and the proof's result stands.
     const removed = finished && !evidenceDir && await rm(proof.proofDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }).then(() => true, () => false);
     if (!removed) t.diagnostic(`run files and worker evidence kept in ${proof.proofDir}`);
@@ -119,7 +120,7 @@ async function interruptAndResume(t, name, key, plan) {
   const runner = () => { const started = startRunner(proof.proofDir); runners.push(started); return started; };
   const first = runner();
   let open = null;
-  const deadline = Date.now() + 10 * 60 * 1000;
+  const deadline = Date.now() + (plan.processFixture ? 30000 : 10 * 60 * 1000);
   while (!open && Date.now() < deadline) {
     const state = await readState(proof.statePath);
     open = state?.actions.find((action) => action.key === key && action.status === 'started' && action.worker) ?? null;
@@ -127,13 +128,13 @@ async function interruptAndResume(t, name, key, plan) {
     if (!open) await wait(500);
   }
   assert.ok(open, `the run reached ${key} with a recorded worker (${first.stderr()})`);
-  await wait(killAfterMs);
+  await wait(plan.processFixture ? 100 : killAfterMs);
   const workerActiveAtKill = processStarted(open.worker.pid) === open.worker.started;
   assert.ok(workerActiveAtKill, `the real ${open.role} (process ${open.worker.pid}) was still working when its runner was killed`);
   const killedAt = new Date().toISOString();
   first.child.kill('SIGKILL');
   await first.exited;
-  await wait(3000);
+  await wait(plan.processFixture ? 100 : 3000);
   const workerAfterKill = processStarted(open.worker.pid) === open.worker.started ? 'still running without a runner' : 'ended with its runner';
   const partialChanges = proof.git('status', '--porcelain').split('\n').filter(Boolean);
   const interrupted = await readState(proof.statePath);
@@ -145,14 +146,18 @@ async function interruptAndResume(t, name, key, plan) {
     scenario: name, test: 'scripts/julia-delivery-interrupt.test.mjs', interruptedAction: key, configuration: proof.configuration, killedAt, killAfterMs, workerActiveAtKill, workerAfterKill, partialChangesAtRestart: partialChanges,
     secondRunnerExit: exit, result, restarts: state?.restarts, repairsUsed: state?.repairsUsed, stage: state?.stage,
     approvedInputUnchanged: sha256(await readFile(proof.approvedPath, 'utf8')) === proof.approvedHash && state?.approved.sha256 === proof.approvedHash,
-    worktree: state?.worktree, findingsBeforeRestart: interrupted?.findings ?? [], findingsAfter: state?.findings ?? [],
+    worktree: state?.worktree, worktreeBeforeRestart: interrupted?.worktree, findingsBeforeRestart: interrupted?.findings ?? [], findingsAfter: state?.findings ?? [],
+    resumedFixtureActions: second.fixtures(),
     actions: state ? journal(state) : null, proofTxt: await readFile(join(proof.worktree, 'proof.txt'), 'utf8').catch(() => null),
-    reviewer: plan.realReviewer ? 'real codex reviewer' : 'scripted stand-in (not a review)', candidate: 'disposable snapshot and content check (not the JUL-122 checks)',
+    builder: plan.processFixture ? 'deterministic OS process fixture (not provider integration)' : 'real Claude builder',
+    reviewer: 'deterministic fixture / scripted verdict (not provider integration or a review)', candidate: 'disposable snapshot and content check (not the JUL-122 checks)',
     proofDir: proof.proofDir, savedAt: new Date().toISOString(),
   };
-  await saveJson(join(evidenceDir ?? proof.proofDir, `real-proof-${name}.json`), evidence);
+  await saveJson(join(evidenceDir ?? proof.proofDir, `${plan.processFixture ? 'process-fixture' : 'real-proof'}-${name}.json`), evidence);
   assert.ok(result, `the second runner reported a result (${second.stderr()})`);
   assert.deepEqual(state.result, result, 'the reported result is the one saved in the run record');
+  assert.equal(state.worktree.path, proof.worktree);
+  assert.deepEqual(state.worktree, interrupted.worktree, 'restart kept exactly the same worktree identity');
   t.diagnostic(`${name}: ${result.outcome}${result.reason ? ` (${result.reason})` : ''}; repairs used ${state.repairsUsed}; worker ${workerAfterKill}`);
   return { evidence, state, interrupted, passed: () => { finished = true; } };
 }
@@ -163,7 +168,31 @@ const oneWorkerAtATime = (state) => {
   assert.match(stopped.handling, /had already exited|was stopped/, 'the old worker was proved gone');
   assert.ok(Date.parse(next.startedAt) >= Date.parse(stopped.interruptedAt), 'the next worker started only after the old one was settled');
   if (next.worker) assert.notDeepEqual(next.worker, stopped.worker, 'the next worker is a different process');
+  assert.notEqual(processStarted(stopped.worker.pid), stopped.worker.started, 'the old PID/start identity is gone');
 };
+
+test('deterministic build process fixture: killed runner keeps partial changes and finishes without overlapping workers', { timeout: 60000 }, async t => {
+  const { evidence, state, passed } = await interruptAndResume(t, 'fixture-build', 'build:0', { processFixture: true, interruptAction: 'build:0', passWhen: '^JUL-196 recovery proof', finding: 'fixture finding' });
+  assert.equal(evidence.approvedInputUnchanged, true);
+  assert.deepEqual([state.restarts, state.repairsUsed], [1, 1]);
+  assert.equal(evidence.result.outcome, 'pass');
+  assert.equal(evidence.resumedFixtureActions[0].before, 'JUL-196 recovery proof\npartial\n');
+  assert.match(evidence.proofTxt, /partial\nrepaired/);
+  oneWorkerAtATime(state); passed();
+});
+
+test('deterministic repair process fixture: killed runner preserves completed build, findings and spent budget', { timeout: 60000 }, async t => {
+  const finding = 'Finding: append repaired without discarding partial edits.';
+  const { evidence, state, interrupted, passed } = await interruptAndResume(t, 'fixture-repair', 'build:1', { processFixture: true, interruptAction: 'build:1', passWhen: '^JUL-196 recovery proof\\r?\\npartial\\r?\\nrepaired', finding });
+  assert.equal(evidence.approvedInputUnchanged, true);
+  assert.equal(interrupted.repairsUsed, 1);
+  assert.equal(state.repairsUsed, 2, 'the disposable interrupted repair consumes a repair; the actual code repair remains 1/3');
+  assert.deepEqual(state.findings[0], interrupted.findings[0]);
+  assert.equal(state.actions.filter(action => action.key === 'build:0').length, 1);
+  assert.equal(evidence.resumedFixtureActions[0].before, 'JUL-196 recovery proof\npartial\nrepaired\n');
+  assert.equal(evidence.result.outcome, 'pass');
+  oneWorkerAtATime(state); passed();
+});
 
 test('real Claude builder: the runner is killed during the initial build and a new runner finishes the run', { skip: missing('claude'), timeout: 20 * 60 * 1000 }, async (t) => {
   const { evidence, state, passed } = await interruptAndResume(t, 'build', 'build:0', { passWhen: '^JUL-196 recovery proof', finding: 'proof.txt must start with the line JUL-196 recovery proof.' });
@@ -187,12 +216,14 @@ test('real Claude builder: the runner is killed during a repair; findings and th
   passed();
 });
 
-test('real codex reviewer: the runner is killed during review and the review is run again without rebuilding', { skip: missing('claude', 'codex'), timeout: 30 * 60 * 1000 }, async (t) => {
-  const { evidence, state, passed } = await interruptAndResume(t, 'review', 'review:0', { realReviewer: true });
+test('deterministic review process fixture: interruption parks without another review or build', { timeout: 60000 }, async (t) => {
+  const { evidence, state, passed } = await interruptAndResume(t, 'fixture-review', 'review:0', { processFixture: true, interruptAction: 'review:0', passWhen: '^JUL-196 recovery proof' });
   assert.equal(evidence.approvedInputUnchanged, true);
   assert.equal(state.actions.filter((action) => action.kind === 'build').length, 1, 'the finished build was not run again');
-  assert.deepEqual(state.actions.filter((action) => action.key === 'review:0').map(({ attempt, status }) => [attempt, status]), [[1, 'interrupted'], [2, 'done']]);
-  oneWorkerAtATime(state);
-  // The run's outcome is recorded and printed, not asserted: whether the real reviewer's identity and verdict are accepted is outside step 7.
+  assert.deepEqual(state.actions.filter((action) => action.key === 'review:0').map(({ attempt, status }) => [attempt, status]), [[1, 'uncertain']]);
+  assert.equal(evidence.result.unsafe, true);
+  assert.match(evidence.result.reason, /review.*interrupted.*not.*retr/i);
+  assert.match(state.actions.at(-1).handling, /had already exited|was stopped/);
+  assert.notEqual(processStarted(state.actions.at(-1).worker.pid), state.actions.at(-1).worker.started);
   passed();
 });

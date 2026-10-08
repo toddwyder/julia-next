@@ -3,7 +3,8 @@
 // testable and make each worker's observed identity part of the durable record.
 import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { isDeepStrictEqual } from 'node:util';
 import { getIssue } from './linear-cli.mjs';
 import { git, runChecks, localTester } from './julia-minimal-runner-checks.mjs';
@@ -35,7 +36,7 @@ export function workerPrompt(role, card, configuration, runPath, approvedPath, f
   // A builder that follows an interrupted one inherits its unfinished edits; it is told so, never left to guess.
   const resumed = interrupted ? '\n\nThe previous builder for this work was interrupted before it finished. Its partial changes are still in the worktree: inspect them first (git status, git diff) and finish the work from there. Do not discard them or start over.' : '';
   if (role === 'builder') return `${common}\n\nExplicitly read and follow .agents/skills/implement/SKILL.md for ${card.identifier}. The approved requirements are only in ${approvedPath}; do not reread Linear. Work only in the prepared isolated worktree.${resumed}${findings ? `\n\nRepair these review findings:\n${findings}` : ''}`;
-  return `${common}\n\nReview the candidate named in the saved handoff file only. You are independent of the builder and must not receive its conversation. End with exactly VERDICT: PASS or VERDICT: FAIL, and name the reviewed 40-character commit.`;
+  return `${common}\n\nReview the changed, checked immutable candidate named in the saved handoff file only, in one fresh session. Keep Standards and Spec separate in the report. You are independent of the builder and must not receive its conversation. Save and reuse this review for this candidate; no polling or retry after an ambiguous or failing call, and no unchanged rereview. End with exactly VERDICT: PASS or VERDICT: FAIL, and name the reviewed 40-character commit.`;
 }
 
 function validObserved(role, configured, observed) {
@@ -81,20 +82,53 @@ function claudeCommand() {
   throw new Error('Installed Claude Code native executable was not found');
 }
 
-export function productionLauncher(worktree) {
+function nativeCommand(harness) {
+  if (harness === 'claude-code') return claudeCommand();
+  if (harness !== 'codex') return null;
+  if (process.platform !== 'win32') return 'codex';
+  const native = spawnSync('where.exe', ['codex.exe'], { encoding: 'utf8', windowsHide: true });
+  if (native.status === 0) return native.stdout.trim().split(/\r?\n/)[0];
+  throw new Error('Installed Codex native executable was not found');
+}
+
+// Read the exact thread's native session record once; never trust agent prose
+// or the requested model. Missing/conflicting metadata fails identity closed.
+function codexIdentity(output, root) {
+  const events = output.split(/\r?\n/).flatMap(line => { try { return [JSON.parse(line)]; } catch { return []; } });
+  const thread = events.find(event => event.type === 'thread.started')?.thread_id;
+  if (!/^[0-9a-f-]{36}$/i.test(thread ?? '')) return null;
+  const walk = (directory) => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) { const found = walk(path); if (found) return found; }
+      else if (entry.name.startsWith('rollout-') && entry.name.endsWith(`-${thread}.jsonl`)) return path;
+    }
+    return null;
+  };
+  try {
+    const path = walk(root); if (!path) return null;
+    const records = readFileSync(path, 'utf8').split(/\r?\n/).filter(Boolean).map(line => JSON.parse(line));
+    const session = records.find(event => event.type === 'session_meta')?.payload;
+    const turns = records.filter(event => event.type === 'turn_context').map(event => event.payload);
+    if (session?.id !== thread || session.model_provider !== 'openai' || !turns.length || !turns[0]?.model || turns.some(turn => turn.model !== turns[0].model)) return null;
+    return { thread, path, provider: session.model_provider, model: turns[0].model, effort: turns[0].reasoning_effort ?? turns[0].effort ?? null };
+  } catch { return null; }
+}
+
+export function productionLauncher(worktree, { run = runLimited, findExecutable = nativeCommand, sessionRoot = join(process.env.CODEX_HOME || join(homedir(), '.codex'), 'sessions') } = {}) {
   return async (role, request) => {
     const configured = request.configuration;
     const cwd = role === 'builder' ? worktree : process.cwd();
     const startedAt = new Date().toISOString();
     // A worker whose executable cannot be found is recorded like one that could not be started.
     let command = null; let failed = null;
-    try { command = configured.harness === 'claude-code' ? claudeCommand() : configured.harness === 'codex' ? 'codex' : null; }
+    try { command = findExecutable(configured.harness); }
     catch (cause) { failed = failure(`find ${configured.harness} executable`, cause); }
     const args = configured.harness === 'claude-code' ? ['-p', '--model', configured.model, '--effort', configured.thinking ?? 'high', '--output-format', 'stream-json', '--verbose', '--permission-mode', 'acceptEdits', '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}', '--tools', 'Read,Edit,Write,Bash,Glob,Grep,Skill', '--allowedTools', 'Read,Edit,Write,Glob,Grep,Skill,Bash(node --test *),Bash(git status *),Bash(git diff *)']
-      : configured.harness === 'codex' ? ['exec', '-m', configured.model, '-s', 'read-only', '--skip-git-repo-check', '-'] : [];
+      : configured.harness === 'codex' ? ['exec', '-m', configured.model, '-c', 'model_provider="openai"', '-c', 'approval_policy="never"', ...(configured.thinking ? ['-c', `model_reasoning_effort="${configured.thinking}"`] : []), '-s', role === 'builder' ? 'workspace-write' : 'read-only', '--skip-git-repo-check', '--json', '-'] : [];
     if (!command && !failed) return { exitCode: 2, observed: null, text: `unsupported harness ${configured.harness}` };
     let output = ''; let error = ''; let pid = null; let unrecorded = null;
-    const result = failed ? { code: null, signal: null, stopped: false } : await runLimited(command, args, { cwd, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true }, {
+    const result = failed ? { code: null, signal: null, stopped: false } : await run(command, args, { cwd, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true }, {
       seconds: LIMITS.builder.fallback,
       started: (child) => {
         child.stdout.on('data', (chunk) => { output += chunk; }); child.stderr.on('data', (chunk) => { error += chunk; }); child.stdin.on('error', () => {});
@@ -109,8 +143,9 @@ export function productionLauncher(worktree) {
       },
     });
     failed ??= failure('start worker', result.error) ?? unrecorded;
-    const observed = /^OBSERVED:\s*(\{.*\})$/m.exec(output)?.[1];
-    let identity = null; try { identity = observed && JSON.parse(observed); } catch { /* fail closed below */ }
+    let identity = null;
+    const identityEvidence = configured.harness === 'codex' ? codexIdentity(output, sessionRoot) : null;
+    if (identityEvidence) identity = { harness: 'codex', model: identityEvidence.model, maker: 'OpenAI' };
     if (configured.harness === 'claude-code') {
       const events = output.split(/\r?\n/).flatMap(line => { try { return [JSON.parse(line)]; } catch { return []; } });
       const init = events.find(event => event.type === 'system' && event.subtype === 'init');
@@ -120,7 +155,7 @@ export function productionLauncher(worktree) {
     const finishedAt = new Date().toISOString();
     const exitCode = result.stopped ? 124 : unrecorded ? 1 : result.code ?? 1;
     // The worker's own streams are the evidence; nothing here is summarised.
-    if (request.outputPath) await fileSave(request.outputPath, { role, configured, observed: identity ?? null, command, cwd, pid, exitCode, signal: result.signal ?? null, timedOut: result.stopped, error: failed, startedAt, finishedAt, stdout: output, stderr: error });
+    if (request.outputPath) await fileSave(request.outputPath, { role, configured, observed: identity ?? null, identityEvidence, command, args, cwd, pid, exitCode, signal: result.signal ?? null, timedOut: result.stopped, error: failed, startedAt, finishedAt, stdout: output, stderr: error });
     return { exitCode, observed: identity ?? null, text: output || error || failed?.message || '', outputPath: request.outputPath ?? null, timedOut: result.stopped };
   };
 }
@@ -206,6 +241,10 @@ export async function runDelivery({ issueId, configuration, runPath }, { readCar
         if (settled.unsafe && !settled.final) return await refuse(settled.unsafe, open.round);
         open.interruptedAt = now(); open.handling = settled.unsafe ?? settled.handling;
         if (settled.unsafe) { open.status = 'uncertain'; return await finish(unsafe(settled.unsafe, open.round)); }
+        if (open.kind === 'review') {
+          open.status = 'uncertain';
+          return await finish(unsafe('review was interrupted; its provider outcome is ambiguous and is not retried', open.round));
+        }
         open.status = 'interrupted';
         // An interrupted build is not retried for free: the next builder is the next round.
         if (open.kind === 'build') record.round = open.round + 1;
@@ -277,6 +316,7 @@ export async function runDelivery({ issueId, configuration, runPath }, { readCar
       if (builder.exitCode !== 0 || builderIdentity) return await finish(park(builderIdentity ?? `builder exited ${builder.exitCode}`, round));
       const current = await act('candidate', round, null, () => candidate({ round }));
       if (!SHA.test(current?.commit ?? '') || !current.clean || !current.checks?.pass) return await finish(park(!SHA.test(current?.commit ?? '') ? 'candidate has no immutable commit' : !current.clean ? 'candidate drifted or is dirty' : 'candidate checks failed', round));
+      if (!isDone('review', round) && record.findings.some(finding => finding.commit === current.commit)) return await finish(park('unchanged candidate: saved review findings require changed checked code before another review', round));
       const handoffPath = join(directory, `${issueId}-handoff-round-${round}.json`);
       const handoff = { issueId, round, approvedPath, candidate: current, builder: { configured: configuration.builder, observed: builder.observed, exitCode: builder.exitCode, outputPath: builder.outputPath ?? null }, createdAt: now() };
       if (!isDone('review', round)) await save(handoffPath, handoff);

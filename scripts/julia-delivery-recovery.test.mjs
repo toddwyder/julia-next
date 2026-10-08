@@ -41,7 +41,7 @@ function idleProcess(t) {
   return child;
 }
 
-test('a restart after the runner dies during review keeps the finished build and does not read Linear again', async (t) => {
+test('a restart after the runner dies during review parks without retrying and does not read Linear again', async (t) => {
   const { runPath } = await runFiles(t);
   const launches = []; let reads = 0;
   const adapters = (review) => ({
@@ -55,8 +55,9 @@ test('a restart after the runner dies during review keeps the finished build and
   });
   await assert.rejects(runDelivery({ ...run, runPath }, adapters(async () => { throw new Error('runner died during review'); })), /runner died during review/);
   const result = await runDelivery({ ...run, runPath }, adapters(async () => ({ exitCode: 0, observed: reviewerSeen, text: `VERDICT: PASS\nCOMMIT: ${COMMIT}` })));
-  assert.equal(result.outcome, 'pass');
-  assert.deepEqual(launches, ['builder', 'reviewer', 'reviewer'], 'the finished build is not run again');
+  assert.equal(result.unsafe, true);
+  assert.match(result.reason, /review.*interrupted.*not.*retr/i);
+  assert.deepEqual(launches, ['builder', 'reviewer'], 'neither the finished build nor the ambiguous review is run again');
   assert.equal(reads, 1, 'the approved requirements are read from Linear once');
 });
 

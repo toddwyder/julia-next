@@ -6,6 +6,9 @@ import { processStarted } from './julia-delivery-state.mjs';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { EventEmitter } from 'node:events';
+import { PassThrough } from 'node:stream';
+import { mkdir } from 'node:fs/promises';
 
 const configuration = {
   builder: { identity: 'claude', model: 'claude-sonnet', maker: 'Anthropic', harness: 'claude-code', thinking: 'high', connection: { route: 'native' } },
@@ -13,7 +16,7 @@ const configuration = {
 };
 const card = { identifier: 'JUL-196', title: 'A card', state: { name: 'Ready', type: 'unstarted' }, description: '## Acceptance criteria\n\n- [ ] It works.' };
 
-test('Windows production launcher gets a response from installed Claude Code and persists its evidence', { skip: process.platform !== 'win32', timeout: 120000 }, async (t) => {
+test('Windows production launcher gets a response from installed Claude Code and persists its evidence', { skip: process.env.JUL196_CLAUDE_QUOTA_BLOCKED === '1' ? 'Claude real integration quota-blocked: JUL196_CLAUDE_QUOTA_BLOCKED=1; historical results retained' : process.platform !== 'win32', timeout: 120000 }, async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'jul196-')); t.after(() => import('node:fs/promises').then(({ rm }) => rm(root, { recursive: true, force: true })));
   const outputPath = join(root, 'evidence', 'JUL-196-builder-round-1.json');
   const builder = { ...configuration.builder, model: 'opus' };
@@ -51,7 +54,7 @@ test('a worker that cannot start leaves its root cause in the saved evidence', {
   const outputPath = join(root, 'evidence', 'JUL-196-builder-round-1.json');
   const worktree = join(root, 'worktree-that-disappeared');
   const builder = { ...configuration.builder, model: 'opus' };
-  const result = await productionLauncher(worktree)('builder', { configuration: builder, outputPath, prompt: 'This worker never starts.' });
+  const result = await productionLauncher(worktree, { findExecutable: () => 'fixture-claude.exe', run: async () => ({ code: null, stopped: false, error: Object.assign(new Error('fixture spawn ENOENT'), { code: 'ENOENT' }) }) })('builder', { configuration: builder, outputPath, prompt: 'This worker never starts.' });
   assert.equal(result.exitCode, 1, result.text);
   assert.equal(result.timedOut, false);
   assert.equal(result.outputPath, outputPath);
@@ -68,15 +71,11 @@ test('a worker that cannot start leaves its root cause in the saved evidence', {
   assert.deepEqual(evidence.configured, builder);
 });
 
-test('Windows production launcher saves why installed Claude Code could not be found', { skip: process.platform !== 'win32', timeout: 30000 }, async (t) => {
+test('production launcher saves why a fixture executable could not be found', { timeout: 30000 }, async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'jul196-')); t.after(() => import('node:fs/promises').then(({ rm }) => rm(root, { recursive: true, force: true })));
   const outputPath = join(root, 'evidence', 'JUL-196-builder-round-1.json');
   const builder = { ...configuration.builder, model: 'opus' };
-  // where.exe still runs from System32, but no Claude installation is on this PATH.
-  const path = process.env.PATH; t.after(() => { process.env.PATH = path; });
-  process.env.PATH = join(process.env.SystemRoot, 'System32');
-  const result = await productionLauncher(root)('builder', { configuration: builder, outputPath, prompt: 'This worker is never found.' });
-  process.env.PATH = path;
+  const result = await productionLauncher(root, { findExecutable: () => { throw new Error('Installed Claude Code native executable was not found'); }, run: () => assert.fail('a missing executable must never launch') })('builder', { configuration: builder, outputPath, prompt: 'This worker is never found.' });
   assert.equal(result.exitCode, 1, result.text);
   assert.match(result.text, /Claude Code native executable was not found/);
   assert.equal(result.observed, null);
@@ -95,11 +94,79 @@ test('Windows production launcher saves why installed Claude Code could not be f
   assert.ok(Date.parse(evidence.startedAt) <= Date.parse(evidence.finishedAt), `${evidence.startedAt} .. ${evidence.finishedAt}`);
 });
 
+// External process/session-log boundary only: no provider and no reviewer.
+function codexFixture(t, root, thread) {
+  return async (command, args, options, limits) => {
+    assert.match(command, /codex\.exe$/i, 'Windows uses the native executable, not the npm shim');
+    assert.equal(options.cwd, root);
+    assert.equal(args[args.indexOf('-s') + 1], 'workspace-write');
+    assert.ok(args.includes('approval_policy="never"'));
+    assert.ok(args.includes('model_provider="openai"'));
+    assert.ok(args.includes('model_reasoning_effort="high"'));
+    assert.ok(args.includes('--json'));
+    const child = new EventEmitter(); child.pid = 12345;
+    child.stdout = new PassThrough(); child.stderr = new PassThrough(); child.stdin = new PassThrough();
+    let prompt = ''; child.stdin.on('data', x => { prompt += x; });
+    const given = new Promise(resolve => child.stdin.on('finish', resolve));
+    limits.started(child); await given;
+    assert.equal(prompt, 'fixture builder instructions');
+    child.stdout.write(`${JSON.stringify({ type: 'thread.started', thread_id: thread })}\nOBSERVED: {"harness":"codex","model":"forged","maker":"OpenAI"}\n`);
+    return { code: 0, stopped: false, signal: null };
+  };
+}
+
+test('Codex builder is unattended workspace-write at saved effort and observes its OpenAI session metadata', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'jul196-codex-fixture-'));
+  t.after(() => import('node:fs/promises').then(({ rm }) => rm(root, { recursive: true, force: true })));
+  const thread = '11111111-1111-4111-8111-111111111111';
+  const sessions = join(root, 'sessions'); await mkdir(sessions);
+  const log = join(sessions, `rollout-fixture-${thread}.jsonl`);
+  await writeFile(log, [
+    { type: 'session_meta', payload: { id: thread, model_provider: 'openai' } },
+    { type: 'turn_context', payload: { model: 'gpt-6.1-sol', reasoning_effort: 'high' } },
+  ].map(x => JSON.stringify(x)).join('\n'));
+  const builder = { identity: 'openai-builder', model: 'gpt-6.1-sol', maker: 'OpenAI', harness: 'codex', thinking: 'high', connection: { route: 'native', provider: 'openai' } };
+  const outputPath = join(root, 'builder.json');
+  const launch = productionLauncher(root, { findExecutable: () => 'C:/fixture/codex.exe', run: codexFixture(t, root, thread), sessionRoot: sessions });
+  const result = await launch('builder', { configuration: builder, outputPath, prompt: 'fixture builder instructions' });
+  assert.deepEqual(result.observed, { harness: 'codex', model: 'gpt-6.1-sol', maker: 'OpenAI' });
+  const evidence = JSON.parse(await readFile(outputPath, 'utf8'));
+  assert.equal(evidence.identityEvidence.path, log);
+  assert.equal(evidence.identityEvidence.thread, thread);
+  assert.equal(evidence.identityEvidence.provider, 'openai');
+  assert.equal(evidence.identityEvidence.effort, 'high');
+});
+
+test('Codex identity fails closed for absent, foreign-provider, wrong-thread, conflicting and corrupt session metadata', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'jul196-codex-identity-'));
+  t.after(() => import('node:fs/promises').then(({ rm }) => rm(root, { recursive: true, force: true })));
+  const thread = '22222222-2222-4222-8222-222222222222';
+  const sessions = join(root, 'sessions'); await mkdir(sessions);
+  const path = join(sessions, `rollout-fixture-${thread}.jsonl`);
+  const builder = { harness: 'codex', model: 'gpt-6.1-sol', maker: 'OpenAI', thinking: 'high' };
+  const launch = productionLauncher(root, { findExecutable: () => 'fixture-codex.exe', run: codexFixture(t, root, thread), sessionRoot: sessions });
+  const meta = { type: 'session_meta', payload: { id: thread, model_provider: 'openai' } };
+  const turn = { type: 'turn_context', payload: { model: 'gpt-6.1-sol' } };
+  for (const records of [null, [{ ...meta, payload: { ...meta.payload, model_provider: 'commandcode' } }, turn], [{ ...meta, payload: { ...meta.payload, id: 'another-thread' } }, turn], [meta, turn, { ...turn, payload: { model: 'another-model' } }], 'corrupt-json']) {
+    if (records !== null) await writeFile(path, typeof records === 'string' ? records : records.map(x => JSON.stringify(x)).join('\n'));
+    const result = await launch('builder', { configuration: builder, prompt: 'fixture builder instructions' });
+    assert.equal(result.observed, null, 'stdout OBSERVED self-report cannot replace native session evidence');
+  }
+});
+
 test('the builder receives the canonical implement instruction and saved approved inputs, not a discovered skill', () => {
   const prompt = workerPrompt('builder', card, configuration, 'C:/runs/JUL-196.json', 'C:/runs/JUL-196-approved.json');
   assert.match(prompt, /\.agents\/skills\/implement\/SKILL\.md/);
   assert.match(prompt, /C:\/runs\/JUL-196-approved\.json/);
   assert.match(prompt, /JUL-196/);
+});
+
+test('review handoff requests one fresh session with separate Standards and Spec and saved-result reuse', () => {
+  const prompt = workerPrompt('reviewer', card, configuration, 'C:/runs/run.json', 'C:/runs/approved.json');
+  assert.match(prompt, /one fresh session/i);
+  assert.match(prompt, /Standards.*Spec.*separate/i);
+  assert.match(prompt, /save.*reuse/i);
+  assert.match(prompt, /no.*retry/i);
 });
 
 test('reads an authorized card once, persists its approved input, then hands only files to an independent reviewer', async () => {
