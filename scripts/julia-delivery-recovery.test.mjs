@@ -1,0 +1,273 @@
+// Restart recovery for the delivery runner (JUL-196 step 7). Every test goes
+// through the public seams: runDelivery / startDelivery with real run files in
+// a temporary directory, and real processes wherever a worker's identity matters.
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { spawn, spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+import { runDelivery, startDelivery } from './julia-delivery-runner.mjs';
+import { processStarted } from './julia-delivery-state.mjs';
+
+const configuration = {
+  builder: { identity: 'claude', model: 'claude-sonnet', maker: 'Anthropic', harness: 'claude-code', thinking: 'high', connection: { route: 'native' } },
+  reviewer: { identity: 'codex', model: 'gpt-review', maker: 'OpenAI', harness: 'codex', thinking: null, connection: { route: 'native' } },
+};
+const card = { identifier: 'JUL-196', title: 'A card', state: { name: 'Ready', type: 'unstarted' }, description: '## Acceptance criteria\n\n- [ ] It works.' };
+const COMMIT = 'a'.repeat(40);
+const builderSeen = { harness: 'claude-code', model: 'claude-sonnet', maker: 'Anthropic' };
+const reviewerSeen = { harness: 'codex', model: 'gpt-review', maker: 'OpenAI' };
+const run = { issueId: 'JUL-196', configuration };
+
+async function runFiles(t) {
+  const root = await mkdtemp(join(tmpdir(), 'jul196-recovery-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  return { root, runPath: join(root, 'JUL-196.json'), statePath: join(root, 'JUL-196-state.json') };
+}
+
+// A worker that died with its runner: a real process id that has already exited.
+const deadWorker = () => ({ pid: spawnSync(process.execPath, ['-e', '']).pid });
+const pass = { exitCode: 0, observed: reviewerSeen, text: `VERDICT: PASS\nCOMMIT: ${COMMIT}` };
+const goodCandidate = async () => ({ commit: COMMIT, clean: true, checks: { pass: true } });
+const savedState = async (statePath) => JSON.parse(await readFile(statePath, 'utf8'));
+// A real process that keeps running until the test (or the runner) stops it.
+function idleProcess(t) {
+  const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
+  t.after(() => { child.kill(); });
+  return child;
+}
+
+test('a restart after the runner dies during review keeps the finished build and does not read Linear again', async (t) => {
+  const { runPath } = await runFiles(t);
+  const launches = []; let reads = 0;
+  const adapters = (review) => ({
+    readCard: async () => { reads += 1; return card; },
+    candidate: async () => ({ commit: COMMIT, clean: true, checks: { pass: true } }),
+    launch: async (role, request) => {
+      launches.push(role);
+      await request.started?.(deadWorker());
+      return role === 'builder' ? { exitCode: 0, observed: builderSeen, outputPath: 'build.json' } : review();
+    },
+  });
+  await assert.rejects(runDelivery({ ...run, runPath }, adapters(async () => { throw new Error('runner died during review'); })), /runner died during review/);
+  const result = await runDelivery({ ...run, runPath }, adapters(async () => ({ exitCode: 0, observed: reviewerSeen, text: `VERDICT: PASS\nCOMMIT: ${COMMIT}` })));
+  assert.equal(result.outcome, 'pass');
+  assert.deepEqual(launches, ['builder', 'reviewer', 'reviewer'], 'the finished build is not run again');
+  assert.equal(reads, 1, 'the approved requirements are read from Linear once');
+});
+
+test('findings and the repair count survive a restart: one build, then three repairs in all, and an interrupted repair is spent', async (t) => {
+  const { runPath, statePath } = await runFiles(t);
+  let builds = 0; const prompts = [];
+  const adapters = (dieAtBuild) => ({
+    readCard: async () => card,
+    candidate: async () => ({ commit: String(builds).padStart(40, 'b'), clean: true, checks: { pass: true } }),
+    launch: async (role, request) => {
+      await request.started?.(deadWorker());
+      if (role === 'reviewer') return { exitCode: 0, observed: reviewerSeen, text: `VERDICT: FAIL\nFinding ${builds}: test missing` };
+      builds += 1; prompts.push(request.prompt);
+      if (builds === dieAtBuild) throw new Error('runner died during repair');
+      return { exitCode: 0, observed: builderSeen };
+    },
+  });
+  await assert.rejects(runDelivery({ ...run, runPath }, adapters(2)), /died during repair/);
+  const interrupted = await savedState(statePath);
+  assert.equal(interrupted.repairsUsed, 1, 'the repair was counted when it was about to start');
+  assert.deepEqual(interrupted.findings.map(({ round, text }) => [round, text]), [[0, 'VERDICT: FAIL\nFinding 1: test missing']]);
+  const result = await runDelivery({ ...run, runPath }, adapters(0));
+  assert.equal(result.outcome, 'park');
+  assert.match(result.reason, /initial build and three repairs/);
+  assert.equal(builds, 4, 'one build and three repairs, the interrupted repair included');
+  assert.match(prompts[2], /Finding 1: test missing/, 'the builder after the restart repairs the saved findings');
+  assert.match(prompts[2], /previous builder for this work was interrupted/);
+  const final = await savedState(statePath);
+  assert.equal(final.repairsUsed, 3);
+  assert.deepEqual(final.findings.map(({ round }) => round), [0, 2, 3]);
+  const again = await runDelivery({ ...run, runPath }, adapters(0));
+  assert.deepEqual(again, result, 'a finished run answers with its saved result');
+  assert.equal(builds, 4, 'and starts no further builder');
+});
+
+test('a builder left running by a dead runner is stopped before another builder starts', async (t) => {
+  const { runPath, statePath } = await runFiles(t);
+  const orphan = idleProcess(t);
+  const base = { readCard: async () => card, candidate: goodCandidate };
+  await assert.rejects(runDelivery({ ...run, runPath }, { ...base, launch: async (role, request) => { await request.started({ pid: orphan.pid }); throw new Error('runner died during build'); } }), /died during build/);
+  assert.ok(processStarted(orphan.pid), 'the old builder outlived its runner');
+  let oldBuilderAtRelaunch = 'not relaunched';
+  const result = await runDelivery({ ...run, runPath }, { ...base, launch: async (role) => {
+    if (role === 'reviewer') return pass;
+    oldBuilderAtRelaunch = processStarted(orphan.pid);
+    return { exitCode: 0, observed: builderSeen };
+  } });
+  assert.equal(oldBuilderAtRelaunch, null, 'the old builder was gone before the new one started');
+  assert.equal(result.outcome, 'pass');
+  const state = await savedState(statePath);
+  assert.equal(state.repairsUsed, 1, 'finishing an interrupted build costs a repair');
+  assert.match(state.actions[0].handling, /was stopped/);
+  assert.equal(state.actions[0].status, 'interrupted');
+});
+
+test('a recorded process id that now belongs to another process is never stopped', async (t) => {
+  const { runPath, statePath } = await runFiles(t);
+  const bystander = idleProcess(t);
+  const base = { readCard: async () => card, candidate: goodCandidate };
+  // The dead worker had this process id at an earlier creation time; the system has since reused the number.
+  const earlier = { started: async () => '1', stop: () => { throw new Error('nothing may be stopped here'); } };
+  await assert.rejects(runDelivery({ ...run, runPath }, { ...base, processes: earlier, launch: async (role, request) => { await request.started({ pid: bystander.pid }); throw new Error('runner died'); } }), /runner died/);
+  const result = await runDelivery({ ...run, runPath }, { ...base, launch: async (role) => (role === 'reviewer' ? pass : { exitCode: 0, observed: builderSeen }) });
+  assert.equal(result.outcome, 'pass');
+  assert.ok(processStarted(bystander.pid), 'the unrelated process is still running');
+  assert.match((await savedState(statePath)).actions[0].handling, /left alone/);
+});
+
+test('an interrupted worker whose process was never recorded parks the run as unsafe, durably', async (t) => {
+  const { runPath, statePath } = await runFiles(t);
+  let launches = 0;
+  const adapters = (launch) => ({ readCard: async () => card, candidate: goodCandidate, launch: async (...args) => { launches += 1; return launch(...args); } });
+  await assert.rejects(runDelivery({ ...run, runPath }, adapters(async () => { throw new Error('runner died while starting the builder'); })), /while starting/);
+  const result = await runDelivery({ ...run, runPath }, adapters(async () => ({ exitCode: 0, observed: builderSeen })));
+  assert.deepEqual([result.outcome, result.unsafe], ['park', true]);
+  assert.match(result.reason, /never recorded, so it may still be running/);
+  assert.equal(launches, 1, 'nothing is started on top of a worker that may still be running');
+  assert.deepEqual((await savedState(statePath)).result, result);
+  assert.deepEqual(await runDelivery({ ...run, runPath }, adapters(async () => ({ exitCode: 0, observed: builderSeen }))), result);
+  assert.equal(launches, 1);
+});
+
+test('corrupt, foreign, or altered run files stop a restart without running anything or rereading Linear', async (t) => {
+  const refusedWith = async (damage, expected) => {
+    const { root, runPath, statePath } = await runFiles(t);
+    const base = { readCard: async () => card, candidate: goodCandidate };
+    await assert.rejects(runDelivery({ ...run, runPath }, { ...base, launch: async (role, request) => { await request.started(deadWorker()); throw new Error('runner died'); } }), /runner died/);
+    const changed = await damage({ root, statePath });
+    const before = await readFile(statePath, 'utf8');
+    let touched = 0;
+    const result = await runDelivery({ ...run, runPath, ...changed }, { readCard: async () => { touched += 1; return card; }, candidate: async () => { touched += 1; }, launch: async () => { touched += 1; } });
+    assert.deepEqual([result.outcome, result.unsafe], ['park', true], expected.source);
+    assert.match(result.reason, expected);
+    assert.equal(touched, 0, `${expected.source}: nothing ran`);
+    assert.match(await readFile(join(root, 'JUL-196-refusal.json'), 'utf8'), expected);
+    return { before, after: await readFile(statePath, 'utf8') };
+  };
+  const untouched = ({ before, after }) => assert.equal(after, before, 'the damaged run record is left exactly as it was found');
+  untouched(await refusedWith(async ({ statePath }) => { await writeFile(statePath, '{"schema": 1, "issueId": "JUL-196", "actions": ['); }, /saved run state is corrupt/));
+  untouched(await refusedWith(async ({ statePath }) => { await writeFile(statePath, ''); }, /saved run state is corrupt/));
+  untouched(await refusedWith(async () => ({ configuration: { ...configuration, builder: { ...configuration.builder, model: 'another-model' } } }), /different builder\/reviewer configuration/));
+  const changedInput = JSON.stringify({ card: { ...card, description: '## Acceptance criteria\n\n- [ ] Something else.' }, configuration });
+  await refusedWith(async ({ root }) => { await writeFile(join(root, 'JUL-196-approved.json'), changedInput); }, /not the one this run started with/);
+  await refusedWith(async ({ root }) => { await rm(join(root, 'JUL-196-approved.json')); }, /approved input is missing; Linear is not reread/);
+});
+
+test('a second runner cannot work on a run while the first is still alive', async (t) => {
+  const { runPath } = await runFiles(t);
+  let release; const blocked = new Promise((done) => { release = done; });
+  let launches = 0; let reached; const building = new Promise((done) => { reached = done; });
+  const first = runDelivery({ ...run, runPath }, { readCard: async () => card, candidate: goodCandidate, launch: async (role) => {
+    launches += 1;
+    if (role === 'reviewer') return pass;
+    reached(); await blocked; return { exitCode: 0, observed: builderSeen };
+  } });
+  await building;
+  const second = await runDelivery({ ...run, runPath }, { readCard: async () => card, candidate: goodCandidate, launch: async () => { launches += 1; } });
+  assert.deepEqual([second.outcome, second.unsafe], ['park', true]);
+  assert.match(second.reason, /is still working on this run/);
+  assert.equal(launches, 1, 'the second runner started no worker');
+  release();
+  assert.equal((await first).outcome, 'pass');
+});
+
+// A real runner process whose builder is a real, idle process. It prints the
+// worker's process id once the runner has recorded it, then never finishes.
+// The worker is detached, as runLimited's workers are on Linux: on Windows a
+// worker that is not detached is ended by the system with its runner (libuv's
+// kill-on-close job), and this test is about the worker that does survive.
+const runnerSource = (runnerUrl) => [
+  "import { spawn } from 'node:child_process';",
+  `import { runDelivery } from ${JSON.stringify(runnerUrl)};`,
+  'const launch = async (role, request) => {',
+  "  const worker = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', detached: true, windowsHide: true });",
+  '  await request.started({ pid: worker.pid });',
+  "  console.log('WORKER ' + worker.pid);",
+  '  await new Promise(() => {});',
+  '};',
+  'const inputs = { issueId: process.env.RUN_ISSUE, configuration: JSON.parse(process.env.RUN_CONFIGURATION), runPath: process.env.RUN_PATH };',
+  'await runDelivery(inputs, { readCard: async () => JSON.parse(process.env.RUN_CARD), candidate: async () => null, launch });',
+].join('\n');
+
+const forceStop = (pid) => (process.platform === 'win32'
+  ? spawnSync('taskkill.exe', ['/PID', String(pid), '/F'], { stdio: 'ignore', windowsHide: true })
+  : spawnSync('kill', ['-9', String(pid)], { stdio: 'ignore' }));
+
+test('a runner process killed mid-build is replaced by one that stops its orphaned worker and finishes the run', { timeout: 60000 }, async (t) => {
+  const { runPath, statePath } = await runFiles(t);
+  const { NODE_TEST_CONTEXT: _context, ...env } = process.env;
+  const source = runnerSource(pathToFileURL(resolve('scripts/julia-delivery-runner.mjs')).href);
+  const runner = spawn(process.execPath, ['--input-type=module', '-e', source], {
+    env: { ...env, RUN_ISSUE: 'JUL-196', RUN_PATH: runPath, RUN_CONFIGURATION: JSON.stringify(configuration), RUN_CARD: JSON.stringify(card) },
+    stdio: ['ignore', 'pipe', 'inherit'],
+  });
+  let workerPid = null;
+  t.after(() => { runner.kill('SIGKILL'); if (workerPid) forceStop(workerPid); });
+  const exited = new Promise((done) => { runner.on('exit', done); });
+  workerPid = await new Promise((found, failed) => {
+    let out = '';
+    runner.stdout.on('data', (chunk) => { out += chunk; const pid = /WORKER (\d+)/.exec(out)?.[1]; if (pid) found(Number(pid)); });
+    exited.then((code) => failed(new Error(`the runner exited (${code}) before its worker started`)));
+  });
+  runner.kill('SIGKILL');
+  await exited;
+  assert.ok(processStarted(workerPid), 'the worker outlived the killed runner');
+  let reads = 0; let orphanAtRelaunch = 'not relaunched';
+  const result = await runDelivery({ ...run, runPath }, { readCard: async () => { reads += 1; return card; }, candidate: goodCandidate, launch: async (role) => {
+    if (role === 'reviewer') return pass;
+    orphanAtRelaunch = processStarted(workerPid);
+    return { exitCode: 0, observed: builderSeen };
+  } });
+  assert.equal(orphanAtRelaunch, null, 'old and new workers never run together');
+  assert.equal(result.outcome, 'pass');
+  assert.equal(reads, 0, 'the new runner works from the saved approved input');
+  const state = await savedState(statePath);
+  assert.deepEqual([state.restarts, state.repairsUsed, state.actions[0].status], [1, 1, 'interrupted']);
+});
+
+function gitRepo(root, name) {
+  const path = join(root, name);
+  const inRepo = (...args) => { const result = spawnSync('git', args, { cwd: path, encoding: 'utf8' }); assert.equal(result.status, 0, result.stderr); return result.stdout.trim(); };
+  spawnSync('git', ['init', '-q', '-b', 'work', path], { encoding: 'utf8' });
+  inRepo('-c', 'user.name=test', '-c', 'user.email=test@example.invalid', 'commit', '-q', '--allow-empty', '-m', 'start');
+  return { path, inRepo };
+}
+
+test('a restart continues only in its own worktree and branch, and keeps the interrupted builder\'s partial changes', { timeout: 60000 }, async (t) => {
+  const { root, runPath, statePath } = await runFiles(t);
+  const own = gitRepo(root, 'own'); const other = gitRepo(root, 'other');
+  const partial = join(own.path, 'half-written.txt');
+  const options = (worktree, launch) => ({ runPath, worktree, readCard: async () => card, launch });
+  const dying = async (role, request) => { await request.started(deadWorker()); await writeFile(partial, 'half'); throw new Error('runner died during build'); };
+  await assert.rejects(startDelivery('JUL-196', configuration, options(own.path, dying)), /died during build/);
+  const saved = await savedState(statePath);
+  assert.deepEqual([saved.worktree.branch, saved.worktree.startCommit], ['work', own.inRepo('rev-parse', 'HEAD')]);
+  let launches = 0;
+  const elsewhere = await startDelivery('JUL-196', configuration, options(other.path, async () => { launches += 1; }));
+  assert.equal(elsewhere.unsafe, true);
+  assert.match(elsewhere.reason, /this run belongs to worktree/);
+  own.inRepo('checkout', '-q', '--detach');
+  const detached = await startDelivery('JUL-196', configuration, options(own.path, async () => { launches += 1; }));
+  assert.match(detached.reason, /not the run's branch work/);
+  assert.equal(launches, 0, 'no worker starts in the wrong place');
+  own.inRepo('checkout', '-q', 'work');
+  let nextBuilder = null;
+  const result = await startDelivery('JUL-196', configuration, options(own.path, async (role, request) => {
+    nextBuilder = { partial: existsSync(partial) ? await readFile(partial, 'utf8') : null, prompt: request.prompt };
+    return { exitCode: 0, observed: builderSeen };
+  }));
+  assert.equal(nextBuilder.partial, 'half', 'the partial change is still in the worktree');
+  assert.match(nextBuilder.prompt, /partial changes are still in the worktree/);
+  // The fixture repository has no origin/main, so the real candidate check parks the run; the worktree guards let it through.
+  assert.match(result.reason, /candidate has no immutable commit/);
+});

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { productionLauncher, runDelivery, startDelivery, workerPrompt } from './julia-delivery-runner.mjs';
+import { processStarted } from './julia-delivery-state.mjs';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -17,11 +18,16 @@ test('Windows production launcher gets a response from installed Claude Code and
   const outputPath = join(root, 'evidence', 'JUL-196-builder-round-1.json');
   const builder = { ...configuration.builder, model: 'opus' };
   const before = Date.now();
+  // The launcher names the real worker process before the worker is given its prompt.
+  let worker = null;
   const result = await productionLauncher(process.cwd())('builder', {
     configuration: builder, outputPath,
+    started: async ({ pid }) => { worker = { pid, startedAt: processStarted(pid) }; },
     prompt: 'Reply with exactly JUL-196 runner launch OK. Do not use tools or change any files.',
   });
   const after = Date.now();
+  assert.ok(Number.isInteger(worker?.pid) && worker.startedAt, `the running worker was identified: ${JSON.stringify(worker)}`);
+  assert.equal(processStarted(worker.pid), null, 'the worker is gone once the launcher returns');
   assert.equal(result.exitCode, 0, result.text);
   assert.match(result.text, /JUL-196 runner launch OK/);
   assert.equal(result.outputPath, outputPath);
@@ -124,17 +130,20 @@ test('failed checks, candidate drift, same-maker reviews, and malformed verdicts
   }
 });
 
-test('a review fail returns findings for repair and three unsuccessful rounds park', async () => {
-  let builds = 0;
+test('a review fail returns findings for repair, and the initial build plus three unsuccessful repairs park', async () => {
+  let builds = 0; const repairPrompts = [];
   const result = await runDelivery({ issueId: 'JUL-196', configuration, runPath: 'C:/runs/JUL-196.json' }, {
     readCard: async () => card, save: async () => {},
     candidate: async () => ({ commit: String(++builds).padStart(40, 'a'), clean: true, checks: { pass: true } }),
-    launch: async (role) => role === 'builder'
+    launch: async (role, request) => { if (role === 'builder') repairPrompts.push(/Repair these review findings:\nVERDICT: FAIL\nFinding: test missing/.test(request.prompt)); return role === 'builder'
       ? { exitCode: 0, observed: { harness: 'claude-code', model: 'claude-sonnet', maker: 'Anthropic' } }
-      : { exitCode: 0, observed: { harness: 'codex', model: 'gpt-review', maker: 'OpenAI' }, text: 'VERDICT: FAIL\nFinding: test missing' },
+      : { exitCode: 0, observed: { harness: 'codex', model: 'gpt-review', maker: 'OpenAI' }, text: 'VERDICT: FAIL\nFinding: test missing' }; },
   });
   assert.equal(result.outcome, 'park');
-  assert.equal(builds, 3);
+  assert.equal(result.round, 3);
+  // One initial build, then exactly three repairs (not three builds in total).
+  assert.equal(builds, 4);
+  assert.deepEqual(repairPrompts, [false, true, true, true]);
 });
 
 test('resume uses the saved approved card without another Linear read, and records a terminal refusal', async (t) => {
