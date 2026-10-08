@@ -75,21 +75,20 @@ export async function prepareDeliveryWorkspace({ issueId, runPath, repoRoot, bas
   return { ok: true, worktree: identity, instructions };
 }
 
-export async function captureDeliveryCandidate({ issueId, runPath, workspace, card, test, round, expected = null }) {
+export async function captureDeliveryCandidate({ issueId, runPath, workspace, card, test, round }) {
   const { path, repository, branch, startCommit: base } = workspace;
   const evidencePath = join(dirname(resolve(runPath)), `${issueId}-candidate-round-${round}.json`);
   const evidence = { base, round, commit: null, clean: false, checks: { pass: false }, redProof: { pass: false }, runs: [], evidencePath };
   const drift = commit => git(path, 'rev-parse', 'HEAD') !== commit || git(path, 'branch', '--show-current') !== branch || Boolean(git(path, 'status', '--porcelain'));
   try {
     await prepareDeliveryWorkspace({ issueId, runPath, repoRoot: workspace.source, worktree: path, saved: workspace });
-    if (expected && drift(expected)) throw new Error('candidate drifted since it was fixed');
-    if (!expected && git(path, 'status', '--porcelain')) {
+    if (git(path, 'status', '--porcelain')) {
       // Git add -A records additions and deletions, including source evidence.
       // No new ignore rules or blanket evidence exclusions hide unfinished edits.
       git(path, 'add', '-A');
       git(path, '-c', 'user.name=Julia runner', '-c', 'user.email=runner@julia.invalid', 'commit', '-q', '-m', `runner: ${issueId} candidate round ${round}`);
     }
-    const commit = expected ?? git(path, 'rev-parse', 'HEAD');
+    const commit = git(path, 'rev-parse', 'HEAD');
     evidence.commit = commit;
     evidence.diff = git(path, 'diff', '--binary', `${base}...${commit}`);
     evidence.files = git(path, 'diff', '--name-status', `${base}...${commit}`);

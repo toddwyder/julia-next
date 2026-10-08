@@ -173,7 +173,6 @@ export function productionLauncher(worktree, { run = runLimited, findExecutable 
   };
 }
 
-
 // The run record: everything a restart needs, in one file that is replaced
 // whole at every step. `actions` is the journal: an action is saved as started
 // before it runs and as done after it, so a restart can tell a finished step
@@ -387,8 +386,8 @@ export async function startDelivery(issueId, configuration, {
       fixed = previous ?? fixed;
       // Never commit/recheck new source changes under a reviewed SHA.
       const { git } = await import('./julia-minimal-runner-checks.mjs');
-      const clean = git(workspace.path, 'rev-parse', 'HEAD') === fixed.commit && !git(workspace.path, 'status', '--porcelain') && git(workspace.path, 'branch', '--show-current') === workspace.branch;
       try {
+        const clean = git(workspace.path, 'rev-parse', 'HEAD') === fixed.commit && !git(workspace.path, 'status', '--porcelain') && git(workspace.path, 'branch', '--show-current') === workspace.branch;
         const raw = await loadText(fixed.evidencePath);
         const matches = raw && isDeepStrictEqual(JSON.parse(raw), fixed);
         return { ...fixed, clean: clean && Boolean(matches) };
