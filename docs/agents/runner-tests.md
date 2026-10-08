@@ -14,6 +14,12 @@ Tests elsewhere that import those modules, the shared dependencies below or
 `ops/julia-runner/` are also included. CI conservatively routes new MJS test paths
 to Windows, except tests with existing focused Factory, web-script or policy
 ownership. Keep new runner regressions beside their behavior in those families.
+Tests with no known owner are included by default, including subprocess-only
+regressions with arbitrary filenames and no runner-module import. The explicit
+`NON_RUNNER_TESTS` inventory keeps existing non-runner CI/manual responsibilities
+unchanged; a new exclusion needs an identified owner rather than an inferred
+filename or missing import. Factory-owned directories and script prefixes retain
+their existing gate. Routing a new test to Windows now also executes it.
 
 The shared script tests are included explicitly:
 

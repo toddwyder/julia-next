@@ -23,7 +23,7 @@ test('discovers new and nested runner tests, shared safety tests, and unwrapped 
     'ops/julia-runner/new.test.mjs': '',
     'scripts/acceptance-check.test.mjs': '',
     'tests/new-safety.test.mjs': "import '../scripts/julia-delivery-runner.mjs';",
-    'scripts/unrelated.test.mjs': '',
+    'scripts/board-setup.test.mjs': '',
     'ops/factory/app/retained.test.mjs': '',
     '.julia/archive/scripts/julia-init.test.mjs': '',
     'node_modules/archived/julia-init.test.mjs': '',
@@ -50,7 +50,7 @@ test('the local gate runs discovered files with spaces and propagates a failing 
 });
 
 test('an empty suite fails closed instead of invoking repository-wide Node discovery', (t) => {
-  const root = fixture(t, { 'scripts/unrelated.test.mjs': '' });
+  const root = fixture(t, { 'scripts/board-setup.test.mjs': '' });
   const result = spawnSync(process.execPath, [join(import.meta.dirname, 'julia-runner-suite.mjs')], { cwd: root, encoding: 'utf8' });
   assert.equal(result.status, 1);
   assert.match(result.stderr, /no active runner tests/);
@@ -99,4 +99,17 @@ test('new transport and secret regressions are discovered beside shared modules 
     'ops/service-dropbox/new-pi-safety.test.mjs',
     'ops/service-dropbox/new-secret-safety.test.mjs',
   ]);
+});
+
+test('a new subprocess-only runner regression is executed even without a runner filename or module import', (t) => {
+  const root = fixture(t, {
+    'scripts/julia-delivery-runner.mjs': 'process.exitCode = 1;',
+    'scripts/check-runner-output.test.mjs': "import { test } from 'node:test'; import assert from 'node:assert/strict'; import { spawnSync } from 'node:child_process'; test('subprocess-only runner regression', () => { const result = spawnSync(process.execPath, ['scripts/julia-delivery-runner.mjs']); assert.equal(result.status, 0); });",
+  });
+  const result = spawnSync(process.execPath, [join(import.meta.dirname, 'julia-runner-suite.mjs')], {
+    cwd: root, encoding: 'utf8', env: { ...process.env, NODE_TEST_CONTEXT: 'child-v8' },
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stdout, /scripts\/check-runner-output\.test\.mjs/);
+  assert.match(result.stdout, /subprocess-only runner regression/);
 });
