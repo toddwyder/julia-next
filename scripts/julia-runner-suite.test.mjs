@@ -87,3 +87,16 @@ test('shared regressions run directly once while known historical controller jou
   });
   assert.deepEqual(discoverRunnerTests(root), ['graph/seat-table.test.mjs', 'tests/new-shared-safety.test.mjs']);
 });
+
+test('new transport and secret regressions are discovered beside shared modules with relative imports', (t) => {
+  const root = fixture(t, {
+    'ops/service-dropbox/new-agy-safety.test.mjs': "import './run-agy-seat.mjs';",
+    'ops/service-dropbox/new-pi-safety.test.mjs': "import './run-pi-seat.mjs';",
+    'ops/service-dropbox/new-secret-safety.test.mjs': "import './read-secret.mjs';",
+  });
+  assert.deepEqual(discoverRunnerTests(root), [
+    'ops/service-dropbox/new-agy-safety.test.mjs',
+    'ops/service-dropbox/new-pi-safety.test.mjs',
+    'ops/service-dropbox/new-secret-safety.test.mjs',
+  ]);
+});
