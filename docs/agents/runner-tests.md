@@ -41,7 +41,7 @@ reasons and counts. Failures return nonzero; there is no baseline-failure waiver
 
 Factory's directly owned tests remain under `ops/factory/` and its JUL-197 Linux
 gate with existing package/lockfile setup: workflows, skills, trace retention,
-local sandbox, observability retention/scheduling, review batching and installer.
+local sandbox, observability retention/scheduling and installer.
 PostgreSQL coverage remains in the database gate. Other existing Factory tests
 (upgrade, sandbox cleanup and wait alerts) retain their historical/manual scope;
 this change neither deletes them nor claims they ran. Web/browser and docs/policy
