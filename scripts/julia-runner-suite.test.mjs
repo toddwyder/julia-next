@@ -63,3 +63,16 @@ test('the Windows CI job invokes the same complete local gate', () => {
   assert.match(windows, /runs-on: windows-latest/);
   assert.match(windows, /run: node scripts\/julia-runner-suite\.mjs\s*$/);
 });
+
+test('new unwrapped shared safety regressions are discovered beside their imported dependencies', (t) => {
+  const root = fixture(t, {
+    'graph/new-seat-safety.test.mjs': "import './seat-table.mjs';",
+    'scripts/nested/linear-cli-extra.test.mjs': "import '../linear-cli.mjs';",
+    'tests/new-evidence-safety.test.mjs': "import '../scripts/acceptance-check.mjs';",
+    'tests/new-transport-safety.test.mjs': "import '../ops/service-dropbox/run-pi-seat.mjs';",
+  });
+  assert.deepEqual(discoverRunnerTests(root), [
+    'graph/new-seat-safety.test.mjs', 'scripts/nested/linear-cli-extra.test.mjs',
+    'tests/new-evidence-safety.test.mjs', 'tests/new-transport-safety.test.mjs',
+  ]);
+});
