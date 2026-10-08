@@ -10,7 +10,7 @@ Factory, database, web, docs-policy and baseline retain their existing commands.
 The gate recursively discovers `*.test.mjs` named `julia-init*`, `julia-delivery*`,
 `julia-graph-model*`, `julia-minimal-runner*` or `julia-runner*`, and every MJS test
 under `ops/julia-runner/`. New tests in these families need no registration.
-Tests elsewhere that import those modules, `delivery-tool-settings` or
+Tests elsewhere that import those modules, the shared dependencies below or
 `ops/julia-runner/` are also included. CI conservatively routes new MJS test paths
 to Windows, except tests with existing focused Factory, web-script or policy
 ownership. Keep new runner regressions beside their behavior in those families.
@@ -28,9 +28,10 @@ The shared script tests are included explicitly:
 | `line-endings`, `no-personal-paths`, `personal-paths` | Portable source and safe configuration |
 | `ci-routing` | Gates for runner, shared paths and multi-domain changes |
 
-The seat-table and service-dropbox wrappers remain: they execute shared tests in
-`graph/` and `ops/service-dropbox/` once, rather than discovering those copies
-again. `julia-runner-suite.test.mjs` proves new/nested/unwrapped discovery,
+The seat-table and service-dropbox tests run directly in `graph/` and
+`ops/service-dropbox/`, once each. Their historical script wrappers remain outside
+this gate; importing another test file does not make a wrapper an active runner
+regression. `julia-runner-suite.test.mjs` proves new/nested/unwrapped discovery,
 archive separation, space-containing paths, inherited test-context isolation,
 failure propagation, empty-suite refusal and the CI command contract.
 The command prints every selected file, then Node's full results including skip
@@ -46,7 +47,12 @@ PostgreSQL coverage remains in the database gate. Other existing Factory tests
 this change neither deletes them nor claims they ran. Web/browser and docs/policy
 checks keep their existing gates. Retired graph/controller tests remain historical
 checks outside this required runner gate, including the separate JUL-199 import
-and JUL-200 checkout failures. No shared runner test was deleted.
+and JUL-200 checkout failures. Five historical journeys import shared helpers but
+belong to that retained route: `graph/board-spec.test.mjs`,
+`scripts/bad-submissions.test.mjs`, `scripts/controller-board.test.mjs`,
+`scripts/controller-carry.test.mjs` and `scripts/stand-in-seat.test.mjs`. These
+exact paths are classified explicitly; new unwrapped shared regressions are
+automatically discovered. No shared runner test was deleted.
 
 Removed exactly:
 

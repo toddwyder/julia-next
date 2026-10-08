@@ -8,13 +8,27 @@ const RUNNER_TEST = /(?:^|\/)julia-(?:init|delivery|graph-model|minimal-runner|r
 const SHARED_TESTS = new Set([
   'acceptance-check', 'delivery-tool-settings', 'effort', 'linear-cli',
   'no-personal-paths', 'personal-paths', 'line-endings', 'verify-reviewer-worktree',
-  'seat-labels', 'seat-table', 'service-dropbox-run-agy-seat',
-  'service-dropbox-run-pi-seat', 'service-dropbox-read-secret', 'ci-routing',
-].map((name) => `scripts/${name}.test.mjs`));
+  'seat-labels', 'ci-routing',
+].map((name) => `scripts/${name}.test.mjs`).concat([
+  'graph/seat-table.test.mjs', 'ops/service-dropbox/run-agy-seat.test.mjs',
+  'ops/service-dropbox/run-pi-seat.test.mjs', 'ops/service-dropbox/read-secret.test.mjs',
+]));
+// These retained journeys use shared helpers in the retired graph/controller
+// route, not the adapted runner. Keep their failures separately attributable.
+const HISTORICAL_TESTS = new Set([
+  'graph/board-spec.test.mjs', 'scripts/bad-submissions.test.mjs',
+  'scripts/controller-board.test.mjs', 'scripts/controller-carry.test.mjs',
+  'scripts/stand-in-seat.test.mjs',
+]);
 // Evidence and generated/vendor trees are never executable source. In particular,
 // do not recurse into .julia's saved copies or mutate them to make discovery pass.
 const GENERATED = new Set(['.git', '.julia', '.next', '.mastra', '.artifacts', 'node_modules', 'test-results', 'playwright-report']);
-const RUNNER_IMPORT = /(?:from\s*|import\s*\(?\s*)['"][^'"]*(?:julia-(?:init|delivery|graph-model|minimal-runner|runner)|delivery-tool-settings|ops\/julia-runner\/)[^'"]*['"]/;
+const IMPORT_SPECIFIER = /(?:from\s*|import\s*\(?\s*)['"]([^'"]+)['"]/g;
+const RUNNER_MODULE = /julia-(?:init|delivery|graph-model|minimal-runner|runner)|delivery-tool-settings|acceptance-check|linear-cli|effort|seat-labels|seat-table|verify-reviewer-worktree|line-endings|no-personal-paths|personal-paths|ops\/julia-runner\/|ops\/service-dropbox\/(?:run-agy-seat|run-pi-seat|read-secret)/;
+
+function importsRunnerModule(text) {
+  return [...text.matchAll(IMPORT_SPECIFIER)].some(([, path]) => !path.endsWith('.test.mjs') && RUNNER_MODULE.test(path));
+}
 
 export function discoverRunnerTests(root = process.cwd()) {
   const files = [];
@@ -26,9 +40,9 @@ export function discoverRunnerTests(root = process.cwd()) {
       } else if (entry.isFile() && entry.name.endsWith('.test.mjs')) {
         // Factory keeps its own JUL-197 gate; a shared import cannot pull its
         // Linux sandbox/dependency setup into the Windows runner gate.
-        if (path.startsWith('ops/factory/')) continue;
+        if (path.startsWith('ops/factory/') || HISTORICAL_TESTS.has(path)) continue;
         if (RUNNER_TEST.test(path) || path.startsWith('ops/julia-runner/') || SHARED_TESTS.has(path)
-          || RUNNER_IMPORT.test(readFileSync(join(root, path), 'utf8'))) files.push(path);
+          || importsRunnerModule(readFileSync(join(root, path), 'utf8'))) files.push(path);
       }
     }
   }

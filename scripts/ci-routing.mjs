@@ -29,7 +29,7 @@ export function selectCIGates(paths) {
   // deletions. Existing focused Factory, web-script and policy owners stay put.
   if (paths.some((path) => path.endsWith('.test.mjs')
     && !GATE_PATHS.factory.some((pattern) => pattern.test(path))
-    && !GATE_PATHS['docs-policy'].some((pattern) => pattern.test(path))
+    && !(/^scripts\//.test(path) && GATE_PATHS['docs-policy'].some((pattern) => pattern.test(path)))
     && !(/^scripts\//.test(path) && GATE_PATHS.web.some((pattern) => pattern.test(path))))) selected.add('julia-init-windows');
   return GATES.filter((gate) => selected.has(gate));
 }
