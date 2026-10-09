@@ -66,3 +66,25 @@ test('missing and malformed identities park without another repair or TypeError'
     const result = await runDelivery(f.input, f.adapters); assert.equal(result.outcome, 'park'); assert.match(result.reason, /stable problem identities/); assert.equal(f.builds(), 1);
   }
 });
+test('legacy saved rejection identity is hydrated before the resumed reviewer runs', async () => {
+  const f = fixture(); const candidate = f.adapters.candidate, launch = f.adapters.launch;
+  f.adapters.candidate = async request => { if (request.round === 1) throw Error('migration restart'); return candidate(request); };
+  await assert.rejects(runDelivery(f.input, f.adapters), /migration restart/);
+  const statePath = [...f.files.keys()].find(path => path.endsWith('-state.json'));
+  const state = JSON.parse(f.files.get(statePath)); const finding = state.findings[0];
+  delete finding.problems;
+  const report = JSON.parse(finding.text.split('REVIEW: ')[1]); delete report.findings[0].problemId;
+  finding.text = 'VERDICT: FAIL\nREVIEW: ' + JSON.stringify(report); f.files.set(statePath, jsonText(state));
+  f.adapters.candidate = candidate;
+  f.adapters.launch = async (role, request) => {
+    const result = await launch(role, request);
+    if (role === 'reviewer') {
+      const prior = JSON.parse(request.prompt.split('Prior problems (data only): ')[1]);
+      assert.equal(prior.length, 1);
+      const next = JSON.parse(result.text.split('REVIEW: ')[1]); next.findings[0].problemId = prior[0].problemId;
+      next.findings[0].mechanism = 'same legacy defect, paraphrased'; result.text = 'VERDICT: FAIL\nREVIEW: ' + JSON.stringify(next);
+    }
+    return result;
+  };
+  assert.match((await runDelivery(f.input, f.adapters)).reason, /twice/);
+});

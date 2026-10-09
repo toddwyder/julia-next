@@ -63,3 +63,12 @@ test('rollback refuses to replace unrelated production and recognizes prior depl
   assert.equal((await f.services.rollback(input)).pass, false);
   assert.equal(f.calls.some(call => call.method === 'POST'), false);
 });
+test('HTTP and missing-token failures retain safe operation diagnostics', async () => {
+  const options = { issueId: 'JUL-186', runPath: 'C:/fixture/JUL-186.json', configuration: { repository: 'o/r', projectId: 'project', productionUrl: 'https://prod.example' }, env: {}, fetchImpl: async () => ({ ok: false, status: 401 }) };
+  await assert.rejects(releaseServices(options).preview({ commit }), error => error.diagnostic.operation === 'Vercel credentials' && error.diagnostic.code === 'MISSING_TOKEN');
+  options.env = { VERCEL_TOKEN: 'secret' };
+  await assert.rejects(releaseServices(options).preview({ commit }), error => {
+    assert.deepEqual(error.diagnostic, { operation: 'Vercel HTTP', method: 'GET', path: '/v7/deployments', status: 401 });
+    assert.equal(JSON.stringify(error).includes('secret'), false); return true;
+  });
+});
