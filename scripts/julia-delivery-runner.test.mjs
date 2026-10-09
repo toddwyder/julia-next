@@ -22,6 +22,13 @@ const authorization = { issueId: 'JUL-196', explicitStart: true, authorizedBy: '
 const runDelivery = (input, adapters) => deliver({ authorization, ...input }, fixtureAdapters(adapters));
 const card = { identifier: 'JUL-196', title: 'A card', state: { name: 'Ready', type: 'unstarted' }, description: '## Acceptance criteria\n\n- [ ] It works.' };
 
+test('native workers do not inherit release and telemetry operator credentials', async () => {
+  let options;
+  const environment = { PATH: 'fixture-path', OPENAI_API_KEY: 'worker-auth', VERCEL_TOKEN: 'release-secret', axiom_token: 'telemetry-secret', AXIOM_DATASET: 'private-dataset', JULIA_OBSERVABILITY_PROOF_TOKEN: 'proof-secret', SENTRY_AUTH_TOKEN: 'sentry-secret' };
+  await productionLauncher('fixture', { environment, findExecutable: () => 'fixture-worker', run: async (_command, _args, value) => { options = value; return { code: 1, stopped: false }; } })('builder', { configuration: configuration.builder, prompt: 'fixture' });
+  assert.deepEqual(options.env, { PATH: 'fixture-path', OPENAI_API_KEY: 'worker-auth' });
+});
+
 test('Windows production launcher gets a response from installed Claude Code and persists its evidence', { skip: process.env.JUL196_CLAUDE_REAL_PROOF !== '1' ? 'operator opt-in required: JUL196_CLAUDE_REAL_PROOF=1; no provider call in ordinary suite' : process.env.JUL196_CLAUDE_QUOTA_BLOCKED === '1' ? 'Claude real integration quota-blocked: JUL196_CLAUDE_QUOTA_BLOCKED=1; historical results retained' : process.platform !== 'win32', timeout: 120000 }, async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'jul196-')); t.after(() => import('node:fs/promises').then(({ rm }) => rm(root, { recursive: true, force: true })));
   const outputPath = join(root, 'evidence', 'JUL-196-builder-round-1.json');
