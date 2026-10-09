@@ -40,7 +40,7 @@ export function fixtureReport(input, verdict = 'PASS', summary = 'scripted stand
     checks: [1, 2, 3, 4, 5].map(check => ({ check, status: 'proven', evidence })),
     counterexamples: ['missing result', 'incorrect candidate'].map(scenario => ({ scenario, method: 'fixture trace', result: 'Scripted for controller tests only.', evidence })),
     testAudit: { analysis: 'This fixture exercises control flow and does not establish test discrimination or provider behavior.', evidence },
-    findings: verdict === 'FAIL' ? [{ file: input.files[0], location: '1', requirement: input.criteria[0], scenario: summary, mechanism: 'deliberate fixture failure', consequence: 'scripted behavior fails', repair: 'Repair the scripted failure.', evidence }] : [], limitations: [],
+    findings: verdict === 'FAIL' ? [{ problemId: sha256(summary), file: input.files[0], location: '1', requirement: input.criteria[0], scenario: summary, mechanism: 'deliberate fixture failure', consequence: 'scripted behavior fails', repair: 'Repair the scripted failure.', evidence }] : [], limitations: [],
   });
 }
 

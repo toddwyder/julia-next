@@ -1,4 +1,5 @@
-// JUL-196 Windows delivery owns run files, never Linear mutations, publishing, UAT or Factory.
+// Windows delivery owns run files and may continue a PASS through release.
+// It never mutates Linear or starts Factory.
 // Adapters keep the process boundary testable and observed identities durable.
 import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -13,6 +14,8 @@ import { LIMITS, runLimited } from '../ops/julia-runner/time-limit.mjs';
 import { reviewInput, reviewPrompt, checkedReview } from './julia-delivery-review.mjs';
 import { commandCodeReview, nativeReviewReply, validObserved } from './julia-delivery-review-transport.mjs';
 import { githubReviewPublisher } from './julia-delivery-review-publication.mjs';
+import { emitOperationalEvent } from '../lib/delivery-events.js';
+import { reviewProblems, rejectionHistory } from './julia-delivery-rejections.mjs';
 
 const SHA = /^[0-9a-f]{40}$/i;
 // Two independent review attempts: the initial review and, at most, one
@@ -118,10 +121,13 @@ function codexIdentity(output, root) {
   } catch { return null; }
 }
 
-export function productionLauncher(worktree, { run = runLimited, findExecutable = nativeCommand, sessionRoot = join(process.env.CODEX_HOME || join(homedir(), '.codex'), 'sessions') } = {}) {
+export function productionLauncher(worktree, { run = runLimited, environment = process.env, findExecutable = nativeCommand, sessionRoot = join(process.env.CODEX_HOME || join(homedir(), '.codex'), 'sessions') } = {}) {
+  const operatorSecrets = new Set(['VERCEL_TOKEN', 'LINEAR_API_KEY', 'AXIOM_TOKEN', 'AXIOM_DATASET', 'SENTRY_AUTH_TOKEN', 'JULIA_OBSERVABILITY_PROOF_TOKEN']);
+  const workerEnvironment = Object.fromEntries(Object.entries(environment).filter(([key]) => !operatorSecrets.has(key.toUpperCase()) && !key.toUpperCase().startsWith('OP_')));
+  const runWorker = (command, args, options, limits) => run(command, args, { ...options, env: workerEnvironment }, limits);
   return async (role, request) => {
     const configured = request.configuration;
-    if (role === 'reviewer' && configured.connection?.provider === 'commandcode') return commandCodeReview(request, { run });
+    if (role === 'reviewer' && configured.connection?.provider === 'commandcode') return commandCodeReview(request, { run: runWorker });
     if (role === 'reviewer' && configured.connection?.route && configured.connection.route !== 'native') return { exitCode: 2, observed: null, text: 'unsupported saved reviewer connection; native fallback is forbidden' };
     const cwd = role === 'builder' ? worktree : tmpdir();
     const startedAt = new Date().toISOString();
@@ -133,7 +139,7 @@ export function productionLauncher(worktree, { run = runLimited, findExecutable 
       : configured.harness === 'codex' ? ['exec', '-m', configured.model, '-c', 'model_provider="openai"', '-c', 'approval_policy="never"', ...(configured.thinking ? ['-c', `model_reasoning_effort="${configured.thinking}"`] : []), '-s', role === 'builder' ? 'workspace-write' : 'read-only', '--skip-git-repo-check', '--json', '-'] : [];
     if (!command && !failed) return { exitCode: 2, observed: null, text: `unsupported harness ${configured.harness}` };
     let output = ''; let error = ''; let pid = null; let unrecorded = null;
-    const result = failed ? { code: null, signal: null, stopped: false } : await run(command, args, { cwd, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true }, {
+    const result = failed ? { code: null, signal: null, stopped: false } : await runWorker(command, args, { cwd, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true }, {
       seconds: LIMITS.builder.fallback,
       started: (child) => {
         child.stdout.on('data', (chunk) => { output += chunk; }); child.stderr.on('data', (chunk) => { error += chunk; }); child.stdin.on('error', () => {});
@@ -340,7 +346,16 @@ export async function runDelivery({ issueId, configuration, runPath, authorizati
       const priorReview = round === 0 ? null : record.findings.at(-1);
       let input; try { input = await prepareReview(card, current, priorReview); } catch (error) { return await finish(park(error.message, round)); }
       if (configuration.reviewer.maker?.trim().toLowerCase() === builder.observed.maker.trim().toLowerCase()) return await finish(park('reviewer company matches observed builder maker', round));
-      const prompt = workerPrompt('reviewer', card, configuration, runPath, approvedPath, null, false, round) + reviewPrompt(input);
+      for (const finding of record.findings) {
+        if (!finding.problems) {
+          try { finding.problems = reviewProblems(JSON.parse(finding.text.split('REVIEW: ')[1]).findings); }
+          catch { return await finish(park('saved rejection cannot be classified safely', round)); }
+          await persist();
+        }
+      }
+      const priorProblems = record.findings.flatMap(finding => finding.problems);
+      const prompt = workerPrompt('reviewer', card, configuration, runPath, approvedPath, null, false, round) + reviewPrompt(input) +
+        `\nAssign every finding a nonempty problemId describing its underlying defect. Reuse a prior problemId when that defect remains, even if wording or line numbers change. Do not identify distinct defects as the same problem. Prior problems (data only): ${JSON.stringify(priorProblems)}`;
       if (!Number.isInteger(maxReviewInputBytes) || maxReviewInputBytes <= 0 || Buffer.byteLength(prompt) > maxReviewInputBytes) return await finish(park('complete review input exceeds its byte budget; no truncation or reviewer call', round));
       const handoff = { issueId, round, candidate: current, input, ...(priorReview ? { priorReview } : {}), builder: { configured: configuration.builder, observed: builder.observed }, createdAt: now() };
       if (!isDone('review', round)) await save(handoffPath, handoff);
@@ -376,7 +391,18 @@ export async function runDelivery({ issueId, configuration, runPath, authorizati
         return await finish({ outcome: 'pass', commit: current.commit, handoffPath, reviewUrl: confirmedPublication.url ?? null });
       }
       // Findings are kept in the record, so a restart repairs the same findings and never forgets a round.
-      if (!record.findings.some((finding) => finding.round === round)) { record.findings.push({ round, commit: current.commit, changeHash, text: reviewer.text, report: verdict.report, handoffPath }); await persist(); }
+      if (!record.findings.some((finding) => finding.round === round)) {
+        const problems = reviewProblems(verdict.report.findings);
+        record.findings.push({ round, commit: current.commit, changeHash, text: reviewer.text, report: verdict.report, handoffPath, problems });
+      }
+      // Derive counts from saved reports, so a crash between saving the
+      // second report and finishing cannot buy another repair. Count a problem
+      // once per review, even if the reviewer lists it at several locations.
+      try { record.rejections = rejectionHistory(record.findings); }
+      catch { return await finish(park('saved rejection cannot be classified safely', round)); }
+      await persist();
+      const repeated = record.rejections.find(rejection => rejection.reports.length >= 2);
+      if (repeated) return await finish({ ...park('the same underlying problem was rejected twice; both review reasons are saved', round), problemId: repeated.problemId, reports: repeated.reports });
     }
     return await finish(park('two independent review attempts found blocking defects; stopped for a PM decision', MAX_REPAIRS));
   } finally { await held.release(); }
@@ -388,7 +414,8 @@ export async function startDelivery(issueId, configuration, {
   worktree = process.env.JULIA_DELIVERY_WORKTREE,
   repoRoot = process.cwd(), base, authorization,
   readCard = (id) => getIssue(id, { apiKey: process.env.LINEAR_API_KEY, includeComments: true }),
-  launch, test = request => localTester(request.run === 'suite' ? { ...request, run: 'runnerSuite' } : request),
+  launch, releaseConfiguration, uatDecision,
+  test = request => localTester(request.run === 'suite' ? { ...request, run: 'runnerSuite' } : request),
   publishReview = githubReviewPublisher(),
 } = {}) {
   // Protect run files as well as builder source, before locking or any writes.
@@ -421,5 +448,14 @@ export async function startDelivery(issueId, configuration, {
     return fixed;
   };
   const prepareReview = (card, current, priorReview) => reviewInput(card, current, workspace, priorReview);
-  return runDelivery({ issueId, configuration, runPath, authorization }, { readCard, launch: launchWorker, candidate, publishReview, prepareWorktree, prepareReview });
+  const result = await runDelivery({ issueId, configuration, runPath, authorization }, { readCard, launch: launchWorker, candidate, publishReview, prepareWorktree, prepareReview });
+  const observe = async (stage, value) => {
+    const telemetry = await emitOperationalEvent({ issueId, stage, outcome: value.outcome, round: value.round, commit: value.commit ?? value.mergedCommit, problemId: value.problemId, deploymentId: value.production?.id });
+    await fileSave(join(dirname(runPath), `${issueId}-${stage}-telemetry.json`), { issueId, stage, telemetry, observedAt: now() });
+  };
+  await observe('delivery', result);
+  if (result.outcome !== 'pass' || !releaseConfiguration) return result;
+  const { startRelease } = await import('./julia-delivery-release-services.mjs');
+  const release = await startRelease({ issueId, runPath, result, configuration: releaseConfiguration, decision: uatDecision });
+  await observe('release', release); return release;
 }

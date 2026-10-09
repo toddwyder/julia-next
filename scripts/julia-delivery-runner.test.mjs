@@ -22,6 +22,13 @@ const authorization = { issueId: 'JUL-196', explicitStart: true, authorizedBy: '
 const runDelivery = (input, adapters) => deliver({ authorization, ...input }, fixtureAdapters(adapters));
 const card = { identifier: 'JUL-196', title: 'A card', state: { name: 'Ready', type: 'unstarted' }, description: '## Acceptance criteria\n\n- [ ] It works.' };
 
+test('native workers do not inherit release and telemetry operator credentials', async () => {
+  let options;
+  const environment = { PATH: 'fixture-path', OPENAI_API_KEY: 'worker-auth', VERCEL_TOKEN: 'release-secret', axiom_token: 'telemetry-secret', AXIOM_DATASET: 'private-dataset', JULIA_OBSERVABILITY_PROOF_TOKEN: 'proof-secret', SENTRY_AUTH_TOKEN: 'sentry-secret', LINEAR_API_KEY: 'operator-card-secret', OP_SERVICE_ACCOUNT_TOKEN: 'vault-secret', op_session_account: 'vault-session' };
+  await productionLauncher('fixture', { environment, findExecutable: () => 'fixture-worker', run: async (_command, _args, value) => { options = value; return { code: 1, stopped: false }; } })('builder', { configuration: configuration.builder, prompt: 'fixture' });
+  assert.deepEqual(options.env, { PATH: 'fixture-path', OPENAI_API_KEY: 'worker-auth' });
+});
+
 test('Windows production launcher gets a response from installed Claude Code and persists its evidence', { skip: process.env.JUL196_CLAUDE_REAL_PROOF !== '1' ? 'operator opt-in required: JUL196_CLAUDE_REAL_PROOF=1; no provider call in ordinary suite' : process.env.JUL196_CLAUDE_QUOTA_BLOCKED === '1' ? 'Claude real integration quota-blocked: JUL196_CLAUDE_QUOTA_BLOCKED=1; historical results retained' : process.platform !== 'win32', timeout: 120000 }, async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'jul196-')); t.after(() => import('node:fs/promises').then(({ rm }) => rm(root, { recursive: true, force: true })));
   const outputPath = join(root, 'evidence', 'JUL-196-builder-round-1.json');
@@ -213,7 +220,7 @@ test('two failed independent reviews allow one repair, then park for a PM decisi
     candidate: async () => ({ commit: String(++builds).padStart(40, 'a'), clean: true, checks: { pass: true } }),
     launch: async (role, request) => { if (role === 'builder') repairPrompts.push(/Repair these review findings:[\s\S]*Finding: test missing/.test(request.prompt)); else reviewPrompts.push(request.prompt); return role === 'builder'
       ? { exitCode: 0, observed: { harness: 'claude-code', model: 'claude-sonnet', maker: 'Anthropic' } }
-      : { exitCode: 0, observed: { harness: 'codex', model: 'gpt-review', maker: 'OpenAI' }, text: 'VERDICT: FAIL\nFinding: test missing' }; },
+      : { exitCode: 0, observed: { harness: 'codex', model: 'gpt-review', maker: 'OpenAI' }, text: `VERDICT: FAIL\nFinding: test missing; distinct problem ${builds}` }; },
   });
   assert.equal(result.outcome, 'park');
   assert.equal(result.round, 1);
