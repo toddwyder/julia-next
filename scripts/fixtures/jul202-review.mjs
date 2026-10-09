@@ -55,5 +55,12 @@ export function fixtureLaunch(launch) {
 }
 
 export function fixtureAdapters(adapters) {
-  return { ...adapters, prepareReview: fixtureInput, launch: fixtureLaunch(adapters.launch) };
+  return {
+    ...adapters,
+    prepareReview: fixtureInput,
+    launch: fixtureLaunch(adapters.launch),
+    // Controller fixtures exercise the public publication seam without
+    // pretending a local fixture is a GitHub record.
+    publishReview: adapters.publishReview ?? (async review => ({ confirmed: true, authoritative: review.state === 'completed', id: 1, url: 'https://example.invalid/review/1', pr: 1 })),
+  };
 }

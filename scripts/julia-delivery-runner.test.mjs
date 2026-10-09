@@ -11,7 +11,8 @@ import { PassThrough } from 'node:stream';
 import { mkdir } from 'node:fs/promises';
 
 import { fixtureAdapters, fixtureLaunch } from './fixtures/jul202-review.mjs';
-const startDelivery = (id, config, options) => start(id, config, { ...options, launch: options.launch ? fixtureLaunch(options.launch) : undefined });
+const fixturePublication = async review => ({ confirmed: true, authoritative: review.state === 'completed', id: 1, url: 'https://example.invalid/review/1', pr: 1 });
+const startDelivery = (id, config, options) => start(id, config, { ...options, launch: options.launch ? fixtureLaunch(options.launch) : undefined, publishReview: options.publishReview ?? fixturePublication });
 
 const configuration = {
   builder: { identity: 'claude', model: 'claude-sonnet', maker: 'Anthropic', harness: 'claude-code', thinking: 'high', connection: { route: 'native' } },

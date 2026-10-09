@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { runDelivery, productionLauncher } from './julia-delivery-runner.mjs';
+import { runDelivery as deliver, productionLauncher } from './julia-delivery-runner.mjs';
 import { saveJson, loadText } from './julia-delivery-state.mjs';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
@@ -14,6 +14,12 @@ const configuration = { builder: { harness: 'codex', model: 'builder', maker: 'O
 const authorization = { explicitStart: true, issueId: 'JUL-202', authorizedBy: 'fixture', spending: { builder: { mode: 'fixture', maxUsd: 0 }, reviewer: { mode: 'fixture', maxUsd: 0 } } };
 const card = { identifier: 'JUL-202', description: '## Acceptance criteria\n- [ ] Reject unsupported approval.\n- [ ] Preserve inconclusive outcomes.' };
 const commit = 'a'.repeat(40);
+// The public publication seam is a deterministic fixture here; GitHub API
+// behavior has its own contract tests.
+const runDelivery = (input, adapters) => deliver(input, {
+  ...adapters,
+  publishReview: adapters.publishReview ?? (async review => ({ confirmed: true, authoritative: review.state === 'completed', id: 1, url: 'https://example.invalid/review/1', pr: 1 })),
+});
 
 async function scenario(t, change = report => report, selected = configuration) {
   const root = await mkdtemp(join(tmpdir(), 'jul202-review-')); t.after(() => rm(root, { recursive: true, force: true }));
@@ -97,10 +103,11 @@ test('a repair re-review receives the persisted failed review and uses a targete
 
 test('a malformed repair review parks without a third review or repair', async t => {
   const root = await mkdtemp(join(tmpdir(), 'jul202-malformed-repair-')); t.after(() => rm(root, { recursive: true, force: true }));
-  let builders = 0, reviewers = 0, candidates = 0;
+  let builders = 0, reviewers = 0, candidates = 0; const publications = [];
   const result = await runDelivery({ issueId: 'JUL-202', configuration, authorization, runPath: join(root, 'run.json') }, {
     readCard: async () => card, prepareReview: fixtureInput,
     candidate: async () => ({ commit: String(++candidates).padStart(40, 'a'), clean: true, checks: { pass: true } }),
+    publishReview: async review => { publications.push(review); return { confirmed: true, authoritative: review.state === 'completed', id: publications.length, url: `https://example.invalid/review/${publications.length}`, pr: 1 }; },
     launch: async (role, request) => {
       if (role === 'builder') { builders++; return { exitCode: 0, observed: configuration.builder }; }
       reviewers++;
@@ -114,6 +121,73 @@ test('a malformed repair review parks without a third review or repair', async t
   assert.match(result.reason, /repair review/);
   assert.equal(builders, 2);
   assert.equal(reviewers, 2);
+  assert.equal(publications.at(-1).state, 'incomplete', 'malformed output is a visible non-authoritative attempt, never a completed verdict');
+  assert.equal(publications.at(-1).verdict, 'INCONCLUSIVE');
+});
+
+test('a completed review is published once with its exact candidate and checked input before PASS', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'jul203-publication-')); t.after(() => rm(root, { recursive: true, force: true }));
+  const published = [];
+  const result = await runDelivery({ issueId: 'JUL-202', configuration, authorization, runPath: join(root, 'run.json') }, {
+    readCard: async () => card, prepareReview: fixtureInput,
+    candidate: async ({ afterReview, previous }) => afterReview ? previous : { commit, clean: true, checks: { pass: true } },
+    publishReview: async (review) => { published.push(review); return { confirmed: true, authoritative: true, id: 22, url: 'https://example.invalid/pull/22#review', pr: 22 }; },
+    launch: async (role, request) => role === 'builder'
+      ? { exitCode: 0, observed: configuration.builder }
+      : { exitCode: 0, observed: configuration.reviewer, text: fixtureReport(request.reviewInput) },
+  });
+  assert.equal(result.outcome, 'pass', result.reason);
+  assert.equal(published.length, 1);
+  assert.deepEqual([published[0].round, published[0].candidate.commit, published[0].input.digest, published[0].verdict, published[0].state], [0, commit, published[0].input.digest, 'PASS', 'completed']);
+  const state = JSON.parse(await readFile(join(root, 'JUL-202-state.json'), 'utf8'));
+  assert.equal(state.actions.find(action => action.kind === 'publish-review').outcome.publication.url, 'https://example.invalid/pull/22#review');
+});
+
+test('a GitHub publication failure parks instead of reporting the review as successfully published', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'jul203-publication-failure-')); t.after(() => rm(root, { recursive: true, force: true }));
+  const result = await runDelivery({ issueId: 'JUL-202', configuration, authorization, runPath: join(root, 'run.json') }, {
+    readCard: async () => card, prepareReview: fixtureInput,
+    candidate: async () => ({ commit, clean: true, checks: { pass: true } }),
+    publishReview: async () => { throw new Error('GitHub read-back failed'); },
+    launch: async (role, request) => role === 'builder'
+      ? { exitCode: 0, observed: configuration.builder }
+      : { exitCode: 0, observed: configuration.reviewer, text: fixtureReport(request.reviewInput) },
+  });
+  assert.equal(result.outcome, 'park');
+  assert.match(result.reason, /durable GitHub review publication.*GitHub read-back failed/);
+});
+
+test('recovery after publication confirmation reuses its review identity without another authoritative record', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'jul203-publication-recovery-')); t.after(() => rm(root, { recursive: true, force: true }));
+  const runPath = join(root, 'run.json'), statePath = join(root, 'JUL-202-state.json');
+  const identities = new Map(); let calls = 0, created = 0, losePersistence = true;
+  const publishReview = async review => {
+    calls += 1;
+    const identity = `${review.round}:${review.candidate.commit}:${review.input.digest}:${review.verdict}:${review.state}`;
+    if (!identities.has(identity)) { created += 1; identities.set(identity, { confirmed: true, authoritative: true, id: 29, url: 'https://example.invalid/pull/29#review', pr: 29 }); }
+    return identities.get(identity);
+  };
+  const adapters = {
+    readCard: async () => card, prepareReview: fixtureInput,
+    candidate: async ({ afterReview, previous }) => afterReview ? previous : { commit, clean: true, checks: { pass: true } },
+    publishReview,
+    save: async (path, value) => {
+      if (losePersistence && path === statePath && value.actions?.at(-1)?.kind === 'publish-review' && value.actions.at(-1).status === 'done') { losePersistence = false; throw new Error('runner died after GitHub confirmation'); }
+      await saveJson(path, value);
+    },
+    load: loadText,
+    launch: async (role, request) => role === 'builder'
+      ? { exitCode: 0, observed: configuration.builder }
+      : { exitCode: 0, observed: configuration.reviewer, text: fixtureReport(request.reviewInput) },
+  };
+  const input = { issueId: 'JUL-202', configuration, authorization, runPath };
+  await assert.rejects(runDelivery(input, adapters), /runner died after GitHub confirmation/);
+  const result = await runDelivery(input, adapters);
+  assert.equal(result.outcome, 'pass', result.reason);
+  assert.equal(calls, 2, 'the recovery confirms the already-published identity');
+  assert.equal(created, 1, 'recovery did not create a duplicate authoritative review record');
+  const publications = JSON.parse(await readFile(statePath, 'utf8')).actions.filter(action => action.kind === 'publish-review');
+  assert.deepEqual(publications.map(action => action.status), ['interrupted', 'done']);
 });
 
 test('normal transport errors and persistence interruption retain uncertainty without duplicate calls', async t => {
