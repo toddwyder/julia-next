@@ -24,7 +24,7 @@ const card = { identifier: 'JUL-196', title: 'A card', state: { name: 'Ready', t
 
 test('native workers do not inherit release and telemetry operator credentials', async () => {
   let options;
-  const environment = { PATH: 'fixture-path', OPENAI_API_KEY: 'worker-auth', VERCEL_TOKEN: 'release-secret', axiom_token: 'telemetry-secret', AXIOM_DATASET: 'private-dataset', JULIA_OBSERVABILITY_PROOF_TOKEN: 'proof-secret', SENTRY_AUTH_TOKEN: 'sentry-secret' };
+  const environment = { PATH: 'fixture-path', OPENAI_API_KEY: 'worker-auth', VERCEL_TOKEN: 'release-secret', axiom_token: 'telemetry-secret', AXIOM_DATASET: 'private-dataset', JULIA_OBSERVABILITY_PROOF_TOKEN: 'proof-secret', SENTRY_AUTH_TOKEN: 'sentry-secret', LINEAR_API_KEY: 'operator-card-secret', OP_SERVICE_ACCOUNT_TOKEN: 'vault-secret', op_session_account: 'vault-session' };
   await productionLauncher('fixture', { environment, findExecutable: () => 'fixture-worker', run: async (_command, _args, value) => { options = value; return { code: 1, stopped: false }; } })('builder', { configuration: configuration.builder, prompt: 'fixture' });
   assert.deepEqual(options.env, { PATH: 'fixture-path', OPENAI_API_KEY: 'worker-auth' });
 });

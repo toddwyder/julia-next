@@ -20,6 +20,8 @@ Set `JULIA_RELEASE_CONFIG` to an operator-owned JSON file outside the builder ch
 
 Keep `VERCEL_TOKEN` in the runner environment, never in this file or a card. The configuration and exact reviewed input are frozen in `<issue>-release.json`. A completed delivery PASS resumes without running builder/reviewer again. It pushes the reviewed SHA, creates/reuses its PR, waits for the exact preview, and reports `awaiting-uat` with the URL. A building preview reports `awaiting-preview`; repeat the same `$init` to inspect it again.
 
+Use the [Julia 1Password vault launcher](julia-secret-vault.md) to supply runtime secrets from references instead of maintaining plaintext runner environment files.
+
 After Todd accepts that preview, set `JULIA_UAT_DECISION` to a separate operator-owned decision JSON file, then repeat the same `$init`:
 
 ```json

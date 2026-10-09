@@ -122,8 +122,8 @@ function codexIdentity(output, root) {
 }
 
 export function productionLauncher(worktree, { run = runLimited, environment = process.env, findExecutable = nativeCommand, sessionRoot = join(process.env.CODEX_HOME || join(homedir(), '.codex'), 'sessions') } = {}) {
-  const operatorSecrets = new Set(['VERCEL_TOKEN', 'AXIOM_TOKEN', 'AXIOM_DATASET', 'SENTRY_AUTH_TOKEN', 'JULIA_OBSERVABILITY_PROOF_TOKEN']);
-  const workerEnvironment = Object.fromEntries(Object.entries(environment).filter(([key]) => !operatorSecrets.has(key.toUpperCase())));
+  const operatorSecrets = new Set(['VERCEL_TOKEN', 'LINEAR_API_KEY', 'AXIOM_TOKEN', 'AXIOM_DATASET', 'SENTRY_AUTH_TOKEN', 'JULIA_OBSERVABILITY_PROOF_TOKEN']);
+  const workerEnvironment = Object.fromEntries(Object.entries(environment).filter(([key]) => !operatorSecrets.has(key.toUpperCase()) && !key.toUpperCase().startsWith('OP_')));
   const runWorker = (command, args, options, limits) => run(command, args, { ...options, env: workerEnvironment }, limits);
   return async (role, request) => {
     const configured = request.configuration;
