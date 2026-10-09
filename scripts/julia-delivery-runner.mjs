@@ -121,10 +121,13 @@ function codexIdentity(output, root) {
   } catch { return null; }
 }
 
-export function productionLauncher(worktree, { run = runLimited, findExecutable = nativeCommand, sessionRoot = join(process.env.CODEX_HOME || join(homedir(), '.codex'), 'sessions') } = {}) {
+export function productionLauncher(worktree, { run = runLimited, environment = process.env, findExecutable = nativeCommand, sessionRoot = join(process.env.CODEX_HOME || join(homedir(), '.codex'), 'sessions') } = {}) {
+  const operatorSecrets = new Set(['VERCEL_TOKEN', 'AXIOM_TOKEN', 'AXIOM_DATASET', 'SENTRY_AUTH_TOKEN', 'JULIA_OBSERVABILITY_PROOF_TOKEN']);
+  const workerEnvironment = Object.fromEntries(Object.entries(environment).filter(([key]) => !operatorSecrets.has(key.toUpperCase())));
+  const runWorker = (command, args, options, limits) => run(command, args, { ...options, env: workerEnvironment }, limits);
   return async (role, request) => {
     const configured = request.configuration;
-    if (role === 'reviewer' && configured.connection?.provider === 'commandcode') return commandCodeReview(request, { run });
+    if (role === 'reviewer' && configured.connection?.provider === 'commandcode') return commandCodeReview(request, { run: runWorker });
     if (role === 'reviewer' && configured.connection?.route && configured.connection.route !== 'native') return { exitCode: 2, observed: null, text: 'unsupported saved reviewer connection; native fallback is forbidden' };
     const cwd = role === 'builder' ? worktree : tmpdir();
     const startedAt = new Date().toISOString();
@@ -136,7 +139,7 @@ export function productionLauncher(worktree, { run = runLimited, findExecutable 
       : configured.harness === 'codex' ? ['exec', '-m', configured.model, '-c', 'model_provider="openai"', '-c', 'approval_policy="never"', ...(configured.thinking ? ['-c', `model_reasoning_effort="${configured.thinking}"`] : []), '-s', role === 'builder' ? 'workspace-write' : 'read-only', '--skip-git-repo-check', '--json', '-'] : [];
     if (!command && !failed) return { exitCode: 2, observed: null, text: `unsupported harness ${configured.harness}` };
     let output = ''; let error = ''; let pid = null; let unrecorded = null;
-    const result = failed ? { code: null, signal: null, stopped: false } : await run(command, args, { cwd, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true }, {
+    const result = failed ? { code: null, signal: null, stopped: false } : await runWorker(command, args, { cwd, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true }, {
       seconds: LIMITS.builder.fallback,
       started: (child) => {
         child.stdout.on('data', (chunk) => { output += chunk; }); child.stderr.on('data', (chunk) => { error += chunk; }); child.stdin.on('error', () => {});
