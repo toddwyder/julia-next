@@ -4,7 +4,10 @@ import { test } from 'node:test';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { runDelivery } from './julia-delivery-runner.mjs';
+import { runDelivery as deliver } from './julia-delivery-runner.mjs';
+
+import { fixtureAdapters } from './fixtures/jul202-review.mjs';
+const runDelivery = (input, adapters) => deliver(input, fixtureAdapters(adapters));
 
 const configuration = {
   builder: { harness: 'codex', model: 'gpt-6.1-sol', maker: 'OpenAI' },
@@ -93,4 +96,17 @@ test('authentication failures, malformed verdicts and unknown identity are saved
     assert.deepEqual(f.launches, ['builder', 'reviewer']);
     assert.equal((await f.state()).repairsUsed, 0);
   }
+});
+
+test('a new commit with identical checked changes cannot purchase another review', async t => {
+  const f = await fixture(t);
+  f.adapters.candidate = async ({ round }) => ({ commit: round ? B : A, diff: 'same checked source changes', clean: true, checks: { pass: true } });
+  f.adapters.launch = async role => {
+    f.launches.push(role);
+    return role === 'builder' ? { exitCode: 0, observed: configuration.builder } : { exitCode: 0, observed: configuration.reviewer, text: 'VERDICT: FAIL\nFinding: add regression' };
+  };
+  const result = await runDelivery(f.run, f.adapters);
+  assert.match(result.reason, /unchanged.*review/);
+  assert.deepEqual(f.launches, ['builder', 'reviewer', 'builder']);
+  assert.equal((await f.state()).repairsUsed, 1);
 });

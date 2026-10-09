@@ -10,8 +10,11 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { runDelivery, startDelivery } from './julia-delivery-runner.mjs';
+import { runDelivery as deliver, startDelivery } from './julia-delivery-runner.mjs';
 import { acquireRunLock, loadText, processStarted, saveJson } from './julia-delivery-state.mjs';
+
+import { fixtureAdapters } from './fixtures/jul202-review.mjs';
+const runDelivery = (input, adapters) => deliver(input, fixtureAdapters(adapters));
 
 const configuration = {
   builder: { identity: 'claude', model: 'claude-sonnet', maker: 'Anthropic', harness: 'claude-code', thinking: 'high', connection: { route: 'native' } },
@@ -79,7 +82,8 @@ test('findings and the repair count survive a restart: one build, then three rep
   await assert.rejects(runDelivery({ ...run, runPath }, adapters(2)), /died during repair/);
   const interrupted = await savedState(statePath);
   assert.equal(interrupted.repairsUsed, 1, 'the repair was counted when it was about to start');
-  assert.deepEqual(interrupted.findings.map(({ round, text }) => [round, text]), [[0, 'VERDICT: FAIL\nFinding 1: test missing']]);
+  assert.deepEqual(interrupted.findings.map(({ round }) => round), [0]);
+  assert.match(interrupted.findings[0].text, /Finding 1: test missing/);
   const result = await runDelivery({ ...run, runPath }, adapters(0));
   assert.equal(result.outcome, 'park');
   assert.match(result.reason, /initial build and three repairs/);

@@ -266,3 +266,15 @@ test('a 200 response carrying GraphQL errors also throws with its status and bod
     },
   );
 });
+
+test('delivery specification fetch includes complete comment evidence and refuses partial discussion', async () => {
+  let query;
+  const fetchImpl = async (_url, opts) => {
+    query = JSON.parse(opts.body).query;
+    return { ok: true, status: 200, json: async () => ({ data: { issue: { identifier: 'JUL-202', comments: { nodes: [{ body: 'PM-approved clarification' }], pageInfo: { hasNextPage: false } } } } }) };
+  };
+  const issue = await getIssue('JUL-202', { apiKey: 'fixture', fetchImpl, includeComments: true });
+  assert.match(query, /comments\(first: 250\)/);
+  assert.equal(issue.comments.nodes[0].body, 'PM-approved clarification');
+  await assert.rejects(getIssue('JUL-202', { apiKey: 'fixture', includeComments: true, fetchImpl: fakeFetch([{ body: { data: { issue: { comments: { nodes: [], pageInfo: { hasNextPage: true } } } } } }]) }), /incomplete/);
+});
