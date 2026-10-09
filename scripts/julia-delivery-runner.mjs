@@ -14,10 +14,10 @@ import { reviewInput, reviewPrompt, checkedReview } from './julia-delivery-revie
 import { commandCodeReview, nativeReviewReply, validObserved } from './julia-delivery-review-transport.mjs';
 
 const SHA = /^[0-9a-f]{40}$/i;
-// The initial build and its review, then at most this many repairs. A repair
-// is spent when its builder is durably about to start, not when it finishes,
-// so a restart can never win an extra one.
-export const MAX_REPAIRS = 3;
+// Two independent review attempts: the initial review and, at most, one
+// repair review. A repair is spent when its builder is durably about to start,
+// not when it finishes, so a restart can never win an extra attempt.
+export const MAX_REPAIRS = 1;
 const SCHEMA = 1;
 
 // Operator authorization is separate from readiness; save explicit spending and exact choices for both roles.
@@ -43,13 +43,16 @@ function approvedInput(card, configuration) {
   return { issueId: card.identifier, title: card.title, description: card.description, configuration, readAt: new Date().toISOString() };
 }
 
-export function workerPrompt(role, card, configuration, runPath, approvedPath, findings = null, interrupted = false) {
+export function workerPrompt(role, card, configuration, runPath, approvedPath, findings = null, interrupted = false, round = 0) {
   const chosen = configuration[role];
   const common = `Issue: ${card.identifier}\nSaved run: ${runPath}\nApproved input: ${approvedPath}\nConfigured ${role}: ${JSON.stringify(chosen)}`;
   // A builder that follows an interrupted one inherits its unfinished edits; it is told so, never left to guess.
   const resumed = interrupted ? '\n\nThe previous builder for this work was interrupted before it finished. Its partial changes are still in the worktree: inspect them first (git status, git diff) and finish the work from there. Do not discard them or start over.' : '';
   if (role === 'builder') return `${common}\n\nExplicitly read and follow .claude/skills/implement/SKILL.md for ${card.identifier}. The approved requirements are only in ${approvedPath}; do not reread Linear. Work only in the prepared isolated worktree.${resumed}${findings ? `\n\nRepair these review findings:\n${findings}` : ''}`;
-  return `Issue: ${card.identifier}\nConfigured reviewer: ${JSON.stringify(chosen)}\n\nExplicitly read and follow .agents/skills/adversarial-review/SKILL.md (the complete pinned instructions are supplied below). Review the changed, checked immutable candidate in one fresh session using only the supplied review input. Keep Standards and Spec separate in the report. Save and reuse this review for this candidate; no polling or retry after an ambiguous or failing call, and no unchanged rereview.`;
+  const scope = round === 0
+    ? 'Perform the full adversarial review of the changed, checked immutable candidate.'
+    : 'Check the repairs and relevant regressions on the changed, checked immutable candidate; do not repeat the entire initial review.';
+  return `Issue: ${card.identifier}\nConfigured reviewer: ${JSON.stringify(chosen)}\n\nExplicitly read and follow .agents/skills/adversarial-review/SKILL.md (the complete pinned instructions are supplied below). ${scope} Use only the supplied review input in one fresh session. Keep Standards and Spec separate in the report. Save and reuse this review for this candidate; no polling or retry after an ambiguous or failing call, and no unchanged rereview.`;
 }
 
 const fileSave = saveJson;
@@ -333,11 +336,12 @@ export async function runDelivery({ issueId, configuration, runPath, authorizati
       const changeHash = typeof current.diff === 'string' ? sha256(current.diff) : null;
       if (!isDone('review', round) && record.findings.some(finding => finding.commit === current.commit || (changeHash && finding.changeHash === changeHash))) return await finish(park('unchanged candidate: saved review findings require changed checked code before another review', round));
       const handoffPath = join(directory, `${issueId}-handoff-round-${round}.json`);
-      let input; try { input = await prepareReview(card, current); } catch (error) { return await finish(park(error.message, round)); }
+      const priorReview = round === 0 ? null : record.findings.at(-1);
+      let input; try { input = await prepareReview(card, current, priorReview); } catch (error) { return await finish(park(error.message, round)); }
       if (configuration.reviewer.maker?.trim().toLowerCase() === builder.observed.maker.trim().toLowerCase()) return await finish(park('reviewer company matches observed builder maker', round));
-      const prompt = workerPrompt('reviewer', card, configuration, runPath, approvedPath) + reviewPrompt(input);
+      const prompt = workerPrompt('reviewer', card, configuration, runPath, approvedPath, null, false, round) + reviewPrompt(input);
       if (!Number.isInteger(maxReviewInputBytes) || maxReviewInputBytes <= 0 || Buffer.byteLength(prompt) > maxReviewInputBytes) return await finish(park('complete review input exceeds its byte budget; no truncation or reviewer call', round));
-      const handoff = { issueId, round, candidate: current, input, builder: { configured: configuration.builder, observed: builder.observed }, createdAt: now() };
+      const handoff = { issueId, round, candidate: current, input, ...(priorReview ? { priorReview } : {}), builder: { configured: configuration.builder, observed: builder.observed }, createdAt: now() };
       if (!isDone('review', round)) await save(handoffPath, handoff);
       const reviewerConfig = { ...configuration.reviewer, builderMaker: configuration.builder.maker };
       const reviewer = await act('review', round, 'reviewer', (started, attempt) => launch('reviewer', { prompt, reviewInput: input, configuration: reviewerConfig, handoffPath, round, started, outputPath: evidence('reviewer', attempt), spending: approvedAuthorization.spending.reviewer }));
@@ -351,9 +355,9 @@ export async function runDelivery({ issueId, configuration, runPath, authorizati
         return await finish({ outcome: 'pass', commit: current.commit, handoffPath });
       }
       // Findings are kept in the record, so a restart repairs the same findings and never forgets a round.
-      if (!record.findings.some((finding) => finding.round === round)) { record.findings.push({ round, commit: current.commit, changeHash, text: reviewer.text, handoffPath }); await persist(); }
+      if (!record.findings.some((finding) => finding.round === round)) { record.findings.push({ round, commit: current.commit, changeHash, text: reviewer.text, report: verdict.report, handoffPath }); await persist(); }
     }
-    return await finish(park('the initial build and three repairs did not produce a passing reviewed commit', MAX_REPAIRS));
+    return await finish(park('two independent review attempts found blocking defects; stopped for a PM decision', MAX_REPAIRS));
   } finally { await held.release(); }
 }
 
@@ -394,6 +398,6 @@ export async function startDelivery(issueId, configuration, {
     fixed = await captureDeliveryCandidate({ issueId, runPath, workspace, card: approvedCard, test, round });
     return fixed;
   };
-  const prepareReview = (card, current) => reviewInput(card, current, workspace);
+  const prepareReview = (card, current, priorReview) => reviewInput(card, current, workspace, priorReview);
   return runDelivery({ issueId, configuration, runPath, authorization }, { readCard, launch: launchWorker, candidate, prepareWorktree, prepareReview });
 }

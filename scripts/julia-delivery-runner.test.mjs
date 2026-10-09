@@ -205,20 +205,23 @@ test('failed checks, candidate drift, same-maker reviews, and malformed verdicts
   }
 });
 
-test('a review fail returns findings for repair, and the initial build plus three unsuccessful repairs park', async () => {
-  let builds = 0; const repairPrompts = [];
+test('two failed independent reviews allow one repair, then park for a PM decision', async () => {
+  let builds = 0; const repairPrompts = []; const reviewPrompts = [];
   const result = await runDelivery({ issueId: 'JUL-196', configuration, runPath: 'C:/runs/JUL-196.json' }, {
     readCard: async () => card, save: async () => {},
     candidate: async () => ({ commit: String(++builds).padStart(40, 'a'), clean: true, checks: { pass: true } }),
-    launch: async (role, request) => { if (role === 'builder') repairPrompts.push(/Repair these review findings:[\s\S]*Finding: test missing/.test(request.prompt)); return role === 'builder'
+    launch: async (role, request) => { if (role === 'builder') repairPrompts.push(/Repair these review findings:[\s\S]*Finding: test missing/.test(request.prompt)); else reviewPrompts.push(request.prompt); return role === 'builder'
       ? { exitCode: 0, observed: { harness: 'claude-code', model: 'claude-sonnet', maker: 'Anthropic' } }
       : { exitCode: 0, observed: { harness: 'codex', model: 'gpt-review', maker: 'OpenAI' }, text: 'VERDICT: FAIL\nFinding: test missing' }; },
   });
   assert.equal(result.outcome, 'park');
-  assert.equal(result.round, 3);
-  // One initial build, then exactly three repairs (not three builds in total).
-  assert.equal(builds, 4);
-  assert.deepEqual(repairPrompts, [false, true, true, true]);
+  assert.equal(result.round, 1);
+  assert.match(result.reason, /two independent review attempts/);
+  assert.equal(builds, 2, 'one initial build and one repair only');
+  assert.deepEqual(repairPrompts, [false, true]);
+  assert.match(reviewPrompts[0], /full adversarial review/i);
+  assert.match(reviewPrompts[1], /repairs and relevant regressions/i);
+  assert.doesNotMatch(reviewPrompts[1], /full adversarial review/i);
 });
 
 test('resume uses the saved approved card without another Linear read, and records a terminal refusal', async (t) => {

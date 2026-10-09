@@ -71,6 +71,51 @@ test('actual assembled reviewer prompt invokes the skill for every configured di
   });
 });
 
+test('a repair re-review receives the persisted failed review and uses a targeted contract', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'jul202-targeted-review-')); t.after(() => rm(root, { recursive: true, force: true }));
+  const reviews = [], handoffs = [];
+  let candidates = 0;
+  const result = await runDelivery({ issueId: 'JUL-202', configuration, authorization, runPath: join(root, 'run.json') }, {
+    readCard: async () => card, prepareReview: fixtureInput,
+    candidate: async ({ afterReview, previous }) => afterReview ? previous : { commit: String(++candidates).padStart(40, 'a'), clean: true, checks: { pass: true } },
+    launch: async (role, request) => {
+      if (role === 'builder') return { exitCode: 0, observed: configuration.builder };
+      reviews.push(request); handoffs.push(JSON.parse(await readFile(request.handoffPath, 'utf8')));
+      return { exitCode: 0, observed: configuration.reviewer, text: fixtureReport(request.reviewInput, reviews.length === 1 ? 'FAIL' : 'PASS', 'Finding: fixture repair required') };
+    },
+  });
+  assert.equal(result.outcome, 'pass', result.reason);
+  assert.equal(reviews.length, 2, 'one initial review and one repair review');
+  assert.equal(handoffs[1].priorReview.commit, handoffs[0].candidate.commit);
+  assert.match(handoffs[1].priorReview.text, /fixture repair required/);
+  assert.match(reviews[1].prompt, /repair-review contract/i);
+  assert.match(reviews[1].prompt, /fixture repair required/i);
+  assert.match(reviews[1].prompt, /relevant regressions/i);
+  assert.doesNotMatch(reviews[1].prompt, /all criteria\/files\/axes/i);
+  assert.doesNotMatch(reviews[1].prompt, /five supported checks/i);
+});
+
+test('a malformed repair review parks without a third review or repair', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'jul202-malformed-repair-')); t.after(() => rm(root, { recursive: true, force: true }));
+  let builders = 0, reviewers = 0, candidates = 0;
+  const result = await runDelivery({ issueId: 'JUL-202', configuration, authorization, runPath: join(root, 'run.json') }, {
+    readCard: async () => card, prepareReview: fixtureInput,
+    candidate: async () => ({ commit: String(++candidates).padStart(40, 'a'), clean: true, checks: { pass: true } }),
+    launch: async (role, request) => {
+      if (role === 'builder') { builders++; return { exitCode: 0, observed: configuration.builder }; }
+      reviewers++;
+      if (reviewers === 1) return { exitCode: 0, observed: configuration.reviewer, text: fixtureReport(request.reviewInput, 'FAIL', 'Finding: fixture repair required') };
+      const malformed = JSON.parse(fixtureReport(request.reviewInput).split('REVIEW: ')[1]);
+      delete malformed.repairedFindings;
+      return { exitCode: 0, observed: configuration.reviewer, text: `VERDICT: PASS\nREVIEW: ${JSON.stringify(malformed)}` };
+    },
+  });
+  assert.equal(result.outcome, 'park');
+  assert.match(result.reason, /repair review/);
+  assert.equal(builders, 2);
+  assert.equal(reviewers, 2);
+});
+
 test('normal transport errors and persistence interruption retain uncertainty without duplicate calls', async t => {
   for (const kind of ['authentication', 'wrong model', 'reasoning only', 'malformed', 'lost result persistence']) await t.test(kind, async t => {
     const root = await mkdtemp(join(tmpdir(), 'jul202-transport-recovery-')); t.after(() => rm(root, { recursive: true, force: true }));
