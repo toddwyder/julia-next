@@ -81,5 +81,8 @@ const prepareWorktree = async ({ saved }) => {
 const result = await runDelivery({ issueId, configuration, runPath: join(proofDir, 'runs', `${issueId}.json`) }, {
   readCard: async () => { throw new Error('Linear must not be read: the approved input is already saved'); },
   launch, candidate, prepareWorktree, prepareReview: fixtureInput,
+  // A deterministic stand-in for the public GitHub boundary; this proof is
+  // about worker interruption and carries no real pull request.
+  publishReview: async review => ({ confirmed: true, authoritative: review.state === 'completed', id: 1, url: 'https://example.invalid/review/1', pr: 1 }),
 });
 console.log(`RESULT ${JSON.stringify(result)}`);

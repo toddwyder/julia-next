@@ -12,6 +12,7 @@ import { assertDeliveryPath, prepareDeliveryWorkspace, captureDeliveryCandidate 
 import { LIMITS, runLimited } from '../ops/julia-runner/time-limit.mjs';
 import { reviewInput, reviewPrompt, checkedReview } from './julia-delivery-review.mjs';
 import { commandCodeReview, nativeReviewReply, validObserved } from './julia-delivery-review-transport.mjs';
+import { githubReviewPublisher } from './julia-delivery-review-publication.mjs';
 
 const SHA = /^[0-9a-f]{40}$/i;
 // Two independent review attempts: the initial review and, at most, one
@@ -183,7 +184,7 @@ const plain = (value) => JSON.parse(JSON.stringify(value));
 function recordMismatch(record, issueId, configuration) {
   if (!Number.isInteger(record.repairsUsed) || record.repairsUsed < 0 || record.repairsUsed > MAX_REPAIRS || record.round < record.repairsUsed || record.round > MAX_REPAIRS + 1 || !Array.isArray(record.actions) || record.actions.filter(action => action?.status === 'started').length > 1) return 'the saved repair budget or action journal is invalid';
   if (record.schema !== SCHEMA || !Array.isArray(record.actions) || !Array.isArray(record.findings) || !Number.isInteger(record.round) || typeof record.approved?.sha256 !== 'string') return 'the saved run state is not in a form this runner wrote';
-  if (record.actions.some(action => !action || !['build', 'candidate', 'review', 'verify'].includes(action.kind) || !['started', 'done', 'interrupted', 'stale', 'uncertain'].includes(action.status) || !Number.isInteger(action.round) || action.round < 0 || action.round > MAX_REPAIRS || action.key !== `${action.kind}:${action.round}` || (action.worker != null && (!Number.isInteger(action.worker.pid) || action.worker.pid <= 0 || (action.worker.started != null && typeof action.worker.started !== 'string'))))) return 'the saved action journal is invalid';
+  if (record.actions.some(action => !action || !['build', 'candidate', 'review', 'publish-review', 'verify'].includes(action.kind) || !['started', 'done', 'interrupted', 'stale', 'uncertain'].includes(action.status) || !Number.isInteger(action.round) || action.round < 0 || action.round > MAX_REPAIRS || action.key !== `${action.kind}:${action.round}` || (action.worker != null && (!Number.isInteger(action.worker.pid) || action.worker.pid <= 0 || (action.worker.started != null && typeof action.worker.started !== 'string'))))) return 'the saved action journal is invalid';
   if (record.issueId !== issueId) return `the saved run state belongs to ${record.issueId}, not ${issueId}`;
   if (!isDeepStrictEqual(record.configuration, plain(configuration))) return 'the saved run was started with a different builder/reviewer configuration';
   return null;
@@ -208,7 +209,7 @@ async function settleWorker(action, processes) {
   } catch (error) { return { unsafe: `could not tell whether the earlier ${action.role} (process ${pid}) is still running: ${error.message}` }; }
 }
 
-export async function runDelivery({ issueId, configuration, runPath, authorization }, { readCard, save = fileSave, load, lock, launch, candidate, prepareReview = reviewInput, maxReviewInputBytes = 512000, prepareWorktree = async () => ({ ok: true }), preflight = () => null, processes = { started: processStarted, stop: stopProcessTree } }) {
+export async function runDelivery({ issueId, configuration, runPath, authorization }, { readCard, save = fileSave, load, lock, launch, candidate, publishReview, prepareReview = reviewInput, maxReviewInputBytes = 512000, prepareWorktree = async () => ({ ok: true }), preflight = () => null, processes = { started: processStarted, stop: stopProcessTree } }) {
   // Run files are either all real or all injected: a test that keeps them in
   // memory has no earlier run to load and no second process to lock out.
   load ??= save === fileSave ? loadText : async () => null;
@@ -348,11 +349,31 @@ export async function runDelivery({ issueId, configuration, runPath, authorizati
       const reviewerIdentity = validObserved('reviewer', reviewerConfig, reviewer.observed);
       const verdict = checkedReview(reviewer.text, input);
       await save(handoffPath, { ...handoff, reviewer: { configured: configuration.reviewer, observed: reviewer.observed, exitCode: reviewer.exitCode, outputPath: reviewer.outputPath ?? null, verdict: verdict.verdict ?? null }, result: verdict.error ?? verdict.verdict });
-      if (reviewer.exitCode !== 0 || reviewerIdentity || verdict.error) return await finish(park(reviewerIdentity ?? verdict.error ?? `reviewer exited ${reviewer.exitCode}`, round));
+      const completed = reviewer.exitCode === 0 && !reviewerIdentity && !verdict.error;
+      const publication = {
+        issueId, round, candidate: current, input,
+        verdict: completed ? verdict.verdict : 'INCONCLUSIVE',
+        report: completed ? verdict.report : null,
+        state: completed ? 'completed' : 'incomplete',
+        reason: reviewerIdentity ?? verdict.error ?? (reviewer.exitCode !== 0 ? `reviewer exited ${reviewer.exitCode}` : 'review did not produce a completed verdict'),
+      };
+      if (typeof publishReview !== 'function') return await finish(park('durable GitHub review publication could not be confirmed: no GitHub review publisher is configured', round));
+      // A publisher failure is a completed local action and parks the run.
+      // A failure while saving its confirmed outcome is different: leave the
+      // journal action started so recovery can ask the idempotent publisher
+      // for the same identity rather than claim success or create a duplicate.
+      const published = await act('publish-review', round, null, async () => {
+        try { return { publication: await publishReview(publication) }; }
+        catch (error) { return { publicationError: error.message }; }
+      });
+      if (published?.publicationError) return await finish(park(`durable GitHub review publication could not be confirmed: ${published.publicationError}`, round));
+      const confirmedPublication = published?.publication;
+      if (confirmedPublication?.confirmed !== true || confirmedPublication.authoritative !== completed) return await finish(park('durable GitHub review publication could not be confirmed: GitHub did not confirm the expected review record', round));
+      if (!completed) return await finish(park(reviewerIdentity ?? verdict.error ?? `reviewer exited ${reviewer.exitCode}`, round));
       if (verdict.verdict === 'PASS') {
         const afterReview = await act('verify', round, null, () => candidate({ round, afterReview: true, previous: current }));
         if (afterReview?.commit !== current.commit || afterReview.clean !== true || afterReview.checks?.pass !== true) return await finish(park('candidate changed after review', round));
-        return await finish({ outcome: 'pass', commit: current.commit, handoffPath });
+        return await finish({ outcome: 'pass', commit: current.commit, handoffPath, reviewUrl: confirmedPublication.url ?? null });
       }
       // Findings are kept in the record, so a restart repairs the same findings and never forgets a round.
       if (!record.findings.some((finding) => finding.round === round)) { record.findings.push({ round, commit: current.commit, changeHash, text: reviewer.text, report: verdict.report, handoffPath }); await persist(); }
@@ -368,6 +389,7 @@ export async function startDelivery(issueId, configuration, {
   repoRoot = process.cwd(), base, authorization,
   readCard = (id) => getIssue(id, { apiKey: process.env.LINEAR_API_KEY, includeComments: true }),
   launch, test = request => localTester(request.run === 'suite' ? { ...request, run: 'runnerSuite' } : request),
+  publishReview = githubReviewPublisher(),
 } = {}) {
   // Protect run files as well as builder source, before locking or any writes.
   assertDeliveryPath(runPath);
@@ -399,5 +421,5 @@ export async function startDelivery(issueId, configuration, {
     return fixed;
   };
   const prepareReview = (card, current, priorReview) => reviewInput(card, current, workspace, priorReview);
-  return runDelivery({ issueId, configuration, runPath, authorization }, { readCard, launch: launchWorker, candidate, prepareWorktree, prepareReview });
+  return runDelivery({ issueId, configuration, runPath, authorization }, { readCard, launch: launchWorker, candidate, publishReview, prepareWorktree, prepareReview });
 }
