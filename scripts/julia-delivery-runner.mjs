@@ -1,16 +1,17 @@
-// The Windows delivery handoff for JUL-196.  It owns run files, never Linear
-// mutations, publishing, UAT, or Factory.  Adapters keep the process boundary
-// testable and make each worker's observed identity part of the durable record.
+// JUL-196 Windows delivery owns run files, never Linear mutations, publishing, UAT or Factory.
+// Adapters keep the process boundary testable and observed identities durable.
 import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { isDeepStrictEqual } from 'node:util';
 import { getIssue } from './linear-cli.mjs';
 import { localTester } from './julia-minimal-runner-checks.mjs';
 import { acquireRunLock, jsonText, loadText, processStarted, saveJson, sha256, stopProcessTree } from './julia-delivery-state.mjs';
 import { assertDeliveryPath, prepareDeliveryWorkspace, captureDeliveryCandidate } from './julia-delivery-candidate.mjs';
 import { LIMITS, runLimited } from '../ops/julia-runner/time-limit.mjs';
+import { reviewInput, reviewPrompt, checkedReview } from './julia-delivery-review.mjs';
+import { commandCodeReview, nativeReviewReply, validObserved } from './julia-delivery-review-transport.mjs';
 
 const SHA = /^[0-9a-f]{40}$/i;
 // The initial build and its review, then at most this many repairs. A repair
@@ -19,8 +20,7 @@ const SHA = /^[0-9a-f]{40}$/i;
 export const MAX_REPAIRS = 3;
 const SCHEMA = 1;
 
-// Authorization is an operator input, separate from tracker readiness. Spending
-// names both roles explicitly; the exact resolved configuration is saved with it.
+// Operator authorization is separate from readiness; save explicit spending and exact choices for both roles.
 export function authorizationReason(authorization, issueId, configuration) {
   if (!authorization || authorization.explicitStart !== true || authorization.issueId !== issueId || (typeof authorization.authorizedBy !== 'string' || !authorization.authorizedBy.trim())) return 'explicit start authorization for this issue is required';
   for (const role of ['builder', 'reviewer']) {
@@ -49,20 +49,7 @@ export function workerPrompt(role, card, configuration, runPath, approvedPath, f
   // A builder that follows an interrupted one inherits its unfinished edits; it is told so, never left to guess.
   const resumed = interrupted ? '\n\nThe previous builder for this work was interrupted before it finished. Its partial changes are still in the worktree: inspect them first (git status, git diff) and finish the work from there. Do not discard them or start over.' : '';
   if (role === 'builder') return `${common}\n\nExplicitly read and follow .claude/skills/implement/SKILL.md for ${card.identifier}. The approved requirements are only in ${approvedPath}; do not reread Linear. Work only in the prepared isolated worktree.${resumed}${findings ? `\n\nRepair these review findings:\n${findings}` : ''}`;
-  return `${common}\n\nReview the changed, checked immutable candidate named in the saved handoff file only, in one fresh session. Keep Standards and Spec separate in the report. You are independent of the builder and must not receive its conversation. Save and reuse this review for this candidate; no polling or retry after an ambiguous or failing call, and no unchanged rereview. End with exactly VERDICT: PASS or VERDICT: FAIL, and name the reviewed 40-character commit.`;
-}
-
-function validObserved(role, configured, observed) {
-  if (!observed || observed.harness !== configured.harness || observed.model !== configured.model || observed.maker !== configured.maker) return `${role} observed identity does not match its saved configuration`;
-  if (role === 'reviewer' && observed.maker.trim().toLowerCase() === configured.builderMaker?.trim().toLowerCase()) return 'reviewer maker matches builder maker';
-  return null;
-}
-
-function reviewVerdict(text, commit) {
-  const verdict = /^VERDICT:\s*(PASS|FAIL)\s*$/mi.exec(text ?? '')?.[1];
-  if (!verdict) return { error: 'review output has no exact PASS/FAIL verdict' };
-  if (verdict === 'PASS' && !new RegExp(`\\b${commit}\\b`, 'i').test(text)) return { error: 'PASS does not name the exact candidate commit' };
-  return { verdict };
+  return `Issue: ${card.identifier}\nConfigured reviewer: ${JSON.stringify(chosen)}\n\nExplicitly read and follow .agents/skills/adversarial-review/SKILL.md (the complete pinned instructions are supplied below). Review the changed, checked immutable candidate in one fresh session using only the supplied review input. Keep Standards and Spec separate in the report. Save and reuse this review for this candidate; no polling or retry after an ambiguous or failing call, and no unchanged rereview.`;
 }
 
 const fileSave = saveJson;
@@ -73,8 +60,7 @@ function park(reason, round = null) { return { outcome: 'park', reason, round };
 // A started run the runner will not continue because it cannot prove that continuing is safe.
 function unsafe(reason, round = null) { return { ...park(reason, round), unsafe: true }; }
 
-// What a failed launch leaves in the evidence. Only the code and message are
-// kept: the raw error also carries the stack and the full command line.
+// Failed launches retain code/message; raw errors also carry stack and command line.
 function failure(operation, error) {
   return error ? { operation, code: error.code ?? null, message: String(error.message ?? error) } : null;
 }
@@ -131,13 +117,15 @@ function codexIdentity(output, root) {
 export function productionLauncher(worktree, { run = runLimited, findExecutable = nativeCommand, sessionRoot = join(process.env.CODEX_HOME || join(homedir(), '.codex'), 'sessions') } = {}) {
   return async (role, request) => {
     const configured = request.configuration;
-    const cwd = role === 'builder' ? worktree : process.cwd();
+    if (role === 'reviewer' && configured.connection?.provider === 'commandcode') return commandCodeReview(request, { run });
+    if (role === 'reviewer' && configured.connection?.route && configured.connection.route !== 'native') return { exitCode: 2, observed: null, text: 'unsupported saved reviewer connection; native fallback is forbidden' };
+    const cwd = role === 'builder' ? worktree : tmpdir();
     const startedAt = new Date().toISOString();
     // A worker whose executable cannot be found is recorded like one that could not be started.
     let command = null; let failed = null;
     try { command = findExecutable(configured.harness); }
     catch (cause) { failed = failure(`find ${configured.harness} executable`, cause); }
-    const args = configured.harness === 'claude-code' ? ['-p', '--model', configured.model, '--effort', configured.thinking ?? 'high', '--output-format', 'stream-json', '--verbose', '--permission-mode', 'acceptEdits', '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}', '--tools', 'Read,Edit,Write,Bash,Glob,Grep,Skill', '--allowedTools', 'Read,Edit,Write,Glob,Grep,Skill,Bash(node --test *),Bash(git status *),Bash(git diff *)']
+    const args = configured.harness === 'claude-code' ? ['-p', '--model', configured.model, '--effort', configured.thinking ?? 'high', '--output-format', 'stream-json', '--verbose', '--permission-mode', role === 'builder' ? 'acceptEdits' : 'default', '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}', '--tools', role === 'builder' ? 'Read,Edit,Write,Bash,Glob,Grep,Skill' : '', ...(role === 'builder' ? ['--allowedTools', 'Read,Edit,Write,Glob,Grep,Skill,Bash(node --test *),Bash(git status *),Bash(git diff *)'] : [])]
       : configured.harness === 'codex' ? ['exec', '-m', configured.model, '-c', 'model_provider="openai"', '-c', 'approval_policy="never"', ...(configured.thinking ? ['-c', `model_reasoning_effort="${configured.thinking}"`] : []), '-s', role === 'builder' ? 'workspace-write' : 'read-only', '--skip-git-repo-check', '--json', '-'] : [];
     if (!command && !failed) return { exitCode: 2, observed: null, text: `unsupported harness ${configured.harness}` };
     let output = ''; let error = ''; let pid = null; let unrecorded = null;
@@ -165,11 +153,16 @@ export function productionLauncher(worktree, { run = runLimited, findExecutable 
       const model = events.find(event => event.type === 'assistant')?.message?.model ?? init?.model;
       if (model) identity = { harness: 'claude-code', model, maker: 'Anthropic' };
     }
+    let reply = output; let responseId = identityEvidence?.thread ?? null;
+    if (role === 'reviewer') {
+      const parsed = nativeReviewReply(configured.harness, output); reply = parsed.text; responseId = parsed.responseId;
+      if (parsed.error) failed ??= { operation: 'reviewer final reply', message: parsed.error };
+    }
     const finishedAt = new Date().toISOString();
-    const exitCode = result.stopped ? 124 : unrecorded ? 1 : result.code ?? 1;
+    const exitCode = result.stopped ? 124 : unrecorded || (role === 'reviewer' && failed) ? 1 : result.code ?? 1;
     // The worker's own streams are the evidence; nothing here is summarised.
-    if (request.outputPath) await fileSave(request.outputPath, { role, configured, observed: identity ?? null, identityEvidence, command, args, cwd, pid, exitCode, signal: result.signal ?? null, timedOut: result.stopped, error: failed, startedAt, finishedAt, stdout: output, stderr: error });
-    return { exitCode, observed: identity ?? null, text: output || error || failed?.message || '', outputPath: request.outputPath ?? null, timedOut: result.stopped };
+    if (request.outputPath) await fileSave(request.outputPath, { role, configured, observed: identity ?? null, identityEvidence, command, args, cwd, pid, exitCode, signal: result.signal ?? null, timedOut: result.stopped, error: failed, startedAt, finishedAt, responseId, stdout: output, stderr: error });
+    return { exitCode, observed: identity ?? null, text: reply || error || failed?.message || '', outputPath: request.outputPath ?? null, timedOut: result.stopped, responseId, startedAt, finishedAt, connection: configured.connection };
   };
 }
 
@@ -212,7 +205,7 @@ async function settleWorker(action, processes) {
   } catch (error) { return { unsafe: `could not tell whether the earlier ${action.role} (process ${pid}) is still running: ${error.message}` }; }
 }
 
-export async function runDelivery({ issueId, configuration, runPath, authorization }, { readCard, save = fileSave, load, lock, launch, candidate, prepareWorktree = async () => ({ ok: true }), preflight = () => null, processes = { started: processStarted, stop: stopProcessTree } }) {
+export async function runDelivery({ issueId, configuration, runPath, authorization }, { readCard, save = fileSave, load, lock, launch, candidate, prepareReview = reviewInput, maxReviewInputBytes = 512000, prepareWorktree = async () => ({ ok: true }), preflight = () => null, processes = { started: processStarted, stop: stopProcessTree } }) {
   // Run files are either all real or all injected: a test that keeps them in
   // memory has no earlier run to load and no second process to lock out.
   load ??= save === fileSave ? loadText : async () => null;
@@ -337,14 +330,19 @@ export async function runDelivery({ issueId, configuration, runPath, authorizati
       if (builder.exitCode !== 0 || builderIdentity) return await finish(park(builderIdentity ?? `builder exited ${builder.exitCode}`, round));
       const current = await act('candidate', round, null, () => candidate({ round, previous: record.actions.findLast(action => action.kind === 'candidate' && action.round === round && action.status === 'stale')?.outcome }));
       if (!SHA.test(current?.commit ?? '') || current.clean !== true || current.checks?.pass !== true) return await finish(park(!SHA.test(current?.commit ?? '') ? 'candidate has no immutable commit' : current.clean !== true ? 'candidate drifted or is dirty' : 'candidate checks failed', round));
-      if (!isDone('review', round) && record.findings.some(finding => finding.commit === current.commit)) return await finish(park('unchanged candidate: saved review findings require changed checked code before another review', round));
+      const changeHash = typeof current.diff === 'string' ? sha256(current.diff) : null;
+      if (!isDone('review', round) && record.findings.some(finding => finding.commit === current.commit || (changeHash && finding.changeHash === changeHash))) return await finish(park('unchanged candidate: saved review findings require changed checked code before another review', round));
       const handoffPath = join(directory, `${issueId}-handoff-round-${round}.json`);
-      const handoff = { issueId, round, approvedPath, candidate: current, builder: { configured: configuration.builder, observed: builder.observed, exitCode: builder.exitCode, outputPath: builder.outputPath ?? null }, createdAt: now() };
+      let input; try { input = await prepareReview(card, current); } catch (error) { return await finish(park(error.message, round)); }
+      if (configuration.reviewer.maker?.trim().toLowerCase() === builder.observed.maker.trim().toLowerCase()) return await finish(park('reviewer company matches observed builder maker', round));
+      const prompt = workerPrompt('reviewer', card, configuration, runPath, approvedPath) + reviewPrompt(input);
+      if (!Number.isInteger(maxReviewInputBytes) || maxReviewInputBytes <= 0 || Buffer.byteLength(prompt) > maxReviewInputBytes) return await finish(park('complete review input exceeds its byte budget; no truncation or reviewer call', round));
+      const handoff = { issueId, round, candidate: current, input, builder: { configured: configuration.builder, observed: builder.observed }, createdAt: now() };
       if (!isDone('review', round)) await save(handoffPath, handoff);
       const reviewerConfig = { ...configuration.reviewer, builderMaker: configuration.builder.maker };
-      const reviewer = await act('review', round, 'reviewer', (started, attempt) => launch('reviewer', { prompt: `${workerPrompt('reviewer', card, configuration, runPath, approvedPath)}\nHandoff: ${handoffPath}\nCandidate: ${current.commit}`, configuration: reviewerConfig, handoffPath, round, started, outputPath: evidence('reviewer', attempt) }));
+      const reviewer = await act('review', round, 'reviewer', (started, attempt) => launch('reviewer', { prompt, reviewInput: input, configuration: reviewerConfig, handoffPath, round, started, outputPath: evidence('reviewer', attempt), spending: approvedAuthorization.spending.reviewer }));
       const reviewerIdentity = validObserved('reviewer', reviewerConfig, reviewer.observed);
-      const verdict = reviewVerdict(reviewer.text, current.commit);
+      const verdict = checkedReview(reviewer.text, input);
       await save(handoffPath, { ...handoff, reviewer: { configured: configuration.reviewer, observed: reviewer.observed, exitCode: reviewer.exitCode, outputPath: reviewer.outputPath ?? null, verdict: verdict.verdict ?? null }, result: verdict.error ?? verdict.verdict });
       if (reviewer.exitCode !== 0 || reviewerIdentity || verdict.error) return await finish(park(reviewerIdentity ?? verdict.error ?? `reviewer exited ${reviewer.exitCode}`, round));
       if (verdict.verdict === 'PASS') {
@@ -353,7 +351,7 @@ export async function runDelivery({ issueId, configuration, runPath, authorizati
         return await finish({ outcome: 'pass', commit: current.commit, handoffPath });
       }
       // Findings are kept in the record, so a restart repairs the same findings and never forgets a round.
-      if (!record.findings.some((finding) => finding.round === round)) { record.findings.push({ round, commit: current.commit, text: reviewer.text, handoffPath }); await persist(); }
+      if (!record.findings.some((finding) => finding.round === round)) { record.findings.push({ round, commit: current.commit, changeHash, text: reviewer.text, handoffPath }); await persist(); }
     }
     return await finish(park('the initial build and three repairs did not produce a passing reviewed commit', MAX_REPAIRS));
   } finally { await held.release(); }
@@ -364,7 +362,7 @@ export async function startDelivery(issueId, configuration, {
   runPath = join(homedir(), '.julia', 'runs', `${issueId}.json`),
   worktree = process.env.JULIA_DELIVERY_WORKTREE,
   repoRoot = process.cwd(), base, authorization,
-  readCard = (id) => getIssue(id, { apiKey: process.env.LINEAR_API_KEY }),
+  readCard = (id) => getIssue(id, { apiKey: process.env.LINEAR_API_KEY, includeComments: true }),
   launch, test = request => localTester(request.run === 'suite' ? { ...request, run: 'runnerSuite' } : request),
 } = {}) {
   // Protect run files as well as builder source, before locking or any writes.
@@ -396,5 +394,6 @@ export async function startDelivery(issueId, configuration, {
     fixed = await captureDeliveryCandidate({ issueId, runPath, workspace, card: approvedCard, test, round });
     return fixed;
   };
-  return runDelivery({ issueId, configuration, runPath, authorization }, { readCard, launch: launchWorker, candidate, prepareWorktree });
+  const prepareReview = (card, current) => reviewInput(card, current, workspace);
+  return runDelivery({ issueId, configuration, runPath, authorization }, { readCard, launch: launchWorker, candidate, prepareWorktree, prepareReview });
 }

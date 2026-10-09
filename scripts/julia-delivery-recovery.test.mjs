@@ -10,8 +10,11 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { runDelivery, startDelivery } from './julia-delivery-runner.mjs';
+import { runDelivery as deliver, startDelivery } from './julia-delivery-runner.mjs';
 import { acquireRunLock, loadText, processStarted, saveJson } from './julia-delivery-state.mjs';
+
+import { fixtureAdapters } from './fixtures/jul202-review.mjs';
+const runDelivery = (input, adapters) => deliver(input, fixtureAdapters(adapters));
 
 const configuration = {
   builder: { identity: 'claude', model: 'claude-sonnet', maker: 'Anthropic', harness: 'claude-code', thinking: 'high', connection: { route: 'native' } },
@@ -30,8 +33,15 @@ async function runFiles(t) {
   return { root, runPath: join(root, 'JUL-196.json'), statePath: join(root, 'JUL-196-state.json') };
 }
 
-// A worker that died with its runner: a real process id that has already exited.
-const deadWorker = () => ({ pid: spawnSync(process.execPath, ['-e', '']).pid });
+// Record the owned worker while it is alive, then wait for its exit. Recording
+// an already-dead PID races reuse during parallel Windows tests and gives the
+// runner no creation time with which to distinguish the unrelated new process.
+async function recordExitedWorker(started) {
+  const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', windowsHide: true });
+  const ended = new Promise(resolve => child.once('exit', resolve));
+  try { await started({ pid: child.pid }); }
+  finally { child.kill(); await ended; }
+}
 const pass = { exitCode: 0, observed: reviewerSeen, text: `VERDICT: PASS\nCOMMIT: ${COMMIT}` };
 const goodCandidate = async () => ({ commit: COMMIT, clean: true, checks: { pass: true } });
 const savedState = async (statePath) => JSON.parse(await readFile(statePath, 'utf8'));
@@ -50,7 +60,7 @@ test('a restart after the runner dies during review parks without retrying and d
     candidate: async () => ({ commit: COMMIT, clean: true, checks: { pass: true } }),
     launch: async (role, request) => {
       launches.push(role);
-      await request.started?.(deadWorker());
+      await recordExitedWorker(request.started);
       return role === 'builder' ? { exitCode: 0, observed: builderSeen, outputPath: 'build.json' } : review();
     },
   });
@@ -69,7 +79,7 @@ test('findings and the repair count survive a restart: one build, then three rep
     readCard: async () => card,
     candidate: async () => ({ commit: String(builds).padStart(40, 'b'), clean: true, checks: { pass: true } }),
     launch: async (role, request) => {
-      await request.started?.(deadWorker());
+      await recordExitedWorker(request.started);
       if (role === 'reviewer') return { exitCode: 0, observed: reviewerSeen, text: `VERDICT: FAIL\nFinding ${builds}: test missing` };
       builds += 1; prompts.push(request.prompt);
       if (builds === dieAtBuild) throw new Error('runner died during repair');
@@ -79,7 +89,8 @@ test('findings and the repair count survive a restart: one build, then three rep
   await assert.rejects(runDelivery({ ...run, runPath }, adapters(2)), /died during repair/);
   const interrupted = await savedState(statePath);
   assert.equal(interrupted.repairsUsed, 1, 'the repair was counted when it was about to start');
-  assert.deepEqual(interrupted.findings.map(({ round, text }) => [round, text]), [[0, 'VERDICT: FAIL\nFinding 1: test missing']]);
+  assert.deepEqual(interrupted.findings.map(({ round }) => round), [0]);
+  assert.match(interrupted.findings[0].text, /Finding 1: test missing/);
   const result = await runDelivery({ ...run, runPath }, adapters(0));
   assert.equal(result.outcome, 'park');
   assert.match(result.reason, /initial build and three repairs/);
@@ -145,7 +156,7 @@ test('corrupt, foreign, or altered run files stop a restart without running anyt
   const refusedWith = async (damage, expected) => {
     const { root, runPath, statePath } = await runFiles(t);
     const base = { readCard: async () => card, candidate: goodCandidate };
-    await assert.rejects(runDelivery({ ...run, runPath }, { ...base, launch: async (role, request) => { await request.started(deadWorker()); throw new Error('runner died'); } }), /runner died/);
+    await assert.rejects(runDelivery({ ...run, runPath }, { ...base, launch: async (role, request) => { await recordExitedWorker(request.started); throw new Error('runner died'); } }), /runner died/);
     const changed = await damage({ root, statePath });
     const before = await readFile(statePath, 'utf8');
     let touched = 0;
@@ -255,7 +266,7 @@ test('a restart continues only in its own worktree and branch, and keeps the int
   const own = { path, inRepo: (...args) => { const r = spawnSync('git', ['-C', path, ...args], { encoding: 'utf8' }); assert.equal(r.status, 0, r.stderr); return r.stdout.trim(); } };
   const partial = join(path, 'half-written.txt');
   const options = (worktree, launch) => ({ authorization, repoRoot: source.path, base: source.inRepo('rev-parse', 'HEAD'), runPath, worktree, readCard: async () => card, launch });
-  const dying = async (role, request) => { await request.started(deadWorker()); await writeFile(partial, 'half'); throw new Error('runner died during build'); };
+  const dying = async (role, request) => { await recordExitedWorker(request.started); await writeFile(partial, 'half'); throw new Error('runner died during build'); };
   await assert.rejects(startDelivery('JUL-196', configuration, options(own.path, dying)), /died during build/);
   const saved = await savedState(statePath);
   assert.deepEqual([saved.worktree.branch, saved.worktree.startCommit], ['runner/card-196', own.inRepo('rev-parse', 'HEAD')]);
@@ -293,7 +304,7 @@ test('a restart between the passed verification and the saved result measures th
       candidate: async () => { reads += 1; return { commit: worktree.inRepo('rev-parse', 'HEAD'), clean: !worktree.inRepo('status', '--porcelain'), checks: { pass: true } }; },
       launch: async (role, request) => {
         launches += 1;
-        await request.started(deadWorker());
+        await recordExitedWorker(request.started);
         return role === 'builder' ? { exitCode: 0, observed: builderSeen } : { exitCode: 0, observed: reviewerSeen, text: `VERDICT: PASS\nCOMMIT: ${reviewed}` };
       },
     };
@@ -347,7 +358,7 @@ test('resuming a spent repair preserves one used and two remaining without charg
     candidate: async () => ({ commit: String(builds).padStart(40, 'b'), clean: true, checks: { pass: true } }),
     launch: async (role, request) => {
       if (role === 'reviewer') return builds === 1 ? { exitCode: 0, observed: reviewerSeen, text: 'VERDICT: FAIL\nrepair this finding' } : { ...pass, text: `VERDICT: PASS\nCOMMIT: ${String(builds).padStart(40, 'b')}` };
-      await request.started(deadWorker());
+      await recordExitedWorker(request.started);
       builds++;
       if (builds === 2) throw new Error('repair interrupted');
       return { exitCode: 0, observed: builderSeen };
@@ -378,7 +389,7 @@ test('a live worker without a recorded creation time cannot be replaced or mista
 test('invalid journal entries and exhausted repair budgets stop durably without replacement', async t => {
   for (const mutation of [state => { state.actions.push(null); }, state => { state.repairsUsed = 4; }]) {
     const { runPath, statePath, root } = await runFiles(t);
-    await assert.rejects(runDelivery({ ...run, runPath }, { readCard: async () => card, candidate: goodCandidate, launch: async (_role, request) => { await request.started(deadWorker()); throw new Error('interrupted'); } }), /interrupted/);
+    await assert.rejects(runDelivery({ ...run, runPath }, { readCard: async () => card, candidate: goodCandidate, launch: async (_role, request) => { await recordExitedWorker(request.started); throw new Error('interrupted'); } }), /interrupted/);
     const state = await savedState(statePath); mutation(state); await writeFile(statePath, JSON.stringify(state));
     const result = await runDelivery({ ...run, runPath }, { readCard: () => assert.fail('invalid state cannot reread Linear'), candidate: () => assert.fail('invalid state cannot create a candidate'), launch: () => assert.fail('invalid state cannot replace a worker') });
     assert.equal(result.unsafe, true);

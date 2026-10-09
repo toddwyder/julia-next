@@ -1,3 +1,4 @@
+import { fixtureInput, fixtureReport } from './fixtures/jul202-review.mjs';
 // julia-delivery-interrupt-runner.mjs -- one real runner process for the
 // real-worker interruption proof (JUL-196 step 7).
 // Usage: node julia-delivery-interrupt-runner.mjs <proofDir>. It runs the real
@@ -60,7 +61,7 @@ const launch = async (role, request) => {
   if (plan.interruptAction === `review:${request.round}`) await fixture(role, request);
   const { harness, model, maker } = configuration.reviewer;
   const good = new RegExp(plan.passWhen).test(await proofText());
-  return { exitCode: 0, observed: { harness, model, maker }, text: good ? `VERDICT: PASS\nCOMMIT: ${git('rev-parse', 'HEAD')}\n(scripted stand-in, not a review)` : `VERDICT: FAIL\n${plan.finding}\n(scripted stand-in, not a review)` };
+  return { exitCode: 0, observed: { harness, model, maker }, text: fixtureReport(request.reviewInput, good ? 'PASS' : 'FAIL', plan.finding) };
 };
 
 const candidate = async () => {
@@ -79,6 +80,6 @@ const prepareWorktree = async ({ saved }) => {
 
 const result = await runDelivery({ issueId, configuration, runPath: join(proofDir, 'runs', `${issueId}.json`) }, {
   readCard: async () => { throw new Error('Linear must not be read: the approved input is already saved'); },
-  launch, candidate, prepareWorktree,
+  launch, candidate, prepareWorktree, prepareReview: fixtureInput,
 });
 console.log(`RESULT ${JSON.stringify(result)}`);

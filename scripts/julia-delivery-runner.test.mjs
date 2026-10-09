@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { productionLauncher, runDelivery as deliver, startDelivery, workerPrompt } from './julia-delivery-runner.mjs';
+import { productionLauncher, runDelivery as deliver, startDelivery as start, workerPrompt } from './julia-delivery-runner.mjs';
 import { processStarted } from './julia-delivery-state.mjs';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -10,12 +10,15 @@ import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { mkdir } from 'node:fs/promises';
 
+import { fixtureAdapters, fixtureLaunch } from './fixtures/jul202-review.mjs';
+const startDelivery = (id, config, options) => start(id, config, { ...options, launch: options.launch ? fixtureLaunch(options.launch) : undefined });
+
 const configuration = {
   builder: { identity: 'claude', model: 'claude-sonnet', maker: 'Anthropic', harness: 'claude-code', thinking: 'high', connection: { route: 'native' } },
   reviewer: { identity: 'codex', model: 'gpt-review', maker: 'OpenAI', harness: 'codex', thinking: null, connection: { route: 'native' } },
 };
 const authorization = { issueId: 'JUL-196', explicitStart: true, authorizedBy: 'fixture operator', spending: { builder: { mode: 'fixture', maxUsd: 0 }, reviewer: { mode: 'fixture', maxUsd: 0 } } };
-const runDelivery = (input, adapters) => deliver({ authorization, ...input }, adapters);
+const runDelivery = (input, adapters) => deliver({ authorization, ...input }, fixtureAdapters(adapters));
 const card = { identifier: 'JUL-196', title: 'A card', state: { name: 'Ready', type: 'unstarted' }, description: '## Acceptance criteria\n\n- [ ] It works.' };
 
 test('Windows production launcher gets a response from installed Claude Code and persists its evidence', { skip: process.env.JUL196_CLAUDE_REAL_PROOF !== '1' ? 'operator opt-in required: JUL196_CLAUDE_REAL_PROOF=1; no provider call in ordinary suite' : process.env.JUL196_CLAUDE_QUOTA_BLOCKED === '1' ? 'Claude real integration quota-blocked: JUL196_CLAUDE_QUOTA_BLOCKED=1; historical results retained' : process.platform !== 'win32', timeout: 120000 }, async (t) => {
@@ -184,7 +187,7 @@ test('reads an authorized card once, persists its approved input, then hands onl
   assert.equal(result.outcome, 'pass');
   assert.deepEqual(reads, ['JUL-196']);
   assert.deepEqual(launches.map(({ role }) => role), ['builder', 'reviewer']);
-  assert.doesNotMatch(launches[1].request.prompt, /builder conversation/i);
+  assert.doesNotMatch(launches[1].request.prompt, /C:\/runs\/build\.log/);
   assert.ok(saved.some(({ path }) => path.endsWith('JUL-196-approved.json')));
 });
 
@@ -207,7 +210,7 @@ test('a review fail returns findings for repair, and the initial build plus thre
   const result = await runDelivery({ issueId: 'JUL-196', configuration, runPath: 'C:/runs/JUL-196.json' }, {
     readCard: async () => card, save: async () => {},
     candidate: async () => ({ commit: String(++builds).padStart(40, 'a'), clean: true, checks: { pass: true } }),
-    launch: async (role, request) => { if (role === 'builder') repairPrompts.push(/Repair these review findings:\nVERDICT: FAIL\nFinding: test missing/.test(request.prompt)); return role === 'builder'
+    launch: async (role, request) => { if (role === 'builder') repairPrompts.push(/Repair these review findings:[\s\S]*Finding: test missing/.test(request.prompt)); return role === 'builder'
       ? { exitCode: 0, observed: { harness: 'claude-code', model: 'claude-sonnet', maker: 'Anthropic' } }
       : { exitCode: 0, observed: { harness: 'codex', model: 'gpt-review', maker: 'OpenAI' }, text: 'VERDICT: FAIL\nFinding: test missing' }; },
   });
@@ -269,6 +272,7 @@ async function candidateFixture(t) {
   assert.equal(spawnSync('git', ['init', '-q', '-b', 'main', source]).status, 0);
   await mkdir(join(source, '.claude/skills/implement'), { recursive: true });
   await writeFile(join(source, '.claude/skills/implement/SKILL.md'), 'Canonical fixture implementation instructions');
+  await writeFile(join(source, 'CODING_STANDARDS.md'), 'Fixture standards: verify meaningful assertions.');
   await writeFile(join(source, 'deleted.txt'), 'original');
   await mkdir(join(source, 'scripts'));
   await writeFile(join(source, 'scripts/seam.test.mjs'), 'old test');
@@ -293,13 +297,20 @@ test('authorized production adapter prepares isolation and freezes additions/del
         builderPath = request.worktree;
         assert.notEqual(builderPath, source);
         assert.match(request.prompt, /Canonical fixture implementation instructions/);
-        await writeFile(join(builderPath, 'added.txt'), 'new');
+        await writeFile(join(builderPath, 'added.txt'), '  new\n\n');
         await rm(join(builderPath, 'deleted.txt'));
         await writeFile(join(builderPath, 'scripts/seam.test.mjs'), 'regression test');
         return { exitCode: 0, observed: configuration.builder };
       }
       const handoff = JSON.parse(await readFile(request.handoffPath, 'utf8'));
       assert.equal(handoff.candidate.base, base);
+      assert.match(request.prompt, /adversarial-review\/SKILL\.md/);
+      assert.equal(request.reviewInput.sources.specification, card.description + '\n## Seams\n`scripts/seam.test.mjs`');
+      assert.equal(request.reviewInput.sources['file:added.txt'], '  new\n\n', 'complete committed code keeps leading and trailing bytes');
+      assert.equal(request.reviewInput.sources['file:deleted.txt'], 'original');
+      assert.equal(request.reviewInput.sources.standards, 'Fixture standards: verify meaningful assertions.');
+      assert.equal(request.reviewInput.sources.diff, handoff.candidate.diff);
+      assert.doesNotMatch(request.prompt, /builder-round-|Approved input:|Saved run:/);
       assert.match(handoff.candidate.diff, /added.txt/);
       assert.match(handoff.candidate.diff, /deleted.txt/);
       assert.equal(handoff.candidate.redProof.pass, true);
@@ -475,4 +486,130 @@ test('interrupted candidate checks retain their completed raw evidence unchanged
   const result = await startDelivery('JUL-196', configuration, { ...options, readCard: () => assert.fail('restart cannot reread Linear'), launch: () => assert.fail('finished builder cannot rerun'), test: () => assert.fail('uncertain checks cannot rerun') });
   assert.equal(result.outcome, 'park');
   assert.equal(await readFile(evidencePath, 'utf8'), before);
+});
+
+test('every selected reviewer gets the canonical adversarial skill without builder record paths', () => {
+  for (const harness of ['claude-code', 'codex', 'commandcode', 'omp', 'antigravity', 'other']) {
+    const selected = { ...configuration, reviewer: { ...configuration.reviewer, harness } };
+    const prompt = workerPrompt('reviewer', card, selected, 'C:/runs/private-run.json', 'C:/runs/private-approved.json');
+    assert.match(prompt, /Explicitly read and follow \.agents\/skills\/adversarial-review\/SKILL\.md/);
+    assert.doesNotMatch(prompt, /private-run|private-approved/);
+  }
+});
+
+test('well-formed unsupported approval and inconclusive failure park without consuming a repair', async () => {
+  for (const text of [`VERDICT: PASS\nCOMMIT: ${'a'.repeat(40)}`, `VERDICT: FAIL\nEvidence unavailable`, 'VERDICT: INCONCLUSIVE']) {
+    const launches = [], saved = [];
+    const result = await deliver({ authorization, issueId: 'JUL-196', configuration, runPath: 'C:/fixtures/jul202/run.json' }, {
+      readCard: async () => card, save: async (path, value) => saved.push({ path, value }),
+      candidate: async () => ({ commit: 'a'.repeat(40), clean: true, checks: { pass: true } }),
+      launch: async role => { launches.push(role); return role === 'builder' ? { exitCode: 0, observed: configuration.builder } : { exitCode: 0, observed: configuration.reviewer, text }; },
+    });
+    assert.equal(result.outcome, 'park');
+    assert.deepEqual(launches, ['builder', 'reviewer']);
+    assert.equal(saved.findLast(entry => entry.path.endsWith('-state.json')).value.repairsUsed, 0);
+  }
+});
+
+test('normal CommandCode review transport uses the saved model and one journalled request', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'jul202-transport-'));
+  t.after(() => import('node:fs/promises').then(({ rm }) => rm(root, { recursive: true, force: true })));
+  const selected = { harness: 'commandcode', model: 'example/reviewer-model', maker: 'Example', thinking: 'medium', builderMaker: 'OpenAI', connection: { route: 'existing-commandcode', provider: 'commandcode', endpoint: 'https://api.commandcode.ai/provider/v1', protocol: 'openai-completions', authReference: 'dropbox:commandcode' } };
+  let calls = 0, given = '', recorded = false;
+  const run = async (command, args, options, limits) => {
+    calls++;
+    assert.match(command, /ssh/);
+    assert.doesNotMatch(args.join(' '), /reviewer-model|credential-value/);
+    const child = new EventEmitter(); child.pid = 12345;
+    child.stdout = new PassThrough(); child.stderr = new PassThrough(); child.stdin = new PassThrough();
+    child.stdin.on('data', data => { assert.equal(recorded, true); given += data; });
+    const supplied = new Promise(resolve => child.stdin.on('finish', resolve));
+    limits.started(child); await supplied;
+    const body = JSON.parse(given);
+    assert.equal(body.body.model, selected.model);
+    assert.match(body.body.messages[0].content, /adversarial-review\/SKILL\.md/);
+    child.stdout.write(JSON.stringify({ httpStatus: 200, body: JSON.stringify({ id: 'fixture-response-1', model: selected.model, choices: [{ finish_reason: 'stop', message: { content: 'fixture final reply' } }], usage: { total_tokens: 41 } }) }));
+    return { code: 0, signal: null, stopped: false };
+  };
+  const launch = productionLauncher(root, { run });
+  const result = await launch('reviewer', { configuration: selected, prompt: workerPrompt('reviewer', card, { ...configuration, reviewer: selected }, 'private-run', 'private-approved'), spending: { mode: 'fixture', maxUsd: 0 }, outputPath: join(root, 'result.json'), started: async () => { recorded = true; } });
+  assert.equal(calls, 1);
+  assert.equal(result.text, 'fixture final reply');
+  assert.deepEqual(result.observed, { harness: selected.harness, model: selected.model, maker: 'Example' });
+  const evidence = JSON.parse(await readFile(result.outputPath, 'utf8'));
+  assert.equal(evidence.responseId, 'fixture-response-1');
+  assert.equal(evidence.usage.total_tokens, 41);
+  assert.deepEqual(evidence.connection, selected.connection);
+});
+
+test('same-company selection and oversized complete input refuse before reviewer dispatch', async () => {
+  for (const kind of ['company', 'budget']) {
+    const calls = [];
+    const selected = kind === 'company' ? { ...configuration, reviewer: { ...configuration.reviewer, maker: configuration.builder.maker } } : configuration;
+    const result = await deliver({ authorization, issueId: 'JUL-196', configuration: selected, runPath: 'C:/fixtures/jul202/gate.json' }, {
+      readCard: async () => card, save: async () => {}, maxReviewInputBytes: kind === 'budget' ? 10 : 512000,
+      candidate: async () => ({ commit: 'a'.repeat(40), clean: true, checks: { pass: true } }),
+      launch: async role => { calls.push(role); return { exitCode: 0, observed: selected[role], text: 'unused' }; },
+    });
+    assert.equal(result.outcome, 'park');
+    assert.deepEqual(calls, ['builder']);
+    assert.match(result.reason, kind === 'company' ? /company|maker/ : /budget|oversized/);
+  }
+});
+
+test('native reviewer final replies reach verdict handling without JSON stream wrappers', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'jul202-native-'));
+  t.after(() => import('node:fs/promises').then(({ rm }) => rm(root, { recursive: true, force: true })));
+  const final = 'VERDICT: INCONCLUSIVE\nREVIEW: {}';
+  const selected = { ...configuration.builder, maker: 'Anthropic', model: 'claude-sonnet', builderMaker: 'OpenAI' };
+  const run = async (_command, args, _options, limits) => {
+    assert.equal(args[args.indexOf('--tools') + 1], '', 'inline review requires no access to builder files or tools');
+    const child = new EventEmitter(); child.pid = 12345;
+    child.stdout = new PassThrough(); child.stderr = new PassThrough(); child.stdin = new PassThrough();
+    const supplied = new Promise(resolve => child.stdin.on('finish', resolve));
+    limits.started(child); await supplied;
+    child.stdout.write(JSON.stringify({ type: 'system', subtype: 'init', model: selected.model }) + '\n');
+    child.stdout.write(JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: final, session_id: 'fixture-native-review' }) + '\n');
+    return { code: 0, stopped: false, signal: null };
+  };
+  const result = await productionLauncher(root, { run, findExecutable: () => 'fixture-claude.exe' })('reviewer', { configuration: selected, prompt: 'inline supplied review', outputPath: join(root, 'native.json') });
+  assert.equal(result.text, final);
+  const evidence = JSON.parse(await readFile(result.outputPath, 'utf8'));
+  assert.match(evidence.stdout, /"type":"result"/);
+  assert.equal(evidence.responseId, 'fixture-native-review');
+});
+
+test('saved PM clarification is delivered in complete specification without rereading Linear', async () => {
+  const clarified = { ...card, comments: { nodes: [{ id: 'pm-comment', body: 'PM-approved acceptance clarification: invoke the adversarial skill for all routes.' }], pageInfo: { hasNextPage: false } } };
+  let specification;
+  const result = await runDelivery({ issueId: 'JUL-196', configuration, runPath: 'C:/fixtures/jul202/comments.json' }, {
+    readCard: async () => clarified, save: async () => {},
+    candidate: async () => ({ commit: 'a'.repeat(40), clean: true, checks: { pass: true } }),
+    launch: async (role, request) => { if (role === 'reviewer') specification = request.reviewInput.sources.specification; return role === 'builder' ? { exitCode: 0, observed: configuration.builder } : { exitCode: 0, observed: configuration.reviewer, text: `VERDICT: PASS\nCOMMIT: ${'a'.repeat(40)}` }; },
+  });
+  assert.equal(result.outcome, 'pass');
+  assert.match(specification, /PM-approved acceptance clarification: invoke/);
+});
+
+test('CommandCode accepts another saved model ID without imposing a model-company naming convention', async () => {
+  const selected = { harness: 'commandcode', model: 'catalog-model-v2', maker: 'Catalog Company', thinking: null, connection: { provider: 'commandcode', endpoint: 'https://api.commandcode.ai/provider/v1', protocol: 'openai-completions', authReference: 'dropbox:commandcode' } };
+  const run = async (_command, _args, _options, limits) => {
+    const child = new EventEmitter(); child.pid = 12345;
+    child.stdout = new PassThrough(); child.stderr = new PassThrough(); child.stdin = new PassThrough();
+    const supplied = new Promise(resolve => child.stdin.on('finish', resolve)); limits.started(child); await supplied;
+    child.stdout.write(JSON.stringify({ httpStatus: 200, body: JSON.stringify({ id: 'other-model-result', model: selected.model, choices: [{ finish_reason: 'stop', message: { content: 'checked reply' } }] }) }));
+    return { code: 0, stopped: false };
+  };
+  const result = await productionLauncher(process.cwd(), { run })('reviewer', { configuration: selected, prompt: 'configured model fixture', spending: { mode: 'fixture', maxUsd: 0 } });
+  assert.equal(result.exitCode, 0, result.error);
+  assert.deepEqual(result.observed, { harness: selected.harness, model: selected.model, maker: selected.maker });
+});
+
+test('a saved API connection cannot silently launch a native reviewer', async () => {
+  let calls = 0;
+  const selected = { ...configuration.builder, connection: { route: 'api', provider: 'another-provider', endpoint: 'https://example.invalid/v1', protocol: 'openai-completions', authReference: 'reference-only' } };
+  const result = await productionLauncher(process.cwd(), { findExecutable: () => 'fixture-claude.exe', run: async () => { calls++; return { code: 1, stopped: false }; } })('reviewer', { configuration: selected, prompt: 'fixture' });
+  assert.equal(calls, 0);
+  assert.equal(result.exitCode, 2);
+  assert.match(result.text, /connection/);
 });

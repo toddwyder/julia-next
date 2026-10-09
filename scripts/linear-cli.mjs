@@ -66,7 +66,9 @@ const GET_ISSUE_QUERY = `
 `;
 
 export async function getIssue(identifier, opts) {
-  const data = await linearGraphQL(GET_ISSUE_QUERY, { id: identifier }, opts);
+  const query = opts?.includeComments ? GET_ISSUE_QUERY.replace('labels { nodes { name } }', 'labels { nodes { name } }\n      comments(first: 250) { nodes { id body createdAt updatedAt user { name } } pageInfo { hasNextPage } }') : GET_ISSUE_QUERY;
+  const data = await linearGraphQL(query, { id: identifier }, opts);
+  if (opts?.includeComments && data.issue && (data.issue.comments?.pageInfo?.hasNextPage !== false || !Array.isArray(data.issue.comments?.nodes))) throw new Error('incomplete specification comments; refusing truncated intake');
   return data.issue;
 }
 
