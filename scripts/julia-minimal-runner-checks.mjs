@@ -22,6 +22,7 @@ export const TEST_RUNS = {
   // The spec reporter always: Node 22 prints TAP off a terminal, and the
   // regression comparison reads the spec reporter's "✖ name" lines.
   files: { command: 'node', args: ['--test', '--test-reporter=spec'] },
+  runnerSuite: { command: 'node', args: ['scripts/julia-runner-suite.mjs'] },
 };
 
 export function testCommand({ run, files = [] }) {
@@ -64,11 +65,12 @@ export async function onCommit({ worktree, branch, commit, carry = [], sha }, ch
 // The lint must pass. The suite may fail only in tests that already failed on
 // the start commit: on the Windows laptop two tests fail for path reasons
 // before any change (24 Sep), and a change is judged on what it breaks.
-export async function runChecks({ worktree, branch, base, test }) {
+export async function runChecks({ worktree, branch, base, test, strict = false }) {
   const lint = await test({ worktree, run: 'lint' });
   if (lint.status !== 0) return { pass: false, summary: 'lint failed (`npm run lint:framework`)', output: lint.output.slice(-4000) };
   const suite = await test({ worktree, run: 'suite' });
   if (suite.status === 0) return { pass: true, summary: `lint:framework and ${SUITE_SCOPE} passed`, output: '' };
+  if (strict) return { pass: false, summary: 'candidate suite failed or did not complete', output: suite.output };
   const failed = [...failedTests(suite.output)];
   const before = failed.length
     ? await onCommit({ worktree, branch, commit: base }, async () => failedTests((await test({ worktree, run: 'suite' })).output))

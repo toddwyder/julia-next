@@ -107,6 +107,7 @@ export async function acquireRunLock(path, { started = processStarted } = {}) {
   if (held.pid != null) {
     let now;
     try { now = started(held.pid); } catch (error) { return { ok: false, reason: `could not tell whether runner ${held.pid} is still working on this run: ${error.message}` }; }
+    if (now && !held.started) return { ok: false, reason: `runner process ${held.pid} is live but its recorded creation identity is missing` };
     if (now && now === held.started) return { ok: false, reason: `runner process ${held.pid} is still working on this run` };
   }
   try { await create(`${path}.takeover-${held.token}`); } catch (error) {

@@ -1,11 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { agyArgs, allowListProblem, shareWithGroup, worktreeProblem } from '../ops/julia-runner/run-gemini.mjs';
+import { agyArgs, allowListProblem, worktreeProblem } from '../ops/julia-runner/run-gemini.mjs';
 import { answer } from '../ops/julia-runner/run-tests.mjs';
 import { sudoCommand, WORKERS } from './julia-minimal-runner-adapters.mjs';
 
@@ -90,20 +88,4 @@ test('every test run asks for the spec reporter, whose failure lines the checks 
   // The suite is run directly, not through package.json: the start commit a
   // card branches from need not have a `test` script (origin/main has none).
   assert.deepEqual(testCommand({ run: 'suite' }), { command: 'node', args: ['--test', '--test-reporter=spec', 'scripts/*.test.mjs'] });
-});
-
-test('after its turn, what Gemini wrote becomes group-writable so the runner can commit and clean it', { skip: process.platform === 'win32' && 'POSIX modes' }, () => {
-  const root = mkdtempSync(join(tmpdir(), 'share-'));
-  mkdirSync(join(root, 'scripts', 'fixtures'), { recursive: true });
-  writeFileSync(join(root, 'scripts', 'fixtures', 'a.js'), 'x');
-  mkdirSync(join(root, 'node_modules'));
-  writeFileSync(join(root, 'node_modules', 'dep.js'), 'x');
-  for (const path of ['scripts', 'scripts/fixtures', 'node_modules']) chmodSync(join(root, path), 0o755);
-  for (const path of ['scripts/fixtures/a.js', 'node_modules/dep.js']) chmodSync(join(root, path), 0o644);
-  shareWithGroup(root);
-  const mode = (path) => statSync(join(root, path)).mode & 0o777;
-  assert.equal(mode('scripts/fixtures'), 0o775);
-  assert.equal(mode('scripts/fixtures/a.js'), 0o664);
-  assert.equal(mode('node_modules/dep.js'), 0o644, 'node_modules is left alone');
-  rmSync(root, { recursive: true, force: true });
 });

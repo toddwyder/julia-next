@@ -87,24 +87,24 @@ async function prepare(name, plan) {
   const proofDir = await mkdtemp(join(tmpdir(), `jul196-real-proof-${name}-`));
   const worktree = join(proofDir, 'worktree');
   const configuration = configurationFor(plan);
-  await mkdir(join(worktree, '.agents', 'skills', 'implement'), { recursive: true });
+  await mkdir(join(worktree, '.claude', 'skills', 'implement'), { recursive: true });
   // The tracked skill supplies the fixture's canonical worker path. A clean
-  // checkout has no machine-local .agents alias (the historical proof did).
-  await copyFile(resolve(here, '../.claude/skills/implement/SKILL.md'), join(worktree, '.agents', 'skills', 'implement', 'SKILL.md'));
+  // checkout uses the canonical tracked .claude path; no local alias is needed.
+  await copyFile(resolve(here, '../.claude/skills/implement/SKILL.md'), join(worktree, '.claude', 'skills', 'implement', 'SKILL.md'));
   const git = (...args) => { const result = spawnSync('git', ['-C', worktree, ...args], { encoding: 'utf8' }); assert.equal(result.status, 0, result.stderr); return result.stdout.trim(); };
   spawnSync('git', ['init', '-q', '-b', 'work', worktree], { encoding: 'utf8' });
   git('add', '-A'); git('-c', 'user.name=jul196-proof', '-c', 'user.email=proof@example.invalid', 'commit', '-q', '-m', 'start');
   const approvedPath = join(proofDir, 'runs', 'JUL-196-approved.json');
   const marker = `partial ${randomUUID()}`;
   const proofCard = plan.realCodexBuilder ? { ...card, description: [
-    'Disposable native Codex recovery proof. Read this SAVED approved input and the canonical .agents/skills/implement/SKILL.md using a local terminal command that prints their full contents before writing anything.',
+    'Disposable native Codex recovery proof. Read this SAVED approved input and the canonical .claude/skills/implement/SKILL.md using a local terminal command that prints their full contents before writing anything.',
     'These bounded instructions override the skill: do not commit, review, run tests, use network/MCP/Linear, or change any file except proof.txt.',
     `If the runner says the previous builder was interrupted: read existing proof.txt, preserve its two lines byte-for-byte, append exactly recovered on a third line, and finish. Do not sleep during recovery.`,
     `Otherwise use a local Node command to write exactly ${JSON.stringify(`JUL-196 recovery proof\n${marker}\n`)} to proof.txt, then keep that SAME command running with setTimeout(()=>{},300000). Do not finish or shorten this wait: the parent will interrupt your runner while you are working.`,
     '## Acceptance criteria',
     `- [ ] proof.txt preserves its first line JUL-196 recovery proof and second line ${marker}; recovery appends recovered on a third line.`,
   ].join('\n') } : card;
-  await saveJson(approvedPath, { card: proofCard, configuration, issueId: 'JUL-196', savedBy: 'julia-delivery-interrupt.test.mjs (no Linear read)' });
+  await saveJson(approvedPath, { authorization: { issueId: 'JUL-196', explicitStart: true, authorizedBy: 'fixture operator', spending: { builder: { mode: 'fixture', maxUsd: 0 }, reviewer: { mode: 'fixture', maxUsd: 0 } } }, card: proofCard, configuration, issueId: 'JUL-196', savedBy: 'julia-delivery-interrupt.test.mjs (no Linear read)' });
   await saveJson(join(proofDir, 'plan.json'), { issueId: 'JUL-196', worktree, configuration, checkWhen: '^JUL-196 recovery proof', ...plan });
   return { proofDir, worktree, configuration, git, marker, statePath: join(proofDir, 'runs', 'JUL-196-state.json'), approvedHash: sha256(await readFile(approvedPath, 'utf8')), approvedPath };
 }
@@ -205,7 +205,7 @@ const oneWorkerAtATime = (state) => {
 test('deterministic build process fixture: killed runner keeps partial changes and finishes without overlapping workers', { timeout: 60000 }, async t => {
   const { evidence, state, passed } = await interruptAndResume(t, 'fixture-build', 'build:0', { processFixture: true, interruptAction: 'build:0', passWhen: '^JUL-196 recovery proof', finding: 'fixture finding' });
   assert.equal(evidence.approvedInputUnchanged, true);
-  assert.deepEqual([state.restarts, state.repairsUsed], [1, 1]);
+  assert.deepEqual([state.restarts, state.repairsUsed], [1, 0]);
   assert.equal(evidence.result.outcome, 'pass');
   assert.equal(evidence.resumedFixtureActions[0].before, 'JUL-196 recovery proof\npartial\n');
   assert.match(evidence.proofTxt, /partial\nrepaired/);
@@ -217,7 +217,7 @@ test('deterministic repair process fixture: killed runner preserves completed bu
   const { evidence, state, interrupted, passed } = await interruptAndResume(t, 'fixture-repair', 'build:1', { processFixture: true, interruptAction: 'build:1', passWhen: '^JUL-196 recovery proof\\r?\\npartial\\r?\\nrepaired', finding });
   assert.equal(evidence.approvedInputUnchanged, true);
   assert.equal(interrupted.repairsUsed, 1);
-  assert.equal(state.repairsUsed, 2, 'the disposable interrupted repair consumes a repair; the actual code repair remains 1/3');
+  assert.equal(state.repairsUsed, 1, 'resuming the disposable spent repair does not charge it twice; actual continuation remains 1/3');
   assert.deepEqual(state.findings[0], interrupted.findings[0]);
   assert.equal(state.actions.filter(action => action.key === 'build:0').length, 1);
   assert.equal(evidence.resumedFixtureActions[0].before, 'JUL-196 recovery proof\npartial\nrepaired\n');
@@ -228,7 +228,7 @@ test('deterministic repair process fixture: killed runner preserves completed bu
 test('real Claude builder: the runner is killed during the initial build and a new runner finishes the run', { skip: missing('claude'), timeout: 20 * 60 * 1000 }, async (t) => {
   const { evidence, state, passed } = await interruptAndResume(t, 'build', 'build:0', { passWhen: '^JUL-196 recovery proof', finding: 'proof.txt must start with the line JUL-196 recovery proof.' });
   assert.equal(evidence.approvedInputUnchanged, true);
-  assert.deepEqual([state.restarts, state.repairsUsed, state.actions[0].status], [1, 1, 'interrupted']);
+  assert.deepEqual([state.restarts, state.repairsUsed, state.actions[0].status], [1, 0, 'interrupted']);
   oneWorkerAtATime(state);
   assert.equal(evidence.result.outcome, 'pass', JSON.stringify(evidence.result));
   passed();
@@ -240,7 +240,7 @@ test('real Claude builder: the runner is killed during a repair; findings and th
   assert.equal(evidence.approvedInputUnchanged, true);
   assert.deepEqual(interrupted.findings.map(({ round }) => round), [0]);
   assert.deepEqual(state.findings[0], interrupted.findings[0], 'the finding saved before the restart is the one repaired after it');
-  assert.equal(state.repairsUsed, 2, 'the interrupted repair was spent, and one more finished the work');
+  assert.equal(state.repairsUsed, 1, 'the same spent repair finished after restart');
   assert.equal(state.actions.filter((action) => action.key === 'build:0').length, 1, 'the finished initial build was not run again');
   oneWorkerAtATime(state);
   assert.equal(evidence.result.outcome, 'pass', JSON.stringify(evidence.result));
@@ -268,7 +268,7 @@ test('opt-in real Codex builder: interrupted initial build recovers partial work
   assert.equal(evidence.workerActiveAtKill, true);
   assert.equal(evidence.partialAtKill, `JUL-196 recovery proof\n${proof.marker}\n`);
   assert.equal(evidence.proofTxt, `${evidence.partialAtKill}recovered\n`, 'native recovery preserved the initial partial work');
-  assert.deepEqual([state.restarts, state.repairsUsed, state.actions[0].status], [1, 1, 'interrupted']);
+  assert.deepEqual([state.restarts, state.repairsUsed, state.actions[0].status], [1, 0, 'interrupted']);
   oneWorkerAtATime(state);
   assert.equal(evidence.result.outcome, 'pass', JSON.stringify(evidence.result));
   const completed = state.actions.find(action => action.key === 'build:1' && action.status === 'done');

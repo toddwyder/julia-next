@@ -58,7 +58,8 @@ belong to that retained route: `graph/board-spec.test.mjs`,
 `scripts/bad-submissions.test.mjs`, `scripts/controller-board.test.mjs`,
 `scripts/controller-carry.test.mjs` and `scripts/stand-in-seat.test.mjs`. These
 exact paths are classified explicitly; new unwrapped shared regressions are
-automatically discovered. No shared runner test was deleted.
+automatically discovered. Shared timeout coverage now exercises the current Windows
+process-tree behavior; obsolete Linux account-sweep assertions are removed.
 
 Removed exactly:
 
@@ -80,8 +81,15 @@ Three real Claude checks now require `JUL196_CLAUDE_REAL_PROOF=1`; the existing
 Codex proof requires `JUL196_CODEX_REAL_PROOF=1`. These flags require separate
 operator authorization. Ordinary local/CI runs disclose these four checks as
 unexecuted opt-ins. Claude's existing quota-blocked flag remains supported.
-Linux process-group/subreaper/systemd and POSIX-mode cases retain explicit Windows
-skip reasons. Fixture passes do not prove a provider connection or independent
+The six real-process/POSIX-mode tests exclusive to the retired Linux launchers
+were removed: one Gemini group-permission test and five systemd/subreaper reviewer
+tests. Git history preserves them. Shared timeout tests now prove Windows worker
+and child termination, forced termination, unrelated-process survival, and portable
+normal completion. Their real Windows process cases skip only on other operating
+systems. Protected-path tests use disposable directories and real directory aliases,
+with explicit fixture commits rather than local checkouts or `origin/main`.
+Production protection defaults remain fixed; only the path-guard test boundary
+accepts disposable protected roots. Fixture passes do not prove a provider connection or independent
 review. Historical provider results stay tied to their original revisions.
 
 Interruption fixtures copy the tracked `.claude/skills/implement/SKILL.md` into

@@ -1,100 +1,75 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 
 import { answerWithin, MAX_OUTPUT } from '../ops/julia-runner/run-tests.mjs';
 import { LIMITS, limitSeconds, runLimited, STOPPED_EXIT, stoppedLine } from '../ops/julia-runner/time-limit.mjs';
 
-// The time limit each worker's launcher enforces (JUL-126): a worker that runs
-// too long is stopped with everything it started, even if the graph has died.
-// These tests start real processes, so they need Linux process groups.
-const linuxOnly = { skip: process.platform === 'win32' && 'process groups are Linux-only' };
-
-const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+// The current delivery launcher uses runLimited directly. Windows termination
+// must stop the selected process tree while leaving unrelated processes alone.
+const windowsOnly = { skip: process.platform !== 'win32', timeout: 15000 };
+const alive = pid => { try { process.kill(pid, 0); return true; } catch { return false; } };
 const until = async (check, ms = 5000) => {
   const end = Date.now() + ms;
-  while (!check() && Date.now() < end) await new Promise((r) => setTimeout(r, 25));
+  while (!check() && Date.now() < end) await new Promise(resolve => setTimeout(resolve, 25));
   return check();
 };
+const stop = pid => { if (pid) spawnSync('taskkill.exe', ['/PID', String(pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' }); };
 
-// Never sends the real "kill every process of this account" signal: that
-// would end the whole test account's session. It is recorded instead.
-function safeKill() {
-  const swept = [];
-  const kill = (pid, signal) => (pid === -1 ? swept.push(signal) : process.kill(pid, signal));
-  return { kill, swept };
-}
-
-// A worker that starts a child and runs forever; both print their pid.
-const worker = (ignoreTerm = false) => `
-  const { spawn } = require('node:child_process');
-  spawn(process.execPath, ['-e', 'console.log(process.pid); setInterval(() => {}, 1000)'], { stdio: ['ignore', 'inherit', 'ignore'] });
-  console.log(process.pid);
-  ${ignoreTerm ? "process.on('SIGTERM', () => {});" : ''}
-  setInterval(() => {}, 1000);
-`;
-
-async function runForever({ ignoreTerm = false, seconds = 0.4, graceMs = 300, account = 'gemini-worker' } = {}) {
-  const { kill, swept } = safeKill();
-  let out = '';
-  const result = await runLimited(process.execPath, ['-e', worker(ignoreTerm)], { stdio: ['ignore', 'pipe', 'ignore'] }, {
-    seconds, graceMs, kill, account, started: (child) => child.stdout.on('data', (d) => { out += d; }),
-  });
-  return { result, swept, pids: out.trim().split(/\s+/).map(Number) };
-}
-
-test('Windows time limit stops the worker and its child process', { skip: process.platform !== 'win32', timeout: 15000 }, async (t) => {
+async function timedWorker(t, { ignoreTerm = false } = {}) {
   let out = ''; let pid;
-  t.after(() => { if (pid) spawnSync('taskkill.exe', ['/PID', String(pid), '/T', '/F'], { windowsHide: true }); });
-  const completion = runLimited(process.execPath, ['-e', worker()], { stdio: ['ignore', 'pipe', 'ignore'] }, {
-    seconds: 1, graceMs: 100,
+  t.after(() => stop(pid));
+  const program = `
+    const { spawn } = require('node:child_process');
+    spawn(process.execPath, ['-e', 'console.log(process.pid); setInterval(() => {}, 1000)'], { stdio: ['ignore', 'inherit', 'ignore'] });
+    ${ignoreTerm ? "process.on('SIGTERM', () => {});" : ''}
+    console.log(process.pid);
+    setInterval(() => {}, 1000);
+  `;
+  const completion = runLimited(process.execPath, ['-e', program], { stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true }, {
+    seconds: 1.5, graceMs: 100,
     started: child => { pid = child.pid; child.stdout.on('data', chunk => { out += chunk; }); },
   });
   let deadline;
-  const result = await Promise.race([completion, new Promise((_, reject) => { deadline = setTimeout(() => reject(new Error('Windows worker survived its time limit')), 5000); })]).finally(() => clearTimeout(deadline));
+  const result = await Promise.race([completion, new Promise((_, reject) => {
+    deadline = setTimeout(() => reject(new Error('Windows worker survived its time limit')), 7000);
+  })]).finally(() => clearTimeout(deadline));
   assert.equal(result.stopped, true);
   const pids = out.trim().split(/\s+/).map(Number);
-  assert.equal(pids.length, 2);
+  assert.equal(pids.length, 2, 'both worker and child started');
   for (const workerPid of pids) assert.ok(await until(() => !alive(workerPid)), `process ${workerPid} is gone`);
+}
+
+test('Windows time limit stops the worker and its child process', windowsOnly, async t => {
+  await timedWorker(t);
 });
 
-test('a worker past its limit is stopped, and so is the child it started', linuxOnly, async () => {
-  const { result, swept, pids } = await runForever();
-  assert.equal(result.stopped, true);
-  assert.equal(pids.length, 2, 'the worker and its child both started');
-  for (const pid of pids) assert.ok(await until(() => !alive(pid)), `process ${pid} is gone`);
-  assert.deepEqual(swept, ['SIGKILL'], "then the worker account's leftovers are swept");
+test('Windows time limit forcibly stops a worker with a SIGTERM handler and its child', windowsOnly, async t => {
+  await timedWorker(t, { ignoreTerm: true });
 });
 
-test('a worker that ignores the polite stop is killed after the grace period', linuxOnly, async () => {
-  const started = Date.now();
-  const { result, pids } = await runForever({ ignoreTerm: true, graceMs: 400 });
-  assert.equal(result.stopped, true);
-  assert.equal(result.signal, 'SIGKILL');
-  assert.ok(Date.now() - started >= 700, 'it waited out the grace period first');
-  for (const pid of pids) assert.ok(await until(() => !alive(pid)), `process ${pid} is gone`);
+test('a worker that finishes in time retains its exit code and is not stopped', async () => {
+  const result = await runLimited(process.execPath, ['-e', 'process.exit(3)'], { stdio: 'ignore', windowsHide: true }, {
+    seconds: 5, kill: () => assert.fail('a completed worker must not be stopped'),
+  });
+  assert.deepEqual([result.code, result.stopped, result.signal], [3, false, null]);
 });
 
-test('a worker that finishes in time is not stopped and nothing is swept', linuxOnly, async () => {
-  const { kill, swept } = safeKill();
-  const result = await runLimited(process.execPath, ['-e', 'process.exit(3)'], { stdio: 'ignore' }, { seconds: 5, kill, account: 'gemini-worker' });
-  assert.deepEqual([result.code, result.stopped], [3, false]);
-  assert.deepEqual(swept, []);
+test('Windows timeout leaves an unrelated process running', windowsOnly, async t => {
+  const unrelated = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', windowsHide: true });
+  t.after(() => stop(unrelated.pid));
+  await new Promise((resolve, reject) => { unrelated.once('spawn', resolve); unrelated.once('error', reject); });
+  await timedWorker(t);
+  assert.equal(alive(unrelated.pid), true, 'only the timed worker tree is stopped');
 });
 
-test('only the two worker accounts are ever swept', linuxOnly, async () => {
-  const { result, swept } = await runForever({ account: 'ubuntu' });
-  assert.equal(result.stopped, true);
-  assert.deepEqual(swept, []);
-});
-
-test('the limit is the one the graph asked for, within a cap, or the fallback', () => {
+test('the requested time limit, within a cap, or the fallback', () => {
   assert.equal(limitSeconds(90, LIMITS.builder), 90);
   assert.equal(limitSeconds(10 * 60 * 60, LIMITS.builder), 3 * 60 * 60);
   for (const odd of [undefined, 0, -5, 1.5, '60', null]) assert.equal(limitSeconds(odd, LIMITS.builder), 60 * 60, String(odd));
   assert.equal(limitSeconds(undefined, LIMITS.tests), 15 * 60);
   assert.equal(stoppedLine(90), 'stopped: ran longer than its 90-second time limit');
-  assert.equal(STOPPED_EXIT, 124, 'the graph reads 124 as stopped (graph/pydantic workers.STOPPED_EXIT)');
+  assert.equal(STOPPED_EXIT, 124, 'a timeout retains its stopped exit status');
 });
 
 test('a test run that is stopped answers as stopped, and one that finishes answers normally', async () => {

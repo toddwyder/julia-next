@@ -7,14 +7,23 @@ import { promisify } from 'node:util';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { parseInitCommand, runInit, runInitCli } from './julia-init.mjs';
+import { parseInitCommand, runInit as init, runInitCli as initCli } from './julia-init.mjs';
+
+const authorize = issueId => ({ issueId, explicitStart: true, authorizedBy: 'fixture operator', spending: { builder: { mode: 'fixture', maxUsd: 0 }, reviewer: { mode: 'fixture', maxUsd: 0 } } });
+const runInit = async (command, options) => init(command, { authorization: authorize(parseInitCommand(command).issueId), ...options });
+const runInitCli = async (command, options) => initCli(command, { authorization: authorize(parseInitCommand(command).issueId), ...options });
 
 const execFileAsync = promisify(execFile);
 const initScript = fileURLToPath(new URL('./julia-init.mjs', import.meta.url));
 
-function runCli(arguments_, { cwd, input = '' } = {}) {
+async function runCli(arguments_, { cwd, input = '' } = {}) {
+  const authorizationPath = join(cwd, 'authorization.json');
+  const issueId = parseInitCommand(arguments_.join(' ')).issueId;
+  await writeFile(authorizationPath, JSON.stringify(authorize(issueId)));
+  await mkdir(join(cwd, '.julia/runs'), { recursive: true });
+  await writeFile(join(cwd, '.julia/runs', `${issueId}-approved.json`), JSON.stringify({ card: { identifier: issueId, description: '## Acceptance criteria\n- [ ] fixture' }, authorization: authorize(issueId) }));
   return new Promise((done, fail) => {
-    const child = spawn(process.execPath, [initScript, ...arguments_], { cwd });
+    const child = spawn(process.execPath, [initScript, ...arguments_], { cwd, env: { ...process.env, JULIA_START_AUTHORIZATION: authorizationPath, JULIA_RUN_DIRECTORY: join(cwd, '.julia/runs') } });
     let stdout = '';
     let stderr = '';
     child.stdout.setEncoding('utf8').on('data', (chunk) => { stdout += chunk; });
@@ -105,12 +114,15 @@ test('dispatch receives the issue and immutable run-file path needed by the JUL-
   const { directory, settingsPath } = await fixture(t);
   let dispatchContext;
   await runInit('$init JUL-196', { settingsPath, stateDirectory: join(directory, 'runs'), dispatch: async (_configuration, context) => { dispatchContext = context; } });
-  assert.deepEqual(dispatchContext, { issueId: 'JUL-196', runPath: join(directory, 'runs', 'JUL-196.json'), resumed: false });
+  assert.equal(dispatchContext.issueId, 'JUL-196');
+  assert.equal(dispatchContext.runPath, join(directory, 'runs', 'JUL-196.json'));
+  assert.equal(dispatchContext.resumed, false);
+  assert.equal(dispatchContext.authorization.explicitStart, true);
 });
 
 test('the command-line entry point receives literal $init, writes the run file, and rejects /init', async (t) => {
   const { directory } = await fixture(t);
-  const { stdout } = await execFileAsync(process.execPath, [initScript, '$init JUL-199 --builder anthropic-builder low --reviewer openai-reviewer none'], { cwd: directory });
+  const { stdout } = await runCli(['$init JUL-199 --builder anthropic-builder low --reviewer openai-reviewer none'], { cwd: directory });
 
   assert.equal(JSON.parse(stdout).issueId, 'JUL-199');
   assert.deepEqual(JSON.parse(await readFile(join(directory, '.julia', 'runs', 'JUL-199.json'), 'utf8')).configuration.builder.thinking, 'low');
@@ -286,4 +298,23 @@ test('resume dispatches the saved snapshot unchanged after defaults and catalog 
   assert.equal(resumed.resumed, true);
   assert.deepEqual(calls, [first.configuration]);
   await assert.rejects(runInit('$init JUL-195 --builder anthropic-builder high', { settingsPath, stateDirectory }), /already has a saved configuration/);
+});
+
+
+test('$init refuses dispatch without explicit issue and spend authorization, then saves exact choices before authorized dispatch', async t => {
+  const { directory, settingsPath } = await fixture(t);
+  const stateDirectory = join(directory, 'runs');
+  for (const authorization of [null, { explicitStart: true, issueId: 'JUL-195' }, { ...authorize('JUL-195'), spending: {} }, authorize('JUL-196')]) {
+    await assert.rejects(init('$init JUL-195', { authorization, settingsPath, stateDirectory, dispatch: () => assert.fail('unauthorized start') }), /authorization|spending/);
+  }
+  const authorization = authorize('JUL-195');
+  const first = await init('$init JUL-195', { authorization, settingsPath, stateDirectory, dispatch: async (configuration, context) => {
+    const saved = JSON.parse(await readFile(context.runPath, 'utf8'));
+    assert.deepEqual(saved.authorization.configuration, configuration);
+    assert.deepEqual(saved.authorization.spending, authorization.spending);
+  } });
+  await init('$init JUL-195', { settingsPath, stateDirectory, dispatch: async (configuration, context) => {
+    assert.deepEqual(configuration, first.configuration);
+    assert.deepEqual(context.authorization.spending, authorization.spending);
+  } });
 });

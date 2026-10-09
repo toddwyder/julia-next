@@ -26,7 +26,7 @@ const markerLine = (step, fields) => `runner: ${step} ${Object.entries(fields).m
 // A fresh run starts only from a clean checkout and from exactly origin/main,
 // so the base is a commit everyone can see. A resumed run keeps the base it
 // started from, even if main has moved on since. Returns a refusal reason or null.
-function pinWorktree({ repoRoot, worktree, branch, base }) {
+export function pinWorktree({ repoRoot, worktree, branch, base, fetch = true }) {
   if (existsSync(worktree)) {
     // Resuming: put the branch back as committed. An interrupted Gemini turn's
     // uncommitted edits are discarded (and reported), never counted as a
@@ -40,13 +40,21 @@ function pinWorktree({ repoRoot, worktree, branch, base }) {
   if (git(repoRoot, 'status', '--porcelain', '--untracked-files=no')) {
     return { refusal: `the checkout at ${repoRoot} has uncommitted changes to tracked files`, discarded: [] };
   }
-  git(repoRoot, 'fetch', '-q', 'origin', 'main');
+  if (fetch) git(repoRoot, 'fetch', '-q', 'origin', 'main');
   const main = git(repoRoot, 'rev-parse', 'origin/main');
   if (git(repoRoot, 'rev-parse', '--verify', `${base}^{commit}`) !== main) {
     return { refusal: `start commit ${base} is not origin/main (${main})`, discarded: [] };
   }
   git(repoRoot, 'worktree', 'add', '-q', '-b', branch, worktree, main);
   return { refusal: null, discarded: [] };
+}
+
+// Shared fresh-worktree setup, from the checked revision's own lockfile.
+export function installDependencies(worktree, progress = () => {}) {
+  if (!existsSync(join(worktree, 'package-lock.json')) || existsSync(join(worktree, 'node_modules'))) return { status: 0, output: '', skipped: true };
+  progress('Installing dependencies (npm ci) from the start commit');
+  const result = spawnSync('npm', ['ci', '--no-audit', '--no-fund'], { cwd: worktree, encoding: 'utf8', shell: process.platform === 'win32', windowsHide: true, timeout: 300000, maxBuffer: 64 * 1024 * 1024 });
+  return { status: result.status, output: `${result.stdout ?? ''}${result.stderr ?? ''}`, error: result.error?.message ?? null, skipped: false };
 }
 
 // The pre-agreed seams (tdd skill: "Test only at pre-agreed seams"): the
@@ -115,11 +123,8 @@ export async function runIssue(issueId, { base, repoRoot, worktreeRoot, adapters
   const relay = (worker) => (line) => progress(`${worker}: ${line}`);
   // A fresh worktree has no dependencies. They come from the start commit's own
   // lockfile (trusted code on main), installed once, before Gemini's turn.
-  if (existsSync(join(worktree, 'package-lock.json')) && !existsSync(join(worktree, 'node_modules'))) {
-    progress('Installing dependencies (npm ci) from the start commit');
-    const install = spawnSync('npm', ['ci', '--no-audit', '--no-fund'], { cwd: worktree, encoding: 'utf8', shell: process.platform === 'win32' });
-    if (install.status !== 0) return blocked(`npm ci failed in the new worktree (exit ${install.status}): ${String(install.stderr).trim().split('\n').at(-1)}`);
-  }
+  const install = installDependencies(worktree, progress);
+  if (install.status !== 0) return blocked(`npm ci failed in the new worktree (exit ${install.status}): ${String(install.output).trim().split('\n').at(-1)}`);
 
   const head = () => git(worktree, 'rev-parse', 'HEAD');
   const commitCount = () => Number(git(worktree, 'rev-list', '--count', `${base}..HEAD`));

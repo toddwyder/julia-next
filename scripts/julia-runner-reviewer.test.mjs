@@ -1,20 +1,16 @@
 // The graph's reviewer launcher (JUL-128): ops/julia-runner/run-reviewer.mjs.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { runLimited } from '../ops/julia-runner/time-limit.mjs';
 import { BUILDERS, codexModel, codexReply, geminiMessages, geminiReply, piReply, PYTHON, REAPER, REVIEWERS, review, SCOPE_PREFIX, STOP_GRACE_MS, stopScope, userManager } from '../ops/julia-runner/run-reviewer.mjs';
 
 // For the tests that fake the run: a user manager that is there, and a scope with nothing left in it.
 const FREE = { manager: () => ({ XDG_RUNTIME_DIR: '/run/user/1' }), stop: async () => [] };
-
-const LAUNCHER = fileURLToPath(new URL('../ops/julia-runner/run-reviewer.mjs', import.meta.url));
 
 test('the reaper always has time to finish its sweep before anything kills it', async () => {
   const reap = readFileSync(REAPER, 'utf8');
@@ -259,151 +255,4 @@ test('the reviewer runs under its reaper from /, and a stop, a crash, an abnorma
   assert.match(crashed.error, /exited 137/);
   const noStart = await review({ reviewer: 'codex', prompt: 'p' }, { run: fakeRun({ error: new Error('spawn codex ENOENT') }), contain: FREE });
   assert.match(noStart.error, /did not start: spawn codex ENOENT/);
-});
-
-// Real processes: whatever the reviewer starts is stopped with it, even a
-// process that left its group (setsid) or was orphaned by a double fork.
-// Each test has a timeout, and cleans up what its pretend reviewer made even when it fails,
-// so a broken stop can never leave processes running on the machine.
-const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
-const linuxOnly = { skip: process.platform === 'win32' ? 'process groups and subreapers: Linux only' : false, timeout: 60_000 };
-// The real reviews run in a systemd user scope, which needs this account's user
-// manager: orchestrator-svc has one on the server; the test worker's account does not.
-const contained = { ...linuxOnly, skip: linuxOnly.skip || (userManager() ? false : 'no systemd user manager for this account') };
-const settle = () => new Promise((r) => setTimeout(r, 500));
-const pidsIn = (...files) => files.flatMap((file) => { try { return readFileSync(file, 'utf8').split('\n').map(Number).filter(Boolean); } catch { return []; } });
-const killAll = (pids) => { for (const pid of pids) { try { process.kill(pid, 'SIGKILL'); } catch { /* gone */ } } };
-
-// A pretend reviewer (a shell script) that starts a plain child, one that escapes its
-// process group with setsid, and one orphaned by a double fork, writes their pids, then
-// either waits or ends at once.
-function fakeReviewer(dir, { endAtOnce = false } = {}) {
-  const script = join(dir, 'codex');
-  writeFileSync(script, [
-    '#!/bin/sh',
-    'sleep 60 & echo $! > "$0.plain"',
-    'setsid sleep 60 & echo $! > "$0.escaped"',
-    '( sleep 60 & echo $! > "$0.orphan" ) &',
-    'while [ ! -s "$0.orphan" ]; do sleep 0.05; done',
-    'echo ready > "$0.ready"',
-    endAtOnce ? 'exit 0' : 'wait',
-    '',
-  ].join('\n'), { mode: 0o755 });
-  const pids = () => ['plain', 'escaped', 'orphan'].map((kind) => Number(readFileSync(`${script}.${kind}`, 'utf8').trim()));
-  const ready = () => { try { return readFileSync(`${script}.ready`, 'utf8').includes('ready'); } catch { return false; } };
-  const cleanup = () => killAll(pidsIn(`${script}.plain`, `${script}.escaped`, `${script}.orphan`));
-  return { script, pids, ready, cleanup };
-}
-
-test('a child that ignores SIGTERM and keeps forking while being stopped is stopped with everything it made', contained, async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'reviewer-'));
-  const script = join(dir, 'codex');
-  writeFileSync(script, [
-    '#!/bin/sh',
-    // a detached forker: ignores SIGTERM and starts a new sleeper every 20 ms, well past the 2 s
-    // limit; it is bounded (200 sleepers of 30 s) so a broken stop cannot flood the machine
-    `setsid sh -c 'trap "" TERM; echo $$ > "${script}.forker"; i=0; while [ $i -lt 200 ]; do sleep 30 & echo $! >> "${script}.forks"; i=$((i+1)); sleep 0.02; done; wait' &`,
-    `while [ ! -s "${script}.forks" ]; do sleep 0.05; done`,
-    'wait',
-    '',
-  ].join('\n'), { mode: 0o755 });
-  const reviewers = { fake: () => ({ command: script, args: [], env: process.env, stdin: false }) };
-  try {
-    const reply = await review({ reviewer: 'fake', prompt: 'p', limit_seconds: 2 }, { reviewers });
-    assert.equal(reply.status, 'stopped');
-    await settle();
-    const made = [readFileSync(`${script}.forker`, 'utf8'), ...readFileSync(`${script}.forks`, 'utf8').split('\n')].map(Number).filter(Boolean);
-    assert.ok(made.length > 5, `the forker made ${made.length} processes`);
-    const left = made.filter(alive);
-    assert.deepEqual(left, [], `${left.length} of the ${made.length} processes the forker made outlived the stop`);
-  } finally {
-    killAll(pidsIn(`${script}.forker`, `${script}.forks`));
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
-test('at its limit the whole reviewer is stopped, escaped and orphaned children included', contained, async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'reviewer-'));
-  const fake = fakeReviewer(dir);
-  const reviewers = { fake: () => ({ command: fake.script, args: [], env: process.env, stdin: false }) };
-  try {
-    const reply = await review({ reviewer: 'fake', prompt: 'p', limit_seconds: 2 }, { reviewers });
-    assert.equal(reply.status, 'stopped');
-    assert.ok(fake.ready(), 'the pretend reviewer started its children before the limit');
-    await settle();
-    for (const pid of fake.pids()) assert.equal(alive(pid), false, `child ${pid} outlived the limit`);
-  } finally {
-    fake.cleanup();
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
-test('a reviewer that ends leaves nothing running behind it', contained, async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'reviewer-'));
-  const fake = fakeReviewer(dir, { endAtOnce: true });
-  const reviewers = { fake: () => ({ command: fake.script, args: [], env: process.env, stdin: false }) };
-  try {
-    const reply = await review({ reviewer: 'fake', prompt: 'p', limit_seconds: 30 }, { reviewers });
-    assert.equal(reply.status, 'failed'); // no final message: never a review
-    await settle();
-    for (const pid of fake.pids()) assert.equal(alive(pid), false, `child ${pid} outlived the reviewer`);
-  } finally {
-    fake.cleanup();
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
-test('a reviewer left behind by a reaper killed outright is stopped, even a helper that left the group and wiped its environment', contained, async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'reviewer-'));
-  const script = join(dir, 'codex');
-  // a pretend reviewer with a plain child, a double-fork orphan, a helper that left the group
-  // (setsid), and one that left the group with an empty environment (Codex review, round 11)
-  writeFileSync(script, [
-    '#!/bin/sh',
-    `sleep 60 & echo $! > "${script}.plain"`,
-    `( sleep 60 & echo $! > "${script}.orphan" ) &`,
-    `setsid sleep 60 & echo $! > "${script}.escaped"`,
-    `setsid env -i sleep 60 & echo $! > "${script}.wiped"`,
-    `while [ ! -s "${script}.orphan" ] || [ ! -s "${script}.escaped" ] || [ ! -s "${script}.wiped" ]; do sleep 0.05; done`,
-    'wait', '',
-  ].join('\n'), { mode: 0o755 });
-  const reviewers = { fake: () => ({ command: script, args: [], env: process.env, stdin: false }) };
-  let reaper;
-  const run = (command, args, options, limits) => runLimited(command, args, options, {
-    ...limits, started: (child) => { reaper = child.pid; limits.started(child); },
-  });
-  try {
-    const pending = review({ reviewer: 'fake', prompt: 'p', limit_seconds: 40 }, { run, reviewers });
-    for (let i = 0; i < 100 && pidsIn(`${script}.orphan`, `${script}.escaped`, `${script}.wiped`).length < 3; i += 1) await new Promise((r) => setTimeout(r, 100));
-    process.kill(reaper, 'SIGKILL'); // as the kernel's out-of-memory killer would
-    const reply = await pending;
-    assert.equal(reply.status, 'failed');
-    assert.match(reply.error, /stopped by SIGKILL/);
-    await settle();
-    const made = pidsIn(`${script}.plain`, `${script}.orphan`, `${script}.escaped`, `${script}.wiped`);
-    assert.equal(made.length, 4);
-    for (const pid of made) assert.equal(alive(pid), false, `child ${pid} outlived its reaper`);
-  } finally {
-    killAll(pidsIn(`${script}.plain`, `${script}.orphan`, `${script}.escaped`, `${script}.wiped`));
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
-test('when the graph stops the launcher, everything the reviewer started stops too', contained, async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'reviewer-'));
-  const fake = fakeReviewer(dir);
-  try {
-    const launcher = spawn(process.execPath, [LAUNCHER], { env: { ...process.env, PATH: `${dir}:/usr/bin:/bin` }, stdio: ['pipe', 'pipe', 'pipe'] });
-    launcher.stdin.end(JSON.stringify({ reviewer: 'codex', prompt: 'p', limit_seconds: 60 }));
-    for (let i = 0; i < 100 && !fake.ready(); i += 1) await new Promise((r) => setTimeout(r, 100));
-    assert.ok(fake.ready(), 'the pretend reviewer started its children');
-    for (const pid of fake.pids()) assert.ok(alive(pid), `child ${pid} started`);
-    const code = await new Promise((r) => { launcher.on('close', r); launcher.kill('SIGTERM'); });
-    assert.equal(code, 124);
-    await settle();
-    for (const pid of fake.pids()) assert.equal(alive(pid), false, `child ${pid} outlived the graph's stop`);
-  } finally {
-    fake.cleanup();
-    rmSync(dir, { recursive: true, force: true });
-  }
 });

@@ -10,13 +10,14 @@ const configuration = {
   builder: { harness: 'codex', model: 'gpt-6.1-sol', maker: 'OpenAI' },
   reviewer: { harness: 'fixture', model: 'deterministic', maker: 'Fixture' },
 };
+const authorization = { issueId: 'JUL-196', explicitStart: true, authorizedBy: 'fixture operator', spending: { builder: { mode: 'fixture', maxUsd: 0 }, reviewer: { mode: 'fixture', maxUsd: 0 } } };
 const card = { identifier: 'JUL-196', state: { name: 'Ready' }, description: '## Acceptance criteria\n- [ ] saved input' };
 const A = 'a'.repeat(40), B = 'b'.repeat(40);
 async function fixture(t) {
   const root = await mkdtemp(join(tmpdir(), 'jul196-spending-'));
   t.after(() => rm(root, { recursive: true, force: true }));
   const launches = [], stops = []; let reads = 0;
-  const run = { issueId: 'JUL-196', configuration, runPath: join(root, 'run.json') };
+  const run = { issueId: 'JUL-196', configuration, authorization, runPath: join(root, 'run.json') };
   const adapters = {
     lock: async () => ({ ok: true, release: async () => {} }),
     processes: { started: () => 'fixture-start', stop: async pid => { stops.push(pid); adapters.processes.started = () => null; } },

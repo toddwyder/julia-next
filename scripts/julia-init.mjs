@@ -1,12 +1,14 @@
-// The local `$init` selection wrapper.  It only selects and records the two
-// model jobs; JUL-196 owns real worker startup and handoff.
+// The local `$init` wrapper saves model/spend/start choices before the
+// existing delivery runner prepares its workspace and dispatches workers.
 import { appendFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline/promises';
+import { homedir } from 'node:os';
+import { assertDeliveryPath } from './julia-delivery-candidate.mjs';
 import { fileURLToPath } from 'node:url';
 
 import { validateDeliveryToolSettings } from './delivery-tool-settings.mjs';
-import { startDelivery } from './julia-delivery-runner.mjs';
+import { startDelivery, authorizationReason } from './julia-delivery-runner.mjs';
 
 const ROLE_FLAGS = Object.freeze({ '--builder': 'builder', '--reviewer': 'reviewer' });
 const ISSUE_ID = /^[A-Z][A-Z0-9]*-\d+$/;
@@ -120,17 +122,27 @@ function resolveSelections(settings, defaults, explicit) {
   }
 }
 
-// `dispatch` is intentionally injected. Tests use a fake; JUL-196 will be
-// the only caller that supplies real startup/handoff behaviour.
+// Selection-only callers omit dispatch. Every dispatch, including fixtures,
+// requires explicit start authorization; the CLI uses the existing runner.
 export async function runInit(command, {
   settingsPath = new URL('../delivery-tools.json', import.meta.url),
-  stateDirectory = '.julia/runs',
-  dispatch = async () => {},
+  stateDirectory = process.env.JULIA_RUN_DIRECTORY ?? join(homedir(), '.julia', 'runs'),
+  dispatch = null,
+  authorization,
+  authorizationPath = process.env.JULIA_START_AUTHORIZATION,
   logger = () => {},
   read = readFile,
   ...writers
 } = {}) {
+  if (dispatch) assertDeliveryPath(stateDirectory);
   const eventsPath = join(stateDirectory, 'events.jsonl');
+  const requireAuthorization = async (approved, issueId, configuration) => {
+    const reason = authorizationReason(approved, issueId, configuration);
+    if (!reason) return;
+    const event = { event: 'authorization-refused', issueId, reason };
+    await recordEvent(eventsPath, event, writers); logger(event);
+    reject(reason);
+  };
   let parsed;
   try {
     parsed = parseInitCommand(command);
@@ -153,7 +165,15 @@ export async function runInit(command, {
     const event = { event: 'resume', issueId, builder: saved.configuration.builder.identity, reviewer: saved.configuration.reviewer.identity };
     await recordEvent(eventsPath, event, writers);
     logger(event);
-    await dispatch(saved.configuration, { issueId, runPath, resumed: true });
+    if (dispatch) {
+      const approved = saved.authorization ?? authorization ?? (authorizationPath ? await readJson(authorizationPath, { read }) : null);
+      await requireAuthorization(approved, issueId, saved.configuration);
+      if (!saved.authorization) {
+        saved.authorization = { ...approved, configuration: saved.configuration };
+        await writeJson(runPath, saved, writers);
+      }
+      await dispatch(saved.configuration, { issueId, runPath, resumed: true, authorization: saved.authorization });
+    }
     return { issueId, configuration: saved.configuration, resumed: true };
   }
 
@@ -172,14 +192,19 @@ export async function runInit(command, {
   }
 
   const configuration = snapshot(resolved);
+  const approved = authorization ?? (authorizationPath ? await readJson(authorizationPath, { read }) : null);
+  if (dispatch) {
+    await requireAuthorization(approved, issueId, configuration);
+  }
+  const savedAuthorization = approved ? { ...approved, configuration } : null;
   // Both files are written only after the pair is valid. Dispatch comes last,
   // so an invalid pair can neither mutate defaults nor partially start work.
   await writeJson(defaultsPath, selected, writers);
-  await writeJson(runPath, { issueId, configuration }, writers);
+  await writeJson(runPath, { issueId, configuration, authorization: savedAuthorization }, writers);
   const event = { event: 'selection-saved', issueId, builder: configuration.builder.identity, reviewer: configuration.reviewer.identity };
   await recordEvent(eventsPath, event, writers);
   logger(event);
-  await dispatch(configuration, { issueId, runPath, resumed: false });
+  if (dispatch) await dispatch(configuration, { issueId, runPath, resumed: false, authorization: savedAuthorization });
   return { issueId, configuration, resumed: false };
 }
 
@@ -203,14 +228,13 @@ export async function runInitCli(command, { ask, ...options } = {}) {
   }
 }
 
-// This diagnostic entry point deliberately supplies no real dispatcher. It
-// makes the selection/run-file behaviour testable on a Windows laptop; JUL-196
-// will provide real startup and handoff after consuming the saved snapshot.
+// The literal Windows entry point reads an operator authorization file once.
+// Restart uses the saved snapshot rather than rereading settings or approval.
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const prompts = createInterface({ input: process.stdin, output: process.stderr });
   try {
     const result = await runInitCli(process.argv.slice(2).join(' '), {
-      dispatch: (configuration, { issueId, runPath }) => startDelivery(issueId, configuration, { runPath }),
+      dispatch: (configuration, { issueId, runPath, authorization }) => startDelivery(issueId, configuration, { runPath, authorization }),
       logger: (event) => console.error(JSON.stringify(event)),
       ask: (role) => prompts.question(`$init needs ${role}; enter its exact model name or ID and thinking level: `),
     });
