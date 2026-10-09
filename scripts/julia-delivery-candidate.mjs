@@ -21,9 +21,10 @@ export function canonicalPath(path) {
   return process.platform === 'win32' ? canonical.toLowerCase() : canonical;
 }
 const inside = (root, path) => { const suffix = relative(root, path); return suffix === '' || (!suffix.startsWith('..') && !isAbsolute(suffix)); };
-export function assertDeliveryPath(path) {
+// Tests supply disposable protected roots; production callers retain the fixed originals.
+export function assertDeliveryPath(path, { protectedRoots = PROTECTED } = {}) {
   const canonical = canonicalPath(path);
-  if (PROTECTED.some(root => inside(canonicalPath(root), canonical))) throw new Error(`protected original checkout: ${path}`);
+  if (protectedRoots.some(root => inside(canonicalPath(root), canonical))) throw new Error(`protected original checkout: ${path}`);
   return canonical;
 }
 

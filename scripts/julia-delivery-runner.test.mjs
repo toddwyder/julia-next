@@ -353,16 +353,41 @@ test('failed, ambiguous, red-proof and drifted checks cannot reach a reviewer an
   }
 });
 
-test('protected originals, aliases and foreign working copies are refused before fixture dispatch', { skip: process.platform !== 'win32' && 'Windows original-checkout junction protection' }, async t => {
-  const { symlink, rm } = await import('node:fs/promises');
-  const root = await mkdtemp(join(tmpdir(), 'jul201-protection-'));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const alias = join(root, 'alias');
-  await symlink('C:/Dev/julia-next', alias, 'junction');
-  for (const worktree of ['C:/Dev/julia-next', 'C:/Dev/julia-next-jul196', alias, root]) {
-    const result = await startDelivery('JUL-196', configuration, { authorization, worktree, runPath: join(root, 'runs/JUL-196.json'), readCard: async () => card, launch: async () => assert.fail('protected or foreign workspace cannot dispatch') });
+test('each production protected original is refused before fixture dispatch', async t => {
+  const { source, base, runPath } = await candidateFixture(t);
+  for (const worktree of ['C:/Dev/julia-next', 'C:/Dev/julia-next-jul196', 'C:/Dev/julia-next-jul196-proof']) {
+    const result = await startDelivery('JUL-196', configuration, { authorization, repoRoot: source, base, worktree, runPath,
+      readCard: async () => card, launch: async () => assert.fail('protected workspace cannot dispatch') });
     assert.equal(result.outcome, 'park');
-    assert.match(result.reason, /protected original|existing unrelated/);
+    assert.match(result.reason, /protected original/);
+  }
+});
+
+test('a protected fixture and its directory alias are refused, including children that do not exist yet', async t => {
+  const { symlink } = await import('node:fs/promises');
+  const { assertDeliveryPath } = await import('./julia-delivery-candidate.mjs');
+  const { root, source } = await candidateFixture(t);
+  const alias = join(root, 'alias');
+  await symlink(source, alias, process.platform === 'win32' ? 'junction' : 'dir');
+  for (const path of [source, alias, join(alias, 'not-created', 'child')]) {
+    assert.throws(() => assertDeliveryPath(path, { protectedRoots: [source] }), /protected original/);
+  }
+  assert.doesNotThrow(() => assertDeliveryPath(join(root, 'source-neighbor'), { protectedRoots: [source] }));
+});
+
+test('an existing foreign fixture and its directory alias are refused without changing their contents', async t => {
+  const { symlink } = await import('node:fs/promises');
+  const { root, source, base, runPath, git } = await candidateFixture(t);
+  const alias = join(root, 'foreign alias with spaces');
+  await symlink(source, alias, process.platform === 'win32' ? 'junction' : 'dir');
+  for (const worktree of [source, alias]) {
+    const result = await startDelivery('JUL-196', configuration, { authorization, repoRoot: source, base, worktree, runPath,
+      readCard: async () => card, launch: async () => assert.fail('foreign workspace cannot dispatch') });
+    assert.equal(result.outcome, 'park');
+    assert.match(result.reason, /existing unrelated/);
+    assert.equal(git(source, 'rev-parse', 'HEAD'), base);
+    assert.equal(git(source, 'status', '--porcelain'), '');
+    assert.equal(await readFile(join(source, 'deleted.txt'), 'utf8'), 'original');
   }
 });
 
