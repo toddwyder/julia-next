@@ -8,9 +8,11 @@ Copyright (c) 2026 Lauren Tan; MIT license retained verbatim in
 Only the four named skills below and the generator's three referenced feature-map
 examples are included. Each file is an unmodified upstream Git blob: names,
 frontmatter, bodies, workflows, and references are preserved. No other Pstack
-skill, hook, controller, or setup system is installed. Generation and maintenance
-have not been invoked. The canonical source is `.agents/skills`; explicit readers
-must use that path rather than maintaining another copy.
+skill, hook, controller, or setup system is installed. The original
+`create-verification-skill` workflow was run for Julia in JUL-204; its generated
+output is `.agents/skills/verify-julia`. Maintenance has not been invoked. The
+canonical source is `.agents/skills`; explicit readers must use that path rather
+than maintaining another copy.
 
 ## Comparison with the pinned source
 
