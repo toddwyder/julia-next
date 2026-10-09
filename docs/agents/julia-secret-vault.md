@@ -25,7 +25,19 @@ node scripts/julia-vault.mjs init '$init' JUL-123
 
 The wrapper runs the existing `$init` entry point with `op run`, stdout/stderr secret masking enabled, and no shell command expansion. It refuses plaintext values, unexpected fields, references outside the selected vault and inherited references to other vaults. Existing spending/start approval and release/UAT configuration still apply. Secrets exist only in the operator subprocess environment for its lifetime. Native builders and reviewer transports exclude deployment/telemetry/Linear credentials and all `OP_` bootstrap/session variables; provider authentication and PATH remain.
 
-Desktop integration is suitable for supervised use and may prompt for Windows Hello. It does **not** restrict the authenticated desktop account to one vault. For unattended runs, use a 1Password service account granted **read_items only on Julia**, without write/share/create-vault permissions. Keep its bootstrap token in a protected Windows credential store and retrieve it only into the operator process, not a plaintext env file. Service-account creation and bootstrap installation are pending until account access is available; do not claim unattended vault isolation based on desktop integration alone.
+Desktop integration is suitable for supervised use and may prompt for Windows Hello. It does **not** restrict the authenticated desktop account to one vault. For unattended runs, use a 1Password service account granted **read_items only on Julia**, without write/share/create-vault permissions. Keep its bootstrap token in protected Windows storage and retrieve it only into the operator process, not a plaintext env file. Service-account creation and bootstrap installation are pending explicit operator approval; do not claim unattended vault isolation based on desktop integration alone.
+
+The Windows bootstrap helper implements this restricted account with a 90-day expiry. Provision it only after the operator explicitly approves that account, scope, lifetime and storage:
+
+```powershell
+.\scripts\julia-vault-windows.ps1 -ConfigurationPath 'operator-vault-launch.json' -Provision
+.\scripts\julia-vault-windows.ps1 -ConfigurationPath 'operator-vault-launch.json' -Verify
+.\scripts\julia-vault-windows.ps1 -ConfigurationPath 'operator-vault-launch.json' -JuliaArguments @('$init', 'JUL-123')
+```
+
+The helper stores only a current-user DPAPI-encrypted token, with file access restricted to that Windows user and SYSTEM. It clears personal `OP_` variables while running, verifies that the account sees exactly the Julia vault, and restores the original environment afterward. Its resolution probe uses the same validated reference snapshot as delivery and prints only a field count. Provisioning writes durable intent before creating the account; interruption or failed persistence parks the operation until account inspection/revocation, rather than creating duplicates. A token cannot be moved to another user or machine by copying the encrypted file. Before the recorded expiry, explicitly revoke/reprovision the account through 1Password administration. Never remove provisioning intent merely to force a retry.
+
+Machine migration status: the Julia vault was created and the located Axiom/Sentry fields matched on vault readback. Vercel and Linear credentials were absent. Original files and service destinations were retained. Restricted runner provisioning remains pending explicit approval; no service account or bootstrap token has been created yet. Live service proof remains deferred to first cards.
 
 Vercel's application runtime still needs its deployment environment values. Those are runtime projections of the canonical vault, rather than another manually maintained source. Migrating this runner does not delete cloud configuration or alter the paused Factory's credentials/service. The controlled Sentry error and actual Axiom delivery event remain first-card proofs.
 

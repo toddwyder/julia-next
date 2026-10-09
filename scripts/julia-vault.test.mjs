@@ -1,6 +1,36 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { migrateJuliaSecrets, vaultLaunch } from './julia-vault.mjs';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { migrateJuliaSecrets, vaultLaunch, vaultProbe } from './julia-vault.mjs';
+
+test('Windows provisioning parks after account creation followed by failed persistence', { skip: process.platform !== 'win32' }, () => {
+  const directory = mkdtempSync(join(tmpdir(), 'julia-bootstrap-'));
+  const quote = value => `'${value.replaceAll("'", "''")}'`;
+  try {
+    const fakeOp = join(directory, 'fake-op.ps1');
+    const counter = join(directory, 'calls.txt');
+    writeFileSync(fakeOp, `Set-Content -LiteralPath ${quote(counter)} -Value 'created-once'\nNew-Item -ItemType Directory -Path ${quote(join(directory, 'runner-token.dpapi'))} > $null\n$global:LASTEXITCODE=0\nWrite-Output 'ops_synthetic_test_only'\n`);
+    const configuration = join(directory, 'vault-launch.json');
+    writeFileSync(configuration, JSON.stringify({ vaultId: 'vault-id', opExecutable: fakeOp, referencesPath: join(directory, 'secrets.env') }));
+    const wrapper = fileURLToPath(new URL('./julia-vault-windows.ps1', import.meta.url));
+    const powershell = join(process.env.SystemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+    const invoke = () => spawnSync(powershell, ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', wrapper, '-ConfigurationPath', configuration, '-Provision'], { encoding: 'utf8', timeout: 20000, windowsHide: true });
+    const first = invoke();
+    assert.equal(first.status, 1);
+    assert.equal(JSON.parse(readFileSync(join(directory, 'runner-provision.json'), 'utf8')).phase, 'creation-started');
+    assert.equal(readFileSync(counter, 'utf8').trim(), 'created-once');
+    rmSync(join(directory, 'runner-token.dpapi'), { recursive: true });
+    const second = invoke();
+    assert.equal(second.status, 1);
+    assert.match(second.stderr, /already attempted/);
+    assert.equal(readFileSync(counter, 'utf8').trim(), 'created-once');
+    assert.equal((first.stdout + first.stderr + second.stdout + second.stderr).includes('ops_synthetic_test_only'), false);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
 
 test('migration pipes secrets, verifies readback and returns references only', async () => {
   const calls = []; let item;
@@ -26,6 +56,21 @@ test('migration refuses an existing conflicting item instead of overwriting it',
 test('failed readback returns no replacement references', async () => {
   const execute = async args => args[0] === 'vault' ? [{ id: 'vault-id', name: 'Julia' }] : args[1] === 'list' ? [] : args[1] === 'create' ? { id: 'item-id' } : { fields: [] };
   await assert.rejects(migrateJuliaSecrets({ AXIOM_TOKEN: 'private-value' }, { execute }), /readback did not match/);
+});
+
+test('vault probe verifies resolution without starting delivery or displaying values', () => {
+  const options = { configuration: { vaultId: 'vault-id', referencesPath: 'references.env' }, references: 'AXIOM_TOKEN=op://vault-id/item-id/token\n' };
+  const run = (command, args, settings) => {
+    assert.equal(args[3], '-e');
+    assert.equal(args.some(arg => arg.includes('julia-init.mjs')), false);
+    const result = spawnSync(process.execPath, args.slice(3), { ...settings, stdio: 'pipe', encoding: 'utf8', env: { ...settings.env, AXIOM_TOKEN: 'resolved-private-value' } });
+    assert.equal(result.stdout.includes('resolved-private-value'), false);
+    assert.match(result.stdout, /1 fields/);
+    return result;
+  };
+  assert.equal(vaultProbe({ ...options, run }), 0);
+  assert.equal(vaultProbe({ ...options, run: (command, args, settings) => spawnSync(process.execPath, args.slice(3), { ...settings, stdio: 'pipe' }) }), 1);
+  assert.throws(() => vaultProbe({ ...options, references: 'AXIOM_TOKEN=plaintext', run: () => assert.fail('invalid references launched') }), /invalid vault reference/);
 });
 test('vault launcher loads only references in the designated vault, preserves masking and child exit code', () => {
   let call;

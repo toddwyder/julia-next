@@ -27,7 +27,7 @@ export function opExecutor(executable = 'op') {
 export async function migrateJuliaSecrets(environment, { execute = opExecutor(), vaultName = 'Julia' } = {}) {
   const vaults = (await execute(['vault', 'list'])).filter(vault => vault.name === vaultName);
   if (vaults.length > 1) throw Error('Julia vault is ambiguous; select the account before migration');
-  const vault = vaults[0] ?? await execute(['vault', 'create', vaultName, '--description', 'Canonical Julia service credentials; runner access is read-only.']);
+  const vault = vaults[0] ?? await execute(['vault', 'create', vaultName, '--icon', 'vault-door', '--description', 'Canonical Julia service credentials; runner access is read-only.']);
   if (!vault.id) throw Error('1Password did not return the vault identity');
   const items = await execute(['item', 'list', '--vault', vault.id]);
   const references = {}, migrated = [], missing = [];
@@ -76,6 +76,13 @@ export function vaultLaunch(args, { configuration, references, environment = pro
   return result.status ?? 1;
 }
 
+export function vaultProbe(options = {}) {
+  const fields = Object.keys(parseEnv(options.references ?? ''));
+  const code = `const keys=${JSON.stringify(fields)};if(keys.some(k=>!process.env[k]||process.env[k].startsWith('op://')))process.exit(1);console.log('Julia vault resolution verified: '+keys.length+' fields; no values displayed.')`;
+  const execute = options.run ?? spawnSync;
+  return vaultLaunch([], { ...options, run: (command, args, settings) => execute(command, [...args.slice(0, 3), '-e', code], settings) });
+}
+
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     const [operation, ...args] = process.argv.slice(2);
@@ -93,10 +100,10 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       await writeFile(referencesPath, Object.entries(report.references).map(([key, value]) => `${key}=${value}`).join('\n') + '\n');
       await writeFile(configurationPath, JSON.stringify({ vaultId: report.vaultId, referencesPath, opExecutable: process.env.JULIA_OP_EXECUTABLE ?? 'op' }, null, 2));
       console.log(JSON.stringify(report));
-    } else if (operation === 'init') {
+    } else if (operation === 'init' || operation === 'verify') {
       const configuration = JSON.parse(await readFile(configurationPath, 'utf8'));
       const references = await readFile(configuration.referencesPath, 'utf8');
-      process.exitCode = vaultLaunch(args, { configuration, references });
+      process.exitCode = operation === 'verify' ? vaultProbe({ configuration, references }) : vaultLaunch(args, { configuration, references });
     } else throw Error('expected migrate or init');
   } catch (error) { console.error(error.message); process.exitCode = 1; }
 }
