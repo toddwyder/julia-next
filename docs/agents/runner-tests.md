@@ -3,7 +3,7 @@
 Local and CI command: `node scripts/julia-runner-suite.mjs`.
 Inventory without executing tests: `node scripts/julia-runner-suite.mjs --list`.
 JUL-197's stable `julia-init-windows` job uses the same command and routing;
-Factory, database, web, docs-policy and baseline retain their existing commands.
+Web, docs-policy and baseline retain their existing commands.
 
 ## Discovery and shared safety
 
@@ -12,7 +12,7 @@ The gate recursively discovers `*.test.mjs` named `julia-init*`, `julia-delivery
 under `ops/julia-runner/`. New tests in these families need no registration.
 Tests elsewhere that import those modules, the shared dependencies below or
 `ops/julia-runner/` are also included. CI conservatively routes new MJS test paths
-to Windows, except tests with existing focused Factory, web-script or policy
+to Windows, except tests with existing focused web-script or policy
 ownership. Keep new runner regressions beside their behavior in those families.
 Tests with no known owner are included by default, including subprocess-only
 regressions with arbitrary filenames and no runner-module import. The explicit
@@ -45,13 +45,8 @@ reasons and counts. Failures return nonzero; there is no baseline-failure waiver
 
 ## Non-runner tests and removed duplicates
 
-Factory's directly owned tests remain under `ops/factory/` and its JUL-197 Linux
-gate with existing package/lockfile setup: workflows, skills, trace retention,
-local sandbox, observability retention/scheduling and installer.
-PostgreSQL coverage remains in the database gate. Other existing Factory tests
-(upgrade, sandbox cleanup and wait alerts) retain their historical/manual scope;
-this change neither deletes them nor claims they ran. Web/browser and docs/policy
-checks keep their existing gates. Retired graph/controller tests remain historical
+Factory and database gates were removed with the retired infrastructure. Web/browser and
+docs/policy checks keep their existing gates. Retired graph/controller tests remain historical
 checks outside this required runner gate, including the separate JUL-199 import
 and JUL-200 checkout failures. Five historical journeys import shared helpers but
 belong to that retained route: `graph/board-spec.test.mjs`,
@@ -63,8 +58,7 @@ process-tree behavior; obsolete Linux account-sweep assertions are removed.
 
 Removed exactly:
 
-- `scripts/factory-tests.test.mjs`: duplicate Factory-only import wrapper; its
-  four imported tests remain directly owned by the existing Factory gate.
+- `scripts/factory-tests.test.mjs`: retired Factory-only import wrapper.
 - `scripts/test-wrappers.test.mjs`: obsolete monolithic-CI wrapper assumption;
   active runner discovery/routing regressions replace it. It recursively treated
   saved proof copies and directly gated Factory tests as missing wrappers.

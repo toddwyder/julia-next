@@ -5,10 +5,8 @@ import { selectCIGates } from './ci-routing.mjs';
 test('routes representative changed paths to their focused CI gates', () => {
   assert.deepEqual(selectCIGates(['scripts/julia-init.mjs']), ['baseline', 'julia-init-windows']);
   assert.deepEqual(selectCIGates(['docs/agents/init.md']), ['baseline', 'julia-init-windows', 'docs-policy']);
-  assert.deepEqual(selectCIGates(['ops/factory/app/local-sandbox.test.mjs']), ['baseline', 'factory']);
   assert.deepEqual(selectCIGates(['app/recipes/page.tsx']), ['baseline', 'web']);
   assert.deepEqual(selectCIGates(['app/removed-page.tsx']), ['baseline', 'web']);
-  assert.deepEqual(selectCIGates(['ops/factory/model-face-values.sql']), ['baseline', 'factory', 'database']);
   assert.deepEqual(selectCIGates(['docs/guide.md']), ['baseline', 'docs-policy']);
   assert.deepEqual(selectCIGates(['scripts/personal-paths.test.mjs']), ['baseline', 'julia-init-windows', 'docs-policy']);
 });
@@ -20,11 +18,11 @@ test('unions applicable gates and treats workflow changes as high-risk', () => {
   );
   assert.deepEqual(
     selectCIGates(['.github/workflows/ci.yml']),
-    ['baseline', 'julia-init-windows', 'factory', 'database', 'web', 'docs-policy'],
+    ['baseline', 'julia-init-windows', 'web', 'docs-policy'],
   );
   assert.deepEqual(
     selectCIGates(['scripts/ci-routing.test.mjs']),
-    ['baseline', 'julia-init-windows', 'factory', 'database', 'web', 'docs-policy'],
+    ['baseline', 'julia-init-windows', 'web', 'docs-policy'],
   );
 });
 
@@ -41,6 +39,6 @@ test('runner code, new regressions and shared safety dependencies select the Win
     assert.deepEqual(selectCIGates([path]), ['baseline', 'julia-init-windows'], path);
   }
   assert.deepEqual(selectCIGates(['scripts/personal-paths.mjs']), ['baseline', 'julia-init-windows', 'docs-policy']);
-  assert.deepEqual(selectCIGates(['scripts/julia-delivery-new.test.mjs', 'ops/factory/app/local-sandbox.test.mjs']), ['baseline', 'julia-init-windows', 'factory']);
+  assert.deepEqual(selectCIGates(['scripts/julia-delivery-new.test.mjs']), ['baseline', 'julia-init-windows']);
   assert.deepEqual(selectCIGates(['tests/new-safety.test.mjs']), ['baseline', 'julia-init-windows', 'web']);
 });

@@ -24,7 +24,6 @@ test('discovers new and nested runner tests, shared safety tests, and unwrapped 
     'scripts/acceptance-check.test.mjs': '',
     'tests/new-safety.test.mjs': "import '../scripts/julia-delivery-runner.mjs';",
     'scripts/board-setup.test.mjs': '',
-    'ops/factory/app/retained.test.mjs': '',
     '.julia/archive/scripts/julia-init.test.mjs': '',
     'node_modules/archived/julia-init.test.mjs': '',
   });
@@ -58,7 +57,7 @@ test('an empty suite fails closed instead of invoking repository-wide Node disco
 
 test('the Windows CI job invokes the same complete local gate', () => {
   const workflow = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
-  const windows = workflow.match(/\n  julia-init-windows:\n([\s\S]*?)(?=\n  factory:)/)?.[1];
+  const windows = workflow.match(/\n  julia-init-windows:\n([\s\S]*?)(?=\n  web:)/)?.[1];
   assert.ok(windows, 'the stable JUL-197 Windows gate exists');
   assert.match(windows, /runs-on: windows-latest/);
   assert.match(windows, /run: node scripts\/julia-runner-suite\.mjs\s*$/);

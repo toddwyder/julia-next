@@ -1,4 +1,7 @@
-# Spec: Factory route
+# Historical spec: Factory route (retired)
+
+> **Retired 2026-10-09.** Factory's code and operating resources have been removed. This document
+> records the former proposal only; it is not a plan or an implementation route.
 
 Milestone: **Factory route**. Decisions: `docs/adr/0009-mastra-factory.md`. Audit behind them:
 `docs/research/mastra-intended-use-audit.md`. Setup already done on JUL-184 (memory model, traces,

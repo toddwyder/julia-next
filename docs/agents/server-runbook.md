@@ -1,9 +1,9 @@
 # Julia-next server runbook
 
-**Current operator runbook for the OVH server.** GitHub issues and Mastra Factory are the
-current route (`docs/agents/work-execution.md`, ADR 0009). The retired graph/Orca dispatch
-machinery and its history are archived in `docs/retros/server-runbook-graph-history.md`; nothing
-there is a live route.
+**Current operator runbook for the OVH server.** Linear is the card tracker; GitHub owns code,
+pull requests, and CI. Mastra Factory is retired and is not a server route. The retired graph/Orca
+dispatch machinery and its history are archived in `docs/retros/server-runbook-graph-history.md`;
+nothing there is a live route.
 
 ## Access
 
@@ -12,29 +12,15 @@ there is a live route.
 - **`ubuntu` has passwordless sudo** as the installation channel: create accounts, install files
   under `/opt` and `/etc`, manage systemd, and run a command as another account with
   `sudo -u <account>`.
-- **Keep SSH and sudo outside the Factory sandbox.** An authorized operator uses the laptop's
-  Tailscale route; never copy a private key into Factory or request one in chat.
-- **On a machine card the laptop agent is the operator.** A laptop agent working a
-  `factory:machine` card is the authorized operator and may use this route for read-only server
-  work (logs, files and read-only commands) without asking Todd. A server change (install,
-  restart, configuration or writing sudo command) needs the card's approval. A Factory builder is
-  never the operator.
+- **Keep SSH and sudo outside automated runners.** An authorized operator uses the laptop's
+  Tailscale route; never copy a private key into an agent workspace or request one in chat.
+- **The laptop agent is the operator for an authorized card.** It may perform read-only server
+  work without a separate prompt. A server change needs the card's approval.
 
-## Factory service (Mastra Factory — current route)
+## Retired Factory service
 
-- Factory runs as the dedicated `julia-factory` service account from `/var/lib/julia-factory/app`
-  under `julia-factory-trial.service`, bound to `127.0.0.1:4111` behind the existing Tailscale
-  HTTPS Funnel, with WorkOS login protection.
-- The root-owned, mode-600 `/etc/julia-factory/factory.env` holds service configuration; never
-  put credential values there.
-- Installed versions are pinned: Factory 0.19.1, `@mastra/auth-workos` 1.6.6, core 1.74.0, SDK
-  1.10.1. The aligned direct storage and memory packages are recorded in
-  `ops/factory/app/package.json`.
-- **Read the running Factory commit (look only):** `sudo sh -c 'app="$(systemctl show julia-factory-trial.service --property=WorkingDirectory --value)"; systemctl is-active --quiet julia-factory-trial.service && cat "$app/BUILD_COMMIT"'`. The installer writes this marker from the checkout's full Git commit and verifies it after restart.
-- The WorkOS cookie-identity install patch was removed after the 1.6.6 upgrade. See
-  `ops/factory/README.md` for the current approved-exceptions list and the installer.
-- The normal Git identity is the verified Factory App bot, not a person; the Factory App is
-  restricted to `julia-next`.
+Factory's service, account, Funnel endpoint, credentials, database, timers, and repository source
+were removed. Do not recreate or probe the former paths. Historical evidence lives in Git only.
 
 ## Accounts and permission boundaries
 
@@ -44,8 +30,8 @@ there is a live route.
 | `orchestrator-svc` | Service operator — maintains the deployed checkout | Narrow exact-command sudo only (`/etc/sudoers.d/orchestrator-svc-checkout-sync` and `-ops`) |
 | `runner` | Builder — writes in its own worktree and commits locally | No sudo access |
 
-- SSH, sudo, and credential-adjacent operations stay outside the Factory sandbox and are done by
-  an authorized operator, not a builder.
+- SSH, sudo, and credential-adjacent operations stay outside automated runners and are done by an
+  authorized operator, not a builder.
 
 ## Secret transport
 
@@ -62,12 +48,9 @@ there is a live route.
 
 ## GitHub write boundaries
 
-- For machine cards, the laptop operator uses its ordinary signed-in access to `git push` the
-  branch, `gh pr create`, then `gh pr merge --squash` once CI is green. The publisher App and
-  `scripts/publish-pr.mjs` / `scripts/merge-pr.mjs` are for the Factory-card route only and must
-  not be used for machine cards.
-- Factory cards remain built, reviewed, and merged by Factory under the Factory-card process in
-  `docs/agents/work-execution.md`.
+- For authorized cards, use the approved delivery path and ordinary signed-in GitHub access where
+  the card calls for it. The publisher scripts remain owned by the separate graph service and are
+  not a general card-delivery route.
 - Keep credentials, tokens, and other authentication material inside their trusted process; never
   expose their values in output, prompts, tickets, artifacts, or logs.
 
@@ -82,11 +65,7 @@ there is a live route.
 - The retired graph/Orca rollback pin lives under `/opt/orca-pin/`; changing it is an admin
   session between cards. Retirement of old host units is recorded in
   `docs/agents/factory-platform-auth-change-log.md` (issue #144 before/after evidence).
-- Factory storage and the trace store: see `ops/factory/storage-operations.md` (free-space
-  thresholds, sandbox cleanup, DuckDB trace growth; never delete the live DuckDB or its WAL).
-- Factory wait alerts and the storage monitor: see `ops/factory/README.md`.
-- Backup/rollback for the Factory install itself is in `ops/factory/README.md` (`.before-*`
-  backups and the reinstall wrapper).
+- Factory has no live storage, trace store, alerting, or install rollback procedure.
 
 ## Residual accounts and retired machinery
 

@@ -17,59 +17,19 @@ test('coding standards seed reflects the framework-first rules and is linked fro
   assert.match(read('AGENTS.md'), /\[CODING_STANDARDS\.md\]\(CODING_STANDARDS\.md\)/);
 });
 
-test('agent instructions use GitHub issues and Factory boards, with live UAT after merge', () => {
+test('agent instructions use the Linear delivery route and mark Factory retired', () => {
   for (const path of ['CLAUDE.md', 'AGENTS.md']) {
     const text = read(path);
-    assert.match(text, /GitHub issues/);
-    assert.match(text, /Factory/);
+    assert.match(text, /GitHub/);
+    assert.match(text, /RETIRED/);
     assert.match(text, /Todd/);
     assert.doesNotMatch(text, /Tick as you go|Finish the card/);
-    assert.match(text, /publisher App/);
-    if (path === 'CLAUDE.md') {
-      assert.match(text, /feature cards, Factory's plan names only `\.claude\/skills\/implement\/SKILL\.md`; that skill\s+already runs TDD at the planned seams and one code-review/i);
-    } else {
+    if (path === 'AGENTS.md') {
       assert.match(text, /\.claude\/skills\/tdd\/SKILL\.md/);
     }
   }
-  assert.match(read('CLAUDE.md'), /reviewer merges the PR/);
-  assert.doesNotMatch(read('CLAUDE.md'), /close a Linear feature card|throwaway Linear card|Default label vocabulary \(/);
-  assert.match(read('AGENTS.md'), /reviewer merges the PR/);
-  assert.match(read('CLAUDE.md'), /outside the Factory sandbox/);
-  assert.match(read('AGENTS.md'), /outside the Factory sandbox/);
-  assert.match(read('docs/agents/work-execution.md'), /Needs attention/);
-});
-
-test('the Factory README documents the supported bounded-trace procedure without a Monday note', () => {
-  const readme = read('ops/factory/README.md');
-  // Bounded storage: name the supported retention (DEFAULT_RETENTION on the
-  // storage backends) and the operator check that reads the DuckDB store.
-  assert.match(readme, /## Bounded trace storage/);
-  assert.match(readme, /DEFAULT_RETENTION/);
-  assert.match(readme, /observability\.duckdb/);
-  assert.match(readme, /never deletes|does not delete/);
-  assert.doesNotMatch(readme, /enforceRetention/);
-  assert.doesNotMatch(readme, /selectExpiredSpans|runTraceCleanup/);
-  assert.doesNotMatch(readme, /## Monday note/);
-});
-
-test('the Factory README carries a framework map with local sources and states the gaps', () => {
-  const readme = read('ops/factory/README.md');
-  assert.match(readme, /## Framework map/);
-  // Real, local sources (repository docs and installed package paths), not
-  // invented web citations.
-  assert.match(readme, /docs\/research\/mastra-intended-use-audit\.md/);
-  assert.match(readme, /@mastra\/duckdb|DuckDBStore/);
-  assert.match(readme, /storage-maintenance/);
-  // The gaps this card could not close through supported config are named, with
-  // what is missing, rather than a fabricated citation.
-  assert.match(readme, /gap|not configured|missing/i);
-  assert.match(readme, /no supported|not supported|cannot be configured|fail(s)? closed/i);
-});
-
-test('the exceptions list no longer contains the retired Monday note', () => {
-  const readme = read('ops/factory/README.md');
-  assert.match(readme, /Only\s+Todd adds or removes an entry/);
-  assert.doesNotMatch(readme, /Monday note/);
+  assert.match(read('AGENTS.md'), /ordinary signed-in GitHub access/);
+  assert.match(read('docs/agents/work-execution.md'), /historical evidence only/);
 });
 
 test('post-build reviewer checks and the plan-answers/park policy replace stop-and-ask builder gates', () => {
