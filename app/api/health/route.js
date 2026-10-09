@@ -8,5 +8,5 @@
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  return Response.json({ status: 'ok' });
+  return Response.json({ status: 'ok', ...(process.env.VERCEL_GIT_COMMIT_SHA ? { commit: process.env.VERCEL_GIT_COMMIT_SHA } : {}) });
 }

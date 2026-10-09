@@ -172,7 +172,8 @@ export async function runInit(command, {
         saved.authorization = { ...approved, configuration: saved.configuration };
         await writeJson(runPath, saved, writers);
       }
-      await dispatch(saved.configuration, { issueId, runPath, resumed: true, authorization: saved.authorization });
+      const delivery = await dispatch(saved.configuration, { issueId, runPath, resumed: true, authorization: saved.authorization });
+      if (delivery) return { issueId, configuration: saved.configuration, resumed: true, delivery };
     }
     return { issueId, configuration: saved.configuration, resumed: true };
   }
@@ -204,7 +205,10 @@ export async function runInit(command, {
   const event = { event: 'selection-saved', issueId, builder: configuration.builder.identity, reviewer: configuration.reviewer.identity };
   await recordEvent(eventsPath, event, writers);
   logger(event);
-  if (dispatch) await dispatch(configuration, { issueId, runPath, resumed: false, authorization: savedAuthorization });
+  if (dispatch) {
+    const delivery = await dispatch(configuration, { issueId, runPath, resumed: false, authorization: savedAuthorization });
+    if (delivery) return { issueId, configuration, resumed: false, delivery };
+  }
   return { issueId, configuration, resumed: false };
 }
 
@@ -234,7 +238,11 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const prompts = createInterface({ input: process.stdin, output: process.stderr });
   try {
     const result = await runInitCli(process.argv.slice(2).join(' '), {
-      dispatch: (configuration, { issueId, runPath, authorization }) => startDelivery(issueId, configuration, { runPath, authorization }),
+      dispatch: async (configuration, { issueId, runPath, authorization }) => startDelivery(issueId, configuration, {
+        runPath, authorization,
+        releaseConfiguration: process.env.JULIA_RELEASE_CONFIG ? JSON.parse(await readFile(process.env.JULIA_RELEASE_CONFIG, 'utf8')) : undefined,
+        uatDecision: process.env.JULIA_UAT_DECISION ? JSON.parse(await readFile(process.env.JULIA_UAT_DECISION, 'utf8')) : undefined,
+      }),
       logger: (event) => console.error(JSON.stringify(event)),
       ask: (role) => prompts.question(`$init needs ${role}; enter its exact model name or ID and thinking level: `),
     });

@@ -213,7 +213,7 @@ test('two failed independent reviews allow one repair, then park for a PM decisi
     candidate: async () => ({ commit: String(++builds).padStart(40, 'a'), clean: true, checks: { pass: true } }),
     launch: async (role, request) => { if (role === 'builder') repairPrompts.push(/Repair these review findings:[\s\S]*Finding: test missing/.test(request.prompt)); else reviewPrompts.push(request.prompt); return role === 'builder'
       ? { exitCode: 0, observed: { harness: 'claude-code', model: 'claude-sonnet', maker: 'Anthropic' } }
-      : { exitCode: 0, observed: { harness: 'codex', model: 'gpt-review', maker: 'OpenAI' }, text: 'VERDICT: FAIL\nFinding: test missing' }; },
+      : { exitCode: 0, observed: { harness: 'codex', model: 'gpt-review', maker: 'OpenAI' }, text: `VERDICT: FAIL\nFinding: test missing; distinct problem ${builds}` }; },
   });
   assert.equal(result.outcome, 'park');
   assert.equal(result.round, 1);
