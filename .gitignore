@@ -14,3 +14,7 @@ ops/factory/app/src/mastra/public/factory/
 
 # Throwaway work tree the guard-reversion script rebuilds (#140).
 .artifacts/guard-issue-140/guard2/
+# Playwright CLI output (may contain credentials)
+.playwright-cli/
+# Local proof artifacts for verify-julia (retained after run cleanup)
+.artifacts/verify-julia/
