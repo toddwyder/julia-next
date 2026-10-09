@@ -1,6 +1,6 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 
-const GATES = ['baseline', 'julia-init-windows', 'factory', 'database', 'web', 'docs-policy'];
+const GATES = ['baseline', 'julia-init-windows', 'web', 'docs-policy'];
 
 const GATE_PATHS = {
   'julia-init-windows': [
@@ -10,8 +10,6 @@ const GATE_PATHS = {
     /^graph\/seat-table\./, /^delivery-tools\.json$/, /^\.(?:agents|claude)\/skills\/implement\//,
     /^docs\/agents\/(?:init|work-execution|runner-tests)\.md$/,
   ],
-  factory: [/^ops\/factory\//, /^scripts\/factory-/],
-  database: [/^ops\/factory\/model-face-values\./],
   web: [/^(?:app|lib)\//, /^(?:next\.config|playwright\.config)/, /^tests\//, /^scripts\/(?:health-route|dynamic-route|web-app|framework-lint)\./],
   'docs-policy': [/^docs\//, /^scripts\/(?:agent-docs|line-endings|no-personal-paths|personal-paths|merge-pr|publish-pr|publish-via-github-app)\./],
 };
@@ -26,9 +24,8 @@ export function selectCIGates(paths) {
   }
   // New/unwrapped MJS regressions may import runner behavior without adopting
   // its filename prefix. Conservatively run Windows for those paths, including
-  // deletions. Existing focused Factory, web-script and policy owners stay put.
+  // deletions. Existing focused web-script and policy owners stay put.
   if (paths.some((path) => path.endsWith('.test.mjs')
-    && !GATE_PATHS.factory.some((pattern) => pattern.test(path))
     && !(/^scripts\//.test(path) && GATE_PATHS['docs-policy'].some((pattern) => pattern.test(path)))
     && !(/^scripts\//.test(path) && GATE_PATHS.web.some((pattern) => pattern.test(path))))) selected.add('julia-init-windows');
   return GATES.filter((gate) => selected.has(gate));

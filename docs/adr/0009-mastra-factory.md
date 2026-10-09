@@ -2,7 +2,8 @@
 
 Date: 2026-09-26, revised 2026-09-29
 
-Status: accepted. Factory replaced the Pydantic graph as the route for Julia cards.
+Status: superseded and retired on 2026-10-09. Factory's operating resources and repository source
+were removed; this ADR remains as historical context only.
 
 Factory's Intake receives GitHub issues. Todd starts a card there; Factory plans, builds,
 opens a pull request, and reviews it. Factory's Work and Review boards and Needs attention

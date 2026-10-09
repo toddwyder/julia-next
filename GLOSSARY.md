@@ -261,11 +261,11 @@ is the robot's job and happens before UAT.
 _Avoid_: QA, testing, verification (for Todd's part)
 
 **Mastra Factory**:
-The existing Factory code and server service. It is **PAUSED**, not removed: leave it in place but
-do not start new cards through it. The intended replacement route is the adapted JUL-122 runner,
+The former Factory code and server service. It is **RETIRED**: its operating resources and source
+were removed; do not recreate it. The intended replacement route is the adapted JUL-122 runner,
 started on Todd's Windows laptop with `$init JUL-nnn`; both that runner and its route are pending
 implementation and verification.
-_Avoid_: Retired, deleted, active card runner
+_Avoid_: Active card runner
 
 **Delivery ownership**:
 New Julia and machine cards live in Linear. Linear owns cards, requirements, acceptance criteria,
@@ -281,8 +281,7 @@ Real Julia's data.
 _Avoid_: Staging database, sandbox, throwaway data
 
 **Needs attention**:
-Factory's own list of cards that are stuck, stalled, or waiting on someone, rechecked every five
-minutes. How Todd tells a slow card from a dead one. A phone alert waits until this proves not
+Historical Factory terminology. It is not an active queue or alerting route.
 to be enough.
 _Avoid_: Stuck alert, heartbeat, ping, alarm
 

@@ -15,8 +15,6 @@ jobs:
     outputs:
       baseline: ${{ steps.routes.outputs.baseline }}
       julia_init_windows: ${{ steps.routes.outputs.julia_init_windows }}
-      factory: ${{ steps.routes.outputs.factory }}
-      database: ${{ steps.routes.outputs.database }}
       web: ${{ steps.routes.outputs.web }}
       docs_policy: ${{ steps.routes.outputs.docs_policy }}
     steps:
@@ -43,7 +41,7 @@ jobs:
           else
             echo "Changed paths unavailable; selecting every gate."
             echo "Selected gates: all"
-            printf '%s\n' baseline=true julia_init_windows=true factory=true database=true web=true docs_policy=true >> "$GITHUB_OUTPUT"
+            printf '%s\n' baseline=true julia_init_windows=true web=true docs_policy=true >> "$GITHUB_OUTPUT"
           fi
 
   baseline:
@@ -98,56 +96,6 @@ jobs:
       - name: Test active runner and shared safety regressions without provider calls
         run: node scripts/julia-runner-suite.mjs
 
-  factory:
-    needs: changes
-    if: needs.changes.outputs.factory == 'true'
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22.23.2
-      - name: Run Factory workflows, skills, and retention tests
-        run: node --test ops/factory/workflows.test.mjs ops/factory/skills.test.mjs ops/factory/trace-retention.test.mjs
-      - name: Run Factory sandbox isolation tests
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y bubblewrap
-          npm ci --prefix ops/factory/app
-          node --experimental-strip-types --test ops/factory/app/local-sandbox.test.mjs
-          (cd ops/factory/app && node --experimental-strip-types --import ./register-typescript-esm.mjs \
-            --test observability-retention.test.mjs observability-retention-schedule.test.mjs)
-          npm run check --prefix ops/factory/app
-      - name: Run Factory installation tests
-        run: node --test ops/factory/install.test.mjs
-
-  database:
-    needs: changes
-    if: needs.changes.outputs.database == 'true'
-    runs-on: ubuntu-22.04
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_PASSWORD: postgres
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-    steps:
-      - uses: actions/checkout@v4
-      - name: Run face-value PostgreSQL integration test
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client
-          python3 ops/factory/model-face-values.sql.test.py "$DATABASE_URL"
-
   web:
     needs: changes
     if: needs.changes.outputs.web == 'true'
@@ -187,23 +135,21 @@ jobs:
             scripts/publish-via-github-app.test.mjs
 
   checks:
-    needs: [changes, baseline, julia-init-windows, factory, database, web, docs-policy]
+    needs: [changes, baseline, julia-init-windows, web, docs-policy]
     if: always()
     runs-on: ubuntu-22.04
     env:
       GATE_CHANGES: ${{ needs.changes.result }}
       GATE_BASELINE: ${{ needs.baseline.result }}
       GATE_JULIA_INIT_WINDOWS: ${{ needs.julia-init-windows.result }}
-      GATE_FACTORY: ${{ needs.factory.result }}
-      GATE_DATABASE: ${{ needs.database.result }}
       GATE_WEB: ${{ needs.web.result }}
       GATE_DOCS_POLICY: ${{ needs.docs-policy.result }}
     steps:
       - name: Verify selected gates completed
         run: |
           set -euo pipefail
-          gates=(changes baseline julia-init-windows factory database web docs-policy)
-          results=("$GATE_CHANGES" "$GATE_BASELINE" "$GATE_JULIA_INIT_WINDOWS" "$GATE_FACTORY" "$GATE_DATABASE" "$GATE_WEB" "$GATE_DOCS_POLICY")
+          gates=(changes baseline julia-init-windows web docs-policy)
+          results=("$GATE_CHANGES" "$GATE_BASELINE" "$GATE_JULIA_INIT_WINDOWS" "$GATE_WEB" "$GATE_DOCS_POLICY")
           status=0
           for index in "${!gates[@]}"; do
             gate="${gates[$index]}"

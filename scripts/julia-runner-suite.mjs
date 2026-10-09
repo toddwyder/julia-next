@@ -64,9 +64,7 @@ export function discoverRunnerTests(root = process.cwd()) {
       if (entry.isDirectory()) {
         if (!GENERATED.has(entry.name)) walk(join(directory, entry.name), `${path}/`);
       } else if (entry.isFile() && entry.name.endsWith('.test.mjs')) {
-        // Factory keeps its own JUL-197 gate; a shared import cannot pull its
-        // Linux sandbox/dependency setup into the Windows runner gate.
-        if (path.startsWith('ops/factory/') || path.startsWith('scripts/factory-') || HISTORICAL_TESTS.has(path)) continue;
+        if (HISTORICAL_TESTS.has(path)) continue;
         if (RUNNER_TEST.test(path) || path.startsWith('ops/julia-runner/') || SHARED_TESTS.has(path)
           || importsRunnerModule(readFileSync(join(root, path), 'utf8')) || !NON_RUNNER_TESTS.has(path)) files.push(path);
       }
