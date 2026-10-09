@@ -72,15 +72,18 @@ test('a restart after the runner dies during review parks without retrying and d
   assert.equal(reads, 1, 'the approved requirements are read from Linear once');
 });
 
-test('findings and the repair count survive a restart: one build, then three repairs in all, and an interrupted repair is spent', async (t) => {
+test('findings and the one repair survive a restart, and an interrupted repair is spent', async (t) => {
   const { runPath, statePath } = await runFiles(t);
-  let builds = 0; const prompts = [];
+  let builds = 0; const prompts = []; const repairInputs = [];
   const adapters = (dieAtBuild) => ({
     readCard: async () => card,
     candidate: async () => ({ commit: String(builds).padStart(40, 'b'), clean: true, checks: { pass: true } }),
     launch: async (role, request) => {
       await recordExitedWorker(request.started);
-      if (role === 'reviewer') return { exitCode: 0, observed: reviewerSeen, text: `VERDICT: FAIL\nFinding ${builds}: test missing` };
+      if (role === 'reviewer') {
+        if (request.round === 1) repairInputs.push(request.reviewInput);
+        return { exitCode: 0, observed: reviewerSeen, text: `VERDICT: FAIL\nFinding ${builds}: test missing` };
+      }
       builds += 1; prompts.push(request.prompt);
       if (builds === dieAtBuild) throw new Error('runner died during repair');
       return { exitCode: 0, observed: builderSeen };
@@ -91,18 +94,21 @@ test('findings and the repair count survive a restart: one build, then three rep
   assert.equal(interrupted.repairsUsed, 1, 'the repair was counted when it was about to start');
   assert.deepEqual(interrupted.findings.map(({ round }) => round), [0]);
   assert.match(interrupted.findings[0].text, /Finding 1: test missing/);
+  assert.equal(interrupted.findings[0].report.findings.length, 1, 'the failed review evidence survives the restart');
   const result = await runDelivery({ ...run, runPath }, adapters(0));
   assert.equal(result.outcome, 'park');
-  assert.match(result.reason, /initial build and three repairs/);
-  assert.equal(builds, 5, 'one build and three repairs, with the spent repair resumed once');
+  assert.match(result.reason, /two independent review attempts/);
+  assert.equal(builds, 3, 'one build and one repair, with the spent repair resumed once');
   assert.match(prompts[2], /Finding 1: test missing/, 'the builder after the restart repairs the saved findings');
   assert.match(prompts[2], /previous builder for this work was interrupted/);
+  assert.equal(repairInputs[0].scope.kind, 'repair');
+  assert.match(repairInputs[0].sources['prior-review'], /Finding 1: test missing/);
   const final = await savedState(statePath);
-  assert.equal(final.repairsUsed, 3);
-  assert.deepEqual(final.findings.map(({ round }) => round), [0, 1, 2, 3]);
+  assert.equal(final.repairsUsed, 1);
+  assert.deepEqual(final.findings.map(({ round }) => round), [0, 1]);
   const again = await runDelivery({ ...run, runPath }, adapters(0));
   assert.deepEqual(again, result, 'a finished run answers with its saved result');
-  assert.equal(builds, 5, 'and starts no further builder');
+  assert.equal(builds, 3, 'and starts no further builder');
 });
 
 test('a builder left running by a dead runner is stopped before another builder starts', async (t) => {
