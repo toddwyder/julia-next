@@ -31,7 +31,14 @@ gh pr list --state open --limit 100
 gh pr view 264
 gh workflow list
 gh issue view 144 --comments
+gh api --paginate -X GET "/search/issues?q=repo%3Atoddwyder%2Fjulia-next%20Factory%20in%3Atitle%2Cbody&per_page=100"
 ```
+
+The final command is the exact read-only GitHub search used for the 2026-10-09
+snapshot. Its first response reported `total_count: 113`; `--paginate` was used
+to retrieve all pages. GitHub search is mutable, so rerunning this query later
+does not reproduce the 2026-10-09 count; the date and count are snapshot
+evidence, not a claim about the current result set.
 
 The [work-execution record](../agents/work-execution.md) and the
 [root agent instructions](../../AGENTS.md) are the ownership evidence for the
@@ -74,7 +81,7 @@ A clean status is not proof that the worktree is retired; all are retained.
 | `C:/Dev/julia-next-issue199` / `build/199-web-push-device-signup` | Owner unknown; clean, lock/upstream unknown | `399cc2ac`, 2026-10-06 05:41:59-07:00; divergence 69/0 | Possible Factory history; retain | High; yes |
 | `C:/Dev/julia-next-jul196` / `toddwyder/jul-196-runner-init-review` | Owner unknown; clean, lock/upstream unknown | `251736a4`, 2026-10-07 22:54:41-07:00; divergence 32/0 | Current runner work; retain | High; yes |
 | `C:/Dev/julia-next-jul196-proof` / `proof/jul196-claude` | Owner unknown; clean, lock/upstream unknown | `ee5eb822`, 2026-10-08 08:37:10-07:00; divergence 25/0 | Current proof work; retain | High; yes |
-| `C:/Dev/julia-next-jul207` / `toddwyder/jul-207-retire-factory-leftovers-and-reconcile-delivery-records` | Current JUL-207 builder; clean, lock/upstream unknown | `bdf937cd`, 2026-10-09 12:21:08-07:00; divergence 0/1 | This inventory's evidence worktree; retain | Medium; yes before any removal |
+| `C:/Dev/julia-next-jul207` / `toddwyder/jul-207-retire-factory-leftovers-and-reconcile-delivery-records` | Current JUL-207 builder; clean, lock/upstream unknown | `085f778f`, 2026-10-09 12:21:08-07:00; divergence 0/1 | This inventory's evidence worktree; retain | Medium; yes before any removal |
 | `C:/Dev/julia-next-review-limit` / `fix/jul-202-two-review-attempts` | Owner unknown; clean, lock/upstream unknown | `82c6328e`, 2026-10-09 10:02:39-07:00; divergence 2/0 | Current delivery work; retain | High; yes |
 | `C:/Dev/julia-next-review-publication` / `main` | Owner unknown; clean, lock/upstream unknown | `13c5cc2f`, 2026-10-09 11:14:32-07:00; divergence 0/0 | Current main checkout; retain | High; yes |
 | `C:/Dev/julia-next-rules` / `docs/machine-card-rules` | Owner unknown; clean, lock/upstream unknown | `561fca49`, 2026-10-05 23:11:37-07:00; divergence 82/1 | Ambiguous Julia work; retain | High; yes |
