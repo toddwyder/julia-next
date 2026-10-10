@@ -126,21 +126,36 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          npx playwright test --reporter=line,html 2>&1 | tee ci-playwright-evidence/test-output.txt
-          status="${PIPESTATUS[0]}"
+          if npx playwright test --reporter=line,html 2>&1 | tee ci-playwright-evidence/test-output.txt; then
+            status=0
+          else
+            status="${PIPESTATUS[0]}"
+          fi
           printf 'exitCode=%s\n' "$status" | tee ci-playwright-evidence/test-exit.txt
           exit "$status"
       - name: Require browser evidence and passing verification
         if: always()
         run: |
           set -euo pipefail
-          test -s ci-playwright-evidence/test-list.txt
-          test -s ci-playwright-evidence/test-output.txt
-          test -s ci-playwright-evidence/test-exit.txt
-          test -f playwright-report/index.html
-          grep -Eq '^Total: [1-9][0-9]* tests?' ci-playwright-evidence/test-list.txt
+          problems=()
           if [[ "${{ steps.browser_tests.outcome }}" != success ]]; then
-            echo '::error::Browser verification failed; retained evidence is attached to this run'
+            if [[ -s ci-playwright-evidence/test-exit.txt ]]; then
+              exit_detail="$(tr '\n' ' ' < ci-playwright-evidence/test-exit.txt)"
+            else
+              exit_detail='test-exit.txt was not written'
+            fi
+            echo "::error::Browser verification failed (${exit_detail}); retained evidence is attached to this run"
+            problems+=('the Playwright verification command failed')
+          fi
+          [[ -s ci-playwright-evidence/test-list.txt ]] || problems+=('test-list.txt is missing or empty')
+          [[ -s ci-playwright-evidence/test-output.txt ]] || problems+=('test-output.txt is missing or empty')
+          [[ -s ci-playwright-evidence/test-exit.txt ]] || problems+=('test-exit.txt is missing or empty')
+          [[ -f playwright-report/index.html ]] || problems+=('playwright-report/index.html is missing')
+          if [[ -s ci-playwright-evidence/test-list.txt ]] && ! grep -Eq '^Total: [1-9][0-9]* tests?' ci-playwright-evidence/test-list.txt; then
+            problems+=('the browser-test list selected zero required tests')
+          fi
+          if (( ${#problems[@]} > 0 )); then
+            echo "::error::Browser verification evidence is incomplete: ${problems[*]}"
             exit 1
           fi
       - name: Retain browser verification evidence
