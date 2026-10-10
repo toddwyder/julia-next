@@ -31,7 +31,7 @@ Specs are documents; reserve implementation cards for buildable work. Linear own
 - **Sentry:** unexpected failures carry enough context to identify the affected journey and diagnose the failing operation.
 - **Axiom:** significant operations, outcomes, and failures produce structured events. Related events share an operation identifier. Every connection between services has a trace showing the intended service and account.
 - **Integration tests:** identify every seam the change crosses, including component, storage, sync, and external-service boundaries. Cover observable contracts and relevant failure cases. Connections between services are tested against the real service, as required by [CODING_STANDARDS.md](../../CODING_STANDARDS.md); mocked responses alone do not prove that connection works.
-- **Verification:** Proof decides done; tests guard; live alarms catch the rest.
+- **Verification:** Proof decides done; tests guard; live alarms catch the rest. Specify fixture setup, isolation, and cleanup so the checks can be repeated.
   - A change is done only when an agent has driven the journeys it touches on the real app and saved evidence of actions, results and side effects. Passing tests alone never count.
   - The every-change CI gate has a 10-minute limit: logic checks, real-service seam checks against the free Firebase test project, and deterministic checks on sample inputs. Over 10 minutes, cut or move checks; don’t add machines.
   - Paid AI-model checks run only when the code that calls the model changes.
