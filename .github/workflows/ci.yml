@@ -111,8 +111,48 @@ jobs:
         run: node --test scripts/health-route.test.mjs scripts/dynamic-route.test.mjs scripts/web-app.test.mjs scripts/framework-lint.test.mjs
       - name: Install Chromium
         run: npx playwright install chromium
+      - name: List required browser verification tests
+        run: |
+          set -euo pipefail
+          mkdir -p ci-playwright-evidence
+          rm -rf playwright-report test-results
+          npx playwright test --list | tee ci-playwright-evidence/test-list.txt
+          if ! grep -Eq '^Total: [1-9][0-9]* tests?' ci-playwright-evidence/test-list.txt; then
+            echo '::error::Browser verification selected zero required tests'
+            exit 1
+          fi
       - name: Run browser tests
-        run: npx playwright test
+        id: browser_tests
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          npx playwright test --reporter=line,html 2>&1 | tee ci-playwright-evidence/test-output.txt
+          status="${PIPESTATUS[0]}"
+          printf 'exitCode=%s\n' "$status" | tee ci-playwright-evidence/test-exit.txt
+          exit "$status"
+      - name: Require browser evidence and passing verification
+        if: always()
+        run: |
+          set -euo pipefail
+          test -s ci-playwright-evidence/test-list.txt
+          test -s ci-playwright-evidence/test-output.txt
+          test -s ci-playwright-evidence/test-exit.txt
+          test -f playwright-report/index.html
+          grep -Eq '^Total: [1-9][0-9]* tests?' ci-playwright-evidence/test-list.txt
+          if [[ "${{ steps.browser_tests.outcome }}" != success ]]; then
+            echo '::error::Browser verification failed; retained evidence is attached to this run'
+            exit 1
+          fi
+      - name: Retain browser verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-verification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ci-playwright-evidence
+            playwright-report
+            test-results
+          if-no-files-found: error
       - name: Lint framework code
         run: npm run lint:framework
       - name: Build application
