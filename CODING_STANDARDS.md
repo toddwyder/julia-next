@@ -19,7 +19,23 @@ Build test-first with `.claude/skills/tdd/SKILL.md`.
 ## Reviewer checks
 
 1. **unit tests** — meaningful behavior and regression coverage for affected code through appropriate interfaces. Check the assertions actually detect the relevant failure; mocked provider responses alone cannot prove provider behavior.
-2. **integration tests at affected boundaries** — when a connection between two services is built or changed, test it against the real service; do not substitute a fake or stand-in for that test. Every integration test joins the regression suite, and the whole suite runs on every pull request, which cannot merge until it passes.
+2. **integration tests at affected boundaries** — when a connection between two services is built or changed, test it against the real service; do not substitute a fake or stand-in for that test. Proof decides done. Tests guard. Live alarms catch the rest.
+   - **Proof:** a change is done only when an agent has driven the journeys it touches on the real
+     app and saved evidence of actions, results and side effects. Passing tests never count as done.
+     Proof covers only the journeys the change touches. Do not build a permanent all-journey browser
+     suite.
+   - **Every-change gate (CI), 10-minute limit:** logic checks, real-service seam checks against the
+     free Firebase test project, and the deterministic import tests on Julia's own sample pages. If
+     the gate passes 10 minutes, cut or move tests; do not add machines.
+   - **Paid model check:** runs only when import code changes.
+   - **Physical phone and Chrome clipper checks:** they cannot run in cloud CI. They run on the laptop
+     as part of the builder's proof, only when that code changes.
+   - **Preview smoke check:** every preview, about two minutes: sign in, open a recipe, search, add
+     one recipe.
+   - **Every test must be able to fail and must catch something no other test catches.** Delete
+     tests that would still pass if every imported function returned nothing, and tests that
+     duplicate others.
+   - **Live alarms:** Sentry and Axiom, as the draft already specifies.
 3. **end-to-end for the changed journey** — when the change has a user-facing surface, inspect the actual behavior evidence for the affected journey end to end, including relevant failure paths, tied to the reviewed candidate identity. Confirm the launch/Doctor commit and dirty-tree digest match the reviewed tree and that the saved commands and results passed. Missing, failed, unavailable, stale, or mismatched proof fails closed; Todd's live UAT and a builder's unverified “tests pass” statement do not substitute. A change with no user-facing surface is marked not applicable with a reason.
 4. **a clean browser console** — during the affected journey, no unexpected console errors or unhandled failures. Changes with no browser surface may be marked not applicable with a reason.
 5. **logging good enough to find a root cause** — lasting logs/measurements identify the failing operation and useful context, connect related events, and expose no secrets. Inspect failure-path evidence; temporary debugging or a silent non-zero exit is insufficient. Each connection between services records its own trace; a connection whose trace shows errors or calls to the wrong account fails.
