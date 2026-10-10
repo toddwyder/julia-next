@@ -111,8 +111,63 @@ jobs:
         run: node --test scripts/health-route.test.mjs scripts/dynamic-route.test.mjs scripts/web-app.test.mjs scripts/framework-lint.test.mjs
       - name: Install Chromium
         run: npx playwright install chromium
+      - name: List required browser verification tests
+        run: |
+          set -euo pipefail
+          mkdir -p ci-playwright-evidence
+          rm -rf playwright-report test-results
+          npx playwright test --list | tee ci-playwright-evidence/test-list.txt
+          if ! grep -Eq '^Total: [1-9][0-9]* tests?' ci-playwright-evidence/test-list.txt; then
+            echo '::error::Browser verification selected zero required tests'
+            exit 1
+          fi
       - name: Run browser tests
-        run: npx playwright test
+        id: browser_tests
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          if npx playwright test --reporter=line,html 2>&1 | tee ci-playwright-evidence/test-output.txt; then
+            status=0
+          else
+            status="${PIPESTATUS[0]}"
+          fi
+          printf 'exitCode=%s\n' "$status" | tee ci-playwright-evidence/test-exit.txt
+          exit "$status"
+      - name: Require browser evidence and passing verification
+        if: always()
+        run: |
+          set -euo pipefail
+          problems=()
+          if [[ "${{ steps.browser_tests.outcome }}" != success ]]; then
+            if [[ -s ci-playwright-evidence/test-exit.txt ]]; then
+              exit_detail="$(tr '\n' ' ' < ci-playwright-evidence/test-exit.txt)"
+            else
+              exit_detail='test-exit.txt was not written'
+            fi
+            echo "::error::Browser verification failed (${exit_detail}); retained evidence is attached to this run"
+            problems+=('the Playwright verification command failed')
+          fi
+          [[ -s ci-playwright-evidence/test-list.txt ]] || problems+=('test-list.txt is missing or empty')
+          [[ -s ci-playwright-evidence/test-output.txt ]] || problems+=('test-output.txt is missing or empty')
+          [[ -s ci-playwright-evidence/test-exit.txt ]] || problems+=('test-exit.txt is missing or empty')
+          [[ -f playwright-report/index.html ]] || problems+=('playwright-report/index.html is missing')
+          if [[ -s ci-playwright-evidence/test-list.txt ]] && ! grep -Eq '^Total: [1-9][0-9]* tests?' ci-playwright-evidence/test-list.txt; then
+            problems+=('the browser-test list selected zero required tests')
+          fi
+          if (( ${#problems[@]} > 0 )); then
+            echo "::error::Browser verification evidence is incomplete: ${problems[*]}"
+            exit 1
+          fi
+      - name: Retain browser verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-verification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ci-playwright-evidence
+            playwright-report
+            test-results
+          if-no-files-found: error
       - name: Lint framework code
         run: npm run lint:framework
       - name: Build application

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { selectCIGates } from './ci-routing.mjs';
 
@@ -6,6 +7,9 @@ test('routes representative changed paths to their focused CI gates', () => {
   assert.deepEqual(selectCIGates(['scripts/julia-init.mjs']), ['baseline', 'julia-init-windows']);
   assert.deepEqual(selectCIGates(['docs/agents/init.md']), ['baseline', 'julia-init-windows', 'docs-policy']);
   assert.deepEqual(selectCIGates(['app/recipes/page.tsx']), ['baseline', 'web']);
+  assert.deepEqual(selectCIGates(['e2e/home.spec.mjs']), ['baseline', 'web']);
+  assert.deepEqual(selectCIGates(['.agents/skills/verify-julia/SKILL.md']), ['baseline', 'web']);
+  assert.deepEqual(selectCIGates(['scripts/verify-julia.mjs']), ['baseline', 'web']);
   assert.deepEqual(selectCIGates(['app/removed-page.tsx']), ['baseline', 'web']);
   assert.deepEqual(selectCIGates(['docs/guide.md']), ['baseline', 'docs-policy']);
   assert.deepEqual(selectCIGates(['scripts/personal-paths.test.mjs']), ['baseline', 'julia-init-windows', 'docs-policy']);
@@ -41,4 +45,24 @@ test('runner code, new regressions and shared safety dependencies select the Win
   assert.deepEqual(selectCIGates(['scripts/personal-paths.mjs']), ['baseline', 'julia-init-windows', 'docs-policy']);
   assert.deepEqual(selectCIGates(['scripts/julia-delivery-new.test.mjs']), ['baseline', 'julia-init-windows']);
   assert.deepEqual(selectCIGates(['tests/new-safety.test.mjs']), ['baseline', 'julia-init-windows', 'web']);
+});
+
+test('retains Playwright failure evidence and reports its root cause before failing the web gate', () => {
+  const workflow = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
+  const browserTests = workflow.match(/- name: Run browser tests\n([\s\S]*?)(?=\n      - name: Require browser evidence)/)?.[1];
+  const evidenceGate = workflow.match(/- name: Require browser evidence and passing verification\n([\s\S]*?)(?=\n      - name: Retain browser verification evidence)/)?.[1];
+
+  assert.ok(browserTests, 'the browser-test step exists');
+  assert.match(browserTests, /if npx playwright test --reporter=line,html 2>&1 \| tee ci-playwright-evidence\/test-output\.txt; then/);
+  assert.match(browserTests, /else\n\s+status="\$\{PIPESTATUS\[0\]\}"/);
+  assert.match(browserTests, /printf 'exitCode=%s\\n' "\$status" \| tee ci-playwright-evidence\/test-exit\.txt/);
+
+  assert.ok(evidenceGate, 'the evidence-validation step exists');
+  assert.match(evidenceGate, /::error::Browser verification failed \(\$\{exit_detail\}\); retained evidence is attached to this run/);
+  assert.match(evidenceGate, /::error::Browser verification evidence is incomplete: /);
+  assert.ok(
+    evidenceGate.indexOf('::error::Browser verification failed (${exit_detail}); retained evidence is attached to this run')
+      < evidenceGate.indexOf("problems+=('test-list.txt is missing or empty')"),
+    'the Playwright failure annotation is emitted before evidence validation can exit',
+  );
 });

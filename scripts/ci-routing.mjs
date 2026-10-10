@@ -10,7 +10,7 @@ const GATE_PATHS = {
     /^graph\/seat-table\./, /^delivery-tools\.json$/, /^\.(?:agents|claude)\/skills\/implement\//,
     /^docs\/agents\/(?:init|work-execution|runner-tests)\.md$/,
   ],
-  web: [/^(?:app|lib)\//, /^(?:next\.config|playwright\.config)/, /^tests\//, /^scripts\/(?:health-route|dynamic-route|web-app|framework-lint)\./],
+  web: [/^(?:app|lib|e2e)\//, /^(?:next\.config|playwright\.config)/, /^tests\//, /^\.agents\/skills\/verify-julia\//, /^scripts\/(?:health-route|dynamic-route|web-app|framework-lint|verify-julia)\./],
   'docs-policy': [/^docs\//, /^scripts\/(?:agent-docs|line-endings|no-personal-paths|personal-paths|merge-pr|publish-pr|publish-via-github-app)\./],
 };
 
