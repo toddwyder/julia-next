@@ -122,12 +122,14 @@ function codexIdentity(output, root) {
 }
 
 export function productionLauncher(worktree, { run = runLimited, environment = process.env, findExecutable = nativeCommand, sessionRoot = join(process.env.CODEX_HOME || join(homedir(), '.codex'), 'sessions') } = {}) {
-  const operatorSecrets = new Set(['VERCEL_TOKEN', 'LINEAR_API_KEY', 'AXIOM_TOKEN', 'AXIOM_DATASET', 'SENTRY_AUTH_TOKEN', 'JULIA_OBSERVABILITY_PROOF_TOKEN']);
+  const operatorSecrets = new Set(['VERCEL_TOKEN', 'LINEAR_API_KEY', 'AXIOM_TOKEN', 'AXIOM_DATASET', 'SENTRY_AUTH_TOKEN', 'JULIA_OBSERVABILITY_PROOF_TOKEN', 'COMMANDCODE_API_KEY', 'COMMAND_CODE_API_KEY']);
   const workerEnvironment = Object.fromEntries(Object.entries(environment).filter(([key]) => !operatorSecrets.has(key.toUpperCase()) && !key.toUpperCase().startsWith('OP_')));
   const runWorker = (command, args, options, limits) => run(command, args, { ...options, env: workerEnvironment }, limits);
   return async (role, request) => {
     const configured = request.configuration;
-    if (role === 'reviewer' && configured.connection?.provider === 'commandcode') return commandCodeReview(request, { run: runWorker });
+    if (role === 'reviewer' && configured.connection?.provider === 'commandcode') return commandCodeReview(request, {
+      run: (command, args, options, limits) => run(command, args, { ...options, env: { ...workerEnvironment, COMMANDCODE_API_KEY: environment.COMMANDCODE_API_KEY } }, limits),
+    });
     if (role === 'reviewer' && configured.connection?.route && configured.connection.route !== 'native') return { exitCode: 2, observed: null, text: 'unsupported saved reviewer connection; native fallback is forbidden' };
     const cwd = role === 'builder' ? worktree : tmpdir();
     const startedAt = new Date().toISOString();

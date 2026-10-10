@@ -17,6 +17,34 @@ The tool creates or reuses the Julia vault and one item per configured service. 
 
 The saved `.julia/secrets.env` contains only `op://<vault-id>/<item-id>/<field>` references. `.julia/vault-launch.json` contains the vault ID, reference file path and CLI executable path. Both live outside the builder checkout. Keep source environment files until real service connections are proved with the first Julia cards. Vault readback alone does not establish the correct service/project/dataset or a working token. Preserve the existing Axiom dataset and Sentry project during import, and confirm their intended Julia destination before use.
 
+## OVH migration (Todd's 10 Oct 2026 decision)
+
+The laptop launcher also accepts `COMMANDCODE_API_KEY`, stored as a concealed field
+in **Julia CommandCode**. The normal delivery review transport requires
+`authReference: "env:COMMANDCODE_API_KEY"` and calls CommandCode directly from a
+local Node process. Preserve the saved model, thinking and spending selections
+when updating the connection reference. Old `dropbox:commandcode` references fail
+closed; there is no SSH fallback. The runner retains its request intent, worker
+identity, timeout, interruption handling and substantive review validation.
+Only the CommandCode reviewer child receives this key; native workers exclude
+it, all `OP_` bootstrap variables and the operator's service credentials.
+
+The VPS's Linear personal key and CommandCode key were imported into the existing
+Julia vault and read back unchanged. The laptop CommandCode login and the VPS key
+resolve to the same account and active GOAT subscription. Machine access remains
+the existing read-only Julia service account. Preserve the existing references,
+bootstrap configuration and encrypted token when adding fields; do not replace
+the configuration with a fresh default migration file.
+
+The VPS Axiom token differs from the canonical Julia vault token and was not
+overwritten or imported. Current laptop telemetry uses the vault token. Confirm
+any deployment projections before revoking the older token. Sentry runtime uses
+the DSN already in Julia; its old personal management token has no current code
+consumer. Supabase, PowerSync, native DeepSeek and the old controller's Linear
+client ID/secret have no current laptop or application consumer. These are
+**candidates to revoke later**, subject to account inventory. No VPS credential,
+service, account or OVH resource is changed by this migration.
+
 ## Launch Julia delivery
 
 ```powershell
