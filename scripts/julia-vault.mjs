@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 const GROUPS = {
   'Julia Vercel': ['VERCEL_TOKEN'],
   'Julia Linear': ['LINEAR_API_KEY'],
+  'Julia CommandCode': ['COMMANDCODE_API_KEY'],
   'Julia Axiom': ['AXIOM_TOKEN', 'AXIOM_DATASET'],
   'Julia Sentry': ['NEXT_PUBLIC_SENTRY_DSN', 'SENTRY_AUTH_TOKEN', 'SENTRY_ORG', 'SENTRY_PROJECT'],
 };

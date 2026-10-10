@@ -53,6 +53,31 @@ test('migration refuses an existing conflicting item instead of overwriting it',
   const execute = async args => args[0] === 'vault' ? [{ id: 'vault-id', name: 'Julia' }] : args[1] === 'list' ? [{ id: 'item-id', title: 'Julia Axiom' }] : { fields: [{ label: 'AXIOM_TOKEN', value: 'different' }] };
   await assert.rejects(migrateJuliaSecrets({ AXIOM_TOKEN: 'private-value' }, { execute }), /existing vault item differs/);
 });
+
+test('CommandCode migrates through stdin and launches from a Julia reference without stale plaintext', async () => {
+  let item;
+  const execute = async (args, input) => {
+    assert.equal(args.includes('private-commandcode-value'), false);
+    if (args[0] === 'vault') return [{ id: 'vault-id', name: 'Julia' }];
+    if (args[1] === 'list') return [];
+    if (args[1] === 'create') { item = { ...input, id: 'commandcode-item' }; return { id: item.id }; }
+    if (args[1] === 'get') return item;
+    assert.fail('unexpected operation');
+  };
+  const result = await migrateJuliaSecrets({ COMMANDCODE_API_KEY: 'private-commandcode-value', DEEPSEEK_API_KEY: 'retired-secret' }, { execute });
+  assert.equal(result.references.COMMANDCODE_API_KEY, 'op://vault-id/commandcode-item/COMMANDCODE_API_KEY');
+  assert.equal(item.fields[0].type, 'CONCEALED');
+  assert.equal(JSON.stringify(result).includes('private-commandcode-value'), false);
+  assert.equal(result.references.DEEPSEEK_API_KEY, undefined);
+  const configuration = { vaultId: 'vault-id', referencesPath: 'references.env' };
+  assert.equal(vaultLaunch([], { configuration, references: `COMMANDCODE_API_KEY=${result.references.COMMANDCODE_API_KEY}`, environment: { COMMANDCODE_API_KEY: 'stale', PATH: 'fixture' }, run: (_command, _args, options) => {
+    assert.deepEqual(options.env, { PATH: 'fixture', COMMANDCODE_API_KEY: 'op://vault-id/commandcode-item/COMMANDCODE_API_KEY' });
+    return { status: 0 };
+  } }), 0);
+  for (const reference of ['plaintext', 'op://other-vault/item/key']) {
+    assert.throws(() => vaultLaunch([], { configuration, references: `COMMANDCODE_API_KEY=${reference}`, run: () => assert.fail('must not launch') }), /invalid vault reference/);
+  }
+});
 test('failed readback returns no replacement references', async () => {
   const execute = async args => args[0] === 'vault' ? [{ id: 'vault-id', name: 'Julia' }] : args[1] === 'list' ? [] : args[1] === 'create' ? { id: 'item-id' } : { fields: [] };
   await assert.rejects(migrateJuliaSecrets({ AXIOM_TOKEN: 'private-value' }, { execute }), /readback did not match/);
