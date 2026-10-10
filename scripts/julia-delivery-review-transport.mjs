@@ -1,7 +1,6 @@
 // The saved operator CommandCode transport, connected to the normal launcher.
-// One request, no retries/polling/redirects. Secrets stay on the existing server.
-import { homedir } from 'node:os';
-import { join } from 'node:path';
+// One laptop request, no retries/polling/redirects. The vault launcher supplies auth.
+import { fileURLToPath } from 'node:url';
 import { saveJson, sha256 } from './julia-delivery-state.mjs';
 import { runLimited } from '../ops/julia-runner/time-limit.mjs';
 import { codexReply } from '../ops/julia-runner/run-reviewer.mjs';
@@ -23,16 +22,13 @@ export function nativeReviewReply(harness, output) {
   return { text: final.result, responseId: final.session_id ?? null, error: null };
 }
 
-const remote = `import {readSecret} from '/opt/julia-runner/ops/service-dropbox/read-secret.mjs';import{readFileSync}from'node:fs';let secret='';try{const b=JSON.parse(readFileSync(0,'utf8'));secret=readSecret('commandcode');const r=await fetch(b.endpoint,{method:'POST',redirect:'error',headers:{Authorization:'Bearer '+secret,'Content-Type':'application/json'},body:JSON.stringify(b.body),signal:AbortSignal.timeout(1200000)});const raw=await r.text();console.log(JSON.stringify({httpStatus:r.status,body:raw.replaceAll(secret,'[REDACTED]')}));}catch(e){console.log(JSON.stringify({error:String(e.message).replaceAll(secret||'NEVER_MATCH_EMPTY_SECRET','[REDACTED]'),uncertain:true}));process.exitCode=2;}`;
-const remoteCommand = "sudo -n -u runner node --input-type=module -e '" + remote.replaceAll("'", "'\\''") + "'";
-
 export async function commandCodeReview(request, { run = runLimited, maxOutputTokens = 16384 } = {}) {
   const configured = request.configuration, connection = configured.connection;
   const startedAt = new Date().toISOString();
   const evidence = { configured, connection, startedAt, observed: null, responseId: null, usage: null, error: null };
   let output = '', stderr = '', result;
   try {
-    if (connection?.provider !== 'commandcode' || connection.protocol !== 'openai-completions' || connection.authReference !== 'dropbox:commandcode' || connection.endpoint !== 'https://api.commandcode.ai/provider/v1') throw new Error('saved CommandCode connection is not the existing authorized transport');
+    if (connection?.provider !== 'commandcode' || connection.protocol !== 'openai-completions' || connection.authReference !== 'env:COMMANDCODE_API_KEY' || connection.endpoint !== 'https://api.commandcode.ai/provider/v1') throw new Error('saved CommandCode connection must use the Julia vault laptop credential');
     if (!['paid', 'subscription', 'fixture'].includes(request.spending?.mode)) throw new Error('saved reviewer spending authorization is missing');
     // Resolve the observed model through its saved catalog attribution, never
     // through agent prose or the provider connection's company.
@@ -42,9 +38,7 @@ export async function commandCodeReview(request, { run = runLimited, maxOutputTo
     // The runner already persisted review intent. Save the exact request before
     // the transport process starts, so a crash remains an ambiguous action.
     if (request.outputPath) await saveJson(request.outputPath, evidence);
-    const command = process.platform === 'win32' ? 'C:/Windows/System32/OpenSSH/ssh.exe' : 'ssh';
-    const args = ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', '-i', join(homedir(), '.ssh', 'ovh_runner_ed25519'), 'ubuntu@100.125.239.98', remoteCommand];
-    result = await run(command, args, { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true }, {
+    result = await run(process.execPath, [fileURLToPath(new URL('./julia-commandcode-request.mjs', import.meta.url))], { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true }, {
       seconds: 20 * 60,
       started: child => {
         child.stdout.on('data', chunk => { output += chunk; }); child.stderr.on('data', chunk => { stderr += chunk; }); child.stdin.on('error', () => {});

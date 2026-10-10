@@ -24,7 +24,7 @@ const card = { identifier: 'JUL-196', title: 'A card', state: { name: 'Ready', t
 
 test('native workers do not inherit release and telemetry operator credentials', async () => {
   let options;
-  const environment = { PATH: 'fixture-path', OPENAI_API_KEY: 'worker-auth', VERCEL_TOKEN: 'release-secret', axiom_token: 'telemetry-secret', AXIOM_DATASET: 'private-dataset', JULIA_OBSERVABILITY_PROOF_TOKEN: 'proof-secret', SENTRY_AUTH_TOKEN: 'sentry-secret', LINEAR_API_KEY: 'operator-card-secret', OP_SERVICE_ACCOUNT_TOKEN: 'vault-secret', op_session_account: 'vault-session' };
+  const environment = { PATH: 'fixture-path', OPENAI_API_KEY: 'worker-auth', COMMANDCODE_API_KEY: 'review-only-secret', COMMAND_CODE_API_KEY: 'review-cli-secret', VERCEL_TOKEN: 'release-secret', axiom_token: 'telemetry-secret', AXIOM_DATASET: 'private-dataset', JULIA_OBSERVABILITY_PROOF_TOKEN: 'proof-secret', SENTRY_AUTH_TOKEN: 'sentry-secret', LINEAR_API_KEY: 'operator-card-secret', OP_SERVICE_ACCOUNT_TOKEN: 'vault-secret', op_session_account: 'vault-session' };
   await productionLauncher('fixture', { environment, findExecutable: () => 'fixture-worker', run: async (_command, _args, value) => { options = value; return { code: 1, stopped: false }; } })('builder', { configuration: configuration.builder, prompt: 'fixture' });
   assert.deepEqual(options.env, { PATH: 'fixture-path', OPENAI_API_KEY: 'worker-auth' });
 });
@@ -525,11 +525,14 @@ test('well-formed unsupported approval and inconclusive failure park without con
 test('normal CommandCode review transport uses the saved model and one journalled request', async t => {
   const root = await mkdtemp(join(tmpdir(), 'jul202-transport-'));
   t.after(() => import('node:fs/promises').then(({ rm }) => rm(root, { recursive: true, force: true })));
-  const selected = { harness: 'commandcode', model: 'example/reviewer-model', maker: 'Example', thinking: 'medium', builderMaker: 'OpenAI', connection: { route: 'existing-commandcode', provider: 'commandcode', endpoint: 'https://api.commandcode.ai/provider/v1', protocol: 'openai-completions', authReference: 'dropbox:commandcode' } };
+  const selected = { harness: 'commandcode', model: 'example/reviewer-model', maker: 'Example', thinking: 'medium', builderMaker: 'OpenAI', connection: { route: 'existing-commandcode', provider: 'commandcode', endpoint: 'https://api.commandcode.ai/provider/v1', protocol: 'openai-completions', authReference: 'env:COMMANDCODE_API_KEY' } };
   let calls = 0, given = '', recorded = false;
   const run = async (command, args, options, limits) => {
     calls++;
-    assert.match(command, /ssh/);
+    assert.equal(command, process.execPath);
+    assert.deepEqual(options.env, { PATH: 'fixture-path', COMMANDCODE_API_KEY: 'credential-value' });
+    assert.match(args[0], /julia-commandcode-request\.mjs$/);
+    assert.doesNotMatch(args.join(' '), /ssh|sudo|100\.125\.239\.98|ovh_runner/);
     assert.doesNotMatch(args.join(' '), /reviewer-model|credential-value/);
     const child = new EventEmitter(); child.pid = 12345;
     child.stdout = new PassThrough(); child.stderr = new PassThrough(); child.stdin = new PassThrough();
@@ -542,7 +545,7 @@ test('normal CommandCode review transport uses the saved model and one journalle
     child.stdout.write(JSON.stringify({ httpStatus: 200, body: JSON.stringify({ id: 'fixture-response-1', model: selected.model, choices: [{ finish_reason: 'stop', message: { content: 'fixture final reply' } }], usage: { total_tokens: 41 } }) }));
     return { code: 0, signal: null, stopped: false };
   };
-  const launch = productionLauncher(root, { run });
+  const launch = productionLauncher(root, { run, environment: { PATH: 'fixture-path', COMMANDCODE_API_KEY: 'credential-value', LINEAR_API_KEY: 'operator-secret', OP_SERVICE_ACCOUNT_TOKEN: 'bootstrap-secret' } });
   const result = await launch('reviewer', { configuration: selected, prompt: workerPrompt('reviewer', card, { ...configuration, reviewer: selected }, 'private-run', 'private-approved'), spending: { mode: 'fixture', maxUsd: 0 }, outputPath: join(root, 'result.json'), started: async () => { recorded = true; } });
   assert.equal(calls, 1);
   assert.equal(result.text, 'fixture final reply');
@@ -603,7 +606,7 @@ test('saved PM clarification is delivered in complete specification without rere
 });
 
 test('CommandCode accepts another saved model ID without imposing a model-company naming convention', async () => {
-  const selected = { harness: 'commandcode', model: 'catalog-model-v2', maker: 'Catalog Company', thinking: null, connection: { provider: 'commandcode', endpoint: 'https://api.commandcode.ai/provider/v1', protocol: 'openai-completions', authReference: 'dropbox:commandcode' } };
+  const selected = { harness: 'commandcode', model: 'catalog-model-v2', maker: 'Catalog Company', thinking: null, connection: { provider: 'commandcode', endpoint: 'https://api.commandcode.ai/provider/v1', protocol: 'openai-completions', authReference: 'env:COMMANDCODE_API_KEY' } };
   const run = async (_command, _args, _options, limits) => {
     const child = new EventEmitter(); child.pid = 12345;
     child.stdout = new PassThrough(); child.stderr = new PassThrough(); child.stdin = new PassThrough();

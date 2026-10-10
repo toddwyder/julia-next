@@ -193,7 +193,7 @@ test('recovery after publication confirmation reuses its review identity without
 test('normal transport errors and persistence interruption retain uncertainty without duplicate calls', async t => {
   for (const kind of ['authentication', 'wrong model', 'reasoning only', 'malformed', 'lost result persistence']) await t.test(kind, async t => {
     const root = await mkdtemp(join(tmpdir(), 'jul202-transport-recovery-')); t.after(() => rm(root, { recursive: true, force: true }));
-    const reviewer = { harness: 'commandcode', model: 'example/reviewer', maker: 'Example', thinking: null, connection: { route: 'existing-commandcode', provider: 'commandcode', endpoint: 'https://api.commandcode.ai/provider/v1', protocol: 'openai-completions', authReference: 'dropbox:commandcode' } };
+    const reviewer = { harness: 'commandcode', model: 'example/reviewer', maker: 'Example', thinking: null, connection: { route: 'existing-commandcode', provider: 'commandcode', endpoint: 'https://api.commandcode.ai/provider/v1', protocol: 'openai-completions', authReference: 'env:COMMANDCODE_API_KEY' } };
     const selected = { ...configuration, reviewer }, runPath = join(root, 'run.json'), statePath = join(root, 'JUL-202-state.json');
     let calls = 0, live = false;
     const run = async (_command, _args, _options, limits) => {
