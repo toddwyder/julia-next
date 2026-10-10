@@ -186,7 +186,7 @@ class GraphTest(unittest.IsolatedAsyncioTestCase):
             limits={'builder': 3600, 'tests': 900, 'reviewer': 1200},
             snapshot=workers.snapshot, restore=workers.restore, drift=workers.drift, diff=workers.change,
             install=self.install,
-            base_file=lambda run, path: ROLE if path == '.agents/skills/julia-reviewer/SKILL.md' else '',
+            base_file=lambda run, path: ROLE if path == '.agents/skills/adversarial-review/SKILL.md' else '',
         )
 
     async def install(self, run):

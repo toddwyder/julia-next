@@ -59,7 +59,7 @@ export const ANSWER_DIR = '.julia';
 // own working copy.
 export const WORKER_SKILLS = Object.freeze({
   builder: '.claude/skills/julia-builder/SKILL.md',
-  reviewer: '.claude/skills/julia-reviewer/SKILL.md',
+  reviewer: '.agents/skills/adversarial-review/SKILL.md',
 });
 
 // The vendor model ids the seats run on, per MODEL_CATALOG model name.

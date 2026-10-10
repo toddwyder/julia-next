@@ -2,7 +2,7 @@
 // its two model workers, and how it reads their answers back.
 //
 // The rules are the committed Orca role files (.claude/skills/julia-builder
-// and julia-reviewer, main at 8206fcd) mapped to today's separated workers,
+// and independent reviewer, main at 8206fcd) mapped to today's separated workers,
 // not pasted: Gemini edits files and runs nothing, a test worker runs the
 // tests, the runner commits, and two DeepSeek sessions review one axis each
 // without access to the working copy. Kept (Todd, 24 Sep): per-criterion

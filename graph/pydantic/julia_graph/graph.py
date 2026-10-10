@@ -59,7 +59,7 @@ MAX_REVIEW_ROUNDS = 2
 MAX_REVIEW_BYTES = 500_000
 MAX_PI_REVIEW_BYTES = 120_000
 # The reviewer's standing orders, read from the card's start commit.
-REVIEWER_ROLE_FILE = '.agents/skills/julia-reviewer/SKILL.md'
+REVIEWER_ROLE_FILE = '.agents/skills/adversarial-review/SKILL.md'
 # Each worker's time limit in seconds. Each worker's own launcher enforces it
 # (ops/julia-runner/time-limit.mjs; the reviewer's through run-reviewer.mjs),
 # so a worker is stopped, with everything it started, even if the graph dies.
