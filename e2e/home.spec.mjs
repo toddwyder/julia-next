@@ -7,7 +7,7 @@ test('home page shows Julia, the application version, and a welcome line', async
   await page.goto('/');
   await expect(page.locator('main')).toContainText('Julia');
   await expect(page.locator('main')).toContainText(version);
-  await expect(page.locator('main > p')).toHaveText('what are we cooking today?');
+  await expect(page.locator('main > p')).toHaveText('controlled CI failure: verification must reject this');
   await expect(page.locator('main > p')).toBeVisible();
   await expect(page.locator('main > div')).toHaveText(`Julia ${version}`);
   await expect(page.locator('main > *')).toHaveText([
