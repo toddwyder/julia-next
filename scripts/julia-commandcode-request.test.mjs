@@ -9,7 +9,7 @@ const secret = 'synthetic-provider-secret';
 
 test('laptop request sends one authenticated request, denies redirects and redacts provider echoes', async () => {
   let calls = 0;
-  const body = { model: 'deepseek/deepseek-v4-flash', messages: [{ role: 'user', content: 'review supplied evidence' }], stream: false, max_tokens: 16384 };
+  const body = { model: 'deepseek/deepseek-v4-flash', messages: [{ role: 'user', content: 'review supplied evidence' }], stream: false };
   const result = await commandCodeRequest({ endpoint, body }, { environment: { COMMANDCODE_API_KEY: secret }, fetchImpl: async (url, options) => {
     calls++;
     assert.equal(url, endpoint);
@@ -21,6 +21,16 @@ test('laptop request sends one authenticated request, denies redirects and redac
   } });
   assert.equal(calls, 1);
   assert.deepEqual(result, { httpStatus: 401, body: 'refused [REDACTED]' });
+});
+
+test('laptop review request rejects every output-token cap before it can reach CommandCode', async () => {
+  for (const field of ['max_tokens', 'max_completion_tokens', 'max_output_tokens']) {
+    const result = await commandCodeRequest({ endpoint, body: { model: 'deepseek/deepseek-v4-flash', [field]: 1 } }, {
+      environment: { COMMANDCODE_API_KEY: secret },
+      fetchImpl: () => assert.fail('a capped review request must not be dispatched'),
+    });
+    assert.deepEqual(result, { error: 'CommandCode review requests must not set an output-token cap', uncertain: false });
+  }
 });
 
 test('missing or unresolved credentials and a foreign endpoint refuse before any network call', async () => {

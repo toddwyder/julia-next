@@ -22,7 +22,7 @@ export function nativeReviewReply(harness, output) {
   return { text: final.result, responseId: final.session_id ?? null, error: null };
 }
 
-export async function commandCodeReview(request, { run = runLimited, maxOutputTokens = 16384 } = {}) {
+export async function commandCodeReview(request, { run = runLimited } = {}) {
   const configured = request.configuration, connection = configured.connection;
   const startedAt = new Date().toISOString();
   const evidence = { configured, connection, startedAt, observed: null, responseId: null, usage: null, error: null };
@@ -33,7 +33,10 @@ export async function commandCodeReview(request, { run = runLimited, maxOutputTo
     // Resolve the observed model through its saved catalog attribution, never
     // through agent prose or the provider connection's company.
     const namespace = configured.model.split('/');
-    const body = { model: configured.model, ...(configured.thinking ? { reasoning_effort: configured.thinking } : {}), messages: [{ role: 'user', content: request.prompt }], max_tokens: maxOutputTokens, stream: false };
+    // JUL-98 established that DeepSeek reviews use the selected model's own
+    // output limit. An OpenAI-compatible client default can otherwise impose
+    // a 16,384-token limit before the provider has finished reasoning.
+    const body = { model: configured.model, ...(configured.thinking ? { reasoning_effort: configured.thinking } : {}), messages: [{ role: 'user', content: request.prompt }], stream: false };
     evidence.requestId = sha256(JSON.stringify(body)); evidence.request = body; evidence.spending = request.spending;
     // The runner already persisted review intent. Save the exact request before
     // the transport process starts, so a crash remains an ambiguous action.
