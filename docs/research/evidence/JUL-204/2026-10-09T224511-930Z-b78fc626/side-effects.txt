@@ -1,0 +1,1 @@
+No persistent household data changed; read-only browser checks only.

@@ -3,6 +3,15 @@
 Post-build reviewer guidance. The reviewer checks the completed change and records evidence tied
 to the change, or explains why a check does not apply; missing evidence is not a pass.
 
+For a Julia user-facing change, independently inspect the behavior artifacts from the applicable
+`.agents/skills/verify-julia/SKILL.md` recipe. The launch and Doctor records must identify the
+reviewed candidate (commit and dirty-tree SHA-256), and the artifacts must show the actions,
+observed results, command exit codes, console outcome, and post-cleanup readback. A source change
+after proof makes it stale. Missing, failed, unavailable, stale, or candidate-mismatched proof
+fails the review closed; do not infer success from a builder summary or label unavailable evidence
+not applicable. Mark not applicable only when the change has no relevant user-facing behavior, and
+give the reason.
+
 ## Build
 
 Build test-first with `.claude/skills/tdd/SKILL.md`.
@@ -11,7 +20,7 @@ Build test-first with `.claude/skills/tdd/SKILL.md`.
 
 1. **unit tests** — meaningful behavior and regression coverage for affected code through appropriate interfaces. Check the assertions actually detect the relevant failure; mocked provider responses alone cannot prove provider behavior.
 2. **integration tests at affected boundaries** — when a connection between two services is built or changed, test it against the real service; do not substitute a fake or stand-in for that test. Every integration test joins the regression suite, and the whole suite runs on every pull request, which cannot merge until it passes.
-3. **end-to-end for the changed journey** — when the change has a user-facing surface, verify the affected user journey end to end, including relevant failure paths, tied to the reviewed revision. A change with no user-facing surface is marked not applicable with a reason. Todd's live UAT does not substitute for this check.
+3. **end-to-end for the changed journey** — when the change has a user-facing surface, inspect the actual behavior evidence for the affected journey end to end, including relevant failure paths, tied to the reviewed candidate identity. Confirm the launch/Doctor commit and dirty-tree digest match the reviewed tree and that the saved commands and results passed. Missing, failed, unavailable, stale, or mismatched proof fails closed; Todd's live UAT and a builder's unverified “tests pass” statement do not substitute. A change with no user-facing surface is marked not applicable with a reason.
 4. **a clean browser console** — during the affected journey, no unexpected console errors or unhandled failures. Changes with no browser surface may be marked not applicable with a reason.
 5. **logging good enough to find a root cause** — lasting logs/measurements identify the failing operation and useful context, connect related events, and expose no secrets. Inspect failure-path evidence; temporary debugging or a silent non-zero exit is insufficient. Each connection between services records its own trace; a connection whose trace shows errors or calls to the wrong account fails.
 

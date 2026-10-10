@@ -19,6 +19,10 @@ Keep Todd's start authorization and explicit model/spend choices. Never ask Todd
 or workaround approval. If an authorization boundary or platform limit blocks the next required
 action, park the Linear card with one line explaining why.
 
+## Building and reviewing
+
+Follow the repository's [AGENTS.md building and reviewing requirements](AGENTS.md#building-and-reviewing).
+
 ## Reaching the server
 
 Keep SSH and sudo outside automated runners. An authorized operator uses the laptop's Tailscale
