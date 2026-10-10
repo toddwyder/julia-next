@@ -16,7 +16,8 @@ import { checkQuotes } from './quote-check.mjs';
 const exec = promisify(execFile);
 const here = dirname(fileURLToPath(import.meta.url));
 const spikeRoot = resolve(here, '..');
-const repoRoot = resolve(spikeRoot, '..', '..', '..');
+// The spike lives at <repository>/ops/mastra-reviewer-spike.
+const repoRoot = resolve(spikeRoot, '..', '..');
 const tracePath = resolve(spikeRoot, 'traces', 'mastra-reviewer-spike.db');
 const outputPath = resolve(spikeRoot, 'artifacts', 'run-282.json');
 const head = process.env.PR_HEAD ?? '8a0d87cbc9c56458c367a2cd2b6bae4083c48722';
