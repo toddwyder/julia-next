@@ -1,0 +1,22 @@
+{
+  "name": "mastra-reviewer-spike",
+  "version": "1.0.0",
+  "description": "",
+  "main": "src/reviewer.mjs",
+  "scripts": {
+    "test": "node --test",
+    "review": "node src/reviewer.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "private": "true",
+  "dependencies": {
+    "@ai-sdk/openai-compatible": "^2.0.81",
+    "@mastra/core": "^1.75.0",
+    "@mastra/libsql": "^1.25.1",
+    "@mastra/observability": "^1.18.4",
+    "zod": "^4.1.12"
+  }
+}
