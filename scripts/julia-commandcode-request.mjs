@@ -15,9 +15,14 @@ export async function commandCodeRequest(payload, { environment = process.env, f
       body: JSON.stringify(payload.body), signal: AbortSignal.timeout(1200000),
     });
     return { httpStatus: response.status, body: (await response.text()).replaceAll(secret, '[REDACTED]') };
-  } catch {
-    // Provider exceptions can contain headers/URLs. Retain uncertainty without echoing them.
-    return { error: 'CommandCode laptop request failed; outcome is uncertain', uncertain: true };
+  } catch (cause) {
+    // Provider exceptions can contain headers/URLs. Persist only a safe class;
+    // the caller already records the authorized endpoint and request identity.
+    const category = cause?.name === 'TimeoutError' ? 'timeout'
+      : cause?.name === 'AbortError' ? 'aborted'
+        : ['ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'UND_ERR_CONNECT_TIMEOUT'].includes(cause?.cause?.code ?? cause?.code) ? 'network'
+          : 'local';
+    return { error: `CommandCode laptop request ${category} failure; outcome is uncertain`, uncertain: true };
   }
 }
 

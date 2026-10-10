@@ -49,6 +49,15 @@ test('a failed request remains uncertain without retrying or logging credential-
   assert.equal(JSON.stringify(result).includes(secret), false);
 });
 
+test('a request timeout records its safe failure category without provider exception text', async () => {
+  const result = await commandCodeRequest({ endpoint, body: {} }, {
+    environment: { COMMANDCODE_API_KEY: secret },
+    fetchImpl: async () => { throw new DOMException(`Bearer ${secret}`, 'TimeoutError'); },
+  });
+  assert.deepEqual(result, { error: 'CommandCode laptop request timeout failure; outcome is uncertain', uncertain: true });
+  assert.equal(JSON.stringify(result).includes(secret), false);
+});
+
 test('the real laptop child refuses unresolved vault references without echoing input or starting a request', () => {
   const result = spawnSync(process.execPath, [fileURLToPath(new URL('./julia-commandcode-request.mjs', import.meta.url))], {
     env: { ...process.env, COMMANDCODE_API_KEY: 'op://vault/item/key' }, input: JSON.stringify({ endpoint, body: { prompt: secret } }), encoding: 'utf8', windowsHide: true,

@@ -34,8 +34,8 @@ export async function commandCodeReview(request, { run = runLimited } = {}) {
     // through agent prose or the provider connection's company.
     const namespace = configured.model.split('/');
     // JUL-98 established that DeepSeek reviews use the selected model's own
-    // output limit. An OpenAI-compatible client default can otherwise impose
-    // a 16,384-token limit before the provider has finished reasoning.
+    // output limit. The initial laptop transport reintroduced an explicit
+    // 16,384-token max_tokens field before the provider finished reasoning.
     const body = { model: configured.model, ...(configured.thinking ? { reasoning_effort: configured.thinking } : {}), messages: [{ role: 'user', content: request.prompt }], stream: false };
     evidence.requestId = sha256(JSON.stringify(body)); evidence.request = body; evidence.spending = request.spending;
     // The runner already persisted review intent. Save the exact request before
