@@ -1,0 +1,40 @@
+{
+  "runId": "2026-10-09T224813-907Z-d61c3b09",
+  "session": "verify-julia-2026-10-09T224813-907Z-d61c3b09",
+  "url": "http://127.0.0.1:64389",
+  "command": [
+    "C:\\Program Files\\nodejs\\node.exe",
+    "C:\\Dev\\julia-next-jul204\\node_modules\\next\\dist\\bin\\next",
+    "dev",
+    "--hostname",
+    "127.0.0.1",
+    "--port",
+    "64389"
+  ],
+  "environment": {
+    "JULIA_VERIFY_RUN_ID": "2026-10-09T224813-907Z-d61c3b09",
+    "JULIA_VERIFY_COMMIT": "5bd201cd08b6e96e2517c0ab279e339ea79feb38",
+    "JULIA_VERIFY_DIST_DIR": ".next\\verify-julia\\2026-10-09T224813-907Z-d61c3b09"
+  },
+  "candidate": {
+    "root": "C:\\Dev\\julia-next-jul204",
+    "branch": "toddwyder/jul-204-generate-verify-julia-and-prove-the-two-existing-features",
+    "commit": "5bd201cd08b6e96e2517c0ab279e339ea79feb38",
+    "worktreeSha256": "28d5599cbf8edb81e4f31e7109c7a3382506d3683885ddacf66780590dd96db8",
+    "nodeVersion": "v24.14.1",
+    "version": "0.0.0",
+    "nextVersion": "16.3.5",
+    "playwrightVersion": "1.63.0"
+  },
+  "pid": 42360,
+  "readiness": {
+    "health": {
+      "status": "ok"
+    },
+    "listenerPids": [
+      45112
+    ]
+  },
+  "log": "C:\\Dev\\julia-next-jul204\\.artifacts\\verify-julia\\2026-10-09T224813-907Z-d61c3b09\\evidence\\server.log",
+  "evidenceDir": "C:\\Dev\\julia-next-jul204\\.artifacts\\verify-julia\\2026-10-09T224813-907Z-d61c3b09\\evidence"
+}

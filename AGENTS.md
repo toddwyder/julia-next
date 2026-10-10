@@ -20,7 +20,11 @@ Follow the approved plan; it answers the questions skills ask (scope, seams, acc
 verification, observability). Build test-first with `.claude/skills/tdd/SKILL.md`; review with
 `.claude/skills/code-review/SKILL.md` against [CODING_STANDARDS.md](CODING_STANDARDS.md). The
 reviewer records evidence for the five checks in `CODING_STANDARDS.md`, or explains why a check
-does not apply.
+does not apply. Before handing a Julia user-facing change to independent review, run the relevant
+proof in `.agents/skills/verify-julia/SKILL.md` and retain behavior evidence that identifies the
+exact candidate commit and dirty-tree digest. Any source change after proof makes that proof stale;
+rerun it before review. Missing, failed, unavailable, stale, or identity-mismatched proof is a
+review blocker, not a pass or an implied not-applicable result.
 
 ## Authorization and blockers
 

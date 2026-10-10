@@ -25,6 +25,7 @@ This map covers Julia's two existing browser surfaces: home content and install 
 - Install-metadata proof includes the home page's same-origin manifest link, the live manifest response, and both icon responses with MIME type and decoded dimensions.
 - Record candidate commit, dirty-tree SHA-256, Julia version, Playwright version, run ID, URL, process/listener identity, command exits, and console errors.
 - Read the retained artifacts after cleanup. A manifest/assets result does not prove that a phone installed Julia.
+- Before independent review, verify that the launch and Doctor candidate identity matches the exact reviewed tree, then inspect the saved behavior results and exit codes. Missing, failed, unavailable, stale, or mismatched evidence blocks a pass; rerun proof after any source change.
 
 ## Features
 

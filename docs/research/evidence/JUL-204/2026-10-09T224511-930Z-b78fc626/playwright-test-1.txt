@@ -1,0 +1,11 @@
+
+Running 2 tests using 1 worker
+
+
+
+(node:53464) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[1/2] e2e\home.spec.mjs:6:1 › home page shows Julia, the application version, and a welcome line
+[2/2] e2e\home.spec.mjs:19:1 › home page exposes an installable Julia manifest and decodable icons
+  2 passed (7.4s)
+exitCode=0

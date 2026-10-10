@@ -1,0 +1,33 @@
+{
+  "runId": "2026-10-09T224511-930Z-b78fc626",
+  "session": "verify-julia-2026-10-09T224511-930Z-b78fc626",
+  "url": "http://127.0.0.1:61166",
+  "command": [
+    "C:\\Program Files\\nodejs\\node.exe",
+    "C:\\Dev\\julia-next-jul204\\node_modules\\next\\dist\\bin\\next",
+    "dev",
+    "--hostname",
+    "127.0.0.1",
+    "--port",
+    "61166"
+  ],
+  "candidate": {
+    "root": "C:\\Dev\\julia-next-jul204",
+    "branch": "toddwyder/jul-204-generate-verify-julia-and-prove-the-two-existing-features",
+    "commit": "5bd201cd08b6e96e2517c0ab279e339ea79feb38",
+    "worktreeSha256": "28d5599cbf8edb81e4f31e7109c7a3382506d3683885ddacf66780590dd96db8",
+    "nodeVersion": "v24.14.1",
+    "version": "0.0.0",
+    "nextVersion": "16.3.5",
+    "playwrightVersion": "1.63.0"
+  },
+  "pid": 45556,
+  "listenerPids": [
+    39712
+  ],
+  "health": {
+    "status": "ok"
+  },
+  "healthAttempts": 1,
+  "evidenceDir": "C:\\Dev\\julia-next-jul204\\.artifacts\\verify-julia\\2026-10-09T224511-930Z-b78fc626\\evidence"
+}
