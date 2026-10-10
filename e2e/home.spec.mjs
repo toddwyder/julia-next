@@ -14,7 +14,6 @@ test('home page shows Julia, the application version, and a welcome line', async
     `Julia ${version}`,
     'what are we cooking today?',
   ]);
-  expect(true, 'JUL-206 controlled browser-failure proof').toBe(false);
 });
 
 test('home page exposes an installable Julia manifest and decodable icons', async ({ page, request }) => {
