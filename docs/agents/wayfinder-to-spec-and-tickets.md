@@ -31,23 +31,14 @@ Specs are documents; reserve implementation cards for buildable work. Linear own
 - **Sentry:** unexpected failures carry enough context to identify the affected journey and diagnose the failing operation.
 - **Axiom:** significant operations, outcomes, and failures produce structured events. Related events share an operation identifier. Every connection between services has a trace showing the intended service and account.
 - **Integration tests:** identify every seam the change crosses, including component, storage, sync, and external-service boundaries. Cover observable contracts and relevant failure cases. Connections between services are tested against the real service, as required by [CODING_STANDARDS.md](../../CODING_STANDARDS.md); mocked responses alone do not prove that connection works.
-- **Verification model:** proof decides done. Tests guard. Live alarms catch the rest.
-  - **Proof:** a change is done only when an agent has driven the journeys it touches on the real
-    app and saved evidence of actions, results and side effects. Passing tests never count as done.
-    Proof covers only the journeys the change touches. Do not build a permanent all-journey browser
-    suite.
-  - **Every-change gate (CI), 10-minute limit:** logic checks, real-service seam checks against the
-    free Firebase test project, and the deterministic import tests on Julia's own sample pages. If
-    the gate passes 10 minutes, cut or move tests; do not add machines.
-  - **Paid model check:** runs only when import code changes.
-  - **Physical phone and Chrome clipper checks:** they cannot run in cloud CI. They run on the laptop
-    as part of the builder's proof, only when that code changes.
-  - **Preview smoke check:** every preview, about two minutes: sign in, open a recipe, search, add
-    one recipe.
-  - **Every test must be able to fail and must catch something no other test catches.** Delete
-    tests that would still pass if every imported function returned nothing, and tests that
-    duplicate others.
-  - **Live alarms:** Sentry and Axiom, as the draft already specifies.
+- **Verification:** Proof decides done; tests guard; live alarms catch the rest.
+  - A change is done only when an agent has driven the journeys it touches on the real app and saved evidence of actions, results and side effects. Passing tests alone never count.
+  - The every-change CI gate has a 10-minute limit: logic checks, real-service seam checks against the free Firebase test project, and deterministic checks on sample inputs. Over 10 minutes, cut or move checks; don’t add machines.
+  - Paid AI-model checks run only when the code that calls the model changes.
+  - Physical-phone and browser-extension checks run on Todd’s laptop as builder proof, only when that code changes.
+  - Every preview gets a two-minute smoke check of the core journeys.
+  - Prove only the journeys a change touches. No permanent all-journey browser suite.
+  - Every test must be able to fail and must catch something no other test catches. Delete the rest.
 - **Runtime dependencies:** for server or database work, include a runtime dependency matrix naming each boundary, the deployed principal (service identity), backing store/API, read/write mode, test fixture, and deployed proof command. Follow [work-execution.md](work-execution.md).
 - **Telemetry proof:** exercise the relevant success and controlled failure paths and inspect the actual expected telemetry. Use an isolated verification environment and identify its build. Record concrete events and error expectations; adding logging calls alone is insufficient. Keep secrets and personal data out of telemetry and evidence.
 
