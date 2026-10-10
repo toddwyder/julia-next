@@ -126,7 +126,7 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          npx playwright test --reporter=line,html 2>&1 | tee ci-playwright-evidence/test-output.txt
+          npx playwright test --reporter=line 2>&1 | tee ci-playwright-evidence/test-output.txt
           status="${PIPESTATUS[0]}"
           printf 'exitCode=%s\n' "$status" | tee ci-playwright-evidence/test-exit.txt
           exit "$status"
