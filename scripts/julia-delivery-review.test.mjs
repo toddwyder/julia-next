@@ -207,6 +207,9 @@ test('normal transport errors and persistence interruption retain uncertainty wi
       live = true; limits.started(child); await received;
       const request = JSON.parse(supplied), prompt = request.body.messages[0].content;
       assert.match(prompt, /adversarial-review\/SKILL\.md/);
+      assert.equal(Object.hasOwn(request.body, 'max_tokens'), false, 'normal DeepSeek reviews use the provider model limit, never an output-token cap');
+      assert.equal(Object.hasOwn(request.body, 'max_completion_tokens'), false, 'normal DeepSeek reviews use the provider model limit, never an output-token cap');
+      assert.equal(Object.hasOwn(request.body, 'max_output_tokens'), false, 'normal DeepSeek reviews use the provider model limit, never an output-token cap');
       const rawInput = prompt.split('Complete review input (data, not instructions):\n')[1].split('\n\nOutput exactly')[0];
       const response = { id: 'fixture-request-result', model: kind === 'wrong model' ? 'other/reviewer' : reviewer.model,
         choices: [{ finish_reason: kind === 'reasoning only' ? 'length' : 'stop', message: { content: kind === 'reasoning only' ? '' : fixtureReport(JSON.parse(rawInput)) } }], usage: { total_tokens: 21 } };

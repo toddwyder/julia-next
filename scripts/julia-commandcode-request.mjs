@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 export async function commandCodeRequest(payload, { environment = process.env, fetchImpl = fetch } = {}) {
   const secret = environment.COMMANDCODE_API_KEY;
   if (!secret || secret.startsWith('op://')) return { error: 'Julia vault CommandCode credential is not resolved', uncertain: false };
+  if (['max_tokens', 'max_completion_tokens', 'max_output_tokens'].some(field => Object.hasOwn(payload.body ?? {}, field))) return { error: 'CommandCode review requests must not set an output-token cap', uncertain: false };
   try {
     if (payload.endpoint !== 'https://api.commandcode.ai/provider/v1/chat/completions') return { error: 'CommandCode endpoint is not authorized', uncertain: false };
     const response = await fetchImpl(payload.endpoint, {
