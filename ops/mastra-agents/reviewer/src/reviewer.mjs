@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { setTimeout as delay } from 'node:timers/promises';
 import { checkQuotes } from './quote-check.mjs';
-import { finishReviewerRun, requireCompleteFileReview, REVIEWER_RESOURCE, requestWithoutOutputCap, reviewThread, reviewerConfiguration } from './contract.mjs';
+import { finishReviewerRun, requireCompleteFileReview, REVIEWER_RESOURCE, requestWithoutOutputCap, reviewThread, reviewerConfiguration, reviewerStorageConfiguration } from './contract.mjs';
 import { checkedReview } from '../../../../scripts/julia-delivery-review.mjs';
 import { commandCodeCostEstimate, commandCodeUsageSummary, requireUsageSummaryCoverage, usageSummaryDelta } from './commandcode-cost.mjs';
 
@@ -212,11 +212,7 @@ export async function runReviewer(request, { onVerdict = async () => {} } = {}) 
   const connectionOptions = { name: 'commandcode', apiKey: process.env.COMMANDCODE_API_KEY, baseURL, supportsStructuredOutputs: true, transformRequestBody: requestWithoutOutputCap };
   const memoryStorage = new LibSQLStore({ id: 'julia-reviewer-memory', url: memoryUrl });
   const vector = new LibSQLVector({ id: 'julia-reviewer-semantic-memory', url: memoryUrl });
-  const costStorage = new DuckDBStore({
-    id: 'julia-reviewer-observability',
-    path: costPath,
-    retention: { observability: { spans: { maxAge: '14d' } } },
-  });
+  const costStorage = new DuckDBStore(reviewerStorageConfiguration(costPath));
   const memory = new Memory({
     id: 'julia-reviewer-memory', storage: memoryStorage, vector, embedder: fastembed,
     options: {

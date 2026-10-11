@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_REVIEWER, REVIEWER_RESOURCE, finishReviewerRun, requireCompleteFileReview, reviewThread, requestWithoutOutputCap, requireLiveTracing, reviewerConfiguration } from '../src/contract.mjs';
+import { DEFAULT_REVIEWER, REVIEWER_RESOURCE, finishReviewerRun, requireCompleteFileReview, reviewThread, requestWithoutOutputCap, requireLiveTracing, reviewerConfiguration, reviewerStorageConfiguration } from '../src/contract.mjs';
 import { captureCommandCodeResponse, commandCodeMetadata } from '../src/reviewer.mjs';
 import { commandCodeCostEstimate, commandCodeUsageSummary, requireUsageSummaryCoverage, usageSummaryDelta } from '../src/commandcode-cost.mjs';
 
@@ -27,6 +27,16 @@ test('per-card reviewer model overrides the CommandCode default', () => {
   assert.equal(reviewerConfiguration({ reviewer: { model: 'deepseek/custom' } }).model, 'deepseek/custom');
   assert.equal(reviewerConfiguration({ reviewer: { connection: { route: 'api', provider: 'commandcode' } } }).connection, 'existing-commandcode');
   assert.equal(reviewerConfiguration().model, DEFAULT_REVIEWER.model);
+});
+
+test('the persistent DuckDB store has a bounded working set on the reviewer laptop', () => {
+  assert.deepEqual(reviewerStorageConfiguration('C:/proof/reviewer-costs.duckdb'), {
+    id: 'julia-reviewer-observability',
+    path: 'C:/proof/reviewer-costs.duckdb',
+    memoryLimit: '512MB',
+    threads: 1,
+    retention: { observability: { spans: { maxAge: '14d' } } },
+  });
 });
 
 test('published CommandCode prices produce a labeled estimate from every token category', async () => {

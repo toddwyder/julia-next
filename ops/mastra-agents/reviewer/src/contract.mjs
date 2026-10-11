@@ -32,6 +32,16 @@ export function requestWithoutOutputCap(body) {
 
 export const REVIEWER_RESOURCE = 'julia-reviewer';
 
+export function reviewerStorageConfiguration(path) {
+  return {
+    id: 'julia-reviewer-observability',
+    path,
+    memoryLimit: '512MB',
+    threads: 1,
+    retention: { observability: { spans: { maxAge: '14d' } } },
+  };
+}
+
 export function reviewThread(cardId, commit) {
   if (!/^JUL-\d+$/.test(cardId ?? '') || !/^[0-9a-f]{40}$/i.test(commit ?? '')) throw new Error('reviewer memory needs a Julia card identifier and immutable commit');
   return `reviewer:${cardId}:${commit}`;

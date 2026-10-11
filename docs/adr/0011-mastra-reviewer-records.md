@@ -15,6 +15,10 @@ DuckDB retention applies only to observability spans, with `maxAge: '14d'`. A sc
 summaries, or LibSQL memory, so those records are kept permanently. Pruning is never an end-of-run
 cleanup step and does not promise to shrink the DuckDB file.
 
+The DuckDB store uses its supported 512 MB memory limit and one worker thread. The installed
+adapter otherwise defaults to a 2 GB working set; bounding it lets file-backed analytical work
+spill to disk and prevents full internal-trace persistence from exhausting the reviewer laptop.
+
 Each run emits exactly one human-readable summary line through stock Mastra logging. It records the
 card, change, round, verdict or stop and reason, reviewer and safety-check model/effort, input and
 output tokens, the published-price estimate, the machine usage-summary actual cost (marked as a

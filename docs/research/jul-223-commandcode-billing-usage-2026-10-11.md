@@ -58,8 +58,10 @@ Mastra packages. No third-party account of either API is used.
    credits, and period basis. It exposed no request ID, trace ID, or per-request
    rows. The temporary probe printed only status, latency, and field names/types;
    it was removed immediately afterward and no secret value left the launcher.
-   An aggregate delta is not a safe substitute because another CommandCode call
-   during the interval would be charged to the wrong reviewer call.
+   Historical conclusion, superseded by Todd's later 11 Oct decision: an
+   aggregate delta cannot isolate one request. The accepted design deliberately
+   uses the machine-wide delta because mixed usage overcounts in the safe
+   direction; it does not claim request-level attribution.
 
 4. **The per-request Studio record has the necessary join and cost fields.** The
    usage client renders each record's request `id`, creation time, token counts,
@@ -76,8 +78,10 @@ Mastra packages. No third-party account of either API is used.
    history tracks usage as it happens. Neither specifies an SLA for when an
    individual record becomes queryable. The Studio client's five-minute cache
    freshness setting is a UI cache policy, not evidence of backend delay.
-   Consequently a live request-ID poll is required before concluding that
-   `/internal/usage` is timely enough to gate the next paid model call.
+   Historical conclusion, superseded by Todd's later 11 Oct decision: a
+   request-ID poll is not a precondition. The in-run gate uses the published
+   token-price estimate, while `/alpha/usage/summary` reconciles actual
+   machine-wide cost after the run.
    Sources: [Studio usage tab](https://commandcode.ai/docs/studio#usage-tab),
    [Tracking your limits](https://commandcode.ai/docs/resources/pricing-limits#tracking-your-limits),
    [Studio usage bundle](https://commandcode.ai/assets/usage-C1KUGoNk.js).
