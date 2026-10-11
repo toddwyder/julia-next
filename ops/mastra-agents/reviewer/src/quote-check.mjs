@@ -15,11 +15,24 @@ export async function gitText(repoRoot, commit, source) {
   return (await exec('git', ['show', `${commit}:${path}`], { cwd: repoRoot, windowsHide: true })).stdout;
 }
 
-export async function checkQuotes(repoRoot, commit, report) {
+export function evidenceCitations(value, found = []) {
+  if (!value || typeof value !== 'object') return found;
+  if (typeof value.source === 'string' && typeof value.quote === 'string') found.push({ source: value.source, quote: value.quote });
+  for (const child of Array.isArray(value) ? value : Object.values(value)) evidenceCitations(child, found);
+  return found;
+}
+
+export async function checkQuotes(repoRoot, commit, report, sources = {}) {
   const checks = [];
-  for (const criterion of report.criteria) for (const evidence of criterion.evidence) {
-    try { checks.push({ source: evidence.source, quote: evidence.quote, ok: quoteIsPresent(evidence.quote, await gitText(repoRoot, commit, evidence.source)) }); }
-    catch (error) { checks.push({ source: evidence.source, quote: evidence.quote, ok: false, error: error.message }); }
+  for (const evidence of evidenceCitations(report)) {
+    try {
+      const sourceText = evidence.source === 'diff' || evidence.source.startsWith('file:')
+        ? await gitText(repoRoot, commit, evidence.source)
+        : sources[evidence.source];
+      checks.push({ source: evidence.source, quote: evidence.quote, ok: quoteIsPresent(evidence.quote, sourceText ?? '') });
+    } catch (error) {
+      checks.push({ source: evidence.source, quote: evidence.quote, ok: false, error: error.message });
+    }
   }
   return checks;
 }

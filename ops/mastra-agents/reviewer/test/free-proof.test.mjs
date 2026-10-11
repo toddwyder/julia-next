@@ -8,6 +8,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { productionLauncher } from '../../../../scripts/julia-delivery-runner.mjs';
+import { checkedReview, reviewInput } from '../../../../scripts/julia-delivery-review.mjs';
 
 const exec = promisify(execFile);
 const testRoot = dirname(fileURLToPath(import.meta.url));
@@ -28,6 +29,7 @@ async function standInServer() {
   let review = 0;
   const requests = [];
   const observations = [];
+  const contracts = [];
   const server = createServer(async (request, response) => {
     let raw = '';
     for await (const chunk of request) raw += chunk;
@@ -44,16 +46,32 @@ async function standInServer() {
       const schema = body.response_format?.json_schema?.schema;
       const value = schemaValue(schema);
       if (schema?.properties?.verdict) {
+        const contract = contracts[review];
         review += 1;
         const requestText = JSON.stringify(body.messages ?? []);
         const hasWorkingMemory = requestText.includes('No arbitrary caps or limits; flag any new one.');
         const hasPriorReview = review === 1 || requestText.includes('first-review-memory-marker');
         observations.push({ review, hasWorkingMemory, hasPriorReview });
         value.verdict = hasWorkingMemory && hasPriorReview ? 'PASS' : 'INCONCLUSIVE';
+        const codeEvidence = [{ source: 'diff', quote: 'violet arbitrary run cap', reasoning: 'The immutable diff exposes the arbitrary cap behavior under review.' }];
+        const testEvidence = { source: 'test-evidence', quote: 'deterministic stand-in checks passed', reasoning: 'The saved runner evidence records the deterministic check result.' };
+        const combinedEvidence = [...codeEvidence, testEvidence];
         value.report = {
           filesReviewed: ['candidate.mjs'],
+          candidate: contract.candidate, inputDigest: contract.digest,
+          approach: 'Read the immutable diff, apply the standing cap rule, and challenge the saved check evidence.',
+          standards: { status: 'proven', evidence: codeEvidence },
+          spec: { status: 'proven', evidence: combinedEvidence },
+          criteria: contract.criteria.map(criterion => ({ criterion, status: 'proven', evidence: codeEvidence })),
+          files: contract.files.map(file => ({ file, status: 'proven', evidence: [{ source: `file:${file}`, quote: 'violet arbitrary run cap', reasoning: 'The committed file contains the reviewed behavior.' }] })),
+          checks: [1, 2, 5].map(check => ({ check, status: 'proven', evidence: combinedEvidence })).concat([
+            { check: 3, status: 'not-applicable', reason: 'The reviewer has no household-facing UI.', evidence: combinedEvidence },
+            { check: 4, status: 'not-applicable', reason: 'The reviewer has no browser surface.', evidence: combinedEvidence },
+          ]),
+          counterexamples: ['missing cap rule', 'missing checked result'].map(scenario => ({ scenario, method: 'deterministic request inspection', result: 'The stand-in refuses PASS when required memory is absent.', evidence: combinedEvidence })),
+          testAudit: { analysis: 'The proof checks request causality, exact file coverage, trace content, persistence, and the cost brake.', evidence: combinedEvidence },
           summary: review === 1 ? 'first-review-memory-marker applied the standing rule against arbitrary run caps' : 'review 2 retrieved first-review-memory-marker and applied the standing rule against arbitrary run caps', findings: [],
-          criteria: [{ id: 'AC1', verdict: 'met', how: 'read_candidate_diff returned the immutable candidate diff', evidence: [{ source: 'file:candidate.mjs', quote: 'violet arbitrary run cap' }] }],
+          limitations: [],
         };
       }
       message = { role: 'assistant', content: JSON.stringify(value) };
@@ -62,7 +80,7 @@ async function standInServer() {
     response.end(JSON.stringify({ id: `standin-${requests.length}`, object: 'chat.completion', created: 1, model: 'deepseek/deepseek-v4.1-flash', choices: [{ index: 0, message, finish_reason: finishReason }], usage: { prompt_tokens: 120, completion_tokens: 30, total_tokens: 150, cost: { total: 0.15 } } }));
   });
   await new Promise((done, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', done); });
-  return { server, requests, observations, baseURL: `http://127.0.0.1:${server.address().port}/v1` };
+  return { server, requests, observations, contracts, baseURL: `http://127.0.0.1:${server.address().port}/v1` };
 }
 
 async function candidateRepository(root) {
@@ -71,8 +89,9 @@ async function candidateRepository(root) {
   await git('init', '-q');
   await git('config', 'user.email', 'reviewer-proof@example.invalid');
   await git('config', 'user.name', 'Reviewer Proof');
+  await writeFile(join(root, 'CODING_STANDARDS.md'), '# Fixture standards\nNo arbitrary caps.\n');
   await writeFile(join(root, 'candidate.mjs'), 'export const reviewerPolicy = "no cap";\n');
-  await git('add', 'candidate.mjs');
+  await git('add', 'CODING_STANDARDS.md', 'candidate.mjs');
   await git('commit', '-q', '-m', 'base');
   const base = (await git('rev-parse', 'HEAD')).stdout.trim();
   await writeFile(join(root, 'candidate.mjs'), 'export const reviewerPolicy = "violet arbitrary run cap";\n');
@@ -102,18 +121,28 @@ test('runner starts the real reviewer twice and preserves verdict, trace, workin
     connection: { provider: 'commandcode' }, costCeilingUsd: 1, baseURL: api.baseURL, storageDirectory: data,
   };
   const launcher = productionLauncher(repositoryRoot, { environment: { ...process.env, COMMANDCODE_API_KEY: 'free-proof', MASTRA_REVIEWER_STANDIN: '1' } });
-  const run = async (commit, number) => launcher('reviewer', {
-    mastraReviewOnly: true, issueId: 'JUL-206', repoRoot: join(directory, 'candidate'), candidate: { base: candidate.base, commit },
-    reviewInput: { candidate: { base: candidate.base, commit }, criteria: [{ id: 'AC1', text: 'No arbitrary run cap' }], files: ['candidate.mjs'], scope: 'free proof', sources: { specification: 'Flag arbitrary caps. The violet policy is relevant across reviews.', 'test-evidence': 'deterministic stand-in' } },
-    configuration, outputPath: join(evidence, `run-${number}.json`), started: async () => {},
-  });
+  const candidatePath = join(directory, 'candidate');
+  const card = { description: '# Acceptance criteria\n- [ ] No arbitrary run cap\n', comments: { nodes: [], pageInfo: { hasNextPage: false } } };
+  const run = async (commit, number) => {
+    await exec('git', ['checkout', '--detach', '-q', commit], { cwd: candidatePath, windowsHide: true });
+    const diff = (await exec('git', ['diff', '--binary', `${candidate.base}...${commit}`], { cwd: candidatePath, windowsHide: true })).stdout.trim();
+    const checkedCandidate = { base: candidate.base, commit, diff, files: ['candidate.mjs'], runs: [{ status: 0, output: 'deterministic stand-in checks passed' }] };
+    const input = reviewInput(card, checkedCandidate, { path: candidatePath });
+    api.contracts.push(input);
+    const result = await launcher('reviewer', {
+      mastraReviewOnly: true, issueId: 'JUL-206', repoRoot: candidatePath, candidate: { base: candidate.base, commit }, reviewInput: input,
+      configuration, outputPath: join(evidence, `run-${number}.json`), started: async () => {},
+    });
+    return { result, input };
+  };
 
-  const first = await run(candidate.first, 1);
-  const second = await run(candidate.second, 2);
-  assert.equal(first.exitCode, 0, first.text);
-  assert.equal(second.exitCode, 0, second.text);
+  const firstRun = await run(candidate.first, 1);
+  const secondRun = await run(candidate.second, 2);
+  assert.equal(firstRun.result.exitCode, 0, firstRun.result.text);
+  assert.equal(secondRun.result.exitCode, 0, secondRun.result.text);
   const verdicts = await Promise.all([1, 2].map(number => readFile(join(evidence, `run-${number}.json.verdict.json`), 'utf8').then(JSON.parse)));
   assert.deepEqual(verdicts.map(result => result.text.match(/^VERDICT: (\w+)/)?.[1]), ['PASS', 'PASS']);
+  assert.deepEqual([checkedReview(verdicts[0].text, firstRun.input).verdict, checkedReview(verdicts[1].text, secondRun.input).verdict], ['PASS', 'PASS']);
   assert.equal(verdicts[0].evidence.resourceId, verdicts[1].evidence.resourceId);
   assert.notEqual(verdicts[0].evidence.threadId, verdicts[1].evidence.threadId);
   assert.match(verdicts[0].text, /standing rule against arbitrary run caps/);
@@ -179,8 +208,8 @@ test('runner starts the real reviewer twice and preserves verdict, trace, workin
 
   configuration.costCeilingUsd = readback.costAggregate.estimatedCost / 2;
   const blocked = await run(candidate.third, 3);
-  assert.equal(blocked.exitCode, 2, blocked.text);
-  assert.match(blocked.text, /cost|limit|budget/i);
+  assert.equal(blocked.result.exitCode, 2, blocked.result.text);
+  assert.match(blocked.result.text, /cost|limit|budget/i);
   await assert.rejects(readFile(join(evidence, 'run-3.json.verdict.json'), 'utf8'), /ENOENT/);
   await writeFile(join(directory, 'acceptance-evidence.json'), `${JSON.stringify({
     generatedAt: new Date().toISOString(), candidate, verdicts, readback,

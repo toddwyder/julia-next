@@ -4,6 +4,8 @@ The review-only laptop runner starts this worker with the per-card reviewer
 configuration (default: CommandCode `deepseek/deepseek-v4.1-flash`). It reads
 candidate files lazily through immutable, read-only Git tools, returns a
 structured verdict, and preserves the runner's quote validation.
+The structured output carries the complete delivery-runner report contract and
+is passed through the same `checkedReview` gate before it can become durable.
 
 Run it only through the established 1Password launcher, with
 `COMMANDCODE_API_KEY` resolved in its child environment:

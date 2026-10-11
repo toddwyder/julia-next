@@ -628,7 +628,7 @@ test('Mastra launcher keeps an atomic verdict when later shutdown times out', as
     child.stdout = new PassThrough(); child.stderr = new PassThrough(); child.stdin = new PassThrough();
     limits.started(child);
     await writeFile(`${outputPath}.verdict.json`, `${JSON.stringify(verdict)}\n`);
-    child.stdout.write(`${JSON.stringify(verdict)}\n`);
+    child.stdout.write('shutdown interrupted after durable verdict');
     return { code: null, stopped: true, signal: 'SIGTERM' };
   };
   const selected = { harness: 'mastra-commandcode', model: 'fixture-model', maker: 'Fixture', connection: { provider: 'commandcode' } };
