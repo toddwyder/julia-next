@@ -482,7 +482,7 @@ test('literal $init drives the authorized fixture journey and restarting reuses 
   const settingsPath = join(dirname(runPath), 'settings.json');
   await mkdir(dirname(runPath), { recursive: true });
   const catalog = Object.values(configuration).map(chosen => ({ id: chosen.identity, displayName: chosen.identity, executableModelId: chosen.model, maker: chosen.maker, harness: chosen.harness, thinking: { supported: chosen.thinking ? [chosen.thinking] : false, default: chosen.thinking }, connection: { route: 'native', provider: null, endpoint: null, protocol: null, authReference: null } }));
-  await writeFile(settingsPath, JSON.stringify({ catalog, builder: { model: 'claude', thinking: 'high' }, reviewer: { model: 'codex', thinking: null } }));
+  await writeFile(settingsPath, JSON.stringify({ catalog, reviewerRunLimits: { maxTotalUsd: 1, maxLiveRuns: 4, outputTokenCap: null }, builder: { model: 'claude', thinking: 'high' }, reviewer: { model: 'codex', thinking: null } }));
   let reads = 0, builds = 0, delivery;
   const dispatch = async (selected, context) => {
     const saved = JSON.parse(await readFile(context.runPath, 'utf8'));
