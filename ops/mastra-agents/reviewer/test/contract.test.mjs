@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_REVIEWER, REVIEWER_RESOURCE, finishReviewerRun, requireCompleteFileReview, reviewThread, requestWithoutOutputCap, requireLiveTracing, reviewerConfiguration, reviewerDuckDBSettings, reviewerExporterConfiguration, reviewerStorageConfiguration } from '../src/contract.mjs';
+import { DEFAULT_REVIEWER, REVIEWER_RESOURCE, finishReviewerRun, requireCompleteFileReview, reviewPromptContract, reviewThread, requestWithoutOutputCap, requireLiveTracing, reviewerConfiguration, reviewerDuckDBSettings, reviewerExporterConfiguration, reviewerStorageConfiguration } from '../src/contract.mjs';
 import { captureCommandCodeResponse, commandCodeMetadata } from '../src/reviewer.mjs';
 import { commandCodeCostEstimate, commandCodeUsageSummary, requireUsageSummaryCoverage, usageSummaryDelta } from '../src/commandcode-cost.mjs';
 
@@ -16,6 +16,14 @@ test('reviewer memory uses one stable private resource and one thread per review
   assert.equal(REVIEWER_RESOURCE, 'julia-reviewer');
   assert.equal(reviewThread('JUL-206', 'a'.repeat(40)), `reviewer:JUL-206:${'a'.repeat(40)}`);
   assert.notEqual(REVIEWER_RESOURCE, 'julia-builder');
+});
+
+test('the model prompt keeps requirements and proof but reads candidate bytes through tools', () => {
+  const input = { candidate: 'abc', sources: { specification: 'requirements', clarifications: 'decisions', 'test-evidence': 'proof', diff: 'large diff', 'file:a.mjs': 'large file' } };
+  assert.deepEqual(reviewPromptContract(input), {
+    candidate: 'abc', sources: { specification: 'requirements', clarifications: 'decisions', 'test-evidence': 'proof' },
+  });
+  assert.deepEqual(input.sources, { specification: 'requirements', clarifications: 'decisions', 'test-evidence': 'proof', diff: 'large diff', 'file:a.mjs': 'large file' });
 });
 
 test('a review refuses to start when no live trace context exists', () => {

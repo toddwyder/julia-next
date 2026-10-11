@@ -32,6 +32,13 @@ export function requestWithoutOutputCap(body) {
 
 export const REVIEWER_RESOURCE = 'julia-reviewer';
 
+export function reviewPromptContract(input) {
+  return {
+    ...input,
+    sources: Object.fromEntries(Object.entries(input.sources ?? {}).filter(([source]) => source !== 'diff' && !source.startsWith('file:'))),
+  };
+}
+
 export function reviewerStorageConfiguration(path) {
   return {
     id: 'julia-reviewer-observability',
