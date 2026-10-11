@@ -531,7 +531,7 @@ export async function startReviewOnly(issueId, configuration, {
   if (!candidateCommit && pullRequest == null) throw new Error('review-only runs require an existing PR or candidate commit');
   const launchWorker = async (role, request) => {
     if (role !== 'reviewer') throw new Error('review-only runs never launch a builder');
-    return (launch ?? productionLauncher(workspace?.path ?? tmpdir()))(role, request);
+    return (launch ?? productionLauncher(process.cwd()))(role, request);
   };
   const captureCandidate = async () => {
     try {
@@ -543,6 +543,7 @@ export async function startReviewOnly(issueId, configuration, {
   const result = await runDelivery({ issueId, configuration, runPath, authorization }, {
     readCard, launch: launchWorker,
     candidate: captureCandidate, reviewOnly: true,
+    prepareWorktree: async () => ({ ok: true, worktree: workspace }),
     publishReview, prepareReview, ...(save ? { save } : {}), ...(load ? { load } : {}), ...(lock ? { lock } : {}),
   });
   // A parked normal-laptop review must leave its reason on the owning card.
