@@ -19,9 +19,10 @@ test('reviewer memory uses one stable private resource and one thread per review
 });
 
 test('reviewer step budget follows the immutable file inventory and contract phases', () => {
-  assert.equal(reviewStepBudget(['a.mjs']), 5);
-  assert.equal(reviewStepBudget(['a.mjs', 'b.mjs', 'c.mjs', 'd.mjs']), 8);
-  assert.throws(() => reviewStepBudget([]), /changed file/);
+  assert.equal(reviewStepBudget(['a.mjs'], ['criterion']), 6);
+  assert.equal(reviewStepBudget(['a.mjs', 'b.mjs', 'c.mjs', 'd.mjs'], Array(8).fill('criterion')), 16);
+  assert.throws(() => reviewStepBudget([], ['criterion']), /changed file/);
+  assert.throws(() => reviewStepBudget(['a.mjs'], []), /criterion/);
 });
 
 test('provider usage is known when every attempted response supplied token metadata', () => {

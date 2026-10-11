@@ -62,11 +62,12 @@ export function reviewThread(cardId, commit) {
   return `reviewer:${cardId}:${commit}`;
 }
 
-export function reviewStepBudget(changedFiles) {
+export function reviewStepBudget(changedFiles, criteria) {
   if (!Array.isArray(changedFiles) || changedFiles.length === 0) throw new Error('reviewer needs at least one changed file');
-  // Inventory, diff, one step per changed file, batched quote verification,
-  // and the final structured report.
-  return changedFiles.length + 4;
+  if (!Array.isArray(criteria) || criteria.length === 0) throw new Error('reviewer needs at least one acceptance criterion');
+  // Inventory, diff, one step per changed file, one per acceptance criterion,
+  // batched quote verification, and the final structured report.
+  return changedFiles.length + criteria.length + 4;
 }
 
 export function providerUsageIsUnknown({ attempted, observed, failures = 0, error }) {
