@@ -618,7 +618,7 @@ test('normal CommandCode review transport uses the saved model and one journalle
   assert.deepEqual(evidence.connection, selected.connection);
 });
 
-test('Mastra launcher keeps an atomic verdict when later shutdown times out', async t => {
+test('Mastra launcher keeps an atomic verdict but surfaces a later worker failure', async t => {
   const root = await mkdtemp(join(tmpdir(), 'jul206-verdict-first-'));
   t.after(() => import('node:fs/promises').then(({ rm }) => rm(root, { recursive: true, force: true })));
   const outputPath = join(root, 'review.json');
@@ -631,15 +631,16 @@ test('Mastra launcher keeps an atomic verdict when later shutdown times out', as
     child.stdout.write('shutdown interrupted after durable verdict');
     return { code: null, stopped: true, signal: 'SIGTERM' };
   };
-  const selected = { harness: 'mastra-commandcode', model: 'fixture-model', maker: 'Fixture', connection: { provider: 'commandcode' } };
+  const selected = { harness: 'omp', model: 'fixture-model', maker: 'Fixture', connection: { provider: 'commandcode' } };
   const result = await productionLauncher(root, { run, environment: { COMMANDCODE_API_KEY: 'fixture-key' } })('reviewer', {
     mastraReviewOnly: true, issueId: 'JUL-206', repoRoot: root, candidate: { base: 'a'.repeat(40), commit: 'b'.repeat(40) },
     reviewInput: { candidate: {}, criteria: [], files: [], scope: 'fixture', sources: { specification: '', 'test-evidence': '' } },
     configuration: selected, outputPath, started: async () => {},
   });
-  assert.equal(result.exitCode, 0);
+  assert.equal(result.exitCode, 2);
   assert.equal(result.text, verdict.text);
   assert.equal(result.traceId, verdict.traceId);
+  assert.deepEqual(result.observed, { harness: 'omp', model: 'fixture-model', maker: 'Fixture' });
 });
 
 test('same-company selection refuses before reviewer dispatch without imposing a review-input cap', async () => {

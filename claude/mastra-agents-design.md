@@ -1,17 +1,17 @@
 # Mastra builder and reviewer agents: settled design and parked items
 
-As of Sun 11 Oct 2026, 07:45 Pacific. This file is the source of truth for the Mastra agents. If a brief and this file disagree, this file wins. Mastra docs findings behind the 11 Oct changes: `claude/mastra-memory-research.md`.
+As of Sun 11 Oct 2026. This file is the source of truth for the Mastra agents. If a brief and this file disagree, this file wins. Mastra docs findings behind the 11 Oct changes: `claude/mastra-memory-research.md`.
 
 ## Where things stand
 - Spike (closed PR #286) proved a Mastra agent on DeepSeek 4.1 Flash via CommandCode can use read-only tools and return a strict structured review in one run. Spike verdict on PR #282: PASS, 16 of 16 quotes verified.
-- Real reviewer is in PR #287 (open). Live attempts on 10-11 Oct reached the model but lost every verdict: the end-of-run cleanup deleted the database while it was in use (Windows EBUSY), and the error replaced the result. Traces were empty because internal spans were excluded. JUL-206 is parked.
+- Real reviewer is in PR #287 (open). Six live attempts on 10-11 Oct were reported as reviewer-identity mismatches because the runner validated a missing observed identity before considering the worker's nonzero exit. Retained evidence separates three millisecond-scale preflight failures from three 79–139 second paid executions with storage/shutdown errors. The runner now reports nonzero worker exits as the primary failure and validates identity only for an exit-zero worker; an exit-zero missing or mismatched identity still fails closed. Earlier failures also exposed end-of-run database cleanup and missing-internal-span defects; those have regression coverage. The first 11 Oct proof attempt then showed that the AI SDK's OpenAI-compatible response schema removes CommandCode's non-standard `usage.cost` field before its metadata extractor runs. The provider transport now validates and retains raw response usage before schema normalization, keyed by response ID, while still failing closed before a missing-cost response reaches the agent.
 - Spend limit: $1.00 per card (JUL-206 covers the #282 review; a separate $1.00 covers the #287 review). There is NO limit on the number of runs. Other runaway guards: time limits, stuck-worker rule, same step failing twice, two review rounds then park.
 - PR #284 (OVH move) stays a draft, not merged. OVH VPS is cancelled only after the new reviewer is proven.
 - 1Password: Julia-vault-only read_items service account, token DPAPI-protected on the laptop, unattended. Expires 6 Jan 2027 Pacific.
 
 ## Settled design
 - Two Mastra agents, builder and reviewer, called as steps by the existing delivery runner. The runner owns sequence, saved state, lock, kill-orphan-workers and authorization checks.
-- Stock Mastra first: every Mastra feature is configured from Mastra's own docs for the pinned version (@mastra/core 1.75.0), read through the Mastra docs MCP server (@mastra/mcp-docs-server 1.3.5), not from memory. Custom code only where the docs show Mastra has nothing, and the report says what was checked.
+- Look it up, don't recall it: use version-matched documentation bundled with each installed package first; otherwise use the tool's official `llms.txt` index and fetch only the applicable individual page, never `llms-full.txt`. The Mastra docs MCP server is a fallback only. Every framework-map job cites the exact page used. Custom code is allowed only after the applicable docs show the stock tool has no feature for the need, and the report records the gap.
 - Models from the per-card configuration (JUL-195). Default: CommandCode `deepseek/deepseek-v4.1-flash`. Reviewer must be a different maker from the builder.
 - Instructions: reviewer = `.agents/skills/adversarial-review/SKILL.md` plus CODING_STANDARDS.md. No builder role file yet; `julia-builder` still referenced in 5 legacy places.
 - **Reviewer memory (Todd, 11 Oct): no observational memory.** Observational memory works only within one conversation, starts after about 30,000 tokens, and its cross-conversation mode is deprecated, so it cannot carry anything between one-shot reviews. Reviewer uses: message history; working memory, resource-scoped, holding Todd's standing rules (section "Standing rules for the reviewer"); semantic recall, resource-scoped, LibSQL vector store, local FastEmbed (one embedding model, needs a clean Windows proof). One stable resource for the reviewer, one thread per review. Reviewer memory is never shared with the builder (different resource). Revisit observational memory for the builder, whose sessions run long.
@@ -21,12 +21,15 @@ As of Sun 11 Oct 2026, 07:45 Pacific. This file is the source of truth for the M
 - **Verdict first:** the reviewer saves and returns its verdict before any end-of-run step. No end-of-run step may lose or replace a verdict.
 - **End of run order:** verdict out; wait for memory background work (`memory.settled()`); flush observability; then close storage. No deletion.
 - Guards: UnicodeNormalizer plus PromptInjectionDetector in warn-only mode.
-- **Tracing (Todd, 11 Oct):** local LibSQL; `includeInternalSpans: true` (otherwise model, tool and step contents are dropped); Mastra's default SensitiveDataFilter. Traces must show each step's content, tokens and cost.
-- **Cleanup (Todd, 11 Oct): removed entirely until the reviewer is proven to run properly.** Added back later as Mastra's documented age-based retention plus `storage.prune()` from a scheduler, never at startup or shutdown. Deleting a card's traces after its retro would be custom (Mastra has no such feature) and is decided then.
-- **Cost (Todd, 11 Oct):** LibSQL cannot store metrics, so cost records go to a second local database: route only the observability metrics to DuckDB (Mastra's documented local setup). TokenCostControl ($1.00 per card) reads from it. The runner refuses to start an agent unless tracing and cost recording are live. The model's price comes from Mastra's pricing registry or the documented way to supply one.
+- **Storage (Todd, 11 Oct):** traces, cost metrics, and permanent run-summary logs live together in one stock local DuckDB observability store. Reviewer message history, resource-scoped working memory, and resource-scoped semantic recall remain in LibSQL. Use Mastra's stock domain storage configuration; no custom per-method storage adapter.
+- **Tracing (Todd, 11 Oct):** `includeInternalSpans: true` (otherwise model, tool and step contents are dropped) and Mastra's default SensitiveDataFilter. Traces must show each step's content, tokens, and cost.
+- **Retention (Todd, 11 Oct):** configure stock DuckDB observability retention only for spans, with `maxAge: '14d'`, and exercise stock `storage.prune()` through the reviewer's external-scheduler target. Metrics/cost records, logs/permanent summaries, and LibSQL memory have no retention policy and are never pruned. Do not delete at startup or shutdown. Install the laptop schedule from the merged checkout after UAT so it never points at a disposable PR worktree. Mastra pruning deletes rows but does not shrink the database file.
+- **Permanent run summary (Todd, 11 Oct):** emit exactly one line per run through stock Mastra logging and keep it permanently. The line contains card, change, round, verdict or stop and reason, reviewer model and effort, safety-check model and effort, input/output tokens, cost, start/end time, and the memory and observability database sizes. When a provider has no effort setting, record that explicitly and cite its documentation.
+- **Cost (Todd, 11 Oct):** TokenCostControl ($1.00 per card) counts every paid model call, including PromptInjectionDetector's safety check. Because the installed stock processor documents its threshold as best-effort, the worker also performs a fail-closed preflight against the same stock cost metrics before any paid call. Missing, non-finite, or otherwise unknown provider cost or token counts fail closed and are never recorded as zero. A real CommandCode response must retain evidence of `usage.cost.total`, and recorded totals must reconcile with CommandCode's billing/usage record, including the six earlier attempts. The runner refuses to start unless tracing and cost recording are live.
 - No human-in-the-loop in builder or reviewer. Anything needing Todd parks the card with a visible reason.
 - Park visibility: post one safe, idempotent line to the Linear card after local state is saved.
-- Scorers: passive recorder only. Model choice by an escalation ladder, authorized up front on the card. A run ledger must be built (model, role, round, verdict, park reason, cost with source).
+- Scorers: passive recorder only. Model choice by an escalation ladder, authorized up front on the card. The stock permanent summary log is the run ledger.
+- Delivery order is independent review, then Todd's UAT on the Vercel preview, then merge. Reviewers and automated runners never merge.
 - No arbitrary caps. Still to remove: the 130,000-byte cap in the older minimal runner, the 5-failure/500-character trimming in the old controller.
 
 ## Reviewer acceptance evidence (Todd, 11 Oct)
@@ -34,7 +37,7 @@ Three pieces, retrieved and explained in plain English with where each came from
 1. A trace of one review: what it read, what the model did, tokens and cost per step.
 2. Working memory: Todd's standing rules on the reviewer's notepad, and a review visibly applying one.
 3. Semantic memory: a second review retrieving something relevant from the first, with the match shown.
-Shown first in a free end-to-end run with a stand-in model, then on the real reviews of #282 and #287.
+Shown first in a free end-to-end run with a stand-in model, then on the real reviews of #282 and #287. The free proof also verifies one correct permanent summary per run, the brake total equals the sum of cost records (including the safety check), and stock 14-day retention deletes only traces while summaries, cost records, and memory remain. It runs locally and in CI.
 
 ## Standing rules for the reviewer (seed for working memory)
 - Every quote must appear word for word in the named file or diff at the reviewed commit.
@@ -52,12 +55,11 @@ Shown first in a free end-to-end run with a stand-in model, then on the real rev
 - Each step ends in something Todd can see.
 
 ## Parked items, in the order they come up
-1. Reviewer: build to this design, free end-to-end proof with the three pieces of evidence, then the real reviews of #282 (JUL-206) and #287, merge, close JUL-206.
+1. Reviewer: build to this design, free end-to-end proof with the required retained evidence, diagnose and fix the reviewer-identity mismatch, then complete the real reviews of #282 (JUL-206) and #287 under $1.00 each. Todd performs UAT on the #287 Vercel preview before merge.
 2. Runner preflight: the runner checks a card's assumptions and credentials before starting, repairs what it can, and posts stop reasons to the card.
 3. Credential-list writer: the migration writer must add to `secrets.env`, not overwrite it.
 4. Builder: research what Mastra gives a coding agent, small spike, build; builder role file; clean `julia-builder` references.
 5. Token renewal (expires 6 Jan 2027): automatic or one tap.
 6. Escalation ladder.
 7. OVH cancellation after the reviewer is proven.
-8. Cleanup back in: age-based retention and scheduled prune; decide on post-retro trace deletion.
-9. Smaller cleanups: confirm the cost ceiling from a real run; revoke stale 1Password service accounts; retire the old graph controller; close stale PR #184; investigate JUL-196's stall.
+8. Smaller cleanups: confirm the cost ceiling from a real run; revoke stale 1Password service accounts; retire the old graph controller; close stale PR #184; investigate JUL-196's stall.

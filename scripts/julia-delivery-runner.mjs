@@ -164,14 +164,15 @@ export function productionLauncher(worktree, { run = runLimited, environment = p
           child.stdout.on('data', chunk => { stdout += chunk; }); child.stderr.on('data', chunk => { stderr += chunk; }); child.stdin.on('error', () => {});
           Promise.resolve(request.started?.({ pid: child.pid })).then(() => {
             recorded = true;
-            child.stdin.end(JSON.stringify({ issueId: request.issueId, repoRoot: request.repoRoot ?? worktree, candidate: request.candidate, input: request.reviewInput, configuration: configured, verdictPath }));
+            child.stdin.end(JSON.stringify({ issueId: request.issueId, repoRoot: request.repoRoot ?? worktree, candidate: request.candidate, input: request.reviewInput, configuration: configured, round: request.round, verdictPath }));
           }, () => child.kill());
         },
       });
       let reply = null; try { reply = JSON.parse(stdout); } catch { /* durable sidecar checked below */ }
       if (!reply && existsSync(verdictPath)) try { reply = JSON.parse(readFileSync(verdictPath, 'utf8')); } catch { /* recorded below */ }
       const durableVerdict = typeof reply?.text === 'string' && /^VERDICT: (?:PASS|FAIL|INCONCLUSIVE)\b/.test(reply.text);
-      const exitCode = recorded && durableVerdict ? 0 : 2;
+      const workerSucceeded = result.code === 0 && result.stopped !== true;
+      const exitCode = recorded && durableVerdict && workerSucceeded ? 0 : 2;
       const observed = reply?.observed ? { ...reply.observed, harness: configured.harness, maker: configured.maker } : null;
       if (request.outputPath) await fileSave(request.outputPath, { role, configured, observed, startedAt, finishedAt: new Date().toISOString(), stdout, stderr, exitCode, traceId: reply?.traceId ?? null, responseId: reply?.responseId ?? null, quotes: reply?.quotes ?? [], warnings: reply?.warnings ?? [] });
       return { exitCode, observed, text: reply?.text ?? stderr, outputPath: request.outputPath ?? null, responseId: reply?.responseId ?? null, traceId: reply?.traceId ?? null };
@@ -415,8 +416,9 @@ export async function runDelivery({ issueId, configuration, runPath, authorizati
       if (!isDone('review', round)) await save(handoffPath, handoff);
       const reviewerConfig = { ...configuration.reviewer, builderMaker: configuration.builder.maker };
       const reviewer = await act('review', round, 'reviewer', (started, attempt) => launch('reviewer', { prompt, reviewInput: input, configuration: reviewerConfig, handoffPath, round, issueId, candidate: current, repoRoot: record.worktree?.path, mastraReviewOnly: reviewOnly, started, outputPath: evidence('reviewer', attempt), spending: approvedAuthorization.spending.reviewer }));
-      const reviewerIdentity = validObserved('reviewer', reviewerConfig, reviewer.observed);
+      const reviewerIdentity = reviewer.exitCode === 0 ? validObserved('reviewer', reviewerConfig, reviewer.observed) : null;
       const verdict = checkedReview(reviewer.text, input);
+      const reviewerFailure = reviewer.exitCode !== 0 ? `reviewer exited ${reviewer.exitCode}` : reviewerIdentity ?? verdict.error ?? null;
       await save(handoffPath, { ...handoff, reviewer: { configured: configuration.reviewer, observed: reviewer.observed, exitCode: reviewer.exitCode, outputPath: reviewer.outputPath ?? null, verdict: verdict.verdict ?? null }, result: verdict.error ?? verdict.verdict });
       const completed = reviewer.exitCode === 0 && !reviewerIdentity && !verdict.error;
       const publication = {
@@ -424,7 +426,7 @@ export async function runDelivery({ issueId, configuration, runPath, authorizati
         verdict: completed ? verdict.verdict : 'INCONCLUSIVE',
         report: completed ? verdict.report : null,
         state: completed ? 'completed' : 'incomplete',
-        reason: reviewerIdentity ?? verdict.error ?? (reviewer.exitCode !== 0 ? `reviewer exited ${reviewer.exitCode}` : 'review did not produce a completed verdict'),
+        reason: reviewerFailure ?? 'review did not produce a completed verdict',
       };
       let postReviewCandidate = null;
       if (reviewOnly && completed && verdict.verdict === 'PASS') {
@@ -443,7 +445,7 @@ export async function runDelivery({ issueId, configuration, runPath, authorizati
       if (published?.publicationError) return await finish(park(`durable GitHub review publication could not be confirmed: ${published.publicationError}`, round));
       const confirmedPublication = published?.publication;
       if (confirmedPublication?.confirmed !== true || confirmedPublication.authoritative !== completed) return await finish(park('durable GitHub review publication could not be confirmed: GitHub did not confirm the expected review record', round));
-      if (!completed) return await finish(park(reviewerIdentity ?? verdict.error ?? `reviewer exited ${reviewer.exitCode}`, round));
+      if (!completed) return await finish(park(reviewerFailure ?? 'review did not produce a completed verdict', round));
       if (verdict.verdict === 'PASS') {
         const afterReview = postReviewCandidate ?? await act('verify', round, null, () => candidate({ round, afterReview: true, previous: current }));
         if (afterReview?.commit !== current.commit || afterReview.clean !== true || afterReview.checks?.pass !== true) return await finish(park('candidate changed after review', round));

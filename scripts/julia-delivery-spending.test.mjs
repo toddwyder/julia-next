@@ -83,15 +83,17 @@ test('actionable findings allow one new fixture review only after changed checke
 });
 
 test('authentication failures, malformed verdicts and unknown identity are saved and reused without reviewer retries', async t => {
-  for (const review of [
-    { exitCode: 1, text: 'fixture authentication failure', observed: configuration.reviewer },
-    { exitCode: 0, text: 'fixture malformed response', observed: configuration.reviewer },
-    { exitCode: 0, text: `VERDICT: PASS\nCOMMIT: ${A}`, observed: null },
+  for (const { review, reason, rejectedReason } of [
+    { review: { exitCode: 1, text: 'fixture authentication failure', observed: null }, reason: /reviewer exited 1/, rejectedReason: /identity/ },
+    { review: { exitCode: 0, text: 'fixture malformed response', observed: configuration.reviewer }, reason: /incomplete output contract/ },
+    { review: { exitCode: 0, text: `VERDICT: PASS\nCOMMIT: ${A}`, observed: null }, reason: /identity/ },
   ]) {
     const f = await fixture(t);
     f.adapters.launch = async role => { f.launches.push(role); return role === 'builder' ? { exitCode: 0, observed: configuration.builder } : review; };
     const result = await runDelivery(f.run, f.adapters);
     assert.equal(result.outcome, 'park');
+    assert.match(result.reason, reason);
+    if (rejectedReason) assert.doesNotMatch(result.reason, rejectedReason);
     assert.deepEqual(await runDelivery(f.run, f.adapters), result);
     assert.deepEqual(f.launches, ['builder', 'reviewer']);
     assert.equal((await f.state()).repairsUsed, 0);

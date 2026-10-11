@@ -20,15 +20,25 @@ Resource-scoped working memory is seeded from the design document's standing
 rules; resource-scoped semantic recall uses LibSQL vectors and local FastEmbed.
 Observational memory is intentionally disabled.
 
-LibSQL retains message history, working memory, vectors, and traces. A narrow
-observability-domain adapter sends only metric methods to a second local DuckDB
-file because Mastra's documented composite store routes the entire observability
-domain and cannot route individual signals. `TokenCostControl` reads that DuckDB
-store at the $1-per-card scope. Both databases persist after every run.
+LibSQL retains message history, resource-scoped working memory, and vectors. The
+stock composite store routes the complete observability domain—traces,
+metrics/cost records, and logs—to one local DuckDB file. DuckDB span retention
+is `maxAge: '14d'`; metrics and logs have no retention policy and LibSQL memory
+stays outside pruning. Every completed or stopped run emits one structured
+`mastra reviewer run summary` record through Mastra's stock observability logger.
+CommandCode's provider page exposes no reasoning-effort setting, so both model
+roles record effort as `not-supported`. Both databases persist after every run.
 
 The runner supplies a unique verdict path. The worker writes and emits the
 verdict before waiting for memory, flushing observability, and closing storage;
-shutdown failures are warnings and cannot replace the saved verdict.
+shutdown or summary failures surface as run failures without replacing a verdict
+that was already saved.
+
+Run `npm run retention -- <storage-directory>` from the laptop's external daily
+scheduler. The command is deliberately separate from reviewer startup and
+shutdown. Install that scheduler target only from the merged checkout after
+Todd's preview UAT, so the pre-merge branch cannot leave a task pointing at a
+disposable worktree.
 
 ## Mastra framework map
 
@@ -38,8 +48,9 @@ shutdown failures are warnings and cannot replace the saved verdict.
 | Cross-review retrieval | Resource-scoped semantic recall, `LibSQLVector`, local `fastembed` | `docs/memory/semantic-recall.md` |
 | No observational memory | OM is thread-oriented and resource scope is deprecated | `docs/memory/observational-memory.md` |
 | Complete local traces | `MastraStorageExporter`, `includeInternalSpans: true`, `SensitiveDataFilter` | `docs/observability/tracing/overview.md`; `reference/observability/tracing/processors/sensitive-data-filter.md` |
-| Persistent cost metrics | DuckDB observability storage and automatic span-derived metrics; CommandCode's `usage.cost.total` is carried as provider-reported cost because the embedded registry has no exact CommandCode/model entry | `integrations/databases/duckdb.md`; `docs/observability/metrics/overview.md`; `reference/observability/metrics/automatic-metrics.md` |
+| Complete traces and persistent cost metrics together | Stock DuckDB observability domain and automatic span-derived metrics; the transport validates and retains CommandCode's raw `usage.cost.total` before the OpenAI-compatible schema removes that non-standard field, then carries it as provider-reported cost because the embedded registry has no exact CommandCode/model entry | `integrations/databases/duckdb.md`; `docs/observability/metrics/overview.md`; `reference/observability/metrics/automatic-metrics.md` |
 | $1 per-card brake | `TokenCostControl`, card ID carried as `userId` trace metadata | `reference/processors/token-cost-control.md` |
 | Safe short-lived shutdown | `memory.settled()`, observability `flush()`, then storage `close()` | `reference/memory/settled.md`; `docs/observability/overview.md` |
-| No end-of-run deletion | Persistent storage; age-based scheduled retention is the later stock option | `reference/storage/retention.md` |
-| Metrics-only database split | No stock per-signal router exists; documented composite routing is domain-wide | `docs/observability/overview.md`; `integrations/databases/duckdb.md` |
+| Span-only 14-day retention | DuckDB retention on `observability.spans`; omitted metrics/log policies keep them forever; `npm run retention -- [storage-directory]` is the external scheduler target that calls stock `prune()` | `reference/storage/retention.md` |
+| Stock domain routing | `MastraCompositeStore` routes the complete observability domain to `DuckDBStore.observability` | `reference/storage/composite.md`; `integrations/databases/duckdb.md` |
+| Permanent summary | `loggerVNext.info()` at the documented `info` minimum level, exported by `MastraStorageExporter`; CommandCode exposes no effort option | `reference/observability/tracing/configuration.md`; `docs/observability/logging.md`; [CommandCode provider page](https://commandcode.ai/docs/byok) |

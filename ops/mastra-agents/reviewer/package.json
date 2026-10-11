@@ -4,8 +4,9 @@
   "description": "",
   "main": "src/reviewer.mjs",
   "scripts": {
-    "test": "node --test",
+    "test": "node --test --test-concurrency=1",
     "review": "node src/reviewer.mjs",
+    "retention": "node src/retention.mjs",
     "test:contract": "node --test test/contract.test.mjs"
   },
   "keywords": [],

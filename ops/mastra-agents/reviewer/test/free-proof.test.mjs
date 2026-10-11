@@ -28,13 +28,21 @@ function schemaValue(schema = {}) {
 async function standInServer() {
   let review = 0;
   const requests = [];
+  const reportedCosts = [];
   const observations = [];
   const contracts = [];
+  let failNext = false;
   const server = createServer(async (request, response) => {
     let raw = '';
     for await (const chunk of request) raw += chunk;
     const body = JSON.parse(raw);
     requests.push(body);
+    if (failNext) {
+      failNext = false;
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({ id: `standin-${requests.length}`, object: 'chat.completion', choices: [{ index: 0, message: { role: 'assistant', content: '{}' }, finish_reason: 'stop' }] }));
+      return;
+    }
     const candidateTool = body.tools?.find(tool => tool.function?.name === 'read_candidate_diff');
     const hasToolResult = body.messages?.some(message => message.role === 'tool');
     let message;
@@ -77,10 +85,11 @@ async function standInServer() {
       message = { role: 'assistant', content: JSON.stringify(value) };
     }
     response.writeHead(200, { 'content-type': 'application/json' });
+    reportedCosts.push(0.15);
     response.end(JSON.stringify({ id: `standin-${requests.length}`, object: 'chat.completion', created: 1, model: 'deepseek/deepseek-v4.1-flash', choices: [{ index: 0, message, finish_reason: finishReason }], usage: { prompt_tokens: 120, completion_tokens: 30, total_tokens: 150, cost: { total: 0.15 } } }));
   });
   await new Promise((done, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', done); });
-  return { server, requests, observations, contracts, baseURL: `http://127.0.0.1:${server.address().port}/v1` };
+  return { server, requests, reportedCosts, observations, contracts, failOnce: () => { failNext = true; }, baseURL: `http://127.0.0.1:${server.address().port}/v1` };
 }
 
 async function candidateRepository(root) {
@@ -131,10 +140,22 @@ test('runner starts the real reviewer twice and preserves verdict, trace, workin
     api.contracts.push(input);
     const result = await launcher('reviewer', {
       mastraReviewOnly: true, issueId: 'JUL-206', repoRoot: candidatePath, candidate: { base: candidate.base, commit }, reviewInput: input,
-      configuration, outputPath: join(evidence, `run-${number}.json`), started: async () => {},
+      configuration, round: number, outputPath: join(evidence, `run-${number}.json`), started: async () => {},
     });
     return { result, input };
   };
+
+  await exec('git', ['checkout', '--detach', '-q', candidate.first], { cwd: candidatePath, windowsHide: true });
+  const invalidDiff = (await exec('git', ['diff', '--binary', `${candidate.base}...${candidate.first}`], { cwd: candidatePath, windowsHide: true })).stdout.trim();
+  const invalidInput = reviewInput(card, { base: candidate.base, commit: candidate.first, diff: invalidDiff, files: ['candidate.mjs'], runs: [{ status: 0, output: 'fixture' }] }, { path: candidatePath });
+  invalidInput.candidate = candidate.second;
+  const invalidResult = await launcher('reviewer', {
+    mastraReviewOnly: true, issueId: 'JUL-206', repoRoot: candidatePath, candidate: { base: candidate.base, commit: candidate.first }, reviewInput: invalidInput,
+    configuration, round: 0, outputPath: join(evidence, 'run-0.json'), started: async () => {},
+  });
+  assert.equal(invalidResult.exitCode, 2, invalidResult.text);
+  assert.match(invalidResult.text, /identity is incomplete/i);
+  await assert.rejects(readFile(join(evidence, 'run-0.json.verdict.json'), 'utf8'), /ENOENT/);
 
   const firstRun = await run(candidate.first, 1);
   const secondRun = await run(candidate.second, 2);
@@ -148,72 +169,184 @@ test('runner starts the real reviewer twice and preserves verdict, trace, workin
   assert.match(verdicts[0].text, /standing rule against arbitrary run caps/);
   assert.ok(verdicts[1].evidence.semanticMatches.some(match => /violet|arbitrary run cap/i.test(match.text)), JSON.stringify(verdicts[1].evidence.semanticMatches));
 
+  configuration.costCeilingUsd = 10;
+  api.failOnce();
+  const ambiguous = await run(candidate.third, 4);
+  assert.equal(ambiguous.result.exitCode, 2, ambiguous.result.text);
+  assert.match(ambiguous.result.text, /usage.*missing or unknown/i);
+  await assert.rejects(readFile(join(evidence, 'run-4.json.verdict.json'), 'utf8'), /ENOENT/);
+
   const memoryPath = join(data, 'reviewer.db');
   const costPath = join(data, 'reviewer-costs.duckdb');
   assert.ok((await readFile(memoryPath)).length > 0);
   assert.ok((await readFile(costPath)).length > 0);
+  const retentionScript = fileURLToPath(new URL('../src/retention.mjs', import.meta.url));
   const readbackProgram = `
     import { LibSQLStore } from '@mastra/libsql';
     import { DuckDBStore } from '@mastra/duckdb';
     import { Memory } from '@mastra/memory';
     const [memoryPath, costPath, traceIds, threadId, resourceId] = process.argv.slice(1);
     const memory = new LibSQLStore({ id: 'proof-memory-readback', url: 'file:' + memoryPath.replaceAll('\\\\', '/') });
-    const traceStore = await memory.getStore('observability');
-    const traces = await Promise.all(JSON.parse(traceIds).map(traceId => traceStore.getTrace({ traceId })));
+    const memoryObservability = await memory.getStore('observability');
+    const memoryTraces = await Promise.all(JSON.parse(traceIds).map(traceId => memoryObservability.getTrace({ traceId })));
     const memoryApi = new Memory({ storage: memory, options: { workingMemory: { enabled: true, scope: 'resource' } } });
     const workingMemory = await memoryApi.getWorkingMemory({ threadId, resourceId });
-    await traceStore.close?.(); await memory.close();
-    const duck = new DuckDBStore({ id: 'proof-cost-readback', path: costPath });
+    const duck = new DuckDBStore({ id: 'proof-cost-readback', path: costPath, retention: { observability: { spans: { maxAge: '14d' } } } });
     const metricStore = await duck.getStore('observability');
+    const traces = await Promise.all(JSON.parse(traceIds).map(traceId => metricStore.getTrace({ traceId })));
     const metrics = await metricStore.listMetrics({ pagination: { page: 0, perPage: 100 } });
+    const logs = await metricStore.listLogs({ pagination: { page: 0, perPage: 100 } });
     const costAggregate = await metricStore.getMetricAggregate({ name: ['mastra_model_total_input_tokens', 'mastra_model_total_output_tokens'], aggregation: 'sum', filters: { entityType: 'agent', userId: 'JUL-206' } });
+    const expiredAt = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000);
+    const example = traces[0].spans[0];
+    const { createdAt, updatedAt, ...createFields } = example;
+    await metricStore.createSpan({ span: {
+      ...createFields, traceId: 'expired-retention-proof', spanId: 'expired-span', parentSpanId: null,
+      name: 'expired retention proof', startedAt: expiredAt, endedAt: expiredAt,
+    } });
+    const expiredBefore = await metricStore.getTrace({ traceId: 'expired-retention-proof' });
+    await memoryObservability.close?.(); await memory.close();
     await metricStore.close?.(); await duck.close();
     const traceText = JSON.stringify(traces);
-    const tokenCostFields = (value, path = '', found = []) => {
-      if (found.length >= 40 || value == null) return found;
+    const firstPositiveCost = (value, path = '', seen = new WeakSet()) => {
+      if (value == null) return null;
       if (typeof value !== 'object') {
-        if (/token|cost/i.test(path)) found.push({ path, value });
-        return found;
+        return /(?:gateway\.cost|usage\.cost\.total)$/.test(path) && typeof value === 'number' && value > 0 ? { path, value } : null;
       }
-      for (const [key, child] of Object.entries(value)) tokenCostFields(child, path ? path + '.' + key : key, found);
-      return found;
+      if (seen.has(value)) return null;
+      seen.add(value);
+      for (const [key, child] of Object.entries(value)) {
+        const found = firstPositiveCost(child, path ? path + '.' + key : key, seen);
+        if (found) return found;
+      }
+      return null;
     };
     console.log(JSON.stringify({
       traceCount: traces.filter(Boolean).length,
+      memoryTraceCount: memoryTraces.filter(Boolean).length,
       traceIds: traces.map(trace => trace?.traceId),
       hasToolContent: traceText.includes('read_candidate_diff'),
       hasTokenContent: /promptTokens|inputTokens|prompt_tokens|input_tokens/i.test(traceText),
-      hasNumericStepCost: traces.every(trace => tokenCostFields(trace).some(field => /estimatedCost$/.test(field.path) && typeof field.value === 'number')),
+      hasNumericStepCost: traces.every(trace => Boolean(firstPositiveCost(trace))),
       metricCount: metrics.metrics?.length ?? 0,
       costAggregate,
       metricNames: (metrics.metrics ?? []).map(metric => metric.name),
+      summaries: (logs.logs ?? []).filter(log => log.message === 'mastra reviewer run summary').map(log => log.data),
+      expiredExisted: Boolean(expiredBefore),
       workingMemory,
-      steps: traces.map(trace => trace.spans.map(span => ({ name: span.name, type: span.spanType, tokenCost: tokenCostFields(span) }))),
+      steps: traces.map(trace => trace.spans.map(span => ({ name: span.name, type: span.spanType, tokenCost: firstPositiveCost(span) })).filter(step => step.tokenCost)),
     }));
   `;
   const readbackOutput = await exec(process.execPath, ['--input-type=module', '-e', readbackProgram, memoryPath, costPath, JSON.stringify(verdicts.map(result => result.traceId)), verdicts[0].evidence.threadId, verdicts[0].evidence.resourceId], { cwd: resolve(testRoot, '..'), windowsHide: true, maxBuffer: 4 * 1024 * 1024 });
   const readback = JSON.parse(readbackOutput.stdout.trim().split(/\r?\n/).at(-1));
-  assert.equal(readback.traceCount, 2, 'both saved trace IDs must read back from LibSQL');
+  const retentionOutput = await exec(process.execPath, [retentionScript, data], { cwd: resolve(testRoot, '..'), windowsHide: true });
+  const retentionRun = JSON.parse(retentionOutput.stdout.trim().split(/\r?\n/).at(-1));
+  const postRetentionProgram = `
+    import { LibSQLStore } from '@mastra/libsql';
+    import { DuckDBStore } from '@mastra/duckdb';
+    import { Memory } from '@mastra/memory';
+    const [memoryPath, costPath, traceIds, threadId, resourceId] = process.argv.slice(1);
+    const memory = new LibSQLStore({ id: 'proof-memory-after-prune', url: 'file:' + memoryPath.replaceAll('\\\\', '/') });
+    const memoryApi = new Memory({ storage: memory, options: { workingMemory: { enabled: true, scope: 'resource' } } });
+    const workingMemory = await memoryApi.getWorkingMemory({ threadId, resourceId });
+    const duck = new DuckDBStore({ id: 'proof-cost-after-prune', path: costPath, retention: { observability: { spans: { maxAge: '14d' } } } });
+    const store = await duck.getStore('observability');
+    const [expired, traces, metrics, logs] = await Promise.all([
+      store.getTrace({ traceId: 'expired-retention-proof' }),
+      Promise.all(JSON.parse(traceIds).map(traceId => store.getTrace({ traceId }))),
+      store.listMetrics({ pagination: { page: 0, perPage: 100 } }),
+      store.listLogs({ pagination: { page: 0, perPage: 100 } }),
+    ]);
+    await memory.close(); await store.close?.(); await duck.close();
+    console.log(JSON.stringify({ expiredDeleted: !expired, currentTraceCount: traces.filter(Boolean).length, metricCount: metrics.metrics?.length ?? 0, summaryCount: (logs.logs ?? []).filter(log => log.message === 'mastra reviewer run summary').length, workingMemory }));
+  `;
+  const postRetentionOutput = await exec(process.execPath, ['--input-type=module', '-e', postRetentionProgram, memoryPath, costPath, JSON.stringify(verdicts.map(result => result.traceId)), verdicts[0].evidence.threadId, verdicts[0].evidence.resourceId], { cwd: resolve(testRoot, '..'), windowsHide: true });
+  const postRetention = JSON.parse(postRetentionOutput.stdout.trim().split(/\r?\n/).at(-1));
+  assert.equal(readback.traceCount, 2, 'both saved trace IDs must read back from the stock DuckDB observability domain');
+  assert.equal(readback.memoryTraceCount, 0, 'LibSQL must retain memory without reviewer traces');
   assert.equal(readback.hasToolContent, true);
   assert.equal(readback.hasTokenContent, true);
   assert.equal(readback.hasNumericStepCost, true, JSON.stringify(readback.steps));
   assert.ok(readback.metricCount > 0, 'DuckDB must retain automatic cost/token metrics');
   assert.ok(readback.costAggregate.estimatedCost > 0, JSON.stringify(readback.costAggregate));
+  assert.equal(Number(readback.costAggregate.estimatedCost.toFixed(12)), Number(api.reportedCosts.reduce((sum, cost) => sum + cost, 0).toFixed(12)), 'the brake total must equal every reported paid stand-in call, including safety checks');
+  assert.equal(readback.summaries.length, 4, JSON.stringify(readback.summaries));
+  const invalidSummary = readback.summaries.find(summary => summary.round === 0);
+  assert.equal(invalidSummary.verdict, null);
+  assert.match(invalidSummary.stopReason, /identity is incomplete/i);
+  assert.deepEqual(invalidSummary.tokens, { input: 0, output: 0 });
+  assert.equal(invalidSummary.costUsd, 0);
+  const ambiguousSummary = readback.summaries.find(summary => summary.round === 4);
+  assert.equal(ambiguousSummary.verdict, null);
+  assert.match(ambiguousSummary.stopReason, /usage.*missing or unknown/i);
+  assert.deepEqual(ambiguousSummary.tokens, { input: null, output: null });
+  assert.equal(ambiguousSummary.costUsd, null);
+  for (const [index, summary] of readback.summaries.filter(summary => summary.round === 1 || summary.round === 2).toSorted((a, b) => a.round - b.round).entries()) {
+    assert.equal(summary.card, 'JUL-206');
+    assert.equal(summary.change, `${candidate.base}...${index === 0 ? candidate.first : candidate.second}`);
+    assert.equal(summary.round, index + 1);
+    assert.equal(summary.verdict, 'PASS');
+    assert.equal(summary.stopReason, null);
+    assert.deepEqual(summary.reviewer, { model: 'deepseek/deepseek-v4.1-flash', effort: 'not-supported' });
+    assert.deepEqual(summary.safetyCheck, { model: 'deepseek/deepseek-v4.1-flash', effort: 'not-supported' });
+    assert.ok(summary.tokens.input > 0 && summary.tokens.output > 0, JSON.stringify(summary));
+    assert.ok(summary.costUsd > 0, JSON.stringify(summary));
+    assert.match(summary.startedAt, /^\d{4}-\d{2}-\d{2}T/);
+    assert.match(summary.endedAt, /^\d{4}-\d{2}-\d{2}T/);
+    assert.ok(summary.databaseBytes.memory > 0 && summary.databaseBytes.observability > 0, JSON.stringify(summary));
+  }
   assert.match(readback.workingMemory, /No arbitrary caps or limits; flag any new one\./);
+  assert.deepEqual({
+    expiredExisted: readback.expiredExisted,
+    expiredDeleted: postRetention.expiredDeleted,
+    currentTraceCount: postRetention.currentTraceCount,
+    metricCounts: [readback.metricCount, postRetention.metricCount],
+    summaryCounts: [readback.summaries.length, postRetention.summaryCount],
+    memoryUnchanged: postRetention.workingMemory === readback.workingMemory,
+  }, {
+    expiredExisted: true, expiredDeleted: true, currentTraceCount: 2,
+    metricCounts: [readback.metricCount, readback.metricCount], summaryCounts: [4, 4], memoryUnchanged: true,
+  });
+  assert.ok(retentionRun.results.some(result => result.domain === 'observability' && result.deleted > 0), JSON.stringify(retentionRun));
   assert.deepEqual(api.observations, [
     { review: 1, hasWorkingMemory: true, hasPriorReview: true },
     { review: 2, hasWorkingMemory: true, hasPriorReview: true },
   ]);
   assert.ok(api.requests.some(body => body.tools?.some(tool => tool.function?.name === 'read_candidate_diff')), 'the model must receive the real read-only reviewer tool');
 
-  configuration.costCeilingUsd = readback.costAggregate.estimatedCost / 2;
+  const costBeforeBlockedRun = readback.costAggregate.estimatedCost;
+  configuration.costCeilingUsd = costBeforeBlockedRun / 2;
   const blocked = await run(candidate.third, 3);
   assert.equal(blocked.result.exitCode, 2, blocked.result.text);
   assert.match(blocked.result.text, /cost|limit|budget/i);
   await assert.rejects(readFile(join(evidence, 'run-3.json.verdict.json'), 'utf8'), /ENOENT/);
+  const stoppedReadbackProgram = `
+    import { DuckDBStore } from '@mastra/duckdb';
+    const [costPath] = process.argv.slice(1);
+    const duck = new DuckDBStore({ id: 'proof-stopped-readback', path: costPath, retention: { observability: { spans: { maxAge: '14d' } } } });
+    const store = await duck.getStore('observability');
+    const logs = await store.listLogs({ pagination: { page: 0, perPage: 100 } });
+    const aggregate = await store.getMetricAggregate({ name: ['mastra_model_total_input_tokens', 'mastra_model_total_output_tokens'], aggregation: 'sum', filters: { entityType: 'agent', userId: 'JUL-206' } });
+    await store.close?.(); await duck.close();
+    console.log(JSON.stringify({ summaries: (logs.logs ?? []).filter(log => log.message === 'mastra reviewer run summary').map(log => log.data), aggregate }));
+  `;
+  const stoppedOutput = await exec(process.execPath, ['--input-type=module', '-e', stoppedReadbackProgram, costPath], { cwd: resolve(testRoot, '..'), windowsHide: true });
+  const stoppedReadback = JSON.parse(stoppedOutput.stdout.trim().split(/\r?\n/).at(-1));
+  assert.equal(stoppedReadback.summaries.length, 5, JSON.stringify(stoppedReadback.summaries));
+  const stoppedSummary = stoppedReadback.summaries.find(summary => summary.round === 3);
+  assert.equal(stoppedSummary.card, 'JUL-206');
+  assert.equal(stoppedSummary.change, `${candidate.base}...${candidate.third}`);
+  assert.equal(stoppedSummary.verdict, null);
+  assert.match(stoppedSummary.stopReason, /cost|limit|budget/i);
+  assert.deepEqual(stoppedSummary.reviewer, { model: 'deepseek/deepseek-v4.1-flash', effort: 'not-supported' });
+  assert.deepEqual(stoppedSummary.safetyCheck, { model: 'deepseek/deepseek-v4.1-flash', effort: 'not-supported' });
+  assert.deepEqual(stoppedSummary.tokens, { input: 0, output: 0 });
+  assert.equal(stoppedSummary.costUsd, 0);
+  assert.equal(Number(stoppedReadback.aggregate.estimatedCost.toFixed(12)), Number(api.reportedCosts.reduce((sum, cost) => sum + cost, 0).toFixed(12)));
+
   await writeFile(join(directory, 'acceptance-evidence.json'), `${JSON.stringify({
-    generatedAt: new Date().toISOString(), candidate, verdicts, readback,
-    costControl: { accumulatedCost: readback.costAggregate.estimatedCost, configuredLimit: configuration.costCeilingUsd, blocked: true },
+    generatedAt: new Date().toISOString(), candidate, verdicts, readback, stoppedReadback,
+    costControl: { accumulatedCostBeforeBlockedRun: costBeforeBlockedRun, accumulatedCostAfterBlockedRun: stoppedReadback.aggregate.estimatedCost, configuredLimit: configuration.costCeilingUsd, blocked: true },
     databases: { memoryAndTraces: memoryPath, costs: costPath },
   }, null, 2)}\n`);
 });
