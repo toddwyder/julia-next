@@ -28,7 +28,7 @@ export function parseReviewOnlyCommand(args) {
 export function authorizedReviewConfiguration() {
   return {
     builder: { identity: 'anthropic-builder', model: 'opus', maker: 'Anthropic', harness: 'claude-code', thinking: 'high', connection: { route: 'native', provider: null, endpoint: null, protocol: null, authReference: null } },
-    reviewer: { identity: 'commandcode-deepseek-reviewer', model: 'deepseek/deepseek-v4.1-flash', maker: 'DeepSeek', harness: 'omp', thinking: null, connection: { route: 'api', provider: 'commandcode', endpoint: 'https://api.commandcode.ai/provider/v1', protocol: 'openai-compatible', authReference: 'COMMANDCODE_API_KEY' } },
+    reviewer: { identity: 'commandcode-deepseek-reviewer', model: 'deepseek/deepseek-v4.1-flash', maker: 'DeepSeek', harness: 'omp', thinking: null, connection: { route: 'api', provider: 'commandcode', endpoint: 'https://api.commandcode.ai/provider/v1', protocol: 'openai-completions', authReference: 'env:COMMANDCODE_API_KEY' } },
   };
 }
 

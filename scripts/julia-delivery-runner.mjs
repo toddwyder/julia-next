@@ -523,6 +523,7 @@ export async function startReviewOnly(issueId, configuration, {
   runPath = join(homedir(), '.julia', 'runs', `${issueId}.json`), authorization,
   candidateCommit, pullRequest, base, checks, runs, workspace = null,
   readCard = (id) => getIssue(id, { apiKey: process.env.LINEAR_API_KEY, includeComments: true }),
+  parkCard = (id, reason) => postComment(id, `Runner parked: ${reason}`, { apiKey: process.env.LINEAR_API_KEY }),
   launch, publishReview = githubReviewPublisher(), resolvePullRequest = githubPullRequestTarget, save, load, lock,
   prepareReview = (card, current, priorReview) => reviewInput(card, current, workspace, priorReview),
 } = {}) {

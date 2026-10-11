@@ -12,5 +12,7 @@ test('review-only configuration keeps the authorized per-card cap out of prompts
   const configuration = authorizedReviewConfiguration();
   assert.equal(configuration.reviewer.model, 'deepseek/deepseek-v4.1-flash');
   assert.equal(configuration.reviewer.connection.provider, 'commandcode');
+  assert.equal(configuration.reviewer.connection.protocol, 'openai-completions');
+  assert.equal(configuration.reviewer.connection.authReference, 'env:COMMANDCODE_API_KEY');
   assert.equal('maxOutputTokens' in configuration.reviewer, false);
 });
