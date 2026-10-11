@@ -62,6 +62,17 @@ export function reviewThread(cardId, commit) {
   return `reviewer:${cardId}:${commit}`;
 }
 
+export function reviewStepBudget(changedFiles) {
+  if (!Array.isArray(changedFiles) || changedFiles.length === 0) throw new Error('reviewer needs at least one changed file');
+  // Inventory, diff, one step per changed file, batched quote verification,
+  // and the final structured report.
+  return changedFiles.length + 4;
+}
+
+export function providerUsageIsUnknown({ attempted, observed, failures = 0, error }) {
+  return observed < attempted || failures > 0 || /(?:usage\.(?:prompt_tokens|completion_tokens)|CommandCode response token usage).*missing or unknown/.test(error?.message ?? '');
+}
+
 export function requireLiveTracing(context) {
   if (!context?.traceId || context.currentSpan?.isValid !== true) throw new Error('reviewer refused: tracing context is not live');
   return context;

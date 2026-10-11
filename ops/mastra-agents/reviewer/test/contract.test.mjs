@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_REVIEWER, REVIEWER_RESOURCE, finishReviewerRun, requireCompleteFileReview, reviewPromptContract, reviewThread, requestWithoutOutputCap, requireLiveTracing, reviewerConfiguration, reviewerDuckDBSettings, reviewerExporterConfiguration, reviewerStorageConfiguration } from '../src/contract.mjs';
+import { DEFAULT_REVIEWER, REVIEWER_RESOURCE, finishReviewerRun, providerUsageIsUnknown, requireCompleteFileReview, reviewPromptContract, reviewStepBudget, reviewThread, requestWithoutOutputCap, requireLiveTracing, reviewerConfiguration, reviewerDuckDBSettings, reviewerExporterConfiguration, reviewerStorageConfiguration } from '../src/contract.mjs';
 import { captureCommandCodeResponse, commandCodeMetadata } from '../src/reviewer.mjs';
 import { commandCodeCostEstimate, commandCodeUsageSummary, requireUsageSummaryCoverage, usageSummaryDelta } from '../src/commandcode-cost.mjs';
 
@@ -16,6 +16,19 @@ test('reviewer memory uses one stable private resource and one thread per review
   assert.equal(REVIEWER_RESOURCE, 'julia-reviewer');
   assert.equal(reviewThread('JUL-206', 'a'.repeat(40)), `reviewer:JUL-206:${'a'.repeat(40)}`);
   assert.notEqual(REVIEWER_RESOURCE, 'julia-builder');
+});
+
+test('reviewer step budget follows the immutable file inventory and contract phases', () => {
+  assert.equal(reviewStepBudget(['a.mjs']), 5);
+  assert.equal(reviewStepBudget(['a.mjs', 'b.mjs', 'c.mjs', 'd.mjs']), 8);
+  assert.throws(() => reviewStepBudget([]), /changed file/);
+});
+
+test('provider usage is known when every attempted response supplied token metadata', () => {
+  assert.equal(providerUsageIsUnknown({ attempted: 6, observed: 6 }), false);
+  assert.equal(providerUsageIsUnknown({ attempted: 6, observed: 6, failures: 1 }), true);
+  assert.equal(providerUsageIsUnknown({ attempted: 6, observed: 5 }), true);
+  assert.equal(providerUsageIsUnknown({ attempted: 1, observed: 1, error: new Error('usage.prompt_tokens is missing or unknown') }), true);
 });
 
 test('the model prompt keeps requirements and proof but reads candidate bytes through tools', () => {
