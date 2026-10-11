@@ -4,8 +4,8 @@ import { execFileSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-test('the spike locates its enclosing Git repository', () => {
+test('the reviewer locates its enclosing Git repository', () => {
   const spikeRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-  const repoRoot = resolve(spikeRoot, '..', '..');
+  const repoRoot = resolve(spikeRoot, '..', '..', '..');
   assert.equal(execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: repoRoot, encoding: 'utf8' }).trim(), repoRoot.replaceAll('\\', '/'));
 });

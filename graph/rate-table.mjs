@@ -152,6 +152,17 @@ export const RATE_TABLE = {
       source: 'https://commandcode.ai/models/deepseek-v4-flash',
       checkedOn: '2026-09-22',
     },
+    // JUL-206's Mastra reviewer uses CommandCode's current fully-qualified
+    // V4.1 Flash id. It is priced separately so a provider rename cannot be
+    // accidentally treated as a zero-cost run.
+    'commandcode/deepseek/deepseek-v4.1-flash': {
+      vendor: 'commandcode',
+      offPeak: { input: 0.15, output: 0.6, cacheRead: 0.003 },
+      peak: { input: 0.3, output: 1.2, cacheRead: 0.006 },
+      contextWindow: 1000000,
+      source: 'https://commandcode.ai/models/deepseek-v4-flash',
+      checkedOn: '2026-10-10',
+    },
   },
 };
 

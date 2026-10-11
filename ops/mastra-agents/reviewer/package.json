@@ -1,11 +1,12 @@
 {
-  "name": "mastra-reviewer-spike",
+  "name": "julia-mastra-reviewer",
   "version": "1.0.0",
   "description": "",
   "main": "src/reviewer.mjs",
   "scripts": {
     "test": "node --test",
-    "review": "node src/reviewer.mjs"
+    "review": "node src/reviewer.mjs",
+    "test:contract": "node --test test/contract.test.mjs"
   },
   "keywords": [],
   "author": "",
@@ -16,6 +17,7 @@
     "@ai-sdk/openai-compatible": "^2.0.81",
     "@mastra/core": "^1.75.0",
     "@mastra/libsql": "^1.25.1",
+    "@mastra/memory": "^1.36.0",
     "@mastra/observability": "^1.18.4",
     "zod": "^4.1.12"
   }

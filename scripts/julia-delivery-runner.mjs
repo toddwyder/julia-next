@@ -6,8 +6,8 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { isDeepStrictEqual } from 'node:util';
-import { getIssue } from './linear-cli.mjs';
-import { localTester } from './julia-minimal-runner-checks.mjs';
+import { getIssue, postComment } from './linear-cli.mjs';
+import { git, localTester } from './julia-minimal-runner-checks.mjs';
 import { acquireRunLock, jsonText, loadText, processStarted, saveJson, sha256, stopProcessTree } from './julia-delivery-state.mjs';
 import { assertDeliveryPath, prepareDeliveryWorkspace, captureDeliveryCandidate } from './julia-delivery-candidate.mjs';
 import { LIMITS, runLimited } from '../ops/julia-runner/time-limit.mjs';
@@ -57,6 +57,29 @@ export function workerPrompt(role, card, configuration, runPath, approvedPath, f
     ? 'Perform the full adversarial review of the changed, checked immutable candidate.'
     : 'Check the repairs and relevant regressions on the changed, checked immutable candidate; do not repeat the entire initial review.';
   return `Issue: ${card.identifier}\nConfigured reviewer: ${JSON.stringify(chosen)}\n\nExplicitly read and follow .agents/skills/adversarial-review/SKILL.md (the complete pinned instructions are supplied below). ${scope} Use only the supplied review input in one fresh session. Keep Standards and Spec separate in the report. Save and reuse this review for this candidate; no polling or retry after an ambiguous or failing call, and no unchanged rereview.`;
+}
+
+// A reviewer-only run receives the identity and completed checks of an
+// existing candidate, then re-reads its immutable Git content. This keeps a
+// PR/commit handoff from becoming a trust-me object while leaving candidate
+// creation and every builder path unchanged.
+export function buildReviewCandidateRecord({ workspace, commit, base, checks, runs }) {
+  if (!workspace?.path || !SHA.test(commit ?? '') || !SHA.test(base ?? '')) throw new Error('review-only candidate needs a workspace, immutable candidate commit and immutable base commit');
+  if (checks?.pass !== true || !Array.isArray(runs) || !runs.length || runs.some(run => run?.commit !== commit || !Number.isInteger(run.status) || typeof run.output !== 'string')) throw new Error('review-only candidate needs completed checks bound to its immutable commit');
+  if (git(workspace.path, 'rev-parse', 'HEAD') !== commit || git(workspace.path, 'status', '--porcelain')) throw new Error('review-only workspace is not clean at the requested candidate commit');
+  const diff = git(workspace.path, 'diff', '--binary', `${base}...${commit}`);
+  const files = git(workspace.path, 'diff', '--name-status', `${base}...${commit}`);
+  if (!files.trim()) throw new Error('review-only candidate has no changes from its base');
+  return { base, commit, clean: true, checks, runs, diff, files };
+}
+
+function githubPullRequestTarget(pullRequest, { cwd = process.cwd() } = {}) {
+  if (!Number.isInteger(pullRequest) || pullRequest <= 0) throw new Error('review-only PR must be a positive number');
+  const result = spawnSync('gh', ['pr', 'view', String(pullRequest), '--json', 'headRefOid,baseRefOid'], { cwd, encoding: 'utf8', windowsHide: true });
+  if (result.status !== 0) throw new Error(`could not read PR ${pullRequest}: ${String(result.stderr ?? result.error?.message ?? '').trim() || 'GitHub CLI did not succeed'}`);
+  let target; try { target = JSON.parse(result.stdout); } catch { throw new Error(`could not read PR ${pullRequest}: GitHub returned invalid JSON`); }
+  if (!SHA.test(target?.headRefOid ?? '') || !SHA.test(target?.baseRefOid ?? '')) throw new Error(`could not read PR ${pullRequest}: GitHub returned no immutable head/base`);
+  return { commit: target.headRefOid, base: target.baseRefOid };
 }
 
 const fileSave = saveJson;
@@ -127,6 +150,26 @@ export function productionLauncher(worktree, { run = runLimited, environment = p
   const runWorker = (command, args, options, limits) => run(command, args, { ...options, env: workerEnvironment }, limits);
   return async (role, request) => {
     const configured = request.configuration;
+    // Review-only work is the Mastra path.  It receives metadata and reads the
+    // immutable candidate through its own read-only Git tools, rather than
+    // putting changed files in a provider prompt.
+    if (role === 'reviewer' && request.reviewInput && configured.connection?.provider === 'commandcode') {
+      let stdout = ''; let stderr = ''; let recorded = false;
+      const startedAt = new Date().toISOString();
+      const script = resolve(worktree, 'ops', 'mastra-agents', 'reviewer', 'src', 'reviewer.mjs');
+      const result = await run(process.execPath, [script], { cwd: dirname(script), stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, env: { ...workerEnvironment, COMMANDCODE_API_KEY: environment.COMMANDCODE_API_KEY } }, {
+        seconds: LIMITS.builder.fallback,
+        started: child => {
+          child.stdout.on('data', chunk => { stdout += chunk; }); child.stderr.on('data', chunk => { stderr += chunk; }); child.stdin.on('error', () => {});
+          Promise.resolve(request.started?.({ pid: child.pid })).then(() => { recorded = true; child.stdin.end(JSON.stringify({ issueId: request.issueId, repoRoot: request.repoRoot ?? worktree, candidate: request.candidate, input: request.reviewInput, configuration: configured })); }, () => child.kill());
+        },
+      });
+      let reply = null; try { reply = JSON.parse(stdout); } catch { /* recorded below */ }
+      const exitCode = result.code === 0 && recorded && reply ? 0 : 2;
+      const observed = reply?.observed ? { ...reply.observed, harness: configured.harness, maker: configured.maker } : null;
+      if (request.outputPath) await fileSave(request.outputPath, { role, configured, observed, startedAt, finishedAt: new Date().toISOString(), stdout, stderr, exitCode, traceId: reply?.traceId ?? null, responseId: reply?.responseId ?? null, quotes: reply?.quotes ?? [], warnings: reply?.warnings ?? [] });
+      return { exitCode, observed, text: reply?.text ?? stderr, outputPath: request.outputPath ?? null, responseId: reply?.responseId ?? null, traceId: reply?.traceId ?? null };
+    }
     if (role === 'reviewer' && configured.connection?.provider === 'commandcode') return commandCodeReview(request, {
       run: (command, args, options, limits) => run(command, args, { ...options, env: { ...workerEnvironment, COMMANDCODE_API_KEY: environment.COMMANDCODE_API_KEY } }, limits),
     });
@@ -182,18 +225,19 @@ export function productionLauncher(worktree, { run = runLimited, environment = p
 // whole at every step. `actions` is the journal: an action is saved as started
 // before it runs and as done after it, so a restart can tell a finished step
 // (skipped) from an interrupted one (handled explicitly, never assumed done).
-function newRecord({ issueId, configuration, approvedPath, approvedHash, worktree }) {
-  return { schema: SCHEMA, issueId, configuration, approved: { path: approvedPath, sha256: approvedHash }, worktree, stage: 'build', round: 0, repairsUsed: 0, restarts: 0, actions: [], findings: [], result: null, startedAt: now(), updatedAt: now() };
+function newRecord({ issueId, configuration, approvedPath, approvedHash, worktree, reviewOnly = false }) {
+  return { schema: SCHEMA, issueId, configuration, approved: { path: approvedPath, sha256: approvedHash }, worktree, mode: reviewOnly ? 'review-only' : 'delivery', stage: reviewOnly ? 'review' : 'build', round: 0, repairsUsed: 0, restarts: 0, actions: [], findings: [], result: null, startedAt: now(), updatedAt: now() };
 }
 
 const plain = (value) => JSON.parse(JSON.stringify(value));
 
 // Why this start may not continue a saved record, or null.
-function recordMismatch(record, issueId, configuration) {
+function recordMismatch(record, issueId, configuration, reviewOnly = false) {
   if (!Number.isInteger(record.repairsUsed) || record.repairsUsed < 0 || record.repairsUsed > MAX_REPAIRS || record.round < record.repairsUsed || record.round > MAX_REPAIRS + 1 || !Array.isArray(record.actions) || record.actions.filter(action => action?.status === 'started').length > 1) return 'the saved repair budget or action journal is invalid';
   if (record.schema !== SCHEMA || !Array.isArray(record.actions) || !Array.isArray(record.findings) || !Number.isInteger(record.round) || typeof record.approved?.sha256 !== 'string') return 'the saved run state is not in a form this runner wrote';
   if (record.actions.some(action => !action || !['build', 'candidate', 'review', 'publish-review', 'verify'].includes(action.kind) || !['started', 'done', 'interrupted', 'stale', 'uncertain'].includes(action.status) || !Number.isInteger(action.round) || action.round < 0 || action.round > MAX_REPAIRS || action.key !== `${action.kind}:${action.round}` || (action.worker != null && (!Number.isInteger(action.worker.pid) || action.worker.pid <= 0 || (action.worker.started != null && typeof action.worker.started !== 'string'))))) return 'the saved action journal is invalid';
   if (record.issueId !== issueId) return `the saved run state belongs to ${record.issueId}, not ${issueId}`;
+  if ((record.mode ?? 'delivery') !== (reviewOnly ? 'review-only' : 'delivery')) return 'the saved run state was started in a different runner mode';
   if (!isDeepStrictEqual(record.configuration, plain(configuration))) return 'the saved run was started with a different builder/reviewer configuration';
   return null;
 }
@@ -217,7 +261,7 @@ async function settleWorker(action, processes) {
   } catch (error) { return { unsafe: `could not tell whether the earlier ${action.role} (process ${pid}) is still running: ${error.message}` }; }
 }
 
-export async function runDelivery({ issueId, configuration, runPath, authorization }, { readCard, save = fileSave, load, lock, launch, candidate, publishReview, prepareReview = reviewInput, maxReviewInputBytes = 512000, prepareWorktree = async () => ({ ok: true }), preflight = () => null, processes = { started: processStarted, stop: stopProcessTree } }) {
+export async function runDelivery({ issueId, configuration, runPath, authorization }, { readCard, save = fileSave, load, lock, launch, candidate, reviewOnly = false, publishReview, prepareReview = reviewInput, prepareWorktree = async () => ({ ok: true }), preflight = () => null, processes = { started: processStarted, stop: stopProcessTree } }) {
   // Run files are either all real or all injected: a test that keeps them in
   // memory has no earlier run to load and no second process to lock out.
   load ??= save === fileSave ? loadText : async () => null;
@@ -237,7 +281,7 @@ export async function runDelivery({ issueId, configuration, runPath, authorizati
       if (!parsed || typeof parsed !== 'object' || (parsed.schema == null && !parsed.result)) return await refuse('the saved run state is corrupt; nothing was run and Linear was not reread');
       // A file without a schema is the note of a start refused before any work: there is no run to resume.
       if (parsed.schema != null) {
-        const mismatch = recordMismatch(parsed, issueId, configuration);
+        const mismatch = recordMismatch(parsed, issueId, configuration, reviewOnly);
         if (mismatch) return await refuse(mismatch);
         // A finished run stays finished: its saved result is the answer and nothing runs twice.
         if (parsed.result) return parsed.result;
@@ -311,7 +355,7 @@ export async function runDelivery({ issueId, configuration, runPath, authorizati
     let prepared; try { prepared = await prepareWorktree({ issueId, configuration, runPath, card, saved: record?.worktree ?? null }); } catch (error) { prepared = { ok: false, reason: error.message }; }
     if (!prepared?.ok) return await stop(prepared?.reason ?? 'could not prepare isolated worktree');
     if (record?.worktree?.path && prepared.worktree?.path && record.worktree.path !== prepared.worktree.path) return await refuse(`this run belongs to worktree ${record.worktree.path}, not ${prepared.worktree.path}`, record.round);
-    if (!record) { record = newRecord({ issueId, configuration, approvedPath, approvedHash, worktree: prepared.worktree ?? null }); await persist(); }
+    if (!record) { record = newRecord({ issueId, configuration, approvedPath, approvedHash, worktree: prepared.worktree ?? null, reviewOnly }); await persist(); }
     if (record.round > MAX_REPAIRS) return await finish(park('the builder was interrupted in the last allowed repair, and no repair is left to finish it', MAX_REPAIRS));
 
     const isDone = (kind, round) => record.actions.some((action) => action.key === `${kind}:${round}` && action.status === 'done');
@@ -337,9 +381,11 @@ export async function runDelivery({ issueId, configuration, runPath, authorizati
       const findings = record.findings.at(-1)?.text ?? null;
       const interrupted = record.actions.some((action) => action.kind === 'build' && action.round === round && action.status === 'interrupted');
       const evidence = (role, attempt) => join(directory, `${issueId}-${role}-round-${round}${attempt > 1 ? `-attempt-${attempt}` : ''}.json`);
-      const builder = await act('build', round, 'builder', (started, attempt) => launch('builder', { prompt: workerPrompt('builder', card, configuration, runPath, approvedPath, findings, interrupted), configuration: configuration.builder, round, started, outputPath: evidence('builder', attempt) }));
-      const builderIdentity = validObserved('builder', configuration.builder, builder.observed);
-      if (builder.exitCode !== 0 || builderIdentity) return await finish(park(builderIdentity ?? `builder exited ${builder.exitCode}`, round));
+      const builder = !reviewOnly
+        ? await act('build', round, 'builder', (started, attempt) => launch('builder', { prompt: workerPrompt('builder', card, configuration, runPath, approvedPath, findings, interrupted), configuration: configuration.builder, round, started, outputPath: evidence('builder', attempt) }))
+        : null;
+      const builderIdentity = builder ? validObserved('builder', configuration.builder, builder.observed) : null;
+      if (builder && (builder.exitCode !== 0 || builderIdentity)) return await finish(park(builderIdentity ?? `builder exited ${builder.exitCode}`, round));
       const current = await act('candidate', round, null, () => candidate({ round, previous: record.actions.findLast(action => action.kind === 'candidate' && action.round === round && action.status === 'stale')?.outcome }));
       if (!SHA.test(current?.commit ?? '') || current.clean !== true || current.checks?.pass !== true) return await finish(park(!SHA.test(current?.commit ?? '') ? 'candidate has no immutable commit' : current.clean !== true ? 'candidate drifted or is dirty' : 'candidate checks failed', round));
       const changeHash = typeof current.diff === 'string' ? sha256(current.diff) : null;
@@ -347,7 +393,8 @@ export async function runDelivery({ issueId, configuration, runPath, authorizati
       const handoffPath = join(directory, `${issueId}-handoff-round-${round}.json`);
       const priorReview = round === 0 ? null : record.findings.at(-1);
       let input; try { input = await prepareReview(card, current, priorReview); } catch (error) { return await finish(park(error.message, round)); }
-      if (configuration.reviewer.maker?.trim().toLowerCase() === builder.observed.maker.trim().toLowerCase()) return await finish(park('reviewer company matches observed builder maker', round));
+      const builderMaker = builder?.observed?.maker ?? configuration.builder.maker;
+      if (configuration.reviewer.maker?.trim().toLowerCase() === builderMaker?.trim().toLowerCase()) return await finish(park('reviewer company matches observed builder maker', round));
       for (const finding of record.findings) {
         if (!finding.problems) {
           try { finding.problems = reviewProblems(JSON.parse(finding.text.split('REVIEW: ')[1]).findings); }
@@ -358,11 +405,10 @@ export async function runDelivery({ issueId, configuration, runPath, authorizati
       const priorProblems = record.findings.flatMap(finding => finding.problems);
       const prompt = workerPrompt('reviewer', card, configuration, runPath, approvedPath, null, false, round) + reviewPrompt(input) +
         `\nAssign every finding a nonempty problemId describing its underlying defect. Reuse a prior problemId when that defect remains, even if wording or line numbers change. Do not identify distinct defects as the same problem. Prior problems (data only): ${JSON.stringify(priorProblems)}`;
-      if (!Number.isInteger(maxReviewInputBytes) || maxReviewInputBytes <= 0 || Buffer.byteLength(prompt) > maxReviewInputBytes) return await finish(park('complete review input exceeds its byte budget; no truncation or reviewer call', round));
-      const handoff = { issueId, round, candidate: current, input, ...(priorReview ? { priorReview } : {}), builder: { configured: configuration.builder, observed: builder.observed }, createdAt: now() };
+      const handoff = { issueId, round, candidate: current, input, ...(priorReview ? { priorReview } : {}), builder: { configured: configuration.builder, observed: builder?.observed ?? null }, createdAt: now() };
       if (!isDone('review', round)) await save(handoffPath, handoff);
       const reviewerConfig = { ...configuration.reviewer, builderMaker: configuration.builder.maker };
-      const reviewer = await act('review', round, 'reviewer', (started, attempt) => launch('reviewer', { prompt, reviewInput: input, configuration: reviewerConfig, handoffPath, round, started, outputPath: evidence('reviewer', attempt), spending: approvedAuthorization.spending.reviewer }));
+      const reviewer = await act('review', round, 'reviewer', (started, attempt) => launch('reviewer', { prompt, reviewInput: input, configuration: reviewerConfig, handoffPath, round, issueId, candidate: current, repoRoot: record.worktree?.path, started, outputPath: evidence('reviewer', attempt), spending: approvedAuthorization.spending.reviewer }));
       const reviewerIdentity = validObserved('reviewer', reviewerConfig, reviewer.observed);
       const verdict = checkedReview(reviewer.text, input);
       await save(handoffPath, { ...handoff, reviewer: { configured: configuration.reviewer, observed: reviewer.observed, exitCode: reviewer.exitCode, outputPath: reviewer.outputPath ?? null, verdict: verdict.verdict ?? null }, result: verdict.error ?? verdict.verdict });
@@ -374,6 +420,11 @@ export async function runDelivery({ issueId, configuration, runPath, authorizati
         state: completed ? 'completed' : 'incomplete',
         reason: reviewerIdentity ?? verdict.error ?? (reviewer.exitCode !== 0 ? `reviewer exited ${reviewer.exitCode}` : 'review did not produce a completed verdict'),
       };
+      let postReviewCandidate = null;
+      if (reviewOnly && completed && verdict.verdict === 'PASS') {
+        postReviewCandidate = await act('verify', round, null, () => candidate({ round, afterReview: true, previous: current }));
+        if (postReviewCandidate?.commit !== current.commit || postReviewCandidate.clean !== true || postReviewCandidate.checks?.pass !== true) return await finish(park('candidate changed after review', round));
+      }
       if (typeof publishReview !== 'function') return await finish(park('durable GitHub review publication could not be confirmed: no GitHub review publisher is configured', round));
       // A publisher failure is a completed local action and parks the run.
       // A failure while saving its confirmed outcome is different: leave the
@@ -388,7 +439,7 @@ export async function runDelivery({ issueId, configuration, runPath, authorizati
       if (confirmedPublication?.confirmed !== true || confirmedPublication.authoritative !== completed) return await finish(park('durable GitHub review publication could not be confirmed: GitHub did not confirm the expected review record', round));
       if (!completed) return await finish(park(reviewerIdentity ?? verdict.error ?? `reviewer exited ${reviewer.exitCode}`, round));
       if (verdict.verdict === 'PASS') {
-        const afterReview = await act('verify', round, null, () => candidate({ round, afterReview: true, previous: current }));
+        const afterReview = postReviewCandidate ?? await act('verify', round, null, () => candidate({ round, afterReview: true, previous: current }));
         if (afterReview?.commit !== current.commit || afterReview.clean !== true || afterReview.checks?.pass !== true) return await finish(park('candidate changed after review', round));
         return await finish({ outcome: 'pass', commit: current.commit, handoffPath, reviewUrl: confirmedPublication.url ?? null });
       }
@@ -397,6 +448,7 @@ export async function runDelivery({ issueId, configuration, runPath, authorizati
         const problems = reviewProblems(verdict.report.findings);
         record.findings.push({ round, commit: current.commit, changeHash, text: reviewer.text, report: verdict.report, handoffPath, problems });
       }
+      if (reviewOnly) return await finish(park('review-only runs do not launch a builder to repair review findings', round));
       // Derive counts from saved reports, so a crash between saving the
       // second report and finishing cannot buy another repair. Count a problem
       // once per review, even if the reviewer lists it at several locations.
@@ -416,6 +468,7 @@ export async function startDelivery(issueId, configuration, {
   worktree = process.env.JULIA_DELIVERY_WORKTREE,
   repoRoot = process.cwd(), base, authorization,
   readCard = (id) => getIssue(id, { apiKey: process.env.LINEAR_API_KEY, includeComments: true }),
+  parkCard = (id, reason) => postComment(id, `Runner parked: ${reason}`, { apiKey: process.env.LINEAR_API_KEY }),
   launch, releaseConfiguration, uatDecision,
   test = request => localTester(request.run === 'suite' ? { ...request, run: 'runnerSuite' } : request),
   publishReview = githubReviewPublisher(),
@@ -460,4 +513,43 @@ export async function startDelivery(issueId, configuration, {
   const { startRelease } = await import('./julia-delivery-release-services.mjs');
   const release = await startRelease({ issueId, runPath, result, configuration: releaseConfiguration, decision: uatDecision });
   await observe('release', release); return release;
+}
+
+// Reviewer-only work starts from a candidate that was already made immutable
+// and checked elsewhere (for example, an existing pull request). It retains
+// the delivery journal, lock, authorization and publication rules, but never
+// starts a builder or creates a repair round.
+export async function startReviewOnly(issueId, configuration, {
+  runPath = join(homedir(), '.julia', 'runs', `${issueId}.json`), authorization,
+  candidateCommit, pullRequest, base, checks, runs, workspace = null,
+  readCard = (id) => getIssue(id, { apiKey: process.env.LINEAR_API_KEY, includeComments: true }),
+  launch, publishReview = githubReviewPublisher(), resolvePullRequest = githubPullRequestTarget, save, load, lock,
+  prepareReview = (card, current, priorReview) => reviewInput(card, current, workspace, priorReview),
+} = {}) {
+  assertDeliveryPath(runPath);
+  if (!candidateCommit && pullRequest == null) throw new Error('review-only runs require an existing PR or candidate commit');
+  const launchWorker = async (role, request) => {
+    if (role !== 'reviewer') throw new Error('review-only runs never launch a builder');
+    return (launch ?? productionLauncher(workspace?.path ?? tmpdir()))(role, request);
+  };
+  const captureCandidate = async () => {
+    try {
+      const target = candidateCommit ? { commit: candidateCommit, base } : await resolvePullRequest(pullRequest, { cwd: workspace?.path });
+      return buildReviewCandidateRecord({ workspace, ...target, checks, runs });
+    }
+    catch (error) { return { commit: candidateCommit, clean: false, checks: { pass: false, error: error.message } }; }
+  };
+  const result = await runDelivery({ issueId, configuration, runPath, authorization }, {
+    readCard, launch: launchWorker,
+    candidate: captureCandidate, reviewOnly: true,
+    publishReview, prepareReview, ...(save ? { save } : {}), ...(load ? { load } : {}), ...(lock ? { lock } : {}),
+  });
+  // A parked normal-laptop review must leave its reason on the owning card.
+  // If Linear cannot acknowledge the comment, preserve the local park and add
+  // that failure to its durable reason rather than silently losing it.
+  if (result.outcome === 'park') {
+    try { await parkCard(issueId, result.reason); }
+    catch (error) { return { ...result, reason: `${result.reason}; could not post park reason to Linear: ${error.message}` }; }
+  }
+  return result;
 }

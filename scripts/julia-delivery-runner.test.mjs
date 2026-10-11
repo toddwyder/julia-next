@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { productionLauncher, runDelivery as deliver, startDelivery as start, workerPrompt } from './julia-delivery-runner.mjs';
+import { buildReviewCandidateRecord, productionLauncher, runDelivery as deliver, startDelivery as start, startReviewOnly, workerPrompt } from './julia-delivery-runner.mjs';
 import { processStarted } from './julia-delivery-state.mjs';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -10,7 +10,7 @@ import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { mkdir } from 'node:fs/promises';
 
-import { fixtureAdapters, fixtureLaunch } from './fixtures/jul202-review.mjs';
+import { fixtureAdapters, fixtureInput, fixtureLaunch, fixtureReport } from './fixtures/jul202-review.mjs';
 const fixturePublication = async review => ({ confirmed: true, authoritative: review.state === 'completed', id: 1, url: 'https://example.invalid/review/1', pr: 1 });
 const startDelivery = (id, config, options) => start(id, config, { ...options, launch: options.launch ? fixtureLaunch(options.launch) : undefined, publishReview: options.publishReview ?? fixturePublication });
 
@@ -199,6 +199,53 @@ test('reads an authorized card once, persists its approved input, then hands onl
   assert.ok(saved.some(({ path }) => path.endsWith('JUL-196-approved.json')));
 });
 
+test('review-only entry journals and publishes an existing checked candidate without launching a builder', async t => {
+  const launches = [];
+  const { source, base, git } = await candidateFixture(t);
+  await writeFile(join(source, 'scripts/seam.test.mjs'), 'existing checked candidate');
+  git(source, 'add', '-A');
+  git(source, '-c', 'user.name=fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'existing candidate');
+  const candidateCommit = git(source, 'rev-parse', 'HEAD');
+  const result = await startReviewOnly('JUL-196', configuration, {
+    authorization,
+    readCard: async () => card,
+    workspace: { path: source }, pullRequest: 282, checks: { pass: true },
+    runs: [{ commit: candidateCommit, status: 0, output: 'existing checked candidate evidence' }],
+    resolvePullRequest: async number => { assert.equal(number, 282); return { commit: candidateCommit, base }; },
+    prepareReview: fixtureInput,
+    launch: async (role, request) => {
+      launches.push(role);
+      assert.equal(role, 'reviewer');
+      return { exitCode: 0, observed: configuration.reviewer, text: fixtureReport(request.reviewInput) };
+    },
+    publishReview: fixturePublication,
+    save: async () => {},
+  });
+  assert.equal(result.outcome, 'pass');
+  assert.deepEqual(launches, ['reviewer']);
+});
+
+test('review-only entry refuses to publish when the candidate changes during review', async t => {
+  const { source, base, git } = await candidateFixture(t);
+  await writeFile(join(source, 'scripts/seam.test.mjs'), 'checked candidate');
+  git(source, 'add', '-A');
+  git(source, '-c', 'user.name=fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'checked candidate');
+  const candidateCommit = git(source, 'rev-parse', 'HEAD');
+  let publications = 0;
+  const result = await startReviewOnly('JUL-196', configuration, {
+    authorization, readCard: async () => card, workspace: { path: source }, candidateCommit, base,
+    checks: { pass: true }, runs: [{ commit: candidateCommit, status: 0, output: 'checked candidate evidence' }], prepareReview: fixtureInput,
+    launch: async (_role, request) => {
+      await writeFile(join(source, 'changed-during-review.txt'), 'dirty after review began');
+      return { exitCode: 0, observed: configuration.reviewer, text: fixtureReport(request.reviewInput) };
+    },
+    publishReview: async () => { publications += 1; return fixturePublication; }, save: async () => {},
+  });
+  assert.equal(result.outcome, 'park');
+  assert.match(result.reason, /changed after review/);
+  assert.equal(publications, 0);
+});
+
 test('failed checks, candidate drift, same-maker reviews, and malformed verdicts fail closed before PASS', async () => {
   const base = { readCard: async () => card, save: async () => {}, launch: async role => { assert.equal(role, 'builder', 'invalid candidates cannot dispatch review'); return { exitCode: 0, observed: configuration.builder }; } };
   for (const candidate of [
@@ -293,6 +340,21 @@ async function candidateFixture(t) {
   const runPath = join(root, 'runs/JUL-196.json');
   return { root, source, base, runPath, git };
 }
+
+test('review-only candidate records re-read a clean existing commit and retain its completed checks', async t => {
+  const { source, base, git } = await candidateFixture(t);
+  await writeFile(join(source, 'scripts/seam.test.mjs'), 'existing candidate regression');
+  git(source, 'add', '-A');
+  git(source, '-c', 'user.name=fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'existing candidate');
+  const commit = git(source, 'rev-parse', 'HEAD');
+  const record = buildReviewCandidateRecord({
+    workspace: { path: source }, base, commit, checks: { pass: true },
+    runs: [{ commit, status: 0, output: 'already measured candidate checks' }],
+  });
+  assert.equal(record.commit, commit);
+  assert.match(record.diff, /existing candidate regression/);
+  assert.match(record.files, /scripts\/seam\.test\.mjs/);
+});
 
 test('authorized production adapter prepares isolation and freezes additions/deletions with checked evidence', async t => {
   const { source, base, runPath, git } = await candidateFixture(t);
@@ -556,19 +618,17 @@ test('normal CommandCode review transport uses the saved model and one journalle
   assert.deepEqual(evidence.connection, selected.connection);
 });
 
-test('same-company selection and oversized complete input refuse before reviewer dispatch', async () => {
-  for (const kind of ['company', 'budget']) {
-    const calls = [];
-    const selected = kind === 'company' ? { ...configuration, reviewer: { ...configuration.reviewer, maker: configuration.builder.maker } } : configuration;
-    const result = await deliver({ authorization, issueId: 'JUL-196', configuration: selected, runPath: 'C:/fixtures/jul202/gate.json' }, {
-      readCard: async () => card, save: async () => {}, maxReviewInputBytes: kind === 'budget' ? 10 : 512000,
-      candidate: async () => ({ commit: 'a'.repeat(40), clean: true, checks: { pass: true } }),
-      launch: async role => { calls.push(role); return { exitCode: 0, observed: selected[role], text: 'unused' }; },
-    });
-    assert.equal(result.outcome, 'park');
-    assert.deepEqual(calls, ['builder']);
-    assert.match(result.reason, kind === 'company' ? /company|maker/ : /budget|oversized/);
-  }
+test('same-company selection refuses before reviewer dispatch without imposing a review-input cap', async () => {
+  const calls = [];
+  const selected = { ...configuration, reviewer: { ...configuration.reviewer, maker: configuration.builder.maker } };
+  const result = await deliver({ authorization, issueId: 'JUL-196', configuration: selected, runPath: 'C:/fixtures/jul202/gate.json' }, {
+    readCard: async () => card, save: async () => {},
+    candidate: async () => ({ commit: 'a'.repeat(40), clean: true, checks: { pass: true } }),
+    launch: async role => { calls.push(role); return { exitCode: 0, observed: selected[role], text: 'unused' }; },
+  });
+  assert.equal(result.outcome, 'park');
+  assert.deepEqual(calls, ['builder']);
+  assert.match(result.reason, /company|maker/);
 });
 
 test('native reviewer final replies reach verdict handling without JSON stream wrappers', async t => {
