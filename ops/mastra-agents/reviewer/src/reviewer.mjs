@@ -23,7 +23,7 @@ import { promisify } from 'node:util';
 import { setTimeout as delay } from 'node:timers/promises';
 import { randomUUID } from 'node:crypto';
 import { checkQuotes, verifyEvidenceQuote } from './quote-check.mjs';
-import { finishReviewerRun, providerUsageIsUnknown, requireCompleteFileReview, reviewPromptContract, REVIEWER_RESOURCE, requestWithoutOutputCap, reviewStepBudget, reviewThread, reviewerConfiguration, reviewerDuckDBSettings, reviewerExporterConfiguration, reviewerStorageConfiguration } from './contract.mjs';
+import { finishReviewerRun, providerUsageIsUnknown, requireCompleteFileReview, requireCostStoreReadable, reviewPromptContract, REVIEWER_RESOURCE, requestWithoutOutputCap, reviewStepBudget, reviewThread, reviewerConfiguration, reviewerDuckDBSettings, reviewerExporterConfiguration, reviewerStorageConfiguration } from './contract.mjs';
 import { checkedReview } from '../../../../scripts/julia-delivery-review.mjs';
 import { commandCodeCostEstimate, commandCodeUsageSummary, requireUsageSummaryCoverage, usageSummaryDelta } from './commandcode-cost.mjs';
 
@@ -104,8 +104,9 @@ export function captureCommandCodeResponse(body) {
   return captured;
 }
 
-async function checkedFetch(url, init, recordCost = async () => {}) {
+async function checkedFetch(url, init, recordCost = async () => {}, assertCostStore = async () => {}) {
   if (init?.body) init = { ...init, body: JSON.stringify(requestWithoutOutputCap(JSON.parse(String(init.body)))) };
+  await assertCostStore();
   providerRequestsAttempted += 1;
   const response = await fetch(url, init);
   let body;
@@ -264,12 +265,13 @@ export async function runReviewer(request, { onVerdict = async () => {} } = {}) 
     if (includeTokens) costMetrics.emit('mastra_model_total_output_tokens', usage.completion_tokens, labels);
     await observability.flush();
   };
+  const assertCostStore = () => requireCostStoreReadable(() => runTotals(observabilityStore, issueId, { allowEmpty: true }));
   const connection = createOpenAICompatible({
-    ...connectionOptions, fetch: (url, init) => checkedFetch(url, init, recordEstimatedCost('reviewer', false)), metadataExtractor: commandCodeMetadata,
+    ...connectionOptions, fetch: (url, init) => checkedFetch(url, init, recordEstimatedCost('reviewer', false), assertCostStore), metadataExtractor: commandCodeMetadata,
   });
   const model = await resolveModelConfig(connection.chatModel(config.model));
   const safetyConnection = createOpenAICompatible({
-    ...connectionOptions, name: 'commandcode-safety', fetch: (url, init) => checkedFetch(url, init, recordEstimatedCost('safety-check', true)),
+    ...connectionOptions, name: 'commandcode-safety', fetch: (url, init) => checkedFetch(url, init, recordEstimatedCost('safety-check', true), assertCostStore),
     metadataExtractor: safetyCheckMetadata(),
   });
   const safetyModel = await resolveModelConfig(safetyConnection.chatModel(config.model));

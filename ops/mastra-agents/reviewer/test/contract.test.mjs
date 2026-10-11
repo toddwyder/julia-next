@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_REVIEWER, REVIEWER_RESOURCE, finishReviewerRun, providerUsageIsUnknown, requireCompleteFileReview, reviewPromptContract, reviewStepBudget, reviewThread, requestWithoutOutputCap, requireLiveTracing, reviewerConfiguration, reviewerDuckDBSettings, reviewerExporterConfiguration, reviewerStorageConfiguration } from '../src/contract.mjs';
+import { DEFAULT_REVIEWER, REVIEWER_RESOURCE, finishReviewerRun, providerUsageIsUnknown, requireCompleteFileReview, requireCostStoreReadable, reviewPromptContract, reviewStepBudget, reviewThread, requestWithoutOutputCap, requireLiveTracing, reviewerConfiguration, reviewerDuckDBSettings, reviewerExporterConfiguration, reviewerStorageConfiguration } from '../src/contract.mjs';
 import { captureCommandCodeResponse, commandCodeMetadata } from '../src/reviewer.mjs';
 import { commandCodeCostEstimate, commandCodeUsageSummary, requireUsageSummaryCoverage, usageSummaryDelta } from '../src/commandcode-cost.mjs';
 
@@ -29,6 +29,11 @@ test('provider usage is known when every attempted response supplied token metad
   assert.equal(providerUsageIsUnknown({ attempted: 6, observed: 6, failures: 1 }), true);
   assert.equal(providerUsageIsUnknown({ attempted: 6, observed: 5 }), true);
   assert.equal(providerUsageIsUnknown({ attempted: 1, observed: 1, error: new Error('usage.prompt_tokens is missing or unknown') }), true);
+});
+
+test('provider boundary fails closed when the stock cost store cannot be read', async () => {
+  await assert.doesNotReject(requireCostStoreReadable(async () => ({ cost: 0.25 })));
+  await assert.rejects(requireCostStoreReadable(async () => { throw new Error('database invalidated'); }), /cost store is unavailable/);
 });
 
 test('the model prompt keeps requirements and proof but reads candidate bytes through tools', () => {

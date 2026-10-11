@@ -73,6 +73,11 @@ export function providerUsageIsUnknown({ attempted, observed, failures = 0, erro
   return observed < attempted || failures > 0 || /(?:usage\.(?:prompt_tokens|completion_tokens)|CommandCode response token usage).*missing or unknown/.test(error?.message ?? '');
 }
 
+export async function requireCostStoreReadable(read) {
+  try { return await read(); }
+  catch (error) { throw new Error('reviewer refused: cost store is unavailable; paid call blocked', { cause: error }); }
+}
+
 export function requireLiveTracing(context) {
   if (!context?.traceId || context.currentSpan?.isValid !== true) throw new Error('reviewer refused: tracing context is not live');
   return context;
