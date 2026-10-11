@@ -36,7 +36,7 @@ export function reviewerStorageConfiguration(path) {
   return {
     id: 'julia-reviewer-observability',
     path,
-    memoryLimit: '512MB',
+    memoryLimit: '1GB',
     threads: 1,
     retention: { observability: { spans: { maxAge: '14d' } } },
   };

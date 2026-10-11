@@ -33,7 +33,7 @@ test('the persistent DuckDB store has a bounded working set on the reviewer lapt
   assert.deepEqual(reviewerStorageConfiguration('C:/proof/reviewer-costs.duckdb'), {
     id: 'julia-reviewer-observability',
     path: 'C:/proof/reviewer-costs.duckdb',
-    memoryLimit: '512MB',
+    memoryLimit: '1GB',
     threads: 1,
     retention: { observability: { spans: { maxAge: '14d' } } },
   });
