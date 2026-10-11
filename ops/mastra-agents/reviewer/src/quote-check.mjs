@@ -45,3 +45,19 @@ export async function verifyEvidenceQuote(repoRoot, commit, source, quote, sourc
     return { ok: false, error: error.message };
   }
 }
+
+export function repairSerializedEvidenceQuotes(value, sources, repairs = []) {
+  if (!value || typeof value !== 'object') return repairs;
+  if (typeof value.source === 'string' && typeof value.quote === 'string' && Object.hasOwn(sources, value.source)) {
+    const sourceText = sources[value.source] ?? '';
+    if (!quoteIsPresent(value.quote, sourceText)) {
+      const escaped = value.quote.replaceAll('\r', '\\r').replaceAll('\n', '\\n').replaceAll('\t', '\\t');
+      if (escaped !== value.quote && quoteIsPresent(escaped, sourceText)) {
+        repairs.push({ source: value.source, before: value.quote, after: escaped });
+        value.quote = escaped;
+      }
+    }
+  }
+  for (const child of Array.isArray(value) ? value : Object.values(value)) repairSerializedEvidenceQuotes(child, sources, repairs);
+  return repairs;
+}

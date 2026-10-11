@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { checkQuotes, evidenceCitations, quoteIsPresent, verifyEvidenceQuote } from '../src/quote-check.mjs';
+import { checkQuotes, evidenceCitations, quoteIsPresent, repairSerializedEvidenceQuotes, verifyEvidenceQuote } from '../src/quote-check.mjs';
 
 test('quote check accepts an exact quote only', () => {
   assert.equal(quoteIsPresent('exitCode=1', 'artifact: test-exit.txt\nexitCode=1\n'), true);
@@ -38,4 +38,13 @@ test('the model-facing quote verifier accepts only exact immutable candidate tex
   assert.deepEqual(await verifyEvidenceQuote('missing-repository', 'f'.repeat(40), 'diff', 'Exact candidate text', {
     diff: 'before\nexact candidate text\nafter',
   }), { ok: false });
+});
+
+test('serialized source control characters are repaired only to exact source text', () => {
+  const report = { evidence: [{ source: 'candidate', quote: 'checks\tpass\nurl' }, { source: 'diff', quote: 'unchanged\ttext' }] };
+  assert.deepEqual(repairSerializedEvidenceQuotes(report, {
+    candidate: 'prefix checks\\tpass\\nurl suffix', diff: 'unchanged\ttext',
+  }), [{ source: 'candidate', before: 'checks\tpass\nurl', after: 'checks\\tpass\\nurl' }]);
+  assert.equal(report.evidence[0].quote, 'checks\\tpass\\nurl');
+  assert.equal(report.evidence[1].quote, 'unchanged\ttext');
 });

@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { setTimeout as delay } from 'node:timers/promises';
 import { randomUUID } from 'node:crypto';
-import { checkQuotes, verifyEvidenceQuote } from './quote-check.mjs';
+import { checkQuotes, repairSerializedEvidenceQuotes, verifyEvidenceQuote } from './quote-check.mjs';
 import { finishReviewerRun, providerUsageIsUnknown, requireCompleteFileReview, requireCostStoreReadable, reviewPromptContract, REVIEWER_RESOURCE, requestWithoutOutputCap, reviewStepBudget, reviewThread, reviewerConfiguration, reviewerDuckDBSettings, reviewerExporterConfiguration, reviewerStorageConfiguration, semanticReviewMatches } from './contract.mjs';
 import { checkedReview } from '../../../../scripts/julia-delivery-review.mjs';
 import { commandCodeCostEstimate, commandCodeUsageSummary, requireUsageSummaryCoverage, usageSummaryDelta } from './commandcode-cost.mjs';
@@ -326,6 +326,7 @@ export async function runReviewer(request, { onVerdict = async () => {} } = {}) 
       if (providerUsageFailures > providerUsageFailuresBefore) throw lastProviderUsageError;
       throw new Error('reviewer refused: CommandCode structured report is missing or unknown');
     }
+    const serializedQuoteRepairs = repairSerializedEvidenceQuotes(result.object.report, input.sources);
     const quotes = await checkQuotes(repoRoot, candidate.commit, result.object.report, input.sources);
     const invalidQuotes = quotes.filter(check => !check.ok);
     if (invalidQuotes.length) throw new Error(`reviewer refused: report contains unverifiable evidence quotes: ${JSON.stringify(invalidQuotes)}`);
@@ -337,7 +338,7 @@ export async function runReviewer(request, { onVerdict = async () => {} } = {}) 
     verdict = {
       text,
       observed: { harness: 'mastra-commandcode', model: config.model, maker: request.configuration?.maker ?? 'DeepSeek' },
-      responseId: result.response?.id ?? null, traceId: result.traceId, warnings, quotes,
+      responseId: result.response?.id ?? null, traceId: result.traceId, warnings, quotes, serializedQuoteRepairs,
       evidence: { resourceId: REVIEWER_RESOURCE, threadId, semanticMatches, memoryPath, costPath },
     };
     await mkdir(dirname(verdictPath), { recursive: true });
