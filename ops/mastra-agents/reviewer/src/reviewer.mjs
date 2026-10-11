@@ -39,11 +39,13 @@ const Finding = z.object({
   problemId: z.string().min(1).optional(), file: z.string().min(1), location: z.string().min(1), requirement: z.string().min(1),
   scenario: z.string().min(1), mechanism: z.string().min(1), consequence: z.string().min(1), repair: z.string().min(1), evidence: EvidenceList,
 });
+const FileReview = z.object({ file: z.string().min(1), status: Status, evidence: EvidenceList });
+const RegressionReview = z.object({ file: z.string().min(1), status: Status, evidence: EvidenceList });
 const InitialReport = z.object({
   filesReviewed: z.array(z.string()).min(1), candidate: z.string().min(1), inputDigest: z.string().min(1), summary: z.string().min(1), approach: z.string().min(1),
   standards: Supported, spec: Supported,
   criteria: z.array(z.object({ criterion: z.string().min(1), status: Status, evidence: EvidenceList })),
-  files: z.array(z.object({ file: z.string().min(1), status: Status, evidence: EvidenceList })),
+  files: z.array(FileReview),
   checks: z.array(z.object({ check: z.number().int().min(1).max(5), status: z.enum(['proven', 'failed', 'unverified', 'not-applicable']), evidence: EvidenceList, reason: z.string().optional() })),
   counterexamples: z.array(z.object({ scenario: z.string().min(1), method: z.string().min(1), result: z.string().min(1), evidence: EvidenceList })).min(2),
   testAudit: z.object({ analysis: z.string().min(1), evidence: EvidenceList }), findings: z.array(Finding), limitations: z.array(z.string()),
@@ -51,10 +53,18 @@ const InitialReport = z.object({
 const RepairReport = z.object({
   filesReviewed: z.array(z.string()).min(1), candidate: z.string().min(1), inputDigest: z.string().min(1), summary: z.string().min(1),
   repairedFindings: z.array(z.object({ id: z.string().min(1), status: Status, evidence: EvidenceList })),
-  regressions: z.array(z.object({ file: z.string().min(1), status: Status, evidence: EvidenceList })),
+  regressions: z.array(RegressionReview),
   findings: z.array(Finding.omit({ problemId: true })), limitations: z.array(z.string()),
 });
-const envelopeFor = input => z.object({ verdict: z.enum(['PASS', 'FAIL', 'INCONCLUSIVE']), report: input.scope?.kind === 'repair' ? RepairReport : InitialReport });
+export const reviewedFilesSchema = files => z.array(z.enum(files)).length(files.length);
+const envelopeFor = input => {
+  const allowed = z.enum(input.files);
+  const exactFiles = reviewedFilesSchema(input.files);
+  const report = input.scope?.kind === 'repair'
+    ? RepairReport.extend({ filesReviewed: exactFiles, regressions: z.array(RegressionReview.extend({ file: allowed })).length(input.files.length) })
+    : InitialReport.extend({ filesReviewed: exactFiles, files: z.array(FileReview.extend({ file: allowed })).length(input.files.length) });
+  return z.object({ verdict: z.enum(['PASS', 'FAIL', 'INCONCLUSIVE']), report });
+};
 export const STANDING_RULES = `# Standing rules for the reviewer
 - Every quote must appear word for word in the named file or diff at the reviewed commit.
 - No arbitrary caps or limits; flag any new one.

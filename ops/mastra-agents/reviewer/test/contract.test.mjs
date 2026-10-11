@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_REVIEWER, REVIEWER_RESOURCE, finishReviewerRun, providerUsageIsUnknown, requireCompleteFileReview, requireCostStoreReadable, reviewPromptContract, reviewStepBudget, reviewThread, requestWithoutOutputCap, requireLiveTracing, reviewerConfiguration, reviewerDuckDBSettings, reviewerExporterConfiguration, reviewerStorageConfiguration, semanticReviewMatches } from '../src/contract.mjs';
-import { captureCommandCodeResponse, commandCodeMetadata } from '../src/reviewer.mjs';
+import { captureCommandCodeResponse, commandCodeMetadata, reviewedFilesSchema } from '../src/reviewer.mjs';
 import { commandCodeCostEstimate, commandCodeUsageSummary, requireUsageSummaryCoverage, usageSummaryDelta } from '../src/commandcode-cost.mjs';
 
 test('the reviewer defaults to CommandCode DeepSeek Flash and never sends an output cap', () => {
@@ -23,6 +23,13 @@ test('reviewer step budget follows the immutable file inventory and contract pha
   assert.equal(reviewStepBudget(['a.mjs', 'b.mjs', 'c.mjs', 'd.mjs'], Array(8).fill('criterion')), 16);
   assert.throws(() => reviewStepBudget([], ['criterion']), /changed file/);
   assert.throws(() => reviewStepBudget(['a.mjs'], []), /criterion/);
+});
+
+test('structured output accepts exactly the immutable changed-file inventory', () => {
+  const schema = reviewedFilesSchema(['a.mjs', 'b.mjs']);
+  assert.deepEqual(schema.parse(['a.mjs', 'b.mjs']), ['a.mjs', 'b.mjs']);
+  assert.throws(() => schema.parse(['a.mjs', 'extra.mjs']));
+  assert.throws(() => schema.parse(['a.mjs']));
 });
 
 test('provider usage is known when every attempted response supplied token metadata', () => {
