@@ -78,6 +78,21 @@ export async function requireCostStoreReadable(read) {
   catch (error) { throw new Error('reviewer refused: cost store is unavailable; paid call blocked', { cause: error }); }
 }
 
+function memoryMessageText(message) {
+  if (typeof message?.content === 'string') return message.content;
+  const parts = Array.isArray(message?.content) ? message.content : message?.content?.parts;
+  return Array.isArray(parts) ? parts.filter(part => part?.type === 'text').map(part => part.text).join('') : '';
+}
+
+export function semanticReviewMatches(messages, currentThread) {
+  return messages.flatMap(message => {
+    if (message.threadId === currentThread || message.role !== 'assistant') return [];
+    const text = memoryMessageText(message);
+    try { if (JSON.parse(text)?.kind === 'review-memory') return [{ threadId: message.threadId, text }]; } catch { /* legacy message */ }
+    return [];
+  });
+}
+
 export function requireLiveTracing(context) {
   if (!context?.traceId || context.currentSpan?.isValid !== true) throw new Error('reviewer refused: tracing context is not live');
   return context;

@@ -23,7 +23,7 @@ import { promisify } from 'node:util';
 import { setTimeout as delay } from 'node:timers/promises';
 import { randomUUID } from 'node:crypto';
 import { checkQuotes, verifyEvidenceQuote } from './quote-check.mjs';
-import { finishReviewerRun, providerUsageIsUnknown, requireCompleteFileReview, requireCostStoreReadable, reviewPromptContract, REVIEWER_RESOURCE, requestWithoutOutputCap, reviewStepBudget, reviewThread, reviewerConfiguration, reviewerDuckDBSettings, reviewerExporterConfiguration, reviewerStorageConfiguration } from './contract.mjs';
+import { finishReviewerRun, providerUsageIsUnknown, requireCompleteFileReview, requireCostStoreReadable, reviewPromptContract, REVIEWER_RESOURCE, requestWithoutOutputCap, reviewStepBudget, reviewThread, reviewerConfiguration, reviewerDuckDBSettings, reviewerExporterConfiguration, reviewerStorageConfiguration, semanticReviewMatches } from './contract.mjs';
 import { checkedReview } from '../../../../scripts/julia-delivery-review.mjs';
 import { commandCodeCostEstimate, commandCodeUsageSummary, requireUsageSummaryCoverage, usageSummaryDelta } from './commandcode-cost.mjs';
 
@@ -182,13 +182,6 @@ async function reviewerInstructions() {
   return `${role}\n\n# Repository coding standards\n\n${standards}`;
 }
 
-function messageText(message) {
-  if (typeof message?.content === 'string') return message.content;
-  if (Array.isArray(message?.content)) return message.content.filter(part => part?.type === 'text').map(part => part.text).join('');
-  if (Array.isArray(message?.content?.parts)) return message.content.parts.filter(part => part?.type === 'text').map(part => part.text).join('');
-  return message?.content ? JSON.stringify(message.content) : '';
-}
-
 async function runTotals(store, issueId, { allowEmpty = false } = {}) {
   const aggregate = name => store.getMetricAggregate({
     name, aggregation: 'sum', filters: { entityType: 'agent', userId: issueId },
@@ -309,7 +302,7 @@ export async function runReviewer(request, { onVerdict = async () => {} } = {}) 
     const currentWorkingMemory = await memory.getWorkingMemory({ threadId, resourceId: REVIEWER_RESOURCE });
     if (!currentWorkingMemory) await memory.updateWorkingMemory({ threadId, resourceId: REVIEWER_RESOURCE, workingMemory: STANDING_RULES });
     const prior = await memory.recall({ threadId, resourceId: REVIEWER_RESOURCE, vectorSearchString: 'arbitrary caps limits stock Mastra missing tests logging', threadConfig: { semanticRecall: { topK: 3, messageRange: 1, scope: 'resource' } } });
-    const semanticMatches = prior.messages.filter(message => message.threadId !== threadId && message.role === 'assistant').map(message => ({ threadId: message.threadId, text: messageText(message) })).filter(match => match.text);
+    const semanticMatches = semanticReviewMatches(prior.messages, threadId);
     const generationOptions = {
       memory: { thread: threadId, resource: REVIEWER_RESOURCE, options: { lastMessages: false, semanticRecall: false } }, requestContext,
       tracingOptions: { metadata: { userId: issueId, issueId, candidateCommit: candidate.commit } },

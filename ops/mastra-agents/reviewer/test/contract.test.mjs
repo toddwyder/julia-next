@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_REVIEWER, REVIEWER_RESOURCE, finishReviewerRun, providerUsageIsUnknown, requireCompleteFileReview, requireCostStoreReadable, reviewPromptContract, reviewStepBudget, reviewThread, requestWithoutOutputCap, requireLiveTracing, reviewerConfiguration, reviewerDuckDBSettings, reviewerExporterConfiguration, reviewerStorageConfiguration } from '../src/contract.mjs';
+import { DEFAULT_REVIEWER, REVIEWER_RESOURCE, finishReviewerRun, providerUsageIsUnknown, requireCompleteFileReview, requireCostStoreReadable, reviewPromptContract, reviewStepBudget, reviewThread, requestWithoutOutputCap, requireLiveTracing, reviewerConfiguration, reviewerDuckDBSettings, reviewerExporterConfiguration, reviewerStorageConfiguration, semanticReviewMatches } from '../src/contract.mjs';
 import { captureCommandCodeResponse, commandCodeMetadata } from '../src/reviewer.mjs';
 import { commandCodeCostEstimate, commandCodeUsageSummary, requireUsageSummaryCoverage, usageSummaryDelta } from '../src/commandcode-cost.mjs';
 
@@ -34,6 +34,15 @@ test('provider usage is known when every attempted response supplied token metad
 test('provider boundary fails closed when the stock cost store cannot be read', async () => {
   await assert.doesNotReject(requireCostStoreReadable(async () => ({ cost: 0.25 })));
   await assert.rejects(requireCostStoreReadable(async () => { throw new Error('database invalidated'); }), /cost store is unavailable/);
+});
+
+test('semantic recall supplies only compact saved review memories', () => {
+  const messages = [
+    { threadId: 'old', role: 'assistant', content: { parts: [{ type: 'text', text: 'a large legacy report' }] } },
+    { threadId: 'old', role: 'assistant', content: { parts: [{ type: 'text', text: JSON.stringify({ kind: 'review-memory', summary: 'remember this' }) }] } },
+    { threadId: 'current', role: 'assistant', content: { parts: [{ type: 'text', text: JSON.stringify({ kind: 'review-memory', summary: 'same thread' }) }] } },
+  ];
+  assert.deepEqual(semanticReviewMatches(messages, 'current'), [{ threadId: 'old', text: '{"kind":"review-memory","summary":"remember this"}' }]);
 });
 
 test('the model prompt keeps requirements and proof but reads candidate bytes through tools', () => {
