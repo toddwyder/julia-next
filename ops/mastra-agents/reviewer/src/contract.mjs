@@ -8,12 +8,17 @@ export const DEFAULT_REVIEWER = Object.freeze({
 export function reviewerConfiguration(configuration = {}) {
   const reviewer = configuration.reviewer ?? configuration;
   const savedConnection = reviewer.connection;
-  return {
+  const resolved = {
     ...DEFAULT_REVIEWER,
     model: reviewer.model ?? DEFAULT_REVIEWER.model,
     connection: savedConnection?.provider === 'commandcode' ? 'existing-commandcode' : savedConnection?.route ?? savedConnection ?? DEFAULT_REVIEWER.connection,
     costCeilingUsd: reviewer.costCeilingUsd ?? DEFAULT_REVIEWER.costCeilingUsd,
   };
+  if (process.env.MASTRA_REVIEWER_STANDIN === '1') {
+    resolved.baseURL = reviewer.baseURL;
+    resolved.storageDirectory = reviewer.storageDirectory;
+  }
+  return resolved;
 }
 
 export function requestWithoutOutputCap(body) {
@@ -24,9 +29,11 @@ export function requestWithoutOutputCap(body) {
   return request;
 }
 
-export function memoryScope(cardId) {
-  if (!/^JUL-\d+$/.test(cardId ?? '')) throw new Error('reviewer memory needs a Julia card identifier');
-  return `reviewer:${cardId}`;
+export const REVIEWER_RESOURCE = 'julia-reviewer';
+
+export function reviewThread(cardId, commit) {
+  if (!/^JUL-\d+$/.test(cardId ?? '') || !/^[0-9a-f]{40}$/i.test(commit ?? '')) throw new Error('reviewer memory needs a Julia card identifier and immutable commit');
+  return `reviewer:${cardId}:${commit}`;
 }
 
 export function requireLiveTracing(context) {
@@ -34,12 +41,21 @@ export function requireLiveTracing(context) {
   return context;
 }
 
-// Reviewer memory is short-lived operational state.  Delete the thread before
-// compacting the local database so a stopped review cannot bleed into another
-// candidate or leave a steadily growing trace file on the laptop.
-export async function purgeAndCompact({ memory, threadId, closeStorage = async () => {}, compact }) {
-  await memory.deleteThread(threadId);
-  await memory.settled();
-  await closeStorage();
-  await compact();
+export async function finishReviewerRun({ memory, observability, primaryStorage, vectorStorage, observabilityStorage }) {
+  const errors = [];
+  for (const step of [
+    () => memory.settled(),
+    () => observability.flush(),
+    () => primaryStorage.close(),
+    () => vectorStorage?.close(),
+    () => observabilityStorage.close(),
+  ]) {
+    try {
+      await step();
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  if (errors.length === 1) throw errors[0];
+  if (errors.length > 1) throw new AggregateError(errors, 'reviewer end-of-run failures');
 }

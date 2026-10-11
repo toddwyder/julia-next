@@ -161,7 +161,10 @@ export function productionLauncher(worktree, { run = runLimited, environment = p
         seconds: LIMITS.builder.fallback,
         started: child => {
           child.stdout.on('data', chunk => { stdout += chunk; }); child.stderr.on('data', chunk => { stderr += chunk; }); child.stdin.on('error', () => {});
-          Promise.resolve(request.started?.({ pid: child.pid })).then(() => { recorded = true; child.stdin.end(JSON.stringify({ issueId: request.issueId, repoRoot: request.repoRoot ?? worktree, candidate: request.candidate, input: request.reviewInput, configuration: configured })); }, () => child.kill());
+          Promise.resolve(request.started?.({ pid: child.pid })).then(() => {
+            recorded = true;
+            child.stdin.end(JSON.stringify({ issueId: request.issueId, repoRoot: request.repoRoot ?? worktree, candidate: request.candidate, input: request.reviewInput, configuration: configured, verdictPath: `${request.outputPath}.verdict.json` }));
+          }, () => child.kill());
         },
       });
       let reply = null; try { reply = JSON.parse(stdout); } catch { /* recorded below */ }

@@ -19,7 +19,7 @@
       "connection": { "route": "api", "provider": "commandcode", "endpoint": "https://api.commandcode.ai/provider/v1", "protocol": "openai-compatible", "authReference": "COMMANDCODE_API_KEY" }
     }
   ],
-  "reviewerRunLimits": { "maxTotalUsd": 1.00, "maxLiveRuns": 4, "outputTokenCap": null },
+  "reviewerRunLimits": { "maxTotalUsd": 1.00, "outputTokenCap": null },
   "builder": { "model": "anthropic-builder", "thinking": "high" },
   "reviewer": { "model": "commandcode-deepseek-reviewer", "thinking": null }
 }

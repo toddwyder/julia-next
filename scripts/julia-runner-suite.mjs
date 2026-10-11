@@ -20,6 +20,12 @@ const HISTORICAL_TESTS = new Set([
   'scripts/controller-board.test.mjs', 'scripts/controller-carry.test.mjs',
   'scripts/stand-in-seat.test.mjs',
 ]);
+const SEPARATE_MASTRA_REVIEWER_TESTS = new Set([
+  'ops/mastra-agents/reviewer/test/contract.test.mjs',
+  'ops/mastra-agents/reviewer/test/free-proof.test.mjs',
+  'ops/mastra-agents/reviewer/test/quote-check.test.mjs',
+  'ops/mastra-agents/reviewer/test/repository-root.test.mjs',
+]);
 // Explicitly inventoried non-runner tests retain their existing CI/manual owner.
 // Unknown tests default to execution so a new subprocess-only regression cannot
 // trigger the Windows job and then silently disappear from its file list.
@@ -64,7 +70,7 @@ export function discoverRunnerTests(root = process.cwd()) {
       if (entry.isDirectory()) {
         if (!GENERATED.has(entry.name)) walk(join(directory, entry.name), `${path}/`);
       } else if (entry.isFile() && entry.name.endsWith('.test.mjs')) {
-        if (HISTORICAL_TESTS.has(path)) continue;
+        if (HISTORICAL_TESTS.has(path) || SEPARATE_MASTRA_REVIEWER_TESTS.has(path)) continue;
         if (RUNNER_TEST.test(path) || path.startsWith('ops/julia-runner/') || SHARED_TESTS.has(path)
           || importsRunnerModule(readFileSync(join(root, path), 'utf8')) || !NON_RUNNER_TESTS.has(path)) files.push(path);
       }

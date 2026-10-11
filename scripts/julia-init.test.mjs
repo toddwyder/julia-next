@@ -55,7 +55,7 @@ const catalog = [
   },
 ];
 
-const reviewerRunLimits = { maxTotalUsd: 1, maxLiveRuns: 4, outputTokenCap: null };
+const reviewerRunLimits = { maxTotalUsd: 1, outputTokenCap: null };
 
 async function fixture(t, settings = { catalog, reviewerRunLimits, builder: { model: 'anthropic-builder', thinking: 'high' }, reviewer: { model: 'openai-reviewer', thinking: null } }) {
   const directory = await mkdtemp(join(tmpdir(), 'julia-init-'));

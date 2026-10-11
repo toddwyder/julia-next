@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_REVIEWER, memoryScope, purgeAndCompact, requestWithoutOutputCap, requireLiveTracing, reviewerConfiguration } from '../src/contract.mjs';
+import { DEFAULT_REVIEWER, REVIEWER_RESOURCE, finishReviewerRun, reviewThread, requestWithoutOutputCap, requireLiveTracing, reviewerConfiguration } from '../src/contract.mjs';
 
 test('the reviewer defaults to CommandCode DeepSeek Flash and never sends an output cap', () => {
   assert.deepEqual(DEFAULT_REVIEWER.model, 'deepseek/deepseek-v4.1-flash');
@@ -10,9 +10,10 @@ test('the reviewer defaults to CommandCode DeepSeek Flash and never sends an out
   assert.equal('max_output_tokens' in body, false);
 });
 
-test('reviewer memory is private to its card and never shares a builder resource', () => {
-  assert.equal(memoryScope('JUL-206'), 'reviewer:JUL-206');
-  assert.notEqual(memoryScope('JUL-206'), 'builder:JUL-206');
+test('reviewer memory uses one stable private resource and one thread per review', () => {
+  assert.equal(REVIEWER_RESOURCE, 'julia-reviewer');
+  assert.equal(reviewThread('JUL-206', 'a'.repeat(40)), `reviewer:JUL-206:${'a'.repeat(40)}`);
+  assert.notEqual(REVIEWER_RESOURCE, 'julia-builder');
 });
 
 test('a review refuses to start when no live trace context exists', () => {
@@ -26,12 +27,29 @@ test('per-card reviewer model overrides the CommandCode default', () => {
   assert.equal(reviewerConfiguration().model, DEFAULT_REVIEWER.model);
 });
 
-test('purge closes the isolated storage before compacting its local trace', async () => {
+test('end of run waits for memory, flushes observability, then closes both intact stores', async () => {
   const calls = [];
-  await purgeAndCompact({
-    memory: { deleteThread: async id => calls.push(`delete:${id}`), settled: async () => calls.push('settled') },
-    threadId: 'reviewer:JUL-206:abc', compact: async () => calls.push('compact'),
-    closeStorage: async () => calls.push('close'),
+  await finishReviewerRun({
+    memory: { settled: async () => calls.push('settled') },
+    observability: { flush: async () => calls.push('flush') },
+    primaryStorage: { close: async () => calls.push('close-primary') },
+    vectorStorage: { close: async () => calls.push('close-vector') },
+    observabilityStorage: { close: async () => calls.push('close-observability') },
   });
-  assert.deepEqual(calls, ['delete:reviewer:JUL-206:abc', 'settled', 'close', 'compact']);
+  assert.deepEqual(calls, ['settled', 'flush', 'close-primary', 'close-vector', 'close-observability']);
+});
+
+test('end of run attempts every ordered step when an earlier step fails', async () => {
+  const calls = [];
+  await assert.rejects(
+    finishReviewerRun({
+      memory: { settled: async () => { calls.push('settled'); throw new Error('settle failed'); } },
+      observability: { flush: async () => calls.push('flush') },
+      primaryStorage: { close: async () => calls.push('close-primary') },
+      vectorStorage: { close: async () => calls.push('close-vector') },
+      observabilityStorage: { close: async () => calls.push('close-observability') },
+    }),
+    /settle failed/,
+  );
+  assert.deepEqual(calls, ['settled', 'flush', 'close-primary', 'close-vector', 'close-observability']);
 });

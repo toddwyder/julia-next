@@ -95,6 +95,12 @@ jobs:
         run: node --test scripts/bad-submissions.test.mjs
       - name: Test active runner and shared safety regressions without provider calls
         run: node scripts/julia-runner-suite.mjs
+      - name: Install pinned Mastra reviewer dependencies
+        working-directory: ops/mastra-agents/reviewer
+        run: npm ci
+      - name: Run free Mastra reviewer proof
+        working-directory: ops/mastra-agents/reviewer
+        run: npm test
 
   web:
     needs: changes

@@ -60,7 +60,8 @@ test('the Windows CI job invokes the same complete local gate', () => {
   const windows = workflow.match(/\n  julia-init-windows:\n([\s\S]*?)(?=\n  web:)/)?.[1];
   assert.ok(windows, 'the stable JUL-197 Windows gate exists');
   assert.match(windows, /runs-on: windows-latest/);
-  assert.match(windows, /run: node scripts\/julia-runner-suite\.mjs\s*$/);
+  assert.match(windows, /run: node scripts\/julia-runner-suite\.mjs/);
+  assert.match(windows, /working-directory: ops\/mastra-agents\/reviewer[\s\S]*run: npm test/);
 });
 
 test('new unwrapped shared safety regressions are discovered beside their imported dependencies', (t) => {

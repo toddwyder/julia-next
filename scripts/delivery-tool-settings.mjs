@@ -123,11 +123,10 @@ function validateRole(role, choice, catalog) {
 
 function validateReviewerRunLimits(limits) {
   if (!isObject(limits)) reject('reviewerRunLimits must be an object');
-  checkKeys(limits, ['maxTotalUsd', 'maxLiveRuns', 'outputTokenCap'], 'reviewerRunLimits');
+  checkKeys(limits, ['maxTotalUsd', 'outputTokenCap'], 'reviewerRunLimits');
   if (!Number.isFinite(limits.maxTotalUsd) || limits.maxTotalUsd < 0) reject('reviewerRunLimits maxTotalUsd must be a non-negative number');
-  if (!Number.isInteger(limits.maxLiveRuns) || limits.maxLiveRuns < 1) reject('reviewerRunLimits maxLiveRuns must be a positive integer');
   if (limits.outputTokenCap !== null) reject('reviewerRunLimits outputTokenCap must be null');
-  return { maxTotalUsd: limits.maxTotalUsd, maxLiveRuns: limits.maxLiveRuns, outputTokenCap: null };
+  return { maxTotalUsd: limits.maxTotalUsd, outputTokenCap: null };
 }
 
 export function validateDeliveryToolSettings(settings) {

@@ -16,6 +16,10 @@ an authorized operator uses the laptop's Tailscale route.
 
 ## Building and reviewing
 
+Read claude/mastra-agents-design.md before any Mastra work. Where a brief and the design doc disagree, the design doc wins.
+
+Before configuring any Mastra feature, read its page in the Mastra docs MCP server for the pinned version. Use the stock feature; write custom code only where the docs show Mastra has nothing.
+
 Follow the approved plan; it answers the questions skills ask (scope, seams, acceptance criteria,
 verification, observability). Build test-first with `.claude/skills/tdd/SKILL.md`; review with
 `.claude/skills/code-review/SKILL.md` against [CODING_STANDARDS.md](CODING_STANDARDS.md). The
@@ -33,8 +37,7 @@ or workaround approval. If an authorization boundary or platform limit blocks th
 action, park the Linear card with one line explaining why; do not use Factory's Needs attention
 route: Factory is retired.
 
-Before asking for any approval, find where the thing lives today and why the current path cannot
-reach it. Ask only if no existing path works, and include that trace in the request.
+Before asking for any approval: find where the thing lives today and why the current path can't reach it. Ask only if no existing path works, and include that trace in the request.
 
 ### Standing stop policy
 
@@ -43,8 +46,7 @@ On any blocker other than (a) an account action, (b) money beyond the authorized
 choice in the final report. Do not use a reversible repository defect as a reason to stop or ask
 Todd for a workaround.
 
-Work to the brief's finish line. A completed step is not a stopping point; continue until the
-finish line is met or a stop condition applies.
+Work to the brief's finish line. A completed step is not a stopping point. Waiting on CI or any background job is not a stop: wait for it and continue.
 
 ### Preflight
 
