@@ -46,6 +46,10 @@ export function reviewerExporterConfiguration() {
   return { maxBatchSize: 1 };
 }
 
+export function reviewerDuckDBSettings() {
+  return ['SET preserve_insertion_order = false', "PRAGMA force_compression = 'zstd'"];
+}
+
 export function reviewThread(cardId, commit) {
   if (!/^JUL-\d+$/.test(cardId ?? '') || !/^[0-9a-f]{40}$/i.test(commit ?? '')) throw new Error('reviewer memory needs a Julia card identifier and immutable commit');
   return `reviewer:${cardId}:${commit}`;

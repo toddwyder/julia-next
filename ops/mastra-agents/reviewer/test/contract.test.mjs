@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_REVIEWER, REVIEWER_RESOURCE, finishReviewerRun, requireCompleteFileReview, reviewThread, requestWithoutOutputCap, requireLiveTracing, reviewerConfiguration, reviewerExporterConfiguration, reviewerStorageConfiguration } from '../src/contract.mjs';
+import { DEFAULT_REVIEWER, REVIEWER_RESOURCE, finishReviewerRun, requireCompleteFileReview, reviewThread, requestWithoutOutputCap, requireLiveTracing, reviewerConfiguration, reviewerDuckDBSettings, reviewerExporterConfiguration, reviewerStorageConfiguration } from '../src/contract.mjs';
 import { captureCommandCodeResponse, commandCodeMetadata } from '../src/reviewer.mjs';
 import { commandCodeCostEstimate, commandCodeUsageSummary, requireUsageSummaryCoverage, usageSummaryDelta } from '../src/commandcode-cost.mjs';
 
@@ -38,6 +38,10 @@ test('the persistent DuckDB store has a bounded working set on the reviewer lapt
     retention: { observability: { spans: { maxAge: '14d' } } },
   });
   assert.deepEqual(reviewerExporterConfiguration(), { maxBatchSize: 1 });
+  assert.deepEqual(reviewerDuckDBSettings(), [
+    'SET preserve_insertion_order = false',
+    "PRAGMA force_compression = 'zstd'",
+  ]);
 });
 
 test('published CommandCode prices produce a labeled estimate from every token category', async () => {

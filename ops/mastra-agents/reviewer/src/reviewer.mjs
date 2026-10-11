@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { setTimeout as delay } from 'node:timers/promises';
 import { checkQuotes } from './quote-check.mjs';
-import { finishReviewerRun, requireCompleteFileReview, REVIEWER_RESOURCE, requestWithoutOutputCap, reviewThread, reviewerConfiguration, reviewerExporterConfiguration, reviewerStorageConfiguration } from './contract.mjs';
+import { finishReviewerRun, requireCompleteFileReview, REVIEWER_RESOURCE, requestWithoutOutputCap, reviewThread, reviewerConfiguration, reviewerDuckDBSettings, reviewerExporterConfiguration, reviewerStorageConfiguration } from './contract.mjs';
 import { checkedReview } from '../../../../scripts/julia-delivery-review.mjs';
 import { commandCodeCostEstimate, commandCodeUsageSummary, requireUsageSummaryCoverage, usageSummaryDelta } from './commandcode-cost.mjs';
 
@@ -222,6 +222,7 @@ export async function runReviewer(request, { onVerdict = async () => {} } = {}) 
   const observabilityStore = costStorage.observability;
   if (!observabilityStore || typeof observabilityStore.getMetricAggregate !== 'function') throw new Error('reviewer refused: tracing and cost recording are not live');
   await observabilityStore.init();
+  for (const setting of reviewerDuckDBSettings()) await costStorage.db.execute(setting);
   const totalsBefore = await runTotals(observabilityStore, issueId, { allowEmpty: true });
   const storage = new MastraCompositeStore({ id: 'julia-reviewer-storage', default: memoryStorage, domains: { observability: observabilityStore } });
   const requestContext = new RequestContext();

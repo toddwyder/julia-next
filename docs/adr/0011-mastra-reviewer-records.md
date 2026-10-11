@@ -20,6 +20,8 @@ adapter otherwise defaults to a 2 GB working set; bounding it lets file-backed a
 spill to disk and prevents full internal-trace persistence from exhausting the reviewer laptop.
 The stock storage exporter flushes each complete event (`maxBatchSize: 1`) so it does not retain a
 large in-memory event batch; this changes batching only and does not omit or truncate trace data.
+DuckDB also uses its documented `preserve_insertion_order=false` OOM setting and Zstandard
+checkpoint compression. These are stock database settings and do not change record semantics.
 
 Each run emits exactly one human-readable summary line through stock Mastra logging. It records the
 card, change, round, verdict or stop and reason, reviewer and safety-check model/effort, input and
