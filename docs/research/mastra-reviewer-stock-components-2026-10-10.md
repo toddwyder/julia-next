@@ -112,4 +112,3 @@ observational memory, working memory, model-selection routing, and
 This is deliberately the smallest reversible option: it relies on stock Mastra
 components for storage/history and trace creation, while retaining runner ownership
 of authorization, locks, exact candidate identity, and hard spend enforcement.
-
