@@ -50,7 +50,7 @@ export function reviewerStorageConfiguration(path) {
 }
 
 export function reviewerExporterConfiguration() {
-  return { maxBatchSize: 1 };
+  return { maxBatchSize: 100 };
 }
 
 export function reviewerDuckDBSettings() {

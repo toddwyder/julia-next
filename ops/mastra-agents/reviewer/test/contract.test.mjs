@@ -45,7 +45,7 @@ test('the persistent DuckDB store has a bounded working set on the reviewer lapt
     threads: 1,
     retention: { observability: { spans: { maxAge: '14d' } } },
   });
-  assert.deepEqual(reviewerExporterConfiguration(), { maxBatchSize: 1 });
+  assert.deepEqual(reviewerExporterConfiguration(), { maxBatchSize: 100 });
   assert.deepEqual(reviewerDuckDBSettings(), [
     'SET preserve_insertion_order = false',
     "PRAGMA force_compression = 'zstd'",

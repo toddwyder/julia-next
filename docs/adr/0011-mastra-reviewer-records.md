@@ -18,8 +18,8 @@ cleanup step and does not promise to shrink the DuckDB file.
 The DuckDB store uses its supported 1 GB memory limit and one worker thread. The installed
 adapter otherwise defaults to a 2 GB working set; bounding it lets file-backed analytical work
 spill to disk and prevents full internal-trace persistence from exhausting the reviewer laptop.
-The stock storage exporter flushes each complete event (`maxBatchSize: 1`) so it does not retain a
-large in-memory event batch; this changes batching only and does not omit or truncate trace data.
+The stock storage exporter uses `maxBatchSize: 100`, below its 1,000-event default while avoiding
+overlapping one-event checkpoints; this changes batching only and does not omit or truncate trace data.
 DuckDB also uses its documented `preserve_insertion_order=false` OOM setting and Zstandard
 checkpoint compression. These are stock database settings and do not change record semantics.
 
