@@ -32,6 +32,12 @@ test('Windows provisioning parks after account creation followed by failed persi
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
+test('Windows vault wrapper has a narrow review-only launcher operation', () => {
+  const wrapper = readFileSync(fileURLToPath(new URL('./julia-vault-windows.ps1', import.meta.url)), 'utf8');
+  assert.match(wrapper, /ValidateSet\('init', 'startReviewOnly'\)/);
+  assert.match(wrapper, /julia-vault\.mjs'\) \$Operation @JuliaArguments/);
+});
+
 test('migration pipes secrets, verifies readback and returns references only', async () => {
   const calls = []; let item;
   const execute = async (args, input) => {
