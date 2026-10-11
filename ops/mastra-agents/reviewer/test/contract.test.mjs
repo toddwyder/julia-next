@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_REVIEWER, REVIEWER_RESOURCE, finishReviewerRun, requireCompleteFileReview, reviewThread, requestWithoutOutputCap, requireLiveTracing, reviewerConfiguration } from '../src/contract.mjs';
 import { captureCommandCodeResponse, commandCodeMetadata } from '../src/reviewer.mjs';
-import { commandCodeCostEstimate, commandCodeUsageSummary, usageSummaryDelta } from '../src/commandcode-cost.mjs';
+import { commandCodeCostEstimate, commandCodeUsageSummary, requireUsageSummaryCoverage, usageSummaryDelta } from '../src/commandcode-cost.mjs';
 
 test('the reviewer defaults to CommandCode DeepSeek Flash and never sends an output cap', () => {
   assert.deepEqual(DEFAULT_REVIEWER.model, 'deepseek/deepseek-v4.1-flash');
@@ -64,6 +64,13 @@ test('launcher-key usage snapshots provide a nonnegative actual machine delta', 
   assert.deepEqual(usageSummaryDelta({ totalCount: 10, totalCost: 1, totalTokensIn: 400, totalTokensOut: 30 }, snapshot), {
     kind: 'actual', cost: 0.25, requestCount: 2, tokensIn: 100, tokensOut: 10, mayIncludeOtherUsage: true,
   });
+});
+
+test('machine reconciliation refuses a snapshot that has not caught up with every attempted call', () => {
+  const before = { totalCount: 10, totalCost: 1, totalTokensIn: 400, totalTokensOut: 30 };
+  const caughtUp = { totalCount: 12, totalCost: 1.2, totalTokensIn: 450, totalTokensOut: 40 };
+  assert.equal(requireUsageSummaryCoverage(before, caughtUp, 2), caughtUp);
+  assert.throws(() => requireUsageSummaryCoverage(before, { ...caughtUp, totalCount: 11 }, 2), /has not reported every attempted provider call/);
 });
 
 test('end of run waits for memory, flushes observability, then closes both intact stores', async () => {

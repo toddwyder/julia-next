@@ -143,8 +143,8 @@ The installed versions are `@mastra/core` 1.75.0 and
 `@mastra/observability` 1.18.4. Their stock, user-facing metric API is
 `MetricsContext.emit(name, value, labels, { costContext })`; `costContext`
 accepts `provider`, `model`, `estimatedCost`, `costUnit`, and `costMetadata`.
-An observability instance exposes `getMetricsContext(span?)`, so an exact
-CommandCode charge can be emitted as a normal trace-correlated Mastra metric.
+An observability instance exposes `getMetricsContext(span?)`, so the
+published-price estimate can be emitted as a normal trace-correlated Mastra metric.
 Sources: bundled
 [`metrics.d.ts`](../../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/observability/types/metrics.d.ts)
 and [`base.d.ts`](../../ops/mastra-agents/reviewer/node_modules/@mastra/observability/dist/instances/base.d.ts).
@@ -152,12 +152,13 @@ and [`base.d.ts`](../../ops/mastra-agents/reviewer/node_modules/@mastra/observab
 `TokenCostControl` then uses the stock observability storage
 `getMetricAggregate` query before each model call. Its bundled reference warns
 that exporters persist metrics asynchronously, making the built-in threshold
-approximate for fast loops. The application therefore still needs to await the
-request-ID billing lookup and ensure the exact-cost metric has flushed before
-allowing the next paid call; the external lookup/poll is custom because the
-installed Mastra packages contain no CommandCode billing adapter. Once obtained,
-however, the cost enters the brake through Mastra's stock metric context rather
-than through a custom storage adapter. Source: bundled
+approximate for fast loops. The application therefore awaits each estimated-cost
+metric flush before allowing the next paid call. After the run, the machine-wide
+`/alpha/usage/summary` delta is recorded as actual cost and any positive
+actual-over-estimated difference is emitted into the same stock brake aggregate.
+The endpoint lookup is custom because the installed Mastra packages contain no
+CommandCode billing adapter; the cost enters the brake through Mastra's stock
+metric context rather than through a custom storage adapter. Source: bundled
 [`TokenCostControl` reference](../../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/reference-processors-token-cost-control.md).
 
 The bundled documentation was searched for `metrics.emit`, external/provider

@@ -24,7 +24,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { checkQuotes } from './quote-check.mjs';
 import { finishReviewerRun, requireCompleteFileReview, REVIEWER_RESOURCE, requestWithoutOutputCap, reviewThread, reviewerConfiguration } from './contract.mjs';
 import { checkedReview } from '../../../../scripts/julia-delivery-review.mjs';
-import { commandCodeCostEstimate, commandCodeUsageSummary, usageSummaryDelta } from './commandcode-cost.mjs';
+import { commandCodeCostEstimate, commandCodeUsageSummary, requireUsageSummaryCoverage, usageSummaryDelta } from './commandcode-cost.mjs';
 
 const exec = promisify(execFile);
 const here = dirname(fileURLToPath(import.meta.url));
@@ -78,6 +78,7 @@ function reviewerTools(repoRoot, base, commit) {
 
 const rawUsageByResponseId = new Map();
 let providerResponsesObserved = 0;
+let providerRequestsAttempted = 0;
 
 export function captureCommandCodeResponse(body) {
   const capturedAt = new Date();
@@ -90,6 +91,7 @@ export function captureCommandCodeResponse(body) {
 
 async function checkedFetch(url, init, recordCost = async () => {}) {
   if (init?.body) init = { ...init, body: JSON.stringify(requestWithoutOutputCap(JSON.parse(String(init.body)))) };
+  providerRequestsAttempted += 1;
   const response = await fetch(url, init);
   let body;
   try { body = await response.clone().json(); }
@@ -131,16 +133,24 @@ function safetyCheckMetadata() {
   };
 }
 
-async function usageSummaryAfterRun(before, expectedResponses, options) {
-  const requiredCount = before.totalCount + expectedResponses;
+async function usageSummaryAfterRun(before, attemptedCalls, options) {
   const deadline = Date.now() + 30_000;
   let snapshot;
+  let coveredAt;
+  let coveredCount;
   do {
     snapshot = await commandCodeUsageSummary(options);
-    if (snapshot.totalCount >= requiredCount) return snapshot;
+    if (snapshot.totalCount >= before.totalCount + attemptedCalls) {
+      if (coveredCount !== snapshot.totalCount) {
+        coveredCount = snapshot.totalCount;
+        coveredAt = Date.now();
+      } else if (Date.now() - coveredAt >= 2_000) {
+        return requireUsageSummaryCoverage(before, snapshot, attemptedCalls);
+      }
+    }
     await delay(500);
   } while (Date.now() < deadline);
-  return snapshot;
+  return requireUsageSummaryCoverage(before, snapshot, attemptedCalls);
 }
 
 async function reviewerInstructions() {
@@ -188,8 +198,6 @@ export async function runReviewer(request, { onVerdict = async () => {} } = {}) 
   if (config.connection !== 'existing-commandcode') throw new Error('reviewer requires the saved CommandCode connection');
   if (!process.env.COMMANDCODE_API_KEY || process.env.COMMANDCODE_API_KEY.startsWith('op://')) throw new Error('CommandCode credential was not resolved by the launcher');
   const usageOptions = { key: process.env.COMMANDCODE_API_KEY, ...(config.usageBaseURL ? { baseURL: config.usageBaseURL } : {}) };
-  const machineUsageBefore = await commandCodeUsageSummary(usageOptions);
-  const providerResponsesBefore = providerResponsesObserved;
 
   const dataRoot = config.storageDirectory ? resolve(config.storageDirectory) : resolve(workerRoot, 'traces');
   await mkdir(dataRoot, { recursive: true });
@@ -266,7 +274,11 @@ export async function runReviewer(request, { onVerdict = async () => {} } = {}) 
   let runError;
   let paidCallsAttempted = false;
   let paidCallsCompleted = false;
+  let machineUsageBefore;
+  let providerRequestsBefore = providerRequestsAttempted;
   try {
+    machineUsageBefore = await commandCodeUsageSummary(usageOptions);
+    providerRequestsBefore = providerRequestsAttempted;
     const changedFiles = (await exec('git', ['diff', '--name-only', `${candidate.base}...${candidate.commit}`], { cwd: repoRoot, windowsHide: true })).stdout.split(/\r?\n/).filter(Boolean);
     if (input.candidate !== candidate.commit || typeof input.digest !== 'string' || !input.digest) throw new Error('reviewer refused: review input identity is incomplete');
     requireCompleteFileReview(changedFiles, input.files);
@@ -315,17 +327,31 @@ export async function runReviewer(request, { onVerdict = async () => {} } = {}) 
       }
       const storedEstimatedRunCost = totalsAfter.cost - totalsBefore.cost;
       const estimatedRunCost = providerUsageUnknown && storedEstimatedRunCost === 0 ? null : storedEstimatedRunCost;
-      const expectedResponses = providerResponsesObserved - providerResponsesBefore;
-      const machineUsageAfter = await usageSummaryAfterRun(machineUsageBefore, expectedResponses, usageOptions);
-      const actual = usageSummaryDelta(machineUsageBefore, machineUsageAfter);
-      if (actual.cost > (estimatedRunCost ?? 0)) {
-        const adjustment = actual.cost - (estimatedRunCost ?? 0);
-        costMetrics.emit('mastra_model_total_input_tokens', 0, { callRole: 'machine-reconciliation', costKind: 'actual-adjustment' }, { costContext: {
-          provider: 'commandcode', model: config.model, estimatedCost: adjustment, costUnit: 'usd',
-          costMetadata: { kind: 'actual', source: 'commandcode.alpha.usage.summary', mayIncludeOtherUsage: true },
-        } });
-        await mastra.observability.flush();
-        totalsAfter = await runTotals(observabilityStore, issueId, { allowEmpty: true });
+      let actual = {
+        kind: 'actual', cost: null, requestCount: null, tokensIn: null, tokensOut: null,
+        mayIncludeOtherUsage: true, reconciliationError: machineUsageBefore ? null : 'start usage snapshot unavailable',
+      };
+      if (machineUsageBefore) {
+        try {
+          const attemptedCalls = providerRequestsAttempted - providerRequestsBefore;
+          const machineUsageAfter = await usageSummaryAfterRun(machineUsageBefore, attemptedCalls, usageOptions);
+          actual = { ...usageSummaryDelta(machineUsageBefore, machineUsageAfter), reconciliationError: null };
+        } catch (error) {
+          actual.reconciliationError = error?.message ?? String(error);
+        }
+      }
+      if (typeof actual.cost === 'number' && actual.cost > (estimatedRunCost ?? 0)) {
+        try {
+          const adjustment = actual.cost - (estimatedRunCost ?? 0);
+          costMetrics.emit('mastra_model_total_input_tokens', 0, { callRole: 'machine-reconciliation', costKind: 'actual-adjustment' }, { costContext: {
+            provider: 'commandcode', model: config.model, estimatedCost: adjustment, costUnit: 'usd',
+            costMetadata: { kind: 'actual', source: 'commandcode.alpha.usage.summary', mayIncludeOtherUsage: true },
+          } });
+          await mastra.observability.flush();
+          totalsAfter = await runTotals(observabilityStore, issueId, { allowEmpty: true });
+        } catch (error) {
+          actual.reconciliationError = error?.message ?? String(error);
+        }
       }
       const endedAt = new Date();
       const summaryLogger = mastra.observability.getInstance('local')?.getLoggerContext();
@@ -347,6 +373,7 @@ export async function runReviewer(request, { onVerdict = async () => {} } = {}) 
           brake: totalsAfter.cost - totalsBefore.cost,
           actualMayIncludeOtherUsage: actual.mayIncludeOtherUsage,
           actualRequestCount: actual.requestCount,
+          reconciliationError: actual.reconciliationError,
         },
         startedAt: startedAt.toISOString(),
         endedAt: endedAt.toISOString(),
@@ -359,8 +386,13 @@ export async function runReviewer(request, { onVerdict = async () => {} } = {}) 
       await mastra.observability.flush();
       await finishReviewerRun({ memory, observability: mastra.observability, primaryStorage: storage, vectorStorage: vector, observabilityStorage: costStorage });
     } catch (error) {
-      if (!runError) throw error;
-      throw new AggregateError([runError, error], 'reviewer failed and could not persist its complete run summary');
+      if (verdict) {
+        console.error(`reviewer preserved saved verdict after finalization error: ${error?.message ?? String(error)}`);
+      } else if (!runError) {
+        throw error;
+      } else {
+        throw new AggregateError([runError, error], 'reviewer failed and could not persist its complete run summary');
+      }
     }
   }
   return verdict;

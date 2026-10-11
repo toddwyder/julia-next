@@ -290,7 +290,7 @@ test('runner starts the real reviewer twice and preserves verdict, trace, workin
   assert.equal(invalidSummary.verdict, null);
   assert.match(invalidSummary.stopReason, /identity is incomplete/i);
   assert.deepEqual(invalidSummary.tokens, { input: 0, output: 0 });
-  assert.deepEqual(invalidSummary.costUsd, { estimated: 0, actual: 0, brake: 0, actualMayIncludeOtherUsage: true, actualRequestCount: 0 });
+  assert.deepEqual(invalidSummary.costUsd, { estimated: 0, actual: 0, brake: 0, actualMayIncludeOtherUsage: true, actualRequestCount: 0, reconciliationError: null });
   const ambiguousSummary = readback.summaries.find(summary => summary.round === 4);
   assert.equal(ambiguousSummary.verdict, null);
   assert.match(ambiguousSummary.stopReason, /usage.*missing or unknown/i);
@@ -313,6 +313,7 @@ test('runner starts the real reviewer twice and preserves verdict, trace, workin
     assert.equal(Number(summary.costUsd.brake.toFixed(12)), 0.45);
     assert.equal(summary.costUsd.actualMayIncludeOtherUsage, true);
     assert.equal(summary.costUsd.actualRequestCount, 3);
+    assert.equal(summary.costUsd.reconciliationError, null);
     assert.match(summary.startedAt, /^\d{4}-\d{2}-\d{2}T/);
     assert.match(summary.endedAt, /^\d{4}-\d{2}-\d{2}T/);
     assert.ok(summary.databaseBytes.memory > 0 && summary.databaseBytes.observability > 0, JSON.stringify(summary));
@@ -363,7 +364,7 @@ test('runner starts the real reviewer twice and preserves verdict, trace, workin
   assert.deepEqual(stoppedSummary.reviewer, { model: 'deepseek/deepseek-v4.1-flash', effort: 'not-supported' });
   assert.deepEqual(stoppedSummary.safetyCheck, { model: 'deepseek/deepseek-v4.1-flash', effort: 'not-supported' });
   assert.deepEqual(stoppedSummary.tokens, { input: 0, output: 0 });
-  assert.deepEqual(stoppedSummary.costUsd, { estimated: 0, actual: 0, brake: 0, actualMayIncludeOtherUsage: true, actualRequestCount: 0 });
+  assert.deepEqual(stoppedSummary.costUsd, { estimated: 0, actual: 0, brake: 0, actualMayIncludeOtherUsage: true, actualRequestCount: 0, reconciliationError: null });
   assert.equal(Number(stoppedReadback.aggregate.estimatedCost.toFixed(12)), Number(api.reportedCosts.reduce((sum, cost) => sum + cost, 0).toFixed(12)));
 
   await writeFile(join(directory, 'acceptance-evidence.json'), `${JSON.stringify({

@@ -68,3 +68,13 @@ export function usageSummaryDelta(before, after) {
     mayIncludeOtherUsage: true,
   };
 }
+
+export function requireUsageSummaryCoverage(before, after, attemptedCalls) {
+  if (!Number.isInteger(attemptedCalls) || attemptedCalls < 0) {
+    throw new Error('reviewer refused: attempted provider call count is invalid');
+  }
+  if (after.totalCount < before.totalCount + attemptedCalls) {
+    throw new Error('reviewer refused: CommandCode usage summary has not reported every attempted provider call');
+  }
+  return after;
+}
