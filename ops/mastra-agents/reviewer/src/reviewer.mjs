@@ -71,5 +71,11 @@ export async function runReviewer(request) {
   }
 }
 
-async function main() { console.log(JSON.stringify(await runReviewer(JSON.parse(await readFile(0, 'utf8'))))); }
+async function stdinText() {
+  let text = '';
+  for await (const chunk of process.stdin) text += chunk;
+  return text;
+}
+
+async function main() { console.log(JSON.stringify(await runReviewer(JSON.parse(await stdinText())))); }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main().catch(error => { console.error(error.message); process.exitCode = 1; });
