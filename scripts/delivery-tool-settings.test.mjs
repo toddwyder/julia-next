@@ -45,7 +45,7 @@ const catalog = [
 
 const valid = {
   catalog,
-  reviewerRunLimits: { maxTotalUsd: 2, maxLiveRuns: 4, outputTokenCap: null },
+  reviewerRunLimits: { maxTotalUsd: 1, maxLiveRuns: 4, outputTokenCap: null },
   builder: { model: 'anthropic-builder', thinking: 'low' },
   reviewer: { model: 'OpenAI reviewer placeholder', thinking: null },
 };
@@ -81,7 +81,7 @@ test('checks in the authorized CommandCode DeepSeek Flash reviewer as the defaul
   assert.equal(settings.reviewer.model.id, 'commandcode-deepseek-reviewer');
   assert.equal(settings.reviewer.model.executableModelId, 'deepseek/deepseek-v4.1-flash');
   assert.equal(settings.reviewer.model.connection.provider, 'commandcode');
-  assert.deepEqual(settings.reviewerRunLimits, { maxTotalUsd: 2, maxLiveRuns: 4, outputTokenCap: null });
+  assert.deepEqual(settings.reviewerRunLimits, { maxTotalUsd: 1, maxLiveRuns: 4, outputTokenCap: null });
 });
 
 test('accepts an API-routed OMP catalog model with a Command Code provider', () => {
@@ -139,8 +139,8 @@ test('rejects unsupported thinking and invalid thinking defaults', () => {
 });
 
 test('rejects an output cap or malformed aggregate reviewer limits', () => {
-  assert.throws(() => validateDeliveryToolSettings({ ...valid, reviewerRunLimits: { maxTotalUsd: 2, maxLiveRuns: 4, outputTokenCap: 100 } }), /outputTokenCap must be null/);
-  assert.throws(() => validateDeliveryToolSettings({ ...valid, reviewerRunLimits: { maxTotalUsd: 2, maxLiveRuns: 0, outputTokenCap: null } }), /maxLiveRuns must be a positive integer/);
+  assert.throws(() => validateDeliveryToolSettings({ ...valid, reviewerRunLimits: { maxTotalUsd: 1, maxLiveRuns: 4, outputTokenCap: 100 } }), /outputTokenCap must be null/);
+  assert.throws(() => validateDeliveryToolSettings({ ...valid, reviewerRunLimits: { maxTotalUsd: 1, maxLiveRuns: 0, outputTokenCap: null } }), /maxLiveRuns must be a positive integer/);
 });
 
 test('rejects incomplete API connections and native routes with applicable fields', () => {

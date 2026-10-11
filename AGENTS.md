@@ -33,12 +33,18 @@ or workaround approval. If an authorization boundary or platform limit blocks th
 action, park the Linear card with one line explaining why; do not use Factory's Needs attention
 route: Factory is retired.
 
+Before asking for any approval, find where the thing lives today and why the current path cannot
+reach it. Ask only if no existing path works, and include that trace in the request.
+
 ### Standing stop policy
 
 On any blocker other than (a) an account action, (b) money beyond the authorized limit, or
 (c) a product decision, make the smallest reversible repository fix and continue. Record that
 choice in the final report. Do not use a reversible repository defect as a reason to stop or ask
 Todd for a workaround.
+
+Work to the brief's finish line. A completed step is not a stopping point; continue until the
+finish line is met or a stop condition applies.
 
 ### Preflight
 

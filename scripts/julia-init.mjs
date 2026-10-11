@@ -114,7 +114,7 @@ function resolveSelections(settings, defaults, explicit) {
     reviewer: explicit.reviewer ?? (defaults === null ? settings.reviewer : defaults?.reviewer),
   };
   try {
-    return { selected, resolved: validateDeliveryToolSettings({ catalog: settings.catalog, ...selected }) };
+    return { selected, resolved: validateDeliveryToolSettings({ catalog: settings.catalog, reviewerRunLimits: settings.reviewerRunLimits, ...selected }) };
   } catch (error) {
     const missing = ['builder', 'reviewer'].filter((role) => !explicit[role] && isStaleChoice(selected[role], settings.catalog));
     if (missing.length) throw new SelectionRequiredError(missing, selected);
