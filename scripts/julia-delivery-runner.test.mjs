@@ -624,6 +624,7 @@ test('Mastra launcher keeps an atomic verdict but surfaces a later worker failur
   const outputPath = join(root, 'review.json');
   const verdict = { text: 'VERDICT: PASS\nREVIEW: {}', observed: { harness: 'mastra-commandcode', model: 'fixture-model', maker: 'Fixture' }, traceId: 'trace-fixture', responseId: 'response-fixture', quotes: [], warnings: [] };
   const run = async (_command, _args, _options, limits) => {
+    assert.equal(limits.seconds, 3 * 60 * 60, 'large evidence reviews receive the bounded three-hour worker cap');
     const child = new EventEmitter(); child.pid = 12345;
     child.stdout = new PassThrough(); child.stderr = new PassThrough(); child.stdin = new PassThrough();
     limits.started(child);

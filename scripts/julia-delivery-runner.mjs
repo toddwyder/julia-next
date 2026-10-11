@@ -159,7 +159,7 @@ export function productionLauncher(worktree, { run = runLimited, environment = p
       const script = resolve(worktree, 'ops', 'mastra-agents', 'reviewer', 'src', 'reviewer.mjs');
       const verdictPath = `${request.outputPath}.verdict.json`;
       const result = await run(process.execPath, [script], { cwd: dirname(script), stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, env: { ...workerEnvironment, COMMANDCODE_API_KEY: environment.COMMANDCODE_API_KEY } }, {
-        seconds: LIMITS.builder.fallback,
+        seconds: LIMITS.builder.max,
         started: child => {
           child.stdout.on('data', chunk => { stdout += chunk; }); child.stderr.on('data', chunk => { stderr += chunk; }); child.stdin.on('error', () => {});
           Promise.resolve(request.started?.({ pid: child.pid })).then(() => {
