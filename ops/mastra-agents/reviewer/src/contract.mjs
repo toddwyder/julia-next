@@ -7,10 +7,11 @@ export const DEFAULT_REVIEWER = Object.freeze({
 
 export function reviewerConfiguration(configuration = {}) {
   const reviewer = configuration.reviewer ?? configuration;
+  const savedConnection = reviewer.connection;
   return {
     ...DEFAULT_REVIEWER,
     model: reviewer.model ?? DEFAULT_REVIEWER.model,
-    connection: reviewer.connection?.route ?? reviewer.connection ?? DEFAULT_REVIEWER.connection,
+    connection: savedConnection?.provider === 'commandcode' ? 'existing-commandcode' : savedConnection?.route ?? savedConnection ?? DEFAULT_REVIEWER.connection,
     costCeilingUsd: reviewer.costCeilingUsd ?? DEFAULT_REVIEWER.costCeilingUsd,
   };
 }

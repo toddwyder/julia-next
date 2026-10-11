@@ -10,15 +10,16 @@
       "connection": { "route": "native", "provider": null, "endpoint": null, "protocol": null, "authReference": null }
     },
     {
-      "id": "openai-reviewer",
-      "displayName": "OpenAI reviewer placeholder",
-      "executableModelId": "placeholder-openai-reviewer",
-      "maker": "OpenAI",
-      "harness": "codex",
+      "id": "commandcode-deepseek-reviewer",
+      "displayName": "CommandCode DeepSeek Flash reviewer",
+      "executableModelId": "deepseek/deepseek-v4.1-flash",
+      "maker": "DeepSeek",
+      "harness": "omp",
       "thinking": { "supported": false, "default": null },
-      "connection": { "route": "native", "provider": null, "endpoint": null, "protocol": null, "authReference": null }
+      "connection": { "route": "api", "provider": "commandcode", "endpoint": "https://api.commandcode.ai/provider/v1", "protocol": "openai-compatible", "authReference": "COMMANDCODE_API_KEY" }
     }
   ],
+  "reviewerRunLimits": { "maxTotalUsd": 2.00, "maxLiveRuns": 4, "outputTokenCap": null },
   "builder": { "model": "anthropic-builder", "thinking": "high" },
-  "reviewer": { "model": "openai-reviewer", "thinking": null }
+  "reviewer": { "model": "commandcode-deepseek-reviewer", "thinking": null }
 }

@@ -121,15 +121,24 @@ function validateRole(role, choice, catalog) {
   return { role, model, thinking };
 }
 
+function validateReviewerRunLimits(limits) {
+  if (!isObject(limits)) reject('reviewerRunLimits must be an object');
+  checkKeys(limits, ['maxTotalUsd', 'maxLiveRuns', 'outputTokenCap'], 'reviewerRunLimits');
+  if (!Number.isFinite(limits.maxTotalUsd) || limits.maxTotalUsd < 0) reject('reviewerRunLimits maxTotalUsd must be a non-negative number');
+  if (!Number.isInteger(limits.maxLiveRuns) || limits.maxLiveRuns < 1) reject('reviewerRunLimits maxLiveRuns must be a positive integer');
+  if (limits.outputTokenCap !== null) reject('reviewerRunLimits outputTokenCap must be null');
+  return { maxTotalUsd: limits.maxTotalUsd, maxLiveRuns: limits.maxLiveRuns, outputTokenCap: null };
+}
+
 export function validateDeliveryToolSettings(settings) {
   if (!isObject(settings)) reject('must be an object');
-  checkKeys(settings, ['catalog', ...ROLES], 'settings');
+  checkKeys(settings, ['catalog', 'reviewerRunLimits', ...ROLES], 'settings');
   const catalog = validateCatalog(settings.catalog);
   const resolved = Object.fromEntries(ROLES.map((role) => [role, validateRole(role, settings[role], catalog)]));
   if (canonicalMaker(resolved.builder.model.maker) === canonicalMaker(resolved.reviewer.model.maker)) {
     reject(`builder and reviewer both resolve to maker ${JSON.stringify(resolved.builder.model.maker)}; they must use different makers`);
   }
-  return resolved;
+  return { ...resolved, reviewerRunLimits: validateReviewerRunLimits(settings.reviewerRunLimits) };
 }
 
 export async function loadDeliveryToolSettings(path, { read = readFile } = {}) {

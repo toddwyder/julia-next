@@ -45,6 +45,7 @@ const catalog = [
 
 const valid = {
   catalog,
+  reviewerRunLimits: { maxTotalUsd: 2, maxLiveRuns: 4, outputTokenCap: null },
   builder: { model: 'anthropic-builder', thinking: 'low' },
   reviewer: { model: 'OpenAI reviewer placeholder', thinking: null },
 };
@@ -66,12 +67,21 @@ test('loads complete effective configurations by exact catalog ID and display na
   assert.deepEqual(settings.reviewer, { role: 'reviewer', model: catalog[1], thinking: null });
 });
 
-test('loads the checked-in placeholder catalog without a worker launch', async () => {
+test('loads the checked-in catalog without a worker launch', async () => {
   const settings = await loadDeliveryToolSettings(new URL('../delivery-tools.json', import.meta.url));
 
   assert.equal(settings.builder.model.id, 'anthropic-builder');
-  assert.equal(settings.reviewer.model.id, 'openai-reviewer');
+  assert.equal(settings.reviewer.model.id, 'commandcode-deepseek-reviewer');
   assert.equal(settings.reviewer.thinking, null);
+});
+
+test('checks in the authorized CommandCode DeepSeek Flash reviewer as the default', async () => {
+  const settings = await loadDeliveryToolSettings(new URL('../delivery-tools.json', import.meta.url));
+
+  assert.equal(settings.reviewer.model.id, 'commandcode-deepseek-reviewer');
+  assert.equal(settings.reviewer.model.executableModelId, 'deepseek/deepseek-v4.1-flash');
+  assert.equal(settings.reviewer.model.connection.provider, 'commandcode');
+  assert.deepEqual(settings.reviewerRunLimits, { maxTotalUsd: 2, maxLiveRuns: 4, outputTokenCap: null });
 });
 
 test('accepts an API-routed OMP catalog model with a Command Code provider', () => {
@@ -88,6 +98,7 @@ test('accepts an API-routed OMP catalog model with a Command Code provider', () 
         connection: apiConnection,
       },
     ],
+    reviewerRunLimits: valid.reviewerRunLimits,
     builder: { model: 'deepseek-omp', thinking: 'medium' },
     reviewer: valid.reviewer,
   });
@@ -125,6 +136,11 @@ test('rejects unsupported thinking and invalid thinking defaults', () => {
     () => validateDeliveryToolSettings({ ...valid, catalog: [{ ...catalog[0], thinking: { supported: ['low'], default: 'high' } }, catalog[1]] }),
     /catalog entry "anthropic-builder" has a default thinking level that is not supported/,
   );
+});
+
+test('rejects an output cap or malformed aggregate reviewer limits', () => {
+  assert.throws(() => validateDeliveryToolSettings({ ...valid, reviewerRunLimits: { maxTotalUsd: 2, maxLiveRuns: 4, outputTokenCap: 100 } }), /outputTokenCap must be null/);
+  assert.throws(() => validateDeliveryToolSettings({ ...valid, reviewerRunLimits: { maxTotalUsd: 2, maxLiveRuns: 0, outputTokenCap: null } }), /maxLiveRuns must be a positive integer/);
 });
 
 test('rejects incomplete API connections and native routes with applicable fields', () => {
@@ -190,7 +206,7 @@ test('accepts a compatible catalog addition without validator changes', () => {
     thinking: { supported: ['minimal'], default: 'minimal' }, connection: nativeConnection,
   };
   const settings = validateDeliveryToolSettings({
-    catalog: [...catalog, added], builder: { model: 'openai-builder', thinking: 'minimal' }, reviewer: valid.builder,
+    catalog: [...catalog, added], reviewerRunLimits: valid.reviewerRunLimits, builder: { model: 'openai-builder', thinking: 'minimal' }, reviewer: valid.builder,
   });
 
   assert.equal(settings.builder.model, added);

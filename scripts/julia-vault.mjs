@@ -56,7 +56,7 @@ export async function migrateJuliaSecrets(environment, { execute = opExecutor(),
   return { vaultId: vault.id, references, migrated, missing, verified: 'vault readback only; live service proof pending' };
 }
 
-export function vaultLaunch(args, { configuration, references, environment = process.env, run = spawnSync } = {}) {
+export function vaultLaunch(args, { entryPoint = 'julia-init.mjs', configuration, references, environment = process.env, run = spawnSync } = {}) {
   if (!configuration?.vaultId || !configuration.referencesPath) throw Error('missing Julia vault launch configuration');
   const values = parseEnv(references);
   if (!Object.keys(values).length) throw Error('empty Julia vault reference file');
@@ -72,7 +72,8 @@ export function vaultLaunch(args, { configuration, references, environment = pro
   }
   // Resolve this validated snapshot, not a second read of the mutable file.
   // Omitted fields stay absent instead of falling back to stale plaintext.
-  const result = run(configuration.opExecutable ?? 'op', ['run', '--', process.execPath, fileURLToPath(new URL('./julia-init.mjs', import.meta.url)), ...args], { stdio: 'inherit', env: { ...launchEnvironment, ...values }, windowsHide: true });
+  if (!new Set(['julia-init.mjs', 'julia-review-only.mjs']).has(entryPoint)) throw Error('unapproved Julia launcher entry point');
+  const result = run(configuration.opExecutable ?? 'op', ['run', '--', process.execPath, fileURLToPath(new URL(`./${entryPoint}`, import.meta.url)), ...args], { stdio: 'inherit', env: { ...launchEnvironment, ...values }, windowsHide: true });
   if (result.error) throw Error('1Password launch failed; confirm the installed CLI and account access');
   return result.status ?? 1;
 }
@@ -101,10 +102,10 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       await writeFile(referencesPath, Object.entries(report.references).map(([key, value]) => `${key}=${value}`).join('\n') + '\n');
       await writeFile(configurationPath, JSON.stringify({ vaultId: report.vaultId, referencesPath, opExecutable: process.env.JULIA_OP_EXECUTABLE ?? 'op' }, null, 2));
       console.log(JSON.stringify(report));
-    } else if (operation === 'init' || operation === 'verify') {
+    } else if (operation === 'init' || operation === 'startReviewOnly' || operation === 'verify') {
       const configuration = JSON.parse(await readFile(configurationPath, 'utf8'));
       const references = await readFile(configuration.referencesPath, 'utf8');
-      process.exitCode = operation === 'verify' ? vaultProbe({ configuration, references }) : vaultLaunch(args, { configuration, references });
-    } else throw Error('expected migrate or init');
+      process.exitCode = operation === 'verify' ? vaultProbe({ configuration, references }) : vaultLaunch(args, { entryPoint: operation === 'startReviewOnly' ? 'julia-review-only.mjs' : 'julia-init.mjs', configuration, references });
+    } else throw Error('expected migrate, init, startReviewOnly, or verify');
   } catch (error) { console.error(error.message); process.exitCode = 1; }
 }

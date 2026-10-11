@@ -33,6 +33,20 @@ or workaround approval. If an authorization boundary or platform limit blocks th
 action, park the Linear card with one line explaining why; do not use Factory's Needs attention
 route: Factory is retired.
 
+### Standing stop policy
+
+On any blocker other than (a) an account action, (b) money beyond the authorized limit, or
+(c) a product decision, make the smallest reversible repository fix and continue. Record that
+choice in the final report. Do not use a reversible repository defect as a reason to stop or ask
+Todd for a workaround.
+
+### Preflight
+
+Before any task, verify the applicable entry points, the launcher's accepted command list,
+configuration and authorized spend limits, required credentials, and branch/worktree state. Fix
+what is safely fixable before starting work. Spend limits belong in
+`claude/mastra-agents-design.md`, never in prompts. The reviewer limit is **$1.00 per card**.
+
 ## Server and domain
 
 Keep SSH and sudo outside automated runners; an authorized operator uses the laptop's Tailscale

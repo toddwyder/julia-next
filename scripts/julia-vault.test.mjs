@@ -106,6 +106,18 @@ test('vault launcher loads only references in the designated vault, preserves ma
   assert.equal(call.options.env.VERCEL_TOKEN, 'op://vault-id/item-id/token');
   assert.equal(call.args.includes('--no-masking'), false); assert.equal(call.options.shell, undefined);
 });
+test('vault launcher selects the review-only entry point only for startReviewOnly', () => {
+  let call;
+  const code = vaultLaunch(['JUL-206', '--pr', '282'], {
+    entryPoint: 'julia-review-only.mjs', configuration: { vaultId: 'vault-id', opExecutable: 'op.exe', referencesPath: 'references.env' },
+    references: 'COMMANDCODE_API_KEY=op://vault-id/item-id/key\n',
+    run: (command, args, options) => { call = { command, args, options }; return { status: 0 }; },
+  });
+  assert.equal(code, 0);
+  assert.match(call.args[3], /julia-review-only\.mjs$/);
+  assert.deepEqual(call.args.slice(4), ['JUL-206', '--pr', '282']);
+  assert.equal(call.options.env.COMMANDCODE_API_KEY, 'op://vault-id/item-id/key');
+});
 test('omitted service secrets do not inherit stale plaintext or unrelated vault references', () => {
   vaultLaunch(['$init', 'JUL-123'], { configuration: { vaultId: 'vault-id', referencesPath: 'mutable.env' }, references: 'LINEAR_API_KEY=op://vault-id/item-id/key', environment: { VERCEL_TOKEN: 'stale', axiom_token: 'stale', AXIOM_DATASET: 'op://other/item/dataset', OP_SERVICE_ACCOUNT_TOKEN: 'bootstrap', PATH: 'fixture' }, run: (_command, args, options) => {
     assert.equal(args.includes('mutable.env'), false);

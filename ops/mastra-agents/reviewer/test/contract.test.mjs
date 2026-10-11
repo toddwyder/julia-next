@@ -22,6 +22,7 @@ test('a review refuses to start when no live trace context exists', () => {
 
 test('per-card reviewer model overrides the CommandCode default', () => {
   assert.equal(reviewerConfiguration({ reviewer: { model: 'deepseek/custom' } }).model, 'deepseek/custom');
+  assert.equal(reviewerConfiguration({ reviewer: { connection: { route: 'api', provider: 'commandcode' } } }).connection, 'existing-commandcode');
   assert.equal(reviewerConfiguration().model, DEFAULT_REVIEWER.model);
 });
 
