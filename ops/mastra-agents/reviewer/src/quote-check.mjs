@@ -26,9 +26,9 @@ export async function checkQuotes(repoRoot, commit, report, sources = {}) {
   const checks = [];
   for (const evidence of evidenceCitations(report)) {
     try {
-      const sourceText = evidence.source === 'diff' || evidence.source.startsWith('file:')
-        ? await gitText(repoRoot, commit, evidence.source)
-        : sources[evidence.source];
+      const sourceText = Object.hasOwn(sources, evidence.source)
+        ? sources[evidence.source]
+        : await gitText(repoRoot, commit, evidence.source);
       checks.push({ source: evidence.source, quote: evidence.quote, ok: quoteIsPresent(evidence.quote, sourceText ?? '') });
     } catch (error) {
       checks.push({ source: evidence.source, quote: evidence.quote, ok: false, error: error.message });
