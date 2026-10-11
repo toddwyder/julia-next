@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { checkQuotes, evidenceCitations, quoteIsPresent } from '../src/quote-check.mjs';
+import { checkQuotes, evidenceCitations, quoteIsPresent, verifyEvidenceQuote } from '../src/quote-check.mjs';
 
 test('quote check accepts an exact quote only', () => {
   assert.equal(quoteIsPresent('exitCode=1', 'artifact: test-exit.txt\nexitCode=1\n'), true);
@@ -29,4 +29,13 @@ test('quote check prefers the authoritative cumulative diff and deleted-file sou
     'file:deleted.mjs': 'content retained from the base revision',
   });
   assert.deepEqual(checks.map(check => check.ok), [true, true]);
+});
+
+test('the model-facing quote verifier accepts only exact immutable candidate text', async () => {
+  assert.deepEqual(await verifyEvidenceQuote('missing-repository', 'f'.repeat(40), 'diff', 'exact candidate text', {
+    diff: 'before\nexact candidate text\nafter',
+  }), { ok: true });
+  assert.deepEqual(await verifyEvidenceQuote('missing-repository', 'f'.repeat(40), 'diff', 'Exact candidate text', {
+    diff: 'before\nexact candidate text\nafter',
+  }), { ok: false });
 });

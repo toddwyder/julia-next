@@ -36,3 +36,12 @@ export async function checkQuotes(repoRoot, commit, report, sources = {}) {
   }
   return checks;
 }
+
+export async function verifyEvidenceQuote(repoRoot, commit, source, quote, sources = {}) {
+  try {
+    const sourceText = Object.hasOwn(sources, source) ? sources[source] : await gitText(repoRoot, commit, source);
+    return { ok: quoteIsPresent(quote, sourceText ?? '') };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
