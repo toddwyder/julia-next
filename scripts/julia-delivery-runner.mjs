@@ -153,7 +153,7 @@ export function productionLauncher(worktree, { run = runLimited, environment = p
     // Review-only work is the Mastra path.  It receives metadata and reads the
     // immutable candidate through its own read-only Git tools, rather than
     // putting changed files in a provider prompt.
-    if (role === 'reviewer' && request.reviewInput && request.issueId && request.candidate && configured.connection?.provider === 'commandcode') {
+    if (role === 'reviewer' && request.mastraReviewOnly === true && request.reviewInput && request.issueId && request.candidate && configured.connection?.provider === 'commandcode') {
       let stdout = ''; let stderr = ''; let recorded = false;
       const startedAt = new Date().toISOString();
       const script = resolve(worktree, 'ops', 'mastra-agents', 'reviewer', 'src', 'reviewer.mjs');
@@ -408,7 +408,7 @@ export async function runDelivery({ issueId, configuration, runPath, authorizati
       const handoff = { issueId, round, candidate: current, input, ...(priorReview ? { priorReview } : {}), builder: { configured: configuration.builder, observed: builder?.observed ?? null }, createdAt: now() };
       if (!isDone('review', round)) await save(handoffPath, handoff);
       const reviewerConfig = { ...configuration.reviewer, builderMaker: configuration.builder.maker };
-      const reviewer = await act('review', round, 'reviewer', (started, attempt) => launch('reviewer', { prompt, reviewInput: input, configuration: reviewerConfig, handoffPath, round, issueId, candidate: current, repoRoot: record.worktree?.path, started, outputPath: evidence('reviewer', attempt), spending: approvedAuthorization.spending.reviewer }));
+      const reviewer = await act('review', round, 'reviewer', (started, attempt) => launch('reviewer', { prompt, reviewInput: input, configuration: reviewerConfig, handoffPath, round, issueId, candidate: current, repoRoot: record.worktree?.path, mastraReviewOnly: reviewOnly, started, outputPath: evidence('reviewer', attempt), spending: approvedAuthorization.spending.reviewer }));
       const reviewerIdentity = validObserved('reviewer', reviewerConfig, reviewer.observed);
       const verdict = checkedReview(reviewer.text, input);
       await save(handoffPath, { ...handoff, reviewer: { configured: configuration.reviewer, observed: reviewer.observed, exitCode: reviewer.exitCode, outputPath: reviewer.outputPath ?? null, verdict: verdict.verdict ?? null }, result: verdict.error ?? verdict.verdict });
