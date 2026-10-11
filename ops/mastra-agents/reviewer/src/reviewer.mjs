@@ -332,6 +332,21 @@ export async function runReviewer(request, { onVerdict = async () => {} } = {}) 
     if (invalidQuotes.length) throw new Error(`reviewer refused: report contains unverifiable evidence quotes: ${JSON.stringify(invalidQuotes)}`);
     requireCompleteFileReview(changedFiles, result.object.report.filesReviewed);
     if (!result.traceId) throw new Error('reviewer refused: completed result has no trace');
+    const saveReviewMemory = async () => memory.saveMessages({
+      messages: [{
+        id: randomUUID(), type: 'text', role: 'assistant', threadId, resourceId: REVIEWER_RESOURCE, createdAt: new Date(),
+        content: { format: 2, parts: [{ type: 'text', text: JSON.stringify({
+          kind: 'review-memory', card: issueId, candidate: candidate.commit, verdict: result.object.verdict,
+          summary: result.object.report.summary, findings: result.object.report.findings, limitations: result.object.report.limitations,
+        }) }] },
+      }],
+      memoryConfig: { semanticRecall: { topK: 3, messageRange: 1, scope: 'resource' } },
+    });
+    let reviewMemorySaved = false;
+    if (result.object.verdict === 'INCONCLUSIVE') {
+      try { await saveReviewMemory(); reviewMemorySaved = true; }
+      catch (error) { warnings.push({ semanticMemoryError: error?.message ?? String(error) }); }
+    }
     const text = `VERDICT: ${result.object.verdict}\nREVIEW: ${JSON.stringify(result.object.report)}`;
     const checked = checkedReview(text, input);
     if (!checked.verdict) throw new Error(checked.error);
@@ -345,16 +360,7 @@ export async function runReviewer(request, { onVerdict = async () => {} } = {}) 
     await writeFile(verdictPath, `${JSON.stringify(verdict)}\n`, { flag: 'wx' });
     await onVerdict(verdict);
     try {
-      await memory.saveMessages({
-        messages: [{
-          id: randomUUID(), type: 'text', role: 'assistant', threadId, resourceId: REVIEWER_RESOURCE, createdAt: new Date(),
-          content: { format: 2, parts: [{ type: 'text', text: JSON.stringify({
-            kind: 'review-memory', card: issueId, candidate: candidate.commit, verdict: result.object.verdict,
-            summary: result.object.report.summary, findings: result.object.report.findings, limitations: result.object.report.limitations,
-          }) }] },
-        }],
-        memoryConfig: { semanticRecall: { topK: 3, messageRange: 1, scope: 'resource' } },
-      });
+      if (!reviewMemorySaved) await saveReviewMemory();
     } catch (error) {
       warnings.push({ semanticMemoryError: error?.message ?? String(error) });
     }
