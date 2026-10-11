@@ -33,12 +33,23 @@ async function standInServer() {
   const contracts = [];
   let failNext = false;
   const server = createServer(async (request, response) => {
+    if (request.method === 'GET' && request.url === '/alpha/usage/summary') {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({
+        totalCount: reportedCosts.length,
+        totalCost: reportedCosts.reduce((sum, cost) => sum + cost, 0),
+        totalTokensIn: requests.length * 120,
+        totalTokensOut: requests.length * 30,
+      }));
+      return;
+    }
     let raw = '';
     for await (const chunk of request) raw += chunk;
     const body = JSON.parse(raw);
     requests.push(body);
     if (failNext) {
       failNext = false;
+      reportedCosts.push(0.15);
       response.writeHead(200, { 'content-type': 'application/json' });
       response.end(JSON.stringify({ id: `standin-${requests.length}`, object: 'chat.completion', choices: [{ index: 0, message: { role: 'assistant', content: '{}' }, finish_reason: 'stop' }] }));
       return;
@@ -86,10 +97,11 @@ async function standInServer() {
     }
     response.writeHead(200, { 'content-type': 'application/json' });
     reportedCosts.push(0.15);
-    response.end(JSON.stringify({ id: `standin-${requests.length}`, object: 'chat.completion', created: 1, model: 'deepseek/deepseek-v4.1-flash', choices: [{ index: 0, message, finish_reason: finishReason }], usage: { prompt_tokens: 120, completion_tokens: 30, total_tokens: 150, cost: { total: 0.15 } } }));
+    response.end(JSON.stringify({ id: `standin-${requests.length}`, object: 'chat.completion', created: 1, model: 'deepseek/deepseek-v4.1-flash', choices: [{ index: 0, message, finish_reason: finishReason }], usage: { prompt_tokens: 120, completion_tokens: 30, total_tokens: 150 } }));
   });
   await new Promise((done, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', done); });
-  return { server, requests, reportedCosts, observations, contracts, failOnce: () => { failNext = true; }, baseURL: `http://127.0.0.1:${server.address().port}/v1` };
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  return { server, requests, reportedCosts, observations, contracts, failOnce: () => { failNext = true; }, baseURL: `${origin}/v1`, usageBaseURL: origin };
 }
 
 async function candidateRepository(root) {
@@ -127,7 +139,7 @@ test('runner starts the real reviewer twice and preserves verdict, trace, workin
   await mkdir(evidence, { recursive: true });
   const configuration = {
     model: 'deepseek/deepseek-v4.1-flash', maker: 'DeepSeek', harness: 'mastra-commandcode',
-    connection: { provider: 'commandcode' }, costCeilingUsd: 1, baseURL: api.baseURL, storageDirectory: data,
+    connection: { provider: 'commandcode' }, costCeilingUsd: 1, baseURL: api.baseURL, usageBaseURL: api.usageBaseURL, storageDirectory: data,
   };
   const launcher = productionLauncher(repositoryRoot, { environment: { ...process.env, COMMANDCODE_API_KEY: 'free-proof', MASTRA_REVIEWER_STANDIN: '1' } });
   const candidatePath = join(directory, 'candidate');
@@ -211,7 +223,7 @@ test('runner starts the real reviewer twice and preserves verdict, trace, workin
     const firstPositiveCost = (value, path = '', seen = new WeakSet()) => {
       if (value == null) return null;
       if (typeof value !== 'object') {
-        return /(?:gateway\.cost|usage\.cost\.total)$/.test(path) && typeof value === 'number' && value > 0 ? { path, value } : null;
+        return /(?:gateway\.cost|commandcode\.cost\.cost|usage\.cost\.total)$/.test(path) && typeof value === 'number' && value > 0 ? { path, value } : null;
       }
       if (seen.has(value)) return null;
       seen.add(value);
@@ -231,6 +243,7 @@ test('runner starts the real reviewer twice and preserves verdict, trace, workin
       metricCount: metrics.metrics?.length ?? 0,
       costAggregate,
       metricNames: (metrics.metrics ?? []).map(metric => metric.name),
+      costRecordKinds: (metrics.metrics ?? []).filter(metric => metric.estimatedCost != null).map(metric => metric.labels?.costKind),
       summaries: (logs.logs ?? []).filter(log => log.message === 'mastra reviewer run summary').map(log => log.data),
       expiredExisted: Boolean(expiredBefore),
       workingMemory,
@@ -270,17 +283,22 @@ test('runner starts the real reviewer twice and preserves verdict, trace, workin
   assert.ok(readback.metricCount > 0, 'DuckDB must retain automatic cost/token metrics');
   assert.ok(readback.costAggregate.estimatedCost > 0, JSON.stringify(readback.costAggregate));
   assert.equal(Number(readback.costAggregate.estimatedCost.toFixed(12)), Number(api.reportedCosts.reduce((sum, cost) => sum + cost, 0).toFixed(12)), 'the brake total must equal every reported paid stand-in call, including safety checks');
+  assert.ok(readback.costRecordKinds.includes('estimated'), JSON.stringify(readback.costRecordKinds));
+  assert.ok(readback.costRecordKinds.every(kind => kind === 'estimated' || kind === 'actual-adjustment'), JSON.stringify(readback.costRecordKinds));
   assert.equal(readback.summaries.length, 4, JSON.stringify(readback.summaries));
   const invalidSummary = readback.summaries.find(summary => summary.round === 0);
   assert.equal(invalidSummary.verdict, null);
   assert.match(invalidSummary.stopReason, /identity is incomplete/i);
   assert.deepEqual(invalidSummary.tokens, { input: 0, output: 0 });
-  assert.equal(invalidSummary.costUsd, 0);
+  assert.deepEqual(invalidSummary.costUsd, { estimated: 0, actual: 0, brake: 0, actualMayIncludeOtherUsage: true, actualRequestCount: 0 });
   const ambiguousSummary = readback.summaries.find(summary => summary.round === 4);
   assert.equal(ambiguousSummary.verdict, null);
   assert.match(ambiguousSummary.stopReason, /usage.*missing or unknown/i);
   assert.deepEqual(ambiguousSummary.tokens, { input: null, output: null });
-  assert.equal(ambiguousSummary.costUsd, null);
+  assert.equal(ambiguousSummary.costUsd.estimated, null);
+  assert.equal(Number(ambiguousSummary.costUsd.actual.toFixed(12)), 0.15);
+  assert.equal(Number(ambiguousSummary.costUsd.brake.toFixed(12)), 0.15);
+  assert.equal(ambiguousSummary.costUsd.actualMayIncludeOtherUsage, true);
   for (const [index, summary] of readback.summaries.filter(summary => summary.round === 1 || summary.round === 2).toSorted((a, b) => a.round - b.round).entries()) {
     assert.equal(summary.card, 'JUL-206');
     assert.equal(summary.change, `${candidate.base}...${index === 0 ? candidate.first : candidate.second}`);
@@ -290,7 +308,11 @@ test('runner starts the real reviewer twice and preserves verdict, trace, workin
     assert.deepEqual(summary.reviewer, { model: 'deepseek/deepseek-v4.1-flash', effort: 'not-supported' });
     assert.deepEqual(summary.safetyCheck, { model: 'deepseek/deepseek-v4.1-flash', effort: 'not-supported' });
     assert.ok(summary.tokens.input > 0 && summary.tokens.output > 0, JSON.stringify(summary));
-    assert.ok(summary.costUsd > 0, JSON.stringify(summary));
+    assert.ok(summary.costUsd.estimated > 0, JSON.stringify(summary));
+    assert.equal(Number(summary.costUsd.actual.toFixed(12)), 0.45);
+    assert.equal(Number(summary.costUsd.brake.toFixed(12)), 0.45);
+    assert.equal(summary.costUsd.actualMayIncludeOtherUsage, true);
+    assert.equal(summary.costUsd.actualRequestCount, 3);
     assert.match(summary.startedAt, /^\d{4}-\d{2}-\d{2}T/);
     assert.match(summary.endedAt, /^\d{4}-\d{2}-\d{2}T/);
     assert.ok(summary.databaseBytes.memory > 0 && summary.databaseBytes.observability > 0, JSON.stringify(summary));
@@ -341,7 +363,7 @@ test('runner starts the real reviewer twice and preserves verdict, trace, workin
   assert.deepEqual(stoppedSummary.reviewer, { model: 'deepseek/deepseek-v4.1-flash', effort: 'not-supported' });
   assert.deepEqual(stoppedSummary.safetyCheck, { model: 'deepseek/deepseek-v4.1-flash', effort: 'not-supported' });
   assert.deepEqual(stoppedSummary.tokens, { input: 0, output: 0 });
-  assert.equal(stoppedSummary.costUsd, 0);
+  assert.deepEqual(stoppedSummary.costUsd, { estimated: 0, actual: 0, brake: 0, actualMayIncludeOtherUsage: true, actualRequestCount: 0 });
   assert.equal(Number(stoppedReadback.aggregate.estimatedCost.toFixed(12)), Number(api.reportedCosts.reduce((sum, cost) => sum + cost, 0).toFixed(12)));
 
   await writeFile(join(directory, 'acceptance-evidence.json'), `${JSON.stringify({

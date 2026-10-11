@@ -17,7 +17,8 @@ cleanup step and does not promise to shrink the DuckDB file.
 
 Each run emits exactly one human-readable summary line through stock Mastra logging. It records the
 card, change, round, verdict or stop and reason, reviewer and safety-check model/effort, input and
-output tokens, cost, start and end time, and both database sizes. These fields make the durable log
+output tokens, the published-price estimate, the machine usage-summary actual cost (marked as a
+safe possible overcount), the cost used by the brake, start and end time, and both database sizes. These fields make the durable log
 the UAT record; traces remain diagnostic evidence rather than a prerequisite for understanding a
 run's outcome.
 

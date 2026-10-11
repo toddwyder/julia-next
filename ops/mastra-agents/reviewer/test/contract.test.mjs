@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_REVIEWER, REVIEWER_RESOURCE, finishReviewerRun, requireCompleteFileReview, reviewThread, requestWithoutOutputCap, requireLiveTracing, reviewerConfiguration } from '../src/contract.mjs';
 import { captureCommandCodeResponse, commandCodeMetadata } from '../src/reviewer.mjs';
+import { commandCodeCostEstimate, commandCodeUsageSummary, usageSummaryDelta } from '../src/commandcode-cost.mjs';
 
 test('the reviewer defaults to CommandCode DeepSeek Flash and never sends an output cap', () => {
   assert.deepEqual(DEFAULT_REVIEWER.model, 'deepseek/deepseek-v4.1-flash');
@@ -28,23 +29,41 @@ test('per-card reviewer model overrides the CommandCode default', () => {
   assert.equal(reviewerConfiguration().model, DEFAULT_REVIEWER.model);
 });
 
-test('every CommandCode response requires finite nonnegative provider cost and token counts', async () => {
-  assert.deepEqual(await commandCodeMetadata.extractMetadata({ parsedBody: { usage: { prompt_tokens: 8, completion_tokens: 4, cost: { total: 0.125 } } } }), { gateway: { cost: 0.125, source: 'commandcode.usage.cost.total' } });
-  await assert.rejects(commandCodeMetadata.extractMetadata({ parsedBody: { usage: {} } }), /usage\.cost\.total is missing or unknown/);
-  await assert.rejects(commandCodeMetadata.extractMetadata({ parsedBody: { usage: { cost: { total: 'unknown' } } } }), /usage\.cost\.total is missing or unknown/);
-  await assert.rejects(commandCodeMetadata.extractMetadata({ parsedBody: { usage: { cost: { total: 0.01 }, completion_tokens: 4 } } }), /usage\.prompt_tokens is missing or unknown/);
-  await assert.rejects(commandCodeMetadata.extractMetadata({ parsedBody: { usage: { cost: { total: 0.01 }, prompt_tokens: 8 } } }), /usage\.completion_tokens is missing or unknown/);
+test('published CommandCode prices produce a labeled estimate from every token category', async () => {
+  const usage = { prompt_tokens: 1_000_000, completion_tokens: 1_000_000, prompt_tokens_details: { cached_tokens: 400_000 } };
+  assert.deepEqual(commandCodeCostEstimate(usage, new Date('2026-10-11T18:00:00Z')), {
+    cost: 0.6912, kind: 'estimated', source: 'commandcode.pricing.2026-10-11', priceBand: 'off-peak',
+  });
+  assert.deepEqual(commandCodeCostEstimate(usage, new Date('2026-10-12T06:30:00Z')), {
+    cost: 1.3812, kind: 'estimated', source: 'commandcode.pricing.2026-10-11', priceBand: 'peak',
+  });
+  assert.throws(() => commandCodeCostEstimate({ completion_tokens: 4 }), /prompt_tokens is missing or unknown/);
+  assert.throws(() => commandCodeCostEstimate({ prompt_tokens: 8 }), /completion_tokens is missing or unknown/);
 });
 
-test('raw CommandCode usage survives schema normalization and stays correlated by response ID', async () => {
-  const usage = { prompt_tokens: 13, completion_tokens: 5, total_tokens: 18, cost: { total: 0.007 } };
+test('raw CommandCode tokens survive schema normalization and carry the published-price estimate', async () => {
+  const usage = { prompt_tokens: 13, completion_tokens: 5, total_tokens: 18 };
   captureCommandCodeResponse({ id: 'raw-response-a', usage });
-  assert.deepEqual(await commandCodeMetadata.extractMetadata({ parsedBody: { id: 'raw-response-a', usage: { prompt_tokens: 13, completion_tokens: 5, total_tokens: 18 } } }), {
-    gateway: { cost: 0.007, source: 'commandcode.usage.cost.total' },
-    commandcode: { responseId: 'raw-response-a', usage },
+  const metadata = await commandCodeMetadata.extractMetadata({ parsedBody: { id: 'raw-response-a', usage } });
+  assert.equal(metadata.commandcode.responseId, 'raw-response-a');
+  assert.deepEqual(metadata.commandcode.usage, usage);
+  assert.equal(metadata.commandcode.cost.source, 'commandcode.pricing.2026-10-11');
+  assert.equal(metadata.commandcode.cost.kind, 'estimated');
+  assert.ok(metadata.commandcode.cost.cost > 0);
+  await assert.rejects(commandCodeMetadata.extractMetadata({ parsedBody: { id: 'raw-response-b', usage } }), /response identity is missing or unknown/);
+});
+
+test('launcher-key usage snapshots provide a nonnegative actual machine delta', async () => {
+  let authorization;
+  const snapshot = await commandCodeUsageSummary({ key: 'secret', fetchImpl: async (_url, options) => {
+    authorization = options.headers.Authorization;
+    return { ok: true, json: async () => ({ totalCount: 12, totalCost: 1.25, totalTokensIn: 500, totalTokensOut: 40 }) };
+  } });
+  assert.equal(authorization, 'Bearer secret');
+  assert.deepEqual(snapshot, { totalCount: 12, totalCost: 1.25, totalTokensIn: 500, totalTokensOut: 40 });
+  assert.deepEqual(usageSummaryDelta({ totalCount: 10, totalCost: 1, totalTokensIn: 400, totalTokensOut: 30 }, snapshot), {
+    kind: 'actual', cost: 0.25, requestCount: 2, tokensIn: 100, tokensOut: 10, mayIncludeOtherUsage: true,
   });
-  await assert.rejects(commandCodeMetadata.extractMetadata({ parsedBody: { id: 'raw-response-b', usage: { prompt_tokens: 13, completion_tokens: 5 } } }), /usage\.cost\.total is missing or unknown/);
-  await assert.rejects(commandCodeMetadata.extractMetadata({ parsedBody: { id: 'raw-response-a', usage: { prompt_tokens: 13, completion_tokens: 5 } } }), /usage\.cost\.total is missing or unknown/);
 });
 
 test('end of run waits for memory, flushes observability, then closes both intact stores', async () => {

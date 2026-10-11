@@ -16,6 +16,7 @@ export function reviewerConfiguration(configuration = {}) {
   };
   if (process.env.MASTRA_REVIEWER_STANDIN === '1') {
     resolved.baseURL = reviewer.baseURL;
+    resolved.usageBaseURL = reviewer.usageBaseURL;
     resolved.storageDirectory = reviewer.storageDirectory;
   }
   return resolved;

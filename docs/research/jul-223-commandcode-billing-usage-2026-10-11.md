@@ -82,6 +82,61 @@ Mastra packages. No third-party account of either API is used.
    [Tracking your limits](https://commandcode.ai/docs/resources/pricing-limits#tracking-your-limits),
    [Studio usage bundle](https://commandcode.ai/assets/usage-C1KUGoNk.js).
 
+## Published DeepSeek V4.1 Flash prices checked 2026-10-11
+
+CommandCode's official **Pricing & Limits** page was checked on **2026-10-11**
+(the live response's HTTP `Date` was `Sun, 11 Oct 2026 18:46:44 GMT`). It lists
+all model prices per 1 million tokens and, for model ID
+`deepseek/deepseek-v4.1-flash`, publishes these rates:
+
+| Token class | Off-peak price per 1M | Peak price per 1M |
+| --- | ---: | ---: |
+| Fresh input | $0.15 | $0.30 |
+| Output | $0.60 | $1.20 |
+| Cache read | $0.003 | No separate peak value is published |
+| Cache write | Not priced (`—`) | Not priced (`—`) |
+
+The table labels the displayed $0.15 / $0.60 prices as off-peak and the
+$0.30 / $1.20 prices as peak. Peak is **01:00–04:00 and 06:00–10:00 UTC,
+Monday through Friday**; the other 17 weekday hours and every hour on Saturday
+and Sunday are off-peak. The docs say there is no switch to enable the lower
+rate. Sources: [CommandCode Pricing & Limits — model-price table](https://commandcode.ai/docs/resources/pricing-limits#model-pricing-at-cost),
+[CommandCode Pricing & Limits — DeepSeek time-of-day rates](https://commandcode.ai/docs/resources/pricing-limits#faqs),
+and [CommandCode's model catalog](https://commandcode.ai/docs/reference/cli/models#deep-seek)
+for the exact model ID.
+
+For an in-run estimate, select the input/output rate from the request's UTC
+time and calculate:
+
+```text
+estimated USD =
+  (fresh input tokens × input price per 1M
+   + output tokens × output price per 1M
+   + cache-read tokens × $0.003 per 1M) / 1,000,000
+```
+
+If the provider reports cached tokens as a subset of total prompt/input tokens,
+`fresh input tokens` must be `input tokens - cache-read tokens`; charging both
+the full input count and the cached subset would double-count cache reads. The
+published page does not state a different peak cache-read rate, so the only
+first-party value available for the estimate is $0.003 per 1M at either time.
+That absence is a pricing-document caveat and is one reason the aggregate
+`/alpha/usage/summary` delta remains the actual-cost reconciliation source.
+
+The advertised DeepSeek V4.1 Flash deal does **not** reduce or multiply these
+per-token rates. It permanently boosts the monthly per-model allowance to $10
+on Go, $60 on GOAT, and $70 on Pro, says explicitly that the per-token rates
+are unchanged, and says top-up credits bill at the regular model rate. The
+general claim that subscriptions include 2–10× more credits likewise describes
+how much usage the subscription buys, not a multiplier to apply to a request's
+token cost. Source: [CommandCode Pricing & Limits — DeepSeek V4.1 Flash deal](https://commandcode.ai/docs/resources/pricing-limits#deals).
+
+These prices are mutable operational configuration, not timeless constants:
+the same official page says CommandCode passes upstream model-price changes
+through without markup. The implementation should therefore label token-price
+records `estimated`, retain this checked date/source, and reconcile each run
+against the launcher-authenticated aggregate `actual` delta.
+
 ## Mastra stock path for externally reported cost
 
 The installed versions are `@mastra/core` 1.75.0 and
