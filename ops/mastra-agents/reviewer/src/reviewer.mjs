@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { setTimeout as delay } from 'node:timers/promises';
 import { checkQuotes } from './quote-check.mjs';
-import { finishReviewerRun, requireCompleteFileReview, REVIEWER_RESOURCE, requestWithoutOutputCap, reviewThread, reviewerConfiguration, reviewerStorageConfiguration } from './contract.mjs';
+import { finishReviewerRun, requireCompleteFileReview, REVIEWER_RESOURCE, requestWithoutOutputCap, reviewThread, reviewerConfiguration, reviewerExporterConfiguration, reviewerStorageConfiguration } from './contract.mjs';
 import { checkedReview } from '../../../../scripts/julia-delivery-review.mjs';
 import { commandCodeCostEstimate, commandCodeUsageSummary, requireUsageSummaryCoverage, usageSummaryDelta } from './commandcode-cost.mjs';
 
@@ -205,7 +205,7 @@ export async function runReviewer(request, { onVerdict = async () => {} } = {}) 
   const baseURL = config.baseURL ?? 'https://api.commandcode.ai/provider/v1';
   const observability = new Observability({ configs: { local: {
     serviceName: 'julia-mastra-reviewer', includeInternalSpans: true, logging: { level: 'info' },
-    exporters: [new MastraStorageExporter()],
+    exporters: [new MastraStorageExporter(reviewerExporterConfiguration())],
   } } });
   const connectionOptions = { name: 'commandcode', apiKey: process.env.COMMANDCODE_API_KEY, baseURL, supportsStructuredOutputs: true, transformRequestBody: requestWithoutOutputCap };
   const memoryStorage = new LibSQLStore({ id: 'julia-reviewer-memory', url: memoryUrl });

@@ -42,6 +42,10 @@ export function reviewerStorageConfiguration(path) {
   };
 }
 
+export function reviewerExporterConfiguration() {
+  return { maxBatchSize: 1 };
+}
+
 export function reviewThread(cardId, commit) {
   if (!/^JUL-\d+$/.test(cardId ?? '') || !/^[0-9a-f]{40}$/i.test(commit ?? '')) throw new Error('reviewer memory needs a Julia card identifier and immutable commit');
   return `reviewer:${cardId}:${commit}`;

@@ -18,6 +18,8 @@ cleanup step and does not promise to shrink the DuckDB file.
 The DuckDB store uses its supported 1 GB memory limit and one worker thread. The installed
 adapter otherwise defaults to a 2 GB working set; bounding it lets file-backed analytical work
 spill to disk and prevents full internal-trace persistence from exhausting the reviewer laptop.
+The stock storage exporter flushes each complete event (`maxBatchSize: 1`) so it does not retain a
+large in-memory event batch; this changes batching only and does not omit or truncate trace data.
 
 Each run emits exactly one human-readable summary line through stock Mastra logging. It records the
 card, change, round, verdict or stop and reason, reviewer and safety-check model/effort, input and
