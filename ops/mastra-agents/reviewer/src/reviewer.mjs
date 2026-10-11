@@ -133,24 +133,22 @@ function safetyCheckMetadata() {
   };
 }
 
-async function usageSummaryAfterRun(before, attemptedCalls, options) {
-  const deadline = Date.now() + 30_000;
+async function usageSummaryAfterRun(before, attemptedCalls, options, stableForMs) {
   let snapshot;
   let coveredAt;
   let coveredCount;
-  do {
+  for (;;) {
     snapshot = await commandCodeUsageSummary(options);
     if (snapshot.totalCount >= before.totalCount + attemptedCalls) {
       if (coveredCount !== snapshot.totalCount) {
         coveredCount = snapshot.totalCount;
         coveredAt = Date.now();
-      } else if (Date.now() - coveredAt >= 2_000) {
+      } else if (Date.now() - coveredAt >= stableForMs) {
         return requireUsageSummaryCoverage(before, snapshot, attemptedCalls);
       }
     }
     await delay(500);
-  } while (Date.now() < deadline);
-  return requireUsageSummaryCoverage(before, snapshot, attemptedCalls);
+  }
 }
 
 async function reviewerInstructions() {
@@ -330,7 +328,7 @@ export async function runReviewer(request, { onVerdict = async () => {} } = {}) 
       if (machineUsageBefore) {
         try {
           const attemptedCalls = providerRequestsAttempted - providerRequestsBefore;
-          const machineUsageAfter = await usageSummaryAfterRun(machineUsageBefore, attemptedCalls, usageOptions);
+          const machineUsageAfter = await usageSummaryAfterRun(machineUsageBefore, attemptedCalls, usageOptions, config.usageBaseURL ? 2_000 : 30_000);
           actual = { ...usageSummaryDelta(machineUsageBefore, machineUsageAfter), reconciliationError: null };
         } catch (error) {
           actual.reconciliationError = error?.message ?? String(error);
