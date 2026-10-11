@@ -9,11 +9,17 @@ import { saveJson, loadText } from './julia-delivery-state.mjs';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { fixtureInput, fixtureReport } from './fixtures/jul202-review.mjs';
+import { reviewInput } from './julia-delivery-review.mjs';
 
 const configuration = { builder: { harness: 'codex', model: 'builder', maker: 'OpenAI' }, reviewer: { harness: 'fixture', model: 'reviewer', maker: 'Other' } };
 const authorization = { explicitStart: true, issueId: 'JUL-202', authorizedBy: 'fixture', spending: { builder: { mode: 'fixture', maxUsd: 0 }, reviewer: { mode: 'fixture', maxUsd: 0 } } };
 const card = { identifier: 'JUL-202', description: '## Acceptance criteria\n- [ ] Reject unsupported approval.\n- [ ] Preserve inconclusive outcomes.' };
 const commit = 'a'.repeat(40);
+
+test('review input accepts the ballot-box criteria emitted by Linear', () => {
+  const linearCard = { description: '## Acceptance criteria\n* ☐ First criterion.\n* ☑ Completed criterion.' };
+  assert.deepEqual(reviewInput(linearCard, { commit }).criteria, ['First criterion.', 'Completed criterion.']);
+});
 // The public publication seam is a deterministic fixture here; GitHub API
 // behavior has its own contract tests.
 const runDelivery = (input, adapters) => deliver(input, {

@@ -11,7 +11,7 @@ const guidance = readFileSync(new URL('../.claude/skills/code-review/SKILL.md', 
 const standards = readFileSync(new URL('../CODING_STANDARDS.md', import.meta.url), 'utf8');
 const SHA = /^[0-9a-f]{40}$/i;
 const text = value => typeof value === 'string' && Boolean(value.trim());
-const criteriaOf = spec => [...spec.matchAll(/^\s*- \[[ xX]\]\s+(.+)$/gm)].map(([, criterion]) => criterion);
+const criteriaOf = spec => [...spec.matchAll(/^\s*[-*]\s+(?:\[[ xX]\]|[☐☑☒])\s+(.+)$/gm)].map(([, criterion]) => criterion);
 
 function committedFile(workspace, revision, file) {
   const result = spawnSync('git', ['show', `${revision}:${file}`], { cwd: workspace.path, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, windowsHide: true });
