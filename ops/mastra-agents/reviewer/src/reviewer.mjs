@@ -67,7 +67,7 @@ export async function runReviewer(request) {
     if (!quotes.every(check => check.ok)) throw new Error('reviewer emitted an unverifiable quote');
     return { text: `VERDICT: ${result.object.verdict}\nREVIEW: ${JSON.stringify(result.object.report)}`, observed: { harness: 'mastra-commandcode', model: config.model, maker: request.configuration?.maker ?? 'DeepSeek' }, responseId: result.response?.id ?? null, traceId: result.traceId ?? null, warnings, quotes };
   } finally {
-    await purgeAndCompact({ memory, threadId, compact: () => rm(dbPath, { force: true }) });
+    await purgeAndCompact({ memory, threadId, closeStorage: () => storage.close(), compact: () => rm(dbPath, { force: true }) });
   }
 }
 

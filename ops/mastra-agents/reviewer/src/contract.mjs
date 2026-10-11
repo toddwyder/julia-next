@@ -37,8 +37,9 @@ export function requireLiveTracing(context) {
 // Reviewer memory is short-lived operational state.  Delete the thread before
 // compacting the local database so a stopped review cannot bleed into another
 // candidate or leave a steadily growing trace file on the laptop.
-export async function purgeAndCompact({ memory, threadId, compact }) {
+export async function purgeAndCompact({ memory, threadId, closeStorage = async () => {}, compact }) {
   await memory.deleteThread(threadId);
   await memory.settled();
+  await closeStorage();
   await compact();
 }

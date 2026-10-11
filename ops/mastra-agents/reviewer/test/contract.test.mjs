@@ -26,11 +26,12 @@ test('per-card reviewer model overrides the CommandCode default', () => {
   assert.equal(reviewerConfiguration().model, DEFAULT_REVIEWER.model);
 });
 
-test('purge deletes the isolated memory thread before compacting local storage', async () => {
+test('purge closes the isolated storage before compacting its local trace', async () => {
   const calls = [];
   await purgeAndCompact({
     memory: { deleteThread: async id => calls.push(`delete:${id}`), settled: async () => calls.push('settled') },
     threadId: 'reviewer:JUL-206:abc', compact: async () => calls.push('compact'),
+    closeStorage: async () => calls.push('close'),
   });
-  assert.deepEqual(calls, ['delete:reviewer:JUL-206:abc', 'settled', 'compact']);
+  assert.deepEqual(calls, ['delete:reviewer:JUL-206:abc', 'settled', 'close', 'compact']);
 });
