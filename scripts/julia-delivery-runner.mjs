@@ -153,7 +153,7 @@ export function productionLauncher(worktree, { run = runLimited, environment = p
     // Review-only work is the Mastra path.  It receives metadata and reads the
     // immutable candidate through its own read-only Git tools, rather than
     // putting changed files in a provider prompt.
-    if (role === 'reviewer' && request.reviewInput && configured.connection?.provider === 'commandcode') {
+    if (role === 'reviewer' && request.reviewInput && request.issueId && request.candidate && configured.connection?.provider === 'commandcode') {
       let stdout = ''; let stderr = ''; let recorded = false;
       const startedAt = new Date().toISOString();
       const script = resolve(worktree, 'ops', 'mastra-agents', 'reviewer', 'src', 'reviewer.mjs');
