@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_REVIEWER, REVIEWER_RESOURCE, finishReviewerRun, reviewThread, requestWithoutOutputCap, requireLiveTracing, reviewerConfiguration } from '../src/contract.mjs';
+import { DEFAULT_REVIEWER, REVIEWER_RESOURCE, finishReviewerRun, requireCompleteFileReview, reviewThread, requestWithoutOutputCap, requireLiveTracing, reviewerConfiguration } from '../src/contract.mjs';
 
 test('the reviewer defaults to CommandCode DeepSeek Flash and never sends an output cap', () => {
   assert.deepEqual(DEFAULT_REVIEWER.model, 'deepseek/deepseek-v4.1-flash');
@@ -52,4 +52,11 @@ test('end of run attempts every ordered step when an earlier step fails', async 
     /settle failed/,
   );
   assert.deepEqual(calls, ['settled', 'flush', 'close-primary', 'close-vector', 'close-observability']);
+});
+
+test('a verdict fails closed unless it accounts for every changed file exactly once', () => {
+  assert.doesNotThrow(() => requireCompleteFileReview(['a.mjs', 'nested/b.mjs'], ['nested/b.mjs', 'a.mjs']));
+  assert.throws(() => requireCompleteFileReview(['a.mjs', 'nested/b.mjs'], ['a.mjs']), /missing nested\/b\.mjs/);
+  assert.throws(() => requireCompleteFileReview(['a.mjs'], ['a.mjs', 'invented.mjs']), /unexpected invented\.mjs/);
+  assert.throws(() => requireCompleteFileReview(['a.mjs'], ['a.mjs', 'a.mjs']), /duplicate a\.mjs/);
 });

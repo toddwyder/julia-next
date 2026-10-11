@@ -157,18 +157,21 @@ export function productionLauncher(worktree, { run = runLimited, environment = p
       let stdout = ''; let stderr = ''; let recorded = false;
       const startedAt = new Date().toISOString();
       const script = resolve(worktree, 'ops', 'mastra-agents', 'reviewer', 'src', 'reviewer.mjs');
+      const verdictPath = `${request.outputPath}.verdict.json`;
       const result = await run(process.execPath, [script], { cwd: dirname(script), stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, env: { ...workerEnvironment, COMMANDCODE_API_KEY: environment.COMMANDCODE_API_KEY } }, {
         seconds: LIMITS.builder.fallback,
         started: child => {
           child.stdout.on('data', chunk => { stdout += chunk; }); child.stderr.on('data', chunk => { stderr += chunk; }); child.stdin.on('error', () => {});
           Promise.resolve(request.started?.({ pid: child.pid })).then(() => {
             recorded = true;
-            child.stdin.end(JSON.stringify({ issueId: request.issueId, repoRoot: request.repoRoot ?? worktree, candidate: request.candidate, input: request.reviewInput, configuration: configured, verdictPath: `${request.outputPath}.verdict.json` }));
+            child.stdin.end(JSON.stringify({ issueId: request.issueId, repoRoot: request.repoRoot ?? worktree, candidate: request.candidate, input: request.reviewInput, configuration: configured, verdictPath }));
           }, () => child.kill());
         },
       });
-      let reply = null; try { reply = JSON.parse(stdout); } catch { /* recorded below */ }
-      const exitCode = result.code === 0 && recorded && reply ? 0 : 2;
+      let reply = null; try { reply = JSON.parse(stdout); } catch { /* durable sidecar checked below */ }
+      if (!reply && existsSync(verdictPath)) try { reply = JSON.parse(readFileSync(verdictPath, 'utf8')); } catch { /* recorded below */ }
+      const durableVerdict = typeof reply?.text === 'string' && /^VERDICT: (?:PASS|FAIL|INCONCLUSIVE)\b/.test(reply.text);
+      const exitCode = recorded && durableVerdict ? 0 : 2;
       const observed = reply?.observed ? { ...reply.observed, harness: configured.harness, maker: configured.maker } : null;
       if (request.outputPath) await fileSave(request.outputPath, { role, configured, observed, startedAt, finishedAt: new Date().toISOString(), stdout, stderr, exitCode, traceId: reply?.traceId ?? null, responseId: reply?.responseId ?? null, quotes: reply?.quotes ?? [], warnings: reply?.warnings ?? [] });
       return { exitCode, observed, text: reply?.text ?? stderr, outputPath: request.outputPath ?? null, responseId: reply?.responseId ?? null, traceId: reply?.traceId ?? null };

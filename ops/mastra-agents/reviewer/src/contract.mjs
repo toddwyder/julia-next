@@ -41,6 +41,18 @@ export function requireLiveTracing(context) {
   return context;
 }
 
+export function requireCompleteFileReview(changedFiles, reviewedFiles) {
+  const changed = [...changedFiles].sort();
+  const reviewed = [...reviewedFiles].sort();
+  const duplicate = reviewed.find((file, index) => file === reviewed[index - 1]);
+  if (duplicate) throw new Error(`reviewer refused: duplicate ${duplicate}`);
+  const missing = changed.find(file => !reviewed.includes(file));
+  if (missing) throw new Error(`reviewer refused: missing ${missing}`);
+  const unexpected = reviewed.find(file => !changed.includes(file));
+  if (unexpected) throw new Error(`reviewer refused: unexpected ${unexpected}`);
+  return reviewed;
+}
+
 export async function finishReviewerRun({ memory, observability, primaryStorage, vectorStorage, observabilityStorage }) {
   const errors = [];
   for (const step of [

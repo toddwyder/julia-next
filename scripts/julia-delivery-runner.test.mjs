@@ -618,6 +618,30 @@ test('normal CommandCode review transport uses the saved model and one journalle
   assert.deepEqual(evidence.connection, selected.connection);
 });
 
+test('Mastra launcher keeps an atomic verdict when later shutdown times out', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'jul206-verdict-first-'));
+  t.after(() => import('node:fs/promises').then(({ rm }) => rm(root, { recursive: true, force: true })));
+  const outputPath = join(root, 'review.json');
+  const verdict = { text: 'VERDICT: PASS\nREVIEW: {}', observed: { harness: 'mastra-commandcode', model: 'fixture-model', maker: 'Fixture' }, traceId: 'trace-fixture', responseId: 'response-fixture', quotes: [], warnings: [] };
+  const run = async (_command, _args, _options, limits) => {
+    const child = new EventEmitter(); child.pid = 12345;
+    child.stdout = new PassThrough(); child.stderr = new PassThrough(); child.stdin = new PassThrough();
+    limits.started(child);
+    await writeFile(`${outputPath}.verdict.json`, `${JSON.stringify(verdict)}\n`);
+    child.stdout.write(`${JSON.stringify(verdict)}\n`);
+    return { code: null, stopped: true, signal: 'SIGTERM' };
+  };
+  const selected = { harness: 'mastra-commandcode', model: 'fixture-model', maker: 'Fixture', connection: { provider: 'commandcode' } };
+  const result = await productionLauncher(root, { run, environment: { COMMANDCODE_API_KEY: 'fixture-key' } })('reviewer', {
+    mastraReviewOnly: true, issueId: 'JUL-206', repoRoot: root, candidate: { base: 'a'.repeat(40), commit: 'b'.repeat(40) },
+    reviewInput: { candidate: {}, criteria: [], files: [], scope: 'fixture', sources: { specification: '', 'test-evidence': '' } },
+    configuration: selected, outputPath, started: async () => {},
+  });
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.text, verdict.text);
+  assert.equal(result.traceId, verdict.traceId);
+});
+
 test('same-company selection refuses before reviewer dispatch without imposing a review-input cap', async () => {
   const calls = [];
   const selected = { ...configuration, reviewer: { ...configuration.reviewer, maker: configuration.builder.maker } };

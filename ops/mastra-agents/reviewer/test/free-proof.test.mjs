@@ -27,6 +27,7 @@ function schemaValue(schema = {}) {
 async function standInServer() {
   let review = 0;
   const requests = [];
+  const observations = [];
   const server = createServer(async (request, response) => {
     let raw = '';
     for await (const chunk of request) raw += chunk;
@@ -44,19 +45,24 @@ async function standInServer() {
       const value = schemaValue(schema);
       if (schema?.properties?.verdict) {
         review += 1;
-        value.verdict = 'PASS';
+        const requestText = JSON.stringify(body.messages ?? []);
+        const hasWorkingMemory = requestText.includes('No arbitrary caps or limits; flag any new one.');
+        const hasPriorReview = review === 1 || requestText.includes('first-review-memory-marker');
+        observations.push({ review, hasWorkingMemory, hasPriorReview });
+        value.verdict = hasWorkingMemory && hasPriorReview ? 'PASS' : 'INCONCLUSIVE';
         value.report = {
-          summary: `review ${review} applied the standing rule against arbitrary run caps`, findings: [],
+          filesReviewed: ['candidate.mjs'],
+          summary: review === 1 ? 'first-review-memory-marker applied the standing rule against arbitrary run caps' : 'review 2 retrieved first-review-memory-marker and applied the standing rule against arbitrary run caps', findings: [],
           criteria: [{ id: 'AC1', verdict: 'met', how: 'read_candidate_diff returned the immutable candidate diff', evidence: [{ source: 'file:candidate.mjs', quote: 'violet arbitrary run cap' }] }],
         };
       }
       message = { role: 'assistant', content: JSON.stringify(value) };
     }
     response.writeHead(200, { 'content-type': 'application/json' });
-    response.end(JSON.stringify({ id: `standin-${requests.length}`, object: 'chat.completion', created: 1, model: 'deepseek/deepseek-v4.1-flash', choices: [{ index: 0, message, finish_reason: finishReason }], usage: { prompt_tokens: 120, completion_tokens: 30, total_tokens: 150, cost: { total: 0 } } }));
+    response.end(JSON.stringify({ id: `standin-${requests.length}`, object: 'chat.completion', created: 1, model: 'deepseek/deepseek-v4.1-flash', choices: [{ index: 0, message, finish_reason: finishReason }], usage: { prompt_tokens: 120, completion_tokens: 30, total_tokens: 150, cost: { total: 0.15 } } }));
   });
   await new Promise((done, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', done); });
-  return { server, requests, baseURL: `http://127.0.0.1:${server.address().port}/v1` };
+  return { server, requests, observations, baseURL: `http://127.0.0.1:${server.address().port}/v1` };
 }
 
 async function candidateRepository(root) {
@@ -75,7 +81,10 @@ async function candidateRepository(root) {
   await writeFile(join(root, 'candidate.mjs'), 'export const reviewerPolicy = "violet arbitrary run cap with lasting logging";\n');
   await git('commit', '-q', '-am', 'candidate two');
   const second = (await git('rev-parse', 'HEAD')).stdout.trim();
-  return { base, first, second };
+  await writeFile(join(root, 'candidate.mjs'), 'export const reviewerPolicy = "violet arbitrary run cap with lasting logging and cost control";\n');
+  await git('commit', '-q', '-am', 'candidate three');
+  const third = (await git('rev-parse', 'HEAD')).stdout.trim();
+  return { base, first, second, third };
 }
 
 test('runner starts the real reviewer twice and preserves verdict, trace, working memory, semantic recall, and both databases', { timeout: 300_000 }, async t => {
@@ -128,9 +137,9 @@ test('runner starts the real reviewer twice and preserves verdict, trace, workin
     const duck = new DuckDBStore({ id: 'proof-cost-readback', path: costPath });
     const metricStore = await duck.getStore('observability');
     const metrics = await metricStore.listMetrics({ pagination: { page: 0, perPage: 100 } });
+    const costAggregate = await metricStore.getMetricAggregate({ name: ['mastra_model_total_input_tokens', 'mastra_model_total_output_tokens'], aggregation: 'sum', filters: { entityType: 'agent', userId: 'JUL-206' } });
     await metricStore.close?.(); await duck.close();
     const traceText = JSON.stringify(traces);
-    const metricText = JSON.stringify(metrics);
     const tokenCostFields = (value, path = '', found = []) => {
       if (found.length >= 40 || value == null) return found;
       if (typeof value !== 'object') {
@@ -147,7 +156,7 @@ test('runner starts the real reviewer twice and preserves verdict, trace, workin
       hasTokenContent: /promptTokens|inputTokens|prompt_tokens|input_tokens/i.test(traceText),
       hasNumericStepCost: traces.every(trace => tokenCostFields(trace).some(field => /estimatedCost$/.test(field.path) && typeof field.value === 'number')),
       metricCount: metrics.metrics?.length ?? 0,
-      hasCostMetric: /cost/i.test(metricText),
+      costAggregate,
       metricNames: (metrics.metrics ?? []).map(metric => metric.name),
       workingMemory,
       steps: traces.map(trace => trace.spans.map(span => ({ name: span.name, type: span.spanType, tokenCost: tokenCostFields(span) }))),
@@ -160,11 +169,22 @@ test('runner starts the real reviewer twice and preserves verdict, trace, workin
   assert.equal(readback.hasTokenContent, true);
   assert.equal(readback.hasNumericStepCost, true, JSON.stringify(readback.steps));
   assert.ok(readback.metricCount > 0, 'DuckDB must retain automatic cost/token metrics');
-  assert.equal(readback.hasCostMetric, true, JSON.stringify(readback.metricNames));
+  assert.ok(readback.costAggregate.estimatedCost > 0, JSON.stringify(readback.costAggregate));
   assert.match(readback.workingMemory, /No arbitrary caps or limits; flag any new one\./);
+  assert.deepEqual(api.observations, [
+    { review: 1, hasWorkingMemory: true, hasPriorReview: true },
+    { review: 2, hasWorkingMemory: true, hasPriorReview: true },
+  ]);
   assert.ok(api.requests.some(body => body.tools?.some(tool => tool.function?.name === 'read_candidate_diff')), 'the model must receive the real read-only reviewer tool');
+
+  configuration.costCeilingUsd = readback.costAggregate.estimatedCost / 2;
+  const blocked = await run(candidate.third, 3);
+  assert.equal(blocked.exitCode, 2, blocked.text);
+  assert.match(blocked.text, /cost|limit|budget/i);
+  await assert.rejects(readFile(join(evidence, 'run-3.json.verdict.json'), 'utf8'), /ENOENT/);
   await writeFile(join(directory, 'acceptance-evidence.json'), `${JSON.stringify({
     generatedAt: new Date().toISOString(), candidate, verdicts, readback,
+    costControl: { accumulatedCost: readback.costAggregate.estimatedCost, configuredLimit: configuration.costCeilingUsd, blocked: true },
     databases: { memoryAndTraces: memoryPath, costs: costPath },
   }, null, 2)}\n`);
 });
