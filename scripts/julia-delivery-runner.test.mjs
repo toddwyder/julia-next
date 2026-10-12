@@ -29,6 +29,87 @@ test('native workers do not inherit release and telemetry operator credentials',
   assert.deepEqual(options.env, { PATH: 'fixture-path', OPENAI_API_KEY: 'worker-auth' });
 });
 
+test('Mastra reviewer technical failures preserve the raw-answer reason for the runner', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'jul223-runner-failure-'));
+  t.after(() => import('node:fs/promises').then(({ rm }) => rm(root, { recursive: true, force: true })));
+  const outputPath = join(root, 'evidence', 'JUL-223-reviewer-round-1.json');
+  await mkdir(dirname(outputPath), { recursive: true });
+  const rawAnswerPath = join(root, 'evidence', `jul223-offline.${'a'.repeat(40)}.reviewer-raw.txt`);
+  const reason = `reviewer technical failure: Mastra structured-output parsing or schema validation failed; raw answer: ${rawAnswerPath}`;
+  const run = async (_command, _args, _options, limits) => {
+    const stdout = new PassThrough();
+    const stderr = new PassThrough();
+    const stdin = new EventEmitter();
+    stdin.end = requestText => {
+      const request = JSON.parse(requestText);
+      writeFile(`${request.verdictPath}.failure.json`, `${JSON.stringify({ kind: 'technical-failure', reason, rawAnswerPath })}\n`);
+      stderr.end('Mastra structured output failed');
+    };
+    stdin.on = stdin.addListener.bind(stdin);
+    limits.started({ pid: 223, stdin, stdout, stderr, kill: () => {} });
+    await new Promise(resolve => setTimeout(resolve, 50));
+    return { code: 1, stopped: false };
+  };
+  const reviewer = {
+    model: 'deepseek/deepseek-v4.1-flash', maker: 'DeepSeek', harness: 'mastra-commandcode',
+    connection: { provider: 'commandcode' },
+  };
+  const result = await productionLauncher(root, { run, environment: { COMMANDCODE_API_KEY: 'offline-fixture' } })('reviewer', {
+    mastraReviewOnly: true,
+    issueId: 'JUL-223',
+    runId: 'jul223-offline',
+    repoRoot: root,
+    candidate: { base: 'b'.repeat(40), commit: 'a'.repeat(40) },
+    reviewInput: { candidate: 'a'.repeat(40), digest: 'fixture', files: ['fixture.mjs'], criteria: ['it works'] },
+    configuration: reviewer,
+    outputPath,
+    started: async () => {},
+  });
+  assert.equal(result.exitCode, 2);
+  assert.equal(result.technicalFailure, reason);
+  assert.equal(result.text, reason);
+});
+
+test('Mastra reviewer preserves a schema-valid INCONCLUSIVE fixture as the model verdict', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'jul223-runner-verdict-'));
+  t.after(() => import('node:fs/promises').then(({ rm }) => rm(root, { recursive: true, force: true })));
+  const outputPath = join(root, 'evidence', 'JUL-223-reviewer-round-1.json');
+  await mkdir(dirname(outputPath), { recursive: true });
+  const repaired = JSON.parse(await readFile(join(process.cwd(), 'ops', 'mastra-agents', 'reviewer', 'test', 'fixtures', 'repaired.json'), 'utf8'));
+  const text = `VERDICT: ${repaired.verdict}\nREVIEW: ${JSON.stringify(repaired.report)}`;
+  const reviewer = {
+    model: 'deepseek/deepseek-v4.1-flash', maker: 'DeepSeek', harness: 'mastra-commandcode',
+    connection: { provider: 'commandcode' },
+  };
+  const run = async (_command, _args, _options, limits) => {
+    const stdout = new PassThrough();
+    const stderr = new PassThrough();
+    const stdin = new EventEmitter();
+    stdin.end = requestText => {
+      const request = JSON.parse(requestText);
+      writeFile(request.verdictPath, `${JSON.stringify({ text, observed: { harness: reviewer.harness, model: reviewer.model, maker: reviewer.maker } })}\n`);
+    };
+    stdin.on = stdin.addListener.bind(stdin);
+    limits.started({ pid: 224, stdin, stdout, stderr, kill: () => {} });
+    await new Promise(resolve => setTimeout(resolve, 50));
+    return { code: 0, stopped: false };
+  };
+  const result = await productionLauncher(root, { run, environment: { COMMANDCODE_API_KEY: 'offline-fixture' } })('reviewer', {
+    mastraReviewOnly: true,
+    issueId: 'JUL-223',
+    runId: 'jul223-offline',
+    repoRoot: root,
+    candidate: { base: 'b'.repeat(40), commit: repaired.report.candidate },
+    reviewInput: { candidate: repaired.report.candidate, digest: repaired.report.inputDigest, files: repaired.report.filesReviewed, criteria: repaired.report.criteria.map(item => item.criterion) },
+    configuration: reviewer,
+    outputPath,
+    started: async () => {},
+  });
+  assert.equal(result.exitCode, 0, result.text);
+  assert.match(result.text, /^VERDICT: INCONCLUSIVE\nREVIEW: /);
+  assert.equal(result.technicalFailure, null);
+});
+
 test('Windows production launcher gets a response from installed Claude Code and persists its evidence', { skip: process.env.JUL196_CLAUDE_REAL_PROOF !== '1' ? 'operator opt-in required: JUL196_CLAUDE_REAL_PROOF=1; no provider call in ordinary suite' : process.env.JUL196_CLAUDE_QUOTA_BLOCKED === '1' ? 'Claude real integration quota-blocked: JUL196_CLAUDE_QUOTA_BLOCKED=1; historical results retained' : process.platform !== 'win32', timeout: 120000 }, async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'jul196-')); t.after(() => import('node:fs/promises').then(({ rm }) => rm(root, { recursive: true, force: true })));
   const outputPath = join(root, 'evidence', 'JUL-196-builder-round-1.json');
@@ -582,6 +663,27 @@ test('well-formed unsupported approval and inconclusive failure park without con
     assert.deepEqual(launches, ['builder', 'reviewer']);
     assert.equal(saved.findLast(entry => entry.path.endsWith('-state.json')).value.repairsUsed, 0);
   }
+});
+
+test('a malformed Mastra answer parks with the saved technical-failure reason and raw path', async () => {
+  const rawAnswerPath = `C:/runs/jul223-offline.${'a'.repeat(40)}.reviewer-raw.txt`;
+  const reason = `reviewer technical failure: Mastra structured-output parsing or schema validation failed; raw answer: ${rawAnswerPath}`;
+  const launches = [];
+  const result = await deliver({ authorization, issueId: 'JUL-196', configuration, runPath: 'C:/fixtures/jul223/run.json' }, {
+    readCard: async () => card,
+    save: async () => {},
+    candidate: async () => ({ commit: 'a'.repeat(40), clean: true, checks: { pass: true } }),
+    launch: async role => {
+      launches.push(role);
+      return role === 'builder'
+        ? { exitCode: 0, observed: configuration.builder }
+        : { exitCode: 2, observed: null, text: reason, technicalFailure: reason };
+    },
+    publishReview: fixturePublication,
+  });
+  assert.equal(result.outcome, 'park');
+  assert.equal(result.reason, reason);
+  assert.deepEqual(launches, ['builder', 'reviewer']);
 });
 
 test('normal CommandCode review transport uses the saved model and one journalled request', async t => {

@@ -29,10 +29,13 @@ stays outside pruning. Every completed or stopped run emits one structured
 CommandCode's provider page exposes no reasoning-effort setting, so both model
 roles record effort as `not-supported`. Both databases persist after every run.
 
-The runner supplies a unique verdict path. The worker writes and emits the
-verdict before waiting for memory, flushing observability, and closing storage;
-shutdown or summary failures surface as run failures without replacing a verdict
-that was already saved.
+The runner supplies a unique verdict path and run ID. At the existing provider
+transport boundary, the worker fsyncs and atomically renames the exact raw model
+answer to a path containing the run ID and candidate commit before Mastra parses
+structured output. Mastra's stock `errorStrategy: 'warn'` returns control on
+invalid JSON or schema; the worker records that as a technical failure naming
+the raw path, never as a verdict. A valid answer is written and emitted as the
+model's verdict before memory, observability, or storage finalization can run.
 
 Run `npm run retention -- <storage-directory>` from the laptop's external daily
 scheduler. The command is deliberately separate from reviewer startup and
@@ -44,6 +47,7 @@ disposable worktree.
 
 | Need | Stock feature or checked gap | Pinned docs page |
 | --- | --- | --- |
+| Malformed structured output | Stock `errorStrategy: 'warn'` returns control without substituting fallback data; Mastra exposes no stock durable raw-answer sink, so the existing provider transport saves the exact response text before Mastra parses it | `references/docs-agents-structured-output.md` |
 | Durable reviewer notepad | Resource-scoped working memory and `updateWorkingMemory()` | `docs/memory/working-memory.md` |
 | Cross-review retrieval | Resource-scoped semantic recall, `LibSQLVector`, local `fastembed` | `docs/memory/semantic-recall.md` |
 | No observational memory | OM is thread-oriented and resource scope is deprecated | `docs/memory/observational-memory.md` |

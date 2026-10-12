@@ -1,7 +1,7 @@
 // Windows delivery owns run files and may continue a PASS through release.
 // It never mutates Linear or starts Factory.
 // Adapters keep the process boundary testable and observed identities durable.
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
@@ -164,18 +164,26 @@ export function productionLauncher(worktree, { run = runLimited, environment = p
           child.stdout.on('data', chunk => { stdout += chunk; }); child.stderr.on('data', chunk => { stderr += chunk; }); child.stdin.on('error', () => {});
           Promise.resolve(request.started?.({ pid: child.pid })).then(() => {
             recorded = true;
-            child.stdin.end(JSON.stringify({ issueId: request.issueId, repoRoot: request.repoRoot ?? worktree, candidate: request.candidate, input: request.reviewInput, configuration: configured, round: request.round, verdictPath }));
+            child.stdin.end(JSON.stringify({ issueId: request.issueId, runId: request.runId ?? basename(dirname(request.outputPath ?? verdictPath)), repoRoot: request.repoRoot ?? worktree, candidate: request.candidate, input: request.reviewInput, configuration: configured, round: request.round, verdictPath }));
           }, () => child.kill());
         },
       });
       let reply = null; try { reply = JSON.parse(stdout); } catch { /* durable sidecar checked below */ }
       if (!reply && existsSync(verdictPath)) try { reply = JSON.parse(readFileSync(verdictPath, 'utf8')); } catch { /* recorded below */ }
+      let technicalFailure = null;
+      const failurePath = `${verdictPath}.failure.json`;
+      if (existsSync(failurePath)) {
+        try {
+          const failure = JSON.parse(readFileSync(failurePath, 'utf8'));
+          if (failure?.kind === 'technical-failure' && typeof failure.reason === 'string') technicalFailure = failure.reason;
+        } catch { /* malformed failure evidence is not trusted */ }
+      }
       const durableVerdict = typeof reply?.text === 'string' && /^VERDICT: (?:PASS|FAIL|INCONCLUSIVE)\b/.test(reply.text);
       const workerSucceeded = result.code === 0 && result.stopped !== true;
       const exitCode = recorded && durableVerdict && workerSucceeded ? 0 : 2;
       const observed = reply?.observed ? { ...reply.observed, harness: configured.harness, maker: configured.maker } : null;
-      if (request.outputPath) await fileSave(request.outputPath, { role, configured, observed, startedAt, finishedAt: new Date().toISOString(), stdout, stderr, exitCode, traceId: reply?.traceId ?? null, responseId: reply?.responseId ?? null, quotes: reply?.quotes ?? [], warnings: reply?.warnings ?? [] });
-      return { exitCode, observed, text: reply?.text ?? stderr, outputPath: request.outputPath ?? null, responseId: reply?.responseId ?? null, traceId: reply?.traceId ?? null };
+      if (request.outputPath) await fileSave(request.outputPath, { role, configured, observed, startedAt, finishedAt: new Date().toISOString(), stdout, stderr, exitCode, technicalFailure, traceId: reply?.traceId ?? null, responseId: reply?.responseId ?? null, quotes: reply?.quotes ?? [], warnings: reply?.warnings ?? [] });
+      return { exitCode, observed, text: reply?.text ?? technicalFailure ?? stderr, technicalFailure, outputPath: request.outputPath ?? null, responseId: reply?.responseId ?? null, traceId: reply?.traceId ?? null };
     }
     if (role === 'reviewer' && configured.connection?.provider === 'commandcode') return commandCodeReview(request, {
       run: (command, args, options, limits) => run(command, args, { ...options, env: { ...workerEnvironment, COMMANDCODE_API_KEY: environment.COMMANDCODE_API_KEY } }, limits),
@@ -415,10 +423,10 @@ export async function runDelivery({ issueId, configuration, runPath, authorizati
       const handoff = { issueId, round, candidate: current, input, ...(priorReview ? { priorReview } : {}), builder: { configured: configuration.builder, observed: builder?.observed ?? null }, createdAt: now() };
       if (!isDone('review', round)) await save(handoffPath, handoff);
       const reviewerConfig = { ...configuration.reviewer, builderMaker: configuration.builder.maker };
-      const reviewer = await act('review', round, 'reviewer', (started, attempt) => launch('reviewer', { prompt, reviewInput: input, configuration: reviewerConfig, handoffPath, round, issueId, candidate: current, repoRoot: record.worktree?.path, mastraReviewOnly: reviewOnly, started, outputPath: evidence('reviewer', attempt), spending: approvedAuthorization.spending.reviewer }));
+      const reviewer = await act('review', round, 'reviewer', (started, attempt) => launch('reviewer', { prompt, reviewInput: input, configuration: reviewerConfig, handoffPath, round, issueId, runId: basename(dirname(runPath)), candidate: current, repoRoot: record.worktree?.path, mastraReviewOnly: reviewOnly, started, outputPath: evidence('reviewer', attempt), spending: approvedAuthorization.spending.reviewer }));
       const reviewerIdentity = reviewer.exitCode === 0 ? validObserved('reviewer', reviewerConfig, reviewer.observed) : null;
       const verdict = checkedReview(reviewer.text, input);
-      const reviewerFailure = reviewer.exitCode !== 0 ? `reviewer exited ${reviewer.exitCode}` : reviewerIdentity ?? verdict.error ?? null;
+      const reviewerFailure = reviewer.exitCode !== 0 ? reviewer.technicalFailure ?? `reviewer exited ${reviewer.exitCode}` : reviewerIdentity ?? verdict.error ?? null;
       await save(handoffPath, { ...handoff, reviewer: { configured: configuration.reviewer, observed: reviewer.observed, exitCode: reviewer.exitCode, outputPath: reviewer.outputPath ?? null, verdict: verdict.verdict ?? null }, result: verdict.error ?? verdict.verdict });
       const completed = reviewer.exitCode === 0 && !reviewerIdentity && !verdict.error;
       const publication = {
