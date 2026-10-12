@@ -28,7 +28,7 @@ As of Mon 12 Oct 2026. This file is the source of truth for the Mastra agents ex
 - **Cost:** paid execution stays disabled in stage one. A later offline stage must prove the preconfigured per-run hard ledger before a paid call can resume; provider token usage and the checked CommandCode rates feed that ledger without DuckDB, `TokenCostControl` or machine-wide usage reconciliation.
 - No human-in-the-loop in builder or reviewer. Anything needing Todd parks the card with a visible reason.
 - Park visibility: post one safe, idempotent line to the Linear card after local state is saved.
-- Scorers: passive recorder only. Model choice by an escalation ladder, authorized up front on the card. The stock permanent summary log is the run ledger.
+- Scorers: passive recorder only. Model choice by an escalation ladder, authorized up front on the card. The runner terminal event and per-run provider journal are the run ledger; there is no stock permanent-summary log.
 - Delivery order for this machine card is independent review, green CI and Todd's technical acceptance of the evidence packet, then merge. Household UAT is not applicable. Reviewers and automated runners never merge.
 - No arbitrary caps. The 12 Oct reset removed the older minimal runner's 130,000-byte refusal and deleted the old controller that carried the 5-failure/500-character trimming.
 

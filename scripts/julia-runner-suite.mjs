@@ -17,12 +17,12 @@ const SHARED_TESTS = new Set([
 // Unknown tests default to execution so a new subprocess-only regression cannot
 // trigger the Windows job and then silently disappear from its file list.
 const NON_RUNNER_TESTS = new Set([
-  'graph/rate-table.test.mjs', 'scripts/agent-docs.test.mjs',
+  'scripts/agent-docs.test.mjs',
   'scripts/board-setup.test.mjs', 'scripts/board-spec.test.mjs',
   'scripts/dynamic-route.test.mjs', 'scripts/framework-lint.test.mjs', 'scripts/health-route.test.mjs',
   'scripts/merge-pr.test.mjs',
   'scripts/publish-pr.real-git.test.mjs', 'scripts/publish-pr.test.mjs',
-  'scripts/publish-via-github-app.test.mjs', 'scripts/rate-table.test.mjs',
+  'scripts/publish-via-github-app.test.mjs',
   'scripts/seat-table.test.mjs', 'scripts/service-dropbox-read-secret.test.mjs',
   'scripts/service-dropbox-run-agy-seat.test.mjs', 'scripts/service-dropbox-run-pi-seat.test.mjs',
   'scripts/web-app.test.mjs',
