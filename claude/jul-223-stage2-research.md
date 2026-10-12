@@ -128,7 +128,13 @@ See [generate, `abortSignal`](../ops/mastra-agents/reviewer/node_modules/@mastra
 runner's process timeout as the ultimate elapsed-time stop. Keep a custom,
 durable per-run ledger and conservative next-call reservation check. The custom
 `reviewStepBudget` formula stays because Mastra only consumes the numeric
-answer. `TokenCostControl` and database metrics stay out.
+answer. `TokenCostControl` and database metrics stay out. Configure stock
+`modelSettings.timeout.stepMs` as the conservative maximum duration of one
+pending provider call. Immediately before dispatch, refuse when elapsed time
+plus that full bound would exceed 20 minutes; `totalMs` and the process timer
+remain backstops. Stage three must select and prove the fixed `stepMs` against
+the offline worst-case fixture before paid execution rather than inventing it
+during a run.
 
 ### 3. Model log
 
@@ -248,31 +254,28 @@ database snapshots merely to replace existing run files.
   verdicts, accepted pieces, and raw answers. Stage three may consolidate the
   duplicate helper into one module, but should not weaken its behavior.
 
-## Stage-three deletion and replacement list
+## Stage-three research handoff
 
-No whole current reviewer source file is justified for deletion by the stock
-audit. In particular, do **not** delete `recording-engine.mjs`,
-`reviewer-report.mjs`, `quote-check.mjs`, or `commandcode-cost.mjs`.
+The canonical stage-three deletion and replacement list is in
+[`claude/mastra-agents-design.md`](mastra-agents-design.md#stage-three-replacement-and-deletion-list).
+No whole current reviewer source file is justified for deletion by this stock
+audit; in particular, keep `recording-engine.mjs`, `reviewer-report.mjs`,
+`quote-check.mjs`, and `commandcode-cost.mjs` for the documented custom gaps.
+This research supports the following complete handoff:
 
-Delete only the custom output-cap scrubber:
-
-1. Remove `requestWithoutOutputCap()` from `contract.mjs` and its focused
-   assertions.
-2. Remove the `init.body` rewrite that calls it from `checkedFetch()`.
-3. Replace it with stock `modelSettings.maxOutputTokens: 4096`; do not inject
-   legacy provider-body `max_tokens` or `max_completion_tokens` fields.
-
-Adopt/configure these stock parts in stage three:
-
-1. Keep `createTool` input schemas and Mastra's tool-error-to-model correction
-   loop for report pieces and read tools.
-2. Pass the retained custom formula to stock `maxSteps`; optionally use the
-   documented last-step reminder/`toolChoice: 'none'` pattern, provided it does
-   not turn an incomplete report into a verdict.
-3. Keep using the OpenAI-compatible provider's custom `fetch` and metadata
-   seams, but make the custom journal bounded and durable per response.
-4. Leave workflow adoption to JUL-196. There, replace custom sequencing with a
-   Mastra workflow, not the four-state/domain mapping or run-file authority.
+1. Delete the request-body output-cap scrubber and its focused assertions;
+   replace it with stock `modelSettings.maxOutputTokens: 4096`.
+2. Configure stock `maxSteps`, `timeout.totalMs`, and a fixed, offline-proved
+   `timeout.stepMs`; keep the custom pre-dispatch cost/time check and outer
+   process timer.
+3. Consolidate the duplicate atomic writer while keeping the provider hook and
+   bounded durable journal custom.
+4. In JUL-196, replace custom sequencing with a workflow and conditionally
+   delete the named old-runner seat seam only after the actual route passes its
+   offline gates. Keep authorization, immutable identity, run-file authority,
+   four-state mapping, cleanup, and idempotent publication custom.
+5. Correct the review-only launch record to the approved $0.50 per-review cap
+   while retaining the $1.00 cumulative JUL-223 ceiling.
 
 ## Ambiguities that still require offline or later authorized probes
 

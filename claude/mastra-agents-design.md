@@ -267,7 +267,7 @@ are configured before the process starts and enforced without DuckDB.
 | Resource | Budget for one review | Sizing and enforcement |
 | --- | ---: | --- |
 | Model steps | Derived hard maximum | Compute the ceiling from the final changed-file and acceptance-criterion inventory before the offline maximum-length proof. The retained four-file/eight-criterion fixture evaluates to `3F + 3C + 34 = 70`; that example is not permission to use 70 for a different inventory. A review that does not fit the calculated ceiling returns to Triage before a paid call. |
-| Elapsed time | 20 minutes hard maximum | Matches the existing direct CommandCode review timeout and is far below the accidental three-hour Mastra worker cap. The runner owns the process timer; expiry is `SYSTEM_ERROR` with durable progress, never `INCONCLUSIVE`. |
+| Elapsed time | 20 minutes hard maximum | Before each provider request, refuse when elapsed time plus the configured conservative one-call `stepMs` bound would exceed 20 minutes. Stage three selects that fixed bound from the offline worst-case fixture before paid execution. Stock `totalMs` and the runner's process timer are backstops; expiry is `SYSTEM_ERROR` with durable progress, never `INCONCLUSIVE`. |
 | Estimated cost | `$0.50` hard maximum for the one PR review; `$1.00` cumulative JUL-223 maximum | Before each request, the ledger adds spent validated usage to a conservative maximum for the pending request and refuses to send if the result exceeds `$0.50`. Use peak published rates and a 4,096-token output ceiling; input is conservatively bounded from the serialized request before dispatch. All reviewer calls are included because the paid safety call is removed. Any live-review result or infrastructure error is preserved and not retried. |
 | Durable evidence growth | 64 MiB maximum per review | Includes raw responses, provider-boundary model events, recorded pieces, terminal state and temporary atomic-write files. There is no DuckDB or LibSQL. Measure the run folder before start and after close; exceeding the budget fails the implementation proof but cannot overturn a saved verdict. |
 | Peak worker memory | 768 MiB RSS maximum | Less than half the previously measured 1.6 GB free-memory envelope and well below the failed roughly 1.3 GB process/store condition. Sample RSS through the offline proof and live-run summary. A future hard OS limit may be added only if the existing runner's process control cannot enforce it safely. |
@@ -363,10 +363,14 @@ stage three merely for this audit result.
   query is unavailable. None reserves the conservative maximum cost or duration
   of the request about to be sent.
 - **Verdict:** **stock plus a small custom part**. Configure the derived stock
-  step ceiling and the 20-minute stock total timeout, while the outer runner
-  retains its process kill. Keep a small file-backed pre-call ledger that adds
-  spent validated usage to the pending request's conservative maximum and
-  refuses before dispatch. It must have no observability/database dependency.
+  step ceiling, the 20-minute stock total timeout, and stock `stepMs` as the
+  conservative maximum duration of one provider call, while the outer runner
+  retains its process kill. Before dispatch, a small file-backed pre-call
+  ledger must refuse when either spent cost plus the pending maximum price
+  exceeds the money limit or elapsed time plus the full `stepMs` bound exceeds
+  20 minutes. Stage three selects and proves the fixed `stepMs` with its offline
+  worst-case fixture before any paid execution. The ledger must have no
+  observability/database dependency.
 
 #### Model log
 
@@ -454,10 +458,12 @@ identified above. Stage three does remove duplicated custom paths inside them:
    `modelSettings.maxOutputTokens: 4096` before the run, as required by the
    conservative cost reservation, rather than stripping every provider output
    limit from the request.
-2. Configure stock `maxSteps` from `reviewStepBudget(files, criteria)` and stock
-   `modelSettings.timeout.totalMs` to 20 minutes. Keep the outer process timeout
-   and add the custom pre-call cost/time reservation ledger; neither stock
-   setting replaces it.
+2. Configure stock `maxSteps` from `reviewStepBudget(files, criteria)`, stock
+   `modelSettings.timeout.totalMs` to 20 minutes, and a fixed stock `stepMs`
+   selected and proved by the offline worst-case fixture. Before each dispatch,
+   the custom ledger refuses when elapsed time plus the full `stepMs` bound
+   would cross 20 minutes. Keep the outer process timeout; neither stock timeout
+   replaces that pre-call guarantee.
 3. Keep the OpenAI-compatible `fetch`/metadata extension points but replace the
    two local atomic-write implementations with one shared run-file helper. Add
    the bounded provider journal there; its write failures become durable
