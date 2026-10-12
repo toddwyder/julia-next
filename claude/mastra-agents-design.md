@@ -1,15 +1,15 @@
 # Mastra builder and reviewer agents: settled design and parked items
 
-As of Sun 11 Oct 2026. This file is the source of truth for the Mastra agents. If a brief and this file disagree, this file wins. Mastra docs findings behind the 11 Oct changes: `claude/mastra-memory-research.md`.
+As of Mon 12 Oct 2026. This file is the source of truth for the Mastra agents except where JUL-223's 12 Oct card decisions supersede older text. Mastra docs findings behind the 11 Oct changes: `claude/mastra-memory-research.md`.
 
 ## Where things stand
 - Spike (closed PR #286) proved a Mastra agent on DeepSeek 4.1 Flash via CommandCode can use read-only tools and return a strict structured review in one run. Spike verdict on PR #282: PASS, 16 of 16 quotes verified.
 - Real reviewer is in PR #287 (open). Six live attempts on 10-11 Oct were reported as reviewer-identity mismatches because the runner validated a missing observed identity before considering the worker's nonzero exit. Retained evidence separates three millisecond-scale preflight failures from three 79–139 second paid executions with storage/shutdown errors. The runner now reports nonzero worker exits as the primary failure and validates identity only for an exit-zero worker; an exit-zero missing or mismatched identity still fails closed. Earlier failures also exposed end-of-run database cleanup and missing-internal-span defects; those have regression coverage. The first 11 Oct proof attempt then showed that the AI SDK's OpenAI-compatible response schema removes CommandCode's non-standard `usage.cost` field before its metadata extractor runs. The provider transport now validates and retains raw response token usage before schema normalization, keyed by response ID, and fails closed when required token counts are missing or invalid.
-- Spend limit: $1.00 per card (JUL-206 covers the #282 review; a separate $1.00 covers the #287 review). There is NO limit on the number of runs. Other runaway guards: time limits, stuck-worker rule, same step failing twice, two review rounds then park.
+- Spend limit: $1.00 cumulative for JUL-223 and $0.50 for its one authorized PR #287 review. There is no retry after any #287 outcome and no #282 rerun under this card. Offline and trust-check work makes no JUL-223 provider call unless its later stage explicitly authorizes one.
 - PR #284 (OVH move) stays a draft, not merged. OVH VPS is cancelled only after the new reviewer is proven.
 - 1Password: Julia-vault-only read_items service account, token DPAPI-protected on the laptop, unattended. Expires 6 Jan 2027 Pacific.
 
-## Settled design
+## 11 Oct design (superseded where the 12 Oct reset says so)
 - Two Mastra agents, builder and reviewer, called as steps by the existing delivery runner. The runner owns sequence, saved state, lock, kill-orphan-workers and authorization checks.
 - Look it up, don't recall it: use version-matched documentation bundled with each installed package first; otherwise use the tool's official `llms.txt` index and fetch only the applicable individual page, never `llms-full.txt`. The Mastra docs MCP server is a fallback only. Every framework-map job cites the exact page used. Custom code is allowed only after the applicable docs show the stock tool has no feature for the need, and the report records the gap.
 - Models from the per-card configuration (JUL-195). Default: CommandCode `deepseek/deepseek-v4.1-flash`. Reviewer must be a different maker from the builder.
@@ -29,7 +29,7 @@ As of Sun 11 Oct 2026. This file is the source of truth for the Mastra agents. I
 - No human-in-the-loop in builder or reviewer. Anything needing Todd parks the card with a visible reason.
 - Park visibility: post one safe, idempotent line to the Linear card after local state is saved.
 - Scorers: passive recorder only. Model choice by an escalation ladder, authorized up front on the card. The stock permanent summary log is the run ledger.
-- Delivery order is independent review, then Todd's UAT on the Vercel preview, then merge. Reviewers and automated runners never merge.
+- Delivery order for this machine card is independent review, green CI and Todd's technical acceptance of the evidence packet, then merge. Household UAT is not applicable. Reviewers and automated runners never merge.
 - No arbitrary caps. Still to remove: the 130,000-byte cap in the older minimal runner, the 5-failure/500-character trimming in the old controller.
 
 ## Reviewer acceptance evidence (Todd, 11 Oct)
@@ -75,10 +75,12 @@ parallel tool calls and are not count-capped.
 
 ## Reset to minimum reviewer (Todd, 12 Oct 2026)
 
-This section supersedes the 11 Oct memory, tracing, cost-brake and acceptance-
-evidence decisions above. The report gate and the Step 4 recording engine stay;
-the cross-review recall and full-internal-span experiment do not. This round is
-design only. It made no runtime or test changes and made no provider calls.
+This section supersedes the 11 Oct memory, tracing, cost-brake, workflow,
+acceptance and rerun decisions above. The report gate and the Step 4 recording
+engine stay; the cross-review recall and full-internal-span experiment do not.
+JUL-223's 12 Oct card is controlling where this section and older text differ.
+Stage one removed the failed and superseded implementation without provider
+calls; later stages rebuild and prove the minimum path offline.
 
 ### Incident and backup baseline
 
@@ -95,21 +97,111 @@ Before this design change, the complete active trace directory was copied to:
 `%USERPROFILE%\.julia\backups\jul-223-reset-round1-20261012\reviewer-traces`
 
 The source and backup inventories both contained six files and exactly
-2,988,804,123 bytes. The active directory was not deleted or modified.
+2,988,804,123 bytes at the design checkpoint. Stage one reverified the backup
+as six files and 2,988,804,123 bytes, recorded each SHA-256, and then deleted
+the active `ops/mastra-agents/reviewer/traces` directory. The backup is retained
+unchanged as evidence and is never an input to a new run.
+
+### Dated inventory and stage-one result (12 Oct 2026)
+
+The inventory below covers every reviewer commit and attempted fix on this
+branch from 10 October through the reset. Commit groups are chronological;
+"kept" means the requirement and its focused code remain, not that an older
+execution route remains usable.
+
+| Date | Commits and change family | Stage-one disposition |
+| --- | --- | --- |
+| 10 Oct | `a8512ff`, `58d521d`, `6a3b8e3`: laptop direct CommandCode request, uncapped output and transport diagnostics | Deleted the direct request module, transport module and their tests. The route cannot execute or fall back. |
+| 10 Oct | `c34c835`, `67f38d3`: Mastra spike and repository-root repair | Kept the immutable Git read-tool boundary and repository-root focused proof; historical spike output stays in Git/artifacts only. |
+| 10 Oct | `4bac925`, `427df55`, `d8f27e0`, `4122d26`: review-only Mastra agent, legacy-transport compatibility tests, dispatch restriction and docs | Kept the review-only isolation boundary; deleted compatibility tests and runtime claims for the retired direct route. |
+| 10 Oct | `331fb34`, `d0e3b98`, `5cb4888`, `bb96a99`, `de14667`, `2ea1676`, `2abd738`: CommandCode launch/vault wiring, limits, identity, stdin and outside-candidate execution | Kept the narrow vault `startReviewOnly` entry and immutable-candidate isolation. Removed the live format-probe entry and direct-provider fallback. Reviewer execution now stops locally until later offline gates pass. |
+| 10 Oct | `89b95a2`: trace-close-before-cleanup repair | Deleted with shared tracing/finalization code; it no longer has an executable path. |
+| 11 Oct | `20505d9`, `30a0d74`, `3946a3c`, `292c99c`, `9a6ceb2`, `ff8ebff`: durable proof rebuild, evidence integrity, research formatting, report contract, authoritative sources and reviewer records | Kept exact-set checks, quote checks, immutable sources, raw answers and durable piece recording. Replaced old full-report prompt instructions with the recorder-only contract. |
+| 11 Oct | `df8516b`: published CommandCode price source | Kept response-usage validation and the pure rate calculation for the later hard ledger; it has no active paid caller in stage one. |
+| 11 Oct | `c129ac7`, `a497045`: machine-wide usage reconciliation and safety fixes | Deleted `/alpha/usage/summary`, start/end waits, delta/coverage helpers, adjustment metrics and tests. |
+| 11 Oct | `bf37da1`, `ef5c09c`, `00e4ac4`, `269f9c9`, `78a7587`, `17a975c`, `18759d3`: DuckDB memory, settle/wait, checkpoint headroom, exporter flushing/compression/serialization fixes | Deleted shared DuckDB configuration, exporter/finalization/retention code and tests; deleted the active databases after backup verification. |
+| 11 Oct | `ea98850`, `1ad094f`: citation repair and candidate-byte read tools | Kept exact quote validation and immutable candidate reads. |
+| 11 Oct | `f76e705`, `e563ac8`, `4975437`, `301dffc`: bounded recall, tool-loop completion, compact semantic memories and INCONCLUSIVE memory | Kept only tool-loop/report behavior covered at the recorder seam. Deleted semantic recall, saved messages, conversation history, vector/embedder code, dependencies, evidence fields and tests. |
+| 11 Oct | `1df70b3`: fail-closed DuckDB cost-store probe | Deleted the custom store-readability probe and storage-backed brake. No replacement paid path is enabled in stage one. |
+| 11 Oct | `c3948c1`, `d2d471b`, `1a5286b`, `1c1164a`, `d98b1bc`: derived recording budget, exact file inventory, serialized quote repair, Linear ballot criteria and large-review finalization | Kept the recorder budget formula, exact inventory, quote repair and ballot parsing. Removed the three-hour live worker assumption from the reset design; the card's 20-minute limit controls the later implementation. |
+| 11 Oct | `70f78c5`: raw reviewer answers | Kept raw-response-before-parse and interruption evidence with focused tests. |
+| 11 Oct | `6302ac5`, `1fb51a2`: paid CommandCode output-format probes | Deleted both executable probes, their tests and the vault command that exposed them. Historical results remain in Git. |
+| 12 Oct | `453815a`, `f6fd59e`: bad-tool-call probe and generic small-piece recording engine | Kept correction-shaped tool errors, generic durable piece storage, deterministic assembly and focused tests. |
+| 12 Oct | `2ad78cb`: first reset design | Updated here to the card's 12 Oct decisions and the completed deletion state. |
+
+Stage-one source deletion is therefore exact: the direct CommandCode request and
+transport files; both format probes; their route/probe tests; the end-to-end
+free proof for the removed memory/telemetry/brake stack; shared retention code;
+semantic/message/vector/embedder code and dependencies; internal-span/exporter
+configuration; the paid warn-only classifier; storage-backed cost control;
+machine-wide reconciliation; and the retired full-report prompt instructions.
+The active trace directory was also deleted. Git history, checked-in proof
+artifacts and the verified external backup were kept because they are evidence,
+not executable fallbacks.
+
+Exact deleted tracked files:
+
+- `ops/mastra-agents/reviewer/src/retention.mjs`
+- `ops/mastra-agents/reviewer/test/free-proof.test.mjs`
+- `scripts/julia-commandcode-format-probe.mjs`
+- `scripts/julia-commandcode-format-probe.test.mjs`
+- `scripts/julia-commandcode-format-probe-step3b.mjs`
+- `scripts/julia-commandcode-format-probe-step3b.test.mjs`
+- `scripts/julia-commandcode-request.mjs`
+- `scripts/julia-commandcode-request.test.mjs`
+- `scripts/julia-delivery-review-transport.mjs`
+
+Exact deleted settings and executable branches: the reviewer package's
+`retention` script and direct dependencies on `@ai-sdk/openai-compatible`,
+`@mastra/duckdb`, `@mastra/fastembed`, `@mastra/libsql`, `@mastra/memory` and
+`@mastra/observability`; DuckDB memory/thread/compression/exporter/14-day
+retention settings; `includeInternalSpans`; message-history and semantic-recall
+settings; vector/embedder construction; saved-message/recall/finalization
+calls; `PromptInjectionDetector`; `TokenCostControl`; the custom cost-store
+readability callback; `/alpha/usage/summary` and its coverage/delta/adjustment
+code; safety-model construction and summary fields; the direct CommandCode and
+native-reviewer launcher branches; both full-report prompt contracts; the
+runner-suite registration for the removed free proof; and
+`probeCommandCodeFormats` in both vault launchers. Matching assertions and
+fixture tests for those deleted behaviors were removed; focused recorder,
+quote, raw-answer, repository-root, tool-correction and reset-stop tests remain.
+
+Exact active runtime deletion: the baseline active directory held
+`reviewer-costs.duckdb`, `.wal`, `.wal.checkpoint`, `reviewer.db`, `.db-shm`
+and `.db-wal`. The first red reset test opened the old DuckDB before the new
+stop existed, creating `reviewer-costs.duckdb.wal.recovery`, an empty temporary
+directory, and consuming the SQLite `-shm`/empty `-wal` files. The four
+unchanged nonempty baseline files still matched the backup byte-for-byte. Stage
+one then deleted every remaining active file and the directory. The backup was
+not opened or changed.
+
+Preserved evidence is separate from source. The verified external backup is
+`%USERPROFILE%\.julia\backups\jul-223-reset-round1-20261012\reviewer-traces`
+(six files, 2,988,804,123 bytes, with per-file SHA-256 rechecked). The following
+untracked evidence trees are retained unchanged and excluded from source/test
+discovery: `.artifacts/jul-223-free-guard`, `jul-223-step1-final-proof`,
+`jul-223-step1-free-proof-green`, `jul-223-step1-free-proof`,
+`jul-223-step1-review-fix-proof`, `jul-223-step3`, `jul-223-step3b`,
+`jul-223-step3c`, `jul-223-verdict-first-final-2`,
+`jul-223-verdict-first-final`, `jul-223-verdict-first-focused-final`,
+`jul-223-verdict-first-green-2`, `jul-223-verdict-first-green`,
+`jul-223-verdict-first-red`, `mastra-reviewer-free-proof`, and
+`spike-core-287`. Git history and existing checked-in proof artifacts also
+remain as historical evidence.
 
 ### Current file-level map
 
 | Area | Files and current interface | Current implementation and reset consequence |
 | --- | --- | --- |
-| Reviewer entry and tools | `ops/mastra-agents/reviewer/src/reviewer.mjs` | Owns the worker process, immutable Git read tools, provider transport, processors, memory, telemetry, report recorder and finalization. It is currently too broad; the reset introduces one internal budget seam and one terminal-state seam without changing the runner's report schema. |
-| Processors | `reviewer.mjs`; `test/free-proof.test.mjs`; `test/contract.test.mjs` | `UnicodeNormalizer`, a paid warn-only `PromptInjectionDetector`, and storage-backed `TokenCostControl` run in the input pipeline. Only deterministic normalization remains in the minimum reviewer. Candidate-as-data safety is enforced by immutable read-only tools and the prompt contract, not a second paid classifier. |
-| Working, message and semantic memory | `reviewer.mjs`; `src/contract.mjs`; `package.json`; `package-lock.json`; `test/contract.test.mjs`; `test/free-proof.test.mjs`; `README.md`; runtime `traces/reviewer.db*` | One `Memory` currently combines resource-scoped template working memory, 12-message history, resource-scoped semantic recall, `LibSQLVector` and FastEmbed. The reset keeps only resource-scoped working memory containing the standing rules. Stock `messageHistory: { maxTokens: 0 }` disables history; semantic recall, vector storage, embedding and explicit saved review memories are removed. |
+| Reviewer entry and tools | `ops/mastra-agents/reviewer/src/reviewer.mjs`; `test/reset-stage.test.mjs` | Retains immutable Git read tools, raw-response capture and report-generation failure evidence. `runReviewer` stops locally with the reset-disabled reason before any provider request; no memory, telemetry, processor or finalization stack is constructed in stage one. |
+| Processors | none active | The paid warn-only classifier and storage-backed cost processor are deleted. Deterministic normalization returns only with the later minimum Agent build. Candidate-as-data safety remains a requirement enforced by immutable tools and fixed instructions. |
+| Working memory | `STANDING_RULES` seed retained in `reviewer.mjs`; no active memory dependency or database | Semantic recall, saved messages, conversation history, vector storage and embeddings are deleted. The later minimum build may restore only stock resource-scoped standing-rules working memory with history disabled; stage one makes no memory claim. |
 | Report recording and evidence | `src/recording-engine.mjs`; `src/reviewer-report.mjs`; `src/quote-check.mjs`; `test/recording-engine.test.mjs`; `test/recorded-review.test.mjs`; `test/quote-check.test.mjs`; `test/tool-input-failure.test.mjs`; `test/fixtures/repaired.json`; `support/recorded-review-interrupt-child.mjs` | This is the deep module at the report seam: small validated durable pieces, correction-shaped errors, deterministic assembly, exact quote checks and the unchanged runner envelope. It worked in the live run and stays. |
 | Raw model evidence and interruption | `reviewer.mjs`; `test/raw-answer.test.mjs`; `test/fixtures/final-answer.txt`; `support/raw-answer-interrupt-child.mjs`; the recorder's progress sidecar | The exact last raw provider response is saved before parsing and accepted piece keys survive interruption. The minimum design keeps both and adds a per-run model-event journal so every prompt, reply, tool call and usage record is retained once without depending on trace internals. |
-| Observability storage and retention | `reviewer.mjs`; `src/contract.mjs`; `src/retention.mjs`; `package.json` `retention` script; `test/free-proof.test.mjs`; `README.md`; runtime `traces/reviewer-costs.duckdb*` | A shared DuckDB currently stores internal spans, metrics and permanent logs with 14-day span pruning, a 1.4 GB DuckDB memory limit and a 100-event exporter batch. The reset uses a per-run telemetry database, drops internal spans and treats export, flush, logging and pruning as non-authoritative. The backed-up shared database is evidence, not an input to a new run. |
-| Cost control | `src/commandcode-cost.mjs`; `reviewer.mjs`; `src/contract.mjs`; `test/contract.test.mjs`; `test/free-proof.test.mjs`; `scripts/delivery-tool-settings.mjs`; `scripts/delivery-tool-settings.test.mjs`; `scripts/julia-review-only.mjs`; `scripts/julia-review-only.test.mjs` | Provider usage is priced correctly, but stock `TokenCostControl`, a shared DuckDB aggregate, a custom pre-call readability probe and the machine-wide `/alpha/usage/summary` reconciliation are coupled. The reset keeps provider-response usage and rate calculation, but a per-run in-memory/durable ledger enforces a limit selected before the run. Telemetry is only a sink. |
-| Runner and final state | `scripts/julia-review-only.mjs`; `scripts/julia-vault.mjs`; `scripts/julia-vault-windows.ps1`; `scripts/julia-delivery-runner.mjs`; `scripts/julia-delivery-review.mjs`; `scripts/julia-delivery-review-publication.mjs`; `scripts/julia-delivery-state.mjs`; their matching tests | The launcher resolves credentials and an immutable PR, the runner journals the action, the worker writes a verdict sidecar, and `checkedReview` applies the unchanged evidence gate. Today `checkedReview` turns `INCONCLUSIVE` into an error and the launcher requires a zero worker exit even after a durable verdict. The reset gives the runner one explicit terminal state to read and makes post-verdict telemetry failures warnings. |
-| Replaced-route leftovers | `scripts/julia-delivery-review-transport.mjs`; `scripts/julia-commandcode-request.mjs`; their tests; the non-Mastra full-JSON text in `scripts/julia-delivery-review.mjs`; `scripts/julia-minimal-runner*.mjs`; `ops/julia-runner/run-reviewer.mjs` | The direct single-shot CommandCode path and older fixed-route reviewer still exist beside the Mastra recording route. Shared candidate/check helpers used by the active runner are not leftovers merely because their filenames say `minimal-runner`; only the old reviewer dispatch and full-report contract are. They must be deleted when the Mastra route replaces them, not wrapped in another compatibility layer. |
+| Observability storage and retention | no active reviewer observability dependency, retention script or runtime database | Internal-span export, shared DuckDB settings, retention and the free proof for that stack are deleted. The external backup is evidence only. Per-run model-level telemetry and non-authoritative finalization are later-stage targets, not stage-one behavior. |
+| Cost evidence | `src/commandcode-cost.mjs`; raw-response tests | Only provider-response usage validation and the pure published-rate calculation remain for reuse by the later hard ledger. `TokenCostControl`, aggregate reads, the custom store-readability probe and `/alpha/usage/summary` reconciliation are deleted. With reviewer execution disabled, this code has no active paid caller. |
+| Runner and final state | `scripts/julia-review-only.mjs`; `scripts/julia-vault.mjs`; `scripts/julia-vault-windows.ps1`; `scripts/julia-delivery-runner.mjs`; their matching tests | Candidate and authorization journaling remain. Both the worker and the retired direct CommandCode branch stop locally during reset; the vault exposes no live format-probe command. The PASS/FAIL/INCONCLUSIVE/SYSTEM_ERROR terminal-state implementation remains later-stage work. |
+| Replaced-route leftovers | shared candidate/check helpers in `scripts/julia-minimal-runner*.mjs`; historical `ops/julia-runner/run-reviewer.mjs` | Stage one deleted `scripts/julia-delivery-review-transport.mjs`, `scripts/julia-commandcode-request.mjs`, their route-only tests, the CommandCode fallback branch and the non-Mastra full-report prompt. Shared candidate/check helpers remain because they serve the active runner; filenames alone do not make them leftovers. |
 
 ### Minimum interfaces and terminal state
 
@@ -154,8 +246,8 @@ Every started run has exactly one terminal state:
 | Remove | Storage-backed paid-call brake | Delete `TokenCostControl`, `requireCostStoreReadable`, the pre-call DuckDB aggregate probe, cross-run/card `runTotals` gating, and their contract/free-proof assertions. Replace them in the same change with the preconfigured per-run hard budget ledger; do not leave both brakes active. |
 | Remove | Machine-wide usage-summary reconciliation from the critical path | Delete the `/alpha/usage/summary` start/end wait and actual-adjustment write (`commandCodeUsageSummary`, `usageSummaryDelta`, `requireUsageSummaryCoverage`, `usageSummaryAfterRun`) and their tests. It can overcount concurrent work and is not needed when each provider response supplies validated usage. Provider usage remains durable model-level evidence. |
 | Remove | Paid warn-only prompt-injection classifier | Delete `PromptInjectionDetector`, its safety model/connection/cost role and warning-only proof from `reviewer.mjs`, `test/free-proof.test.mjs` and README claims. It adds a paid model call but does not enforce the candidate-as-data rule; immutable tools and fixed instructions remain the enforcement. |
-| Remove when replaced | Direct single-shot reviewer route and old full-JSON contract | In the implementation that makes Mastra the delivery review route, delete `julia-delivery-review-transport.mjs`, `julia-commandcode-request.mjs`, their route-only tests, the fallback branch in `julia-delivery-runner.mjs`, and the full-report output instruction in `julia-delivery-review.mjs`. Preserve shared candidate/check helpers. Do not add a compatibility wrapper. |
-| Defer | Mastra workflows | Return only after two clean live reviews on two separate real changes, both accepted by the runner and both within every budget below, and only if a named runner problem remains that a workflow snapshot directly solves. Until then the existing runner owns sequence and recovery. |
+| Removed | Direct single-shot reviewer route and old full-JSON contract | Stage one deleted `julia-delivery-review-transport.mjs`, `julia-commandcode-request.mjs`, their route-only tests, the fallback branch in `julia-delivery-runner.mjs`, both live format probes and the full-report output instruction in `julia-delivery-review.mjs`. Shared candidate/check helpers remain. No compatibility wrapper was added. |
+| In scope through JUL-196 | Mastra workflows | JUL-223 proves its offline components first. JUL-196 then replaces custom runner orchestration with Mastra workflows while retaining authorization, immutable candidate/evidence identity and recovery contracts. The integrated offline gates must pass through that actual route before JUL-224's trust check or the one paid #287 review. |
 | Defer | Semantic or observational reviewer memory | Return only after two clean live reviews on separate real changes and a third review demonstrates, with a written fixture, a required decision that cannot be made from the card, candidate, test evidence and standing rules. Any proposal must show bounded storage and cannot restore raw message history. |
 | Defer | Rich internal tracing or external observability export | Return only after two clean live reviews on separate real changes meet the database/disk/memory budgets and a concrete diagnosis cannot be made from the model-event journal plus model-level spans. The proof must measure incremental bytes before enabling any extra span type. |
 
@@ -172,9 +264,9 @@ are configured before the process starts and enforced without DuckDB.
 
 | Resource | Budget for one review | Sizing and enforcement |
 | --- | ---: | --- |
-| Model steps | 70 hard maximum | The retained four-file/eight-criterion review needs `3F + 3C + 34 = 70`, including one correction opportunity per required recording/submission unit. A review whose computed need exceeds 70 is refused before a paid call and ends `SYSTEM_ERROR`; changing the ceiling is a product decision. |
+| Model steps | Derived hard maximum | Compute the ceiling from the final changed-file and acceptance-criterion inventory before the offline maximum-length proof. The retained four-file/eight-criterion fixture evaluates to `3F + 3C + 34 = 70`; that example is not permission to use 70 for a different inventory. A review that does not fit the calculated ceiling returns to Triage before a paid call. |
 | Elapsed time | 20 minutes hard maximum | Matches the existing direct CommandCode review timeout and is far below the accidental three-hour Mastra worker cap. The runner owns the process timer; expiry is `SYSTEM_ERROR` with durable progress, never `INCONCLUSIVE`. |
-| Estimated cost | `$0.50` hard maximum per review; `$1.00` remains the card maximum | Two possible review rounds fit the authorized card ceiling. Before each request, the ledger adds spent validated usage to a conservative maximum for the pending request and refuses to send if the result exceeds `$0.50`. Use peak published rates and a 4,096-token output ceiling; input is conservatively bounded from the serialized request before dispatch. All reviewer calls are included because the paid safety call is removed. |
+| Estimated cost | `$0.50` hard maximum for the one PR review; `$1.00` cumulative JUL-223 maximum | Before each request, the ledger adds spent validated usage to a conservative maximum for the pending request and refuses to send if the result exceeds `$0.50`. Use peak published rates and a 4,096-token output ceiling; input is conservatively bounded from the serialized request before dispatch. All reviewer calls are included because the paid safety call is removed. Any live-review result or infrastructure error is preserved and not retried. |
 | Database growth | 64 MiB maximum per review | Includes the per-run DuckDB plus any LibSQL growth. Internal spans are off and standing working memory should normally add no per-review messages. Measure file sizes before start and after close; exceeding the budget fails the implementation proof but cannot overturn a saved verdict. |
 | Peak worker memory | 768 MiB RSS maximum | Less than half the previously measured 1.6 GB free-memory envelope and well below the failed roughly 1.3 GB process/store condition. Sample RSS through the offline proof and live-run summary. A future hard OS limit may be added only if the existing runner's process control cannot enforce it safely. |
 | Disk growth | 128 MiB maximum per review and 2 GiB free-space preflight | Allows 64 MiB of databases plus 64 MiB for the raw/model-event journal, pieces, terminal state and temporary checkpoint files. The preflight refuses to start below 2 GiB free. Temporary files are removed only after their durable replacement is confirmed; retained run evidence is not silently cleaned. |
@@ -239,7 +331,7 @@ path can still execute.
 - Each step ends in something Todd can see.
 
 ## Parked items, in the order they come up
-1. Reviewer: build to this design, free end-to-end proof with the required retained evidence, diagnose and fix the reviewer-identity mismatch, then complete the real reviews of #282 (JUL-206) and #287 under $1.00 each. Todd performs UAT on the #287 Vercel preview before merge.
+1. Reviewer: complete JUL-223's offline component proofs; let JUL-196 supply and prove the workflow route; pass JUL-224's separate four-defect trust check; then run exactly one paid #287 review under the $0.50 review/$1.00 cumulative JUL-223 limits. Do not rerun #282 and do not retry #287. Green CI, independent review and Todd's technical acceptance of the exact evidence packet precede merge; household UAT is not applicable.
 2. Runner preflight: the runner checks a card's assumptions and credentials before starting, repairs what it can, and posts stop reasons to the card.
 3. Credential-list writer: the migration writer must add to `secrets.env`, not overwrite it.
 4. Builder: research what Mastra gives a coding agent, small spike, build; builder role file; clean `julia-builder` references.
