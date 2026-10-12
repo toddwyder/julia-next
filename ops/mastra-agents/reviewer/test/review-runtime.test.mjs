@@ -22,7 +22,7 @@ test('the offline runtime wires stock bounds, authorization, durable budget, and
   });
   assert.deepEqual(runtime.generationOptions, {
     maxSteps: 40,
-    modelSettings: { maxOutputTokens: 4096, timeout: { totalMs: 1_200_000, stepMs: 120_000 } },
+    modelSettings: { maxRetries: 0, maxOutputTokens: 4096, timeout: { totalMs: 1_200_000, stepMs: 120_000 } },
   });
 
   const server = createServer(async (request, response) => {

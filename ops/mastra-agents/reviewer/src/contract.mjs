@@ -43,6 +43,7 @@ export function reviewGenerationOptions(changedFiles, criteria) {
   return {
     maxSteps: reviewStepBudget(changedFiles, criteria),
     modelSettings: {
+      maxRetries: 0,
       maxOutputTokens: 4096,
       timeout: { totalMs: 20 * 60 * 1000, stepMs: 2 * 60 * 1000 },
     },

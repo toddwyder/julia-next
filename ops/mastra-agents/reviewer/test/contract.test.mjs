@@ -9,6 +9,7 @@ test('the reviewer uses the approved stock generation bounds', () => {
   assert.deepEqual(reviewGenerationOptions(['a.mjs'], ['criterion']), {
     maxSteps: 40,
     modelSettings: {
+      maxRetries: 0,
       maxOutputTokens: 4096,
       timeout: { totalMs: 1_200_000, stepMs: 120_000 },
     },
