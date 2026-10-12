@@ -11,7 +11,7 @@ test('the reviewer uses the approved stock generation bounds', () => {
     modelSettings: {
       maxRetries: 0,
       maxOutputTokens: 4096,
-      timeout: { totalMs: 1_200_000, stepMs: 120_000 },
+      timeout: { totalMs: 1_200_000, stepMs: 15_000 },
     },
   });
 });

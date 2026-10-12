@@ -16,7 +16,7 @@ test('the durable budget reserves each request before dispatch and charges valid
   const reservation = await budget.beforeRequest({ model: 'fixture', messages: [{ role: 'user', content: 'review' }] });
   const pending = JSON.parse(await readFile(path, 'utf8'));
   assert.equal(pending.pending.maximumOutputTokens, 4096);
-  assert.equal(pending.pending.maximumDurationMs, 120_000);
+  assert.equal(pending.pending.maximumDurationMs, 15_000);
   assert.equal(pending.pending.maximumCostUsd, reservation.maximumCostUsd);
 
   await budget.recordResponse({ responseId: 'response-1', estimate: { cost: 0.001 } });
@@ -25,7 +25,7 @@ test('the durable budget reserves each request before dispatch and charges valid
   assert.equal(charged.pending, null);
   assert.deepEqual(charged.responses, ['response-1']);
 
-  now = 1_000_000 + 20 * 60 * 1000 - 120_000 + 1;
+  now = 1_000_000 + 20 * 60 * 1000 - 15_000 + 1;
   await assert.rejects(budget.beforeRequest({ messages: [] }), /pending request would cross the 20 minute limit/);
 });
 
@@ -101,7 +101,7 @@ test('malformed saved measurements and costs above a reservation fail closed', a
   const directory = await mkdtemp(join(tmpdir(), 'jul223-budget-invalid-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const path = join(directory, 'budget.json');
-  await writeFile(path, JSON.stringify({ maxUsd: 0.5, totalMs: 1_200_000, stepMs: 120_000, spentUsd: null, pending: null, responses: [] }));
+  await writeFile(path, JSON.stringify({ maxUsd: 0.5, totalMs: 1_200_000, stepMs: 15_000, spentUsd: null, pending: null, responses: [] }));
   await assert.rejects(createReviewBudget({ path }), /saved budget is invalid/);
   await rm(path);
   const budget = await createReviewBudget({ path });

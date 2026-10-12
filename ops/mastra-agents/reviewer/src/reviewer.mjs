@@ -14,6 +14,7 @@ import { reviewGenerationOptions } from './contract.mjs';
 import { createModelJournal } from './model-journal.mjs';
 import { createReviewBudget } from './review-budget.mjs';
 import { durableWrite, verifyRunEvidenceLimit } from './run-file.mjs';
+import { createReviewResourceBudget, recordReviewSystemError, reviewLimitForReason } from './resource-budget.mjs';
 
 const exec = promisify(execFile);
 export { envelopeFor, reviewedFilesSchema } from './reviewer-report.mjs';
@@ -108,27 +109,29 @@ export const commandCodeMetadata = {
   },
 };
 
-export async function generateRecordedReview({ agent, prompt, generationOptions, verdictPath, rawAnswer, recorder, submitted, failureDetail = null }) {
+export async function generateRecordedReview({ agent, prompt, generationOptions, verdictPath, rawAnswer, recorder, submitted, failureDetail = null, onSystemError = async () => {} }) {
   let result;
   try {
     result = await agent.generate(prompt, generationOptions);
   } catch (error) {
     const raw = rawAnswer.saved ? `; raw answer: ${rawAnswer.rawAnswerPath}` : '';
     const reason = `reviewer technical failure: ${error?.message ?? String(error)}${raw}`;
-    await recorder.recordTechnicalFailure(`${verdictPath}.failure.json`, reason, {
+    const failure = await recorder.recordTechnicalFailure(`${verdictPath}.failure.json`, reason, {
       rawAnswerPath: rawAnswer.saved ? rawAnswer.rawAnswerPath : null,
       runId: rawAnswer.runId, candidateCommit: rawAnswer.candidateCommit, responseId: rawAnswer.responseId,
     });
+    await onSystemError(reason, failure);
     throw new Error(reason, { cause: error });
   }
   if (submitted()) return result;
   const detail = failureDetail?.() ?? 'the model ended without a successful submit_report call';
   const raw = rawAnswer.saved ? `; raw answer: ${rawAnswer.rawAnswerPath}` : '';
   const reason = `reviewer technical failure: ${detail}${raw}`;
-  await recorder.recordTechnicalFailure(`${verdictPath}.failure.json`, reason, {
+  const failure = await recorder.recordTechnicalFailure(`${verdictPath}.failure.json`, reason, {
     rawAnswerPath: rawAnswer.saved ? rawAnswer.rawAnswerPath : null,
     runId: rawAnswer.runId, candidateCommit: rawAnswer.candidateCommit, responseId: rawAnswer.responseId,
   });
+  await onSystemError(reason, failure);
   throw new Error(reason);
 }
 
@@ -137,18 +140,75 @@ export function rawAnswerPathFor(verdictPath, runId, candidateCommit) {
   return resolve(dirname(verdictPath), `${safeFilePart(runId)}.${safeFilePart(candidateCommit)}.reviewer-raw.txt`);
 }
 
-export async function createReviewerRuntime({ runDirectory, cardBudgetPath, input, spending, startedAt = Date.now(), now = Date.now, verdictSaved = () => false }) {
+export async function createReviewerRuntime({ runDirectory, cardBudgetPath, input, spending, startedAt = Date.now(), now = Date.now, verdictSaved = () => false, progress = () => [], resourceMeasurements = {} }) {
   if (spending?.mode !== 'paid' || spending.maxUsd !== 0.50 || spending.cumulativeMaxUsd !== 1) {
     throw new Error('reviewer refused: runtime requires the approved $0.50 paid limit and $1 cumulative card limit');
   }
   if (!cardBudgetPath || spending.ledgerPath !== cardBudgetPath) throw new Error('reviewer refused: runtime requires the authorized cumulative card ledger path');
   const warnings = [];
+  const terminalPath = join(runDirectory, 'terminal-state.json');
+  const resources = await createReviewResourceBudget({ runDirectory, terminalPath, progress, ...resourceMeasurements });
   const budget = await createReviewBudget({ path: join(runDirectory, 'review-budget.json'), maxUsd: spending.maxUsd, cardPath: cardBudgetPath, cardMaxUsd: spending.cumulativeMaxUsd, startedAt, now });
   const journal = await createModelJournal({ path: join(runDirectory, 'model-events.json'), verdictSaved, warnings });
+  const generationOptions = reviewGenerationOptions(input.files, input.criteria);
+  const fetchWithBudgets = async (url, init, rawAnswer = null) => {
+    const memorySignal = resources.beginAgentStep();
+    await resources.beforeDispatch();
+    const signals = [init?.signal, memorySignal].filter(Boolean);
+    const boundedInit = { ...init, signal: signals.length === 1 ? signals[0] : AbortSignal.any(signals) };
+    const stepStartedAt = performance.now();
+    try {
+      return await checkedFetch(url, boundedInit, budget.recordResponse, rawAnswer, budget.beforeRequest, journal.record);
+    } finally {
+      resources.recordProviderStep(performance.now() - stepStartedAt);
+      await resources.sample();
+    }
+  };
+  const onSystemError = async (reason, failure = {}) => {
+    resources.finishAgentStep();
+    return recordReviewSystemError({
+      terminalPath,
+      progress: () => failure.acceptedPieces ?? progress(),
+      limit: reviewLimitForReason(reason),
+      reason,
+      measured: await resources.summary(),
+    });
+  };
+  const generate = async options => {
+    let result;
+    try {
+      result = await generateRecordedReview({ ...options, generationOptions, onSystemError });
+    } finally {
+      resources.finishAgentStep();
+    }
+    try {
+      resources.assertWithinLimits();
+    } catch (error) {
+      const reason = `reviewer technical failure: ${error.message}`;
+      const failure = await options.recorder.recordTechnicalFailure(`${options.verdictPath}.failure.json`, reason, {
+        rawAnswerPath: options.rawAnswer.saved ? options.rawAnswer.rawAnswerPath : null,
+        runId: options.rawAnswer.runId,
+        candidateCommit: options.rawAnswer.candidateCommit,
+        responseId: options.rawAnswer.responseId,
+      });
+      await onSystemError(reason, failure);
+      throw new Error(reason, { cause: error });
+    }
+    await durableWrite(join(runDirectory, 'review-measurements.json'), `${JSON.stringify({
+      state: 'COMPLETED',
+      budget: await budget.summary(),
+      resources: await resources.summary(),
+      recordedAt: new Date().toISOString(),
+    })}\n`, { root: runDirectory });
+    return result;
+  };
   return {
-    generationOptions: reviewGenerationOptions(input.files, input.criteria),
-    fetch: (url, init, rawAnswer = null) => checkedFetch(url, init, budget.recordResponse, rawAnswer, budget.beforeRequest, journal.record),
+    generationOptions,
+    fetch: fetchWithBudgets,
+    generate,
     verifyEvidence: () => verifyRunEvidenceLimit(runDirectory),
+    budgetSummary: budget.summary,
+    resourceSummary: resources.summary,
     warnings,
   };
 }

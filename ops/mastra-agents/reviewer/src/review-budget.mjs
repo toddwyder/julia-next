@@ -1,10 +1,8 @@
 import { durableWrite, withFileLock } from './run-file.mjs';
 import { readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
+import { REVIEW_MAX_OUTPUT_TOKENS, REVIEW_STEP_MS, REVIEW_TOTAL_MS } from './contract.mjs';
 
-const MAX_OUTPUT_TOKENS = 4096;
-const TOTAL_MS = 20 * 60 * 1000;
-const STEP_MS = 2 * 60 * 1000;
 const PEAK_INPUT_PER_MILLION = 0.30;
 const PEAK_OUTPUT_PER_MILLION = 1.20;
 
@@ -12,8 +10,8 @@ const maximumRequestCost = body => {
   const maximumInputTokens = Buffer.byteLength(JSON.stringify(body), 'utf8');
   return {
     maximumInputTokens,
-    maximumOutputTokens: MAX_OUTPUT_TOKENS,
-    maximumCostUsd: (maximumInputTokens * PEAK_INPUT_PER_MILLION + MAX_OUTPUT_TOKENS * PEAK_OUTPUT_PER_MILLION) / 1_000_000,
+    maximumOutputTokens: REVIEW_MAX_OUTPUT_TOKENS,
+    maximumCostUsd: (maximumInputTokens * PEAK_INPUT_PER_MILLION + REVIEW_MAX_OUTPUT_TOKENS * PEAK_OUTPUT_PER_MILLION) / 1_000_000,
   };
 };
 
@@ -62,18 +60,19 @@ export async function initializeCardBudget(path, maxUsd = 1) {
 export async function createReviewBudget({
   path,
   maxUsd = 0.50,
-  totalMs = TOTAL_MS,
-  stepMs = STEP_MS,
-  maximumOutputTokens = MAX_OUTPUT_TOKENS,
+  totalMs = REVIEW_TOTAL_MS,
+  stepMs = REVIEW_STEP_MS,
+  maximumOutputTokens = REVIEW_MAX_OUTPUT_TOKENS,
   cardPath = null,
   cardMaxUsd = 1,
   startedAt = Date.now(),
   now = Date.now,
 }) {
   if (!path) throw new Error('review budget needs a run-file path');
-  if (maximumOutputTokens !== MAX_OUTPUT_TOKENS) throw new Error('review budget must match the 4096-token generation ceiling');
+  if (maximumOutputTokens !== REVIEW_MAX_OUTPUT_TOKENS) throw new Error('review budget must match the 4096-token generation ceiling');
   const limits = { maxUsd, totalMs, stepMs };
   let state = await loadState(path, { startedAt, ...limits, spentUsd: 0, pending: null, responses: [] }, value => validState(value, limits));
+  let peakReservedTotalUsd = state.spentUsd + (state.pending?.maximumCostUsd ?? 0);
   const validCard = value => value?.maxUsd === cardMaxUsd
     && Number.isFinite(value.spentUsd) && value.spentUsd >= 0 && Array.isArray(value.responses) && value.responses.every(item => typeof item === 'string')
     && (value.pending === null || (Number.isFinite(value.pending.maximumCostUsd) && typeof value.pending.reservationId === 'string' && value.pending.reservationId));
@@ -102,6 +101,7 @@ export async function createReviewBudget({
         await saveCard();
       });
       state.pending = pending;
+      peakReservedTotalUsd = Math.max(peakReservedTotalUsd, state.spentUsd + priced.maximumCostUsd);
       await save();
       return state.pending;
     },
@@ -130,5 +130,11 @@ export async function createReviewBudget({
       state.pending = null;
       await save();
     },
+    summary: () => ({
+      spentUsd: state.spentUsd,
+      peakReservedTotalUsd,
+      pending: state.pending,
+      responses: [...state.responses],
+    }),
   };
 }

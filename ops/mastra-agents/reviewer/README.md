@@ -15,16 +15,30 @@ Retained code provides:
 The stage-three offline runtime now adds:
 
 - stock Mastra turn, output, per-request, and 20-minute total bounds;
+- a measured 15-second stock per-step bound;
 - a durable pre-dispatch `$0.50` cost and elapsed-time reservation ledger;
+- a 2 GiB free-disk preflight, 768 MiB sampled RSS ceiling, and 128 MiB
+  disk-growth reservation;
 - one bounded provider-boundary journal for requests, exact raw replies, and
   validated usage; and
 - one shared atomic run-file writer for the recorder, budget, journal, and raw
   response evidence.
 
-The scripted maximum-correction fixture completes under the configured
-two-minute request bound. That is offline evidence for the bound and library
-plumbing, not proof of CommandCode latency; the paid route remains disabled
-until the separately authorized model-specific probe confirms the real service.
+The scripted four-file/eight-criterion maximum fixture makes all 70 calls through
+the installed `Agent.generate()` path. Two 14-second replies produced a 14.253-
+second maximum complete agent step. The configured 15-second bound is below the
+17.143-second per-step share of the 20-minute total and leaves 150 seconds for
+agent/tool overhead. RSS sampling every 10 ms across complete agent steps found
+a 22,519,808-byte maximum within-step increase. The active sampler aborts at
+736 MiB (the 768 MiB ceiling minus the 32 MiB next-power-of-two reserve), and
+the same guard refuses pre-dispatch. This is offline
+evidence for the bound and library plumbing, not proof
+of CommandCode latency; the paid route remains disabled until the separately
+authorized model-specific probe confirms the real service.
+
+The same offline suite proves step, elapsed, cost, evidence, RSS, disk-growth,
+and free-disk refusals end as `SYSTEM_ERROR` with saved progress. The retained
+measurement is `claude/jul-223-stage3-offline-proof.json`.
 
 Removed code provided semantic recall, saved reviewer messages, message
 history, vector storage and embeddings, internal-span export, a paid warn-only

@@ -273,6 +273,25 @@ are configured before the process starts and enforced without DuckDB.
 | Peak worker memory | 768 MiB RSS maximum | Less than half the previously measured 1.6 GB free-memory envelope and well below the failed roughly 1.3 GB process/store condition. Sample RSS through the offline proof and live-run summary. A future hard OS limit may be added only if the existing runner's process control cannot enforce it safely. |
 | Disk growth | 128 MiB maximum per review and 2 GiB free-space preflight | Allows headroom above the 64 MiB durable-evidence budget for atomic-write temporary files. The preflight refuses to start below 2 GiB free. Temporary files are removed only after their durable replacement is confirmed; retained run evidence is not silently cleaned. |
 
+Stage three selected a fixed `stepMs` of **15,000 ms** from the retained offline
+maximum-length proof. The installed `Agent.generate()` path made all 70 calls for
+the four-file/eight-criterion inventory. Two replies were deliberately held for
+14 seconds, producing a 14,234.781 ms maximum complete agent step and a
+48,002.704 ms total run. Fifteen seconds is below the 17.143-second share of the
+20-minute total for each of 70 steps, leaving 150 seconds for agent/tool overhead;
+the former two-minute placeholder is not retained. RSS was sampled every 10 ms
+across provider, parsing, tool and durable-write work. Peak RSS was 225,304,576
+bytes, and the largest observed within-step increase was 22,519,808 bytes. The
+next-power-of-two 32 MiB reserve moves the active sampler and pre-dispatch
+refusal line to 736 MiB, below the 768 MiB ceiling. Evidence occupied 856,085
+bytes, disk growth was 856,016 bytes, free space was 96,309,301,248 bytes,
+offline estimated spend was
+`$0.00370272`, and the largest spent-plus-pending reservation was `$0.014726124`.
+The retained refusal cases prove that step, elapsed, cost, evidence, memory,
+disk-growth and free-disk limits stop before dispatch/crossing as applicable,
+write `SYSTEM_ERROR`, and retain accepted progress. No external or paid provider
+call was made; all 70 measured calls went only to the local scripted stand-in.
+
 The cost preflight uses the request's UTF-8 byte length as a conservative upper
 bound on input tokens, peak input/output prices, and the 4,096-token maximum
 output. After a response, its validated provider token counts replace the
@@ -447,6 +466,7 @@ separately:
 | Output-token ceiling | Stock `modelSettings.maxOutputTokens`: [installed generate reference](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/reference-agents-generate.md) | Existing contract tests prove the current request-body scrubber; stage three replaces that test with an assertion on the configured 4,096-token stock ceiling. | **Use stock.** The custom scrubber removes the bound needed for conservative pre-call reservation and is marked for deletion. Do not inject legacy provider-body fields. |
 | Fixed rules, configuration and completeness contract | Agent instructions and structured output: [installed Agent reference](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/reference-agents-agent.md), [structured output](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/docs-agents-structured-output.md) | Existing reset and contract tests; included in the full offline suite. | **Stock plus custom.** Mastra carries the instructions and schema; Julia's six rules, different-maker selection, exact file set, criterion coverage and verdict consistency are domain policy. |
 | Atomic run-file writer | Workflow snapshots require configured storage: [installed snapshots guide](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/docs-workflows-snapshots.md) | Recorder, raw-answer and interruption tests exercise temporary-file, fsync and rename behavior. | **Keep custom.** No installed stock dependency supplies the required database-free atomic run-file record. Consolidate the duplicate helper, but do not replace it with telemetry storage. |
+| Process memory and filesystem budgets | Node 24 [`process.memoryUsage()`](https://nodejs.org/docs/latest-v24.x/api/process.html#processmemoryusage), promise [`statfs()`](https://nodejs.org/docs/latest-v24.x/api/fs.html#fspromisesstatfspath-options), and [`setInterval()`](https://nodejs.org/docs/latest-v24.x/api/timers.html#setintervalcallback-delay-args) | `test/resource-budget.test.mjs` proves free-space, RSS-reservation, transient 10 ms RSS sampling, and disk-growth behavior; `test/worst-case-offline.test.mjs` records the real process/run-folder measurements through the complete installed-agent loop. | **Keep custom.** Mastra's stock generation bounds cover steps and time, not process RSS, host free space, or run-folder growth. Node exposes the required measurements and sampler but no stock multi-resource review budget, so the narrow controller refuses before dispatch and records the result in run files. |
 
 #### Stage-three replacement and deletion list
 

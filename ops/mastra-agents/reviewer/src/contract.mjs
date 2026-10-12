@@ -3,6 +3,9 @@ export const DEFAULT_REVIEWER = Object.freeze({
   model: 'deepseek/deepseek-v4.1-flash',
   connection: 'existing-commandcode',
 });
+export const REVIEW_MAX_OUTPUT_TOKENS = 4096;
+export const REVIEW_TOTAL_MS = 20 * 60 * 1000;
+export const REVIEW_STEP_MS = 15 * 1000;
 
 export function reviewerConfiguration(configuration = {}) {
   const reviewer = configuration.reviewer ?? configuration;
@@ -44,8 +47,8 @@ export function reviewGenerationOptions(changedFiles, criteria) {
     maxSteps: reviewStepBudget(changedFiles, criteria),
     modelSettings: {
       maxRetries: 0,
-      maxOutputTokens: 4096,
-      timeout: { totalMs: 20 * 60 * 1000, stepMs: 2 * 60 * 1000 },
+      maxOutputTokens: REVIEW_MAX_OUTPUT_TOKENS,
+      timeout: { totalMs: REVIEW_TOTAL_MS, stepMs: REVIEW_STEP_MS },
     },
   };
 }
