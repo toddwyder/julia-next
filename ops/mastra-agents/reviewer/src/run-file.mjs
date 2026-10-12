@@ -26,26 +26,29 @@ export async function verifyRunEvidenceLimit(root, maxBytes = RUN_EVIDENCE_MAX_B
 
 export async function durableWrite(path, content, { root = dirname(path), maxBytes = RUN_EVIDENCE_MAX_BYTES - RUN_WARNING_RESERVE_BYTES } = {}) {
   await mkdir(dirname(path), { recursive: true });
-  if (await directoryBytes(root) + Buffer.byteLength(content, 'utf8') > maxBytes) {
-    throw new Error(`reviewer refused: durable evidence limit of ${maxBytes} bytes would be exceeded`);
-  }
-  const temporaryPath = `${path}.${randomUUID()}.tmp`;
-  const file = await open(temporaryPath, 'wx');
-  try {
-    await file.writeFile(content);
-    await file.sync();
-  } finally {
-    await file.close();
-  }
-  await rename(temporaryPath, path);
+  await withFileLock(join(root, '.evidence-quota.lock'), async () => {
+    if (await directoryBytes(root) + Buffer.byteLength(content, 'utf8') > maxBytes) {
+      throw new Error(`reviewer refused: durable evidence limit of ${maxBytes} bytes would be exceeded`);
+    }
+    const temporaryPath = `${path}.${randomUUID()}.tmp`;
+    const file = await open(temporaryPath, 'wx');
+    try {
+      await file.writeFile(content);
+      await file.sync();
+    } finally {
+      await file.close();
+    }
+    await rename(temporaryPath, path);
+    if (await directoryBytes(root) > maxBytes) throw new Error(`reviewer refused: durable evidence exceeded the ${maxBytes} byte limit`);
+  }, 'durable evidence writer is busy');
 }
 
-export async function withFileLock(path, operation) {
+export async function withFileLock(path, operation, busyMessage = 'run-file lock is busy') {
   await mkdir(dirname(path), { recursive: true });
   let lock;
   try { lock = await open(path, 'wx'); }
   catch (error) {
-    if (error?.code === 'EEXIST') throw new Error('reviewer refused: cumulative card ledger is busy');
+    if (error?.code === 'EEXIST') throw new Error(`reviewer refused: ${busyMessage}`);
     throw error;
   }
   try { return await operation(); }

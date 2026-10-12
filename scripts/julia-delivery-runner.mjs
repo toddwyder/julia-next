@@ -164,7 +164,7 @@ export function productionLauncher(worktree, { run = runLimited, environment = p
           child.stdout.on('data', chunk => { stdout += chunk; }); child.stderr.on('data', chunk => { stderr += chunk; }); child.stdin.on('error', () => {});
           Promise.resolve(request.started?.({ pid: child.pid })).then(() => {
             recorded = true;
-            child.stdin.end(JSON.stringify({ issueId: request.issueId, runId: request.runId ?? basename(dirname(request.outputPath ?? verdictPath)), repoRoot: request.repoRoot ?? worktree, candidate: request.candidate, input: request.reviewInput, configuration: configured, spending: request.spending, cardBudgetPath: join(dirname(request.outputPath ?? verdictPath), `${request.issueId}-review-spend.json`), round: request.round, verdictPath }));
+            child.stdin.end(JSON.stringify({ issueId: request.issueId, runId: request.runId ?? basename(dirname(request.outputPath ?? verdictPath)), repoRoot: request.repoRoot ?? worktree, candidate: request.candidate, input: request.reviewInput, configuration: configured, spending: request.spending, cardBudgetPath: request.spending?.ledgerPath, round: request.round, verdictPath }));
           }, () => child.kill());
         },
       });

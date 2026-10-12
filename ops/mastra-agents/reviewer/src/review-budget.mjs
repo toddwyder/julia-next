@@ -33,8 +33,30 @@ async function loadState(path, fresh, validate) {
     return state;
   } catch (error) {
     if (error?.code !== 'ENOENT') throw error;
+    if (fresh === null) throw new Error('reviewer refused: cumulative card ledger is missing');
     return fresh;
   }
+}
+
+export async function initializeCardBudget(path, maxUsd = 1) {
+  if (!path) throw new Error('reviewer authorization needs a cumulative card ledger path');
+  return withFileLock(`${path}.lock`, async () => {
+    const markerPath = `${path}.initialized`;
+    let initialized = false;
+    try {
+      const marker = JSON.parse(await readFile(markerPath, 'utf8'));
+      if (marker?.maxUsd !== maxUsd) throw new Error('reviewer refused: cumulative card ledger marker does not match the authorized limit');
+      initialized = true;
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+    }
+    const fresh = { maxUsd, spentUsd: 0, pending: null, responses: [] };
+    const state = await loadState(path, initialized ? null : fresh, value => value?.maxUsd === maxUsd && Number.isFinite(value.spentUsd)
+      && value.spentUsd >= 0 && Array.isArray(value.responses) && (value.pending === null || typeof value.pending?.reservationId === 'string'));
+    await durableWrite(path, `${JSON.stringify(state)}\n`);
+    if (!initialized) await durableWrite(markerPath, `${JSON.stringify({ maxUsd })}\n`);
+    return state;
+  }, 'cumulative card ledger is busy');
 }
 
 export async function createReviewBudget({
@@ -52,15 +74,14 @@ export async function createReviewBudget({
   if (maximumOutputTokens !== MAX_OUTPUT_TOKENS) throw new Error('review budget must match the 4096-token generation ceiling');
   const limits = { maxUsd, totalMs, stepMs };
   let state = await loadState(path, { startedAt, ...limits, spentUsd: 0, pending: null, responses: [] }, value => validState(value, limits));
-  const freshCard = { maxUsd: cardMaxUsd, spentUsd: 0, pending: null, responses: [] };
   const validCard = value => value?.maxUsd === cardMaxUsd
     && Number.isFinite(value.spentUsd) && value.spentUsd >= 0 && Array.isArray(value.responses) && value.responses.every(item => typeof item === 'string')
     && (value.pending === null || (Number.isFinite(value.pending.maximumCostUsd) && typeof value.pending.reservationId === 'string' && value.pending.reservationId));
   const save = () => durableWrite(path, `${JSON.stringify(state)}\n`);
   const withCard = operation => cardPath ? withFileLock(`${cardPath}.lock`, async () => {
-    const card = await loadState(cardPath, freshCard, validCard);
+    const card = await loadState(cardPath, null, validCard);
     return operation(card, () => durableWrite(cardPath, `${JSON.stringify(card)}\n`));
-  }) : operation(null, async () => {});
+  }, 'cumulative card ledger is busy') : operation(null, async () => {});
   await save();
   await withCard(async (card, saveCard) => { if (card) await saveCard(); });
 

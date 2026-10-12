@@ -5,15 +5,18 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createReviewerRuntime } from '../src/reviewer.mjs';
+import { initializeCardBudget } from '../src/review-budget.mjs';
 
 test('the offline runtime wires stock bounds, authorization, durable budget, and provider journal', async t => {
   const directory = await mkdtemp(join(tmpdir(), 'jul223-runtime-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
+  const cardBudgetPath = join(directory, 'JUL-223-review-spend.json');
+  await initializeCardBudget(cardBudgetPath);
   const runtime = await createReviewerRuntime({
     runDirectory: directory,
-    cardBudgetPath: join(directory, 'JUL-223-review-spend.json'),
+    cardBudgetPath,
     input: { files: ['a.mjs'], criteria: ['criterion'] },
-    spending: { mode: 'paid', maxUsd: 0.50, cumulativeMaxUsd: 1 },
+    spending: { mode: 'paid', maxUsd: 0.50, cumulativeMaxUsd: 1, ledgerPath: cardBudgetPath },
     startedAt: 1_000_000,
     now: () => 1_000_000,
   });

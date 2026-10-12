@@ -7,6 +7,7 @@ import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startReviewOnly } from './julia-delivery-runner.mjs';
+import { initializeCardBudget } from '../ops/mastra-agents/reviewer/src/review-budget.mjs';
 
 const ISSUE = /^JUL-\d+$/;
 const POSITIVE = /^[1-9]\d*$/;
@@ -32,8 +33,8 @@ export function authorizedReviewConfiguration() {
   };
 }
 
-export function authorizedReviewSpending() {
-  return { builder: { mode: 'subscription', maxUsd: 0 }, reviewer: { mode: 'paid', maxUsd: 0.50, cumulativeMaxUsd: 1 } };
+export function authorizedReviewSpending(ledgerPath) {
+  return { builder: { mode: 'subscription', maxUsd: 0 }, reviewer: { mode: 'paid', maxUsd: 0.50, cumulativeMaxUsd: 1, ...(ledgerPath ? { ledgerPath } : {}) } };
 }
 
 export async function runReviewOnly(args, { root = resolve(fileURLToPath(new URL('..', import.meta.url))), stateDirectory = process.env.JULIA_RUN_DIRECTORY ?? join(homedir(), '.julia', 'runs'), start = startReviewOnly } = {}) {
@@ -48,7 +49,9 @@ export async function runReviewOnly(args, { root = resolve(fileURLToPath(new URL
   try {
     const checksText = execute('gh', ['pr', 'checks', String(pullRequest), '--required'], { cwd: root });
     const configuration = authorizedReviewConfiguration();
-    const authorization = { issueId, explicitStart: true, authorizedBy: 'Todd: JUL-206 reviewer authorization', spending: authorizedReviewSpending(), configuration };
+    const cardBudgetPath = join(stateDirectory, `${issueId}-review-spend.json`);
+    await initializeCardBudget(cardBudgetPath, 1);
+    const authorization = { issueId, explicitStart: true, authorizedBy: 'Todd: JUL-206 reviewer authorization', spending: authorizedReviewSpending(cardBudgetPath), configuration };
     return await start(issueId, configuration, {
       pullRequest, workspace: { path: workspace },
       checks: { pass: true, summary: 'GitHub required checks passed' },

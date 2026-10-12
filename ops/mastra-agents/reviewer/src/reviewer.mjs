@@ -141,7 +141,7 @@ export async function createReviewerRuntime({ runDirectory, cardBudgetPath, inpu
   if (spending?.mode !== 'paid' || spending.maxUsd !== 0.50 || spending.cumulativeMaxUsd !== 1) {
     throw new Error('reviewer refused: runtime requires the approved $0.50 paid limit and $1 cumulative card limit');
   }
-  if (!cardBudgetPath) throw new Error('reviewer refused: runtime requires the cumulative card ledger path');
+  if (!cardBudgetPath || spending.ledgerPath !== cardBudgetPath) throw new Error('reviewer refused: runtime requires the authorized cumulative card ledger path');
   const warnings = [];
   const budget = await createReviewBudget({ path: join(runDirectory, 'review-budget.json'), maxUsd: spending.maxUsd, cardPath: cardBudgetPath, cardMaxUsd: spending.cumulativeMaxUsd, startedAt, now });
   const journal = await createModelJournal({ path: join(runDirectory, 'model-events.json'), verdictSaved, warnings });

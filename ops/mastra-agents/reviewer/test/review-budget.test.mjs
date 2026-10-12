@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createReviewBudget } from '../src/review-budget.mjs';
+import { createReviewBudget, initializeCardBudget } from '../src/review-budget.mjs';
 import { checkedFetch } from '../src/reviewer.mjs';
 
 test('the durable budget reserves each request before dispatch and charges validated usage', async t => {
@@ -73,11 +73,28 @@ test('separate run ledgers share the cumulative card ceiling', async t => {
   const directory = await mkdtemp(join(tmpdir(), 'jul223-budget-card-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const cardPath = join(directory, 'card.json');
+  await initializeCardBudget(cardPath, 0.009);
   const first = await createReviewBudget({ path: join(directory, 'run-1.json'), cardPath, cardMaxUsd: 0.009 });
   await first.beforeRequest({ messages: [] });
   await first.recordResponse({ responseId: 'one', estimate: { cost: 0.0045 } });
   const second = await createReviewBudget({ path: join(directory, 'run-2.json'), cardPath, cardMaxUsd: 0.009 });
   await assert.rejects(second.beforeRequest({ messages: [] }), /cumulative card limit/);
+});
+
+test('a missing cumulative card ledger cannot reset previously authorized spend', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'jul223-budget-card-loss-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const cardPath = join(directory, 'card.json');
+  await initializeCardBudget(cardPath);
+  const first = await createReviewBudget({ path: join(directory, 'run-1.json'), cardPath });
+  await first.beforeRequest({ messages: [] });
+  await first.recordResponse({ responseId: 'one', estimate: { cost: 0.0045 } });
+  await rm(cardPath);
+
+  await assert.rejects(
+    initializeCardBudget(cardPath),
+    /cumulative card ledger is missing/,
+  );
 });
 
 test('malformed saved measurements and costs above a reservation fail closed', async t => {
@@ -99,6 +116,7 @@ test('future clocks, busy card ledgers, and mismatched reservations fail closed'
   await assert.rejects(future.beforeRequest({ messages: [] }), /elapsed review time is invalid/);
 
   const cardPath = join(directory, 'card.json');
+  await initializeCardBudget(cardPath);
   const budget = await createReviewBudget({ path: join(directory, 'run.json'), cardPath });
   await writeFile(`${cardPath}.lock`, 'busy');
   await assert.rejects(budget.beforeRequest({ messages: [] }), /card ledger is busy/);
