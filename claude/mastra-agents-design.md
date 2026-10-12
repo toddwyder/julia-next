@@ -377,8 +377,12 @@ stage three merely for this audit result.
   ([installed generate reference](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/reference-agents-generate.md));
   and the provider's injectable `fetch` plus raw-response metadata extractor
   ([installed OpenAI-compatible provider guide](../ops/mastra-agents/reviewer/node_modules/@ai-sdk/openai-compatible/docs/index.mdx)).
-- **Result:** the stock exporters listed by Mastra write to Mastra storage,
-  Mastra Platform or third parties; there is no stock file exporter.
+- **Result:** the stock production exporters listed by Mastra write to Mastra
+  storage, Mastra Platform or third parties. The installed first-party
+  `TestExporter.writeToFile()` is a testing/debugging snapshot that buffers all
+  events in memory until explicitly flushed; it is not an incremental or
+  crash-durable production file exporter
+  ([installed TestExporter declaration](../ops/mastra-agents/reviewer/node_modules/@mastra/observability/dist/exporters/test.d.ts)).
   `onStepFinish` is documented as unavailable for non-streaming structured
   output and occurs after a step, so it cannot guarantee raw-before-parse
   capture. The provider hook does expose the exact boundary but file format,
@@ -412,6 +416,20 @@ stage three merely for this audit result.
   SYSTEM_ERROR. Do not use `suspend()` for INCONCLUSIVE and do not introduce a
   workflow database as a second execution record; run files remain authoritative.
 
+#### Outer-runner responsibilities
+
+The generic workflow verdict does not by itself audit the custom work around
+the reviewer. Each remaining outer-runner responsibility was checked
+separately:
+
+| Responsibility | Stock candidate and exact page | Test/result | Verdict and exact gap |
+| --- | --- | --- | --- |
+| Narrow launch parsing and start/spend authorization | Agent tool approval: [installed human-in-the-loop guide](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/docs-agents-human-in-the-loop.md); workflow input schema: [installed workflows overview](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/docs-workflows-overview.md) | `scripts/julia-review-only.test.mjs` exercises accepted and refused launch shapes plus the selected identities. The docs are decisive, so no new probe was needed. | **Keep custom.** Tool approval occurs after agent execution has begun and workflow input validation proves shape, not Todd's prior card/candidate/spend authorization. The outer launcher must refuse first and journal that exact authority. |
+| Pull-request resolution and immutable detached worktree | Workspace filesystem access: [installed Workspace reference](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/reference-workspace-workspace-class.md) | `scripts/verify-reviewer-worktree.test.mjs` uses a real local Git repository and detached worktree to prove clean and changed candidates. | **Keep custom.** Workspace exposes a current filesystem; it does not resolve a GitHub pull request to a commit, fetch that object, create a detached worktree or prove it stayed at that commit. |
+| Required-check acquisition | Custom workflow step and tools: [installed workflows overview](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/docs-workflows-overview.md), [installed tools guide](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/docs-agents-tools.md) | Docs show that step/tool `execute` remains application code; no runtime probe was needed to distinguish orchestration from a GitHub required-check query. | **Stock plus a small custom part.** A workflow should order and fail the step, but a narrow GitHub adapter must fetch required checks and bind them to the already-resolved candidate commit. |
+| Temporary-worktree cleanup | Workflow success/error callbacks: [installed workflow error handling](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/docs-workflows-error-handling.md) | The current launcher uses an outer `finally`; workflow docs state lifecycle callback errors are caught and logged. That makes callbacks unsuitable as the sole cleanup guarantee, so no ambiguity needed a probe. | **Keep custom.** Retain the outer `finally` and exact-path checks for safe local cleanup. A workflow may request cleanup, but a caught callback failure cannot own this guarantee. |
+| Idempotent publication | Custom workflow step, retries and result inspection: [installed workflow error handling](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/docs-workflows-error-handling.md) | Existing publication adapter tests cover the repository's push/update behavior; the stock docs contain no Julia/Linear/GitHub destination or idempotency key. | **Stock plus a small custom part.** The workflow should sequence the step and surface failure; the adapter must choose the authorized destination, deduplicate by run/candidate identity and leave the saved verdict authoritative if publication fails. |
+
 #### Smaller pieces
 
 | Piece | Stock feature and exact page | Test/result | Verdict and exact gap |
@@ -422,6 +440,7 @@ stage three merely for this audit result.
 | Provider cost arithmetic | Stock cost guard: [cost-control reference](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/reference-processors-token-cost-control.md); provider rates: [CommandCode pricing](https://commandcode.ai/docs/resources/pricing-limits) | The official page still lists DeepSeek V4.1 Flash at $0.15/$0.60/$0.003 off-peak and $0.30/$1.20 peak per million input/output/cache-read tokens. Existing contract tests cover both bands and reject missing counts. | **Keep custom.** Stock cost is a delayed trace estimate; the hard ledger needs these provider-specific current rates and the captured raw counts. |
 | Read-only Git tools | Read-only workspace filesystem: [installed Workspace reference](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/reference-workspace-workspace-class.md); tool schemas: [installed tools guide](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/docs-agents-tools.md) | Existing repository-root and recorded-review tests; included in the full offline suite. | **Stock plus custom.** Keep stock `createTool`; custom Git commands remain because workspace reads follow a mutable filesystem and cannot address a named commit, base-to-candidate diff or deleted file at its prior revision. |
 | Derived step formula | Stock `maxSteps`: [installed generate reference](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/reference-agents-generate.md) | Existing contract test proves four files/eight criteria yields 70. | **Stock plus custom.** Mastra enforces the number but does not derive it from Julia's immutable file/criterion and correction inventory. |
+| Output-token ceiling | Stock `modelSettings.maxOutputTokens`: [installed generate reference](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/reference-agents-generate.md) | Existing contract tests prove the current request-body scrubber; stage three replaces that test with an assertion on the configured 4,096-token stock ceiling. | **Use stock.** The custom scrubber removes the bound needed for conservative pre-call reservation and is marked for deletion. Do not inject legacy provider-body fields. |
 | Fixed rules, configuration and completeness contract | Agent instructions and structured output: [installed Agent reference](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/reference-agents-agent.md), [structured output](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/docs-agents-structured-output.md) | Existing reset and contract tests; included in the full offline suite. | **Stock plus custom.** Mastra carries the instructions and schema; Julia's six rules, different-maker selection, exact file set, criterion coverage and verdict consistency are domain policy. |
 | Atomic run-file writer | Workflow snapshots require configured storage: [installed snapshots guide](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/docs-workflows-snapshots.md) | Recorder, raw-answer and interruption tests exercise temporary-file, fsync and rename behavior. | **Keep custom.** No installed stock dependency supplies the required database-free atomic run-file record. Consolidate the duplicate helper, but do not replace it with telemetry storage. |
 
@@ -461,14 +480,19 @@ identified above. Stage three does remove duplicated custom paths inside them:
 
 The complete reviewer suite passed 28 tests, including the real installed
 Mastra Agent/tool/structured-output stand-in and the interruption-recovery
-process test. That stand-in is also the relevant integration-boundary proof: it
-crosses the installed Agent and OpenAI-compatible provider layers without an
-external service or paid call. End-to-end browser behavior and console checks do
-not apply because this audit changes no Julia user-facing surface. Production
-logging behavior is unchanged; the audit instead identifies the exact logging
-gap stage three must close. `npm run lint:framework` also passed. The
-user-facing Julia proof is not applicable for the same reason: this is an audit,
-documentation, and offline test only.
+process test. Eleven focused outer-runner tests also passed for launch refusal,
+authorized configuration, real detached-worktree identity/tamper checks, and
+idempotent commit-bound review publication. The stand-in is offline
+component/contract evidence for the
+installed library path; it is not proof of the real CommandCode service
+boundary. Real-service integration is not applicable because this audit changes
+no service connection and authorizes no provider call. End-to-end browser
+behavior and console checks do not apply because this audit changes no Julia
+user-facing surface. Production logging behavior is unchanged; the audit
+instead identifies the exact logging gap stage three must close.
+`npm run lint:framework` also passed. The user-facing Julia proof is not
+applicable for the same reason: this is an audit, documentation, and offline
+test only.
 
 ### Replace, then delete
 

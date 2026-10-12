@@ -9,7 +9,7 @@ authorization to make a provider call. No paid call was made.
 | --- | --- | --- | --- | --- |
 | Incremental report recording | Saves a long review safely in small checked pieces and assembles the final decision | Structured output, tool schemas, and output processors | **Stock plus a small custom part** | Keep stock tool schemas and the stock correction loop, but stock structured output is only a final object and does not durably save accepted pieces or run the repository-specific checks. |
 | Final report shape | Produces the exact decision and evidence packet the runner accepts | Structured output | **Keep custom** | The shape, exact inventory, evidence rules, and decision mapping are Julia's contract; a generic schema validates shape but does not supply those rules. |
-| Pre-call spending and time brake | Refuses the next paid request before it can exceed the review's limits | Step caps, token limiting, and stock cost control | **Keep custom** | Stock cost control is approximate, database-backed, delayed, and can fail open; token limiting trims prompts or responses, and a step cap limits call count rather than predicted spend or elapsed time. |
+| Pre-call spending and time brake | Refuses the next paid request before it can exceed the review's limits | Step caps, token limiting, stock timeouts, and stock cost control | **Stock plus a small custom part** | Use stock step and time limits, but keep the reservation ledger: stock cost control is approximate, database-backed, delayed, and can fail open. |
 | Model-event log | Keeps every provider prompt, response, tool call, and usage record once without jeopardizing the decision | Mastra observability, file-capable test exporter, provider hooks, and finish callbacks | **Keep custom** | Stock spans can expose the data, but the supplied file exporter buffers in memory and writes only when explicitly asked; it is not the durable provider-boundary journal required here. |
 | Review orchestration | Runs the review and gives every started run one of four terminal outcomes | Mastra workflows, result statuses, callbacks, suspension, and snapshots | **Stock plus a small custom part** | JUL-196 should use workflows for sequencing, step results, retries, and lifecycle callbacks. Julia must still map workflow outcomes to its four states and atomically protect an already-saved verdict. |
 | Pausing and recovery | Recovers interrupted orchestration | Workflow suspension, resumption, and snapshots | **Keep custom for this reviewer** | Durable stock suspension requires configured database storage, while this route says run files own state and has no human-in-the-loop pause. JUL-196 may use ordinary workflow execution without making snapshots the evidence authority. |
@@ -54,15 +54,17 @@ separate structuring model makes a second paid call. See the installed
 [structured-output guide](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/docs-agents-structured-output.md)
 and [generate reference](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/reference-agents-generate.md).
 
-An offline stand-in using the installed real `Agent.generate()` and
-`createOpenAICompatible()` made a tool call on step one and returned a
-schema-validated object on step two. Both requests contained the tool schema
-and `response_format: { type: "json_schema" }`; the final `response.object` was
-validated. This proves the installed Mastra/AI-SDK route can combine the two
-when the provider accepts that wire shape. It does **not** prove that Command
-Code's current DeepSeek endpoint accepts `response_format` together with
-tools. Command Code says its endpoint follows the OpenAI Chat Completions
-schema and supports client tool arrays, but its provider page does not make a
+The committed offline stand-in in
+[`audit/jul-223-stage2-stock.test.mjs`](../ops/mastra-agents/reviewer/audit/jul-223-stage2-stock.test.mjs)
+uses the installed real `Agent.generate()` and `createOpenAICompatible()`. It
+makes a tool call on step one and returns a schema-validated object on step two.
+Because native structured output is deliberately disabled, both requests keep
+the tool schema, omit `response_format`, and carry Mastra's inline JSON
+instructions. This proves the documented fallback combines the tool loop with
+final structured validation. It does **not** prove that Command Code's current
+DeepSeek endpoint accepts native `response_format` together with tools.
+Command Code says its endpoint follows the OpenAI Chat Completions schema and
+supports client tool arrays, but its provider page does not make a
 model-specific structured-output promise
 ([Command Code Provider API](https://commandcode.ai/docs/provider)). Resolve
 that ambiguity only in the later authorized, model-specific opt-in probe; it
@@ -121,9 +123,10 @@ Mastra accepts an `AbortSignal`, which is useful once a deadline fires, but it
 cannot predict that the next provider call would finish after the deadline.
 See [generate, `abortSignal`](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/reference-agents-generate.md).
 
-**Verdict:** keep a custom, durable per-run ledger and conservative next-call
-reservation check. Use stock `maxSteps` as a second independent loop bound and
-the runner's process timeout as the ultimate elapsed-time stop. The custom
+**Verdict:** stock plus a small custom part. Use stock `maxSteps` and
+`modelSettings.timeout.totalMs` as independent loop and time bounds, with the
+runner's process timeout as the ultimate elapsed-time stop. Keep a custom,
+durable per-run ledger and conservative next-call reservation check. The custom
 `reviewStepBudget` formula stays because Mastra only consumes the numeric
 answer. `TokenCostControl` and database metrics stay out.
 
@@ -293,4 +296,3 @@ Adopt/configure these stock parts in stage three:
    page observed during this audit, but pricing can change independently of
    code. Stage three must fetch/check the official page and update the dated
    tariff fixture before enabling paid execution.
-
