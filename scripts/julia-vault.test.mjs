@@ -32,9 +32,9 @@ test('Windows provisioning parks after account creation followed by failed persi
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
-test('Windows vault wrapper has a narrow review-only launcher operation', () => {
+test('Windows vault wrapper has narrow review-only and opt-in format-probe operations', () => {
   const wrapper = readFileSync(fileURLToPath(new URL('./julia-vault-windows.ps1', import.meta.url)), 'utf8');
-  assert.match(wrapper, /ValidateSet\('init', 'startReviewOnly'\)/);
+  assert.match(wrapper, /ValidateSet\('init', 'startReviewOnly', 'probeCommandCodeFormats'\)/);
   assert.match(wrapper, /julia-vault\.mjs'\) \$Operation @JuliaArguments/);
 });
 
@@ -123,6 +123,20 @@ test('vault launcher selects the review-only entry point only for startReviewOnl
   assert.match(call.args[3], /julia-review-only\.mjs$/);
   assert.deepEqual(call.args.slice(4), ['JUL-206', '--pr', '282']);
   assert.equal(call.options.env.COMMANDCODE_API_KEY, 'op://vault-id/item-id/key');
+});
+test('vault launcher permits only the explicit CommandCode format-probe entry point', () => {
+  let call;
+  const code = vaultLaunch(['--live'], {
+    entryPoint: 'julia-commandcode-format-probe.mjs', configuration: { vaultId: 'vault-id', opExecutable: 'op.exe', referencesPath: 'references.env' },
+    references: 'COMMANDCODE_API_KEY=op://vault-id/item-id/key\n',
+    run: (command, args, options) => { call = { command, args, options }; return { status: 0 }; },
+  });
+  assert.equal(code, 0);
+  assert.match(call.args[3], /julia-commandcode-format-probe\.mjs$/);
+  assert.deepEqual(call.args.slice(4), ['--live']);
+  assert.throws(() => vaultLaunch([], {
+    entryPoint: 'arbitrary.mjs', configuration: { vaultId: 'vault-id', referencesPath: 'references.env' }, references: 'COMMANDCODE_API_KEY=op://vault-id/item-id/key\n',
+  }), /unapproved Julia launcher entry point/);
 });
 test('omitted service secrets do not inherit stale plaintext or unrelated vault references', () => {
   vaultLaunch(['$init', 'JUL-123'], { configuration: { vaultId: 'vault-id', referencesPath: 'mutable.env' }, references: 'LINEAR_API_KEY=op://vault-id/item-id/key', environment: { VERCEL_TOKEN: 'stale', axiom_token: 'stale', AXIOM_DATASET: 'op://other/item/dataset', OP_SERVICE_ACCOUNT_TOKEN: 'bootstrap', PATH: 'fixture' }, run: (_command, args, options) => {
