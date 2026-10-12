@@ -1,18 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { Agent } from '@mastra/core/agent';
 import { resolveModelConfig } from '@mastra/core/llm';
 import { createTool } from '@mastra/core/tools';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { z } from 'zod';
 
-const testRoot = dirname(fileURLToPath(import.meta.url));
-const repositoryRoot = resolve(testRoot, '..', '..', '..', '..');
-const artifactDirectory = join(repositoryRoot, '.artifacts', 'jul-223-step3c');
 const changedFiles = ['.github/workflows/ci.yml', 'playwright.config.mjs', 'scripts/ci-routing.mjs', 'scripts/ci-routing.test.mjs'];
 const correctedInput = { file: changedFiles[0], status: 'proven', quote: 'known quote' };
 
@@ -95,15 +89,10 @@ async function runCase(spec) {
 }
 
 test('real Mastra generate reports bad tool calls to the model and accepts a corrected call', async () => {
-  await mkdir(artifactDirectory, { recursive: true });
-  const evidence = [];
   const observations = new Map();
   for (const spec of cases) {
     const observed = await runCase(spec);
     observations.set(spec.id, observed);
-    for (let index = 0; index < observed.requests.length; index++) {
-      await writeFile(join(artifactDirectory, `${spec.id}.request-${String(index + 1).padStart(2, '0')}.json`), JSON.stringify(observed.requests[index], null, 2));
-    }
 
     assert.equal(observed.thrown, undefined, `${spec.id} should return rather than throw`);
     assert.equal(observed.requests.length, 3, `${spec.id} should make one correction request and one final request`);
@@ -113,18 +102,6 @@ test('real Mastra generate reports bad tool calls to the model and accepts a cor
     assert.equal(observed.requests[0].tools[0].function.strict, spec.strict);
     assert.ok(observed.toolResultText, `${spec.id} should send the first tool result to the model`);
 
-    evidence.push({
-      case: spec.id,
-      strict: spec.strict,
-      generate: observed.thrown ? 'throws' : 'returns',
-      loops: observed.requests.length > 3,
-      executeRanForFirstCall: observed.executions.length > 1,
-      executeCalls: observed.executions,
-      sentSecondRequest: observed.requests.length >= 2,
-      toolResultText: observed.toolResultText,
-      completedAfterCorrection: observed.result?.text === 'recorded after correction',
-      requestCount: observed.requests.length,
-    });
   }
 
   const enumMessage = 'Invalid option: expected one of ".github/workflows/ci.yml"|"playwright.config.mjs"|"scripts/ci-routing.mjs"|"scripts/ci-routing.test.mjs"';
@@ -147,5 +124,4 @@ test('real Mastra generate reports bad tool calls to the model and accepts a cor
   assert.equal(observations.get('03-execute-rejected').toolResultText, 'quote not found in file .github/workflows/ci.yml');
   assert.equal(observations.get('04-malformed-strict').toolResultText, observations.get('01-malformed').toolResultText);
   assert.equal(observations.get('05-schema-invalid-strict').toolResultText, observations.get('02-schema-invalid').toolResultText);
-  await writeFile(join(artifactDirectory, 'summary.json'), JSON.stringify({ cases: evidence }, null, 2));
 });
