@@ -16,9 +16,10 @@ Removed code provided semantic recall, saved reviewer messages, message
 history, vector storage and embeddings, internal-span export, a paid warn-only
 prompt-injection classifier, a DuckDB-backed cost brake, machine-wide usage
 reconciliation, shared trace retention, live format probes, and the direct
-single-shot CommandCode reviewer route. Their 10-12 October evidence remains in
-Git history and in the verified reset backup named in
-`claude/mastra-agents-design.md`; none remains as an executable fallback.
+single-shot CommandCode reviewer route. Their 10-12 October incident record
+remains in Git history and `claude/mastra-agents-design.md`; Todd's later 12 Oct
+decision deleted the disposable reset backup and artifacts. None remains as an
+executable fallback.
 
 Run the offline package suite with:
 

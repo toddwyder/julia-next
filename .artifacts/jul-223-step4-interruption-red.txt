@@ -1,1 +1,0 @@
-✖ interruption keeps accepted pieces and records their names in the technical failure (15024.1524ms)
