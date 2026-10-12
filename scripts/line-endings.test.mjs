@@ -18,7 +18,6 @@ test('.gitattributes sets LF for every text file, and for the files installed on
   const has = (pattern, ...attrs) => rules.some(([p, ...a]) => p === pattern && attrs.every((x) => a.includes(x)));
   assert.ok(has('*', 'text=auto', 'eol=lf'), 'the catch-all rule must be `* text=auto eol=lf`');
   assert.ok(has('*.sh', 'text', 'eol=lf'), 'shell scripts installed on the server must be LF');
-  assert.ok(has('ops/sudoers/*', 'text', 'eol=lf'), 'sudoers rules must be LF');
 });
 
 test('no tracked text file is committed with CRLF line endings', (t) => {

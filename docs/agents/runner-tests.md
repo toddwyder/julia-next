@@ -50,6 +50,10 @@ docs/policy checks keep their existing gates. The retired graph/controller sourc
 its tests and its free stand-in worker harness are deleted. Shared safety tests such
 as `graph/board-spec.test.mjs` and `scripts/bad-submissions.test.mjs` are discovered
 normally by this gate. New unwrapped shared regressions are automatically discovered.
+The unused OVH-only Python graph, Orca/ready-queue launch chain, controller/sudoers/
+daemon config and credential drop-box writer service are also deleted with their
+tests and suite inventory. The laptop-imported seat launchers and read-only secret
+boundary remain in this gate until the stage-three Mastra workflow replacement.
 Shared timeout coverage now exercises the current Windows
 process-tree behavior; obsolete Linux account-sweep assertions are removed.
 

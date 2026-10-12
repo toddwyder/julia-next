@@ -1,6 +1,5 @@
-// read-secret.mjs -- the only sanctioned way to read a value out of one of
-// the protected files under /etc/orca-runner/dropbox-secrets/ into this
-// process, for use directly as an in-process fetch() header value.
+// read-secret.mjs -- the retained read-only boundary for loading one known
+// field from the protected secret directory into this process.
 //
 // Never source, eval, or exec a secret file's content, and never pass it to
 // a child process as a shell command or argv entry. An incident on this
@@ -9,8 +8,8 @@
 // the token itself as a command -- "command not found" echoed the full
 // value into the calling agent's own tool output. readSecret() below is the
 // durable fix: it reads the file's bytes directly via readFileSync, strips
-// exactly the one trailing newline write-secret.sh's `cat` leaves (see
-// dropbox.mjs), and returns the value in-process. It performs no shell
+// exactly one trailing newline from the established file format, and returns
+// the value in-process. It performs no shell
 // interpretation of the content, under any circumstance, regardless of the
 // file's format -- this module must never shell out to read a secret (see
 // the static guard in read-secret.test.mjs).
@@ -29,10 +28,8 @@ export function readSecret(field, { dir = DEFAULT_DIR, readFileImpl = readFileSy
   }
   const raw = readFileImpl(`${dir}/${field}.env`, 'utf8');
   // Strip exactly one trailing newline, not arbitrary whitespace -- a token
-  // legitimately containing embedded whitespace would violate
-  // dropbox.mjs's own validateFieldShape invariant at write time, so any
-  // other whitespace surviving here is a sign something upstream is wrong,
-  // not something this function should silently absorb.
+  // Any other whitespace survives for the caller to validate; this read-only
+  // boundary must not silently normalize secret material.
   return raw.replace(/\n$/, '');
 }
 

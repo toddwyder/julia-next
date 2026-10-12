@@ -1,7 +1,7 @@
 // seat-table.mjs -- JUL-77: one place to choose each seat's tool and model,
 // with an ordered backup. No secrets live here -- entries name a launch
-// route (see scripts/julia-run.mjs and ops/service-dropbox/run-pi-seat.mjs
-// for how each route actually authenticates).
+// route (see scripts/julia-minimal-runner-adapters.mjs and
+// ops/service-dropbox/run-pi-seat.mjs for how retained routes authenticate).
 //
 // Rule enforced by assertCanPickDifferentFamilies: the ticket's real rule is
 // about the builder/reviewer models CHOSEN FOR ONE CARD, not about every
