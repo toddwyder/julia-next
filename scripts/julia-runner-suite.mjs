@@ -22,7 +22,6 @@ const HISTORICAL_TESTS = new Set([
 ]);
 const SEPARATE_MASTRA_REVIEWER_TESTS = new Set([
   'ops/mastra-agents/reviewer/test/contract.test.mjs',
-  'ops/mastra-agents/reviewer/test/free-proof.test.mjs',
   'ops/mastra-agents/reviewer/test/quote-check.test.mjs',
   'ops/mastra-agents/reviewer/test/repository-root.test.mjs',
 ]);

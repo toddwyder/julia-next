@@ -32,9 +32,10 @@ test('Windows provisioning parks after account creation followed by failed persi
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
-test('Windows vault wrapper has narrow review-only and opt-in format-probe operations', () => {
+test('Windows vault wrapper has only init and the narrow review-only operation', () => {
   const wrapper = readFileSync(fileURLToPath(new URL('./julia-vault-windows.ps1', import.meta.url)), 'utf8');
-  assert.match(wrapper, /ValidateSet\('init', 'startReviewOnly', 'probeCommandCodeFormats'\)/);
+  assert.match(wrapper, /ValidateSet\('init', 'startReviewOnly'\)/);
+  assert.doesNotMatch(wrapper, /probeCommandCodeFormats/);
   assert.match(wrapper, /julia-vault\.mjs'\) \$Operation @JuliaArguments/);
 });
 
@@ -124,16 +125,10 @@ test('vault launcher selects the review-only entry point only for startReviewOnl
   assert.deepEqual(call.args.slice(4), ['JUL-206', '--pr', '282']);
   assert.equal(call.options.env.COMMANDCODE_API_KEY, 'op://vault-id/item-id/key');
 });
-test('vault launcher permits only the explicit CommandCode format-probe entry point', () => {
-  let call;
-  const code = vaultLaunch(['--live'], {
-    entryPoint: 'julia-commandcode-format-probe.mjs', configuration: { vaultId: 'vault-id', opExecutable: 'op.exe', referencesPath: 'references.env' },
-    references: 'COMMANDCODE_API_KEY=op://vault-id/item-id/key\n',
-    run: (command, args, options) => { call = { command, args, options }; return { status: 0 }; },
-  });
-  assert.equal(code, 0);
-  assert.match(call.args[3], /julia-commandcode-format-probe\.mjs$/);
-  assert.deepEqual(call.args.slice(4), ['--live']);
+test('vault launcher rejects retired reviewer and arbitrary entry points', () => {
+  assert.throws(() => vaultLaunch([], {
+    entryPoint: 'julia-commandcode-format-probe.mjs', configuration: { vaultId: 'vault-id', referencesPath: 'references.env' }, references: 'COMMANDCODE_API_KEY=op://vault-id/item-id/key\n',
+  }), /unapproved Julia launcher entry point/);
   assert.throws(() => vaultLaunch([], {
     entryPoint: 'arbitrary.mjs', configuration: { vaultId: 'vault-id', referencesPath: 'references.env' }, references: 'COMMANDCODE_API_KEY=op://vault-id/item-id/key\n',
   }), /unapproved Julia launcher entry point/);

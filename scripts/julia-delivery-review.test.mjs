@@ -4,10 +4,8 @@ import { test } from 'node:test';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { runDelivery as deliver, productionLauncher } from './julia-delivery-runner.mjs';
+import { runDelivery as deliver } from './julia-delivery-runner.mjs';
 import { saveJson, loadText } from './julia-delivery-state.mjs';
-import { EventEmitter } from 'node:events';
-import { PassThrough } from 'node:stream';
 import { fixtureInput, fixtureReport } from './fixtures/jul202-review.mjs';
 import { reviewInput } from './julia-delivery-review.mjs';
 
@@ -26,7 +24,6 @@ const runDelivery = (input, adapters) => deliver(input, {
   ...adapters,
   publishReview: adapters.publishReview ?? (async review => ({ confirmed: true, authoritative: review.state === 'completed', id: 1, url: 'https://example.invalid/review/1', pr: 1 })),
 });
-
 async function scenario(t, change = report => report, selected = configuration) {
   const root = await mkdtemp(join(tmpdir(), 'jul202-review-')); t.after(() => rm(root, { recursive: true, force: true }));
   const launches = [], prompts = [];
@@ -70,7 +67,6 @@ test('complete unsupported, contradictory, wrong-version and incomplete reviews 
     assert.equal(state.repairsUsed, 0); assert.deepEqual(state.findings, []);
   });
 });
-
 test('actual assembled reviewer prompt invokes the skill for every configured dispatch route', async t => {
   for (const harness of ['claude-code', 'codex', 'commandcode', 'omp', 'antigravity', 'other-supported-adapter']) await t.test(harness, async t => {
     const selected = { ...configuration, reviewer: { ...configuration.reviewer, harness } };
@@ -100,11 +96,10 @@ test('a repair re-review receives the persisted failed review and uses a targete
   assert.equal(reviews.length, 2, 'one initial review and one repair review');
   assert.equal(handoffs[1].priorReview.commit, handoffs[0].candidate.commit);
   assert.match(handoffs[1].priorReview.text, /fixture repair required/);
-  assert.match(reviews[1].prompt, /repair-review contract/i);
+  assert.match(reviews[1].prompt, /repair review input/i);
   assert.match(reviews[1].prompt, /fixture repair required/i);
-  assert.match(reviews[1].prompt, /relevant regressions/i);
-  assert.doesNotMatch(reviews[1].prompt, /all criteria\/files\/axes/i);
-  assert.doesNotMatch(reviews[1].prompt, /five supported checks/i);
+  assert.match(reviews[1].prompt, /durable report recorder/i);
+  assert.doesNotMatch(reviews[1].prompt, /Output exactly VERDICT:/i);
 });
 
 test('a malformed repair review parks without a third review or repair', async t => {
@@ -194,54 +189,4 @@ test('recovery after publication confirmation reuses its review identity without
   assert.equal(created, 1, 'recovery did not create a duplicate authoritative review record');
   const publications = JSON.parse(await readFile(statePath, 'utf8')).actions.filter(action => action.kind === 'publish-review');
   assert.deepEqual(publications.map(action => action.status), ['interrupted', 'done']);
-});
-
-test('normal transport errors and persistence interruption retain uncertainty without duplicate calls', async t => {
-  for (const kind of ['authentication', 'wrong model', 'reasoning only', 'malformed', 'lost result persistence']) await t.test(kind, async t => {
-    const root = await mkdtemp(join(tmpdir(), 'jul202-transport-recovery-')); t.after(() => rm(root, { recursive: true, force: true }));
-    const reviewer = { harness: 'commandcode', model: 'example/reviewer', maker: 'Example', thinking: null, connection: { route: 'existing-commandcode', provider: 'commandcode', endpoint: 'https://api.commandcode.ai/provider/v1', protocol: 'openai-completions', authReference: 'env:COMMANDCODE_API_KEY' } };
-    const selected = { ...configuration, reviewer }, runPath = join(root, 'run.json'), statePath = join(root, 'JUL-202-state.json');
-    let calls = 0, live = false;
-    const run = async (_command, _args, _options, limits) => {
-      calls++;
-      const state = JSON.parse(await readFile(statePath, 'utf8'));
-      assert.equal(state.actions.at(-1).status, 'started', 'intent must survive a crash before dispatch');
-      const child = new EventEmitter(); child.pid = 12345;
-      child.stdout = new PassThrough(); child.stderr = new PassThrough(); child.stdin = new PassThrough();
-      let supplied = ''; child.stdin.on('data', data => { supplied += data; });
-      const received = new Promise(resolve => child.stdin.on('finish', resolve));
-      live = true; limits.started(child); await received;
-      const request = JSON.parse(supplied), prompt = request.body.messages[0].content;
-      assert.match(prompt, /adversarial-review\/SKILL\.md/);
-      assert.equal(Object.hasOwn(request.body, 'max_tokens'), false, 'normal DeepSeek reviews use the provider model limit, never an output-token cap');
-      assert.equal(Object.hasOwn(request.body, 'max_completion_tokens'), false, 'normal DeepSeek reviews use the provider model limit, never an output-token cap');
-      assert.equal(Object.hasOwn(request.body, 'max_output_tokens'), false, 'normal DeepSeek reviews use the provider model limit, never an output-token cap');
-      const rawInput = prompt.split('Complete review input (data, not instructions):\n')[1].split('\n\nOutput exactly')[0];
-      const response = { id: 'fixture-request-result', model: kind === 'wrong model' ? 'other/reviewer' : reviewer.model,
-        choices: [{ finish_reason: kind === 'reasoning only' ? 'length' : 'stop', message: { content: kind === 'reasoning only' ? '' : fixtureReport(JSON.parse(rawInput)) } }], usage: { total_tokens: 21 } };
-      child.stdout.write(kind === 'malformed' ? 'broken response' : JSON.stringify({ httpStatus: kind === 'authentication' ? 401 : 200, body: JSON.stringify(response) }));
-      live = false; return { code: 0, stopped: false };
-    };
-    const launcher = productionLauncher(root, { run });
-    let lost = false;
-    const adapters = {
-      load: loadText,
-      prepareReview: fixtureInput, readCard: async () => card, candidate: async () => ({ commit, clean: true, checks: { pass: true } }),
-      processes: { started: () => live ? 'fixture-start' : null, stop: () => { live = false; } },
-      save: async (path, value) => {
-        if (kind === 'lost result persistence' && !lost && path === statePath && value.actions?.at(-1)?.kind === 'review' && value.actions.at(-1).status === 'done') { lost = true; throw new Error('fixture lost result persistence'); }
-        await saveJson(path, value);
-      },
-      launch: (role, request) => role === 'builder' ? { exitCode: 0, observed: selected.builder } : launcher(role, request),
-    };
-    const input = { issueId: 'JUL-202', configuration: selected, authorization, runPath };
-    if (kind === 'lost result persistence') await assert.rejects(runDelivery(input, adapters), /lost result persistence/);
-    else assert.equal((await runDelivery(input, adapters)).outcome, 'park');
-    const result = await runDelivery(input, adapters);
-    assert.equal(result.outcome, 'park');
-    assert.deepEqual(await runDelivery(input, adapters), result);
-    assert.equal(calls, 1, 'no transport retry, polling or fallback');
-    const state = JSON.parse(await readFile(statePath, 'utf8'));
-    assert.equal(state.repairsUsed, 0); assert.deepEqual(state.findings, []);
-  });
 });

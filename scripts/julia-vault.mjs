@@ -72,7 +72,7 @@ export function vaultLaunch(args, { entryPoint = 'julia-init.mjs', configuration
   }
   // Resolve this validated snapshot, not a second read of the mutable file.
   // Omitted fields stay absent instead of falling back to stale plaintext.
-  if (!new Set(['julia-init.mjs', 'julia-review-only.mjs', 'julia-commandcode-format-probe.mjs']).has(entryPoint)) throw Error('unapproved Julia launcher entry point');
+  if (!new Set(['julia-init.mjs', 'julia-review-only.mjs']).has(entryPoint)) throw Error('unapproved Julia launcher entry point');
   const result = run(configuration.opExecutable ?? 'op', ['run', '--', process.execPath, fileURLToPath(new URL(`./${entryPoint}`, import.meta.url)), ...args], { stdio: 'inherit', env: { ...launchEnvironment, ...values }, windowsHide: true });
   if (result.error) throw Error('1Password launch failed; confirm the installed CLI and account access');
   return result.status ?? 1;
@@ -102,13 +102,11 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       await writeFile(referencesPath, Object.entries(report.references).map(([key, value]) => `${key}=${value}`).join('\n') + '\n');
       await writeFile(configurationPath, JSON.stringify({ vaultId: report.vaultId, referencesPath, opExecutable: process.env.JULIA_OP_EXECUTABLE ?? 'op' }, null, 2));
       console.log(JSON.stringify(report));
-    } else if (operation === 'init' || operation === 'startReviewOnly' || operation === 'probeCommandCodeFormats' || operation === 'verify') {
+    } else if (operation === 'init' || operation === 'startReviewOnly' || operation === 'verify') {
       const configuration = JSON.parse(await readFile(configurationPath, 'utf8'));
       const references = await readFile(configuration.referencesPath, 'utf8');
-      const entryPoint = operation === 'startReviewOnly' ? 'julia-review-only.mjs'
-        : operation === 'probeCommandCodeFormats' ? 'julia-commandcode-format-probe.mjs'
-          : 'julia-init.mjs';
+      const entryPoint = operation === 'startReviewOnly' ? 'julia-review-only.mjs' : 'julia-init.mjs';
       process.exitCode = operation === 'verify' ? vaultProbe({ configuration, references }) : vaultLaunch(args, { entryPoint, configuration, references });
-    } else throw Error('expected migrate, init, startReviewOnly, probeCommandCodeFormats, or verify');
+    } else throw Error('expected migrate, init, startReviewOnly, or verify');
   } catch (error) { console.error(error.message); process.exitCode = 1; }
 }

@@ -12,7 +12,7 @@ import { acquireRunLock, jsonText, loadText, processStarted, saveJson, sha256, s
 import { assertDeliveryPath, prepareDeliveryWorkspace, captureDeliveryCandidate } from './julia-delivery-candidate.mjs';
 import { LIMITS, runLimited } from '../ops/julia-runner/time-limit.mjs';
 import { reviewInput, reviewPrompt, checkedReview } from './julia-delivery-review.mjs';
-import { commandCodeReview, nativeReviewReply, validObserved } from './julia-delivery-review-transport.mjs';
+import { validObserved } from './julia-delivery-review-result.mjs';
 import { githubReviewPublisher } from './julia-delivery-review-publication.mjs';
 import { emitOperationalEvent } from '../lib/delivery-events.js';
 import { reviewProblems, rejectionHistory } from './julia-delivery-rejections.mjs';
@@ -185,10 +185,7 @@ export function productionLauncher(worktree, { run = runLimited, environment = p
       if (request.outputPath) await fileSave(request.outputPath, { role, configured, observed, startedAt, finishedAt: new Date().toISOString(), stdout, stderr, exitCode, technicalFailure, traceId: reply?.traceId ?? null, responseId: reply?.responseId ?? null, quotes: reply?.quotes ?? [], warnings: reply?.warnings ?? [] });
       return { exitCode, observed, text: reply?.text ?? technicalFailure ?? stderr, technicalFailure, outputPath: request.outputPath ?? null, responseId: reply?.responseId ?? null, traceId: reply?.traceId ?? null };
     }
-    if (role === 'reviewer' && configured.connection?.provider === 'commandcode') return commandCodeReview(request, {
-      run: (command, args, options, limits) => run(command, args, { ...options, env: { ...workerEnvironment, COMMANDCODE_API_KEY: environment.COMMANDCODE_API_KEY } }, limits),
-    });
-    if (role === 'reviewer' && configured.connection?.route && configured.connection.route !== 'native') return { exitCode: 2, observed: null, text: 'unsupported saved reviewer connection; native fallback is forbidden' };
+    if (role === 'reviewer') return { exitCode: 2, observed: null, text: 'Reviewer execution is disabled during the JUL-223 reset' };
     const cwd = role === 'builder' ? worktree : tmpdir();
     const startedAt = new Date().toISOString();
     // A worker whose executable cannot be found is recorded like one that could not be started.
@@ -223,11 +220,7 @@ export function productionLauncher(worktree, { run = runLimited, environment = p
       const model = events.find(event => event.type === 'assistant')?.message?.model ?? init?.model;
       if (model) identity = { harness: 'claude-code', model, maker: 'Anthropic' };
     }
-    let reply = output; let responseId = identityEvidence?.thread ?? null;
-    if (role === 'reviewer') {
-      const parsed = nativeReviewReply(configured.harness, output); reply = parsed.text; responseId = parsed.responseId;
-      if (parsed.error) failed ??= { operation: 'reviewer final reply', message: parsed.error };
-    }
+    const reply = output; const responseId = identityEvidence?.thread ?? null;
     const finishedAt = new Date().toISOString();
     const exitCode = result.stopped ? 124 : unrecorded || (role === 'reviewer' && failed) ? 1 : result.code ?? 1;
     // The worker's own streams are the evidence; nothing here is summarised.

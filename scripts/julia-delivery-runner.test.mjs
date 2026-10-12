@@ -28,7 +28,6 @@ test('native workers do not inherit release and telemetry operator credentials',
   await productionLauncher('fixture', { environment, findExecutable: () => 'fixture-worker', run: async (_command, _args, value) => { options = value; return { code: 1, stopped: false }; } })('builder', { configuration: configuration.builder, prompt: 'fixture' });
   assert.deepEqual(options.env, { PATH: 'fixture-path', OPENAI_API_KEY: 'worker-auth' });
 });
-
 test('Mastra reviewer technical failures preserve the raw-answer reason for the runner', async t => {
   const root = await mkdtemp(join(tmpdir(), 'jul223-runner-failure-'));
   t.after(() => import('node:fs/promises').then(({ rm }) => rm(root, { recursive: true, force: true })));
@@ -69,7 +68,6 @@ test('Mastra reviewer technical failures preserve the raw-answer reason for the 
   assert.equal(result.technicalFailure, reason);
   assert.equal(result.text, reason);
 });
-
 test('Mastra reviewer preserves a schema-valid INCONCLUSIVE fixture as the model verdict', async t => {
   const root = await mkdtemp(join(tmpdir(), 'jul223-runner-verdict-'));
   t.after(() => import('node:fs/promises').then(({ rm }) => rm(root, { recursive: true, force: true })));
@@ -686,38 +684,20 @@ test('a malformed Mastra answer parks with the saved technical-failure reason an
   assert.deepEqual(launches, ['builder', 'reviewer']);
 });
 
-test('normal CommandCode review transport uses the saved model and one journalled request', async t => {
-  const root = await mkdtemp(join(tmpdir(), 'jul202-transport-'));
-  t.after(() => import('node:fs/promises').then(({ rm }) => rm(root, { recursive: true, force: true })));
-  const selected = { harness: 'commandcode', model: 'example/reviewer-model', maker: 'Example', thinking: 'medium', builderMaker: 'OpenAI', connection: { route: 'existing-commandcode', provider: 'commandcode', endpoint: 'https://api.commandcode.ai/provider/v1', protocol: 'openai-completions', authReference: 'env:COMMANDCODE_API_KEY' } };
-  let calls = 0, given = '', recorded = false;
-  const run = async (command, args, options, limits) => {
-    calls++;
-    assert.equal(command, process.execPath);
-    assert.deepEqual(options.env, { PATH: 'fixture-path', COMMANDCODE_API_KEY: 'credential-value' });
-    assert.match(args[0], /julia-commandcode-request\.mjs$/);
-    assert.doesNotMatch(args.join(' '), /ssh|sudo|100\.125\.239\.98|ovh_runner/);
-    assert.doesNotMatch(args.join(' '), /reviewer-model|credential-value/);
-    const child = new EventEmitter(); child.pid = 12345;
-    child.stdout = new PassThrough(); child.stderr = new PassThrough(); child.stdin = new PassThrough();
-    child.stdin.on('data', data => { assert.equal(recorded, true); given += data; });
-    const supplied = new Promise(resolve => child.stdin.on('finish', resolve));
-    limits.started(child); await supplied;
-    const body = JSON.parse(given);
-    assert.equal(body.body.model, selected.model);
-    assert.match(body.body.messages[0].content, /adversarial-review\/SKILL\.md/);
-    child.stdout.write(JSON.stringify({ httpStatus: 200, body: JSON.stringify({ id: 'fixture-response-1', model: selected.model, choices: [{ finish_reason: 'stop', message: { content: 'fixture final reply' } }], usage: { total_tokens: 41 } }) }));
-    return { code: 0, signal: null, stopped: false };
-  };
-  const launch = productionLauncher(root, { run, environment: { PATH: 'fixture-path', COMMANDCODE_API_KEY: 'credential-value', LINEAR_API_KEY: 'operator-secret', OP_SERVICE_ACCOUNT_TOKEN: 'bootstrap-secret' } });
-  const result = await launch('reviewer', { configuration: selected, prompt: workerPrompt('reviewer', card, { ...configuration, reviewer: selected }, 'private-run', 'private-approved'), spending: { mode: 'fixture', maxUsd: 0 }, outputPath: join(root, 'result.json'), started: async () => { recorded = true; } });
-  assert.equal(calls, 1);
-  assert.equal(result.text, 'fixture final reply');
-  assert.deepEqual(result.observed, { harness: selected.harness, model: selected.model, maker: 'Example' });
-  const evidence = JSON.parse(await readFile(result.outputPath, 'utf8'));
-  assert.equal(evidence.responseId, 'fixture-response-1');
-  assert.equal(evidence.usage.total_tokens, 41);
-  assert.deepEqual(evidence.connection, selected.connection);
+test('retired direct reviewers stop locally without starting a process', async () => {
+  for (const selected of [
+    { harness: 'omp', model: 'example/reviewer-model', maker: 'Example', connection: { provider: 'commandcode' } },
+    { harness: 'claude-code', model: 'claude-sonnet', maker: 'Anthropic', connection: { route: 'native' } },
+  ]) {
+    let calls = 0;
+    const result = await productionLauncher(process.cwd(), { run: async () => { calls += 1; return { code: 0, stopped: false }; } })('reviewer', {
+      configuration: selected,
+      prompt: 'must not be sent',
+    });
+    assert.equal(calls, 0);
+    assert.equal(result.exitCode, 2);
+    assert.match(result.text, /disabled during the JUL-223 reset/);
+  }
 });
 
 test('Mastra launcher keeps an atomic verdict but surfaces a later worker failure', async t => {
@@ -759,28 +739,6 @@ test('same-company selection refuses before reviewer dispatch without imposing a
   assert.match(result.reason, /company|maker/);
 });
 
-test('native reviewer final replies reach verdict handling without JSON stream wrappers', async t => {
-  const root = await mkdtemp(join(tmpdir(), 'jul202-native-'));
-  t.after(() => import('node:fs/promises').then(({ rm }) => rm(root, { recursive: true, force: true })));
-  const final = 'VERDICT: INCONCLUSIVE\nREVIEW: {}';
-  const selected = { ...configuration.builder, maker: 'Anthropic', model: 'claude-sonnet', builderMaker: 'OpenAI' };
-  const run = async (_command, args, _options, limits) => {
-    assert.equal(args[args.indexOf('--tools') + 1], '', 'inline review requires no access to builder files or tools');
-    const child = new EventEmitter(); child.pid = 12345;
-    child.stdout = new PassThrough(); child.stderr = new PassThrough(); child.stdin = new PassThrough();
-    const supplied = new Promise(resolve => child.stdin.on('finish', resolve));
-    limits.started(child); await supplied;
-    child.stdout.write(JSON.stringify({ type: 'system', subtype: 'init', model: selected.model }) + '\n');
-    child.stdout.write(JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: final, session_id: 'fixture-native-review' }) + '\n');
-    return { code: 0, stopped: false, signal: null };
-  };
-  const result = await productionLauncher(root, { run, findExecutable: () => 'fixture-claude.exe' })('reviewer', { configuration: selected, prompt: 'inline supplied review', outputPath: join(root, 'native.json') });
-  assert.equal(result.text, final);
-  const evidence = JSON.parse(await readFile(result.outputPath, 'utf8'));
-  assert.match(evidence.stdout, /"type":"result"/);
-  assert.equal(evidence.responseId, 'fixture-native-review');
-});
-
 test('saved PM clarification is delivered in complete specification without rereading Linear', async () => {
   const clarified = { ...card, comments: { nodes: [{ id: 'pm-comment', body: 'PM-approved acceptance clarification: invoke the adversarial skill for all routes.' }], pageInfo: { hasNextPage: false } } };
   let specification;
@@ -791,27 +749,4 @@ test('saved PM clarification is delivered in complete specification without rere
   });
   assert.equal(result.outcome, 'pass');
   assert.match(specification, /PM-approved acceptance clarification: invoke/);
-});
-
-test('CommandCode accepts another saved model ID without imposing a model-company naming convention', async () => {
-  const selected = { harness: 'commandcode', model: 'catalog-model-v2', maker: 'Catalog Company', thinking: null, connection: { provider: 'commandcode', endpoint: 'https://api.commandcode.ai/provider/v1', protocol: 'openai-completions', authReference: 'env:COMMANDCODE_API_KEY' } };
-  const run = async (_command, _args, _options, limits) => {
-    const child = new EventEmitter(); child.pid = 12345;
-    child.stdout = new PassThrough(); child.stderr = new PassThrough(); child.stdin = new PassThrough();
-    const supplied = new Promise(resolve => child.stdin.on('finish', resolve)); limits.started(child); await supplied;
-    child.stdout.write(JSON.stringify({ httpStatus: 200, body: JSON.stringify({ id: 'other-model-result', model: selected.model, choices: [{ finish_reason: 'stop', message: { content: 'checked reply' } }] }) }));
-    return { code: 0, stopped: false };
-  };
-  const result = await productionLauncher(process.cwd(), { run })('reviewer', { configuration: selected, prompt: 'configured model fixture', spending: { mode: 'fixture', maxUsd: 0 } });
-  assert.equal(result.exitCode, 0, result.error);
-  assert.deepEqual(result.observed, { harness: selected.harness, model: selected.model, maker: selected.maker });
-});
-
-test('a saved API connection cannot silently launch a native reviewer', async () => {
-  let calls = 0;
-  const selected = { ...configuration.builder, connection: { route: 'api', provider: 'another-provider', endpoint: 'https://example.invalid/v1', protocol: 'openai-completions', authReference: 'reference-only' } };
-  const result = await productionLauncher(process.cwd(), { findExecutable: () => 'fixture-claude.exe', run: async () => { calls++; return { code: 1, stopped: false }; } })('reviewer', { configuration: selected, prompt: 'fixture' });
-  assert.equal(calls, 0);
-  assert.equal(result.exitCode, 2);
-  assert.match(result.text, /connection/);
 });
