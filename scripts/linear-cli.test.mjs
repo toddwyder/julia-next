@@ -230,7 +230,7 @@ test('postComment still posts a body that passes the guard', async () => {
 // ---------------------------------------------------------------------------
 // JUL-98 step 2, item 1: a refused call must be recognisable as an EXPIRED
 // TOKEN rather than as any other failure, so the controller can renew and retry
-// exactly once (graph/controller/token.mjs isAuthRefusal). A thrown Error whose
+// exactly once. A thrown Error whose
 // only content is a message string cannot carry that, so linearGraphQL attaches
 // the HTTP status and the parsed body to the error it throws.
 // ---------------------------------------------------------------------------

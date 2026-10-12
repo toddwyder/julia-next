@@ -1,8 +1,8 @@
 // julia-minimal-runner-brief.mjs -- what the minimal runner (JUL-122) tells
 // its two model workers, and how it reads their answers back.
 //
-// The rules are the committed Orca role files (.claude/skills/julia-builder
-// and independent reviewer, main at 8206fcd) mapped to today's separated workers,
+// The rules are the retained JUL-122 builder and independent-review contracts
+// mapped to today's separated workers,
 // not pasted: Gemini edits files and runs nothing, a test worker runs the
 // tests, the runner commits, and two DeepSeek sessions review one axis each
 // without access to the working copy. Kept (Todd, 24 Sep): per-criterion

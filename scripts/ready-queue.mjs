@@ -208,7 +208,7 @@ export function ineligibleCommentBody(issue, reasons) {
 const MAX_RUN_PAGES = 1000;
 
 // JUL-98 step 4: the SAME walk, returning the run it found rather than only a
-// boolean. The controller's own width-1 gate (graph/controller/core.mjs's
+// boolean. The retired controller's width-1 gate historically
 // `activeRunImpl`) has to name the card that is in flight, not just say that
 // one is; `isSlotBusy` keeps its boolean answer and its callers by delegating
 // here, so there is still exactly one walk of Orca's run list in the repo.
@@ -357,7 +357,7 @@ const TEAM_STATES_QUERY = `
 
 // JUL-98 step 2: `description` is here for the controller's third refusal --
 // does the card carry a `## UAT plan` section? The Ready queue itself does not
-// read it; the controller's board (graph/controller/board.mjs) shares this
+// read it; board callers share this
 // query and cannot judge a card without it.
 const READY_ISSUES_QUERY = `
   query ReadyQueueIssues($stateId: ID!) {
@@ -511,7 +511,7 @@ export function normalizeIssue(raw) {
     sortOrder: raw?.sortOrder,
     state: raw?.state ?? null,
     // Carried through for the controller's `## UAT plan` refusal
-    // (graph/controller/eligibility.mjs). Absent on a card Linear returned
+    // from the retired eligibility route. Absent on a card Linear returned
     // without one, which the refusal reads as "no plan".
     description: raw?.description ?? null,
     labels,

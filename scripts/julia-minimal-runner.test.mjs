@@ -262,7 +262,7 @@ test('red proof: a refactor that edits its seam test blocks the run', async () =
 test('DeepSeek gets the whole diff, the card, the code-review skill and the pinned standards, word for word', async () => {
   const fx = makeRepo();
   const bigLine = 'x'.repeat(100);
-  // About 100 KB: far past any cut-off, and under MAX_REVIEW_BYTES.
+  // About 100 KB: large enough to expose accidental truncation or refusal.
   const big = `${Array.from({ length: 900 }, (_, i) => `// ${i} ${bigLine}`).join('\n')}\n// END-OF-BIG-FILE\n`;
   const { adapters, calls } = fakes({ geminiTurn: (cwd) => { goodFix(cwd); write(cwd, 'scripts/big.mjs', big); } });
   const result = await run(fx, adapters);
@@ -280,23 +280,17 @@ test('DeepSeek gets the whole diff, the card, the code-review skill and the pinn
   rmSync(fx.root, { recursive: true, force: true });
 });
 
-// Three limits, one refusal: a review prompt over MAX_REVIEW_BYTES; one that
-// is short in characters but over it in bytes (the reviewer seat hands the
-// prompt to Pi as one argument, which Linux caps at 128 KiB: E2BIG, found
-// live 24 Sep); and a diff over the 1 MB Node's default git buffer would
-// have crashed on.
-for (const [limit, huge] of [['over the review size limit', `${'y'.repeat(120)}\n`.repeat(5000)], ['over the limit in bytes though not in characters', `${'é'.repeat(60)}\n`.repeat(1200)], ['over a megabyte', `${'z'.repeat(200)}\n`.repeat(6000)]]) {
-  test(`a diff ${limit} is refused with "split the card", on the card, and never reaches a review`, async () => {
-    const fx = makeRepo();
-    const { adapters, calls, comments } = fakes({ geminiTurn: (cwd) => { goodFix(cwd); write(cwd, 'scripts/huge.mjs', huge); } });
-    const result = await run(fx, adapters);
-    assert.equal(result.outcome, 'blocked');
-    assert.match(result.reason, /split the card/);
-    assert.equal(calls.deepseek.length, 0);
-    assert.match(comments.at(-1), /split the card/);
-    rmSync(fx.root, { recursive: true, force: true });
-  });
-}
+test('a review larger than the retired 130 KB cap reaches both review axes intact', async () => {
+  const fx = makeRepo();
+  const marker = 'END-OF-UNCAPPED-REVIEW';
+  const huge = `${'z'.repeat(200)}\n`.repeat(900) + marker;
+  const { adapters, calls } = fakes({ geminiTurn: (cwd) => { goodFix(cwd); write(cwd, 'scripts/huge.mjs', huge); } });
+  const result = await run(fx, adapters);
+  assert.equal(result.outcome, 'pr', result.reason);
+  assert.equal(calls.deepseek.length, 2);
+  for (const { prompt } of calls.deepseek) assert.ok(prompt.includes(marker), 'the uncapped review is complete');
+  rmSync(fx.root, { recursive: true, force: true });
+});
 
 test('review findings get exactly one correction round, with the findings in the second brief', async () => {
   const fx = makeRepo();

@@ -46,14 +46,11 @@ reasons and counts. Failures return nonzero; there is no baseline-failure waiver
 ## Non-runner tests and removed duplicates
 
 Factory and database gates were removed with the retired infrastructure. Web/browser and
-docs/policy checks keep their existing gates. Retired graph/controller tests remain historical
-checks outside this required runner gate, including the separate JUL-199 import
-and JUL-200 checkout failures. Five historical journeys import shared helpers but
-belong to that retained route: `graph/board-spec.test.mjs`,
-`scripts/bad-submissions.test.mjs`, `scripts/controller-board.test.mjs`,
-`scripts/controller-carry.test.mjs` and `scripts/stand-in-seat.test.mjs`. These
-exact paths are classified explicitly; new unwrapped shared regressions are
-automatically discovered. Shared timeout coverage now exercises the current Windows
+docs/policy checks keep their existing gates. The retired graph/controller source,
+its tests and its free stand-in worker harness are deleted. Shared safety tests such
+as `graph/board-spec.test.mjs` and `scripts/bad-submissions.test.mjs` are discovered
+normally by this gate. New unwrapped shared regressions are automatically discovered.
+Shared timeout coverage now exercises the current Windows
 process-tree behavior; obsolete Linux account-sweep assertions are removed.
 
 Removed exactly:

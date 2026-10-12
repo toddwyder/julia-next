@@ -112,7 +112,7 @@ def _post(url: str, data: bytes, headers: dict) -> dict:
 
 
 TEAM = 'Julia-next'
-# The app's token lives 30 days (graph/controller/token.mjs). A long-running
+# The app's token lives 30 days. A long-running
 # graph fetches a new one well before that, and at once if Linear refuses it.
 TOKEN_RENEW_SECONDS = 24 * 60 * 60
 

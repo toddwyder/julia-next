@@ -108,7 +108,7 @@ export const RATE_TABLE = {
     // {source,status,tool_calls,thinking,step_index,type,content,created_at};
     // the CLI log has no token line. Only `agy -p` (print mode) reports usage,
     // and a seat worker is interactive. So the allowance IS the figure, and
-    // graph/controller/cost.mjs's Gemini line carries it instead of tokens.
+    // Historical Gemini records carry allowance use instead of tokens.
     'gemini-3.8-flash': {
       vendor: 'gemini',
       billing: 'allowance',
@@ -205,9 +205,9 @@ export function costOf(model, usage = {}, { at = new Date() } = {}) {
     // A refusal, never a plausible zero. Nobody is billed a dollar for this
     // model, so any number here would be an invention; the figure that IS real
     // is the allowance the run drew down, which
-    // graph/controller/cost.mjs's geminiExtractFromAllowance computes from two
+    // The caller computes allowance use from two
     // `/usage` readings and puts on the seat's line.
-    throw new Error(`costOf: '${model}' is billed against a ${r.plan ?? 'subscription'} allowance (buckets: ${(r.allowanceBuckets ?? []).join(', ')}), not per token -- use the allowance used, which graph/controller/cost.mjs puts on the cost line`);
+    throw new Error(`costOf: '${model}' is billed against a ${r.plan ?? 'subscription'} allowance (buckets: ${(r.allowanceBuckets ?? []).join(', ')}), not per token -- supply the measured allowance used`);
   }
   throw new Error(`costOf: unknown vendor '${r.vendor}' for model '${model}'`);
 }

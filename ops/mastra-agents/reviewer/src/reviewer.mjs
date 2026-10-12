@@ -23,6 +23,10 @@ export const STANDING_RULES = `# Standing rules for the reviewer
 - Prefer stock Mastra features; flag custom code that duplicates one.
 - Flag missing tests and missing logging.`;
 
+export function reviewerInstructions(role, standards) {
+  return `${role}\n\n# Repository coding standards\n\n${standards}\n\n${STANDING_RULES}`;
+}
+
 const safePath = path => {
   if (!path || path.includes('..') || path.startsWith('/') || path.startsWith('\\')) throw new Error('unsafe repository path');
   return path;

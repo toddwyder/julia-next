@@ -77,15 +77,29 @@ test('new unwrapped shared safety regressions are discovered beside their import
   ]);
 });
 
-test('shared regressions run directly once while known historical controller journeys retain their separate lane', (t) => {
+test('shared regressions run directly once while known wrappers retain their separate lane', (t) => {
   const root = fixture(t, {
     'graph/seat-table.test.mjs': "import './seat-table.mjs';",
     'scripts/seat-table.test.mjs': "import '../graph/seat-table.test.mjs';",
     'scripts/bad-submissions.test.mjs': "import './acceptance-check.mjs';",
-    'scripts/controller-carry.test.mjs': "import './linear-cli.mjs';",
     'tests/new-shared-safety.test.mjs': "import '../scripts/acceptance-check.mjs';",
   });
-  assert.deepEqual(discoverRunnerTests(root), ['graph/seat-table.test.mjs', 'tests/new-shared-safety.test.mjs']);
+  assert.deepEqual(discoverRunnerTests(root), [
+    'graph/seat-table.test.mjs', 'scripts/bad-submissions.test.mjs', 'tests/new-shared-safety.test.mjs',
+  ]);
+});
+
+test('the full runner gate includes the retained reviewer contract, quote and repository-root checks', (t) => {
+  const root = fixture(t, {
+    'ops/mastra-agents/reviewer/test/contract.test.mjs': '',
+    'ops/mastra-agents/reviewer/test/quote-check.test.mjs': '',
+    'ops/mastra-agents/reviewer/test/repository-root.test.mjs': '',
+  });
+  assert.deepEqual(discoverRunnerTests(root), [
+    'ops/mastra-agents/reviewer/test/contract.test.mjs',
+    'ops/mastra-agents/reviewer/test/quote-check.test.mjs',
+    'ops/mastra-agents/reviewer/test/repository-root.test.mjs',
+  ]);
 });
 
 test('new transport and secret regressions are discovered beside shared modules with relative imports', (t) => {

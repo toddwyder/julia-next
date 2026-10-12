@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { runReviewer } from '../src/reviewer.mjs';
+import { reviewerInstructions, runReviewer, STANDING_RULES } from '../src/reviewer.mjs';
+
+test('the six standing rules are part of the fixed reviewer instructions', () => {
+  const instructions = reviewerInstructions('ADVERSARIAL ROLE', 'CODING STANDARDS');
+  assert.match(instructions, /ADVERSARIAL ROLE/);
+  assert.match(instructions, /CODING STANDARDS/);
+  for (const rule of STANDING_RULES.split('\n').slice(1)) assert.ok(instructions.includes(rule), rule);
+});
 
 test('the stage-one reset refuses reviewer execution before any provider request', async () => {
   const originalKey = process.env.COMMANDCODE_API_KEY;

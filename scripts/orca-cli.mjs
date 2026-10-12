@@ -111,7 +111,7 @@ async function defaultExecImpl(bin, args) {
 // `worker-release`, `worktree rm`, `worktree ps`) and for the ones that need
 // `--retry-request`, Orca's own idempotency flag.
 //
-// It is exported rather than copied into graph/controller/wiring.mjs so that
+// It is exported so callers share one response-shape boundary and
 // the envelope unwrapping, the `.code` on a structured failure, and the
 // ORCA_BIN rule all keep exactly one home. Callers build the argv; everything
 // about how an answer or a refusal is read stays here.

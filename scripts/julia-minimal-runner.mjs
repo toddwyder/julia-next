@@ -73,11 +73,6 @@ export function seamsOf(description) {
 const SKILL_FILES = ['.claude/skills/implement/SKILL.md', '.claude/skills/tdd/SKILL.md', '.claude/skills/tdd/tests.md', '.claude/skills/tdd/mocking.md'];
 const pinnedText = (repoRoot, base, paths) => paths.map((path) => `<file path="${path}">\n${git(repoRoot, 'show', `${base}:${path}`)}\n</file>`).join('\n\n');
 
-// One review is one prompt; above this size it is refused, never cut short.
-// The reviewer seat (run-pi-seat.mjs) hands the prompt to Pi as one command
-// argument, and Linux caps one argument at 128 KiB (E2BIG, measured 24 Sep),
-// so the limit is in bytes and just under that.
-export const MAX_REVIEW_BYTES = 130_000;
 // The repo's documented standards: the three it has, plus the two files the
 // code-review skill names, whenever the start commit has them.
 const STANDARDS_FILES = ['CLAUDE.md', 'AGENTS.md', 'eslint.config.mjs'];
@@ -178,8 +173,6 @@ export async function runIssue(issueId, { base, repoRoot, worktreeRoot, adapters
       diff: git(worktree, 'diff', `${base}...${sha}`),
     };
     const prompts = { spec: reviewPrompt('spec', material), standards: reviewPrompt('standards', material) };
-    const longest = Math.max(Buffer.byteLength(prompts.spec), Buffer.byteLength(prompts.standards));
-    if (longest > MAX_REVIEW_BYTES) return { failure: `the review would be ${longest} bytes, over the ${MAX_REVIEW_BYTES}-byte limit for one review; split the card` };
     const verdicts = {};
     const reports = {};
     // The two axes run one after the other, each in its own DeepSeek session:
