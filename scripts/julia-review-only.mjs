@@ -32,6 +32,10 @@ export function authorizedReviewConfiguration() {
   };
 }
 
+export function authorizedReviewSpending() {
+  return { builder: { mode: 'subscription', maxUsd: 0 }, reviewer: { mode: 'paid', maxUsd: 0.50 } };
+}
+
 export async function runReviewOnly(args, { root = resolve(fileURLToPath(new URL('..', import.meta.url))), stateDirectory = process.env.JULIA_RUN_DIRECTORY ?? join(homedir(), '.julia', 'runs'), start = startReviewOnly } = {}) {
   const { issueId, pullRequest } = parseReviewOnlyCommand(args);
   const target = JSON.parse(execute('gh', ['pr', 'view', String(pullRequest), '--json', 'headRefOid'], { cwd: root }));
@@ -44,7 +48,7 @@ export async function runReviewOnly(args, { root = resolve(fileURLToPath(new URL
   try {
     const checksText = execute('gh', ['pr', 'checks', String(pullRequest), '--required'], { cwd: root });
     const configuration = authorizedReviewConfiguration();
-    const authorization = { issueId, explicitStart: true, authorizedBy: 'Todd: JUL-206 reviewer authorization', spending: { builder: { mode: 'subscription', maxUsd: 0 }, reviewer: { mode: 'paid', maxUsd: 1 } }, configuration };
+    const authorization = { issueId, explicitStart: true, authorizedBy: 'Todd: JUL-206 reviewer authorization', spending: authorizedReviewSpending(), configuration };
     return await start(issueId, configuration, {
       pullRequest, workspace: { path: workspace },
       checks: { pass: true, summary: 'GitHub required checks passed' },

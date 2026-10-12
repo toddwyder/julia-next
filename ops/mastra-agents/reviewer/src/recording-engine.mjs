@@ -1,26 +1,16 @@
 import { createTool } from '@mastra/core/tools';
-import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, open, readdir, readFile, rename, rm } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { createHash } from 'node:crypto';
+import { mkdir, readdir, readFile, rm } from 'node:fs/promises';
+import { join } from 'node:path';
 import { z } from 'zod/v4';
+import { durableWrite } from './run-file.mjs';
 
 const toolError = problems => ({
   error: true,
   message: Array.isArray(problems) ? problems.join('\n') : String(problems),
 });
 
-export async function durableWrite(path, content) {
-  await mkdir(dirname(path), { recursive: true });
-  const temporaryPath = `${path}.${randomUUID()}.tmp`;
-  const file = await open(temporaryPath, 'wx');
-  try {
-    await file.writeFile(content);
-    await file.sync();
-  } finally {
-    await file.close();
-  }
-  await rename(temporaryPath, path);
-}
+export { durableWrite } from './run-file.mjs';
 
 const fileForKey = (directory, key) => join(directory, `${createHash('sha256').update(key).digest('hex')}.json`);
 

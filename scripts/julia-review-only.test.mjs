@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { authorizedReviewConfiguration, parseReviewOnlyCommand } from './julia-review-only.mjs';
+import { authorizedReviewConfiguration, authorizedReviewSpending, parseReviewOnlyCommand } from './julia-review-only.mjs';
 
 test('startReviewOnly accepts only a card and an existing pull request', () => {
   assert.deepEqual(parseReviewOnlyCommand(['JUL-206', '--pr', '282']), { issueId: 'JUL-206', pullRequest: 282 });
@@ -15,4 +15,8 @@ test('review-only configuration keeps the authorized per-card cap out of prompts
   assert.equal(configuration.reviewer.connection.protocol, 'openai-completions');
   assert.equal(configuration.reviewer.connection.authReference, 'env:COMMANDCODE_API_KEY');
   assert.equal('maxOutputTokens' in configuration.reviewer, false);
+  assert.deepEqual(authorizedReviewSpending(), {
+    builder: { mode: 'subscription', maxUsd: 0 },
+    reviewer: { mode: 'paid', maxUsd: 0.50 },
+  });
 });

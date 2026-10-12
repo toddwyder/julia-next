@@ -1,8 +1,8 @@
 # Julia Mastra reviewer
 
-JUL-223 stage one has reset this package to its proven seams. Paid reviewer
-execution is deliberately disabled until the later offline build and proof
-stages supply the replacement budget and model-event interfaces.
+JUL-223 stage three is rebuilding paid reviewer execution from the proven
+stage-one seams. Paid execution remains disabled until the separately
+authorized model-specific opt-in gate passes.
 
 Retained code provides:
 
@@ -11,6 +11,15 @@ Retained code provides:
 - exact changed-file and evidence-quote checks;
 - raw provider-response capture before parsing; and
 - interruption progress that records accepted report pieces.
+
+The stage-three offline runtime now adds:
+
+- stock Mastra turn, output, per-request, and 20-minute total bounds;
+- a durable pre-dispatch `$0.50` cost and elapsed-time reservation ledger;
+- one bounded provider-boundary journal for requests, exact raw replies, and
+  validated usage; and
+- one shared atomic run-file writer for the recorder, budget, journal, and raw
+  response evidence.
 
 Removed code provided semantic recall, saved reviewer messages, message
 history, vector storage and embeddings, internal-span export, a paid warn-only
@@ -27,5 +36,5 @@ Run the offline package suite with:
 npm test
 ```
 
-The `review` script currently exits locally with the reset-disabled reason. It
-must not be used for delivery until JUL-223's later offline gates pass.
+The `review` script still exits locally with the reset-disabled reason. It must
+not be used for delivery until the model-specific opt-in gate passes.

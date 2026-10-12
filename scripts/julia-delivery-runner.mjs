@@ -159,12 +159,12 @@ export function productionLauncher(worktree, { run = runLimited, environment = p
       const script = resolve(worktree, 'ops', 'mastra-agents', 'reviewer', 'src', 'reviewer.mjs');
       const verdictPath = `${request.outputPath}.verdict.json`;
       const result = await run(process.execPath, [script], { cwd: dirname(script), stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, env: { ...workerEnvironment, COMMANDCODE_API_KEY: environment.COMMANDCODE_API_KEY } }, {
-        seconds: LIMITS.builder.max,
+        seconds: 20 * 60,
         started: child => {
           child.stdout.on('data', chunk => { stdout += chunk; }); child.stderr.on('data', chunk => { stderr += chunk; }); child.stdin.on('error', () => {});
           Promise.resolve(request.started?.({ pid: child.pid })).then(() => {
             recorded = true;
-            child.stdin.end(JSON.stringify({ issueId: request.issueId, runId: request.runId ?? basename(dirname(request.outputPath ?? verdictPath)), repoRoot: request.repoRoot ?? worktree, candidate: request.candidate, input: request.reviewInput, configuration: configured, round: request.round, verdictPath }));
+            child.stdin.end(JSON.stringify({ issueId: request.issueId, runId: request.runId ?? basename(dirname(request.outputPath ?? verdictPath)), repoRoot: request.repoRoot ?? worktree, candidate: request.candidate, input: request.reviewInput, configuration: configured, spending: request.spending, round: request.round, verdictPath }));
           }, () => child.kill());
         },
       });

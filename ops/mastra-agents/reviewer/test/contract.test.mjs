@@ -1,15 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_REVIEWER, requireCompleteFileReview, reviewPromptContract, reviewStepBudget, requestWithoutOutputCap, reviewerConfiguration } from '../src/contract.mjs';
+import { DEFAULT_REVIEWER, requireCompleteFileReview, reviewGenerationOptions, reviewPromptContract, reviewStepBudget, reviewerConfiguration } from '../src/contract.mjs';
 import { captureCommandCodeResponse, commandCodeMetadata, reviewedFilesSchema } from '../src/reviewer.mjs';
 import { commandCodeCostEstimate } from '../src/commandcode-cost.mjs';
 
-test('the reviewer defaults to CommandCode DeepSeek Flash and never sends an output cap', () => {
+test('the reviewer uses the approved stock generation bounds', () => {
   assert.deepEqual(DEFAULT_REVIEWER.model, 'deepseek/deepseek-v4.1-flash');
-  const body = requestWithoutOutputCap({ model: DEFAULT_REVIEWER.model, max_tokens: 12, max_completion_tokens: 13, max_output_tokens: 14 });
-  assert.equal('max_tokens' in body, false);
-  assert.equal('max_completion_tokens' in body, false);
-  assert.equal('max_output_tokens' in body, false);
+  assert.deepEqual(reviewGenerationOptions(['a.mjs'], ['criterion']), {
+    maxSteps: 40,
+    modelSettings: {
+      maxOutputTokens: 4096,
+      timeout: { totalMs: 1_200_000, stepMs: 120_000 },
+    },
+  });
 });
 
 test('reviewer step budget follows the immutable file inventory and contract phases', () => {

@@ -4,14 +4,16 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod/v4';
 import { execFile } from 'node:child_process';
-import { mkdir, open, readFile, rename } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import { randomUUID } from 'node:crypto';
 import { verifyEvidenceQuote } from './quote-check.mjs';
-import { requestWithoutOutputCap } from './contract.mjs';
 import { commandCodeCostEstimate } from './commandcode-cost.mjs';
+import { reviewGenerationOptions } from './contract.mjs';
+import { createModelJournal } from './model-journal.mjs';
+import { createReviewBudget } from './review-budget.mjs';
+import { durableWrite } from './run-file.mjs';
 
 const exec = promisify(execFile);
 export { envelopeFor, reviewedFilesSchema } from './reviewer-report.mjs';
@@ -57,29 +59,20 @@ export function captureCommandCodeResponse(body) {
   const capturedAt = new Date();
   const estimate = commandCodeCostEstimate(body?.usage, capturedAt);
   if (typeof body?.id !== 'string' || !body.id) throw new Error('reviewer refused: CommandCode response identity is missing or unknown');
-  const captured = { usage: body.usage, capturedAt, estimate };
+  const captured = { responseId: body.id, usage: body.usage, capturedAt, estimate };
   rawUsageByResponseId.set(body.id, captured);
   return captured;
 }
 
-async function durableWrite(path, content) {
-  await mkdir(dirname(path), { recursive: true });
-  const temporaryPath = `${path}.${randomUUID()}.tmp`;
-  const file = await open(temporaryPath, 'wx');
-  try {
-    await file.writeFile(content);
-    await file.sync();
-  } finally {
-    await file.close();
-  }
-  await rename(temporaryPath, path);
-}
-
-export async function checkedFetch(url, init, recordCost = async () => {}, rawAnswer = null) {
-  if (init?.body) init = { ...init, body: JSON.stringify(requestWithoutOutputCap(JSON.parse(String(init.body)))) };
+export async function checkedFetch(url, init, recordCost = async () => {}, rawAnswer = null, beforeRequest = async () => {}, recordModelEvent = async () => {}) {
+  const requestBody = init?.body ? JSON.parse(String(init.body)) : {};
+  await beforeRequest(requestBody);
+  await recordModelEvent({ kind: 'request', body: requestBody });
   const response = await fetch(url, init);
+  const rawBody = await response.clone().text();
+  await recordModelEvent({ kind: 'response', raw: rawBody });
   let body;
-  try { body = await response.clone().json(); }
+  try { body = JSON.parse(rawBody); }
   catch { throw new Error('reviewer refused: CommandCode response token usage is missing or unknown'); }
   const choice = body?.choices?.[0];
   const rawText = choice?.message?.content;
@@ -91,6 +84,7 @@ export async function checkedFetch(url, init, recordCost = async () => {}, rawAn
     rawAnswer.responseId = typeof body?.id === 'string' ? body.id : null;
   }
   const captured = captureCommandCodeResponse(body);
+  await recordModelEvent({ kind: 'usage', responseId: captured.responseId, usage: captured.usage, estimate: captured.estimate });
   await recordCost(captured);
   return response;
 }
@@ -141,6 +135,20 @@ export async function generateRecordedReview({ agent, prompt, generationOptions,
 export function rawAnswerPathFor(verdictPath, runId, candidateCommit) {
   const safeFilePart = value => String(value).replace(/[^a-zA-Z0-9._-]/g, '_');
   return resolve(dirname(verdictPath), `${safeFilePart(runId)}.${safeFilePart(candidateCommit)}.reviewer-raw.txt`);
+}
+
+export async function createReviewerRuntime({ runDirectory, input, spending, startedAt = Date.now(), now = Date.now, verdictSaved = () => false }) {
+  if (spending?.mode !== 'paid' || spending.maxUsd !== 0.50) {
+    throw new Error('reviewer refused: runtime requires the approved $0.50 paid limit');
+  }
+  const warnings = [];
+  const budget = await createReviewBudget({ path: join(runDirectory, 'review-budget.json'), maxUsd: spending.maxUsd, startedAt, now });
+  const journal = await createModelJournal({ path: join(runDirectory, 'model-events.json'), verdictSaved, warnings });
+  return {
+    generationOptions: reviewGenerationOptions(input.files, input.criteria),
+    fetch: (url, init, rawAnswer = null) => checkedFetch(url, init, budget.recordResponse, rawAnswer, budget.beforeRequest, journal.record),
+    warnings,
+  };
 }
 
 export async function runReviewer() {

@@ -15,14 +15,6 @@ export function reviewerConfiguration(configuration = {}) {
   return resolved;
 }
 
-export function requestWithoutOutputCap(body) {
-  const request = { ...body };
-  delete request.max_tokens;
-  delete request.max_completion_tokens;
-  delete request.max_output_tokens;
-  return request;
-}
-
 export function reviewPromptContract(input) {
   return {
     ...input,
@@ -45,6 +37,16 @@ export function reviewStepBudget(changedFiles, criteria) {
   return (changedFiles.length + criteria.length + 3)
     + (changedFiles.length + criteria.length + 15) * 2
     + 1;
+}
+
+export function reviewGenerationOptions(changedFiles, criteria) {
+  return {
+    maxSteps: reviewStepBudget(changedFiles, criteria),
+    modelSettings: {
+      maxOutputTokens: 4096,
+      timeout: { totalMs: 20 * 60 * 1000, stepMs: 2 * 60 * 1000 },
+    },
+  };
 }
 
 export function requireCompleteFileReview(changedFiles, reviewedFiles) {

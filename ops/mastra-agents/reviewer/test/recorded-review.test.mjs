@@ -10,6 +10,7 @@ import { Agent } from '@mastra/core/agent';
 import { resolveModelConfig } from '@mastra/core/llm';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { checkedReview } from '../../../../scripts/julia-delivery-review.mjs';
+import { reviewGenerationOptions } from '../src/contract.mjs';
 import { evidenceCitations } from '../src/quote-check.mjs';
 import { createReviewerReportRecorder, reviewerEnvelopeText } from '../src/reviewer-report.mjs';
 import { checkedFetch } from '../src/reviewer.mjs';
@@ -127,7 +128,7 @@ test('real Agent.generate records a complete review and recovers each scripted r
     id: 'jul223-recorded-review', name: 'JUL-223 recorded review', model,
     instructions: 'Record small pieces, correct tool errors, and submit.', tools: recorder.tools,
   });
-  const result = await agent.generate('Record the review.', { maxSteps: 20 });
+  const result = await agent.generate('Record the review.', reviewGenerationOptions(input.files, input.criteria));
 
   assert.equal(result.text, 'The report was submitted from its recorded pieces.');
   assert.match(rawSeenBeforeVerdict, /"name":"submit_report"/);
@@ -140,6 +141,7 @@ test('real Agent.generate records a complete review and recovers each scripted r
     error: true, message: 'Evidence quote was not found word for word in standards: quote that is not in the candidate',
   });
   assert.match(JSON.parse(api.requests[7].messages.find(message => message.tool_call_id === 'early-submit').content).message, /Report is incomplete\. Missing:/);
+  assert.ok(api.requests.every(request => request.max_tokens === 4096));
   assert.deepEqual(checkedReview(reviewerEnvelopeText(submitted), input), { error: 'inconclusive review: reviewer could not establish a verdict' });
 });
 

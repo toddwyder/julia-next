@@ -85,6 +85,7 @@ test('Mastra reviewer preserves a schema-valid INCONCLUSIVE fixture as the model
     const stdin = new EventEmitter();
     stdin.end = requestText => {
       const request = JSON.parse(requestText);
+      assert.deepEqual(request.spending, { mode: 'paid', maxUsd: 0.50 });
       writeFile(request.verdictPath, `${JSON.stringify({ text, observed: { harness: reviewer.harness, model: reviewer.model, maker: reviewer.maker } })}\n`);
     };
     stdin.on = stdin.addListener.bind(stdin);
@@ -100,6 +101,7 @@ test('Mastra reviewer preserves a schema-valid INCONCLUSIVE fixture as the model
     candidate: { base: 'b'.repeat(40), commit: repaired.report.candidate },
     reviewInput: { candidate: repaired.report.candidate, digest: repaired.report.inputDigest, files: repaired.report.filesReviewed, criteria: repaired.report.criteria.map(item => item.criterion) },
     configuration: reviewer,
+    spending: { mode: 'paid', maxUsd: 0.50 },
     outputPath,
     started: async () => {},
   });
@@ -706,7 +708,7 @@ test('Mastra launcher keeps an atomic verdict but surfaces a later worker failur
   const outputPath = join(root, 'review.json');
   const verdict = { text: 'VERDICT: PASS\nREVIEW: {}', observed: { harness: 'mastra-commandcode', model: 'fixture-model', maker: 'Fixture' }, traceId: 'trace-fixture', responseId: 'response-fixture', quotes: [], warnings: [] };
   const run = async (_command, _args, _options, limits) => {
-    assert.equal(limits.seconds, 3 * 60 * 60, 'large evidence reviews receive the bounded three-hour worker cap');
+    assert.equal(limits.seconds, 20 * 60, 'review execution has the approved twenty-minute process backstop');
     const child = new EventEmitter(); child.pid = 12345;
     child.stdout = new PassThrough(); child.stderr = new PassThrough(); child.stdin = new PassThrough();
     limits.started(child);
