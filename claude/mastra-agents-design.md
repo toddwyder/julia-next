@@ -54,16 +54,19 @@ The reviewer adapter supplies only reviewer schemas and checks; the engine has n
 reviewer concepts. A packing-list schema proves that separation. The builder's
 hand-off report moves later, in a separate step.
 
-Stock Mastra was checked first. Final structured output was rejected because the
-Step 3b provider route does not enforce it. Schema-based working memory was
-checked and rejected: its resource scope spans reviews, it conflicts with the
-reviewer's existing template-mode standing-rules memory, and an update replaces
-whole arrays rather than durably recording independent per-run pieces. Built-in
-task tools and workflow snapshots were also checked: they model task state and
-workflow execution, not schema-parametric report assembly or the unchanged
-runner verdict. Stock `createTool` schemas and Mastra's tool-error-to-model loop
-remain the validation and recovery boundary; only durable piece storage and
-assembly are custom ([installed tools guide](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/docs-agents-tools.md), [installed `createTool` reference](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/reference-tools-create-tool.md), [installed structured-output guide](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/docs-agents-structured-output.md), [installed working-memory guide](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/docs-memory-working-memory.md)). Any agent and any tool-calling model can use the engine; a new model must pass the opt-in probe before use. During reset this is enforced by the local execution refusal plus the full-suite offline recorder probe; removing the refusal for a different model requires a model-specific opt-in result.
+Stage two re-checked stock Mastra against the current Agent-through-CommandCode
+route. The earlier Step 3b rejection no longer applies: installed Mastra can
+combine tools with structured output by injecting the schema into the prompt
+when the OpenAI-compatible connection does not advertise native structured
+output. The offline audit probe demonstrated that combination. It still does
+not replace the recorder: final structured output is validated only at the end
+of the run, while this reviewer must fsync each accepted piece before another
+provider call and retain those pieces after process death. Output processors
+likewise transform or reject model output but do not supply atomic per-piece
+run-file storage. Stock `createTool` schemas and Mastra's tool-error-to-model
+loop remain the validation and recovery boundary; durable piece storage,
+domain completeness checks and deterministic assembly stay custom
+([installed tools guide](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/docs-agents-tools.md), [installed `createTool` reference](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/reference-tools-create-tool.md), [installed structured-output guide](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/docs-agents-structured-output.md), [installed processor interface](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/reference-processors-processor-interface.md)). Any agent and any tool-calling model can use the engine; a new model must pass the opt-in probe before use. During reset this is enforced by the local execution refusal plus the full-suite offline recorder probe; removing the refusal for a different model requires a model-specific opt-in result.
 
 The `maxSteps` budget is derived, not guessed. Reading and analysis receive
 `files + criteria + 3` calls (inventory, diff and quote review included). Every
@@ -298,6 +301,174 @@ including malformed tool JSON, correction, durable pieces and submission. It is
 now part of the full runner suite. Because `runReviewer` still refuses before a
 provider request, a new model cannot enter the live loop; restoring live
 execution requires a separately authorized model-specific opt-in recorder probe.
+
+### JUL-223 stage-two stock-feature audit (12 Oct 2026)
+
+This appendix re-checks every custom part against the current route: a Mastra
+`Agent` using the existing OpenAI-compatible CommandCode connection. It replaces
+the older Step 3b assumptions where they differ. The plain-English decision
+table is in `claude/jul-223-stage2-audit.md`; the detailed research notes are in
+`claude/jul-223-stage2-research.md`.
+
+#### Package currency
+
+The lockfile installs `@mastra/core` 1.75.0. On 12 Oct, the official npm `latest`
+tag reported 1.76.0 ([npm registry package record](https://registry.npmjs.org/@mastra%2fcore/latest)).
+The 1.76.0 package changelog adds durable-agent run ownership and fencing plus a
+workspace argument for `processLLMRequest`; it adds no file exporter, exact
+pre-call cost reservation, immutable-Git read tool, or file-backed workflow
+snapshot ([official 1.76.0 changelog](https://github.com/mastra-ai/mastra/blob/%40mastra/core%401.76.0/packages/core/CHANGELOG.md)).
+Run fencing is relevant to a future database-backed durable-agent design, but
+the current rule is that run files own execution state. Do not upgrade during
+stage three merely for this audit result.
+
+#### Recording engine and report adapter
+
+- **Stock checked:** `structuredOutput`, its `jsonPromptInjection` fallback and
+  its tools-plus-structured-output guidance ([installed structured-output
+  guide](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/docs-agents-structured-output.md));
+  agent output processors ([installed processor interface](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/reference-processors-processor-interface.md));
+  and `createTool` input/output schemas and validation failures
+  ([installed tools guide](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/docs-agents-tools.md),
+  [installed `createTool` reference](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/reference-tools-create-tool.md)).
+- **Tried:** `node --test audit/jul-223-stage2-stock.test.mjs` used installed
+  `Agent.generate()`, `createTool`, and the installed OpenAI-compatible provider
+  against a local HTTP stand-in. With native structured output disabled, inline
+  schema injection remained combined with tools, made two model steps, executed
+  the tool, omitted `response_format`, and returned the validated object. PASS.
+  `test/tool-input-failure.test.mjs` also proved that malformed and
+  schema-invalid tool inputs become correction messages and can be retried. PASS.
+- **Verdict:** **stock plus a small custom part**. Stock owns tool-input schema
+  validation, the correction loop and, when useful, final object validation.
+  The exact gap is that structured output validates only the final result and
+  output processors operate on model output; neither fsyncs each accepted
+  semantic report piece before the next provider request, restores those pieces
+  after process death, enforces Julia's exact-set/evidence rules, or assembles
+  the existing verdict envelope. `recording-engine.mjs` and
+  `reviewer-report.mjs` therefore stay. The engine's direct tool-execution seam
+  can be called without the Agent runtime, so its defensive parse remains part
+  of that public module contract rather than relying solely on Agent dispatch.
+
+#### Pre-call spending and time limit
+
+- **Stock checked:** `maxSteps`, `stopWhen`, and `modelSettings.timeout`
+  ([installed generate reference](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/reference-agents-generate.md));
+  `TokenLimiterProcessor` ([installed token-limiter reference](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/reference-processors-token-limiter-processor.md));
+  and `TokenCostControl` ([installed cost-control reference](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/reference-processors-token-cost-control.md)).
+- **Result:** docs are decisive, so no runtime probe was needed. `maxSteps` and
+  `stopWhen` bound iterations, and `totalMs` supplies a hard run deadline.
+  `TokenLimiterProcessor` trims or aborts by token count, not price. The stock
+  cost control explicitly queries observability storage, sees asynchronously
+  persisted past cost, can overshoot, and fails open when required context or a
+  query is unavailable. None reserves the conservative maximum cost or duration
+  of the request about to be sent.
+- **Verdict:** **stock plus a small custom part**. Configure the derived stock
+  step ceiling and the 20-minute stock total timeout, while the outer runner
+  retains its process kill. Keep a small file-backed pre-call ledger that adds
+  spent validated usage to the pending request's conservative maximum and
+  refuses before dispatch. It must have no observability/database dependency.
+
+#### Model log
+
+- **Stock checked:** model-generation span inputs/outputs and custom exporters,
+  with internal spans disabled ([installed tracing configuration](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/reference-observability-tracing-configuration.md),
+  [installed tracing interfaces](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/reference-observability-tracing-interfaces.md));
+  `onStepFinish`, `onFinish`, returned steps/request/response/tool calls and usage
+  ([installed generate reference](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/reference-agents-generate.md));
+  and the provider's injectable `fetch` plus raw-response metadata extractor
+  ([installed OpenAI-compatible provider guide](../ops/mastra-agents/reviewer/node_modules/@ai-sdk/openai-compatible/docs/index.mdx)).
+- **Result:** the stock exporters listed by Mastra write to Mastra storage,
+  Mastra Platform or third parties; there is no stock file exporter.
+  `onStepFinish` is documented as unavailable for non-streaming structured
+  output and occurs after a step, so it cannot guarantee raw-before-parse
+  capture. The provider hook does expose the exact boundary but file format,
+  size enforcement, atomicity and non-blocking failure policy remain application
+  work.
+- **Verdict:** **keep custom**. The exact gap is one bounded, file-backed,
+  provider-boundary journal that persists prompt, raw reply, tool calls and
+  validated usage exactly once, without a logging failure blocking or replacing
+  a saved verdict. Do not restore model/internal-span storage.
+
+#### Runner and terminal states
+
+- **Stock checked:** workflow steps, schemas and result statuses
+  ([installed workflows overview](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/docs-workflows-overview.md));
+  failure statuses, per-step results, callbacks and retries
+  ([installed workflow error handling](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/docs-workflows-error-handling.md));
+  suspend/resume ([installed suspend/resume guide](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/docs-workflows-suspend-and-resume.md));
+  and snapshots ([installed snapshots guide](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/docs-workflows-snapshots.md)).
+- **Result:** workflows provide the stock execution graph and distinguish
+  success, failed, suspended, tripwire and paused outcomes. Lifecycle callback
+  errors are caught and logged without changing the workflow result. Persistent
+  suspend/resume snapshots, however, are written to a configured database, and
+  the stock statuses do not mean Julia's PASS, FAIL, INCONCLUSIVE and
+  SYSTEM_ERROR.
+- **Verdict:** **stock plus a small custom part**. JUL-196 should own the
+  preflight/review/publication sequence as typed workflow steps and use stock
+  result/error handling. The existing outer runner must retain explicit start
+  and spend authorization, immutable candidate identity, the process-level hard
+  timeout, idempotent publication and the domain mapping: only a validated
+  report can produce PASS/FAIL/INCONCLUSIVE; every other failure becomes
+  SYSTEM_ERROR. Do not use `suspend()` for INCONCLUSIVE and do not introduce a
+  workflow database as a second execution record; run files remain authoritative.
+
+#### Smaller pieces
+
+| Piece | Stock feature and exact page | Test/result | Verdict and exact gap |
+| --- | --- | --- | --- |
+| Word-for-word quote check | Structured-output schemas and output processors: [structured output](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/docs-agents-structured-output.md), [processor interface](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/reference-processors-processor-interface.md) | Existing `test/quote-check.test.mjs`; included in the full offline suite. | **Keep custom.** Stock validates shape/content policies but does not resolve `diff` or `file:path` at a pinned Git commit and compare the quote byte for byte. |
+| Raw answer before parsing | Provider `fetch` and metadata hooks: [OpenAI-compatible provider guide](../ops/mastra-agents/reviewer/node_modules/@ai-sdk/openai-compatible/docs/index.mdx) | Existing `test/raw-answer.test.mjs`; included in the full offline suite. | **Stock plus custom.** The hook is stock; ordered atomic persistence before Mastra parses, with run/candidate identity, is not. |
+| Interruption evidence | Workflow snapshots: [snapshots guide](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/docs-workflows-snapshots.md) | `test/recorded-review.test.mjs` killed the child after an accepted piece and recovered the accepted key plus technical-failure sidecar. PASS. | **Keep custom.** Snapshots persist at suspension to a database, not synchronously after each accepted piece, and are not the required run-file record. |
+| Provider cost arithmetic | Stock cost guard: [cost-control reference](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/reference-processors-token-cost-control.md); provider rates: [CommandCode pricing](https://commandcode.ai/docs/resources/pricing-limits) | The official page still lists DeepSeek V4.1 Flash at $0.15/$0.60/$0.003 off-peak and $0.30/$1.20 peak per million input/output/cache-read tokens. Existing contract tests cover both bands and reject missing counts. | **Keep custom.** Stock cost is a delayed trace estimate; the hard ledger needs these provider-specific current rates and the captured raw counts. |
+| Read-only Git tools | Read-only workspace filesystem: [installed Workspace reference](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/reference-workspace-workspace-class.md); tool schemas: [installed tools guide](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/docs-agents-tools.md) | Existing repository-root and recorded-review tests; included in the full offline suite. | **Stock plus custom.** Keep stock `createTool`; custom Git commands remain because workspace reads follow a mutable filesystem and cannot address a named commit, base-to-candidate diff or deleted file at its prior revision. |
+| Derived step formula | Stock `maxSteps`: [installed generate reference](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/reference-agents-generate.md) | Existing contract test proves four files/eight criteria yields 70. | **Stock plus custom.** Mastra enforces the number but does not derive it from Julia's immutable file/criterion and correction inventory. |
+| Fixed rules, configuration and completeness contract | Agent instructions and structured output: [installed Agent reference](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/reference-agents-agent.md), [structured output](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/docs-agents-structured-output.md) | Existing reset and contract tests; included in the full offline suite. | **Stock plus custom.** Mastra carries the instructions and schema; Julia's six rules, different-maker selection, exact file set, criterion coverage and verdict consistency are domain policy. |
+| Atomic run-file writer | Workflow snapshots require configured storage: [installed snapshots guide](../ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/docs/references/docs-workflows-snapshots.md) | Recorder, raw-answer and interruption tests exercise temporary-file, fsync and rename behavior. | **Keep custom.** No installed stock dependency supplies the required database-free atomic run-file record. Consolidate the duplicate helper, but do not replace it with telemetry storage. |
+
+#### Stage-three replacement and deletion list
+
+No reviewer source file is marked for wholesale deletion: every file under
+`ops/mastra-agents/reviewer/src` contains at least one requirement-specific gap
+identified above. Stage three does remove duplicated custom paths inside them:
+
+1. Delete `requestWithoutOutputCap()` and its assertions. Configure stock
+   `modelSettings.maxOutputTokens: 4096` before the run, as required by the
+   conservative cost reservation, rather than stripping every provider output
+   limit from the request.
+2. Configure stock `maxSteps` from `reviewStepBudget(files, criteria)` and stock
+   `modelSettings.timeout.totalMs` to 20 minutes. Keep the outer process timeout
+   and add the custom pre-call cost/time reservation ledger; neither stock
+   setting replaces it.
+3. Keep the OpenAI-compatible `fetch`/metadata extension points but replace the
+   two local atomic-write implementations with one shared run-file helper. Add
+   the bounded provider journal there; its write failures become durable
+   warnings after a verdict exists and technical failures before one exists.
+4. Have JUL-196 express the existing preflight, review and publication sequence
+   as Mastra workflow steps. Once the actual workflow route passes its offline
+   gates, delete the retained old-runner seat seam already listed in the current
+   file map: `run-pi-seat.mjs`, `run-agy-seat.mjs`, `read-secret.mjs`,
+   `graph/seat-table.mjs`, `scripts/seat-labels.mjs`,
+   `julia-minimal-runner-adapters.mjs`, `julia-graph-model.mjs`,
+   `board-setup.mjs`, and `ops/julia-runner/run-reviewer.mjs`. Keep the outer
+   run-file journal, authorization, candidate identity, timeout, terminal-state
+   mapper and idempotent publication adapter.
+5. Correct the existing reviewer-only launch authorization from `$1.00` to the
+   approved `$0.50` per-review maximum while preserving the `$1.00` cumulative
+   JUL-223 ceiling in the card/run ledger. Paid execution remains disabled until
+   the resulting offline gates pass.
+
+#### Stage-two verification record
+
+The complete reviewer suite passed 28 tests, including the real installed
+Mastra Agent/tool/structured-output stand-in and the interruption-recovery
+process test. That stand-in is also the relevant integration-boundary proof: it
+crosses the installed Agent and OpenAI-compatible provider layers without an
+external service or paid call. End-to-end browser behavior and console checks do
+not apply because this audit changes no Julia user-facing surface. Production
+logging behavior is unchanged; the audit instead identifies the exact logging
+gap stage three must close. `npm run lint:framework` also passed. The
+user-facing Julia proof is not applicable for the same reason: this is an audit,
+documentation, and offline test only.
 
 ### Replace, then delete
 

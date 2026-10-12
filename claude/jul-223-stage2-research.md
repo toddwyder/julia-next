@@ -19,7 +19,7 @@ authorization to make a provider call. No paid call was made.
 | Price calculation | Converts validated provider usage into a conservative charge | Stock cost metrics and usage totals | **Keep custom** | Mastra does not contain Command Code's time-banded prices, and its stock cost threshold is explicitly approximate. |
 | Read-only repository access | Lets the reviewer inspect only the pinned candidate | Stock tools and tool hooks | **Stock plus a small custom part** | `createTool` supplies schemas and execution plumbing; immutable Git commands, path rules, commit pinning, and the no-write policy remain application logic. |
 | Step allowance | Gives the reviewer enough model turns for every required piece plus correction attempts | `maxSteps` and stop controls | **Stock plus a small custom part** | Use stock `maxSteps` to enforce the result, but retain the domain formula that derives the number from files, criteria, and mandatory report sections. |
-| Output-token cap removal | Ensures the reviewer is not silently cut off by a guessed output ceiling | Omit the optional generation token limit | **Use stock** | Mastra's generation API does not require an output-token cap. Stage three should omit the option and delete request-body cap scrubbing. |
+| Output-token ceiling | Bounds the pending request so its maximum price can be reserved before dispatch | Built-in generation output limit | **Use stock** | Stage three should configure the approved 4,096-token ceiling through Mastra and delete request-body cap scrubbing. |
 | Fixed rules, configuration, and exact-file check | Applies the standing policy, selected connection/model, and exact candidate inventory | Agent instructions and request context | **Stock plus a small custom part** | Put fixed text in stock agent instructions, but Julia's authorization/configuration mapping and exact-set comparison remain custom policy. |
 
 ## Version finding
@@ -234,11 +234,12 @@ database snapshots merely to replace existing run files.
 - **Fixed instructions — use stock configuration with small custom policy.**
   `Agent.instructions` is the stock home for the six rules. Their text and the
   model/connection authorization mapping remain repository policy.
-- **Output cap scrubber — delete.** The generate API's output-token limit is
-  optional. Stage three should simply not provide one. Delete
-  `requestWithoutOutputCap()` and the request-body rewrite in `checkedFetch`;
-  retain `checkedFetch` only for the bounded provider journal and raw usage
-  capture.
+- **Output cap scrubber — delete.** The generate API has the stock
+  `modelSettings.maxOutputTokens` option. Stage three should configure the
+  approved 4,096-token ceiling there so the pending call's maximum price is
+  actually bounded. Delete `requestWithoutOutputCap()` and the request-body
+  rewrite in `checkedFetch`; retain `checkedFetch` only for the bounded provider
+  journal and raw usage capture.
 - **Durable write helper — keep custom or centralize.** Mastra's stock file
   exporter does not provide the write/fsync/atomic-rename contract needed by
   verdicts, accepted pieces, and raw answers. Stage three may consolidate the
@@ -255,8 +256,8 @@ Delete only the custom output-cap scrubber:
 1. Remove `requestWithoutOutputCap()` from `contract.mjs` and its focused
    assertions.
 2. Remove the `init.body` rewrite that calls it from `checkedFetch()`.
-3. Replace it by omitting all `max_tokens`, `max_completion_tokens`, and
-   `maxOutputTokens` generation/provider options.
+3. Replace it with stock `modelSettings.maxOutputTokens: 4096`; do not inject
+   legacy provider-body `max_tokens` or `max_completion_tokens` fields.
 
 Adopt/configure these stock parts in stage three:
 
