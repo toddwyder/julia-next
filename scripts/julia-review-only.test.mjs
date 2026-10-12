@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { authorizedReviewConfiguration, authorizedReviewSpending, parseReviewOnlyCommand } from './julia-review-only.mjs';
+import { join } from 'node:path';
+import { authorizedReviewConfiguration, authorizedReviewSpending, parseReviewOnlyCommand, reviewSpendLedgerPath } from './julia-review-only.mjs';
 
 test('startReviewOnly accepts only a card and an existing pull request', () => {
   assert.deepEqual(parseReviewOnlyCommand(['JUL-206', '--pr', '282']), { issueId: 'JUL-206', pullRequest: 282 });
@@ -19,4 +20,8 @@ test('review-only configuration keeps the authorized per-card cap out of prompts
     builder: { mode: 'subscription', maxUsd: 0 },
     reviewer: { mode: 'paid', maxUsd: 0.50, cumulativeMaxUsd: 1 },
   });
+  assert.equal(
+    reviewSpendLedgerPath('C:\\runs', 'JUL-223'),
+    join('C:\\runs', 'review-spend', 'JUL-223', 'ledger.json'),
+  );
 });

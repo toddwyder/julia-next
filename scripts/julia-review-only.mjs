@@ -37,6 +37,10 @@ export function authorizedReviewSpending(ledgerPath) {
   return { builder: { mode: 'subscription', maxUsd: 0 }, reviewer: { mode: 'paid', maxUsd: 0.50, cumulativeMaxUsd: 1, ...(ledgerPath ? { ledgerPath } : {}) } };
 }
 
+export function reviewSpendLedgerPath(stateDirectory, issueId) {
+  return join(stateDirectory, 'review-spend', issueId, 'ledger.json');
+}
+
 export async function runReviewOnly(args, { root = resolve(fileURLToPath(new URL('..', import.meta.url))), stateDirectory = process.env.JULIA_RUN_DIRECTORY ?? join(homedir(), '.julia', 'runs'), start = startReviewOnly } = {}) {
   const { issueId, pullRequest } = parseReviewOnlyCommand(args);
   const target = JSON.parse(execute('gh', ['pr', 'view', String(pullRequest), '--json', 'headRefOid'], { cwd: root }));
@@ -49,7 +53,7 @@ export async function runReviewOnly(args, { root = resolve(fileURLToPath(new URL
   try {
     const checksText = execute('gh', ['pr', 'checks', String(pullRequest), '--required'], { cwd: root });
     const configuration = authorizedReviewConfiguration();
-    const cardBudgetPath = join(stateDirectory, `${issueId}-review-spend.json`);
+    const cardBudgetPath = reviewSpendLedgerPath(stateDirectory, issueId);
     await initializeCardBudget(cardBudgetPath, 1);
     const authorization = { issueId, explicitStart: true, authorizedBy: 'Todd: JUL-206 reviewer authorization', spending: authorizedReviewSpending(cardBudgetPath), configuration };
     return await start(issueId, configuration, {
