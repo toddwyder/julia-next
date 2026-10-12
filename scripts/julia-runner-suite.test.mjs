@@ -60,9 +60,9 @@ test('the Windows CI job invokes the same complete local gate', () => {
   const windows = workflow.match(/\n  julia-init-windows:\n([\s\S]*?)(?=\n  web:)/)?.[1];
   assert.ok(windows, 'the stable JUL-197 Windows gate exists');
   assert.match(windows, /runs-on: windows-latest/);
-  const install = windows.indexOf('run: npm ci');
+  const reviewerInstall = /working-directory: ops\/mastra-agents\/reviewer\r?\n\s+run: npm ci/.exec(windows);
   const suite = windows.indexOf('run: node scripts/julia-runner-suite.mjs');
-  assert.ok(install >= 0 && install < suite, 'reviewer dependencies are installed before its tests enter the full gate');
+  assert.ok(reviewerInstall && reviewerInstall.index < suite, 'reviewer dependencies are installed before its tests enter the full gate');
   assert.equal(windows.includes('run: npm test'), false, 'the reviewer package is not run twice');
 });
 
