@@ -2,7 +2,6 @@ export const DEFAULT_REVIEWER = Object.freeze({
   provider: 'commandcode',
   model: 'deepseek/deepseek-v4.1-flash',
   connection: 'existing-commandcode',
-  costCeilingUsd: 1,
 });
 
 export function reviewerConfiguration(configuration = {}) {
@@ -12,13 +11,7 @@ export function reviewerConfiguration(configuration = {}) {
     ...DEFAULT_REVIEWER,
     model: reviewer.model ?? DEFAULT_REVIEWER.model,
     connection: savedConnection?.provider === 'commandcode' ? 'existing-commandcode' : savedConnection?.route ?? savedConnection ?? DEFAULT_REVIEWER.connection,
-    costCeilingUsd: reviewer.costCeilingUsd ?? DEFAULT_REVIEWER.costCeilingUsd,
   };
-  if (process.env.MASTRA_REVIEWER_STANDIN === '1') {
-    resolved.baseURL = reviewer.baseURL;
-    resolved.usageBaseURL = reviewer.usageBaseURL;
-    resolved.storageDirectory = reviewer.storageDirectory;
-  }
   return resolved;
 }
 
@@ -30,8 +23,6 @@ export function requestWithoutOutputCap(body) {
   return request;
 }
 
-export const REVIEWER_RESOURCE = 'julia-reviewer';
-
 export function reviewPromptContract(input) {
   return {
     ...input,
@@ -41,29 +32,6 @@ export function reviewPromptContract(input) {
       record: 'record_piece', replace: 'replace_piece', remove: 'remove_piece', missing: 'show_missing', submit: 'submit_report',
     },
   };
-}
-
-export function reviewerStorageConfiguration(path) {
-  return {
-    id: 'julia-reviewer-observability',
-    path,
-    memoryLimit: '1400MB',
-    threads: 1,
-    retention: { observability: { spans: { maxAge: '14d' } } },
-  };
-}
-
-export function reviewerExporterConfiguration() {
-  return { maxBatchSize: 100 };
-}
-
-export function reviewerDuckDBSettings() {
-  return ['SET preserve_insertion_order = false', "PRAGMA force_compression = 'zstd'"];
-}
-
-export function reviewThread(cardId, commit) {
-  if (!/^JUL-\d+$/.test(cardId ?? '') || !/^[0-9a-f]{40}$/i.test(commit ?? '')) throw new Error('reviewer memory needs a Julia card identifier and immutable commit');
-  return `reviewer:${cardId}:${commit}`;
 }
 
 export function reviewStepBudget(changedFiles, criteria) {
@@ -79,35 +47,6 @@ export function reviewStepBudget(changedFiles, criteria) {
     + 1;
 }
 
-export function providerUsageIsUnknown({ attempted, observed, failures = 0, error }) {
-  return observed < attempted || failures > 0 || /(?:usage\.(?:prompt_tokens|completion_tokens)|CommandCode response token usage).*missing or unknown/.test(error?.message ?? '');
-}
-
-export async function requireCostStoreReadable(read) {
-  try { return await read(); }
-  catch (error) { throw new Error('reviewer refused: cost store is unavailable; paid call blocked', { cause: error }); }
-}
-
-function memoryMessageText(message) {
-  if (typeof message?.content === 'string') return message.content;
-  const parts = Array.isArray(message?.content) ? message.content : message?.content?.parts;
-  return Array.isArray(parts) ? parts.filter(part => part?.type === 'text').map(part => part.text).join('') : '';
-}
-
-export function semanticReviewMatches(messages, currentThread) {
-  return messages.flatMap(message => {
-    if (message.threadId === currentThread || message.role !== 'assistant') return [];
-    const text = memoryMessageText(message);
-    try { if (JSON.parse(text)?.kind === 'review-memory') return [{ threadId: message.threadId, text }]; } catch { /* legacy message */ }
-    return [];
-  });
-}
-
-export function requireLiveTracing(context) {
-  if (!context?.traceId || context.currentSpan?.isValid !== true) throw new Error('reviewer refused: tracing context is not live');
-  return context;
-}
-
 export function requireCompleteFileReview(changedFiles, reviewedFiles) {
   const changed = [...changedFiles].sort();
   const reviewed = [...reviewedFiles].sort();
@@ -118,23 +57,4 @@ export function requireCompleteFileReview(changedFiles, reviewedFiles) {
   const unexpected = reviewed.find(file => !changed.includes(file));
   if (unexpected) throw new Error(`reviewer refused: unexpected ${unexpected}`);
   return reviewed;
-}
-
-export async function finishReviewerRun({ memory, observability, primaryStorage, vectorStorage, observabilityStorage }) {
-  const errors = [];
-  for (const step of [
-    () => memory.settled(),
-    () => observability.flush(),
-    () => primaryStorage.close(),
-    () => vectorStorage?.close(),
-    () => observabilityStorage.close(),
-  ]) {
-    try {
-      await step();
-    } catch (error) {
-      errors.push(error);
-    }
-  }
-  if (errors.length === 1) throw errors[0];
-  if (errors.length > 1) throw new AggregateError(errors, 'reviewer end-of-run failures');
 }

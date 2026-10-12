@@ -34,7 +34,7 @@ const connection = createOpenAICompatible({
   apiKey: 'offline-fixture',
   baseURL: url.replace('/chat/completions', ''),
   supportsStructuredOutputs: true,
-  fetch: (requestUrl, init) => checkedFetch(requestUrl, init, async () => {}, async () => {}, rawAnswer),
+  fetch: (requestUrl, init) => checkedFetch(requestUrl, init, async () => {}, rawAnswer),
   metadataExtractor: commandCodeMetadata,
 });
 const model = await resolveModelConfig(connection.chatModel('fixture-reviewer'));

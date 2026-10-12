@@ -120,7 +120,7 @@ test('real Agent.generate records a complete review and recovers each scripted r
   t.after(() => api.close());
   const connection = createOpenAICompatible({
     name: 'offline', apiKey: 'offline', baseURL: api.baseURL,
-    fetch: (url, init) => checkedFetch(url, init, async () => {}, async () => {}, rawAnswer),
+    fetch: (url, init) => checkedFetch(url, init, async () => {}, rawAnswer),
   });
   const model = await resolveModelConfig(connection.chatModel('offline-reviewer'));
   const agent = new Agent({

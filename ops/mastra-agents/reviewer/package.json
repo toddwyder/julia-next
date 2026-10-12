@@ -6,7 +6,6 @@
   "scripts": {
     "test": "node --test --test-concurrency=1",
     "review": "node src/reviewer.mjs",
-    "retention": "node src/retention.mjs",
     "test:contract": "node --test test/contract.test.mjs"
   },
   "keywords": [],
@@ -15,13 +14,7 @@
   "type": "module",
   "private": "true",
   "dependencies": {
-    "@ai-sdk/openai-compatible": "^2.0.81",
     "@mastra/core": "^1.75.0",
-    "@mastra/duckdb": "1.13.0",
-    "@mastra/fastembed": "1.3.2",
-    "@mastra/libsql": "^1.25.1",
-    "@mastra/memory": "^1.36.0",
-    "@mastra/observability": "^1.18.4",
     "zod": "^4.1.12"
   }
 }
