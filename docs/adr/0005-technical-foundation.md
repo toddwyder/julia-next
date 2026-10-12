@@ -2,7 +2,7 @@
 
 Date: 2026-09-15
 
-Status: accepted; amended 2026-09-16 to name the sync service.
+Status: Accepted; amended 2026-09-16 to name the sync service.
 
 > **Superseded in part, 2026-10-03 (ADR 0010).** Julia's data moves to Firestore on Firebase's
 > free Spark plan. PowerSync and the Postgres database (Supabase) below are retired.

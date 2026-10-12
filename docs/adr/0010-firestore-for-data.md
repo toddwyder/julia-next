@@ -2,7 +2,7 @@
 
 Date: 2026-10-03
 
-Status: accepted. Supersedes the data part of ADR 0005 (PowerSync over a Postgres database).
+Status: Accepted. Supersedes the data part of ADR 0005 (PowerSync over a Postgres database).
 
 Julia's data moves to Cloud Firestore on Firebase's free Spark plan. Firestore keeps a copy of
 the data on each device, lets the app read and write it with no connection, and syncs when the

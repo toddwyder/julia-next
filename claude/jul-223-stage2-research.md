@@ -257,7 +257,7 @@ database snapshots merely to replace existing run files.
 ## Stage-three research handoff
 
 The canonical stage-three deletion and replacement list is in
-[`claude/mastra-agents-design.md`](mastra-agents-design.md#stage-three-replacement-and-deletion-list).
+the stage-three deletion and replacement plan.
 No whole current reviewer source file is justified for deletion by this stock
 audit; in particular, keep `recording-engine.mjs`, `reviewer-report.mjs`,
 `quote-check.mjs`, and `commandcode-cost.mjs` for the documented custom gaps.

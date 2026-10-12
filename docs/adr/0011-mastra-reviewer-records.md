@@ -2,7 +2,7 @@
 
 Date: 2026-10-11
 
-Status: accepted
+Status: Accepted
 
 The Mastra reviewer keeps two local databases. Its stock DuckDB observability store contains full
 traces, cost metrics, and one permanent stock-log summary line for every run. Its LibSQL store

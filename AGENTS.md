@@ -16,7 +16,7 @@ an authorized operator uses the laptop's Tailscale route.
 
 ## Building and reviewing
 
-Read claude/mastra-agents-design.md before any Mastra work. Where a brief and the design doc disagree, the design doc wins.
+Accepted ADRs and Todd’s dated card decisions bind. Proposed ADRs and other docs do not.
 
 ## Look it up, don't recall it
 
@@ -78,7 +78,7 @@ Work to the brief's finish line. A completed step is not a stopping point. Waiti
 Before any task, verify the applicable entry points, the launcher's accepted command list,
 configuration and authorized spend limits, required credentials, and branch/worktree state. Fix
 what is safely fixable before starting work. Spend limits belong in
-`claude/mastra-agents-design.md`, never in prompts. The reviewer limit is **$1.00 per card**.
+accepted ADRs and dated card decisions, never in prompts. The reviewer limit is **$1.00 per card**.
 
 ## Server and domain
 

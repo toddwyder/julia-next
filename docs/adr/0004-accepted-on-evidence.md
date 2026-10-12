@@ -2,6 +2,8 @@
 
 Date: 2026-09-15
 
+Status: Superseded
+
 > **Superseded, 2026-10-01 (ADR 0009).** The "gate before Todd" and the recording/evidence
 > gates described here are retired: Factory's review merges the PR and Todd tests the live app
 > after merge. Kept as the historical evidence definition.

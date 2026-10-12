@@ -2,6 +2,8 @@
 
 Date: 2026-09-15
 
+Status: Accepted
+
 Julia is for one household (Todd and his wife) and there is never more than one. Every piece
 of data belongs to the household, not to a person: recipes, menus, shopping list, pantry,
 notes, nutrition targets. Screen preferences (text size, keep-screen-on) belong to the device.

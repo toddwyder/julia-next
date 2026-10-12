@@ -60,7 +60,7 @@ feature was tried, how, and exactly why it fails.
    what it does (one line), the stock option checked, and the verdict (**use
    stock** / **keep custom** / **stock plus a small custom part**), with the
    reason in one line. No file names or code terms in this table.
-2. **Technical appendix** in `claude/mastra-agents-design.md`: for each piece,
+2. **Technical appendix** in the design documentation: for each piece,
    the doc page cited, the test run (if any) and its result, and for every
    keep-custom verdict the exact gap.
 3. **What changes for stage three**: which custom files are marked for deletion,

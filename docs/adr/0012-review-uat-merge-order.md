@@ -2,7 +2,7 @@
 
 Date: 2026-10-11
 
-Status: accepted
+Status: Accepted
 
 Julia delivery order is:
 
