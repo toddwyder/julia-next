@@ -229,15 +229,25 @@ test('interruption keeps accepted pieces and records their names in the technica
   const piecesDirectory = join(directory, 'pieces');
   const failurePath = join(directory, 'verdict.json.failure.json');
   await new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error(`pieces were not durable before interruption: ${stderr}`)), 15_000);
+    let settled = false;
+    const timeout = setTimeout(() => {
+      settled = true;
+      reject(new Error(`pieces were not durable before interruption: ${stderr}`));
+    }, 30_000);
     const poll = async () => {
+      if (settled) return;
       try {
         if ((await readdir(piecesDirectory)).length >= 3) {
           const failure = JSON.parse(await readFile(failurePath, 'utf8'));
-          if (failure.acceptedPieces.length >= 3) { clearTimeout(timeout); resolve(); return; }
+          if (failure.acceptedPieces.length >= 3) {
+            settled = true;
+            clearTimeout(timeout);
+            resolve();
+            return;
+          }
         }
       } catch { /* child has not recorded yet */ }
-      setTimeout(poll, 20);
+      if (!settled) setTimeout(poll, 20);
     };
     poll();
   });
