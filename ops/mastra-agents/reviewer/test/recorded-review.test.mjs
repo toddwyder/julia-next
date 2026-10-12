@@ -74,7 +74,7 @@ async function scriptedServer(responses) {
 const call = (id, name, argumentsValue) => ({ id, type: 'function', function: { name, arguments: argumentsValue } });
 const toolMessage = tool_calls => ({ role: 'assistant', content: null, tool_calls });
 
-test('real Agent.generate records a complete review and recovers each scripted report failure', async t => {
+test('real Agent.generate records a complete review and recovers each scripted report failure', { timeout: 120_000 }, async t => {
   const fixture = JSON.parse(await readFile(fixturePath, 'utf8'));
   const input = inputForFixture(fixture);
   const directory = await mkdtemp(join(tmpdir(), 'jul223-recorded-review-'));

@@ -137,12 +137,13 @@ export function rawAnswerPathFor(verdictPath, runId, candidateCommit) {
   return resolve(dirname(verdictPath), `${safeFilePart(runId)}.${safeFilePart(candidateCommit)}.reviewer-raw.txt`);
 }
 
-export async function createReviewerRuntime({ runDirectory, input, spending, startedAt = Date.now(), now = Date.now, verdictSaved = () => false }) {
-  if (spending?.mode !== 'paid' || spending.maxUsd !== 0.50) {
-    throw new Error('reviewer refused: runtime requires the approved $0.50 paid limit');
+export async function createReviewerRuntime({ runDirectory, cardBudgetPath, input, spending, startedAt = Date.now(), now = Date.now, verdictSaved = () => false }) {
+  if (spending?.mode !== 'paid' || spending.maxUsd !== 0.50 || spending.cumulativeMaxUsd !== 1) {
+    throw new Error('reviewer refused: runtime requires the approved $0.50 paid limit and $1 cumulative card limit');
   }
+  if (!cardBudgetPath) throw new Error('reviewer refused: runtime requires the cumulative card ledger path');
   const warnings = [];
-  const budget = await createReviewBudget({ path: join(runDirectory, 'review-budget.json'), maxUsd: spending.maxUsd, startedAt, now });
+  const budget = await createReviewBudget({ path: join(runDirectory, 'review-budget.json'), maxUsd: spending.maxUsd, cardPath: cardBudgetPath, cardMaxUsd: spending.cumulativeMaxUsd, startedAt, now });
   const journal = await createModelJournal({ path: join(runDirectory, 'model-events.json'), verdictSaved, warnings });
   return {
     generationOptions: reviewGenerationOptions(input.files, input.criteria),

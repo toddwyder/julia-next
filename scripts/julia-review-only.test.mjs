@@ -17,6 +17,6 @@ test('review-only configuration keeps the authorized per-card cap out of prompts
   assert.equal('maxOutputTokens' in configuration.reviewer, false);
   assert.deepEqual(authorizedReviewSpending(), {
     builder: { mode: 'subscription', maxUsd: 0 },
-    reviewer: { mode: 'paid', maxUsd: 0.50 },
+    reviewer: { mode: 'paid', maxUsd: 0.50, cumulativeMaxUsd: 1 },
   });
 });

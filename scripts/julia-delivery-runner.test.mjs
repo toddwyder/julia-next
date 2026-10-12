@@ -85,7 +85,8 @@ test('Mastra reviewer preserves a schema-valid INCONCLUSIVE fixture as the model
     const stdin = new EventEmitter();
     stdin.end = requestText => {
       const request = JSON.parse(requestText);
-      assert.deepEqual(request.spending, { mode: 'paid', maxUsd: 0.50 });
+      assert.deepEqual(request.spending, { mode: 'paid', maxUsd: 0.50, cumulativeMaxUsd: 1 });
+      assert.match(request.cardBudgetPath, /JUL-223-review-spend\.json$/);
       writeFile(request.verdictPath, `${JSON.stringify({ text, observed: { harness: reviewer.harness, model: reviewer.model, maker: reviewer.maker } })}\n`);
     };
     stdin.on = stdin.addListener.bind(stdin);
@@ -101,7 +102,7 @@ test('Mastra reviewer preserves a schema-valid INCONCLUSIVE fixture as the model
     candidate: { base: 'b'.repeat(40), commit: repaired.report.candidate },
     reviewInput: { candidate: repaired.report.candidate, digest: repaired.report.inputDigest, files: repaired.report.filesReviewed, criteria: repaired.report.criteria.map(item => item.criterion) },
     configuration: reviewer,
-    spending: { mode: 'paid', maxUsd: 0.50 },
+    spending: { mode: 'paid', maxUsd: 0.50, cumulativeMaxUsd: 1 },
     outputPath,
     started: async () => {},
   });

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createReviewBudget } from '../src/review-budget.mjs';
@@ -19,9 +19,9 @@ test('the durable budget reserves each request before dispatch and charges valid
   assert.equal(pending.pending.maximumDurationMs, 120_000);
   assert.equal(pending.pending.maximumCostUsd, reservation.maximumCostUsd);
 
-  await budget.recordResponse({ responseId: 'response-1', estimate: { cost: 0.01 } });
+  await budget.recordResponse({ responseId: 'response-1', estimate: { cost: 0.001 } });
   const charged = JSON.parse(await readFile(path, 'utf8'));
-  assert.equal(charged.spentUsd, 0.01);
+  assert.equal(charged.spentUsd, 0.001);
   assert.equal(charged.pending, null);
   assert.deepEqual(charged.responses, ['response-1']);
 
@@ -61,10 +61,33 @@ test('a restart preserves charges and refuses to retry an unresolved paid reques
 
   const resumedPending = await createReviewBudget({ path, startedAt: 10, now: () => 11 });
   await assert.rejects(resumedPending.beforeRequest({ messages: [] }), /unresolved paid request/);
-  await resumedPending.recordResponse({ responseId: 'recovered-response', estimate: { cost: 0.02 } });
+  await resumedPending.recordResponse({ responseId: 'recovered-response', estimate: { cost: 0.002 } });
 
   await createReviewBudget({ path, startedAt: 10, now: () => 12 });
   const state = JSON.parse(await readFile(path, 'utf8'));
-  assert.equal(state.spentUsd, 0.02);
+  assert.equal(state.spentUsd, 0.002);
   assert.deepEqual(state.responses, ['recovered-response']);
+});
+
+test('separate run ledgers share the cumulative card ceiling', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'jul223-budget-card-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const cardPath = join(directory, 'card.json');
+  const first = await createReviewBudget({ path: join(directory, 'run-1.json'), cardPath, cardMaxUsd: 0.009 });
+  await first.beforeRequest({ messages: [] });
+  await first.recordResponse({ responseId: 'one', estimate: { cost: 0.0045 } });
+  const second = await createReviewBudget({ path: join(directory, 'run-2.json'), cardPath, cardMaxUsd: 0.009 });
+  await assert.rejects(second.beforeRequest({ messages: [] }), /cumulative card limit/);
+});
+
+test('malformed saved measurements and costs above a reservation fail closed', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'jul223-budget-invalid-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const path = join(directory, 'budget.json');
+  await writeFile(path, JSON.stringify({ maxUsd: 0.5, totalMs: 1_200_000, stepMs: 120_000, spentUsd: null, pending: null, responses: [] }));
+  await assert.rejects(createReviewBudget({ path }), /saved budget is invalid/);
+  await rm(path);
+  const budget = await createReviewBudget({ path });
+  await budget.beforeRequest({ messages: [] });
+  await assert.rejects(budget.recordResponse({ responseId: 'too-expensive', estimate: { cost: 0.5 } }), /exceeds the reserved/);
 });

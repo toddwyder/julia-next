@@ -21,6 +21,11 @@ The stage-three offline runtime now adds:
 - one shared atomic run-file writer for the recorder, budget, journal, and raw
   response evidence.
 
+The scripted maximum-correction fixture completes under the configured
+two-minute request bound. That is offline evidence for the bound and library
+plumbing, not proof of CommandCode latency; the paid route remains disabled
+until the separately authorized model-specific probe confirms the real service.
+
 Removed code provided semantic recall, saved reviewer messages, message
 history, vector storage and embeddings, internal-span export, a paid warn-only
 prompt-injection classifier, a DuckDB-backed cost brake, machine-wide usage

@@ -11,8 +11,9 @@ test('the offline runtime wires stock bounds, authorization, durable budget, and
   t.after(() => rm(directory, { recursive: true, force: true }));
   const runtime = await createReviewerRuntime({
     runDirectory: directory,
+    cardBudgetPath: join(directory, 'JUL-223-review-spend.json'),
     input: { files: ['a.mjs'], criteria: ['criterion'] },
-    spending: { mode: 'paid', maxUsd: 0.50 },
+    spending: { mode: 'paid', maxUsd: 0.50, cumulativeMaxUsd: 1 },
     startedAt: 1_000_000,
     now: () => 1_000_000,
   });

@@ -33,7 +33,7 @@ export function authorizedReviewConfiguration() {
 }
 
 export function authorizedReviewSpending() {
-  return { builder: { mode: 'subscription', maxUsd: 0 }, reviewer: { mode: 'paid', maxUsd: 0.50 } };
+  return { builder: { mode: 'subscription', maxUsd: 0 }, reviewer: { mode: 'paid', maxUsd: 0.50, cumulativeMaxUsd: 1 } };
 }
 
 export async function runReviewOnly(args, { root = resolve(fileURLToPath(new URL('..', import.meta.url))), stateDirectory = process.env.JULIA_RUN_DIRECTORY ?? join(homedir(), '.julia', 'runs'), start = startReviewOnly } = {}) {
