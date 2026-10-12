@@ -60,6 +60,14 @@ separate; do not duplicate their rules or let one passing axis hide another.
 
 ## Findings and verdict
 
+When the runner supplies report-recording tools, never write the complete report
+as one JSON answer. Record each header, axis, criterion, file, standards check,
+counterexample, test audit, finding and limitation with `record_piece`; use
+`replace_piece` or `remove_piece` to correct accepted work, call `show_missing`,
+and finish only after `submit_report` accepts the assembled report. Correct a
+tool validation error using its returned reason. The runner, not the model,
+formats the final output contract.
+
 Give specific, actionable findings: requirement/standard, file and location,
 trigger, mechanism, consequence, underlying evidence and an imperative repair.
 Verify the requested repair would satisfy the contract without unnecessary scope.

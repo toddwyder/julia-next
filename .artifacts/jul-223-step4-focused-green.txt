@@ -1,0 +1,19 @@
+✔ the live failure fixtures are copied byte-for-byte (7.0767ms)
+✔ the recorded malformed answer is durable before it becomes a technical failure (160.2953ms)
+✔ a valid-looking single-shot JSON answer cannot bypass the recording tools (36.8622ms)
+✔ killing the transport process after the raw answer arrives leaves the complete file (1867.9832ms)
+Error converting tool call input to JSON { toolCallId: 'malformed', toolName: 'record_piece', inputLength: 21 }
+✔ real Agent.generate records a complete review and recovers each scripted report failure (582.16ms)
+✔ real Agent.generate records and submits the repair-report shape (81.8691ms)
+✔ a rejected piece cannot add serialized-quote repair audit metadata (14.037ms)
+✔ interruption keeps accepted pieces and records their names in the technical failure (1122.7986ms)
+✔ accepted pieces are durable and can be replaced, removed, inspected, and submitted (46.161ms)
+✔ the same engine records an unrelated packing-list schema without engine changes (173.9409ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8684.8353

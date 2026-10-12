@@ -2,10 +2,10 @@
 
 The review-only laptop runner starts this worker with the per-card reviewer
 configuration (default: CommandCode `deepseek/deepseek-v4.1-flash`). It reads
-candidate files lazily through immutable, read-only Git tools, returns a
-structured verdict, and preserves the runner's quote validation.
-The structured output carries the complete delivery-runner report contract and
-is passed through the same `checkedReview` gate before it can become durable.
+candidate files lazily through immutable, read-only Git tools and records the
+review as small validated pieces. Repository code assembles those pieces into
+the unchanged delivery-runner report and passes it through the same
+`checkedReview` gate before it can become durable.
 
 Run it only through the established 1Password launcher, with
 `COMMANDCODE_API_KEY` resolved in its child environment:
@@ -29,13 +29,21 @@ stays outside pruning. Every completed or stopped run emits one structured
 CommandCode's provider page exposes no reasoning-effort setting, so both model
 roles record effort as `not-supported`. Both databases persist after every run.
 
+The recording engine exposes tools to record, replace, remove and inspect
+missing pieces, plus a submit tool. Every accepted piece is atomically written
+under the run's verdict recording directory. Submit assembles and validates the
+existing envelope and writes the verdict; interrupted progress remains available
+and technical failures name the accepted piece keys.
+
 The runner supplies a unique verdict path and run ID. At the existing provider
-transport boundary, the worker fsyncs and atomically renames the exact raw model
-answer to a path containing the run ID and candidate commit before Mastra parses
-structured output. Mastra's stock `errorStrategy: 'warn'` returns control on
-invalid JSON or schema; the worker records that as a technical failure naming
-the raw path, never as a verdict. A valid answer is written and emitted as the
-model's verdict before memory, observability, or storage finalization can run.
+transport boundary, the worker fsyncs and atomically renames each exact raw
+model response to a path containing the run ID and candidate commit before
+Mastra parses its tool calls. The last response remains there. Malformed tool
+JSON or schema input is returned by Mastra to the model for correction and is
+never a verdict. After each accepted piece the worker also refreshes a durable
+technical-failure sidecar naming every accepted key; successful submission
+removes it. A submitted report is written and emitted as the model's verdict
+before memory, observability, or storage finalization can run.
 
 Run `npm run retention -- <storage-directory>` from the laptop's external daily
 scheduler. The command is deliberately separate from reviewer startup and
@@ -47,7 +55,8 @@ disposable worktree.
 
 | Need | Stock feature or checked gap | Pinned docs page |
 | --- | --- | --- |
-| Malformed structured output | Stock `errorStrategy: 'warn'` returns control without substituting fallback data; Mastra exposes no stock durable raw-answer sink, so the existing provider transport saves the exact response text before Mastra parses it | `references/docs-agents-structured-output.md` |
+| Small report calls and recoverable input errors | Stock `createTool` input schemas and the agent tool loop return fixable validation failures to the model; custom code is limited to durable per-run piece storage and deterministic assembly because Mastra has no stock report recorder | `references/docs-agents-tools.md`; `references/reference-tools-create-tool.md` |
+| Rejected final-output alternatives | Provider structured output is not enforced on this route; schema working memory is cross-review resource state, conflicts with the standing-rules template, and replaces whole arrays | `references/docs-agents-structured-output.md`; `references/docs-memory-working-memory.md` |
 | Durable reviewer notepad | Resource-scoped working memory and `updateWorkingMemory()` | `docs/memory/working-memory.md` |
 | Cross-review retrieval | Resource-scoped semantic recall, `LibSQLVector`, local `fastembed` | `docs/memory/semantic-recall.md` |
 | No observational memory | OM is thread-oriented and resource scope is deprecated | `docs/memory/observational-memory.md` |

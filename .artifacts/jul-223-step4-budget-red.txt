@@ -1,0 +1,30 @@
+✖ reviewer step budget follows the immutable file inventory and contract phases (2.3143ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1856.6802
+
+✖ failing tests:
+
+test at test\contract.test.mjs:21:1
+✖ reviewer step budget follows the immutable file inventory and contract phases (2.3143ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  6 !== 40
+
+      at TestContext.<anonymous> (file:///C:/Dev/julia-next-mastra-reviewer/ops/mastra-agents/reviewer/test/contract.test.mjs:22:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 6,
+    expected: 40,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

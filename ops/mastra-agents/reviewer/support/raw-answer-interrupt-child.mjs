@@ -1,14 +1,13 @@
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { Agent } from '@mastra/core/agent';
 import { resolveModelConfig } from '@mastra/core/llm';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import { checkedFetch, commandCodeMetadata, envelopeFor, generateStructuredReview } from '../src/reviewer.mjs';
+import { checkedFetch, commandCodeMetadata, generateRecordedReview } from '../src/reviewer.mjs';
 
 const [fixturePath, rawAnswerPath] = process.argv.slice(2);
 const text = await readFile(fixturePath, 'utf8');
-const repaired = JSON.parse(await readFile(join(dirname(fixturePath), 'repaired.json'), 'utf8'));
 const server = createServer(async (request, response) => {
   for await (const _chunk of request) { /* consume the request */ }
   response.writeHead(200, { 'content-type': 'application/json' });
@@ -41,17 +40,14 @@ const connection = createOpenAICompatible({
 const model = await resolveModelConfig(connection.chatModel('fixture-reviewer'));
 const agent = new Agent({ id: 'jul223-interruption', name: 'JUL-223 interruption proof', model, instructions: 'Return the fixture unchanged.' });
 try {
-  await generateStructuredReview({
+  await generateRecordedReview({
     agent,
     prompt: 'Return the fixture.',
-    generationOptions: {
-      structuredOutput: {
-        schema: envelopeFor({ files: repaired.report.filesReviewed, scope: { kind: 'initial' } }),
-        errorStrategy: 'warn',
-      },
-    },
+    generationOptions: {},
     verdictPath: join(dirname(rawAnswerPath), 'verdict.json'),
     rawAnswer,
+    recorder: { recordTechnicalFailure: async (path, reason, details) => writeFile(path, `${JSON.stringify({ kind: 'technical-failure', reason, acceptedPieces: [], ...details })}\n`) },
+    submitted: () => null,
   });
 } catch { /* parent kills this reviewer process after observing the raw file */ }
 await new Promise(() => {});

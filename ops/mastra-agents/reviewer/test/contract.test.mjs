@@ -19,8 +19,8 @@ test('reviewer memory uses one stable private resource and one thread per review
 });
 
 test('reviewer step budget follows the immutable file inventory and contract phases', () => {
-  assert.equal(reviewStepBudget(['a.mjs'], ['criterion']), 6);
-  assert.equal(reviewStepBudget(['a.mjs', 'b.mjs', 'c.mjs', 'd.mjs'], Array(8).fill('criterion')), 16);
+  assert.equal(reviewStepBudget(['a.mjs'], ['criterion']), 40);
+  assert.equal(reviewStepBudget(['a.mjs', 'b.mjs', 'c.mjs', 'd.mjs'], Array(8).fill('criterion')), 70);
   assert.throws(() => reviewStepBudget([], ['criterion']), /changed file/);
   assert.throws(() => reviewStepBudget(['a.mjs'], []), /criterion/);
 });
@@ -57,6 +57,10 @@ test('the model prompt keeps requirements and proof but reads candidate bytes th
   const input = { candidate: 'abc', sources: { specification: 'requirements', clarifications: 'decisions', 'test-evidence': 'proof', diff: 'large diff', 'file:a.mjs': 'large file' } };
   assert.deepEqual(reviewPromptContract(input), {
     candidate: 'abc', sources: { specification: 'requirements', clarifications: 'decisions', 'test-evidence': 'proof' },
+    recording: {
+      mode: 'small-tools',
+      record: 'record_piece', replace: 'replace_piece', remove: 'remove_piece', missing: 'show_missing', submit: 'submit_report',
+    },
   });
   assert.deepEqual(input.sources, { specification: 'requirements', clarifications: 'decisions', 'test-evidence': 'proof', diff: 'large diff', 'file:a.mjs': 'large file' });
 });

@@ -3,14 +3,14 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
-import { access, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { access, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Agent } from '@mastra/core/agent';
 import { resolveModelConfig } from '@mastra/core/llm';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import { checkedFetch, commandCodeMetadata, envelopeFor, generateStructuredReview } from '../src/reviewer.mjs';
+import { checkedFetch, commandCodeMetadata, generateRecordedReview } from '../src/reviewer.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixtures = join(here, 'fixtures');
@@ -44,14 +44,12 @@ async function standIn(text) {
 }
 
 async function generateFixture(text, rawAnswerPath) {
-  const repaired = JSON.parse(await readFile(join(fixtures, 'repaired.json'), 'utf8'));
-  const input = { files: repaired.report.filesReviewed, scope: { kind: 'initial' } };
   const api = await standIn(text);
   try {
     const rawAnswer = {
       rawAnswerPath,
       runId: 'jul223-offline-proof',
-      candidateCommit: repaired.report.candidate,
+      candidateCommit: '8a0d87cbc9c56458c367a2cd2b6bae4083c48722',
       saved: false,
       responseId: null,
     };
@@ -62,19 +60,26 @@ async function generateFixture(text, rawAnswerPath) {
     });
     const model = await resolveModelConfig(connection.chatModel('fixture-reviewer'));
     const agent = new Agent({ id: 'jul223-offline-proof', name: 'JUL-223 offline proof', model, instructions: 'Return the supplied fixture unchanged.' });
-    return await generateStructuredReview({
+    const recorder = {
+      recordTechnicalFailure: async (path, reason, details) => {
+        await writeFile(path, `${JSON.stringify({ kind: 'technical-failure', reason, acceptedPieces: [], ...details })}\n`);
+      },
+    };
+    return await generateRecordedReview({
       agent,
       prompt: 'Return the fixture.',
-      generationOptions: { structuredOutput: { schema: envelopeFor(input), errorStrategy: 'warn' } },
+      generationOptions: {},
       verdictPath: join(dirname(rawAnswerPath), 'verdict.json'),
       rawAnswer,
+      recorder,
+      submitted: () => null,
     });
   } finally {
     await api.close();
   }
 }
 
-test('the recorded malformed answer is durable before Mastra rejects structured output', async t => {
+test('the recorded malformed answer is durable before it becomes a technical failure', async t => {
   const directory = await mkdtemp(join(tmpdir(), 'jul223-malformed-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const fixture = await readFile(join(fixtures, 'final-answer.txt'), 'utf8');
@@ -91,14 +96,16 @@ test('the recorded malformed answer is durable before Mastra rejects structured 
   assert.equal(failure.candidateCommit, '8a0d87cbc9c56458c367a2cd2b6bae4083c48722');
 });
 
-test('the repaired fixture follows the same Mastra path and remains INCONCLUSIVE', async t => {
+test('a valid-looking single-shot JSON answer cannot bypass the recording tools', async t => {
   const directory = await mkdtemp(join(tmpdir(), 'jul223-valid-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const fixture = await readFile(join(fixtures, 'repaired.json'), 'utf8');
   const rawAnswerPath = join(directory, 'JUL-223.8a0d87.raw.txt');
-  const result = await generateFixture(fixture, rawAnswerPath);
-  assert.equal(result.object.verdict, 'INCONCLUSIVE');
+  await assert.rejects(generateFixture(fixture, rawAnswerPath), /technical failure.*without a successful submit_report/i);
   assert.equal(await readFile(rawAnswerPath, 'utf8'), fixture);
+  const failure = JSON.parse(await readFile(join(directory, 'verdict.json.failure.json'), 'utf8'));
+  assert.equal(failure.kind, 'technical-failure');
+  assert.deepEqual(failure.acceptedPieces, []);
 });
 
 test('killing the transport process after the raw answer arrives leaves the complete file', async t => {

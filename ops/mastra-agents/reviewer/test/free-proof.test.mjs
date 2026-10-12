@@ -25,6 +25,23 @@ function schemaValue(schema = {}) {
   return '';
 }
 
+function reportPieces(value) {
+  const report = value.report;
+  return [
+    { type: 'header', verdict: value.verdict, summary: report.summary, approach: report.approach },
+    { type: 'axis', axis: 'standards', ...report.standards },
+    { type: 'axis', axis: 'spec', ...report.spec },
+    ...report.criteria.map(item => ({ type: 'criterion', ...item })),
+    ...report.files.map(item => ({ type: 'file', ...item })),
+    ...report.checks.map(item => ({ type: 'check', ...item })),
+    ...report.counterexamples.map((item, index) => ({ type: 'counterexample', index, ...item })),
+    { type: 'test-audit', ...report.testAudit },
+    { type: 'collection-complete', collection: 'counterexamples' },
+    { type: 'collection-complete', collection: 'findings' },
+    { type: 'collection-complete', collection: 'limitations' },
+  ];
+}
+
 async function standInServer() {
   let review = 0;
   const requests = [];
@@ -55,32 +72,31 @@ async function standInServer() {
       return;
     }
     const candidateTool = body.tools?.find(tool => tool.function?.name === 'read_candidate_diff');
+    const recordTool = body.tools?.find(tool => tool.function?.name === 'record_piece');
     const hasToolResult = body.messages?.some(message => message.role === 'tool');
+    const hasRecordResult = body.messages?.some(message => message.role === 'tool' && message.tool_call_id?.startsWith('record-'));
+    const hasSubmitResult = body.messages?.some(message => message.role === 'tool' && message.tool_call_id?.startsWith('submit-'));
     let message;
     let finishReason = 'stop';
     if (candidateTool && !hasToolResult) {
       message = { role: 'assistant', content: null, tool_calls: [{ id: `read-${requests.length}`, type: 'function', function: { name: 'read_candidate_diff', arguments: '{}' } }] };
       finishReason = 'tool_calls';
-    } else {
-      const schema = body.response_format?.json_schema?.schema;
-      const value = schemaValue(schema);
-      if (schema?.properties?.verdict) {
-        const contract = contracts[review];
-        review += 1;
-        const requestText = JSON.stringify(body.messages ?? []);
-        const hasWorkingMemory = requestText.includes('No arbitrary caps or limits; flag any new one.');
-        const hasPriorReview = review === 1 || requestText.includes('first-review-memory-marker');
-        observations.push({ review, hasWorkingMemory, hasPriorReview });
-        value.verdict = hasWorkingMemory && hasPriorReview ? 'PASS' : 'INCONCLUSIVE';
-        const codeEvidence = [{ source: 'diff', quote: 'violet arbitrary run cap', reasoning: 'The immutable diff exposes the arbitrary cap behavior under review.' }];
-        const testEvidence = { source: 'test-evidence', quote: 'deterministic stand-in checks passed', reasoning: 'The saved runner evidence records the deterministic check result.' };
-        const combinedEvidence = [...codeEvidence, testEvidence];
-        value.report = {
-          filesReviewed: ['candidate.mjs'],
-          candidate: contract.candidate, inputDigest: contract.digest,
+    } else if (recordTool && !hasRecordResult) {
+      const contract = contracts[review];
+      review += 1;
+      const requestText = JSON.stringify(body.messages ?? []);
+      const hasWorkingMemory = requestText.includes('No arbitrary caps or limits; flag any new one.');
+      const hasPriorReview = review === 1 || requestText.includes('first-review-memory-marker');
+      observations.push({ review, hasWorkingMemory, hasPriorReview });
+      const codeEvidence = [{ source: 'diff', quote: 'violet arbitrary run cap', reasoning: 'The immutable diff exposes the arbitrary cap behavior under review.' }];
+      const testEvidence = { source: 'test-evidence', quote: 'deterministic stand-in checks passed', reasoning: 'The saved runner evidence records the deterministic check result.' };
+      const combinedEvidence = [...codeEvidence, testEvidence];
+      const value = {
+        verdict: hasWorkingMemory && hasPriorReview ? 'PASS' : 'INCONCLUSIVE',
+        report: {
+          filesReviewed: ['candidate.mjs'], candidate: contract.candidate, inputDigest: contract.digest,
           approach: 'Read the immutable diff, apply the standing cap rule, and challenge the saved check evidence.',
-          standards: { status: 'proven', evidence: codeEvidence },
-          spec: { status: 'proven', evidence: combinedEvidence },
+          standards: { status: 'proven', evidence: codeEvidence }, spec: { status: 'proven', evidence: combinedEvidence },
           criteria: contract.criteria.map(criterion => ({ criterion, status: 'proven', evidence: codeEvidence })),
           files: contract.files.map(file => ({ file, status: 'proven', evidence: [{ source: `file:${file}`, quote: 'violet arbitrary run cap', reasoning: 'The committed file contains the reviewed behavior.' }] })),
           checks: [1, 2, 5].map(check => ({ check, status: 'proven', evidence: combinedEvidence })).concat([
@@ -89,10 +105,19 @@ async function standInServer() {
           ]),
           counterexamples: ['missing cap rule', 'missing checked result'].map(scenario => ({ scenario, method: 'deterministic request inspection', result: 'The stand-in refuses PASS when required memory is absent.', evidence: combinedEvidence })),
           testAudit: { analysis: 'The proof checks request causality, exact file coverage, trace content, persistence, and the cost brake.', evidence: combinedEvidence },
-          summary: review === 1 ? 'first-review-memory-marker applied the standing rule against arbitrary run caps' : 'review 2 retrieved first-review-memory-marker and applied the standing rule against arbitrary run caps', findings: [],
-          limitations: [],
-        };
-      }
+          summary: review === 1 ? 'first-review-memory-marker applied the standing rule against arbitrary run caps' : 'review 2 retrieved first-review-memory-marker and applied the standing rule against arbitrary run caps', findings: [], limitations: [],
+        },
+      };
+      message = { role: 'assistant', content: null, tool_calls: reportPieces(value).map((piece, index) => ({ id: `record-${review}-${index}`, type: 'function', function: { name: 'record_piece', arguments: JSON.stringify(piece) } })) };
+      finishReason = 'tool_calls';
+    } else if (recordTool && !hasSubmitResult) {
+      message = { role: 'assistant', content: null, tool_calls: [{ id: `submit-${review}`, type: 'function', function: { name: 'submit_report', arguments: '{}' } }] };
+      finishReason = 'tool_calls';
+    } else if (recordTool) {
+      message = { role: 'assistant', content: 'Recorded review submitted.' };
+    } else {
+      const schema = body.response_format?.json_schema?.schema;
+      const value = schemaValue(schema);
       message = { role: 'assistant', content: JSON.stringify(value) };
     }
     response.writeHead(200, { 'content-type': 'application/json' });
@@ -309,10 +334,10 @@ test('runner starts the real reviewer twice and preserves verdict, trace, workin
     assert.deepEqual(summary.safetyCheck, { model: 'deepseek/deepseek-v4.1-flash', effort: 'not-supported' });
     assert.ok(summary.tokens.input > 0 && summary.tokens.output > 0, JSON.stringify(summary));
     assert.ok(summary.costUsd.estimated > 0, JSON.stringify(summary));
-    assert.equal(Number(summary.costUsd.actual.toFixed(12)), 0.45);
-    assert.equal(Number(summary.costUsd.brake.toFixed(12)), 0.45);
+    assert.equal(Number(summary.costUsd.actual.toFixed(12)), 0.75);
+    assert.equal(Number(summary.costUsd.brake.toFixed(12)), 0.75);
     assert.equal(summary.costUsd.actualMayIncludeOtherUsage, true);
-    assert.equal(summary.costUsd.actualRequestCount, 3);
+    assert.equal(summary.costUsd.actualRequestCount, 5);
     assert.equal(summary.costUsd.reconciliationError, null);
     assert.match(summary.startedAt, /^\d{4}-\d{2}-\d{2}T/);
     assert.match(summary.endedAt, /^\d{4}-\d{2}-\d{2}T/);

@@ -36,6 +36,10 @@ export function reviewPromptContract(input) {
   return {
     ...input,
     sources: Object.fromEntries(Object.entries(input.sources ?? {}).filter(([source]) => source !== 'diff' && !source.startsWith('file:'))),
+    recording: {
+      mode: 'small-tools',
+      record: 'record_piece', replace: 'replace_piece', remove: 'remove_piece', missing: 'show_missing', submit: 'submit_report',
+    },
   };
 }
 
@@ -65,9 +69,14 @@ export function reviewThread(cardId, commit) {
 export function reviewStepBudget(changedFiles, criteria) {
   if (!Array.isArray(changedFiles) || changedFiles.length === 0) throw new Error('reviewer needs at least one changed file');
   if (!Array.isArray(criteria) || criteria.length === 0) throw new Error('reviewer needs at least one acceptance criterion');
-  // Inventory, diff, one step per changed file, one per acceptance criterion,
-  // batched quote verification, and the final structured report.
-  return changedFiles.length + criteria.length + 4;
+  // Reading/analysis: inventory, diff, every file and criterion, and quote review.
+  // Recording: header, two axes, every file and criterion, five checks, two
+  // counterexamples, test audit, three collection markers, and submit. Give
+  // every recording call one correction call, then allow a final acknowledgement.
+  // Findings and limitations are independent parallel calls, not count-capped.
+  return (changedFiles.length + criteria.length + 3)
+    + (changedFiles.length + criteria.length + 15) * 2
+    + 1;
 }
 
 export function providerUsageIsUnknown({ attempted, observed, failures = 0, error }) {
