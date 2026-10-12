@@ -1,23 +1,10 @@
-import { durableWrite } from './run-file.mjs';
-import { readFile, readdir, stat } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
-
-async function directoryBytes(directory) {
-  let total = 0;
-  try {
-    for (const entry of await readdir(directory, { withFileTypes: true })) {
-      const path = join(directory, entry.name);
-      total += entry.isDirectory() ? await directoryBytes(path) : (await stat(path)).size;
-    }
-  } catch (error) {
-    if (error?.code !== 'ENOENT') throw error;
-  }
-  return total;
-}
+import { directoryBytes, durableWrite, RUN_EVIDENCE_MAX_BYTES, RUN_WARNING_RESERVE_BYTES } from './run-file.mjs';
+import { readFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
 
 export async function createModelJournal({
   path,
-  maxBytes = 64 * 1024 * 1024,
+  maxBytes = RUN_EVIDENCE_MAX_BYTES - RUN_WARNING_RESERVE_BYTES,
   verdictSaved = () => false,
   warnings = [],
 }) {
@@ -40,7 +27,7 @@ export async function createModelJournal({
   if (!exists) {
     const initial = `${JSON.stringify(events)}\n`;
     if (currentBytes + Buffer.byteLength(initial, 'utf8') > maxBytes) throw new Error(`reviewer refused: durable evidence limit of ${maxBytes} bytes would be exceeded`);
-    await durableWrite(path, initial);
+    await durableWrite(path, initial, { root: runDirectory, maxBytes });
   }
 
   const record = event => {
@@ -50,7 +37,7 @@ export async function createModelJournal({
         const content = `${JSON.stringify(next)}\n`;
         const nextBytes = Buffer.byteLength(content, 'utf8');
         if (await directoryBytes(runDirectory) + nextBytes > maxBytes) throw new Error(`reviewer refused: durable evidence limit of ${maxBytes} bytes would be exceeded`);
-        await durableWrite(path, content);
+        await durableWrite(path, content, { root: runDirectory, maxBytes });
         events.push(event);
         return true;
       } catch (error) {
@@ -61,7 +48,7 @@ export async function createModelJournal({
           let durableWarnings = [];
           try { durableWarnings = JSON.parse(await readFile(warningPath, 'utf8')); }
           catch (readError) { if (readError?.code !== 'ENOENT') throw readError; }
-          await durableWrite(warningPath, `${JSON.stringify([...durableWarnings, warning])}\n`);
+          await durableWrite(warningPath, `${JSON.stringify([...durableWarnings, warning])}\n`, { root: runDirectory, maxBytes: maxBytes + RUN_WARNING_RESERVE_BYTES });
         } catch { /* a saved verdict remains authoritative even if its warning cannot be written */ }
         return false;
       }

@@ -39,6 +39,7 @@ export async function createRecordingEngine({
     throw new Error('recording engine needs a run folder, schemas, key function, assembler, and submitter');
   }
   const piecesDirectory = join(runDirectory, 'pieces');
+  const writeRunFile = (path, content) => durableWrite(path, content, { root: runDirectory });
   await mkdir(piecesDirectory, { recursive: true });
   const pieces = new Map();
   for (const file of await readdir(piecesDirectory)) {
@@ -79,7 +80,7 @@ export async function createRecordingEngine({
         ? `Piece ${checked.key} already exists. Use replace_piece to change it.`
         : `Piece ${checked.key} does not exist. Use record_piece to add it.`);
     }
-    await durableWrite(fileForKey(piecesDirectory, checked.key), `${JSON.stringify({ key: checked.key, piece: checked.piece })}\n`);
+    await writeRunFile(fileForKey(piecesDirectory, checked.key), `${JSON.stringify({ key: checked.key, piece: checked.piece })}\n`);
     pieces.set(checked.key, checked.piece);
     await onAccepted(checked.piece, checked.key, accepted());
     await onProgress(accepted());
@@ -144,7 +145,7 @@ export async function createRecordingEngine({
     missingKeys: missing,
     recordTechnicalFailure: async (path, reason, details = {}) => {
       const failure = { kind: 'technical-failure', reason, acceptedPieces: accepted(), ...details };
-      await durableWrite(path, `${JSON.stringify(failure)}\n`);
+      await writeRunFile(path, `${JSON.stringify(failure)}\n`);
       return failure;
     },
   };

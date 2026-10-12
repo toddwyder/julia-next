@@ -91,3 +91,20 @@ test('malformed saved measurements and costs above a reservation fail closed', a
   await budget.beforeRequest({ messages: [] });
   await assert.rejects(budget.recordResponse({ responseId: 'too-expensive', estimate: { cost: 0.5 } }), /exceeds the reserved/);
 });
+
+test('future clocks, busy card ledgers, and mismatched reservations fail closed', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'jul223-budget-race-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const future = await createReviewBudget({ path: join(directory, 'future.json'), startedAt: 10, now: () => 9 });
+  await assert.rejects(future.beforeRequest({ messages: [] }), /elapsed review time is invalid/);
+
+  const cardPath = join(directory, 'card.json');
+  const budget = await createReviewBudget({ path: join(directory, 'run.json'), cardPath });
+  await writeFile(`${cardPath}.lock`, 'busy');
+  await assert.rejects(budget.beforeRequest({ messages: [] }), /card ledger is busy/);
+  await rm(`${cardPath}.lock`);
+  await budget.beforeRequest({ messages: [] });
+  const card = JSON.parse(await readFile(cardPath, 'utf8'));
+  await writeFile(cardPath, JSON.stringify({ ...card, pending: null }));
+  await assert.rejects(budget.recordResponse({ responseId: 'wrong-reservation', estimate: { cost: 0.001 } }), /does not match.*reservation/);
+});

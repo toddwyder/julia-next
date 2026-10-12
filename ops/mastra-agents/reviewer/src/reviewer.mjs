@@ -13,7 +13,7 @@ import { commandCodeCostEstimate } from './commandcode-cost.mjs';
 import { reviewGenerationOptions } from './contract.mjs';
 import { createModelJournal } from './model-journal.mjs';
 import { createReviewBudget } from './review-budget.mjs';
-import { durableWrite } from './run-file.mjs';
+import { durableWrite, verifyRunEvidenceLimit } from './run-file.mjs';
 
 const exec = promisify(execFile);
 export { envelopeFor, reviewedFilesSchema } from './reviewer-report.mjs';
@@ -148,6 +148,7 @@ export async function createReviewerRuntime({ runDirectory, cardBudgetPath, inpu
   return {
     generationOptions: reviewGenerationOptions(input.files, input.criteria),
     fetch: (url, init, rawAnswer = null) => checkedFetch(url, init, budget.recordResponse, rawAnswer, budget.beforeRequest, journal.record),
+    verifyEvidence: () => verifyRunEvidenceLimit(runDirectory),
     warnings,
   };
 }

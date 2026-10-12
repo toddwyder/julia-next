@@ -39,6 +39,7 @@ test('the offline runtime wires stock bounds, authorization, durable budget, and
   assert.equal(budget.pending, null);
   const events = JSON.parse(await readFile(join(directory, 'model-events.json'), 'utf8'));
   assert.deepEqual(events.map(event => event.kind), ['request', 'response', 'usage']);
+  assert.ok(await runtime.verifyEvidence() > 0);
 });
 
 test('the runtime refuses an authorization other than the approved per-review amount', async () => {
