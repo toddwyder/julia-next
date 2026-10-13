@@ -1,4 +1,4 @@
-# 0016. Builder and reviewer agent separation under delivery runner orchestration
+# 0016. Current reviewer-only boundary and deferred Mastra builder
 
 Date: 2026-10-12
 
@@ -6,22 +6,21 @@ Status: Proposed
 
 ## Context
 
-Automated card implementation requires autonomous code development paired with independent adversarial
-verification to maintain quality without requiring human code reviews for every machine step.
+The repository currently contains Mastra reviewer components but no Mastra builder agent. The normal
+review command is also disabled while the minimum reviewer route is being rebuilt and verified.
 
 ## Decision (Agent Design Choice)
 
-1. **Two agents:** Implement two distinct Mastra agent roles:
-   - **Builder:** Reads repository code, writes changes, runs tests, and commits to its own branch.
-   - **Reviewer:** Operates read-only against the pinned candidate commit using immutable Git tools.
-2. **Provider independence:** The reviewer must use a model from a different maker than the builder.
-3. **Strict operational boundary:** Neither agent may merge pull requests, create Linear tickets, or
-   delete files outside authorized scratch directories.
-4. **Runner orchestration:** The outer delivery runner owns sequencing, state persistence, locks, worker
-   lifecycle, and start/spend authorization. Any condition requiring human intervention parks the card
-   with a visible reason.
+1. **Reviewer only:** `ops/mastra-agents/reviewer` contains the current Mastra component work. Its Git
+   tools use `git diff` and `git show` to read the pinned candidate without writing repository files.
+2. **Disabled normal route:** `runReviewer` refuses normal execution. The separately opted-in provider
+   probe is the only current path that can make paid reviewer calls.
+3. **No Mastra builder:** There is no implemented Mastra builder role. Builder research, implementation,
+   and integration with the reviewer remain future work.
+4. **No integrated two-agent route:** The current package does not yet enforce builder/reviewer provider
+   separation or provide the planned delivery-runner orchestration.
 
 ## Consequences
 
-- Prevents builder self-review bias by enforcing adversarial review from an independent model.
-- Retains human authority over ticket creation, merge decisions, and final acceptance.
+- The current code supplies reviewer components and offline or explicitly opted-in probe seams only.
+- Builder/reviewer separation and delivery orchestration must not be claimed until those routes exist.

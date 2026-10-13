@@ -19,8 +19,8 @@ and strict pre-dispatch resource budgeting:
    a bounded provider-boundary model events journal (model-events.json), accepted report pieces,
    and terminal state within a 64 MiB evidence budget. There is no DuckDB or LibSQL database.
 2. **Pre-dispatch spend ledger:** Before each provider request, conservative spend is reserved
-   against published provider rates. Execution refuses if the pending call would exceed .50
-   for the review or .00 cumulative card budget.
+   against published provider rates. Execution refuses if the pending call would exceed `$0.50`
+   for the review or `$1.00` cumulative card budget.
 3. **Time and step bounds:** Enforce a hard 20-minute total runtime limit (REVIEW_TOTAL_MS = 1200000),
    a configured 15-second per-step timeout (REVIEW_STEP_MS = 15000), and a derived maxSteps
    budget based on changed files and criteria (3F + 3C + 34).

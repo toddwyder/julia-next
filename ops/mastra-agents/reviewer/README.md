@@ -1,15 +1,17 @@
 # Julia Mastra reviewer
 
-The Julia Mastra reviewer performs automated, read-only adversarial review of
-candidate changes against approved Linear card criteria and repository coding
-standards.
+This package contains the current Julia Mastra reviewer components. The normal
+review command is disabled: `runReviewer` in `src/reviewer.mjs` always refuses
+execution while the minimum reviewer route remains incomplete. The skipped-by-
+default, explicitly opted-in provider probe is the only current path that can
+make paid provider calls.
 
 ## Architecture and components
 
 The reviewer is built on `@mastra/core` and provides:
 
-- **Immutable candidate access:** Read-only Git tools (`git show`, `git diff`,
-  `git log`, `git ls-tree`) pointing to the pinned candidate commit.
+- **Immutable candidate access:** Read-only `git diff` and `git show` tools
+  pointing to the pinned candidate commit.
 - **Incremental report recording:** A small-piece tool recording engine
   (`recording-engine.mjs`) allowing the model to submit individual review
   elements (`record_piece`, `replace_piece`, `remove_piece`, `show_missing`,
@@ -45,9 +47,14 @@ resource budgets defined in `src/contract.mjs`:
   (`model-events.json`) recording requests, raw replies, and validated token
   usage without external database dependencies.
 
-## Running tests
+## Package scripts
 
-Run the reviewer package test suite:
+`npm test` runs the package test suite. `npm run review` invokes the disabled
+normal entry point and exits with its reset-incomplete refusal. The ordinary
+test suite does not make provider calls; the real CommandCode probe is skipped
+unless an authorized operator explicitly opts in with
+`JUL223_COMMANDCODE_REAL_PROOF=1` and supplies its required credentials and
+retained-evidence paths.
 
 ```powershell
 npm test

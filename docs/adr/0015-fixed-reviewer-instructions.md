@@ -25,4 +25,4 @@ fixed rules, effectively acting as a database holding static constants.
 ## Consequences
 
 - Eliminates vector dependencies (@mastra/libsql, @mastra/fastembed, @mastra/memory).
-- Each review execution is completely isolated and reproducible from repository state and candidate diffs alone.
+- No persisted reviewer history or memory is injected from one review into another.

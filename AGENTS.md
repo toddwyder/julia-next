@@ -17,6 +17,7 @@ an authorized operator uses the laptop's Tailscale route.
 ## Building and reviewing
 
 Accepted ADRs and Todd’s dated card decisions bind. Proposed ADRs and other docs do not.
+When records disagree, Todd’s latest dated decision wins.
 
 ## Look it up, don't recall it
 
