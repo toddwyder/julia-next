@@ -214,7 +214,10 @@ export async function createReviewerRuntime({ runDirectory, cardBudgetPath, inpu
 }
 
 export async function runReviewer() {
-  throw new Error('reviewer reset is incomplete; paid execution is disabled until the JUL-224 trust test passes');
+  const error = new Error('reviewer reset is incomplete; paid execution is disabled until the JUL-224 trust test passes');
+  error.providerAcceptance = 'not-accepted';
+  error.costUsd = 0;
+  throw error;
 }
 
 async function readStandardInput(stream = process.stdin) {
@@ -225,10 +228,17 @@ async function readStandardInput(stream = process.stdin) {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  let request;
   try {
-    JSON.parse(await readStandardInput());
-    await runReviewer();
+    request = JSON.parse(await readStandardInput());
+    await runReviewer(request);
   } catch (error) {
+    if (request?.verdictPath && error?.providerAcceptance === 'not-accepted' && error?.costUsd === 0) {
+      await durableWrite(`${request.verdictPath}.failure.json`, `${JSON.stringify({
+        kind: 'technical-failure', stage: 'reviewer-start', reason: error.message,
+        providerAcceptance: error.providerAcceptance, costUsd: error.costUsd,
+      })}\n`, { root: dirname(request.verdictPath) });
+    }
     console.error(error.message);
     process.exitCode = 1;
   }

@@ -2,7 +2,7 @@ import { createStep, createWorkflow } from '@mastra/core/workflows';
 import { appendFile, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod/v4';
-
+import { handleReviewerCrash } from './delivery-crash-recovery.mjs';
 export const DELIVERY_WORKFLOW_ID = 'julia-delivery';
 const MAX_ROUNDS = 2;
 const pathSchema = z.string().min(1);
@@ -103,33 +103,6 @@ async function failedResult(inputData, role, error) {
     model: null, effort: null, inputTokens: 0, outputTokens: 0, costEstimateUsd: 0,
   });
   return { resultPath, reason };
-}
-
-async function technicalReviewStop(inputData, reason, additions = {}) {
-  const resultPath = await writeJson(join(inputData.runDirectory, `review-system-error-${inputData.round}.json`), {
-    verdict: 'SYSTEM_ERROR', reason, model: null, effort: null,
-    inputTokens: null, outputTokens: null, costEstimateUsd: null, ...additions,
-  });
-  return { resultPath, reason };
-}
-
-function recoveryProblem(recovery, crash, checks, crashPath, authorizedUsd) {
-  const candidateCommit = checks.candidateCommit ?? checks.change;
-  if (!recovery || !['RESUME', 'PARK'].includes(recovery.status)) return 'recovery result has no valid terminal status';
-  if (recovery.incidentId !== crash.incidentId || recovery.crashPath !== crashPath || recovery.interruptedStep !== crash.step) return 'recovery result does not identify the crash incident';
-  if (recovery.candidateCommit !== candidateCommit) return 'recovery result does not preserve the Julia candidate';
-  const spend = recovery.spend;
-  if (![spend?.authorizedUsd, spend?.spentUsd, spend?.maximumAdditionalUsd].every(value => Number.isFinite(value) && value >= 0)
-    || !Number.isFinite(authorizedUsd) || spend.authorizedUsd !== authorizedUsd
-    || spend.spentUsd + spend.maximumAdditionalUsd > spend.authorizedUsd) return 'recovery could exceed the authorized spending limit';
-  if (recovery.originalPaidRequest?.acceptance !== crash.providerAcceptance
-    || recovery.originalPaidRequest?.costUsd !== crash.costUsd) return 'recovery result does not preserve original provider acceptance and cost evidence';
-  if (recovery.status === 'PARK') return typeof recovery.reason === 'string' && recovery.reason.trim() ? null : 'parked recovery has no concise reason';
-  if (!recovery.rootCause || !recovery.recoveryCommit || !recovery.fixer?.identity || !recovery.fixer?.maker
-    || !recovery.reviewer?.identity || !recovery.reviewer?.maker || !recovery.resumePoint) return 'recovery evidence is incomplete';
-  if (recovery.fixer.maker.trim().toLowerCase() === recovery.reviewer.maker.trim().toLowerCase()) return 'recovery reviewer maker matches the fixer maker';
-  if (recovery.reviewBypassedFailedStep !== true || recovery.reviewResult !== 'PASS' || recovery.verificationResult !== 'PASS') return 'recovery review or verification did not pass through an independent bypass route';
-  return null;
 }
 
 export function createDeliveryWorkflow(adapters, samplePeak, summaryPath) {
@@ -255,71 +228,9 @@ export function createDeliveryWorkflow(adapters, samplePeak, summaryPath) {
           }));
           reviewResultPath = requireResultPath('reviewer', result);
         } catch (error) {
-          const crashPath = error?.deliveryCrashPath;
-          if (!crashPath) {
-            const failed = await technicalReviewStop(inputData, `reviewer technical failure: ${errorMessage(error)}`);
-            reviewResultPath = failed.resultPath;
-            inputData = { ...inputData, stopReason: failed.reason };
-          } else {
-            const crash = await readJson(crashPath);
-            const metadata = await readJson(inputData.runMetadataPath);
-            const incident = { incidentId: crash.incidentId, crashPath, interruptedStep: crash.step, round: inputData.round };
-            const crashIncidents = [...(metadata.crashIncidents ?? []), incident];
-            await updateMetadata(inputData.runMetadataPath, { crashIncidents });
-            if (crash.providerAcceptance !== 'not-accepted' || crash.costUsd !== 0) {
-              const reason = 'reviewer crashed and the original paid-request acceptance or cost is uncertain or positive; refusing another model call';
-              const failed = await technicalReviewStop(inputData, reason, { crashPath });
-              reviewResultPath = failed.resultPath;
-              inputData = { ...inputData, crashPath, stopReason: reason };
-            } else {
-              let recoveryResultPath;
-              try {
-                recoveryResultPath = requireResultPath('crash recovery', await adapters.recoverCrash(adapterInput(inputData, {
-                  builderResultPath: inputData.builderResultPath, checksResultPath: inputData.checksResultPath, crashPath,
-                })));
-                const recovery = await readJson(recoveryResultPath);
-                const approved = await readJson(inputData.approvedInputPath);
-                const authorizedUsd = approved.authorization?.spending?.reviewer?.maxUsd;
-                const problem = recoveryProblem(recovery, crash, checksResult, crashPath, authorizedUsd);
-                if (problem || recovery.status === 'PARK') {
-                  const reason = problem ? `recovery parked: ${problem}` : recovery.reason;
-                  const failed = await technicalReviewStop(inputData, reason, { crashPath, recoveryResultPath });
-                  reviewResultPath = failed.resultPath;
-                  inputData = { ...inputData, crashPath, recoveryResultPath, stopReason: reason };
-                } else {
-                  await updateMetadata(inputData.runMetadataPath, {
-                    crashIncidents: crashIncidents.map(item => item.incidentId === crash.incidentId ? { ...item, recoveryResultPath } : item),
-                  });
-                  try {
-                    const resumed = await adapters.reviewer(adapterInput(inputData, {
-                      builderResultPath: inputData.builderResultPath, checksResultPath: inputData.checksResultPath,
-                      crashPath, recoveryResultPath,
-                    }));
-                    reviewResultPath = requireResultPath('resumed reviewer', resumed);
-                    inputData = { ...inputData, crashPath, recoveryResultPath };
-                  } catch (resumedError) {
-                    const reason = `reviewer crashed again before the interrupted step completed: ${errorMessage(resumedError)}`;
-                    const resumptionCrashPath = resumedError?.deliveryCrashPath ?? crashPath;
-                    await updateMetadata(inputData.runMetadataPath, {
-                      crashIncidents: crashIncidents.map(item => item.incidentId === crash.incidentId
-                        ? { ...item, recoveryResultPath, resumptionCrashPath, parkedReason: reason }
-                        : item),
-                    });
-                    const failed = await technicalReviewStop(inputData, reason, {
-                      crashPath: resumptionCrashPath, recoveryResultPath,
-                    });
-                    reviewResultPath = failed.resultPath;
-                    inputData = { ...inputData, crashPath, recoveryResultPath, stopReason: reason };
-                  }
-                }
-              } catch (recoveryError) {
-                const reason = `crash recovery failed: ${errorMessage(recoveryError)}`;
-                const failed = await technicalReviewStop(inputData, reason, { crashPath, ...(recoveryResultPath ? { recoveryResultPath } : {}) });
-                reviewResultPath = failed.resultPath;
-                inputData = { ...inputData, crashPath, ...(recoveryResultPath ? { recoveryResultPath } : {}), stopReason: reason };
-              }
-            }
-          }
+          const handled = await handleReviewerCrash({ error, inputData, checksResult, adapters });
+          reviewResultPath = handled.reviewResultPath;
+          inputData = handled.inputData;
         }
       } else {
         reviewResultPath = await writeJson(join(inputData.runDirectory, `review-${inputData.round}.json`), {

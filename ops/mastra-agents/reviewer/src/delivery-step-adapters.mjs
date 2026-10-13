@@ -18,14 +18,23 @@ async function saveResult(runDirectory, name, value) {
 
 async function reviewerCrash(runDirectory, suffix, launched, candidateCommit) {
   const crashPath = join(runDirectory, `crash-reviewer-${suffix}.json`);
-  const incidentId = `reviewer-${suffix}-${Date.now()}`;
-  await writeFile(crashPath, `${JSON.stringify({
-    kind: 'technical-failure', incidentId, step: 'reviewer-launch',
-    reason: launched.technicalFailure ?? launched.text ?? `reviewer launcher exited ${launched.exitCode}`,
-    candidateCommit, providerAcceptance: launched.providerAcceptance ?? 'uncertain',
-    costUsd: Number.isFinite(launched.costEstimateUsd) ? launched.costEstimateUsd : null,
-    outputPath: launched.outputPath ?? null, responseId: launched.responseId ?? null,
-  })}\n`, { flag: 'wx' });
+  const acceptance = launched.providerAcceptance ?? 'uncertain';
+  const costUsd = Number.isFinite(launched.costEstimateUsd) ? launched.costEstimateUsd : null;
+  if (existsSync(crashPath)) {
+    const saved = await readJson(crashPath);
+    if (saved.kind !== 'technical-failure' || saved.step !== 'reviewer-launch' || saved.candidateCommit !== candidateCommit
+      || saved.providerAcceptance !== acceptance || saved.costUsd !== costUsd || !saved.incidentId) {
+      throw new Error(`saved reviewer crash does not match the replayed launch: ${crashPath}`);
+    }
+  } else {
+    const incidentId = `reviewer-${suffix}-${Date.now()}`;
+    await writeFile(crashPath, `${JSON.stringify({
+      kind: 'technical-failure', incidentId, step: 'reviewer-launch',
+      reason: launched.technicalFailure ?? launched.text ?? `reviewer launcher exited ${launched.exitCode}`,
+      candidateCommit, providerAcceptance: acceptance, costUsd,
+      outputPath: launched.outputPath ?? null, responseId: launched.responseId ?? null,
+    })}\n`, { flag: 'wx' });
+  }
   const error = new Error(`reviewer launcher failed: ${launched.technicalFailure ?? `exit ${launched.exitCode}`}`);
   error.deliveryCrashPath = crashPath;
   throw error;
