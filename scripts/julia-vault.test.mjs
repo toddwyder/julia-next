@@ -32,6 +32,13 @@ test('Windows provisioning parks after account creation followed by failed persi
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
+test('Windows vault wrapper has only workflow init and read-only card lookup', () => {
+  const wrapper = readFileSync(fileURLToPath(new URL('./julia-vault-windows.ps1', import.meta.url)), 'utf8');
+  assert.match(wrapper, /ValidateSet\('init', 'readIssue'\)/);
+  assert.doesNotMatch(wrapper, /probeCommandCodeFormats/);
+  assert.match(wrapper, /julia-vault\.mjs'\) \$Operation @JuliaArguments/);
+});
+
 test('migration pipes secrets, verifies readback and returns references only', async () => {
   const calls = []; let item;
   const execute = async (args, input) => {
@@ -52,6 +59,31 @@ test('migration pipes secrets, verifies readback and returns references only', a
 test('migration refuses an existing conflicting item instead of overwriting it', async () => {
   const execute = async args => args[0] === 'vault' ? [{ id: 'vault-id', name: 'Julia' }] : args[1] === 'list' ? [{ id: 'item-id', title: 'Julia Axiom' }] : { fields: [{ label: 'AXIOM_TOKEN', value: 'different' }] };
   await assert.rejects(migrateJuliaSecrets({ AXIOM_TOKEN: 'private-value' }, { execute }), /existing vault item differs/);
+});
+
+test('CommandCode migrates through stdin and launches from a Julia reference without stale plaintext', async () => {
+  let item;
+  const execute = async (args, input) => {
+    assert.equal(args.includes('private-commandcode-value'), false);
+    if (args[0] === 'vault') return [{ id: 'vault-id', name: 'Julia' }];
+    if (args[1] === 'list') return [];
+    if (args[1] === 'create') { item = { ...input, id: 'commandcode-item' }; return { id: item.id }; }
+    if (args[1] === 'get') return item;
+    assert.fail('unexpected operation');
+  };
+  const result = await migrateJuliaSecrets({ COMMANDCODE_API_KEY: 'private-commandcode-value', DEEPSEEK_API_KEY: 'retired-secret' }, { execute });
+  assert.equal(result.references.COMMANDCODE_API_KEY, 'op://vault-id/commandcode-item/COMMANDCODE_API_KEY');
+  assert.equal(item.fields[0].type, 'CONCEALED');
+  assert.equal(JSON.stringify(result).includes('private-commandcode-value'), false);
+  assert.equal(result.references.DEEPSEEK_API_KEY, undefined);
+  const configuration = { vaultId: 'vault-id', referencesPath: 'references.env' };
+  assert.equal(vaultLaunch([], { configuration, references: `COMMANDCODE_API_KEY=${result.references.COMMANDCODE_API_KEY}`, environment: { COMMANDCODE_API_KEY: 'stale', PATH: 'fixture' }, run: (_command, _args, options) => {
+    assert.deepEqual(options.env, { PATH: 'fixture', COMMANDCODE_API_KEY: 'op://vault-id/commandcode-item/COMMANDCODE_API_KEY' });
+    return { status: 0 };
+  } }), 0);
+  for (const reference of ['plaintext', 'op://other-vault/item/key']) {
+    assert.throws(() => vaultLaunch([], { configuration, references: `COMMANDCODE_API_KEY=${reference}`, run: () => assert.fail('must not launch') }), /invalid vault reference/);
+  }
 });
 test('failed readback returns no replacement references', async () => {
   const execute = async args => args[0] === 'vault' ? [{ id: 'vault-id', name: 'Julia' }] : args[1] === 'list' ? [] : args[1] === 'create' ? { id: 'item-id' } : { fields: [] };
@@ -80,6 +112,26 @@ test('vault launcher loads only references in the designated vault, preserves ma
   assert.equal(call.args.includes('references.env'), false);
   assert.equal(call.options.env.VERCEL_TOKEN, 'op://vault-id/item-id/token');
   assert.equal(call.args.includes('--no-masking'), false); assert.equal(call.options.shell, undefined);
+});
+test('vault launcher permits the read-only Linear entry point', () => {
+  let call;
+  const code = vaultLaunch(['JUL-206', '--pr', '282'], {
+    entryPoint: 'linear-cli.mjs', configuration: { vaultId: 'vault-id', opExecutable: 'op.exe', referencesPath: 'references.env' },
+    references: 'COMMANDCODE_API_KEY=op://vault-id/item-id/key\n',
+    run: (command, args, options) => { call = { command, args, options }; return { status: 0 }; },
+  });
+  assert.equal(code, 0);
+  assert.match(call.args[3], /linear-cli\.mjs$/);
+  assert.deepEqual(call.args.slice(4), ['JUL-206', '--pr', '282']);
+  assert.equal(call.options.env.COMMANDCODE_API_KEY, 'op://vault-id/item-id/key');
+});
+test('vault launcher rejects retired reviewer and arbitrary entry points', () => {
+  assert.throws(() => vaultLaunch([], {
+    entryPoint: 'julia-commandcode-format-probe.mjs', configuration: { vaultId: 'vault-id', referencesPath: 'references.env' }, references: 'COMMANDCODE_API_KEY=op://vault-id/item-id/key\n',
+  }), /unapproved Julia launcher entry point/);
+  assert.throws(() => vaultLaunch([], {
+    entryPoint: 'arbitrary.mjs', configuration: { vaultId: 'vault-id', referencesPath: 'references.env' }, references: 'COMMANDCODE_API_KEY=op://vault-id/item-id/key\n',
+  }), /unapproved Julia launcher entry point/);
 });
 test('omitted service secrets do not inherit stale plaintext or unrelated vault references', () => {
   vaultLaunch(['$init', 'JUL-123'], { configuration: { vaultId: 'vault-id', referencesPath: 'mutable.env' }, references: 'LINEAR_API_KEY=op://vault-id/item-id/key', environment: { VERCEL_TOKEN: 'stale', axiom_token: 'stale', AXIOM_DATASET: 'op://other/item/dataset', OP_SERVICE_ACCOUNT_TOKEN: 'bootstrap', PATH: 'fixture' }, run: (_command, args, options) => {

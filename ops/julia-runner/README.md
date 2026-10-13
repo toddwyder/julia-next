@@ -1,90 +1,18 @@
-# julia-runner -- historical minimal runner (JUL-122)
+# Julia runner support boundaries
 
-**Retired route.** Do not use these setup steps to start new work. GitHub issues enter Factory's Intake; Todd starts them there. The standalone `scripts/julia-minimal-runner.mjs` command now refuses to launch cards. This document preserves the old design for reference only.
+Delivery starts only through `$init`, which invokes the Mastra workflow in
+`ops/mastra-agents/reviewer/src/delivery-workflow.mjs`.
 
-The former runner took one card through Gemini, the tests, a DeepSeek review
-and a PR. On the OVH server its jobs ran in separate accounts (Todd, 24 Sep):
+This directory is retained because the workflow still reuses its narrow worker
+support:
 
-| Job | Account | Holds |
-| --- | --- | --- |
-| The runner: state, commits, Linear comments, the publisher | `orchestrator-svc` | the Linear app credential, at run time only |
-| Gemini: edits files, runs no command | `gemini-worker` | its own agy sign-in; no groups, no service keys |
-| Test worker: lint, suite, seam tests; no model | `julia-tester` | nothing |
-| DeepSeek review | `runner` | the Command Code key (as today) |
-| The graph's Codex builder, through `run-codex-builder.mjs` | `runner` | Codex's ChatGPT sign-in |
-| The graph's reviewer (JUL-128): Codex or DeepSeek | `runner` | Codex's ChatGPT sign-in, or the Command Code key |
-| The graph's Gemini reviewer | `gemini-worker` | its own agy sign-in |
-| Publisher: push and open the PR | `orchestrator-svc` | the GitHub App (as today) |
+- `time-limit.mjs` owns bounded child-process execution.
+- `run-tests.mjs`, `run-gemini.mjs`, and `run-codex-builder.mjs` are
+  isolated worker boundaries retained for their safety contracts and tests.
+- `run-reviewer.mjs` remains a worker wrapper; it does not sequence or start
+  a delivery.
 
-The runner starts each worker only through `sudoers` in this folder: one fixed command per
-account, with the worker's input on stdin and an environment of `PATH` and `LANG` only.
-
-## The Linear credential: systemd-creds
-
-The runner's Linear identity is the "Julia controller" OAuth app. Its client id and secret are
-encrypted with `systemd-creds` under the host key (`/var/lib/systemd/credential.secret`, root
-only; this server has no TPM). `systemd-run` decrypts them into a credentials directory that only
-the runner's own process can read, and the runner reads them in-process
-(`readAppCredential` in `scripts/julia-minimal-runner-adapters.mjs`). Root can decrypt them;
-that limit is accepted (Todd, 24 Sep). The values never appear in a command line, prompt, log,
-Git, a PR or Linear.
-
-## One-time setup (as `ubuntu`, with sudo)
-
-1. Accounts and the worktree group:
-   ```
-   sudo useradd --system --create-home --shell /usr/sbin/nologin gemini-worker
-   sudo useradd --system --create-home --shell /usr/sbin/nologin julia-tester
-   sudo groupadd julia-runner-work
-   for u in orchestrator-svc gemini-worker julia-tester runner; do sudo usermod -aG julia-runner-work "$u"; done
-   ```
-2. Folders. `/srv/julia-runner` belongs to `orchestrator-svc`; worktrees are group-shared:
-   ```
-   sudo install -d -o orchestrator-svc -g julia-runner-work -m 0750 /srv/julia-runner
-   sudo install -d -o orchestrator-svc -g julia-runner-work -m 2770 /srv/julia-runner/worktrees
-   sudo -u orchestrator-svc git clone -q /srv/orchestrator-svc/julia-next /srv/julia-runner/repo
-   ```
-3. The credential, straight from the drop box into systemd-creds (the value is never shown):
-   ```
-   sudo systemd-creds setup
-   for f in linear-app-id linear-app-secret; do
-     sudo systemd-creds encrypt --name="$f" "/etc/orca-runner/dropbox-secrets/$f.env" "/etc/credstore.encrypted/julia-runner-$f.cred"
-   done
-   sudo chmod 0600 /etc/credstore.encrypted/julia-runner-*.cred
-   ```
-4. The worker code, root-owned, mirroring the repo layout, copied from a checkout of the
-   reviewed commit:
-   ```
-   for f in ops/julia-runner/run-gemini.mjs ops/julia-runner/run-tests.mjs ops/julia-runner/time-limit.mjs ops/julia-runner/run-reviewer.mjs ops/julia-runner/run-codex-builder.mjs ops/julia-runner/reap.py \
-            scripts/julia-minimal-runner-checks.mjs ops/service-dropbox/run-pi-seat.mjs ops/service-dropbox/read-secret.mjs; do
-     sudo install -D -o root -g root -m 0644 "$CHECKOUT/$f" "/opt/julia-runner/$f"
-   done
-   sudo install -o root -g root -m 0440 "$CHECKOUT/ops/julia-runner/sudoers" /etc/sudoers.d/julia-runner
-   sudo visudo -c
-   sudo loginctl enable-linger runner   # the graph's reviewer runs each review in its own systemd user scope
-   sudo loginctl enable-linger gemini-worker   # Gemini review uses a read-only transient user service
-   ```
-   Without the selected account's user manager the reviewer launcher refuses to start a review.
-   Gemini's transient service makes `/srv/julia-runner` inaccessible and permits writes only in
-   `gemini-worker`'s home for its CLI session. Disable linger for either account to undo it.
-5. Gemini for `gemini-worker`: the agy binary in `~gemini-worker/.local/bin/agy`, an agy
-   `settings.json` whose `permissions.allow` is empty, and **Todd's one-time sign-in** in that
-   account.
-
-## What a card needs
-
-The runner refuses a card before Gemini starts unless its description has:
-
-- a `## Seams` section naming the seam test files (`Kind: refactor` for a pure refactor);
-- checkboxes under an `Acceptance criteria` heading; and
-- numbered items under `## UAT plan`.
-
-Gemini hands in evidence for each criterion and a line for each UAT item. The Spec reviewer answers
-met or not met for each criterion. `scripts/acceptance-check.mjs` refuses the change before the PR
-unless every criterion has both. Before the UAT move, the runner posts the evidence comment, then
-ticks the boxes (never before their evidence is on the card), and then passes the same script's
-live-card guard.
-
-## Retired launch
-
-The former credential-backed server command is no longer an available route. Executing `scripts/julia-minimal-runner.mjs` exits with a retirement message without loading a Linear credential or starting a card. Start new work from Factory's Intake instead.
+There is no controller, card launcher, retry loop, acceptance route, merge
+route, or delivery entry point in this directory. The retired JUL-122
+orchestration and its sudo adapter were deleted during the JUL-196 Mastra
+cutover.

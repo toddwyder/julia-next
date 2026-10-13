@@ -13,37 +13,18 @@ const SHARED_TESTS = new Set([
   'graph/seat-table.test.mjs', 'ops/service-dropbox/run-agy-seat.test.mjs',
   'ops/service-dropbox/run-pi-seat.test.mjs', 'ops/service-dropbox/read-secret.test.mjs',
 ]));
-// These retained journeys use shared helpers in the retired graph/controller
-// route, not the adapted runner. Keep their failures separately attributable.
-const HISTORICAL_TESTS = new Set([
-  'graph/board-spec.test.mjs', 'scripts/bad-submissions.test.mjs',
-  'scripts/controller-board.test.mjs', 'scripts/controller-carry.test.mjs',
-  'scripts/stand-in-seat.test.mjs',
-]);
 // Explicitly inventoried non-runner tests retain their existing CI/manual owner.
 // Unknown tests default to execution so a new subprocess-only regression cannot
 // trigger the Windows job and then silently disappear from its file list.
 const NON_RUNNER_TESTS = new Set([
-  'graph/rate-table.test.mjs', 'ops/controller/units.test.mjs',
-  'ops/service-dropbox/dropbox.test.mjs', 'ops/service-dropbox/write-secret.test.mjs',
-  'ops/sudoers/orchestrator-svc-ops.test.mjs', 'scripts/agent-docs.test.mjs',
-  'scripts/board-setup.test.mjs', 'scripts/board-spec.test.mjs', 'scripts/check-readiness.test.mjs',
-  'scripts/collect-worker-result.test.mjs', 'scripts/controller-card-steps.test.mjs',
-  'scripts/controller-columns.test.mjs', 'scripts/controller-core.test.mjs',
-  'scripts/controller-cost.test.mjs', 'scripts/controller-crash-loop.test.mjs',
-  'scripts/controller-eligibility.test.mjs', 'scripts/controller-inflight.test.mjs',
-  'scripts/controller-main.test.mjs', 'scripts/controller-seat-run.test.mjs',
-  'scripts/controller-step-runner.test.mjs', 'scripts/controller-test-run.test.mjs',
-  'scripts/controller-token.test.mjs', 'scripts/controller-wiring.test.mjs',
+  'scripts/agent-docs.test.mjs',
+  'scripts/board-setup.test.mjs', 'scripts/board-spec.test.mjs',
   'scripts/dynamic-route.test.mjs', 'scripts/framework-lint.test.mjs', 'scripts/health-route.test.mjs',
-  'scripts/merge-pr.test.mjs', 'scripts/ops-controller.test.mjs', 'scripts/ops-sudoers.test.mjs',
-  'scripts/orca-cli-cli.test.mjs', 'scripts/orca-cli.test.mjs',
+  'scripts/merge-pr.test.mjs',
   'scripts/publish-pr.real-git.test.mjs', 'scripts/publish-pr.test.mjs',
-  'scripts/publish-via-github-app.test.mjs', 'scripts/rate-table.test.mjs',
-  'scripts/ready-queue.test.mjs', 'scripts/retired-graph-cli.test.mjs', 'scripts/run-seat.test.mjs',
+  'scripts/publish-via-github-app.test.mjs',
   'scripts/seat-table.test.mjs', 'scripts/service-dropbox-read-secret.test.mjs',
   'scripts/service-dropbox-run-agy-seat.test.mjs', 'scripts/service-dropbox-run-pi-seat.test.mjs',
-  'scripts/service-dropbox-write-secret.test.mjs', 'scripts/service-dropbox.test.mjs',
   'scripts/web-app.test.mjs',
 ]);
 // Evidence and generated/vendor trees are never executable source. In particular,
@@ -64,7 +45,6 @@ export function discoverRunnerTests(root = process.cwd()) {
       if (entry.isDirectory()) {
         if (!GENERATED.has(entry.name)) walk(join(directory, entry.name), `${path}/`);
       } else if (entry.isFile() && entry.name.endsWith('.test.mjs')) {
-        if (HISTORICAL_TESTS.has(path)) continue;
         if (RUNNER_TEST.test(path) || path.startsWith('ops/julia-runner/') || SHARED_TESTS.has(path)
           || importsRunnerModule(readFileSync(join(root, path), 'utf8')) || !NON_RUNNER_TESTS.has(path)) files.push(path);
       }

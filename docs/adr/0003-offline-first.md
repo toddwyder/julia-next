@@ -2,6 +2,8 @@
 
 Date: 2026-09-15
 
+Status: Accepted
+
 Every device holds the whole household collection and works fully offline, reads and writes.
 Only features that reach outside the house (URL import, the Chrome clipper, the Lab's
 suggestions, sharing, first sign-in) need a connection. Changes sync silently when the

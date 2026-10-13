@@ -9,7 +9,7 @@ import { test } from 'node:test';
 
 import { parseInitCommand, runInit as init, runInitCli as initCli } from './julia-init.mjs';
 
-const authorize = issueId => ({ issueId, explicitStart: true, authorizedBy: 'fixture operator', spending: { builder: { mode: 'fixture', maxUsd: 0 }, reviewer: { mode: 'fixture', maxUsd: 0 } } });
+const authorize = issueId => ({ issueId, explicitStart: true, authorizedBy: 'fixture operator', linearActorId: 'fixture-linear-actor', spending: { builder: { mode: 'fixture', maxUsd: 0 }, reviewer: { mode: 'fixture', maxUsd: 0 } } });
 const runInit = async (command, options) => init(command, { authorization: authorize(parseInitCommand(command).issueId), ...options });
 const runInitCli = async (command, options) => initCli(command, { authorization: authorize(parseInitCommand(command).issueId), ...options });
 
@@ -23,7 +23,7 @@ async function runCli(arguments_, { cwd, input = '' } = {}) {
   await mkdir(join(cwd, '.julia/runs'), { recursive: true });
   await writeFile(join(cwd, '.julia/runs', `${issueId}-approved.json`), JSON.stringify({ card: { identifier: issueId, description: '## Acceptance criteria\n- [ ] fixture' }, authorization: authorize(issueId) }));
   return new Promise((done, fail) => {
-    const child = spawn(process.execPath, [initScript, ...arguments_], { cwd, env: { ...process.env, JULIA_START_AUTHORIZATION: authorizationPath, JULIA_RUN_DIRECTORY: join(cwd, '.julia/runs') } });
+    const child = spawn(process.execPath, [initScript, ...arguments_], { cwd, env: { ...process.env, JULIA_DELIVERY_OFFLINE_FIXTURE: '1', JULIA_START_AUTHORIZATION: authorizationPath, JULIA_RUN_DIRECTORY: join(cwd, '.julia/runs') } });
     let stdout = '';
     let stderr = '';
     child.stdout.setEncoding('utf8').on('data', (chunk) => { stdout += chunk; });
@@ -55,7 +55,9 @@ const catalog = [
   },
 ];
 
-async function fixture(t, settings = { catalog, builder: { model: 'anthropic-builder', thinking: 'high' }, reviewer: { model: 'openai-reviewer', thinking: null } }) {
+const reviewerRunLimits = { maxTotalUsd: 1, outputTokenCap: null };
+
+async function fixture(t, settings = { catalog, reviewerRunLimits, builder: { model: 'anthropic-builder', thinking: 'high' }, reviewer: { model: 'openai-reviewer', thinking: null } }) {
   const directory = await mkdtemp(join(tmpdir(), 'julia-init-'));
   const settingsPath = join(directory, 'delivery-tools.json');
   await writeFile(settingsPath, `${JSON.stringify(settings)}\n`);
@@ -122,7 +124,7 @@ test('dispatch receives the issue and immutable run-file path needed by the JUL-
 
 test('the command-line entry point receives literal $init, writes the run file, and rejects /init', async (t) => {
   const { directory } = await fixture(t);
-  const { stdout } = await runCli(['$init JUL-199 --builder anthropic-builder low --reviewer openai-reviewer none'], { cwd: directory });
+  const { stdout } = await runCli(['$init JUL-199 --builder anthropic-builder low --reviewer commandcode-deepseek-reviewer none'], { cwd: directory });
 
   assert.equal(JSON.parse(stdout).issueId, 'JUL-199');
   assert.deepEqual(JSON.parse(await readFile(join(directory, '.julia', 'runs', 'JUL-199.json'), 'utf8')).configuration.builder.thinking, 'low');
@@ -139,12 +141,12 @@ test('the command-line entry point prompts for a stale role and saves its replac
     builder: { model: 'anthropic-builder', thinking: 'low' }, reviewer: { model: 'gone', thinking: null },
   })}\n`);
 
-  const result = await runCli(['$init JUL-198'], { cwd: directory, input: 'openai-reviewer none\n' });
+  const result = await runCli(['$init JUL-198'], { cwd: directory, input: 'commandcode-deepseek-reviewer none\n' });
 
   assert.equal(result.code, 0);
   assert.match(result.stderr, /\$init needs reviewer/);
   assert.equal(JSON.parse(result.stdout).configuration.builder.thinking, 'low');
-  assert.equal(JSON.parse(result.stdout).configuration.reviewer.identity, 'openai-reviewer');
+  assert.equal(JSON.parse(result.stdout).configuration.reviewer.identity, 'commandcode-deepseek-reviewer');
 });
 
 test('uses remembered defaults when neither role is supplied and updates each role independently', async (t) => {
@@ -168,7 +170,7 @@ test('rejects malformed, unknown, unsupported, ambiguous, and same-maker selecti
     maker: 'Anthropic', harness: 'claude-code', thinking: { supported: ['low'], default: 'low' }, connection: nativeConnection,
   };
   const ambiguous = { ...catalog[1], id: 'other-reviewer', displayName: 'openai-reviewer' };
-  const { directory, settingsPath } = await fixture(t, { catalog: [...catalog, sameMaker], builder: { model: 'anthropic-builder', thinking: 'high' }, reviewer: { model: 'openai-reviewer', thinking: null } });
+  const { directory, settingsPath } = await fixture(t, { catalog: [...catalog, sameMaker], reviewerRunLimits, builder: { model: 'anthropic-builder', thinking: 'high' }, reviewer: { model: 'openai-reviewer', thinking: null } });
   const stateDirectory = join(directory, 'runs');
   const calls = [];
   await runInit('$init JUL-195', { settingsPath, stateDirectory, dispatch: async (value) => calls.push(value) });
@@ -186,7 +188,7 @@ test('rejects malformed, unknown, unsupported, ambiguous, and same-maker selecti
 
   assert.equal(calls.length, 1);
   assert.equal(await readFile(join(stateDirectory, 'defaults.json'), 'utf8'), before);
-  await writeFile(settingsPath, `${JSON.stringify({ catalog: [...catalog, ambiguous], builder: { model: 'anthropic-builder', thinking: 'high' }, reviewer: { model: 'openai-reviewer', thinking: null } })}\n`);
+  await writeFile(settingsPath, `${JSON.stringify({ catalog: [...catalog, ambiguous], reviewerRunLimits, builder: { model: 'anthropic-builder', thinking: 'high' }, reviewer: { model: 'openai-reviewer', thinking: null } })}\n`);
   await assert.rejects(
     runInit('$init JUL-196 --reviewer "openai-reviewer" none', { settingsPath, stateDirectory }),
     /ambiguous/,
@@ -200,7 +202,7 @@ test('a stale remembered default asks for that role while retaining the other va
   const { directory, settingsPath } = await fixture(t);
   const stateDirectory = join(directory, 'runs');
   await writeFile(join(directory, 'delivery-tools.json'), `${JSON.stringify({
-    catalog: [catalog[0]], builder: { model: 'anthropic-builder', thinking: 'high' }, reviewer: { model: 'openai-reviewer', thinking: null },
+    catalog: [catalog[0]], reviewerRunLimits, builder: { model: 'anthropic-builder', thinking: 'high' }, reviewer: { model: 'openai-reviewer', thinking: null },
   })}\n`);
   await mkdir(join(directory, 'runs'), { recursive: true });
   await writeFile(join(directory, 'runs', 'defaults.json'), `${JSON.stringify({
@@ -277,7 +279,7 @@ test('an API-routed model snapshot keeps routing metadata and only an auth refer
     maker: 'DeepSeek', harness: 'omp', connection: apiConnection,
   };
   const { directory, settingsPath } = await fixture(t, {
-    catalog: [apiBuilder, catalog[1]], builder: { model: 'deepseek-builder', thinking: 'high' }, reviewer: { model: 'openai-reviewer', thinking: null },
+    catalog: [apiBuilder, catalog[1]], reviewerRunLimits, builder: { model: 'deepseek-builder', thinking: 'high' }, reviewer: { model: 'openai-reviewer', thinking: null },
   });
 
   const { configuration } = await runInit('$init JUL-195', { settingsPath, stateDirectory: join(directory, 'runs') });
@@ -290,7 +292,7 @@ test('resume dispatches the saved snapshot unchanged after defaults and catalog 
   const { directory, settingsPath } = await fixture(t);
   const stateDirectory = join(directory, 'runs');
   const first = await runInit('$init JUL-195 --builder anthropic-builder low --reviewer openai-reviewer none', { settingsPath, stateDirectory });
-  await writeFile(settingsPath, `${JSON.stringify({ catalog: [{ ...catalog[0], executableModelId: 'changed', connection: { ...nativeConnection, route: 'api', provider: 'Other', endpoint: 'https://changed.invalid', protocol: 'openai-compatible', authReference: 'CHANGED' } }], builder: { model: 'anthropic-builder', thinking: 'high' }, reviewer: { model: 'gone', thinking: null } })}\n`);
+  await writeFile(settingsPath, `${JSON.stringify({ catalog: [{ ...catalog[0], executableModelId: 'changed', connection: { ...nativeConnection, route: 'api', provider: 'Other', endpoint: 'https://changed.invalid', protocol: 'openai-compatible', authReference: 'CHANGED' } }], reviewerRunLimits, builder: { model: 'anthropic-builder', thinking: 'high' }, reviewer: { model: 'gone', thinking: null } })}\n`);
   const calls = [];
 
   const resumed = await runInit('$init JUL-195', { settingsPath, stateDirectory, dispatch: async (configuration) => calls.push(configuration) });

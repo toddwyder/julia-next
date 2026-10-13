@@ -10,15 +10,35 @@
       "connection": { "route": "native", "provider": null, "endpoint": null, "protocol": null, "authReference": null }
     },
     {
-      "id": "openai-reviewer",
-      "displayName": "OpenAI reviewer placeholder",
-      "executableModelId": "placeholder-openai-reviewer",
+      "id": "openai-codex-builder",
+      "displayName": "Codex",
+      "executableModelId": null,
       "maker": "OpenAI",
       "harness": "codex",
+      "thinking": { "supported": ["low", "medium", "high"], "default": "high" },
+      "connection": { "route": "native", "provider": null, "endpoint": null, "protocol": null, "authReference": null }
+    },
+    {
+      "id": "commandcode-deepseek-reviewer",
+      "displayName": "CommandCode DeepSeek Flash reviewer",
+      "executableModelId": "deepseek/deepseek-v4.1-flash",
+      "maker": "DeepSeek",
+      "harness": "omp",
       "thinking": { "supported": false, "default": null },
+      "connection": { "route": "api", "provider": "commandcode", "endpoint": "https://api.commandcode.ai/provider/v1", "protocol": "openai-compatible", "authReference": "COMMANDCODE_API_KEY" }
+    },
+    {
+      "id": "google-gemini-recovery-reviewer",
+      "displayName": "Gemini recovery reviewer",
+      "executableModelId": null,
+      "maker": "Google",
+      "harness": "agy",
+      "thinking": { "supported": ["low", "medium", "high"], "default": "medium" },
       "connection": { "route": "native", "provider": null, "endpoint": null, "protocol": null, "authReference": null }
     }
   ],
-  "builder": { "model": "anthropic-builder", "thinking": "high" },
-  "reviewer": { "model": "openai-reviewer", "thinking": null }
+  "reviewerRunLimits": { "maxTotalUsd": 1.00, "outputTokenCap": null },
+  "builder": { "model": "openai-codex-builder", "thinking": "high" },
+  "reviewer": { "model": "commandcode-deepseek-reviewer", "thinking": null },
+  "recoveryReviewer": { "model": "google-gemini-recovery-reviewer", "thinking": "medium" }
 }

@@ -7,4 +7,3 @@
 # Files installed onto the Linux server must never gain a CR: a CR after
 # `#!/bin/sh` breaks the script, and sudo rejects a rule that carries one.
 *.sh text eol=lf
-ops/sudoers/* text eol=lf

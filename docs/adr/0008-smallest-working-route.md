@@ -2,8 +2,9 @@
 
 Date: 2026-09-24
 
-Status: accepted. Partly supersedes ADR 0004 (see Consequences). The Linear parts (stuck
-alerts via Linear, models chosen on a Linear Settings card) are superseded by ADR 0009.
+Status: Accepted, partly superseded by ADR 0009. Partly supersedes ADR 0004 (see Consequences).
+The Linear parts (stuck alerts via Linear, models chosen on a Linear Settings card) are
+superseded by ADR 0009.
 
 > **Superseded in part, 2026-10-01 (ADR 0009).** Pre-merge rehearsal acceptance ("Todd follows
 > the card's steps on that copy") is retired: Factory's review merges the PR and Todd tests the

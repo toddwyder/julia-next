@@ -2,6 +2,8 @@
 
 Date: 2026-09-15
 
+Status: Accepted
+
 A recipe holds a title, a yield (a number and a word), prep and cook time, ingredient lines,
 numbered steps, notes, and a source. Nothing else: no photo, tags, rating, or history.
 

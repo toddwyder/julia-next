@@ -7,7 +7,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { mkdir } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { git, redProof, runChecks } from './julia-minimal-runner-checks.mjs';
-import { pinWorktree, seamsOf, installDependencies } from './julia-minimal-runner.mjs';
+import { pinWorktree, seamsOf, installDependencies } from './julia-delivery-workspace.mjs';
 import { loadText, saveJson } from './julia-delivery-state.mjs';
 
 const PROTECTED = ['C:/Dev/julia-next', 'C:/Dev/julia-next-jul196', 'C:/Dev/julia-next-jul196-proof'];
@@ -76,9 +76,9 @@ export async function prepareDeliveryWorkspace({ issueId, runPath, repoRoot, bas
   return { ok: true, worktree: identity, instructions };
 }
 
-export async function captureDeliveryCandidate({ issueId, runPath, workspace, card, test, round }) {
+export async function captureDeliveryCandidate({ issueId, runPath, workspace, card, test, round, evidenceName = round }) {
   const { path, repository, branch, startCommit: base } = workspace;
-  const evidencePath = join(dirname(resolve(runPath)), `${issueId}-candidate-round-${round}.json`);
+  const evidencePath = join(dirname(resolve(runPath)), `${issueId}-candidate-round-${evidenceName}.json`);
   const evidence = { base, round, commit: null, clean: false, checks: { pass: false }, redProof: { pass: false }, runs: [], evidencePath };
   if (await loadText(evidencePath) != null) return { ...evidence, checks: { pass: false, error: 'existing candidate evidence is preserved; interrupted capture/checks cannot be retried under stale evidence' } };
 
@@ -97,7 +97,7 @@ export async function captureDeliveryCandidate({ issueId, runPath, workspace, ca
     evidence.files = git(path, 'diff', '--name-status', `${base}...${commit}`);
     if (drift(commit)) throw new Error('candidate is dirty or drifted before checks');
     const seams = seamsOf(card.description);
-    if (!seams) throw new Error('approved input has no agreed Seams test files for red proof');
+    if (!seams) throw new Error('approved input has no agreed test seams for red proof');
     const checkPath = join(dirname(resolve(runPath)), `${issueId}-checks-${round}`);
     assertDeliveryPath(checkPath);
     // A prior interrupted checker is never force-reset. Its raw state survives;

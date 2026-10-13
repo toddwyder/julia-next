@@ -2,6 +2,7 @@ param(
   [Parameter(Mandatory = $true)][string]$ConfigurationPath,
   [switch]$Provision,
   [switch]$Verify,
+  [ValidateSet('init', 'readIssue')][string]$Operation = 'init',
   [string[]]$JuliaArguments
 )
 $ErrorActionPreference = 'Stop'
@@ -58,7 +59,7 @@ try {
     # Only presence flags leave the subprocess. No delivery or external service call.
     & $nodeExecutable (Join-Path $PSScriptRoot 'julia-vault.mjs') verify
   } else {
-    & $nodeExecutable (Join-Path $PSScriptRoot 'julia-vault.mjs') init @JuliaArguments
+    & $nodeExecutable (Join-Path $PSScriptRoot 'julia-vault.mjs') $Operation @JuliaArguments
   }
   if ($LASTEXITCODE -ne 0) { throw 'Julia vault subprocess failed; inspect its masked output.' }
 } finally {

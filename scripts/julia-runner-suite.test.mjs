@@ -60,7 +60,10 @@ test('the Windows CI job invokes the same complete local gate', () => {
   const windows = workflow.match(/\n  julia-init-windows:\n([\s\S]*?)(?=\n  web:)/)?.[1];
   assert.ok(windows, 'the stable JUL-197 Windows gate exists');
   assert.match(windows, /runs-on: windows-latest/);
-  assert.match(windows, /run: node scripts\/julia-runner-suite\.mjs\s*$/);
+  const reviewerInstall = /working-directory: ops\/mastra-agents\/reviewer\r?\n\s+run: npm ci/.exec(windows);
+  const suite = windows.indexOf('run: node scripts/julia-runner-suite.mjs');
+  assert.ok(reviewerInstall && reviewerInstall.index < suite, 'reviewer dependencies are installed before its tests enter the full gate');
+  assert.equal(windows.includes('run: npm test'), false, 'the reviewer package is not run twice');
 });
 
 test('new unwrapped shared safety regressions are discovered beside their imported dependencies', (t) => {
@@ -76,15 +79,29 @@ test('new unwrapped shared safety regressions are discovered beside their import
   ]);
 });
 
-test('shared regressions run directly once while known historical controller journeys retain their separate lane', (t) => {
+test('shared regressions run directly once while known wrappers retain their separate lane', (t) => {
   const root = fixture(t, {
     'graph/seat-table.test.mjs': "import './seat-table.mjs';",
     'scripts/seat-table.test.mjs': "import '../graph/seat-table.test.mjs';",
     'scripts/bad-submissions.test.mjs': "import './acceptance-check.mjs';",
-    'scripts/controller-carry.test.mjs': "import './linear-cli.mjs';",
     'tests/new-shared-safety.test.mjs': "import '../scripts/acceptance-check.mjs';",
   });
-  assert.deepEqual(discoverRunnerTests(root), ['graph/seat-table.test.mjs', 'tests/new-shared-safety.test.mjs']);
+  assert.deepEqual(discoverRunnerTests(root), [
+    'graph/seat-table.test.mjs', 'scripts/bad-submissions.test.mjs', 'tests/new-shared-safety.test.mjs',
+  ]);
+});
+
+test('the full runner gate includes the retained reviewer contract, quote and repository-root checks', (t) => {
+  const root = fixture(t, {
+    'ops/mastra-agents/reviewer/test/contract.test.mjs': '',
+    'ops/mastra-agents/reviewer/test/quote-check.test.mjs': '',
+    'ops/mastra-agents/reviewer/test/repository-root.test.mjs': '',
+  });
+  assert.deepEqual(discoverRunnerTests(root), [
+    'ops/mastra-agents/reviewer/test/contract.test.mjs',
+    'ops/mastra-agents/reviewer/test/quote-check.test.mjs',
+    'ops/mastra-agents/reviewer/test/repository-root.test.mjs',
+  ]);
 });
 
 test('new transport and secret regressions are discovered beside shared modules with relative imports', (t) => {

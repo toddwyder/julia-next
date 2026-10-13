@@ -31,12 +31,13 @@ Build test-first with `.claude/skills/tdd/SKILL.md`.
 4. **a clean browser console** — during the affected journey, no unexpected console errors or unhandled failures. Changes with no browser surface may be marked not applicable with a reason.
 5. **logging good enough to find a root cause** — lasting logs/measurements identify the failing operation and useful context, connect related events, and expose no secrets. Inspect failure-path evidence; temporary debugging or a silent non-zero exit is insufficient. Each connection between services records its own trace; a connection whose trace shows errors or calls to the wrong account fails.
 
-## Framework and design (reviewer checks)
+## Tool and design documentation (reviewer checks)
 
-- Read the framework's official docs before coding and post a framework map (need → framework feature → docs link) on the card.
-- Start from the framework's own example and change as little as possible.
+- Read the applicable official docs matched to the installed version before coding and post a framework map (need → tool or framework feature → exact documentation page) on the card. This check covers every tool used by the change, not only application frameworks.
+- Fail the change when any framework-map job lacks a cited applicable documentation page. A top-level site, search result, `llms.txt`, or `llms-full.txt` is not the cited job page; `llms.txt` is only the index used to find that page.
+- Start from the tool or framework's own example and change as little as possible.
 - Run `npm run lint:framework`. Hand-built progress files, retry or wait loops, and controller code over 400 lines are refused unless skipped with an ESLint comment that gives a reason and docs link, and listed on JUL-115.
-- Use the built-in feature of Factory, Mastra, or GitHub before building a workaround; if one is missing, state the gap, the docs checked, and the consequence.
+- Use the built-in feature of the applicable tool before building a workaround; if one is missing, state the gap, the exact docs page checked, and the consequence.
 
 ## Integrity (reviewer checks that protect approval and merge)
 

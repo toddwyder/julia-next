@@ -24,7 +24,7 @@ import { parseEnv } from 'node:util';
 // how Node loads the App's credentials into process.env -- omit it and
 // JULIA_PUBLISHER_APP_ID/_PRIVATE_KEY are simply unset, which is also
 // exactly what the Bash *permission grant* requires verbatim to allow the
-// call at all (`julia-run.mjs`'s startOrchestrator allowlist), so the
+// call at all (the retired server launcher's allowlist required it), so the
 // command was refused before main() ever ran. This mirrors the same
 // morning's absolute-vs-relative-path mismatch on the other granted
 // scripts: a session forgetting one exact invocation detail loses the

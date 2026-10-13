@@ -3,7 +3,7 @@
 import { readFile } from 'node:fs/promises';
 
 const ROLES = Object.freeze(['builder', 'reviewer']);
-const HARNESSES = new Set(['claude-code', 'codex', 'omp']);
+const HARNESSES = new Set(['claude-code', 'codex', 'omp', 'agy']);
 const CONNECTION_FIELDS = Object.freeze(['provider', 'endpoint', 'protocol', 'authReference']);
 
 function reject(reason) {
@@ -88,10 +88,14 @@ function validateCatalog(catalog) {
     if (!nonEmptyString(entry.id) || /\s/.test(entry.id)) reject(`${label} ID must be a non-empty string without spaces`);
     if (ids.has(entry.id)) reject(`duplicate catalog ID "${entry.id}"`);
     ids.add(entry.id);
-    for (const field of ['displayName', 'executableModelId', 'maker']) {
+    for (const field of ['displayName', 'maker']) {
       if (!nonEmptyString(entry[field])) reject(`${label} ${field} must be a non-empty string`);
     }
     if (!nonEmptyString(entry.harness) || !HARNESSES.has(entry.harness)) reject(`${label} has unknown harness ${JSON.stringify(entry.harness)}`);
+    if (!nonEmptyString(entry.executableModelId)
+      && !(entry.executableModelId === null && ['codex', 'agy'].includes(entry.harness) && entry.connection?.route === 'native')) {
+      reject(`${label} executableModelId must be a non-empty string, or null for a supported native CLI default`);
+    }
     validateThinking(entry.thinking, label);
     validateConnection(entry.connection, label);
   }
@@ -121,15 +125,31 @@ function validateRole(role, choice, catalog) {
   return { role, model, thinking };
 }
 
+function validateReviewerRunLimits(limits) {
+  if (!isObject(limits)) reject('reviewerRunLimits must be an object');
+  checkKeys(limits, ['maxTotalUsd', 'outputTokenCap'], 'reviewerRunLimits');
+  if (!Number.isFinite(limits.maxTotalUsd) || limits.maxTotalUsd < 0) reject('reviewerRunLimits maxTotalUsd must be a non-negative number');
+  if (limits.outputTokenCap !== null) reject('reviewerRunLimits outputTokenCap must be null');
+  return { maxTotalUsd: limits.maxTotalUsd, outputTokenCap: null };
+}
+
 export function validateDeliveryToolSettings(settings) {
   if (!isObject(settings)) reject('must be an object');
-  checkKeys(settings, ['catalog', ...ROLES], 'settings');
+  checkKeys(settings, ['catalog', 'reviewerRunLimits', ...ROLES, 'recoveryReviewer'], 'settings');
   const catalog = validateCatalog(settings.catalog);
   const resolved = Object.fromEntries(ROLES.map((role) => [role, validateRole(role, settings[role], catalog)]));
   if (canonicalMaker(resolved.builder.model.maker) === canonicalMaker(resolved.reviewer.model.maker)) {
     reject(`builder and reviewer both resolve to maker ${JSON.stringify(resolved.builder.model.maker)}; they must use different makers`);
   }
-  return resolved;
+  const recoveryReviewer = settings.recoveryReviewer
+    ? validateRole('recoveryReviewer', settings.recoveryReviewer, catalog)
+    : (catalog.some(entry => entry.id === 'google-gemini-recovery-reviewer')
+      ? validateRole('recoveryReviewer', { model: 'google-gemini-recovery-reviewer' }, catalog)
+      : null);
+  if (recoveryReviewer && canonicalMaker(recoveryReviewer.model.maker) === canonicalMaker(resolved.builder.model.maker)) {
+    reject(`builder and recovery reviewer both resolve to maker ${JSON.stringify(resolved.builder.model.maker)}; they must use different makers`);
+  }
+  return { ...resolved, ...(recoveryReviewer ? { recoveryReviewer } : {}), reviewerRunLimits: validateReviewerRunLimits(settings.reviewerRunLimits) };
 }
 
 export async function loadDeliveryToolSettings(path, { read = readFile } = {}) {

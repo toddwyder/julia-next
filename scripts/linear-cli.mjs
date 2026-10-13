@@ -15,11 +15,11 @@ const LINEAR_GRAPHQL_URL = 'https://api.linear.app/graphql';
 // DIFFERENTLY. A personal API key (`lin_api_...`) is sent raw, with no scheme
 // prefix -- Linear expects exactly that, and scripts/linear-cli.test.mjs pins
 // it. An OAuth access token, which is what the "Julia controller" app gets from
-// the client-credentials grant (graph/controller/token.mjs), is a bearer token
+// a client-credentials grant, is a bearer token
 // and must be sent as `Bearer <token>`; sent raw it is refused.
 //
 // JUL-98 step 2: `accessToken` is the app path and is what
-// graph/controller/board.mjs passes, so the controller writes to the board as
+// an authenticated caller passes, so it writes to the board as
 // its own identity. The `apiKey` path is untouched -- the coordinator, the
 // Ready queue and every existing caller still use it.
 export async function linearGraphQL(query, variables, { apiKey, accessToken, fetchImpl = fetch, url = LINEAR_GRAPHQL_URL } = {}) {
@@ -37,7 +37,7 @@ export async function linearGraphQL(query, variables, { apiKey, accessToken, fet
     // JUL-98 step 2: the controller has to tell an EXPIRED TOKEN (renew and
     // retry once) from a scope error, a rate limit or a bad query (do not).
     // A message string cannot carry that, so the status and the parsed body
-    // travel on the error itself; graph/controller/token.mjs isAuthRefusal is
+    // travel on the error itself; callers can classify an auth refusal from
     // the one place that reads them. The message is unchanged, so every
     // existing caller and test still matches on it.
     const error = new Error(`Linear API error: ${res.status} ${JSON.stringify(body.errors ?? body)}`);
@@ -53,6 +53,7 @@ export async function linearGraphQL(query, variables, { apiKey, accessToken, fet
 // (seat-labels.mjs's seatChoicesForIssue). `state` was already here.
 const GET_ISSUE_QUERY = `
   query GetIssue($id: String!) {
+    viewer { id name }
     issue(id: $id) {
       id
       identifier
@@ -69,7 +70,7 @@ export async function getIssue(identifier, opts) {
   const query = opts?.includeComments ? GET_ISSUE_QUERY.replace('labels { nodes { name } }', 'labels { nodes { name } }\n      comments(first: 250) { nodes { id body createdAt updatedAt user { name } } pageInfo { hasNextPage } }') : GET_ISSUE_QUERY;
   const data = await linearGraphQL(query, { id: identifier }, opts);
   if (opts?.includeComments && data.issue && (data.issue.comments?.pageInfo?.hasNextPage !== false || !Array.isArray(data.issue.comments?.nodes))) throw new Error('incomplete specification comments; refusing truncated intake');
-  return data.issue;
+  return data.issue ? { ...data.issue, linearActor: data.viewer ?? null } : data.issue;
 }
 
 const ISSUE_ID_QUERY = `
@@ -193,9 +194,15 @@ export async function postComment(identifier, body, opts) {
     throw guardRefusalError(guard);
   }
   const { issue } = await linearGraphQL(ISSUE_ID_QUERY, { id: identifier }, opts);
-  const data = await linearGraphQL(COMMENT_CREATE_MUTATION, { issueId: issue.id, body }, opts);
+  return postCommentToIssueId(issue.id, body, opts);
+}
+
+export async function postCommentToIssueId(issueId, body, opts) {
+  const guard = checkForToddGuard(body);
+  if (!guard.ok) throw guardRefusalError(guard);
+  const data = await linearGraphQL(COMMENT_CREATE_MUTATION, { issueId, body }, opts);
   if (!data.commentCreate.success) {
-    throw new Error(`commentCreate did not report success for ${identifier}`);
+    throw new Error(`commentCreate did not report success for ${issueId}`);
   }
   return data.commentCreate.comment;
 }

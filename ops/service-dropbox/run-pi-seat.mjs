@@ -7,11 +7,11 @@
 // JUL-79 step 3 adds an optional effort (Low/Medium/High, default Medium) to
 // every seat, translated here to Pi's own spelling: Pi has no graded effort
 // setting, only `--thinking` on/off, so Low is off and Medium/High are on.
-// The launcher on the other side (scripts/julia-run.mjs) passes the neutral
-// `--effort <level>` label, never a vendor flag, so this module stays the one
+// The laptop runner adapter passes the neutral `--effort <level>` label,
+// never a vendor flag, so this module stays the one
 // place that knows how Pi spells it. Duplicating the low/medium/high default
 // rule from scripts/effort.mjs is deliberate: the seat namespace here
-// (`builder-backup`, `orchestrator-deepseek`) is not the seat-table entry
+// (`builder-backup`, `reviewer-backup`) is not the seat-table entry
 // namespace there (`pi-deepseek`), so the two maps cannot literally be one.
 import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -216,8 +216,8 @@ export function supervisePiSeat(child, { stdout = process.stdout, stderr = proce
 }
 
 // CLI entry: `{ cat SKILL.md; printf ...; } | node run-pi-seat.mjs <seat>
-// [--effort low|medium|high]` -- mirrors julia-run.mjs's existing codex launch
-// pattern (prompt text piped in via stdin, not an argv entry) so the same
+// [--effort low|medium|high]` -- matches the laptop adapter's launch pattern
+// (prompt text piped in via stdin, not an argv entry) so the same
 // shell-command string works for every seat, and never carries a secret
 // itself -- the secret is read in-process by buildPiSpawnSpec above.
 export function readAllStdin({ readFileSyncImpl = readFileSync } = {}) {

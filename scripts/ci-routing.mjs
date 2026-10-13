@@ -6,7 +6,7 @@ const GATE_PATHS = {
   'julia-init-windows': [
     /^scripts\/(?:.*\/)?julia-(?:init|delivery|graph-model|minimal-runner|runner)/,
     /^scripts\/(?:delivery-tool-settings|acceptance-check|linear-cli|effort|seat-labels|seat-table|verify-reviewer-worktree|line-endings|no-personal-paths|personal-paths|service-dropbox-(?:run-agy-seat|run-pi-seat|read-secret))\./,
-    /^ops\/julia-runner\//, /^ops\/service-dropbox\/(?:run-agy-seat|run-pi-seat|read-secret)\./,
+    /^ops\/julia-runner\//, /^ops\/mastra-agents\/reviewer\//, /^ops\/service-dropbox\/(?:run-agy-seat|run-pi-seat|read-secret)\./,
     /^graph\/seat-table\./, /^delivery-tools\.json$/, /^\.(?:agents|claude)\/skills\/implement\//,
     /^docs\/agents\/(?:init|work-execution|runner-tests)\.md$/,
   ],

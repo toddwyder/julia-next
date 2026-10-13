@@ -8,7 +8,8 @@ import { assertDeliveryPath } from './julia-delivery-candidate.mjs';
 import { fileURLToPath } from 'node:url';
 
 import { validateDeliveryToolSettings } from './delivery-tool-settings.mjs';
-import { startDelivery, authorizationReason } from './julia-delivery-runner.mjs';
+import { authorizationReason } from './julia-delivery-runner.mjs';
+import { startMastraDelivery } from './julia-mastra-delivery.mjs';
 
 const ROLE_FLAGS = Object.freeze({ '--builder': 'builder', '--reviewer': 'reviewer' });
 const ISSUE_ID = /^[A-Z][A-Z0-9]*-\d+$/;
@@ -86,7 +87,7 @@ async function recordEvent(path, event, { mkdirImpl = mkdir, append = appendFile
 }
 
 function snapshot(resolved) {
-  return Object.fromEntries(['builder', 'reviewer'].map((role) => {
+  return Object.fromEntries(['builder', 'reviewer', ...(resolved.recoveryReviewer ? ['recoveryReviewer'] : [])].map((role) => {
     const { model, thinking } = resolved[role];
     return [role, {
       identity: model.id,
@@ -114,7 +115,7 @@ function resolveSelections(settings, defaults, explicit) {
     reviewer: explicit.reviewer ?? (defaults === null ? settings.reviewer : defaults?.reviewer),
   };
   try {
-    return { selected, resolved: validateDeliveryToolSettings({ catalog: settings.catalog, ...selected }) };
+    return { selected, resolved: validateDeliveryToolSettings({ catalog: settings.catalog, reviewerRunLimits: settings.reviewerRunLimits, recoveryReviewer: settings.recoveryReviewer, ...selected }) };
   } catch (error) {
     const missing = ['builder', 'reviewer'].filter((role) => !explicit[role] && isStaleChoice(selected[role], settings.catalog));
     if (missing.length) throw new SelectionRequiredError(missing, selected);
@@ -238,10 +239,9 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const prompts = createInterface({ input: process.stdin, output: process.stderr });
   try {
     const result = await runInitCli(process.argv.slice(2).join(' '), {
-      dispatch: async (configuration, { issueId, runPath, authorization }) => startDelivery(issueId, configuration, {
+      dispatch: async (configuration, { issueId, runPath, authorization }) => startMastraDelivery(issueId, configuration, {
         runPath, authorization,
-        releaseConfiguration: process.env.JULIA_RELEASE_CONFIG ? JSON.parse(await readFile(process.env.JULIA_RELEASE_CONFIG, 'utf8')) : undefined,
-        uatDecision: process.env.JULIA_UAT_DECISION ? JSON.parse(await readFile(process.env.JULIA_UAT_DECISION, 'utf8')) : undefined,
+        decision: process.env.JULIA_TECHNICAL_ACCEPTANCE ? JSON.parse(await readFile(process.env.JULIA_TECHNICAL_ACCEPTANCE, 'utf8')) : undefined,
       }),
       logger: (event) => console.error(JSON.stringify(event)),
       ask: (role) => prompts.question(`$init needs ${role}; enter its exact model name or ID and thinking level: `),

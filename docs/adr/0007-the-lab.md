@@ -2,7 +2,7 @@
 
 Date: 2026-09-16
 
-Status: accepted; amended 2026-09-16 to name the pairing sources (see Consequences).
+Status: Accepted; amended 2026-09-16 to name the pairing sources (see Consequences).
 
 The Lab takes a spark and a time budget and answers with four variations, each a different use
 of an ingredient-pairing graph: the spark's closest partners (Classic), a plausible but rarely

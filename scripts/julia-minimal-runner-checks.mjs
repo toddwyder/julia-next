@@ -1,5 +1,5 @@
-// julia-minimal-runner-checks.mjs -- the red proof and the checks for
-// julia-minimal-runner.mjs (JUL-122). The runner never runs a candidate's
+// Red proof and check helpers retained from JUL-122 for the Mastra workflow.
+// The workflow never runs a candidate's
 // tests itself: every lint, suite and seam-test run is a request to the test
 // worker, `test({ worktree, run, files })`, which on the server runs in its
 // own account with no access to the runner's Linear credential. Git work
@@ -37,7 +37,20 @@ export function testCommand({ run, files = [] }) {
 // A `node --test` started from inside another test run inherits
 // NODE_TEST_CONTEXT and then exits 0 even when its tests fail (measured
 // 24 Sep, Node 24). No test run may inherit it.
-const { NODE_TEST_CONTEXT: _inherited, ...TEST_ENV } = process.env;
+const SAFE_ENVIRONMENT_KEYS = new Set([
+  'APPDATA', 'CI', 'COMSPEC', 'HOMEDRIVE', 'HOMEPATH', 'LOCALAPPDATA',
+  'NO_COLOR', 'NUMBER_OF_PROCESSORS', 'OS', 'PATH', 'PATHEXT', 'PROCESSOR_ARCHITECTURE',
+  'PROGRAMDATA', 'PROGRAMFILES', 'PROGRAMFILES(X86)', 'SYSTEMDRIVE', 'SYSTEMROOT',
+  'TEMP', 'TMP', 'USERPROFILE', 'WINDIR',
+]);
+
+// Candidate-controlled commands receive only operating-system plumbing. In
+// particular, credentials resolved by the vault wrapper are never inherited.
+export function safeWorkerEnvironment(environment = process.env) {
+  return Object.fromEntries(Object.entries(environment).filter(([key]) => SAFE_ENVIRONMENT_KEYS.has(key.toUpperCase())));
+}
+
+const TEST_ENV = safeWorkerEnvironment();
 
 // The test worker as a plain local process: what the fixture tests use, and
 // what the server's worker does inside its own account.
@@ -88,7 +101,9 @@ export async function runChecks({ worktree, branch, base, test, strict = false }
 // Returns a reason the proof failed, or null.
 export async function redProof({ worktree, branch, base, sha, seams, test }) {
   const passes = async (files) => (await test({ worktree, run: 'files', files })).status === 0;
-  const atSeam = (paths) => paths.filter((path) => seams.tests.some((seam) => path.endsWith(seam)));
+  const atSeam = (paths) => seams.tests
+    ? paths.filter((path) => seams.tests.some((seam) => path.endsWith(seam)))
+    : paths.filter((path) => path.endsWith('.test.mjs'));
   const changedTests = atSeam(git(worktree, 'diff', '--name-only', '--diff-filter=AM', `${base}...${sha}`).split('\n').filter(Boolean));
   if (seams.kind === 'refactor') {
     const edited = atSeam(git(worktree, 'diff', '--name-only', `${base}...${sha}`).split('\n').filter(Boolean));
@@ -99,7 +114,9 @@ export async function redProof({ worktree, branch, base, sha, seams, test }) {
     if (!(await onCommit({ worktree, branch, commit: base }, () => passes(existing)))) return 'red proof: the seam tests already fail on the start commit';
     return null;
   }
-  if (!changedTests.length) return `red proof: the change adds or changes none of the seam tests (${seams.tests.join(', ')})`;
+  if (!changedTests.length) return seams.tests
+    ? `red proof: the change adds or changes none of the seam tests (${seams.tests.join(', ')})`
+    : 'red proof: the change adds or changes no test for the agreed behavior seams';
   if (!(await passes(changedTests))) return 'red proof: the seam tests fail on the candidate';
   const greenOnBase = await onCommit({ worktree, branch, commit: base, carry: changedTests, sha }, () => passes(changedTests));
   if (greenOnBase) return `red proof: ${changedTests.join(', ')} already pass on the start commit, so they do not test the change`;
