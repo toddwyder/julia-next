@@ -81,6 +81,10 @@ Before any task, verify the applicable entry points, the launcher's accepted com
 configuration and authorized spend limits, required credentials, and branch/worktree state. Fix
 what is safely fixable before starting work. Spend limits belong in
 accepted ADRs and dated card decisions, never in prompts. The reviewer limit is **$1.00 per card**.
+On Windows, every local command that needs a Julia vault secret must run through
+`scripts/julia-vault-windows.ps1`; its default configuration is the provisioned restricted Julia
+service account. Never use personal 1Password desktop authentication for those commands. Direct
+`julia-vault.mjs` key operations fail closed when the service-account bootstrap is absent.
 
 ## Server and domain
 
