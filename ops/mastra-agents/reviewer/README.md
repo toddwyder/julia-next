@@ -17,6 +17,10 @@ candidate invalidates the answer, reruns checks and review, and suspends again.
 Acceptance records the exact reviewed commit and stops; it never merges,
 previews, publishes, emails, pushes, or writes a Linear waiting comment.
 
+Start authorization includes `linearActorId`. The single Linear intake query
+returns both the card and authenticated viewer; a mismatch stops before any
+update, and the verified actor is retained in each start/park update journal.
+
 Steps exchange durable paths rather than file contents. The production adapter
 in `scripts/julia-mastra-delivery.mjs` reuses the existing authorization,
 Linear, worktree, candidate, check, launcher, and reviewer boundaries. Local
@@ -28,7 +32,7 @@ Reused boundary map:
 | Workflow responsibility | Existing source retained |
 | --- | --- |
 | Start authorization and canonical implement prompt | `scripts/julia-delivery-runner.mjs` (`authorizationReason`, `workerPrompt`) |
-| One complete card read and start/park comments | `scripts/linear-cli.mjs` (`getIssue`, `postComment`) |
+| One complete card read and start/park comments | `scripts/linear-cli.mjs` (`getIssue`, `postCommentToIssueId`) |
 | Builder and Mastra reviewer process launch | `scripts/julia-delivery-runner.mjs` (`productionLauncher`) |
 | Isolated worktree and pinned canonical implement instructions | `scripts/julia-delivery-candidate.mjs`, with setup helpers moved intact to `scripts/julia-delivery-workspace.mjs` |
 | SHA, branch, dirty-tree, red-proof, and check guards | `scripts/julia-delivery-candidate.mjs` and `scripts/julia-minimal-runner-checks.mjs` |

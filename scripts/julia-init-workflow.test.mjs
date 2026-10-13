@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 
 const entry = resolve('scripts/julia-init.mjs');
 const authorize = {
-  issueId: 'JUL-196', explicitStart: true, authorizedBy: 'offline workflow test',
+  issueId: 'JUL-196', explicitStart: true, authorizedBy: 'offline workflow test', linearActorId: 'offline-linear-actor',
   spending: { builder: { mode: 'fixture', maxUsd: 0 }, reviewer: { mode: 'fixture', maxUsd: 0 } },
 };
 

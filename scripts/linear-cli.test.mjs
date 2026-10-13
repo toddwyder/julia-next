@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { linearGraphQL, getIssue, postComment, checkForToddGuard } from './linear-cli.mjs';
+import { linearGraphQL, getIssue, postComment, postCommentToIssueId, checkForToddGuard } from './linear-cli.mjs';
 
 function fakeFetch(responses) {
   let call = 0;
@@ -37,11 +37,12 @@ test('linearGraphQL throws with the response errors on a non-ok or errored respo
 
 test('getIssue reads back the issue fields', async () => {
   const fetchImpl = fakeFetch([
-    { body: { data: { issue: { id: 'uuid-1', identifier: 'JUL-77', title: 'Seat table', url: 'https://linear.app/x' } } } },
+    { body: { data: { viewer: { id: 'actor-1', name: 'Julia' }, issue: { id: 'uuid-1', identifier: 'JUL-77', title: 'Seat table', url: 'https://linear.app/x' } } } },
   ]);
   const issue = await getIssue('JUL-77', { apiKey: 'k', fetchImpl });
   assert.equal(issue.identifier, 'JUL-77');
   assert.equal(issue.title, 'Seat table');
+  assert.deepEqual(issue.linearActor, { id: 'actor-1', name: 'Julia' });
 });
 
 test('getIssue asks Linear for the issue labels (and its state), so the coordinator can resolve the seats', async () => {
@@ -75,6 +76,14 @@ test('postComment resolves the identifier to a UUID first, then creates the comm
     { body: { data: { commentCreate: { success: true, comment: { id: 'c1', url: 'https://linear.app/c1' } } } } },
   ]);
   const comment = await postComment('JUL-77', 'hello from the Linear command', { apiKey: 'k', fetchImpl });
+  assert.equal(comment.id, 'c1');
+});
+
+test('postCommentToIssueId uses the already-read UUID without another card lookup', async () => {
+  const fetchImpl = fakeFetch([
+    { body: { data: { commentCreate: { success: true, comment: { id: 'c1', url: 'https://linear.app/c1' } } } } },
+  ]);
+  const comment = await postCommentToIssueId('uuid-77', 'hello from the Linear command', { apiKey: 'k', fetchImpl });
   assert.equal(comment.id, 'c1');
 });
 

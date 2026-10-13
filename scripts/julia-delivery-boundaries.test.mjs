@@ -11,9 +11,10 @@ import { createExistingDeliveryStepAdapters } from '../ops/mastra-agents/reviewe
 
 test('authorization and canonical builder prompt retain the approved production boundaries', () => {
   const configuration = { builder: { harness: 'codex' }, reviewer: { harness: 'commandcode' } };
-  const authorization = { issueId: 'JUL-196', explicitStart: true, authorizedBy: 'Todd', spending: { builder: { mode: 'subscription', maxUsd: 0 }, reviewer: { mode: 'paid', maxUsd: 1 } } };
+  const authorization = { issueId: 'JUL-196', explicitStart: true, authorizedBy: 'Todd', linearActorId: 'linear-actor-1', spending: { builder: { mode: 'subscription', maxUsd: 0 }, reviewer: { mode: 'paid', maxUsd: 1 } } };
   assert.equal(authorizationReason(authorization, 'JUL-196', configuration), null);
   assert.match(authorizationReason({ ...authorization, explicitStart: false }, 'JUL-196', configuration), /explicit start/);
+  assert.match(authorizationReason({ ...authorization, linearActorId: '' }, 'JUL-196', configuration), /Linear actor/);
   const prompt = workerPrompt('builder', { identifier: 'JUL-196' }, configuration, 'run.json', 'approved.json');
   assert.match(prompt, /\.claude\/skills\/implement\/SKILL\.md/);
   assert.match(prompt, /do not reread Linear/);

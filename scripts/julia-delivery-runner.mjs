@@ -14,6 +14,7 @@ const plain = value => JSON.parse(JSON.stringify(value));
 
 export function authorizationReason(authorization, issueId, configuration) {
   if (!authorization || authorization.explicitStart !== true || authorization.issueId !== issueId || (typeof authorization.authorizedBy !== 'string' || !authorization.authorizedBy.trim())) return 'explicit start authorization for this issue is required';
+  if (typeof authorization.linearActorId !== 'string' || !authorization.linearActorId.trim()) return 'authorized Linear actor identity is required';
   for (const role of ['builder', 'reviewer']) {
     const spend = authorization.spending?.[role];
     if (!spend || !['subscription', 'paid', 'fixture'].includes(spend.mode) || !Number.isFinite(spend.maxUsd) || spend.maxUsd < 0) return `explicit ${role} spending choice is required`;

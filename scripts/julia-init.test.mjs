@@ -9,7 +9,7 @@ import { test } from 'node:test';
 
 import { parseInitCommand, runInit as init, runInitCli as initCli } from './julia-init.mjs';
 
-const authorize = issueId => ({ issueId, explicitStart: true, authorizedBy: 'fixture operator', spending: { builder: { mode: 'fixture', maxUsd: 0 }, reviewer: { mode: 'fixture', maxUsd: 0 } } });
+const authorize = issueId => ({ issueId, explicitStart: true, authorizedBy: 'fixture operator', linearActorId: 'fixture-linear-actor', spending: { builder: { mode: 'fixture', maxUsd: 0 }, reviewer: { mode: 'fixture', maxUsd: 0 } } });
 const runInit = async (command, options) => init(command, { authorization: authorize(parseInitCommand(command).issueId), ...options });
 const runInitCli = async (command, options) => initCli(command, { authorization: authorize(parseInitCommand(command).issueId), ...options });
 

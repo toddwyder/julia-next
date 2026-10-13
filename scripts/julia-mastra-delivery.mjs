@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 
-import { getIssue, postComment } from './linear-cli.mjs';
+import { getIssue, postCommentToIssueId } from './linear-cli.mjs';
 import { authorizationReason, productionLauncher, workerPrompt } from './julia-delivery-runner.mjs';
 import { assertDeliveryPath, captureDeliveryCandidate, prepareDeliveryWorkspace } from './julia-delivery-candidate.mjs';
 import { git, localTester } from './julia-minimal-runner-checks.mjs';
@@ -14,9 +14,10 @@ import { createExistingDeliveryStepAdapters } from '../ops/mastra-agents/reviewe
 
 const readJson = async path => JSON.parse(await readFile(path, 'utf8'));
 
-function cardReason(card, issueId) {
+function cardReason(card, issueId, authorization) {
   if (!card || card.identifier == null) return 'Linear did not return a card';
   if (card.identifier !== issueId) return `Linear returned ${card.identifier}, not ${issueId}`;
+  if (!card.linearActor?.id || card.linearActor.id !== authorization?.linearActorId) return 'Linear actor does not match the authorized account';
   if (!/^##\s+Acceptance criteria\s*$/mi.test(card.description ?? '')) return 'card has no approved acceptance criteria';
   return null;
 }
@@ -57,8 +58,8 @@ export function createMastraDeliveryAdapters({
   worktree,
   base,
   readCard = id => getIssue(id, { apiKey: process.env.LINEAR_API_KEY, includeComments: true }),
-  startCard = (id, commit) => postComment(id, `Runner started from ${commit}.`, { apiKey: process.env.LINEAR_API_KEY }),
-  parkCard = (id, reason) => postComment(id, `Runner parked: ${reason}`, { apiKey: process.env.LINEAR_API_KEY }),
+  startCard = (card, commit) => postCommentToIssueId(card.id, `Runner started from ${commit}.`, { apiKey: process.env.LINEAR_API_KEY }),
+  parkCard = (card, reason) => postCommentToIssueId(card.id, `Runner parked: ${reason}`, { apiKey: process.env.LINEAR_API_KEY }),
   launch,
   test = request => localTester(request.run === 'suite' ? { ...request, run: 'runnerSuite' } : request),
 } = {}) {
@@ -131,8 +132,8 @@ export function createMastraDeliveryAdapters({
         await runDurableExternalUpdate({
           requestPath: join(input.runDirectory, 'linear-park-request.json'),
           resultPath: join(input.runDirectory, 'linear-park-result.json'),
-          request: { operation: 'park-card', card: approvedInput.issueId, reason },
-          operation: () => parkCard(approvedInput.issueId, reason),
+          request: { operation: 'park-card', card: approvedInput.issueId, actor: approvedInput.card.linearActor, reason },
+          operation: () => parkCard(approvedInput.card, reason),
         });
         return writeOnce(join(input.runDirectory, 'park.json'), { card: approvedInput.issueId, reason });
       },
@@ -149,7 +150,7 @@ export function createMastraDeliveryAdapters({
     cardRead: async input => {
       const launchInput = await readJson(input.launchInputPath);
       const card = { ...await readCard(launchInput.issueId), expectedId: launchInput.issueId };
-      const reason = cardReason(card, launchInput.issueId);
+      const reason = cardReason(card, launchInput.issueId, launchInput.authorization);
       if (reason) throw new Error(reason);
       const prepared = await prepareDeliveryWorkspace({
         issueId: launchInput.issueId, runPath: launchInput.runPath, repoRoot,
@@ -175,8 +176,8 @@ export function createMastraDeliveryAdapters({
       await runDurableExternalUpdate({
         requestPath: join(input.runDirectory, 'linear-start-request.json'),
         resultPath: join(input.runDirectory, 'linear-start-result.json'),
-        request: { operation: 'start-card', card: launchInput.issueId, startCommit: prepared.worktree.startCommit },
-        operation: () => startCard(launchInput.issueId, prepared.worktree.startCommit),
+        request: { operation: 'start-card', card: launchInput.issueId, actor: card.linearActor, startCommit: prepared.worktree.startCommit },
+        operation: () => startCard(card, prepared.worktree.startCommit),
       });
       return { resultPath: approvedInputPath };
     },
