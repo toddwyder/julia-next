@@ -143,6 +143,23 @@ export function createMastraDeliveryAdapters({
         });
         return writeOnce(join(input.runDirectory, 'park.json'), { card: approvedInput.issueId, reason });
       },
+      recoverCrash: async input => {
+        const approvedInput = await readJson(input.approvedInputPath);
+        const crash = await readJson(input.crashPath);
+        const checks = await readJson(input.checksResultPath);
+        const authorizedUsd = approvedInput.authorization?.spending?.reviewer?.maxUsd;
+        return writeOnce(join(input.runDirectory, `recovery-${crash.incidentId}.json`), {
+          status: 'PARK', incidentId: crash.incidentId, interruptedStep: crash.step,
+          crashPath: input.crashPath,
+          rootCause: 'automatic recovery is parked because no authorized independent bypass reviewer is configured',
+          recoveryCommit: null, fixer: null, reviewer: null,
+          reviewBypassedFailedStep: false, reviewResult: 'NOT_RUN', verificationResult: 'NOT_RUN',
+          resumePoint: crash.step, candidateCommit: checks.candidateCommit ?? checks.change,
+          spend: { authorizedUsd: Number.isFinite(authorizedUsd) ? authorizedUsd : 0, spentUsd: 0, maximumAdditionalUsd: 0 },
+          originalPaidRequest: { acceptance: crash.providerAcceptance, costUsd: crash.costUsd },
+          reason: 'recovery parked: no authorized independent route bypasses the crashed reviewer launcher',
+        });
+      },
     });
     return existingSteps;
   };
@@ -199,6 +216,7 @@ export function createMastraDeliveryAdapters({
     builder: async input => (await steps(input.approvedInputPath)).builder(input),
     checks: async input => (await steps(input.approvedInputPath)).checks(input),
     reviewer: async input => (await steps(input.approvedInputPath)).reviewer(input),
+    recoverCrash: async input => (await steps(input.approvedInputPath)).recoverCrash(input),
     waitingRecord: async input => (await steps(input.approvedInputPath)).waitingRecord(input),
     validateCandidate: async input => (await steps(input.approvedInputPath)).validateCandidate(input),
     recordAcceptance: async input => (await steps(input.approvedInputPath)).recordAcceptance(input),

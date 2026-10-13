@@ -25,8 +25,10 @@ test('candidate processes receive operating-system plumbing but no controller se
   const environment = { PATH: 'safe-path', SystemRoot: 'safe-root', LINEAR_API_KEY: 'linear-secret', OP_SERVICE_ACCOUNT_TOKEN: 'vault-secret', RANDOM_SECRET: 'secret' };
   assert.deepEqual(safeWorkerEnvironment(environment), { PATH: 'safe-path', SystemRoot: 'safe-root' });
   let launchedEnvironment;
+  let launchedArguments;
   let recordedPid;
-  const run = async (_command, _args, options, limits) => {
+  const run = async (_command, args, options, limits) => {
+    launchedArguments = args;
     launchedEnvironment = options.env;
     const sink = { on() {}, end() {} };
     limits.started({ pid: 42, stdout: sink, stderr: sink, stdin: sink, kill() {} });
@@ -35,7 +37,7 @@ test('candidate processes receive operating-system plumbing but no controller se
   };
   const launch = productionLauncher('C:\\candidate', { run, environment, findExecutable: () => 'codex', sessionRoot: 'C:\\missing' });
   await launch('builder', {
-    configuration: { harness: 'codex', model: 'stand-in', maker: 'OpenAI' }, prompt: 'offline',
+    configuration: { harness: 'codex', model: null, maker: 'OpenAI' }, prompt: 'offline',
     started: async ({ pid }) => { recordedPid = pid; },
   });
   assert.equal(recordedPid, 42);
@@ -43,6 +45,7 @@ test('candidate processes receive operating-system plumbing but no controller se
   assert.equal(launchedEnvironment.LINEAR_API_KEY, undefined);
   assert.equal(launchedEnvironment.OP_SERVICE_ACCOUNT_TOKEN, undefined);
   assert.equal(launchedEnvironment.RANDOM_SECRET, undefined);
+  assert.equal(launchedArguments.includes('-m'), false, 'Codex chooses its current default model');
 });
 
 test('an ambiguous in-flight worker is journaled and never launched twice', async t => {

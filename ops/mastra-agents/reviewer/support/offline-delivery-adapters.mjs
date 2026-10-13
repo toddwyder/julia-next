@@ -53,6 +53,18 @@ export function createOfflineDeliveryAdapters({ directory, callsPath, verdicts =
         model: 'stand-in-reviewer', effort: 'none', inputTokens: 0, outputTokens: 0, costEstimateUsd: 0,
       });
     },
+    recoverCrash: async ({ round, crashPath }) => {
+      await record({ kind: 'recovery', round });
+      return resultFile(`recovery-${round}.json`, {
+        status: 'PARK', incidentId: `offline-${round}`, interruptedStep: 'reviewer-launch', crashPath,
+        rootCause: 'offline fixture has no configured recovery route', recoveryCommit: null,
+        fixer: null, reviewer: null, reviewBypassedFailedStep: false, reviewResult: 'NOT_RUN',
+        verificationResult: 'NOT_RUN', resumePoint: 'reviewer-launch', candidateCommit: `offline-candidate-${await candidateVersion()}`,
+        spend: { authorizedUsd: 0, spentUsd: 0, maximumAdditionalUsd: 0 },
+        originalPaidRequest: { acceptance: 'not-accepted', costUsd: 0 },
+        reason: 'offline fixture recovery was not configured',
+      });
+    },
     waitingRecord: async ({ round, builderResultPath, checksResultPath, reviewResultPath }) => {
       await record({ kind: 'waiting', round });
       const version = await candidateVersion();

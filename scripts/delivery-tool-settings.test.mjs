@@ -70,7 +70,10 @@ test('loads complete effective configurations by exact catalog ID and display na
 test('loads the checked-in catalog without a worker launch', async () => {
   const settings = await loadDeliveryToolSettings(new URL('../delivery-tools.json', import.meta.url));
 
-  assert.equal(settings.builder.model.id, 'anthropic-builder');
+  assert.equal(settings.builder.model.id, 'openai-codex-builder');
+  assert.equal(settings.builder.model.executableModelId, null);
+  assert.equal(settings.builder.model.harness, 'codex');
+  assert.equal(settings.builder.thinking, 'high');
   assert.equal(settings.reviewer.model.id, 'commandcode-deepseek-reviewer');
   assert.equal(settings.reviewer.thinking, null);
 });

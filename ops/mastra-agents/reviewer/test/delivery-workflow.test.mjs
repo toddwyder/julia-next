@@ -24,7 +24,10 @@ async function fixture(t, verdicts = ['PASS']) {
   const summaryPath = join(directory, 'summary.log');
   const approvedInputPath = join(directory, 'JUL-196-approved.json');
   const launchInputPath = join(directory, 'launch.json');
-  await writeFile(approvedInputPath, `${JSON.stringify({ identifier: 'JUL-196' })}\n`);
+  await writeFile(approvedInputPath, `${JSON.stringify({
+    identifier: 'JUL-196',
+    authorization: { spending: { reviewer: { mode: 'paid', maxUsd: 1 } } },
+  })}\n`);
   await writeFile(launchInputPath, `${JSON.stringify({ issueId: 'JUL-196' })}\n`);
   const adapters = createOfflineDeliveryAdapters({ directory, callsPath, verdicts });
   const options = { storagePath, runDirectory: directory, summaryPath, adapters };
@@ -34,6 +37,11 @@ async function fixture(t, verdicts = ['PASS']) {
 
 async function events(path) {
   return (await readFile(path, 'utf8')).trim().split(/\r?\n/).filter(Boolean).map(line => JSON.parse(line));
+}
+
+async function resultFile(path, value) {
+  await writeFile(path, `${JSON.stringify(value)}\n`);
+  return { resultPath: path };
 }
 
 test('green build, checks and independent review write one waiting record, pause, and accept after a runtime restart', async t => {
@@ -151,6 +159,87 @@ test('two failed reviews park without a waiting record or a third builder launch
   assert.match(summary, /round=2 stop=PARK reason="offline stand-in review"/);
 });
 
+test('a reviewer-launcher crash gets one recovery cycle, never becomes review FAIL, and launches no product builder', async t => {
+  const f = await fixture(t);
+  let reviewLaunches = 0;
+  const crashPath = join(f.directory, 'crash-reviewer-1.json');
+  f.options.adapters.reviewer = async ({ round }) => {
+    reviewLaunches += 1;
+    await f.options.adapters.record({ kind: 'reviewer', round, attempt: reviewLaunches });
+    if (reviewLaunches === 1) {
+      await writeFile(crashPath, `${JSON.stringify({
+        kind: 'technical-failure', incidentId: 'reviewer-1-incident-1', step: 'reviewer-launch',
+        reason: 'fault injection: reviewer launcher crashed before provider dispatch',
+        candidateCommit: 'offline-candidate-1', providerAcceptance: 'not-accepted', costUsd: 0,
+      })}\n`);
+      const error = new Error('fault injection: reviewer launcher crashed');
+      error.deliveryCrashPath = crashPath;
+      throw error;
+    }
+    return resultFile(join(f.directory, 'review-1-recovered.json'), {
+      verdict: 'PASS', reason: null, model: 'stand-in-reviewer', effort: 'none',
+      inputTokens: 0, outputTokens: 0, costEstimateUsd: 0,
+    });
+  };
+  f.options.adapters.recoverCrash = async ({ round, crashPath: receivedCrashPath }) => {
+    await f.options.adapters.record({ kind: 'recovery', round });
+    assert.equal(receivedCrashPath, crashPath);
+    return resultFile(join(f.directory, 'recovery-reviewer-1.json'), {
+      status: 'RESUME', incidentId: 'reviewer-1-incident-1', interruptedStep: 'reviewer-launch',
+      crashPath, rootCause: 'reviewer stdin used fs.promises.readFile with numeric descriptor 0',
+      recoveryCommit: '1'.repeat(40), fixer: { identity: 'codex-recovery', maker: 'OpenAI' },
+      reviewer: { identity: 'claude-recovery-review', maker: 'Anthropic' },
+      reviewBypassedFailedStep: true, reviewResult: 'PASS', verificationResult: 'PASS',
+      resumePoint: 'reviewer-launch', candidateCommit: 'offline-candidate-1',
+      spend: { authorizedUsd: 1, spentUsd: 0, maximumAdditionalUsd: 0 },
+      originalPaidRequest: { acceptance: 'not-accepted', costUsd: 0 },
+    });
+  };
+
+  const runtime = await createDeliveryWorkflowRuntime(f.options);
+  const result = await runtime.start({ runId: 'jul196-reviewer-crash', input: f.input });
+  await runtime.close();
+
+  assert.equal(result.status, 'suspended');
+  const recorded = await events(f.callsPath);
+  assert.deepEqual(recorded.map(({ kind, round }) => `${kind}:${round}`), [
+    'authorization:0', 'card-read:0', 'builder:1', 'checks:1',
+    'reviewer:1', 'recovery:1', 'reviewer:1', 'waiting:1',
+  ]);
+  assert.equal(recorded.filter(({ kind }) => kind === 'builder').length, 1);
+  assert.equal((await readFile(join(f.directory, 'review-1.json'), 'utf8').catch(() => null)), null);
+  const metadata = JSON.parse(await readFile(join(f.directory, 'jul196-reviewer-crash-workflow-metrics.json'), 'utf8'));
+  assert.equal(metadata.crashIncidents.length, 1);
+  assert.equal(metadata.crashIncidents[0].recoveryResultPath, join(f.directory, 'recovery-reviewer-1.json'));
+});
+
+test('uncertain paid reviewer acceptance parks without recovery or another model call', async t => {
+  const f = await fixture(t);
+  const crashPath = join(f.directory, 'crash-reviewer-uncertain.json');
+  f.options.adapters.reviewer = async ({ round }) => {
+    await f.options.adapters.record({ kind: 'reviewer', round });
+    await writeFile(crashPath, `${JSON.stringify({
+      kind: 'technical-failure', incidentId: 'reviewer-uncertain', step: 'reviewer-launch', reason: 'connection lost',
+      candidateCommit: 'offline-candidate-1', providerAcceptance: 'uncertain', costUsd: null,
+    })}\n`);
+    const error = new Error('connection lost after dispatch');
+    error.deliveryCrashPath = crashPath;
+    throw error;
+  };
+  f.options.adapters.recoverCrash = () => assert.fail('uncertain paid dispatch must park before a recovery call');
+
+  const runtime = await createDeliveryWorkflowRuntime(f.options);
+  const result = await runtime.start({ runId: 'jul196-uncertain-reviewer-crash', input: f.input });
+  await runtime.close();
+
+  assert.equal(result.status, 'success');
+  assert.equal(result.result.outcome, 'parked');
+  assert.match(result.result.reason, /acceptance or cost is uncertain/);
+  assert.deepEqual((await events(f.callsPath)).map(({ kind, round }) => `${kind}:${round}`), [
+    'authorization:0', 'card-read:0', 'builder:1', 'checks:1', 'reviewer:1', 'park:1',
+  ]);
+});
+
 test('accepting a changed candidate discards the answer, reruns checks and review, and pauses again', async t => {
   const f = await fixture(t);
   f.options.adapters.validateCandidate = async ({ round }) => {
@@ -235,14 +324,25 @@ test('production adapter glue invokes the existing launcher for builder and Mast
   });
   const built = await adapters.builder({ approvedInputPath: f.approvedInputPath, runDirectory: f.directory, round: 1 });
   const checked = await adapters.checks({ runDirectory: f.directory, round: 1, builderResultPath: built.resultPath });
-  await adapters.reviewer({
+  await assert.rejects(adapters.reviewer({
     approvedInputPath: f.approvedInputPath, runDirectory: f.directory, round: 1,
     builderResultPath: built.resultPath, checksResultPath: checked.resultPath,
+  }), error => {
+    assert.match(error.message, /reviewer launcher failed/);
+    assert.equal(typeof error.deliveryCrashPath, 'string');
+    return true;
   });
   assert.deepEqual(roles.map(({ role }) => role), ['builder', 'reviewer']);
   assert.equal(roles[1].request.mastraReviewOnly, true);
   assert.equal(roles[1].request.builderResultPath, built.resultPath);
   assert.equal(roles[1].request.checksResultPath, checked.resultPath);
+  assert.equal(await readFile(join(f.directory, 'review-1.json'), 'utf8').catch(() => null), null);
+  await assert.rejects(adapters.reviewer({
+    approvedInputPath: f.approvedInputPath, runDirectory: f.directory, round: 1,
+    builderResultPath: built.resultPath, checksResultPath: checked.resultPath,
+    recoveryResultPath: join(f.directory, 'recovery-reviewer-1.json'),
+  }), /reviewer launcher failed/);
+  assert.match(roles[2].request.outputPath, /reviewer-worker-1-recovered\.json$/);
 });
 
 test('production adapter repair consumes prior findings and reviews the checks current candidate', async t => {
@@ -279,10 +379,10 @@ test('production adapter repair consumes prior findings and reviews the checks c
     approvedInputPath: f.approvedInputPath, runDirectory: f.directory, round: 2, priorReviewPath,
   });
   const checked = await adapters.checks({ runDirectory: f.directory, round: 2, builderResultPath: built.resultPath });
-  await adapters.reviewer({
+  await assert.rejects(adapters.reviewer({
     approvedInputPath: f.approvedInputPath, runDirectory: f.directory, round: 2,
     builderResultPath: built.resultPath, checksResultPath: checked.resultPath,
-  });
+  }), /reviewer launcher failed/);
   assert.match(launched[0].request.prompt, /review-1\.json/);
   assert.doesNotMatch(launched[0].request.prompt, /repair this/);
   assert.equal(launched[1].request.reviewInput.candidate, 'candidate-2');

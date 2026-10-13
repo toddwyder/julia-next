@@ -17,7 +17,7 @@ const errorMessage = error => typeof error?.message === 'string' ? error.message
 
 export async function createDeliveryWorkflowRuntime({ storagePath, runDirectory, summaryPath, adapters }) {
   if (!storagePath || !runDirectory || !summaryPath) throw new Error('delivery workflow requires storage, run directory and summary paths');
-  for (const name of ['authorization', 'cardRead', 'builder', 'checks', 'reviewer', 'waitingRecord', 'validateCandidate', 'recordAcceptance', 'park']) {
+  for (const name of ['authorization', 'cardRead', 'builder', 'checks', 'reviewer', 'recoverCrash', 'waitingRecord', 'validateCandidate', 'recordAcceptance', 'park']) {
     if (typeof adapters?.[name] !== 'function') throw new Error(`delivery workflow requires the existing ${name} adapter`);
   }
   const absoluteStoragePath = resolve(storagePath).replaceAll('\\', '/');

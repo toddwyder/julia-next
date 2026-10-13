@@ -88,10 +88,14 @@ function validateCatalog(catalog) {
     if (!nonEmptyString(entry.id) || /\s/.test(entry.id)) reject(`${label} ID must be a non-empty string without spaces`);
     if (ids.has(entry.id)) reject(`duplicate catalog ID "${entry.id}"`);
     ids.add(entry.id);
-    for (const field of ['displayName', 'executableModelId', 'maker']) {
+    for (const field of ['displayName', 'maker']) {
       if (!nonEmptyString(entry[field])) reject(`${label} ${field} must be a non-empty string`);
     }
     if (!nonEmptyString(entry.harness) || !HARNESSES.has(entry.harness)) reject(`${label} has unknown harness ${JSON.stringify(entry.harness)}`);
+    if (!nonEmptyString(entry.executableModelId)
+      && !(entry.executableModelId === null && entry.harness === 'codex' && entry.connection?.route === 'native')) {
+      reject(`${label} executableModelId must be a non-empty string, or null for the native Codex default`);
+    }
     validateThinking(entry.thinking, label);
     validateConnection(entry.connection, label);
   }

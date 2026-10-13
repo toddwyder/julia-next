@@ -214,12 +214,19 @@ export async function createReviewerRuntime({ runDirectory, cardBudgetPath, inpu
 }
 
 export async function runReviewer() {
-  throw new Error('reviewer reset is incomplete; paid execution is disabled until JUL-223 offline gates pass');
+  throw new Error('reviewer reset is incomplete; paid execution is disabled until the JUL-224 trust test passes');
+}
+
+async function readStandardInput(stream = process.stdin) {
+  stream.setEncoding('utf8');
+  let input = '';
+  for await (const chunk of stream) input += chunk;
+  return input;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    JSON.parse(await readFile(0, 'utf8'));
+    JSON.parse(await readStandardInput());
     await runReviewer();
   } catch (error) {
     console.error(error.message);

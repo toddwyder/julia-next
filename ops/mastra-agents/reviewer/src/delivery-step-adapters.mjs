@@ -16,6 +16,21 @@ async function saveResult(runDirectory, name, value) {
   return { resultPath };
 }
 
+async function reviewerCrash(runDirectory, suffix, launched, candidateCommit) {
+  const crashPath = join(runDirectory, `crash-reviewer-${suffix}.json`);
+  const incidentId = `reviewer-${suffix}-${Date.now()}`;
+  await writeFile(crashPath, `${JSON.stringify({
+    kind: 'technical-failure', incidentId, step: 'reviewer-launch',
+    reason: launched.technicalFailure ?? launched.text ?? `reviewer launcher exited ${launched.exitCode}`,
+    candidateCommit, providerAcceptance: launched.providerAcceptance ?? 'uncertain',
+    costUsd: Number.isFinite(launched.costEstimateUsd) ? launched.costEstimateUsd : null,
+    outputPath: launched.outputPath ?? null, responseId: launched.responseId ?? null,
+  })}\n`, { flag: 'wx' });
+  const error = new Error(`reviewer launcher failed: ${launched.technicalFailure ?? `exit ${launched.exitCode}`}`);
+  error.deliveryCrashPath = crashPath;
+  throw error;
+}
+
 async function launchDurably(launch, role, request, runDirectory, suffix) {
   const outputPath = request.outputPath;
   if (outputPath && existsSync(outputPath)) {
@@ -42,6 +57,7 @@ export function createExistingDeliveryStepAdapters({
   worktree,
   launch = productionLauncher(worktree),
   checks,
+  recoverCrash = async () => { throw new Error('recovery route is required'); },
   waitingRecord,
   validateCandidate = async () => ({ status: 'PASS' }),
   recordAcceptance = async () => { throw new Error('acceptance recorder is required'); },
@@ -94,7 +110,8 @@ export function createExistingDeliveryStepAdapters({
       if (!reviewInput || !candidate || (input.round > 1 && (!checkResult.reviewInputPath || !checkResult.candidatePath))) {
         throw new Error('checks did not save the current candidate and review input');
       }
-      const suffix = input.cycle && input.cycle > 1 ? `${input.round}-cycle-${input.cycle}` : input.round;
+      const roundSuffix = input.cycle && input.cycle > 1 ? `${input.round}-cycle-${input.cycle}` : input.round;
+      const suffix = input.recoveryResultPath ? `${roundSuffix}-recovered` : roundSuffix;
       const launched = await launchDurably(launch, 'reviewer', {
         ...request,
         candidate,
@@ -105,6 +122,9 @@ export function createExistingDeliveryStepAdapters({
         mastraReviewOnly: true,
         outputPath: join(input.runDirectory, `reviewer-worker-${suffix}.json`),
       }, input.runDirectory, suffix);
+      if (launched.exitCode !== 0 || launched.technicalFailure) {
+        await reviewerCrash(input.runDirectory, suffix, launched, candidate.commit ?? reviewInput.candidate ?? null);
+      }
       const reviewed = checkedReview(launched.text, reviewInput);
       const inputTokens = launched.usage?.inputTokens ?? launched.usage?.prompt_tokens;
       const outputTokens = launched.usage?.outputTokens ?? launched.usage?.completion_tokens;
@@ -125,6 +145,7 @@ export function createExistingDeliveryStepAdapters({
         costEstimateUsd: launched.costEstimateUsd ?? null,
       });
     },
+    recoverCrash,
     waitingRecord,
     validateCandidate,
     recordAcceptance,

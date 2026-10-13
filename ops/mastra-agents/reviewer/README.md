@@ -17,6 +17,25 @@ candidate invalidates the answer, reruns checks and review, and suspends again.
 Acceptance records the exact reviewed commit and stops; it never merges,
 previews, publishes, emails, pushes, or writes a Linear waiting comment.
 
+A reviewer-launcher crash is a technical incident, not a review `FAIL`. Its
+crash record is kept separately and no product repair round starts. A request
+whose provider acceptance or cost is positive or uncertain parks without a
+repeat. Otherwise the workflow allows one recovery result for the incident,
+requires a different-maker review through a route that bypasses the failed
+step plus a passing Windows verification result, and resumes the same reviewer
+step. A crash anywhere in that recovery or resumption parks with the retained
+incident evidence. The production adapter currently parks because no
+authorized bypass reviewer is configured; the deterministic fault-injection
+fixture proves both the complete recovery/resume route and the fail-closed
+paid-request route without a model call.
+
+The checked-in builder default is native Codex on Todd's subscription. Its
+model field is deliberately null so the Codex CLI chooses its current default;
+the launcher omits `-m` and still reads the exact observed model and effort
+from the resulting Codex session record. The reviewer remains
+`commandcode-deepseek-reviewer`, with normal paid execution disabled until the
+JUL-224 trust test permits it.
+
 Start authorization includes `linearActorId`. The single Linear intake query
 returns both the card and authenticated viewer; a mismatch stops before any
 update, and the verified actor is retained in each start/park update journal.
@@ -50,6 +69,7 @@ Framework map:
 | At most two builder/reviewer rounds and stale-candidate re-review | nested `.dountil()` workflows | [Control flow](https://mastra.ai/docs/workflows/control-flow) and [`.dountil()` reference](https://mastra.ai/reference/workflows/workflow-methods/dountil) |
 | Pause for and resume from Todd's answer | step `suspend()` and `Run.resume()` | [Suspend and resume](https://mastra.ai/docs/workflows/suspend-and-resume) and [`Run.resume()` reference](https://mastra.ai/reference/workflows/run-methods/resume) |
 | Survive a process restart while paused | workflow snapshots in configured storage, loaded by run ID | [Snapshots](https://mastra.ai/docs/workflows/snapshots) |
+| Classify failed workflow steps and retain a technical terminal result | workflow result statuses plus explicit error handling inside the affected step | [Error handling](https://mastra.ai/docs/workflows/error-handling) and [Workflows overview](https://mastra.ai/docs/workflows/overview) |
 | Default local durable database | file-backed `LibSQLStore` | [libSQL storage](https://mastra.ai/integrations/databases/libsql) |
 | Query the persisted snapshot row | `@libsql/client` local `createClient()` and `execute()` | [libSQL TypeScript client local-query example](https://github.com/tursodatabase/libsql-client-ts/blob/main/examples/local/index.mjs) |
 | Measure the stored JSONB snapshot | SQLite `length()` on the snapshot BLOB | [SQLite core `length()` function](https://www.sqlite.org/lang_corefunc.html#length) |
