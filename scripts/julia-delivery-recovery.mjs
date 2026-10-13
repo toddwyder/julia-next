@@ -73,7 +73,9 @@ export async function recoverDeliveryCrash(input, {
       `A delivery reviewer launcher crashed. This is recovery incident ${crash.incidentId}.`,
       `Read and follow .agents/skills/diagnosing-bugs/SKILL.md. Diagnose and fix only the confirmed cause in the delivery machinery at ${input.repoRoot}.`,
       `Crash evidence: ${input.crashPath}. The Julia candidate is separate and must not be changed: ${input.candidate.path} at ${input.candidate.commit}.`,
-      'Run the tight regression and relevant tests, remove debug instrumentation, commit the recovery fix, and leave the delivery source clean. Do not call any paid model or edit Linear.',
+      'Run only the tight regression for the confirmed cause and any directly affected test file. Do not run the complete runner suite; the controller runs it after independent review.',
+      'Do not put TEMP or TMP inside the repository. Remove throwaway repro files and debug instrumentation, then leave the delivery source ready for the controller-owned recovery commit.',
+      'Do not call any paid model or edit Linear.',
     ].join('\n\n');
     const launchFix = fix ?? (request => productionLauncher(input.repoRoot)('builder', request));
     const fixed = await launchFix({

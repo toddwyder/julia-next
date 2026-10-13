@@ -40,6 +40,8 @@ test('a Codex recovery fix is independently reviewed by unpinned Gemini, verifie
       calls.push(['fix', request]);
       assert.equal(request.configuration.model, null);
       assert.match(request.prompt, /diagnosing-bugs\/SKILL\.md/);
+      assert.match(request.prompt, /Do not run the complete runner suite/);
+      assert.match(request.prompt, /Do not put TEMP or TMP inside the repository/);
       sourceDirty = true;
       return { exitCode: 0, observed: { maker: 'OpenAI', model: 'gpt-current', cliVersion: 'codex-cli current' } };
     },
