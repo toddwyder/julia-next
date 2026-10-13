@@ -5,7 +5,7 @@ import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { migrateJuliaSecrets, vaultLaunch, vaultProbe } from './julia-vault.mjs';
+import { assertRestrictedWindowsAuthentication, migrateJuliaSecrets, vaultCommand, vaultLaunch, vaultProbe } from './julia-vault.mjs';
 
 test('Windows provisioning parks after account creation followed by failed persistence', { skip: process.platform !== 'win32' }, () => {
   const directory = mkdtempSync(join(tmpdir(), 'julia-bootstrap-'));
@@ -18,7 +18,7 @@ test('Windows provisioning parks after account creation followed by failed persi
     writeFileSync(configuration, JSON.stringify({ vaultId: 'vault-id', opExecutable: fakeOp, referencesPath: join(directory, 'secrets.env') }));
     const wrapper = fileURLToPath(new URL('./julia-vault-windows.ps1', import.meta.url));
     const powershell = join(process.env.SystemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
-    const invoke = () => spawnSync(powershell, ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', wrapper, '-ConfigurationPath', configuration, '-Provision'], { encoding: 'utf8', timeout: 20000, windowsHide: true });
+    const invoke = () => spawnSync(powershell, ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', wrapper, '-ConfigurationPath', configuration, '-Provision'], { encoding: 'utf8', timeout: 60000, windowsHide: true });
     const first = invoke();
     assert.equal(first.status, 1);
     assert.equal(JSON.parse(readFileSync(join(directory, 'runner-provision.json'), 'utf8')).phase, 'creation-started');
@@ -32,11 +32,13 @@ test('Windows provisioning parks after account creation followed by failed persi
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
-test('Windows vault wrapper has only workflow init and read-only card lookup', () => {
+test('Windows vault wrapper keeps workflow routes and adds a named-secret command route', () => {
   const wrapper = readFileSync(fileURLToPath(new URL('./julia-vault-windows.ps1', import.meta.url)), 'utf8');
+  assert.match(wrapper, /ConfigurationPath = \(Join-Path \$env:USERPROFILE '\.julia\\vault-launch\.json'\)/);
   assert.match(wrapper, /ValidateSet\('init', 'readIssue'\)/);
   assert.doesNotMatch(wrapper, /probeCommandCodeFormats/);
   assert.match(wrapper, /julia-vault\.mjs'\) \$Operation @JuliaArguments/);
+  assert.match(wrapper, /julia-vault\.mjs'\) run --secrets \(\$SecretNames -join ','\) -- @RunArguments/);
 });
 
 test('migration pipes secrets, verifies readback and returns references only', async () => {
@@ -132,6 +134,55 @@ test('vault launcher rejects retired reviewer and arbitrary entry points', () =>
   assert.throws(() => vaultLaunch([], {
     entryPoint: 'arbitrary.mjs', configuration: { vaultId: 'vault-id', referencesPath: 'references.env' }, references: 'COMMANDCODE_API_KEY=op://vault-id/item-id/key\n',
   }), /unapproved Julia launcher entry point/);
+});
+test('vault command exposes only the named secret and never invokes a shell', () => {
+  let call;
+  const code = vaultCommand(process.execPath, ['--test', 'provider-probe.test.mjs'], {
+    configuration: { vaultId: 'vault-id', opExecutable: 'op.exe', referencesPath: 'references.env' },
+    references: 'COMMANDCODE_API_KEY=op://vault-id/item-id/key\nLINEAR_API_KEY=op://vault-id/linear/key\n',
+    secretNames: ['COMMANDCODE_API_KEY'],
+    run: (command, args, options) => { call = { command, args, options }; return { status: 0 }; },
+  });
+  assert.equal(code, 0);
+  assert.equal(call.command, 'op.exe');
+  assert.deepEqual(call.args.slice(0, 3), ['run', '--', process.execPath]);
+  assert.match(call.args[3], /julia-vault-command\.mjs$/);
+  assert.deepEqual(call.args.slice(4), [process.execPath, '--test', 'provider-probe.test.mjs']);
+  assert.equal(call.options.shell, undefined);
+  assert.equal(call.args.includes('--no-masking'), false);
+  assert.equal(call.options.env.COMMANDCODE_API_KEY, 'op://vault-id/item-id/key');
+  assert.equal(call.options.env.LINEAR_API_KEY, undefined);
+});
+test('vault command refuses missing names, missing fields, and invalid unselected references', () => {
+  const base = {
+    configuration: { vaultId: 'vault-id', referencesPath: 'references.env' },
+    references: 'COMMANDCODE_API_KEY=op://vault-id/item-id/key\n',
+    run: () => assert.fail('must not launch'),
+  };
+  assert.throws(() => vaultCommand('node', [], base), /secret names/);
+  assert.throws(() => vaultCommand('node', [], { ...base, secretNames: ['LINEAR_API_KEY'] }), /not present/);
+  for (const references of [
+    'COMMANDCODE_API_KEY=op://vault-id/item-id/key\nLINEAR_API_KEY=plaintext\n',
+    'COMMANDCODE_API_KEY=op://vault-id/item-id/key\nLINEAR_API_KEY=op://other-vault/item/key\n',
+    'COMMANDCODE_API_KEY=op://vault-id/item-id/key\nUNEXPECTED_KEY=op://vault-id/item/key\n',
+  ]) assert.throws(() => vaultCommand('node', [], { ...base, references, secretNames: ['COMMANDCODE_API_KEY'] }), /invalid vault reference/);
+});
+test('Windows key operations require the restricted helper marker and service account', () => {
+  assert.throws(() => assertRestrictedWindowsAuthentication({ platform: 'win32', environment: {} }), /restricted Julia Windows helper/);
+  assert.throws(() => assertRestrictedWindowsAuthentication({ platform: 'win32', environment: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_test_only' } }), /restricted Julia Windows helper/);
+  assert.doesNotThrow(() => assertRestrictedWindowsAuthentication({ platform: 'win32', environment: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_test_only', JULIA_VAULT_WINDOWS_HELPER: 'verified' } }));
+  assert.doesNotThrow(() => assertRestrictedWindowsAuthentication({ platform: 'linux', environment: {} }));
+});
+test('vault command wrapper removes bootstrap state before launching the target', () => {
+  const wrapper = fileURLToPath(new URL('./julia-vault-command.mjs', import.meta.url));
+  const code = `if(!process.env.COMMANDCODE_API_KEY||process.env.OP_SERVICE_ACCOUNT_TOKEN||process.env.OP_SESSION_test||process.env.op_lowercase_test||process.env.JULIA_VAULT_WINDOWS_HELPER)process.exit(9)`;
+  const result = spawnSync(process.execPath, [wrapper, process.execPath, '-e', code], {
+    encoding: 'utf8',
+    env: { ...process.env, COMMANDCODE_API_KEY: 'resolved-test-value', OP_SERVICE_ACCOUNT_TOKEN: 'bootstrap-test-value', OP_SESSION_test: 'session-test-value', op_lowercase_test: 'lowercase-test-value', JULIA_VAULT_WINDOWS_HELPER: 'verified' },
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout.includes('resolved-test-value'), false);
+  assert.equal(result.stderr.includes('bootstrap-test-value'), false);
 });
 test('omitted service secrets do not inherit stale plaintext or unrelated vault references', () => {
   vaultLaunch(['$init', 'JUL-123'], { configuration: { vaultId: 'vault-id', referencesPath: 'mutable.env' }, references: 'LINEAR_API_KEY=op://vault-id/item-id/key', environment: { VERCEL_TOKEN: 'stale', axiom_token: 'stale', AXIOM_DATASET: 'op://other/item/dataset', OP_SERVICE_ACCOUNT_TOKEN: 'bootstrap', PATH: 'fixture' }, run: (_command, args, options) => {

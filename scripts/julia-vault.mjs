@@ -56,7 +56,13 @@ export async function migrateJuliaSecrets(environment, { execute = opExecutor(),
   return { vaultId: vault.id, references, migrated, missing, verified: 'vault readback only; live service proof pending' };
 }
 
-export function vaultLaunch(args, { entryPoint = 'julia-init.mjs', configuration, references, environment = process.env, run = spawnSync } = {}) {
+export function assertRestrictedWindowsAuthentication({ platform = process.platform, environment = process.env } = {}) {
+  if (platform === 'win32' && (!environment.OP_SERVICE_ACCOUNT_TOKEN || environment.JULIA_VAULT_WINDOWS_HELPER !== 'verified')) {
+    throw Error('Windows key operations require the restricted Julia Windows helper; personal 1Password desktop authentication is refused');
+  }
+}
+
+function validatedVaultSnapshot(configuration, references, environment) {
   if (!configuration?.vaultId || !configuration.referencesPath) throw Error('missing Julia vault launch configuration');
   const values = parseEnv(references);
   if (!Object.keys(values).length) throw Error('empty Julia vault reference file');
@@ -70,12 +76,36 @@ export function vaultLaunch(args, { entryPoint = 'julia-init.mjs', configuration
   for (const [field, value] of Object.entries(launchEnvironment)) {
     if (typeof value === 'string' && value.startsWith('op://') && (!FIELDS.has(field) || !allowed(value))) throw Error(`foreign inherited vault reference for ${field}`);
   }
+  return { values, launchEnvironment };
+}
+
+export function vaultLaunch(args, { entryPoint = 'julia-init.mjs', configuration, references, environment = process.env, run = spawnSync, command } = {}) {
+  const { values, launchEnvironment } = validatedVaultSnapshot(configuration, references, environment);
   // Resolve this validated snapshot, not a second read of the mutable file.
   // Omitted fields stay absent instead of falling back to stale plaintext.
-  if (!new Set(['julia-init.mjs', 'linear-cli.mjs']).has(entryPoint)) throw Error('unapproved Julia launcher entry point');
-  const result = run(configuration.opExecutable ?? 'op', ['run', '--', process.execPath, fileURLToPath(new URL(`./${entryPoint}`, import.meta.url)), ...args], { stdio: 'inherit', env: { ...launchEnvironment, ...values }, windowsHide: true });
+  let childCommand = command;
+  if (!childCommand) {
+    if (!new Set(['julia-init.mjs', 'linear-cli.mjs']).has(entryPoint)) throw Error('unapproved Julia launcher entry point');
+    childCommand = [process.execPath, fileURLToPath(new URL(`./${entryPoint}`, import.meta.url))];
+  }
+  if (!Array.isArray(childCommand) || !childCommand.length || childCommand.some(value => typeof value !== 'string' || !value)) throw Error('vault child command is required');
+  const result = run(configuration.opExecutable ?? 'op', ['run', '--', ...childCommand, ...args], { stdio: 'inherit', env: { ...launchEnvironment, ...values }, windowsHide: true });
   if (result.error) throw Error('1Password launch failed; confirm the installed CLI and account access');
   return result.status ?? 1;
+}
+
+export function vaultCommand(executable, args, { secretNames, references, ...options } = {}) {
+  if (!Array.isArray(secretNames) || !secretNames.length) throw Error('vault command secret names are required');
+  const available = validatedVaultSnapshot(options.configuration, references, options.environment ?? process.env).values;
+  const selected = {};
+  for (const name of new Set(secretNames)) {
+    if (!FIELDS.has(name)) throw Error(`vault command secret name is not allowed: ${name}`);
+    if (!available[name]) throw Error(`vault command secret is not present: ${name}`);
+    selected[name] = available[name];
+  }
+  const selectedReferences = Object.entries(selected).map(([name, value]) => `${name}=${value}`).join('\n');
+  const wrapper = fileURLToPath(new URL('./julia-vault-command.mjs', import.meta.url));
+  return vaultLaunch(args, { ...options, references: selectedReferences, command: [process.execPath, wrapper, executable] });
 }
 
 export function vaultProbe(options = {}) {
@@ -102,12 +132,19 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       await writeFile(referencesPath, Object.entries(report.references).map(([key, value]) => `${key}=${value}`).join('\n') + '\n');
       await writeFile(configurationPath, JSON.stringify({ vaultId: report.vaultId, referencesPath, opExecutable: process.env.JULIA_OP_EXECUTABLE ?? 'op' }, null, 2));
       console.log(JSON.stringify(report));
-    } else if (operation === 'init' || operation === 'readIssue' || operation === 'verify') {
+    } else if (operation === 'init' || operation === 'readIssue' || operation === 'verify' || operation === 'run') {
+      assertRestrictedWindowsAuthentication();
       const configuration = JSON.parse(await readFile(configurationPath, 'utf8'));
       const references = await readFile(configuration.referencesPath, 'utf8');
-      const entryPoint = operation === 'readIssue' ? 'linear-cli.mjs' : 'julia-init.mjs';
-      const launchArgs = operation === 'readIssue' ? ['get-issue', ...args] : args;
-      process.exitCode = operation === 'verify' ? vaultProbe({ configuration, references }) : vaultLaunch(launchArgs, { entryPoint, configuration, references });
-    } else throw Error('expected migrate, init, readIssue, or verify');
+      if (operation === 'verify') process.exitCode = vaultProbe({ configuration, references });
+      else if (operation === 'run') {
+        if (args[0] !== '--secrets' || !args[1] || args[2] !== '--' || !args[3]) throw Error('use run --secrets NAME[,NAME] -- followed by an executable and arguments');
+        process.exitCode = vaultCommand(args[3], args.slice(4), { configuration, references, secretNames: args[1].split(',') });
+      } else {
+        const entryPoint = operation === 'readIssue' ? 'linear-cli.mjs' : 'julia-init.mjs';
+        const launchArgs = operation === 'readIssue' ? ['get-issue', ...args] : args;
+        process.exitCode = vaultLaunch(launchArgs, { entryPoint, configuration, references });
+      }
+    } else throw Error('expected migrate, init, readIssue, verify, or run');
   } catch (error) { console.error(error.message); process.exitCode = 1; }
 }

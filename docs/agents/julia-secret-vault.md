@@ -48,10 +48,16 @@ service, account or OVH resource is changed by this migration.
 ## Launch Julia delivery
 
 ```powershell
-node scripts/julia-vault.mjs init '$init' JUL-123
+.\scripts\julia-vault-windows.ps1 -JuliaArguments @('$init', 'JUL-123')
 ```
 
-The wrapper runs the existing `$init` entry point with `op run`, stdout/stderr secret masking enabled, and no shell command expansion. It refuses plaintext values, unexpected fields, references outside the selected vault and inherited references to other vaults. Existing spending/start approval and release/UAT configuration still apply. Secrets exist only in the operator subprocess environment for its lifetime. Native builders and reviewer transports exclude deployment/telemetry/Linear credentials and all `OP_` bootstrap/session variables; provider authentication and PATH remain.
+On Windows this restricted helper is the default and required entry point for every local command that needs a Julia vault key. It defaults to `%USERPROFILE%\.julia\vault-launch.json`; `-ConfigurationPath` is only needed for a deliberately separate operator configuration. For a non-delivery command, pass the executable and arguments without shell expansion:
+
+```powershell
+.\scripts\julia-vault-windows.ps1 -SecretNames COMMANDCODE_API_KEY -RunArguments @('node', '--test', 'path\to\provider-probe.test.mjs')
+```
+
+The helper runs the existing `$init` entry point or explicit command with `op run`, stdout/stderr secret masking enabled, and no shell command expansion. An explicit command must name the exact saved fields it needs with `-SecretNames`; all other Julia references stay absent from that child. The helper refuses plaintext values, unexpected fields, references outside the selected vault and inherited references to other vaults. Direct Windows `init`, `readIssue`, `verify` and `run` operations in `julia-vault.mjs` refuse personal desktop authentication and require the helper's service-account bootstrap. Existing spending/start approval and release/UAT configuration still apply. Secrets exist only in the operator subprocess environment for its lifetime. Native builders and reviewer transports exclude deployment/telemetry/Linear credentials and all `OP_` bootstrap/session variables; provider authentication and PATH remain.
 
 Desktop integration is suitable for supervised use and may prompt for Windows Hello. It does **not** restrict the authenticated desktop account to one vault. For unattended runs, use a 1Password service account granted **read_items only on Julia**, without write/share/create-vault permissions. Keep its bootstrap token in protected Windows storage and retrieve it only into the operator process, not a plaintext env file. Do not claim unattended vault isolation based on desktop integration alone.
 

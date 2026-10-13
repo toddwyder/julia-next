@@ -1,11 +1,18 @@
 param(
-  [Parameter(Mandatory = $true)][string]$ConfigurationPath,
+  [string]$ConfigurationPath = (Join-Path $env:USERPROFILE '.julia\vault-launch.json'),
   [switch]$Provision,
   [switch]$Verify,
   [ValidateSet('init', 'readIssue')][string]$Operation = 'init',
-  [string[]]$JuliaArguments
+  [string[]]$JuliaArguments,
+  [string[]]$SecretNames,
+  [string[]]$RunArguments
 )
 $ErrorActionPreference = 'Stop'
+if ($Verify -and ($JuliaArguments.Count -gt 0 -or $RunArguments.Count -gt 0)) { throw 'Verify cannot be combined with a Julia or command run.' }
+if ($JuliaArguments.Count -gt 0 -and $RunArguments.Count -gt 0) { throw 'Choose either a Julia run or a command run.' }
+if (-not $Provision -and -not $Verify -and $JuliaArguments.Count -eq 0 -and $RunArguments.Count -eq 0) { throw 'Choose Verify, JuliaArguments or RunArguments.' }
+if ($RunArguments.Count -gt 0 -and $SecretNames.Count -eq 0) { throw 'Command runs must name the exact Julia vault secrets they require.' }
+if ($RunArguments.Count -eq 0 -and $SecretNames.Count -gt 0) { throw 'SecretNames applies only to a command run.' }
 $configuration = Get-Content -LiteralPath $ConfigurationPath -Raw | ConvertFrom-Json
 $bootstrapPath = Join-Path (Split-Path -Parent $ConfigurationPath) 'runner-token.dpapi'
 $provisionPath = Join-Path (Split-Path -Parent $ConfigurationPath) 'runner-provision.json'
@@ -13,6 +20,7 @@ $nodeExecutable = (Get-Command node -ErrorAction Stop).Source
 $savedOpEnvironment = @{}
 Get-ChildItem Env: | Where-Object Name -like 'OP_*' | ForEach-Object { $savedOpEnvironment[$_.Name] = $_.Value }
 $savedConfiguration = $env:JULIA_VAULT_CONFIG
+$savedHelperMarker = $env:JULIA_VAULT_WINDOWS_HELPER
 try {
   if ($Provision) {
     if (Test-Path -LiteralPath $bootstrapPath) { throw 'Julia runner bootstrap already exists; refusing to create another account.' }
@@ -55,9 +63,12 @@ try {
   if ($LASTEXITCODE -ne 0) { throw 'Restricted Julia runner authentication failed; no credential output was displayed.' }
   $vaults = ($visibleVaults -join "`n") | ConvertFrom-Json
   if (@($vaults).Count -ne 1 -or $vaults[0].id -ne $configuration.vaultId) { throw 'Julia runner access does not match the single configured vault.' }
+  $env:JULIA_VAULT_WINDOWS_HELPER = 'verified'
   if ($Verify -or $Provision) {
     # Only presence flags leave the subprocess. No delivery or external service call.
     & $nodeExecutable (Join-Path $PSScriptRoot 'julia-vault.mjs') verify
+  } elseif ($RunArguments.Count -gt 0) {
+    & $nodeExecutable (Join-Path $PSScriptRoot 'julia-vault.mjs') run --secrets ($SecretNames -join ',') -- @RunArguments
   } else {
     & $nodeExecutable (Join-Path $PSScriptRoot 'julia-vault.mjs') $Operation @JuliaArguments
   }
@@ -66,5 +77,6 @@ try {
   Get-ChildItem Env: | Where-Object Name -like 'OP_*' | ForEach-Object { Remove-Item -LiteralPath "Env:$($_.Name)" }
   foreach ($entry in $savedOpEnvironment.GetEnumerator()) { Set-Item -LiteralPath "Env:$($entry.Key)" -Value $entry.Value }
   $env:JULIA_VAULT_CONFIG = $savedConfiguration
+  $env:JULIA_VAULT_WINDOWS_HELPER = $savedHelperMarker
   $secureToken = $null
 }
