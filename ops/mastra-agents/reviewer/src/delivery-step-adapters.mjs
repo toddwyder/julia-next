@@ -33,9 +33,8 @@ export function createExistingDeliveryStepAdapters({
       const approved = await readJson(input.approvedInputPath);
       const request = approved.builderRequest;
       if (!request?.configuration || typeof request.prompt !== 'string') throw new Error('approved input has no existing builder launch request');
-      const priorReview = input.priorReviewPath ? await readJson(input.priorReviewPath) : null;
-      const prompt = priorReview
-        ? `${request.prompt}\n\nRepair the findings in the saved independent review at ${input.priorReviewPath}:\n${JSON.stringify(priorReview)}`
+      const prompt = input.priorReviewPath
+        ? `${request.prompt}\n\nRepair every finding in the saved independent review at ${input.priorReviewPath}. Read that file; its path is the handoff.`
         : request.prompt;
       const launched = await launch('builder', { ...request, prompt, round: input.round });
       return saveResult(input.runDirectory, `builder-${input.round}.json`, {
@@ -89,6 +88,7 @@ export function createExistingDeliveryStepAdapters({
       return saveResult(input.runDirectory, `review-${input.round}.json`, {
         verdict: launched.exitCode === 0 && !reviewed.error ? reviewed.verdict : 'FAIL',
         reason: launched.technicalFailure ?? reviewed.error ?? (launched.exitCode === 0 ? null : `reviewer exited ${launched.exitCode}`),
+        report: reviewed.report ?? null,
         model: launched.observed?.model ?? request.configuration.model ?? null,
         effort: launched.observed?.effort ?? request.configuration.thinking ?? null,
         inputTokens: inputTokens ?? null,

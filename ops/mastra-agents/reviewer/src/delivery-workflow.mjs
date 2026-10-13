@@ -49,6 +49,15 @@ async function updateMetadata(path, update) {
   return next;
 }
 
+export async function appendPermanentSummaryLine(path, runId, line) {
+  const identity = `runId=${JSON.stringify(runId)}`;
+  let existing = '';
+  try { existing = await readFile(path, 'utf8'); } catch (error) { if (error?.code !== 'ENOENT') throw error; }
+  if (existing.split(/\r?\n/).some(saved => saved.endsWith(identity))) return false;
+  await appendFile(path, `${line} ${identity}\n`);
+  return true;
+}
+
 function adapterInput(inputData, additions = {}) {
   const input = {
     round: inputData.round,
@@ -240,7 +249,7 @@ function createDeliveryWorkflow(adapters, samplePeak, summaryPath) {
         `inputTokens=${total('inputTokens')}`, `outputTokens=${total('outputTokens')}`,
         `costEstimateUsd=${total('costEstimateUsd')}`, `start=${metadata.startTime}`, `end=${metadata.endTime}`,
       ].join(' ');
-      await appendFile(summaryPath, `${line}\n`);
+      await appendPermanentSummaryLine(summaryPath, metadata.runId, line);
       await updateMetadata(inputData.runMetadataPath, { summaryWritten: true });
       return {
         outcome: inputData.outcome,
@@ -342,7 +351,7 @@ export async function createDeliveryWorkflowRuntime({ storagePath, runDirectory,
       `inputTokens=${total('inputTokens')}`, `outputTokens=${total('outputTokens')}`,
       `costEstimateUsd=${total('costEstimateUsd')}`, `start=${metadata.startTime}`, `end=${endTime}`,
     ].join(' ');
-    await appendFile(summaryPath, `${line}\n`);
+    await appendPermanentSummaryLine(summaryPath, runId, line);
     try { await updateMetadata(metadataPath, { endTime, summaryWritten: true }); } catch { /* summary is already permanent */ }
   };
 

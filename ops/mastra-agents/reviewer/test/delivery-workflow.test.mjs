@@ -7,9 +7,10 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createClient } from '@libsql/client';
 
-import { createDeliveryWorkflowRuntime } from '../src/delivery-workflow.mjs';
+import { appendPermanentSummaryLine, createDeliveryWorkflowRuntime } from '../src/delivery-workflow.mjs';
 import { createExistingDeliveryStepAdapters } from '../src/delivery-step-adapters.mjs';
 import { createOfflineDeliveryAdapters } from '../support/offline-delivery-adapters.mjs';
+import { fixtureReport } from '../../../../scripts/fixtures/jul202-review.mjs';
 
 const suiteDirectory = await mkdtemp(join(tmpdir(), 'jul196-workflow-suite-'));
 after(() => rm(suiteDirectory, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 }));
@@ -224,7 +225,7 @@ test('production adapter repair consumes prior findings and reviews the checks c
     builderResultPath: built.resultPath, checksResultPath: checked.resultPath,
   });
   assert.match(launched[0].request.prompt, /review-1\.json/);
-  assert.match(launched[0].request.prompt, /repair this/);
+  assert.doesNotMatch(launched[0].request.prompt, /repair this/);
   assert.equal(launched[1].request.reviewInput.candidate, 'candidate-2');
   assert.equal(launched[1].request.candidate.commit, 'd'.repeat(40));
 });
@@ -252,6 +253,44 @@ test('production adapter refuses a reviewer from the observed builder maker', as
   }), /maker must differ/);
 });
 
+test('production adapter preserves a failed review report for the next repair', async t => {
+  const f = await fixture(t);
+  const reviewInput = {
+    candidate: 'b'.repeat(40), digest: 'fixture-digest', files: ['fixture.mjs'], criteria: ['the fixture works'],
+    sources: { 'file:fixture.mjs': 'deliberate deterministic candidate fixture', 'test-evidence': 'checked offline evidence' },
+  };
+  const text = fixtureReport(reviewInput, 'FAIL', 'repair this finding');
+  const expectedReport = JSON.parse(text.split('\nREVIEW: ')[1]);
+  await writeFile(f.input.approvedInputPath, `${JSON.stringify({
+    reviewerRequest: {
+      issueId: 'JUL-196', candidate: { base: 'a'.repeat(40), commit: reviewInput.candidate },
+      configuration: { model: 'reviewer', maker: 'Reviewer Co', connection: { provider: 'commandcode' } },
+      reviewInput,
+    },
+  })}\n`);
+  const builderResultPath = join(f.directory, 'builder-real-1.json');
+  const checksResultPath = join(f.directory, 'checks-real-1.json');
+  await writeFile(builderResultPath, `${JSON.stringify({ status: 'PASS', observed: { maker: 'Builder Co' } })}\n`);
+  await writeFile(checksResultPath, `${JSON.stringify({ status: 'PASS' })}\n`);
+  const adapters = createExistingDeliveryStepAdapters({
+    worktree: f.directory,
+    launch: async () => ({
+      exitCode: 0, text,
+      observed: { maker: 'Reviewer Co', model: 'reviewer' },
+      usage: { inputTokens: 21, outputTokens: 8 }, costEstimateUsd: 0.0042,
+    }),
+    checks: async () => ({}), notify: f.options.adapters.notify,
+  });
+  const { resultPath } = await adapters.reviewer({
+    approvedInputPath: f.input.approvedInputPath, runDirectory: f.directory, round: 1,
+    builderResultPath, checksResultPath,
+  });
+  const saved = JSON.parse(await readFile(resultPath, 'utf8'));
+  assert.deepEqual(saved.report, expectedReport);
+  assert.equal(saved.inputTokens, 21);
+  assert.equal(saved.costEstimateUsd, 0.0042);
+});
+
 test('an unhandled workflow failure still ends with an ADR 0017 summary line', async t => {
   const f = await fixture(t);
   f.options.adapters.builder = async () => ({});
@@ -263,4 +302,11 @@ test('an unhandled workflow failure still ends with an ADR 0017 summary line', a
   assert.equal(summaries.length, 1);
   assert.match(summaries[0], /^card=JUL-196 change=unknown round=1 stop=SYSTEM_ERROR reason=/);
   assert.match(summaries[0], /reviewerModel=unknown reviewerEffort=unknown inputTokens=unknown outputTokens=unknown costEstimateUsd=unknown start=.* end=.*/);
+});
+
+test('a recovered terminal write does not duplicate the run summary line', async () => {
+  const summaryPath = join(suiteDirectory, 'idempotent-summary.log');
+  assert.equal(await appendPermanentSummaryLine(summaryPath, 'same-run', 'card=JUL-196 verdict=ACCEPT'), true);
+  assert.equal(await appendPermanentSummaryLine(summaryPath, 'same-run', 'card=JUL-196 verdict=ACCEPT'), false);
+  assert.equal((await readFile(summaryPath, 'utf8')).trim().split(/\r?\n/).length, 1);
 });
