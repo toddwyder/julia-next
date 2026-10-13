@@ -114,6 +114,7 @@ export function productionLauncher(worktree, { run = runLimited, environment = p
       let reply = null; try { reply = JSON.parse(stdout); } catch { /* durable sidecar checked below */ }
       if (!reply && existsSync(verdictPath)) try { reply = JSON.parse(readFileSync(verdictPath, 'utf8')); } catch { /* recorded below */ }
       let technicalFailure = null;
+      let plannedGate = null;
       let providerAcceptance = null;
       let recordedCostUsd = null;
       const failurePath = `${verdictPath}.failure.json`;
@@ -122,6 +123,7 @@ export function productionLauncher(worktree, { run = runLimited, environment = p
           const failure = JSON.parse(readFileSync(failurePath, 'utf8'));
           if (failure?.kind === 'technical-failure' && typeof failure.reason === 'string') {
             technicalFailure = failure.reason;
+            plannedGate = typeof failure.plannedGate === 'string' ? failure.plannedGate : null;
             if (failure.providerAcceptance === 'not-accepted' && failure.costUsd === 0) {
               providerAcceptance = failure.providerAcceptance;
               recordedCostUsd = failure.costUsd;
@@ -134,12 +136,12 @@ export function productionLauncher(worktree, { run = runLimited, environment = p
       const exitCode = recorded && durableVerdict && workerSucceeded ? 0 : 2;
       const observed = reply?.observed ? { ...reply.observed, harness: configured.harness, maker: configured.maker } : null;
       const deliveryResult = {
-        exitCode, observed, text: reply?.text ?? technicalFailure ?? stderr, technicalFailure,
+        exitCode, observed, text: reply?.text ?? technicalFailure ?? stderr, technicalFailure, plannedGate,
         outputPath: request.outputPath ?? null, responseId: reply?.responseId ?? null, traceId: reply?.traceId ?? null,
         usage: reply?.usage ?? null, costEstimateUsd: reply?.costEstimateUsd ?? recordedCostUsd,
         providerAcceptance,
       };
-      if (request.outputPath) await fileSave(request.outputPath, { role, configured, observed, startedAt, finishedAt: new Date().toISOString(), stdout, stderr, exitCode, technicalFailure, traceId: reply?.traceId ?? null, responseId: reply?.responseId ?? null, quotes: reply?.quotes ?? [], warnings: reply?.warnings ?? [], deliveryResult });
+      if (request.outputPath) await fileSave(request.outputPath, { role, configured, observed, startedAt, finishedAt: new Date().toISOString(), stdout, stderr, exitCode, technicalFailure, plannedGate, traceId: reply?.traceId ?? null, responseId: reply?.responseId ?? null, quotes: reply?.quotes ?? [], warnings: reply?.warnings ?? [], deliveryResult });
       return deliveryResult;
     }
     if (role === 'reviewer') return { exitCode: 2, observed: null, text: 'Reviewer execution is disabled during the JUL-223 reset' };

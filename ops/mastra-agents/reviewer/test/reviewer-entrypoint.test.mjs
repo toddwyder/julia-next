@@ -21,6 +21,7 @@ test('the Windows reviewer entry point reads a piped request and records the pre
   assert.match(result.stderr, /paid execution is disabled until the JUL-224 trust test passes/);
   assert.doesNotMatch(result.stderr, /path.*argument.*number|Received type number \(0\)/i);
   const failure = JSON.parse(await readFile(`${verdictPath}.failure.json`, 'utf8'));
+  assert.equal(failure.plannedGate, 'paid-reviewer-disabled');
   assert.equal(failure.providerAcceptance, 'not-accepted');
   assert.equal(failure.costUsd, 0);
 });

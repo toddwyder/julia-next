@@ -8,6 +8,17 @@ import { productionLauncher } from './julia-delivery-runner.mjs';
 
 const errorText = error => typeof error?.message === 'string' ? error.message : String(error);
 
+function codexDiagnosis(text) {
+  const messages = String(text ?? '').split(/\r?\n/).flatMap(line => {
+    try {
+      const event = JSON.parse(line);
+      return event?.type === 'item.completed' && event.item?.type === 'agent_message' && typeof event.item.text === 'string'
+        ? [event.item.text.trim()] : [];
+    } catch { return []; }
+  }).filter(Boolean);
+  return messages.at(-1) ?? null;
+}
+
 async function runAgyDeliveryReview(request) {
   const stem = `recovery-reviewer-${request.incidentId}`;
   const stdoutPath = join(request.runDirectory, `${stem}.stdout.jsonl`);
@@ -112,7 +123,8 @@ export async function recoverDeliveryCrash(input, {
     if (recoveryCommit === sourceBefore || git(input.repoRoot, 'status', '--porcelain')) {
       return park('recovery parked: Codex did not leave one committed clean recovery fix', { fixer, recoveryCommit });
     }
-    const rootCause = `Confirmed by Codex diagnosis in ${fixed.outputPath ?? 'the retained fixer output'}; recovery changed ${sourceBefore} to ${recoveryCommit}.`;
+    const rootCause = codexDiagnosis(fixed.text)
+      ?? `Codex diagnosis is retained at ${fixed.outputPath ?? 'the fixer output'}; recovery changed ${sourceBefore} to ${recoveryCommit}.`;
     const diff = git(input.repoRoot, 'diff', '--binary', `${sourceBefore}...${recoveryCommit}`);
     const reviewPrompt = [
       'Review this crash-recovery fix independently. Do not edit files or call another model.',

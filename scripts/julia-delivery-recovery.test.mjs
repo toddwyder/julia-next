@@ -43,7 +43,11 @@ test('a Codex recovery fix is independently reviewed by unpinned Gemini, verifie
       assert.match(request.prompt, /Do not run the complete runner suite/);
       assert.match(request.prompt, /Do not put TEMP or TMP inside the repository/);
       sourceDirty = true;
-      return { exitCode: 0, observed: { maker: 'OpenAI', model: 'gpt-current', cliVersion: 'codex-cli current' } };
+      return {
+        exitCode: 0,
+        observed: { maker: 'OpenAI', model: 'gpt-current', cliVersion: 'codex-cli current' },
+        text: `${JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: 'The reviewer launcher referenced a nonexistent entry point; restored reviewer.mjs.' } })}\n`,
+      };
     },
     review: async request => {
       calls.push(['review', request]);
@@ -55,6 +59,7 @@ test('a Codex recovery fix is independently reviewed by unpinned Gemini, verifie
 
   assert.equal(result.status, 'RESUME');
   assert.equal(result.recoveryCommit, 'source-after');
+  assert.equal(result.rootCause, 'The reviewer launcher referenced a nonexistent entry point; restored reviewer.mjs.');
   assert.deepEqual(result.fixer, { identity: 'openai-codex-builder', maker: 'OpenAI', model: 'gpt-current', cliVersion: 'codex-cli current' });
   assert.deepEqual(result.reviewer, { identity: 'google-gemini-recovery-reviewer', maker: 'Google', model: 'gemini-current', cliVersion: 'agy current' });
   assert.equal(result.reviewBypassedFailedStep, true);

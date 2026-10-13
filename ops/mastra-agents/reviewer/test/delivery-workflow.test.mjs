@@ -308,7 +308,7 @@ test('recovery evidence cannot resume a step other than the crashed step', async
   assert.match(handled.inputData.stopReason, /wrong resume point/);
 });
 
-test('the production reviewer gate supplies zero-cost pre-provider evidence through recovery and resumes the same step', async t => {
+test('the intentional production reviewer gate parks at zero cost without crash recovery', async t => {
   const f = await fixture(t);
   const candidateCommit = 'b'.repeat(40);
   const reviewInput = {
@@ -326,6 +326,7 @@ test('the production reviewer gate supplies zero-cost pre-provider evidence thro
   const realLaunch = productionLauncher(f.directory);
   let reviewerLaunches = 0;
   let builderLaunches = 0;
+  let recoveries = 0;
   const launch = async (role, request) => {
     if (role === 'builder') {
       builderLaunches += 1;
@@ -333,36 +334,25 @@ test('the production reviewer gate supplies zero-cost pre-provider evidence thro
     }
     reviewerLaunches += 1;
     await f.options.adapters.record({ kind: 'reviewer', round: request.round, attempt: reviewerLaunches });
-    if (reviewerLaunches === 1) return realLaunch(role, request);
-    return { exitCode: 0, text: fixtureReport(reviewInput, 'PASS'), observed: { maker: 'Reviewer Co', model: 'fixture-reviewer' }, usage: { inputTokens: 1, outputTokens: 1 }, costEstimateUsd: 0 };
+    return realLaunch(role, request);
   };
   const existing = createExistingDeliveryStepAdapters({
     worktree: f.directory,
     launch,
     checks: async () => ({ status: 'PASS', change: candidateCommit, candidateCommit }),
-    recoverCrash: async ({ crashPath }) => {
-      await f.options.adapters.record({ kind: 'recovery', round: 1 });
-      const crash = JSON.parse(await readFile(crashPath, 'utf8'));
-      assert.equal(crash.providerAcceptance, 'not-accepted');
-      assert.equal(crash.costUsd, 0);
-      return resultFile(join(f.directory, 'recovery-production-gate.json'), {
-        status: 'RESUME', incidentId: crash.incidentId, interruptedStep: crash.step, crashPath,
-        rootCause: 'paid execution gate stopped before provider dispatch', recoveryCommit: 'c'.repeat(40),
-        fixer: { identity: 'codex-recovery', maker: 'OpenAI' }, reviewer: { identity: 'independent-review', maker: 'Anthropic' },
-        reviewBypassedFailedStep: true, reviewResult: 'PASS', verificationResult: 'PASS', resumePoint: crash.step,
-        candidateCommit, spend: { authorizedUsd: 1, spentUsd: 0, maximumAdditionalUsd: 0 },
-        originalPaidRequest: { acceptance: crash.providerAcceptance, costUsd: crash.costUsd },
-      });
-    },
+    recoverCrash: async () => { recoveries += 1; throw new Error('intentional paid gate must not enter recovery'); },
     waitingRecord: f.options.adapters.waitingRecord,
   });
   f.options.adapters = { ...f.options.adapters, builder: existing.builder, checks: existing.checks, reviewer: existing.reviewer, recoverCrash: existing.recoverCrash };
   const runtime = await createDeliveryWorkflowRuntime(f.options);
   const result = await runtime.start({ runId: 'jul196-production-gate-recovery', input: f.input });
   await runtime.close();
-  assert.equal(result.status, 'suspended');
-  assert.equal(reviewerLaunches, 2);
+  assert.equal(result.status, 'success');
+  assert.equal(result.result.outcome, 'parked');
+  assert.match(result.result.reason, /paid execution is disabled/);
+  assert.equal(reviewerLaunches, 1);
   assert.equal(builderLaunches, 1);
+  assert.equal(recoveries, 0);
 });
 
 test('accepting a changed candidate discards the answer, reruns checks and review, and pauses again', async t => {

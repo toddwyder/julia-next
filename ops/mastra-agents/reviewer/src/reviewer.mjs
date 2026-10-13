@@ -215,6 +215,7 @@ export async function createReviewerRuntime({ runDirectory, cardBudgetPath, inpu
 
 export async function runReviewer() {
   const error = new Error('reviewer reset is incomplete; paid execution is disabled until the JUL-224 trust test passes');
+  error.plannedGate = 'paid-reviewer-disabled';
   error.providerAcceptance = 'not-accepted';
   error.costUsd = 0;
   throw error;
@@ -235,7 +236,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   } catch (error) {
     if (request?.verdictPath && error?.providerAcceptance === 'not-accepted' && error?.costUsd === 0) {
       await durableWrite(`${request.verdictPath}.failure.json`, `${JSON.stringify({
-        kind: 'technical-failure', stage: 'reviewer-start', reason: error.message,
+        kind: 'technical-failure', stage: 'reviewer-start', plannedGate: error.plannedGate, reason: error.message,
         providerAcceptance: error.providerAcceptance, costUsd: error.costUsd,
       })}\n`, { root: dirname(request.verdictPath) });
     }

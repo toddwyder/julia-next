@@ -138,6 +138,11 @@ export function createExistingDeliveryStepAdapters({
         mastraReviewOnly: true,
         outputPath: join(input.runDirectory, `reviewer-worker-${suffix}.json`),
       }, input.runDirectory, suffix);
+      if (launched.plannedGate === 'paid-reviewer-disabled') {
+        const error = new Error(`reviewer planned gate: ${launched.technicalFailure ?? launched.text ?? 'paid reviewer is disabled'}`);
+        error.plannedGate = launched.plannedGate;
+        throw error;
+      }
       if (launched.exitCode !== 0 || launched.technicalFailure) {
         await reviewerCrash(input.runDirectory, suffix, launched, candidate.commit ?? reviewInput.candidate ?? null);
       }
