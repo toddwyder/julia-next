@@ -2,8 +2,7 @@
 
 Date: 2026-10-11
 
-Status: Partly superseded by ADR 0014 (Proposed). The current reviewer code no longer uses
-DuckDB or LibSQL.
+Status: Superseded by ADR 0017.
 
 The Mastra reviewer keeps two local databases. Its stock DuckDB observability store contains full
 traces, cost metrics, and one permanent stock-log summary line for every run. Its LibSQL store
