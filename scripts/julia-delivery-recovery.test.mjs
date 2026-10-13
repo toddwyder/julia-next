@@ -90,3 +90,46 @@ test('same-maker recovery review parks before verification', async t => {
   assert.match(result.reason, /same maker/);
   assert.equal(verified, false);
 });
+
+test('a failed Gemini recovery review retains its diagnostic text and artifact paths', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'delivery-recovery-review-failure-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const crashPath = join(directory, 'crash.json');
+  await writeFile(crashPath, `${JSON.stringify({ incidentId: 'incident-3', step: 'reviewer-launch', candidateCommit: 'candidate-1', providerAcceptance: 'not-accepted', costUsd: 0 })}\n`);
+  let sourceCommit = 'before';
+  let sourceDirty = false;
+  let verified = false;
+  const result = await recoverDeliveryCrash({
+    crashPath, runDirectory: directory, repoRoot: 'source', candidate: { path: 'candidate', commit: 'candidate-1' },
+    configuration: {
+      builder: { identity: 'codex', harness: 'codex', maker: 'OpenAI', model: null },
+      recoveryReviewer: { identity: 'gemini', harness: 'agy', maker: 'Google', model: null },
+    }, authorizedUsd: 0,
+  }, {
+    git: (cwd, ...args) => {
+      if (cwd === 'candidate' && args.join(' ') === 'rev-parse HEAD') return 'candidate-1';
+      if (cwd === 'candidate' && args.join(' ') === 'status --porcelain') return '';
+      if (cwd === 'source' && args.join(' ') === 'rev-parse HEAD') return sourceCommit;
+      if (cwd === 'source' && args.join(' ') === 'status --porcelain') return sourceDirty ? ' M fault.mjs' : '';
+      if (cwd === 'source' && args.join(' ') === 'add -A') return '';
+      if (cwd === 'source' && args.at(-2) === '-m') { sourceCommit = 'after'; sourceDirty = false; return ''; }
+      if (cwd === 'source' && args[0] === 'diff') return 'a recovery diff';
+      throw new Error(`unexpected git: ${cwd} ${args.join(' ')}`);
+    },
+    fix: async () => { sourceDirty = true; return { exitCode: 0, observed: { maker: 'OpenAI', model: 'gpt-current' } }; },
+    review: async () => ({
+      exitCode: 1, text: 'agy delivery turn did not finish', observed: null,
+      outputPath: join(directory, 'review.stdout.jsonl'), stderrPath: join(directory, 'review.stderr.txt'), logPath: join(directory, 'review.agy.log'),
+    }),
+    verify: async () => { verified = true; return { status: 0, output: '' }; },
+  });
+  assert.equal(result.status, 'PARK');
+  assert.deepEqual(result.reviewEvidence, {
+    text: 'agy delivery turn did not finish',
+    outputPath: join(directory, 'review.stdout.jsonl'),
+    stderrPath: join(directory, 'review.stderr.txt'),
+    logPath: join(directory, 'review.agy.log'),
+  });
+  assert.equal(verified, false);
+  assert.deepEqual(JSON.parse(await readFile(result.evidencePath, 'utf8')), result);
+});

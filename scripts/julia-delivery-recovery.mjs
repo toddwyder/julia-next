@@ -127,27 +127,33 @@ export async function recoverDeliveryCrash(input, {
       cliVersion: input.toolVersions?.agy ?? null, runDirectory: input.runDirectory, incidentId: crash.incidentId,
     });
     const reviewer = identity(reviewerConfiguration, reviewed.observed);
+    const reviewEvidence = {
+      text: reviewed.text ?? null,
+      outputPath: reviewed.outputPath ?? null,
+      stderrPath: reviewed.stderrPath ?? null,
+      logPath: reviewed.logPath ?? null,
+    };
     if (reviewed.exitCode !== 0 || !reviewed.observed?.model || !/^VERDICT: PASS\b/m.test(reviewed.text ?? '')) {
-      return park('recovery parked: Gemini independent recovery review did not pass', { rootCause, recoveryCommit, fixer, reviewer, reviewResult: 'FAIL' });
+      return park('recovery parked: Gemini independent recovery review did not pass', { rootCause, recoveryCommit, fixer, reviewer, reviewEvidence, reviewResult: 'FAIL' });
     }
     if (fixer.maker.trim().toLowerCase() === reviewer.maker.trim().toLowerCase()) {
-      return park('recovery parked: recovery review used the same maker as the fixer', { rootCause, recoveryCommit, fixer, reviewer, reviewResult: 'FAIL' });
+      return park('recovery parked: recovery review used the same maker as the fixer', { rootCause, recoveryCommit, fixer, reviewer, reviewEvidence, reviewResult: 'FAIL' });
     }
     if (git(input.repoRoot, 'rev-parse', 'HEAD') !== recoveryCommit || git(input.repoRoot, 'status', '--porcelain')) {
-      return park('recovery parked: delivery source changed during independent review', { rootCause, recoveryCommit, fixer, reviewer, reviewResult: 'PASS' });
+      return park('recovery parked: delivery source changed during independent review', { rootCause, recoveryCommit, fixer, reviewer, reviewEvidence, reviewResult: 'PASS' });
     }
     const verified = await verify({ repoRoot: input.repoRoot, recoveryCommit });
     if (verified.status !== 0) return park('recovery parked: complete Windows runner and safety suite failed', {
-      rootCause, recoveryCommit, fixer, reviewer, reviewResult: 'PASS', verificationResult: 'FAIL', verificationOutput: verified.output,
+      rootCause, recoveryCommit, fixer, reviewer, reviewEvidence, reviewResult: 'PASS', verificationResult: 'FAIL', verificationOutput: verified.output,
     });
     const candidateAfter = git(input.candidate.path, 'rev-parse', 'HEAD');
     const candidateDirtyAfter = git(input.candidate.path, 'status', '--porcelain');
     if (candidateAfter !== input.candidate.commit || candidateDirtyAfter) return park('recovery parked: recovery altered the Julia candidate', {
-      rootCause, recoveryCommit, fixer, reviewer, reviewResult: 'PASS', verificationResult: 'PASS', verificationOutput: verified.output,
+      rootCause, recoveryCommit, fixer, reviewer, reviewEvidence, reviewResult: 'PASS', verificationResult: 'PASS', verificationOutput: verified.output,
     });
     return save({
       ...base, status: 'RESUME', rootCause, recoveryCommit, fixer, reviewer,
-      reviewResult: 'PASS', reviewText: reviewed.text, verificationResult: 'PASS', verificationOutput: verified.output,
+      reviewEvidence, reviewResult: 'PASS', reviewText: reviewed.text, verificationResult: 'PASS', verificationOutput: verified.output,
     });
   } catch (error) {
     return park(`recovery parked: ${errorText(error)}`);

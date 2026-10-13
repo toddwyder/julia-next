@@ -41,7 +41,8 @@ from the resulting Codex session record. The reviewer remains
 `commandcode-deepseek-reviewer`, with normal paid execution disabled until the
 JUL-224 trust test permits it. The recovery reviewer is native Antigravity on
 the Google subscription; its model is also null, the harness omits `--model`,
-and the observed Gemini model comes from Antigravity's init event.
+and the observed Gemini model comes from the unique per-turn Antigravity log
+(agy 1.3.4 no longer includes it in the stream-json init event).
 
 Start authorization includes `linearActorId`. The single Linear intake query
 returns both the card and authenticated viewer; a mismatch stops before any
@@ -77,8 +78,8 @@ Framework map:
 | Pause for and resume from Todd's answer | step `suspend()` and `Run.resume()` | [Suspend and resume](https://mastra.ai/docs/workflows/suspend-and-resume) and [`Run.resume()` reference](https://mastra.ai/reference/workflows/run-methods/resume) |
 | Survive a process restart while paused | workflow snapshots in configured storage, loaded by run ID | [Snapshots](https://mastra.ai/docs/workflows/snapshots) |
 | Classify failed workflow steps and retain a technical terminal result | workflow result statuses plus explicit error handling inside the affected step | [Error handling](https://mastra.ai/docs/workflows/error-handling) and [Workflows overview](https://mastra.ai/docs/workflows/overview) |
-| Update Codex and Antigravity before worker launch | each installed CLI's native `update` and `--version` commands | installed `codex --help` and `agy --help` / `agy update --help` |
-| Launch the unpinned Gemini recovery review and observe its model | Antigravity `--print` with `stream-json` init/result events | installed `agy --help` |
+| Update Codex and Antigravity before worker launch | each installed CLI's native `update` and `--version` commands | [Codex developer commands](https://developers.openai.com/codex/cli/reference) and [Antigravity CLI overview](https://antigravity.google/docs/cli/overview); agy 1.3.4's exact update/version flags are documented only by its installed `--help`, so the launcher fails closed if that native contract changes |
+| Launch the unpinned Gemini recovery review and observe its model | Antigravity `--print` with stream-json init/result events and a unique diagnostic log | [Antigravity CLI overview](https://antigravity.google/docs/cli/overview); agy 1.3.4's exact automation flags and log schema are documented only by its installed `--help`/runtime output, so parsing ambiguity parks recovery |
 | Default local durable database | file-backed `LibSQLStore` | [libSQL storage](https://mastra.ai/integrations/databases/libsql) |
 | Query the persisted snapshot row | `@libsql/client` local `createClient()` and `execute()` | [libSQL TypeScript client local-query example](https://github.com/tursodatabase/libsql-client-ts/blob/main/examples/local/index.mjs) |
 | Measure the stored JSONB snapshot | SQLite `length()` on the snapshot BLOB | [SQLite core `length()` function](https://www.sqlite.org/lang_corefunc.html#length) |
