@@ -6,7 +6,7 @@ import { join } from 'node:path';
 
 import { authorizationReason, productionLauncher, workerPrompt } from './julia-delivery-runner.mjs';
 import { safeWorkerEnvironment } from './julia-minimal-runner-checks.mjs';
-import { createMastraDeliveryAdapters } from './julia-mastra-delivery.mjs';
+import { createMastraDeliveryAdapters, runDurableExternalUpdate } from './julia-mastra-delivery.mjs';
 import { createExistingDeliveryStepAdapters } from '../ops/mastra-agents/reviewer/src/delivery-step-adapters.mjs';
 
 test('authorization and canonical builder prompt retain the approved production boundaries', () => {
@@ -104,4 +104,29 @@ test('production waiting record is immutable and exactly once for a reviewed com
   assert.equal(record.card, 'JUL-196');
   assert.equal(record.candidateCommit, 'abc123');
   assert.deepEqual(record.evidencePaths, [builderResultPath, checksResultPath, reviewResultPath, 'proof.json']);
+});
+
+test('external card updates retain their result and refuse ambiguous duplicate notices', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'delivery-external-update-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const requestPath = join(root, 'request.json');
+  const resultPath = join(root, 'result.json');
+  let calls = 0;
+  const input = {
+    requestPath, resultPath, request: { operation: 'start-card', card: 'JUL-196' },
+    operation: async () => { calls += 1; return { id: 'linear-comment-1', account: 'restricted-julia-service' }; },
+  };
+  const first = await runDurableExternalUpdate(input);
+  const second = await runDurableExternalUpdate(input);
+  assert.equal(calls, 1);
+  assert.deepEqual(second.response, first.response);
+  assert.deepEqual(JSON.parse(await readFile(resultPath, 'utf8')).response, { id: 'linear-comment-1', account: 'restricted-julia-service' });
+
+  const ambiguousRequest = join(root, 'ambiguous-request.json');
+  await writeFile(ambiguousRequest, '{}\n');
+  await assert.rejects(runDurableExternalUpdate({
+    requestPath: ambiguousRequest, resultPath: join(root, 'missing-result.json'),
+    request: { operation: 'park-card', card: 'JUL-196' }, operation: async () => { calls += 1; },
+  }), /refusing a duplicate/);
+  assert.equal(calls, 1);
 });

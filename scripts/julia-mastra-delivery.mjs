@@ -30,6 +30,28 @@ async function writeOnce(path, value) {
   return { resultPath: path };
 }
 
+export async function runDurableExternalUpdate({ requestPath, resultPath, request, operation }) {
+  if (existsSync(resultPath)) {
+    const saved = await readJson(resultPath);
+    if (saved.status !== 'PASS') throw new Error(saved.reason ?? 'saved external update failed');
+    return saved;
+  }
+  if (existsSync(requestPath)) {
+    throw new Error(`external update is ambiguous after restart; refusing a duplicate (${requestPath})`);
+  }
+  await writeOnce(requestPath, request);
+  try {
+    const response = await operation();
+    const saved = { status: 'PASS', operation: request.operation, card: request.card, response: response ?? null, completedAt: new Date().toISOString() };
+    await writeOnce(resultPath, saved);
+    return saved;
+  } catch (error) {
+    const reason = typeof error?.message === 'string' ? error.message : String(error);
+    await writeOnce(resultPath, { status: 'FAIL', operation: request.operation, card: request.card, reason, completedAt: new Date().toISOString() });
+    throw error;
+  }
+}
+
 export function createMastraDeliveryAdapters({
   repoRoot = process.cwd(),
   worktree,
@@ -106,7 +128,12 @@ export function createMastraDeliveryAdapters({
         const approvedInput = await readJson(input.approvedInputPath);
         const review = await readJson(input.reviewResultPath);
         const reason = review.reason ?? 'two independent review attempts found blocking defects';
-        await parkCard(approvedInput.issueId, reason);
+        await runDurableExternalUpdate({
+          requestPath: join(input.runDirectory, 'linear-park-request.json'),
+          resultPath: join(input.runDirectory, 'linear-park-result.json'),
+          request: { operation: 'park-card', card: approvedInput.issueId, reason },
+          operation: () => parkCard(approvedInput.issueId, reason),
+        });
         return writeOnce(join(input.runDirectory, 'park.json'), { card: approvedInput.issueId, reason });
       },
     });
@@ -145,7 +172,12 @@ export function createMastraDeliveryAdapters({
         outputPath: join(input.runDirectory, 'reviewer-worker.json'),
       };
       await saveJson(approvedInputPath, approved);
-      await startCard(launchInput.issueId, prepared.worktree.startCommit);
+      await runDurableExternalUpdate({
+        requestPath: join(input.runDirectory, 'linear-start-request.json'),
+        resultPath: join(input.runDirectory, 'linear-start-result.json'),
+        request: { operation: 'start-card', card: launchInput.issueId, startCommit: prepared.worktree.startCommit },
+        operation: () => startCard(launchInput.issueId, prepared.worktree.startCommit),
+      });
       return { resultPath: approvedInputPath };
     },
     builder: async input => (await steps(input.approvedInputPath)).builder(input),
