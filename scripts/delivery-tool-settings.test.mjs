@@ -76,6 +76,9 @@ test('loads the checked-in catalog without a worker launch', async () => {
   assert.equal(settings.builder.thinking, 'high');
   assert.equal(settings.reviewer.model.id, 'commandcode-deepseek-reviewer');
   assert.equal(settings.reviewer.thinking, null);
+  assert.equal(settings.recoveryReviewer.model.id, 'google-gemini-recovery-reviewer');
+  assert.equal(settings.recoveryReviewer.model.executableModelId, null);
+  assert.equal(settings.recoveryReviewer.model.harness, 'agy');
 });
 
 test('checks in the authorized CommandCode DeepSeek Flash reviewer as the default', async () => {

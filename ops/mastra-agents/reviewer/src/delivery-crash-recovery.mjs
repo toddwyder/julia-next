@@ -20,6 +20,7 @@ function adapterInput(inputData, additions = {}) {
     round: inputData.round,
     cycle: inputData.cycle,
     runDirectory: inputData.runDirectory,
+    toolUpdatesResultPath: inputData.toolUpdatesResultPath,
     launchInputPath: inputData.launchInputPath,
     approvedInputPath: inputData.approvedInputPath,
     priorReviewPath: inputData.priorReviewPath,

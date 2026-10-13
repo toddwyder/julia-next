@@ -109,6 +109,23 @@ test('a card missing agreed seams parks immediately without a builder or repair 
   assert.match(summaries[0], /^card=JUL-196 change=unknown round=0 stop=PARK reason="card has no agreed test seams"/);
 });
 
+test('a failed worker CLI update parks before any worker launches', async t => {
+  const f = await fixture(t);
+  f.options.adapters.toolUpdates = () => resultFile(join(f.directory, 'tool-updates.json'), {
+    status: 'FAIL', reason: 'codex update failed: network unavailable',
+    tools: [{ tool: 'codex', status: 'FAIL', beforeVersion: 'old' }],
+  });
+  const runtime = await createDeliveryWorkflowRuntime(f.options);
+  const result = await runtime.start({ runId: 'jul196-update-failure', input: f.input });
+  await runtime.close();
+
+  assert.equal(result.status, 'success');
+  assert.equal(result.result.outcome, 'parked');
+  assert.equal(result.result.round, 0);
+  assert.match(result.result.reason, /codex update failed/);
+  assert.deepEqual((await events(f.callsPath)).map(({ kind }) => kind), ['authorization', 'card-read', 'park']);
+});
+
 test('a separate process resumes the saved pause without duplicate launches or notices', async t => {
   const directory = join(suiteDirectory, crypto.randomUUID());
   await mkdir(directory);

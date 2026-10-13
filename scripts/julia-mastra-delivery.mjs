@@ -10,6 +10,8 @@ import { git, localTester } from './julia-minimal-runner-checks.mjs';
 import { seamsOf } from './julia-delivery-workspace.mjs';
 import { reviewInput } from './julia-delivery-review.mjs';
 import { saveJson } from './julia-delivery-state.mjs';
+import { updateWorkerTools } from './delivery-tool-updates.mjs';
+import { recoverDeliveryCrash } from './julia-delivery-recovery.mjs';
 import { createDeliveryWorkflowRuntime } from '../ops/mastra-agents/reviewer/src/delivery-workflow-runtime.mjs';
 import { createExistingDeliveryStepAdapters } from '../ops/mastra-agents/reviewer/src/delivery-step-adapters.mjs';
 
@@ -148,17 +150,14 @@ export function createMastraDeliveryAdapters({
         const crash = await readJson(input.crashPath);
         const checks = await readJson(input.checksResultPath);
         const authorizedUsd = approvedInput.authorization?.spending?.reviewer?.maxUsd;
-        return writeOnce(join(input.runDirectory, `recovery-${crash.incidentId}.json`), {
-          status: 'PARK', incidentId: crash.incidentId, interruptedStep: crash.step,
-          crashPath: input.crashPath,
-          rootCause: 'automatic recovery is parked because no authorized independent bypass reviewer is configured',
-          recoveryCommit: null, fixer: null, reviewer: null,
-          reviewBypassedFailedStep: false, reviewResult: 'NOT_RUN', verificationResult: 'NOT_RUN',
-          resumePoint: crash.step, candidateCommit: checks.candidateCommit ?? checks.change,
-          spend: { authorizedUsd: Number.isFinite(authorizedUsd) ? authorizedUsd : 0, spentUsd: 0, maximumAdditionalUsd: 0 },
-          originalPaidRequest: { acceptance: crash.providerAcceptance, costUsd: crash.costUsd },
-          reason: 'recovery parked: no authorized independent route bypasses the crashed reviewer launcher',
+        const updates = input.toolUpdatesResultPath ? await readJson(input.toolUpdatesResultPath) : { tools: [] };
+        const toolVersions = Object.fromEntries((updates.tools ?? []).map(tool => [tool.tool, tool.afterVersion]));
+        const result = await recoverDeliveryCrash({
+          crashPath: input.crashPath, runDirectory: input.runDirectory, repoRoot,
+          candidate: { path: approvedInput.workspace.path, commit: checks.candidateCommit ?? checks.change },
+          configuration: approvedInput.configuration, authorizedUsd, toolVersions,
         });
+        return { resultPath: result.evidencePath };
       },
     });
     return existingSteps;
@@ -212,6 +211,14 @@ export function createMastraDeliveryAdapters({
         operation: () => startCard(card, prepared.worktree.startCommit),
       });
       return { resultPath: approvedInputPath };
+    },
+    toolUpdates: async input => {
+      const approved = await readJson(input.approvedInputPath);
+      const harnesses = [approved.configuration?.builder?.harness, approved.configuration?.recoveryReviewer?.harness]
+        .filter(harness => harness === 'codex' || harness === 'agy');
+      const path = join(input.runDirectory, 'tool-updates.json');
+      if (existsSync(path)) return { resultPath: path };
+      return writeOnce(path, await updateWorkerTools(harnesses));
     },
     builder: async input => (await steps(input.approvedInputPath)).builder(input),
     checks: async input => (await steps(input.approvedInputPath)).checks(input),

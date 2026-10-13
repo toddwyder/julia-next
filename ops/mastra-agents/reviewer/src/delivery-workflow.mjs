@@ -19,6 +19,7 @@ const handoffSchema = z.object({
   approvedInputPath: pathSchema,
   runDirectory: pathSchema,
   runMetadataPath: pathSchema,
+  toolUpdatesResultPath: pathSchema.optional(),
   round: z.number().int().min(0).max(MAX_ROUNDS),
   builderResultPath: pathSchema.optional(),
   checksResultPath: pathSchema.optional(),
@@ -78,6 +79,7 @@ function adapterInput(inputData, additions = {}) {
     runDirectory: inputData.runDirectory,
     launchInputPath: inputData.launchInputPath,
     approvedInputPath: inputData.approvedInputPath,
+    toolUpdatesResultPath: inputData.toolUpdatesResultPath,
     priorReviewPath: inputData.priorReviewPath,
     ...additions,
   };
@@ -145,6 +147,38 @@ export function createDeliveryWorkflow(adapters, samplePeak, summaryPath) {
     },
   });
 
+  const updateWorkerTools = createStep({
+    id: 'update-worker-command-line-tools',
+    inputSchema: handoffSchema,
+    outputSchema: handoffSchema,
+    execute: async ({ inputData }) => {
+      if (inputData.stopReason) return inputData;
+      let resultPath;
+      try {
+        resultPath = requireResultPath('worker tool updates', await adapters.toolUpdates(adapterInput(inputData)));
+      } catch (error) {
+        const failed = await failedResult(inputData, 'worker tool updates', error);
+        resultPath = failed.resultPath;
+      }
+      const result = await readJson(resultPath);
+      if (result.status === 'PASS') {
+        await updateMetadata(inputData.runMetadataPath, { toolUpdatesResultPath: resultPath });
+        return { ...inputData, toolUpdatesResultPath: resultPath };
+      }
+      const reason = result.reason ?? 'worker command-line tool update failed';
+      const checksResultPath = await writeJson(join(inputData.runDirectory, 'checks-0.json'), { status: 'FAIL', reason });
+      const reviewResultPath = await writeJson(join(inputData.runDirectory, 'review-0.json'), {
+        verdict: 'SYSTEM_ERROR', reason, model: null, effort: null,
+        inputTokens: 0, outputTokens: 0, costEstimateUsd: 0,
+      });
+      await updateMetadata(inputData.runMetadataPath, {
+        toolUpdatesResultPath: resultPath, checksResultPath, reviewResultPath,
+        reviewResultPaths: [reviewResultPath], stopReason: reason,
+      });
+      return { ...inputData, toolUpdatesResultPath: resultPath, checksResultPath, reviewResultPath, stopReason: reason };
+    },
+  });
+
   const build = createStep({
     id: 'build',
     inputSchema: handoffSchema,
@@ -177,6 +211,7 @@ export function createDeliveryWorkflow(adapters, samplePeak, summaryPath) {
         approvedInputPath: inputData.approvedInputPath,
         runDirectory: inputData.runDirectory,
         runMetadataPath: inputData.runMetadataPath,
+        toolUpdatesResultPath: inputData.toolUpdatesResultPath,
         round,
         builderResultPath,
         ...(priorReviewPath ? { priorReviewPath } : {}),
@@ -394,6 +429,7 @@ export function createDeliveryWorkflow(adapters, samplePeak, summaryPath) {
   })
     .then(authorize)
     .then(readCard)
+    .then(updateWorkerTools)
     .dountil(reviewCycle, async ({ inputData }) => inputData.outcome !== 'stale')
     .then(summarize)
     .commit();

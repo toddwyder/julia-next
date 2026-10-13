@@ -24,17 +24,24 @@ repeat. Otherwise the workflow allows one recovery result for the incident,
 requires a different-maker review through a route that bypasses the failed
 step plus a passing Windows verification result, and resumes the same reviewer
 step. A crash anywhere in that recovery or resumption parks with the retained
-incident evidence. The production adapter currently parks because no
-authorized bypass reviewer is configured; the deterministic fault-injection
-fixture proves both the complete recovery/resume route and the fail-closed
-paid-request route without a model call.
+incident evidence. The production recovery route launches Codex against the
+delivery source with the canonical `diagnosing-bugs` skill, protects the Julia
+candidate, sends the committed recovery diff through the existing
+`ops/service-dropbox/run-agy-seat.mjs` Antigravity harness for a Google Gemini
+subscription review, runs the complete Windows runner suite, and resumes the
+failed reviewer step only after all three records pass.
 
+Before the first worker step, the workflow runs each configured worker CLI's
+own update command (`codex update`, `agy update`) and records before/after
+versions. Any update failure produces a technical park before a worker launch.
 The checked-in builder default is native Codex on Todd's subscription. Its
 model field is deliberately null so the Codex CLI chooses its current default;
 the launcher omits `-m` and still reads the exact observed model and effort
 from the resulting Codex session record. The reviewer remains
 `commandcode-deepseek-reviewer`, with normal paid execution disabled until the
-JUL-224 trust test permits it.
+JUL-224 trust test permits it. The recovery reviewer is native Antigravity on
+the Google subscription; its model is also null, the harness omits `--model`,
+and the observed Gemini model comes from Antigravity's init event.
 
 Start authorization includes `linearActorId`. The single Linear intake query
 returns both the card and authenticated viewer; a mismatch stops before any
@@ -70,6 +77,8 @@ Framework map:
 | Pause for and resume from Todd's answer | step `suspend()` and `Run.resume()` | [Suspend and resume](https://mastra.ai/docs/workflows/suspend-and-resume) and [`Run.resume()` reference](https://mastra.ai/reference/workflows/run-methods/resume) |
 | Survive a process restart while paused | workflow snapshots in configured storage, loaded by run ID | [Snapshots](https://mastra.ai/docs/workflows/snapshots) |
 | Classify failed workflow steps and retain a technical terminal result | workflow result statuses plus explicit error handling inside the affected step | [Error handling](https://mastra.ai/docs/workflows/error-handling) and [Workflows overview](https://mastra.ai/docs/workflows/overview) |
+| Update Codex and Antigravity before worker launch | each installed CLI's native `update` and `--version` commands | installed `codex --help` and `agy --help` / `agy update --help` |
+| Launch the unpinned Gemini recovery review and observe its model | Antigravity `--print` with `stream-json` init/result events | installed `agy --help` |
 | Default local durable database | file-backed `LibSQLStore` | [libSQL storage](https://mastra.ai/integrations/databases/libsql) |
 | Query the persisted snapshot row | `@libsql/client` local `createClient()` and `execute()` | [libSQL TypeScript client local-query example](https://github.com/tursodatabase/libsql-client-ts/blob/main/examples/local/index.mjs) |
 | Measure the stored JSONB snapshot | SQLite `length()` on the snapshot BLOB | [SQLite core `length()` function](https://www.sqlite.org/lang_corefunc.html#length) |

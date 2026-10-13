@@ -7,6 +7,7 @@ import { PassThrough } from 'node:stream';
 import {
   buildAgySpawnSpec, runAgySeat, parseAgyJsonResult, superviseAgySeat,
   readAllStdin, parseAgyArgs, normalizeEffort, EFFORT_LEVELS, DEFAULT_EFFORT,
+  buildAgyDeliverySpec, parseAgyDeliveryResult,
 } from './run-agy-seat.mjs';
 
 function fakeAgyChild() {
@@ -158,6 +159,18 @@ test('parseAgyJsonResult: unparseable output is a failure, never a silent pass',
   const result = parseAgyJsonResult('not json at all');
   assert.equal(result.ok, false);
   assert.match(result.errorText, /parseable JSON/);
+});
+
+test('delivery review uses the current default model and records the model agy actually reports', () => {
+  const spec = buildAgyDeliverySpec('review this recovery fix', { cwd: 'C:\\recovery' });
+  assert.equal(spec.command, 'agy');
+  assert.equal(spec.args.includes('--model'), false);
+  assert.deepEqual(spec.options, { cwd: 'C:\\recovery' });
+  const parsed = parseAgyDeliveryResult([
+    JSON.stringify({ event: 'init', conversation_id: 'conversation-1', init: { model: 'gemini-current-default' } }),
+    JSON.stringify({ event: 'result', result: { conversation_id: 'conversation-1', status: 'SUCCESS', response: 'VERDICT: PASS' } }),
+  ].join('\n'));
+  assert.deepEqual(parsed, { ok: true, errorText: null, response: 'VERDICT: PASS', model: 'gemini-current-default', usage: null });
 });
 
 test('superviseAgySeat: a successful turn exits 0, prints nothing to stderr, tees stdout through', async () => {

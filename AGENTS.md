@@ -55,6 +55,7 @@ proof in `.agents/skills/verify-julia/SKILL.md` and retain behavior evidence tha
 exact candidate commit and dirty-tree digest. Any source change after proof makes that proof stale;
 rerun it before review. Missing, failed, unavailable, stale, or identity-mismatched proof is a
 review blocker, not a pass or an implied not-applicable result.
+A check by the same maker as the work is a self-check; never call it independent.
 
 ## Authorization and blockers
 

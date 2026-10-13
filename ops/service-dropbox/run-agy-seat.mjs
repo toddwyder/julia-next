@@ -55,6 +55,38 @@ export function runAgySeat(prompt, { spawnImpl = spawn, spawnOpts, ...specOpts }
   return spawnImpl(spec.command, spec.args, { ...spec.options, ...(spawnOpts || {}) });
 }
 
+// Delivery recovery needs the model reported by Antigravity's init event.
+// Keep this in the existing agy harness and omit --model so agy chooses its
+// current default. --print remains the final flag immediately before prompt.
+export function buildAgyDeliverySpec(prompt, { effort = DEFAULT_EFFORT, cwd, printTimeout = '0' } = {}) {
+  const args = [
+    '--output-format', 'stream-json',
+    '--print-timeout', printTimeout,
+    '--dangerously-skip-permissions',
+    '--disable-slash-commands',
+    '--effort', normalizeEffort(effort),
+    '--print', prompt,
+  ];
+  return { command: 'agy', args, options: cwd ? { cwd } : {} };
+}
+
+export function parseAgyDeliveryResult(text) {
+  const events = String(text).split(/\r?\n/).filter(Boolean).flatMap(line => {
+    try { return [JSON.parse(line)]; } catch { return []; }
+  });
+  const init = events.find(event => event.event === 'init');
+  const results = events.filter(event => event.event === 'result').map(event => event.result);
+  const final = results.at(-1);
+  const model = init?.init?.model ?? null;
+  const response = final?.response ?? null;
+  const invalid = !init || !final || results.some(result => result?.conversation_id !== init.conversation_id);
+  if (invalid) return { ok: false, errorText: 'agy delivery turn did not finish with a matching result', response, model, usage: final?.usage ?? null };
+  if (final.status !== 'SUCCESS' || final.denied_actions?.length || !String(response ?? '').trim()) {
+    return { ok: false, errorText: String(final.error ?? (final.denied_actions?.length ? 'agy was denied a tool' : 'agy gave no completed reply')), response, model, usage: final.usage ?? null };
+  }
+  return { ok: true, errorText: null, response, model, usage: final.usage ?? null };
+}
+
 // agy's `--output-format json` prints exactly one JSON object once the turn
 // ends (not an NDJSON stream like Pi's `--mode json`), and -- unlike the
 // adopt route, which has no per-session token record for this provider at

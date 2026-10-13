@@ -36,6 +36,12 @@ export function createOfflineDeliveryAdapters({ directory, callsPath, verdicts =
       await record({ kind: 'card-read', round: 0 });
       return { resultPath: join(directory, 'JUL-196-approved.json') };
     },
+    toolUpdates: async () => resultFileOnce('tool-updates.json', {
+      status: 'PASS', tools: [
+        { tool: 'codex', status: 'PASS', beforeVersion: 'fixture', afterVersion: 'fixture' },
+        { tool: 'agy', status: 'PASS', beforeVersion: 'fixture', afterVersion: 'fixture' },
+      ],
+    }),
     builder: async ({ round }) => {
       await record({ kind: 'builder', round });
       return resultFile(`builder-${round}.json`, { status: 'PASS' });

@@ -87,7 +87,7 @@ async function recordEvent(path, event, { mkdirImpl = mkdir, append = appendFile
 }
 
 function snapshot(resolved) {
-  return Object.fromEntries(['builder', 'reviewer'].map((role) => {
+  return Object.fromEntries(['builder', 'reviewer', ...(resolved.recoveryReviewer ? ['recoveryReviewer'] : [])].map((role) => {
     const { model, thinking } = resolved[role];
     return [role, {
       identity: model.id,
@@ -115,7 +115,7 @@ function resolveSelections(settings, defaults, explicit) {
     reviewer: explicit.reviewer ?? (defaults === null ? settings.reviewer : defaults?.reviewer),
   };
   try {
-    return { selected, resolved: validateDeliveryToolSettings({ catalog: settings.catalog, reviewerRunLimits: settings.reviewerRunLimits, ...selected }) };
+    return { selected, resolved: validateDeliveryToolSettings({ catalog: settings.catalog, reviewerRunLimits: settings.reviewerRunLimits, recoveryReviewer: settings.recoveryReviewer, ...selected }) };
   } catch (error) {
     const missing = ['builder', 'reviewer'].filter((role) => !explicit[role] && isStaleChoice(selected[role], settings.catalog));
     if (missing.length) throw new SelectionRequiredError(missing, selected);

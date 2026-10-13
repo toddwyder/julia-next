@@ -16,6 +16,12 @@ async function saveResult(runDirectory, name, value) {
   return { resultPath };
 }
 
+async function cliVersion(input, harness) {
+  if (!input.toolUpdatesResultPath) return null;
+  const updates = await readJson(input.toolUpdatesResultPath);
+  return updates.tools?.find(tool => tool.tool === harness)?.afterVersion ?? null;
+}
+
 async function reviewerCrash(runDirectory, suffix, launched, candidateCommit) {
   const crashPath = join(runDirectory, `crash-reviewer-${suffix}.json`);
   const acceptance = launched.providerAcceptance ?? 'uncertain';
@@ -86,10 +92,11 @@ export function createExistingDeliveryStepAdapters({
         : request.prompt;
       const suffix = input.cycle && input.cycle > 1 ? `${input.round}-cycle-${input.cycle}` : input.round;
       const launched = await launchDurably(launch, 'builder', { ...request, prompt, round: input.round, outputPath: join(input.runDirectory, `builder-worker-${suffix}.json`) }, input.runDirectory, suffix);
+      const observed = launched.observed ? { ...launched.observed, cliVersion: await cliVersion(input, request.configuration.harness) } : null;
       return saveResult(input.runDirectory, `builder-${suffix}.json`, {
         status: launched.exitCode === 0 ? 'PASS' : 'FAIL',
         reason: launched.exitCode === 0 ? null : launched.text || `builder exited ${launched.exitCode}`,
-        observed: launched.observed ?? null,
+        observed,
         outputPath: launched.outputPath ?? null,
       });
     },
