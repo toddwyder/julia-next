@@ -3,7 +3,7 @@ import { createStep, createWorkflow } from '@mastra/core/workflows';
 import { LibSQLStore } from '@mastra/libsql';
 import { createClient } from '@libsql/client';
 import { appendFile, readFile, writeFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { z } from 'zod/v4';
 
 export const DELIVERY_WORKFLOW_ID = 'julia-delivery-round-1';
@@ -87,7 +87,8 @@ function createDeliveryWorkflow(adapters, samplePeak, summaryPath) {
     outputSchema: handoffSchema,
     execute: async ({ inputData }) => {
       const round = inputData.round + 1;
-      await samplePeak();
+      await updateMetadata(inputData.runMetadataPath, { round });
+      await samplePeak(inputData.runMetadataPath);
       let result;
       try {
         result = await adapters.builder(adapterInput({ ...inputData, round }, {
@@ -95,15 +96,18 @@ function createDeliveryWorkflow(adapters, samplePeak, summaryPath) {
         }));
       } catch (error) {
         const failed = await failedResult({ ...inputData, round }, 'builder', error);
+        await updateMetadata(inputData.runMetadataPath, { round, builderResultPath: failed.resultPath, stopReason: failed.reason });
         return { ...inputData, round, builderResultPath: failed.resultPath, stopReason: failed.reason };
       }
-      await samplePeak();
+      const builderResultPath = requireResultPath('builder', result);
+      await updateMetadata(inputData.runMetadataPath, { round, builderResultPath });
+      await samplePeak(inputData.runMetadataPath);
       return {
         approvedInputPath: inputData.approvedInputPath,
         runDirectory: inputData.runDirectory,
         runMetadataPath: inputData.runMetadataPath,
         round,
-        builderResultPath: requireResultPath('builder', result),
+        builderResultPath,
       };
     },
   });
@@ -129,7 +133,8 @@ function createDeliveryWorkflow(adapters, samplePeak, summaryPath) {
           status: 'FAIL', reason: builder.reason ?? 'builder did not pass',
         });
       }
-      await samplePeak();
+      await updateMetadata(inputData.runMetadataPath, { checksResultPath, ...(inputData.stopReason ? { stopReason: inputData.stopReason } : {}) });
+      await samplePeak(inputData.runMetadataPath);
       return { ...inputData, checksResultPath };
     },
   });
@@ -159,7 +164,8 @@ function createDeliveryWorkflow(adapters, samplePeak, summaryPath) {
           model: null, effort: null, inputTokens: 0, outputTokens: 0, costEstimateUsd: 0,
         });
       }
-      await samplePeak();
+      await updateMetadata(inputData.runMetadataPath, { reviewResultPath, ...(inputData.stopReason ? { stopReason: inputData.stopReason } : {}) });
+      await samplePeak(inputData.runMetadataPath);
       return { ...inputData, reviewResultPath };
     },
   });
@@ -182,10 +188,13 @@ function createDeliveryWorkflow(adapters, samplePeak, summaryPath) {
         result = await adapters.notify(adapterInput(inputData, { reviewResultPath: inputData.reviewResultPath }));
       } catch (error) {
         const failed = await failedResult(inputData, 'notification', error);
+        await updateMetadata(inputData.runMetadataPath, { noticeResultPath: failed.resultPath, stopReason: failed.reason });
         return { ...inputData, noticeResultPath: failed.resultPath, stopReason: failed.reason };
       }
-      await samplePeak();
-      return { ...inputData, noticeResultPath: requireResultPath('notification', result) };
+      const noticeResultPath = requireResultPath('notification', result);
+      await updateMetadata(inputData.runMetadataPath, { noticeResultPath });
+      await samplePeak(inputData.runMetadataPath);
+      return { ...inputData, noticeResultPath };
     },
   });
 
@@ -212,7 +221,7 @@ function createDeliveryWorkflow(adapters, samplePeak, summaryPath) {
     outputSchema: workflowOutputSchema,
     execute: async ({ inputData }) => {
       const metadata = await updateMetadata(inputData.runMetadataPath, {
-        peakMemoryBytes: await samplePeak(), endTime: new Date().toISOString(),
+        peakMemoryBytes: await samplePeak(inputData.runMetadataPath), endTime: new Date().toISOString(),
       });
       const checksResult = await readJson(inputData.checksResultPath);
       const reviewResult = await readJson(inputData.reviewResultPath);
@@ -269,20 +278,36 @@ export async function createDeliveryWorkflowRuntime({ storagePath, runDirectory,
     id: 'julia-delivery-local', url: `file:${absoluteStoragePath}`,
     localPragmas: { mmapSize: 0 },
   });
-  let metadataPath = null;
-  const samplePeak = async () => {
-    const rss = process.resourceUsage().maxRSS * 1024;
-    if (!metadataPath) return rss;
+  const trackers = new Map();
+  const observePeak = metadataPath => {
+    const tracker = trackers.get(metadataPath);
+    const rss = process.memoryUsage().rss;
+    if (tracker) tracker.peakMemoryBytes = Math.max(tracker.peakMemoryBytes, rss);
+    return tracker?.peakMemoryBytes ?? rss;
+  };
+  const samplePeak = async metadataPath => observePeak(metadataPath);
+  const beginMeasuring = async metadataPath => {
     const metadata = await readJson(metadataPath);
-    const peakMemoryBytes = Math.max(metadata.peakMemoryBytes ?? 0, rss);
-    if (peakMemoryBytes !== metadata.peakMemoryBytes) await writeJson(metadataPath, { ...metadata, peakMemoryBytes });
-    return peakMemoryBytes;
+    const tracker = {
+      peakMemoryBytes: Math.max(metadata.peakMemoryBytes ?? 0, process.memoryUsage().rss),
+      sampler: null,
+    };
+    tracker.sampler = setInterval(() => observePeak(metadataPath), 10);
+    tracker.sampler.unref();
+    trackers.set(metadataPath, tracker);
+    return async () => {
+      observePeak(metadataPath);
+      clearInterval(tracker.sampler);
+      trackers.delete(metadataPath);
+      await updateMetadata(metadataPath, { peakMemoryBytes: tracker.peakMemoryBytes });
+      return tracker.peakMemoryBytes;
+    };
   };
   const deliveryWorkflow = createDeliveryWorkflow(adapters, samplePeak, summaryPath);
   const mastra = new Mastra({ storage, workflows: { deliveryWorkflow } });
   const workflow = mastra.getWorkflow('deliveryWorkflow');
 
-  const measurePause = async runId => {
+  const measurePause = async (runId, metadataPath) => {
     const measurementClient = createClient({ url: `file:${absoluteStoragePath}` });
     const measured = await measurementClient.execute({
       sql: 'SELECT length(snapshot) AS bytes FROM mastra_workflow_snapshot WHERE workflow_name = ? AND run_id = ?',
@@ -291,40 +316,55 @@ export async function createDeliveryWorkflowRuntime({ storagePath, runDirectory,
     measurementClient.close();
     const pauseStateBytes = Number(measured.rows[0]?.bytes);
     if (!Number.isSafeInteger(pauseStateBytes) || pauseStateBytes <= 0) throw new Error('saved pause state size could not be measured');
-    const metadata = await updateMetadata(metadataPath, { pauseStateBytes, peakMemoryBytes: await samplePeak() });
+    const metadata = await updateMetadata(metadataPath, { pauseStateBytes });
     return { pauseStateBytes, peakMemoryBytes: metadata.peakMemoryBytes };
   };
 
-  const recordFailedRun = async (runId, failure) => {
-    const fallback = { card: 'unknown', startTime: 'unknown', peakMemoryBytes: await samplePeak(), runId };
+  const recordFailedRun = async (runId, metadataPath, failure) => {
+    const fallback = { card: 'unknown', startTime: 'unknown', peakMemoryBytes: process.memoryUsage().rss, runId, round: 0 };
     let metadata;
     try { metadata = { ...fallback, ...await readJson(metadataPath) }; } catch { metadata = fallback; }
     if (metadata.summaryWritten) return;
     const endTime = new Date().toISOString();
+    let checks = {}; let reviews = [];
+    try { if (metadata.checksResultPath) checks = await readJson(metadata.checksResultPath); } catch { /* retain unknown */ }
+    for (let round = 1; round <= (metadata.round ?? 0); round += 1) {
+      try { reviews.push(await readJson(join(dirname(metadataPath), `review-${round}.json`))); } catch { /* incomplete round */ }
+    }
+    const lastReview = reviews.at(-1) ?? {};
+    const total = field => reviews.length && reviews.every(review => Number.isFinite(review[field]))
+      ? reviews.reduce((sum, review) => sum + review[field], 0)
+      : 'unknown';
     const line = [
-      `card=${metadata.card}`, 'change=unknown', 'round=0',
+      `card=${metadata.card}`, `change=${checks.change ?? 'unknown'}`, `round=${metadata.round ?? 0}`,
       `stop=SYSTEM_ERROR reason=${JSON.stringify(errorMessage(failure))}`,
-      'reviewerModel=unknown', 'reviewerEffort=unknown', 'inputTokens=unknown',
-      'outputTokens=unknown', 'costEstimateUsd=unknown', `start=${metadata.startTime}`, `end=${endTime}`,
+      `reviewerModel=${lastReview.model ?? 'unknown'}`, `reviewerEffort=${lastReview.effort ?? 'unknown'}`,
+      `inputTokens=${total('inputTokens')}`, `outputTokens=${total('outputTokens')}`,
+      `costEstimateUsd=${total('costEstimateUsd')}`, `start=${metadata.startTime}`, `end=${endTime}`,
     ].join(' ');
     await appendFile(summaryPath, `${line}\n`);
-    try { await updateMetadata(metadataPath, { endTime, peakMemoryBytes: await samplePeak(), summaryWritten: true }); } catch { /* summary is already permanent */ }
+    try { await updateMetadata(metadataPath, { endTime, summaryWritten: true }); } catch { /* summary is already permanent */ }
   };
 
-  const complete = async (runId, operation) => {
+  const complete = async (runId, metadataPath, operation) => {
+    const finishMeasuring = await beginMeasuring(metadataPath);
+    let result;
     try {
-      const result = await operation();
-      if (result?.status === 'failed' || result?.status === 'tripwire') await recordFailedRun(runId, result.error ?? result.status);
-      return result;
+      result = await operation();
+      if (result?.status === 'failed' || result?.status === 'tripwire') await recordFailedRun(runId, metadataPath, result.error ?? result.status);
     } catch (error) {
-      await recordFailedRun(runId, error);
+      await recordFailedRun(runId, metadataPath, error);
       throw error;
+    } finally {
+      const peakMemoryBytes = await finishMeasuring();
+      if (result?.status === 'success' && result.result) result = { ...result, result: { ...result.result, peakMemoryBytes } };
     }
+    return result;
   };
 
   return {
     async start({ runId, input }) {
-      metadataPath = join(input.runDirectory, `${runId}-workflow-metrics.json`);
+      const metadataPath = join(input.runDirectory, `${runId}-workflow-metrics.json`);
       await writeJson(metadataPath, {
         card: input.card, runId,
         startTime: new Date().toISOString(),
@@ -332,20 +372,20 @@ export async function createDeliveryWorkflowRuntime({ storagePath, runDirectory,
         pauseStateBytes: null,
       });
       const run = await workflow.createRun({ runId });
-      const result = await complete(runId, () => run.start({ inputData: {
+      const result = await complete(runId, metadataPath, () => run.start({ inputData: {
         approvedInputPath: input.approvedInputPath,
         runDirectory: input.runDirectory,
         runMetadataPath: metadataPath,
         round: 0,
       } }));
       if (result.status !== 'suspended') return result;
-      const measurements = await measurePause(runId);
+      const measurements = await measurePause(runId, metadataPath);
       return { ...result, runId, outcome: 'awaiting-technical-acceptance', ...measurements };
     },
     async resume({ runId, decision, reason }) {
-      metadataPath = join(runDirectory, `${runId}-workflow-metrics.json`);
+      const metadataPath = join(runDirectory, `${runId}-workflow-metrics.json`);
       const run = await workflow.createRun({ runId });
-      return complete(runId, () => run.resume({ step: 'technical-acceptance', resumeData: { decision, ...(reason ? { reason } : {}) } }));
+      return complete(runId, metadataPath, () => run.resume({ step: 'technical-acceptance', resumeData: { decision, ...(reason ? { reason } : {}) } }));
     },
     async close() {
       await mastra.getStorage().close();

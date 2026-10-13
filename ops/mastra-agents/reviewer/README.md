@@ -33,9 +33,14 @@ Framework map:
 | Pause for and resume from Todd's answer | step `suspend()` and `Run.resume()` | [Suspend and resume](https://mastra.ai/docs/workflows/suspend-and-resume) and [`Run.resume()` reference](https://mastra.ai/reference/workflows/run-methods/resume) |
 | Survive a process restart while paused | workflow snapshots in configured storage, loaded by run ID | [Snapshots](https://mastra.ai/docs/workflows/snapshots) |
 | Default local durable database | file-backed `LibSQLStore` | [libSQL storage](https://mastra.ai/integrations/databases/libsql) |
+| Query the persisted snapshot row | `@libsql/client` local `createClient()` and `execute()` | [libSQL TypeScript client local-query example](https://github.com/tursodatabase/libsql-client-ts/blob/main/examples/local/index.mjs) |
+| Measure the stored JSONB snapshot | SQLite `length()` on the snapshot BLOB | [SQLite core `length()` function](https://www.sqlite.org/lang_corefunc.html#length) |
+| Validate step and workflow records | Zod strings, numbers, objects, enums, and optionals | [Zod schema API](https://zod.dev/api) |
+| Retained reviewer test/provider dependency | `@ai-sdk/openai-compatible` | [OpenAI Compatible provider](https://ai-sdk.dev/providers/openai-compatible-providers) |
 
-Step and workflow schemas use [Zod](https://zod.dev/) for validation; Zod is a
-schema dependency, not a Mastra feature.
+Memory evidence is the highest orchestration-process RSS observed from start or
+resume through that execution window, sampled every 10 ms and carried across
+the pause in the run's metrics file. It excludes idle time while suspended.
 
 ## Architecture and components
 

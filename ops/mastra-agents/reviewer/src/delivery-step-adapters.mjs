@@ -33,7 +33,11 @@ export function createExistingDeliveryStepAdapters({
       const approved = await readJson(input.approvedInputPath);
       const request = approved.builderRequest;
       if (!request?.configuration || typeof request.prompt !== 'string') throw new Error('approved input has no existing builder launch request');
-      const launched = await launch('builder', { ...request, round: input.round });
+      const priorReview = input.priorReviewPath ? await readJson(input.priorReviewPath) : null;
+      const prompt = priorReview
+        ? `${request.prompt}\n\nRepair the findings in the saved independent review at ${input.priorReviewPath}:\n${JSON.stringify(priorReview)}`
+        : request.prompt;
+      const launched = await launch('builder', { ...request, prompt, round: input.round });
       return saveResult(input.runDirectory, `builder-${input.round}.json`, {
         status: launched.exitCode === 0 ? 'PASS' : 'FAIL',
         reason: launched.exitCode === 0 ? null : launched.text || `builder exited ${launched.exitCode}`,
@@ -48,22 +52,47 @@ export function createExistingDeliveryStepAdapters({
     reviewer: async input => {
       const approved = await readJson(input.approvedInputPath);
       const request = approved.reviewerRequest;
-      if (!request?.configuration || !request.reviewInput) throw new Error('approved input has no existing Mastra reviewer request');
+      if (!request?.configuration || !request.issueId || !request.candidate || request.configuration.connection?.provider !== 'commandcode') {
+        throw new Error('approved input has no complete existing Mastra reviewer request');
+      }
+      const builder = await readJson(input.builderResultPath);
+      if (!builder.observed?.maker || !request.configuration.maker
+        || builder.observed.maker.trim().toLowerCase() === request.configuration.maker.trim().toLowerCase()) {
+        throw new Error('independent reviewer maker must differ from the observed builder maker');
+      }
+      const checkResult = await readJson(input.checksResultPath);
+      const reviewInput = checkResult.reviewInputPath
+        ? await readJson(checkResult.reviewInputPath)
+        : request.reviewInput;
+      const candidate = checkResult.candidatePath
+        ? await readJson(checkResult.candidatePath)
+        : request.candidate;
+      if (!reviewInput || !candidate || (input.round > 1 && (!checkResult.reviewInputPath || !checkResult.candidatePath))) {
+        throw new Error('checks did not save the current candidate and review input');
+      }
       const launched = await launch('reviewer', {
         ...request,
+        candidate,
+        reviewInput,
         round: input.round,
         builderResultPath: input.builderResultPath,
         checksResultPath: input.checksResultPath,
         mastraReviewOnly: true,
       });
-      const reviewed = checkedReview(launched.text, request.reviewInput);
+      const reviewed = checkedReview(launched.text, reviewInput);
+      const inputTokens = launched.usage?.inputTokens ?? launched.usage?.prompt_tokens;
+      const outputTokens = launched.usage?.outputTokens ?? launched.usage?.completion_tokens;
+      if (launched.exitCode === 0 && (!Number.isFinite(inputTokens) || !Number.isFinite(outputTokens)
+        || !Number.isFinite(launched.costEstimateUsd))) {
+        throw new Error('existing Mastra reviewer returned no token or cost measurement');
+      }
       return saveResult(input.runDirectory, `review-${input.round}.json`, {
         verdict: launched.exitCode === 0 && !reviewed.error ? reviewed.verdict : 'FAIL',
         reason: launched.technicalFailure ?? reviewed.error ?? (launched.exitCode === 0 ? null : `reviewer exited ${launched.exitCode}`),
         model: launched.observed?.model ?? request.configuration.model ?? null,
         effort: launched.observed?.effort ?? request.configuration.thinking ?? null,
-        inputTokens: launched.usage?.inputTokens ?? null,
-        outputTokens: launched.usage?.outputTokens ?? null,
+        inputTokens: inputTokens ?? null,
+        outputTokens: outputTokens ?? null,
         costEstimateUsd: launched.costEstimateUsd ?? null,
       });
     },

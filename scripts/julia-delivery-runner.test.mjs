@@ -88,7 +88,10 @@ test('Mastra reviewer preserves a schema-valid INCONCLUSIVE fixture as the model
       const request = JSON.parse(requestText);
       assert.deepEqual(request.spending, { mode: 'paid', maxUsd: 0.50, cumulativeMaxUsd: 1, ledgerPath });
       assert.equal(request.cardBudgetPath, ledgerPath);
-      writeFile(request.verdictPath, `${JSON.stringify({ text, observed: { harness: reviewer.harness, model: reviewer.model, maker: reviewer.maker } })}\n`);
+      writeFile(request.verdictPath, `${JSON.stringify({
+        text, observed: { harness: reviewer.harness, model: reviewer.model, maker: reviewer.maker },
+        usage: { inputTokens: 21, outputTokens: 8 }, costEstimateUsd: 0.0042,
+      })}\n`);
     };
     stdin.on = stdin.addListener.bind(stdin);
     limits.started({ pid: 224, stdin, stdout, stderr, kill: () => {} });
@@ -110,6 +113,8 @@ test('Mastra reviewer preserves a schema-valid INCONCLUSIVE fixture as the model
   assert.equal(result.exitCode, 0, result.text);
   assert.match(result.text, /^VERDICT: INCONCLUSIVE\nREVIEW: /);
   assert.equal(result.technicalFailure, null);
+  assert.deepEqual(result.usage, { inputTokens: 21, outputTokens: 8 });
+  assert.equal(result.costEstimateUsd, 0.0042);
 });
 
 test('Windows production launcher gets a response from installed Claude Code and persists its evidence', { skip: process.env.JUL196_CLAUDE_REAL_PROOF !== '1' ? 'operator opt-in required: JUL196_CLAUDE_REAL_PROOF=1; no provider call in ordinary suite' : process.env.JUL196_CLAUDE_QUOTA_BLOCKED === '1' ? 'Claude real integration quota-blocked: JUL196_CLAUDE_QUOTA_BLOCKED=1; historical results retained' : process.platform !== 'win32', timeout: 120000 }, async (t) => {

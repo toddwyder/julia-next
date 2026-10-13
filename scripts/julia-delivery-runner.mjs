@@ -183,7 +183,11 @@ export function productionLauncher(worktree, { run = runLimited, environment = p
       const exitCode = recorded && durableVerdict && workerSucceeded ? 0 : 2;
       const observed = reply?.observed ? { ...reply.observed, harness: configured.harness, maker: configured.maker } : null;
       if (request.outputPath) await fileSave(request.outputPath, { role, configured, observed, startedAt, finishedAt: new Date().toISOString(), stdout, stderr, exitCode, technicalFailure, traceId: reply?.traceId ?? null, responseId: reply?.responseId ?? null, quotes: reply?.quotes ?? [], warnings: reply?.warnings ?? [] });
-      return { exitCode, observed, text: reply?.text ?? technicalFailure ?? stderr, technicalFailure, outputPath: request.outputPath ?? null, responseId: reply?.responseId ?? null, traceId: reply?.traceId ?? null };
+      return {
+        exitCode, observed, text: reply?.text ?? technicalFailure ?? stderr, technicalFailure,
+        outputPath: request.outputPath ?? null, responseId: reply?.responseId ?? null, traceId: reply?.traceId ?? null,
+        usage: reply?.usage ?? null, costEstimateUsd: reply?.costEstimateUsd ?? null,
+      };
     }
     if (role === 'reviewer') return { exitCode: 2, observed: null, text: 'Reviewer execution is disabled during the JUL-223 reset' };
     const cwd = role === 'builder' ? worktree : tmpdir();

@@ -1,6 +1,6 @@
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
-import { appendFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -9,6 +9,7 @@ import { createClient } from '@libsql/client';
 
 import { createDeliveryWorkflowRuntime } from '../src/delivery-workflow.mjs';
 import { createExistingDeliveryStepAdapters } from '../src/delivery-step-adapters.mjs';
+import { createOfflineDeliveryAdapters } from '../support/offline-delivery-adapters.mjs';
 
 const suiteDirectory = await mkdtemp(join(tmpdir(), 'jul196-workflow-suite-'));
 after(() => rm(suiteDirectory, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 }));
@@ -21,33 +22,7 @@ async function fixture(t, verdicts = ['PASS']) {
   const summaryPath = join(directory, 'summary.log');
   const approvedInputPath = join(directory, 'JUL-196-approved.json');
   await writeFile(approvedInputPath, `${JSON.stringify({ identifier: 'JUL-196' })}\n`);
-  const record = async event => appendFile(callsPath, `${JSON.stringify(event)}\n`);
-  const writeResult = async (name, value) => {
-    const path = join(directory, name);
-    await writeFile(path, `${JSON.stringify(value)}\n`);
-    return path;
-  };
-  const adapters = {
-    builder: async ({ round }) => {
-      await record({ kind: 'builder', round });
-      return { resultPath: await writeResult(`builder-${round}.json`, { status: 'PASS' }) };
-    },
-    checks: async ({ round }) => {
-      await record({ kind: 'checks', round });
-      return { resultPath: await writeResult(`checks-${round}.json`, { status: 'PASS', change: `candidate-${round}` }) };
-    },
-    reviewer: async ({ round }) => {
-      await record({ kind: 'reviewer', round });
-      return { resultPath: await writeResult(`review-${round}.json`, {
-        verdict: verdicts[round - 1] ?? verdicts.at(-1), reason: 'fixture review',
-        model: 'stand-in-reviewer', effort: 'none', inputTokens: 0, outputTokens: 0, costEstimateUsd: 0,
-      }) };
-    },
-    notify: async ({ round }) => {
-      await record({ kind: 'notice', round });
-      return { resultPath: await writeResult(`notice-${round}.json`, { status: 'sent' }) };
-    },
-  };
+  const adapters = createOfflineDeliveryAdapters({ directory, callsPath, verdicts });
   const options = { storagePath, runDirectory: directory, summaryPath, adapters };
   const input = { card: 'JUL-196', approvedInputPath, runDirectory: directory };
   return { directory, callsPath, storagePath, summaryPath, options, input };
@@ -85,7 +60,7 @@ test('green build, checks and independent review pause once and accept after a r
   ]);
   const summaries = (await readFile(f.summaryPath, 'utf8')).trim().split(/\r?\n/);
   assert.equal(summaries.length, 1);
-  assert.match(summaries[0], /card=JUL-196 change=candidate-1 round=1 verdict=ACCEPT/);
+  assert.match(summaries[0], /card=JUL-196 change=offline-candidate-1 round=1 verdict=ACCEPT/);
   assert.match(summaries[0], /reviewerModel=stand-in-reviewer reviewerEffort=none inputTokens=0 outputTokens=0 costEstimateUsd=0/);
   assert.match(summaries[0], /start=.* end=.*/);
 });
@@ -139,7 +114,7 @@ test('three failed reviews park without a notice or a fourth builder launch', as
     'builder:3', 'checks:3', 'reviewer:3',
   ]);
   const summary = await readFile(f.summaryPath, 'utf8');
-  assert.match(summary, /round=3 stop=PARK reason="fixture review"/);
+  assert.match(summary, /round=3 stop=PARK reason="offline stand-in review"/);
 });
 
 test('workflow step handoffs expose paths and round metadata, never file contents', async t => {
@@ -155,7 +130,7 @@ test('workflow step handoffs expose paths and round metadata, never file content
   for (const { input } of seen) {
     assert.equal(typeof input.runDirectory, 'string');
     assert.equal(Number.isInteger(input.round), true);
-    assert.equal(JSON.stringify(input).includes('fixture review'), false);
+    assert.equal(JSON.stringify(input).includes('offline stand-in review'), false);
     assert.equal(Object.keys(input).every(key => key === 'round' || key.endsWith('Path') || key === 'runDirectory'), true);
   }
 });
@@ -181,14 +156,15 @@ test('production adapter glue invokes the existing launcher for builder and Mast
   const approved = {
     builderRequest: { configuration: { harness: 'fixture' }, prompt: 'saved builder request' },
     reviewerRequest: {
-      configuration: { model: 'fixture-reviewer', thinking: 'none' },
+      issueId: 'JUL-196', candidate: { base: 'a'.repeat(40), commit: 'b'.repeat(40) },
+      configuration: { model: 'fixture-reviewer', maker: 'Reviewer Co', thinking: 'none', connection: { provider: 'commandcode' } },
       reviewInput: { changedFiles: [], criteria: [] },
     },
   };
   await writeFile(f.input.approvedInputPath, `${JSON.stringify(approved)}\n`);
   const launch = async (role, request) => {
     roles.push({ role, request });
-    if (role === 'builder') return { exitCode: 0, observed: { model: 'fixture-builder' } };
+    if (role === 'builder') return { exitCode: 0, observed: { model: 'fixture-builder', maker: 'Builder Co' } };
     return { exitCode: 1, text: 'offline reviewer refusal', observed: { model: 'fixture-reviewer' } };
   };
   const adapters = createExistingDeliveryStepAdapters({
@@ -209,6 +185,73 @@ test('production adapter glue invokes the existing launcher for builder and Mast
   assert.equal(roles[1].request.checksResultPath, checked.resultPath);
 });
 
+test('production adapter repair consumes prior findings and reviews the checks current candidate', async t => {
+  const f = await fixture(t);
+  const priorReviewPath = join(f.directory, 'review-1.json');
+  const currentReviewInputPath = join(f.directory, 'review-input-2.json');
+  const currentCandidatePath = join(f.directory, 'candidate-2.json');
+  await writeFile(priorReviewPath, `${JSON.stringify({ verdict: 'FAIL', findings: ['repair this'] })}\n`);
+  await writeFile(currentReviewInputPath, `${JSON.stringify({ candidate: 'candidate-2', files: [], criteria: [] })}\n`);
+  await writeFile(currentCandidatePath, `${JSON.stringify({ base: 'c'.repeat(40), commit: 'd'.repeat(40) })}\n`);
+  await writeFile(f.input.approvedInputPath, `${JSON.stringify({
+    builderRequest: { configuration: { harness: 'fixture' }, prompt: 'build' },
+    reviewerRequest: {
+      issueId: 'JUL-196', candidate: { base: 'a'.repeat(40), commit: 'b'.repeat(40) },
+      configuration: { model: 'reviewer', maker: 'Reviewer Co', connection: { provider: 'commandcode' } },
+      reviewInput: { candidate: 'stale' },
+    },
+  })}\n`);
+  const launched = [];
+  const adapters = createExistingDeliveryStepAdapters({
+    worktree: f.directory,
+    launch: async (role, request) => {
+      launched.push({ role, request });
+      return role === 'builder'
+        ? { exitCode: 0, observed: { maker: 'Builder Co' } }
+        : { exitCode: 1, text: 'offline refusal', observed: { maker: 'Reviewer Co' } };
+    },
+    checks: async () => ({
+      status: 'PASS', change: 'candidate-2', reviewInputPath: currentReviewInputPath, candidatePath: currentCandidatePath,
+    }),
+    notify: f.options.adapters.notify,
+  });
+  const built = await adapters.builder({
+    approvedInputPath: f.input.approvedInputPath, runDirectory: f.directory, round: 2, priorReviewPath,
+  });
+  const checked = await adapters.checks({ runDirectory: f.directory, round: 2, builderResultPath: built.resultPath });
+  await adapters.reviewer({
+    approvedInputPath: f.input.approvedInputPath, runDirectory: f.directory, round: 2,
+    builderResultPath: built.resultPath, checksResultPath: checked.resultPath,
+  });
+  assert.match(launched[0].request.prompt, /review-1\.json/);
+  assert.match(launched[0].request.prompt, /repair this/);
+  assert.equal(launched[1].request.reviewInput.candidate, 'candidate-2');
+  assert.equal(launched[1].request.candidate.commit, 'd'.repeat(40));
+});
+
+test('production adapter refuses a reviewer from the observed builder maker', async t => {
+  const f = await fixture(t);
+  await writeFile(f.input.approvedInputPath, `${JSON.stringify({
+    reviewerRequest: {
+      issueId: 'JUL-196', candidate: { base: 'a'.repeat(40), commit: 'b'.repeat(40) },
+      configuration: { model: 'reviewer', maker: 'Same Co', connection: { provider: 'commandcode' } },
+      reviewInput: { candidate: 'candidate-1' },
+    },
+  })}\n`);
+  const builderResultPath = join(f.directory, 'builder-1.json');
+  const checksResultPath = join(f.directory, 'checks-1.json');
+  await writeFile(builderResultPath, `${JSON.stringify({ status: 'PASS', observed: { maker: 'same co' } })}\n`);
+  await writeFile(checksResultPath, `${JSON.stringify({ status: 'PASS' })}\n`);
+  const adapters = createExistingDeliveryStepAdapters({
+    worktree: f.directory, launch: () => assert.fail('same-maker review must not launch'),
+    checks: async () => ({}), notify: f.options.adapters.notify,
+  });
+  await assert.rejects(() => adapters.reviewer({
+    approvedInputPath: f.input.approvedInputPath, runDirectory: f.directory, round: 1,
+    builderResultPath, checksResultPath,
+  }), /maker must differ/);
+});
+
 test('an unhandled workflow failure still ends with an ADR 0017 summary line', async t => {
   const f = await fixture(t);
   f.options.adapters.builder = async () => ({});
@@ -218,6 +261,6 @@ test('an unhandled workflow failure still ends with an ADR 0017 summary line', a
   assert.equal(result.status, 'failed');
   const summaries = (await readFile(f.summaryPath, 'utf8')).trim().split(/\r?\n/);
   assert.equal(summaries.length, 1);
-  assert.match(summaries[0], /^card=JUL-196 change=unknown round=0 stop=SYSTEM_ERROR reason=/);
+  assert.match(summaries[0], /^card=JUL-196 change=unknown round=1 stop=SYSTEM_ERROR reason=/);
   assert.match(summaries[0], /reviewerModel=unknown reviewerEffort=unknown inputTokens=unknown outputTokens=unknown costEstimateUsd=unknown start=.* end=.*/);
 });
