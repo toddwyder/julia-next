@@ -101,7 +101,9 @@ export async function runChecks({ worktree, branch, base, test, strict = false }
 // Returns a reason the proof failed, or null.
 export async function redProof({ worktree, branch, base, sha, seams, test }) {
   const passes = async (files) => (await test({ worktree, run: 'files', files })).status === 0;
-  const atSeam = (paths) => paths.filter((path) => seams.tests.some((seam) => path.endsWith(seam)));
+  const atSeam = (paths) => seams.tests
+    ? paths.filter((path) => seams.tests.some((seam) => path.endsWith(seam)))
+    : paths.filter((path) => path.endsWith('.test.mjs'));
   const changedTests = atSeam(git(worktree, 'diff', '--name-only', '--diff-filter=AM', `${base}...${sha}`).split('\n').filter(Boolean));
   if (seams.kind === 'refactor') {
     const edited = atSeam(git(worktree, 'diff', '--name-only', `${base}...${sha}`).split('\n').filter(Boolean));
@@ -112,7 +114,9 @@ export async function redProof({ worktree, branch, base, sha, seams, test }) {
     if (!(await onCommit({ worktree, branch, commit: base }, () => passes(existing)))) return 'red proof: the seam tests already fail on the start commit';
     return null;
   }
-  if (!changedTests.length) return `red proof: the change adds or changes none of the seam tests (${seams.tests.join(', ')})`;
+  if (!changedTests.length) return seams.tests
+    ? `red proof: the change adds or changes none of the seam tests (${seams.tests.join(', ')})`
+    : 'red proof: the change adds or changes no test for the agreed behavior seams';
   if (!(await passes(changedTests))) return 'red proof: the seam tests fail on the candidate';
   const greenOnBase = await onCommit({ worktree, branch, commit: base, carry: changedTests, sha }, () => passes(changedTests));
   if (greenOnBase) return `red proof: ${changedTests.join(', ')} already pass on the start commit, so they do not test the change`;

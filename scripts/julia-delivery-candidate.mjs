@@ -97,7 +97,7 @@ export async function captureDeliveryCandidate({ issueId, runPath, workspace, ca
     evidence.files = git(path, 'diff', '--name-status', `${base}...${commit}`);
     if (drift(commit)) throw new Error('candidate is dirty or drifted before checks');
     const seams = seamsOf(card.description);
-    if (!seams) throw new Error('approved input has no agreed Seams test files for red proof');
+    if (!seams) throw new Error('approved input has no agreed test seams for red proof');
     const checkPath = join(dirname(resolve(runPath)), `${issueId}-checks-${round}`);
     assertDeliveryPath(checkPath);
     // A prior interrupted checker is never force-reset. Its raw state survives;

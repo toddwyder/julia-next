@@ -1,6 +1,6 @@
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -73,6 +73,30 @@ test('green build, checks and independent review write one waiting record, pause
   assert.match(summaries[0], /card=JUL-196 change=offline-candidate-1 round=1 verdict=ACCEPT/);
   assert.match(summaries[0], /reviewerModel=stand-in-reviewer reviewerEffort=none inputTokens=0 outputTokens=0 costEstimateUsd=0/);
   assert.match(summaries[0], /start=.* end=.*/);
+});
+
+test('a card missing agreed seams parks immediately without a builder or repair round', async t => {
+  const f = await fixture(t);
+  const reason = 'card has no agreed test seams';
+  f.options.adapters.cardRead = async () => {
+    await writeFile(f.approvedInputPath, `${JSON.stringify({ identifier: 'JUL-196', cardProblemReason: reason })}\n`);
+    await appendFile(f.callsPath, `${JSON.stringify({ kind: 'card-read', round: 0 })}\n`);
+    return { resultPath: f.approvedInputPath };
+  };
+  const runtime = await createDeliveryWorkflowRuntime(f.options);
+  const result = await runtime.start({ runId: 'jul196-card-problem', input: f.input });
+  await runtime.close();
+
+  assert.equal(result.status, 'success');
+  assert.equal(result.result.outcome, 'parked');
+  assert.equal(result.result.round, 0);
+  assert.equal(result.result.reason, reason);
+  assert.deepEqual((await events(f.callsPath)).map(({ kind, round }) => `${kind}:${round}`), [
+    'authorization:0', 'card-read:0', 'park:0',
+  ]);
+  const summaries = (await readFile(f.summaryPath, 'utf8')).trim().split(/\r?\n/);
+  assert.equal(summaries.length, 1);
+  assert.match(summaries[0], /^card=JUL-196 change=unknown round=0 stop=PARK reason="card has no agreed test seams"/);
 });
 
 test('a separate process resumes the saved pause without duplicate launches or notices', async t => {

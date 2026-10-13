@@ -33,8 +33,14 @@ export function installDependencies(worktree, progress = () => {}) {
 }
 
 export function seamsOf(description) {
-  const section = /^##\s+Seams\s*$([\s\S]*?)(?=^##\s|(?![\s\S]))/m.exec(description ?? '')?.[1];
-  const tests = [...(section ?? '').matchAll(/`([^`\s]+\.test\.mjs)`/g)].map((match) => match[1]);
-  if (!tests.length) return null;
-  return { tests, kind: /Kind:\s*refactor/i.test(section) ? 'refactor' : 'behavior' };
+  const text = description ?? '';
+  const namedSection = /^##\s+Seams\s*$([\s\S]*?)(?=^##\s|(?![\s\S]))/m.exec(text)?.[1];
+  const tests = [...(namedSection ?? '').matchAll(/`([^`\s]+\.test\.mjs)`/g)].map((match) => match[1]);
+  if (tests.length) return { tests, kind: /Kind:\s*refactor/i.test(namedSection) ? 'refactor' : 'behavior' };
+
+  const behaviorSection = /^##\s+Test seams and regression selection\s*$([\s\S]*?)(?=^##\s|(?![\s\S]))/mi.exec(text)?.[1];
+  const behaviors = (behaviorSection ?? '').split(/\r?\n/)
+    .map(line => /^\s*[*-]\s+(.+?)\s*$/.exec(line)?.[1])
+    .filter(Boolean);
+  return behaviors.length ? { kind: 'behavior', tests: null, behaviors } : null;
 }

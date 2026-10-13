@@ -128,7 +128,18 @@ export function createDeliveryWorkflow(adapters, samplePeak, summaryPath) {
         authorizationResultPath: inputData.authorizationResultPath,
         runDirectory: inputData.runDirectory,
       }));
-      return { ...inputData, approvedInputPath, round: 0, cycle: 1 };
+      const approved = await readJson(approvedInputPath);
+      if (!approved.cardProblemReason) return { ...inputData, approvedInputPath, round: 0, cycle: 1 };
+      const reason = approved.cardProblemReason;
+      const checksResultPath = await writeJson(join(inputData.runDirectory, 'checks-0.json'), { status: 'FAIL', reason });
+      const reviewResultPath = await writeJson(join(inputData.runDirectory, 'review-0.json'), {
+        verdict: 'FAIL', reason, model: null, effort: null,
+        inputTokens: 0, outputTokens: 0, costEstimateUsd: 0,
+      });
+      await updateMetadata(inputData.runMetadataPath, {
+        round: 0, checksResultPath, reviewResultPath, reviewResultPaths: [reviewResultPath], stopReason: reason,
+      });
+      return { ...inputData, approvedInputPath, round: 0, cycle: 1, checksResultPath, reviewResultPath, stopReason: reason };
     },
   });
 
@@ -137,6 +148,7 @@ export function createDeliveryWorkflow(adapters, samplePeak, summaryPath) {
     inputSchema: handoffSchema,
     outputSchema: handoffSchema,
     execute: async ({ inputData }) => {
+      if (inputData.stopReason && inputData.round === 0) return inputData;
       if (inputData.rerunCandidate) {
         return { ...inputData, rerunCandidate: false, stopReason: undefined, priorReviewPath: undefined };
       }
@@ -175,6 +187,7 @@ export function createDeliveryWorkflow(adapters, samplePeak, summaryPath) {
     inputSchema: handoffSchema,
     outputSchema: handoffSchema,
     execute: async ({ inputData }) => {
+      if (inputData.stopReason && inputData.round === 0) return inputData;
       const builder = await readJson(inputData.builderResultPath);
       let checksResultPath;
       if (builder.status === 'PASS') {
@@ -202,6 +215,7 @@ export function createDeliveryWorkflow(adapters, samplePeak, summaryPath) {
     inputSchema: handoffSchema,
     outputSchema: handoffSchema,
     execute: async ({ inputData }) => {
+      if (inputData.stopReason && inputData.round === 0) return inputData;
       const checksResult = await readJson(inputData.checksResultPath);
       let reviewResultPath;
       if (checksResult.status === 'PASS') {

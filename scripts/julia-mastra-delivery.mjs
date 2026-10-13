@@ -7,6 +7,7 @@ import { getIssue, postCommentToIssueId } from './linear-cli.mjs';
 import { authorizationReason, productionLauncher, workerPrompt } from './julia-delivery-runner.mjs';
 import { assertDeliveryPath, captureDeliveryCandidate, prepareDeliveryWorkspace } from './julia-delivery-candidate.mjs';
 import { git, localTester } from './julia-minimal-runner-checks.mjs';
+import { seamsOf } from './julia-delivery-workspace.mjs';
 import { reviewInput } from './julia-delivery-review.mjs';
 import { saveJson } from './julia-delivery-state.mjs';
 import { createDeliveryWorkflowRuntime } from '../ops/mastra-agents/reviewer/src/delivery-workflow-runtime.mjs';
@@ -14,11 +15,16 @@ import { createExistingDeliveryStepAdapters } from '../ops/mastra-agents/reviewe
 
 const readJson = async path => JSON.parse(await readFile(path, 'utf8'));
 
-function cardReason(card, issueId, authorization) {
+function cardIdentityReason(card, issueId, authorization) {
   if (!card || card.identifier == null) return 'Linear did not return a card';
   if (card.identifier !== issueId) return `Linear returned ${card.identifier}, not ${issueId}`;
   if (!card.linearActor?.id || card.linearActor.id !== authorization?.linearActorId) return 'Linear actor does not match the authorized account';
+  return null;
+}
+
+function cardRequirementsReason(card) {
   if (!/^##\s+Acceptance criteria\s*$/mi.test(card.description ?? '')) return 'card has no approved acceptance criteria';
+  if (!seamsOf(card.description)) return 'card has no agreed test seams';
   return null;
 }
 
@@ -150,13 +156,22 @@ export function createMastraDeliveryAdapters({
     cardRead: async input => {
       const launchInput = await readJson(input.launchInputPath);
       const card = { ...await readCard(launchInput.issueId), expectedId: launchInput.issueId };
-      const reason = cardReason(card, launchInput.issueId, launchInput.authorization);
-      if (reason) throw new Error(reason);
+      const identityReason = cardIdentityReason(card, launchInput.issueId, launchInput.authorization);
+      if (identityReason) throw new Error(identityReason);
+      const requirementsReason = cardRequirementsReason(card);
+      const approvedInputPath = join(input.runDirectory, `${launchInput.issueId}-approved.json`);
+      if (requirementsReason) {
+        await saveJson(approvedInputPath, {
+          issueId: launchInput.issueId, card, configuration: launchInput.configuration,
+          authorization: launchInput.authorization, runPath: launchInput.runPath,
+          readAt: new Date().toISOString(), cardProblemReason: requirementsReason,
+        });
+        return { resultPath: approvedInputPath };
+      }
       const prepared = await prepareDeliveryWorkspace({
         issueId: launchInput.issueId, runPath: launchInput.runPath, repoRoot,
         base, worktree, saved: launchInput.workspace,
       });
-      const approvedInputPath = join(input.runDirectory, `${launchInput.issueId}-approved.json`);
       const approved = {
         issueId: launchInput.issueId, card, configuration: launchInput.configuration,
         authorization: launchInput.authorization, runPath: launchInput.runPath,

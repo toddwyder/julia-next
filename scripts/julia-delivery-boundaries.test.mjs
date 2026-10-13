@@ -150,6 +150,54 @@ test('production card intake refuses the wrong Linear actor before a start updat
   assert.equal(starts, 0);
 });
 
+test('production card intake records a missing seam problem before workspace setup or start update', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'delivery-card-preflight-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const launchInputPath = join(root, 'launch.json');
+  await writeFile(launchInputPath, `${JSON.stringify({
+    issueId: 'JUL-196', runPath: join(root, 'run.json'), configuration: {},
+    authorization: { linearActorId: 'authorized-actor' },
+  })}\n`);
+  let starts = 0;
+  const adapters = createMastraDeliveryAdapters({
+    repoRoot: join(root, 'source-that-must-not-be-opened'),
+    readCard: async () => ({
+      id: 'issue-uuid', identifier: 'JUL-196', description: '## Acceptance criteria\n- [ ] approved',
+      linearActor: { id: 'authorized-actor', name: 'Authorized account' },
+    }),
+    startCard: async () => { starts += 1; },
+  });
+  const result = await adapters.cardRead({ launchInputPath, runDirectory: root });
+  const approved = JSON.parse(await readFile(result.resultPath, 'utf8'));
+  assert.equal(approved.cardProblemReason, 'card has no agreed test seams');
+  assert.equal(approved.workspace, undefined);
+  assert.equal(starts, 0);
+});
+
+test('production card intake records missing acceptance criteria before workspace setup or start update', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'delivery-card-acceptance-preflight-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const launchInputPath = join(root, 'launch.json');
+  await writeFile(launchInputPath, `${JSON.stringify({
+    issueId: 'JUL-196', runPath: join(root, 'run.json'), configuration: {},
+    authorization: { linearActorId: 'authorized-actor' },
+  })}\n`);
+  let starts = 0;
+  const adapters = createMastraDeliveryAdapters({
+    repoRoot: join(root, 'source-that-must-not-be-opened'),
+    readCard: async () => ({
+      id: 'issue-uuid', identifier: 'JUL-196', description: '## Seams\n* `scripts/example.test.mjs`',
+      linearActor: { id: 'authorized-actor', name: 'Authorized account' },
+    }),
+    startCard: async () => { starts += 1; },
+  });
+  const result = await adapters.cardRead({ launchInputPath, runDirectory: root });
+  const approved = JSON.parse(await readFile(result.resultPath, 'utf8'));
+  assert.equal(approved.cardProblemReason, 'card has no approved acceptance criteria');
+  assert.equal(approved.workspace, undefined);
+  assert.equal(starts, 0);
+});
+
 test('production park journal binds the verified Linear actor and known issue UUID', async t => {
   const root = await mkdtemp(join(tmpdir(), 'delivery-linear-trace-'));
   t.after(() => rm(root, { recursive: true, force: true }));
