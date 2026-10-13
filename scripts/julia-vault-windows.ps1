@@ -2,7 +2,7 @@ param(
   [Parameter(Mandatory = $true)][string]$ConfigurationPath,
   [switch]$Provision,
   [switch]$Verify,
-  [ValidateSet('init', 'startReviewOnly')][string]$Operation = 'init',
+  [ValidateSet('init', 'readIssue')][string]$Operation = 'init',
   [string[]]$JuliaArguments
 )
 $ErrorActionPreference = 'Stop'

@@ -6,30 +6,44 @@ execution while the minimum reviewer route remains incomplete. The skipped-by-
 default, explicitly opted-in provider probe is the only current path that can
 make paid provider calls.
 
-## JUL-196 round-one delivery workflow
+## JUL-196 delivery workflow
 
-`src/delivery-workflow.mjs` is the offline workflow skeleton for build, checks,
-independent review, up to three build/review rounds, and Todd's technical
-acceptance. Its step adapters receive durable file paths rather than file
-contents, so the existing builder launcher and Mastra reviewer remain the
-execution boundaries. `src/delivery-step-adapters.mjs` is the narrow production
-glue: it imports the existing `productionLauncher`, uses its builder role, and
-sets `mastraReviewOnly` for the launcher's existing `reviewer.mjs` route. A
-file-backed local libSQL database holds Mastra's pause
-snapshot. `support/offline-delivery-workflow-child.mjs` is the no-provider
-restart demonstration used by the tests; it makes no model call.
+`src/delivery-workflow.mjs` is the only delivery sequence reached by `$init`;
+`src/delivery-workflow-runtime.mjs` supplies its local storage and measurements.
+It checks authorization, reads the Linear card once, builds, checks, performs
+independent review, allows at most two builder/reviewer rounds, writes a local
+waiting record, and suspends for Todd's technical acceptance. A changed
+candidate invalidates the answer, reruns checks and review, and suspends again.
+Acceptance records the exact reviewed commit and stops; it never merges,
+previews, publishes, emails, pushes, or writes a Linear waiting comment.
 
-This round does not switch `$init` or the delivery runner to the workflow, so
-it does not replace a live orchestration path yet. Consequently there is no
-old orchestration source to delete in round one; deletion belongs in the same
-later change that performs the route cutover, never before the offline proof.
+Steps exchange durable paths rather than file contents. The production adapter
+in `scripts/julia-mastra-delivery.mjs` reuses the existing authorization,
+Linear, worktree, candidate, check, launcher, and reviewer boundaries. Local
+libSQL holds the Mastra snapshot. The offline adapter and child process are
+deterministic stand-ins and never call a model or Linear.
+
+Reused boundary map:
+
+| Workflow responsibility | Existing source retained |
+| --- | --- |
+| Start authorization and canonical implement prompt | `scripts/julia-delivery-runner.mjs` (`authorizationReason`, `workerPrompt`) |
+| One complete card read and start/park comments | `scripts/linear-cli.mjs` (`getIssue`, `postComment`) |
+| Builder and Mastra reviewer process launch | `scripts/julia-delivery-runner.mjs` (`productionLauncher`) |
+| Isolated worktree and pinned canonical implement instructions | `scripts/julia-delivery-candidate.mjs`, with setup helpers moved intact to `scripts/julia-delivery-workspace.mjs` |
+| SHA, branch, dirty-tree, red-proof, and check guards | `scripts/julia-delivery-candidate.mjs` and `scripts/julia-minimal-runner-checks.mjs` |
+| Immutable candidate and reviewer handoff | `scripts/julia-delivery-candidate.mjs` and `scripts/julia-delivery-review.mjs` |
+
+The local waiting record and exact-commit acceptance record did not exist in
+the retired controller; their smallest implementations live in
+`scripts/julia-mastra-delivery.mjs`.
 
 Framework map:
 
 | Need | Mastra feature | Official documentation |
 | --- | --- | --- |
 | Typed build/check/review sequence | `createStep`, `createWorkflow`, `.then()`, `.commit()`, and workflow registration | [Workflows overview](https://mastra.ai/docs/workflows/overview) |
-| At most three repair rounds | `.dountil()` | [Control flow](https://mastra.ai/docs/workflows/control-flow) and [`.dountil()` reference](https://mastra.ai/reference/workflows/workflow-methods/dountil) |
+| At most two builder/reviewer rounds and stale-candidate re-review | nested `.dountil()` workflows | [Control flow](https://mastra.ai/docs/workflows/control-flow) and [`.dountil()` reference](https://mastra.ai/reference/workflows/workflow-methods/dountil) |
 | Pause for and resume from Todd's answer | step `suspend()` and `Run.resume()` | [Suspend and resume](https://mastra.ai/docs/workflows/suspend-and-resume) and [`Run.resume()` reference](https://mastra.ai/reference/workflows/run-methods/resume) |
 | Survive a process restart while paused | workflow snapshots in configured storage, loaded by run ID | [Snapshots](https://mastra.ai/docs/workflows/snapshots) |
 | Default local durable database | file-backed `LibSQLStore` | [libSQL storage](https://mastra.ai/integrations/databases/libsql) |

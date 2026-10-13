@@ -32,9 +32,9 @@ test('Windows provisioning parks after account creation followed by failed persi
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
-test('Windows vault wrapper has only init and the narrow review-only operation', () => {
+test('Windows vault wrapper has only workflow init and read-only card lookup', () => {
   const wrapper = readFileSync(fileURLToPath(new URL('./julia-vault-windows.ps1', import.meta.url)), 'utf8');
-  assert.match(wrapper, /ValidateSet\('init', 'startReviewOnly'\)/);
+  assert.match(wrapper, /ValidateSet\('init', 'readIssue'\)/);
   assert.doesNotMatch(wrapper, /probeCommandCodeFormats/);
   assert.match(wrapper, /julia-vault\.mjs'\) \$Operation @JuliaArguments/);
 });
@@ -113,15 +113,15 @@ test('vault launcher loads only references in the designated vault, preserves ma
   assert.equal(call.options.env.VERCEL_TOKEN, 'op://vault-id/item-id/token');
   assert.equal(call.args.includes('--no-masking'), false); assert.equal(call.options.shell, undefined);
 });
-test('vault launcher selects the review-only entry point only for startReviewOnly', () => {
+test('vault launcher permits the read-only Linear entry point', () => {
   let call;
   const code = vaultLaunch(['JUL-206', '--pr', '282'], {
-    entryPoint: 'julia-review-only.mjs', configuration: { vaultId: 'vault-id', opExecutable: 'op.exe', referencesPath: 'references.env' },
+    entryPoint: 'linear-cli.mjs', configuration: { vaultId: 'vault-id', opExecutable: 'op.exe', referencesPath: 'references.env' },
     references: 'COMMANDCODE_API_KEY=op://vault-id/item-id/key\n',
     run: (command, args, options) => { call = { command, args, options }; return { status: 0 }; },
   });
   assert.equal(code, 0);
-  assert.match(call.args[3], /julia-review-only\.mjs$/);
+  assert.match(call.args[3], /linear-cli\.mjs$/);
   assert.deepEqual(call.args.slice(4), ['JUL-206', '--pr', '282']);
   assert.equal(call.options.env.COMMANDCODE_API_KEY, 'op://vault-id/item-id/key');
 });

@@ -7,7 +7,8 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createClient } from '@libsql/client';
 
-import { appendPermanentSummaryLine, createDeliveryWorkflowRuntime } from '../src/delivery-workflow.mjs';
+import { appendPermanentSummaryLine } from '../src/delivery-workflow.mjs';
+import { createDeliveryWorkflowRuntime } from '../src/delivery-workflow-runtime.mjs';
 import { createExistingDeliveryStepAdapters } from '../src/delivery-step-adapters.mjs';
 import { createOfflineDeliveryAdapters } from '../support/offline-delivery-adapters.mjs';
 import { fixtureReport } from '../../../../scripts/fixtures/jul202-review.mjs';
@@ -22,18 +23,20 @@ async function fixture(t, verdicts = ['PASS']) {
   const storagePath = join(directory, 'mastra.db');
   const summaryPath = join(directory, 'summary.log');
   const approvedInputPath = join(directory, 'JUL-196-approved.json');
+  const launchInputPath = join(directory, 'launch.json');
   await writeFile(approvedInputPath, `${JSON.stringify({ identifier: 'JUL-196' })}\n`);
+  await writeFile(launchInputPath, `${JSON.stringify({ issueId: 'JUL-196' })}\n`);
   const adapters = createOfflineDeliveryAdapters({ directory, callsPath, verdicts });
   const options = { storagePath, runDirectory: directory, summaryPath, adapters };
-  const input = { card: 'JUL-196', approvedInputPath, runDirectory: directory };
-  return { directory, callsPath, storagePath, summaryPath, options, input };
+  const input = { card: 'JUL-196', launchInputPath, runDirectory: directory };
+  return { directory, callsPath, storagePath, summaryPath, approvedInputPath, launchInputPath, options, input };
 }
 
 async function events(path) {
   return (await readFile(path, 'utf8')).trim().split(/\r?\n/).filter(Boolean).map(line => JSON.parse(line));
 }
 
-test('green build, checks and independent review pause once and accept after a runtime restart', async t => {
+test('green build, checks and independent review write one waiting record, pause, and accept after a runtime restart', async t => {
   const f = await fixture(t);
   const firstRuntime = await createDeliveryWorkflowRuntime(f.options);
   const paused = await firstRuntime.start({ runId: 'jul196-accept', input: f.input });
@@ -44,7 +47,7 @@ test('green build, checks and independent review pause once and accept after a r
   const database = createClient({ url: `file:${f.storagePath.replaceAll('\\', '/')}` });
   const stored = await database.execute({
     sql: 'SELECT length(snapshot) AS bytes FROM mastra_workflow_snapshot WHERE workflow_name = ? AND run_id = ?',
-    args: ['julia-delivery-round-1', 'jul196-accept'],
+    args: ['julia-delivery', 'jul196-accept'],
   });
   database.close();
   assert.equal(paused.pauseStateBytes, Number(stored.rows[0].bytes));
@@ -57,8 +60,14 @@ test('green build, checks and independent review pause once and accept after a r
   await restartedRuntime.close();
 
   assert.deepEqual((await events(f.callsPath)).map(({ kind, round }) => `${kind}:${round}`), [
-    'builder:1', 'checks:1', 'reviewer:1', 'notice:1',
+    'authorization:0', 'card-read:0', 'builder:1', 'checks:1', 'reviewer:1', 'waiting:1', 'acceptance:1',
   ]);
+  const waiting = JSON.parse(await readFile(join(f.directory, 'waiting-offline-candidate-1.json'), 'utf8'));
+  assert.deepEqual(waiting, {
+    card: 'JUL-196', candidateCommit: 'offline-candidate-1',
+    evidencePaths: [join(f.directory, 'builder-1.json'), join(f.directory, 'checks-1.json'), join(f.directory, 'review-1.json')],
+    summary: 'Round 1 passed its checks and independent review and is waiting for Todd\'s technical acceptance.',
+  });
   const summaries = (await readFile(f.summaryPath, 'utf8')).trim().split(/\r?\n/);
   assert.equal(summaries.length, 1);
   assert.match(summaries[0], /card=JUL-196 change=offline-candidate-1 round=1 verdict=ACCEPT/);
@@ -80,7 +89,7 @@ test('a separate process resumes the saved pause without duplicate launches or n
   assert.equal(resumed.status, 0, resumed.stderr);
   assert.equal(JSON.parse(resumed.stdout).result.outcome, 'accepted');
   assert.deepEqual((await events(join(directory, 'calls.jsonl'))).map(({ kind, round }) => `${kind}:${round}`), [
-    'builder:1', 'checks:1', 'reviewer:1', 'notice:1',
+    'authorization:0', 'card-read:0', 'builder:1', 'checks:1', 'reviewer:1', 'waiting:1', 'acceptance:1',
   ]);
 });
 
@@ -101,27 +110,49 @@ test('reject resumes the suspended run and stops with Todd\'s reason', async t =
   assert.match(summary, /stop=REJECT reason="checks need another look"/);
 });
 
-test('three failed reviews park without a notice or a fourth builder launch', async t => {
-  const f = await fixture(t, ['FAIL', 'FAIL', 'FAIL']);
+test('two failed reviews park without a waiting record or a third builder launch', async t => {
+  const f = await fixture(t, ['FAIL', 'FAIL']);
   const runtime = await createDeliveryWorkflowRuntime(f.options);
   const result = await runtime.start({ runId: 'jul196-park', input: f.input });
   assert.equal(result.status, 'success');
   assert.equal(result.result.outcome, 'parked');
-  assert.equal(result.result.round, 3);
+  assert.equal(result.result.round, 2);
   await runtime.close();
   assert.deepEqual((await events(f.callsPath)).map(({ kind, round }) => `${kind}:${round}`), [
-    'builder:1', 'checks:1', 'reviewer:1',
+    'authorization:0', 'card-read:0', 'builder:1', 'checks:1', 'reviewer:1',
     'builder:2', 'checks:2', 'reviewer:2',
-    'builder:3', 'checks:3', 'reviewer:3',
+    'park:2',
   ]);
   const summary = await readFile(f.summaryPath, 'utf8');
-  assert.match(summary, /round=3 stop=PARK reason="offline stand-in review"/);
+  assert.match(summary, /round=2 stop=PARK reason="offline stand-in review"/);
+});
+
+test('accepting a changed candidate discards the answer, reruns checks and review, and pauses again', async t => {
+  const f = await fixture(t);
+  f.options.adapters.validateCandidate = async ({ round }) => {
+    await f.options.adapters.record({ kind: 'validate', round });
+    return { status: 'STALE', reason: 'candidate commit changed' };
+  };
+  const firstRuntime = await createDeliveryWorkflowRuntime(f.options);
+  const paused = await firstRuntime.start({ runId: 'jul196-stale', input: f.input });
+  assert.equal(paused.status, 'suspended');
+  await firstRuntime.close();
+
+  const restartedRuntime = await createDeliveryWorkflowRuntime(f.options);
+  const rerun = await restartedRuntime.resume({ runId: 'jul196-stale', decision: 'accept' });
+  assert.equal(rerun.status, 'suspended');
+  assert.equal(rerun.outcome, 'awaiting-technical-acceptance');
+  await restartedRuntime.close();
+  assert.deepEqual((await events(f.callsPath)).map(({ kind, round }) => `${kind}:${round}`), [
+    'authorization:0', 'card-read:0', 'builder:1', 'checks:1', 'reviewer:1', 'waiting:1', 'validate:1',
+    'checks:1', 'reviewer:1', 'waiting:1',
+  ]);
 });
 
 test('workflow step handoffs expose paths and round metadata, never file contents', async t => {
   const f = await fixture(t);
   const seen = [];
-  for (const key of ['builder', 'checks', 'reviewer', 'notify']) {
+  for (const key of ['authorization', 'cardRead', 'builder', 'checks', 'reviewer', 'waitingRecord']) {
     const original = f.options.adapters[key];
     f.options.adapters[key] = async input => { seen.push({ key, input }); return original(input); };
   }
@@ -130,9 +161,9 @@ test('workflow step handoffs expose paths and round metadata, never file content
   await runtime.close();
   for (const { input } of seen) {
     assert.equal(typeof input.runDirectory, 'string');
-    assert.equal(Number.isInteger(input.round), true);
+    if ('round' in input) assert.equal(Number.isInteger(input.round), true);
     assert.equal(JSON.stringify(input).includes('offline stand-in review'), false);
-    assert.equal(Object.keys(input).every(key => key === 'round' || key.endsWith('Path') || key === 'runDirectory'), true);
+    assert.equal(Object.keys(input).every(key => ['round', 'cycle', 'runDirectory'].includes(key) || key.endsWith('Path')), true);
   }
 });
 
@@ -162,7 +193,7 @@ test('production adapter glue invokes the existing launcher for builder and Mast
       reviewInput: { changedFiles: [], criteria: [] },
     },
   };
-  await writeFile(f.input.approvedInputPath, `${JSON.stringify(approved)}\n`);
+  await writeFile(f.approvedInputPath, `${JSON.stringify(approved)}\n`);
   const launch = async (role, request) => {
     roles.push({ role, request });
     if (role === 'builder') return { exitCode: 0, observed: { model: 'fixture-builder', maker: 'Builder Co' } };
@@ -172,12 +203,12 @@ test('production adapter glue invokes the existing launcher for builder and Mast
     worktree: f.directory,
     launch,
     checks: async () => ({ status: 'PASS', change: 'fixture-change' }),
-    notify: f.options.adapters.notify,
+    waitingRecord: f.options.adapters.waitingRecord,
   });
-  const built = await adapters.builder({ approvedInputPath: f.input.approvedInputPath, runDirectory: f.directory, round: 1 });
+  const built = await adapters.builder({ approvedInputPath: f.approvedInputPath, runDirectory: f.directory, round: 1 });
   const checked = await adapters.checks({ runDirectory: f.directory, round: 1, builderResultPath: built.resultPath });
   await adapters.reviewer({
-    approvedInputPath: f.input.approvedInputPath, runDirectory: f.directory, round: 1,
+    approvedInputPath: f.approvedInputPath, runDirectory: f.directory, round: 1,
     builderResultPath: built.resultPath, checksResultPath: checked.resultPath,
   });
   assert.deepEqual(roles.map(({ role }) => role), ['builder', 'reviewer']);
@@ -194,7 +225,7 @@ test('production adapter repair consumes prior findings and reviews the checks c
   await writeFile(priorReviewPath, `${JSON.stringify({ verdict: 'FAIL', findings: ['repair this'] })}\n`);
   await writeFile(currentReviewInputPath, `${JSON.stringify({ candidate: 'candidate-2', files: [], criteria: [] })}\n`);
   await writeFile(currentCandidatePath, `${JSON.stringify({ base: 'c'.repeat(40), commit: 'd'.repeat(40) })}\n`);
-  await writeFile(f.input.approvedInputPath, `${JSON.stringify({
+  await writeFile(f.approvedInputPath, `${JSON.stringify({
     builderRequest: { configuration: { harness: 'fixture' }, prompt: 'build' },
     reviewerRequest: {
       issueId: 'JUL-196', candidate: { base: 'a'.repeat(40), commit: 'b'.repeat(40) },
@@ -214,14 +245,14 @@ test('production adapter repair consumes prior findings and reviews the checks c
     checks: async () => ({
       status: 'PASS', change: 'candidate-2', reviewInputPath: currentReviewInputPath, candidatePath: currentCandidatePath,
     }),
-    notify: f.options.adapters.notify,
+    waitingRecord: f.options.adapters.waitingRecord,
   });
   const built = await adapters.builder({
-    approvedInputPath: f.input.approvedInputPath, runDirectory: f.directory, round: 2, priorReviewPath,
+    approvedInputPath: f.approvedInputPath, runDirectory: f.directory, round: 2, priorReviewPath,
   });
   const checked = await adapters.checks({ runDirectory: f.directory, round: 2, builderResultPath: built.resultPath });
   await adapters.reviewer({
-    approvedInputPath: f.input.approvedInputPath, runDirectory: f.directory, round: 2,
+    approvedInputPath: f.approvedInputPath, runDirectory: f.directory, round: 2,
     builderResultPath: built.resultPath, checksResultPath: checked.resultPath,
   });
   assert.match(launched[0].request.prompt, /review-1\.json/);
@@ -232,7 +263,7 @@ test('production adapter repair consumes prior findings and reviews the checks c
 
 test('production adapter refuses a reviewer from the observed builder maker', async t => {
   const f = await fixture(t);
-  await writeFile(f.input.approvedInputPath, `${JSON.stringify({
+  await writeFile(f.approvedInputPath, `${JSON.stringify({
     reviewerRequest: {
       issueId: 'JUL-196', candidate: { base: 'a'.repeat(40), commit: 'b'.repeat(40) },
       configuration: { model: 'reviewer', maker: 'Same Co', connection: { provider: 'commandcode' } },
@@ -245,10 +276,10 @@ test('production adapter refuses a reviewer from the observed builder maker', as
   await writeFile(checksResultPath, `${JSON.stringify({ status: 'PASS' })}\n`);
   const adapters = createExistingDeliveryStepAdapters({
     worktree: f.directory, launch: () => assert.fail('same-maker review must not launch'),
-    checks: async () => ({}), notify: f.options.adapters.notify,
+    checks: async () => ({}), waitingRecord: f.options.adapters.waitingRecord,
   });
   await assert.rejects(() => adapters.reviewer({
-    approvedInputPath: f.input.approvedInputPath, runDirectory: f.directory, round: 1,
+    approvedInputPath: f.approvedInputPath, runDirectory: f.directory, round: 1,
     builderResultPath, checksResultPath,
   }), /maker must differ/);
 });
@@ -261,7 +292,7 @@ test('production adapter preserves a failed review report for the next repair', 
   };
   const text = fixtureReport(reviewInput, 'FAIL', 'repair this finding');
   const expectedReport = JSON.parse(text.split('\nREVIEW: ')[1]);
-  await writeFile(f.input.approvedInputPath, `${JSON.stringify({
+  await writeFile(f.approvedInputPath, `${JSON.stringify({
     reviewerRequest: {
       issueId: 'JUL-196', candidate: { base: 'a'.repeat(40), commit: reviewInput.candidate },
       configuration: { model: 'reviewer', maker: 'Reviewer Co', connection: { provider: 'commandcode' } },
@@ -279,10 +310,10 @@ test('production adapter preserves a failed review report for the next repair', 
       observed: { maker: 'Reviewer Co', model: 'reviewer' },
       usage: { inputTokens: 21, outputTokens: 8 }, costEstimateUsd: 0.0042,
     }),
-    checks: async () => ({}), notify: f.options.adapters.notify,
+    checks: async () => ({}), waitingRecord: f.options.adapters.waitingRecord,
   });
   const { resultPath } = await adapters.reviewer({
-    approvedInputPath: f.input.approvedInputPath, runDirectory: f.directory, round: 1,
+    approvedInputPath: f.approvedInputPath, runDirectory: f.directory, round: 1,
     builderResultPath, checksResultPath,
   });
   const saved = JSON.parse(await readFile(resultPath, 'utf8'));

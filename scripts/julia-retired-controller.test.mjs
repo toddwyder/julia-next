@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import test from 'node:test';
 
 const retiredPaths = [
@@ -37,6 +37,10 @@ const retiredPaths = [
   './run-seat.test.mjs',
   './stand-in-seat.mjs',
   './stand-in-seat.test.mjs',
+  './julia-minimal-runner.mjs',
+  './julia-minimal-runner-adapters.mjs',
+  './julia-delivery-interrupt-runner.mjs',
+  './julia-review-only.mjs',
 ];
 
 test('retired controller and OVH-only routes are not executable source or deployable config', () => {
@@ -48,16 +52,24 @@ test('the active suite has no retired controller or OVH-only registration', () =
   assert.doesNotMatch(suite, /HISTORICAL_TESTS|controller-(?:board|carry)\.test|stand-in-seat\.test|ops-controller|ops-sudoers|check-readiness|collect-worker-result|orca-cli|ready-queue|service-dropbox(?:-write-secret)?\.test/);
 });
 
-test('laptop seat code remains until the stage-three Mastra workflow replacement', () => {
+test('worker support that does not orchestrate delivery remains available', () => {
   for (const path of [
     '../ops/service-dropbox/run-pi-seat.mjs',
     '../ops/service-dropbox/run-agy-seat.mjs',
     '../ops/service-dropbox/read-secret.mjs',
     '../graph/seat-table.mjs',
     './seat-labels.mjs',
-    './julia-minimal-runner-adapters.mjs',
     './julia-graph-model.mjs',
     './board-setup.mjs',
     '../ops/julia-runner/run-reviewer.mjs',
   ]) assert.equal(existsSync(new URL(path, import.meta.url)), true, path);
+});
+
+test('$init and the Mastra workflow are the only delivery start route', () => {
+  const directory = new URL('.', import.meta.url);
+  const sources = readdirSync(directory).filter(name => name.endsWith('.mjs') && !name.endsWith('.test.mjs'))
+    .map(name => [name, readFileSync(new URL(name, directory), 'utf8')]);
+  for (const [name, source] of sources) assert.doesNotMatch(source, /\b(?:runDelivery|startDelivery|startReviewOnly)\b/, name);
+  assert.match(sources.find(([name]) => name === 'julia-init.mjs')[1], /startMastraDelivery/);
+  assert.match(sources.find(([name]) => name === 'julia-mastra-delivery.mjs')[1], /createDeliveryWorkflowRuntime/);
 });

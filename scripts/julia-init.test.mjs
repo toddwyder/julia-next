@@ -23,7 +23,7 @@ async function runCli(arguments_, { cwd, input = '' } = {}) {
   await mkdir(join(cwd, '.julia/runs'), { recursive: true });
   await writeFile(join(cwd, '.julia/runs', `${issueId}-approved.json`), JSON.stringify({ card: { identifier: issueId, description: '## Acceptance criteria\n- [ ] fixture' }, authorization: authorize(issueId) }));
   return new Promise((done, fail) => {
-    const child = spawn(process.execPath, [initScript, ...arguments_], { cwd, env: { ...process.env, JULIA_START_AUTHORIZATION: authorizationPath, JULIA_RUN_DIRECTORY: join(cwd, '.julia/runs') } });
+    const child = spawn(process.execPath, [initScript, ...arguments_], { cwd, env: { ...process.env, JULIA_DELIVERY_OFFLINE_FIXTURE: '1', JULIA_START_AUTHORIZATION: authorizationPath, JULIA_RUN_DIRECTORY: join(cwd, '.julia/runs') } });
     let stdout = '';
     let stderr = '';
     child.stdout.setEncoding('utf8').on('data', (chunk) => { stdout += chunk; });

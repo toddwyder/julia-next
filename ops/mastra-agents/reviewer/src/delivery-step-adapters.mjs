@@ -22,11 +22,14 @@ export function createExistingDeliveryStepAdapters({
   worktree,
   launch = productionLauncher(worktree),
   checks,
-  notify,
+  waitingRecord,
+  validateCandidate = async () => ({ status: 'PASS' }),
+  recordAcceptance = async () => { throw new Error('acceptance recorder is required'); },
+  park = async () => { throw new Error('park recorder is required'); },
 }) {
   if (!worktree) throw new Error('existing delivery steps require a worktree');
-  if (typeof launch !== 'function' || typeof checks !== 'function' || typeof notify !== 'function') {
-    throw new Error('existing delivery steps require launcher, checks and notification boundaries');
+  if (typeof launch !== 'function' || typeof checks !== 'function' || typeof waitingRecord !== 'function') {
+    throw new Error('existing delivery steps require launcher, checks and waiting-record boundaries');
   }
   return {
     builder: async input => {
@@ -36,8 +39,9 @@ export function createExistingDeliveryStepAdapters({
       const prompt = input.priorReviewPath
         ? `${request.prompt}\n\nRepair every finding in the saved independent review at ${input.priorReviewPath}. Read that file; its path is the handoff.`
         : request.prompt;
-      const launched = await launch('builder', { ...request, prompt, round: input.round });
-      return saveResult(input.runDirectory, `builder-${input.round}.json`, {
+      const suffix = input.cycle && input.cycle > 1 ? `${input.round}-cycle-${input.cycle}` : input.round;
+      const launched = await launch('builder', { ...request, prompt, round: input.round, outputPath: join(input.runDirectory, `builder-worker-${suffix}.json`) });
+      return saveResult(input.runDirectory, `builder-${suffix}.json`, {
         status: launched.exitCode === 0 ? 'PASS' : 'FAIL',
         reason: launched.exitCode === 0 ? null : launched.text || `builder exited ${launched.exitCode}`,
         observed: launched.observed ?? null,
@@ -46,12 +50,13 @@ export function createExistingDeliveryStepAdapters({
     },
     checks: async input => {
       const checked = await checks(input);
-      return saveResult(input.runDirectory, `checks-${input.round}.json`, checked);
+      const suffix = input.cycle && input.cycle > 1 ? `${input.round}-cycle-${input.cycle}` : input.round;
+      return saveResult(input.runDirectory, `checks-${suffix}.json`, checked);
     },
     reviewer: async input => {
       const approved = await readJson(input.approvedInputPath);
       const request = approved.reviewerRequest;
-      if (!request?.configuration || !request.issueId || !request.candidate || request.configuration.connection?.provider !== 'commandcode') {
+      if (!request?.configuration || !request.issueId || request.configuration.connection?.provider !== 'commandcode') {
         throw new Error('approved input has no complete existing Mastra reviewer request');
       }
       const builder = await readJson(input.builderResultPath);
@@ -69,6 +74,7 @@ export function createExistingDeliveryStepAdapters({
       if (!reviewInput || !candidate || (input.round > 1 && (!checkResult.reviewInputPath || !checkResult.candidatePath))) {
         throw new Error('checks did not save the current candidate and review input');
       }
+      const suffix = input.cycle && input.cycle > 1 ? `${input.round}-cycle-${input.cycle}` : input.round;
       const launched = await launch('reviewer', {
         ...request,
         candidate,
@@ -77,6 +83,7 @@ export function createExistingDeliveryStepAdapters({
         builderResultPath: input.builderResultPath,
         checksResultPath: input.checksResultPath,
         mastraReviewOnly: true,
+        outputPath: join(input.runDirectory, `reviewer-worker-${suffix}.json`),
       });
       const reviewed = checkedReview(launched.text, reviewInput);
       const inputTokens = launched.usage?.inputTokens ?? launched.usage?.prompt_tokens;
@@ -85,10 +92,12 @@ export function createExistingDeliveryStepAdapters({
         || !Number.isFinite(launched.costEstimateUsd))) {
         throw new Error('existing Mastra reviewer returned no token or cost measurement');
       }
-      return saveResult(input.runDirectory, `review-${input.round}.json`, {
+      return saveResult(input.runDirectory, `review-${suffix}.json`, {
         verdict: launched.exitCode === 0 && !reviewed.error ? reviewed.verdict : 'FAIL',
         reason: launched.technicalFailure ?? reviewed.error ?? (launched.exitCode === 0 ? null : `reviewer exited ${launched.exitCode}`),
         report: reviewed.report ?? null,
+        text: launched.text ?? null,
+        candidateCommit: candidate.commit ?? reviewInput.candidate ?? null,
         model: launched.observed?.model ?? request.configuration.model ?? null,
         effort: launched.observed?.effort ?? request.configuration.thinking ?? null,
         inputTokens: inputTokens ?? null,
@@ -96,6 +105,9 @@ export function createExistingDeliveryStepAdapters({
         costEstimateUsd: launched.costEstimateUsd ?? null,
       });
     },
-    notify,
+    waitingRecord,
+    validateCandidate,
+    recordAcceptance,
+    park,
   };
 }

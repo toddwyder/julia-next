@@ -1,15 +1,21 @@
-import { Mastra } from '@mastra/core/mastra';
 import { createStep, createWorkflow } from '@mastra/core/workflows';
-import { LibSQLStore } from '@mastra/libsql';
-import { createClient } from '@libsql/client';
 import { appendFile, readFile, writeFile } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { z } from 'zod/v4';
 
-export const DELIVERY_WORKFLOW_ID = 'julia-delivery-round-1';
-const MAX_ROUNDS = 3;
+export const DELIVERY_WORKFLOW_ID = 'julia-delivery';
+const MAX_ROUNDS = 2;
 const pathSchema = z.string().min(1);
+const launchSchema = z.object({
+  card: z.string().min(1),
+  launchInputPath: pathSchema,
+  runDirectory: pathSchema,
+  runMetadataPath: pathSchema,
+});
+const authorizedSchema = z.object({ ...launchSchema.shape, authorizationResultPath: pathSchema });
 const handoffSchema = z.object({
+  launchInputPath: pathSchema,
+  authorizationResultPath: pathSchema,
   approvedInputPath: pathSchema,
   runDirectory: pathSchema,
   runMetadataPath: pathSchema,
@@ -17,12 +23,17 @@ const handoffSchema = z.object({
   builderResultPath: pathSchema.optional(),
   checksResultPath: pathSchema.optional(),
   reviewResultPath: pathSchema.optional(),
-  noticeResultPath: pathSchema.optional(),
+  priorReviewPath: pathSchema.optional(),
+  waitingRecordPath: pathSchema.optional(),
+  parkResultPath: pathSchema.optional(),
+  acceptanceResultPath: pathSchema.optional(),
+  rerunCandidate: z.boolean().optional(),
+  cycle: z.number().int().min(1).optional(),
   stopReason: z.string().optional(),
 });
 const terminalSchema = z.object({
   ...handoffSchema.shape,
-  outcome: z.enum(['accepted', 'rejected', 'parked']),
+  outcome: z.enum(['accepted', 'rejected', 'parked', 'stale']),
   reason: z.string().optional(),
 });
 const workflowOutputSchema = z.object({
@@ -61,8 +72,11 @@ export async function appendPermanentSummaryLine(path, runId, line) {
 function adapterInput(inputData, additions = {}) {
   const input = {
     round: inputData.round,
+    cycle: inputData.cycle,
     runDirectory: inputData.runDirectory,
+    launchInputPath: inputData.launchInputPath,
     approvedInputPath: inputData.approvedInputPath,
+    priorReviewPath: inputData.priorReviewPath,
     ...additions,
   };
   return Object.fromEntries(Object.entries(input).filter(([, value]) => value != null));
@@ -81,7 +95,7 @@ function errorMessage(error) {
 
 async function failedResult(inputData, role, error) {
   const reason = `${role} failed: ${errorMessage(error)}`;
-  const fileRole = role === 'reviewer' ? 'review' : role === 'notification' ? 'notice' : role;
+  const fileRole = role === 'reviewer' ? 'review' : role;
   const resultPath = await writeJson(join(inputData.runDirectory, `${fileRole}-${inputData.round}.json`), {
     status: 'FAIL', verdict: 'FAIL', reason,
     model: null, effort: null, inputTokens: 0, outputTokens: 0, costEstimateUsd: 0,
@@ -89,13 +103,45 @@ async function failedResult(inputData, role, error) {
   return { resultPath, reason };
 }
 
-function createDeliveryWorkflow(adapters, samplePeak, summaryPath) {
+export function createDeliveryWorkflow(adapters, samplePeak, summaryPath) {
+  const authorize = createStep({
+    id: 'authorization-check',
+    inputSchema: launchSchema,
+    outputSchema: authorizedSchema,
+    execute: async ({ inputData }) => {
+      const resultPath = requireResultPath('authorization', await adapters.authorization({
+        launchInputPath: inputData.launchInputPath, runDirectory: inputData.runDirectory,
+      }));
+      const result = await readJson(resultPath);
+      if (result.status !== 'PASS') throw new Error(result.reason ?? 'delivery authorization was refused');
+      return { ...inputData, authorizationResultPath: resultPath };
+    },
+  });
+
+  const readCard = createStep({
+    id: 'read-linear-card-once',
+    inputSchema: authorizedSchema,
+    outputSchema: handoffSchema,
+    execute: async ({ inputData }) => {
+      const approvedInputPath = requireResultPath('card read', await adapters.cardRead({
+        launchInputPath: inputData.launchInputPath,
+        authorizationResultPath: inputData.authorizationResultPath,
+        runDirectory: inputData.runDirectory,
+      }));
+      return { ...inputData, approvedInputPath, round: 0, cycle: 1 };
+    },
+  });
+
   const build = createStep({
     id: 'build',
     inputSchema: handoffSchema,
     outputSchema: handoffSchema,
     execute: async ({ inputData }) => {
+      if (inputData.rerunCandidate) {
+        return { ...inputData, rerunCandidate: false, stopReason: undefined, priorReviewPath: undefined };
+      }
       const round = inputData.round + 1;
+      const priorReviewPath = inputData.reviewResultPath;
       await updateMetadata(inputData.runMetadataPath, { round });
       await samplePeak(inputData.runMetadataPath);
       let result;
@@ -112,11 +158,14 @@ function createDeliveryWorkflow(adapters, samplePeak, summaryPath) {
       await updateMetadata(inputData.runMetadataPath, { round, builderResultPath });
       await samplePeak(inputData.runMetadataPath);
       return {
+        launchInputPath: inputData.launchInputPath,
+        authorizationResultPath: inputData.authorizationResultPath,
         approvedInputPath: inputData.approvedInputPath,
         runDirectory: inputData.runDirectory,
         runMetadataPath: inputData.runMetadataPath,
         round,
         builderResultPath,
+        ...(priorReviewPath ? { priorReviewPath } : {}),
       };
     },
   });
@@ -173,7 +222,12 @@ function createDeliveryWorkflow(adapters, samplePeak, summaryPath) {
           model: null, effort: null, inputTokens: 0, outputTokens: 0, costEstimateUsd: 0,
         });
       }
-      await updateMetadata(inputData.runMetadataPath, { reviewResultPath, ...(inputData.stopReason ? { stopReason: inputData.stopReason } : {}) });
+      const metadata = await readJson(inputData.runMetadataPath);
+      await updateMetadata(inputData.runMetadataPath, {
+        reviewResultPath,
+        reviewResultPaths: [...(metadata.reviewResultPaths ?? []), reviewResultPath],
+        ...(inputData.stopReason ? { stopReason: inputData.stopReason } : {}),
+      });
       await samplePeak(inputData.runMetadataPath);
       return { ...inputData, reviewResultPath };
     },
@@ -185,41 +239,67 @@ function createDeliveryWorkflow(adapters, samplePeak, summaryPath) {
     outputSchema: handoffSchema,
   }).then(build).then(checks).then(review).commit();
 
-  const notify = createStep({
-    id: 'notify-technical-acceptance',
+  const waitingRecord = createStep({
+    id: 'write-waiting-record',
     inputSchema: handoffSchema,
-    outputSchema: handoffSchema,
+    outputSchema: terminalSchema,
     execute: async ({ inputData }) => {
       const reviewResult = await readJson(inputData.reviewResultPath);
-      if (reviewResult.verdict !== 'PASS') return inputData;
+      if (inputData.stopReason || reviewResult.verdict !== 'PASS') {
+        const reason = inputData.stopReason ?? reviewResult.reason ?? 'two rounds ended without an accepted independent review';
+        let parkResultPath;
+        try {
+          parkResultPath = requireResultPath('park', await adapters.park(adapterInput(inputData, { reviewResultPath: inputData.reviewResultPath })));
+        } catch (error) {
+          const failed = await failedResult(inputData, 'park', error);
+          parkResultPath = failed.resultPath;
+        }
+        await updateMetadata(inputData.runMetadataPath, { parkResultPath, stopReason: reason });
+        return { ...inputData, parkResultPath, outcome: 'parked', reason };
+      }
       let result;
       try {
-        result = await adapters.notify(adapterInput(inputData, { reviewResultPath: inputData.reviewResultPath }));
+        result = await adapters.waitingRecord(adapterInput(inputData, {
+          builderResultPath: inputData.builderResultPath,
+          checksResultPath: inputData.checksResultPath,
+          reviewResultPath: inputData.reviewResultPath,
+        }));
       } catch (error) {
-        const failed = await failedResult(inputData, 'notification', error);
-        await updateMetadata(inputData.runMetadataPath, { noticeResultPath: failed.resultPath, stopReason: failed.reason });
-        return { ...inputData, noticeResultPath: failed.resultPath, stopReason: failed.reason };
+        const failed = await failedResult(inputData, 'waiting-record', error);
+        await updateMetadata(inputData.runMetadataPath, { waitingRecordPath: failed.resultPath, stopReason: failed.reason });
+        return { ...inputData, waitingRecordPath: failed.resultPath, outcome: 'parked', reason: failed.reason };
       }
-      const noticeResultPath = requireResultPath('notification', result);
-      await updateMetadata(inputData.runMetadataPath, { noticeResultPath });
+      const waitingRecordPath = requireResultPath('waiting record', result);
+      await updateMetadata(inputData.runMetadataPath, { waitingRecordPath });
       await samplePeak(inputData.runMetadataPath);
-      return { ...inputData, noticeResultPath };
+      return { ...inputData, waitingRecordPath, outcome: 'stale' };
     },
   });
 
   const acceptance = createStep({
     id: 'technical-acceptance',
-    inputSchema: handoffSchema,
+    inputSchema: terminalSchema,
     resumeSchema: z.object({ decision: z.enum(['accept', 'reject']), reason: z.string().optional() }),
     suspendSchema: z.object({ round: z.number().int(), reviewResultPath: pathSchema }),
     outputSchema: terminalSchema,
     execute: async ({ inputData, resumeData, suspend }) => {
       const reviewResult = await readJson(inputData.reviewResultPath);
-      if (inputData.stopReason || reviewResult.verdict !== 'PASS') {
-        return { ...inputData, outcome: 'parked', reason: inputData.stopReason ?? reviewResult.reason ?? 'three rounds ended without an accepted independent review' };
-      }
+      if (inputData.outcome === 'parked') return inputData;
       if (!resumeData) return suspend({ round: inputData.round, reviewResultPath: inputData.reviewResultPath });
-      if (resumeData.decision === 'accept') return { ...inputData, outcome: 'accepted' };
+      if (resumeData.decision === 'accept') {
+        const validation = await adapters.validateCandidate(adapterInput(inputData, {
+          checksResultPath: inputData.checksResultPath,
+          reviewResultPath: inputData.reviewResultPath,
+        }));
+        if (validation?.status !== 'PASS') {
+          return { ...inputData, outcome: 'stale', reason: validation?.reason ?? 'reviewed candidate changed', rerunCandidate: true, cycle: (inputData.cycle ?? 1) + 1 };
+        }
+        const acceptanceResultPath = requireResultPath('acceptance', await adapters.recordAcceptance(adapterInput(inputData, {
+          checksResultPath: inputData.checksResultPath,
+          reviewResultPath: inputData.reviewResultPath,
+        })));
+        return { ...inputData, acceptanceResultPath, outcome: 'accepted', reason: undefined };
+      }
       return { ...inputData, outcome: 'rejected', reason: resumeData.reason?.trim() || 'Todd rejected technical acceptance' };
     },
   });
@@ -234,9 +314,7 @@ function createDeliveryWorkflow(adapters, samplePeak, summaryPath) {
       });
       const checksResult = await readJson(inputData.checksResultPath);
       const reviewResult = await readJson(inputData.reviewResultPath);
-      const reviews = await Promise.all(Array.from({ length: inputData.round }, (_, index) => (
-        readJson(join(inputData.runDirectory, `review-${index + 1}.json`))
-      )));
+      const reviews = await Promise.all((metadata.reviewResultPaths ?? [inputData.reviewResultPath]).map(readJson));
       const total = field => reviews.every(review => Number.isFinite(review[field]))
         ? reviews.reduce((sum, review) => sum + review[field], 0)
         : 'unknown';
@@ -261,143 +339,28 @@ function createDeliveryWorkflow(adapters, samplePeak, summaryPath) {
     },
   });
 
-  return createWorkflow({
-    id: DELIVERY_WORKFLOW_ID,
+  const reviewCycle = createWorkflow({
+    id: `${DELIVERY_WORKFLOW_ID}-cycle`,
     inputSchema: handoffSchema,
-    outputSchema: workflowOutputSchema,
-    options: { autoRestartActiveRuns: false },
+    outputSchema: terminalSchema,
   })
     .dountil(round, async ({ inputData }) => {
       const reviewResult = await readJson(inputData.reviewResultPath);
       return Boolean(inputData.stopReason) || reviewResult.verdict === 'PASS' || inputData.round >= MAX_ROUNDS;
     })
-    .then(notify)
+    .then(waitingRecord)
     .then(acceptance)
+    .commit();
+
+  return createWorkflow({
+    id: DELIVERY_WORKFLOW_ID,
+    inputSchema: launchSchema,
+    outputSchema: workflowOutputSchema,
+    options: { autoRestartActiveRuns: false },
+  })
+    .then(authorize)
+    .then(readCard)
+    .dountil(reviewCycle, async ({ inputData }) => inputData.outcome !== 'stale')
     .then(summarize)
     .commit();
-}
-
-export async function createDeliveryWorkflowRuntime({ storagePath, runDirectory, summaryPath, adapters }) {
-  if (!storagePath || !runDirectory || !summaryPath) throw new Error('delivery workflow requires storage, run directory and summary paths');
-  for (const name of ['builder', 'checks', 'reviewer', 'notify']) {
-    if (typeof adapters?.[name] !== 'function') throw new Error(`delivery workflow requires the existing ${name} adapter`);
-  }
-  const absoluteStoragePath = resolve(storagePath).replaceAll('\\', '/');
-  const storage = new LibSQLStore({
-    id: 'julia-delivery-local', url: `file:${absoluteStoragePath}`,
-    localPragmas: { mmapSize: 0 },
-  });
-  const trackers = new Map();
-  const observePeak = metadataPath => {
-    const tracker = trackers.get(metadataPath);
-    const rss = process.memoryUsage().rss;
-    if (tracker) tracker.peakMemoryBytes = Math.max(tracker.peakMemoryBytes, rss);
-    return tracker?.peakMemoryBytes ?? rss;
-  };
-  const samplePeak = async metadataPath => observePeak(metadataPath);
-  const beginMeasuring = async metadataPath => {
-    const metadata = await readJson(metadataPath);
-    const tracker = {
-      peakMemoryBytes: Math.max(metadata.peakMemoryBytes ?? 0, process.memoryUsage().rss),
-      sampler: null,
-    };
-    tracker.sampler = setInterval(() => observePeak(metadataPath), 10);
-    tracker.sampler.unref();
-    trackers.set(metadataPath, tracker);
-    return async () => {
-      observePeak(metadataPath);
-      clearInterval(tracker.sampler);
-      trackers.delete(metadataPath);
-      await updateMetadata(metadataPath, { peakMemoryBytes: tracker.peakMemoryBytes });
-      return tracker.peakMemoryBytes;
-    };
-  };
-  const deliveryWorkflow = createDeliveryWorkflow(adapters, samplePeak, summaryPath);
-  const mastra = new Mastra({ storage, workflows: { deliveryWorkflow } });
-  const workflow = mastra.getWorkflow('deliveryWorkflow');
-
-  const measurePause = async (runId, metadataPath) => {
-    const measurementClient = createClient({ url: `file:${absoluteStoragePath}` });
-    const measured = await measurementClient.execute({
-      sql: 'SELECT length(snapshot) AS bytes FROM mastra_workflow_snapshot WHERE workflow_name = ? AND run_id = ?',
-      args: [DELIVERY_WORKFLOW_ID, runId],
-    });
-    measurementClient.close();
-    const pauseStateBytes = Number(measured.rows[0]?.bytes);
-    if (!Number.isSafeInteger(pauseStateBytes) || pauseStateBytes <= 0) throw new Error('saved pause state size could not be measured');
-    const metadata = await updateMetadata(metadataPath, { pauseStateBytes });
-    return { pauseStateBytes, peakMemoryBytes: metadata.peakMemoryBytes };
-  };
-
-  const recordFailedRun = async (runId, metadataPath, failure) => {
-    const fallback = { card: 'unknown', startTime: 'unknown', peakMemoryBytes: process.memoryUsage().rss, runId, round: 0 };
-    let metadata;
-    try { metadata = { ...fallback, ...await readJson(metadataPath) }; } catch { metadata = fallback; }
-    if (metadata.summaryWritten) return;
-    const endTime = new Date().toISOString();
-    let checks = {}; let reviews = [];
-    try { if (metadata.checksResultPath) checks = await readJson(metadata.checksResultPath); } catch { /* retain unknown */ }
-    for (let round = 1; round <= (metadata.round ?? 0); round += 1) {
-      try { reviews.push(await readJson(join(dirname(metadataPath), `review-${round}.json`))); } catch { /* incomplete round */ }
-    }
-    const lastReview = reviews.at(-1) ?? {};
-    const total = field => reviews.length && reviews.every(review => Number.isFinite(review[field]))
-      ? reviews.reduce((sum, review) => sum + review[field], 0)
-      : 'unknown';
-    const line = [
-      `card=${metadata.card}`, `change=${checks.change ?? 'unknown'}`, `round=${metadata.round ?? 0}`,
-      `stop=SYSTEM_ERROR reason=${JSON.stringify(errorMessage(failure))}`,
-      `reviewerModel=${lastReview.model ?? 'unknown'}`, `reviewerEffort=${lastReview.effort ?? 'unknown'}`,
-      `inputTokens=${total('inputTokens')}`, `outputTokens=${total('outputTokens')}`,
-      `costEstimateUsd=${total('costEstimateUsd')}`, `start=${metadata.startTime}`, `end=${endTime}`,
-    ].join(' ');
-    await appendPermanentSummaryLine(summaryPath, runId, line);
-    try { await updateMetadata(metadataPath, { endTime, summaryWritten: true }); } catch { /* summary is already permanent */ }
-  };
-
-  const complete = async (runId, metadataPath, operation) => {
-    const finishMeasuring = await beginMeasuring(metadataPath);
-    let result;
-    try {
-      result = await operation();
-      if (result?.status === 'failed' || result?.status === 'tripwire') await recordFailedRun(runId, metadataPath, result.error ?? result.status);
-    } catch (error) {
-      await recordFailedRun(runId, metadataPath, error);
-      throw error;
-    } finally {
-      const peakMemoryBytes = await finishMeasuring();
-      if (result?.status === 'success' && result.result) result = { ...result, result: { ...result.result, peakMemoryBytes } };
-    }
-    return result;
-  };
-
-  return {
-    async start({ runId, input }) {
-      const metadataPath = join(input.runDirectory, `${runId}-workflow-metrics.json`);
-      await writeJson(metadataPath, {
-        card: input.card, runId,
-        startTime: new Date().toISOString(),
-        peakMemoryBytes: process.memoryUsage().rss,
-        pauseStateBytes: null,
-      });
-      const run = await workflow.createRun({ runId });
-      const result = await complete(runId, metadataPath, () => run.start({ inputData: {
-        approvedInputPath: input.approvedInputPath,
-        runDirectory: input.runDirectory,
-        runMetadataPath: metadataPath,
-        round: 0,
-      } }));
-      if (result.status !== 'suspended') return result;
-      const measurements = await measurePause(runId, metadataPath);
-      return { ...result, runId, outcome: 'awaiting-technical-acceptance', ...measurements };
-    },
-    async resume({ runId, decision, reason }) {
-      const metadataPath = join(runDirectory, `${runId}-workflow-metrics.json`);
-      const run = await workflow.createRun({ runId });
-      return complete(runId, metadataPath, () => run.resume({ step: 'technical-acceptance', resumeData: { decision, ...(reason ? { reason } : {}) } }));
-    },
-    async close() {
-      await mastra.getStorage().close();
-    },
-  };
 }

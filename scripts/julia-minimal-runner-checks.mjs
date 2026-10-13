@@ -1,5 +1,5 @@
-// julia-minimal-runner-checks.mjs -- the red proof and the checks for
-// julia-minimal-runner.mjs (JUL-122). The runner never runs a candidate's
+// Red proof and check helpers retained from JUL-122 for the Mastra workflow.
+// The workflow never runs a candidate's
 // tests itself: every lint, suite and seam-test run is a request to the test
 // worker, `test({ worktree, run, files })`, which on the server runs in its
 // own account with no access to the runner's Linear credential. Git work
