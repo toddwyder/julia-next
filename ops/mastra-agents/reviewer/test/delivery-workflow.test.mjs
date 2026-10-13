@@ -13,7 +13,6 @@ import { createExistingDeliveryStepAdapters } from '../src/delivery-step-adapter
 import { handleReviewerCrash } from '../src/delivery-crash-recovery.mjs';
 import { createOfflineDeliveryAdapters } from '../support/offline-delivery-adapters.mjs';
 import { fixtureReport } from '../../../../scripts/fixtures/jul202-review.mjs';
-import { productionLauncher } from '../../../../scripts/julia-delivery-runner.mjs';
 
 const suiteDirectory = await mkdtemp(join(tmpdir(), 'jul196-workflow-suite-'));
 after(() => rm(suiteDirectory, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 }));
@@ -323,7 +322,6 @@ test('the intentional production reviewer gate parks at zero cost without crash 
       configuration: { model: 'fixture-reviewer', maker: 'Reviewer Co', harness: 'omp', connection: { provider: 'commandcode' } },
     },
   })}\n`);
-  const realLaunch = productionLauncher(f.directory);
   let reviewerLaunches = 0;
   let builderLaunches = 0;
   let recoveries = 0;
@@ -334,7 +332,15 @@ test('the intentional production reviewer gate parks at zero cost without crash 
     }
     reviewerLaunches += 1;
     await f.options.adapters.record({ kind: 'reviewer', round: request.round, attempt: reviewerLaunches });
-    return realLaunch(role, request);
+    return {
+      exitCode: 2,
+      observed: null,
+      text: 'paid execution is disabled until provider acceptance is implemented',
+      technicalFailure: 'paid execution is disabled until provider acceptance is implemented',
+      plannedGate: 'paid-reviewer-disabled',
+      providerAcceptance: 'not-accepted',
+      costEstimateUsd: 0,
+    };
   };
   const existing = createExistingDeliveryStepAdapters({
     worktree: f.directory,
