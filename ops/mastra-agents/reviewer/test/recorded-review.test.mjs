@@ -224,37 +224,24 @@ test('interruption keeps accepted pieces and records their names in the technica
   const directory = await mkdtemp(join(tmpdir(), 'jul223-recorded-interrupt-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const childPath = fileURLToPath(new URL('../support/recorded-review-interrupt-child.mjs', import.meta.url));
-  const child = spawn(process.execPath, [childPath, directory], { stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(process.execPath, [childPath, directory], { stdio: ['ignore', 'pipe', 'pipe', 'ipc'] });
   t.after(() => { if (child.exitCode == null) child.kill('SIGKILL'); });
   let stderr = '';
   child.stderr.on('data', chunk => { stderr += chunk; });
-  const piecesDirectory = join(directory, 'pieces');
-  const failurePath = join(directory, 'verdict.json.failure.json');
   await new Promise((resolve, reject) => {
-    let settled = false;
     const timeout = setTimeout(() => {
-      settled = true;
       reject(new Error(`pieces were not durable before interruption: ${stderr}`));
-    }, 30_000);
-    const poll = async () => {
-      if (settled) return;
-      try {
-        if ((await readdir(piecesDirectory)).length >= 3) {
-          const failure = JSON.parse(await readFile(failurePath, 'utf8'));
-          if (failure.acceptedPieces.length >= 3) {
-            settled = true;
-            clearTimeout(timeout);
-            resolve();
-            return;
-          }
-        }
-      } catch { /* child has not recorded yet */ }
-      if (!settled) setTimeout(poll, 20);
-    };
-    poll();
+    }, 10_000);
+    child.once('message', message => {
+      clearTimeout(timeout);
+      if (message === 'durable-pieces-recorded') resolve();
+      else reject(new Error(`unexpected interruption fixture message: ${message}`));
+    });
   });
   child.kill('SIGKILL');
   await new Promise(resolve => child.once('exit', resolve));
+  const piecesDirectory = join(directory, 'pieces');
+  const failurePath = join(directory, 'verdict.json.failure.json');
   const failure = JSON.parse(await readFile(failurePath, 'utf8'));
   assert.equal(failure.kind, 'technical-failure');
   assert.match(failure.reason, /interrupted/);

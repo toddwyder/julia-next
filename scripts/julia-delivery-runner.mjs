@@ -4,11 +4,10 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { isDeepStrictEqual } from 'node:util';
-import { git, safeWorkerEnvironment } from './julia-minimal-runner-checks.mjs';
+import { safeWorkerEnvironment } from './julia-minimal-runner-checks.mjs';
 import { saveJson } from './julia-delivery-state.mjs';
 import { LIMITS, runLimited } from '../ops/julia-runner/time-limit.mjs';
 
-const SHA = /^[0-9a-f]{40}$/i;
 const fileSave = saveJson;
 const plain = value => JSON.parse(JSON.stringify(value));
 
@@ -34,20 +33,6 @@ export function workerPrompt(role, card, configuration, runPath, approvedPath, f
     ? 'Perform the full adversarial review of the changed, checked immutable candidate.'
     : 'Check the repairs and relevant regressions on the changed, checked immutable candidate; do not repeat the entire initial review.';
   return `Issue: ${card.identifier}\nConfigured reviewer: ${JSON.stringify(chosen)}\n\nExplicitly read and follow .agents/skills/adversarial-review/SKILL.md (the complete pinned instructions are supplied below). ${scope} Use only the supplied review input in one fresh session. Keep Standards and Spec separate in the report. Save and reuse this review for this candidate; no polling or retry after an ambiguous or failing call, and no unchanged rereview.`;
-}
-
-// A reviewer-only run receives the identity and completed checks of an
-// existing candidate, then re-reads its immutable Git content. This keeps a
-// PR/commit handoff from becoming a trust-me object while leaving candidate
-// creation and every builder path unchanged.
-export function buildReviewCandidateRecord({ workspace, commit, base, checks, runs }) {
-  if (!workspace?.path || !SHA.test(commit ?? '') || !SHA.test(base ?? '')) throw new Error('review-only candidate needs a workspace, immutable candidate commit and immutable base commit');
-  if (checks?.pass !== true || !Array.isArray(runs) || !runs.length || runs.some(run => run?.commit !== commit || !Number.isInteger(run.status) || typeof run.output !== 'string')) throw new Error('review-only candidate needs completed checks bound to its immutable commit');
-  if (git(workspace.path, 'rev-parse', 'HEAD') !== commit || git(workspace.path, 'status', '--porcelain')) throw new Error('review-only workspace is not clean at the requested candidate commit');
-  const diff = git(workspace.path, 'diff', '--binary', `${base}...${commit}`);
-  const files = git(workspace.path, 'diff', '--name-status', `${base}...${commit}`);
-  if (!files.trim()) throw new Error('review-only candidate has no changes from its base');
-  return { base, commit, clean: true, checks, runs, diff, files };
 }
 
 function failure(operation, error) {
