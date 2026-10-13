@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { buildAgyDeliverySpec, parseAgyDeliveryResult } from '../ops/service-dropbox/run-agy-seat.mjs';
+import { buildAgyDeliverySpec, parseAgyDeliveryModelLog, parseAgyDeliveryResult } from '../ops/service-dropbox/run-agy-seat.mjs';
 import { runLimited } from '../ops/julia-runner/time-limit.mjs';
 import { git as repositoryGit, localTester, safeWorkerEnvironment } from './julia-minimal-runner-checks.mjs';
 import { productionLauncher } from './julia-delivery-runner.mjs';
@@ -9,7 +9,13 @@ import { productionLauncher } from './julia-delivery-runner.mjs';
 const errorText = error => typeof error?.message === 'string' ? error.message : String(error);
 
 async function runAgyDeliveryReview(request) {
-  const spec = buildAgyDeliverySpec(request.prompt, { effort: request.configuration.thinking, cwd: request.repoRoot });
+  const stem = `recovery-reviewer-${request.incidentId}`;
+  const stdoutPath = join(request.runDirectory, `${stem}.stdout.jsonl`);
+  const stderrPath = join(request.runDirectory, `${stem}.stderr.txt`);
+  const logPath = join(request.runDirectory, `${stem}.agy.log`);
+  const spec = buildAgyDeliverySpec(request.prompt, {
+    effort: request.configuration.thinking, cwd: request.repoRoot, logFile: logPath,
+  });
   let stdout = '';
   let stderr = '';
   const result = await runLimited(spec.command, spec.args, {
@@ -22,11 +28,20 @@ async function runAgyDeliveryReview(request) {
     },
   });
   const parsed = parseAgyDeliveryResult(stdout);
+  await Promise.all([writeFile(stdoutPath, stdout), writeFile(stderrPath, stderr)]);
+  let model = parsed.model;
+  if (!model) {
+    const log = await readFile(logPath, 'utf8').catch(() => '');
+    model = parseAgyDeliveryModelLog(log, parsed.conversationId);
+  }
   return {
     exitCode: result.code === 0 && !result.stopped && parsed.ok ? 0 : (result.stopped ? 124 : result.code ?? 1),
     text: parsed.response ?? parsed.errorText ?? stderr,
-    observed: parsed.model ? { maker: request.configuration.maker, model: parsed.model, harness: 'agy', cliVersion: request.cliVersion ?? null } : null,
+    observed: model ? { maker: request.configuration.maker, model, harness: 'agy', cliVersion: request.cliVersion ?? null } : null,
     usage: parsed.usage,
+    outputPath: stdoutPath,
+    stderrPath,
+    logPath,
   };
 }
 
@@ -109,7 +124,7 @@ export async function recoverDeliveryCrash(input, {
     ].join('\n\n');
     const reviewed = await review({
       configuration: reviewerConfiguration, prompt: reviewPrompt, repoRoot: input.repoRoot,
-      cliVersion: input.toolVersions?.agy ?? null,
+      cliVersion: input.toolVersions?.agy ?? null, runDirectory: input.runDirectory, incidentId: crash.incidentId,
     });
     const reviewer = identity(reviewerConfiguration, reviewed.observed);
     if (reviewed.exitCode !== 0 || !reviewed.observed?.model || !/^VERDICT: PASS\b/m.test(reviewed.text ?? '')) {
