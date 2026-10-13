@@ -131,3 +131,41 @@ test('external card updates retain their result and refuse ambiguous duplicate n
   }), /refusing a duplicate/);
   assert.equal(calls, 1);
 });
+
+test('production card intake refuses the wrong Linear actor before a start update', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'delivery-linear-actor-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const launchInputPath = join(root, 'launch.json');
+  await writeFile(launchInputPath, `${JSON.stringify({
+    issueId: 'JUL-196', runPath: join(root, 'run.json'), configuration: {},
+    authorization: { linearActorId: 'authorized-actor' },
+  })}\n`);
+  let starts = 0;
+  const adapters = createMastraDeliveryAdapters({
+    readCard: async () => ({ id: 'issue-uuid', identifier: 'JUL-196', description: '## Acceptance criteria\n- approved', linearActor: { id: 'wrong-actor', name: 'Wrong account' } }),
+    startCard: async () => { starts += 1; },
+    launch: async () => ({ exitCode: 0 }), test: async () => ({ status: 0, output: '' }),
+  });
+  await assert.rejects(adapters.cardRead({ launchInputPath, runDirectory: root }), /Linear actor does not match/);
+  assert.equal(starts, 0);
+});
+
+test('production park journal binds the verified Linear actor and known issue UUID', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'delivery-linear-trace-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const approvedInputPath = join(root, 'approved.json');
+  const reviewResultPath = join(root, 'review.json');
+  const actor = { id: 'authorized-actor', name: 'Julia service' };
+  await writeFile(approvedInputPath, `${JSON.stringify({ issueId: 'JUL-196', card: { id: 'issue-uuid', linearActor: actor }, workspace: { path: root } })}\n`);
+  await writeFile(reviewResultPath, `${JSON.stringify({ verdict: 'FAIL', reason: 'blocking defect' })}\n`);
+  let receivedCard;
+  const adapters = createMastraDeliveryAdapters({
+    parkCard: async card => { receivedCard = card; return { id: 'comment-1', url: 'https://linear.app/comment-1' }; },
+    launch: async () => ({ exitCode: 0 }), test: async () => ({ status: 0, output: '' }),
+  });
+  await adapters.park({ approvedInputPath, reviewResultPath, runDirectory: root });
+  assert.equal(receivedCard.id, 'issue-uuid');
+  const journal = JSON.parse(await readFile(join(root, 'linear-park-request.json'), 'utf8'));
+  assert.deepEqual(journal.actor, actor);
+  assert.equal(journal.card, 'JUL-196');
+});
