@@ -30,9 +30,6 @@ const NON_RUNNER_TESTS = new Set([
 // Evidence and generated/vendor trees are never executable source. In particular,
 // do not recurse into .julia's saved copies or mutate them to make discovery pass.
 const GENERATED = new Set(['.git', '.julia', '.next', '.mastra', '.artifacts', 'node_modules', 'test-results', 'playwright-report']);
-const ISOLATED_TIMING_TESTS = new Set([
-  'ops/mastra-agents/reviewer/test/worst-case-offline.test.mjs',
-]);
 const IMPORT_SPECIFIER = /(?:from\s*|import\s*\(?\s*)['"]([^'"]+)['"]/g;
 const RUNNER_MODULE = /julia-(?:init|delivery|graph-model|minimal-runner|runner)|delivery-tool-settings|acceptance-check|linear-cli|effort|seat-labels|seat-table|verify-reviewer-worktree|line-endings|no-personal-paths|personal-paths|ops\/julia-runner\/|run-agy-seat|run-pi-seat|read-secret/;
 
@@ -57,19 +54,6 @@ export function discoverRunnerTests(root = process.cwd()) {
   return files.sort();
 }
 
-// Keep enough parallelism for the ten-minute gate while leaving CPU headroom
-// for the installed reviewer's deliberate 14-second/15-second timing proof.
-export function runnerTestArguments(files, concurrency = 4) {
-  return ['--test', `--test-concurrency=${concurrency}`, '--test-reporter=spec', ...files];
-}
-
-export function partitionRunnerTests(files) {
-  return {
-    concurrent: files.filter(file => !ISOLATED_TIMING_TESTS.has(file)),
-    isolated: files.filter(file => ISOLATED_TIMING_TESTS.has(file)),
-  };
-}
-
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const files = discoverRunnerTests();
   if (!files.length) {
@@ -81,16 +65,9 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       // A nested Node test invocation must not inherit NODE_TEST_CONTEXT; it
       // otherwise returns success without running tests. No shell/glob expansion.
       const { NODE_TEST_CONTEXT: _context, ...env } = process.env;
-      const { concurrent, isolated } = partitionRunnerTests(files);
-      const groups = [
-        { files: concurrent, concurrency: 4 },
-        { files: isolated, concurrency: 1 },
-      ].filter(group => group.files.length);
-      for (const group of groups) {
-        const result = spawnSync(process.execPath, runnerTestArguments(group.files, group.concurrency), { stdio: 'inherit', env });
-        if (result.error) console.error(`runner suite: unable to start tests: ${result.error.message}`);
-        if ((result.status ?? 1) !== 0) { process.exitCode = result.status ?? 1; break; }
-      }
+      const result = spawnSync(process.execPath, ['--test', '--test-reporter=spec', ...files], { stdio: 'inherit', env });
+      if (result.error) console.error(`runner suite: unable to start tests: ${result.error.message}`);
+      process.exitCode = result.status ?? 1;
     }
   }
 }

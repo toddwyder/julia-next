@@ -12,9 +12,17 @@ make paid provider calls.
 independent review, up to three build/review rounds, and Todd's technical
 acceptance. Its step adapters receive durable file paths rather than file
 contents, so the existing builder launcher and Mastra reviewer remain the
-execution boundaries. A file-backed local libSQL database holds Mastra's pause
+execution boundaries. `src/delivery-step-adapters.mjs` is the narrow production
+glue: it imports the existing `productionLauncher`, uses its builder role, and
+sets `mastraReviewOnly` for the launcher's existing `reviewer.mjs` route. A
+file-backed local libSQL database holds Mastra's pause
 snapshot. `support/offline-delivery-workflow-child.mjs` is the no-provider
 restart demonstration used by the tests; it makes no model call.
+
+This round does not switch `$init` or the delivery runner to the workflow, so
+it does not replace a live orchestration path yet. Consequently there is no
+old orchestration source to delete in round one; deletion belongs in the same
+later change that performs the route cutover, never before the offline proof.
 
 Framework map:
 
@@ -25,6 +33,9 @@ Framework map:
 | Pause for and resume from Todd's answer | step `suspend()` and `Run.resume()` | [Suspend and resume](https://mastra.ai/docs/workflows/suspend-and-resume) and [`Run.resume()` reference](https://mastra.ai/reference/workflows/run-methods/resume) |
 | Survive a process restart while paused | workflow snapshots in configured storage, loaded by run ID | [Snapshots](https://mastra.ai/docs/workflows/snapshots) |
 | Default local durable database | file-backed `LibSQLStore` | [libSQL storage](https://mastra.ai/integrations/databases/libsql) |
+
+Step and workflow schemas use [Zod](https://zod.dev/) for validation; Zod is a
+schema dependency, not a Mastra feature.
 
 ## Architecture and components
 

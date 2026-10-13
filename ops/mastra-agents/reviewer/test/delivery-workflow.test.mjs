@@ -5,8 +5,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { createClient } from '@libsql/client';
 
 import { createDeliveryWorkflowRuntime } from '../src/delivery-workflow.mjs';
+import { createExistingDeliveryStepAdapters } from '../src/delivery-step-adapters.mjs';
 
 const suiteDirectory = await mkdtemp(join(tmpdir(), 'jul196-workflow-suite-'));
 after(() => rm(suiteDirectory, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 }));
@@ -63,6 +65,13 @@ test('green build, checks and independent review pause once and accept after a r
   assert.equal(paused.outcome, 'awaiting-technical-acceptance');
   assert.ok(paused.peakMemoryBytes > 0);
   assert.ok(paused.pauseStateBytes > 0);
+  const database = createClient({ url: `file:${f.storagePath.replaceAll('\\', '/')}` });
+  const stored = await database.execute({
+    sql: 'SELECT length(snapshot) AS bytes FROM mastra_workflow_snapshot WHERE workflow_name = ? AND run_id = ?',
+    args: ['julia-delivery-round-1', 'jul196-accept'],
+  });
+  database.close();
+  assert.equal(paused.pauseStateBytes, Number(stored.rows[0].bytes));
   await firstRuntime.close();
 
   const restartedRuntime = await createDeliveryWorkflowRuntime(f.options);
@@ -149,4 +158,66 @@ test('workflow step handoffs expose paths and round metadata, never file content
     assert.equal(JSON.stringify(input).includes('fixture review'), false);
     assert.equal(Object.keys(input).every(key => key === 'round' || key.endsWith('Path') || key === 'runDirectory'), true);
   }
+});
+
+test('a failed existing boundary parks and still writes one complete permanent summary', async t => {
+  const f = await fixture(t);
+  f.options.adapters.builder = async () => { throw new Error('offline builder failure'); };
+  const runtime = await createDeliveryWorkflowRuntime(f.options);
+  const result = await runtime.start({ runId: 'jul196-boundary-failure', input: f.input });
+  await runtime.close();
+  assert.equal(result.status, 'success');
+  assert.equal(result.result.outcome, 'parked');
+  assert.equal(result.result.round, 1);
+  const summaries = (await readFile(f.summaryPath, 'utf8')).trim().split(/\r?\n/);
+  assert.equal(summaries.length, 1);
+  assert.match(summaries[0], /card=JUL-196 change=unknown round=1 stop=PARK reason="builder failed: offline builder failure"/);
+  assert.match(summaries[0], /reviewerModel=unknown reviewerEffort=unknown inputTokens=0 outputTokens=0 costEstimateUsd=0/);
+});
+
+test('production adapter glue invokes the existing launcher for builder and Mastra reviewer', async t => {
+  const f = await fixture(t);
+  const roles = [];
+  const approved = {
+    builderRequest: { configuration: { harness: 'fixture' }, prompt: 'saved builder request' },
+    reviewerRequest: {
+      configuration: { model: 'fixture-reviewer', thinking: 'none' },
+      reviewInput: { changedFiles: [], criteria: [] },
+    },
+  };
+  await writeFile(f.input.approvedInputPath, `${JSON.stringify(approved)}\n`);
+  const launch = async (role, request) => {
+    roles.push({ role, request });
+    if (role === 'builder') return { exitCode: 0, observed: { model: 'fixture-builder' } };
+    return { exitCode: 1, text: 'offline reviewer refusal', observed: { model: 'fixture-reviewer' } };
+  };
+  const adapters = createExistingDeliveryStepAdapters({
+    worktree: f.directory,
+    launch,
+    checks: async () => ({ status: 'PASS', change: 'fixture-change' }),
+    notify: f.options.adapters.notify,
+  });
+  const built = await adapters.builder({ approvedInputPath: f.input.approvedInputPath, runDirectory: f.directory, round: 1 });
+  const checked = await adapters.checks({ runDirectory: f.directory, round: 1, builderResultPath: built.resultPath });
+  await adapters.reviewer({
+    approvedInputPath: f.input.approvedInputPath, runDirectory: f.directory, round: 1,
+    builderResultPath: built.resultPath, checksResultPath: checked.resultPath,
+  });
+  assert.deepEqual(roles.map(({ role }) => role), ['builder', 'reviewer']);
+  assert.equal(roles[1].request.mastraReviewOnly, true);
+  assert.equal(roles[1].request.builderResultPath, built.resultPath);
+  assert.equal(roles[1].request.checksResultPath, checked.resultPath);
+});
+
+test('an unhandled workflow failure still ends with an ADR 0017 summary line', async t => {
+  const f = await fixture(t);
+  f.options.adapters.builder = async () => ({});
+  const runtime = await createDeliveryWorkflowRuntime(f.options);
+  const result = await runtime.start({ runId: 'jul196-system-error', input: f.input });
+  await runtime.close();
+  assert.equal(result.status, 'failed');
+  const summaries = (await readFile(f.summaryPath, 'utf8')).trim().split(/\r?\n/);
+  assert.equal(summaries.length, 1);
+  assert.match(summaries[0], /^card=JUL-196 change=unknown round=0 stop=SYSTEM_ERROR reason=/);
+  assert.match(summaries[0], /reviewerModel=unknown reviewerEffort=unknown inputTokens=unknown outputTokens=unknown costEstimateUsd=unknown start=.* end=.*/);
 });
