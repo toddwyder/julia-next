@@ -135,8 +135,13 @@ export async function createDeliveryWorkflowRuntime({ storagePath, runDirectory,
     },
     async resume({ runId, decision, reason }) {
       const metadataPath = join(runDirectory, `${runId}-workflow-metrics.json`);
+      const metadata = await readJson(metadataPath);
+      if (!metadata.checksResultPath) throw new Error('suspended workflow has no reviewed candidate');
+      const checks = await readJson(metadata.checksResultPath);
+      const candidateCommit = checks.candidateCommit ?? checks.change;
+      if (typeof candidateCommit !== 'string' || !candidateCommit) throw new Error('suspended workflow has no candidate commit');
       const run = await workflow.createRun({ runId });
-      const result = await complete(runId, metadataPath, () => run.resume({ resumeData: { decision, ...(reason ? { reason } : {}) } }));
+      const result = await complete(runId, metadataPath, () => run.resume({ resumeData: { decision, candidateCommit, ...(reason ? { reason } : {}) } }));
       if (result.status !== 'suspended') return result;
       const measurements = await measurePause(runId, metadataPath);
       return { ...result, runId, outcome: 'awaiting-technical-acceptance', ...measurements };

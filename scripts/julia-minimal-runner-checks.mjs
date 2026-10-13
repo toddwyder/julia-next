@@ -37,7 +37,20 @@ export function testCommand({ run, files = [] }) {
 // A `node --test` started from inside another test run inherits
 // NODE_TEST_CONTEXT and then exits 0 even when its tests fail (measured
 // 24 Sep, Node 24). No test run may inherit it.
-const { NODE_TEST_CONTEXT: _inherited, ...TEST_ENV } = process.env;
+const SAFE_ENVIRONMENT_KEYS = new Set([
+  'APPDATA', 'CI', 'COMSPEC', 'HOMEDRIVE', 'HOMEPATH', 'LOCALAPPDATA',
+  'NO_COLOR', 'NUMBER_OF_PROCESSORS', 'OS', 'PATH', 'PATHEXT', 'PROCESSOR_ARCHITECTURE',
+  'PROGRAMDATA', 'PROGRAMFILES', 'PROGRAMFILES(X86)', 'SYSTEMDRIVE', 'SYSTEMROOT',
+  'TEMP', 'TMP', 'USERPROFILE', 'WINDIR',
+]);
+
+// Candidate-controlled commands receive only operating-system plumbing. In
+// particular, credentials resolved by the vault wrapper are never inherited.
+export function safeWorkerEnvironment(environment = process.env) {
+  return Object.fromEntries(Object.entries(environment).filter(([key]) => SAFE_ENVIRONMENT_KEYS.has(key.toUpperCase())));
+}
+
+const TEST_ENV = safeWorkerEnvironment();
 
 // The test worker as a plain local process: what the fixture tests use, and
 // what the server's worker does inside its own account.

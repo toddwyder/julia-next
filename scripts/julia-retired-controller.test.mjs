@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { join, relative, resolve } from 'node:path';
 import test from 'node:test';
 
 const retiredPaths = [
@@ -66,10 +67,20 @@ test('worker support that does not orchestrate delivery remains available', () =
 });
 
 test('$init and the Mastra workflow are the only delivery start route', () => {
-  const directory = new URL('.', import.meta.url);
-  const sources = readdirSync(directory).filter(name => name.endsWith('.mjs') && !name.endsWith('.test.mjs'))
-    .map(name => [name, readFileSync(new URL(name, directory), 'utf8')]);
+  const root = resolve(new URL('..', import.meta.url).pathname.slice(process.platform === 'win32' ? 1 : 0));
+  const files = [];
+  const walk = directory => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      if (entry.name === 'node_modules' || entry.name === '.git') continue;
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) walk(path);
+      else if (entry.name.endsWith('.mjs') && !entry.name.endsWith('.test.mjs')) files.push(path);
+    }
+  };
+  for (const directory of ['scripts', 'ops', 'graph']) walk(join(root, directory));
+  const sources = files.map(path => [relative(root, path).replaceAll('\\', '/'), readFileSync(path, 'utf8')]);
   for (const [name, source] of sources) assert.doesNotMatch(source, /\b(?:runDelivery|startDelivery|startReviewOnly)\b/, name);
-  assert.match(sources.find(([name]) => name === 'julia-init.mjs')[1], /startMastraDelivery/);
-  assert.match(sources.find(([name]) => name === 'julia-mastra-delivery.mjs')[1], /createDeliveryWorkflowRuntime/);
+  const starters = sources.filter(([, source]) => /\bstartMastraDelivery\b/.test(source)).map(([name]) => name).sort();
+  assert.deepEqual(starters, ['scripts/julia-init.mjs', 'scripts/julia-mastra-delivery.mjs']);
+  assert.match(sources.find(([name]) => name === 'scripts/julia-mastra-delivery.mjs')[1], /createDeliveryWorkflowRuntime/);
 });

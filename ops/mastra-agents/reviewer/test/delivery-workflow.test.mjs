@@ -131,6 +131,7 @@ test('accepting a changed candidate discards the answer, reruns checks and revie
   const f = await fixture(t);
   f.options.adapters.validateCandidate = async ({ round }) => {
     await f.options.adapters.record({ kind: 'validate', round });
+    await writeFile(join(f.directory, 'candidate-version.txt'), '2');
     return { status: 'STALE', reason: 'candidate commit changed' };
   };
   const firstRuntime = await createDeliveryWorkflowRuntime(f.options);
@@ -139,13 +140,16 @@ test('accepting a changed candidate discards the answer, reruns checks and revie
   await firstRuntime.close();
 
   const restartedRuntime = await createDeliveryWorkflowRuntime(f.options);
-  const rerun = await restartedRuntime.resume({ runId: 'jul196-stale', decision: 'accept' });
-  assert.equal(rerun.status, 'suspended');
-  assert.equal(rerun.outcome, 'awaiting-technical-acceptance');
-  await restartedRuntime.close();
+  try {
+    const rerun = await restartedRuntime.resume({ runId: 'jul196-stale', decision: 'accept' });
+    assert.equal(rerun.status, 'suspended');
+    assert.equal(rerun.outcome, 'awaiting-technical-acceptance');
+  } finally {
+    await restartedRuntime.close();
+  }
   assert.deepEqual((await events(f.callsPath)).map(({ kind, round }) => `${kind}:${round}`), [
     'authorization:0', 'card-read:0', 'builder:1', 'checks:1', 'reviewer:1', 'waiting:1', 'validate:1',
-    'checks:1', 'reviewer:1', 'waiting:1',
+    'checks:2', 'reviewer:2', 'waiting:2',
   ]);
 });
 

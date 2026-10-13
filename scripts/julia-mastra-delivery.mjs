@@ -1,4 +1,5 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 
@@ -89,7 +90,15 @@ export function createMastraDeliveryAdapters({
         const approvedInput = await readJson(input.approvedInputPath);
         const checks = await readJson(input.checksResultPath);
         const candidateCommit = checks.candidateCommit ?? checks.change;
-        return writeOnce(join(input.runDirectory, `acceptance-${candidateCommit}.json`), {
+        const acceptancePath = join(input.runDirectory, `acceptance-${candidateCommit}.json`);
+        if (existsSync(acceptancePath)) {
+          const existing = await readJson(acceptancePath);
+          if (existing.card === approvedInput.issueId && existing.candidateCommit === candidateCommit && existing.accepted === true) {
+            return { resultPath: acceptancePath };
+          }
+          throw new Error(`existing acceptance does not match ${approvedInput.issueId} at ${candidateCommit}`);
+        }
+        return writeOnce(acceptancePath, {
           card: approvedInput.issueId, candidateCommit, accepted: true, acceptedAt: new Date().toISOString(),
         });
       },

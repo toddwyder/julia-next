@@ -46,7 +46,14 @@ test('real $init process pauses, restarts without duplicate work, and accepts', 
   assert.equal(f.invoke().delivery.status, 'suspended');
   const accepted = f.invoke(await decision(f, 'accept'));
   assert.equal(accepted.delivery.result.outcome, 'accepted');
-  assert.deepEqual((await events(f)).map(event => event.kind), ['authorization', 'card-read', 'builder', 'checks', 'reviewer', 'waiting', 'acceptance']);
+  const recorded = await events(f);
+  assert.deepEqual(recorded.map(event => event.kind), ['authorization', 'card-read', 'builder', 'checks', 'reviewer', 'waiting', 'acceptance']);
+  assert.equal(recorded.at(-1).candidateCommit, 'offline-candidate-1');
+  const acceptance = JSON.parse(await readFile(join(f.runDirectory, 'acceptance-offline-candidate-1.json'), 'utf8'));
+  assert.equal(acceptance.candidateCommit, 'offline-candidate-1');
+  const waiting = JSON.parse(await readFile(join(f.runDirectory, 'waiting-offline-candidate-1.json'), 'utf8'));
+  assert.equal(waiting.candidateCommit, acceptance.candidateCommit);
+  assert.equal((await readFile(join(f.runs, 'delivery-summary.log'), 'utf8')).trim().match(/change=offline-candidate-1/g)?.length, 1);
 });
 
 test('real $init rejection stops with Todd reason and runs nothing later', async t => {
@@ -75,5 +82,32 @@ test('real $init discards acceptance for a changed candidate and reviews it agai
   assert.equal(pausedAgain.delivery.status, 'suspended');
   assert.deepEqual((await events(f)).map(event => event.kind), [
     'authorization', 'card-read', 'builder', 'checks', 'reviewer', 'waiting', 'checks', 'reviewer', 'waiting',
+  ]);
+});
+
+test('a stale candidate consumes round two and a failed re-review parks without another builder or reviewer', async t => {
+  const f = await fixture(t, 'PASS,FAIL');
+  f.invoke();
+  await writeFile(join(f.runDirectory, 'candidate-changed'), 'changed');
+  const parked = f.invoke(await decision(f, 'accept'));
+  assert.equal(parked.delivery.result.outcome, 'parked');
+  assert.equal(parked.delivery.result.round, 2);
+  assert.deepEqual((await events(f)).map(event => event.kind), [
+    'authorization', 'card-read', 'builder', 'checks', 'reviewer', 'waiting', 'checks', 'reviewer', 'park',
+  ]);
+});
+
+test('a second stale acceptance parks at the two-review cap without a third review', async t => {
+  const f = await fixture(t);
+  f.invoke();
+  await writeFile(join(f.runDirectory, 'candidate-changed'), 'changed');
+  assert.equal(f.invoke(await decision(f, 'accept')).delivery.status, 'suspended');
+  await writeFile(join(f.runDirectory, 'candidate-changed'), 'changed-again');
+  const parked = f.invoke(await decision(f, 'accept'));
+  assert.equal(parked.delivery.result.outcome, 'parked');
+  assert.equal(parked.delivery.result.round, 2);
+  assert.deepEqual((await events(f)).map(event => event.kind), [
+    'authorization', 'card-read', 'builder', 'checks', 'reviewer', 'waiting',
+    'checks', 'reviewer', 'waiting', 'park',
   ]);
 });

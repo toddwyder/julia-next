@@ -1,4 +1,5 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { productionLauncher } from '../../../../scripts/julia-delivery-runner.mjs';
@@ -13,6 +14,25 @@ async function saveResult(runDirectory, name, value) {
   const resultPath = join(runDirectory, name);
   await writeFile(resultPath, `${JSON.stringify(value)}\n`);
   return { resultPath };
+}
+
+async function launchDurably(launch, role, request, runDirectory, suffix) {
+  const outputPath = request.outputPath;
+  if (outputPath && existsSync(outputPath)) {
+    const saved = await readJson(outputPath);
+    if (saved.deliveryResult) return saved.deliveryResult;
+    throw new Error(`${role} output exists without a durable delivery result: ${outputPath}`);
+  }
+  const journalPath = join(runDirectory, `${role}-launch-${suffix}.json`);
+  if (existsSync(journalPath)) {
+    throw new Error(`${role} launch is ambiguous after restart; refusing a duplicate launch (${journalPath})`);
+  }
+  return launch(role, {
+    ...request,
+    started: async ({ pid }) => {
+      await writeFile(journalPath, `${JSON.stringify({ role, pid, round: request.round, outputPath })}\n`, { flag: 'wx' });
+    },
+  });
 }
 
 // This is deliberately glue, not another launcher or reviewer. The workflow
@@ -40,7 +60,7 @@ export function createExistingDeliveryStepAdapters({
         ? `${request.prompt}\n\nRepair every finding in the saved independent review at ${input.priorReviewPath}. Read that file; its path is the handoff.`
         : request.prompt;
       const suffix = input.cycle && input.cycle > 1 ? `${input.round}-cycle-${input.cycle}` : input.round;
-      const launched = await launch('builder', { ...request, prompt, round: input.round, outputPath: join(input.runDirectory, `builder-worker-${suffix}.json`) });
+      const launched = await launchDurably(launch, 'builder', { ...request, prompt, round: input.round, outputPath: join(input.runDirectory, `builder-worker-${suffix}.json`) }, input.runDirectory, suffix);
       return saveResult(input.runDirectory, `builder-${suffix}.json`, {
         status: launched.exitCode === 0 ? 'PASS' : 'FAIL',
         reason: launched.exitCode === 0 ? null : launched.text || `builder exited ${launched.exitCode}`,
@@ -75,7 +95,7 @@ export function createExistingDeliveryStepAdapters({
         throw new Error('checks did not save the current candidate and review input');
       }
       const suffix = input.cycle && input.cycle > 1 ? `${input.round}-cycle-${input.cycle}` : input.round;
-      const launched = await launch('reviewer', {
+      const launched = await launchDurably(launch, 'reviewer', {
         ...request,
         candidate,
         reviewInput,
@@ -84,7 +104,7 @@ export function createExistingDeliveryStepAdapters({
         checksResultPath: input.checksResultPath,
         mastraReviewOnly: true,
         outputPath: join(input.runDirectory, `reviewer-worker-${suffix}.json`),
-      });
+      }, input.runDirectory, suffix);
       const reviewed = checkedReview(launched.text, reviewInput);
       const inputTokens = launched.usage?.inputTokens ?? launched.usage?.prompt_tokens;
       const outputTokens = launched.usage?.outputTokens ?? launched.usage?.completion_tokens;

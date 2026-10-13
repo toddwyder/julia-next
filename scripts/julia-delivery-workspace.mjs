@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { git } from './julia-minimal-runner-checks.mjs';
+import { git, safeWorkerEnvironment } from './julia-minimal-runner-checks.mjs';
 
 export function pinWorktree({ repoRoot, worktree, branch, base, fetch = true }) {
   if (existsSync(worktree)) {
@@ -28,7 +28,7 @@ export function pinWorktree({ repoRoot, worktree, branch, base, fetch = true }) 
 export function installDependencies(worktree, progress = () => {}) {
   if (!existsSync(join(worktree, 'package-lock.json')) || existsSync(join(worktree, 'node_modules'))) return { status: 0, output: '', skipped: true };
   progress('Installing dependencies (npm ci) from the start commit');
-  const result = spawnSync('npm', ['ci', '--no-audit', '--no-fund'], { cwd: worktree, encoding: 'utf8', shell: process.platform === 'win32', windowsHide: true, timeout: 300000, maxBuffer: 64 * 1024 * 1024 });
+  const result = spawnSync('npm', ['ci', '--no-audit', '--no-fund'], { cwd: worktree, encoding: 'utf8', env: safeWorkerEnvironment(), shell: process.platform === 'win32', windowsHide: true, timeout: 300000, maxBuffer: 64 * 1024 * 1024 });
   return { status: result.status, output: `${result.stdout ?? ''}${result.stderr ?? ''}`, error: result.error?.message ?? null, skipped: false };
 }
 

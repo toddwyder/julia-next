@@ -8,6 +8,15 @@ export function createOfflineDeliveryAdapters({ directory, callsPath, verdicts =
     await writeFile(resultPath, `${JSON.stringify(value)}\n`);
     return { resultPath };
   };
+  const resultFileOnce = async (name, value) => {
+    const resultPath = join(directory, name);
+    const text = `${JSON.stringify(value)}\n`;
+    try { await writeFile(resultPath, text, { flag: 'wx' }); }
+    catch (error) {
+      if (error?.code !== 'EEXIST' || await readFile(resultPath, 'utf8') !== text) throw error;
+    }
+    return { resultPath };
+  };
   const count = async name => {
     const path = join(directory, name);
     let value = 0;
@@ -47,7 +56,7 @@ export function createOfflineDeliveryAdapters({ directory, callsPath, verdicts =
     waitingRecord: async ({ round, builderResultPath, checksResultPath, reviewResultPath }) => {
       await record({ kind: 'waiting', round });
       const version = await candidateVersion();
-      return resultFile(`waiting-offline-candidate-${version}.json`, {
+      return resultFileOnce(`waiting-offline-candidate-${version}.json`, {
         card: 'JUL-196', candidateCommit: `offline-candidate-${version}`,
         evidencePaths: [builderResultPath, checksResultPath, reviewResultPath],
         summary: `Round ${round} passed its checks and independent review and is waiting for Todd's technical acceptance.`,
@@ -62,7 +71,11 @@ export function createOfflineDeliveryAdapters({ directory, callsPath, verdicts =
         return { status: 'STALE', reason: 'candidate commit changed' };
       } catch (error) { if (error?.code !== 'ENOENT') throw error; return { status: 'PASS' }; }
     },
-    recordAcceptance: async ({ round }) => { await record({ kind: 'acceptance', round }); return resultFile(`acceptance-${round}.json`, { status: 'ACCEPTED' }); },
+    recordAcceptance: async ({ round, checksResultPath }) => {
+      const checks = JSON.parse(await readFile(checksResultPath, 'utf8'));
+      await record({ kind: 'acceptance', round, candidateCommit: checks.candidateCommit });
+      return resultFileOnce(`acceptance-${checks.candidateCommit}.json`, { card: 'JUL-196', candidateCommit: checks.candidateCommit, accepted: true });
+    },
     park: async ({ round }) => { await record({ kind: 'park', round }); return resultFile(`park-${round}.json`, { status: 'PARKED' }); },
     record,
   };

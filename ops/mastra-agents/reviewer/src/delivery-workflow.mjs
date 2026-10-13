@@ -279,20 +279,38 @@ export function createDeliveryWorkflow(adapters, samplePeak, summaryPath) {
   const acceptance = createStep({
     id: 'technical-acceptance',
     inputSchema: terminalSchema,
-    resumeSchema: z.object({ decision: z.enum(['accept', 'reject']), reason: z.string().optional() }),
+    resumeSchema: z.object({ decision: z.enum(['accept', 'reject']), candidateCommit: z.string().min(1), reason: z.string().optional() }),
     suspendSchema: z.object({ round: z.number().int(), reviewResultPath: pathSchema }),
     outputSchema: terminalSchema,
     execute: async ({ inputData, resumeData, suspend }) => {
       const reviewResult = await readJson(inputData.reviewResultPath);
       if (inputData.outcome === 'parked') return inputData;
       if (!resumeData) return suspend({ round: inputData.round, reviewResultPath: inputData.reviewResultPath });
+      const checksResult = await readJson(inputData.checksResultPath);
+      const reviewedCommit = checksResult.candidateCommit ?? checksResult.change;
+      // Mastra carries resume data through the enclosing do-until iteration.
+      // A decision bound to the stale candidate must not auto-accept or reject
+      // the newly reviewed candidate in the next iteration.
+      if (resumeData.candidateCommit !== reviewedCommit) {
+        return suspend({ round: inputData.round, reviewResultPath: inputData.reviewResultPath });
+      }
       if (resumeData.decision === 'accept') {
         const validation = await adapters.validateCandidate(adapterInput(inputData, {
           checksResultPath: inputData.checksResultPath,
           reviewResultPath: inputData.reviewResultPath,
         }));
         if (validation?.status !== 'PASS') {
-          return { ...inputData, outcome: 'stale', reason: validation?.reason ?? 'reviewed candidate changed', rerunCandidate: true, cycle: (inputData.cycle ?? 1) + 1 };
+          const reason = validation?.reason ?? 'reviewed candidate changed';
+          if (inputData.round >= MAX_ROUNDS) {
+            const parkResultPath = requireResultPath('park', await adapters.park(adapterInput(inputData, {
+              reviewResultPath: inputData.reviewResultPath,
+            })));
+            await updateMetadata(inputData.runMetadataPath, { parkResultPath, stopReason: reason });
+            return { ...inputData, parkResultPath, outcome: 'parked', reason };
+          }
+          const round = inputData.round + 1;
+          await updateMetadata(inputData.runMetadataPath, { round, stopReason: reason });
+          return { ...inputData, round, outcome: 'stale', reason, rerunCandidate: true, cycle: (inputData.cycle ?? 1) + 1 };
         }
         const acceptanceResultPath = requireResultPath('acceptance', await adapters.recordAcceptance(adapterInput(inputData, {
           checksResultPath: inputData.checksResultPath,

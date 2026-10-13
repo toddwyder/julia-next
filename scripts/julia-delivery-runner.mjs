@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { isDeepStrictEqual } from 'node:util';
-import { git } from './julia-minimal-runner-checks.mjs';
+import { git, safeWorkerEnvironment } from './julia-minimal-runner-checks.mjs';
 import { saveJson } from './julia-delivery-state.mjs';
 import { LIMITS, runLimited } from '../ops/julia-runner/time-limit.mjs';
 
@@ -101,8 +101,7 @@ function codexIdentity(output, root) {
 }
 
 export function productionLauncher(worktree, { run = runLimited, environment = process.env, findExecutable = nativeCommand, sessionRoot = join(process.env.CODEX_HOME || join(homedir(), '.codex'), 'sessions') } = {}) {
-  const operatorSecrets = new Set(['VERCEL_TOKEN', 'LINEAR_API_KEY', 'AXIOM_TOKEN', 'AXIOM_DATASET', 'SENTRY_AUTH_TOKEN', 'JULIA_OBSERVABILITY_PROOF_TOKEN', 'COMMANDCODE_API_KEY', 'COMMAND_CODE_API_KEY']);
-  const workerEnvironment = Object.fromEntries(Object.entries(environment).filter(([key]) => !operatorSecrets.has(key.toUpperCase()) && !key.toUpperCase().startsWith('OP_')));
+  const workerEnvironment = safeWorkerEnvironment(environment);
   const runWorker = (command, args, options, limits) => run(command, args, { ...options, env: workerEnvironment }, limits);
   return async (role, request) => {
     const configured = request.configuration;
@@ -112,7 +111,9 @@ export function productionLauncher(worktree, { run = runLimited, environment = p
     if (role === 'reviewer' && request.mastraReviewOnly === true && request.reviewInput && request.issueId && request.candidate && configured.connection?.provider === 'commandcode') {
       let stdout = ''; let stderr = ''; let recorded = false;
       const startedAt = new Date().toISOString();
-      const script = resolve(worktree, 'ops', 'mastra-agents', 'reviewer', 'src', 'reviewer.mjs');
+      // The reviewer executable is controller code, never code from the
+      // candidate worktree that receives the provider credential.
+      const script = resolve(import.meta.dirname, '..', 'ops', 'mastra-agents', 'reviewer', 'src', 'reviewer.mjs');
       const verdictPath = `${request.outputPath}.verdict.json`;
       const result = await run(process.execPath, [script], { cwd: dirname(script), stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, env: { ...workerEnvironment, COMMANDCODE_API_KEY: environment.COMMANDCODE_API_KEY } }, {
         seconds: 20 * 60,
@@ -138,12 +139,13 @@ export function productionLauncher(worktree, { run = runLimited, environment = p
       const workerSucceeded = result.code === 0 && result.stopped !== true;
       const exitCode = recorded && durableVerdict && workerSucceeded ? 0 : 2;
       const observed = reply?.observed ? { ...reply.observed, harness: configured.harness, maker: configured.maker } : null;
-      if (request.outputPath) await fileSave(request.outputPath, { role, configured, observed, startedAt, finishedAt: new Date().toISOString(), stdout, stderr, exitCode, technicalFailure, traceId: reply?.traceId ?? null, responseId: reply?.responseId ?? null, quotes: reply?.quotes ?? [], warnings: reply?.warnings ?? [] });
-      return {
+      const deliveryResult = {
         exitCode, observed, text: reply?.text ?? technicalFailure ?? stderr, technicalFailure,
         outputPath: request.outputPath ?? null, responseId: reply?.responseId ?? null, traceId: reply?.traceId ?? null,
         usage: reply?.usage ?? null, costEstimateUsd: reply?.costEstimateUsd ?? null,
       };
+      if (request.outputPath) await fileSave(request.outputPath, { role, configured, observed, startedAt, finishedAt: new Date().toISOString(), stdout, stderr, exitCode, technicalFailure, traceId: reply?.traceId ?? null, responseId: reply?.responseId ?? null, quotes: reply?.quotes ?? [], warnings: reply?.warnings ?? [], deliveryResult });
+      return deliveryResult;
     }
     if (role === 'reviewer') return { exitCode: 2, observed: null, text: 'Reviewer execution is disabled during the JUL-223 reset' };
     const cwd = role === 'builder' ? worktree : tmpdir();
@@ -184,7 +186,8 @@ export function productionLauncher(worktree, { run = runLimited, environment = p
     const finishedAt = new Date().toISOString();
     const exitCode = result.stopped ? 124 : unrecorded || (role === 'reviewer' && failed) ? 1 : result.code ?? 1;
     // The worker's own streams are the evidence; nothing here is summarised.
-    if (request.outputPath) await fileSave(request.outputPath, { role, configured, observed: identity ?? null, identityEvidence, command, args, cwd, pid, exitCode, signal: result.signal ?? null, timedOut: result.stopped, error: failed, startedAt, finishedAt, responseId, stdout: output, stderr: error });
-    return { exitCode, observed: identity ?? null, text: reply || error || failed?.message || '', outputPath: request.outputPath ?? null, timedOut: result.stopped, responseId, startedAt, finishedAt, connection: configured.connection };
+    const deliveryResult = { exitCode, observed: identity ?? null, text: reply || error || failed?.message || '', outputPath: request.outputPath ?? null, timedOut: result.stopped, responseId, startedAt, finishedAt, connection: configured.connection };
+    if (request.outputPath) await fileSave(request.outputPath, { role, configured, observed: identity ?? null, identityEvidence, command, args, cwd, pid, exitCode, signal: result.signal ?? null, timedOut: result.stopped, error: failed, startedAt, finishedAt, responseId, stdout: output, stderr: error, deliveryResult });
+    return deliveryResult;
   };
 }
