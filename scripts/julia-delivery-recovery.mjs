@@ -86,6 +86,11 @@ export async function recoverDeliveryCrash(input, {
     if (fixed.exitCode !== 0 || !fixed.observed?.model || fixer.maker.trim().toLowerCase() !== 'openai') {
       return park('recovery parked: Codex diagnosis/fix did not complete with observed identity', { fixer });
     }
+    if (git(input.repoRoot, 'status', '--porcelain')) {
+      git(input.repoRoot, 'add', '-A');
+      git(input.repoRoot, '-c', 'user.name=Julia recovery runner', '-c', 'user.email=runner@julia.invalid',
+        'commit', '-q', '-m', `recovery: ${crash.incidentId}`);
+    }
     const recoveryCommit = git(input.repoRoot, 'rev-parse', 'HEAD');
     if (recoveryCommit === sourceBefore || git(input.repoRoot, 'status', '--porcelain')) {
       return park('recovery parked: Codex did not leave one committed clean recovery fix', { fixer, recoveryCommit });

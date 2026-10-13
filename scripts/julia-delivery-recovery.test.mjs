@@ -16,6 +16,7 @@ test('a Codex recovery fix is independently reviewed by unpinned Gemini, verifie
   })}\n`);
   const calls = [];
   let sourceCommit = 'source-before';
+  let sourceDirty = false;
   const result = await recoverDeliveryCrash({
     crashPath, runDirectory: directory, repoRoot: 'C:\\delivery-source',
     candidate: { path: 'C:\\julia-candidate', commit: 'candidate-1' },
@@ -29,7 +30,9 @@ test('a Codex recovery fix is independently reviewed by unpinned Gemini, verifie
       if (cwd === 'C:\\julia-candidate' && args.join(' ') === 'rev-parse HEAD') return 'candidate-1';
       if (cwd === 'C:\\julia-candidate' && args.join(' ') === 'status --porcelain') return '';
       if (cwd === 'C:\\delivery-source' && args.join(' ') === 'rev-parse HEAD') return sourceCommit;
-      if (cwd === 'C:\\delivery-source' && args.join(' ') === 'status --porcelain') return '';
+      if (cwd === 'C:\\delivery-source' && args.join(' ') === 'status --porcelain') return sourceDirty ? ' M scripts/fault.mjs' : '';
+      if (cwd === 'C:\\delivery-source' && args.join(' ') === 'add -A') return '';
+      if (cwd === 'C:\\delivery-source' && args.at(-2) === '-m') { sourceCommit = 'source-after'; sourceDirty = false; return ''; }
       if (cwd === 'C:\\delivery-source' && args[0] === 'diff') return 'diff --git a/fault b/fault\n-fixed\n+working';
       throw new Error(`unexpected git: ${cwd} ${args.join(' ')}`);
     },
@@ -37,7 +40,7 @@ test('a Codex recovery fix is independently reviewed by unpinned Gemini, verifie
       calls.push(['fix', request]);
       assert.equal(request.configuration.model, null);
       assert.match(request.prompt, /diagnosing-bugs\/SKILL\.md/);
-      sourceCommit = 'source-after';
+      sourceDirty = true;
       return { exitCode: 0, observed: { maker: 'OpenAI', model: 'gpt-current', cliVersion: 'codex-cli current' } };
     },
     review: async request => {
