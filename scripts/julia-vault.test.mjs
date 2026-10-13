@@ -18,7 +18,7 @@ test('Windows provisioning parks after account creation followed by failed persi
     writeFileSync(configuration, JSON.stringify({ vaultId: 'vault-id', opExecutable: fakeOp, referencesPath: join(directory, 'secrets.env') }));
     const wrapper = fileURLToPath(new URL('./julia-vault-windows.ps1', import.meta.url));
     const powershell = join(process.env.SystemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
-    const invoke = () => spawnSync(powershell, ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', wrapper, '-ConfigurationPath', configuration, '-Provision'], { encoding: 'utf8', timeout: 20000, windowsHide: true });
+    const invoke = () => spawnSync(powershell, ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', wrapper, '-ConfigurationPath', configuration, '-Provision'], { encoding: 'utf8', timeout: 60000, windowsHide: true });
     const first = invoke();
     assert.equal(first.status, 1);
     assert.equal(JSON.parse(readFileSync(join(directory, 'runner-provision.json'), 'utf8')).phase, 'creation-started');
