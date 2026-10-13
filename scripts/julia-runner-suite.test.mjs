@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
-import { discoverRunnerTests } from './julia-runner-suite.mjs';
+import { discoverRunnerTests, partitionRunnerTests, runnerTestArguments } from './julia-runner-suite.mjs';
 
 function fixture(t, files) {
   const root = mkdtempSync(join(tmpdir(), 'runner suite with spaces-'));
@@ -102,6 +102,18 @@ test('the full runner gate includes the retained reviewer contract, quote and re
     'ops/mastra-agents/reviewer/test/quote-check.test.mjs',
     'ops/mastra-agents/reviewer/test/repository-root.test.mjs',
   ]);
+});
+
+test('the full gate bounds file concurrency so near-limit reviewer timing proof keeps CPU headroom', () => {
+  assert.deepEqual(runnerTestArguments(['one.test.mjs', 'two.test.mjs']), [
+    '--test', '--test-concurrency=4', '--test-reporter=spec', 'one.test.mjs', 'two.test.mjs',
+  ]);
+  assert.deepEqual(partitionRunnerTests([
+    'ordinary.test.mjs', 'ops/mastra-agents/reviewer/test/worst-case-offline.test.mjs',
+  ]), {
+    concurrent: ['ordinary.test.mjs'],
+    isolated: ['ops/mastra-agents/reviewer/test/worst-case-offline.test.mjs'],
+  });
 });
 
 test('new transport and secret regressions are discovered beside shared modules with relative imports', (t) => {

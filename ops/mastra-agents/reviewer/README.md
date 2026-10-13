@@ -6,6 +6,26 @@ execution while the minimum reviewer route remains incomplete. The skipped-by-
 default, explicitly opted-in provider probe is the only current path that can
 make paid provider calls.
 
+## JUL-196 round-one delivery workflow
+
+`src/delivery-workflow.mjs` is the offline workflow skeleton for build, checks,
+independent review, up to three build/review rounds, and Todd's technical
+acceptance. Its step adapters receive durable file paths rather than file
+contents, so the existing builder launcher and Mastra reviewer remain the
+execution boundaries. A file-backed local libSQL database holds Mastra's pause
+snapshot. `support/offline-delivery-workflow-child.mjs` is the no-provider
+restart demonstration used by the tests; it makes no model call.
+
+Framework map:
+
+| Need | Mastra feature | Official documentation |
+| --- | --- | --- |
+| Typed build/check/review sequence | `createStep`, `createWorkflow`, `.then()`, `.commit()`, and workflow registration | [Workflows overview](https://mastra.ai/docs/workflows/overview) |
+| At most three repair rounds | `.dountil()` | [Control flow](https://mastra.ai/docs/workflows/control-flow) and [`.dountil()` reference](https://mastra.ai/reference/workflows/workflow-methods/dountil) |
+| Pause for and resume from Todd's answer | step `suspend()` and `Run.resume()` | [Suspend and resume](https://mastra.ai/docs/workflows/suspend-and-resume) and [`Run.resume()` reference](https://mastra.ai/reference/workflows/run-methods/resume) |
+| Survive a process restart while paused | workflow snapshots in configured storage, loaded by run ID | [Snapshots](https://mastra.ai/docs/workflows/snapshots) |
+| Default local durable database | file-backed `LibSQLStore` | [libSQL storage](https://mastra.ai/integrations/databases/libsql) |
+
 ## Architecture and components
 
 The reviewer is built on `@mastra/core` and provides:
