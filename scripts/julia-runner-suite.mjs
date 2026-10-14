@@ -20,6 +20,7 @@ const NON_RUNNER_TESTS = new Set([
   'scripts/agent-docs.test.mjs',
   'scripts/board-setup.test.mjs', 'scripts/board-spec.test.mjs',
   'scripts/dynamic-route.test.mjs', 'scripts/framework-lint.test.mjs', 'scripts/health-route.test.mjs',
+  'scripts/jul-225-rehearsal.test.mjs',
   'scripts/merge-pr.test.mjs',
   'scripts/publish-pr.real-git.test.mjs', 'scripts/publish-pr.test.mjs',
   'scripts/publish-via-github-app.test.mjs',
