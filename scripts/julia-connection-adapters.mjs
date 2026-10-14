@@ -83,7 +83,7 @@ export async function testApiAdapter(connection, {
   }
 }
 
-export function discoverCodexAppServerModels(executable = 'codex', args = ['app-server', '--stdio'], { timeoutMs = 4000 } = {}) {
+export function discoverCodexAppServerModels(executable = 'codex', args = ['app-server', '--stdio'], { timeoutMs = 10000 } = {}) {
   return new Promise((resolve, reject) => {
     let finished = false;
     const child = spawn(executable, args, { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
@@ -113,7 +113,7 @@ export function discoverCodexAppServerModels(executable = 'codex', args = ['app-
   });
 }
 
-export function discoverAntigravityModels(executable = 'agy', { timeoutMs = 6000, runCommand = null } = {}) {
+export function discoverAntigravityModels(executable = 'agy', { timeoutMs = 15000, runCommand = null } = {}) {
   if (runCommand) {
     return runCommand(executable, ['models']).then(res => {
       if (res.code !== 0) throw new Error(res.stderr || `exit code ${res.code}`);
