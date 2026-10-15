@@ -1,5 +1,6 @@
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { execFile } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
@@ -19,8 +20,28 @@ const PartsSchema = z.object({
 }).strict()
 
 const moduleDirectory = dirname(fileURLToPath(import.meta.url))
+const repositoryRoot = resolve(moduleDirectory, '../../../../..')
 const execute = promisify(execFile)
 export const defaultFrameworkMapPath = resolve(moduleDirectory, '../../../../../docs/agents/jul-225-framework-map.md')
+type CandidateIdentity = { candidateCommit: string; dirtyTreeDigest: string }
+type IdentityProvider = () => Promise<CandidateIdentity>
+
+export async function candidateIdentity(cwd = repositoryRoot): Promise<CandidateIdentity> {
+  const [{ stdout: commit }, { stdout: diff }, { stdout: untracked }] = await Promise.all([
+    execute('git', ['-C', cwd, 'rev-parse', '--verify', 'HEAD'], { windowsHide: true }),
+    execute('git', ['-C', cwd, 'diff', '--binary', 'HEAD'], { windowsHide: true, maxBuffer: 16 * 1024 * 1024 }),
+    execute('git', ['-C', cwd, 'ls-files', '--others', '--exclude-standard', '-z'], { windowsHide: true }),
+  ])
+  const hash = createHash('sha256').update(diff)
+  for (const relativePath of untracked.split('\0').filter(Boolean).sort()) {
+    hash.update(relativePath)
+    hash.update(await readFile(resolve(cwd, relativePath)))
+  }
+  return {
+    candidateCommit: commit.trim(),
+    dirtyTreeDigest: `sha256:${hash.digest('hex')}`,
+  }
+}
 
 async function inventoryFromFrameworkMap(frameworkMapPath: string) {
   const map = await readFile(frameworkMapPath, 'utf8')
@@ -29,7 +50,7 @@ async function inventoryFromFrameworkMap(frameworkMapPath: string) {
   return resolve(moduleDirectory, '../../../../..', match[1])
 }
 
-export async function doctor(frameworkMapPath = defaultFrameworkMapPath) {
+export async function doctor(frameworkMapPath = defaultFrameworkMapPath, identityProvider: IdentityProvider = candidateIdentity) {
   const inventoryPath = await inventoryFromFrameworkMap(frameworkMapPath)
   const inventory = PartsSchema.parse(JSON.parse(await readFile(inventoryPath, 'utf8')))
   const missing = [] as typeof inventory.parts
@@ -43,7 +64,7 @@ export async function doctor(frameworkMapPath = defaultFrameworkMapPath) {
       }
     } catch { missing.push(part) }
   }
-  return { ok: missing.length === 0 && versionMismatches.length === 0, inventoryPath, checked: inventory.parts.length, missing, versionMismatches }
+  return { ...await identityProvider(), ok: missing.length === 0 && versionMismatches.length === 0, inventoryPath, checked: inventory.parts.length, missing, versionMismatches }
 }
 export async function liveModelProof(apiKey: string, cwd = resolve(moduleDirectory, '../../../../..')) {
   const routes = createAcpRoutes(cwd)
@@ -122,7 +143,7 @@ async function cliJourneyProof(apiKey: string, evidenceDirectory: string, roles:
   const negative = [
     await expectFailure('invalid-decision', ['init', 'JUL-225', 'Go']),
     await expectFailure('missing-authorization', ['init', 'JUL-225', 'Start']),
-    await expectFailure('non-ready-card', ['init', 'JUL-228', 'Start'], { ...environment, JULIA_START_AUTHORIZED: 'JUL-228' }, /expected[\s\\"]+Ready/),
+    await expectFailure('non-ready-incomplete-card', ['init', 'JUL-228', 'Start'], { ...environment, JULIA_START_AUTHORIZED: 'JUL-228' }, /(?=[\s\S]*expected[\s\\"]+Ready)(?=[\s\S]*missing nonempty Outcome section)/),
   ]
   const connectionSpecs: Array<[string, string, string, string, string?]> = [
     ['antigravity', 'antigravity', 'Google', 'Antigravity', undefined],
@@ -176,9 +197,10 @@ async function cliJourneyProof(apiKey: string, evidenceDirectory: string, roles:
   }
 }
 
-export async function rehearsal(apiKey: string, evidencePath: string) {
+export async function rehearsal(apiKey: string, evidencePath: string, identityProvider: IdentityProvider = candidateIdentity) {
   let proof: Awaited<ReturnType<typeof liveModelProof>> | undefined
   return withFinalCleanup(async () => {
+    const identityAtStart = await identityProvider()
     proof = await liveModelProof(apiKey)
     const expected = 'JUL-225 ROUTE OK'
     const workflow = createRoleExecutionWorkflow({
@@ -208,8 +230,11 @@ export async function rehearsal(apiKey: string, evidencePath: string) {
     const output = workflowResult.result
     const workflowSnapshot = WorkflowSnapshotSchema.parse({ runId: workflowRun.runId, input: inputData, output })
     const cli = await cliJourneyProof(apiKey, dirname(evidencePath), inputData.snapshot.roles)
+    const identityAtEnd = await identityProvider()
+    if (JSON.stringify(identityAtEnd) !== JSON.stringify(identityAtStart)) throw new Error('candidate identity changed during rehearsal')
     const result = {
       recordedAt: new Date().toISOString(),
+      ...identityAtEnd,
       productMutation: false,
       workflowStatus: workflowResult.status,
       workflowRunId: output.runId,

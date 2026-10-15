@@ -25,7 +25,7 @@ import { ConnectionStore } from '../src/mastra/connections.ts'
 import { fetchLinearCard } from '../src/mastra/cli.ts'
 import { validateRoleDefaults } from '../src/mastra/roles.ts'
 import { decideStart, ensureSelectionsOffered, loadSavedSnapshot, validateStartPreconditions } from '../src/mastra/init.ts'
-import { discoverCommandCodeOffers, ownedAcpProcesses, stopExactWindowsProcesses, waitForAcpProcessExit, withAcpRoutes } from '../src/mastra/routes.ts'
+import { createAcpRoutes, discoverCommandCodeOffers, ownedAcpProcesses, stopExactWindowsProcesses, waitForAcpProcessExit, withAcpRoutes } from '../src/mastra/routes.ts'
 import type { WindowsProcessIdentity } from '../src/mastra/routes.ts'
 import { createRoleExecutionWorkflow } from '../src/mastra/workflows/delivery.ts'
 
@@ -83,6 +83,15 @@ test('standalone ACP route scope disconnects and cleans only processes it create
     { processId: 40, parentProcessId: 19, name: 'agy_acp_server.exe', creationDate: '2026-10-15T00:00:01.0000000-07:00', executablePath: 'C:\\agy_acp_server.exe' },
   ])
   assert.deepEqual(owned, { roots: [ownedProcess], descendants: [ownedIdentity] })
+
+  const initializationFailureRoutes = createAcpRoutes()
+  const clearedConnection = initializationFailureRoutes.antigravity.connection as unknown as { agentProcess?: unknown }
+  const failedLauncher = { pid: 50 }
+  clearedConnection.agentProcess = failedLauncher
+  clearedConnection.agentProcess = undefined
+  const orphanIdentity = { ...ownedIdentity, processId: 60, parentProcessId: 50 }
+  const failedInitializationOwned = await ownedAcpProcesses(initializationFailureRoutes, async () => [orphanIdentity])
+  assert.deepEqual(failedInitializationOwned, { roots: [failedLauncher], descendants: [orphanIdentity] })
 
   const reusedPid = { ...ownedIdentity, creationDate: '2026-10-15T00:00:02.0000000-07:00' }
   const changedPath = { ...ownedIdentity, executablePath: 'C:\\unrelated\\agy_acp_server.exe' }
@@ -208,6 +217,9 @@ test('admission rejects unresolved decision markers embedded in prose', () => {
   assert.throws(() => CardAdmissionSchema.parse({ identifier: 'JUL-225', state: 'Ready', description }), /unresolved decision marker/)
   assert.throws(() => CardAdmissionSchema.parse({ identifier: 'JUL-225', state: 'Ready', description: description.replace('Status: TBD before delivery.', '- TODO choose provider') }), /unresolved decision marker/)
   assert.throws(() => CardAdmissionSchema.parse({ identifier: 'JUL-225', state: 'Ready', description: description.replace('Status: TBD before delivery.', 'Status: unresolved decision — choose provider') }), /unresolved decision marker/)
+  assert.throws(() => CardAdmissionSchema.parse({ identifier: 'JUL-225', state: 'Ready', description: description.replace('Status: TBD before delivery.', 'Status: unresolved decision marker: choose provider') }), /unresolved decision marker/)
+  assert.throws(() => CardAdmissionSchema.parse({ identifier: 'JUL-225', state: 'Ready', description: description.replace('Status: TBD before delivery.', 'TODOs: choose provider') }), /unresolved decision marker/)
+  assert.throws(() => CardAdmissionSchema.parse({ identifier: 'JUL-225', state: 'Ready', description: description.replace('Status: TBD before delivery.', 'Unresolved decisions: choose provider') }), /unresolved decision marker/)
   assert.doesNotThrow(() => CardAdmissionSchema.parse({
     identifier: 'JUL-225', state: 'Ready',
     description: '# Outcome\nA\n# Requirements\nA complete card has no unresolved decision marker.\n# Contracts\nC\n# Finish conditions\nD\n# Proof\nE',

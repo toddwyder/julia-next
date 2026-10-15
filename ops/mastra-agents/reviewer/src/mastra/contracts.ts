@@ -52,7 +52,8 @@ export const CardAdmissionSchema = z.object({
     const content = card.description.slice(heading.index + heading[0].length).split(requiredSectionHeading)[0]?.trim()
     if (!content) context.addIssue({ code: 'custom', path: ['description'], message: `empty ${section} section` })
   }
-  if (/(?<!\bno\s)\b(?:TODO|TBD|unresolved decision)\b(?!\s+markers?\b)/i.test(card.description)) {
+  const decisionText = card.description.replace(/\bno\s+unresolved decisions?(?:\s+markers?)?\b/gi, '')
+  if (/\b(?:TODOs?|TBDs?|unresolved decisions?(?:\s+markers?)?)\b/i.test(decisionText)) {
     context.addIssue({ code: 'custom', path: ['description'], message: 'unresolved decision marker' })
   }
 })

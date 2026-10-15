@@ -18,7 +18,12 @@ test('Doctor reads the permanent-parts inventory and fails closed on a missing c
   ] }))
   const frameworkMap = join(directory, 'framework-map.md')
   await writeFile(frameworkMap, `Doctor inventory: \`${inventory}\`.\n`)
-  const result = await doctor(frameworkMap)
+  const result = await doctor(frameworkMap, async () => ({
+    candidateCommit: 'a'.repeat(40),
+    dirtyTreeDigest: `sha256:${'b'.repeat(64)}`,
+  }))
   assert.equal(result.ok, false)
   assert.deepEqual(result.missing.map(item => item.id), ['missing'])
+  assert.equal(result.candidateCommit, 'a'.repeat(40))
+  assert.equal(result.dirtyTreeDigest, `sha256:${'b'.repeat(64)}`)
 })
