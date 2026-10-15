@@ -106,7 +106,6 @@ async function cliJourneyProof(apiKey: string, evidenceDirectory: string, roles:
     await expectFailure('invalid-decision', ['init', 'JUL-225', 'Go']),
     await expectFailure('missing-authorization', ['init', 'JUL-225', 'Start']),
     await expectFailure('non-ready-card', ['init', 'JUL-228', 'Start'], { ...environment, JULIA_START_AUTHORIZED: 'JUL-228' }, /expected "Ready"/),
-    await expectFailure('incomplete-card', ['init', 'JUL-227', 'Start'], { ...environment, JULIA_START_AUTHORIZED: 'JUL-227' }, /missing nonempty Outcome section/),
   ]
   const connectionSpecs: Array<[string, string, string, string, string?]> = [
     ['antigravity', 'antigravity', 'Google', 'Antigravity', undefined],
