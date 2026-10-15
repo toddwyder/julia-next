@@ -1,0 +1,15 @@
+{
+  "generator": ".agents/skills/create-verification-skill/SKILL.md",
+  "generatorSha256": "dce6a835a30a6547cab3fa742ea94c2487c947349f0289fbe3a312c539761bf5",
+  "generatedAt": "2026-10-15T13:36:05.1801631-07:00",
+  "startingCandidate": "605ac278939519cf1b37a29252b92e9ef8afb9e9",
+  "interviewRecord": ".artifacts/verify-machine/20261015T133159688-pstack/interview.md",
+  "generatedFiles": [
+    "generation.json",
+    "SKILL.md",
+    "features/README.md",
+    "features/check-permanent-prerequisites.md",
+    "features/run-named-secret-command.md",
+    "features/verify-restricted-secrets.md"
+  ]
+}
