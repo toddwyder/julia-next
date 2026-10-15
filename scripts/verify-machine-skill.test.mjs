@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -7,6 +8,21 @@ const skillDirectory = join(import.meta.dirname, '..', '.agents', 'skills', 'ver
 const featuresDirectory = join(skillDirectory, 'features');
 
 test('verify-machine skill and feature map keep the generated public contract', async () => {
+  const generatorPath = join(skillDirectory, '..', 'create-verification-skill', 'SKILL.md');
+  const generator = await readFile(generatorPath, 'utf8');
+  const generation = JSON.parse(await readFile(join(skillDirectory, 'generation.json'), 'utf8'));
+  assert.equal(generation.generator, '.agents/skills/create-verification-skill/SKILL.md');
+  assert.equal(generation.generatorSha256, createHash('sha256').update(generator).digest('hex'));
+  assert.match(generation.interviewRecord, /^\.artifacts\/verify-machine\/[^/]+\/interview\.md$/);
+  assert.deepEqual(generation.generatedFiles, [
+    'generation.json',
+    'SKILL.md',
+    'features/README.md',
+    'features/check-permanent-prerequisites.md',
+    'features/run-named-secret-command.md',
+    'features/verify-restricted-secrets.md',
+  ]);
+
   const skill = await readFile(join(skillDirectory, 'SKILL.md'), 'utf8');
   assert.match(skill, /^---\r?\nname: verify-machine\r?\n/m);
   for (const heading of ['Launch', 'Doctor', 'Drive', 'Evidence', 'Cleanup', 'Helpers']) {
@@ -18,11 +34,22 @@ test('verify-machine skill and feature map keep the generated public contract', 
   for (const source of ['docs', 'commands', 'tests', 'laptop installed state']) {
     assert.match(index, new RegExp(source, 'i'));
   }
+  for (const command of ['doctor', 'rehearsal', 'connections', 'models', 'init', '-Verify', '-JuliaArguments', '-RunArguments', '-Provision', 'readIssue']) {
+    assert.match(index, new RegExp(command.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
+  }
+  for (const operation of ['init', 'readIssue', 'verify', 'run', 'migrate']) {
+    assert.match(index, new RegExp(`julia-vault\\.mjs[^\\n]*${operation}`, 'i'));
+  }
 
   const featureFiles = (await readdir(featuresDirectory))
     .filter(file => file.endsWith('.md') && file !== 'README.md')
     .sort();
   assert.ok(featureFiles.length > 0);
+  assert.deepEqual(featureFiles, [
+    'check-permanent-prerequisites.md',
+    'run-named-secret-command.md',
+    'verify-restricted-secrets.md',
+  ]);
 
   const indexedLinks = [...index.matchAll(/\]\(\.\/([^)]+\.md)\)/g)].map(match => match[1]).sort();
   assert.deepEqual(indexedLinks, featureFiles);
@@ -39,13 +66,7 @@ test('verify-machine skill and feature map keep the generated public contract', 
     assert.match(feature, /observable (?:success|result)|success (?:is|looks like)|succeeds when/i, `${file} must state observable success`);
   }
 
-  const connections = await readFile(join(featuresDirectory, 'manage-model-connections.md'), 'utf8');
-  assert.match(connections, /function Invoke-ConnectionCommand[\s\S]+if \(\$exitCode -ne 0\)/);
-  assert.match(connections, /try \{[\s\S]+\} finally \{[\s\S]+JULIA_CONFIG_DIRECTORY[\s\S]+Remove-Item -LiteralPath/);
-  assert.match(connections, /lastTest\.ok[\s\S]+lastTest\.modelCount[\s\S]+lastTest\.testedAt/);
-
-  const models = await readFile(join(featuresDirectory, 'choose-role-models.md'), 'utf8');
-  assert.match(models, /'models', 'save'[\s\S]+'models', 'list'/);
-  assert.match(models, /saved defaults differ from requested defaults/);
-  assert.match(models, /try \{[\s\S]+\} finally \{[\s\S]+JULIA_CONFIG_DIRECTORY[\s\S]+Remove-Item -LiteralPath/);
+  assert.match(index, /connections[\s\S]+Unavailable today/i);
+  assert.match(index, /models[\s\S]+Unavailable today/i);
+  assert.match(index, /init Start[\s\S]+Pending implementation and verification/i);
 });

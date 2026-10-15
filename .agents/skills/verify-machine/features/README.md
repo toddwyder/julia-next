@@ -1,62 +1,79 @@
-# Julia delivery-machine verification map
+# Delivery-machine verification map
 
-This maintained index was generated with Pstack's `create-verification-skill`. It maps only
-capabilities that exist at the candidate revision. Planned delivery/release behavior, retired
-Factory behavior, and unavailable commands are not presented as working features.
+This is the generated map of the Windows delivery machine's working user-facing behavior today.
+It was built from repository **docs**, exposed **commands**, existing **tests**, and the **laptop
+installed state** observed during the recorded `create-verification-skill` interview. A command that
+is pending, administrative, composite, or currently broken is accounted for below and is not shown
+as a working feature.
 
-## Built from
+## Baseline preconditions
 
-- **Docs:** `AGENTS.md`, `docs/agents/init.md`, `docs/agents/julia-secret-vault.md`,
-  `docs/agents/runner-tests.md`, `docs/agents/work-execution.md`,
-  `docs/agents/jul-225-framework-map.md`, and accepted ADR 0021.
-- **Commands:** `ops/mastra-agents/reviewer/src/mastra/cli.ts`,
-  `ops/mastra-agents/reviewer/src/mastra/verify-machine.ts`, `scripts/julia-vault.mjs`,
-  `scripts/julia-vault-windows.ps1`, package scripts, and the runner-suite inventory.
-- **Tests:** `ops/mastra-agents/reviewer/test/jul-225.test.ts`,
-  `ops/mastra-agents/reviewer/test/verify-machine.test.ts`, and the tests discovered by
-  `node scripts/julia-runner-suite.mjs --list`.
-- **Laptop installed state (2026-10-15):** Node 24.14.1, npm 11.11.0, Git 2.53.0.windows.2,
-  GitHub CLI 2.97.0, Antigravity CLI 1.3.5, Claude Code 2.1.284, Codex CLI 0.162.1,
-  Windows PowerShell 5.1.26100.9711, successful restricted-vault verification, and Doctor reporting
-  all five permanent prerequisites present. These version facts describe the interview; Doctor is
-  authoritative for each run.
+- Work from the repository root on Todd's Windows laptop.
+- Create a unique `.artifacts/verify-machine/<run-id>` evidence directory.
+- Run `verify-machine doctor` and require the exact candidate identity plus five healthy permanent
+  prerequisites.
+- Use only `scripts/julia-vault-windows.ps1` for a command requiring Julia vault secrets.
+- Do not drive shared real Julia configuration while another delivery owns it.
+- Never change or clean up a permanent machine part, sign-in, real configuration, or the inventory.
 
 ## Driving conventions
 
-- Run every recipe from the repository root after Doctor passes.
-- Use the restricted Windows vault launcher whenever a command needs a Julia secret.
-- Use an isolated configuration directory for recipes that write configuration.
-- Capture action and result, exit code, candidate identity, and side effects in run evidence.
-- Never run a delivery Start merely to verify the machine. Start needs separate card authorization.
-- Never mutate a permanent part, sign-in, or the real Julia configuration during cleanup.
+- Start every feature from a passing Doctor record.
+- Treat each PowerShell block as literal and retain stdout, stderr, exit code, and timestamps.
+- Exercise the real user command and real service boundary; tests and fixtures are not proof.
+- Stop only PIDs captured by the run. Retain evidence after cleanup.
+- A broken or excluded command does not become verified through a different entry point.
 
-## Command coverage
+## Proof and skip reporting
 
-| Exposed command | Feature or reason it is not a feature |
-| --- | --- |
-| `connections list/add/reconnect/disable/remove/test` (also `$connections`) | Manage model connections |
-| `models list/save` (also `$models`) | Discover and choose role models |
-| `init JUL-nnn` and `init JUL-nnn Cancel` (also `$init`) | Inspect a complete Ready card and cancel without dispatch |
-| `init JUL-nnn Start` and resume | Pending adapted-runner delivery behavior; binding `AGENTS.md` prohibits using or presenting it as verified until its complete laptop suite passes |
-| `verify-machine doctor` | Check permanent prerequisites |
-| `verify-machine rehearsal EVIDENCE_PATH` | Verification driver that composes connection, model, and card-decision features; it has no separate operator outcome |
-| `julia-vault-windows.ps1 -Verify/-JuliaArguments/-SecretNames ... -RunArguments ...` | Launch with restricted Julia secrets |
-| `julia-vault.mjs init/verify/run` | Internal dispatcher operations reached only through the restricted Windows launcher feature |
-| `julia-vault-windows.ps1 -Provision` and `julia-vault.mjs migrate` | Account/bootstrap administration, not ordinary machine features; both require explicit operator/account authorization |
-| `julia-vault.mjs readIssue` | Compatibility read-only Linear lookup; card reads are covered by the card-decision feature and new delivery uses `init` |
-| App/package scripts, tests, `julia-runner-suite`, and worker tool updates | Development, guard, or internal preflight commands rather than operator-facing features |
-| Antigravity seat and delivery recovery/release helpers | Internal recovery implementation; the adapted runner remains pending verification and is not presented as working |
-| Former Factory commands and routes | Retired and prohibited; intentionally absent |
+- Record the feature ID and exact command with every artifact.
+- Require Doctor's commit and dirty-tree digest to match the candidate.
+- Capture the action and resulting state, not only a final summary.
+- Record relevant side effects and an independent readback for persistence.
+- Report an unavailable command with its observed failure and precondition; do not call it working.
 
 ## Feature entry contract
 
-Each feature file has exactly the four Pstack sections in order. Its `Driving it with` heading names
-the real command, and the recipe states the observable success condition.
+Each feature file has exactly four H2 sections in this order: `Sub-features`,
+`How to get to it (user POV)`, `Driving it with <real driver>`, and `Gotchas`. Its drive uses a
+literal PowerShell command and states the observable success result.
 
-## Features
+## Working features
 
-- [Check permanent prerequisites](./check-permanent-prerequisites.md) confirms recorded machine parts and candidate identity.
-- [Launch with restricted Julia secrets](./launch-with-restricted-secrets.md) confirms service-account isolation and masked resolution.
-- [Manage model connections](./manage-model-connections.md) covers the persisted connection lifecycle and live connection check.
-- [Discover and choose role models](./choose-role-models.md) covers current offers and saved four-role defaults.
-- [Inspect and cancel a card start](./decide-card-start.md) covers a real Ready-card read, displayed limits, and cancellation without delivery.
+- [Check permanent prerequisites](./check-permanent-prerequisites.md) checks candidate identity and
+  every installed permanent delivery prerequisite without changing them.
+- [Verify restricted secrets](./verify-restricted-secrets.md) proves the provisioned restricted
+  account resolves Julia references without revealing values.
+- [Run a named-secret command](./run-named-secret-command.md) gives one approved executable only the
+  requested secret fields and proves a real Linear card read.
+
+## Command accounting
+
+| Exposed command | Feature or reason it is not one |
+| --- | --- |
+| `verify-machine doctor` | `check-permanent-prerequisites.md` |
+| `verify-machine rehearsal` | Retained aggregate paid diagnostic, not one user feature; run only when a card explicitly requires every live route. Current route health was not established by this interview. |
+| `julia-vault-windows.ps1 -Verify` | `verify-restricted-secrets.md` |
+| `julia-vault-windows.ps1 -SecretNames ... -RunArguments ...` | `run-named-secret-command.md` |
+| `julia-vault-windows.ps1 -JuliaArguments ...` | Routes to the `connections`, `models`, and `init` commands accounted for below; none currently qualifies as a working feature. |
+| `julia-vault-windows.ps1 -Operation readIssue` | Legacy Linear-read compatibility entry point; the least-privilege named-secret read is mapped in `run-named-secret-command.md`, so this is not a separate feature. |
+| `julia-vault-windows.ps1 -Operation init` | Default internal selector used with `-JuliaArguments`; its exposed Julia commands are accounted for below. |
+| `julia-vault.mjs init/readIssue/verify/run` | Internal dispatcher operations. On Windows they fail closed unless reached through `julia-vault-windows.ps1`; their supported wrapper paths are mapped or accounted for above. |
+| `julia-vault.mjs migrate` | Operator-only credential migration; it can create vault items and configuration, so it is not a routine verification feature. |
+| `connections list/add/reconnect/test/disable/remove` | Unavailable today: real `connections list` exited 1 because the installed persisted records use the retired shape. |
+| `models list/save` | Unavailable today: real `models list` exited 1 because the installed role-defaults file is absent; Claude selection probes also failed. |
+| `init` inspect/Cancel | Unavailable today because current connection/default prerequisites are not healthy. |
+| `init Start` and resume | Pending implementation and verification under the repository instructions; verification does not authorize delivery. |
+| `julia-vault-windows.ps1 -Provision` and vault migration | Operator-only account creation or credential migration, not routine verification features. |
+
+## Interview sources
+
+- Docs: `AGENTS.md`, `docs/agents/work-execution.md`, `docs/agents/julia-secret-vault.md`, and
+  `docs/agents/permanent-machine-parts.json` read-only.
+- Commands: `scripts/julia-vault-windows.ps1`, `scripts/julia-vault.mjs`,
+  `scripts/linear-cli.mjs`, `ops/mastra-agents/reviewer/src/mastra/cli.ts`, and
+  `ops/mastra-agents/reviewer/src/mastra/verify-machine.ts`.
+- Tests: `scripts/julia-vault.test.mjs`, `scripts/verify-machine-skill.test.mjs`, and
+  `ops/mastra-agents/reviewer/test/verify-machine.test.ts`.
+- Laptop installed state: Node, Git, Windows PowerShell, the restricted vault bootstrap and
+  configuration, Doctor's five-part check, and captured real command results.
