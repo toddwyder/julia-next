@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 import { promisify } from 'node:util'
 
-import { assertStableCandidateIdentity, candidateIdentity, doctor, fetchRehearsalCard, jul208Prompt } from '../src/mastra/verify-machine.ts'
+import { assertReviewerFindings, assertStableCandidateIdentity, candidateIdentity, doctor, fetchRehearsalCard, jul208Prompt } from '../src/mastra/verify-machine.ts'
 
 const execute = promisify(execFile)
 
@@ -93,4 +93,10 @@ test('F10 records a sanitized Linear trace when GraphQL fails with HTTP 200', as
   assert.deepEqual(traces.map(({ durationMs: _durationMs, ...trace }) => trace), [{ operation: 'linear-read', issueId: 'JUL-208', ok: false, status: 200, errorCategory: 'graphql' }])
   assert.equal(typeof traces[0]?.durationMs, 'number')
   assert.doesNotMatch(JSON.stringify(traces), /secret detail|linear-reference/)
+})
+
+test('F10 refuses future-intent text in place of reviewer findings', () => {
+  assert.throws(() => assertReviewerFindings("I'll check the proposal's repository claims against the workspace first."), /did not return findings/)
+  assert.equal(assertReviewerFindings('High: the proposal omits a server-side authorization check.'), 'High: the proposal omits a server-side authorization check.')
+  assert.equal(assertReviewerFindings('No findings after reviewing the supplied proposal.'), 'No findings after reviewing the supplied proposal.')
 })

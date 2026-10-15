@@ -46,9 +46,17 @@ export function jul208Prompt(role: string, card: RehearsalCard, priorResults: Re
   const cardText = `Card: ${card.identifier} — ${card.title}\nState: ${card.state}\n\n${card.description}`
   const boundary = 'This is a read-only rehearsal. Do not create, edit, or delete files; do not change product, tracker, git, configuration, or external state.'
   if (role === 'builder') return `${boundary}\n\nAnalyze the repository against the card below and produce a concrete proposed change. Include likely files, behavior, edge cases, and verification. The proposal is your response only; do not implement it.\n\n${cardText}`
-  if (role === 'reviewer') return `${boundary}\n\nReview the builder proposal below against the card and repository. Return substantive findings ordered by severity, with file references where possible; say explicitly if there are no findings. Do not implement fixes.\n\n${cardText}\n\nBuilder proposal:\n${priorResults.builder ?? '(missing builder proposal)'}`
+  if (role === 'reviewer') return `${boundary}\n\nReview the builder proposal below against the card. Use the supplied card and proposal directly; do not call tools, inspect the workspace, or announce future work. Return final substantive findings now, ordered by severity with file references where possible; say explicitly if there are no findings. Do not implement fixes.\n\n${cardText}\n\nBuilder proposal:\n${priorResults.builder ?? '(missing builder proposal)'}`
   if (role === 'crashFixer') return `${boundary}\n\nIdentify failure modes and recovery gaps in the proposed JUL-208 design and reviewer findings. Return analysis only.\n\nBuilder proposal:\n${priorResults.builder ?? '(missing builder proposal)'}\n\nReviewer findings:\n${priorResults.reviewer ?? '(missing reviewer findings)'}`
   return `${boundary}\n\nPerform a final read-only review of the JUL-208 proposal, findings, and failure analysis. Return remaining findings only.\n\nBuilder proposal:\n${priorResults.builder ?? '(missing builder proposal)'}\n\nReviewer findings:\n${priorResults.reviewer ?? '(missing reviewer findings)'}\n\nFailure analysis:\n${priorResults.crashFixer ?? '(missing failure analysis)'}`
+}
+
+export function assertReviewerFindings(text: string) {
+  const findings = text.trim()
+  if (/^(?:i(?:'ll| will)|let me|i need to)\b/i.test(findings) || !/\b(?:findings?|critical|high|medium|low)\b/i.test(findings)) {
+    throw new Error('JUL-208 reviewer did not return findings')
+  }
+  return findings
 }
 
 export async function candidateIdentity(cwd = repositoryRoot): Promise<CandidateIdentity> {
@@ -268,6 +276,8 @@ export async function rehearsal(apiKey: string, evidencePath: string, identityPr
     const reviewerFindingsPath = resolve(evidenceDirectory, 'jul-208-review-findings.md')
     await writeFile(builderProposalPath, `${output.results.builder.trim()}\n`, 'utf8')
     await writeFile(reviewerFindingsPath, `${output.results.reviewer.trim()}\n`, 'utf8')
+    assertStableCandidateIdentity(identityAtStart, await identityProvider())
+    assertReviewerFindings(output.results.reviewer)
     const cli = await cliJourneyProof(apiKey, dirname(evidencePath), inputData.snapshot.roles)
     const identityAtEnd = assertStableCandidateIdentity(identityAtStart, await identityProvider())
     const result = {
