@@ -201,17 +201,30 @@ export async function waitForAcpProcessExit(child: ChildProcess, graceMillisecon
   })
 }
 
-async function stopExactWindowsProcesses(processes: WindowsProcessIdentity[]) {
+async function terminateExactWindowsProcesses(processes: WindowsProcessIdentity[]) {
   if (!processes.length || process.platform !== 'win32') return
   const encodedIdentities = Buffer.from(JSON.stringify(processes), 'utf8').toString('base64')
   const command = `$owned = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${encodedIdentities}')) | ConvertFrom-Json; Get-CimInstance Win32_Process | Where-Object { $candidate = $_; @($owned | Where-Object { $_.processId -eq $candidate.ProcessId -and $_.name -eq $candidate.Name -and $_.creationDate -eq $candidate.CreationDate.ToString('o') -and $_.executablePath -eq $candidate.ExecutablePath }).Count -gt 0 } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`
   await execute('powershell.exe', ['-NoProfile', '-Command', command], { windowsHide: true })
-  const current = await windowsProcesses()
-  const remaining = processes.filter(identity => current.some(candidate =>
-    candidate.processId === identity.processId
-    && candidate.name === identity.name
-    && candidate.creationDate === identity.creationDate
-    && candidate.executablePath === identity.executablePath))
+}
+
+export function sameWindowsProcessIdentity(left: WindowsProcessIdentity, right: WindowsProcessIdentity) {
+  return left.processId === right.processId
+    && left.name === right.name
+    && left.creationDate === right.creationDate
+    && left.executablePath === right.executablePath
+}
+
+export async function stopExactWindowsProcesses(
+  owned: WindowsProcessIdentity[],
+  listProcesses: () => Promise<WindowsProcessIdentity[]> = windowsProcesses,
+  terminate: (processes: WindowsProcessIdentity[]) => Promise<void> = terminateExactWindowsProcesses,
+) {
+  const current = await listProcesses()
+  const matching = current.filter(candidate => owned.some(identity => sameWindowsProcessIdentity(candidate, identity)))
+  await terminate(matching)
+  const after = await listProcesses()
+  const remaining = owned.filter(identity => after.some(candidate => sameWindowsProcessIdentity(candidate, identity)))
   if (remaining.length) throw new Error(`ACP cleanup failed for process identities ${remaining.map(item => `${item.processId}@${item.creationDate}`).join(', ')}`)
 }
 

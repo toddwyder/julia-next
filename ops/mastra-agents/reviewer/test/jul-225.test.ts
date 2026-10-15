@@ -25,7 +25,8 @@ import { ConnectionStore } from '../src/mastra/connections.ts'
 import { fetchLinearCard } from '../src/mastra/cli.ts'
 import { validateRoleDefaults } from '../src/mastra/roles.ts'
 import { decideStart, ensureSelectionsOffered, loadSavedSnapshot, validateStartPreconditions } from '../src/mastra/init.ts'
-import { discoverCommandCodeOffers, ownedAcpProcesses, waitForAcpProcessExit, withAcpRoutes } from '../src/mastra/routes.ts'
+import { discoverCommandCodeOffers, ownedAcpProcesses, stopExactWindowsProcesses, waitForAcpProcessExit, withAcpRoutes } from '../src/mastra/routes.ts'
+import type { WindowsProcessIdentity } from '../src/mastra/routes.ts'
 import { createRoleExecutionWorkflow } from '../src/mastra/workflows/delivery.ts'
 
 test('secret and persisted connection contracts reject secret values', () => {
@@ -82,6 +83,16 @@ test('standalone ACP route scope disconnects and cleans only processes it create
     { processId: 40, parentProcessId: 19, name: 'agy_acp_server.exe', creationDate: '2026-10-15T00:00:01.0000000-07:00', executablePath: 'C:\\agy_acp_server.exe' },
   ])
   assert.deepEqual(owned, { roots: [ownedProcess], descendants: [ownedIdentity] })
+
+  const reusedPid = { ...ownedIdentity, creationDate: '2026-10-15T00:00:02.0000000-07:00' }
+  const changedPath = { ...ownedIdentity, executablePath: 'C:\\unrelated\\agy_acp_server.exe' }
+  const terminated: WindowsProcessIdentity[] = []
+  let inventoryRead = 0
+  await stopExactWindowsProcesses([ownedIdentity], async () => {
+    inventoryRead += 1
+    return inventoryRead === 1 ? [ownedIdentity, reusedPid, changedPath] : [reusedPid, changedPath]
+  }, async processes => { terminated.push(...processes) })
+  assert.deepEqual(terminated, [ownedIdentity])
 
   const forcedSignals: Array<NodeJS.Signals | number | undefined> = []
   const listeners: Array<() => void> = []
