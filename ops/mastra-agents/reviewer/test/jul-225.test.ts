@@ -60,6 +60,7 @@ test('model offers keep duplicate IDs distinct by route', () => {
 })
 
 test('Claude discovery offers only exact provider model IDs from the session config option', async () => {
+  const traces: unknown[] = []
   const routes = {
     antigravity: { getAvailableModels: async () => [] },
     claude: {
@@ -83,11 +84,19 @@ test('Claude discovery offers only exact provider model IDs from the session con
     },
     },
   }
-  const offers = await discoverAcpOffers(routes as never)
+  const offers = await discoverAcpOffers(routes as never, trace => traces.push(trace))
   assert.deepEqual(offers.map(offer => [offer.route, offer.modelId]), [
     ['claude', 'claude-haiku-4-5-20251001'],
     ['claude', 'claude-sonnet-4-6'],
   ])
+  assert.deepEqual(traces, [{
+    event: 'model-discovery-probe',
+    route: 'claude',
+    operation: 'session/set_config_option',
+    modelId: 'claude-fable-5',
+    ok: false,
+    error: 'Claude model "claude-fable-5" selection failed: Internal error',
+  }])
 })
 
 test('Claude selection and restart reapply the same exact provider model ID', async () => {

@@ -72,6 +72,19 @@ type ClaudeConnectionInternals = {
   session?: ClaudeSession
   connection?: { setSessionConfigOption(request: { sessionId: string; configId: string; value: string }): Promise<{ configOptions?: unknown }> }
 }
+type ClaudeDiscoveryTrace = {
+  event: 'model-discovery-probe'
+  route: 'claude'
+  operation: 'session/set_config_option'
+  modelId: string
+  ok: false
+  error: string
+}
+
+function sanitizedTraceError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error)
+  return message.slice(0, 300).replace(/(?:Bearer\s+\S+|sk-[\w-]+|(?:api[_-]?key|token|secret)\s*[=:]\s*\S+)/gi, '[REDACTED]')
+}
 
 function claudeModelChoices(agent: ReturnType<typeof createAcpRoutes>['claude']) {
   const session = (agent.connection as unknown as { session?: ClaudeSession }).session
@@ -89,7 +102,10 @@ function claudeModelChoices(agent: ReturnType<typeof createAcpRoutes>['claude'])
     typeof choice.value === 'string' && choice.value.startsWith('claude-'))
 }
 
-async function discoverClaudeOffers(agent: ReturnType<typeof createAcpRoutes>['claude']) {
+async function discoverClaudeOffers(
+  agent: ReturnType<typeof createAcpRoutes>['claude'],
+  recordTrace: (trace: ClaudeDiscoveryTrace) => void,
+) {
   await agent.getAvailableModels()
   const offers: ModelOffer[] = []
   for (const choice of claudeModelChoices(agent)) {
@@ -99,8 +115,15 @@ async function discoverClaudeOffers(agent: ReturnType<typeof createAcpRoutes>['c
         modelId: choice.value,
         name: typeof choice.name === 'string' ? choice.name : choice.value,
       }))
-    } catch {
-      // A config option the live bridge refuses is not an offer callers can select.
+    } catch (error) {
+      recordTrace({
+        event: 'model-discovery-probe',
+        route: 'claude',
+        operation: 'session/set_config_option',
+        modelId: choice.value,
+        ok: false,
+        error: sanitizedTraceError(error),
+      })
     }
   }
   return offers
@@ -134,10 +157,13 @@ async function selectClaudeModel(agent: ReturnType<typeof createAcpRoutes>['clau
   await applyClaudeModel(agent, modelId)
 }
 
-export async function discoverAcpOffers(routes: ReturnType<typeof createAcpRoutes>) {
+export async function discoverAcpOffers(
+  routes: ReturnType<typeof createAcpRoutes>,
+  recordTrace: (trace: ClaudeDiscoveryTrace) => void = trace => console.error(JSON.stringify(trace)),
+) {
   const [antigravity, claude] = await Promise.all([
     routes.antigravity.getAvailableModels(),
-    discoverClaudeOffers(routes.claude),
+    discoverClaudeOffers(routes.claude, recordTrace),
   ])
   return [
     ...antigravity.map(item => normalizeAcpOffer('antigravity', item)),
