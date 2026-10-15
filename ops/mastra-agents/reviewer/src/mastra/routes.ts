@@ -153,6 +153,28 @@ type AcpRouteScope = {
   stopOwnedProcesses: typeof stopOwnedAntigravityProcesses
 }
 
+async function cleanupOwnedAcpRoutes(routes: ReturnType<typeof createAcpRoutes>, scope: Omit<AcpRouteScope, 'createRoutes'>) {
+  const errors: unknown[] = []
+  let owned = new Set<number>()
+  try {
+    owned = await scope.captureOwnedProcessIds()
+  } catch (error) {
+    errors.push(error)
+  }
+  try {
+    scope.disconnectRoutes(routes)
+  } catch (error) {
+    errors.push(error)
+  }
+  try {
+    await scope.stopOwnedProcesses(owned)
+  } catch (error) {
+    errors.push(error)
+  }
+  if (errors.length === 1) throw errors[0]
+  if (errors.length > 1) throw new AggregateError(errors, `ACP cleanup failed: ${errors.map(error => error instanceof Error ? error.message : String(error)).join('; ')}`)
+}
+
 export async function withAcpRoutes<T>(
   use: (routes: ReturnType<typeof createAcpRoutes>) => Promise<T>,
   scope: AcpRouteScope = {
@@ -163,31 +185,30 @@ export async function withAcpRoutes<T>(
   },
 ) {
   const routes = scope.createRoutes()
+  let operationError: unknown
   try {
     return await use(routes)
+  } catch (error) {
+    operationError = error
+    throw error
   } finally {
-    let owned = new Set<number>()
     try {
-      owned = await scope.captureOwnedProcessIds()
-    } finally {
-      try {
-        scope.disconnectRoutes(routes)
-      } finally {
-        await scope.stopOwnedProcesses(owned)
+      await cleanupOwnedAcpRoutes(routes, scope)
+    } catch (cleanupError) {
+      if (operationError) {
+        const operationMessage = operationError instanceof Error ? operationError.message : String(operationError)
+        const cleanupMessage = cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
+        throw new AggregateError([operationError, cleanupError], `ACP route operation failed: ${operationMessage}; cleanup also failed: ${cleanupMessage}`)
       }
+      throw cleanupError
     }
   }
 }
 
 export async function cleanupAcpRoutes(routes: ReturnType<typeof createAcpRoutes>) {
-  let owned = new Set<number>()
-  try {
-    owned = await ownedAntigravityProcessIds()
-  } finally {
-    try {
-      disconnectAcpRoutes(routes)
-    } finally {
-      await stopOwnedAntigravityProcesses(owned)
-    }
-  }
+  await cleanupOwnedAcpRoutes(routes, {
+    captureOwnedProcessIds: ownedAntigravityProcessIds,
+    disconnectRoutes: disconnectAcpRoutes,
+    stopOwnedProcesses: stopOwnedAntigravityProcesses,
+  })
 }

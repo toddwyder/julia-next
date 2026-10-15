@@ -101,6 +101,15 @@ test('standalone ACP route scope disconnects and cleans only processes it create
     stopOwnedProcesses: async () => { events.push('cleanup') },
   }), /route failed/)
   assert.deepEqual(events, ['disconnect', 'cleanup'])
+
+  await assert.rejects(withAcpRoutes(async () => { throw new Error('route failed') }, {
+    captureOwnedProcessIds: async () => new Set([20]),
+    createRoutes: () => routes as never,
+    disconnectRoutes: () => {},
+    stopOwnedProcesses: async () => { throw new Error('cleanup failed') },
+  }), error => error instanceof AggregateError
+    && error.errors.some(item => item instanceof Error && item.message === 'route failed')
+    && error.errors.some(item => item instanceof Error && item.message === 'cleanup failed'))
 })
 
 test('four-role company and normal service rules are exhaustive', () => {
@@ -161,6 +170,10 @@ test('admission keeps ordinary bold paragraphs inside a section', () => {
 test('admission rejects unresolved decision markers embedded in prose', () => {
   const description = '# Outcome\nA\n# Requirements\nStatus: TBD before delivery.\n# Contracts\nC\n# Finish conditions\nD\n# Proof\nE'
   assert.throws(() => CardAdmissionSchema.parse({ identifier: 'JUL-225', state: 'Ready', description }), /unresolved decision marker/)
+  assert.doesNotThrow(() => CardAdmissionSchema.parse({
+    identifier: 'JUL-225', state: 'Ready',
+    description: '# Outcome\nA\n# Requirements\nA complete card has no unresolved decision marker.\n# Contracts\nC\n# Finish conditions\nD\n# Proof\nE',
+  }))
 })
 
 test('serialized Linear intake rejects an incomplete Ready card', async () => {
