@@ -67,8 +67,6 @@ export async function modelCommand(args: string[]) {
 }
 
 async function fetchLinearCard(issueId: string) {
-  const verificationCard = process.env.JULIA_VERIFY_MACHINE === '1' ? process.env.JULIA_VERIFY_CARD_JSON : undefined
-  if (verificationCard) return JSON.parse(verificationCard) as unknown
   const apiKey = process.env.LINEAR_API_KEY
   if (!apiKey) throw new Error('LINEAR_API_KEY was not resolved by the Julia vault launcher')
   const response = await fetch('https://api.linear.app/graphql', {

@@ -70,14 +70,16 @@ async function cliJourneyProof(apiKey: string, evidenceDirectory: string, roles:
   const configDirectory = resolve(evidenceDirectory, `cli-state-${process.pid}`)
   const cli = resolve(moduleDirectory, 'cli.ts')
   const environment: NodeJS.ProcessEnv = { ...process.env, COMMANDCODE_API_KEY: apiKey, JULIA_CONFIG_DIRECTORY: configDirectory }
-  const expectFailure = async (name: string, args: string[], env = environment) => {
+  const expectFailure = async (name: string, args: string[], env = environment, expected?: RegExp) => {
     try {
       await execute(process.execPath, ['--experimental-strip-types', cli, ...args], { env, windowsHide: true })
       throw new Error(`expected CLI failure for ${args.join(' ')}`)
     } catch (error) {
       const failure = error as Error & { stderr?: string; code?: number }
       if (failure.message.startsWith('expected CLI failure')) throw failure
-      return { name, args, exitCode: failure.code, message: String(failure.stderr || failure.message).trim() }
+      const message = String(failure.stderr || failure.message).trim()
+      if (expected && !expected.test(message)) throw new Error(`${name} failed for the wrong reason: ${message}`)
+      return { name, args, exitCode: failure.code, message }
     }
   }
   const commands = [
@@ -100,12 +102,11 @@ async function cliJourneyProof(apiKey: string, evidenceDirectory: string, roles:
   const list = await execute(process.execPath, ['--experimental-strip-types', cli, 'models', 'list'], { env: environment, windowsHide: true })
   const preview = await execute(process.execPath, ['--experimental-strip-types', cli, 'init', 'JUL-225'], { env: environment, windowsHide: true })
   const cancel = await execute(process.execPath, ['--experimental-strip-types', cli, 'init', 'JUL-225', 'Cancel'], { env: environment, windowsHide: true })
-  const completeCard = { identifier: 'JUL-225', state: 'Ready', description: '# Outcome\nA\n# Requirements\nB\n# Contracts\nC\n# Finish conditions\nD\n# Proof\nE' }
   const negative = [
     await expectFailure('invalid-decision', ['init', 'JUL-225', 'Go']),
     await expectFailure('missing-authorization', ['init', 'JUL-225', 'Start']),
-    await expectFailure('non-ready-card', ['init', 'JUL-225'], { ...environment, JULIA_VERIFY_MACHINE: '1', JULIA_VERIFY_CARD_JSON: JSON.stringify({ ...completeCard, state: 'Backlog' }) }),
-    await expectFailure('incomplete-card', ['init', 'JUL-225'], { ...environment, JULIA_VERIFY_MACHINE: '1', JULIA_VERIFY_CARD_JSON: JSON.stringify({ ...completeCard, description: '# Outcome\nIncomplete' }) }),
+    await expectFailure('non-ready-card', ['init', 'JUL-228', 'Start'], { ...environment, JULIA_START_AUTHORIZED: 'JUL-228' }, /expected "Ready"/),
+    await expectFailure('incomplete-card', ['init', 'JUL-227', 'Start'], { ...environment, JULIA_START_AUTHORIZED: 'JUL-227' }, /missing nonempty Outcome section/),
   ]
   const connectionSpecs: Array<[string, string, string, string, string?]> = [
     ['antigravity', 'antigravity', 'Google', 'Antigravity', undefined],
