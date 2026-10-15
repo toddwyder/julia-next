@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { loadDeliveryToolSettings, validateDeliveryToolSettings } from './delivery-tool-settings.mjs';
+import { loadDeliveryToolSettings, validateDeliveryToolSettings } from './delivery-tool-settings.ts';
 
 const nativeConnection = {
   route: 'native',

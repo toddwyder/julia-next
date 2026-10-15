@@ -1,33 +1,24 @@
-# `$init` model selection
+# `$init` delivery entry point
 
-`$init JUL-nnn` is the literal command that enters the Julia selection
-wrapper. It is not `/init`, and it does not invoke a coding agent, read a
-Linear card, create a worktree, or start the JUL-122 runner. JUL-196 consumes
-the saved configuration when real startup and handoff are added.
+`$init JUL-nnn` has one implementation: `initCommand` in
+`ops/mastra-agents/reviewer/src/mastra/cli.ts`. The former
+`scripts/julia-init.mjs` selection wrapper was a second implementation and has
+been removed.
 
-The wrapper accepts either both role choices, one role choice, or neither:
+On Todd's Windows laptop, commands that need Julia vault secrets go through the
+restricted service-account helper:
 
-```text
-$init JUL-195 --builder "Anthropic Builder" high --reviewer openai-reviewer none
-$init JUL-195 --builder anthropic-builder low
-$init JUL-195
+```powershell
+.\scripts\julia-vault-windows.ps1 -JuliaArguments @('$init', 'JUL-225')
+.\scripts\julia-vault-windows.ps1 -JuliaArguments @('$init', 'JUL-225', 'Start')
+.\scripts\julia-vault-windows.ps1 -JuliaArguments @('$init', 'JUL-225', 'Cancel')
 ```
 
-Each role value is an exact catalog display name (quoted when it contains
-spaces) or a no-space catalog ID, followed by its thinking level. `none` is
-the thinking-level word for a model whose catalog entry has no thinking
-support. Builder and reviewer defaults are remembered separately in
-`.julia/runs/defaults.json`; each new run receives an immutable non-secret
-configuration in `.julia/runs/JUL-nnn.json`.
+The first command reads the Linear card and displays the saved four-role model
+choices and accepted limits. `Start` requires matching start authorization,
+validated tested connections, current model offers, and a complete Ready card;
+it saves the immutable run snapshot before delivery. `Cancel` does not dispatch.
+A resumed run uses its saved snapshot rather than rereading role defaults.
 
-On Windows, enter `$init ...` directly in the coding-agent prompt. Do not
-paste it unquoted into PowerShell: PowerShell treats `$init` as a variable.
-For a shell-level diagnostic only, keep it literal with single quotes, for
-example `node scripts/julia-init.mjs '$init JUL-195'`. The wrapper accepts the
-literal string and rejects `/init`.
-
-Invalid, stale, ambiguous, unsupported, missing, or same-maker pairs do not
-change remembered defaults and do not dispatch. If a remembered role is stale,
-the wrapper asks for that role while retaining the other valid selection.
-Resuming a saved run without flags dispatches its saved configuration exactly,
-even if the catalog or defaults have since changed.
+Do not invoke a second script-level `$init`, and do not use personal 1Password
+desktop authentication for commands that need Julia secrets.

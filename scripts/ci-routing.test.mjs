@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { selectCIGates } from './ci-routing.mjs';
 
 test('routes representative changed paths to their focused CI gates', () => {
-  assert.deepEqual(selectCIGates(['scripts/julia-init.mjs']), ['baseline', 'julia-init-windows']);
+  assert.deepEqual(selectCIGates(['ops/mastra-agents/reviewer/src/mastra/cli.ts']), ['baseline', 'julia-init-windows']);
   assert.deepEqual(selectCIGates(['docs/agents/init.md']), ['baseline', 'julia-init-windows', 'docs-policy']);
   assert.deepEqual(selectCIGates(['app/recipes/page.tsx']), ['baseline', 'web']);
   assert.deepEqual(selectCIGates(['app/removed-page.tsx']), ['baseline', 'web']);
@@ -13,7 +13,7 @@ test('routes representative changed paths to their focused CI gates', () => {
 
 test('unions applicable gates and treats workflow changes as high-risk', () => {
   assert.deepEqual(
-    selectCIGates(['app/recipes/page.tsx', 'docs/guide.md', 'scripts/julia-init.mjs']),
+    selectCIGates(['app/recipes/page.tsx', 'docs/guide.md', 'ops/mastra-agents/reviewer/src/mastra/cli.ts']),
     ['baseline', 'julia-init-windows', 'web', 'docs-policy'],
   );
   assert.deepEqual(

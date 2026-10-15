@@ -74,13 +74,14 @@ test('$init and the Mastra workflow are the only delivery start route', () => {
       if (entry.name === 'node_modules' || entry.name === '.git') continue;
       const path = join(directory, entry.name);
       if (entry.isDirectory()) walk(path);
-      else if (entry.name.endsWith('.mjs') && !entry.name.endsWith('.test.mjs')) files.push(path);
+      else if (/\.(?:mjs|ts)$/.test(entry.name) && !entry.name.endsWith('.test.mjs')) files.push(path);
     }
   };
   for (const directory of ['scripts', 'ops', 'graph']) walk(join(root, directory));
   const sources = files.map(path => [relative(root, path).replaceAll('\\', '/'), readFileSync(path, 'utf8')]);
   for (const [name, source] of sources) assert.doesNotMatch(source, /\b(?:runDelivery|startDelivery|startReviewOnly)\b/, name);
   const starters = sources.filter(([, source]) => /\bstartMastraDelivery\b/.test(source)).map(([name]) => name).sort();
-  assert.deepEqual(starters, ['scripts/julia-init.mjs', 'scripts/julia-mastra-delivery.mjs']);
+  assert.equal(existsSync(new URL('./julia-init.mjs', import.meta.url)), false);
+  assert.deepEqual(starters, ['scripts/julia-mastra-delivery.mjs']);
   assert.match(sources.find(([name]) => name === 'scripts/julia-mastra-delivery.mjs')[1], /createDeliveryWorkflowRuntime/);
 });

@@ -1,28 +1,52 @@
 ---
 name: pre-plan
-description: Check a card before planning against spec, stock Mastra, YAGNI, finish condition, and real evidence. Use before planning a card or when work keeps failing review.
+description: Check a build card before Ready — trim it to the minimum, draw its contracts, and confirm it can honestly be built. Use before any build card moves to Ready, or when work keeps failing.
 ---
 
 # Pre-plan
 
-Read one card. Run five checks, find every gap, and report them in one comment on the card. Read only: change no code, settings, cards, or servers.
+Read one card. Run six checks, then post one comment on the card with the findings, a proposed
+trimmed card, and a Mermaid diagram. Change no code, settings or servers. Don't edit the card
+itself: Todd approves the trimmed version, and the card moves to Ready only when he says "settled".
 
-Run this check repeatedly until a pass finds no gaps.
+Rerun until a pass finds no gaps.
 
-## Five checks
+## Six checks
 
-1. **Spec story.** Identify which user story in `docs/specs/` the card serves (cite file and story number). If none serves it, FLAG it; do not remove the card.
-2. **Stock Mastra.** For each job the card requires, check how Mastra does it:
-   - Read pinned versions in `ops/factory/app/package.json` (or `package-lock.json`). Fetch latest versions with `npm view <pkg> version`. Download and unpack both into a scratch folder (`npm pack <pkg>@<ver>`). Packages include `@mastra/factory`, `@mastra/core`, `@mastra/code-sdk`, and any `@mastra/*` package the card touches.
-   - Cite `package@version path:line` actually opened in both pinned and latest versions, or cite a listed exception in `ops/factory/README.md`. A claim without an opened `path:line` or an exception row is a gap.
-3. **YAGNI.** Identify anything proposed or implied that no requirement needs, and mark it to cut.
-4. **Finish condition.** Formulate a checkable "done means..." condition that cleanly separates done from not done.
-5. **Evidence.** State the real-job proof that verifies the finish condition. Mocks, stubs, and fakes do not count.
+1. **Trim (YAGNI).** Propose a version of the card with only what is needed to meet its stated
+   outcome. Cut anything nothing requires today: features, options, settings, "for later" items.
+   Mark every line you would cut and why. Add nothing.
+2. **Built the Mastra way.**
+   - For each job, find the stock feature in the installed Mastra packages
+     (`ops/mastra-agents/reviewer/package.json` and its lockfile). Cite the
+     `package@version path:line` you opened. A job with no citation is custom: list it with the reason.
+   - Compare how the card would build it against Mastra's official docs and starter template
+     (language, typed workflow steps, step schemas). Flag any difference.
+3. **Contracts.** Draw a Mermaid diagram: a box for each part the card touches, one arrow per
+   handoff, each arrow labelled with the contract it uses. A part used by several others has one
+   contract, shown once with all its users.
+   - Every contract is a Zod schema (which also gives the TypeScript type), defined once and shared
+     by the provider and every user. Flag any contract the card touches that isn't.
+   - For every contract the card's parts offer or use, the card names a real check of its own side.
+     Offering: the part keeps the whole contract for every user. Using: the part relies only on what
+     the contract promises.
+   - If the card changes a contract, it lists every other user whose check must rerun.
+4. **Finish conditions.** Each is a checkable outcome, not a process step. Test each: if it were
+   removed, would the requirement still be complete? If yes, cut it.
+5. **Real proof.** The proof for each finish condition. A test counts only if it was seen failing
+   before the change and passing after, and the reviewer reran it. It must run against the real
+   thing, except that a rule living entirely inside one part may be proven by a unit test covering
+   every case. Mocks, stubs and fakes never count for anything that crosses a boundary.
+   - Recipe cards: proof uses `verify-julia`, extended for this feature with `maintain-verification-skill`.
+   - Machine cards: proof uses `verify-machine`, extended the same way.
+6. **Nothing that stops the run.** The card tells the agent to stop only for a spend or time cap, a
+   failed production check, two rounds without closing (with the step-back prepared), or an
+   account, money or product decision. Every tool, file and service the card relies on exists, and
+   the card says where.
 
 ## Output
 
-Post one comment on the card listing gaps per check:
-- Group findings by check (1 through 5). Mark passing checks as "None".
-- End with two lines headed `For Todd:` summarizing the status and flagging any decision that needs him.
+One comment on the card: findings grouped by check ("None" if it passes), the proposed trimmed
+card, the diagram, then two lines headed `For Todd:` with the status and any decision he needs to make.
 
-Done when the comment is posted. The card passes pre-plan when all five checks find zero gaps.
+Done when the comment is posted. The card is ready for Todd when all six checks find no gaps.

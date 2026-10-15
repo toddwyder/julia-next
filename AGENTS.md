@@ -66,6 +66,8 @@ route: Factory is retired.
 
 Before asking for any approval: find where the thing lives today and why the current path can't reach it. Ask only if no existing path works, and include that trace in the request.
 
+When a skill says to ask the user for access, evidence, or permission to add temporary logging, get it yourself. Temporary logging is pre-approved and removed when the analysis is done. Ask Todd only for an account action, money beyond the limit, or a product decision.
+
 ### Standing stop policy
 
 On any blocker other than (a) an account action, (b) money beyond the authorized limit, or
@@ -81,6 +83,7 @@ Before any task, verify the applicable entry points, the launcher's accepted com
 configuration and authorized spend limits, required credentials, and branch/worktree state. Fix
 what is safely fixable before starting work. Spend limits belong in
 accepted ADRs and dated card decisions, never in prompts. The reviewer limit is **$1.00 per card**.
+[Permanent machine parts](docs/agents/permanent-machine-parts.json) are preflight prerequisites and no cleanup ever removes them.
 On Windows, every local command that needs a Julia vault secret must run through
 `scripts/julia-vault-windows.ps1`; its default configuration is the provisioned restricted Julia
 service account. Never use personal 1Password desktop authentication for those commands. Direct
