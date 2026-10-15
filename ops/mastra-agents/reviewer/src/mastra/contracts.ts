@@ -40,24 +40,25 @@ export const CardAdmissionSchema = z.object({
   description: nonempty,
 }).strict().superRefine((card, context) => {
   for (const section of requiredSections) {
-    const pattern = new RegExp(`^#{1,6}\\s+${section.replace(' ', '\\s+')}\\s*$`, 'im')
+    const pattern = new RegExp(`^(?:#{1,6}\\s+|\\*\\*)${section.replace(' ', '\\s+')}(?:\\*\\*)?\\s*$`, 'im')
     const heading = pattern.exec(card.description)
     if (!heading) {
       context.addIssue({ code: 'custom', path: ['description'], message: `missing nonempty ${section} section` })
       continue
     }
-    const content = card.description.slice(heading.index + heading[0].length).split(/^#{1,6}\s+/m)[0]?.trim()
+    const content = card.description.slice(heading.index + heading[0].length).split(/^(?:#{1,6}\s+|\*\*)[^\r\n]+(?:\*\*)?\s*$/m)[0]?.trim()
     if (!content) context.addIssue({ code: 'custom', path: ['description'], message: `empty ${section} section` })
   }
-  if (/\b(?:TODO|TBD|unresolved decision)\b/i.test(card.description)) {
+  if (/^\s*(?:TODO|TBD|unresolved decision)\b/im.test(card.description)) {
     context.addIssue({ code: 'custom', path: ['description'], message: 'unresolved decision marker' })
   }
 })
 
-export const RunSnapshotSchema = z.object({ issueId: nonempty, roles: RoleDefaultsSchema, savedAt: z.string().datetime() }).strict().readonly()
+export const RunSnapshotSchema = z.object({ issueId: nonempty, roles: RoleDefaultsSchema, allowSameService: z.boolean().default(false), savedAt: z.string().datetime() }).strict().readonly()
 export const DeliveryStartSchema = z.object({ decision: z.literal('Start'), authorized: z.literal(true), snapshot: RunSnapshotSchema }).strict()
 export const WorkflowInputSchema = DeliveryStartSchema
-export const WorkflowOutputSchema = z.object({ status: z.enum(['completed', 'failed']), runId: nonempty, results: z.record(z.string(), nonempty) }).strict()
+export const RouteTraceSchema = z.object({ route: RouteSchema, modelId: nonempty, startedAt: z.string().datetime(), durationMs: z.number().nonnegative(), ok: z.boolean(), error: nonempty.optional() }).strict()
+export const WorkflowOutputSchema = z.object({ status: z.enum(['completed', 'failed']), runId: nonempty, results: z.record(z.string(), nonempty), traces: z.record(z.string(), RouteTraceSchema) }).strict()
 export const WorkflowSnapshotSchema = z.object({ runId: nonempty, input: WorkflowInputSchema, output: WorkflowOutputSchema.optional() }).strict()
 
 export const ConnectionsCommandSchema = z.discriminatedUnion('action', [
@@ -73,7 +74,8 @@ export const ModelsCommandSchema = z.discriminatedUnion('action', [
 ])
 export const ModelsResultSchema = z.object({ offers: z.array(ModelOfferSchema), defaults: RoleDefaultsSchema.optional() }).strict()
 export const InitCommandSchema = z.object({ issueId: nonempty, decision: z.enum(['Start', 'Cancel']), allowSameService: z.boolean().optional() }).strict()
+export const RoleLimitsSchema = z.object({ builderUsd: z.literal(2), reviewerUsd: z.literal(1), crashFixerUsd: z.literal(0.5), fixReviewerUsd: z.literal(0.25), builderMinutes: z.literal(90), reviewerMinutes: z.literal(30), crashFixerMinutes: z.literal(20), fixReviewerMinutes: z.literal(10) }).strict()
 export const InitResultSchema = z.discriminatedUnion('status', [
-  z.object({ status: z.literal('cancelled') }),
-  z.object({ status: z.literal('started'), snapshot: RoleDefaultsSchema }),
+  z.object({ status: z.literal('cancelled'), issueId: nonempty }).strict(),
+  z.object({ status: z.literal('started'), resumed: z.boolean(), snapshotPath: nonempty, choices: RoleDefaultsSchema, limits: RoleLimitsSchema, snapshot: RunSnapshotSchema, delivery: z.unknown() }).strict(),
 ])

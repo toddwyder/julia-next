@@ -1,32 +1,30 @@
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
-import { dirname, join, resolve } from 'node:path'
+import { readFile } from 'node:fs/promises'
+import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { z } from 'zod/v4'
-import { CardAdmissionSchema, ConnectionRecordSchema, RoleDefaultsSchema, RunSnapshotSchema } from './contracts.ts'
-import { ConnectionStore } from './connections.ts'
+import { CardAdmissionSchema, ConnectionsCommandSchema, ConnectionsResultSchema, InitCommandSchema, InitResultSchema, ModelsCommandSchema, ModelsResultSchema, ConnectionRecordSchema, RoleDefaultsSchema, RunSnapshotSchema } from './contracts.ts'
+import { atomicJson, ConnectionStore } from './connections.ts'
 import { validateRoleDefaults } from './roles.ts'
-import { ensureSelectionsOffered } from './init.ts'
+import { loadSavedSnapshot, validateStartPreconditions } from './init.ts'
 import { createAcpRoutes, disconnectAcpRoutes, discoverAcpOffers, discoverCommandCodeOffers } from './routes.ts'
 import { createRoleExecutionWorkflow } from './workflows/delivery.ts'
 
 const configDirectory = process.env.JULIA_CONFIG_DIRECTORY ?? join(process.env.USERPROFILE ?? process.cwd(), '.julia')
 const connectionsPath = process.env.JULIA_CONNECTIONS_PATH ?? join(configDirectory, 'connections.json')
 const defaultsPath = process.env.JULIA_ROLE_DEFAULTS_PATH ?? join(configDirectory, 'role-defaults.json')
+const acceptedLimits = { builderUsd: 2, reviewerUsd: 1, crashFixerUsd: 0.5, fixReviewerUsd: 0.25, builderMinutes: 90, reviewerMinutes: 30, crashFixerMinutes: 20, fixReviewerMinutes: 10 } as const
 
-async function atomicJson(path: string, value: unknown) {
-  await mkdir(dirname(path), { recursive: true })
-  const temporary = `${path}.${process.pid}.tmp`
-  await writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 })
-  await rename(temporary, path)
-}
-async function connectionCommand(args: string[]) {
+export async function connectionCommand(args: string[]) {
   const [action = 'list', id, route, company, service, secretReference] = args
+  ConnectionsCommandSchema.parse(action === 'add'
+    ? { action, record: { id, route, company, service, enabled: true, ...(secretReference ? { secretReference } : {}) } }
+    : action === 'reconnect' ? { action, id, ...(secretReference ? { secretReference } : {}) }
+      : action === 'list' ? { action } : { action, id })
   const store = new ConnectionStore(connectionsPath)
-  if (action === 'list') return store.list()
-  if (action === 'add') return store.add(ConnectionRecordSchema.parse({ id, route, company, service, enabled: true, ...(secretReference ? { secretReference } : {}) }))
-  if (action === 'reconnect') return store.reconnect(id, secretReference ? { secretReference } : {})
-  if (action === 'disable') return store.disable(id)
-  if (action === 'remove') { await store.remove(id); return { removed: id } }
+  if (action === 'add') await store.add(ConnectionRecordSchema.parse({ id, route, company, service, enabled: true, ...(secretReference ? { secretReference } : {}) }))
+  else if (action === 'reconnect') await store.reconnect(id, secretReference ? { secretReference } : {})
+  else if (action === 'disable') await store.disable(id)
+  else if (action === 'remove') await store.remove(id)
   if (action === 'test') {
     const record = (await store.list()).find(item => item.id === id)
     if (!record || !record.enabled) throw new Error(`enabled connection ${id} not found`)
@@ -40,18 +38,21 @@ async function connectionCommand(args: string[]) {
       try { modelCount = (await discoverAcpOffers(routes)).filter(item => item.route === record.route).length }
       finally { disconnectAcpRoutes(routes) }
     }
-    return store.recordTest(id, { ok: modelCount > 0, modelCount })
+    await store.recordTest(id, { ok: modelCount > 0, modelCount })
   }
-  throw new Error(`unknown $connections action ${action}`)
+  return ConnectionsResultSchema.parse({ ok: true, records: await store.list() })
 }
 
-async function modelCommand(args: string[]) {
+export async function modelCommand(args: string[]) {
   const [action = 'list', value] = args
+  if (action === 'save' && !value) throw new Error('$models save requires a JSON file')
+  ModelsCommandSchema.parse(action === 'save'
+    ? { action, defaults: RoleDefaultsSchema.parse(JSON.parse(await readFile(value, 'utf8'))) }
+    : { action })
   if (action === 'save') {
-    if (!value) throw new Error('$models save requires a JSON file')
     const defaults = validateRoleDefaults(RoleDefaultsSchema.parse(JSON.parse(await readFile(value, 'utf8'))))
     await atomicJson(defaultsPath, defaults)
-    return defaults
+    return ModelsResultSchema.parse({ offers: [], defaults })
   }
   if (action === 'list') {
     const routes = createAcpRoutes()
@@ -59,17 +60,31 @@ async function modelCommand(args: string[]) {
       const offers = await discoverAcpOffers(routes)
       const key = process.env.COMMANDCODE_API_KEY
       if (key) offers.push(...await discoverCommandCodeOffers(key))
-      return { offers, defaults: RoleDefaultsSchema.parse(JSON.parse(await readFile(defaultsPath, 'utf8'))) }
+      return ModelsResultSchema.parse({ offers, defaults: RoleDefaultsSchema.parse(JSON.parse(await readFile(defaultsPath, 'utf8'))) })
     } finally { disconnectAcpRoutes(routes) }
   }
   throw new Error(`unknown $models action ${action}`)
 }
 
-async function initCommand(args: string[]) {
-  const [cardPath, decision, requestedSnapshotPath] = args
-  if (!cardPath) throw new Error('$init requires a saved Linear card JSON path')
-  const card = CardAdmissionSchema.parse(JSON.parse(await readFile(cardPath, 'utf8')))
-  if (decision === 'Cancel') return { status: 'cancelled', issueId: card.identifier }
+async function fetchLinearCard(issueId: string) {
+  const apiKey = process.env.LINEAR_API_KEY
+  if (!apiKey) throw new Error('LINEAR_API_KEY was not resolved by the Julia vault launcher')
+  const response = await fetch('https://api.linear.app/graphql', {
+    method: 'POST', headers: { Authorization: apiKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: 'query Card($id:String!){issue(id:$id){identifier description state{name}}}', variables: { id: issueId } }),
+  })
+  const body = await response.json() as { data?: { issue?: { identifier: string; description: string; state: { name: string } } }; errors?: unknown }
+  if (!response.ok || body.errors || !body.data?.issue) throw new Error(`Linear intake failed with HTTP ${response.status}`)
+  return { identifier: body.data.issue.identifier, state: body.data.issue.state.name, description: body.data.issue.description }
+}
+
+export async function initCommand(args: string[]) {
+  const [issueOrPath, decision, requestedSnapshotPath] = args
+  if (!issueOrPath) throw new Error('$init requires JUL-nnn')
+  const allowSameService = process.env.JULIA_ALLOW_SAME_SERVICE === 'true'
+  InitCommandSchema.parse({ issueId: issueOrPath, decision, ...(allowSameService ? { allowSameService } : {}) })
+  const card = CardAdmissionSchema.parse(await fetchLinearCard(issueOrPath))
+  if (decision === 'Cancel') return InitResultSchema.parse({ status: 'cancelled', issueId: card.identifier })
   if (decision !== 'Start') throw new Error('$init accepts exactly Start or Cancel')
   if (process.env.JULIA_START_AUTHORIZED !== card.identifier) throw new Error(`start authorization for ${card.identifier} is missing`)
   const snapshotPath = requestedSnapshotPath ?? join(configDirectory, 'runs', `${card.identifier}.json`)
@@ -89,26 +104,21 @@ async function initCommand(args: string[]) {
     } finally { disconnectAcpRoutes(routes) }
   }
   try {
-    const saved = RunSnapshotSchema.parse(JSON.parse(await readFile(snapshotPath, 'utf8')))
-    if (saved.issueId !== card.identifier) throw new Error('saved snapshot belongs to another card')
-    return { status: 'started', resumed: true, snapshotPath, snapshot: saved, delivery: await dispatch(saved) }
+    const saved = await loadSavedSnapshot(snapshotPath, card.identifier)
+    return InitResultSchema.parse({ status: 'started', resumed: true, snapshotPath, choices: saved.roles, limits: acceptedLimits, snapshot: saved, delivery: await dispatch(saved) })
   } catch (error: unknown) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
   }
   const roles = validateRoleDefaults(RoleDefaultsSchema.parse(JSON.parse(await readFile(defaultsPath, 'utf8'))))
-  for (const selection of Object.values(roles)) {
-    const connection = records.find(item => item.route === selection.route)
-    if (!connection?.enabled || connection.lastTest?.ok !== true) throw new Error(`${selection.route} connection is disabled, failed, or stale`)
-  }
   const routes = createAcpRoutes()
   try {
     const offers = await discoverAcpOffers(routes)
     offers.push(...await discoverCommandCodeOffers(apiKey))
-    ensureSelectionsOffered(roles, offers)
+    validateStartPreconditions({ authorized: true, roles, records, offers }, { allowSameService })
   } finally { disconnectAcpRoutes(routes) }
-  const saved = RunSnapshotSchema.parse({ issueId: card.identifier, roles, savedAt: new Date().toISOString() })
+  const saved = RunSnapshotSchema.parse({ issueId: card.identifier, roles, allowSameService, savedAt: new Date().toISOString() })
   await atomicJson(snapshotPath, saved)
-  return { status: 'started', snapshotPath, snapshot: saved, delivery: await dispatch(saved) }
+  return InitResultSchema.parse({ status: 'started', resumed: false, snapshotPath, choices: saved.roles, limits: acceptedLimits, snapshot: saved, delivery: await dispatch(saved) })
 }
 
 async function main() {
@@ -124,5 +134,5 @@ async function main() {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  main().catch(error => { console.error(error.message); process.exitCode = 1 })
+  main().then(() => setTimeout(() => process.exit(0), 250)).catch(error => { console.error(error.message); setTimeout(() => process.exit(1), 250) })
 }

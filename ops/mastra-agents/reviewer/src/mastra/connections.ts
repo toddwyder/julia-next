@@ -5,6 +5,13 @@ import type { z } from 'zod/v4'
 
 type ConnectionRecord = z.infer<typeof ConnectionRecordSchema>
 
+export async function atomicJson(path: string, value: unknown) {
+  await mkdir(dirname(path), { recursive: true })
+  const temporary = `${path}.${process.pid}.tmp`
+  await writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 })
+  await rename(temporary, path)
+}
+
 export class ConnectionStore {
   readonly path: string
 
@@ -23,10 +30,7 @@ export class ConnectionStore {
 
   private async save(records: ConnectionRecord[]) {
     const parsed = ConnectionRecordSchema.array().parse(records)
-    await mkdir(dirname(this.path), { recursive: true })
-    const temporary = `${this.path}.${process.pid}.tmp`
-    await writeFile(temporary, `${JSON.stringify(parsed, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 })
-    await rename(temporary, this.path)
+    await atomicJson(this.path, parsed)
   }
 
   async add(input: ConnectionRecord) {

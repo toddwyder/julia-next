@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -7,13 +7,14 @@ import test from 'node:test'
 import {
   CardAdmissionSchema,
   ConnectionRecordSchema,
+  InitCommandSchema,
   ModelOfferSchema,
   RoleDefaultsSchema,
   SecretReferenceSchema,
 } from '../src/mastra/contracts.ts'
 import { ConnectionStore } from '../src/mastra/connections.ts'
 import { validateRoleDefaults } from '../src/mastra/roles.ts'
-import { decideStart, ensureSelectionsOffered } from '../src/mastra/init.ts'
+import { decideStart, ensureSelectionsOffered, loadSavedSnapshot, validateStartPreconditions } from '../src/mastra/init.ts'
 import { discoverCommandCodeOffers } from '../src/mastra/routes.ts'
 
 test('secret and persisted connection contracts reject secret values', () => {
@@ -65,12 +66,24 @@ test('four-role company and normal service rules are exhaustive', () => {
     builder: selection('Google', 'Antigravity', 'antigravity'), reviewer: selection('DeepSeek', 'CommandCode', 'commandcode'),
     crashFixer: selection('Anthropic', 'Claude', 'claude'), fixReviewer: selection('Google', 'Antigravity', 'antigravity'),
   })
-  assert.doesNotThrow(() => validateRoleDefaults(valid))
-  assert.throws(() => validateRoleDefaults({ ...valid, reviewer: selection('Google', 'CommandCode', 'commandcode') }), /different companies/)
-  assert.throws(() => validateRoleDefaults({ ...valid, reviewer: selection('DeepSeek', 'Antigravity', 'antigravity') }), /different services/)
+  for (const builderCompany of ['Google', 'Anthropic']) for (const reviewerCompany of ['Google', 'Anthropic']) {
+    for (const builderService of ['Antigravity', 'Claude']) for (const reviewerService of ['Antigravity', 'Claude']) {
+      const candidate = { ...valid, builder: selection(builderCompany, builderService, 'antigravity'), reviewer: selection(reviewerCompany, reviewerService, 'commandcode') }
+      const accepted = builderCompany !== reviewerCompany && builderService !== reviewerService
+      assert.equal(assertionPasses(() => validateRoleDefaults(candidate)), accepted)
+      assert.equal(assertionPasses(() => validateRoleDefaults(candidate, { allowSameService: true })), builderCompany !== reviewerCompany)
+    }
+  }
+  for (const crashCompany of ['Google', 'Anthropic']) for (const reviewCompany of ['Google', 'Anthropic']) {
+    const candidate = { ...valid, crashFixer: selection(crashCompany, 'Claude', 'claude'), fixReviewer: selection(reviewCompany, 'Antigravity', 'antigravity') }
+    assert.equal(assertionPasses(() => validateRoleDefaults(candidate)), crashCompany !== reviewCompany)
+  }
   assert.doesNotThrow(() => validateRoleDefaults({ ...valid, reviewer: selection('DeepSeek', 'Antigravity', 'antigravity') }, { allowSameService: true }))
-  assert.throws(() => validateRoleDefaults({ ...valid, fixReviewer: selection('Anthropic', 'Antigravity', 'antigravity') }), /crash-fixer and fix reviewer/)
 })
+
+function assertionPasses(assertion: () => unknown) {
+  try { assertion(); return true } catch { return false }
+}
 
 test('admission requires the complete settled card shape and Ready state', () => {
   const complete = { identifier: 'JUL-225', state: 'Ready', description: '# Outcome\nA\n# Requirements\nB\n# Contracts\nC\n# Finish conditions\nD\n# Proof\nE' }
@@ -78,6 +91,8 @@ test('admission requires the complete settled card shape and Ready state', () =>
   assert.throws(() => CardAdmissionSchema.parse({ ...complete, state: 'Backlog' }))
   assert.throws(() => CardAdmissionSchema.parse({ ...complete, description: '# Outcome\nA' }))
   assert.throws(() => CardAdmissionSchema.parse({ ...complete, description: `${complete.description}\nTODO: decision` }))
+  const linear = { ...complete, description: '**Outcome**\nA\n\n**Requirements**\nB\n\n**Contracts**\nC\n\n**Finish conditions**\nD\n\n**Proof**\nE' }
+  assert.equal(CardAdmissionSchema.parse(linear).identifier, 'JUL-225')
 })
 
 test('Cancel never dispatches and restart reuses the immutable snapshot', async () => {
@@ -110,4 +125,39 @@ test('admission refuses stale defaults that are not in the current route offers'
   ]
   assert.doesNotThrow(() => ensureSelectionsOffered(roles, offers))
   assert.throws(() => ensureSelectionsOffered(roles, offers.slice(0, 3)), /fixReviewer.*unavailable/)
+})
+
+test('restart reuses the exact persisted four-role snapshot after live defaults change', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'jul-225-restart-'))
+  t.after(() => rm(directory, { recursive: true, force: true }))
+  const path = join(directory, 'JUL-225.json')
+  const roles = RoleDefaultsSchema.parse({
+    builder: { route: 'antigravity', modelId: 'saved-a', company: 'Google', service: 'Antigravity' },
+    reviewer: { route: 'commandcode', modelId: 'saved-b', company: 'Anthropic', service: 'CommandCode' },
+    crashFixer: { route: 'claude', modelId: 'saved-c', company: 'Anthropic', service: 'Claude' },
+    fixReviewer: { route: 'antigravity', modelId: 'saved-d', company: 'Google', service: 'Antigravity' },
+  })
+  await writeFile(path, JSON.stringify({ issueId: 'JUL-225', savedAt: new Date().toISOString(), roles }))
+  const changedDefaults = structuredClone(roles)
+  changedDefaults.builder.modelId = 'new-live-default'
+  const resumed = await loadSavedSnapshot(path, 'JUL-225')
+  assert.equal(resumed.roles.builder.modelId, 'saved-a')
+  assert.notDeepEqual(resumed.roles, changedDefaults)
+})
+
+test('every named Start precondition fails before dispatch', () => {
+  const roles = RoleDefaultsSchema.parse({
+    builder: { route: 'antigravity', modelId: 'a', company: 'Google', service: 'Antigravity' },
+    reviewer: { route: 'commandcode', modelId: 'b', company: 'Anthropic', service: 'CommandCode' },
+    crashFixer: { route: 'claude', modelId: 'c', company: 'Anthropic', service: 'Claude' },
+    fixReviewer: { route: 'antigravity', modelId: 'd', company: 'Google', service: 'Antigravity' },
+  })
+  const records = ['antigravity', 'claude', 'commandcode'].map(route => ({ route, enabled: true, lastTest: { ok: true } }))
+  const offers = Object.values(roles).map(({ route, modelId }) => ({ route, modelId }))
+  assert.throws(() => validateStartPreconditions({ authorized: false, roles, records, offers }), /authorization/)
+  assert.throws(() => validateStartPreconditions({ authorized: true, roles, records: records.map(record => record.route === 'claude' ? { ...record, enabled: false } : record), offers }), /disabled/)
+  assert.throws(() => validateStartPreconditions({ authorized: true, roles, records: records.map(record => record.route === 'claude' ? { ...record, lastTest: { ok: false } } : record), offers }), /failed/)
+  assert.throws(() => validateStartPreconditions({ authorized: true, roles, records, offers: offers.slice(1) }), /unavailable/)
+  assert.throws(() => validateStartPreconditions({ authorized: true, roles: { ...roles, reviewer: { ...roles.reviewer, company: 'Google' } }, records, offers }), /different companies/)
+  assert.throws(() => InitCommandSchema.parse({ issueId: 'JUL-225', decision: 'Go' }))
 })

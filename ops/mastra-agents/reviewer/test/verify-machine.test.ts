@@ -16,7 +16,9 @@ test('Doctor reads the permanent-parts inventory and fails closed on a missing c
     { id: 'present', name: 'Present', kind: 'executable', location: existing, permanent: true },
     { id: 'missing', name: 'Missing', kind: 'sign-in', location: join(directory, 'missing.json'), permanent: true },
   ] }))
-  const result = await doctor(inventory)
+  const frameworkMap = join(directory, 'framework-map.md')
+  await writeFile(frameworkMap, `Doctor inventory: \`${inventory}\`.\n`)
+  const result = await doctor(frameworkMap)
   assert.equal(result.ok, false)
   assert.deepEqual(result.missing.map(item => item.id), ['missing'])
 })

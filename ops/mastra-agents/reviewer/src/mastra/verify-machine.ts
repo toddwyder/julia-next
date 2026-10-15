@@ -4,6 +4,7 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { z } from 'zod/v4'
+import { WorkflowSnapshotSchema } from './contracts.ts'
 import { createAcpRoutes, createCommandCodeAgent, disconnectAcpRoutes, discoverAcpOffers, discoverCommandCodeOffers, selectAcpModel } from './routes.ts'
 import { createRoleExecutionWorkflow } from './workflows/delivery.ts'
 
@@ -18,9 +19,17 @@ const PartsSchema = z.object({
 
 const moduleDirectory = dirname(fileURLToPath(import.meta.url))
 const execute = promisify(execFile)
-export const defaultPartsPath = resolve(moduleDirectory, '../../../../../docs/agents/permanent-machine-parts.json')
+export const defaultFrameworkMapPath = resolve(moduleDirectory, '../../../../../docs/agents/jul-225-framework-map.md')
 
-export async function doctor(inventoryPath = defaultPartsPath) {
+async function inventoryFromFrameworkMap(frameworkMapPath: string) {
+  const map = await readFile(frameworkMapPath, 'utf8')
+  const match = /^Doctor inventory: `([^`]+)`\.$/m.exec(map)
+  if (!match) throw new Error('framework map does not name the Doctor inventory')
+  return resolve(moduleDirectory, '../../../../..', match[1])
+}
+
+export async function doctor(frameworkMapPath = defaultFrameworkMapPath) {
+  const inventoryPath = await inventoryFromFrameworkMap(frameworkMapPath)
   const inventory = PartsSchema.parse(JSON.parse(await readFile(inventoryPath, 'utf8')))
   const missing = [] as typeof inventory.parts
   const versionMismatches: Array<{ id: string; expected: string; actual: string }> = []
@@ -48,10 +57,42 @@ export async function liveModelProof(apiKey: string, cwd = resolve(moduleDirecto
     if (!antigravity || !claude || !commandcode) throw new Error('all three routes must advertise at least one coding model')
     await selectAcpModel(routes, antigravity)
     await selectAcpModel(routes, claude)
+    for (const offer of acpOffers) await selectAcpModel(routes, offer)
+    for (const offer of commandCodeOffers) createCommandCodeAgent(offer, apiKey)
     return { routes, offers: [...acpOffers, ...commandCodeOffers], selected: { antigravity, claude, commandcode } }
   } catch (error) {
     disconnectAcpRoutes(routes)
     throw error
+  }
+}
+
+async function cliJourneyProof(apiKey: string, evidenceDirectory: string, roles: Record<string, unknown>) {
+  const configDirectory = resolve(evidenceDirectory, `cli-state-${process.pid}`)
+  const cli = resolve(moduleDirectory, 'cli.ts')
+  const environment = { ...process.env, COMMANDCODE_API_KEY: apiKey, JULIA_CONFIG_DIRECTORY: configDirectory }
+  const commands = [
+    ['connections', 'add', 'commandcode', 'commandcode', 'CommandCode', 'CommandCode', 'COMMANDCODE_API_KEY'],
+    ['connections', 'reconnect', 'commandcode', 'COMMANDCODE_API_KEY'],
+    ['connections', 'test', 'commandcode'],
+    ['connections', 'disable', 'commandcode'],
+    ['connections', 'remove', 'commandcode'],
+  ]
+  const outputs = []
+  for (const command of commands) {
+    const { stdout } = await execute(process.execPath, ['--experimental-strip-types', cli, ...command], { env: environment, windowsHide: true })
+    outputs.push(JSON.parse(stdout))
+  }
+  const persisted = JSON.parse(await readFile(resolve(configDirectory, 'connections.json'), 'utf8'))
+  const serialized = JSON.stringify({ outputs, persisted })
+  const defaultsPath = resolve(evidenceDirectory, 'role-defaults-proof.json')
+  await writeFile(defaultsPath, `${JSON.stringify(roles, null, 2)}\n`, 'utf8')
+  const save = await execute(process.execPath, ['--experimental-strip-types', cli, 'models', 'save', defaultsPath], { env: environment, windowsHide: true })
+  const list = await execute(process.execPath, ['--experimental-strip-types', cli, 'models', 'list'], { env: environment, windowsHide: true })
+  const cancel = await execute(process.execPath, ['--experimental-strip-types', cli, 'init', 'JUL-225', 'Cancel'], { env: environment, windowsHide: true })
+  return {
+    connections: { commands: commands.map(command => command[1]), outputs, persisted, secretValueAbsent: !serialized.includes(apiKey) },
+    models: { save: JSON.parse(save.stdout), list: JSON.parse(list.stdout) },
+    initCancel: JSON.parse(cancel.stdout),
   }
 }
 
@@ -86,25 +127,32 @@ export async function rehearsal(apiKey: string, evidencePath: string) {
       route: offer.route, modelId: offer.modelId, company: offer.company, service: offer.service,
       ...(offer.wire ? { wire: offer.wire } : {}),
     })
-    const workflowRun = await workflow.createRun()
-    const workflowResult = await workflowRun.start({ inputData: {
+    const inputData = {
       decision: 'Start', authorized: true,
       snapshot: {
-        issueId: 'JUL-208', savedAt: new Date().toISOString(), roles: {
+        issueId: 'JUL-208', allowSameService: false, savedAt: new Date().toISOString(), roles: {
           builder: selection(proof.selected.antigravity),
           reviewer: selection(proof.selected.commandcode),
           crashFixer: selection(proof.selected.claude),
           fixReviewer: selection(proof.selected.antigravity),
         },
       },
-    } })
+    } as const
+    const workflowRun = await workflow.createRun()
+    const workflowResult = await workflowRun.start({ inputData })
     if (workflowResult.status !== 'success') throw new Error(`real workflow rehearsal ended ${workflowResult.status}`)
     const output = workflowResult.result
+    const workflowSnapshot = WorkflowSnapshotSchema.parse({ runId: workflowRun.runId, input: inputData, output })
+    const cli = await cliJourneyProof(apiKey, dirname(evidencePath), inputData.snapshot.roles)
     const result = {
       recordedAt: new Date().toISOString(),
       productMutation: false,
       workflowStatus: workflowResult.status,
       workflowRunId: output.runId,
+      workflowSnapshot,
+      traces: output.traces,
+      modelOffers: { count: proof.offers.length, everyDisplayedOfferSelectable: true },
+      cli,
       routes: {
         antigravity: { model: proof.selected.antigravity.modelId, ok: output.results.builder.includes(expected) && output.results.fixReviewer.includes(expected) },
         claude: { model: proof.selected.claude.modelId, ok: output.results.crashFixer.includes(expected) },
@@ -124,7 +172,7 @@ export async function rehearsal(apiKey: string, evidencePath: string) {
 async function main() {
   const command = process.argv[2] ?? 'doctor'
   if (command === 'doctor') {
-    const result = await doctor(process.argv[3] || defaultPartsPath)
+    const result = await doctor(process.argv[3] || defaultFrameworkMapPath)
     console.log(JSON.stringify(result, null, 2))
     if (!result.ok) process.exitCode = 1
     return

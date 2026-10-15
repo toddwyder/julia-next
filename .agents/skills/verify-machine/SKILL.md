@@ -30,14 +30,16 @@ its measured cold start is about 30 seconds.
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/julia-vault-windows.ps1 `
-  -SecretNames COMMANDCODE_API_KEY `
+  -SecretNames COMMANDCODE_API_KEY,LINEAR_API_KEY `
   -RunArguments node,--experimental-strip-types,ops/mastra-agents/reviewer/src/mastra/verify-machine.ts,rehearsal,.artifacts/verify-machine/<run-id>/rehearsal.json
 ```
 
-The rehearsal uses stock `AcpAgent` discovery, selection, and generation for Antigravity and
-Claude, plus the documented CommandCode model list and stock `createCodingAgent()`. Its prompt
-forbids file reads and mutation. Retain the exact models, per-route result, timestamp, test output,
-candidate commit, and dirty-tree digest beside the two JSON files.
+The rehearsal drives the real `$connections` lifecycle, `$models` list/save, and `$init JUL-225
+Cancel` journey, then uses stock `AcpAgent` discovery, selection, and generation for Antigravity
+and Claude, plus the documented CommandCode model list and stock `createCodingAgent()`. Its Start
+payload uses JUL-208 and a prompt that forbids file reads and mutation. Retain the exact models,
+per-route result and trace, timestamp, test output, candidate commit, and dirty-tree digest beside
+the two JSON files.
 
 ## Cleanup
 
