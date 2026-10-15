@@ -93,6 +93,15 @@ test('standalone ACP route scope disconnects and cleans only processes it create
   const failedInitializationOwned = await ownedAcpProcesses(initializationFailureRoutes, async () => [orphanIdentity])
   assert.deepEqual(failedInitializationOwned, { roots: [failedLauncher], descendants: [orphanIdentity] })
 
+  const exitedLauncher = { pid: 50, exitCode: 1, signalCode: null }
+  const reusedLauncherIdentity = { ...ownedIdentity, processId: 50, parentProcessId: 4, name: 'unrelated.exe' }
+  const unrelatedDescendant = { ...orphanIdentity, processId: 61 }
+  const reusedLauncherOwned = await ownedAcpProcesses({
+    antigravity: { connection: { agentProcess: exitedLauncher } },
+    claude: { connection: {} },
+  } as never, async () => [reusedLauncherIdentity, unrelatedDescendant])
+  assert.deepEqual(reusedLauncherOwned, { roots: [exitedLauncher], descendants: [] })
+
   const reusedPid = { ...ownedIdentity, creationDate: '2026-10-15T00:00:02.0000000-07:00' }
   const changedPath = { ...ownedIdentity, executablePath: 'C:\\unrelated\\agy_acp_server.exe' }
   const terminated: WindowsProcessIdentity[] = []

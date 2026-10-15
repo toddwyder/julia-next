@@ -65,8 +65,15 @@ export async function ownedAcpProcesses(
       (connection as ProcessBackedConnection).agentProcess,
     ])
     .filter((child): child is ChildProcess => child !== undefined))]
-  const rootProcessIds = roots.flatMap(child => child.pid === undefined ? [] : [child.pid])
-  return { roots, descendants: descendantAcpProcesses(rootProcessIds, await listProcesses()) }
+  const processes = await listProcesses()
+  const rootProcessIds = roots.flatMap(child => {
+    if (child.pid === undefined) return []
+    const hasExitState = child.exitCode !== undefined || child.signalCode !== undefined
+    const hasExited = hasExitState && (child.exitCode !== null || child.signalCode !== null)
+    const pidIsCurrentlyOccupied = processes.some(process => process.processId === child.pid)
+    return hasExited && pidIsCurrentlyOccupied ? [] : [child.pid]
+  })
+  return { roots, descendants: descendantAcpProcesses(rootProcessIds, processes) }
 }
 
 export async function waitForAcpProcessExit(child: ChildProcess, graceMilliseconds = 2_000, forceMilliseconds = 2_000) {

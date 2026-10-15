@@ -23,7 +23,7 @@ const moduleDirectory = dirname(fileURLToPath(import.meta.url))
 const repositoryRoot = resolve(moduleDirectory, '../../../../..')
 const execute = promisify(execFile)
 export const defaultFrameworkMapPath = resolve(moduleDirectory, '../../../../../docs/agents/jul-225-framework-map.md')
-type CandidateIdentity = { candidateCommit: string; dirtyTreeDigest: string }
+export type CandidateIdentity = { candidateCommit: string; dirtyTreeDigest: string }
 type IdentityProvider = () => Promise<CandidateIdentity>
 
 export async function candidateIdentity(cwd = repositoryRoot): Promise<CandidateIdentity> {
@@ -41,6 +41,13 @@ export async function candidateIdentity(cwd = repositoryRoot): Promise<Candidate
     candidateCommit: commit.trim(),
     dirtyTreeDigest: `sha256:${hash.digest('hex')}`,
   }
+}
+
+export function assertStableCandidateIdentity(start: CandidateIdentity, end: CandidateIdentity) {
+  if (end.candidateCommit !== start.candidateCommit || end.dirtyTreeDigest !== start.dirtyTreeDigest) {
+    throw new Error('candidate identity changed during rehearsal')
+  }
+  return end
 }
 
 async function inventoryFromFrameworkMap(frameworkMapPath: string) {
@@ -230,8 +237,7 @@ export async function rehearsal(apiKey: string, evidencePath: string, identityPr
     const output = workflowResult.result
     const workflowSnapshot = WorkflowSnapshotSchema.parse({ runId: workflowRun.runId, input: inputData, output })
     const cli = await cliJourneyProof(apiKey, dirname(evidencePath), inputData.snapshot.roles)
-    const identityAtEnd = await identityProvider()
-    if (JSON.stringify(identityAtEnd) !== JSON.stringify(identityAtStart)) throw new Error('candidate identity changed during rehearsal')
+    const identityAtEnd = assertStableCandidateIdentity(identityAtStart, await identityProvider())
     const result = {
       recordedAt: new Date().toISOString(),
       ...identityAtEnd,
