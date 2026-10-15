@@ -25,7 +25,7 @@ import { ConnectionStore } from '../src/mastra/connections.ts'
 import { fetchLinearCard } from '../src/mastra/cli.ts'
 import { validateRoleDefaults } from '../src/mastra/roles.ts'
 import { decideStart, ensureSelectionsOffered, loadSavedSnapshot, validateStartPreconditions } from '../src/mastra/init.ts'
-import { createAcpRoutes, discoverCommandCodeOffers, ownedAcpProcesses, stopExactWindowsProcesses, waitForAcpProcessExit, withAcpRoutes } from '../src/mastra/routes.ts'
+import { createAcpRoutes, discoverAcpOffers, discoverCommandCodeOffers, ownedAcpProcesses, selectAcpModel, stopExactWindowsProcesses, waitForAcpProcessExit, withAcpRoutes } from '../src/mastra/routes.ts'
 import type { WindowsProcessIdentity } from '../src/mastra/routes.ts'
 import { createRoleExecutionWorkflow } from '../src/mastra/workflows/delivery.ts'
 
@@ -54,9 +54,118 @@ test('real file-backed connection lifecycle persists only parsed records and red
 })
 
 test('model offers keep duplicate IDs distinct by route', () => {
-  const antigravity = ModelOfferSchema.parse({ route: 'antigravity', modelId: 'shared', name: 'Shared', company: 'Google', service: 'Antigravity', codingCapable: true })
-  const claude = ModelOfferSchema.parse({ route: 'claude', modelId: 'shared', name: 'Shared', company: 'Anthropic', service: 'Claude', codingCapable: true })
+  const antigravity = ModelOfferSchema.parse({ route: 'antigravity', modelId: 'claude-sonnet-4-6', name: 'Shared', company: 'Google', service: 'Antigravity', codingCapable: true })
+  const claude = ModelOfferSchema.parse({ route: 'claude', modelId: 'claude-sonnet-4-6', name: 'Shared', company: 'Anthropic', service: 'Claude', codingCapable: true })
   assert.notEqual(`${antigravity.route}:${antigravity.modelId}`, `${claude.route}:${claude.modelId}`)
+})
+
+test('Claude discovery offers only exact provider model IDs from the session config option', async () => {
+  const routes = {
+    antigravity: { getAvailableModels: async () => [] },
+    claude: {
+      getAvailableModels: async () => [],
+      connection: { session: { sessionId: 'claude-session', configOptions: [{
+        id: 'model', type: 'select', currentValue: 'default', options: [
+          { value: 'default', name: 'Default' },
+          { value: 'opus', name: 'Opus' },
+          { value: 'sonnet', name: 'Sonnet' },
+          { value: 'fable', name: 'Fable' },
+          { value: 'haiku', name: 'Haiku' },
+          { value: 'claude-haiku-4-5-20251001', name: 'Haiku 4.5' },
+          { value: 'claude-sonnet-4-6', name: 'Sonnet 4.6' },
+        ],
+      }] } },
+    },
+  }
+  const offers = await discoverAcpOffers(routes as never)
+  assert.deepEqual(offers.map(offer => [offer.route, offer.modelId]), [
+    ['claude', 'claude-haiku-4-5-20251001'],
+    ['claude', 'claude-sonnet-4-6'],
+  ])
+})
+
+test('Claude selection and restart reapply the same exact provider model ID', async () => {
+  const requests: Array<{ sessionId: string; configId: string; value: string }> = []
+  const sessions: Array<{ configOptions: Array<{ id: string; currentValue: string }> }> = []
+  const makeRoutes = (sessionId: string) => {
+    const options = [{ value: 'default', name: 'Default' }, { value: 'claude-sonnet-4-6', name: 'Sonnet 4.6' }]
+    const session = { sessionId, configOptions: [{ id: 'model', currentValue: 'default', options }] }
+    sessions.push(session)
+    return {
+      antigravity: {},
+      claude: {
+        getAvailableModels: async () => [],
+        connection: {
+          session,
+          connection: {
+            setSessionConfigOption: async (request: { sessionId: string; configId: string; value: string }) => {
+              requests.push(request)
+              return { configOptions: [{ id: 'model', currentValue: request.value, options }] }
+            },
+          },
+        },
+      },
+    }
+  }
+  const selection = { route: 'claude' as const, modelId: 'claude-sonnet-4-6', company: 'Anthropic', service: 'Claude' }
+  await selectAcpModel(makeRoutes('initial-session') as never, selection)
+  await selectAcpModel(makeRoutes('restart-session') as never, selection)
+  assert.deepEqual(requests, [
+    { sessionId: 'initial-session', configId: 'model', value: 'claude-sonnet-4-6' },
+    { sessionId: 'restart-session', configId: 'model', value: 'claude-sonnet-4-6' },
+  ])
+  assert.deepEqual(sessions.map(session => session.configOptions.find(option => option.id === 'model')?.currentValue), [
+    'claude-sonnet-4-6', 'claude-sonnet-4-6',
+  ])
+})
+
+test('Claude aliases cannot be saved as role defaults', () => {
+  const exact = { route: 'claude' as const, modelId: 'claude-sonnet-4-6', company: 'Anthropic', service: 'Claude' }
+  const commandcode = { route: 'commandcode' as const, modelId: 'deepseek-v3', company: 'DeepSeek', service: 'CommandCode' }
+  const defaults = { builder: exact, reviewer: commandcode, crashFixer: exact, fixReviewer: commandcode }
+  assert.equal(RoleDefaultsSchema.parse(defaults).builder.modelId, 'claude-sonnet-4-6')
+  for (const alias of ['default', 'opus', 'sonnet', 'fable', 'haiku']) {
+    assert.throws(() => RoleDefaultsSchema.parse({ ...defaults, builder: { ...exact, modelId: alias } }), /full provider model ID/)
+  }
+})
+
+test('Claude selection refuses a saved model that the new session no longer offers', async () => {
+  let requests = 0
+  const routes = {
+    antigravity: {},
+    claude: {
+      getAvailableModels: async () => [],
+      connection: {
+        session: { sessionId: 'restart-session', configOptions: [{
+          id: 'model', currentValue: 'default', options: [{ value: 'claude-haiku-4-5-20251001', name: 'Haiku 4.5' }],
+        }] },
+        connection: { setSessionConfigOption: async () => { requests += 1; return { configOptions: [] } } },
+      },
+    },
+  }
+  await assert.rejects(selectAcpModel(routes as never, {
+    route: 'claude', modelId: 'claude-sonnet-4-6', company: 'Anthropic', service: 'Claude',
+  }), /not currently offered/)
+  assert.equal(requests, 0)
+})
+
+test('Claude selection refuses a bridge response that does not confirm the exact saved ID', async () => {
+  const options = [{ value: 'claude-sonnet-4-6', name: 'Sonnet 4.6' }]
+  const routes = {
+    antigravity: {},
+    claude: {
+      getAvailableModels: async () => [],
+      connection: {
+        session: { sessionId: 'claude-session', configOptions: [{ id: 'model', currentValue: 'default', options }] },
+        connection: { setSessionConfigOption: async () => ({
+          configOptions: [{ id: 'model', currentValue: 'default', options }],
+        }) },
+      },
+    },
+  }
+  await assert.rejects(selectAcpModel(routes as never, {
+    route: 'claude', modelId: 'claude-sonnet-4-6', company: 'Anthropic', service: 'Claude',
+  }), /selected "default" instead/)
 })
 
 test('CommandCode discovery keeps coding endpoints and rejects decision-only models', async () => {
@@ -187,7 +296,9 @@ test('standalone ACP route scope disconnects and cleans only processes it create
 })
 
 test('four-role company and normal service rules are exhaustive', () => {
-  const selection = (company: string, service: string, route: 'antigravity' | 'claude' | 'commandcode') => ({ route, modelId: 'm', company, service })
+  const selection = (company: string, service: string, route: 'antigravity' | 'claude' | 'commandcode') => ({
+    route, modelId: route === 'claude' ? 'claude-sonnet-4-6' : 'm', company, service,
+  })
   const valid = RoleDefaultsSchema.parse({
     builder: selection('Google', 'Antigravity', 'antigravity'), reviewer: selection('DeepSeek', 'CommandCode', 'commandcode'),
     crashFixer: selection('Anthropic', 'Claude', 'claude'), fixReviewer: selection('Google', 'Antigravity', 'antigravity'),
@@ -287,7 +398,7 @@ test('Cancel never dispatches and restart reuses the immutable snapshot', async 
   const snapshot = RoleDefaultsSchema.parse({
     builder: { route: 'antigravity', modelId: 'a', company: 'Google', service: 'Antigravity' },
     reviewer: { route: 'commandcode', modelId: 'b', company: 'DeepSeek', service: 'CommandCode' },
-    crashFixer: { route: 'claude', modelId: 'c', company: 'Anthropic', service: 'Claude' },
+    crashFixer: { route: 'claude', modelId: 'claude-sonnet-4-6', company: 'Anthropic', service: 'Claude' },
     fixReviewer: { route: 'antigravity', modelId: 'd', company: 'Google', service: 'Antigravity' },
   })
   assert.deepEqual(await decideStart({ decision: 'Cancel', snapshot, dispatch: async () => { dispatches += 1 } }), { status: 'cancelled' })
@@ -303,7 +414,7 @@ test('admission refuses stale defaults that are not in the current route offers'
   const roles = RoleDefaultsSchema.parse({
     builder: { route: 'antigravity', modelId: 'a', company: 'Google', service: 'Antigravity' },
     reviewer: { route: 'commandcode', modelId: 'b', company: 'DeepSeek', service: 'CommandCode' },
-    crashFixer: { route: 'claude', modelId: 'c', company: 'Anthropic', service: 'Claude' },
+    crashFixer: { route: 'claude', modelId: 'claude-sonnet-4-6', company: 'Anthropic', service: 'Claude' },
     fixReviewer: { route: 'antigravity', modelId: 'd', company: 'Google', service: 'Antigravity' },
   })
   const offers = Object.values(roles).map(selection => ModelOfferSchema.parse({
@@ -321,7 +432,7 @@ test('restart reuses the exact persisted four-role snapshot after live defaults 
   const roles = RoleDefaultsSchema.parse({
     builder: { route: 'antigravity', modelId: 'saved-a', company: 'Google', service: 'Antigravity' },
     reviewer: { route: 'commandcode', modelId: 'saved-b', company: 'Anthropic', service: 'CommandCode' },
-    crashFixer: { route: 'claude', modelId: 'saved-c', company: 'Anthropic', service: 'Claude' },
+    crashFixer: { route: 'claude', modelId: 'claude-sonnet-4-6', company: 'Anthropic', service: 'Claude' },
     fixReviewer: { route: 'antigravity', modelId: 'saved-d', company: 'Google', service: 'Antigravity' },
   })
   await writeFile(path, JSON.stringify({ issueId: 'JUL-225', savedAt: new Date().toISOString(), roles }))
@@ -336,7 +447,7 @@ test('every named Start precondition fails before dispatch', () => {
   const roles = RoleDefaultsSchema.parse({
     builder: { route: 'antigravity', modelId: 'a', company: 'Google', service: 'Antigravity' },
     reviewer: { route: 'commandcode', modelId: 'b', company: 'Anthropic', service: 'CommandCode' },
-    crashFixer: { route: 'claude', modelId: 'c', company: 'Anthropic', service: 'Claude' },
+    crashFixer: { route: 'claude', modelId: 'claude-sonnet-4-6', company: 'Anthropic', service: 'Claude' },
     fixReviewer: { route: 'antigravity', modelId: 'd', company: 'Google', service: 'Antigravity' },
   })
   const records = ['antigravity', 'claude', 'commandcode'].map(route => ({ route, enabled: true, lastTest: { ok: true } }))
@@ -355,7 +466,7 @@ test('every CLI and workflow handoff contract accepts its exact shape and reject
   const roles = RoleDefaultsSchema.parse({
     builder: { route: 'antigravity', modelId: 'a', company: 'Google', service: 'Antigravity' },
     reviewer: { route: 'commandcode', modelId: 'b', company: 'Anthropic', service: 'CommandCode' },
-    crashFixer: { route: 'claude', modelId: 'c', company: 'Anthropic', service: 'Claude' },
+    crashFixer: { route: 'claude', modelId: 'claude-sonnet-4-6', company: 'Anthropic', service: 'Claude' },
     fixReviewer: { route: 'antigravity', modelId: 'd', company: 'Google', service: 'Antigravity' },
   })
   const snapshot = { issueId: 'JUL-225', roles, allowSameService: false, savedAt: new Date().toISOString() }
@@ -395,7 +506,7 @@ test('a route failure emits correlated role, route, model, timing, and error evi
       snapshot: { issueId: 'JUL-225', allowSameService: false, savedAt: new Date().toISOString(), roles: {
         builder: { route: 'antigravity', modelId: 'a', company: 'Google', service: 'Antigravity' },
         reviewer: { route: 'commandcode', modelId: 'b', company: 'Anthropic', service: 'CommandCode' },
-        crashFixer: { route: 'claude', modelId: 'c', company: 'Anthropic', service: 'Claude' },
+        crashFixer: { route: 'claude', modelId: 'claude-sonnet-4-6', company: 'Anthropic', service: 'Claude' },
         fixReviewer: { route: 'antigravity', modelId: 'd', company: 'Google', service: 'Antigravity' },
       } },
     } })
@@ -415,8 +526,22 @@ test('later workflow roles receive the exact earlier role outputs', async () => 
     setModel: async () => {},
     generate: async (prompt: string) => ({ text: prompt === 'build JUL-208' ? 'PROPOSED CHANGE' : `reviewed: ${prompt}` }),
   }
+  const claudeOptions = [
+    { value: 'claude-sonnet-4-6', name: 'Sonnet 4.6' },
+    { value: 'claude-haiku-4-5-20251001', name: 'Haiku 4.5' },
+  ]
+  const claudeRoute = {
+    ...route,
+    getAvailableModels: async () => [],
+    connection: {
+      session: { sessionId: 'workflow-session', configOptions: [{ id: 'model', currentValue: 'claude-sonnet-4-6', options: claudeOptions }] },
+      connection: { setSessionConfigOption: async ({ value }: { value: string }) => ({
+        configOptions: [{ id: 'model', currentValue: value, options: claudeOptions }],
+      }) },
+    },
+  }
   const workflow = createRoleExecutionWorkflow({
-    routes: { antigravity: route, claude: route } as never,
+    routes: { antigravity: route, claude: claudeRoute } as never,
     promptForRole: (role, issueId, priorResults) => {
       const prompt = role === 'builder' ? `build ${issueId}` : `${role} sees ${priorResults.builder}`
       prompts[role] = prompt
@@ -428,8 +553,8 @@ test('later workflow roles receive the exact earlier role outputs', async () => 
     decision: 'Start', authorized: true,
     snapshot: { issueId: 'JUL-208', allowSameService: false, savedAt: new Date().toISOString(), roles: {
       builder: { route: 'antigravity', modelId: 'a', company: 'Google', service: 'Antigravity' },
-      reviewer: { route: 'claude', modelId: 'b', company: 'Anthropic', service: 'Claude' },
-      crashFixer: { route: 'claude', modelId: 'c', company: 'Anthropic', service: 'Claude' },
+      reviewer: { route: 'claude', modelId: 'claude-sonnet-4-6', company: 'Anthropic', service: 'Claude' },
+      crashFixer: { route: 'claude', modelId: 'claude-haiku-4-5-20251001', company: 'Anthropic', service: 'Claude' },
       fixReviewer: { route: 'antigravity', modelId: 'd', company: 'Google', service: 'Antigravity' },
     } },
   } })
@@ -440,15 +565,28 @@ test('later workflow roles receive the exact earlier role outputs', async () => 
 
 test('workflow rejects a route response truncated by its model limit', async () => {
   const complete = { setModel: async () => {}, generate: async () => ({ text: 'complete', finishReason: 'stop' }) }
-  const truncated = { setModel: async () => {}, generate: async () => ({ text: 'High: cut off mid-sentence', finishReason: 'length' }) }
+  const options = [
+    { value: 'claude-sonnet-4-6', name: 'Sonnet 4.6' },
+    { value: 'claude-haiku-4-5-20251001', name: 'Haiku 4.5' },
+  ]
+  const truncated = {
+    generate: async () => ({ text: 'High: cut off mid-sentence', finishReason: 'length' }),
+    getAvailableModels: async () => [],
+    connection: {
+      session: { sessionId: 'truncated-session', configOptions: [{ id: 'model', currentValue: 'claude-sonnet-4-6', options }] },
+      connection: { setSessionConfigOption: async ({ value }: { value: string }) => ({
+        configOptions: [{ id: 'model', currentValue: value, options }],
+      }) },
+    },
+  }
   const workflow = createRoleExecutionWorkflow({ routes: { antigravity: complete, claude: truncated } as never })
   const run = await workflow.createRun()
   const result = await run.start({ inputData: {
     decision: 'Start', authorized: true,
     snapshot: { issueId: 'JUL-208', allowSameService: false, savedAt: new Date().toISOString(), roles: {
       builder: { route: 'antigravity', modelId: 'a', company: 'Google', service: 'Antigravity' },
-      reviewer: { route: 'claude', modelId: 'b', company: 'Anthropic', service: 'Claude' },
-      crashFixer: { route: 'claude', modelId: 'c', company: 'Anthropic', service: 'Claude' },
+      reviewer: { route: 'claude', modelId: 'claude-sonnet-4-6', company: 'Anthropic', service: 'Claude' },
+      crashFixer: { route: 'claude', modelId: 'claude-haiku-4-5-20251001', company: 'Anthropic', service: 'Claude' },
       fixReviewer: { route: 'antigravity', modelId: 'd', company: 'Google', service: 'Antigravity' },
     } },
   } })

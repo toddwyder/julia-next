@@ -59,14 +59,65 @@ function normalizeAcpOffer(route: 'antigravity' | 'claude', item: { modelId: str
   })
 }
 
+type ClaudeConfigChoice = { value?: unknown; name?: unknown; options?: unknown }
+type ClaudeModelConfig = { id?: unknown; currentValue?: unknown; options?: unknown }
+type ClaudeSession = { sessionId?: unknown; configOptions?: unknown }
+type ClaudeConnectionInternals = {
+  session?: ClaudeSession
+  connection?: { setSessionConfigOption(request: { sessionId: string; configId: string; value: string }): Promise<{ configOptions?: unknown }> }
+}
+
+function claudeModelChoices(agent: ReturnType<typeof createAcpRoutes>['claude']) {
+  const session = (agent.connection as unknown as { session?: ClaudeSession }).session
+  const configs = Array.isArray(session?.configOptions) ? session.configOptions : []
+  const modelConfigs = configs.filter((item): item is ClaudeModelConfig => typeof item === 'object' && item !== null && (item as ClaudeModelConfig).id === 'model')
+  if (modelConfigs.length !== 1 || !Array.isArray(modelConfigs[0]?.options)) {
+    throw new Error('Claude ACP session did not advertise exactly one model config option')
+  }
+  const flatten = (choices: unknown[]): ClaudeConfigChoice[] => choices.flatMap(choice => {
+    if (typeof choice !== 'object' || choice === null) return []
+    const parsed = choice as ClaudeConfigChoice
+    return Array.isArray(parsed.options) ? flatten(parsed.options) : [parsed]
+  })
+  return flatten(modelConfigs[0].options).filter((choice): choice is ClaudeConfigChoice & { value: string } =>
+    typeof choice.value === 'string' && choice.value.startsWith('claude-'))
+}
+
+async function discoverClaudeOffers(agent: ReturnType<typeof createAcpRoutes>['claude']) {
+  await agent.getAvailableModels()
+  return claudeModelChoices(agent).map(choice => normalizeAcpOffer('claude', {
+    modelId: choice.value,
+    name: typeof choice.name === 'string' ? choice.name : choice.value,
+  }))
+}
+
+async function selectClaudeModel(agent: ReturnType<typeof createAcpRoutes>['claude'], modelId: string) {
+  await agent.getAvailableModels()
+  if (!claudeModelChoices(agent).some(choice => choice.value === modelId)) {
+    throw new Error(`Claude model "${modelId}" is not currently offered`)
+  }
+  const internals = agent.connection as unknown as ClaudeConnectionInternals
+  const session = internals.session
+  const sessionId = session?.sessionId
+  if (typeof sessionId !== 'string' || !session || !internals.connection) throw new Error('Claude ACP connection is not initialized')
+  const response = await internals.connection.setSessionConfigOption({ sessionId, configId: 'model', value: modelId })
+  const configs = Array.isArray(response.configOptions) ? response.configOptions : []
+  const selected = configs.find((item): item is ClaudeModelConfig =>
+    typeof item === 'object' && item !== null && (item as ClaudeModelConfig).id === 'model')
+  if (selected?.currentValue !== modelId) {
+    throw new Error(`Claude ACP selected "${String(selected?.currentValue)}" instead of "${modelId}"`)
+  }
+  session.configOptions = configs
+}
+
 export async function discoverAcpOffers(routes: ReturnType<typeof createAcpRoutes>) {
   const [antigravity, claude] = await Promise.all([
     routes.antigravity.getAvailableModels(),
-    routes.claude.getAvailableModels(),
+    discoverClaudeOffers(routes.claude),
   ])
   return [
     ...antigravity.map(item => normalizeAcpOffer('antigravity', item)),
-    ...claude.map(item => normalizeAcpOffer('claude', item)),
+    ...claude,
   ]
 }
 
@@ -76,6 +127,7 @@ export async function selectAcpModel(routes: ReturnType<typeof createAcpRoutes>,
     ...(selection.wire ? { wire: selection.wire } : {}),
   })
   if (parsed.route === 'commandcode') throw new Error('CommandCode is not an ACP route')
+  if (parsed.route === 'claude') return selectClaudeModel(routes.claude, parsed.modelId)
   await routes[parsed.route].setModel(parsed.modelId)
 }
 

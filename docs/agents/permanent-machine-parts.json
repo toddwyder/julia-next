@@ -21,7 +21,7 @@
       "name": "Claude ACP bridge",
       "kind": "package",
       "location": "C:\\Users\\toddw\\AppData\\Roaming\\npm\\node_modules\\@agentclientprotocol\\claude-agent-acp",
-      "expectedVersion": "0.35.0",
+      "expectedVersion": "0.90.0",
       "permanent": true
     },
     {

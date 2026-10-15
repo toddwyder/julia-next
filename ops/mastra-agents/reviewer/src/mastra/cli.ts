@@ -50,8 +50,17 @@ export async function modelCommand(args: string[]) {
     : { action })
   if (action === 'save') {
     const defaults = validateRoleDefaults(RoleDefaultsSchema.parse(JSON.parse(await readFile(value, 'utf8'))))
-    await atomicJson(defaultsPath, defaults)
-    return ModelsResultSchema.parse({ offers: [], defaults })
+    return withAcpRoutes(async routes => {
+      const offers = await discoverAcpOffers(routes)
+      const key = process.env.COMMANDCODE_API_KEY
+      if (Object.values(defaults).some(selection => selection.route === 'commandcode')) {
+        if (!key) throw new Error('CommandCode secret reference did not resolve')
+        offers.push(...await discoverCommandCodeOffers(key))
+      }
+      ensureSelectionsOffered(defaults, offers)
+      await atomicJson(defaultsPath, defaults)
+      return ModelsResultSchema.parse({ offers, defaults })
+    })
   }
   if (action === 'list') {
     return withAcpRoutes(async routes => {

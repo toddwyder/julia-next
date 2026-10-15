@@ -25,7 +25,11 @@ export const ModelOfferSchema = z.object({
   wire: z.enum(['chat', 'responses', 'messages']).optional(),
 }).strict()
 
-export const ModelSelectionSchema = ModelOfferSchema.pick({ route: true, modelId: true, company: true, service: true, wire: true })
+export const ModelSelectionSchema = ModelOfferSchema.pick({ route: true, modelId: true, company: true, service: true, wire: true }).superRefine((selection, context) => {
+  if (selection.route === 'claude' && !selection.modelId.startsWith('claude-')) {
+    context.addIssue({ code: 'custom', path: ['modelId'], message: 'Claude selections require a full provider model ID beginning with claude-' })
+  }
+})
 export const RoleDefaultsSchema = z.object({
   builder: ModelSelectionSchema,
   reviewer: ModelSelectionSchema,
