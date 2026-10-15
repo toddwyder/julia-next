@@ -208,26 +208,35 @@ test('admission requires the complete settled card shape and Ready state', () =>
   }
   assert.throws(() => CardAdmissionSchema.parse({ ...complete, description: `${complete.description}\nTODO: decision` }))
   const linear = { ...complete, description: '**Outcome**\nA\n\n**Requirements**\nB\n\n**Contracts**\nC\n\n**Finish conditions**\nD\n\n**Proof**\nE' }
-  assert.equal(CardAdmissionSchema.parse(linear).identifier, 'JUL-225')
+  assert.throws(() => CardAdmissionSchema.parse(linear), /missing nonempty Outcome section/)
 })
 
 test('admission keeps ordinary bold paragraphs inside a section', () => {
   const description = [
-    '**Outcome**',
-    '**Important:** this is body text, not a section heading.',
-    'A complete outcome.',
+    '# Outcome',
     '**Requirements**',
+    '**Important:** bold lines are body text, not section headings.',
+    'A complete outcome.',
+    '# Requirements',
     'B',
-    '**Contracts**',
+    '# Contracts',
     'C',
-    '**Finish conditions**',
+    '# Finish conditions',
     'D',
-    '**Proof**',
+    '# Proof',
     'E',
   ].join('\n')
   assert.equal(CardAdmissionSchema.parse({ identifier: 'JUL-225', state: 'Ready', description }).identifier, 'JUL-225')
   assert.throws(() => CardAdmissionSchema.parse({
-    identifier: 'JUL-225', state: 'Ready', description: description.replace('**Outcome**', '**Outcome'),
+    identifier: 'JUL-225', state: 'Ready', description: description.replace('# Outcome', '**Outcome**'),
+  }), /missing nonempty Outcome section/)
+  assert.throws(() => CardAdmissionSchema.parse({
+    identifier: 'JUL-225', state: 'Ready',
+    description: description.replace('**Requirements**\n**Important:** bold lines are body text, not section headings.\nA complete outcome.', '# Notes\nNotes are not Outcome content.'),
+  }), /empty Outcome section/)
+  assert.throws(() => CardAdmissionSchema.parse({
+    identifier: 'JUL-225', state: 'Ready',
+    description: description.replace('# Outcome\n**Requirements**\n**Important:** bold lines are body text, not section headings.\nA complete outcome.', '#\nOutcome\nA complete outcome.'),
   }), /missing nonempty Outcome section/)
 })
 
@@ -237,6 +246,7 @@ test('admission rejects unresolved decision markers embedded in prose', () => {
   assert.throws(() => CardAdmissionSchema.parse({ identifier: 'JUL-225', state: 'Ready', description: description.replace('Status: TBD before delivery.', '- TODO choose provider') }), /unresolved decision marker/)
   assert.throws(() => CardAdmissionSchema.parse({ identifier: 'JUL-225', state: 'Ready', description: description.replace('Status: TBD before delivery.', 'Status: unresolved decision — choose provider') }), /unresolved decision marker/)
   assert.throws(() => CardAdmissionSchema.parse({ identifier: 'JUL-225', state: 'Ready', description: description.replace('Status: TBD before delivery.', 'Status: unresolved decision marker: choose provider') }), /unresolved decision marker/)
+  assert.throws(() => CardAdmissionSchema.parse({ identifier: 'JUL-225', state: 'Ready', description: description.replace('Status: TBD before delivery.', 'Provider remains an unresolved-decision marker in this line.') }), /unresolved decision marker/)
   assert.throws(() => CardAdmissionSchema.parse({ identifier: 'JUL-225', state: 'Ready', description: description.replace('Status: TBD before delivery.', 'TODOs: choose provider') }), /unresolved decision marker/)
   assert.throws(() => CardAdmissionSchema.parse({ identifier: 'JUL-225', state: 'Ready', description: description.replace('Status: TBD before delivery.', 'Unresolved decisions: choose provider') }), /unresolved decision marker/)
   assert.doesNotThrow(() => CardAdmissionSchema.parse({

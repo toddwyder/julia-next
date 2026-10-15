@@ -34,8 +34,7 @@ export const RoleDefaultsSchema = z.object({
 }).strict()
 
 const requiredSections = ['Outcome', 'Requirements', 'Contracts', 'Finish conditions', 'Proof'] as const
-const requiredSectionTitles = requiredSections.map(section => section.replace(' ', '\\s+')).join('|')
-const requiredSectionHeading = new RegExp(`^(?:#{1,6}\\s+(?:${requiredSectionTitles})|\\*\\*(?:${requiredSectionTitles})\\*\\*)\\s*$`, 'im')
+const markdownHeading = /^#{1,6}(?:[ \t]+.*)?$/im
 export const CardAdmissionSchema = z.object({
   identifier: z.string().regex(/^[A-Z][A-Z0-9]*-\d+$/),
   state: nonempty,
@@ -45,18 +44,18 @@ export const CardAdmissionSchema = z.object({
     context.addIssue({ code: 'custom', path: ['state'], message: 'expected Ready state' })
   }
   for (const section of requiredSections) {
-    const title = section.replace(' ', '\\s+')
-    const pattern = new RegExp(`^(?:#{1,6}\\s+${title}|\\*\\*${title}\\*\\*)\\s*$`, 'im')
+    const title = section.replace(' ', '[ \\t]+')
+    const pattern = new RegExp(`^#{1,6}[ \\t]+${title}[ \\t]*$`, 'im')
     const heading = pattern.exec(card.description)
     if (!heading) {
       context.addIssue({ code: 'custom', path: ['description'], message: `missing nonempty ${section} section` })
       continue
     }
-    const content = card.description.slice(heading.index + heading[0].length).split(requiredSectionHeading)[0]?.trim()
+    const content = card.description.slice(heading.index + heading[0].length).split(markdownHeading)[0]?.trim()
     if (!content) context.addIssue({ code: 'custom', path: ['description'], message: `empty ${section} section` })
   }
-  const decisionText = card.description.replace(/\bno\s+unresolved decisions?(?:\s+markers?)?\b/gi, '')
-  if (/\b(?:TODOs?|TBDs?|unresolved decisions?(?:\s+markers?)?)\b/i.test(decisionText)) {
+  const decisionText = card.description.replace(/\bno\s+unresolved(?:[\s-]+)decisions?(?:\s+markers?)?\b/gi, '')
+  if (/\b(?:TODOs?|TBDs?|unresolved(?:[\s-]+)decisions?(?:\s+markers?)?)\b/i.test(decisionText)) {
     context.addIssue({ code: 'custom', path: ['description'], message: 'unresolved decision marker' })
   }
 })
