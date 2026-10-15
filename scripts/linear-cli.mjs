@@ -5,10 +5,8 @@
 // former MCP-based Linear routes (Decision comment, JUL-77).
 //
 // The key is never accepted on the command line or read from stdin in the
-// clear here -- callers pass it via LINEAR_API_KEY (the orchestrator-svc
-// identity gets it from ops/service-dropbox/read-secret.mjs, in-process,
-// never through argv or a shell string -- see that module's own comment
-// for why).
+// clear here -- callers pass it via LINEAR_API_KEY. Laptop delivery commands
+// receive it from the vault wrapper, never through argv or a shell string.
 const LINEAR_GRAPHQL_URL = 'https://api.linear.app/graphql';
 
 // Two identities reach Linear through this one function, and they are sent
@@ -48,9 +46,7 @@ export async function linearGraphQL(query, variables, { apiKey, accessToken, fet
   return body.data;
 }
 
-// JUL-79 step 5: the coordinator reads its own card through this CLI and now
-// needs the model/effort labels to resolve each agent's seat
-// (seat-labels.mjs's seatChoicesForIssue). `state` was already here.
+// The delivery intake reads the card state and labels through this shared query.
 const GET_ISSUE_QUERY = `
   query GetIssue($id: String!) {
     viewer { id name }

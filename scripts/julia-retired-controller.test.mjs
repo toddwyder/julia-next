@@ -18,6 +18,18 @@ const retiredPaths = [
   '../ops/service-dropbox/dropbox.env.example',
   '../ops/service-dropbox/write-secret.sh',
   '../ops/service-dropbox/write-secret.test.mjs',
+  '../delivery-tools.json',
+  '../ops/service-dropbox/pi-models.commandcode.json',
+  '../ops/service-dropbox/run-pi-seat.mjs',
+  '../ops/service-dropbox/read-secret.mjs',
+  '../ops/julia-runner/run-reviewer.mjs',
+  '../ops/julia-runner/run-codex-builder.mjs',
+  '../ops/julia-runner/run-gemini.mjs',
+  '../ops/julia-runner/run-tests.mjs',
+  '../ops/julia-runner/reap.py',
+  '../ops/julia-runner/sudoers',
+  '../graph/board-spec.mjs',
+  '../graph/seat-table.mjs',
   './controller-stand-in.mjs',
   './julia-run.mjs',
   './ready-queue.mjs',
@@ -42,6 +54,11 @@ const retiredPaths = [
   './julia-minimal-runner-adapters.mjs',
   './julia-delivery-interrupt-runner.mjs',
   './julia-review-only.mjs',
+  './delivery-tool-settings.ts',
+  './seat-labels.mjs',
+  './julia-graph-model.mjs',
+  './board-setup.mjs',
+  './effort.mjs',
 ];
 
 test('retired controller and OVH-only routes are not executable source or deployable config', () => {
@@ -53,16 +70,10 @@ test('the active suite has no retired controller or OVH-only registration', () =
   assert.doesNotMatch(suite, /HISTORICAL_TESTS|controller-(?:board|carry)\.test|stand-in-seat\.test|ops-controller|ops-sudoers|check-readiness|collect-worker-result|orca-cli|ready-queue|service-dropbox(?:-write-secret)?\.test/);
 });
 
-test('worker support that does not orchestrate delivery remains available', () => {
+test('only worker support used by the Mastra delivery path remains available', () => {
   for (const path of [
-    '../ops/service-dropbox/run-pi-seat.mjs',
     '../ops/service-dropbox/run-agy-seat.mjs',
-    '../ops/service-dropbox/read-secret.mjs',
-    '../graph/seat-table.mjs',
-    './seat-labels.mjs',
-    './julia-graph-model.mjs',
-    './board-setup.mjs',
-    '../ops/julia-runner/run-reviewer.mjs',
+    '../ops/julia-runner/time-limit.mjs',
   ]) assert.equal(existsSync(new URL(path, import.meta.url)), true, path);
 });
 

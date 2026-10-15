@@ -8,7 +8,7 @@ Web, docs-policy and baseline retain their existing commands.
 ## Discovery and shared safety
 
 The gate recursively discovers `*.test.mjs` named `julia-init*`, `julia-delivery*`,
-`julia-graph-model*`, `julia-minimal-runner*` or `julia-runner*`, and every MJS test
+`julia-minimal-runner*` or `julia-runner*`, and every MJS test
 under `ops/julia-runner/`. New tests in these families need no registration.
 Tests elsewhere that import those modules, the shared dependencies below or
 `ops/julia-runner/` are also included. CI conservatively routes new MJS test paths
@@ -25,19 +25,15 @@ The shared script tests are included explicitly:
 
 | Tests | Protection/dependency |
 | --- | --- |
-| `delivery-tool-settings` | Saved model/company, thinking and connection choices |
 | `acceptance-check` | Whole acceptance/evidence contract used by JUL-122 |
 | `linear-cli` | Intake/credential handling, with fixture HTTP responses |
-| `effort`, `seat-labels`, `seat-table` | Model selection and company independence |
-| `service-dropbox-run-agy-seat`, `service-dropbox-run-pi-seat`, `service-dropbox-read-secret` | Existing worker transport, parsing and secret boundaries; fixtures only |
 | `verify-reviewer-worktree` | Review cannot silently alter the candidate |
 | `line-endings`, `no-personal-paths`, `personal-paths` | Portable source and safe configuration |
 | `ci-routing` | Gates for runner, shared paths and multi-domain changes |
 
-The seat-table and service-dropbox tests run directly in `graph/` and
-`ops/service-dropbox/`, once each. Their historical script wrappers remain outside
-this gate; importing another test file does not make a wrapper an active runner
-regression. `julia-runner-suite.test.mjs` proves new/nested/unwrapped discovery,
+The service-dropbox test runs directly in `ops/service-dropbox/`, once.
+Importing another test file does not make a wrapper an active runner regression.
+`julia-runner-suite.test.mjs` proves new/nested/unwrapped discovery,
 archive separation, space-containing paths, inherited test-context isolation,
 failure propagation, empty-suite refusal and the CI command contract.
 The command prints every selected file, then Node's full results including skip
@@ -47,15 +43,14 @@ reasons and counts. Failures return nonzero; there is no baseline-failure waiver
 
 Factory and database gates were removed with the retired infrastructure. Web/browser and
 docs/policy checks keep their existing gates. The retired graph/controller source,
-its tests and its free stand-in worker harness are deleted. Shared safety tests such
-as `graph/board-spec.test.mjs` and `scripts/bad-submissions.test.mjs` are discovered
+board-model tools, fixed-model worker launchers, their tests, and their fixtures are
+deleted. Shared safety tests such as `scripts/bad-submissions.test.mjs` are discovered
 normally by this gate. New unwrapped shared regressions are automatically discovered.
 The unused OVH-only Python graph, Orca/ready-queue launch chain, controller/sudoers/
-daemon config and credential drop-box writer service are also deleted with their
-tests and suite inventory. The laptop-imported seat launchers and read-only secret
-boundary remain in this gate until the stage-three Mastra workflow replacement.
-Shared timeout coverage now exercises the current Windows
-process-tree behavior; obsolete Linux account-sweep assertions are removed.
+daemon config and credential drop-box service are also deleted with their tests and
+suite inventory. The Antigravity recovery launcher remains because today's Mastra
+crash-recovery path imports it. Shared timeout coverage exercises the current Windows
+process-tree behavior.
 
 Removed exactly:
 
@@ -76,10 +71,8 @@ Three real Claude checks now require `JUL196_CLAUDE_REAL_PROOF=1`; the existing
 Codex proof requires `JUL196_CODEX_REAL_PROOF=1`. These flags require separate
 operator authorization. Ordinary local/CI runs disclose these four checks as
 unexecuted opt-ins. Claude's existing quota-blocked flag remains supported.
-The six real-process/POSIX-mode tests exclusive to the retired Linux launchers
-were removed: one Gemini group-permission test and five systemd/subreaper reviewer
-tests. Git history preserves them. Shared timeout tests now prove Windows worker
-and child termination, forced termination, unrelated-process survival, and portable
+Shared timeout tests prove Windows worker and child termination, forced
+termination, unrelated-process survival, and portable
 normal completion. Their real Windows process cases skip only on other operating
 systems. Protected-path tests use disposable directories and real directory aliases,
 with explicit fixture commits rather than local checkouts or `origin/main`.

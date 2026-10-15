@@ -23,10 +23,12 @@
 
 ## Removed authorities and search roots
 
-Exact repository pieces removed: `scripts/julia-connection-adapters.mjs`,
-`scripts/julia-connections.mjs`, `scripts/julia-models.mjs`, and their card-specific tests. They
-contained the static defaults, cached inventory authority, custom connection type, and custom ACP
-adapters. The recorded after-search checks that each exact removed path is absent, then searches
+Exact repository pieces removed include `scripts/julia-connection-adapters.mjs`,
+`scripts/julia-connections.mjs`, `scripts/julia-models.mjs`, `delivery-tools.json`,
+the old board/model selectors, the Pi model fragments, and the fixed-model Linux
+worker launchers, together with their tests and fixtures. They contained the
+static defaults, cached inventory authority, custom connection type, custom ACP
+adapters, and the pre-Mastra model lists. The recorded after-search checks that each exact removed path is absent, then searches
 `scripts/` and `ops/mastra-agents/reviewer/src/mastra/` for these exact forbidden patterns:
 `STOCK_CONNECTION_TYPES`, `models-cache.json`, `testAcpAdapter`, and
 `discoverAntigravityModels`. The framework map is evidence, not an implementation search root.

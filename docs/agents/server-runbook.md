@@ -35,16 +35,11 @@ were removed. Do not recreate or probe the former paths. Historical evidence liv
 
 ## Secret transport
 
-- Every secret is read in-process (via `ops/service-dropbox/read-secret.mjs` `readSecret()`) and
-  handed to the child only through `spawn`'s `env` option — never command arguments and never a
-  shell string, so it never appears in `argv` and is never printed.
-- **Never `cat` a drop-box secret file directly.** These are raw, non-`KEY=VALUE` tokens; a bare
-  `cat` echoes the full value into whatever captured the command's output. Use `readSecret()`.
-- Never print raw secret files. Service and access-check logs record sanitized
-  action/outcome/commit evidence — never credentials, OAuth URLs/codes, pairing material, or raw
+- The retired server runner and its drop-box secret reader have been removed.
+- Laptop delivery commands that need a Julia secret run through
+  `scripts/julia-vault-windows.ps1`, as required by `AGENTS.md`.
+- Never print credentials, OAuth URLs or codes, pairing material, or raw
   credential-bearing subprocess output.
-- After any `groupadd`/`usermod -aG` that a seat's secret access depends on, verify secret
-  access again — supplementary groups are fixed at daemon start and are not re-read live.
 
 ## GitHub write boundaries
 
