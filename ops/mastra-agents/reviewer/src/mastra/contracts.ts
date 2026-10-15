@@ -52,7 +52,7 @@ export const CardAdmissionSchema = z.object({
     const content = card.description.slice(heading.index + heading[0].length).split(requiredSectionHeading)[0]?.trim()
     if (!content) context.addIssue({ code: 'custom', path: ['description'], message: `empty ${section} section` })
   }
-  if (/\bTODO\s*:|\bTBD\b|\bunresolved decision\s*:/i.test(card.description)) {
+  if (/(?<!\bno\s)\b(?:TODO|TBD|unresolved decision)\b(?!\s+markers?\b)/i.test(card.description)) {
     context.addIssue({ code: 'custom', path: ['description'], message: 'unresolved decision marker' })
   }
 })

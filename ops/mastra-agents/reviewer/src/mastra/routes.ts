@@ -175,6 +175,31 @@ async function cleanupOwnedAcpRoutes(routes: ReturnType<typeof createAcpRoutes>,
   if (errors.length > 1) throw new AggregateError(errors, `ACP cleanup failed: ${errors.map(error => error instanceof Error ? error.message : String(error)).join('; ')}`)
 }
 
+export async function withFinalCleanup<T>(operation: () => Promise<T>, cleanup: () => Promise<void>) {
+  let operationError: unknown
+  try {
+    return await operation()
+  } catch (error) {
+    operationError = error
+    throw error
+  } finally {
+    try {
+      await cleanup()
+    } catch (cleanupError) {
+      if (operationError) {
+        const operationMessage = operationError instanceof Error ? operationError.message : String(operationError)
+        const cleanupMessage = cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
+        throw new AggregateError([operationError, cleanupError], `Operation failed: ${operationMessage}; cleanup also failed: ${cleanupMessage}`)
+      }
+      throw cleanupError
+    }
+  }
+}
+
+export async function rethrowAfterCleanup(operationError: unknown, cleanup: () => Promise<void>): Promise<never> {
+  return withFinalCleanup(async () => { throw operationError }, cleanup)
+}
+
 export async function withAcpRoutes<T>(
   use: (routes: ReturnType<typeof createAcpRoutes>) => Promise<T>,
   scope: AcpRouteScope = {
@@ -185,24 +210,7 @@ export async function withAcpRoutes<T>(
   },
 ) {
   const routes = scope.createRoutes()
-  let operationError: unknown
-  try {
-    return await use(routes)
-  } catch (error) {
-    operationError = error
-    throw error
-  } finally {
-    try {
-      await cleanupOwnedAcpRoutes(routes, scope)
-    } catch (cleanupError) {
-      if (operationError) {
-        const operationMessage = operationError instanceof Error ? operationError.message : String(operationError)
-        const cleanupMessage = cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
-        throw new AggregateError([operationError, cleanupError], `ACP route operation failed: ${operationMessage}; cleanup also failed: ${cleanupMessage}`)
-      }
-      throw cleanupError
-    }
-  }
+  return withFinalCleanup(() => use(routes), () => cleanupOwnedAcpRoutes(routes, scope))
 }
 
 export async function cleanupAcpRoutes(routes: ReturnType<typeof createAcpRoutes>) {

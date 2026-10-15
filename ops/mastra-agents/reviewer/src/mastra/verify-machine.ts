@@ -6,7 +6,7 @@ import { promisify } from 'node:util'
 import { z } from 'zod/v4'
 import { fetchLinearCard } from './cli.ts'
 import { ConnectionRecordSchema, ConnectionsResultSchema, InitResultSchema, ModelsResultSchema, WorkflowSnapshotSchema } from './contracts.ts'
-import { cleanupAcpRoutes, createAcpRoutes, createCommandCodeAgent, discoverAcpOffers, discoverCommandCodeOffers, selectAcpModel } from './routes.ts'
+import { cleanupAcpRoutes, createAcpRoutes, createCommandCodeAgent, discoverAcpOffers, discoverCommandCodeOffers, rethrowAfterCleanup, selectAcpModel, withFinalCleanup } from './routes.ts'
 import { createRoleExecutionWorkflow } from './workflows/delivery.ts'
 
 const PartsSchema = z.object({
@@ -62,8 +62,7 @@ export async function liveModelProof(apiKey: string, cwd = resolve(moduleDirecto
     for (const offer of commandCodeOffers) createCommandCodeAgent(offer, apiKey)
     return { routes, offers: [...acpOffers, ...commandCodeOffers], selected: { antigravity, claude, commandcode } }
   } catch (error) {
-    await cleanupAcpRoutes(routes)
-    throw error
+    return rethrowAfterCleanup(error, () => cleanupAcpRoutes(routes))
   }
 }
 
@@ -169,7 +168,8 @@ async function cliJourneyProof(apiKey: string, evidenceDirectory: string, roles:
     models: { save: ModelsResultSchema.parse(JSON.parse(save.stdout)), list: ModelsResultSchema.parse(JSON.parse(list.stdout)) },
     init: {
       preview: InitResultSchema.parse(JSON.parse(preview.stdout)), cancel: InitResultSchema.parse(JSON.parse(cancel.stdout)), prepared: preparedResult, resumed: resumedResult,
-      negativePreconditions: [...negative, { name: 'incomplete-ready-serialized-intake', args: ['init', realCard.identifier, 'Start'], exitCode: 1, ...incompleteReadyRefusal }],
+      negativePreconditions: negative,
+      serializedIncompleteIntake: { method: 'fetchLinearCard parser over a serialized incomplete variant of the real Ready source card', productMutation: false, ...incompleteReadyRefusal },
       exactSnapshotReused: JSON.stringify(preparedResult.snapshot) === JSON.stringify(resumedResult.snapshot),
       defaultsChangedAfterBoundary: changed.builder?.modelId === 'changed-after-safe-boundary',
     },
@@ -178,7 +178,7 @@ async function cliJourneyProof(apiKey: string, evidenceDirectory: string, roles:
 
 export async function rehearsal(apiKey: string, evidencePath: string) {
   let proof: Awaited<ReturnType<typeof liveModelProof>> | undefined
-  try {
+  return withFinalCleanup(async () => {
     proof = await liveModelProof(apiKey)
     const expected = 'JUL-225 ROUTE OK'
     const workflow = createRoleExecutionWorkflow({
@@ -227,9 +227,7 @@ export async function rehearsal(apiKey: string, evidencePath: string) {
     await writeFile(evidencePath, `${JSON.stringify(result, null, 2)}\n`, 'utf8')
     if (!Object.values(result.routes).every(route => route.ok)) throw new Error('one or more real routes returned an unexpected rehearsal result')
     return result
-  } finally {
-    if (proof) await cleanupAcpRoutes(proof.routes)
-  }
+  }, async () => { if (proof) await cleanupAcpRoutes(proof.routes) })
 }
 
 async function main() {

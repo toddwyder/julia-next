@@ -170,6 +170,8 @@ test('admission keeps ordinary bold paragraphs inside a section', () => {
 test('admission rejects unresolved decision markers embedded in prose', () => {
   const description = '# Outcome\nA\n# Requirements\nStatus: TBD before delivery.\n# Contracts\nC\n# Finish conditions\nD\n# Proof\nE'
   assert.throws(() => CardAdmissionSchema.parse({ identifier: 'JUL-225', state: 'Ready', description }), /unresolved decision marker/)
+  assert.throws(() => CardAdmissionSchema.parse({ identifier: 'JUL-225', state: 'Ready', description: description.replace('Status: TBD before delivery.', '- TODO choose provider') }), /unresolved decision marker/)
+  assert.throws(() => CardAdmissionSchema.parse({ identifier: 'JUL-225', state: 'Ready', description: description.replace('Status: TBD before delivery.', 'Status: unresolved decision — choose provider') }), /unresolved decision marker/)
   assert.doesNotThrow(() => CardAdmissionSchema.parse({
     identifier: 'JUL-225', state: 'Ready',
     description: '# Outcome\nA\n# Requirements\nA complete card has no unresolved decision marker.\n# Contracts\nC\n# Finish conditions\nD\n# Proof\nE',
