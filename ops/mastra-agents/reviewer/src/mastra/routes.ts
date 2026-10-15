@@ -121,28 +121,43 @@ export function disconnectAcpRoutes(routes: ReturnType<typeof createAcpRoutes>) 
   routes.claude.connection.disconnect()
 }
 
-type AntigravityProcess = { processId: number; parentProcessId: number }
+type WindowsProcess = { processId: number; parentProcessId: number; name: string }
 
-async function antigravityProcesses(): Promise<AntigravityProcess[]> {
+async function windowsProcesses(): Promise<WindowsProcess[]> {
   if (process.platform !== 'win32') return []
-  const command = "@(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'agy_acp_server.exe' } | Select-Object @{Name='processId';Expression={$_.ProcessId}},@{Name='parentProcessId';Expression={$_.ParentProcessId}}) | ConvertTo-Json -Compress"
+  const command = "@(Get-CimInstance Win32_Process | Select-Object @{Name='processId';Expression={$_.ProcessId}},@{Name='parentProcessId';Expression={$_.ParentProcessId}},@{Name='name';Expression={$_.Name}}) | ConvertTo-Json -Compress"
   const { stdout } = await execute('powershell.exe', ['-NoProfile', '-Command', command], { windowsHide: true })
-  const parsed = JSON.parse(stdout.trim() || '[]') as AntigravityProcess | AntigravityProcess[]
+  const parsed = JSON.parse(stdout.trim() || '[]') as WindowsProcess | WindowsProcess[]
   return Array.isArray(parsed) ? parsed : [parsed]
 }
 
 export async function ownedAntigravityProcessIds(
   parentProcessId = process.pid,
-  listProcesses: () => Promise<AntigravityProcess[]> = antigravityProcesses,
+  listProcesses: () => Promise<WindowsProcess[]> = windowsProcesses,
 ) {
-  return new Set((await listProcesses()).filter(item => item.parentProcessId === parentProcessId).map(item => item.processId))
+  const processes = await listProcesses()
+  const descendants = new Set([parentProcessId])
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const item of processes) {
+      if (!descendants.has(item.processId) && descendants.has(item.parentProcessId)) {
+        descendants.add(item.processId)
+        changed = true
+      }
+    }
+  }
+  return new Set(processes
+    .filter(item => item.name.toLowerCase() === 'agy_acp_server.exe' && descendants.has(item.processId))
+    .map(item => item.processId))
 }
 
 export async function stopOwnedAntigravityProcesses(owned: Set<number>) {
   const processIds = [...owned]
   if (!processIds.length) return
-  await execute('powershell.exe', ['-NoProfile', '-Command', `Stop-Process -Id ${processIds.join(',')} -Force -ErrorAction SilentlyContinue`], { windowsHide: true })
-  const remaining = [...await ownedAntigravityProcessIds()].filter(processId => owned.has(processId))
+  const idList = processIds.join(',')
+  await execute('powershell.exe', ['-NoProfile', '-Command', `Get-CimInstance Win32_Process | Where-Object { @(${idList}) -contains $_.ProcessId -and $_.Name -eq 'agy_acp_server.exe' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`], { windowsHide: true })
+  const remaining = (await windowsProcesses()).filter(item => owned.has(item.processId) && item.name.toLowerCase() === 'agy_acp_server.exe').map(item => item.processId)
   if (remaining.length) throw new Error(`Antigravity ACP cleanup failed for process IDs ${remaining.join(', ')}`)
 }
 

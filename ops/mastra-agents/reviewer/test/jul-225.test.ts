@@ -73,8 +73,9 @@ test('CommandCode discovery keeps coding endpoints and rejects decision-only mod
 
 test('standalone ACP route scope disconnects and cleans only processes it created', async () => {
   const owned = await ownedAntigravityProcessIds(7, async () => [
-    { processId: 20, parentProcessId: 7 },
-    { processId: 30, parentProcessId: 8 },
+    { processId: 15, parentProcessId: 7, name: 'cmd.exe' },
+    { processId: 20, parentProcessId: 15, name: 'agy_acp_server.exe' },
+    { processId: 30, parentProcessId: 8, name: 'agy_acp_server.exe' },
   ])
   assert.deepEqual([...owned], [20])
 
