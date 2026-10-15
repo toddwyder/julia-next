@@ -408,3 +408,32 @@ test('a route failure emits correlated role, route, model, timing, and error evi
   assert.equal(typeof trace.durationMs, 'number')
   assert.match(trace.startedAt, /^\d{4}-\d{2}-\d{2}T/)
 })
+
+test('later workflow roles receive the exact earlier role outputs', async () => {
+  const prompts: Record<string, string> = {}
+  const route = {
+    setModel: async () => {},
+    generate: async (prompt: string) => ({ text: prompt === 'build JUL-208' ? 'PROPOSED CHANGE' : `reviewed: ${prompt}` }),
+  }
+  const workflow = createRoleExecutionWorkflow({
+    routes: { antigravity: route, claude: route } as never,
+    promptForRole: (role, issueId, priorResults) => {
+      const prompt = role === 'builder' ? `build ${issueId}` : `${role} sees ${priorResults.builder}`
+      prompts[role] = prompt
+      return prompt
+    },
+  })
+  const run = await workflow.createRun()
+  const result = await run.start({ inputData: {
+    decision: 'Start', authorized: true,
+    snapshot: { issueId: 'JUL-208', allowSameService: false, savedAt: new Date().toISOString(), roles: {
+      builder: { route: 'antigravity', modelId: 'a', company: 'Google', service: 'Antigravity' },
+      reviewer: { route: 'claude', modelId: 'b', company: 'Anthropic', service: 'Claude' },
+      crashFixer: { route: 'claude', modelId: 'c', company: 'Anthropic', service: 'Claude' },
+      fixReviewer: { route: 'antigravity', modelId: 'd', company: 'Google', service: 'Antigravity' },
+    } },
+  } })
+  assert.equal(result.status, 'success')
+  assert.equal(prompts.reviewer, 'reviewer sees PROPOSED CHANGE')
+  assert.equal(result.result?.results.reviewer, 'reviewed: reviewer sees PROPOSED CHANGE')
+})

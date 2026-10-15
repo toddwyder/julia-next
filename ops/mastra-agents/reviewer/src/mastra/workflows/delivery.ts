@@ -6,7 +6,7 @@ import { validateRoleDefaults } from '../roles.ts'
 export function createRoleExecutionWorkflow({
   routes = createAcpRoutes(),
   commandCodeKey = () => process.env.COMMANDCODE_API_KEY,
-  promptForRole = (role: string, issueId: string) => `Perform the ${role} role for ${issueId}.`,
+  promptForRole = (role: string, issueId: string, _priorResults: Readonly<Record<string, string>>) => `Perform the ${role} role for ${issueId}.`,
 } = {}) {
   const execute = createStep({
     id: 'execute-four-role-snapshot',
@@ -20,14 +20,15 @@ export function createRoleExecutionWorkflow({
         const startedAt = new Date().toISOString()
         const started = performance.now()
         try {
+          const prompt = promptForRole(role, inputData.snapshot.issueId, { ...results })
           if (selection.route === 'commandcode') {
             const key = commandCodeKey()
             if (!key) throw new Error('CommandCode secret reference did not resolve')
-            const result = await createCommandCodeAgent(selection, key).generate(promptForRole(role, inputData.snapshot.issueId))
+            const result = await createCommandCodeAgent(selection, key).generate(prompt)
             results[role] = result.text
           } else {
             await selectAcpModel(routes, selection)
-            const result = await routes[selection.route].generate(promptForRole(role, inputData.snapshot.issueId))
+            const result = await routes[selection.route].generate(prompt)
             results[role] = result.text
           }
         } catch (error) {

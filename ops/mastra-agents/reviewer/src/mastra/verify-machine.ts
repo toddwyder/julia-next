@@ -26,6 +26,35 @@ export const defaultFrameworkMapPath = resolve(moduleDirectory, '../../../../../
 export type CandidateIdentity = { candidateCommit: string; dirtyTreeDigest: string }
 type IdentityProvider = () => Promise<CandidateIdentity>
 
+const RehearsalCardSchema = z.object({
+  identifier: z.literal('JUL-208'),
+  title: z.string().min(1),
+  state: z.string().min(1),
+  description: z.string().min(1),
+}).strict()
+type RehearsalCard = z.infer<typeof RehearsalCardSchema>
+
+export async function fetchRehearsalCard(apiKey = process.env.LINEAR_API_KEY, fetchImpl: typeof fetch = fetch) {
+  if (!apiKey) throw new Error('LINEAR_API_KEY was not resolved by the Julia vault launcher')
+  const response = await fetchImpl('https://api.linear.app/graphql', {
+    method: 'POST', headers: { Authorization: apiKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: 'query RehearsalCard($id:String!){issue(id:$id){identifier title description state{name}}}', variables: { id: 'JUL-208' } }),
+  })
+  const body = await response.json() as { data?: { issue?: { identifier: string; title: string; description: string; state: { name: string } } }; errors?: unknown }
+  if (!response.ok || body.errors || !body.data?.issue) throw new Error(`Linear JUL-208 read failed with HTTP ${response.status}`)
+  const issue = body.data.issue
+  return RehearsalCardSchema.parse({ identifier: issue.identifier, title: issue.title, state: issue.state.name, description: issue.description })
+}
+
+export function jul208Prompt(role: string, card: RehearsalCard, priorResults: Readonly<Record<string, string>>) {
+  const cardText = `Card: ${card.identifier} — ${card.title}\nState: ${card.state}\n\n${card.description}`
+  const boundary = 'This is a read-only rehearsal. Do not create, edit, or delete files; do not change product, tracker, git, configuration, or external state.'
+  if (role === 'builder') return `${boundary}\n\nAnalyze the repository against the card below and produce a concrete proposed change. Include likely files, behavior, edge cases, and verification. The proposal is your response only; do not implement it.\n\n${cardText}`
+  if (role === 'reviewer') return `${boundary}\n\nReview the builder proposal below against the card and repository. Return substantive findings ordered by severity, with file references where possible; say explicitly if there are no findings. Do not implement fixes.\n\n${cardText}\n\nBuilder proposal:\n${priorResults.builder ?? '(missing builder proposal)'}`
+  if (role === 'crashFixer') return `${boundary}\n\nIdentify failure modes and recovery gaps in the proposed JUL-208 design and reviewer findings. Return analysis only.\n\nBuilder proposal:\n${priorResults.builder ?? '(missing builder proposal)'}\n\nReviewer findings:\n${priorResults.reviewer ?? '(missing reviewer findings)'}`
+  return `${boundary}\n\nPerform a final read-only review of the JUL-208 proposal, findings, and failure analysis. Return remaining findings only.\n\nBuilder proposal:\n${priorResults.builder ?? '(missing builder proposal)'}\n\nReviewer findings:\n${priorResults.reviewer ?? '(missing reviewer findings)'}\n\nFailure analysis:\n${priorResults.crashFixer ?? '(missing failure analysis)'}`
+}
+
 export async function candidateIdentity(cwd = repositoryRoot): Promise<CandidateIdentity> {
   const [{ stdout: commit }, { stdout: diff }, { stdout: untracked }] = await Promise.all([
     execute('git', ['-C', cwd, 'rev-parse', '--verify', 'HEAD'], { windowsHide: true }),
@@ -163,7 +192,7 @@ async function cliJourneyProof(apiKey: string, evidenceDirectory: string, roles:
     await execute(process.execPath, add, { env: environment, windowsHide: true })
     await execute(process.execPath, ['--experimental-strip-types', cli, 'connections', 'test', id], { env: environment, windowsHide: true })
   }
-  const startEnvironment = { ...environment, JULIA_START_AUTHORIZED: 'JUL-225', JULIA_VERIFY_MACHINE: '1', JULIA_STOP_AFTER_SNAPSHOT: '1', JULIA_REHEARSAL_PROMPT: 'Read no files and change nothing. Reply exactly JUL-225 ROUTE OK.' }
+  const startEnvironment = { ...environment, JULIA_START_AUTHORIZED: 'JUL-225', JULIA_VERIFY_MACHINE: '1', JULIA_STOP_AFTER_SNAPSHOT: '1', JULIA_REHEARSAL_PROMPT: 'Perform a concise read-only route health assessment. Do not change files or external state.' }
   await execute(process.execPath, ['--experimental-strip-types', cli, 'connections', 'disable', 'claude'], { env: environment, windowsHide: true })
   negative.push(await expectFailure('disabled-connection', ['init', 'JUL-225', 'Start'], startEnvironment))
   await execute(process.execPath, ['--experimental-strip-types', cli, 'connections', 'reconnect', 'claude'], { env: environment, windowsHide: true })
@@ -209,11 +238,11 @@ export async function rehearsal(apiKey: string, evidencePath: string, identityPr
   return withFinalCleanup(async () => {
     const identityAtStart = await identityProvider()
     proof = await liveModelProof(apiKey)
-    const expected = 'JUL-225 ROUTE OK'
+    const card = await fetchRehearsalCard()
     const workflow = createRoleExecutionWorkflow({
       routes: proof.routes,
       commandCodeKey: () => apiKey,
-      promptForRole: () => `Read no files and change nothing. Reply exactly ${expected}.`,
+      promptForRole: (role, _issueId, priorResults) => jul208Prompt(role, card, priorResults),
     })
     type SelectedOffer = Awaited<ReturnType<typeof liveModelProof>>['selected'][keyof Awaited<ReturnType<typeof liveModelProof>>['selected']]
     const selection = (offer: SelectedOffer) => ({
@@ -236,6 +265,12 @@ export async function rehearsal(apiKey: string, evidencePath: string, identityPr
     if (workflowResult.status !== 'success') throw new Error(`real workflow rehearsal ended ${workflowResult.status}`)
     const output = workflowResult.result
     const workflowSnapshot = WorkflowSnapshotSchema.parse({ runId: workflowRun.runId, input: inputData, output })
+    const evidenceDirectory = dirname(evidencePath)
+    await mkdir(evidenceDirectory, { recursive: true })
+    const builderProposalPath = resolve(evidenceDirectory, 'jul-208-builder-proposal.md')
+    const reviewerFindingsPath = resolve(evidenceDirectory, 'jul-208-review-findings.md')
+    await writeFile(builderProposalPath, `${output.results.builder.trim()}\n`, 'utf8')
+    await writeFile(reviewerFindingsPath, `${output.results.reviewer.trim()}\n`, 'utf8')
     const cli = await cliJourneyProof(apiKey, dirname(evidencePath), inputData.snapshot.roles)
     const identityAtEnd = assertStableCandidateIdentity(identityAtStart, await identityProvider())
     const result = {
@@ -245,18 +280,22 @@ export async function rehearsal(apiKey: string, evidencePath: string, identityPr
       workflowStatus: workflowResult.status,
       workflowRunId: output.runId,
       workflowSnapshot,
+      jul208: {
+        card: { identifier: card.identifier, title: card.title, state: card.state },
+        builderProposal: { path: builderProposalPath, bytes: Buffer.byteLength(output.results.builder, 'utf8') },
+        reviewerFindings: { path: reviewerFindingsPath, bytes: Buffer.byteLength(output.results.reviewer, 'utf8'), reviewedExactBuilderOutput: true },
+      },
       traces: output.traces,
       modelOffers: { count: proof.offers.length, everyDisplayedOfferSelectable: true },
       cli,
       routes: {
-        antigravity: { model: proof.selected.antigravity.modelId, ok: output.results.builder.includes(expected) && output.results.fixReviewer.includes(expected) },
-        claude: { model: proof.selected.claude.modelId, ok: output.results.crashFixer.includes(expected) },
-        commandcode: { model: proof.selected.commandcode.modelId, ok: output.results.reviewer.includes(expected) },
+        antigravity: { model: proof.selected.antigravity.modelId, ok: Boolean(output.results.builder.trim() && output.results.fixReviewer.trim()) },
+        claude: { model: proof.selected.claude.modelId, ok: Boolean(output.results.crashFixer.trim()) },
+        commandcode: { model: proof.selected.commandcode.modelId, ok: Boolean(output.results.reviewer.trim()) },
       },
     }
-    await mkdir(dirname(evidencePath), { recursive: true })
     await writeFile(evidencePath, `${JSON.stringify(result, null, 2)}\n`, 'utf8')
-    if (!Object.values(result.routes).every(route => route.ok)) throw new Error('one or more real routes returned an unexpected rehearsal result')
+    if (!Object.values(result.routes).every(route => route.ok)) throw new Error('one or more real routes returned an empty rehearsal result')
     return result
   }, async () => { if (proof) await cleanupAcpRoutes(proof.routes) })
 }

@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 import { promisify } from 'node:util'
 
-import { assertStableCandidateIdentity, candidateIdentity, doctor } from '../src/mastra/verify-machine.ts'
+import { assertStableCandidateIdentity, candidateIdentity, doctor, fetchRehearsalCard, jul208Prompt } from '../src/mastra/verify-machine.ts'
 
 const execute = promisify(execFile)
 
@@ -60,4 +60,24 @@ test('rehearsal candidate identity stability rejects commit or dirty-tree drift'
   assert.deepEqual(assertStableCandidateIdentity(original, { ...original }), original)
   assert.throws(() => assertStableCandidateIdentity(original, { ...original, candidateCommit: 'c'.repeat(40) }), /candidate identity changed during rehearsal/)
   assert.throws(() => assertStableCandidateIdentity(original, { ...original, dirtyTreeDigest: `sha256:${'d'.repeat(64)}` }), /candidate identity changed during rehearsal/)
+})
+
+test('F10 reads JUL-208 without admission and gives the reviewer the exact builder proposal', async () => {
+  let request = ''
+  const card = await fetchRehearsalCard('linear-reference', async (_input, init) => {
+    request = String(init?.body)
+    return new Response(JSON.stringify({ data: { issue: {
+      identifier: 'JUL-208', title: 'Keep a private recipe', description: 'Creation only; do not implement.', state: { name: 'Backlog' },
+    } } }), { status: 200, headers: { 'content-type': 'application/json' } })
+  })
+  const proposal = 'Change proposal with repository-specific file references.'
+  const builderPrompt = jul208Prompt('builder', card, {})
+  const reviewerPrompt = jul208Prompt('reviewer', card, { builder: proposal })
+  assert.match(request, /"id":"JUL-208"/)
+  assert.equal(card.state, 'Backlog')
+  assert.match(builderPrompt, /concrete proposed change/)
+  assert.match(builderPrompt, /do not implement/i)
+  assert.ok(reviewerPrompt.includes(proposal))
+  assert.match(reviewerPrompt, /substantive findings/i)
+  assert.doesNotMatch(`${builderPrompt}\n${reviewerPrompt}`, /reply exactly/i)
 })
