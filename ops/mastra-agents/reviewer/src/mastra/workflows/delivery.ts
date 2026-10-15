@@ -3,10 +3,12 @@ import { WorkflowInputSchema, WorkflowOutputSchema } from '../contracts.ts'
 import { createAcpRoutes, createCommandCodeAgent, selectAcpModel } from '../routes.ts'
 import { validateRoleDefaults } from '../roles.ts'
 
+export type DeliveryRole = keyof ReturnType<typeof validateRoleDefaults>
+
 export function createRoleExecutionWorkflow({
   routes = createAcpRoutes(),
   commandCodeKey = () => process.env.COMMANDCODE_API_KEY,
-  promptForRole = (role: string, issueId: string, _priorResults: Readonly<Record<string, string>>) => `Perform the ${role} role for ${issueId}.`,
+  promptForRole = (role: DeliveryRole, issueId: string, _priorResults: Readonly<Record<string, string>>) => `Perform the ${role} role for ${issueId}.`,
 } = {}) {
   const execute = createStep({
     id: 'execute-four-role-snapshot',
@@ -16,7 +18,7 @@ export function createRoleExecutionWorkflow({
       const results: Record<string, string> = {}
       const traces: Record<string, { route: typeof inputData.snapshot.roles.builder.route; modelId: string; startedAt: string; durationMs: number; ok: boolean }> = {}
       const roles = validateRoleDefaults(inputData.snapshot.roles, { allowSameService: inputData.snapshot.allowSameService })
-      for (const [role, selection] of Object.entries(roles)) {
+      for (const [role, selection] of Object.entries(roles) as Array<[DeliveryRole, typeof roles[DeliveryRole]]>) {
         const startedAt = new Date().toISOString()
         const started = performance.now()
         try {
@@ -25,10 +27,12 @@ export function createRoleExecutionWorkflow({
             const key = commandCodeKey()
             if (!key) throw new Error('CommandCode secret reference did not resolve')
             const result = await createCommandCodeAgent(selection, key).generate(prompt)
+            if (result.finishReason === 'length') throw new Error(`${role} output was truncated by the model limit`)
             results[role] = result.text
           } else {
             await selectAcpModel(routes, selection)
             const result = await routes[selection.route].generate(prompt)
+            if (result.finishReason === 'length') throw new Error(`${role} output was truncated by the model limit`)
             results[role] = result.text
           }
         } catch (error) {

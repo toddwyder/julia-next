@@ -437,3 +437,20 @@ test('later workflow roles receive the exact earlier role outputs', async () => 
   assert.equal(prompts.reviewer, 'reviewer sees PROPOSED CHANGE')
   assert.equal(result.result?.results.reviewer, 'reviewed: reviewer sees PROPOSED CHANGE')
 })
+
+test('workflow rejects a route response truncated by its model limit', async () => {
+  const complete = { setModel: async () => {}, generate: async () => ({ text: 'complete', finishReason: 'stop' }) }
+  const truncated = { setModel: async () => {}, generate: async () => ({ text: 'High: cut off mid-sentence', finishReason: 'length' }) }
+  const workflow = createRoleExecutionWorkflow({ routes: { antigravity: complete, claude: truncated } as never })
+  const run = await workflow.createRun()
+  const result = await run.start({ inputData: {
+    decision: 'Start', authorized: true,
+    snapshot: { issueId: 'JUL-208', allowSameService: false, savedAt: new Date().toISOString(), roles: {
+      builder: { route: 'antigravity', modelId: 'a', company: 'Google', service: 'Antigravity' },
+      reviewer: { route: 'claude', modelId: 'b', company: 'Anthropic', service: 'Claude' },
+      crashFixer: { route: 'claude', modelId: 'c', company: 'Anthropic', service: 'Claude' },
+      fixReviewer: { route: 'antigravity', modelId: 'd', company: 'Google', service: 'Antigravity' },
+    } },
+  } })
+  assert.equal(result.status, 'failed')
+})

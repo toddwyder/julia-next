@@ -11,6 +11,7 @@ import type { LinearReadTrace } from './linear.ts'
 import { ConnectionRecordSchema, ConnectionsResultSchema, InitResultSchema, ModelsResultSchema, WorkflowSnapshotSchema } from './contracts.ts'
 import { cleanupAcpRoutes, createAcpRoutes, createCommandCodeAgent, discoverAcpOffers, discoverCommandCodeOffers, rethrowAfterCleanup, selectAcpModel, withFinalCleanup } from './routes.ts'
 import { createRoleExecutionWorkflow } from './workflows/delivery.ts'
+import type { DeliveryRole } from './workflows/delivery.ts'
 
 const PartsSchema = z.object({
   version: z.literal(1),
@@ -42,13 +43,15 @@ export async function fetchRehearsalCard(apiKey = process.env.LINEAR_API_KEY, fe
   return RehearsalCardSchema.parse({ identifier: issue.identifier, title: issue.title, state: issue.state.name, description: issue.description })
 }
 
-export function jul208Prompt(role: string, card: RehearsalCard, priorResults: Readonly<Record<string, string>>) {
+export function jul208Prompt(role: DeliveryRole, card: RehearsalCard, priorResults: Readonly<Record<string, string>>) {
   const cardText = `Card: ${card.identifier} — ${card.title}\nState: ${card.state}\n\n${card.description}`
   const boundary = 'This is a read-only rehearsal. Do not create, edit, or delete files; do not change product, tracker, git, configuration, or external state.'
-  if (role === 'builder') return `${boundary}\n\nAnalyze the repository against the card below and produce a concrete proposed change. Include likely files, behavior, edge cases, and verification. The proposal is your response only; do not implement it.\n\n${cardText}`
-  if (role === 'reviewer') return `${boundary}\n\nReview the builder proposal below against the card. Use the supplied card and proposal directly; do not call tools, inspect the workspace, or announce future work. Return final substantive findings now, ordered by severity with file references where possible; say explicitly if there are no findings. Do not implement fixes.\n\n${cardText}\n\nBuilder proposal:\n${priorResults.builder ?? '(missing builder proposal)'}`
-  if (role === 'crashFixer') return `${boundary}\n\nIdentify failure modes and recovery gaps in the proposed JUL-208 design and reviewer findings. Return analysis only.\n\nBuilder proposal:\n${priorResults.builder ?? '(missing builder proposal)'}\n\nReviewer findings:\n${priorResults.reviewer ?? '(missing reviewer findings)'}`
-  return `${boundary}\n\nPerform a final read-only review of the JUL-208 proposal, findings, and failure analysis. Return remaining findings only.\n\nBuilder proposal:\n${priorResults.builder ?? '(missing builder proposal)'}\n\nReviewer findings:\n${priorResults.reviewer ?? '(missing reviewer findings)'}\n\nFailure analysis:\n${priorResults.crashFixer ?? '(missing failure analysis)'}`
+  switch (role) {
+    case 'builder': return `${boundary}\n\nAnalyze the repository against the card below and produce a concrete proposed change. Include likely files, behavior, edge cases, and verification. The proposal is your response only; do not implement it.\n\n${cardText}`
+    case 'reviewer': return `${boundary}\n\nReview the builder proposal below against the card. Use the supplied card and proposal directly; do not call tools, inspect the workspace, or announce future work. Return at most the three highest-severity findings in no more than 350 words, with file references where possible; say explicitly if there are no findings. Do not implement fixes.\n\n${cardText}\n\nBuilder proposal:\n${priorResults.builder ?? '(missing builder proposal)'}`
+    case 'crashFixer': return `${boundary}\n\nIdentify failure modes and recovery gaps in the proposed JUL-208 design and reviewer findings. Return analysis only.\n\nBuilder proposal:\n${priorResults.builder ?? '(missing builder proposal)'}\n\nReviewer findings:\n${priorResults.reviewer ?? '(missing reviewer findings)'}`
+    case 'fixReviewer': return `${boundary}\n\nPerform a final read-only review of the JUL-208 proposal, findings, and failure analysis. Return remaining findings only.\n\nBuilder proposal:\n${priorResults.builder ?? '(missing builder proposal)'}\n\nReviewer findings:\n${priorResults.reviewer ?? '(missing reviewer findings)'}\n\nFailure analysis:\n${priorResults.crashFixer ?? '(missing failure analysis)'}`
+  }
 }
 
 export function assertReviewerFindings(text: string) {

@@ -81,7 +81,7 @@ test('F10 reads JUL-208 without admission and gives the reviewer the exact build
   assert.match(builderPrompt, /concrete proposed change/)
   assert.match(builderPrompt, /do not implement/i)
   assert.ok(reviewerPrompt.includes(proposal))
-  assert.match(reviewerPrompt, /substantive findings/i)
+  assert.match(reviewerPrompt, /highest-severity findings/i)
   assert.doesNotMatch(`${builderPrompt}\n${reviewerPrompt}`, /reply exactly/i)
 })
 
