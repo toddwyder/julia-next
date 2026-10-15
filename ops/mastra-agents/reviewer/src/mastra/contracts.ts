@@ -34,22 +34,25 @@ export const RoleDefaultsSchema = z.object({
 }).strict()
 
 const requiredSections = ['Outcome', 'Requirements', 'Contracts', 'Finish conditions', 'Proof'] as const
+const requiredSectionTitles = requiredSections.map(section => section.replace(' ', '\\s+')).join('|')
+const requiredSectionHeading = new RegExp(`^(?:#{1,6}\\s+(?:${requiredSectionTitles})|\\*\\*(?:${requiredSectionTitles})\\*\\*)\\s*$`, 'im')
 export const CardAdmissionSchema = z.object({
   identifier: z.string().regex(/^[A-Z][A-Z0-9]*-\d+$/),
   state: z.literal('Ready'),
   description: nonempty,
 }).strict().superRefine((card, context) => {
   for (const section of requiredSections) {
-    const pattern = new RegExp(`^(?:#{1,6}\\s+|\\*\\*)${section.replace(' ', '\\s+')}(?:\\*\\*)?\\s*$`, 'im')
+    const title = section.replace(' ', '\\s+')
+    const pattern = new RegExp(`^(?:#{1,6}\\s+${title}|\\*\\*${title}\\*\\*)\\s*$`, 'im')
     const heading = pattern.exec(card.description)
     if (!heading) {
       context.addIssue({ code: 'custom', path: ['description'], message: `missing nonempty ${section} section` })
       continue
     }
-    const content = card.description.slice(heading.index + heading[0].length).split(/^(?:#{1,6}\s+|\*\*)[^\r\n]+(?:\*\*)?\s*$/m)[0]?.trim()
+    const content = card.description.slice(heading.index + heading[0].length).split(requiredSectionHeading)[0]?.trim()
     if (!content) context.addIssue({ code: 'custom', path: ['description'], message: `empty ${section} section` })
   }
-  if (/^\s*(?:TODO|TBD|unresolved decision)\b/im.test(card.description)) {
+  if (/\b(?:TODO|TBD|unresolved decision)\b/i.test(card.description)) {
     context.addIssue({ code: 'custom', path: ['description'], message: 'unresolved decision marker' })
   }
 })

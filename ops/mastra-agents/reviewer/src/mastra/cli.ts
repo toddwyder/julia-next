@@ -6,7 +6,7 @@ import { CardAdmissionSchema, ConnectionsCommandSchema, ConnectionsResultSchema,
 import { atomicJson, ConnectionStore } from './connections.ts'
 import { validateRoleDefaults } from './roles.ts'
 import { ensureSelectionsOffered, loadSavedSnapshot, validateStartPreconditions } from './init.ts'
-import { createAcpRoutes, disconnectAcpRoutes, discoverAcpOffers, discoverCommandCodeOffers } from './routes.ts'
+import { discoverAcpOffers, discoverCommandCodeOffers, withAcpRoutes } from './routes.ts'
 import { createRoleExecutionWorkflow } from './workflows/delivery.ts'
 
 const configDirectory = process.env.JULIA_CONFIG_DIRECTORY ?? join(process.env.USERPROFILE ?? process.cwd(), '.julia')
@@ -34,9 +34,7 @@ export async function connectionCommand(args: string[]) {
       if (!key) throw new Error(`secret reference ${record.secretReference ?? '(missing)'} did not resolve`)
       modelCount = (await discoverCommandCodeOffers(key)).length
     } else {
-      const routes = createAcpRoutes()
-      try { modelCount = (await discoverAcpOffers(routes)).filter(item => item.route === record.route).length }
-      finally { disconnectAcpRoutes(routes) }
+      modelCount = await withAcpRoutes(async routes => (await discoverAcpOffers(routes)).filter(item => item.route === record.route).length)
     }
     await store.recordTest(id, { ok: modelCount > 0, modelCount })
   }
@@ -55,27 +53,25 @@ export async function modelCommand(args: string[]) {
     return ModelsResultSchema.parse({ offers: [], defaults })
   }
   if (action === 'list') {
-    const routes = createAcpRoutes()
-    try {
+    return withAcpRoutes(async routes => {
       const offers = await discoverAcpOffers(routes)
       const key = process.env.COMMANDCODE_API_KEY
       if (key) offers.push(...await discoverCommandCodeOffers(key))
       return ModelsResultSchema.parse({ offers, defaults: RoleDefaultsSchema.parse(JSON.parse(await readFile(defaultsPath, 'utf8'))) })
-    } finally { disconnectAcpRoutes(routes) }
+    })
   }
   throw new Error(`unknown $models action ${action}`)
 }
 
-async function fetchLinearCard(issueId: string) {
-  const apiKey = process.env.LINEAR_API_KEY
+export async function fetchLinearCard(issueId: string, apiKey = process.env.LINEAR_API_KEY, fetchImpl: typeof fetch = fetch) {
   if (!apiKey) throw new Error('LINEAR_API_KEY was not resolved by the Julia vault launcher')
-  const response = await fetch('https://api.linear.app/graphql', {
+  const response = await fetchImpl('https://api.linear.app/graphql', {
     method: 'POST', headers: { Authorization: apiKey, 'Content-Type': 'application/json' },
     body: JSON.stringify({ query: 'query Card($id:String!){issue(id:$id){identifier description state{name}}}', variables: { id: issueId } }),
   })
   const body = await response.json() as { data?: { issue?: { identifier: string; description: string; state: { name: string } } }; errors?: unknown }
   if (!response.ok || body.errors || !body.data?.issue) throw new Error(`Linear intake failed with HTTP ${response.status}`)
-  return { identifier: body.data.issue.identifier, state: body.data.issue.state.name, description: body.data.issue.description }
+  return CardAdmissionSchema.parse({ identifier: body.data.issue.identifier, state: body.data.issue.state.name, description: body.data.issue.description })
 }
 
 export async function initCommand(args: string[]) {
@@ -83,7 +79,7 @@ export async function initCommand(args: string[]) {
   if (!issueOrPath) throw new Error('$init requires JUL-nnn')
   const allowSameService = process.env.JULIA_ALLOW_SAME_SERVICE === 'true'
   InitCommandSchema.parse({ issueId: issueOrPath, decision, ...(allowSameService ? { allowSameService } : {}) })
-  const card = CardAdmissionSchema.parse(await fetchLinearCard(issueOrPath))
+  const card = await fetchLinearCard(issueOrPath)
   if (decision === undefined) {
     const choices = validateRoleDefaults(RoleDefaultsSchema.parse(JSON.parse(await readFile(defaultsPath, 'utf8'))), { allowSameService })
     return InitResultSchema.parse({ status: 'awaiting-decision', issueId: card.identifier, choices, limits: acceptedLimits })
@@ -97,8 +93,7 @@ export async function initCommand(args: string[]) {
   const apiKey = commandCode?.secretReference ? process.env[commandCode.secretReference] : undefined
   if (!apiKey) throw new Error('CommandCode secret reference did not resolve')
   const dispatch = async (snapshot: z.infer<typeof RunSnapshotSchema>) => {
-    const routes = createAcpRoutes()
-    try {
+    return withAcpRoutes(async routes => {
       const workflow = createRoleExecutionWorkflow({
         routes, commandCodeKey: () => apiKey,
         promptForRole: (role, issueId) => process.env.JULIA_VERIFY_MACHINE === '1' && process.env.JULIA_REHEARSAL_PROMPT
@@ -107,7 +102,7 @@ export async function initCommand(args: string[]) {
       })
       const run = await workflow.createRun()
       return run.start({ inputData: { decision: 'Start', authorized: true, snapshot } })
-    } finally { disconnectAcpRoutes(routes) }
+    })
   }
   try {
     const saved = await loadSavedSnapshot(snapshotPath, card.identifier)
@@ -116,12 +111,11 @@ export async function initCommand(args: string[]) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
   }
   const roles = RoleDefaultsSchema.parse(JSON.parse(await readFile(defaultsPath, 'utf8')))
-  const routes = createAcpRoutes()
-  try {
+  await withAcpRoutes(async routes => {
     const offers = await discoverAcpOffers(routes)
     offers.push(...await discoverCommandCodeOffers(apiKey))
     validateStartPreconditions({ authorized: true, roles, records, offers }, { allowSameService })
-  } finally { disconnectAcpRoutes(routes) }
+  })
   const saved = RunSnapshotSchema.parse({ issueId: card.identifier, roles, allowSameService, savedAt: new Date().toISOString() })
   await atomicJson(snapshotPath, saved)
   if (process.env.JULIA_VERIFY_MACHINE === '1' && process.env.JULIA_STOP_AFTER_SNAPSHOT === '1') {

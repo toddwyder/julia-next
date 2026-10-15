@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { z } from 'zod/v4'
 import { ConnectionRecordSchema, ConnectionsResultSchema, InitResultSchema, ModelsResultSchema, WorkflowSnapshotSchema } from './contracts.ts'
-import { createAcpRoutes, createCommandCodeAgent, disconnectAcpRoutes, discoverAcpOffers, discoverCommandCodeOffers, selectAcpModel } from './routes.ts'
+import { antigravityProcessIds, createAcpRoutes, createCommandCodeAgent, disconnectAcpRoutes, discoverAcpOffers, discoverCommandCodeOffers, selectAcpModel, stopNewAntigravityProcesses } from './routes.ts'
 import { createRoleExecutionWorkflow } from './workflows/delivery.ts'
 
 const PartsSchema = z.object({
@@ -156,21 +156,6 @@ async function cliJourneyProof(apiKey: string, evidenceDirectory: string, roles:
       defaultsChangedAfterBoundary: changed.builder?.modelId === 'changed-after-safe-boundary',
     },
   }
-}
-
-async function antigravityProcessIds() {
-  if (process.platform !== 'win32') return new Set<number>()
-  const command = "@(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'agy_acp_server.exe' } | Select-Object -ExpandProperty ProcessId) | ConvertTo-Json -Compress"
-  const { stdout } = await execute('powershell.exe', ['-NoProfile', '-Command', command], { windowsHide: true })
-  const parsed = JSON.parse(stdout.trim() || '[]') as number | number[]
-  return new Set(Array.isArray(parsed) ? parsed : [parsed])
-}
-
-async function stopNewAntigravityProcesses(previous: Set<number>) {
-  const current = await antigravityProcessIds()
-  const created = [...current].filter(processId => !previous.has(processId))
-  if (!created.length) return
-  await execute('powershell.exe', ['-NoProfile', '-Command', `Stop-Process -Id ${created.join(',')} -Force`], { windowsHide: true })
 }
 
 export async function rehearsal(apiKey: string, evidencePath: string) {

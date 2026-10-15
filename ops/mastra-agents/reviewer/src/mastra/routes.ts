@@ -3,12 +3,15 @@ import { createCodingAgent } from '@mastra/core/coding-agent'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { createOpenAI } from '@ai-sdk/openai'
+import { execFile } from 'node:child_process'
 import { join } from 'node:path'
+import { promisify } from 'node:util'
 import { ModelOfferSchema, ModelSelectionSchema } from './contracts.ts'
 import type { z } from 'zod/v4'
 
 type ModelOffer = z.infer<typeof ModelOfferSchema>
 type ModelSelection = z.infer<typeof ModelSelectionSchema>
+const execute = promisify(execFile)
 
 function modelCompany(modelId: string) {
   const value = modelId.toLowerCase()
@@ -116,4 +119,50 @@ export function createCommandCodeAgent(selection: ModelSelection, apiKey: string
 export function disconnectAcpRoutes(routes: ReturnType<typeof createAcpRoutes>) {
   routes.antigravity.connection.disconnect()
   routes.claude.connection.disconnect()
+}
+
+export async function antigravityProcessIds() {
+  if (process.platform !== 'win32') return new Set<number>()
+  const command = "@(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'agy_acp_server.exe' } | Select-Object -ExpandProperty ProcessId) | ConvertTo-Json -Compress"
+  const { stdout } = await execute('powershell.exe', ['-NoProfile', '-Command', command], { windowsHide: true })
+  const parsed = JSON.parse(stdout.trim() || '[]') as number | number[]
+  return new Set(Array.isArray(parsed) ? parsed : [parsed])
+}
+
+export async function stopNewAntigravityProcesses(previous: Set<number>) {
+  const current = await antigravityProcessIds()
+  const created = [...current].filter(processId => !previous.has(processId))
+  if (!created.length) return
+  await execute('powershell.exe', ['-NoProfile', '-Command', `Stop-Process -Id ${created.join(',')} -Force -ErrorAction SilentlyContinue`], { windowsHide: true })
+  const remaining = [...await antigravityProcessIds()].filter(processId => created.includes(processId))
+  if (remaining.length) throw new Error(`Antigravity ACP cleanup failed for process IDs ${remaining.join(', ')}`)
+}
+
+type AcpRouteScope = {
+  captureProcessIds: typeof antigravityProcessIds
+  createRoutes: typeof createAcpRoutes
+  disconnectRoutes: typeof disconnectAcpRoutes
+  stopNewProcesses: typeof stopNewAntigravityProcesses
+}
+
+export async function withAcpRoutes<T>(
+  use: (routes: ReturnType<typeof createAcpRoutes>) => Promise<T>,
+  scope: AcpRouteScope = {
+    captureProcessIds: antigravityProcessIds,
+    createRoutes: createAcpRoutes,
+    disconnectRoutes: disconnectAcpRoutes,
+    stopNewProcesses: stopNewAntigravityProcesses,
+  },
+) {
+  const previous = await scope.captureProcessIds()
+  const routes = scope.createRoutes()
+  try {
+    return await use(routes)
+  } finally {
+    try {
+      scope.disconnectRoutes(routes)
+    } finally {
+      await scope.stopNewProcesses(previous)
+    }
+  }
 }

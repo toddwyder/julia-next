@@ -22,9 +22,10 @@ import {
   WorkflowSnapshotSchema,
 } from '../src/mastra/contracts.ts'
 import { ConnectionStore } from '../src/mastra/connections.ts'
+import { fetchLinearCard } from '../src/mastra/cli.ts'
 import { validateRoleDefaults } from '../src/mastra/roles.ts'
 import { decideStart, ensureSelectionsOffered, loadSavedSnapshot, validateStartPreconditions } from '../src/mastra/init.ts'
-import { discoverCommandCodeOffers } from '../src/mastra/routes.ts'
+import { discoverCommandCodeOffers, withAcpRoutes } from '../src/mastra/routes.ts'
 import { createRoleExecutionWorkflow } from '../src/mastra/workflows/delivery.ts'
 
 test('secret and persisted connection contracts reject secret values', () => {
@@ -70,6 +71,32 @@ test('CommandCode discovery keeps coding endpoints and rejects decision-only mod
   ])
 })
 
+test('standalone ACP route scope disconnects and cleans only processes it created', async () => {
+  const events: string[] = []
+  const routes = { antigravity: {}, claude: {} }
+  const result = await withAcpRoutes(async active => {
+    assert.equal(active, routes)
+    events.push('use')
+    return 'done'
+  }, {
+    captureProcessIds: async () => new Set([10]),
+    createRoutes: () => routes as never,
+    disconnectRoutes: () => { events.push('disconnect') },
+    stopNewProcesses: async previous => { events.push(`cleanup:${[...previous].join(',')}`) },
+  })
+  assert.equal(result, 'done')
+  assert.deepEqual(events, ['use', 'disconnect', 'cleanup:10'])
+
+  events.length = 0
+  await assert.rejects(withAcpRoutes(async () => { throw new Error('route failed') }, {
+    captureProcessIds: async () => new Set([10]),
+    createRoutes: () => routes as never,
+    disconnectRoutes: () => { events.push('disconnect') },
+    stopNewProcesses: async () => { events.push('cleanup') },
+  }), /route failed/)
+  assert.deepEqual(events, ['disconnect', 'cleanup'])
+})
+
 test('four-role company and normal service rules are exhaustive', () => {
   const selection = (company: string, service: string, route: 'antigravity' | 'claude' | 'commandcode') => ({ route, modelId: 'm', company, service })
   const valid = RoleDefaultsSchema.parse({
@@ -103,6 +130,38 @@ test('admission requires the complete settled card shape and Ready state', () =>
   assert.throws(() => CardAdmissionSchema.parse({ ...complete, description: `${complete.description}\nTODO: decision` }))
   const linear = { ...complete, description: '**Outcome**\nA\n\n**Requirements**\nB\n\n**Contracts**\nC\n\n**Finish conditions**\nD\n\n**Proof**\nE' }
   assert.equal(CardAdmissionSchema.parse(linear).identifier, 'JUL-225')
+})
+
+test('admission keeps ordinary bold paragraphs inside a section', () => {
+  const description = [
+    '**Outcome**',
+    '**Important:** this is body text, not a section heading.',
+    'A complete outcome.',
+    '**Requirements**',
+    'B',
+    '**Contracts**',
+    'C',
+    '**Finish conditions**',
+    'D',
+    '**Proof**',
+    'E',
+  ].join('\n')
+  assert.equal(CardAdmissionSchema.parse({ identifier: 'JUL-225', state: 'Ready', description }).identifier, 'JUL-225')
+  assert.throws(() => CardAdmissionSchema.parse({
+    identifier: 'JUL-225', state: 'Ready', description: description.replace('**Outcome**', '**Outcome'),
+  }), /missing nonempty Outcome section/)
+})
+
+test('admission rejects unresolved decision markers embedded in prose', () => {
+  const description = '# Outcome\nA\n# Requirements\nStatus: TBD before delivery.\n# Contracts\nC\n# Finish conditions\nD\n# Proof\nE'
+  assert.throws(() => CardAdmissionSchema.parse({ identifier: 'JUL-225', state: 'Ready', description }), /unresolved decision marker/)
+})
+
+test('serialized Linear intake rejects an incomplete Ready card', async () => {
+  const fetchImpl = async () => new Response(JSON.stringify({ data: { issue: {
+    identifier: 'JUL-227', state: { name: 'Ready' }, description: '# Outcome\nOnly one section',
+  } } }), { status: 200, headers: { 'content-type': 'application/json' } })
+  await assert.rejects(fetchLinearCard('JUL-227', 'reference-only', fetchImpl as typeof fetch), /missing nonempty Requirements section/)
 })
 
 test('Cancel never dispatches and restart reuses the immutable snapshot', async () => {
