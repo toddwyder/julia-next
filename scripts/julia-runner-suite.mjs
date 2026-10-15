@@ -4,34 +4,30 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const RUNNER_TEST = /(?:^|\/)julia-(?:init|delivery|graph-model|minimal-runner|runner).*\.test\.mjs$/;
+const RUNNER_TEST = /(?:^|\/)julia-(?:init|delivery|minimal-runner|runner).*\.test\.mjs$/;
 const SHARED_TESTS = new Set([
-  'acceptance-check', 'delivery-tool-settings', 'effort', 'linear-cli',
+  'acceptance-check', 'linear-cli',
   'no-personal-paths', 'personal-paths', 'line-endings', 'verify-reviewer-worktree',
-  'seat-labels', 'ci-routing',
+  'ci-routing',
 ].map((name) => `scripts/${name}.test.mjs`).concat([
-  'graph/seat-table.test.mjs', 'ops/service-dropbox/run-agy-seat.test.mjs',
-  'ops/service-dropbox/run-pi-seat.test.mjs', 'ops/service-dropbox/read-secret.test.mjs',
+  'ops/service-dropbox/run-agy-seat.test.mjs',
 ]));
 // Explicitly inventoried non-runner tests retain their existing CI/manual owner.
 // Unknown tests default to execution so a new subprocess-only regression cannot
 // trigger the Windows job and then silently disappear from its file list.
 const NON_RUNNER_TESTS = new Set([
   'scripts/agent-docs.test.mjs',
-  'scripts/board-setup.test.mjs', 'scripts/board-spec.test.mjs',
   'scripts/dynamic-route.test.mjs', 'scripts/framework-lint.test.mjs', 'scripts/health-route.test.mjs',
   'scripts/merge-pr.test.mjs',
   'scripts/publish-pr.real-git.test.mjs', 'scripts/publish-pr.test.mjs',
   'scripts/publish-via-github-app.test.mjs',
-  'scripts/seat-table.test.mjs', 'scripts/service-dropbox-read-secret.test.mjs',
-  'scripts/service-dropbox-run-agy-seat.test.mjs', 'scripts/service-dropbox-run-pi-seat.test.mjs',
   'scripts/web-app.test.mjs',
 ]);
 // Evidence and generated/vendor trees are never executable source. In particular,
 // do not recurse into .julia's saved copies or mutate them to make discovery pass.
 const GENERATED = new Set(['.git', '.julia', '.next', '.mastra', '.artifacts', 'node_modules', 'test-results', 'playwright-report']);
 const IMPORT_SPECIFIER = /(?:from\s*|import\s*\(?\s*)['"]([^'"]+)['"]/g;
-const RUNNER_MODULE = /julia-(?:init|delivery|graph-model|minimal-runner|runner)|delivery-tool-settings|acceptance-check|linear-cli|effort|seat-labels|seat-table|verify-reviewer-worktree|line-endings|no-personal-paths|personal-paths|ops\/julia-runner\/|run-agy-seat|run-pi-seat|read-secret/;
+const RUNNER_MODULE = /julia-(?:init|delivery|minimal-runner|runner)|acceptance-check|linear-cli|verify-reviewer-worktree|line-endings|no-personal-paths|personal-paths|ops\/julia-runner\/|run-agy-seat/;
 
 function importsRunnerModule(text) {
   return [...text.matchAll(IMPORT_SPECIFIER)].some(([, path]) => !path.endsWith('.test.mjs') && RUNNER_MODULE.test(path));

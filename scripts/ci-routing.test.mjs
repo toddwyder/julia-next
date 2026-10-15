@@ -31,10 +31,9 @@ test('runner code, new regressions and shared safety dependencies select the Win
     'scripts/julia-delivery-runner.mjs', 'scripts/nested/julia-delivery-new.test.mjs',
     'scripts/julia-minimal-runner-checks.mjs', 'scripts/julia-runner-suite.mjs',
     'ops/julia-runner/time-limit.mjs', 'scripts/acceptance-check.mjs',
-    'scripts/linear-cli.mjs', 'scripts/effort.mjs', 'scripts/seat-labels.mjs',
-    'graph/seat-table.mjs', 'ops/service-dropbox/run-pi-seat.mjs',
+    'scripts/linear-cli.mjs', 'ops/service-dropbox/run-agy-seat.mjs',
     'ops/mastra-agents/reviewer/src/reviewer.mjs',
-    'ops/service-dropbox/read-secret.mjs', '.agents/skills/implement/SKILL.md',
+    '.agents/skills/implement/SKILL.md',
     'graph/new-runner-safety.test.mjs',
   ]) {
     assert.deepEqual(selectCIGates([path]), ['baseline', 'julia-init-windows'], path);

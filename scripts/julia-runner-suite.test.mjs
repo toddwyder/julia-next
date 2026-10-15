@@ -23,7 +23,7 @@ test('discovers new and nested runner tests, shared safety tests, and unwrapped 
     'ops/julia-runner/new.test.mjs': '',
     'scripts/acceptance-check.test.mjs': '',
     'tests/new-safety.test.mjs': "import '../scripts/julia-delivery-runner.mjs';",
-    'scripts/board-setup.test.mjs': '',
+    'scripts/web-app.test.mjs': '',
     '.julia/archive/scripts/julia-init.test.mjs': '',
     'node_modules/archived/julia-init.test.mjs': '',
   });
@@ -49,7 +49,7 @@ test('the local gate runs discovered files with spaces and propagates a failing 
 });
 
 test('an empty suite fails closed instead of invoking repository-wide Node discovery', (t) => {
-  const root = fixture(t, { 'scripts/board-setup.test.mjs': '' });
+  const root = fixture(t, { 'scripts/web-app.test.mjs': '' });
   const result = spawnSync(process.execPath, [join(import.meta.dirname, 'julia-runner-suite.mjs')], { cwd: root, encoding: 'utf8' });
   assert.equal(result.status, 1);
   assert.match(result.stderr, /no active runner tests/);
@@ -68,26 +68,25 @@ test('the Windows CI job invokes the same complete local gate', () => {
 
 test('new unwrapped shared safety regressions are discovered beside their imported dependencies', (t) => {
   const root = fixture(t, {
-    'graph/new-seat-safety.test.mjs': "import './seat-table.mjs';",
+    'ops/julia-runner/new-time-limit-safety.test.mjs': "import './time-limit.mjs';",
     'scripts/nested/linear-cli-extra.test.mjs': "import '../linear-cli.mjs';",
     'tests/new-evidence-safety.test.mjs': "import '../scripts/acceptance-check.mjs';",
-    'tests/new-transport-safety.test.mjs': "import '../ops/service-dropbox/run-pi-seat.mjs';",
+    'tests/new-transport-safety.test.mjs': "import '../ops/service-dropbox/run-agy-seat.mjs';",
   });
   assert.deepEqual(discoverRunnerTests(root), [
-    'graph/new-seat-safety.test.mjs', 'scripts/nested/linear-cli-extra.test.mjs',
+    'ops/julia-runner/new-time-limit-safety.test.mjs', 'scripts/nested/linear-cli-extra.test.mjs',
     'tests/new-evidence-safety.test.mjs', 'tests/new-transport-safety.test.mjs',
   ]);
 });
 
-test('shared regressions run directly once while known wrappers retain their separate lane', (t) => {
+test('shared regressions run directly once', (t) => {
   const root = fixture(t, {
-    'graph/seat-table.test.mjs': "import './seat-table.mjs';",
-    'scripts/seat-table.test.mjs': "import '../graph/seat-table.test.mjs';",
+    'ops/service-dropbox/run-agy-seat.test.mjs': "import './run-agy-seat.mjs';",
     'scripts/bad-submissions.test.mjs': "import './acceptance-check.mjs';",
     'tests/new-shared-safety.test.mjs': "import '../scripts/acceptance-check.mjs';",
   });
   assert.deepEqual(discoverRunnerTests(root), [
-    'graph/seat-table.test.mjs', 'scripts/bad-submissions.test.mjs', 'tests/new-shared-safety.test.mjs',
+    'ops/service-dropbox/run-agy-seat.test.mjs', 'scripts/bad-submissions.test.mjs', 'tests/new-shared-safety.test.mjs',
   ]);
 });
 
@@ -104,16 +103,12 @@ test('the full runner gate includes the retained reviewer contract, quote and re
   ]);
 });
 
-test('new transport and secret regressions are discovered beside shared modules with relative imports', (t) => {
+test('new transport regressions are discovered beside the retained shared module', (t) => {
   const root = fixture(t, {
     'ops/service-dropbox/new-agy-safety.test.mjs': "import './run-agy-seat.mjs';",
-    'ops/service-dropbox/new-pi-safety.test.mjs': "import './run-pi-seat.mjs';",
-    'ops/service-dropbox/new-secret-safety.test.mjs': "import './read-secret.mjs';",
   });
   assert.deepEqual(discoverRunnerTests(root), [
     'ops/service-dropbox/new-agy-safety.test.mjs',
-    'ops/service-dropbox/new-pi-safety.test.mjs',
-    'ops/service-dropbox/new-secret-safety.test.mjs',
   ]);
 });
 
