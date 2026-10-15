@@ -91,10 +91,39 @@ function claudeModelChoices(agent: ReturnType<typeof createAcpRoutes>['claude'])
 
 async function discoverClaudeOffers(agent: ReturnType<typeof createAcpRoutes>['claude']) {
   await agent.getAvailableModels()
-  return claudeModelChoices(agent).map(choice => normalizeAcpOffer('claude', {
-    modelId: choice.value,
-    name: typeof choice.name === 'string' ? choice.name : choice.value,
-  }))
+  const offers: ModelOffer[] = []
+  for (const choice of claudeModelChoices(agent)) {
+    try {
+      await applyClaudeModel(agent, choice.value, false)
+      offers.push(normalizeAcpOffer('claude', {
+        modelId: choice.value,
+        name: typeof choice.name === 'string' ? choice.name : choice.value,
+      }))
+    } catch {
+      // A config option the live bridge refuses is not an offer callers can select.
+    }
+  }
+  return offers
+}
+
+async function applyClaudeModel(agent: ReturnType<typeof createAcpRoutes>['claude'], modelId: string, updateSession = true) {
+  const internals = agent.connection as unknown as ClaudeConnectionInternals
+  const session = internals.session
+  const sessionId = session?.sessionId
+  if (typeof sessionId !== 'string' || !session || !internals.connection) throw new Error('Claude ACP connection is not initialized')
+  let response: Awaited<ReturnType<NonNullable<ClaudeConnectionInternals['connection']>['setSessionConfigOption']>>
+  try {
+    response = await internals.connection.setSessionConfigOption({ sessionId, configId: 'model', value: modelId })
+  } catch (error) {
+    throw new Error(`Claude model "${modelId}" selection failed: ${error instanceof Error ? error.message : String(error)}`, { cause: error })
+  }
+  const configs = Array.isArray(response.configOptions) ? response.configOptions : []
+  const selected = configs.find((item): item is ClaudeModelConfig =>
+    typeof item === 'object' && item !== null && (item as ClaudeModelConfig).id === 'model')
+  if (selected?.currentValue !== modelId) {
+    throw new Error(`Claude ACP selected "${String(selected?.currentValue)}" instead of "${modelId}"`)
+  }
+  if (updateSession) session.configOptions = configs
 }
 
 async function selectClaudeModel(agent: ReturnType<typeof createAcpRoutes>['claude'], modelId: string) {
@@ -102,18 +131,7 @@ async function selectClaudeModel(agent: ReturnType<typeof createAcpRoutes>['clau
   if (!claudeModelChoices(agent).some(choice => choice.value === modelId)) {
     throw new Error(`Claude model "${modelId}" is not currently offered`)
   }
-  const internals = agent.connection as unknown as ClaudeConnectionInternals
-  const session = internals.session
-  const sessionId = session?.sessionId
-  if (typeof sessionId !== 'string' || !session || !internals.connection) throw new Error('Claude ACP connection is not initialized')
-  const response = await internals.connection.setSessionConfigOption({ sessionId, configId: 'model', value: modelId })
-  const configs = Array.isArray(response.configOptions) ? response.configOptions : []
-  const selected = configs.find((item): item is ClaudeModelConfig =>
-    typeof item === 'object' && item !== null && (item as ClaudeModelConfig).id === 'model')
-  if (selected?.currentValue !== modelId) {
-    throw new Error(`Claude ACP selected "${String(selected?.currentValue)}" instead of "${modelId}"`)
-  }
-  session.configOptions = configs
+  await applyClaudeModel(agent, modelId)
 }
 
 export async function discoverAcpOffers(routes: ReturnType<typeof createAcpRoutes>) {

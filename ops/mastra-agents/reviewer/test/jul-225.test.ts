@@ -72,9 +72,15 @@ test('Claude discovery offers only exact provider model IDs from the session con
           { value: 'fable', name: 'Fable' },
           { value: 'haiku', name: 'Haiku' },
           { value: 'claude-haiku-4-5-20251001', name: 'Haiku 4.5' },
+          { value: 'claude-fable-5', name: 'Fable 5' },
           { value: 'claude-sonnet-4-6', name: 'Sonnet 4.6' },
         ],
-      }] } },
+      }] },
+      connection: { setSessionConfigOption: async ({ value }: { value: string }) => {
+        if (value === 'claude-fable-5') throw new Error('Internal error')
+        return { configOptions: [{ id: 'model', currentValue: value, options: [] }] }
+      } },
+    },
     },
   }
   const offers = await discoverAcpOffers(routes as never)
