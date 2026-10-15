@@ -177,16 +177,18 @@ async function cleanupOwnedAcpRoutes(routes: ReturnType<typeof createAcpRoutes>,
 
 export async function withFinalCleanup<T>(operation: () => Promise<T>, cleanup: () => Promise<void>) {
   let operationError: unknown
+  let operationFailed = false
   try {
     return await operation()
   } catch (error) {
+    operationFailed = true
     operationError = error
     throw error
   } finally {
     try {
       await cleanup()
     } catch (cleanupError) {
-      if (operationError) {
+      if (operationFailed) {
         const operationMessage = operationError instanceof Error ? operationError.message : String(operationError)
         const cleanupMessage = cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
         throw new AggregateError([operationError, cleanupError], `Operation failed: ${operationMessage}; cleanup also failed: ${cleanupMessage}`)

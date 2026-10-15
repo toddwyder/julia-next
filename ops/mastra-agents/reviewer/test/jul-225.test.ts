@@ -110,6 +110,15 @@ test('standalone ACP route scope disconnects and cleans only processes it create
   }), error => error instanceof AggregateError
     && error.errors.some(item => item instanceof Error && item.message === 'route failed')
     && error.errors.some(item => item instanceof Error && item.message === 'cleanup failed'))
+
+  await assert.rejects(withAcpRoutes(async () => { throw undefined }, {
+    captureOwnedProcessIds: async () => new Set([20]),
+    createRoutes: () => routes as never,
+    disconnectRoutes: () => {},
+    stopOwnedProcesses: async () => { throw new Error('cleanup failed') },
+  }), error => error instanceof AggregateError
+    && error.errors[0] === undefined
+    && error.errors.some(item => item instanceof Error && item.message === 'cleanup failed'))
 })
 
 test('four-role company and normal service rules are exhaustive', () => {
