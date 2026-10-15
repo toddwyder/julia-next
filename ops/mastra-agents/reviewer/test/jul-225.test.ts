@@ -25,7 +25,7 @@ import { ConnectionStore } from '../src/mastra/connections.ts'
 import { fetchLinearCard } from '../src/mastra/cli.ts'
 import { validateRoleDefaults } from '../src/mastra/roles.ts'
 import { decideStart, ensureSelectionsOffered, loadSavedSnapshot, validateStartPreconditions } from '../src/mastra/init.ts'
-import { discoverCommandCodeOffers, ownedAntigravityProcessIds, withAcpRoutes } from '../src/mastra/routes.ts'
+import { discoverCommandCodeOffers, ownedAcpProcesses, waitForAcpProcessExit, withAcpRoutes } from '../src/mastra/routes.ts'
 import { createRoleExecutionWorkflow } from '../src/mastra/workflows/delivery.ts'
 
 test('secret and persisted connection contracts reject secret values', () => {
@@ -72,12 +72,27 @@ test('CommandCode discovery keeps coding endpoints and rejects decision-only mod
 })
 
 test('standalone ACP route scope disconnects and cleans only processes it created', async () => {
-  const owned = await ownedAntigravityProcessIds(7, async () => [
-    { processId: 15, parentProcessId: 7, name: 'cmd.exe' },
-    { processId: 20, parentProcessId: 15, name: 'agy_acp_server.exe' },
-    { processId: 30, parentProcessId: 8, name: 'agy_acp_server.exe' },
+  const ownedProcess = { pid: 20 }
+  const ownedIdentity = { processId: 30, parentProcessId: 20, name: 'agy_acp_server.exe', creationDate: '2026-10-15T00:00:00.0000000-07:00', executablePath: 'C:\\agy_acp_server.exe' }
+  const owned = await ownedAcpProcesses({
+    antigravity: { connection: { agentProcess: ownedProcess } },
+    claude: { connection: {} },
+  } as never, async () => [
+    ownedIdentity,
+    { processId: 40, parentProcessId: 19, name: 'agy_acp_server.exe', creationDate: '2026-10-15T00:00:01.0000000-07:00', executablePath: 'C:\\agy_acp_server.exe' },
   ])
-  assert.deepEqual([...owned], [20])
+  assert.deepEqual(owned, { roots: [ownedProcess], descendants: [ownedIdentity] })
+
+  const forcedSignals: Array<NodeJS.Signals | number | undefined> = []
+  const listeners: Array<() => void> = []
+  const exitingProcess = {
+    pid: 20, exitCode: null as number | null, signalCode: null as NodeJS.Signals | null,
+    once: (_event: string, listener: () => void) => { listeners.push(listener); return exitingProcess },
+    off: (_event: string, listener: () => void) => { listeners.splice(listeners.indexOf(listener), 1); return exitingProcess },
+    kill: (signal?: NodeJS.Signals | number) => { forcedSignals.push(signal); exitingProcess.exitCode = 0; for (const listener of [...listeners]) listener(); return true },
+  }
+  await waitForAcpProcessExit(exitingProcess as never, 0)
+  assert.deepEqual(forcedSignals, ['SIGKILL'])
 
   const events: string[] = []
   const routes = { antigravity: {}, claude: {} }
@@ -86,17 +101,17 @@ test('standalone ACP route scope disconnects and cleans only processes it create
     events.push('use')
     return 'done'
   }, {
-    captureOwnedProcessIds: async () => { events.push('capture-owned'); return new Set([20]) },
+    captureOwnedProcesses: async () => { events.push('capture-owned'); return { roots: [ownedProcess], descendants: [ownedIdentity] } as never },
     createRoutes: () => routes as never,
     disconnectRoutes: () => { events.push('disconnect') },
-    stopOwnedProcesses: async owned => { events.push(`cleanup:${[...owned].join(',')}`) },
+    stopOwnedProcesses: async processes => { events.push(`cleanup:${processes.descendants.map(process => process.processId).join(',')}`) },
   })
   assert.equal(result, 'done')
-  assert.deepEqual(events, ['use', 'capture-owned', 'disconnect', 'cleanup:20'])
+  assert.deepEqual(events, ['use', 'capture-owned', 'disconnect', 'cleanup:30'])
 
   events.length = 0
   await assert.rejects(withAcpRoutes(async () => { throw new Error('route failed') }, {
-    captureOwnedProcessIds: async () => new Set([20]),
+    captureOwnedProcesses: async () => ({ roots: [ownedProcess], descendants: [ownedIdentity] }) as never,
     createRoutes: () => routes as never,
     disconnectRoutes: () => { events.push('disconnect') },
     stopOwnedProcesses: async () => { events.push('cleanup') },
@@ -104,7 +119,7 @@ test('standalone ACP route scope disconnects and cleans only processes it create
   assert.deepEqual(events, ['disconnect', 'cleanup'])
 
   await assert.rejects(withAcpRoutes(async () => { throw new Error('route failed') }, {
-    captureOwnedProcessIds: async () => new Set([20]),
+    captureOwnedProcesses: async () => ({ roots: [ownedProcess], descendants: [ownedIdentity] }) as never,
     createRoutes: () => routes as never,
     disconnectRoutes: () => {},
     stopOwnedProcesses: async () => { throw new Error('cleanup failed') },
@@ -113,7 +128,7 @@ test('standalone ACP route scope disconnects and cleans only processes it create
     && error.errors.some(item => item instanceof Error && item.message === 'cleanup failed'))
 
   await assert.rejects(withAcpRoutes(async () => { throw undefined }, {
-    captureOwnedProcessIds: async () => new Set([20]),
+    captureOwnedProcesses: async () => ({ roots: [ownedProcess], descendants: [ownedIdentity] }) as never,
     createRoutes: () => routes as never,
     disconnectRoutes: () => {},
     stopOwnedProcesses: async () => { throw new Error('cleanup failed') },

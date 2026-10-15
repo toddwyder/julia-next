@@ -3,7 +3,7 @@ import { createCodingAgent } from '@mastra/core/coding-agent'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { createOpenAI } from '@ai-sdk/openai'
-import { execFile } from 'node:child_process'
+import { execFile, type ChildProcess } from 'node:child_process'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { ModelOfferSchema, ModelSelectionSchema } from './contracts.ts'
@@ -121,22 +121,28 @@ export function disconnectAcpRoutes(routes: ReturnType<typeof createAcpRoutes>) 
   routes.claude.connection.disconnect()
 }
 
-type WindowsProcess = { processId: number; parentProcessId: number; name: string }
+type ProcessBackedConnection = { agentProcess?: ChildProcess }
 
-async function windowsProcesses(): Promise<WindowsProcess[]> {
+export type WindowsProcessIdentity = {
+  processId: number
+  parentProcessId: number
+  name: string
+  creationDate: string
+  executablePath: string | null
+}
+
+export type OwnedAcpProcesses = { roots: ChildProcess[]; descendants: WindowsProcessIdentity[] }
+
+async function windowsProcesses(): Promise<WindowsProcessIdentity[]> {
   if (process.platform !== 'win32') return []
-  const command = "@(Get-CimInstance Win32_Process | Select-Object @{Name='processId';Expression={$_.ProcessId}},@{Name='parentProcessId';Expression={$_.ParentProcessId}},@{Name='name';Expression={$_.Name}}) | ConvertTo-Json -Compress"
+  const command = "@(Get-CimInstance Win32_Process | Select-Object @{Name='processId';Expression={$_.ProcessId}},@{Name='parentProcessId';Expression={$_.ParentProcessId}},@{Name='name';Expression={$_.Name}},@{Name='creationDate';Expression={$_.CreationDate.ToString('o')}},@{Name='executablePath';Expression={$_.ExecutablePath}}) | ConvertTo-Json -Compress"
   const { stdout } = await execute('powershell.exe', ['-NoProfile', '-Command', command], { windowsHide: true })
-  const parsed = JSON.parse(stdout.trim() || '[]') as WindowsProcess | WindowsProcess[]
+  const parsed = JSON.parse(stdout.trim() || '[]') as WindowsProcessIdentity | WindowsProcessIdentity[]
   return Array.isArray(parsed) ? parsed : [parsed]
 }
 
-export async function ownedAntigravityProcessIds(
-  parentProcessId = process.pid,
-  listProcesses: () => Promise<WindowsProcess[]> = windowsProcesses,
-) {
-  const processes = await listProcesses()
-  const descendants = new Set([parentProcessId])
+export function descendantAcpProcesses(rootProcessIds: number[], processes: WindowsProcessIdentity[]) {
+  const descendants = new Set(rootProcessIds)
   let changed = true
   while (changed) {
     changed = false
@@ -147,32 +153,90 @@ export async function ownedAntigravityProcessIds(
       }
     }
   }
-  return new Set(processes
-    .filter(item => item.name.toLowerCase() === 'agy_acp_server.exe' && descendants.has(item.processId))
-    .map(item => item.processId))
+  return processes.filter(item => item.name.toLowerCase() === 'agy_acp_server.exe' && descendants.has(item.processId))
 }
 
-export async function stopOwnedAntigravityProcesses(owned: Set<number>) {
-  const processIds = [...owned]
-  if (!processIds.length) return
-  const idList = processIds.join(',')
-  await execute('powershell.exe', ['-NoProfile', '-Command', `Get-CimInstance Win32_Process | Where-Object { @(${idList}) -contains $_.ProcessId -and $_.Name -eq 'agy_acp_server.exe' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`], { windowsHide: true })
-  const remaining = (await windowsProcesses()).filter(item => owned.has(item.processId) && item.name.toLowerCase() === 'agy_acp_server.exe').map(item => item.processId)
-  if (remaining.length) throw new Error(`Antigravity ACP cleanup failed for process IDs ${remaining.join(', ')}`)
+export async function ownedAcpProcesses(
+  routes: ReturnType<typeof createAcpRoutes>,
+  listProcesses: () => Promise<WindowsProcessIdentity[]> = windowsProcesses,
+): Promise<OwnedAcpProcesses> {
+  const roots = [routes.antigravity.connection, routes.claude.connection]
+    .map(connection => (connection as unknown as ProcessBackedConnection).agentProcess)
+    .filter((child): child is ChildProcess => child !== undefined)
+  const rootProcessIds = roots.flatMap(child => child.pid === undefined ? [] : [child.pid])
+  return { roots, descendants: descendantAcpProcesses(rootProcessIds, await listProcesses()) }
+}
+
+export async function waitForAcpProcessExit(child: ChildProcess, graceMilliseconds = 2_000, forceMilliseconds = 2_000) {
+  if (child.exitCode !== null || child.signalCode !== null) return
+  await new Promise<void>((resolve, reject) => {
+    let settled = false
+    let timer: NodeJS.Timeout
+    const cleanup = () => {
+      child.off('exit', finish)
+      clearTimeout(timer)
+    }
+    const finish = () => {
+      if (settled) return
+      settled = true
+      cleanup()
+      resolve()
+    }
+    const fail = (message: string) => {
+      if (settled) return
+      settled = true
+      cleanup()
+      reject(new Error(message))
+    }
+    child.once('exit', finish)
+    timer = setTimeout(() => {
+      if (child.exitCode !== null || child.signalCode !== null) return finish()
+      try {
+        if (!child.kill('SIGKILL')) return fail(`ACP process ${child.pid ?? '(unknown)'} could not be terminated`)
+      } catch (error) {
+        return fail(`ACP process ${child.pid ?? '(unknown)'} could not be terminated: ${error instanceof Error ? error.message : String(error)}`)
+      }
+      if (!settled) timer = setTimeout(() => fail(`ACP process ${child.pid ?? '(unknown)'} did not exit after forced termination`), forceMilliseconds)
+    }, graceMilliseconds)
+  })
+}
+
+async function stopExactWindowsProcesses(processes: WindowsProcessIdentity[]) {
+  if (!processes.length || process.platform !== 'win32') return
+  const encodedIdentities = Buffer.from(JSON.stringify(processes), 'utf8').toString('base64')
+  const command = `$owned = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${encodedIdentities}')) | ConvertFrom-Json; Get-CimInstance Win32_Process | Where-Object { $candidate = $_; @($owned | Where-Object { $_.processId -eq $candidate.ProcessId -and $_.name -eq $candidate.Name -and $_.creationDate -eq $candidate.CreationDate.ToString('o') -and $_.executablePath -eq $candidate.ExecutablePath }).Count -gt 0 } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`
+  await execute('powershell.exe', ['-NoProfile', '-Command', command], { windowsHide: true })
+  const current = await windowsProcesses()
+  const remaining = processes.filter(identity => current.some(candidate =>
+    candidate.processId === identity.processId
+    && candidate.name === identity.name
+    && candidate.creationDate === identity.creationDate
+    && candidate.executablePath === identity.executablePath))
+  if (remaining.length) throw new Error(`ACP cleanup failed for process identities ${remaining.map(item => `${item.processId}@${item.creationDate}`).join(', ')}`)
+}
+
+export async function stopOwnedAcpProcesses(owned: OwnedAcpProcesses) {
+  const results = await Promise.allSettled([
+    ...owned.roots.map(child => waitForAcpProcessExit(child)),
+    stopExactWindowsProcesses(owned.descendants),
+  ])
+  const errors = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected').map(result => result.reason)
+  if (errors.length === 1) throw errors[0]
+  if (errors.length > 1) throw new AggregateError(errors, `ACP process cleanup failed: ${errors.map(error => error instanceof Error ? error.message : String(error)).join('; ')}`)
 }
 
 type AcpRouteScope = {
-  captureOwnedProcessIds: typeof ownedAntigravityProcessIds
+  captureOwnedProcesses: typeof ownedAcpProcesses
   createRoutes: typeof createAcpRoutes
   disconnectRoutes: typeof disconnectAcpRoutes
-  stopOwnedProcesses: typeof stopOwnedAntigravityProcesses
+  stopOwnedProcesses: typeof stopOwnedAcpProcesses
 }
 
 async function cleanupOwnedAcpRoutes(routes: ReturnType<typeof createAcpRoutes>, scope: Omit<AcpRouteScope, 'createRoutes'>) {
   const errors: unknown[] = []
-  let owned = new Set<number>()
+  let owned: OwnedAcpProcesses = { roots: [], descendants: [] }
   try {
-    owned = await scope.captureOwnedProcessIds()
+    owned = await scope.captureOwnedProcesses(routes)
   } catch (error) {
     errors.push(error)
   }
@@ -220,10 +284,10 @@ export async function rethrowAfterCleanup(operationError: unknown, cleanup: () =
 export async function withAcpRoutes<T>(
   use: (routes: ReturnType<typeof createAcpRoutes>) => Promise<T>,
   scope: AcpRouteScope = {
-    captureOwnedProcessIds: ownedAntigravityProcessIds,
+    captureOwnedProcesses: ownedAcpProcesses,
     createRoutes: createAcpRoutes,
     disconnectRoutes: disconnectAcpRoutes,
-    stopOwnedProcesses: stopOwnedAntigravityProcesses,
+    stopOwnedProcesses: stopOwnedAcpProcesses,
   },
 ) {
   const routes = scope.createRoutes()
@@ -232,8 +296,8 @@ export async function withAcpRoutes<T>(
 
 export async function cleanupAcpRoutes(routes: ReturnType<typeof createAcpRoutes>) {
   await cleanupOwnedAcpRoutes(routes, {
-    captureOwnedProcessIds: ownedAntigravityProcessIds,
+    captureOwnedProcesses: ownedAcpProcesses,
     disconnectRoutes: disconnectAcpRoutes,
-    stopOwnedProcesses: stopOwnedAntigravityProcesses,
+    stopOwnedProcesses: stopOwnedAcpProcesses,
   })
 }
