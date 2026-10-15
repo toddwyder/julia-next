@@ -79,14 +79,18 @@ function validatedVaultSnapshot(configuration, references, environment) {
   return { values, launchEnvironment };
 }
 
-export function vaultLaunch(args, { entryPoint = 'julia-init.mjs', configuration, references, environment = process.env, run = spawnSync, command } = {}) {
+export function vaultLaunch(args, { entryPoint = 'mastra-cli', configuration, references, environment = process.env, run = spawnSync, command } = {}) {
   const { values, launchEnvironment } = validatedVaultSnapshot(configuration, references, environment);
   // Resolve this validated snapshot, not a second read of the mutable file.
   // Omitted fields stay absent instead of falling back to stale plaintext.
   let childCommand = command;
   if (!childCommand) {
-    if (!new Set(['julia-init.mjs', 'linear-cli.mjs']).has(entryPoint)) throw Error('unapproved Julia launcher entry point');
-    childCommand = [process.execPath, fileURLToPath(new URL(`./${entryPoint}`, import.meta.url))];
+    const approvedEntryPoints = {
+      'mastra-cli': [process.execPath, '--experimental-strip-types', fileURLToPath(new URL('../ops/mastra-agents/reviewer/src/mastra/cli.ts', import.meta.url))],
+      'linear-cli.mjs': [process.execPath, fileURLToPath(new URL('./linear-cli.mjs', import.meta.url))],
+    };
+    childCommand = approvedEntryPoints[entryPoint];
+    if (!childCommand) throw Error('unapproved Julia launcher entry point');
   }
   if (!Array.isArray(childCommand) || !childCommand.length || childCommand.some(value => typeof value !== 'string' || !value)) throw Error('vault child command is required');
   const result = run(configuration.opExecutable ?? 'op', ['run', '--', ...childCommand, ...args], { stdio: 'inherit', env: { ...launchEnvironment, ...values }, windowsHide: true });
@@ -141,7 +145,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
         if (args[0] !== '--secrets' || !args[1] || args[2] !== '--' || !args[3]) throw Error('use run --secrets NAME[,NAME] -- followed by an executable and arguments');
         process.exitCode = vaultCommand(args[3], args.slice(4), { configuration, references, secretNames: args[1].split(',') });
       } else {
-        const entryPoint = operation === 'readIssue' ? 'linear-cli.mjs' : 'julia-init.mjs';
+        const entryPoint = operation === 'readIssue' ? 'linear-cli.mjs' : 'mastra-cli';
         const launchArgs = operation === 'readIssue' ? ['get-issue', ...args] : args;
         process.exitCode = vaultLaunch(launchArgs, { entryPoint, configuration, references });
       }

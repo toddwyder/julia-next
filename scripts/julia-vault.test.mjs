@@ -111,6 +111,8 @@ test('vault launcher loads only references in the designated vault, preserves ma
   const code = vaultLaunch(['$init', 'JUL-123'], { configuration: { vaultId: 'vault-id', opExecutable: 'op.exe', referencesPath: 'references.env' }, references: 'VERCEL_TOKEN=op://vault-id/item-id/token\n', run: (command, args, options) => { call = { command, args, options }; return { status: 7 }; } });
   assert.equal(code, 7); assert.equal(call.command, 'op.exe');
   assert.deepEqual(call.args.slice(0, 2), ['run', '--']);
+  assert.match(call.args[4], /ops[\\/]mastra-agents[\\/]reviewer[\\/]src[\\/]mastra[\\/]cli\.ts$/);
+  assert.equal(call.args.includes('--experimental-strip-types'), true);
   assert.equal(call.args.includes('references.env'), false);
   assert.equal(call.options.env.VERCEL_TOKEN, 'op://vault-id/item-id/token');
   assert.equal(call.args.includes('--no-masking'), false); assert.equal(call.options.shell, undefined);
@@ -128,6 +130,9 @@ test('vault launcher permits the read-only Linear entry point', () => {
   assert.equal(call.options.env.COMMANDCODE_API_KEY, 'op://vault-id/item-id/key');
 });
 test('vault launcher rejects retired reviewer and arbitrary entry points', () => {
+  assert.throws(() => vaultLaunch([], {
+    entryPoint: 'julia-init.mjs', configuration: { vaultId: 'vault-id', referencesPath: 'references.env' }, references: 'COMMANDCODE_API_KEY=op://vault-id/item-id/key\n',
+  }), /unapproved Julia launcher entry point/);
   assert.throws(() => vaultLaunch([], {
     entryPoint: 'julia-commandcode-format-probe.mjs', configuration: { vaultId: 'vault-id', referencesPath: 'references.env' }, references: 'COMMANDCODE_API_KEY=op://vault-id/item-id/key\n',
   }), /unapproved Julia launcher entry point/);

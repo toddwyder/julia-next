@@ -2,6 +2,7 @@
 
 | Job | Stock feature or custom piece | Installed-version documentation / evidence |
 | --- | --- | --- |
+| Execute the single `$init` CLI and delivery settings as TypeScript | Stock Node 24 type stripping; only erasable TypeScript syntax is used, and the vault launcher passes `--experimental-strip-types` explicitly for the canonical Mastra CLI | Installed Node `v24.14.1` `node --help` (`--experimental-strip-types`); Node 24 [`Modules: TypeScript`](https://nodejs.org/docs/latest-v24.x/api/typescript.html) (type stripping) |
 | Start ACP processes and list/select models | Stock `AcpAgent`, `getAvailableModels()`, `setModel()` | `@mastra/acp@0.4.2` `node_modules/@mastra/acp/dist/docs/references/reference-acp-acp-agent.md` |
 | Launch Claude's ACP bridge | Stock bridge protocol; global `claude-agent-acp@0.35.0` is pinned because it is the newest tested release that returns the `session.models` contract consumed by `@mastra/acp@0.4.2` | Installed bridge `README.md`; stock 0.90.0 was observed returning only `configOptions`, making the stock Mastra model list empty |
 | Run Antigravity and Claude delivery roles | Stock `AcpAgent.generate()` | `@mastra/acp@0.4.2` `node_modules/@mastra/acp/dist/docs/references/docs-connections-acp.md` |
