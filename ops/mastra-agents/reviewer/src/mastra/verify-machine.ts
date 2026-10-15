@@ -4,8 +4,9 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { z } from 'zod/v4'
+import { fetchLinearCard } from './cli.ts'
 import { ConnectionRecordSchema, ConnectionsResultSchema, InitResultSchema, ModelsResultSchema, WorkflowSnapshotSchema } from './contracts.ts'
-import { antigravityProcessIds, createAcpRoutes, createCommandCodeAgent, disconnectAcpRoutes, discoverAcpOffers, discoverCommandCodeOffers, selectAcpModel, stopNewAntigravityProcesses } from './routes.ts'
+import { cleanupAcpRoutes, createAcpRoutes, createCommandCodeAgent, discoverAcpOffers, discoverCommandCodeOffers, selectAcpModel } from './routes.ts'
 import { createRoleExecutionWorkflow } from './workflows/delivery.ts'
 
 const PartsSchema = z.object({
@@ -61,7 +62,7 @@ export async function liveModelProof(apiKey: string, cwd = resolve(moduleDirecto
     for (const offer of commandCodeOffers) createCommandCodeAgent(offer, apiKey)
     return { routes, offers: [...acpOffers, ...commandCodeOffers], selected: { antigravity, claude, commandcode } }
   } catch (error) {
-    disconnectAcpRoutes(routes)
+    await cleanupAcpRoutes(routes)
     throw error
   }
 }
@@ -70,6 +71,23 @@ async function cliJourneyProof(apiKey: string, evidenceDirectory: string, roles:
   const configDirectory = resolve(evidenceDirectory, `cli-state-${process.pid}`)
   const cli = resolve(moduleDirectory, 'cli.ts')
   const environment: NodeJS.ProcessEnv = { ...process.env, COMMANDCODE_API_KEY: apiKey, JULIA_CONFIG_DIRECTORY: configDirectory }
+  const linearKey = environment.LINEAR_API_KEY
+  if (!linearKey) throw new Error('LINEAR_API_KEY was not resolved for serialized incomplete-card proof')
+  const realCard = await fetchLinearCard('JUL-225', linearKey)
+  let incompleteReadyRefusal: { sourceIdentifier: string; sourceState: string; refused: boolean; error: string } | undefined
+  try {
+    await fetchLinearCard(realCard.identifier, linearKey, async () => new Response(JSON.stringify({ data: { issue: {
+      identifier: realCard.identifier, state: { name: realCard.state }, description: '# Outcome\nOnly one section',
+    } } }), { status: 200, headers: { 'content-type': 'application/json' } }))
+  } catch (error) {
+    incompleteReadyRefusal = {
+      sourceIdentifier: realCard.identifier,
+      sourceState: realCard.state,
+      refused: /missing nonempty Requirements section/.test((error as Error).message),
+      error: (error as Error).message,
+    }
+  }
+  if (!incompleteReadyRefusal?.refused) throw new Error('serialized incomplete Ready Linear intake was not refused')
   const expectFailure = async (name: string, args: string[], env = environment, expected?: RegExp) => {
     try {
       await execute(process.execPath, ['--experimental-strip-types', cli, ...args], { env, windowsHide: true })
@@ -151,7 +169,7 @@ async function cliJourneyProof(apiKey: string, evidenceDirectory: string, roles:
     models: { save: ModelsResultSchema.parse(JSON.parse(save.stdout)), list: ModelsResultSchema.parse(JSON.parse(list.stdout)) },
     init: {
       preview: InitResultSchema.parse(JSON.parse(preview.stdout)), cancel: InitResultSchema.parse(JSON.parse(cancel.stdout)), prepared: preparedResult, resumed: resumedResult,
-      negativePreconditions: negative,
+      negativePreconditions: [...negative, { name: 'incomplete-ready-serialized-intake', args: ['init', realCard.identifier, 'Start'], exitCode: 1, ...incompleteReadyRefusal }],
       exactSnapshotReused: JSON.stringify(preparedResult.snapshot) === JSON.stringify(resumedResult.snapshot),
       defaultsChangedAfterBoundary: changed.builder?.modelId === 'changed-after-safe-boundary',
     },
@@ -159,7 +177,6 @@ async function cliJourneyProof(apiKey: string, evidenceDirectory: string, roles:
 }
 
 export async function rehearsal(apiKey: string, evidencePath: string) {
-  const previousAntigravityProcesses = await antigravityProcessIds()
   let proof: Awaited<ReturnType<typeof liveModelProof>> | undefined
   try {
     proof = await liveModelProof(apiKey)
@@ -211,8 +228,7 @@ export async function rehearsal(apiKey: string, evidencePath: string) {
     if (!Object.values(result.routes).every(route => route.ok)) throw new Error('one or more real routes returned an unexpected rehearsal result')
     return result
   } finally {
-    if (proof) disconnectAcpRoutes(proof.routes)
-    await stopNewAntigravityProcesses(previousAntigravityProcesses)
+    if (proof) await cleanupAcpRoutes(proof.routes)
   }
 }
 

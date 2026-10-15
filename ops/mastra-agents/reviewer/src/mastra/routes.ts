@@ -121,48 +121,73 @@ export function disconnectAcpRoutes(routes: ReturnType<typeof createAcpRoutes>) 
   routes.claude.connection.disconnect()
 }
 
-export async function antigravityProcessIds() {
-  if (process.platform !== 'win32') return new Set<number>()
-  const command = "@(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'agy_acp_server.exe' } | Select-Object -ExpandProperty ProcessId) | ConvertTo-Json -Compress"
+type AntigravityProcess = { processId: number; parentProcessId: number }
+
+async function antigravityProcesses(): Promise<AntigravityProcess[]> {
+  if (process.platform !== 'win32') return []
+  const command = "@(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'agy_acp_server.exe' } | Select-Object @{Name='processId';Expression={$_.ProcessId}},@{Name='parentProcessId';Expression={$_.ParentProcessId}}) | ConvertTo-Json -Compress"
   const { stdout } = await execute('powershell.exe', ['-NoProfile', '-Command', command], { windowsHide: true })
-  const parsed = JSON.parse(stdout.trim() || '[]') as number | number[]
-  return new Set(Array.isArray(parsed) ? parsed : [parsed])
+  const parsed = JSON.parse(stdout.trim() || '[]') as AntigravityProcess | AntigravityProcess[]
+  return Array.isArray(parsed) ? parsed : [parsed]
 }
 
-export async function stopNewAntigravityProcesses(previous: Set<number>) {
-  const current = await antigravityProcessIds()
-  const created = [...current].filter(processId => !previous.has(processId))
-  if (!created.length) return
-  await execute('powershell.exe', ['-NoProfile', '-Command', `Stop-Process -Id ${created.join(',')} -Force -ErrorAction SilentlyContinue`], { windowsHide: true })
-  const remaining = [...await antigravityProcessIds()].filter(processId => created.includes(processId))
+export async function ownedAntigravityProcessIds(
+  parentProcessId = process.pid,
+  listProcesses: () => Promise<AntigravityProcess[]> = antigravityProcesses,
+) {
+  return new Set((await listProcesses()).filter(item => item.parentProcessId === parentProcessId).map(item => item.processId))
+}
+
+export async function stopOwnedAntigravityProcesses(owned: Set<number>) {
+  const processIds = [...owned]
+  if (!processIds.length) return
+  await execute('powershell.exe', ['-NoProfile', '-Command', `Stop-Process -Id ${processIds.join(',')} -Force -ErrorAction SilentlyContinue`], { windowsHide: true })
+  const remaining = [...await ownedAntigravityProcessIds()].filter(processId => owned.has(processId))
   if (remaining.length) throw new Error(`Antigravity ACP cleanup failed for process IDs ${remaining.join(', ')}`)
 }
 
 type AcpRouteScope = {
-  captureProcessIds: typeof antigravityProcessIds
+  captureOwnedProcessIds: typeof ownedAntigravityProcessIds
   createRoutes: typeof createAcpRoutes
   disconnectRoutes: typeof disconnectAcpRoutes
-  stopNewProcesses: typeof stopNewAntigravityProcesses
+  stopOwnedProcesses: typeof stopOwnedAntigravityProcesses
 }
 
 export async function withAcpRoutes<T>(
   use: (routes: ReturnType<typeof createAcpRoutes>) => Promise<T>,
   scope: AcpRouteScope = {
-    captureProcessIds: antigravityProcessIds,
+    captureOwnedProcessIds: ownedAntigravityProcessIds,
     createRoutes: createAcpRoutes,
     disconnectRoutes: disconnectAcpRoutes,
-    stopNewProcesses: stopNewAntigravityProcesses,
+    stopOwnedProcesses: stopOwnedAntigravityProcesses,
   },
 ) {
-  const previous = await scope.captureProcessIds()
   const routes = scope.createRoutes()
   try {
     return await use(routes)
   } finally {
+    let owned = new Set<number>()
     try {
-      scope.disconnectRoutes(routes)
+      owned = await scope.captureOwnedProcessIds()
     } finally {
-      await scope.stopNewProcesses(previous)
+      try {
+        scope.disconnectRoutes(routes)
+      } finally {
+        await scope.stopOwnedProcesses(owned)
+      }
+    }
+  }
+}
+
+export async function cleanupAcpRoutes(routes: ReturnType<typeof createAcpRoutes>) {
+  let owned = new Set<number>()
+  try {
+    owned = await ownedAntigravityProcessIds()
+  } finally {
+    try {
+      disconnectAcpRoutes(routes)
+    } finally {
+      await stopOwnedAntigravityProcesses(owned)
     }
   }
 }

@@ -25,7 +25,7 @@ import { ConnectionStore } from '../src/mastra/connections.ts'
 import { fetchLinearCard } from '../src/mastra/cli.ts'
 import { validateRoleDefaults } from '../src/mastra/roles.ts'
 import { decideStart, ensureSelectionsOffered, loadSavedSnapshot, validateStartPreconditions } from '../src/mastra/init.ts'
-import { discoverCommandCodeOffers, withAcpRoutes } from '../src/mastra/routes.ts'
+import { discoverCommandCodeOffers, ownedAntigravityProcessIds, withAcpRoutes } from '../src/mastra/routes.ts'
 import { createRoleExecutionWorkflow } from '../src/mastra/workflows/delivery.ts'
 
 test('secret and persisted connection contracts reject secret values', () => {
@@ -72,6 +72,12 @@ test('CommandCode discovery keeps coding endpoints and rejects decision-only mod
 })
 
 test('standalone ACP route scope disconnects and cleans only processes it created', async () => {
+  const owned = await ownedAntigravityProcessIds(7, async () => [
+    { processId: 20, parentProcessId: 7 },
+    { processId: 30, parentProcessId: 8 },
+  ])
+  assert.deepEqual([...owned], [20])
+
   const events: string[] = []
   const routes = { antigravity: {}, claude: {} }
   const result = await withAcpRoutes(async active => {
@@ -79,20 +85,20 @@ test('standalone ACP route scope disconnects and cleans only processes it create
     events.push('use')
     return 'done'
   }, {
-    captureProcessIds: async () => new Set([10]),
+    captureOwnedProcessIds: async () => { events.push('capture-owned'); return new Set([20]) },
     createRoutes: () => routes as never,
     disconnectRoutes: () => { events.push('disconnect') },
-    stopNewProcesses: async previous => { events.push(`cleanup:${[...previous].join(',')}`) },
+    stopOwnedProcesses: async owned => { events.push(`cleanup:${[...owned].join(',')}`) },
   })
   assert.equal(result, 'done')
-  assert.deepEqual(events, ['use', 'disconnect', 'cleanup:10'])
+  assert.deepEqual(events, ['use', 'capture-owned', 'disconnect', 'cleanup:20'])
 
   events.length = 0
   await assert.rejects(withAcpRoutes(async () => { throw new Error('route failed') }, {
-    captureProcessIds: async () => new Set([10]),
+    captureOwnedProcessIds: async () => new Set([20]),
     createRoutes: () => routes as never,
     disconnectRoutes: () => { events.push('disconnect') },
-    stopNewProcesses: async () => { events.push('cleanup') },
+    stopOwnedProcesses: async () => { events.push('cleanup') },
   }), /route failed/)
   assert.deepEqual(events, ['disconnect', 'cleanup'])
 })
