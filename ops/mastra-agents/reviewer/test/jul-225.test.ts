@@ -168,6 +168,16 @@ test('Claude selection refuses a bridge response that does not confirm the exact
   }), /selected "default" instead/)
 })
 
+test('Claude route accepts only the bridge auth-status extension notification', async () => {
+  const createClient = createAcpRoutes().claude.connection.options.createClient
+  assert.ok(createClient)
+  const client = createClient({} as never)
+  const notify = client.extNotification?.bind(client)
+  assert.ok(notify)
+  await assert.doesNotReject(notify('_auth/status_update', { authStatus: { kind: 'account', label: 'Claude Max' } }))
+  await assert.rejects(notify('unknown/notification', {}), /unsupported Claude ACP notification/)
+})
+
 test('CommandCode discovery keeps coding endpoints and rejects decision-only models', async () => {
   const fetchImpl = async () => new Response(JSON.stringify({ data: [
     { id: 'claude-a', supported_endpoints: ['/v1/messages'] },

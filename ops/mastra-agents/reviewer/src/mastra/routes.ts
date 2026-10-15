@@ -41,6 +41,12 @@ export function createAcpRoutes(cwd = process.cwd()) {
       id: 'claude', name: 'Claude', description: 'Anthropic Claude Code coding agent',
       command: process.platform === 'win32' ? process.execPath : 'claude-agent-acp',
       args: process.platform === 'win32' ? [claudeBridge] : [], cwd,
+      createClient: defaultClient => Object.assign(defaultClient, {
+        async extNotification(method: string, _params: Record<string, unknown>) {
+          if (method === '_auth/status_update') return
+          throw new Error(`unsupported Claude ACP notification: ${method}`)
+        },
+      }),
     }),
   }
   retainAcpProcessHandles(routes.antigravity.connection)
