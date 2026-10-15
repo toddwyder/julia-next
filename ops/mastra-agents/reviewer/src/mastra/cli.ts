@@ -5,7 +5,7 @@ import type { z } from 'zod/v4'
 import { CardAdmissionSchema, ConnectionsCommandSchema, ConnectionsResultSchema, InitCommandSchema, InitResultSchema, ModelsCommandSchema, ModelsResultSchema, ConnectionRecordSchema, RoleDefaultsSchema, RunSnapshotSchema } from './contracts.ts'
 import { atomicJson, ConnectionStore } from './connections.ts'
 import { validateRoleDefaults } from './roles.ts'
-import { loadSavedSnapshot, validateStartPreconditions } from './init.ts'
+import { ensureSelectionsOffered, loadSavedSnapshot, validateStartPreconditions } from './init.ts'
 import { createAcpRoutes, disconnectAcpRoutes, discoverAcpOffers, discoverCommandCodeOffers } from './routes.ts'
 import { createRoleExecutionWorkflow } from './workflows/delivery.ts'
 
@@ -84,6 +84,10 @@ export async function initCommand(args: string[]) {
   const allowSameService = process.env.JULIA_ALLOW_SAME_SERVICE === 'true'
   InitCommandSchema.parse({ issueId: issueOrPath, decision, ...(allowSameService ? { allowSameService } : {}) })
   const card = CardAdmissionSchema.parse(await fetchLinearCard(issueOrPath))
+  if (decision === undefined) {
+    const choices = validateRoleDefaults(RoleDefaultsSchema.parse(JSON.parse(await readFile(defaultsPath, 'utf8'))), { allowSameService })
+    return InitResultSchema.parse({ status: 'awaiting-decision', issueId: card.identifier, choices, limits: acceptedLimits })
+  }
   if (decision === 'Cancel') return InitResultSchema.parse({ status: 'cancelled', issueId: card.identifier })
   if (decision !== 'Start') throw new Error('$init accepts exactly Start or Cancel')
   if (process.env.JULIA_START_AUTHORIZED !== card.identifier) throw new Error(`start authorization for ${card.identifier} is missing`)
@@ -97,7 +101,9 @@ export async function initCommand(args: string[]) {
     try {
       const workflow = createRoleExecutionWorkflow({
         routes, commandCodeKey: () => apiKey,
-        promptForRole: (role, issueId) => `${role} for ${issueId}. Follow this complete card exactly:\n\n${card.description}`,
+        promptForRole: (role, issueId) => process.env.JULIA_VERIFY_MACHINE === '1' && process.env.JULIA_REHEARSAL_PROMPT
+          ? process.env.JULIA_REHEARSAL_PROMPT
+          : `${role} for ${issueId}. Follow this complete card exactly:\n\n${card.description}`,
       })
       const run = await workflow.createRun()
       return run.start({ inputData: { decision: 'Start', authorized: true, snapshot } })
@@ -109,15 +115,19 @@ export async function initCommand(args: string[]) {
   } catch (error: unknown) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
   }
-  const roles = validateRoleDefaults(RoleDefaultsSchema.parse(JSON.parse(await readFile(defaultsPath, 'utf8'))))
+  const roles = RoleDefaultsSchema.parse(JSON.parse(await readFile(defaultsPath, 'utf8')))
+  validateStartPreconditions({ authorized: true, roles, records, offers: Object.values(roles) }, { allowSameService })
   const routes = createAcpRoutes()
   try {
     const offers = await discoverAcpOffers(routes)
     offers.push(...await discoverCommandCodeOffers(apiKey))
-    validateStartPreconditions({ authorized: true, roles, records, offers }, { allowSameService })
+    ensureSelectionsOffered(roles, offers)
   } finally { disconnectAcpRoutes(routes) }
   const saved = RunSnapshotSchema.parse({ issueId: card.identifier, roles, allowSameService, savedAt: new Date().toISOString() })
   await atomicJson(snapshotPath, saved)
+  if (process.env.JULIA_VERIFY_MACHINE === '1' && process.env.JULIA_STOP_AFTER_SNAPSHOT === '1') {
+    return InitResultSchema.parse({ status: 'started', resumed: false, snapshotPath, choices: saved.roles, limits: acceptedLimits, snapshot: saved, delivery: { status: 'stopped-at-safe-boundary' } })
+  }
   return InitResultSchema.parse({ status: 'started', resumed: false, snapshotPath, choices: saved.roles, limits: acceptedLimits, snapshot: saved, delivery: await dispatch(saved) })
 }
 

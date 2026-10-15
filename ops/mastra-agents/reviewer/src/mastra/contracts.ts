@@ -73,9 +73,10 @@ export const ModelsCommandSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('save'), defaults: RoleDefaultsSchema }),
 ])
 export const ModelsResultSchema = z.object({ offers: z.array(ModelOfferSchema), defaults: RoleDefaultsSchema.optional() }).strict()
-export const InitCommandSchema = z.object({ issueId: nonempty, decision: z.enum(['Start', 'Cancel']), allowSameService: z.boolean().optional() }).strict()
+export const InitCommandSchema = z.object({ issueId: z.string().regex(/^[A-Z][A-Z0-9]*-\d+$/), decision: z.enum(['Start', 'Cancel']).optional(), allowSameService: z.boolean().optional() }).strict()
 export const RoleLimitsSchema = z.object({ builderUsd: z.literal(2), reviewerUsd: z.literal(1), crashFixerUsd: z.literal(0.5), fixReviewerUsd: z.literal(0.25), builderMinutes: z.literal(90), reviewerMinutes: z.literal(30), crashFixerMinutes: z.literal(20), fixReviewerMinutes: z.literal(10) }).strict()
 export const InitResultSchema = z.discriminatedUnion('status', [
+  z.object({ status: z.literal('awaiting-decision'), issueId: nonempty, choices: RoleDefaultsSchema, limits: RoleLimitsSchema }).strict(),
   z.object({ status: z.literal('cancelled'), issueId: nonempty }).strict(),
   z.object({ status: z.literal('started'), resumed: z.boolean(), snapshotPath: nonempty, choices: RoleDefaultsSchema, limits: RoleLimitsSchema, snapshot: RunSnapshotSchema, delivery: z.unknown() }).strict(),
 ])

@@ -1,0 +1,27 @@
+{
+  "builder": {
+    "route": "antigravity",
+    "modelId": "gemini-3.8-flash-high",
+    "company": "Google",
+    "service": "Antigravity"
+  },
+  "reviewer": {
+    "route": "commandcode",
+    "modelId": "claude-sonnet-5-5",
+    "company": "Anthropic",
+    "service": "CommandCode",
+    "wire": "messages"
+  },
+  "crashFixer": {
+    "route": "claude",
+    "modelId": "default",
+    "company": "Anthropic",
+    "service": "Claude"
+  },
+  "fixReviewer": {
+    "route": "antigravity",
+    "modelId": "gemini-3.8-flash-high",
+    "company": "Google",
+    "service": "Antigravity"
+  }
+}

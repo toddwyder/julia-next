@@ -6,16 +6,26 @@ import test from 'node:test'
 
 import {
   CardAdmissionSchema,
+  ConnectionsCommandSchema,
+  ConnectionsResultSchema,
   ConnectionRecordSchema,
+  DeliveryStartSchema,
   InitCommandSchema,
+  InitResultSchema,
   ModelOfferSchema,
+  ModelsCommandSchema,
+  ModelsResultSchema,
   RoleDefaultsSchema,
   SecretReferenceSchema,
+  WorkflowInputSchema,
+  WorkflowOutputSchema,
+  WorkflowSnapshotSchema,
 } from '../src/mastra/contracts.ts'
 import { ConnectionStore } from '../src/mastra/connections.ts'
 import { validateRoleDefaults } from '../src/mastra/roles.ts'
 import { decideStart, ensureSelectionsOffered, loadSavedSnapshot, validateStartPreconditions } from '../src/mastra/init.ts'
 import { discoverCommandCodeOffers } from '../src/mastra/routes.ts'
+import { createRoleExecutionWorkflow } from '../src/mastra/workflows/delivery.ts'
 
 test('secret and persisted connection contracts reject secret values', () => {
   assert.equal(SecretReferenceSchema.parse('COMMANDCODE_API_KEY'), 'COMMANDCODE_API_KEY')
@@ -160,4 +170,62 @@ test('every named Start precondition fails before dispatch', () => {
   assert.throws(() => validateStartPreconditions({ authorized: true, roles, records, offers: offers.slice(1) }), /unavailable/)
   assert.throws(() => validateStartPreconditions({ authorized: true, roles: { ...roles, reviewer: { ...roles.reviewer, company: 'Google' } }, records, offers }), /different companies/)
   assert.throws(() => InitCommandSchema.parse({ issueId: 'JUL-225', decision: 'Go' }))
+})
+
+test('every CLI and workflow handoff contract accepts its exact shape and rejects drift', () => {
+  const roles = RoleDefaultsSchema.parse({
+    builder: { route: 'antigravity', modelId: 'a', company: 'Google', service: 'Antigravity' },
+    reviewer: { route: 'commandcode', modelId: 'b', company: 'Anthropic', service: 'CommandCode' },
+    crashFixer: { route: 'claude', modelId: 'c', company: 'Anthropic', service: 'Claude' },
+    fixReviewer: { route: 'antigravity', modelId: 'd', company: 'Google', service: 'Antigravity' },
+  })
+  const snapshot = { issueId: 'JUL-225', roles, allowSameService: false, savedAt: new Date().toISOString() }
+  const input = { decision: 'Start' as const, authorized: true as const, snapshot }
+  const trace = { route: 'antigravity' as const, modelId: 'a', startedAt: new Date().toISOString(), durationMs: 1, ok: true }
+  const output = { status: 'completed' as const, runId: 'run-1', results: { builder: 'ok' }, traces: { builder: trace } }
+  assert.deepEqual(DeliveryStartSchema.parse(input), WorkflowInputSchema.parse(input))
+  assert.equal(WorkflowOutputSchema.parse(output).status, 'completed')
+  assert.equal(WorkflowSnapshotSchema.parse({ runId: 'run-1', input, output }).runId, 'run-1')
+  assert.equal(ConnectionsCommandSchema.parse({ action: 'list' }).action, 'list')
+  assert.equal(ConnectionsResultSchema.parse({ ok: true, records: [] }).ok, true)
+  assert.equal(ModelsCommandSchema.parse({ action: 'save', defaults: roles }).action, 'save')
+  assert.equal(ModelsResultSchema.parse({ offers: [], defaults: roles }).offers.length, 0)
+  assert.equal(InitCommandSchema.parse({ issueId: 'JUL-225' }).issueId, 'JUL-225')
+  assert.equal(InitResultSchema.parse({ status: 'cancelled', issueId: 'JUL-225' }).status, 'cancelled')
+  for (const schema of [DeliveryStartSchema, WorkflowInputSchema]) assert.throws(() => schema.parse({ ...input, authorized: false }))
+  assert.throws(() => WorkflowOutputSchema.parse({ ...output, traces: {} , extra: true }))
+  assert.throws(() => WorkflowSnapshotSchema.parse({ runId: '', input, output }))
+  assert.throws(() => ConnectionsCommandSchema.parse({ action: 'delete-all' }))
+  assert.throws(() => ConnectionsResultSchema.parse({ ok: true, records: [{ secret: 'value' }] }))
+  assert.throws(() => ModelsCommandSchema.parse({ action: 'save', defaults: {} }))
+  assert.throws(() => ModelsResultSchema.parse({ offers: [{ route: 'commandcode', modelId: 'x' }] }))
+  assert.throws(() => InitCommandSchema.parse({ issueId: 'not-an-issue', decision: 'Start' }))
+  assert.throws(() => InitResultSchema.parse({ status: 'started' }))
+})
+
+test('a route failure emits correlated role, route, model, timing, and error evidence', async () => {
+  const lines: string[] = []
+  const savedError = console.error
+  console.error = value => { lines.push(String(value)) }
+  try {
+    const failing = { setModel: async () => {}, generate: async () => { throw new Error('controlled route failure') } }
+    const workflow = createRoleExecutionWorkflow({ routes: { antigravity: failing, claude: failing } as never, commandCodeKey: () => 'reference-only' })
+    const run = await workflow.createRun()
+    const result = await run.start({ inputData: {
+      decision: 'Start', authorized: true,
+      snapshot: { issueId: 'JUL-225', allowSameService: false, savedAt: new Date().toISOString(), roles: {
+        builder: { route: 'antigravity', modelId: 'a', company: 'Google', service: 'Antigravity' },
+        reviewer: { route: 'commandcode', modelId: 'b', company: 'Anthropic', service: 'CommandCode' },
+        crashFixer: { route: 'claude', modelId: 'c', company: 'Anthropic', service: 'Claude' },
+        fixReviewer: { route: 'antigravity', modelId: 'd', company: 'Google', service: 'Antigravity' },
+      } },
+    } })
+    assert.equal(result.status, 'failed')
+  } finally {
+    console.error = savedError
+  }
+  const trace = lines.map(line => { try { return JSON.parse(line) } catch { return null } }).find(item => item?.event === 'delivery-route-failed')
+  assert.deepEqual({ role: trace.role, route: trace.route, modelId: trace.modelId, error: trace.error }, { role: 'builder', route: 'antigravity', modelId: 'a', error: 'controlled route failure' })
+  assert.equal(typeof trace.durationMs, 'number')
+  assert.match(trace.startedAt, /^\d{4}-\d{2}-\d{2}T/)
 })

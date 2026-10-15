@@ -70,6 +70,16 @@ async function cliJourneyProof(apiKey: string, evidenceDirectory: string, roles:
   const configDirectory = resolve(evidenceDirectory, `cli-state-${process.pid}`)
   const cli = resolve(moduleDirectory, 'cli.ts')
   const environment = { ...process.env, COMMANDCODE_API_KEY: apiKey, JULIA_CONFIG_DIRECTORY: configDirectory }
+  const expectFailure = async (args: string[], env = environment) => {
+    try {
+      await execute(process.execPath, ['--experimental-strip-types', cli, ...args], { env, windowsHide: true })
+      throw new Error(`expected CLI failure for ${args.join(' ')}`)
+    } catch (error) {
+      const failure = error as Error & { stderr?: string; code?: number }
+      if (failure.message.startsWith('expected CLI failure')) throw failure
+      return { args, exitCode: failure.code, message: String(failure.stderr || failure.message).trim() }
+    }
+  }
   const commands = [
     ['connections', 'add', 'commandcode', 'commandcode', 'CommandCode', 'CommandCode', 'COMMANDCODE_API_KEY'],
     ['connections', 'reconnect', 'commandcode', 'COMMANDCODE_API_KEY'],
@@ -88,11 +98,54 @@ async function cliJourneyProof(apiKey: string, evidenceDirectory: string, roles:
   await writeFile(defaultsPath, `${JSON.stringify(roles, null, 2)}\n`, 'utf8')
   const save = await execute(process.execPath, ['--experimental-strip-types', cli, 'models', 'save', defaultsPath], { env: environment, windowsHide: true })
   const list = await execute(process.execPath, ['--experimental-strip-types', cli, 'models', 'list'], { env: environment, windowsHide: true })
+  const preview = await execute(process.execPath, ['--experimental-strip-types', cli, 'init', 'JUL-225'], { env: environment, windowsHide: true })
   const cancel = await execute(process.execPath, ['--experimental-strip-types', cli, 'init', 'JUL-225', 'Cancel'], { env: environment, windowsHide: true })
+  const negative = [
+    await expectFailure(['init', 'JUL-225', 'Go']),
+    await expectFailure(['init', 'JUL-225', 'Start']),
+  ]
+  const connectionSpecs: Array<[string, string, string, string, string?]> = [
+    ['antigravity', 'antigravity', 'Google', 'Antigravity', undefined],
+    ['claude', 'claude', 'Anthropic', 'Claude', undefined],
+    ['commandcode', 'commandcode', 'Anthropic', 'CommandCode', 'COMMANDCODE_API_KEY'],
+  ]
+  for (const [id, route, company, service, reference] of connectionSpecs) {
+    const add = ['--experimental-strip-types', cli, 'connections', 'add', id, route, company, service]
+    if (reference) add.push(reference)
+    await execute(process.execPath, add, { env: environment, windowsHide: true })
+    await execute(process.execPath, ['--experimental-strip-types', cli, 'connections', 'test', id], { env: environment, windowsHide: true })
+  }
+  const startEnvironment = { ...environment, JULIA_START_AUTHORIZED: 'JUL-225', JULIA_VERIFY_MACHINE: '1', JULIA_STOP_AFTER_SNAPSHOT: '1', JULIA_REHEARSAL_PROMPT: 'Read no files and change nothing. Reply exactly JUL-225 ROUTE OK.' }
+  await execute(process.execPath, ['--experimental-strip-types', cli, 'connections', 'disable', 'claude'], { env: environment, windowsHide: true })
+  negative.push(await expectFailure(['init', 'JUL-225', 'Start'], startEnvironment))
+  await execute(process.execPath, ['--experimental-strip-types', cli, 'connections', 'reconnect', 'claude'], { env: environment, windowsHide: true })
+  const invalidRoles = structuredClone(roles) as Record<string, { company?: string; modelId?: string }>
+  if (invalidRoles.reviewer) invalidRoles.reviewer.company = 'Google'
+  await writeFile(resolve(configDirectory, 'role-defaults.json'), `${JSON.stringify(invalidRoles, null, 2)}\n`, 'utf8')
+  negative.push(await expectFailure(['init', 'JUL-225', 'Start'], startEnvironment))
+  await writeFile(resolve(configDirectory, 'role-defaults.json'), `${JSON.stringify(roles, null, 2)}\n`, 'utf8')
+  const staleRoles = structuredClone(roles) as Record<string, { modelId?: string }>
+  if (staleRoles.builder) staleRoles.builder.modelId = 'unavailable-model'
+  await writeFile(resolve(configDirectory, 'role-defaults.json'), `${JSON.stringify(staleRoles, null, 2)}\n`, 'utf8')
+  negative.push(await expectFailure(['init', 'JUL-225', 'Start'], startEnvironment))
+  await writeFile(resolve(configDirectory, 'role-defaults.json'), `${JSON.stringify(roles, null, 2)}\n`, 'utf8')
+  const prepared = await execute(process.execPath, ['--experimental-strip-types', cli, 'init', 'JUL-225', 'Start'], { env: startEnvironment, windowsHide: true })
+  const changed = structuredClone(roles) as Record<string, { modelId?: string }>
+  if (changed.builder) changed.builder.modelId = 'changed-after-safe-boundary'
+  await writeFile(resolve(configDirectory, 'role-defaults.json'), `${JSON.stringify(changed, null, 2)}\n`, 'utf8')
+  const { JULIA_STOP_AFTER_SNAPSHOT: _stopped, ...resumeEnvironment } = startEnvironment
+  const resumed = await execute(process.execPath, ['--experimental-strip-types', cli, 'init', 'JUL-225', 'Start'], { env: resumeEnvironment, windowsHide: true })
+  const preparedResult = JSON.parse(prepared.stdout)
+  const resumedResult = JSON.parse(resumed.stdout)
   return {
     connections: { commands: commands.map(command => command[1]), outputs, persisted, secretValueAbsent: !serialized.includes(apiKey) },
     models: { save: JSON.parse(save.stdout), list: JSON.parse(list.stdout) },
-    initCancel: JSON.parse(cancel.stdout),
+    init: {
+      preview: JSON.parse(preview.stdout), cancel: JSON.parse(cancel.stdout), prepared: preparedResult, resumed: resumedResult,
+      negativePreconditions: negative,
+      exactSnapshotReused: JSON.stringify(preparedResult.snapshot) === JSON.stringify(resumedResult.snapshot),
+      defaultsChangedAfterBoundary: changed.builder?.modelId === 'changed-after-safe-boundary',
+    },
   }
 }
 

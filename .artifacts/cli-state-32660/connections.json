@@ -1,0 +1,39 @@
+[
+  {
+    "id": "antigravity",
+    "route": "antigravity",
+    "company": "Google",
+    "service": "Antigravity",
+    "enabled": true,
+    "lastTest": {
+      "ok": true,
+      "testedAt": "2026-10-15T04:27:20.530Z",
+      "modelCount": 3
+    }
+  },
+  {
+    "id": "claude",
+    "route": "claude",
+    "company": "Anthropic",
+    "service": "Claude",
+    "enabled": true,
+    "lastTest": {
+      "ok": true,
+      "testedAt": "2026-10-15T04:27:55.031Z",
+      "modelCount": 4
+    }
+  },
+  {
+    "id": "commandcode",
+    "route": "commandcode",
+    "company": "Anthropic",
+    "service": "CommandCode",
+    "enabled": true,
+    "secretReference": "COMMANDCODE_API_KEY",
+    "lastTest": {
+      "ok": true,
+      "testedAt": "2026-10-15T04:27:58.110Z",
+      "modelCount": 90
+    }
+  }
+]
