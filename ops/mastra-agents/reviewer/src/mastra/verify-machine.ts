@@ -4,7 +4,7 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { z } from 'zod/v4'
-import { WorkflowSnapshotSchema } from './contracts.ts'
+import { ConnectionRecordSchema, ConnectionsResultSchema, InitResultSchema, ModelsResultSchema, WorkflowSnapshotSchema } from './contracts.ts'
 import { createAcpRoutes, createCommandCodeAgent, disconnectAcpRoutes, discoverAcpOffers, discoverCommandCodeOffers, selectAcpModel } from './routes.ts'
 import { createRoleExecutionWorkflow } from './workflows/delivery.ts'
 
@@ -69,15 +69,15 @@ export async function liveModelProof(apiKey: string, cwd = resolve(moduleDirecto
 async function cliJourneyProof(apiKey: string, evidenceDirectory: string, roles: Record<string, unknown>) {
   const configDirectory = resolve(evidenceDirectory, `cli-state-${process.pid}`)
   const cli = resolve(moduleDirectory, 'cli.ts')
-  const environment = { ...process.env, COMMANDCODE_API_KEY: apiKey, JULIA_CONFIG_DIRECTORY: configDirectory }
-  const expectFailure = async (args: string[], env = environment) => {
+  const environment: NodeJS.ProcessEnv = { ...process.env, COMMANDCODE_API_KEY: apiKey, JULIA_CONFIG_DIRECTORY: configDirectory }
+  const expectFailure = async (name: string, args: string[], env = environment) => {
     try {
       await execute(process.execPath, ['--experimental-strip-types', cli, ...args], { env, windowsHide: true })
       throw new Error(`expected CLI failure for ${args.join(' ')}`)
     } catch (error) {
       const failure = error as Error & { stderr?: string; code?: number }
       if (failure.message.startsWith('expected CLI failure')) throw failure
-      return { args, exitCode: failure.code, message: String(failure.stderr || failure.message).trim() }
+      return { name, args, exitCode: failure.code, message: String(failure.stderr || failure.message).trim() }
     }
   }
   const commands = [
@@ -90,9 +90,9 @@ async function cliJourneyProof(apiKey: string, evidenceDirectory: string, roles:
   const outputs = []
   for (const command of commands) {
     const { stdout } = await execute(process.execPath, ['--experimental-strip-types', cli, ...command], { env: environment, windowsHide: true })
-    outputs.push(JSON.parse(stdout))
+    outputs.push(ConnectionsResultSchema.parse(JSON.parse(stdout)))
   }
-  const persisted = JSON.parse(await readFile(resolve(configDirectory, 'connections.json'), 'utf8'))
+  const persisted = ConnectionRecordSchema.array().parse(JSON.parse(await readFile(resolve(configDirectory, 'connections.json'), 'utf8')))
   const serialized = JSON.stringify({ outputs, persisted })
   const defaultsPath = resolve(evidenceDirectory, 'role-defaults-proof.json')
   await writeFile(defaultsPath, `${JSON.stringify(roles, null, 2)}\n`, 'utf8')
@@ -100,9 +100,12 @@ async function cliJourneyProof(apiKey: string, evidenceDirectory: string, roles:
   const list = await execute(process.execPath, ['--experimental-strip-types', cli, 'models', 'list'], { env: environment, windowsHide: true })
   const preview = await execute(process.execPath, ['--experimental-strip-types', cli, 'init', 'JUL-225'], { env: environment, windowsHide: true })
   const cancel = await execute(process.execPath, ['--experimental-strip-types', cli, 'init', 'JUL-225', 'Cancel'], { env: environment, windowsHide: true })
+  const completeCard = { identifier: 'JUL-225', state: 'Ready', description: '# Outcome\nA\n# Requirements\nB\n# Contracts\nC\n# Finish conditions\nD\n# Proof\nE' }
   const negative = [
-    await expectFailure(['init', 'JUL-225', 'Go']),
-    await expectFailure(['init', 'JUL-225', 'Start']),
+    await expectFailure('invalid-decision', ['init', 'JUL-225', 'Go']),
+    await expectFailure('missing-authorization', ['init', 'JUL-225', 'Start']),
+    await expectFailure('non-ready-card', ['init', 'JUL-225'], { ...environment, JULIA_VERIFY_MACHINE: '1', JULIA_VERIFY_CARD_JSON: JSON.stringify({ ...completeCard, state: 'Backlog' }) }),
+    await expectFailure('incomplete-card', ['init', 'JUL-225'], { ...environment, JULIA_VERIFY_MACHINE: '1', JULIA_VERIFY_CARD_JSON: JSON.stringify({ ...completeCard, description: '# Outcome\nIncomplete' }) }),
   ]
   const connectionSpecs: Array<[string, string, string, string, string?]> = [
     ['antigravity', 'antigravity', 'Google', 'Antigravity', undefined],
@@ -117,17 +120,22 @@ async function cliJourneyProof(apiKey: string, evidenceDirectory: string, roles:
   }
   const startEnvironment = { ...environment, JULIA_START_AUTHORIZED: 'JUL-225', JULIA_VERIFY_MACHINE: '1', JULIA_STOP_AFTER_SNAPSHOT: '1', JULIA_REHEARSAL_PROMPT: 'Read no files and change nothing. Reply exactly JUL-225 ROUTE OK.' }
   await execute(process.execPath, ['--experimental-strip-types', cli, 'connections', 'disable', 'claude'], { env: environment, windowsHide: true })
-  negative.push(await expectFailure(['init', 'JUL-225', 'Start'], startEnvironment))
+  negative.push(await expectFailure('disabled-connection', ['init', 'JUL-225', 'Start'], startEnvironment))
   await execute(process.execPath, ['--experimental-strip-types', cli, 'connections', 'reconnect', 'claude'], { env: environment, windowsHide: true })
+  const failedRecords = ConnectionRecordSchema.array().parse(JSON.parse(await readFile(resolve(configDirectory, 'connections.json'), 'utf8')))
+    .map(record => record.route === 'claude' ? { ...record, enabled: true, lastTest: { ok: false, testedAt: new Date().toISOString(), modelCount: 0 } } : record)
+  await writeFile(resolve(configDirectory, 'connections.json'), `${JSON.stringify(failedRecords, null, 2)}\n`, 'utf8')
+  negative.push(await expectFailure('failed-connection', ['init', 'JUL-225', 'Start'], startEnvironment))
+  await execute(process.execPath, ['--experimental-strip-types', cli, 'connections', 'test', 'claude'], { env: environment, windowsHide: true })
   const invalidRoles = structuredClone(roles) as Record<string, { company?: string; modelId?: string }>
   if (invalidRoles.reviewer) invalidRoles.reviewer.company = 'Google'
   await writeFile(resolve(configDirectory, 'role-defaults.json'), `${JSON.stringify(invalidRoles, null, 2)}\n`, 'utf8')
-  negative.push(await expectFailure(['init', 'JUL-225', 'Start'], startEnvironment))
+  negative.push(await expectFailure('invalid-roles', ['init', 'JUL-225', 'Start'], startEnvironment))
   await writeFile(resolve(configDirectory, 'role-defaults.json'), `${JSON.stringify(roles, null, 2)}\n`, 'utf8')
   const staleRoles = structuredClone(roles) as Record<string, { modelId?: string }>
   if (staleRoles.builder) staleRoles.builder.modelId = 'unavailable-model'
   await writeFile(resolve(configDirectory, 'role-defaults.json'), `${JSON.stringify(staleRoles, null, 2)}\n`, 'utf8')
-  negative.push(await expectFailure(['init', 'JUL-225', 'Start'], startEnvironment))
+  negative.push(await expectFailure('stale-model', ['init', 'JUL-225', 'Start'], startEnvironment))
   await writeFile(resolve(configDirectory, 'role-defaults.json'), `${JSON.stringify(roles, null, 2)}\n`, 'utf8')
   const prepared = await execute(process.execPath, ['--experimental-strip-types', cli, 'init', 'JUL-225', 'Start'], { env: startEnvironment, windowsHide: true })
   const changed = structuredClone(roles) as Record<string, { modelId?: string }>
@@ -135,13 +143,14 @@ async function cliJourneyProof(apiKey: string, evidenceDirectory: string, roles:
   await writeFile(resolve(configDirectory, 'role-defaults.json'), `${JSON.stringify(changed, null, 2)}\n`, 'utf8')
   const { JULIA_STOP_AFTER_SNAPSHOT: _stopped, ...resumeEnvironment } = startEnvironment
   const resumed = await execute(process.execPath, ['--experimental-strip-types', cli, 'init', 'JUL-225', 'Start'], { env: resumeEnvironment, windowsHide: true })
-  const preparedResult = JSON.parse(prepared.stdout)
-  const resumedResult = JSON.parse(resumed.stdout)
+  const preparedResult = InitResultSchema.parse(JSON.parse(prepared.stdout))
+  const resumedResult = InitResultSchema.parse(JSON.parse(resumed.stdout))
+  if (preparedResult.status !== 'started' || resumedResult.status !== 'started') throw new Error('Start proof did not return started results')
   return {
     connections: { commands: commands.map(command => command[1]), outputs, persisted, secretValueAbsent: !serialized.includes(apiKey) },
-    models: { save: JSON.parse(save.stdout), list: JSON.parse(list.stdout) },
+    models: { save: ModelsResultSchema.parse(JSON.parse(save.stdout)), list: ModelsResultSchema.parse(JSON.parse(list.stdout)) },
     init: {
-      preview: JSON.parse(preview.stdout), cancel: JSON.parse(cancel.stdout), prepared: preparedResult, resumed: resumedResult,
+      preview: InitResultSchema.parse(JSON.parse(preview.stdout)), cancel: InitResultSchema.parse(JSON.parse(cancel.stdout)), prepared: preparedResult, resumed: resumedResult,
       negativePreconditions: negative,
       exactSnapshotReused: JSON.stringify(preparedResult.snapshot) === JSON.stringify(resumedResult.snapshot),
       defaultsChangedAfterBoundary: changed.builder?.modelId === 'changed-after-safe-boundary',

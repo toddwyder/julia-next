@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises'
-import { RoleDefaultsSchema, RunSnapshotSchema } from './contracts.ts'
+import { ModelOfferSchema, RoleDefaultsSchema, RunSnapshotSchema } from './contracts.ts'
 import { validateRoleDefaults } from './roles.ts'
 import type { z } from 'zod/v4'
 
@@ -20,9 +20,10 @@ export function validateStartPreconditions({ authorized, roles, records, offers 
   return ensureSelectionsOffered(validated, offers)
 }
 
-export function ensureSelectionsOffered(roles: RoleDefaults, offers: Array<{ route: string; modelId: string }>) {
+export function ensureSelectionsOffered(roles: RoleDefaults, offers: unknown) {
+  const parsedOffers = ModelOfferSchema.array().parse(offers)
   for (const [role, selection] of Object.entries(RoleDefaultsSchema.parse(roles))) {
-    if (!offers.some(offer => offer.route === selection.route && offer.modelId === selection.modelId)) {
+    if (!parsedOffers.some(offer => offer.route === selection.route && offer.modelId === selection.modelId)) {
       throw new Error(`${role} selection ${selection.route}:${selection.modelId} is unavailable or stale`)
     }
   }

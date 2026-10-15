@@ -129,12 +129,12 @@ test('admission refuses stale defaults that are not in the current route offers'
     crashFixer: { route: 'claude', modelId: 'c', company: 'Anthropic', service: 'Claude' },
     fixReviewer: { route: 'antigravity', modelId: 'd', company: 'Google', service: 'Antigravity' },
   })
-  const offers = [
-    { route: 'antigravity', modelId: 'a' }, { route: 'commandcode', modelId: 'b' },
-    { route: 'claude', modelId: 'c' }, { route: 'antigravity', modelId: 'd' },
-  ]
+  const offers = Object.values(roles).map(selection => ModelOfferSchema.parse({
+    ...selection, name: selection.modelId, codingCapable: true,
+  }))
   assert.doesNotThrow(() => ensureSelectionsOffered(roles, offers))
   assert.throws(() => ensureSelectionsOffered(roles, offers.slice(0, 3)), /fixReviewer.*unavailable/)
+  assert.throws(() => ensureSelectionsOffered(roles, [{ route: 'antigravity', modelId: 'a' }]), /name/)
 })
 
 test('restart reuses the exact persisted four-role snapshot after live defaults change', async t => {
@@ -163,7 +163,9 @@ test('every named Start precondition fails before dispatch', () => {
     fixReviewer: { route: 'antigravity', modelId: 'd', company: 'Google', service: 'Antigravity' },
   })
   const records = ['antigravity', 'claude', 'commandcode'].map(route => ({ route, enabled: true, lastTest: { ok: true } }))
-  const offers = Object.values(roles).map(({ route, modelId }) => ({ route, modelId }))
+  const offers = Object.values(roles).map(selection => ModelOfferSchema.parse({
+    ...selection, name: selection.modelId, codingCapable: true,
+  }))
   assert.throws(() => validateStartPreconditions({ authorized: false, roles, records, offers }), /authorization/)
   assert.throws(() => validateStartPreconditions({ authorized: true, roles, records: records.map(record => record.route === 'claude' ? { ...record, enabled: false } : record), offers }), /disabled/)
   assert.throws(() => validateStartPreconditions({ authorized: true, roles, records: records.map(record => record.route === 'claude' ? { ...record, lastTest: { ok: false } } : record), offers }), /failed/)
