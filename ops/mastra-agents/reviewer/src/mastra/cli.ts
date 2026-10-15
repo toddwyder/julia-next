@@ -8,6 +8,7 @@ import { validateRoleDefaults } from './roles.ts'
 import { ensureSelectionsOffered, loadSavedSnapshot, validateStartPreconditions } from './init.ts'
 import { discoverAcpOffers, discoverCommandCodeOffers, withAcpRoutes } from './routes.ts'
 import { createRoleExecutionWorkflow } from './workflows/delivery.ts'
+import { fetchLinearIssue } from './linear.ts'
 
 const configDirectory = process.env.JULIA_CONFIG_DIRECTORY ?? join(process.env.USERPROFILE ?? process.cwd(), '.julia')
 const connectionsPath = process.env.JULIA_CONNECTIONS_PATH ?? join(configDirectory, 'connections.json')
@@ -65,13 +66,8 @@ export async function modelCommand(args: string[]) {
 
 export async function fetchLinearCard(issueId: string, apiKey = process.env.LINEAR_API_KEY, fetchImpl: typeof fetch = fetch) {
   if (!apiKey) throw new Error('LINEAR_API_KEY was not resolved by the Julia vault launcher')
-  const response = await fetchImpl('https://api.linear.app/graphql', {
-    method: 'POST', headers: { Authorization: apiKey, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query: 'query Card($id:String!){issue(id:$id){identifier description state{name}}}', variables: { id: issueId } }),
-  })
-  const body = await response.json() as { data?: { issue?: { identifier: string; description: string; state: { name: string } } }; errors?: unknown }
-  if (!response.ok || body.errors || !body.data?.issue) throw new Error(`Linear intake failed with HTTP ${response.status}`)
-  return CardAdmissionSchema.parse({ identifier: body.data.issue.identifier, state: body.data.issue.state.name, description: body.data.issue.description })
+  const issue = await fetchLinearIssue(issueId, apiKey, fetchImpl)
+  return CardAdmissionSchema.parse({ identifier: issue.identifier, state: issue.state.name, description: issue.description })
 }
 
 export async function initCommand(args: string[]) {

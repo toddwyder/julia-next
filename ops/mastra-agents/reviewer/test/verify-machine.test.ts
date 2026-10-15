@@ -64,20 +64,33 @@ test('rehearsal candidate identity stability rejects commit or dirty-tree drift'
 
 test('F10 reads JUL-208 without admission and gives the reviewer the exact builder proposal', async () => {
   let request = ''
+  const traces: unknown[] = []
   const card = await fetchRehearsalCard('linear-reference', async (_input, init) => {
     request = String(init?.body)
     return new Response(JSON.stringify({ data: { issue: {
       identifier: 'JUL-208', title: 'Keep a private recipe', description: 'Creation only; do not implement.', state: { name: 'Backlog' },
     } } }), { status: 200, headers: { 'content-type': 'application/json' } })
-  })
+  }, trace => { traces.push(trace) })
   const proposal = 'Change proposal with repository-specific file references.'
   const builderPrompt = jul208Prompt('builder', card, {})
   const reviewerPrompt = jul208Prompt('reviewer', card, { builder: proposal })
   assert.match(request, /"id":"JUL-208"/)
   assert.equal(card.state, 'Backlog')
+  assert.deepEqual(traces.map(trace => (trace as { ok: boolean; issueId: string }).ok), [true])
+  assert.equal((traces[0] as { issueId: string }).issueId, 'JUL-208')
   assert.match(builderPrompt, /concrete proposed change/)
   assert.match(builderPrompt, /do not implement/i)
   assert.ok(reviewerPrompt.includes(proposal))
   assert.match(reviewerPrompt, /substantive findings/i)
   assert.doesNotMatch(`${builderPrompt}\n${reviewerPrompt}`, /reply exactly/i)
+})
+
+test('F10 records a sanitized Linear trace when GraphQL fails with HTTP 200', async () => {
+  const traces: Array<{ ok: boolean; status: number; errorCategory?: string }> = []
+  await assert.rejects(() => fetchRehearsalCard('linear-reference', async () => new Response(JSON.stringify({ errors: [{ message: 'secret detail' }] }), {
+    status: 200, headers: { 'content-type': 'application/json' },
+  }), trace => { traces.push(trace) }), /Linear JUL-208 read failed/)
+  assert.deepEqual(traces.map(({ durationMs: _durationMs, ...trace }) => trace), [{ operation: 'linear-read', issueId: 'JUL-208', ok: false, status: 200, errorCategory: 'graphql' }])
+  assert.equal(typeof traces[0]?.durationMs, 'number')
+  assert.doesNotMatch(JSON.stringify(traces), /secret detail|linear-reference/)
 })

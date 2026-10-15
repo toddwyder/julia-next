@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { z } from 'zod/v4'
 import { fetchLinearCard } from './cli.ts'
+import { fetchLinearIssue } from './linear.ts'
+import type { LinearReadTrace } from './linear.ts'
 import { ConnectionRecordSchema, ConnectionsResultSchema, InitResultSchema, ModelsResultSchema, WorkflowSnapshotSchema } from './contracts.ts'
 import { cleanupAcpRoutes, createAcpRoutes, createCommandCodeAgent, discoverAcpOffers, discoverCommandCodeOffers, rethrowAfterCleanup, selectAcpModel, withFinalCleanup } from './routes.ts'
 import { createRoleExecutionWorkflow } from './workflows/delivery.ts'
@@ -34,15 +36,9 @@ const RehearsalCardSchema = z.object({
 }).strict()
 type RehearsalCard = z.infer<typeof RehearsalCardSchema>
 
-export async function fetchRehearsalCard(apiKey = process.env.LINEAR_API_KEY, fetchImpl: typeof fetch = fetch) {
+export async function fetchRehearsalCard(apiKey = process.env.LINEAR_API_KEY, fetchImpl: typeof fetch = fetch, recordTrace?: (trace: LinearReadTrace) => void | Promise<void>) {
   if (!apiKey) throw new Error('LINEAR_API_KEY was not resolved by the Julia vault launcher')
-  const response = await fetchImpl('https://api.linear.app/graphql', {
-    method: 'POST', headers: { Authorization: apiKey, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query: 'query RehearsalCard($id:String!){issue(id:$id){identifier title description state{name}}}', variables: { id: 'JUL-208' } }),
-  })
-  const body = await response.json() as { data?: { issue?: { identifier: string; title: string; description: string; state: { name: string } } }; errors?: unknown }
-  if (!response.ok || body.errors || !body.data?.issue) throw new Error(`Linear JUL-208 read failed with HTTP ${response.status}`)
-  const issue = body.data.issue
+  const issue = await fetchLinearIssue('JUL-208', apiKey, fetchImpl, recordTrace)
   return RehearsalCardSchema.parse({ identifier: issue.identifier, title: issue.title, state: issue.state.name, description: issue.description })
 }
 
@@ -236,9 +232,12 @@ async function cliJourneyProof(apiKey: string, evidenceDirectory: string, roles:
 export async function rehearsal(apiKey: string, evidencePath: string, identityProvider: IdentityProvider = candidateIdentity) {
   let proof: Awaited<ReturnType<typeof liveModelProof>> | undefined
   return withFinalCleanup(async () => {
+    const evidenceDirectory = dirname(evidencePath)
+    await mkdir(evidenceDirectory, { recursive: true })
     const identityAtStart = await identityProvider()
     proof = await liveModelProof(apiKey)
-    const card = await fetchRehearsalCard()
+    const linearTracePath = resolve(evidenceDirectory, 'jul-208-linear-read.json')
+    const card = await fetchRehearsalCard(undefined, fetch, trace => writeFile(linearTracePath, `${JSON.stringify(trace, null, 2)}\n`, 'utf8'))
     const workflow = createRoleExecutionWorkflow({
       routes: proof.routes,
       commandCodeKey: () => apiKey,
@@ -265,8 +264,6 @@ export async function rehearsal(apiKey: string, evidencePath: string, identityPr
     if (workflowResult.status !== 'success') throw new Error(`real workflow rehearsal ended ${workflowResult.status}`)
     const output = workflowResult.result
     const workflowSnapshot = WorkflowSnapshotSchema.parse({ runId: workflowRun.runId, input: inputData, output })
-    const evidenceDirectory = dirname(evidencePath)
-    await mkdir(evidenceDirectory, { recursive: true })
     const builderProposalPath = resolve(evidenceDirectory, 'jul-208-builder-proposal.md')
     const reviewerFindingsPath = resolve(evidenceDirectory, 'jul-208-review-findings.md')
     await writeFile(builderProposalPath, `${output.results.builder.trim()}\n`, 'utf8')
@@ -282,6 +279,7 @@ export async function rehearsal(apiKey: string, evidencePath: string, identityPr
       workflowSnapshot,
       jul208: {
         card: { identifier: card.identifier, title: card.title, state: card.state },
+        linearReadTrace: linearTracePath,
         builderProposal: { path: builderProposalPath, bytes: Buffer.byteLength(output.results.builder, 'utf8') },
         reviewerFindings: { path: reviewerFindingsPath, bytes: Buffer.byteLength(output.results.reviewer, 'utf8'), reviewedExactBuilderOutput: true },
       },
