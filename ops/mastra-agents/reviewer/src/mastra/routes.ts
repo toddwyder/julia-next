@@ -4,7 +4,7 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { createOpenAI } from '@ai-sdk/openai'
 import { join } from 'node:path'
-import { ownedAcpProcesses, retainAcpProcessHandles, stopOwnedAcpProcesses, type OwnedAcpProcesses } from './acp-process-lifecycle.ts'
+import { ownedAcpProcesses, retainAcpProcessHandles, sameWindowsProcessIdentity, stopOwnedAcpProcesses, type OwnedAcpProcesses } from './acp-process-lifecycle.ts'
 import { ModelOfferSchema, ModelSelectionSchema } from './contracts.ts'
 import type { z } from 'zod/v4'
 
@@ -132,6 +132,14 @@ type AcpRouteScope = {
   stopOwnedProcesses: typeof stopOwnedAcpProcesses
 }
 
+function mergeOwnedAcpProcesses(left: OwnedAcpProcesses, right: OwnedAcpProcesses): OwnedAcpProcesses {
+  return {
+    roots: [...new Set([...left.roots, ...right.roots])],
+    descendants: [...left.descendants, ...right.descendants.filter(candidate =>
+      !left.descendants.some(existing => sameWindowsProcessIdentity(existing, candidate)))],
+  }
+}
+
 async function cleanupOwnedAcpRoutes(routes: ReturnType<typeof createAcpRoutes>, scope: Omit<AcpRouteScope, 'createRoutes'>) {
   const errors: unknown[] = []
   let owned: OwnedAcpProcesses = { roots: [], descendants: [] }
@@ -146,7 +154,22 @@ async function cleanupOwnedAcpRoutes(routes: ReturnType<typeof createAcpRoutes>,
     errors.push(error)
   }
   try {
-    await scope.stopOwnedProcesses(owned)
+    owned = mergeOwnedAcpProcesses(owned, await scope.captureOwnedProcesses(routes))
+  } catch (error) {
+    errors.push(error)
+  }
+  try {
+    await scope.stopOwnedProcesses({ roots: owned.roots, descendants: [] })
+  } catch (error) {
+    errors.push(error)
+  }
+  try {
+    owned = mergeOwnedAcpProcesses(owned, await scope.captureOwnedProcesses(routes))
+  } catch (error) {
+    errors.push(error)
+  }
+  try {
+    await scope.stopOwnedProcesses({ roots: [], descendants: owned.descendants })
   } catch (error) {
     errors.push(error)
   }
@@ -170,7 +193,8 @@ export async function withFinalCleanup<T>(operation: () => Promise<T>, cleanup: 
       if (operationFailed) {
         const operationMessage = operationError instanceof Error ? operationError.message : String(operationError)
         const cleanupMessage = cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
-        throw new AggregateError([operationError, cleanupError], `Operation failed: ${operationMessage}; cleanup also failed: ${cleanupMessage}`)
+        const cleanupErrors = cleanupError instanceof AggregateError ? cleanupError.errors : [cleanupError]
+        throw new AggregateError([operationError, ...cleanupErrors], `Operation failed: ${operationMessage}; cleanup also failed: ${cleanupMessage}`)
       }
       throw cleanupError
     }

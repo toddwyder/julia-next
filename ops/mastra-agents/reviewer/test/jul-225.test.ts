@@ -125,18 +125,38 @@ test('standalone ACP route scope disconnects and cleans only processes it create
 
   const events: string[] = []
   const routes = { antigravity: {}, claude: {} }
+  const lateOwnedIdentity = { ...ownedIdentity, processId: 31, parentProcessId: 20, creationDate: '2026-10-15T00:00:03.0000000-07:00' }
+  const rootExitOwnedIdentity = { ...ownedIdentity, processId: 32, parentProcessId: 20, creationDate: '2026-10-15T00:00:04.0000000-07:00' }
+  let ownedCaptureCount = 0
   const result = await withAcpRoutes(async active => {
     assert.equal(active, routes)
     events.push('use')
     return 'done'
   }, {
-    captureOwnedProcesses: async () => { events.push('capture-owned'); return { roots: [ownedProcess], descendants: [ownedIdentity] } as never },
+    captureOwnedProcesses: async () => {
+      events.push('capture-owned')
+      ownedCaptureCount += 1
+      const descendants = ownedCaptureCount === 1
+        ? [ownedIdentity]
+        : ownedCaptureCount === 2 ? [ownedIdentity, lateOwnedIdentity] : [ownedIdentity, lateOwnedIdentity, rootExitOwnedIdentity]
+      return { roots: [ownedProcess], descendants } as never
+    },
     createRoutes: () => routes as never,
     disconnectRoutes: () => { events.push('disconnect') },
-    stopOwnedProcesses: async processes => { events.push(`cleanup:${processes.descendants.map(process => process.processId).join(',')}`) },
+    stopOwnedProcesses: async processes => {
+      events.push(`cleanup:roots=${processes.roots.length};descendants=${processes.descendants.map(process => process.processId).join(',')}`)
+    },
   })
   assert.equal(result, 'done')
-  assert.deepEqual(events, ['use', 'capture-owned', 'disconnect', 'cleanup:30'])
+  assert.deepEqual(events, [
+    'use',
+    'capture-owned',
+    'disconnect',
+    'capture-owned',
+    'cleanup:roots=1;descendants=',
+    'capture-owned',
+    'cleanup:roots=0;descendants=30,31,32',
+  ])
 
   events.length = 0
   await assert.rejects(withAcpRoutes(async () => { throw new Error('route failed') }, {
@@ -145,7 +165,7 @@ test('standalone ACP route scope disconnects and cleans only processes it create
     disconnectRoutes: () => { events.push('disconnect') },
     stopOwnedProcesses: async () => { events.push('cleanup') },
   }), /route failed/)
-  assert.deepEqual(events, ['disconnect', 'cleanup'])
+  assert.deepEqual(events, ['disconnect', 'cleanup', 'cleanup'])
 
   await assert.rejects(withAcpRoutes(async () => { throw new Error('route failed') }, {
     captureOwnedProcesses: async () => ({ roots: [ownedProcess], descendants: [ownedIdentity] }) as never,
