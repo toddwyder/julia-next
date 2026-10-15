@@ -38,9 +38,12 @@ const requiredSectionTitles = requiredSections.map(section => section.replace(' 
 const requiredSectionHeading = new RegExp(`^(?:#{1,6}\\s+(?:${requiredSectionTitles})|\\*\\*(?:${requiredSectionTitles})\\*\\*)\\s*$`, 'im')
 export const CardAdmissionSchema = z.object({
   identifier: z.string().regex(/^[A-Z][A-Z0-9]*-\d+$/),
-  state: z.literal('Ready'),
+  state: nonempty,
   description: nonempty,
 }).strict().superRefine((card, context) => {
+  if (card.state !== 'Ready') {
+    context.addIssue({ code: 'custom', path: ['state'], message: 'expected Ready state' })
+  }
   for (const section of requiredSections) {
     const title = section.replace(' ', '\\s+')
     const pattern = new RegExp(`^(?:#{1,6}\\s+${title}|\\*\\*${title}\\*\\*)\\s*$`, 'im')

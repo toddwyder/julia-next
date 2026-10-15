@@ -196,6 +196,16 @@ test('admission requires the complete settled card shape and Ready state', () =>
   assert.equal(CardAdmissionSchema.parse(complete).identifier, 'JUL-225')
   assert.throws(() => CardAdmissionSchema.parse({ ...complete, state: 'Backlog' }))
   assert.throws(() => CardAdmissionSchema.parse({ ...complete, description: '# Outcome\nA' }))
+  const nonReadyIncomplete = CardAdmissionSchema.safeParse({ ...complete, state: 'Backlog', description: '# Outcome\nA' })
+  assert.equal(nonReadyIncomplete.success, false)
+  if (!nonReadyIncomplete.success) {
+    const messages = nonReadyIncomplete.error.issues.map(issue => issue.message)
+    assert.ok(messages.includes('expected Ready state'))
+    assert.ok(messages.includes('missing nonempty Requirements section'))
+    assert.ok(messages.includes('missing nonempty Contracts section'))
+    assert.ok(messages.includes('missing nonempty Finish conditions section'))
+    assert.ok(messages.includes('missing nonempty Proof section'))
+  }
   assert.throws(() => CardAdmissionSchema.parse({ ...complete, description: `${complete.description}\nTODO: decision` }))
   const linear = { ...complete, description: '**Outcome**\nA\n\n**Requirements**\nB\n\n**Contracts**\nC\n\n**Finish conditions**\nD\n\n**Proof**\nE' }
   assert.equal(CardAdmissionSchema.parse(linear).identifier, 'JUL-225')
