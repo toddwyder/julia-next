@@ -42,7 +42,7 @@ if ($driveExit -ne 0) { throw "initialize-ready-card drive failed with exit code
   zero server requests and zero mutations, and independent readback confirming the persisted run
   upon boundary restart.
 - **Retain proof.** `cancel-evidence.json`, `start-evidence.json`, `idempotence-evidence.json`,
-  `readback-evidence.json`, `control-server.log`, and `drive.json` remain readable in `$evidenceDirectory`.
+  `readback-evidence.json`, `boundary-traces.json`, `control-server.log`, and `drive.json` remain readable in `$evidenceDirectory`.
 
 ## Gotchas
 
