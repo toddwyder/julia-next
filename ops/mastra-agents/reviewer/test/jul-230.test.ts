@@ -131,6 +131,8 @@ test('Cancel closes the browser form locally without another server request', as
   const browser = await chromium.launch({ headless: true })
   t.after(() => browser.close())
   const page = await browser.newPage()
+  const consoleErrors: string[] = []
+  page.on('console', message => { if (message.type() === 'error') consoleErrors.push(message.text()) })
   await page.goto(server.url)
   await page.getByRole('heading', { name: 'Initialize a Ready card' }).waitFor()
   const beforeCancel = requests.length
@@ -138,6 +140,7 @@ test('Cancel closes the browser form locally without another server request', as
   await page.getByText('Initialization closed. Nothing was sent or saved.').waitFor()
   assert.equal(requests.length, beforeCancel)
   assert.equal(await page.locator('form').count(), 0)
+  assert.deepEqual(consoleErrors, [])
 })
 
 test('browser Start sends the exact changed card and four selections through the local boundary', async t => {

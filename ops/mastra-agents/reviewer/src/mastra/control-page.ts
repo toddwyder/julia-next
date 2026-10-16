@@ -81,6 +81,10 @@ export async function startControlPageServer({
         response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' })
         return response.end(controlPageHtml())
       }
+      if (method === 'GET' && url.pathname === '/favicon.ico') {
+        response.writeHead(204, { 'Cache-Control': 'public, max-age=86400' })
+        return response.end()
+      }
       if (method === 'GET' && url.pathname === `${CONTROL_PATH}/api/state`) {
         return sendJson(response, 200, ControlPageStateSchema.parse(await getState()))
       }
