@@ -17,8 +17,11 @@ test('verify-machine skill and feature map keep the generated public contract', 
   assert.deepEqual(generation.generatedFiles, [
     'generation.json',
     'SKILL.md',
+    'drive-initialization.mjs',
+    'initialization-driver-support.mjs',
     'features/README.md',
     'features/check-permanent-prerequisites.md',
+    'features/initialize-ready-card.md',
     'features/run-named-secret-command.md',
     'features/verify-restricted-secrets.md',
   ]);
@@ -47,6 +50,7 @@ test('verify-machine skill and feature map keep the generated public contract', 
   assert.ok(featureFiles.length > 0);
   assert.deepEqual(featureFiles, [
     'check-permanent-prerequisites.md',
+    'initialize-ready-card.md',
     'run-named-secret-command.md',
     'verify-restricted-secrets.md',
   ]);
@@ -68,5 +72,10 @@ test('verify-machine skill and feature map keep the generated public contract', 
 
   assert.match(index, /connections[\s\S]+Unavailable today/i);
   assert.match(index, /models[\s\S]+Unavailable today/i);
-  assert.match(index, /init Start[\s\S]+Pending implementation and verification/i);
+  assert.match(index, /init Start[\s\S]+initialize-ready-card\.md/i);
+
+  const initializationDriver = await readFile(join(skillDirectory, 'drive-initialization.mjs'), 'utf8');
+  const initializationSupport = await readFile(join(skillDirectory, 'initialization-driver-support.mjs'), 'utf8');
+  assert.doesNotMatch(initializationDriver, /boundary[12]\.stop\(\)\.catch/);
+  assert.match(initializationSupport, /Wait-Process/);
 });

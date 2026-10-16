@@ -7,8 +7,11 @@
   "generatedFiles": [
     "generation.json",
     "SKILL.md",
+    "drive-initialization.mjs",
+    "initialization-driver-support.mjs",
     "features/README.md",
     "features/check-permanent-prerequisites.md",
+    "features/initialize-ready-card.md",
     "features/run-named-secret-command.md",
     "features/verify-restricted-secrets.md"
   ]

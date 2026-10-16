@@ -42,6 +42,9 @@ literal PowerShell command and states the observable success result.
 
 - [Check permanent prerequisites](./check-permanent-prerequisites.md) checks candidate identity and
   every installed permanent delivery prerequisite without changing them.
+- [Initialize a Ready card](./initialize-ready-card.md) discovers live Ready cards and model offers,
+  allows changing all four role selections without an LLM call or defaults file, durably suspends a
+  restart-surviving pre-build run on Start, and closes cleanly without side effects on Cancel.
 - [Verify restricted secrets](./verify-restricted-secrets.md) proves the provisioned restricted
   account resolves Julia references without revealing values.
 - [Run a named-secret command](./run-named-secret-command.md) gives one approved executable only the
@@ -55,25 +58,31 @@ literal PowerShell command and states the observable success result.
 | `verify-machine rehearsal` | Retained aggregate paid diagnostic, not one user feature; run only when a card explicitly requires every live route. Current route health was not established by this interview. |
 | `julia-vault-windows.ps1 -Verify` | `verify-restricted-secrets.md` |
 | `julia-vault-windows.ps1 -SecretNames ... -RunArguments ...` | `run-named-secret-command.md` |
-| `julia-vault-windows.ps1 -JuliaArguments ...` | Routes to the `connections`, `models`, and `init` commands accounted for below; none currently qualifies as a working feature. |
+| `start-julia-control-page.ps1` / `Start Julia Control Page.cmd` | `initialize-ready-card.md` |
+| `julia-vault-windows.ps1 -JuliaArguments ...` | Routes to legacy CLI commands; initialization has moved to the local control page. |
 | `julia-vault-windows.ps1 -Operation readIssue` | Legacy Linear-read compatibility entry point; the least-privilege named-secret read is mapped in `run-named-secret-command.md`, so this is not a separate feature. |
-| `julia-vault-windows.ps1 -Operation init` | Default internal selector used with `-JuliaArguments`; its exposed Julia commands are accounted for below. |
+| `julia-vault-windows.ps1 -Operation init` | Default internal selector used with `-JuliaArguments`; initialization is now mapped through the local control page in `initialize-ready-card.md`. |
 | `julia-vault.mjs init/readIssue/verify/run` | Internal dispatcher operations. On Windows they fail closed unless reached through `julia-vault-windows.ps1`; their supported wrapper paths are mapped or accounted for above. |
 | `julia-vault.mjs migrate` | Operator-only credential migration; it can create vault items and configuration, so it is not a routine verification feature. |
 | `connections list/add/reconnect/test/disable/remove` | Unavailable today: real `connections list` exited 1 because the installed persisted records use the retired shape. |
 | `models list/save` | Unavailable today: real `models list` exited 1 because the installed role-defaults file is absent; Claude selection probes also failed. |
-| `init` inspect/Cancel | Unavailable today because current connection/default prerequisites are not healthy. |
-| `init Start` and resume | Pending implementation and verification under the repository instructions; verification does not authorize delivery. |
+| `init` inspect/Cancel | Replaced by the browser-side Cancel on the local control page mapped in `initialize-ready-card.md`. |
+| `init Start` and resume | Pre-build workflow initialization from the control page is mapped in `initialize-ready-card.md`; delivery build execution remains a separate downstream boundary. |
 | `julia-vault-windows.ps1 -Provision` and vault migration | Operator-only account creation or credential migration, not routine verification features. |
 
 ## Interview sources
 
-- Docs: `AGENTS.md`, `docs/agents/work-execution.md`, `docs/agents/julia-secret-vault.md`, and
+- Docs: `AGENTS.md`, `docs/agents/work-execution.md`, `docs/agents/julia-secret-vault.md`,
+  `docs/agents/init.md`, `docs/agents/jul-230-framework-map.md`, and
   `docs/agents/permanent-machine-parts.json` read-only.
 - Commands: `scripts/julia-vault-windows.ps1`, `scripts/julia-vault.mjs`,
-  `scripts/linear-cli.mjs`, `ops/mastra-agents/reviewer/src/mastra/cli.ts`, and
+  `scripts/linear-cli.mjs`, `scripts/start-julia-control-page.ps1`,
+  `ops/mastra-agents/reviewer/src/mastra/cli.ts`,
+  `ops/mastra-agents/reviewer/src/mastra/control-server.ts`,
+  `ops/mastra-agents/reviewer/src/mastra/control-page.ts`, and
   `ops/mastra-agents/reviewer/src/mastra/verify-machine.ts`.
-- Tests: `scripts/julia-vault.test.mjs`, `scripts/verify-machine-skill.test.mjs`, and
+- Tests: `scripts/julia-vault.test.mjs`, `scripts/verify-machine-skill.test.mjs`,
+  `ops/mastra-agents/reviewer/test/jul-230.test.ts`, and
   `ops/mastra-agents/reviewer/test/verify-machine.test.ts`.
 - Laptop installed state: Node, Git, Windows PowerShell, the restricted vault bootstrap and
   configuration, Doctor's five-part check, and captured real command results.

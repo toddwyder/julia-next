@@ -1,0 +1,38 @@
+﻿✖ verify-machine skill and feature map keep the generated public contract (6.2282ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 114.4226
+
+✖ failing tests:
+
+test at scripts\verify-machine-skill.test.mjs:10:1
+✖ verify-machine skill and feature map keep the generated public contract (6.2282ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+
+    [
+      'generation.json',
+      'SKILL.md',
+  -   'drive-initialization.mjs',
+      'features/README.md',
+      'features/check-permanent-prerequisites.md',
+  -   'features/initialize-ready-card.md',
+      'features/run-named-secret-command.md',
+      'features/verify-restricted-secrets.md'
+    ]
+
+      at TestContext.<anonymous> (file:///C:/Dev/julia-next/scripts/verify-machine-skill.test.mjs:17:10)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'generation.json', 'SKILL.md', 'features/README.md', 'features/check-permanent-prerequisites.md', 'features/run-named-secret-command.md', 'features/verify-restricted-secrets.md' ],
+    expected: [ 'generation.json', 'SKILL.md', 'drive-initialization.mjs', 'features/README.md', 'features/check-permanent-prerequisites.md', 'features/initialize-ready-card.md', 'features/run-named-secret-command.md', 'features/verify-restricted-secrets.md' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

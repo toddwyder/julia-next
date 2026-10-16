@@ -6,13 +6,27 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { join } from 'node:path'
 import { ownedAcpProcesses, retainAcpProcessHandles, sameWindowsProcessIdentity, stopOwnedAcpProcesses, type OwnedAcpProcesses } from './acp-process-lifecycle.ts'
 import { ModelOfferSchema, ModelSelectionSchema } from './contracts.ts'
-import type { z } from 'zod/v4'
+import { z } from 'zod/v4'
 
 export { descendantAcpProcesses, ownedAcpProcesses, sameWindowsProcessIdentity, stopExactWindowsProcesses, waitForAcpProcessExit } from './acp-process-lifecycle.ts'
 export type { WindowsProcessIdentity } from './acp-process-lifecycle.ts'
 
 type ModelOffer = z.infer<typeof ModelOfferSchema>
 type ModelSelection = z.infer<typeof ModelSelectionSchema>
+
+const CommandCodeModelsResponseSchema = z.object({
+  data: z.array(z.object({
+    id: z.unknown().optional(),
+    name: z.unknown().optional(),
+    supported_endpoints: z.unknown().optional(),
+  }).passthrough()),
+}).passthrough()
+
+export const routeSupportedEfforts = {
+  antigravity: ['low', 'medium', 'high', 'xhigh', 'max'],
+  claude: ['low', 'medium', 'high', 'xhigh', 'max'],
+  commandcode: ['low', 'medium', 'high'],
+} as const
 
 function modelCompany(modelId: string) {
   const value = modelId.toLowerCase()
@@ -62,6 +76,7 @@ function normalizeAcpOffer(route: 'antigravity' | 'claude', item: { modelId: str
     company: route === 'antigravity' ? 'Google' : 'Anthropic',
     service: route === 'antigravity' ? 'Antigravity' : 'Claude',
     codingCapable: true,
+    supportedEfforts: [...routeSupportedEfforts[route]],
   })
 }
 
@@ -79,6 +94,17 @@ type ClaudeDiscoveryTrace = {
   modelId: string
   ok: false
   error: string
+}
+
+export type ModelDiscoveryTrace = ClaudeDiscoveryTrace | {
+  event: 'model-discovery'
+  route: 'antigravity' | 'claude' | 'commandcode'
+  operation: 'models/list'
+  ok: boolean
+  durationMs: number
+  offerCount?: number
+  status?: number
+  error?: string
 }
 
 function sanitizedTraceError(error: unknown) {
@@ -99,7 +125,7 @@ function claudeModelChoices(agent: ReturnType<typeof createAcpRoutes>['claude'])
     return Array.isArray(parsed.options) ? flatten(parsed.options) : [parsed]
   })
   return flatten(modelConfigs[0].options).filter((choice): choice is ClaudeConfigChoice & { value: string } =>
-    typeof choice.value === 'string' && choice.value.startsWith('claude-'))
+    typeof choice.value === 'string' && /^claude-[a-z0-9]+(?:-[a-z0-9]+)*$/.test(choice.value))
 }
 
 async function discoverClaudeOffers(
@@ -159,11 +185,22 @@ async function selectClaudeModel(agent: ReturnType<typeof createAcpRoutes>['clau
 
 export async function discoverAcpOffers(
   routes: ReturnType<typeof createAcpRoutes>,
-  recordTrace: (trace: ClaudeDiscoveryTrace) => void = trace => console.error(JSON.stringify(trace)),
+  recordTrace: (trace: ModelDiscoveryTrace) => void = trace => console.error(JSON.stringify(trace)),
 ) {
+  const discover = async <T>(route: 'antigravity' | 'claude', action: () => Promise<T[]>) => {
+    const started = performance.now()
+    try {
+      const offers = await action()
+      recordTrace({ event: 'model-discovery', route, operation: 'models/list', ok: true, offerCount: offers.length, durationMs: performance.now() - started })
+      return offers
+    } catch (error) {
+      recordTrace({ event: 'model-discovery', route, operation: 'models/list', ok: false, durationMs: performance.now() - started, error: sanitizedTraceError(error) })
+      throw error
+    }
+  }
   const [antigravity, claude] = await Promise.all([
-    routes.antigravity.getAvailableModels(),
-    discoverClaudeOffers(routes.claude, recordTrace),
+    discover('antigravity', () => routes.antigravity.getAvailableModels()),
+    discover('claude', () => discoverClaudeOffers(routes.claude, recordTrace)),
   ])
   return [
     ...antigravity.map(item => normalizeAcpOffer('antigravity', item)),
@@ -181,25 +218,40 @@ export async function selectAcpModel(routes: ReturnType<typeof createAcpRoutes>,
   await routes[parsed.route].setModel(parsed.modelId)
 }
 
-export async function discoverCommandCodeOffers(apiKey: string, fetchImpl: typeof fetch = fetch): Promise<ModelOffer[]> {
-  const response = await fetchImpl('https://api.commandcode.ai/provider/v1/models', {
-    headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
-    redirect: 'error',
-  })
-  if (!response.ok) throw new Error(`CommandCode model list failed with HTTP ${response.status}`)
-  const body = await response.json() as { data?: Array<{ id?: unknown; name?: unknown; supported_endpoints?: unknown }> }
-  return (body.data ?? []).flatMap(item => {
-    const endpoints = Array.isArray(item.supported_endpoints) ? item.supported_endpoints.filter(value => typeof value === 'string') : []
-    const codingCapable = endpoints.some(endpoint => /(?:chat\/completions|responses|messages)$/.test(endpoint))
-    if (!codingCapable || typeof item.id !== 'string') return []
-    const wire = endpoints.some(endpoint => /chat\/completions$/.test(endpoint))
-      ? 'chat'
-      : endpoints.some(endpoint => /messages$/.test(endpoint)) ? 'messages' : 'responses'
-    return [ModelOfferSchema.parse({
-      route: 'commandcode', modelId: item.id, name: typeof item.name === 'string' ? item.name : item.id,
-      company: modelCompany(item.id), service: 'CommandCode', codingCapable: true, wire,
-    })]
-  })
+export async function discoverCommandCodeOffers(
+  apiKey: string,
+  fetchImpl: typeof fetch = fetch,
+  recordTrace: (trace: ModelDiscoveryTrace) => void = trace => console.error(JSON.stringify(trace)),
+): Promise<ModelOffer[]> {
+  const started = performance.now()
+  let status = 0
+  try {
+    const response = await fetchImpl('https://api.commandcode.ai/provider/v1/models', {
+      headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
+      redirect: 'error',
+    })
+    status = response.status
+    if (!response.ok) throw new Error(`CommandCode model list failed with HTTP ${response.status}`)
+    const body = CommandCodeModelsResponseSchema.parse(await response.json())
+    const offers = body.data.flatMap(item => {
+      const endpoints = Array.isArray(item.supported_endpoints) ? item.supported_endpoints.filter(value => typeof value === 'string') : []
+      const codingCapable = endpoints.some(endpoint => /(?:chat\/completions|responses|messages)$/.test(endpoint))
+      if (!codingCapable || typeof item.id !== 'string') return []
+      const wire = endpoints.some(endpoint => /chat\/completions$/.test(endpoint))
+        ? 'chat'
+        : endpoints.some(endpoint => /messages$/.test(endpoint)) ? 'messages' : 'responses'
+      return [ModelOfferSchema.parse({
+        route: 'commandcode', modelId: item.id, name: typeof item.name === 'string' ? item.name : item.id,
+        company: modelCompany(item.id), service: 'CommandCode', codingCapable: true, wire,
+        supportedEfforts: [...routeSupportedEfforts.commandcode],
+      })]
+    })
+    recordTrace({ event: 'model-discovery', route: 'commandcode', operation: 'models/list', ok: true, status, offerCount: offers.length, durationMs: performance.now() - started })
+    return offers
+  } catch (error) {
+    recordTrace({ event: 'model-discovery', route: 'commandcode', operation: 'models/list', ok: false, status, durationMs: performance.now() - started, error: sanitizedTraceError(error) })
+    throw error
+  }
 }
 
 export function createCommandCodeAgent(selection: ModelSelection, apiKey: string) {

@@ -1,0 +1,21 @@
+﻿
+> julia-mastra-reviewer@1.0.0 test:jul-230
+> node --experimental-strip-types --test test/jul-230.test.ts
+
+✔ Ready card admission accepts the authoritative Agent Brief and rejects unresolved decisions (5.1946ms)
+✔ control-page contracts carry complete offers and exact route-supported role selections (3.1898ms)
+✔ initialization observability counts actual boundary activity instead of asserting zeroes (1.2411ms)
+✔ Linear Ready-card discovery paginates every complete card with read-only queries (4.7635ms)
+✔ model discovery records a sanitized success or failure trace for every service connection (1.1761ms)
+✔ CommandCode discovery rejects a malformed success payload instead of tracing an unknown count as zero (0.9998ms)
+✔ Start creates one restart-surviving suspended run and returns it for the same confirmed input (9299.9853ms)
+✔ Cancel closes the browser form locally without another server request (893.9825ms)
+✔ browser Start sends the exact changed card and four selections through the local boundary (944.3772ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 12626.5998

@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises'
-import { ModelOfferSchema, RoleDefaultsSchema, RunSnapshotSchema } from './contracts.ts'
+import { DeliveryRunSnapshotSchema, ModelOfferSchema, RoleDefaultsSchema } from './contracts.ts'
 import { validateRoleDefaults } from './roles.ts'
 import type { z } from 'zod/v4'
 
@@ -31,7 +31,7 @@ export function ensureSelectionsOffered(roles: RoleDefaults, offers: unknown) {
 }
 
 export async function loadSavedSnapshot(path: string, issueId: string) {
-  const saved = RunSnapshotSchema.parse(JSON.parse(await readFile(path, 'utf8')))
+  const saved = DeliveryRunSnapshotSchema.parse(JSON.parse(await readFile(path, 'utf8')))
   if (saved.issueId !== issueId) throw new Error('saved snapshot belongs to another card')
   validateRoleDefaults(saved.roles, { allowSameService: saved.allowSameService })
   return saved

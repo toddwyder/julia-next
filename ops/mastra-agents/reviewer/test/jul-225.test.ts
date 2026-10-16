@@ -54,8 +54,8 @@ test('real file-backed connection lifecycle persists only parsed records and red
 })
 
 test('model offers keep duplicate IDs distinct by route', () => {
-  const antigravity = ModelOfferSchema.parse({ route: 'antigravity', modelId: 'claude-sonnet-4-6', name: 'Shared', company: 'Google', service: 'Antigravity', codingCapable: true })
-  const claude = ModelOfferSchema.parse({ route: 'claude', modelId: 'claude-sonnet-4-6', name: 'Shared', company: 'Anthropic', service: 'Claude', codingCapable: true })
+  const antigravity = ModelOfferSchema.parse({ route: 'antigravity', modelId: 'claude-sonnet-4-6', name: 'Shared', company: 'Google', service: 'Antigravity', codingCapable: true, supportedEfforts: ['low'] })
+  const claude = ModelOfferSchema.parse({ route: 'claude', modelId: 'claude-sonnet-4-6', name: 'Shared', company: 'Anthropic', service: 'Claude', codingCapable: true, supportedEfforts: ['low'] })
   assert.notEqual(`${antigravity.route}:${antigravity.modelId}`, `${claude.route}:${claude.modelId}`)
 })
 
@@ -74,6 +74,7 @@ test('Claude discovery offers only exact provider model IDs from the session con
           { value: 'haiku', name: 'Haiku' },
           { value: 'claude-haiku-4-5-20251001', name: 'Haiku 4.5' },
           { value: 'claude-fable-5', name: 'Fable 5' },
+          { value: 'claude-fable-5-1[1m]', name: 'Malformed terminal-styled ID' },
           { value: 'claude-sonnet-4-6', name: 'Sonnet 4.6' },
         ],
       }] },
@@ -89,7 +90,7 @@ test('Claude discovery offers only exact provider model IDs from the session con
     ['claude', 'claude-haiku-4-5-20251001'],
     ['claude', 'claude-sonnet-4-6'],
   ])
-  assert.deepEqual(traces, [{
+  assert.deepEqual(traces.filter(trace => (trace as { event?: string }).event === 'model-discovery-probe'), [{
     event: 'model-discovery-probe',
     route: 'claude',
     operation: 'session/set_config_option',
@@ -97,6 +98,13 @@ test('Claude discovery offers only exact provider model IDs from the session con
     ok: false,
     error: 'Claude model "claude-fable-5" selection failed: Internal error',
   }])
+  assert.deepEqual(traces.filter(trace => (trace as { event?: string }).event === 'model-discovery').map(trace => {
+    const value = trace as { route: string; ok: boolean; offerCount: number }
+    return { route: value.route, ok: value.ok, offerCount: value.offerCount }
+  }), [
+    { route: 'antigravity', ok: true, offerCount: 0 },
+    { route: 'claude', ok: true, offerCount: 2 },
+  ])
 })
 
 test('Claude selection and restart reapply the same exact provider model ID', async () => {
@@ -443,7 +451,7 @@ test('admission refuses stale defaults that are not in the current route offers'
     fixReviewer: { route: 'antigravity', modelId: 'd', company: 'Google', service: 'Antigravity' },
   })
   const offers = Object.values(roles).map(selection => ModelOfferSchema.parse({
-    ...selection, name: selection.modelId, codingCapable: true,
+    ...selection, name: selection.modelId, codingCapable: true, supportedEfforts: ['low'],
   }))
   assert.doesNotThrow(() => ensureSelectionsOffered(roles, offers))
   assert.throws(() => ensureSelectionsOffered(roles, offers.slice(0, 3)), /fixReviewer.*unavailable/)
@@ -477,7 +485,7 @@ test('every named Start precondition fails before dispatch', () => {
   })
   const records = ['antigravity', 'claude', 'commandcode'].map(route => ({ route, enabled: true, lastTest: { ok: true } }))
   const offers = Object.values(roles).map(selection => ModelOfferSchema.parse({
-    ...selection, name: selection.modelId, codingCapable: true,
+    ...selection, name: selection.modelId, codingCapable: true, supportedEfforts: ['low'],
   }))
   assert.throws(() => validateStartPreconditions({ authorized: false, roles, records, offers }), /authorization/)
   assert.throws(() => validateStartPreconditions({ authorized: true, roles, records: records.map(record => record.route === 'claude' ? { ...record, enabled: false } : record), offers }), /disabled/)
