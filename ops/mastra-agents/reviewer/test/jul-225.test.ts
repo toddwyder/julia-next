@@ -54,8 +54,8 @@ test('real file-backed connection lifecycle persists only parsed records and red
 })
 
 test('model offers keep duplicate IDs distinct by route', () => {
-  const antigravity = ModelOfferSchema.parse({ route: 'antigravity', modelId: 'claude-sonnet-4-6', name: 'Shared', company: 'Google', service: 'Antigravity', codingCapable: true })
-  const claude = ModelOfferSchema.parse({ route: 'claude', modelId: 'claude-sonnet-4-6', name: 'Shared', company: 'Anthropic', service: 'Claude', codingCapable: true })
+  const antigravity = ModelOfferSchema.parse({ route: 'antigravity', modelId: 'claude-sonnet-4-6', name: 'Shared', company: 'Google', service: 'Antigravity', codingCapable: true, supportedEfforts: ['low'] })
+  const claude = ModelOfferSchema.parse({ route: 'claude', modelId: 'claude-sonnet-4-6', name: 'Shared', company: 'Anthropic', service: 'Claude', codingCapable: true, supportedEfforts: ['low'] })
   assert.notEqual(`${antigravity.route}:${antigravity.modelId}`, `${claude.route}:${claude.modelId}`)
 })
 
@@ -443,7 +443,7 @@ test('admission refuses stale defaults that are not in the current route offers'
     fixReviewer: { route: 'antigravity', modelId: 'd', company: 'Google', service: 'Antigravity' },
   })
   const offers = Object.values(roles).map(selection => ModelOfferSchema.parse({
-    ...selection, name: selection.modelId, codingCapable: true,
+    ...selection, name: selection.modelId, codingCapable: true, supportedEfforts: ['low'],
   }))
   assert.doesNotThrow(() => ensureSelectionsOffered(roles, offers))
   assert.throws(() => ensureSelectionsOffered(roles, offers.slice(0, 3)), /fixReviewer.*unavailable/)
@@ -477,7 +477,7 @@ test('every named Start precondition fails before dispatch', () => {
   })
   const records = ['antigravity', 'claude', 'commandcode'].map(route => ({ route, enabled: true, lastTest: { ok: true } }))
   const offers = Object.values(roles).map(selection => ModelOfferSchema.parse({
-    ...selection, name: selection.modelId, codingCapable: true,
+    ...selection, name: selection.modelId, codingCapable: true, supportedEfforts: ['low'],
   }))
   assert.throws(() => validateStartPreconditions({ authorized: false, roles, records, offers }), /authorization/)
   assert.throws(() => validateStartPreconditions({ authorized: true, roles, records: records.map(record => record.route === 'claude' ? { ...record, enabled: false } : record), offers }), /disabled/)

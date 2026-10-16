@@ -14,6 +14,12 @@ export type { WindowsProcessIdentity } from './acp-process-lifecycle.ts'
 type ModelOffer = z.infer<typeof ModelOfferSchema>
 type ModelSelection = z.infer<typeof ModelSelectionSchema>
 
+export const routeSupportedEfforts = {
+  antigravity: ['low', 'medium', 'high', 'xhigh', 'max'],
+  claude: ['low', 'medium', 'high', 'xhigh', 'max'],
+  commandcode: ['low', 'medium', 'high'],
+} as const
+
 function modelCompany(modelId: string) {
   const value = modelId.toLowerCase()
   if (value.includes('claude')) return 'Anthropic'
@@ -62,6 +68,7 @@ function normalizeAcpOffer(route: 'antigravity' | 'claude', item: { modelId: str
     company: route === 'antigravity' ? 'Google' : 'Anthropic',
     service: route === 'antigravity' ? 'Antigravity' : 'Claude',
     codingCapable: true,
+    supportedEfforts: [...routeSupportedEfforts[route]],
   })
 }
 
@@ -198,6 +205,7 @@ export async function discoverCommandCodeOffers(apiKey: string, fetchImpl: typeo
     return [ModelOfferSchema.parse({
       route: 'commandcode', modelId: item.id, name: typeof item.name === 'string' ? item.name : item.id,
       company: modelCompany(item.id), service: 'CommandCode', codingCapable: true, wire,
+      supportedEfforts: [...routeSupportedEfforts.commandcode],
     })]
   })
 }

@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { z } from 'zod/v4'
-import { CardAdmissionSchema, ConnectionsCommandSchema, ConnectionsResultSchema, InitCommandSchema, InitResultSchema, ModelsCommandSchema, ModelsResultSchema, ConnectionRecordSchema, RoleDefaultsSchema, RunSnapshotSchema } from './contracts.ts'
+import { CardAdmissionSchema, ConnectionsCommandSchema, ConnectionsResultSchema, DeliveryRunSnapshotSchema, InitCommandSchema, InitResultSchema, ModelsCommandSchema, ModelsResultSchema, ConnectionRecordSchema, RoleDefaultsSchema } from './contracts.ts'
 import { atomicJson, ConnectionStore } from './connections.ts'
 import { validateRoleDefaults } from './roles.ts'
 import { ensureSelectionsOffered, loadSavedSnapshot, validateStartPreconditions } from './init.ts'
@@ -97,7 +97,7 @@ export async function initCommand(args: string[]) {
   const commandCode = records.find(item => item.route === 'commandcode')
   const apiKey = commandCode?.secretReference ? process.env[commandCode.secretReference] : undefined
   if (!apiKey) throw new Error('CommandCode secret reference did not resolve')
-  const dispatch = async (snapshot: z.infer<typeof RunSnapshotSchema>) => {
+  const dispatch = async (snapshot: z.infer<typeof DeliveryRunSnapshotSchema>) => {
     return withAcpRoutes(async routes => {
       const workflow = createRoleExecutionWorkflow({
         routes, commandCodeKey: () => apiKey,
@@ -121,7 +121,7 @@ export async function initCommand(args: string[]) {
     offers.push(...await discoverCommandCodeOffers(apiKey))
     validateStartPreconditions({ authorized: true, roles, records, offers }, { allowSameService })
   })
-  const saved = RunSnapshotSchema.parse({ issueId: card.identifier, roles, allowSameService, savedAt: new Date().toISOString() })
+  const saved = DeliveryRunSnapshotSchema.parse({ issueId: card.identifier, roles, allowSameService, savedAt: new Date().toISOString() })
   await atomicJson(snapshotPath, saved)
   if (process.env.JULIA_VERIFY_MACHINE === '1' && process.env.JULIA_STOP_AFTER_SNAPSHOT === '1') {
     return InitResultSchema.parse({ status: 'started', resumed: false, snapshotPath, choices: saved.roles, limits: acceptedLimits, snapshot: saved, delivery: { status: 'stopped-at-safe-boundary' } })
