@@ -90,11 +90,11 @@ export async function startControlPageServer({
       return sendJson(response, 404, { error: 'not found' })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      console.error(JSON.stringify({ event: 'control-page-request-failed', method, path: url.pathname, error: message.slice(0, 300) }))
+      console.log(JSON.stringify({ event: 'control-page-request-failed', method, path: url.pathname, error: message.slice(0, 300) }))
       return sendJson(response, 400, { error: message })
     }
   })
-  server.on('error', error => console.error(JSON.stringify({ event: 'control-page-server-failed', error: error.message })))
+  server.on('error', error => console.log(JSON.stringify({ event: 'control-page-server-failed', error: error.message })))
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject)
     server.listen(port, '127.0.0.1', () => { server.off('error', reject); resolve() })

@@ -20,14 +20,14 @@ function requiredSecret(name: 'LINEAR_API_KEY' | 'COMMANDCODE_API_KEY') {
 export async function discoverControlPageState() {
   const linearKey = requiredSecret('LINEAR_API_KEY')
   const commandCodeKey = requiredSecret('COMMANDCODE_API_KEY')
-  const cardsPromise = listReadyLinearCards(linearKey, fetch, trace => console.error(JSON.stringify(trace)))
+  const cardsPromise = listReadyLinearCards(linearKey, fetch, trace => console.log(JSON.stringify(trace)))
   const offersPromise = withAcpRoutes(async routes => {
     const [acp, commandCode] = await Promise.all([
-      discoverAcpOffers(routes),
+      discoverAcpOffers(routes, trace => console.log(JSON.stringify(trace))),
       discoverCommandCodeOffers(commandCodeKey),
     ])
     const offers = [...acp, ...commandCode]
-    console.error(JSON.stringify({ event: 'model-discovery-completed', offerCount: offers.length, routes: [...new Set(offers.map(offer => offer.route))] }))
+    console.log(JSON.stringify({ event: 'model-discovery-completed', offerCount: offers.length, routes: [...new Set(offers.map(offer => offer.route))] }))
     return offers
   })
   const [cards, offers] = await Promise.all([cardsPromise, offersPromise])
@@ -53,10 +53,10 @@ export async function runControlPageServer() {
     startInitialization: async input => {
       latestState = await discoverControlPageState()
       const result = await runtime.start(input, latestState)
-      console.error(JSON.stringify({ event: 'initialization-ready-for-build', card: input.card.identifier, runId: result.runId, resumed: result.resumed, state: result.state }))
+      console.log(JSON.stringify({ event: 'initialization-ready-for-build', card: input.card.identifier, runId: result.runId, resumed: result.resumed, state: result.state }))
       return result
     },
-    onRequest: request => console.error(JSON.stringify({ event: 'control-page-request', ...request })),
+    onRequest: request => console.log(JSON.stringify({ event: 'control-page-request', ...request })),
   })
   console.log(JSON.stringify({ status: 'ready', url: server.url, storage: storagePath }))
   openDefaultBrowser(server.url)
@@ -73,5 +73,5 @@ export async function runControlPageServer() {
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  runControlPageServer().catch(error => { console.error(error instanceof Error ? error.message : String(error)); process.exitCode = 1 })
+  runControlPageServer().catch(error => { console.log(JSON.stringify({ event: 'control-page-fatal', error: error instanceof Error ? error.message : String(error) })); process.exitCode = 1 })
 }
