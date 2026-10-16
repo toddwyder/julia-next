@@ -1,0 +1,13 @@
+Command: npm run typecheck; npm run test:jul-230
+Exit code: 0
+
+TypeScript: passed
+PASS  Ready card admission accepts the authoritative Agent Brief and rejects unresolved decisions
+PASS  control-page contracts carry complete offers and exact route-supported role selections
+PASS  Linear Ready-card discovery paginates every complete card with read-only queries
+PASS  model discovery records a sanitized success or failure trace for every service connection
+PASS  Start creates one restart-surviving suspended run and returns it for the same confirmed input
+PASS  Cancel closes the browser form locally without another server request
+PASS  browser Start sends the exact changed card and four selections through the local boundary
+
+Tests: 7; passed: 7; failed: 0; skipped: 0

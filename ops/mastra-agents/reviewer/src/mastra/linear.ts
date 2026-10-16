@@ -27,18 +27,44 @@ export async function listReadyLinearCards(
   const started = performance.now()
   let status = 0
   try {
-    const response = await fetchImpl('https://api.linear.app/graphql', {
-      method: 'POST', headers: { Authorization: apiKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: 'query ReadyCards { issues(first: 50, filter: { state: { name: { eq: "Ready" } } }) { nodes { identifier title description state { name } } } }' }),
-    })
-    status = response.status
-    const body = await response.json() as { data?: { issues?: { nodes?: LinearIssue[] } }; errors?: unknown }
-    const errorCategory = !response.ok ? 'http' : body.errors ? 'graphql' : !Array.isArray(body.data?.issues?.nodes) ? 'invalid-response' : undefined
-    if (errorCategory) {
-      await recordTrace({ operation: 'linear-ready-list', ok: false, status, errorCategory, durationMs: performance.now() - started })
-      throw new Error(`Linear Ready-card list failed with HTTP ${status} (${errorCategory})`)
-    }
-    const cards = ReadyCardSchema.array().parse(body.data!.issues!.nodes!.map(issue => ({
+    const issues: LinearIssue[] = []
+    let after: string | null = null
+    do {
+      const response = await fetchImpl('https://api.linear.app/graphql', {
+        method: 'POST', headers: { Authorization: apiKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: 'query ReadyCards($after:String) { issues(first: 50, after: $after, filter: { state: { name: { eq: "Ready" } } }) { nodes { identifier title description state { name } } pageInfo { hasNextPage endCursor } } }',
+          variables: { after },
+        }),
+      })
+      status = response.status
+      const body = await response.json() as {
+        data?: { issues?: { nodes?: LinearIssue[]; pageInfo?: { hasNextPage?: unknown; endCursor?: unknown } } }
+        errors?: unknown
+      }
+      const connection = body.data?.issues
+      const errorCategory = !response.ok
+        ? 'http'
+        : body.errors
+          ? 'graphql'
+          : !Array.isArray(connection?.nodes) || typeof connection.pageInfo?.hasNextPage !== 'boolean'
+            ? 'invalid-response'
+            : undefined
+      if (errorCategory) {
+        await recordTrace({ operation: 'linear-ready-list', ok: false, status, errorCategory, durationMs: performance.now() - started })
+        throw new Error(`Linear Ready-card list failed with HTTP ${status} (${errorCategory})`)
+      }
+      issues.push(...connection!.nodes!)
+      if (!connection!.pageInfo!.hasNextPage) {
+        after = null
+      } else if (typeof connection!.pageInfo!.endCursor === 'string' && connection!.pageInfo!.endCursor.length > 0) {
+        after = connection!.pageInfo!.endCursor
+      } else {
+        await recordTrace({ operation: 'linear-ready-list', ok: false, status, errorCategory: 'invalid-response', durationMs: performance.now() - started })
+        throw new Error(`Linear Ready-card list failed with HTTP ${status} (invalid-response)`)
+      }
+    } while (after !== null)
+    const cards = ReadyCardSchema.array().parse(issues.map(issue => ({
       identifier: issue.identifier, title: issue.title, description: issue.description, state: issue.state.name,
     })))
     await recordTrace({ operation: 'linear-ready-list', ok: true, status, cardCount: cards.length, durationMs: performance.now() - started })

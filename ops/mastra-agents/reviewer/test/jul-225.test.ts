@@ -89,7 +89,7 @@ test('Claude discovery offers only exact provider model IDs from the session con
     ['claude', 'claude-haiku-4-5-20251001'],
     ['claude', 'claude-sonnet-4-6'],
   ])
-  assert.deepEqual(traces, [{
+  assert.deepEqual(traces.filter(trace => (trace as { event?: string }).event === 'model-discovery-probe'), [{
     event: 'model-discovery-probe',
     route: 'claude',
     operation: 'session/set_config_option',
@@ -97,6 +97,13 @@ test('Claude discovery offers only exact provider model IDs from the session con
     ok: false,
     error: 'Claude model "claude-fable-5" selection failed: Internal error',
   }])
+  assert.deepEqual(traces.filter(trace => (trace as { event?: string }).event === 'model-discovery').map(trace => {
+    const value = trace as { route: string; ok: boolean; offerCount: number }
+    return { route: value.route, ok: value.ok, offerCount: value.offerCount }
+  }), [
+    { route: 'antigravity', ok: true, offerCount: 0 },
+    { route: 'claude', ok: true, offerCount: 2 },
+  ])
 })
 
 test('Claude selection and restart reapply the same exact provider model ID', async () => {

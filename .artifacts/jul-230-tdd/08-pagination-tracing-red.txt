@@ -1,0 +1,17 @@
+Command: npm run test:jul-230
+Candidate state: tests added before implementation
+Exit code: 1
+
+PASS  Ready card admission accepts the authoritative Agent Brief and rejects unresolved decisions
+PASS  control-page contracts carry complete offers and exact route-supported role selections
+FAIL  Linear Ready-card discovery paginates every complete card with read-only queries
+  Expected identifiers: [JUL-230, JUL-231]
+  Actual identifiers:   [JUL-230]
+FAIL  model discovery records a sanitized success or failure trace for every service connection
+  Expected models/list traces: antigravity success, claude success, commandcode failure
+  Actual models/list traces: []
+PASS  Start creates one restart-surviving suspended run and returns it for the same confirmed input
+PASS  Cancel closes the browser form locally without another server request
+PASS  browser Start sends the exact changed card and four selections through the local boundary
+
+Tests: 7; passed: 5; failed: 2; skipped: 0

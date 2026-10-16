@@ -24,7 +24,7 @@ export async function discoverControlPageState() {
   const offersPromise = withAcpRoutes(async routes => {
     const [acp, commandCode] = await Promise.all([
       discoverAcpOffers(routes, trace => console.log(JSON.stringify(trace))),
-      discoverCommandCodeOffers(commandCodeKey),
+      discoverCommandCodeOffers(commandCodeKey, fetch, trace => console.log(JSON.stringify(trace))),
     ])
     const offers = [...acp, ...commandCode]
     console.log(JSON.stringify({ event: 'model-discovery-completed', offerCount: offers.length, routes: [...new Set(offers.map(offer => offer.route))] }))

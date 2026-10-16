@@ -16,6 +16,7 @@ import {
 import { listReadyLinearCards } from '../src/mastra/linear.ts'
 import { createInitializationRuntime } from '../src/mastra/initialization.ts'
 import { startControlPageServer } from '../src/mastra/control-page.ts'
+import { discoverAcpOffers, discoverCommandCodeOffers } from '../src/mastra/routes.ts'
 
 const settledBrief = `## Agent Brief
 
@@ -60,20 +61,49 @@ test('control-page contracts carry complete offers and exact route-supported rol
   assert.throws(() => ModelOfferSchema.parse({ ...offer, supportedEfforts: [] }))
 })
 
-test('Linear Ready-card discovery parses complete cards and performs a read-only list query', async () => {
-  let requestBody = ''
+test('Linear Ready-card discovery paginates every complete card with read-only queries', async () => {
+  const requestBodies: string[] = []
   const traces: unknown[] = []
+  let page = 0
   const cards = await listReadyLinearCards('linear-reference', async (_input, init) => {
-    requestBody = String(init?.body)
-    return new Response(JSON.stringify({ data: { issues: { nodes: [{
-      identifier: 'JUL-230', title: 'Initialize Ready cards', description: settledBrief, state: { name: 'Ready' },
-    }] } } }), { status: 200, headers: { 'content-type': 'application/json' } })
+    requestBodies.push(String(init?.body))
+    page += 1
+    const identifier = page === 1 ? 'JUL-230' : 'JUL-231'
+    return new Response(JSON.stringify({ data: { issues: {
+      nodes: [{ identifier, title: 'Initialize Ready cards', description: settledBrief, state: { name: 'Ready' } }],
+      pageInfo: { hasNextPage: page === 1, endCursor: page === 1 ? 'cursor-1' : null },
+    } } }), { status: 200, headers: { 'content-type': 'application/json' } })
   }, trace => { traces.push(trace) })
-  assert.equal(cards[0]?.identifier, 'JUL-230')
-  assert.match(requestBody, /issues\(.*Ready/)
-  assert.doesNotMatch(requestBody, /mutation/i)
+  assert.deepEqual(cards.map(card => card.identifier), ['JUL-230', 'JUL-231'])
+  assert.equal(requestBodies.length, 2)
+  assert.match(requestBodies[0]!, /issues\(.*Ready/)
+  assert.doesNotMatch(requestBodies.join('\n'), /mutation/i)
+  assert.equal((JSON.parse(requestBodies[1]!) as { variables: { after: string } }).variables.after, 'cursor-1')
   assert.deepEqual(traces.map(trace => (trace as { operation: string; ok: boolean }).operation), ['linear-ready-list'])
   assert.deepEqual(traces.map(trace => (trace as { operation: string; ok: boolean }).ok), [true])
+  assert.equal((traces[0] as { cardCount: number }).cardCount, 2)
+})
+
+test('model discovery records a sanitized success or failure trace for every service connection', async () => {
+  const traces: Array<{ route: string; ok: boolean; operation: string; error?: string }> = []
+  const routes = {
+    antigravity: { getAvailableModels: async () => [{ modelId: 'gemini-pro', name: 'Gemini Pro' }] },
+    claude: {
+      getAvailableModels: async () => [],
+      connection: { session: { sessionId: 'session', configOptions: [{ id: 'model', options: [] }] } },
+    },
+  }
+  await discoverAcpOffers(routes as never, trace => { traces.push(trace) })
+  await assert.rejects(
+    discoverCommandCodeOffers('secret', async () => new Response('denied', { status: 503 }), trace => { traces.push(trace) }),
+    /HTTP 503/,
+  )
+  assert.deepEqual(traces.filter(trace => trace.operation === 'models/list').map(({ route, ok }) => ({ route, ok })), [
+    { route: 'antigravity', ok: true },
+    { route: 'claude', ok: true },
+    { route: 'commandcode', ok: false },
+  ])
+  assert.doesNotMatch(traces.find(trace => trace.route === 'commandcode')?.error ?? '', /secret/)
 })
 
 test('Start creates one restart-surviving suspended run and returns it for the same confirmed input', async t => {
