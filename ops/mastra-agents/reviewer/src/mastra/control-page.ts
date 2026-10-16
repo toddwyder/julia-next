@@ -1,11 +1,20 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 
-import { ControlPageStateSchema, InitializationResultSchema, StartInitializationSchema } from './contracts.ts'
+import {
+  ControlPageStateSchema,
+  InitializationActivitySchema,
+  InitializationBoundaryStateSchema,
+  InitializationResultSchema,
+  InitializationRunsStateSchema,
+  StartInitializationSchema,
+} from './contracts.ts'
 import type { z } from 'zod/v4'
 
 type ControlPageState = z.infer<typeof ControlPageStateSchema>
 type StartInitialization = z.infer<typeof StartInitializationSchema>
 type InitializationResult = z.infer<typeof InitializationResultSchema>
+type InitializationRunsState = z.infer<typeof InitializationRunsStateSchema>
+type InitializationActivity = z.infer<typeof InitializationActivitySchema>
 
 const CONTROL_PATH = '/julia-control'
 
@@ -63,11 +72,15 @@ export async function startControlPageServer({
   port = 43123,
   getState,
   startInitialization,
+  getRuns,
+  getActivity,
   onRequest = () => {},
 }: {
   port?: number
   getState: () => Promise<ControlPageState>
   startInitialization: (input: StartInitialization) => Promise<InitializationResult>
+  getRuns: () => Promise<InitializationRunsState>
+  getActivity: () => InitializationActivity
   onRequest?: (request: { method: string; path: string }) => void
 }) {
   const server = createServer(async (request, response) => {
@@ -87,6 +100,12 @@ export async function startControlPageServer({
       }
       if (method === 'GET' && url.pathname === `${CONTROL_PATH}/api/state`) {
         return sendJson(response, 200, ControlPageStateSchema.parse(await getState()))
+      }
+      if (method === 'GET' && url.pathname === `${CONTROL_PATH}/api/runs`) {
+        return sendJson(response, 200, InitializationBoundaryStateSchema.parse({
+          ...await getRuns(),
+          activity: getActivity(),
+        }))
       }
       if (method === 'POST' && url.pathname === `${CONTROL_PATH}/api/start`) {
         return sendJson(response, 200, InitializationResultSchema.parse(await startInitialization(StartInitializationSchema.parse(await readJson(request)))))

@@ -125,7 +125,7 @@ function claudeModelChoices(agent: ReturnType<typeof createAcpRoutes>['claude'])
     return Array.isArray(parsed.options) ? flatten(parsed.options) : [parsed]
   })
   return flatten(modelConfigs[0].options).filter((choice): choice is ClaudeConfigChoice & { value: string } =>
-    typeof choice.value === 'string' && choice.value.startsWith('claude-'))
+    typeof choice.value === 'string' && /^claude-[a-z0-9]+(?:-[a-z0-9]+)*$/.test(choice.value))
 }
 
 async function discoverClaudeOffers(

@@ -1,0 +1,6 @@
+Command: npm run test:jul-230
+Working directory: ops/mastra-agents/reviewer
+Exit code: 0
+
+13 tests passed, 0 failed. A raw HTTP request with Host: example.com received
+403 and the loopback Host error contract.

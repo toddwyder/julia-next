@@ -1,13 +1,11 @@
 import assert from 'node:assert/strict'
-import { execFileSync, spawn } from 'node:child_process'
-import { mkdir, stat, writeFile } from 'node:fs/promises'
-import { dirname, resolve } from 'node:path'
-import { createInterface } from 'node:readline'
-import { fileURLToPath } from 'node:url'
+import { mkdir, writeFile } from 'node:fs/promises'
+import { resolve } from 'node:path'
 import { chromium } from 'playwright'
 
-const skillDirectory = dirname(fileURLToPath(import.meta.url))
-const repoRoot = resolve(skillDirectory, '../../..')
+import { activityDelta, launchControlServer, prohibitedActivity, readInitializationBoundary, retainBoundaryMeasurements } from './initialization-driver-support.mjs'
+
+const repoRoot = resolve(import.meta.dirname, '../../..')
 
 const evidenceDirectory = process.argv[2]
   ? resolve(process.argv[2])
@@ -19,131 +17,19 @@ const storagePath = resolve(evidenceDirectory, 'initialization.db')
 const serverLogPath = resolve(evidenceDirectory, 'control-server.log')
 const launcherScript = resolve(repoRoot, 'scripts/start-julia-control-page.ps1')
 
-function getProcessTreePids(rootPid) {
-  try {
-    const output = execFileSync('powershell.exe', [
-      '-NoProfile', '-Command',
-      'Get-CimInstance Win32_Process | Select-Object ProcessId, ParentProcessId | ConvertTo-Json -Compress',
-    ], { encoding: 'utf8' })
-    const list = JSON.parse(output)
-    const tree = new Set([rootPid])
-    let added = true
-    while (added) {
-      added = false
-      for (const p of list) {
-        if (tree.has(p.ParentProcessId) && !tree.has(p.ProcessId)) {
-          tree.add(p.ProcessId)
-          added = true
-        }
-      }
-    }
-    return Array.from(tree)
-  } catch {
-    return [rootPid]
-  }
-}
-
-async function stopCapturedPids(capturedPids, launcherProcess) {
-  try { launcherProcess.kill('SIGINT') } catch {}
-  await new Promise(r => setTimeout(r, 1000))
-  for (const pid of capturedPids.slice().reverse()) {
-    try {
-      process.kill(pid)
-    } catch {}
-  }
-  for (let i = 0; i < 25; i++) {
-    const running = []
-    for (const pid of capturedPids) {
-      try {
-        process.kill(pid, 0)
-        running.push(pid)
-      } catch {}
-    }
-    if (running.length === 0) break
-    await new Promise(r => setTimeout(r, 200))
-  }
-}
-
-async function launchControlServer(boundaryLabel) {
-  console.log(JSON.stringify({ event: 'launching-boundary', boundary: boundaryLabel }))
-  const logs = []
-  let serverReadyResolve
-  let serverReadyReject
-  const serverReadyPromise = new Promise((res, rej) => {
-    serverReadyResolve = res
-    serverReadyReject = rej
-  })
-
-  // Start through the real repository-owned Windows launcher
-  const launcherProcess = spawn('powershell.exe', [
-    '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', launcherScript,
-  ], {
-    cwd: repoRoot,
-    env: {
-      ...process.env,
-      JULIA_INITIALIZATION_DB: storagePath,
-    },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  })
-
-  const launcherPid = launcherProcess.pid
-  const onLine = (line, stream) => {
-    const entry = `[${new Date().toISOString()}] [${boundaryLabel}] [${stream}] ${line}`
-    logs.push({ entry, raw: line, timestamp: new Date().toISOString(), stream, boundary: boundaryLabel })
-    if (line.includes('"status":"ready"')) {
-      try {
-        const data = JSON.parse(line)
-        serverReadyResolve(data)
-      } catch (err) {
-        serverReadyReject(err)
-      }
-    }
-  }
-
-  createInterface({ input: launcherProcess.stdout }).on('line', l => onLine(l, 'STDOUT'))
-  createInterface({ input: launcherProcess.stderr }).on('line', l => onLine(l, 'STDERR'))
-
-  launcherProcess.on('exit', code => {
-    serverReadyReject(new Error(`launcher exited prematurely with code ${code} (${boundaryLabel})`))
-  })
-
-  const timeoutTimer = setTimeout(() => {
-    serverReadyReject(new Error(`timeout waiting for control server to report ready (${boundaryLabel})`))
-  }, 90000)
-
-  let serverInfo
-  try {
-    serverInfo = await serverReadyPromise
-  } finally {
-    clearTimeout(timeoutTimer)
-  }
-
-  // Capture all descendant PIDs owned by this launcher run
-  const capturedPids = getProcessTreePids(launcherPid)
-  console.log(JSON.stringify({
-    event: 'boundary-ready',
-    boundary: boundaryLabel,
-    url: serverInfo.url,
-    launcherPid,
-    capturedPids,
-  }))
-
-  const stop = async () => {
-    await stopCapturedPids(capturedPids, launcherProcess)
-  }
-
-  return { launcherProcess, launcherPid, capturedPids, serverInfo, logs, stop }
-}
+const launchBoundary = boundaryLabel => launchControlServer({ boundaryLabel, launcherScript, repoRoot, storagePath })
 
 const startedAt = new Date().toISOString()
 const allServerLogs = []
-const allCapturedPids = []
+let boundary1
+let boundary2
+let browser
 
+try {
 // --- Launch Boundary 1 ---
-const boundary1 = await launchControlServer('boundary-1')
-allCapturedPids.push(...boundary1.capturedPids)
+boundary1 = await launchBoundary('boundary-1')
 
-const browser = await chromium.launch({ headless: true })
+browser = await chromium.launch({ headless: true })
 const page = await browser.newPage()
 page.setDefaultTimeout(90000)
 page.setDefaultNavigationTimeout(90000)
@@ -209,33 +95,27 @@ assert.equal(
   'Both Builder and Reviewer must be configured with same company to fail Start validation'
 )
 
-// Reset request interceptor to track only Cancel operations
-interceptedRequests = []
-const cancelRequests = interceptedRequests
-const boundaryLogsBeforeCancel = boundary1.logs.length
-
-// Check storage file state before Cancel
-let storageExistsBeforeCancel = false
-try {
-  await stat(storagePath)
-  storageExistsBeforeCancel = true
-} catch {}
+const persistedBeforeCancel = await readInitializationBoundary(boundary1.serverInfo.url)
+const browserRequestsBeforeCancel = interceptedRequests.length
 
 // Click Cancel
 await page.getByRole('button', { name: 'Cancel' }).click()
 await page.getByText('Initialization closed. Nothing was sent or saved.').waitFor()
 
-// Check storage file state after Cancel
-let storageExistsAfterCancel = false
-try {
-  await stat(storagePath)
-  storageExistsAfterCancel = true
-} catch {}
-
-assert.equal(await page.locator('form').count(), 0, 'Cancel must remove the form locally')
-assert.equal(cancelRequests.length, 0, 'Cancel must trigger zero network requests')
-assert.equal(boundary1.logs.length, boundaryLogsBeforeCancel, 'Cancel must trigger zero server boundary requests or events')
-assert.equal(storageExistsAfterCancel, storageExistsBeforeCancel, 'Cancel must perform zero storage writes')
+const formCountAfterCancel = await page.locator('form').count()
+assert.equal(formCountAfterCancel, 0, 'Cancel must remove the form locally')
+const browserRequestsAfterCancel = interceptedRequests.length
+assert.equal(browserRequestsAfterCancel, browserRequestsBeforeCancel, 'Cancel must trigger zero browser requests')
+const persistedAfterCancel = await readInitializationBoundary(boundary1.serverInfo.url)
+assert.deepEqual(persistedAfterCancel.runs, persistedBeforeCancel.runs, 'Cancel must leave every persisted run unchanged')
+assert.equal(persistedAfterCancel.totalRuns, persistedBeforeCancel.totalRuns, 'Cancel must leave the total run count unchanged')
+const cancelActivityDelta = activityDelta(persistedAfterCancel.activity, persistedBeforeCancel.activity)
+const zeroRoleDispatchDelta = Object.fromEntries(Object.keys(cancelActivityDelta.roleDispatches).map(role => [role, 0]))
+assert.deepEqual(prohibitedActivity(cancelActivityDelta), {
+  roleDispatches: zeroRoleDispatchDelta,
+  llmInferenceCalls: 0,
+  linearMutations: 0,
+})
 
 const cancelEvidence = {
   testedAt: new Date().toISOString(),
@@ -244,14 +124,15 @@ const cancelEvidence = {
     reviewerCompany: sameCompanyOffer.company,
     validationViolation: 'builder and reviewer must use different companies',
   },
-  formRemoved: true,
-  networkRequestsTriggered: 0,
-  serverRequestsTriggered: 0,
-  storageWritesTriggered: 0,
-  runsCreated: 0,
-  dispatchesTriggered: 0,
-  inferencesTriggered: 0,
-  linearMutations: 0,
+  formCountAfterCancel,
+  browserRequestsTriggered: browserRequestsAfterCancel - browserRequestsBeforeCancel,
+  runCountBefore: persistedBeforeCancel.totalRuns,
+  runCountAfter: persistedAfterCancel.totalRuns,
+  persistedRunsBefore: persistedBeforeCancel.runs,
+  persistedRunsAfter: persistedAfterCancel.runs,
+  activityBefore: persistedBeforeCancel.activity,
+  activityAfter: persistedAfterCancel.activity,
+  activityDelta: cancelActivityDelta,
   message: 'Initialization closed. Nothing was sent or saved.',
 }
 await writeFile(resolve(evidenceDirectory, 'cancel-evidence.json'), `${JSON.stringify(cancelEvidence, null, 2)}\n`, 'utf8')
@@ -314,6 +195,16 @@ for (const { role, offer, effort } of roleSelectionsToApply) {
 }
 
 await writeFile(resolve(evidenceDirectory, 'start-evidence.json'), `${JSON.stringify(startResult, null, 2)}\n`, 'utf8')
+const persistedAfterStart = await readInitializationBoundary(boundary1.serverInfo.url)
+assert.equal(persistedAfterStart.totalRuns, persistedBeforeCancel.totalRuns + 1, 'Start must add exactly one persisted run')
+assert.deepEqual(persistedAfterStart.runs, [{ ...startResult, resumed: true }], 'read boundary must return the initialized run')
+assert.ok(persistedAfterStart.activity.linearQueries > persistedBeforeCancel.activity.linearQueries, 'live activity measurement must observe Linear discovery queries')
+const zeroRoleDispatches = Object.fromEntries(Object.keys(persistedAfterStart.activity.roleDispatches).map(role => [role, 0]))
+assert.deepEqual(prohibitedActivity(persistedAfterStart.activity), {
+  roleDispatches: zeroRoleDispatches,
+  llmInferenceCalls: 0,
+  linearMutations: 0,
+})
 console.log(JSON.stringify({ event: 'start-verified', runId: startResult.runId, state: startResult.state }))
 
 // --- Exercise 3: Repeat Start through Browser UI (Idempotence) ---
@@ -342,144 +233,89 @@ assert.equal(repeatedResult.state, 'ready-for-build', 'Repeat Start state must r
 assert.deepEqual(repeatedResult.snapshot, startResult.snapshot, 'Repeat Start snapshot must be identical')
 
 await writeFile(resolve(evidenceDirectory, 'idempotence-evidence.json'), `${JSON.stringify(repeatedResult, null, 2)}\n`, 'utf8')
+const persistedAfterRepeat = await readInitializationBoundary(boundary1.serverInfo.url)
+assert.equal(persistedAfterRepeat.totalRuns, persistedAfterStart.totalRuns, 'repeat Start must not create another run')
+assert.deepEqual(persistedAfterRepeat.runs, persistedAfterStart.runs, 'repeat Start must not change persisted run state')
 console.log(JSON.stringify({ event: 'idempotence-verified', ok: true }))
 
 // --- Exercise 4: Boundary Restart and External Readback through Supported Boundary ---
 console.log(JSON.stringify({ event: 'stopping-first-boundary-and-restarting' }))
-await boundary1.stop()
+const boundary1Cleanup = await boundary1.stop()
 allServerLogs.push(...boundary1.logs)
 
 // Start genuinely new process through the real launcher
-const boundary2 = await launchControlServer('boundary-2')
-allCapturedPids.push(...boundary2.capturedPids)
+boundary2 = await launchBoundary('boundary-2')
 
-console.log(JSON.stringify({ event: 'performing-external-readback-through-browser-ui', url: boundary2.serverInfo.url }))
-await page.goto(boundary2.serverInfo.url)
-await page.getByRole('heading', { name: 'Initialize a Ready card' }).waitFor()
-const cardSelect2 = page.locator('select[name="card"]')
-await cardSelect2.waitFor()
-await cardSelect2.selectOption(String(matchingIndex))
-
-for (const { role, offer, effort } of roleSelectionsToApply) {
-  const group = page.getByRole('group', { name: role, exact: true })
-  const optionValue = `${offer.route}::${offer.modelId}`
-  await group.getByLabel('Route and model').selectOption(optionValue)
-  await group.getByLabel('Effort').selectOption(effort)
-}
-
-// User-facing Start on restarted process reads back the persisted run from storage
-await page.getByRole('button', { name: 'Start' }).click()
-await page.getByText('Ready for build').waitFor({ timeout: 90000 })
-
-const readbackStatusText = await page.locator('.status pre').innerText()
-const readbackResult = JSON.parse(readbackStatusText)
-
-assert.equal(readbackResult.runId, startResult.runId, 'Readback runId must match original runId')
-assert.equal(readbackResult.resumed, true, 'Readback on restart must report resumed: true')
-assert.equal(readbackResult.state, 'ready-for-build', 'Readback state must be ready-for-build')
-assert.deepEqual(readbackResult.snapshot, startResult.snapshot, 'Readback snapshot must match original')
+console.log(JSON.stringify({ event: 'performing-read-only-external-readback', url: `${boundary2.serverInfo.url}/api/runs` }))
+const restartedBoundaryState = await readInitializationBoundary(boundary2.serverInfo.url)
+assert.equal(restartedBoundaryState.totalRuns, persistedAfterRepeat.totalRuns, 'restarted boundary must independently report the total run count')
+assert.deepEqual(restartedBoundaryState.runs, persistedAfterRepeat.runs, 'restarted boundary must read the persisted run without Start')
+assert.ok(restartedBoundaryState.activity.linearQueries > 0, 'restarted process must measure its actual Linear discovery query')
+assert.deepEqual(prohibitedActivity(restartedBoundaryState.activity), {
+  roleDispatches: zeroRoleDispatches,
+  llmInferenceCalls: 0,
+  linearMutations: 0,
+})
 
 const readbackEvidence = {
   testedAt: new Date().toISOString(),
-  boundaryRestarted: true,
-  externalBoundary: `${boundary2.serverInfo.url} (browser UI)`,
-  readbackResult,
+  boundaryRestarted: boundary1.launcherPid !== boundary2.launcherPid,
+  externalBoundary: `${boundary2.serverInfo.url}/api/runs`,
+  readback: restartedBoundaryState,
 }
 await writeFile(resolve(evidenceDirectory, 'readback-evidence.json'), `${JSON.stringify(readbackEvidence, null, 2)}\n`, 'utf8')
 console.log(JSON.stringify({ event: 'readback-verified', ok: true }))
 
 // Close browser and stop boundary 2
+assert.deepEqual(consoleErrors, [], 'control page browser console must remain clean')
 await browser.close()
-await boundary2.stop()
+const boundary2Cleanup = await boundary2.stop()
 allServerLogs.push(...boundary2.logs)
 
 // --- Write Combined Server Log ---
 const formattedLogs = allServerLogs.map(l => l.entry)
 await writeFile(serverLogPath, `${formattedLogs.join('\n')}\n`, 'utf8')
 
-// --- Exercise 5: Sanitized Boundary Traces Counting Every Role & Inference Request ---
-console.log(JSON.stringify({ event: 'analyzing-boundary-traces' }))
-const boundaryEvents = []
-let roleExecutionRequestCount = 0
-let inferenceRequestCount = 0
-let llmGenerateCallCount = 0
-let roleDispatchCount = 0
-let linearMutationCount = 0
-
-const roleKeywords = ['builder-execution', 'reviewer-findings', 'crash-fixer-analysis', 'promptForRole', 'execute-four-role-snapshot', 'delivery-route']
-const inferenceKeywords = ['generate', 'createCommandCodeAgent', 'selectAcpModel', 'ai-sdk', 'completions', 'messages']
-
-for (const logItem of allServerLogs) {
-  const line = logItem.raw.trim()
-  if (!line) continue
-  if (line.startsWith('{') && line.endsWith('}')) {
-    try {
-      const parsed = JSON.parse(line)
-      boundaryEvents.push({
-        timestamp: logItem.timestamp,
-        boundary: logItem.boundary,
-        event: parsed.event || parsed.status || 'unknown',
-        data: parsed,
-      })
-    } catch {
-      boundaryEvents.push({ timestamp: logItem.timestamp, boundary: logItem.boundary, text: line })
-    }
-  } else {
-    boundaryEvents.push({ timestamp: logItem.timestamp, boundary: logItem.boundary, text: line })
-  }
-
-  // Count any role execution or inference attempts
-  for (const kw of roleKeywords) {
-    if (line.toLowerCase().includes(kw.toLowerCase())) {
-      roleExecutionRequestCount++
-    }
-  }
-  for (const kw of inferenceKeywords) {
-    if (line.includes(`"${kw}"`) || line.includes(`'${kw}'`)) {
-      inferenceRequestCount++
-    }
-  }
-}
-
-assert.equal(roleExecutionRequestCount, 0, `Role execution requests must be 0, found ${roleExecutionRequestCount}`)
-assert.equal(inferenceRequestCount, 0, `Inference requests must be 0, found ${inferenceRequestCount}`)
-assert.equal(llmGenerateCallCount, 0, `LLM generate calls must be 0, found ${llmGenerateCallCount}`)
-assert.equal(roleDispatchCount, 0, `Role dispatch count must be 0, found ${roleDispatchCount}`)
-assert.equal(linearMutationCount, 0, `Linear mutation count must be 0, found ${linearMutationCount}`)
+// --- Exercise 5: Retain structured boundary events and actual measurements ---
+console.log(JSON.stringify({ event: 'retaining-boundary-measurements' }))
+const processMeasurements = [persistedAfterRepeat.activity, restartedBoundaryState.activity]
+const { boundaryEvents, measuredActivity } = retainBoundaryMeasurements(allServerLogs, processMeasurements)
+assert.ok(measuredActivity.linearQueries > 0, 'structured activity must contain actual allowed Linear queries')
+assert.deepEqual(prohibitedActivity(measuredActivity), {
+  roleDispatches: zeroRoleDispatches,
+  llmInferenceCalls: 0,
+  linearMutations: 0,
+})
 
 const boundaryTraceReport = {
-  analyzedAt: new Date().toISOString(),
+  measuredAt: new Date().toISOString(),
   totalBoundaryLogLines: allServerLogs.length,
   totalParsedEvents: boundaryEvents.length,
-  verificationSummary: {
-    roleExecutionRequestCount,
-    inferenceRequestCount,
-    llmGenerateCallCount,
-    roleDispatchCount,
-    linearMutationCount,
-  },
-  zeroInferenceProven: true,
+  processMeasurements,
+  measuredActivity,
   boundaryEvents,
 }
 await writeFile(resolve(evidenceDirectory, 'boundary-traces.json'), `${JSON.stringify(boundaryTraceReport, null, 2)}\n`, 'utf8')
-console.log(JSON.stringify({ event: 'boundary-traces-verified', zeroInferenceProven: true }))
+console.log(JSON.stringify({ event: 'boundary-measurements-retained', measuredActivity }))
 
 // --- Final drive.json Summary ---
 const driveSummary = {
   feature: 'initialize-ready-card',
   command: 'node .agents/skills/verify-machine/drive-initialization.mjs',
-  expected: 'launcher-driven control page, all four selections differ from initial values, cancel tested with invalid cross-company selections causes zero side effects, repeat start via browser UI proves idempotence, restart via real launcher reads back suspended run through user-facing boundary without internal imports, sanitized boundary traces prove zero role and inference invocations, PID-scoped cleanup stops only captured processes',
+  expected: 'launcher-driven control page, all four selections differ from initial values, Cancel sends no browser request and preserves persisted state, repeat Start is idempotent, restart uses the read-only run boundary, structured activity measures dispatches, inference calls, Linear operations, and PID-scoped cleanup fails on survivors',
   observed: {
     targetCard: targetCardId,
     launcherUsed: launcherScript,
     initialRoleSelections,
     finalRoleSelections,
-    allFourSelectionsDifferProven: true,
     cancelTest: {
       invalidSelection: cancelEvidence.invalidSelectionTested,
-      networkRequestsTriggered: cancelEvidence.networkRequestsTriggered,
-      storageWritesTriggered: cancelEvidence.storageWritesTriggered,
-      runsCreated: cancelEvidence.runsCreated,
+      browserRequestsTriggered: cancelEvidence.browserRequestsTriggered,
+      runCountBefore: cancelEvidence.runCountBefore,
+      runCountAfter: cancelEvidence.runCountAfter,
+      persistedRunsBefore: cancelEvidence.persistedRunsBefore,
+      persistedRunsAfter: cancelEvidence.persistedRunsAfter,
+      activityDelta: cancelEvidence.activityDelta,
     },
     firstStart: {
       runId: startResult.runId,
@@ -491,31 +327,32 @@ const driveSummary = {
       runId: repeatedResult.runId,
       state: repeatedResult.state,
       resumed: repeatedResult.resumed,
-      idempotent: true,
+      totalRuns: persistedAfterRepeat.totalRuns,
     },
     restartAndExternalReadback: {
-      boundaryRestarted: true,
-      externalBoundary: `${boundary2.serverInfo.url} (browser UI)`,
-      runId: readbackResult.runId,
-      state: readbackResult.state,
-      resumed: readbackResult.resumed,
+      externalBoundary: `${boundary2.serverInfo.url}/api/runs`,
+      totalRuns: restartedBoundaryState.totalRuns,
+      runs: restartedBoundaryState.runs,
     },
-    traceVerification: {
-      roleExecutionRequestCount: 0,
-      inferenceRequestCount: 0,
-      zeroInferenceProven: true,
-    },
+    activityMeasurement: measuredActivity,
+    browserConsoleErrors: consoleErrors,
     pidCleanup: {
-      capturedPids: allCapturedPids,
-      portWideKillUsed: false,
-      allCapturedPidsStopped: true,
+      boundaries: [boundary1Cleanup, boundary2Cleanup],
+      capturedPids: [...new Set([...boundary1Cleanup.capturedPids, ...boundary2Cleanup.capturedPids])],
+      survivors: [...new Set([...boundary1Cleanup.survivors, ...boundary2Cleanup.survivors])],
+      allCapturedPidsStopped: [boundary1Cleanup, boundary2Cleanup].every(result => result.allCapturedPidsStopped),
     },
   },
-  exitCode: 0,
+  status: 'completed',
   startedAt,
   finishedAt: new Date().toISOString(),
-  sideEffects: 'one suspended ready-for-build run persisted in run-owned storage; zero external mutation, tracker mutation, dispatch, or inference',
+  sideEffects: { persistedRuns: restartedBoundaryState.totalRuns, measuredActivity },
 }
 
 await writeFile(resolve(evidenceDirectory, 'drive.json'), `${JSON.stringify(driveSummary, null, 2)}\n`, 'utf8')
 console.log(JSON.stringify({ event: 'drive-completed', ok: true }))
+} finally {
+  if (browser) await browser.close().catch(() => {})
+  if (boundary2) await boundary2.stop()
+  if (boundary1) await boundary1.stop()
+}

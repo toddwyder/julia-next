@@ -112,6 +112,28 @@ export const InitializationResultSchema = z.object({
   snapshot: RunSnapshotSchema,
   resumed: z.boolean(),
 }).strict()
+export const InitializationRunsStateSchema = z.object({
+  runs: z.array(InitializationResultSchema),
+  totalRuns: z.number().int().nonnegative(),
+}).strict().superRefine((value, context) => {
+  if (value.runs.length !== value.totalRuns) {
+    context.addIssue({ code: 'custom', path: ['totalRuns'], message: 'totalRuns must match the complete persisted run collection' })
+  }
+})
+export const InitializationActivitySchema = z.object({
+  roleDispatches: z.object({
+    builder: z.number().int().nonnegative(),
+    reviewer: z.number().int().nonnegative(),
+    crashFixer: z.number().int().nonnegative(),
+    crashReviewer: z.number().int().nonnegative(),
+  }).strict(),
+  llmInferenceCalls: z.number().int().nonnegative(),
+  linearQueries: z.number().int().nonnegative(),
+  linearMutations: z.number().int().nonnegative(),
+}).strict()
+export const InitializationBoundaryStateSchema = InitializationRunsStateSchema.extend({
+  activity: InitializationActivitySchema,
+}).strict()
 
 export const DeliveryRunSnapshotSchema = z.object({ issueId: nonempty, roles: RoleDefaultsSchema, allowSameService: z.boolean().default(false), savedAt: z.string().datetime() }).strict().readonly()
 export const DeliveryStartSchema = z.object({ decision: z.literal('Start'), authorized: z.literal(true), snapshot: DeliveryRunSnapshotSchema }).strict()

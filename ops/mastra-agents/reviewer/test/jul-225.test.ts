@@ -74,6 +74,7 @@ test('Claude discovery offers only exact provider model IDs from the session con
           { value: 'haiku', name: 'Haiku' },
           { value: 'claude-haiku-4-5-20251001', name: 'Haiku 4.5' },
           { value: 'claude-fable-5', name: 'Fable 5' },
+          { value: 'claude-fable-5-1[1m]', name: 'Malformed terminal-styled ID' },
           { value: 'claude-sonnet-4-6', name: 'Sonnet 4.6' },
         ],
       }] },

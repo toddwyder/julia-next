@@ -1,0 +1,57 @@
+﻿
+> julia-mastra-reviewer@1.0.0 test:jul-230
+> node --experimental-strip-types --test test/jul-230.test.ts
+
+✔ Ready card admission accepts the authoritative Agent Brief and rejects unresolved decisions (7.3622ms)
+✔ control-page contracts carry complete offers and exact route-supported role selections (3.9215ms)
+✔ initialization observability counts actual boundary activity instead of asserting zeroes (2.0208ms)
+✖ the production role workflow records each dispatch and inference at its actual seam (15.099ms)
+✔ Linear Ready-card discovery paginates every complete card with read-only queries (6.6542ms)
+✔ model discovery records a sanitized success or failure trace for every service connection (1.5322ms)
+✔ CommandCode discovery rejects a malformed success payload instead of tracing an unknown count as zero (1.3684ms)
+✔ Start creates one restart-surviving suspended run and returns it for the same confirmed input (9359.3035ms)
+✔ Cancel closes the browser form locally without another server request (1241.3974ms)
+✔ browser Start sends the exact changed card and four selections through the local boundary (1093.3953ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 9
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 13712.9192
+
+✖ failing tests:
+
+test at test\jul-230.test.ts:88:1
+✖ the production role workflow records each dispatch and inference at its actual seam (15.099ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+
+    {
+      linearMutations: 0,
+      linearQueries: 0,
+  +   llmInferenceCalls: 0,
+  -   llmInferenceCalls: 4,
+      roleDispatches: {
+  +     builder: 0,
+  +     crashFixer: 0,
+  +     crashReviewer: 0,
+  +     reviewer: 0
+  -     builder: 1,
+  -     crashFixer: 1,
+  -     crashReviewer: 1,
+  -     reviewer: 1
+      }
+    }
+
+      at TestContext.<anonymous> (file:///C:/Dev/julia-next/ops/mastra-agents/reviewer/test/jul-230.test.ts:115:10)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { roleDispatches: { builder: 0, reviewer: 0, crashFixer: 0, crashReviewer: 0 }, llmInferenceCalls: 0, linearQueries: 0, linearMutations: 0 },
+    expected: { roleDispatches: { builder: 1, reviewer: 1, crashFixer: 1, crashReviewer: 1 }, llmInferenceCalls: 4, linearQueries: 0, linearMutations: 0 },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

@@ -37,9 +37,14 @@ all recorded permanent prerequisites are worth driving:
 
 ```powershell
 $doctorPath = Join-Path $evidenceDirectory 'doctor.json'
+$doctorCommandPath = Join-Path $evidenceDirectory 'doctor-command.json'
+$doctorCommand = 'node --experimental-strip-types ops/mastra-agents/reviewer/src/mastra/verify-machine.ts doctor'
+$doctorStartedAt = Get-Date -Format o
 $doctorOutput = node --experimental-strip-types ops/mastra-agents/reviewer/src/mastra/verify-machine.ts doctor 2>&1
 $doctorExit = $LASTEXITCODE
 $doctorOutput | Set-Content -Encoding utf8 $doctorPath
+@{ command = $doctorCommand; exitCode = $doctorExit; startedAt = $doctorStartedAt; finishedAt = (Get-Date -Format o) } |
+  ConvertTo-Json | Set-Content -Encoding utf8 $doctorCommandPath
 if ($doctorExit -ne 0) { throw "verify-machine Doctor failed with exit code $doctorExit" }
 $doctor = Get-Content -Raw -LiteralPath $doctorPath | ConvertFrom-Json
 if (-not $doctor.ok) { throw 'verify-machine Doctor reported an unhealthy candidate' }
@@ -64,11 +69,13 @@ guard the recipes but never substitute for the selected real drive.
 
 ## Evidence
 
-Keep evidence under `$evidenceDirectory`. Retain `doctor.json` plus a drive record containing the
+Keep evidence under `$evidenceDirectory`. Retain `doctor.json`, `doctor-command.json`, plus a drive record containing the
 feature ID, exact command, expected result, stdout, stderr, exit code, timestamps, and side effects.
-For persisted behavior, retain a second user-facing readback. A proof uses the real command and real
-boundary; do not substitute a fixture, mock, internal setter, test-only endpoint, or unidentified
-existing process.
+For persisted initialization behavior, retain a second readback from the loopback-only, read-only,
+validated run boundary after restarting the control-page process. The evidence must include the full
+run collection, independently reported total count, and structured activity measurements from the
+production seams. A proof uses the real command and real boundary; do not substitute Start as a read,
+a fixture, mock, internal setter, test-only endpoint, or unidentified existing process.
 
 Before handoff, require all evidence files to remain readable and confirm that Doctor's
 `candidateCommit` and `dirtyTreeDigest` identify the exact candidate. Never include secret values,
@@ -76,7 +83,8 @@ bootstrap material, or personal authentication in evidence.
 
 ## Cleanup
 
-Stop only processes whose PIDs this run captured. Never kill by process name. The mapped features
+Stop only processes whose PIDs this run captured and fail the drive if any captured PID survives.
+Never kill by process name. The mapped features
 clean up their own background processes or are short-lived. If a failed attempt created a run-owned
 scratch directory, resolve its absolute path, prove it is below `$evidenceDirectory`, then remove only
 that directory.

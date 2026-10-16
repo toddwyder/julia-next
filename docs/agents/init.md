@@ -34,3 +34,8 @@ Start creates or reuses one file-backed Mastra workflow run suspended at
 `ready-for-build`; it does not execute a delivery role. Cancel removes the form
 in the browser and sends no request. Close the launcher's window to stop the
 local server. This control page is not a Factory route.
+
+The same loopback server exposes `GET /julia-control/api/runs` as a read-only
+validated machine boundary. It returns the complete initialized-run collection,
+the independently computed total count, and structured activity counts. It has
+no administration screen and never starts or resumes a run.

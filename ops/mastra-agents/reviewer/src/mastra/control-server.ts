@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { ControlPageStateSchema } from './contracts.ts'
 import { startControlPageServer } from './control-page.ts'
 import { createInitializationRuntime } from './initialization.ts'
+import { createInitializationActivityRecorder, createObservedLinearClient } from './initialization-observability.ts'
 import { listReadyLinearCards } from './linear.ts'
 import { discoverAcpOffers, discoverCommandCodeOffers, withAcpRoutes } from './routes.ts'
 
@@ -17,10 +18,13 @@ function requiredSecret(name: 'LINEAR_API_KEY' | 'COMMANDCODE_API_KEY') {
   return value
 }
 
-export async function discoverControlPageState() {
+type InitializationActivityRecorder = ReturnType<typeof createInitializationActivityRecorder>
+
+export async function discoverControlPageState(activity: InitializationActivityRecorder) {
   const linearKey = requiredSecret('LINEAR_API_KEY')
   const commandCodeKey = requiredSecret('COMMANDCODE_API_KEY')
-  const cardsPromise = listReadyLinearCards(linearKey, fetch, trace => console.log(JSON.stringify(trace)))
+  const linear = createObservedLinearClient(linearKey, activity)
+  const cardsPromise = listReadyLinearCards(linear, trace => console.log(JSON.stringify(trace)))
   const offersPromise = withAcpRoutes(async routes => {
     const [acp, commandCode] = await Promise.all([
       discoverAcpOffers(routes, trace => console.log(JSON.stringify(trace))),
@@ -43,15 +47,22 @@ function openDefaultBrowser(url: string) {
   child.unref()
 }
 
+export function shouldOpenControlBrowser(environment: NodeJS.ProcessEnv = process.env) {
+  return environment.JULIA_CONTROL_OPEN_BROWSER !== '0'
+}
+
 export async function runControlPageServer() {
   const storagePath = process.env.JULIA_INITIALIZATION_DB ?? join(homedir(), '.julia', 'initialization.db')
-  const runtime = await createInitializationRuntime({ storagePath })
-  let latestState = await discoverControlPageState()
+  const activity = createInitializationActivityRecorder(event => console.log(JSON.stringify(event)))
+  const runtime = await createInitializationRuntime({ storagePath, activity })
+  let latestState = await discoverControlPageState(activity)
   const server = await startControlPageServer({
     port: CONTROL_PORT,
-    getState: async () => { latestState = await discoverControlPageState(); return latestState },
+    getState: async () => { latestState = await discoverControlPageState(activity); return latestState },
+    getRuns: () => runtime.list(),
+    getActivity: () => activity.snapshot(),
     startInitialization: async input => {
-      latestState = await discoverControlPageState()
+      latestState = await discoverControlPageState(activity)
       const result = await runtime.start(input, latestState)
       console.log(JSON.stringify({ event: 'initialization-ready-for-build', card: input.card.identifier, runId: result.runId, resumed: result.resumed, state: result.state }))
       return result
@@ -59,7 +70,7 @@ export async function runControlPageServer() {
     onRequest: request => console.log(JSON.stringify({ event: 'control-page-request', ...request })),
   })
   console.log(JSON.stringify({ status: 'ready', url: server.url, storage: storagePath }))
-  openDefaultBrowser(server.url)
+  if (shouldOpenControlBrowser()) openDefaultBrowser(server.url)
   let closing = false
   const close = async () => {
     if (closing) return

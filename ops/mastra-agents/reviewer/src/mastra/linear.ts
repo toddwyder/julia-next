@@ -1,4 +1,5 @@
 import { ReadyCardSchema } from './contracts.ts'
+import type { LinearQueryClient } from './initialization-observability.ts'
 
 export type LinearIssue = { identifier: string; title?: string; description: string; state: { name: string } }
 export type LinearReadTrace = {
@@ -20,8 +21,7 @@ export type LinearReadyListTrace = {
 }
 
 export async function listReadyLinearCards(
-  apiKey: string,
-  fetchImpl: typeof fetch = fetch,
+  client: LinearQueryClient,
   recordTrace: (trace: LinearReadyListTrace) => void | Promise<void> = () => {},
 ) {
   const started = performance.now()
@@ -30,13 +30,10 @@ export async function listReadyLinearCards(
     const issues: LinearIssue[] = []
     let after: string | null = null
     do {
-      const response = await fetchImpl('https://api.linear.app/graphql', {
-        method: 'POST', headers: { Authorization: apiKey, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query: 'query ReadyCards($after:String) { issues(first: 50, after: $after, filter: { state: { name: { eq: "Ready" } } }) { nodes { identifier title description state { name } } pageInfo { hasNextPage endCursor } } }',
-          variables: { after },
-        }),
-      })
+      const response = await client.query(
+        'query ReadyCards($after:String) { issues(first: 50, after: $after, filter: { state: { name: { eq: "Ready" } } }) { nodes { identifier title description state { name } } pageInfo { hasNextPage endCursor } } }',
+        { after },
+      )
       status = response.status
       const body = await response.json() as {
         data?: { issues?: { nodes?: LinearIssue[]; pageInfo?: { hasNextPage?: unknown; endCursor?: unknown } } }

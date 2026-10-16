@@ -4,10 +4,13 @@ import { Mastra } from '@mastra/core/mastra'
 import { createStep, createWorkflow, createWorkflowStateReader } from '@mastra/core/workflows'
 import { LibSQLStore } from '@mastra/libsql'
 import type { z } from 'zod/v4'
+import type { InitializationActivityRecorder } from './initialization-observability.ts'
+import { createRoleExecutionWorkflow } from './workflows/delivery.ts'
 
 import {
   InitializationInputSchema,
   InitializationResultSchema,
+  InitializationRunsStateSchema,
   ControlPageStateSchema,
   ModelOfferSchema,
   ReadyForBuildSchema,
@@ -81,11 +84,12 @@ function runIdFor(input: StartInitialization) {
   return `${input.card.identifier.toLowerCase()}-${digest.slice(0, 32)}`
 }
 
-export async function createInitializationRuntime({ storagePath }: { storagePath: string }) {
+export async function createInitializationRuntime({ storagePath, activity }: { storagePath: string; activity: InitializationActivityRecorder }) {
   const storageUrl = `file:${resolve(storagePath).replaceAll('\\', '/')}`
   const storage = new LibSQLStore({ id: 'julia-initialization-local', url: storageUrl, localPragmas: { mmapSize: 0 } })
   const initializationWorkflow = createInitializationWorkflow()
-  const mastra = new Mastra({ storage, workflows: { initializationWorkflow } })
+  const deliveryWorkflow = createRoleExecutionWorkflow({ activity })
+  const mastra = new Mastra({ storage, workflows: { initializationWorkflow, deliveryWorkflow } })
   const workflow = mastra.getWorkflow('initializationWorkflow')
   const pending = new Map<string, Promise<z.infer<typeof InitializationResultSchema>>>()
 
@@ -122,6 +126,15 @@ export async function createInitializationRuntime({ storagePath }: { storagePath
       try { return await starting } finally { pending.delete(runId) }
     },
     read,
+    async list() {
+      const listed = await workflow.listWorkflowRuns()
+      const runs = await Promise.all(listed.runs.map(async (run: { runId: string }) => {
+        const saved = await read(run.runId)
+        if (!saved) throw new Error(`listed initialization run ${run.runId} could not be read`)
+        return saved
+      }))
+      return InitializationRunsStateSchema.parse({ runs, totalRuns: listed.total })
+    },
     async runCount() {
       return (await workflow.listWorkflowRuns()).total
     },
