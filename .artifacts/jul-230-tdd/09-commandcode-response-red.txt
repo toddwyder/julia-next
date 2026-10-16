@@ -1,0 +1,8 @@
+Command: npm run test:jul-230
+Candidate state: regression test added before implementation
+Exit code: 1
+
+FAIL  CommandCode discovery rejects a malformed success payload instead of tracing an unknown count as zero
+  AssertionError: Missing expected rejection.
+
+Tests: 8; passed: 7; failed: 1; skipped: 0

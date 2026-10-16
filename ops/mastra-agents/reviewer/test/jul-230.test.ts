@@ -106,6 +106,20 @@ test('model discovery records a sanitized success or failure trace for every ser
   assert.doesNotMatch(traces.find(trace => trace.route === 'commandcode')?.error ?? '', /secret/)
 })
 
+test('CommandCode discovery rejects a malformed success payload instead of tracing an unknown count as zero', async () => {
+  const traces: Array<{ route: string; ok: boolean; status?: number; offerCount?: number }> = []
+  await assert.rejects(
+    discoverCommandCodeOffers('secret', async () => Response.json({ unexpected: [] }), trace => { traces.push(trace) }),
+    /invalid/i,
+  )
+  assert.deepEqual(traces, [{
+    event: 'model-discovery', route: 'commandcode', operation: 'models/list', ok: false, status: 200,
+    durationMs: (traces[0] as { durationMs: number } | undefined)?.durationMs,
+    error: (traces[0] as { error: string } | undefined)?.error,
+  }])
+  assert.equal(traces[0]?.offerCount, undefined)
+})
+
 test('Start creates one restart-surviving suspended run and returns it for the same confirmed input', async t => {
   const directory = await mkdtemp(join(tmpdir(), 'jul-230-initialization-'))
   t.after(() => rm(directory, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 }))

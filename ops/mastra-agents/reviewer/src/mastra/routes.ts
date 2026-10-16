@@ -6,13 +6,21 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { join } from 'node:path'
 import { ownedAcpProcesses, retainAcpProcessHandles, sameWindowsProcessIdentity, stopOwnedAcpProcesses, type OwnedAcpProcesses } from './acp-process-lifecycle.ts'
 import { ModelOfferSchema, ModelSelectionSchema } from './contracts.ts'
-import type { z } from 'zod/v4'
+import { z } from 'zod/v4'
 
 export { descendantAcpProcesses, ownedAcpProcesses, sameWindowsProcessIdentity, stopExactWindowsProcesses, waitForAcpProcessExit } from './acp-process-lifecycle.ts'
 export type { WindowsProcessIdentity } from './acp-process-lifecycle.ts'
 
 type ModelOffer = z.infer<typeof ModelOfferSchema>
 type ModelSelection = z.infer<typeof ModelSelectionSchema>
+
+const CommandCodeModelsResponseSchema = z.object({
+  data: z.array(z.object({
+    id: z.unknown().optional(),
+    name: z.unknown().optional(),
+    supported_endpoints: z.unknown().optional(),
+  }).passthrough()),
+}).passthrough()
 
 export const routeSupportedEfforts = {
   antigravity: ['low', 'medium', 'high', 'xhigh', 'max'],
@@ -224,8 +232,8 @@ export async function discoverCommandCodeOffers(
     })
     status = response.status
     if (!response.ok) throw new Error(`CommandCode model list failed with HTTP ${response.status}`)
-    const body = await response.json() as { data?: Array<{ id?: unknown; name?: unknown; supported_endpoints?: unknown }> }
-    const offers = (body.data ?? []).flatMap(item => {
+    const body = CommandCodeModelsResponseSchema.parse(await response.json())
+    const offers = body.data.flatMap(item => {
       const endpoints = Array.isArray(item.supported_endpoints) ? item.supported_endpoints.filter(value => typeof value === 'string') : []
       const codingCapable = endpoints.some(endpoint => /(?:chat\/completions|responses|messages)$/.test(endpoint))
       if (!codingCapable || typeof item.id !== 'string') return []
