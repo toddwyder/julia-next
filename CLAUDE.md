@@ -39,3 +39,7 @@ Details and the account table are in `docs/agents/server-runbook.md`.
 Domain model: `GLOSSARY.md`. Decisions: `docs/adr/`. New Julia and machine work goes in Linear;
 Linear owns cards, requirements, acceptance criteria, and status. GitHub owns code, commits, pull
 requests, and CI. Run files own execution state. GitHub issues are not the active card tracker.
+
+## Agent skills
+
+Project-local skills live in `.agents/skills/`; Claude copies live in `.claude/skills/`.

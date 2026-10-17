@@ -60,6 +60,6 @@ test('the repository-owned pre-plan skill survives Pocock skill upgrades', () =>
     sourceType: 'github',
     ref: 'd250fb51',
     skillPath: '.claude/skills/pre-plan/SKILL.md',
-    computedHash: 'cea366558d5fe6218f37a685d8bafccb2400362ea58dfe9f6ecf87b73e432f48',
+    computedHash: '58d9b881b38dd8938901315f042bff7e2fd7ba70bd4fadaf3e5af2cafeafcba8',
   });
 });

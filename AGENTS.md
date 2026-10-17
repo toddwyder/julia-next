@@ -57,6 +57,10 @@ rerun it before review. Missing, failed, unavailable, stale, or identity-mismatc
 review blocker, not a pass or an implied not-applicable result.
 A check by the same maker as the work is a self-check; never call it independent.
 
+Machine changes use the project-local adversarial-review skill
+(`.agents/skills/adversarial-review/SKILL.md`), followed by Proof:
+`docs/agents/machine-pstack-verification.md`; it runs `verify-machine` as machine UAT.
+
 ## Authorization and blockers
 
 Keep Todd's start authorization and explicit model/spend choices. Never ask Todd for an exception
