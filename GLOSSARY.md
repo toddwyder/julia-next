@@ -336,3 +336,19 @@ The folder in Todd's Google Drive that mirrors the household: a readable text fi
 recipe, menus and the shopping list as text, and one machine file for restoring. Refreshed
 overnight on days something changed; only changed files are touched.
 _Avoid_: Export, dump, snapshot, sync
+
+**Unknown**:
+Either a fact a card relies on but can't cite (what an existing module's interface really guarantees) or a design nobody has built here yet (a new module, seam or state model). Settled by research or a prototype before triage.
+_Avoid_: Risk, gap, mechanism
+
+**Proof**:
+The machine step after Remediation and before the PR. An agent drives the real machine through the card's required journey and reports each acceptance criterion met or not met, from evidence on the exact candidate. Any source change makes it stale.
+_Avoid_: Pstack verification, verify run
+
+**Proof story**:
+The single real drive that shows a card's outcome. A card that needs more than one drive to prove is too big and splits.
+_Avoid_: Test plan, scenario
+
+**Parking lot**:
+The one Linear document of ideas set aside, each line dated with why it came up. Read at every retro and at each milestone boundary.
+_Avoid_: Backlog (that's approved cards), icebox, wish list
