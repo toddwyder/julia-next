@@ -73,7 +73,7 @@ All of this is documented in `toddwyder/AI-Stack`, not in the Julia repo.
 | Provider / plan | OVH VPS-2, US-West (Oregon), month-to-month, backup included, $10.92/month | `cloud-runner-setup.md` (AI-Stack PR #119) |
 | Size | 4 vCores, 8 GB RAM, 75 GB NVMe, Ubuntu 24.04 | same |
 | Delivered | 2026-09-11 | same |
-| How it is reached | Only over Tailscale (a private network), at `100.125.239.98`; public SSH removed; firewall denies all public inbound | AI-Stack `AGENTS.md`; `ops/orca-runner/README.md` (PR #118) |
+| How it is reached | Use `ssh ovh` over Tailscale (`100.119.112.9`); public address `40.160.140.228` | laptop SSH configuration |
 | Why it exists | "move Orca/Julia work off Todd's 16 GB laptop … stable memory, survive laptop sleep, and keep production credentials away from workers" | `cloud-runner-setup.md` |
 | Nickname in the repos | `orca-runner` / "the cloud runner" | throughout AI-Stack |
 

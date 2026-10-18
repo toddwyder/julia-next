@@ -28,11 +28,12 @@ Follow the repository's [AGENTS.md building and reviewing requirements](AGENTS.m
 Keep SSH and sudo outside automated runners. An authorized operator uses the laptop's Tailscale
 route; never copy a private key into a runner or request one in chat.
 
-- **Operator SSH (over Tailscale):** `ssh -i ~/.ssh/ovh_runner_ed25519 ubuntu@100.125.239.98`.
-- **`ubuntu` has passwordless sudo** as the installation channel; manage systemd and run commands
-  as another account with `sudo -u <account>`.
+- **Host:** `ovh` (`100.119.112.9` over Tailscale; public address `40.160.140.228`).
+- **Operator SSH:** `ssh ovh`, using `ubuntu` and
+  `C:\Users\toddw\.ssh\ovh_runner_ed25519`.
+- **Host OS:** Ubuntu 24.04, reinstalled 18 October 2026.
 
-Details and the account table are in `docs/agents/server-runbook.md`.
+Details are in `docs/agents/server-runbook.md`.
 
 ## Domain and tracker
 
