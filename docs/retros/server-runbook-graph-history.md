@@ -163,12 +163,12 @@ three tools (Bash, sandbox-disabled Bash, PowerShell `Test-NetConnection`) and s
 reboot, ruling out a transient ban. **The working path is Tailscale**, not the public hostname:
 
 ```sh
-ssh -i ~/.ssh/ovh_runner_ed25519 ubuntu@100.125.239.98
+ssh ovh
 ```
 
 (Windows: the key is at `C:\Users\<you>\.ssh\ovh_runner_ed25519`; use Git Bash or WSL for the
 `ssh`/`scp` commands in this runbook, not raw PowerShell.) The peer name is `orca-runner`,
-Tailscale IP `100.125.239.98`. Probe only this named login when checking access — do not try
+Use the current `ovh` SSH alias when checking access — do not try
 alternate ports or hosts to work around the public-hostname block.
 
 **Editing a file on the server: write locally, then `scp` it over — never nested heredocs
@@ -224,7 +224,7 @@ permission to touch.
 # Get the running daemon's current pairing URL (root only; never print/store it beyond this step):
 sudo journalctl -u orca-server.service --no-pager | grep "Pairing URL:" | tail -1
 # Register it as a new local-named environment (reuses the daemon's advertised
-# ws://100.125.239.98:6768 endpoint -- this does not disturb the laptop's own
+# retired endpoint -- this does not disturb the laptop's own
 # "OVH runner" pairing; each `environment add` just adds another accepted client):
 /opt/Orca/orca-ide environment add --name ovh-local --pairing-code '<pairing URL from above>'
 ```
@@ -289,7 +289,7 @@ this was tried, taking the daemon down with it.
 **One-time setup for the second daemon** (as `ubuntu`, the admin channel):
 ```sh
 sudo tee /etc/orchestrator-svc/orca-server.env >/dev/null <<'ENV'
-ORCA_SERVE_ARGS=serve --pairing-address 100.125.239.98 --port 6769
+ORCA_SERVE_ARGS=serve --port 6769
 ENV
 sudo chown root:orchestrator-svc /etc/orchestrator-svc/orca-server.env
 sudo chmod 0644 /etc/orchestrator-svc/orca-server.env
@@ -2516,8 +2516,7 @@ above); `/proc/<daemon pid>/status` showed group 1004 on both. This unblocks the
 
 ### The laptop Orca app sees both daemons
 
-The laptop's Orca app now lists two environments: **OVH runner** (`ws://100.125.239.98:6768`,
-runs as `runner`) and **OVH orchestrator** (`ws://100.125.239.98:6769`, runs as `orchestrator-svc`),
+The laptop's Orca app previously listed two environments,
 so a run's orchestrator terminal and its builder/reviewer terminals both show in one window. Added
 with `orca environment add --name "OVH orchestrator" --pairing-code <URL from
 journalctl -u orca-server-orchestrator.service | grep "Pairing URL:">` (the laptop CLI is

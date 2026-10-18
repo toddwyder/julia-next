@@ -532,4 +532,4 @@ free); 5 ✓; 6 ✗ (Java — the reason ADR 0005 moved away); 7 ✗; 8 propriet
 82. RxDB premium — https://rxdb.info/premium/
 83. Ditto pricing — https://www.ditto.com/pricing
 84. Convex: optimistic updates — https://docs.convex.dev/client/react/optimistic-updates
-85. Firebase emulator / ADR context: docs/adr/0005-technical-foundation.md and docs/research/orca-ovh.md (branch research/orca-ovh) in this repo.
+85. Firebase emulator / ADR context: docs/adr/0005-technical-foundation.md in this repo.
