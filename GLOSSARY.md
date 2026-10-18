@@ -345,6 +345,36 @@ _Avoid_: Risk, gap, mechanism
 The machine step after Remediation and before the PR. An agent drives the real machine through the card's required journey and reports each acceptance criterion met or not met, from evidence on the exact candidate. Any source change makes it stale.
 _Avoid_: Pstack verification, verify run
 
+**Work session**:
+One start or continuation of the coder's work on a card, ending at completion, interruption,
+failure or handoff. Continuing after a handoff begins a new work session.
+_Avoid_: Attempt (ambiguous with a failure count), conversation
+
+**Phase**:
+A major part of delivering a card, such as Build, Review, Proof, CI or Merge. Each phase
+contains concrete work steps.
+_Avoid_: Step (a phase contains steps)
+
+**Step (delivery)**:
+One concrete piece of work within a delivery phase. A phase's steps show what is done, what
+is being worked on and what remains, including work discovered during the run.
+_Avoid_: Phase, status update
+
+**Chief of staff**:
+The judgment role that keeps card delivery directed toward the authorized goal and decides
+how to respond when the plan no longer fits. Routine execution belongs to the runner.
+_Avoid_: Supervisor (ambiguous with routine monitoring)
+
+**Delivery decision**:
+A choice among defined, permitted next actions for a card. Fixed rules belong to the runner;
+choices requiring interpretation go to a decision model.
+_Avoid_: Judgment (needed when no suitable action can be confidently chosen)
+
+**Delivery judgment**:
+Working out a new approach when the available actions do not fit or cannot be confidently
+selected. The chief of staff diagnoses or replans within the authorized goal and limits.
+_Avoid_: Routine decision, monitoring
+
 **Proof story**:
 The single real drive that shows a card's outcome. A card that needs more than one drive to prove is too big and splits.
 _Avoid_: Test plan, scenario
