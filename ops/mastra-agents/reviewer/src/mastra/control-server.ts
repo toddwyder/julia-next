@@ -96,7 +96,11 @@ export async function runControlPageServer() {
         ])
         const discovered = await discoverAgentActivity({ codexFiles, commandCodeFiles, mastraTraces: mastraTraces as Record<string, any>[] })
         await agentStore.retain(discovered)
-        const cards = projectAgentCards(discovered)
+        const trackerTitles = new Map(latestState.cards.map(item => [item.card.identifier, item.card.title]))
+        const cards = projectAgentCards(discovered.map(record => ({
+          ...record,
+          cardTitle: record.cardIdentifier ? trackerTitles.get(record.cardIdentifier) ?? record.cardTitle : record.cardTitle,
+        })))
         console.log(JSON.stringify({ event: 'agent-activity-discovery', ok: true, codexFiles: codexFiles.length, commandCodeFiles: commandCodeFiles.length, mastraTraces: mastraTraces.length, runningCards: cards.length, durationMs: performance.now() - startedAt }))
         return { updatedAt: new Date().toISOString(), cards }
       } catch (error) {
