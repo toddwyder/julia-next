@@ -42,21 +42,35 @@ function cardIdentity(text: string) {
   return { cardIdentifier: identifier }
 }
 
+function taskIdentity(texts: string[], fallback = '') {
+  for (const text of texts) {
+    const trimmed = text.trimStart()
+    if (trimmed.startsWith('# AGENTS.md instructions') || trimmed.startsWith('<environment_context>')) continue
+    const identity = cardIdentity(text)
+    if (identity.cardIdentifier) return identity
+  }
+  return cardIdentity(fallback)
+}
+
 function actionLabel(name: string, input: unknown) {
-  const detail = typeof input === 'string' ? input : JSON.stringify(input ?? {})
-  if (/exec|command|shell/i.test(name)) {
-    let command = detail
-    try { command = JSON.parse(detail).cmd ?? detail } catch {}
-    if (/\b(?:test|vitest|playwright|jest)\b/i.test(command)) return 'Ran tests'
-    if (/\bgit\b/i.test(command)) return 'Ran a Git command'
-    if (/\b(?:rg|Get-Content|Select-String)\b/i.test(command)) return 'Searched or read project files'
+  const tool = name.toLowerCase()
+  if (/^(?:exec|exec_command|command|shell)$/.test(tool)) {
+    let command = typeof input === 'string' ? input : String((input as Record<string, unknown> | null)?.cmd ?? '')
+    try { command = JSON.parse(command).cmd ?? command } catch {}
+    command = command.replace(/(^|\s)\/\/.*$/gm, '$1').replace(/(^|\s)#.*$/gm, '$1')
+    const kinds = [
+      { label: 'Ran a Git command', match: /(?:^|[;&|]\s*)git(?:\.exe)?\b/im.exec(command) },
+      { label: 'Searched or read project files', match: /(?:^|[;&|]\s*)(?:rg|Get-Content|Select-String|grep|findstr|type)(?:\.exe)?\b/im.exec(command) },
+      { label: 'Ran tests', match: /(?:^|[;&|]\s*)(?:(?:npm|pnpm|yarn)\b[^\r\n;&|]*\btest\b|node(?:\.exe)?\b[^\r\n;&|]*--test\b|(?:npx\s+)?(?:vitest|jest)\b|(?:npx\s+)?playwright\s+test\b)/im.exec(command) },
+    ].filter(candidate => candidate.match).sort((left, right) => left.match!.index - right.match!.index)
+    if (kinds[0]) return kinds[0].label
     return 'Ran a command'
   }
-  if (/read|open/i.test(name)) {
-    return 'Read a project file'
-  }
-  if (/patch|edit|write/i.test(name)) return 'Changed project files'
-  if (/search|glob|grep|find/i.test(name)) return 'Searched project files'
+  if (tool === 'write_stdin') return 'Checked a running command'
+  if (tool === 'web_search' || tool === 'search_query') return 'Searched the web'
+  if (/^(?:read|read_file|open)$/.test(tool)) return 'Read a project file'
+  if (/^(?:apply_patch|patch|edit|edit_file|write|write_file)$/.test(tool)) return 'Changed project files'
+  if (/^(?:search|glob|grep|find)$/.test(tool)) return 'Searched project files'
   return `Used ${name}`.slice(0, 120)
 }
 
@@ -76,6 +90,9 @@ function failed(output: unknown, explicit?: unknown) {
   const value = typeof output === 'string' ? output : JSON.stringify(output ?? '')
   const exitCode = /(?:exit code|exit_code)["':=\s-]*(-?\d+)/i.exec(value)?.[1]
   if (exitCode !== undefined) return Number(exitCode) !== 0
+  const processExitCode = /\bProcess exited with code\s+(-?\d+)\b/i.exec(value)?.[1]
+  if (processExitCode !== undefined) return Number(processExitCode) !== 0
+  if (/\bScript failed\b/i.test(value)) return true
   return /["']?(?:isError|is_error|failed)["']?\s*[:=]\s*(?:true|yes|1)\b/i.test(value)
 }
 
@@ -97,8 +114,8 @@ export async function readCodexActivity(path: string, now = new Date()): Promise
   const entries = await sessionRows(path)
   const meta = entries.find(entry => entry.type === 'session_meta')?.payload ?? {}
   const messages = entries.filter(entry => entry.type === 'response_item' && entry.payload?.type === 'message' && entry.payload?.role === 'user')
-  const userText = messages.flatMap(entry => entry.payload.content ?? []).map((part: any) => part.text ?? '').join('\n')
-  const identity = cardIdentity(userText || meta.cwd || '')
+  const userTexts = messages.map(entry => (entry.payload.content ?? []).map((part: any) => part.text ?? '').join('\n'))
+  const identity = taskIdentity(userTexts, meta.cwd || '')
   const calls = new Map<string, { entry: Record<string, any>; label: string }>()
   const actions: AgentAction[] = []
   for (const entry of entries) {
@@ -127,8 +144,8 @@ export async function readCommandCodeActivity(path: string, now = new Date(), pr
   const entries = await sessionRows(path)
   const session = entries.find(entry => entry.type === 'session') ?? {}
   const messages = entries.filter(entry => entry.type === 'message')
-  const userText = messages.filter(entry => entry.message?.role === 'user').flatMap(entry => entry.message?.content ?? []).map((part: any) => part.text ?? '').join('\n')
-  const identity = cardIdentity(userText)
+  const userTexts = messages.filter(entry => entry.message?.role === 'user').map(entry => (entry.message?.content ?? []).map((part: any) => part.text ?? '').join('\n'))
+  const identity = taskIdentity(userTexts)
   const actions: AgentAction[] = []
   const actionById = new Map<string, AgentAction>()
   for (const entry of messages) {

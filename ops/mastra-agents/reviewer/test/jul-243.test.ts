@@ -16,7 +16,7 @@ import {
 import { createInitializationActivityRecorder } from '../src/mastra/initialization-observability.ts'
 import { createInitializationRuntime } from '../src/mastra/initialization.ts'
 import { startControlPageServer } from '../src/mastra/control-page.ts'
-import { activeCodexFiles, activeCommandCodeFiles, jsonlFiles } from '../src/mastra/control-server.ts'
+import { activeCodexFiles, activeCommandCodeFiles, discoverAgentDashboard, jsonlFiles } from '../src/mastra/control-server.ts'
 
 const NOW = new Date('2026-10-19T15:00:00.000Z')
 
@@ -75,6 +75,7 @@ test('native discovery keeps the complete inventory and uses Codex writer locks 
   const active = join(root, 'rollout-active-id.jsonl')
   await writeFile(active, '{}\n')
   await writeFile(join(locks, 'active-id.lock'), '')
+  assert.deepEqual(await jsonlFiles(root, false, ['active-id']), [active])
   assert.deepEqual(await activeCodexFiles([...files, active], locks), [active])
 })
 
@@ -163,6 +164,75 @@ test('native failures use explicit status, normalize volatile details, and never
   assert.equal('failureKey' in card.actions.at(-1)!, false)
 })
 
+test('real Codex failure markers trigger the repeated-failure rule and an intervening success breaks it', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'jul-243-real-failures-'))
+  const makeActivity = async (name: string, outputs: string[]) => {
+    const path = join(root, `${name}.jsonl`)
+    const entries: object[] = [
+      { timestamp: '2026-10-19T14:50:00.000Z', type: 'session_meta', payload: { id: name } },
+      { timestamp: '2026-10-19T14:50:01.000Z', type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Build JUL-243' }] } },
+    ]
+    outputs.forEach((output, index) => entries.push(
+      { timestamp: `2026-10-19T14:5${index + 1}:00.000Z`, type: 'response_item', payload: { type: 'function_call', call_id: `${name}-${index}`, name: 'exec_command', arguments: '{"cmd":"npm test"}' } },
+      { timestamp: `2026-10-19T14:5${index + 1}:01.000Z`, type: 'response_item', payload: { type: 'function_call_output', call_id: `${name}-${index}`, output } },
+    ))
+    await writeFile(path, entries.map(JSON.stringify).join('\n'))
+    return (await readCodexActivity(path, NOW))!
+  }
+
+  const repeated = await makeActivity('repeated', [
+    'Script failed: apply_patch verification failed',
+    'Script failed: apply_patch verification failed',
+    'Script failed: apply_patch verification failed',
+  ])
+  assert.equal(projectAgentCards([repeated], NOW)[0].status, 'looks-stuck')
+
+  const interrupted = await makeActivity('interrupted', [
+    'Process exited with code 1: same assertion',
+    'Process exited with code 0',
+    'Process exited with code 1: same assertion',
+  ])
+  assert.deepEqual(interrupted.actions.map(action => action.outcome), ['failed', 'succeeded', 'failed'])
+  assert.equal(projectAgentCards([interrupted], NOW)[0].status, 'working')
+})
+
+test('native action labels use the tool and executable command rather than incidental keywords', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'jul-243-labels-'))
+  const path = join(root, 'labels.jsonl')
+  const specs = [
+    ['read-test-file', 'exec_command', '{"cmd":"Get-Content test/jul-243.test.ts"}'],
+    ['comment', 'exec_command', '{"cmd":"Get-Content README.md // npm test later"}'],
+    ['poll', 'write_stdin', '{"session_id":42}'],
+    ['web', 'web_search', '{"query":"agent dashboards"}'],
+  ]
+  const entries: object[] = [
+    { timestamp: '2026-10-19T14:50:00.000Z', type: 'session_meta', payload: { id: 'labels' } },
+    { timestamp: '2026-10-19T14:50:01.000Z', type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Build JUL-243' }] } },
+  ]
+  specs.forEach(([id, name, arguments_], index) => entries.push(
+    { timestamp: `2026-10-19T14:5${index + 1}:00.000Z`, type: 'response_item', payload: { type: 'function_call', call_id: id, name, arguments: arguments_ } },
+    { timestamp: `2026-10-19T14:5${index + 1}:01.000Z`, type: 'response_item', payload: { type: 'function_call_output', call_id: id, output: 'ok' } },
+  ))
+  await writeFile(path, entries.map(JSON.stringify).join('\n'))
+  assert.deepEqual((await readCodexActivity(path, NOW))?.actions.map(action => action.label), [
+    'Searched or read project files',
+    'Searched or read project files',
+    'Checked a running command',
+    'Searched the web',
+  ])
+})
+
+test('card identity ignores injected repository instructions', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'jul-243-identity-'))
+  const path = join(root, 'identity.jsonl')
+  await writeFile(path, [
+    { timestamp: '2026-10-19T14:50:00.000Z', type: 'session_meta', payload: { id: 'identity' } },
+    { timestamp: '2026-10-19T14:50:01.000Z', type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: '# AGENTS.md instructions\nUse JUL-122 as an example.' }] } },
+    { timestamp: '2026-10-19T14:50:02.000Z', type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Build JUL-243' }] } },
+  ].map(JSON.stringify).join('\n'))
+  assert.equal((await readCodexActivity(path, NOW))?.cardIdentifier, 'JUL-243')
+})
+
 test('Looks stuck uses the settled inactivity and repeated-failure thresholds', () => {
   const inactive = projectAgentCards([record({ updatedAt: '2026-10-19T14:45:00.000Z', actions: [] })], NOW)[0]
   assert.equal(inactive.status, 'looks-stuck')
@@ -222,6 +292,32 @@ test('retains Codex detail in the server database across a fresh store', async (
   assert.equal(retained[0].actions[0].label, 'Ran tests')
 })
 
+test('dashboard discovery filters by writer lock, maps tracker titles, and retains Codex actions', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'jul-243-dashboard-'))
+  const codexRoot = join(root, 'codex')
+  const lockRoot = join(root, 'locks')
+  const commandCodeRoot = join(root, 'commandcode')
+  const ideRoot = join(root, 'ide')
+  await Promise.all([mkdir(codexRoot), mkdir(lockRoot), mkdir(commandCodeRoot), mkdir(ideRoot)])
+  const session = join(codexRoot, 'rollout-live-session.jsonl')
+  await writeFile(session, [
+    { timestamp: '2026-10-19T14:50:00.000Z', type: 'session_meta', payload: { id: 'live-session' } },
+    { timestamp: '2026-10-19T14:50:01.000Z', type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Build JUL-243' }] } },
+    { timestamp: '2026-10-19T14:59:00.000Z', type: 'response_item', payload: { type: 'function_call', call_id: 'read', name: 'exec_command', arguments: '{"cmd":"Get-Content README.md"}' } },
+    { timestamp: '2026-10-19T14:59:01.000Z', type: 'response_item', payload: { type: 'function_call_output', call_id: 'read', output: 'ok' } },
+  ].map(JSON.stringify).join('\n'))
+  await writeFile(join(lockRoot, 'live-session.lock'), '')
+  const store = await createAgentActivityStore(join(root, 'activity.db'))
+  const result = await discoverAgentDashboard({
+    codexRoot, codexLockRoot: lockRoot, commandCodeRoot, commandCodeIdeRoot: ideRoot,
+    mastraTraces: [], agentStore: store, controlCards: [{ card: { identifier: 'JUL-243', title: 'Dashboard A + B' } }], now: NOW,
+  })
+  assert.equal(result.cards[0].cardTitle, 'Dashboard A + B')
+  assert.equal(result.cards[0].actions[0].label, 'Searched or read project files')
+  assert.equal((await store.list())[0].sourceId, 'live-session')
+  await store.close()
+})
+
 test('reads a real persisted Mastra workflow trace through the stock observability store', async () => {
   const root = await mkdtemp(join(tmpdir(), 'jul-243-mastra-'))
   const runtime = await createInitializationRuntime({ storagePath: join(root, 'initialization.db'), activity: createInitializationActivityRecorder() })
@@ -270,5 +366,6 @@ test('the phone dashboard renders provider cards, activity, and both status labe
   assert.equal(await page.getByText('Working. Last action 1 min ago.').count(), 1)
   assert.equal(await page.getByText(/Looks stuck: no new action for 20 min/).count(), 1)
   assert.equal(await page.getByRole('heading', { name: 'What it actually did' }).count(), 2)
+  assert.ok((await page.locator('.activity-empty').boundingBox())!.width > 250)
   assert.deepEqual(errors, [])
 })
