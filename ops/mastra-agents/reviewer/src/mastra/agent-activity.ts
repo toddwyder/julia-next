@@ -103,7 +103,13 @@ export async function findActiveCodexFiles(paths: string[]) {
   const active: string[] = []
   for (let offset = 0; offset < paths.length; offset += 16) {
     const batch = paths.slice(offset, offset + 16)
-    const states = await Promise.all(batch.map(async path => nativeRunning(await tailRows(path))))
+    const states = await Promise.all(batch.map(async path => {
+      const entries = await tailRows(path)
+      if (!entries.some(entry => entry.type === 'response_item' || entry.type === 'event_msg' || entry.type === 'agent_settled')) return false
+      const latestUser = entries.findLastIndex(entry => entry.type === 'response_item' && entry.payload?.type === 'message' && entry.payload?.role === 'user')
+      const latestTerminal = entries.findLastIndex(entry => (entry.type === 'event_msg' && ['task_complete', 'turn_aborted'].includes(entry.payload?.type)) || entry.type === 'agent_settled')
+      return latestTerminal < 0 || latestUser > latestTerminal
+    }))
     states.forEach((running, index) => { if (running) active.push(batch[index]) })
   }
   return active

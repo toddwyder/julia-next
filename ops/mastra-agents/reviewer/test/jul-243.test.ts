@@ -75,6 +75,7 @@ test('native discovery keeps the complete candidate inventory while liveness rea
   await writeFile(oldActive, [
     { timestamp: '2026-10-19T14:00:00.000Z', type: 'session_meta', payload: { id: 'old-active' } },
     { timestamp: '2026-10-19T14:01:00.000Z', type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Build JUL-243' }] } },
+    ...Array.from({ length: 1_000 }, (_, index) => ({ timestamp: '2026-10-19T14:02:00.000Z', type: 'response_item', payload: { type: 'function_call_output', call_id: `call-${index}`, output: 'ok'.repeat(40) } })),
   ].map(JSON.stringify).join('\n'))
   assert.deepEqual(await findActiveCodexFiles(files), [oldActive])
 })
