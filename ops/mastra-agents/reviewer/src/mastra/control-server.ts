@@ -11,7 +11,7 @@ import { createInitializationRuntime } from './initialization.ts'
 import { createInitializationActivityRecorder, createObservedLinearClient } from './initialization-observability.ts'
 import { listReadyLinearCards } from './linear.ts'
 import { discoverAcpOffers, discoverCommandCodeOffers, withAcpRoutes } from './routes.ts'
-import { createAgentActivityStore, discoverAgentActivity, projectAgentCards } from './agent-activity.ts'
+import { createAgentActivityStore, discoverAgentActivity, findActiveCodexFiles, projectAgentCards } from './agent-activity.ts'
 
 const CONTROL_PORT = 43123
 const execFileAsync = promisify(execFile)
@@ -68,7 +68,7 @@ export async function jsonlFiles(root: string, omitCheckpoints = false) {
     const paths = entries.filter(entry => entry.isFile() && entry.name.endsWith('.jsonl') && (!omitCheckpoints || !entry.name.endsWith('.checkpoints.jsonl')))
       .map(entry => join(entry.parentPath, entry.name))
     const dated = await Promise.all(paths.map(async path => ({ path, mtimeMs: (await stat(path)).mtimeMs })))
-    return dated.sort((left, right) => right.mtimeMs - left.mtimeMs).slice(0, 16).map(item => item.path)
+    return dated.sort((left, right) => right.mtimeMs - left.mtimeMs).map(item => item.path)
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
     throw error
@@ -108,14 +108,16 @@ export async function discoverAgentDashboard({ codexRoot, commandCodeRoot, mastr
     jsonlFiles(commandCodeRoot, true),
     commandCodeProcessCount(),
   ])
-  const discovered = await discoverAgentActivity({ codexFiles, commandCodeFiles, mastraTraces, now, activeCommandCodeFiles: commandCodeFiles.slice(0, commandCodeProcesses) })
+  const activeCodexFiles = await findActiveCodexFiles(codexFiles)
+  const activeCommandCodeFiles = commandCodeFiles.slice(0, commandCodeProcesses)
+  const discovered = await discoverAgentActivity({ codexFiles: activeCodexFiles, commandCodeFiles: activeCommandCodeFiles, mastraTraces, now, activeCommandCodeFiles })
   await agentStore.retain(discovered)
   const trackerTitles = new Map(controlCards.map(item => [item.card.identifier, item.card.title]))
   const cards = projectAgentCards(discovered.map(record => ({
     ...record,
     cardTitle: record.cardIdentifier ? trackerTitles.get(record.cardIdentifier) ?? record.cardTitle : record.cardTitle,
   })), now)
-  return { cards, counts: { codexFiles: codexFiles.length, commandCodeFiles: commandCodeFiles.length, mastraTraces: mastraTraces.length } }
+  return { cards, counts: { codexFiles: codexFiles.length, activeCodexFiles: activeCodexFiles.length, commandCodeFiles: commandCodeFiles.length, activeCommandCodeFiles: activeCommandCodeFiles.length, mastraTraces: mastraTraces.length } }
 }
 
 export async function runControlPageServer() {

@@ -39,8 +39,7 @@ async function sessionRows(path: string) {
 
 function cardIdentity(text: string) {
   const identifier = /\b([A-Z][A-Z0-9]*-\d+)\b/.exec(text)?.[1]
-  const title = identifier ? new RegExp(`${identifier}\\s*[:—-]\\s*([^\\r\\n]{1,120})`, 'i').exec(text)?.[1]?.trim() : undefined
-  return { cardIdentifier: identifier, cardTitle: title || undefined }
+  return { cardIdentifier: identifier }
 }
 
 function actionLabel(name: string, input: unknown) {
@@ -84,6 +83,30 @@ function nativeRunning(entries: Record<string, any>[]) {
   const latestUser = entries.findLastIndex(entry => entry.type === 'response_item' && entry.payload?.type === 'message' && entry.payload?.role === 'user')
   const latestTerminal = entries.findLastIndex(entry => (entry.type === 'event_msg' && ['task_complete', 'turn_aborted'].includes(entry.payload?.type)) || entry.type === 'agent_settled')
   return latestUser >= 0 && latestTerminal < latestUser
+}
+
+async function tailRows(path: string, bytes = 64 * 1024) {
+  const file = await open(path, 'r')
+  try {
+    const { size } = await file.stat()
+    const length = Math.min(size, bytes)
+    const buffer = Buffer.alloc(length)
+    await file.read(buffer, 0, length, size - length)
+    const text = buffer.toString('utf8')
+    return rows(size > length ? text.replace(/^[^\n]*\n/, '') : text)
+  } finally {
+    await file.close()
+  }
+}
+
+export async function findActiveCodexFiles(paths: string[]) {
+  const active: string[] = []
+  for (let offset = 0; offset < paths.length; offset += 16) {
+    const batch = paths.slice(offset, offset + 16)
+    const states = await Promise.all(batch.map(async path => nativeRunning(await tailRows(path))))
+    states.forEach((running, index) => { if (running) active.push(batch[index]) })
+  }
+  return active
 }
 
 function commandCodeRunning(messages: Record<string, any>[], processRunning: boolean) {

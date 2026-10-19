@@ -8,6 +8,7 @@ import { chromium } from 'playwright'
 import {
   createAgentActivityStore,
   discoverAgentActivity,
+  findActiveCodexFiles,
   projectAgentCards,
   readCodexActivity,
   readCommandCodeActivity,
@@ -65,10 +66,17 @@ test('native lifecycle uses the latest turn and finished CommandCode output is n
   assert.equal((await readCommandCodeActivity(commandCode, NOW, true))?.running, true)
 })
 
-test('native discovery bounds the candidate set before reading session contents', async () => {
+test('native discovery keeps the complete candidate inventory while liveness reads only tails', async () => {
   const root = await mkdtemp(join(tmpdir(), 'jul-243-bounded-'))
   await Promise.all(Array.from({ length: 70 }, (_, index) => writeFile(join(root, `${String(index).padStart(2, '0')}.jsonl`), '{}\n')))
-  assert.equal((await jsonlFiles(root)).length, 16)
+  const files = await jsonlFiles(root)
+  assert.equal(files.length, 70)
+  const oldActive = files.at(-1)!
+  await writeFile(oldActive, [
+    { timestamp: '2026-10-19T14:00:00.000Z', type: 'session_meta', payload: { id: 'old-active' } },
+    { timestamp: '2026-10-19T14:01:00.000Z', type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Build JUL-243' }] } },
+  ].map(JSON.stringify).join('\n'))
+  assert.deepEqual(await findActiveCodexFiles(files), [oldActive])
 })
 
 test('a CommandCode process activates only its newest mapped session, not old transcripts', async () => {
@@ -158,7 +166,7 @@ test('discovers native Codex and CommandCode JSONL plus supplied Mastra traces',
 
   assert.deepEqual(records.map(item => item.source), ['codex', 'commandcode', 'mastra'])
   assert.equal(records[0].actions[0].label, 'Ran tests')
-  assert.equal(records[0].cardTitle, 'Dashboard A + B')
+  assert.equal(records[0].cardTitle, undefined)
   assert.equal(records[1].actions[0].label, 'Read a project file')
   assert.equal(records[2].sourceId, 'mastra-native')
 })
