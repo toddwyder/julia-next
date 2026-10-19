@@ -60,11 +60,12 @@ export function configuredTailscaleHosts(environment: NodeJS.ProcessEnv = proces
   return (environment.JULIA_CONTROL_TAILSCALE_HOST ?? '').split(',').map(name => name.trim()).filter(Boolean)
 }
 
-export async function jsonlFiles(root: string, omitCheckpoints = false) {
+export async function jsonlFiles(root: string, omitCheckpoints = false, pathMarkers?: string[]) {
   try {
     const entries = await readdir(root, { recursive: true, withFileTypes: true })
     const paths = entries.filter(entry => entry.isFile() && entry.name.endsWith('.jsonl') && (!omitCheckpoints || !entry.name.endsWith('.checkpoints.jsonl')))
       .map(entry => join(entry.parentPath, entry.name))
+      .filter(path => pathMarkers === undefined || pathMarkers.some(marker => path.toLowerCase().includes(marker.toLowerCase())))
     const dated = await Promise.all(paths.map(async path => ({ path, mtimeMs: (await stat(path)).mtimeMs })))
     return dated.sort((left, right) => right.mtimeMs - left.mtimeMs).map(item => item.path)
   } catch (error) {
@@ -73,14 +74,18 @@ export async function jsonlFiles(root: string, omitCheckpoints = false) {
   }
 }
 
-export async function activeCodexFiles(paths: string[], lockRoot: string) {
+export async function codexLockIds(lockRoot: string) {
   try {
-    const ids = new Set((await readdir(lockRoot)).filter(name => name.endsWith('.lock') && name !== '.coordination.lock').map(name => name.slice(0, -5)))
-    return paths.filter(path => [...ids].some(id => path.includes(id)))
+    return (await readdir(lockRoot)).filter(name => name.endsWith('.lock') && name !== '.coordination.lock').map(name => name.slice(0, -5))
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
     throw error
   }
+}
+
+export async function activeCodexFiles(paths: string[], lockRoot: string) {
+  const ids = await codexLockIds(lockRoot)
+  return paths.filter(path => ids.some(id => path.includes(id)))
 }
 
 function processAlive(pid: number) {
@@ -108,14 +113,13 @@ export async function discoverAgentDashboard({ codexRoot, codexLockRoot, command
   controlCards: Array<{ card: { identifier: string; title: string } }>
   now?: Date
 }) {
-  const [codexFiles, commandCodeFiles] = await Promise.all([
-    jsonlFiles(codexRoot),
+  const lockRoot = codexLockRoot ?? join(homedir(), '.codex', 'thread-writer-locks')
+  const ids = await codexLockIds(lockRoot)
+  const [codexActive, commandCodeFiles] = await Promise.all([
+    jsonlFiles(codexRoot, false, ids),
     jsonlFiles(commandCodeRoot, true),
   ])
-  const [codexActive, commandCodeActive] = await Promise.all([
-    activeCodexFiles(codexFiles, codexLockRoot ?? join(homedir(), '.codex', 'thread-writer-locks')),
-    activeCommandCodeFiles(commandCodeFiles, commandCodeIdeRoot ?? join(homedir(), '.commandcode', 'ide')),
-  ])
+  const commandCodeActive = await activeCommandCodeFiles(commandCodeFiles, commandCodeIdeRoot ?? join(homedir(), '.commandcode', 'ide'))
   const discovered = await discoverAgentActivity({ codexFiles: codexActive, commandCodeFiles: commandCodeActive, mastraTraces, now, activeCommandCodeFiles: commandCodeActive })
   await agentStore.retain(discovered)
   const trackerTitles = new Map(controlCards.map(item => [item.card.identifier, item.card.title]))
@@ -123,7 +127,7 @@ export async function discoverAgentDashboard({ codexRoot, codexLockRoot, command
     ...record,
     cardTitle: record.cardIdentifier ? trackerTitles.get(record.cardIdentifier) ?? record.cardTitle : record.cardTitle,
   })), now)
-  return { cards, counts: { codexFiles: codexFiles.length, activeCodexFiles: codexActive.length, commandCodeFiles: commandCodeFiles.length, activeCommandCodeFiles: commandCodeActive.length, mastraTraces: mastraTraces.length } }
+  return { cards, counts: { codexLocks: ids.length, activeCodexFiles: codexActive.length, commandCodeFiles: commandCodeFiles.length, activeCommandCodeFiles: commandCodeActive.length, mastraTraces: mastraTraces.length } }
 }
 
 export async function runControlPageServer() {
