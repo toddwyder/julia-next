@@ -130,8 +130,15 @@ async function inspectCommandCodeProcesses(pids: number[]) {
 }
 
 export async function activeCommandCodeFiles(paths: string[], ideRoot: string, inspectProcesses = inspectCommandCodeProcesses) {
+  let names: string[]
   try {
-    const records = await Promise.all((await readdir(ideRoot)).filter(name => name.endsWith('.json')).map(async name => JSON.parse(await readFile(join(ideRoot, name), 'utf8')) as { pid?: number; ideName?: string; timestamp?: number; workspaceFolders?: string[] }))
+    names = await readdir(ideRoot)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
+    throw new Error('CommandCode IDE liveness inspection failed', { cause: error })
+  }
+  try {
+    const records = await Promise.all(names.filter(name => name.endsWith('.json')).map(async name => JSON.parse(await readFile(join(ideRoot, name), 'utf8')) as { pid?: number; ideName?: string; timestamp?: number; workspaceFolders?: string[] }))
     const pids = [...new Set(records.flatMap(record => Number.isInteger(record.pid) ? [record.pid!] : []))]
     const identities = await inspectProcesses(pids)
     const activeProjects = [...new Set(records
@@ -144,7 +151,6 @@ export async function activeCommandCodeFiles(paths: string[], ideRoot: string, i
       .map(folder => folder.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')))]
     return activeProjects.flatMap(project => paths.find(path => path.toLowerCase().replaceAll('\\', '/').includes(`/${project}/`)) ?? []).filter(Boolean)
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
     throw new Error('CommandCode IDE liveness inspection failed', { cause: error })
   }
 }

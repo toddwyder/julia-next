@@ -133,8 +133,9 @@ test('CommandCode verifies a live provider record against Windows process identi
 test('CommandCode process-inspection failures reject discovery with sanitized context', async () => {
   const ide = await mkdtemp(join(tmpdir(), 'jul-243-commandcode-probe-failure-'))
   await writeFile(join(ide, 'code.json'), JSON.stringify({ pid: 4242, ideName: 'code', timestamp: NOW.getTime(), workspaceFolders: ['C:\\Dev\\julia-next'] }))
+  const missingProbe = Object.assign(new Error('private provider detail'), { code: 'ENOENT' })
   await assert.rejects(
-    activeCommandCodeFiles([], ide, async () => { throw new Error('private provider detail') }),
+    activeCommandCodeFiles([], ide, async () => { throw missingProbe }),
     error => error instanceof Error && error.message === 'CommandCode IDE liveness inspection failed' && !error.message.includes('private'),
   )
 })
