@@ -95,7 +95,10 @@ function processAlive(pid: number) {
 export async function activeCommandCodeFiles(paths: string[], ideRoot: string) {
   try {
     const records = await Promise.all((await readdir(ideRoot)).filter(name => name.endsWith('.json')).map(async name => JSON.parse(await readFile(join(ideRoot, name), 'utf8')) as { pid?: number; workspaceFolders?: string[] }))
-    const activeProjects = records.filter(record => Number.isInteger(record.pid) && processAlive(record.pid!)).flatMap(record => record.workspaceFolders ?? []).map(folder => folder.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''))
+    const activeProjects = [...new Set(records
+      .filter(record => Number.isInteger(record.pid) && processAlive(record.pid!))
+      .flatMap(record => record.workspaceFolders ?? [])
+      .map(folder => folder.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')))]
     return activeProjects.flatMap(project => paths.find(path => path.toLowerCase().replaceAll('\\', '/').includes(`/${project}/`)) ?? []).filter(Boolean)
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []

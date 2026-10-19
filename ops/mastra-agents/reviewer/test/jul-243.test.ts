@@ -92,7 +92,10 @@ test('CommandCode provider IDE state maps a live workspace only to its newest se
     { type: 'message', timestamp: '2026-10-19T14:02:01.000Z', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: `${id}-tool`, content: 'done' }] } },
   ].map(JSON.stringify).join('\n')
   await Promise.all([writeFile(oldPath, session('old', 'JUL-200')), writeFile(activePath, session('active', 'JUL-243'))])
-  await writeFile(join(ide, 'code-live.json'), JSON.stringify({ pid: process.pid, workspaceFolders: ['C:\\Dev\\julia-next'] }))
+  await Promise.all([
+    writeFile(join(ide, 'code-live.json'), JSON.stringify({ pid: process.pid, workspaceFolders: ['C:\\Dev\\julia-next'] })),
+    writeFile(join(ide, 'code-live-duplicate.json'), JSON.stringify({ pid: process.pid, workspaceFolders: ['C:\\Dev\\julia-next'] })),
+  ])
   const active = await activeCommandCodeFiles([activePath, oldPath], ide)
   assert.deepEqual(active, [activePath])
   const records = await discoverAgentActivity({ commandCodeFiles: [activePath, oldPath], activeCommandCodeFiles: active, now: NOW })
