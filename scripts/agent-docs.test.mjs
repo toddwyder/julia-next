@@ -66,6 +66,9 @@ test('the repository-owned pre-plan skill survives Pocock skill upgrades', () =>
   }
   assert.match(prePlan, /invoke Pocock's installed `triage` skill/);
   assert.match(prePlan, /card-admission-check\.ts/);
+  assert.match(prePlan, /write.*filled blanks?.*Todd's answers.*card text itself/i);
+  assert.match(prePlan, /Read the Framework Map comment before building\./);
+  assert.match(prePlan, /Confirm comment.*record of what changed/i);
   assert.match(prePlan, /one `For Todd:` summary covering every card/);
   assert.match(prePlan, /move only the settled cards with passing admission results to Ready/);
   assert.deepEqual(JSON.parse(read('skills-lock.json')).skills['pre-plan'], {
@@ -73,6 +76,6 @@ test('the repository-owned pre-plan skill survives Pocock skill upgrades', () =>
     sourceType: 'github',
     ref: 'd250fb51',
     skillPath: '.claude/skills/pre-plan/SKILL.md',
-    computedHash: '20c3120714734eeeb0f77c13df43a5cfc68e1a86cc4bf71e918455ac7f78e678',
+    computedHash: '9a8cde5c0e43deae9a1e6105e67d0f366d751fd6dcf271e31f51efaf4a513b26',
   });
 });

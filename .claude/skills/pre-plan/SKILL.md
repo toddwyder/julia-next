@@ -33,7 +33,7 @@ Explicitly invoke Pocock's installed `triage` skill with the complete Shape outp
 
 ## 3. Confirm and Admission
 
-Run these on the card. Each finding is a blank to fill or a question. Fill a blank only inside an existing criterion, such as naming the entry point, naming a failure outcome, or linking the companion card. A finding that needs a new criterion is a split or a question for Todd, never an addition.
+Run these on the card. Each finding is a blank to fill or a question. Fill a blank only inside an existing criterion, such as naming the entry point, naming a failure outcome, or linking the companion card. A finding that needs a new criterion is a split or a question for Todd, never an addition. Write every filled blank and Todd's answers into the card text itself, inside the existing criteria; never leave operative content only in a comment. Add this exact line to each card's text: `Read the Framework Map comment before building.`
 
 1. **Built the Mastra way.** Each job cites the stock feature in the installed packages (`package@version path:line`). A job with no citation is custom: list it with the reason. Flag any difference from the official docs and starter layout. Put citations in a separate Framework Map comment, not in the card.
 2. **Contracts.** Draw a Mermaid diagram with a box per part and an arrow per handoff, labelled with its contract. A contract is the type-level part of an interface: one Zod schema, defined once and shared by provider and users. The interface also carries rules the schema can't, such as ordering, error behavior and restart behavior. Each offering and using part names a real check of its own side, covering those rules too. A changed contract lists every other user whose check must rerun.
@@ -41,7 +41,7 @@ Run these on the card. Each finding is a blank to fill or a question. Fill a bla
 4. **Real proof.** Each finish condition has a proof. A test counts only if it was seen failing before the change and passing after, and the reviewer reran it. It runs against the real thing, except a rule living entirely inside one module, which a unit test covering every case may prove. Mocks, stubs and fakes never count across a seam. Recipe cards use `verify-julia` and machine cards use `verify-machine`. If the feature isn't mapped, extending the skill with `maintain-verification-skill` is part of the card.
 5. **Nothing that stops the run.** The card tells the agent to stop only for a spend or time cap, a failed production check, two rounds without closing (with the step-back prepared), or an account, money or product decision. Every tool, file and service it relies on exists, and the card says where.
 
-Post one Confirm comment per card: findings by check ("None" if clear), the diagram, and the blanks filled. Confirm runs once, plus one rerun if it found blanks.
+Post one Confirm comment per card as a record of what changed in the card text, including the filled blanks and Todd's answers ("None" if nothing changed). The separate Framework Map comment remains the citation record. Confirm runs once, plus one rerun if it found blanks.
 
 After Confirm, run the launcher's admission contract against every card from the repository root:
 
