@@ -30,6 +30,15 @@ Double-click `Start Julia Control Page.cmd` to open
 vault helper, and the server binds only to loopback. The page discovers current
 Ready cards and current model offers without reading `role-defaults.json`.
 
+The loopback bind stays. To reach the same page from another device in the
+tailnet, the operator fronts it with Tailscale Serve (never Funnel) and sets
+`JULIA_CONTROL_TAILSCALE_HOST` to this host's own tailnet DNS name (for example
+`JULIA_CONTROL_TAILSCALE_HOST=ovh.<tailnet>.ts.net`; a comma-separated list is
+accepted). Serve terminates TLS for that name and proxies to the loopback
+listener, so a request arriving with the server's own name as its Host came
+through Serve. The boundary continues to refuse every other Host, including
+other tailnet names; leaving the variable unset keeps the page loopback-only.
+
 Start creates or reuses one file-backed Mastra workflow run suspended at
 `ready-for-build`; it does not execute a delivery role. Cancel removes the form
 in the browser and sends no request. Close the launcher's window to stop the

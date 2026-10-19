@@ -1,4 +1,4 @@
-import { ReadyCardSchema } from './contracts.ts'
+import { ControlPageCardSchema, ReadyCardSchema } from './contracts.ts'
 import type { LinearQueryClient } from './initialization-observability.ts'
 
 export type LinearIssue = { identifier: string; title?: string; description: string; state: { name: string } }
@@ -17,7 +17,42 @@ export type LinearReadyListTrace = {
   status: number
   durationMs: number
   cardCount?: number
+  inadmissibleCount?: number
   errorCategory?: 'http' | 'graphql' | 'invalid-response'
+}
+
+function admissionReason(error: { issues: { message: string }[] }) {
+  const parts = error.issues.map(issue => {
+    const section = /^missing nonempty (.+) section$/.exec(issue.message)
+    if (section) return `missing the ${section[1]} section`
+    const emptySection = /^empty (.+) section$/.exec(issue.message)
+    if (emptySection) return `the ${emptySection[1]} section is empty`
+    const field = /^missing nonempty (.+) field$/.exec(issue.message)
+    if (field) return `missing the ${field[1]} field`
+    if (issue.message === 'unresolved decision marker') return 'an unresolved decision marker must be decided first'
+    return issue.message
+  })
+  return `Cannot start: ${[...new Set(parts)].join('; ')}`
+}
+
+// Admission is per card. One Ready card that fails it is reported as not startable
+// and the rest are admitted normally, rather than the whole list failing.
+export function admitReadyCards(issues: LinearIssue[]) {
+  return issues.map(issue => {
+    const admitted = ReadyCardSchema.safeParse({
+      identifier: issue.identifier, title: issue.title, description: issue.description, state: issue.state.name,
+    })
+    if (admitted.success) return ControlPageCardSchema.parse({ admitted: true, card: admitted.data })
+    return ControlPageCardSchema.parse({
+      admitted: false,
+      card: {
+        identifier: issue.identifier,
+        title: issue.title?.trim() || issue.identifier,
+        state: issue.state.name,
+        reason: admissionReason(admitted.error),
+      },
+    })
+  })
 }
 
 export async function listReadyLinearCards(
@@ -61,10 +96,11 @@ export async function listReadyLinearCards(
         throw new Error(`Linear Ready-card list failed with HTTP ${status} (invalid-response)`)
       }
     } while (after !== null)
-    const cards = ReadyCardSchema.array().parse(issues.map(issue => ({
-      identifier: issue.identifier, title: issue.title, description: issue.description, state: issue.state.name,
-    })))
-    await recordTrace({ operation: 'linear-ready-list', ok: true, status, cardCount: cards.length, durationMs: performance.now() - started })
+    const cards = admitReadyCards(issues)
+    await recordTrace({
+      operation: 'linear-ready-list', ok: true, status, cardCount: cards.length,
+      inadmissibleCount: cards.filter(entry => !entry.admitted).length, durationMs: performance.now() - started,
+    })
     return cards
   } catch (error) {
     if (error instanceof Error && error.message.startsWith('Linear Ready-card list failed')) throw error

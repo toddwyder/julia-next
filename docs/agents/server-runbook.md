@@ -22,6 +22,28 @@ Linear is the card tracker; GitHub owns code, pull requests, and CI. Mastra Fact
 - Never print credentials, OAuth URLs or codes, pairing material, or raw
   credential-bearing subprocess output.
 
+## Control page over Tailscale Serve
+
+The control page runs on the host and is reached only over Tailscale Serve. A
+Ready card that fails admission is listed as not startable with a plain-English
+reason; the other Ready cards and the model list still load.
+
+- **Code:** `/opt/julia-control/reviewer`.
+- **Service:** `julia-control.service` runs `/usr/local/bin/julia-control-run` as
+  the `julia-control` user. The wrapper injects the service-account token from
+  systemd's credentials directory and resolves the vault references before
+  starting `src/mastra/control-server.ts`.
+- **Vault:** the server has its own read-only Julia service account at
+  `/etc/julia-control/op-service-account-token` (root only). The account is
+  scoped `read_items` on the Julia vault and cannot see other vaults.
+  `/etc/julia-control/secrets.env` holds only `op://` references, never values.
+- **Exposure:** `tailscale serve --bg --https=443 http://127.0.0.1:43123` publishes
+  `https://ovh.tail91f394.ts.net` to the tailnet only. Funnel is off. The page
+  itself accepts only a loopback Host or `ovh.tail91f394.ts.net`.
+- **Boundary:** from a tailnet device the Serve URL reaches the loopback listener;
+  the public address answers nothing.
+- **Restart:** `sudo systemctl restart julia-control.service`.
+
 ## GitHub write boundaries
 
 - For authorized cards, use the approved delivery path and ordinary signed-in GitHub access where

@@ -18,6 +18,23 @@ type InitializationActivity = z.infer<typeof InitializationActivitySchema>
 
 const CONTROL_PATH = '/julia-control'
 
+const LOOPBACK_HOST = /^(?:127\.0\.0\.1|localhost):\d+$/
+
+// Tailscale Serve terminates TLS for this server's tailnet DNS name and proxies the
+// request to the loopback listener, so a request that reaches this loopback-bound
+// server with the server's own tailnet name as its Host came through Serve. The name
+// is configured by the operator who sets Serve up (JUL-242); it is not guessed here.
+function hostName(hostHeader: string) {
+  return hostHeader.trim().toLowerCase().replace(/\.$/, '').replace(/:\d+$/, '')
+}
+
+export function isAllowedControlHost(hostHeader: string, tailscaleHosts: readonly string[]) {
+  if (LOOPBACK_HOST.test(hostHeader.trim().toLowerCase())) return true
+  const name = hostName(hostHeader)
+  if (!name) return false
+  return tailscaleHosts.some(allowed => hostName(allowed) === name)
+}
+
 function sendJson(response: ServerResponse, status: number, value: unknown) {
   response.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
   response.end(JSON.stringify(value))
@@ -53,16 +70,19 @@ function render(state){
   const note=document.createElement('p');note.textContent='Choose the exact route, model, and advertised effort for every role. Start creates only a durable ready-for-build run.';app.append(note);
   const form=document.createElement('form');
   const cardLabel=document.createElement('label');cardLabel.textContent='Ready card';const cardSelect=document.createElement('select');cardSelect.name='card';
-  state.cards.forEach((card,index)=>{const option=document.createElement('option');option.value=String(index);option.textContent=card.identifier+' — '+card.title;cardSelect.append(option)});cardLabel.append(cardSelect);form.append(cardLabel);
+  state.cards.forEach((entry,index)=>{const option=document.createElement('option');option.value=String(index);option.textContent=entry.card.identifier+' — '+entry.card.title+(entry.admitted?'':' (cannot start)');cardSelect.append(option)});cardLabel.append(cardSelect);form.append(cardLabel);
+  const cardNote=document.createElement('p');cardNote.className='status';cardNote.hidden=true;form.append(cardNote);
   const grid=document.createElement('div');grid.className='grid';const controls={};
   Object.entries(roleLabels).forEach(([role,label])=>{const field=document.createElement('fieldset');const legend=document.createElement('legend');legend.textContent=label;field.append(legend);
     const modelLabel=document.createElement('label');modelLabel.textContent='Route and model';const model=document.createElement('select');state.offers.forEach(offer=>{const option=document.createElement('option');option.value=optionKey(offer);option.textContent=offer.service+' · '+offer.name+' ('+offer.company+')';model.append(option)});modelLabel.append(model);field.append(modelLabel);
     const effortLabel=document.createElement('label');effortLabel.textContent='Effort';const effort=document.createElement('select');effortLabel.append(effort);field.append(effortLabel);
     const syncEfforts=()=>{const offer=state.offers.find(item=>optionKey(item)===model.value);effort.textContent='';offer.supportedEfforts.forEach(value=>{const option=document.createElement('option');option.value=value;option.textContent=value;effort.append(option)});effort.value=offer.supportedEfforts.includes('medium')?'medium':offer.supportedEfforts[0]};model.addEventListener('change',syncEfforts);syncEfforts();controls[role]={model,effort};grid.append(field)});
   form.append(grid);const actions=document.createElement('div');actions.className='actions';const start=document.createElement('button');start.type='submit';start.className='start';start.textContent='Start';const cancel=document.createElement('button');cancel.type='button';cancel.className='cancel';cancel.textContent='Cancel';actions.append(start,cancel);form.append(actions);app.append(form);
+  const syncCard=()=>{const entry=state.cards[Number(cardSelect.value)];const blocked=!entry||!entry.admitted;cardNote.hidden=!blocked;cardNote.textContent=blocked?(entry?entry.card.reason:'Select a Ready card.'):'';start.disabled=blocked};
+  cardSelect.addEventListener('change',syncCard);syncCard();
   cancel.addEventListener('click',()=>{form.remove();const closed=document.createElement('p');closed.className='status';closed.textContent='Initialization closed. Nothing was sent or saved.';app.append(closed)});
-  form.addEventListener('submit',async event=>{event.preventDefault();start.disabled=true;const roles={};for(const [role,control] of Object.entries(controls)){const offer=state.offers.find(item=>optionKey(item)===control.model.value);roles[role]=selectionFor(offer,control.effort.value)}
-    try{const response=await fetch(apiPath+'/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({card:state.cards[Number(cardSelect.value)],roles})});const body=await response.json();if(!response.ok)throw new Error(body.error||'Start failed');form.remove();const done=document.createElement('div');done.className='status';done.innerHTML='<strong>Ready for build</strong><pre></pre>';done.querySelector('pre').textContent=JSON.stringify(body,null,2);app.append(done)}catch(error){start.disabled=false;const message=document.createElement('p');message.className='status';message.textContent=error.message;form.append(message)}})
+  form.addEventListener('submit',async event=>{event.preventDefault();const entry=state.cards[Number(cardSelect.value)];if(!entry||!entry.admitted){syncCard();return}start.disabled=true;const roles={};for(const [role,control] of Object.entries(controls)){const offer=state.offers.find(item=>optionKey(item)===control.model.value);roles[role]=selectionFor(offer,control.effort.value)}
+    try{const response=await fetch(apiPath+'/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({card:entry.card,roles})});const body=await response.json();if(!response.ok)throw new Error(body.error||'Start failed');form.remove();const done=document.createElement('div');done.className='status';done.innerHTML='<strong>Ready for build</strong><pre></pre>';done.querySelector('pre').textContent=JSON.stringify(body,null,2);app.append(done)}catch(error){start.disabled=false;const message=document.createElement('p');message.className='status';message.textContent=error.message;form.append(message)}})
 }
 fetch(apiPath+'/state').then(response=>response.json().then(body=>{if(!response.ok)throw new Error(body.error||'Discovery failed');return body})).then(render).catch(error=>{app.textContent='';const h=document.createElement('h1');h.textContent='Initialize a Ready card';const p=document.createElement('p');p.className='status';p.textContent=error.message;app.append(h,p)});
 </script></body></html>`
@@ -70,6 +90,7 @@ fetch(apiPath+'/state').then(response=>response.json().then(body=>{if(!response.
 
 export async function startControlPageServer({
   port = 43123,
+  tailscaleHosts = [],
   getState,
   startInitialization,
   getRuns,
@@ -77,6 +98,7 @@ export async function startControlPageServer({
   onRequest = () => {},
 }: {
   port?: number
+  tailscaleHosts?: readonly string[]
   getState: () => Promise<ControlPageState>
   startInitialization: (input: StartInitialization) => Promise<InitializationResult>
   getRuns: () => Promise<InitializationRunsState>
@@ -88,7 +110,7 @@ export async function startControlPageServer({
     const url = new URL(request.url ?? '/', 'http://127.0.0.1')
     onRequest({ method, path: url.pathname })
     const host = request.headers.host ?? ''
-    if (!/^(?:127\.0\.0\.1|localhost):\d+$/.test(host)) return sendJson(response, 403, { error: 'loopback Host header required' })
+    if (!isAllowedControlHost(host, tailscaleHosts)) return sendJson(response, 403, { error: "Host must be loopback or this server's Tailscale Serve name" })
     try {
       if (method === 'GET' && (url.pathname === CONTROL_PATH || url.pathname === `${CONTROL_PATH}/`)) {
         response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' })

@@ -7,6 +7,7 @@
     "test": "node --test --test-concurrency=1",
     "test:jul-225": "node --experimental-strip-types --test test/jul-225.test.ts test/verify-machine.test.ts",
     "test:jul-230": "node --experimental-strip-types --test test/jul-230.test.ts",
+    "test:jul-242": "node --experimental-strip-types --test test/jul-242.test.ts",
     "typecheck": "tsc --noEmit",
     "julia": "node --experimental-strip-types src/mastra/cli.ts",
     "verify-machine": "node --experimental-strip-types src/mastra/verify-machine.ts",
