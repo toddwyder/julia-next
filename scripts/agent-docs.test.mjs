@@ -69,6 +69,14 @@ test('the repository-owned pre-plan skill survives Pocock skill upgrades', () =>
   assert.match(prePlan, /write.*filled blanks?.*Todd's answers.*card text itself/i);
   assert.match(prePlan, /Read the Framework Map comment before building\./);
   assert.match(prePlan, /Confirm comment.*record of what changed/i);
+  assert.match(prePlan, /full official, version-matched documentation index/i);
+  assert.match(prePlan, /cheap sub-agents, one per tool or settling question/i);
+  assert.match(prePlan, /Pocock's installed `domain-modeling` skill/);
+  assert.match(prePlan, /Open every cited link/i);
+  assert.match(prePlan, /private files instead of an official interface does not go to Ready/i);
+  assert.match(prePlan, /Each acceptance criterion lists every case Proof must cover/i);
+  assert.match(prePlan, /every mockup element a numbered callout/i);
+  assert.doesNotMatch(prePlan, /finish condition/i);
   assert.match(prePlan, /one `For Todd:` summary covering every card/);
   assert.match(prePlan, /move only the settled cards with passing admission results to Ready/);
   assert.deepEqual(JSON.parse(read('skills-lock.json')).skills['pre-plan'], {
@@ -76,6 +84,18 @@ test('the repository-owned pre-plan skill survives Pocock skill upgrades', () =>
     sourceType: 'github',
     ref: 'd250fb51',
     skillPath: '.claude/skills/pre-plan/SKILL.md',
-    computedHash: '9a8cde5c0e43deae9a1e6105e67d0f366d751fd6dcf271e31f51efaf4a513b26',
+    computedHash: '35052a5dd8d59f0aea7e5ca56f2bb00a55d4fcd0e3abc7e57abbb72a77b587bc',
   });
+});
+
+test('Todd\'s 19 October process vocabulary and restart stop are explicit', () => {
+  const glossary = read('GLOSSARY.md');
+  const agents = read('AGENTS.md');
+
+  assert.match(glossary, /\*\*Acceptance criterion\*\*:\s*\nWhat must be true when the card is done\./);
+  assert.match(glossary, /\*\*Proof\*\*:\s*\nThe process: a real pstack verification run against the real thing\./);
+  assert.match(glossary, /\*\*Evidence\*\*:\s*\nWhat Proof produces, showing that every acceptance criterion was met\. No Evidence means not done\./);
+  assert.doesNotMatch(glossary, /_Avoid_: Pstack verification/);
+  assert.match(agents, /After two rounds without closing, stop and write a root-cause report that proposes no fix\./);
+  assert.match(agents, /Then write a restart plan\. Nothing is rebuilt until Todd approves that restart plan\./);
 });

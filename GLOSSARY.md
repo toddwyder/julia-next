@@ -197,16 +197,17 @@ _Avoid_: Public link, published recipe, export
 
 ## Delivery
 
+**Acceptance criterion**:
+What must be true when the card is done.
+_Avoid_: Finish condition, completion criterion
+
 **Journey**:
 One thing a person sets out to do in Julia, start to finish, on a named device. The unit the
 spec is written in and the unit Todd accepts.
 _Avoid_: Feature, story, epic, screen
 
 **Evidence**:
-The checkable proof each step of a card leaves behind, tied to the exact change under test: the
-failing test, the passing run, the guard check, both code-review reports, and the adversarial
-review's verdict on every acceptance criterion. No evidence means not done, whatever an agent
-says.
+What Proof produces, showing that every acceptance criterion was met. No Evidence means not done.
 _Avoid_: Demo, proof of work, "it works"
 
 **Adversarial review**:
@@ -342,8 +343,8 @@ Either a fact a card relies on but can't cite (what an existing module's interfa
 _Avoid_: Risk, gap, mechanism
 
 **Proof**:
-The machine step after Remediation and before the PR. An agent drives the real machine through the card's required journey and reports each acceptance criterion met or not met, from evidence on the exact candidate. Any source change makes it stale.
-_Avoid_: Pstack verification, verify run
+The process: a real pstack verification run against the real thing. It reports each acceptance criterion met or not met from Evidence tied to the exact candidate. Any source change makes it stale.
+_Avoid_: Verify run
 
 **Work session**:
 One start or continuation of the coder's work on a card, ending at completion, interruption,

@@ -81,6 +81,8 @@ Todd for a workaround.
 
 Work to the brief's finish line. A completed step is not a stopping point. Waiting on CI or any background job is not a stop: wait for it and continue.
 
+After two rounds without closing, stop and write a root-cause report that proposes no fix. Then write a restart plan. Nothing is rebuilt until Todd approves that restart plan.
+
 ### Preflight
 
 Before any task, verify the applicable entry points, the launcher's accepted command list,
