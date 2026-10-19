@@ -1,371 +1,232 @@
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import { test } from 'node:test'
+import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import test from 'node:test'
-import { chromium } from 'playwright'
+import { createAgentActivityStore } from '../src/mastra/agent-activity.ts'
 
-import {
-  createAgentActivityStore,
-  discoverAgentActivity,
-  projectAgentCards,
-  readCodexActivity,
-  readCommandCodeActivity,
-  type AgentActivityRecord,
-} from '../src/mastra/agent-activity.ts'
-import { createInitializationActivityRecorder } from '../src/mastra/initialization-observability.ts'
-import { createInitializationRuntime } from '../src/mastra/initialization.ts'
-import { startControlPageServer } from '../src/mastra/control-page.ts'
-import { activeCodexFiles, activeCommandCodeFiles, discoverAgentDashboard, jsonlFiles } from '../src/mastra/control-server.ts'
+const launch = { launchId: 'launch-1', provider: 'codex', providerRunId: 'thread-1', cardIdentifier: 'JUL-243', cardTitle: 'Dashboard', role: 'Builder', model: 'test-model', stage: 'Build', round: 1 } as const
+const at = '2026-10-19T15:00:00.000Z'
 
-const NOW = new Date('2026-10-19T15:00:00.000Z')
-
-function record(overrides: Partial<AgentActivityRecord>): AgentActivityRecord {
-  return {
-    source: 'codex', sourceId: 'run-1', running: true, cardIdentifier: 'JUL-243',
-    cardTitle: 'Card 2: Dashboard A + B', role: 'Builder', model: 'Codex', service: 'ChatGPT Plus',
-    stage: 'Building', round: 1, startedAt: '2026-10-19T14:00:00.000Z', updatedAt: '2026-10-19T14:59:00.000Z',
-    actions: [{ id: 'a1', occurredAt: '2026-10-19T14:59:00.000Z', label: 'Ran tests', outcome: 'succeeded' }],
-    ...overrides,
-  }
-}
-
-test('projects one card per running agent from Codex, CommandCode, and Mastra records', () => {
-  const cards = projectAgentCards([
-    record({ source: 'codex', sourceId: 'codex-1' }),
-    record({ source: 'commandcode', sourceId: 'cc-1', model: 'DeepSeek Flash', service: 'CommandCode' }),
-    record({ source: 'mastra', sourceId: 'trace-1', model: 'Claude', service: 'Mastra' }),
-    record({ source: 'codex', sourceId: 'finished', running: false }),
-  ], NOW)
-
-  assert.deepEqual(cards.map(card => card.agentId), ['codex:codex-1', 'commandcode:cc-1', 'mastra:trace-1'])
-  assert.deepEqual(cards.map(card => card.status), ['working', 'working', 'working'])
-  assert.equal(cards[0].actions[0].label, 'Ran tests')
-  assert.equal('failureKey' in cards[0].actions[0], false)
+test('events are retained without polling; completion removes live cards and survives reopen', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'jul-243-'))
+  const path = join(root, 'events.db')
+  const first = await createAgentActivityStore(path)
+  try {
+    await first.register(launch, at)
+    await first.append({ launchId: launch.launchId, eventId: 'start', kind: 'run-started', providerKind: 'turn/started', providerStatus: 'inProgress', occurredAt: at })
+    await first.append({ launchId: launch.launchId, eventId: 'item', kind: 'action-completed', providerKind: 'item/completed', providerStatus: 'completed', occurredAt: at, action: { id: 'command-1', type: 'commandExecution', name: 'Command execution', outcome: 'succeeded' } })
+    await first.append({ launchId: launch.launchId, eventId: 'finish', kind: 'run-completed', providerKind: 'turn/completed', providerStatus: 'completed', occurredAt: at })
+  } finally { first.close() }
+  const reopened = await createAgentActivityStore(path)
+  try {
+    assert.deepEqual(await reopened.cards(new Date(at)), [])
+    assert.deepEqual((await reopened.history('launch-1')).map(event => event.providerKind), ['turn/started', 'item/completed', 'turn/completed'])
+    assert.equal((await reopened.records())[0].actions[0].outcome, 'succeeded')
+    assert.equal((await reopened.launches())[0].providerRunId, 'thread-1')
+  } finally { reopened.close() }
 })
 
-test('native lifecycle uses the latest turn and finished CommandCode output is not running', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'jul-243-lifecycle-'))
-  const codex = join(root, 'codex.jsonl')
-  const commandCode = join(root, 'commandcode.jsonl')
-  await writeFile(codex, [
-    { timestamp: '2026-10-18T10:00:00.000Z', type: 'session_meta', payload: { id: 'multi-turn' } },
-    { timestamp: '2026-10-18T10:01:00.000Z', type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Build JUL-243: Dashboard A + B' }] } },
-    { timestamp: '2026-10-18T10:02:00.000Z', type: 'event_msg', payload: { type: 'task_complete' } },
-    { timestamp: '2026-10-19T14:00:00.000Z', type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Continue JUL-243' }] } },
-  ].map(JSON.stringify).join('\n'))
-  await writeFile(commandCode, [
-    { type: 'session', id: 'finished-cc', timestamp: '2026-10-19T14:00:00.000Z' },
-    { type: 'message', timestamp: '2026-10-19T14:01:00.000Z', message: { role: 'user', content: [{ type: 'text', text: 'Build JUL-243' }] } },
-    { type: 'message', timestamp: '2026-10-19T14:02:00.000Z', message: { role: 'assistant', content: [{ type: 'tool_use', id: 'last-tool', name: 'read', input: { path: 'README.md' } }] } },
-    { type: 'message', timestamp: '2026-10-19T14:02:01.000Z', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'last-tool', content: 'done' }] } },
-  ].map(JSON.stringify).join('\n'))
-  assert.equal((await readCodexActivity(codex, NOW))?.running, true)
-  assert.equal((await readCommandCodeActivity(commandCode, NOW))?.running, false)
-  assert.equal((await readCommandCodeActivity(commandCode, NOW, true))?.running, true)
+test('concurrent runs use lifecycle progress; repeated structured failures and disconnect are explicit', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'jul-243-'))
+  const store = await createAgentActivityStore(join(root, 'events.db'))
+  const emit = (launchId: string, eventId: string, kind: string, occurredAt = at, action?: object) => store.append({ launchId, eventId, kind, providerKind: kind, providerStatus: kind, occurredAt, ...(action ? { action } : {}) } as never)
+  try {
+    await store.register(launch, '2026-10-19T10:00:00.000Z')
+    await store.register({ ...launch, launchId: 'launch-2', providerRunId: 'thread-2' }, at)
+    await emit('launch-1', 'old-start', 'run-started', '2026-10-19T10:00:00.000Z')
+    await emit('launch-1', 'old-action', 'action-completed', '2026-10-19T10:01:00.000Z', { id: 'old', type: 'command', name: 'Command execution', outcome: 'succeeded' })
+    await emit('launch-1', 'new-turn', 'run-started')
+    await emit('launch-2', 'start', 'run-started')
+    assert.deepEqual((await store.cards(new Date(at))).map(card => card.status), ['working', 'working'])
+    for (let index = 0; index < 3; index++) await emit('launch-2', `failure-${index}`, 'action-completed', at, { id: `tool-${index}`, type: 'tool', name: 'Read', outcome: 'failed', errorCode: 'ENOENT', errorCategory: 'not-found' })
+    assert.deepEqual((await store.cards(new Date(at))).map(card => card.status), ['working', 'looks-stuck'])
+    await emit('launch-1', 'disconnect', 'disconnected')
+    assert.deepEqual((await store.cards(new Date(at))).map(card => card.agentId), ['codex:launch-2'])
+    await emit('launch-2', 'success', 'action-completed', at, { id: 'success', type: 'tool', name: 'Read', outcome: 'succeeded' })
+    assert.equal((await store.cards(new Date(at)))[0].status, 'working')
+    assert.equal((await store.cards(new Date('2026-10-19T15:15:00.000Z')))[0].status, 'looks-stuck')
+  } finally { store.close() }
 })
 
-test('native discovery keeps the complete inventory and uses Codex writer locks for exact liveness', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'jul-243-bounded-'))
-  const locks = join(root, 'locks')
-  await mkdir(locks)
-  await Promise.all(Array.from({ length: 70 }, (_, index) => writeFile(join(root, `${String(index).padStart(2, '0')}.jsonl`), '{}\n')))
-  const files = await jsonlFiles(root)
-  assert.equal(files.length, 70)
-  const active = join(root, 'rollout-active-id.jsonl')
-  await writeFile(active, '{}\n')
-  await writeFile(join(locks, 'active-id.lock'), '')
-  assert.deepEqual(await jsonlFiles(root, false, ['active-id']), [active])
-  assert.deepEqual(await activeCodexFiles([...files, active], locks), [active])
+test('disconnect persists across service recovery until an authoritative reconciliation', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'jul-243-'))
+  const store = await createAgentActivityStore(join(root, 'events.db'))
+  try {
+    await store.register(launch, at)
+    await store.append({ launchId: launch.launchId, eventId: 'start', kind: 'run-started', providerKind: 'turn/started', providerStatus: 'inProgress', occurredAt: at })
+    await store.disconnectActive('service-restart')
+    assert.deepEqual(await store.cards(), [])
+    await store.append({ launchId: launch.launchId, eventId: 'reconcile', kind: 'run-started', providerKind: 'thread/read', providerStatus: 'inProgress', occurredAt: at })
+    assert.equal((await store.cards(new Date(at)))[0].status, 'working')
+    assert.equal((await store.history(launch.launchId))[1].kind, 'disconnected')
+  } finally { store.close() }
 })
 
-test('CommandCode provider IDE state maps a live workspace only to its newest session', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'jul-243-commandcode-active-'))
-  const project = join(root, 'c-dev-julia-next')
-  const ide = join(root, 'ide')
-  await Promise.all([mkdir(project), mkdir(ide)])
-  const oldPath = join(project, 'old.jsonl')
-  const activePath = join(project, 'active.jsonl')
-  const session = (id: string, issue: string) => [
-    { type: 'session', id, timestamp: '2026-10-19T14:00:00.000Z' },
-    { type: 'message', timestamp: '2026-10-19T14:01:00.000Z', message: { role: 'user', content: [{ type: 'text', text: `Build ${issue}` }] } },
-    { type: 'message', timestamp: '2026-10-19T14:02:00.000Z', message: { role: 'assistant', content: [{ type: 'tool_use', id: `${id}-tool`, name: 'read', input: {} }] } },
-    { type: 'message', timestamp: '2026-10-19T14:02:01.000Z', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: `${id}-tool`, content: 'done' }] } },
-  ].map(JSON.stringify).join('\n')
-  await Promise.all([writeFile(oldPath, session('old', 'JUL-200')), writeFile(activePath, session('active', 'JUL-243'))])
-  await Promise.all([
-    writeFile(join(ide, 'code-live.json'), JSON.stringify({ pid: process.pid, ideName: 'code', timestamp: NOW.getTime(), workspaceFolders: ['C:\\Dev\\julia-next'] })),
-    writeFile(join(ide, 'code-live-duplicate.json'), JSON.stringify({ pid: process.pid, ideName: 'code', timestamp: NOW.getTime(), workspaceFolders: ['C:\\Dev\\julia-next'] })),
-  ])
-  const active = await activeCommandCodeFiles([activePath, oldPath], ide, async () => new Map([[process.pid, { name: 'Code', startedAt: NOW.getTime() - 60_000 }]]))
-  assert.deepEqual(active, [activePath])
-  const records = await discoverAgentActivity({ commandCodeFiles: [activePath, oldPath], activeCommandCodeFiles: active, now: NOW })
-  assert.deepEqual(projectAgentCards(records, NOW).map(card => card.agentId), ['commandcode:active'])
+test('dashboard production boundary never discovers provider private files or ingests on polling', async () => {
+  const { readFile } = await import('node:fs/promises')
+  const server = await readFile(new URL('../src/mastra/control-server.ts', import.meta.url), 'utf8')
+  assert.equal(server.includes('jsonlFiles'), false)
+  assert.equal(server.includes('thread-writer-locks'), false)
+  assert.equal(server.includes('activeCommandCodeFiles'), false)
+  assert.match(server, /agentStore\.cards\(/)
 })
 
-test('CommandCode rejects a stale IDE record when its PID has been reused', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'jul-243-commandcode-stale-'))
-  const ide = join(root, 'ide')
-  const project = join(root, 'c-dev-julia-next')
-  await Promise.all([mkdir(ide), mkdir(project)])
-  const sessionPath = join(project, 'session.jsonl')
-  const recordedAt = NOW.getTime() - 60_000
-  await Promise.all([
-    writeFile(sessionPath, '{}\n'),
-    writeFile(join(ide, 'code-stale.json'), JSON.stringify({ pid: 4242, ideName: 'code', timestamp: recordedAt, workspaceFolders: ['C:\\Dev\\julia-next'] })),
-  ])
-  const active = await activeCommandCodeFiles([sessionPath], ide, async () => new Map([[4242, { name: 'Code', startedAt: recordedAt + 30_000 }]]))
-  assert.deepEqual(active, [])
-})
-
-test('CommandCode verifies a live provider record against Windows process identity', { skip: process.platform !== 'win32' }, async () => {
-  const root = await mkdtemp(join(tmpdir(), 'jul-243-commandcode-process-'))
-  const ide = join(root, 'ide')
-  const project = join(root, 'c-dev-julia-next')
-  await Promise.all([mkdir(ide), mkdir(project)])
-  const sessionPath = join(project, 'session.jsonl')
-  await Promise.all([
-    writeFile(sessionPath, '{}\n'),
-    writeFile(join(ide, 'node-live.json'), JSON.stringify({ pid: process.pid, ideName: 'node', timestamp: Date.now(), workspaceFolders: ['C:\\Dev\\julia-next'] })),
-  ])
-  assert.deepEqual(await activeCommandCodeFiles([sessionPath], ide), [sessionPath])
-})
-
-test('CommandCode process-inspection failures reject discovery with sanitized context', async () => {
-  const ide = await mkdtemp(join(tmpdir(), 'jul-243-commandcode-probe-failure-'))
-  await writeFile(join(ide, 'code.json'), JSON.stringify({ pid: 4242, ideName: 'code', timestamp: NOW.getTime(), workspaceFolders: ['C:\\Dev\\julia-next'] }))
-  const missingProbe = Object.assign(new Error('private provider detail'), { code: 'ENOENT' })
-  await assert.rejects(
-    activeCommandCodeFiles([], ide, async () => { throw missingProbe }),
-    error => error instanceof Error && error.message === 'CommandCode IDE liveness inspection failed' && !error.message.includes('private'),
-  )
-})
-
-test('native failures use explicit status, normalize volatile details, and never expose the key', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'jul-243-failures-'))
-  const codex = join(root, 'codex.jsonl')
-  const entries: object[] = [
-    { timestamp: '2026-10-19T14:50:00.000Z', type: 'session_meta', payload: { id: 'failure-run' } },
-    { timestamp: '2026-10-19T14:50:01.000Z', type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Build JUL-243: Dashboard A + B' }] } },
-    { timestamp: '2026-10-19T14:51:00.000Z', type: 'response_item', payload: { type: 'function_call', call_id: 'ok', name: 'exec_command', arguments: '{"cmd":"npm test"}' } },
-    { timestamp: '2026-10-19T14:51:01.000Z', type: 'response_item', payload: { type: 'function_call_output', call_id: 'ok', output: '{"exit_code":0,"output":"0 errors"}' } },
-  ]
-  for (let index = 1; index <= 3; index += 1) {
-    entries.push(
-      { timestamp: `2026-10-19T14:5${index + 1}:00.000Z`, type: 'response_item', payload: { type: 'function_call', call_id: `bad-${index}`, name: 'exec_command', arguments: '{"cmd":"npm test"}' } },
-      { timestamp: `2026-10-19T14:5${index + 1}:01.000Z`, type: 'response_item', payload: { type: 'function_call_output', call_id: `bad-${index}`, output: `{"exit_code":1,"output":"Error: same assertion at 2026-10-19T14:5${index}:00.000Z after ${index * 10}ms"}` } },
-    )
-  }
-  await writeFile(codex, entries.map(JSON.stringify).join('\n'))
-  const activity = await readCodexActivity(codex, NOW)
-  assert.equal(activity?.actions[0].outcome, 'succeeded')
-  const card = projectAgentCards([activity!], NOW)[0]
-  assert.equal(card.status, 'looks-stuck')
-  assert.equal('failureKey' in card.actions.at(-1)!, false)
-})
-
-test('real Codex failure markers trigger the repeated-failure rule and an intervening success breaks it', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'jul-243-real-failures-'))
-  const makeActivity = async (name: string, outputs: string[]) => {
-    const path = join(root, `${name}.jsonl`)
-    const entries: object[] = [
-      { timestamp: '2026-10-19T14:50:00.000Z', type: 'session_meta', payload: { id: name } },
-      { timestamp: '2026-10-19T14:50:01.000Z', type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Build JUL-243' }] } },
-    ]
-    outputs.forEach((output, index) => entries.push(
-      { timestamp: `2026-10-19T14:5${index + 1}:00.000Z`, type: 'response_item', payload: { type: 'function_call', call_id: `${name}-${index}`, name: 'exec_command', arguments: '{"cmd":"npm test"}' } },
-      { timestamp: `2026-10-19T14:5${index + 1}:01.000Z`, type: 'response_item', payload: { type: 'function_call_output', call_id: `${name}-${index}`, output } },
-    ))
-    await writeFile(path, entries.map(JSON.stringify).join('\n'))
-    return (await readCodexActivity(path, NOW))!
-  }
-
-  const repeated = await makeActivity('repeated', [
-    'Script failed: apply_patch verification failed',
-    'Script failed: apply_patch verification failed',
-    'Script failed: apply_patch verification failed',
-  ])
-  assert.equal(projectAgentCards([repeated], NOW)[0].status, 'looks-stuck')
-
-  const interrupted = await makeActivity('interrupted', [
-    'Process exited with code 1: same assertion',
-    'Process exited with code 0',
-    'Process exited with code 1: same assertion',
-  ])
-  assert.deepEqual(interrupted.actions.map(action => action.outcome), ['failed', 'succeeded', 'failed'])
-  assert.equal(projectAgentCards([interrupted], NOW)[0].status, 'working')
-})
-
-test('native action labels use the tool and executable command rather than incidental keywords', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'jul-243-labels-'))
-  const path = join(root, 'labels.jsonl')
-  const specs = [
-    ['read-test-file', 'exec_command', '{"cmd":"Get-Content test/jul-243.test.ts"}'],
-    ['comment', 'exec_command', '{"cmd":"Get-Content README.md // npm test later"}'],
-    ['poll', 'write_stdin', '{"session_id":42}'],
-    ['web', 'web_search', '{"query":"agent dashboards"}'],
-  ]
-  const entries: object[] = [
-    { timestamp: '2026-10-19T14:50:00.000Z', type: 'session_meta', payload: { id: 'labels' } },
-    { timestamp: '2026-10-19T14:50:01.000Z', type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Build JUL-243' }] } },
-  ]
-  specs.forEach(([id, name, arguments_], index) => entries.push(
-    { timestamp: `2026-10-19T14:5${index + 1}:00.000Z`, type: 'response_item', payload: { type: 'function_call', call_id: id, name, arguments: arguments_ } },
-    { timestamp: `2026-10-19T14:5${index + 1}:01.000Z`, type: 'response_item', payload: { type: 'function_call_output', call_id: id, output: 'ok' } },
-  ))
-  await writeFile(path, entries.map(JSON.stringify).join('\n'))
-  assert.deepEqual((await readCodexActivity(path, NOW))?.actions.map(action => action.label), [
-    'Searched or read project files',
-    'Searched or read project files',
-    'Checked a running command',
-    'Searched the web',
-  ])
-})
-
-test('card identity ignores injected repository instructions', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'jul-243-identity-'))
-  const path = join(root, 'identity.jsonl')
-  await writeFile(path, [
-    { timestamp: '2026-10-19T14:50:00.000Z', type: 'session_meta', payload: { id: 'identity' } },
-    { timestamp: '2026-10-19T14:50:01.000Z', type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: '# AGENTS.md instructions\nUse JUL-122 as an example.' }] } },
-    { timestamp: '2026-10-19T14:50:02.000Z', type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Build JUL-243' }] } },
-  ].map(JSON.stringify).join('\n'))
-  assert.equal((await readCodexActivity(path, NOW))?.cardIdentifier, 'JUL-243')
-})
-
-test('Looks stuck uses the settled inactivity and repeated-failure thresholds', () => {
-  const inactive = projectAgentCards([record({ updatedAt: '2026-10-19T14:45:00.000Z', actions: [] })], NOW)[0]
-  assert.equal(inactive.status, 'looks-stuck')
-  assert.match(inactive.statusDetail, /no new action for 15 min/)
-
-  const failures = [1, 2, 3].map(index => ({
-    id: `failure-${index}`, occurredAt: `2026-10-19T14:5${index}:00.000Z`, label: 'Ran tests: 1 failed',
-    outcome: 'failed' as const, failureKey: 'tests:private-recipe',
-  }))
-  const repeated = projectAgentCards([record({ actions: failures, updatedAt: failures[2].occurredAt })], NOW)[0]
-  assert.equal(repeated.status, 'looks-stuck')
-  assert.match(repeated.statusDetail, /same action failing the same way 3 times in a row/)
-})
-
-test('discovers native Codex and CommandCode JSONL plus supplied Mastra traces', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'jul-243-sources-'))
-  const codex = join(root, 'codex.jsonl')
-  const commandCode = join(root, 'commandcode.jsonl')
-  await writeFile(codex, [
-    { timestamp: '2026-10-19T14:58:00.000Z', type: 'session_meta', payload: { id: 'codex-native', cwd: '/work/JUL-243' } },
-    { timestamp: '2026-10-19T14:58:01.000Z', type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Build JUL-243: Dashboard A + B' }] } },
-    { timestamp: '2026-10-19T14:58:02.000Z', type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'private follow-up must not become a title' }] } },
-    { timestamp: '2026-10-19T14:59:00.000Z', type: 'response_item', payload: { type: 'function_call', call_id: 'call-1', name: 'exec_command', arguments: '{"cmd":"npm test"}' } },
-    { timestamp: '2026-10-19T14:59:02.000Z', type: 'response_item', payload: { type: 'function_call_output', call_id: 'call-1', output: '3 passed' } },
-  ].map(value => JSON.stringify(value)).join('\n'))
-  await writeFile(commandCode, [
-    { type: 'session', id: 'cc-native', timestamp: '2026-10-19T14:57:00.000Z' },
-    { type: 'message', timestamp: '2026-10-19T14:57:01.000Z', message: { role: 'user', content: [{ type: 'text', text: 'Build JUL-244' }] } },
-    { type: 'message', timestamp: '2026-10-19T14:59:10.000Z', message: { role: 'assistant', model: 'deepseek-flash', content: [{ type: 'tool_use', id: 'tool-1', name: 'read', input: { path: 'app/page.jsx' } }] } },
-  ].map(value => JSON.stringify(value)).join('\n'))
-
-  const records = await discoverAgentActivity({
-    codexFiles: [codex], commandCodeFiles: [commandCode], now: NOW,
-    mastraTraces: [{ traceId: 'mastra-native', name: 'JUL-245 reviewer', startedAt: '2026-10-19T14:55:00.000Z',
-      spans: [{ spanId: 'span-1', name: 'tool: test', spanType: 'TOOL_CALL', startedAt: '2026-10-19T14:59:20.000Z', status: 'success' }] }],
+test('CommandCode accepts official frames, preserves unknown event kinds, and uses final subtype not output text', async () => {
+  const { commandCodeEvent } = await import('../src/mastra/agent-commandcode.ts')
+  assert.deepEqual(commandCodeEvent({ type: 'event', event: { type: 'tool_running', toolCallId: 'read-1', toolName: 'read_file', description: 'ignored arbitrary description' } }), {
+    kind: 'action-started', providerKind: 'tool_running', providerStatus: 'running', action: { id: 'read-1', type: 'tool', name: 'read_file', outcome: 'unknown' },
   })
-
-  assert.deepEqual(records.map(item => item.source), ['codex', 'commandcode', 'mastra'])
-  assert.equal(records[0].actions[0].label, 'Ran tests')
-  assert.equal(records[0].cardTitle, undefined)
-  assert.equal(records[1].actions[0].label, 'Read a project file')
-  assert.equal(records[2].sourceId, 'mastra-native')
+  assert.deepEqual(commandCodeEvent({ type: 'result', subtype: 'success', finalText: '{"exit_code":1}', usage: {}, durationMs: 2 }), { kind: 'run-completed', providerKind: 'result', providerStatus: 'success' })
+  assert.deepEqual(commandCodeEvent({ type: 'result', subtype: 'max_turns', usage: {}, durationMs: 2 }), { kind: 'run-failed', providerKind: 'result', providerStatus: 'max_turns' })
+  assert.deepEqual(commandCodeEvent({ type: 'event', event: { type: 'new-kind', secretOutput: 'excluded' } }), { kind: 'unknown', providerKind: 'new-kind', providerStatus: 'unknown' })
 })
 
-test('retains Codex detail in the server database across a fresh store', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'jul-243-store-'))
-  const storagePath = join(root, 'initialization.db')
-  const first = await createAgentActivityStore(storagePath)
-  await first.retain([record({ sourceId: 'codex-retained' })])
-  await first.close()
-
-  const reopened = await createAgentActivityStore(storagePath)
-  const retained = await reopened.list()
-  await reopened.close()
-  assert.equal(retained.length, 1)
-  assert.equal(retained[0].sourceId, 'codex-retained')
-  assert.equal(retained[0].actions[0].label, 'Ran tests')
+test('structured error logging preserves nested cause and context while removing credential values', async () => {
+  const { agentError } = await import('../src/mastra/agent-errors.ts')
+  const error = new Error('provider wrapper', { cause: new TypeError('token=topsecret failed request') })
+  const value = agentError(error, { provider: 'commandcode', runId: 'run-1', eventKind: 'stream-error' })
+  assert.deepEqual(value, { provider: 'commandcode', runId: 'run-1', eventKind: 'stream-error', error: { name: 'Error', message: 'provider wrapper', cause: { name: 'TypeError', message: '[REDACTED] failed request' } } })
 })
 
-test('dashboard discovery filters by writer lock, maps tracker titles, and retains Codex actions', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'jul-243-dashboard-'))
-  const codexRoot = join(root, 'codex')
-  const lockRoot = join(root, 'locks')
-  const commandCodeRoot = join(root, 'commandcode')
-  const ideRoot = join(root, 'ide')
-  await Promise.all([mkdir(codexRoot), mkdir(lockRoot), mkdir(commandCodeRoot), mkdir(ideRoot)])
-  const session = join(codexRoot, 'rollout-live-session.jsonl')
-  await writeFile(session, [
-    { timestamp: '2026-10-19T14:50:00.000Z', type: 'session_meta', payload: { id: 'live-session' } },
-    { timestamp: '2026-10-19T14:50:01.000Z', type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Build JUL-243' }] } },
-    { timestamp: '2026-10-19T14:59:00.000Z', type: 'response_item', payload: { type: 'function_call', call_id: 'read', name: 'exec_command', arguments: '{"cmd":"Get-Content README.md"}' } },
-    { timestamp: '2026-10-19T14:59:01.000Z', type: 'response_item', payload: { type: 'function_call_output', call_id: 'read', output: 'ok' } },
-  ].map(JSON.stringify).join('\n'))
-  await writeFile(join(lockRoot, 'live-session.lock'), '')
-  const store = await createAgentActivityStore(join(root, 'activity.db'))
-  const result = await discoverAgentDashboard({
-    codexRoot, codexLockRoot: lockRoot, commandCodeRoot, commandCodeIdeRoot: ideRoot,
-    mastraTraces: [], agentStore: store, controlCards: [{ card: { identifier: 'JUL-243', title: 'Dashboard A + B' } }], now: NOW,
+test('Codex authoritative item status ignores failure-looking stdout and turn completion is terminal', async () => {
+  const { codexEvent } = await import('../src/mastra/agent-codex.ts')
+  const item = { id: 'cmd-1', type: 'commandExecution', command: 'echo source', cwd: '/tmp', processId: '123', status: 'completed', commandActions: [], aggregatedOutput: '{"exit_code":1}', exitCode: 0, durationMs: 1 }
+  assert.deepEqual(codexEvent('item/completed', { threadId: 'thread-1', turnId: 'turn-1', item }), {
+    kind: 'action-completed', providerKind: 'item/completed', providerStatus: 'completed', action: { id: 'cmd-1', type: 'commandExecution', name: 'Command execution', outcome: 'succeeded' },
   })
-  assert.equal(result.cards[0].cardTitle, 'Dashboard A + B')
-  assert.equal(result.cards[0].actions[0].label, 'Searched or read project files')
-  assert.equal((await store.list())[0].sourceId, 'live-session')
-  await store.close()
+  assert.deepEqual(codexEvent('turn/completed', { threadId: 'thread-1', turn: { id: 'turn-1', status: 'failed', items: [], error: { message: 'excluded raw provider message' } } }), { kind: 'run-failed', providerKind: 'turn/completed', providerStatus: 'failed' })
+  assert.deepEqual(codexEvent('item/agentMessage/delta', { threadId: 'thread-1', delta: 'stream of words' }), { kind: 'unknown', providerKind: 'item/agentMessage/delta', providerStatus: 'unknown' })
 })
 
-test('reads a real persisted Mastra workflow trace through the stock observability store', async () => {
+test('real Mastra stream persists completed lifecycle and flushed trace across storage restart', async () => {
+  const { Mastra } = await import('@mastra/core/mastra')
+  const { createStep, createWorkflow } = await import('@mastra/core/workflows')
+  const { z } = await import('zod/v4')
+  const { LibSQLStore } = await import('@mastra/libsql')
+  const { Observability, MastraStorageExporter } = await import('@mastra/observability')
+  const { monitorMastraStream } = await import('../src/mastra/agent-mastra.ts')
   const root = await mkdtemp(join(tmpdir(), 'jul-243-mastra-'))
-  const runtime = await createInitializationRuntime({ storagePath: join(root, 'initialization.db'), activity: createInitializationActivityRecorder() })
-  const offer = { route: 'commandcode' as const, modelId: 'vendor/model', name: 'Model', company: 'Vendor', service: 'CommandCode', codingCapable: true as const, wire: 'chat' as const, supportedEfforts: ['low' as const] }
-  const reviewer = { ...offer, modelId: 'other/model', company: 'Other' }
-  const selection = (item: typeof offer) => ({ route: item.route, modelId: item.modelId, company: item.company, service: item.service, wire: item.wire, effort: 'low' as const })
-  const card = { identifier: 'JUL-243', title: 'Dashboard A + B', state: 'Ready', description: `## Agent Brief
-**Category:** Enhancement
-**Summary:** Dashboard.
-**Current behavior:** Missing.
-**Desired behavior:** Present.
-**Key interfaces:** Traces.
-**Acceptance criteria:** Visible.
-**Out of scope:** None.` }
-  await runtime.start({ card, roles: { builder: selection(offer), reviewer: selection(reviewer), crashFixer: selection(offer), crashReviewer: selection(reviewer) } }, { cards: [{ admitted: true, card }], offers: [offer, reviewer] })
-  const traces = await runtime.listMastraTraces()
-  await runtime.close()
-  assert.ok(traces.some(trace => trace?.spans.some(span => /WORKFLOW/i.test(span.spanType))))
+  const path = join(root, 'mastra.db')
+  const storage = new LibSQLStore({ id: 'contract', url: `file:${path}` })
+  const step = createStep({ id: 'add-one', inputSchema: z.object({ value: z.number() }), outputSchema: z.object({ value: z.number() }), execute: async ({ inputData }) => ({ value: inputData.value + 1 }) })
+  const workflow = createWorkflow({ id: 'contract', inputSchema: step.inputSchema, outputSchema: step.outputSchema }).then(step).commit()
+  const observability = new Observability({ configs: { default: { serviceName: 'jul-243-test', sampling: { type: 'always' }, exporters: [new MastraStorageExporter()] } } })
+  const mastra = new Mastra({ storage, workflows: { workflow }, observability })
+  const store = await createAgentActivityStore(join(root, 'events.db'))
+  try {
+    const run = await mastra.getWorkflow('workflow').createRun({ runId: 'real-mastra-run' })
+    const stream = run.stream({ inputData: { value: 4 }, tracingOptions: { traceId: '0123456789abcdef0123456789abcdef', metadata: { cardIdentifier: 'JUL-243', role: 'Builder' } } })
+    const result = await monitorMastraStream({ store, launch: { ...launch, provider: 'mastra', providerRunId: run.runId }, stream, flush: () => observability.flush() })
+    assert.equal(result.status, 'success')
+    assert.equal((await store.history(launch.launchId)).at(-1)?.kind, 'run-completed')
+    assert.deepEqual((await store.records())[0].actions.map(action => [action.label, action.outcome]), [['add-one', 'succeeded']])
+  } finally { store.close(); await observability.shutdown(); await mastra.shutdown() }
+  const reopened = new LibSQLStore({ id: 'reopen', url: `file:${path}` })
+  try {
+    const traces = await reopened.getStore('observability')
+    const trace = await traces!.getTrace({ traceId: '0123456789abcdef0123456789abcdef' })
+    assert.equal(trace!.spans.some(span => span.name === 'workflow step: \'add-one\''), true)
+  } finally { await reopened.close() }
 })
 
-test('the phone dashboard renders provider cards, activity, and both status labels', async t => {
-  const cards = projectAgentCards([
-    record({ sourceId: 'working' }),
-    record({ source: 'commandcode', sourceId: 'stuck', updatedAt: '2026-10-19T14:40:00.000Z', actions: [] }),
-  ], NOW)
-  const server = await startControlPageServer({
-    port: 0, getState: async () => ({ cards: [], offers: [{
-      route: 'commandcode', modelId: 'vendor/model', name: 'Model', company: 'Vendor', service: 'CommandCode',
-      codingCapable: true, wire: 'chat', supportedEfforts: ['low'],
-    }] }) as never,
-    startInitialization: async () => { throw new Error('not used') },
-    getRuns: async () => ({ runs: [], totalRuns: 0 }),
-    getActivity: () => createInitializationActivityRecorder().snapshot(),
-    getAgentCards: async () => ({ updatedAt: NOW.toISOString(), cards }),
-  })
-  t.after(() => server.close())
-  const browser = await chromium.launch({ headless: true })
-  t.after(() => browser.close())
-  const page = await browser.newPage({ viewport: { width: 390, height: 844 } })
-  const errors: string[] = []
-  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()) })
-  page.on('pageerror', error => errors.push(error.message))
-  await page.goto(server.url)
-  await page.getByRole('heading', { name: "What's running now" }).waitFor()
-  assert.equal(await page.locator('article.agent-card').count(), 2)
-  assert.equal(await page.getByText('Working. Last action 1 min ago.').count(), 1)
-  assert.equal(await page.getByText(/Looks stuck: no new action for 20 min/).count(), 1)
-  assert.equal(await page.getByRole('heading', { name: 'What it actually did' }).count(), 2)
-  assert.ok((await page.locator('.activity-empty').boundingBox())!.width > 250)
-  assert.deepEqual(errors, [])
+test('390px dashboard shows provider cards, outcomes, exact source copy, single-line short times, and all actions', async () => {
+  const { chromium } = await import('playwright')
+  const { startControlPageServer } = await import('../src/mastra/control-page.ts')
+  const root = await mkdtemp(join(tmpdir(), 'jul-243-ui-'))
+  const store = await createAgentActivityStore(join(root, 'events.db'))
+  for (const provider of ['codex', 'commandcode', 'mastra'] as const) {
+    await store.register({ ...launch, launchId: provider, provider, providerRunId: provider }, at)
+    await store.append({ launchId: provider, eventId: 'start', kind: 'run-started', providerKind: 'start', providerStatus: 'running', occurredAt: at })
+    for (let index = 0; index < 11; index++) await store.append({ launchId: provider, eventId: `action-${index}`, kind: 'action-completed', providerKind: 'tool-result', providerStatus: 'completed', occurredAt: at, action: { id: String(index), type: 'tool', name: 'Read file', outcome: provider === 'commandcode' ? 'failed' : 'succeeded', ...(provider === 'commandcode' ? { errorCode: 'ENOENT', errorCategory: 'not-found' } : {}) } })
+  }
+  const server = await startControlPageServer({ port: 0, getState: async () => ({ cards: [], offers: [{ route: 'commandcode', modelId: 'test-model', name: 'Test model', company: 'Test', service: 'CommandCode', codingCapable: true, supportedEfforts: ['low'] }] }), startInitialization: async () => { throw new Error('not used') }, getRuns: async () => ({ runs: [], totalRuns: 0 }), getActivity: () => ({ roleDispatches: { builder: 0, reviewer: 0, crashFixer: 0, crashReviewer: 0 }, llmInferenceCalls: 0, linearQueries: 0, linearMutations: 0 }), getAgentCards: async () => ({ updatedAt: at, cards: await store.cards(new Date(at)) }) })
+  let browser
+  try {
+    browser = await chromium.launch()
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 } })
+    const errors: string[] = []
+    page.on('pageerror', error => errors.push(error.message))
+    page.on('console', message => { if (message.type() === 'error') errors.push(message.text()) })
+    assert.equal((await page.goto(server.url))!.status(), 200)
+    await page.locator('.agent-card').nth(2).waitFor()
+    assert.equal(await page.locator('.agent-card').count(), 3)
+    assert.equal(await page.getByText("From the tools' own records. Newest first.", { exact: true }).count(), 3)
+    assert.equal(await page.locator('.looks-stuck').count(), 1)
+    await page.getByRole('button', { name: 'Show all 11 actions', exact: true }).first().click()
+    assert.equal(await page.locator('.agent-card').first().locator('.activity-time').count(), 11)
+    assert.equal(await page.locator('.agent-card').first().getByText('Succeeded', { exact: true }).count(), 11)
+    assert.deepEqual(await page.locator('.activity-time').evaluateAll(elements => elements.map(element => {
+      const style = getComputedStyle(element)
+      return style.whiteSpace === 'nowrap' && element.textContent!.length <= 5
+    })), Array(31).fill(true))
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+    assert.deepEqual(errors, [])
+    await page.screenshot({ path: join(root, 'dashboard-390.png'), fullPage: true })
+  } finally { await browser?.close(); await server.close(); store.close() }
+})
+
+test('Mastra terminal failure and suspension use official result statuses', async () => {
+  const { Mastra } = await import('@mastra/core/mastra')
+  const { createStep, createWorkflow } = await import('@mastra/core/workflows')
+  const { z } = await import('zod/v4')
+  const { monitorMastraStream } = await import('../src/mastra/agent-mastra.ts')
+  for (const status of ['failed', 'suspended'] as const) {
+    const root = await mkdtemp(join(tmpdir(), 'jul-243-mastra-state-'))
+    const store = await createAgentActivityStore(join(root, 'events.db'))
+    const schema = z.object({})
+    const step = createStep({ id: 'controlled-state', inputSchema: schema, outputSchema: schema, suspendSchema: schema, execute: async ({ suspend }) => { if (status === 'failed') throw new Error('expected contract failure'); return suspend({}) } })
+    const workflow = createWorkflow({ id: `state-${status}`, inputSchema: schema, outputSchema: schema }).then(step).commit()
+    const mastra = new Mastra({ workflows: { workflow } })
+    try {
+      const run = await mastra.getWorkflow('workflow').createRun()
+      const result = await monitorMastraStream({ store, launch: { ...launch, provider: 'mastra', providerRunId: run.runId }, stream: run.stream({ inputData: {} }), flush: async () => {} })
+      assert.equal(result.status, status)
+      assert.equal((await store.history(launch.launchId)).at(-1)?.kind, status === 'failed' ? 'run-failed' : 'run-suspended')
+      assert.equal((await store.records())[0].running, false)
+    } finally { store.close(); await mastra.shutdown() }
+  }
+})
+
+test('Codex collaboration preserves child thread identity without reading its prompt', async () => {
+  const { codexEvent } = await import('../src/mastra/agent-codex.ts')
+  const event = codexEvent('item/completed', { item: { id: 'spawn-1', type: 'collabAgentToolCall', status: 'completed', senderThreadId: 'parent-1', receiverThreadIds: ['child-1'], tool: 'spawnAgent', agentsStates: {}, prompt: 'JUL-999 must never change the launch card' } })
+  assert.deepEqual(event.relatedRunIds, ['child-1'])
+  assert.equal(event.action!.name, 'Agent collaboration')
+})
+
+test('provider identity is bound from the official stream once, and retained on each subsequent event', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'jul-243-identity-'))
+  const store = await createAgentActivityStore(join(root, 'events.db'))
+  try {
+    await store.register({ ...launch, provider: 'commandcode', providerRunId: 'unresolved:launch-1' }, at)
+    await store.identify('launch-1', 'native-session-1')
+    await store.append({ launchId: 'launch-1', eventId: 'start', kind: 'run-started', providerKind: 'run_start', providerStatus: 'running', occurredAt: at })
+    assert.equal((await store.history('launch-1'))[0].launch?.providerRunId, 'native-session-1')
+    await assert.rejects(store.identify('launch-1', 'different-session'), /already bound/)
+    assert.equal((await store.launches())[0].providerRunId, 'native-session-1')
+  } finally { store.close() }
+})
+
+test('CommandCode explicit tool errors produce stable failure identity; completed text is never searched', async () => {
+  const { commandCodeEvent } = await import('../src/mastra/agent-commandcode.ts')
+  const failed = commandCodeEvent({ type: 'event', event: { type: 'tool_errored', toolCallId: 'failed-1', toolName: 'shell_command', error: 'Directory does not exist: /tmp/missing' } })
+  assert.equal(failed.action?.outcome, 'failed')
+  assert.equal(failed.providerStatus, 'errored')
+  const other = commandCodeEvent({ type: 'event', event: { type: 'tool_errored', toolCallId: 'failed-2', toolName: 'shell_command', error: 'Permission denied' } })
+  assert.notEqual(failed.action?.errorCategory, other.action?.errorCategory)
+  const completed = commandCodeEvent({ type: 'event', event: { type: 'tool_completed', toolCallId: 'completed-1', toolName: 'shell_command', result: [{ type: 'text', text: '{"exit_code":1}' }] } })
+  assert.equal(completed.action?.outcome, 'unknown')
+})
+
+test('a completed action with unknown outcome breaks the consecutive explicit failure sequence', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'jul-243-sequence-'))
+  const store = await createAgentActivityStore(join(root, 'events.db'))
+  try {
+    await store.register(launch, at)
+    await store.append({ launchId: launch.launchId, eventId: 'start', kind: 'run-started', providerKind: 'turn/started', providerStatus: 'running', occurredAt: at })
+    for (const [index, outcome] of ['failed', 'unknown', 'failed', 'failed'].entries()) await store.append({ launchId: launch.launchId, eventId: `a-${index}`, kind: 'action-completed', providerKind: 'item/completed', providerStatus: 'completed', occurredAt: at, action: { id: `a-${index}`, type: 'tool', name: 'Read', outcome: outcome as 'failed' | 'unknown', ...(outcome === 'failed' ? { errorCode: 'ENOENT', errorCategory: 'not-found' } : {}) } })
+    assert.equal((await store.cards(new Date(at)))[0].status, 'working')
+    assert.equal((await store.records())[0].actions[1].phase, 'completed')
+  } finally { store.close() }
 })

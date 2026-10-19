@@ -43,12 +43,11 @@ reason; the other Ready cards and the model list still load.
 - **Boundary:** from a tailnet device the Serve URL reaches the loopback listener;
   the public address answers nothing.
 - **Restart:** `sudo systemctl restart julia-control.service`.
-- **Agent dashboard:** `GET /julia-control/api/agents` reads Codex JSONL from
-  `JULIA_CODEX_SESSIONS` (default `~/.codex/sessions`), CommandCode JSONL from
-  `JULIA_COMMANDCODE_PROJECTS` (default `~/.commandcode/projects`), and persisted
-  Mastra traces. Normalized Codex detail is retained across restarts in the
-  Julia-owned `julia_agent_activity_records` table inside the configured
-  `JULIA_INITIALIZATION_DB`; raw prompts and raw tool output are not shown.
+- **Agent dashboard:** `GET /julia-control/api/agents` reads Julia's persistent event ledger. Ingestion happens in the monitored launch process and instrumented Mastra runtime, independently of browser requests. The Julia-owned tables are `julia_agent_launches` and `julia_agent_events` in `JULIA_INITIALIZATION_DB`. Completed runs leave live cards and keep their history.
+- **Monitored launches:** run `node --experimental-strip-types src/mastra/agent-monitor.ts <commandcode|codex> <configuration.json> <prompt.txt>` from the reviewer package. Configuration supplies `storagePath`, `cwd`, and explicit `launch` fields (`launchId`, `provider`, `cardIdentifier`, `cardTitle`, `role`, `model`, `stage`, `round`). CommandCode can also specify `maxTurns` and `allowTools`; its stock 100-turn default is retained. Proof sets a short explicit turn bound. This is a monitoring utility, not authorization to start the pending delivery runner.
+- **Codex connection:** the operator starts the supported shared daemon. Julia obtains its socket from `codex app-server daemon version`, or uses the explicitly provisioned `JULIA_CODEX_SOCKET`. The service account must have access to that supported endpoint. A connection failure is logged and remains disconnected; private provider files are never a fallback.
+- **CommandCode authentication:** provision the installed 1.72.3 CLI's supported API-key login under the account owning the child, using the restricted Julia vault route. The server's API-key environment variable alone does not sign the CLI in. Julia does not claim arbitrary existing interactive sessions.
+- **Isolated verification:** `JULIA_CONTROL_PORT=0` selects an ephemeral loopback port for a distinct candidate process. The default remains 43123. See [JUL-243 framework map](jul-243-framework-map.md) and [approved Proof story](jul-243/jul-243-plan.md).
 
 ## GitHub write boundaries
 

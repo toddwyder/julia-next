@@ -1,7 +1,7 @@
 # JUL-243 restart plan — official lifecycle interfaces only
 
 Date: 2026-10-19  
-Status: Part 1 research and plan only. No implementation is authorized until Todd approves this document.  
+Status: Approved by Todd on 2026-10-19, including the Julia-launched CommandCode monitoring boundary; Part 2 authorized in the work session.
 Starting point: PR #301 at `8368117fe7d2f25d0280deb1a8fa7727acfca467` and the evidence in `C:\Dev\handoffs\2026-10-19\jul-243-root-cause.md`.
 
 ## Decision the plan asks Todd to approve

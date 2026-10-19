@@ -14,7 +14,9 @@
     "verify-machine": "node --experimental-strip-types src/mastra/verify-machine.ts",
     "control-page": "node --experimental-strip-types src/mastra/control-server.ts",
     "review": "node src/reviewer.mjs",
-    "test:contract": "node --test test/contract.test.mjs"
+    "test:contract": "node --test test/contract.test.mjs",
+    "test:jul-243:contracts": "node --experimental-strip-types --test proof/jul-243-contracts.ts",
+    "proof:jul-243": "node --experimental-strip-types proof/jul-243.ts"
   },
   "keywords": [],
   "author": "",
@@ -30,10 +32,13 @@
     "@mastra/core": "^1.75.0",
     "@mastra/libsql": "1.25.1",
     "@mastra/observability": "1.20.1",
+    "ws": "8.18.3",
     "zod": "^4.1.12"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
+    "@types/ws": "8.18.1",
+    "ajv": "8.17.1",
     "playwright": "1.63.0",
     "typescript": "^5.9.3"
   }

@@ -4,9 +4,12 @@ import { Mastra } from '@mastra/core/mastra'
 import { createStep, createWorkflow, createWorkflowStateReader } from '@mastra/core/workflows'
 import { LibSQLStore } from '@mastra/libsql'
 import { MastraStorageExporter, Observability } from '@mastra/observability'
+import { SamplingStrategyType } from '@mastra/core/observability'
 import type { z } from 'zod/v4'
 import type { InitializationActivityRecorder } from './initialization-observability.ts'
 import { createRoleExecutionWorkflow } from './workflows/delivery.ts'
+import { createAgentActivityStore } from './agent-activity.ts'
+import { monitorMastraStream } from './agent-mastra.ts'
 
 import {
   InitializationInputSchema,
@@ -88,11 +91,12 @@ function runIdFor(input: StartInitialization) {
 
 export async function createInitializationRuntime({ storagePath, activity }: { storagePath: string; activity: InitializationActivityRecorder }) {
   const storageUrl = `file:${resolve(storagePath).replaceAll('\\', '/')}`
+  const agentStore = await createAgentActivityStore(storagePath)
   const storage = new LibSQLStore({ id: 'julia-initialization-local', url: storageUrl, localPragmas: { mmapSize: 0 } })
   const initializationWorkflow = createInitializationWorkflow()
   const deliveryWorkflow = createRoleExecutionWorkflow({ activity })
   const observabilityRuntime = new Observability({
-    configs: { default: { serviceName: 'julia-control', exporters: [new MastraStorageExporter()] } },
+    configs: { default: { serviceName: 'julia-control', sampling: { type: SamplingStrategyType.ALWAYS }, exporters: [new MastraStorageExporter()] } },
   })
   const mastra = new Mastra({
     storage,
@@ -124,9 +128,10 @@ export async function createInitializationRuntime({ storagePath, activity }: { s
       if (active) return active
       const starting = (async () => {
         const run = await workflow.createRun({ runId })
-        const result = await run.start({ inputData: InitializationInputSchema.parse({
+        const stream = run.stream({ inputData: InitializationInputSchema.parse({
           ...parsed, runId, initializedAt: new Date().toISOString(),
-        }) })
+        }), tracingOptions: { metadata: { cardIdentifier: parsed.card.identifier, role: 'Initialization', model: 'Workflow', stage: 'Initialize', round: 1 } } })
+        const result = await monitorMastraStream({ store: agentStore, launch: { launchId: runId, provider: 'mastra', providerRunId: runId, cardIdentifier: parsed.card.identifier, cardTitle: parsed.card.title, role: 'Initialization', model: 'Workflow', stage: 'Initialize', round: 1 }, stream, flush: () => observabilityRuntime.flush() })
         if (result.status !== 'suspended') throw new Error(`initialization run ${runId} did not suspend before delivery`)
         const saved = await read(runId, false)
         if (!saved) throw new Error(`initialization run ${runId} was not persisted`)
@@ -178,6 +183,7 @@ export async function createInitializationRuntime({ storagePath, activity }: { s
     async close() {
       await observabilityRuntime.shutdown()
       await mastra.shutdown()
+      agentStore.close()
     },
   }
 }

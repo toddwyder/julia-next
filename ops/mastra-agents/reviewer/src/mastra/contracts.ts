@@ -153,6 +153,7 @@ export const AgentActivityActionSchema = z.object({
   occurredAt: z.string().datetime(),
   label: nonempty,
   outcome: z.enum(['succeeded', 'failed', 'unknown']),
+  phase: z.enum(['running', 'completed']).optional(),
   failureKey: nonempty.optional(),
 }).strict()
 export const AgentDashboardActionSchema = AgentActivityActionSchema.omit({ failureKey: true }).strict()
