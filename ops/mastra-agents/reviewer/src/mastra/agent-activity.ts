@@ -178,10 +178,9 @@ function mastraActivity(trace: Record<string, any>): AgentActivityRecord | null 
 export async function discoverAgentActivity({ codexFiles = [], commandCodeFiles = [], mastraTraces = [], now = new Date(), commandCodeProcessRunning = false }: {
   codexFiles?: string[]; commandCodeFiles?: string[]; mastraTraces?: Record<string, any>[]; now?: Date; commandCodeProcessRunning?: boolean
 }) {
-  const records = await Promise.all([
-    ...codexFiles.map(path => readCodexActivity(path, now)),
-    ...commandCodeFiles.map(path => readCommandCodeActivity(path, now, commandCodeProcessRunning)),
-  ])
+  const records: Array<AgentActivityRecord | null> = []
+  for (const path of codexFiles) records.push(await readCodexActivity(path, now))
+  for (const path of commandCodeFiles) records.push(await readCommandCodeActivity(path, now, commandCodeProcessRunning))
   return AgentActivityRecordSchema.array().parse([...records.filter(Boolean), ...mastraTraces.map(trace => mastraActivity(trace)).filter(Boolean)])
 }
 

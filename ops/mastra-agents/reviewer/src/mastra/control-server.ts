@@ -68,7 +68,7 @@ export async function jsonlFiles(root: string, omitCheckpoints = false) {
     const paths = entries.filter(entry => entry.isFile() && entry.name.endsWith('.jsonl') && (!omitCheckpoints || !entry.name.endsWith('.checkpoints.jsonl')))
       .map(entry => join(entry.parentPath, entry.name))
     const dated = await Promise.all(paths.map(async path => ({ path, mtimeMs: (await stat(path)).mtimeMs })))
-    return dated.sort((left, right) => right.mtimeMs - left.mtimeMs).slice(0, 64).map(item => item.path)
+    return dated.sort((left, right) => right.mtimeMs - left.mtimeMs).slice(0, 16).map(item => item.path)
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
     throw error

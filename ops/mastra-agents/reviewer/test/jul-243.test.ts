@@ -68,7 +68,7 @@ test('native lifecycle uses the latest turn and finished CommandCode output is n
 test('native discovery bounds the candidate set before reading session contents', async () => {
   const root = await mkdtemp(join(tmpdir(), 'jul-243-bounded-'))
   await Promise.all(Array.from({ length: 70 }, (_, index) => writeFile(join(root, `${String(index).padStart(2, '0')}.jsonl`), '{}\n')))
-  assert.equal((await jsonlFiles(root)).length, 64)
+  assert.equal((await jsonlFiles(root)).length, 16)
 })
 
 test('native failures use explicit status, normalize volatile details, and never expose the key', async () => {
