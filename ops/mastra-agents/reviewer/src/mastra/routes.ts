@@ -112,6 +112,14 @@ function sanitizedTraceError(error: unknown) {
   return message.slice(0, 300).replace(/(?:Bearer\s+\S+|sk-[\w-]+|(?:api[_-]?key|token|secret)\s*[=:]\s*\S+)/gi, '[REDACTED]')
 }
 
+// An ACP provider is a local agent binary. A host without it (for example the Linux
+// control-page server, which has neither Antigravity nor the Claude ACP bridge) offers
+// that route's models to nobody; that is an absence, not a failed connection. Any other
+// error is a real failure and still stops discovery.
+function isAgentNotInstalled(error: unknown) {
+  return typeof error === 'object' && error !== null && (error as { code?: unknown }).code === 'ENOENT'
+}
+
 function claudeModelChoices(agent: ReturnType<typeof createAcpRoutes>['claude']) {
   const session = (agent.connection as unknown as { session?: ClaudeSession }).session
   const configs = Array.isArray(session?.configOptions) ? session.configOptions : []
@@ -195,6 +203,7 @@ export async function discoverAcpOffers(
       return offers
     } catch (error) {
       recordTrace({ event: 'model-discovery', route, operation: 'models/list', ok: false, durationMs: performance.now() - started, error: sanitizedTraceError(error) })
+      if (isAgentNotInstalled(error)) return []
       throw error
     }
   }

@@ -95,7 +95,20 @@ const cardIdentityShape = {
 export const CardAdmissionSchema = z.object(cardIdentityShape).strict().superRefine(validateCardAdmission)
 export const ReadyCardSchema = z.object({ ...cardIdentityShape, title: nonempty }).strict().superRefine(validateCardAdmission)
 
-export const ControlPageStateSchema = z.object({ cards: z.array(ReadyCardSchema), offers: z.array(ModelOfferSchema).min(1) }).strict()
+// A Ready card that fails admission is still shown, so one malformed card cannot
+// hide every other card or the model list. It carries a plain-English reason and
+// cannot be started; StartInitializationSchema still accepts only an admitted card.
+export const InadmissibleCardSchema = z.object({
+  identifier: cardIdentityShape.identifier,
+  title: nonempty,
+  state: nonempty,
+  reason: nonempty,
+}).strict()
+export const ControlPageCardSchema = z.discriminatedUnion('admitted', [
+  z.object({ admitted: z.literal(true), card: ReadyCardSchema }).strict(),
+  z.object({ admitted: z.literal(false), card: InadmissibleCardSchema }).strict(),
+])
+export const ControlPageStateSchema = z.object({ cards: z.array(ControlPageCardSchema), offers: z.array(ModelOfferSchema).min(1) }).strict()
 export const StartInitializationSchema = z.object({ card: ReadyCardSchema, roles: InitializationRolesSchema }).strict()
 export const InitializationInputSchema = StartInitializationSchema.extend({ runId: nonempty, initializedAt: z.string().datetime() }).strict()
 export const RunSnapshotSchema = z.object({

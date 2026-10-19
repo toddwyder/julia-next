@@ -51,13 +51,22 @@ export function shouldOpenControlBrowser(environment: NodeJS.ProcessEnv = proces
   return environment.JULIA_CONTROL_OPEN_BROWSER !== '0'
 }
 
+// The operator who configures Tailscale Serve on this host sets its tailnet DNS
+// name here (JUL-242). Unset means loopback only: the page still refuses a
+// Serve-routed request rather than guessing a name.
+export function configuredTailscaleHosts(environment: NodeJS.ProcessEnv = process.env) {
+  return (environment.JULIA_CONTROL_TAILSCALE_HOST ?? '').split(',').map(name => name.trim()).filter(Boolean)
+}
+
 export async function runControlPageServer() {
   const storagePath = process.env.JULIA_INITIALIZATION_DB ?? join(homedir(), '.julia', 'initialization.db')
+  const tailscaleHosts = configuredTailscaleHosts()
   const activity = createInitializationActivityRecorder(event => console.log(JSON.stringify(event)))
   const runtime = await createInitializationRuntime({ storagePath, activity })
   let latestState = await discoverControlPageState(activity)
   const server = await startControlPageServer({
     port: CONTROL_PORT,
+    tailscaleHosts,
     getState: async () => { latestState = await discoverControlPageState(activity); return latestState },
     getRuns: () => runtime.list(),
     getActivity: () => activity.snapshot(),
@@ -69,7 +78,7 @@ export async function runControlPageServer() {
     },
     onRequest: request => console.log(JSON.stringify({ event: 'control-page-request', ...request })),
   })
-  console.log(JSON.stringify({ status: 'ready', url: server.url, storage: storagePath }))
+  console.log(JSON.stringify({ status: 'ready', url: server.url, storage: storagePath, tailscaleHosts }))
   if (shouldOpenControlBrowser()) openDefaultBrowser(server.url)
   let closing = false
   const close = async () => {

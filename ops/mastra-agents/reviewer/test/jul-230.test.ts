@@ -61,7 +61,7 @@ test('control-page contracts carry complete offers and exact route-supported rol
     route: offer.route, modelId: offer.modelId, company: offer.company, service: offer.service, effort: 'xhigh',
   })
   const roles = { builder: selection, reviewer: selection, crashFixer: selection, crashReviewer: selection }
-  assert.deepEqual(ControlPageStateSchema.parse({ cards: [card], offers: [offer] }), { cards: [card], offers: [offer] })
+  assert.deepEqual(ControlPageStateSchema.parse({ cards: [{ admitted: true, card }], offers: [offer] }), { cards: [{ admitted: true, card }], offers: [offer] })
   assert.deepEqual(StartInitializationSchema.parse({ card, roles }), { card, roles })
   assert.throws(() => RoleSelectionSchema.parse({ ...selection, effort: 'unbounded' }))
   assert.throws(() => ModelOfferSchema.parse({ ...offer, supportedEfforts: [] }))
@@ -156,7 +156,7 @@ test('Linear Ready-card discovery paginates every complete card with read-only q
       pageInfo: { hasNextPage: page === 1, endCursor: page === 1 ? 'cursor-1' : null },
     } } }), { status: 200, headers: { 'content-type': 'application/json' } })
   } }, trace => { traces.push(trace) })
-  assert.deepEqual(cards.map(card => card.identifier), ['JUL-230', 'JUL-231'])
+  assert.deepEqual(cards.map(entry => entry.card.identifier), ['JUL-230', 'JUL-231'])
   assert.equal(requests.length, 2)
   assert.equal(requests[0]!.variables.after, null)
   assert.equal(requests[1]!.variables.after, 'cursor-1')
@@ -219,7 +219,7 @@ test('Start creates one restart-surviving suspended run and returns it for the s
   } })
 
   const firstRuntime = await createInitializationRuntime({ storagePath, activity: createInitializationActivityRecorder() })
-  const state = { cards: [card], offers }
+  const state = { cards: [{ admitted: true, card }], offers }
   await assert.rejects(firstRuntime.start({ ...input, card: { ...card, title: 'Forged title' } }, state), /differs from the current admitted card/)
   const first = await firstRuntime.start(input, state)
   assert.equal(first.state, 'ready-for-build')
@@ -253,7 +253,7 @@ test('Cancel closes the browser form locally without another server request', as
   })
   const server = await startControlPageServer({
     port: 0,
-    getState: async () => ({ cards: [card], offers: [offer] }),
+    getState: async () => ({ cards: [{ admitted: true, card }], offers: [offer] }),
     startInitialization: async () => { throw new Error('Start must not run for Cancel') },
     getRuns: async () => persisted,
     getActivity: () => activity,
@@ -298,7 +298,7 @@ test('the control boundary rejects a non-loopback Host header', async t => {
     req.end()
   })
   assert.equal(result.status, 403)
-  assert.deepEqual(JSON.parse(result.body), { error: 'loopback Host header required' })
+  assert.deepEqual(JSON.parse(result.body), { error: "Host must be loopback or this server's Tailscale Serve name" })
 })
 
 test('browser Start sends the exact changed card and four selections through the local boundary', async t => {
@@ -311,7 +311,7 @@ test('browser Start sends the exact changed card and four selections through the
   let received: z.infer<typeof StartInitializationSchema> | undefined
   const server = await startControlPageServer({
     port: 0,
-    getState: async () => ({ cards: [card], offers }),
+    getState: async () => ({ cards: [{ admitted: true, card }], offers }),
     startInitialization: async input => {
       received = input
       const snapshot = { runId: 'run-browser', card: input.card, roles: input.roles, state: 'ready-for-build' as const, initializedAt: '2026-10-16T00:00:00.000Z' }

@@ -49,9 +49,10 @@ export function ensureInitializationSelectionsOffered(input: StartInitialization
 export function validateInitializationRequest(input: StartInitialization, state: ControlPageState) {
   const parsedState = ControlPageStateSchema.parse(state)
   const parsed = ensureInitializationSelectionsOffered(input, parsedState.offers)
-  const currentCard = parsedState.cards.find(card => card.identifier === parsed.card.identifier)
+  const currentCard = parsedState.cards.find(entry => entry.card.identifier === parsed.card.identifier)
   if (!currentCard) throw new Error(`${parsed.card.identifier} is no longer a current Ready card`)
-  if (JSON.stringify(currentCard) !== JSON.stringify(parsed.card)) {
+  if (!currentCard.admitted) throw new Error(`${parsed.card.identifier} cannot start: ${currentCard.card.reason}`)
+  if (JSON.stringify(currentCard.card) !== JSON.stringify(parsed.card)) {
     throw new Error(`${parsed.card.identifier} differs from the current admitted card`)
   }
   return parsed
