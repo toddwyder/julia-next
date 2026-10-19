@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -8,7 +8,6 @@ import { chromium } from 'playwright'
 import {
   createAgentActivityStore,
   discoverAgentActivity,
-  findActiveCodexFiles,
   projectAgentCards,
   readCodexActivity,
   readCommandCodeActivity,
@@ -17,7 +16,7 @@ import {
 import { createInitializationActivityRecorder } from '../src/mastra/initialization-observability.ts'
 import { createInitializationRuntime } from '../src/mastra/initialization.ts'
 import { startControlPageServer } from '../src/mastra/control-page.ts'
-import { commandCodeProcessCount, countCommandCodeProcesses, jsonlFiles } from '../src/mastra/control-server.ts'
+import { activeCodexFiles, activeCommandCodeFiles, jsonlFiles } from '../src/mastra/control-server.ts'
 
 const NOW = new Date('2026-10-19T15:00:00.000Z')
 
@@ -66,24 +65,26 @@ test('native lifecycle uses the latest turn and finished CommandCode output is n
   assert.equal((await readCommandCodeActivity(commandCode, NOW, true))?.running, true)
 })
 
-test('native discovery keeps the complete candidate inventory while liveness reads only tails', async () => {
+test('native discovery keeps the complete inventory and uses Codex writer locks for exact liveness', async () => {
   const root = await mkdtemp(join(tmpdir(), 'jul-243-bounded-'))
+  const locks = join(root, 'locks')
+  await mkdir(locks)
   await Promise.all(Array.from({ length: 70 }, (_, index) => writeFile(join(root, `${String(index).padStart(2, '0')}.jsonl`), '{}\n')))
   const files = await jsonlFiles(root)
   assert.equal(files.length, 70)
-  const oldActive = files.at(-1)!
-  await writeFile(oldActive, [
-    { timestamp: '2026-10-19T14:00:00.000Z', type: 'session_meta', payload: { id: 'old-active' } },
-    { timestamp: '2026-10-19T14:01:00.000Z', type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Build JUL-243' }] } },
-    ...Array.from({ length: 1_000 }, (_, index) => ({ timestamp: '2026-10-19T14:02:00.000Z', type: 'response_item', payload: { type: 'function_call_output', call_id: `call-${index}`, output: 'ok'.repeat(40) } })),
-  ].map(JSON.stringify).join('\n'))
-  assert.deepEqual(await findActiveCodexFiles(files), [oldActive])
+  const active = join(root, 'rollout-active-id.jsonl')
+  await writeFile(active, '{}\n')
+  await writeFile(join(locks, 'active-id.lock'), '')
+  assert.deepEqual(await activeCodexFiles([...files, active], locks), [active])
 })
 
-test('a CommandCode process activates only its newest mapped session, not old transcripts', async () => {
+test('CommandCode provider IDE state maps a live workspace only to its newest session', async () => {
   const root = await mkdtemp(join(tmpdir(), 'jul-243-commandcode-active-'))
-  const oldPath = join(root, 'old.jsonl')
-  const activePath = join(root, 'active.jsonl')
+  const project = join(root, 'c-dev-julia-next')
+  const ide = join(root, 'ide')
+  await Promise.all([mkdir(project), mkdir(ide)])
+  const oldPath = join(project, 'old.jsonl')
+  const activePath = join(project, 'active.jsonl')
   const session = (id: string, issue: string) => [
     { type: 'session', id, timestamp: '2026-10-19T14:00:00.000Z' },
     { type: 'message', timestamp: '2026-10-19T14:01:00.000Z', message: { role: 'user', content: [{ type: 'text', text: `Build ${issue}` }] } },
@@ -91,18 +92,11 @@ test('a CommandCode process activates only its newest mapped session, not old tr
     { type: 'message', timestamp: '2026-10-19T14:02:01.000Z', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: `${id}-tool`, content: 'done' }] } },
   ].map(JSON.stringify).join('\n')
   await Promise.all([writeFile(oldPath, session('old', 'JUL-200')), writeFile(activePath, session('active', 'JUL-243'))])
-  const records = await discoverAgentActivity({ commandCodeFiles: [activePath, oldPath], activeCommandCodeFiles: [activePath], now: NOW })
+  await writeFile(join(ide, 'code-live.json'), JSON.stringify({ pid: process.pid, workspaceFolders: ['C:\\Dev\\julia-next'] }))
+  const active = await activeCommandCodeFiles([activePath, oldPath], ide)
+  assert.deepEqual(active, [activePath])
+  const records = await discoverAgentActivity({ commandCodeFiles: [activePath, oldPath], activeCommandCodeFiles: active, now: NOW })
   assert.deepEqual(projectAgentCards(records, NOW).map(card => card.agentId), ['commandcode:active'])
-})
-
-test('CommandCode process liveness counts POSIX rows once and fails unknown probes closed with context', async () => {
-  assert.equal(countCommandCodeProcesses('COMMAND ARGS\ncommandcode commandcode --session one\nnode server.js\n', 'linux'), 1)
-  const traces: Record<string, unknown>[] = []
-  await assert.rejects(
-    commandCodeProcessCount(async () => { throw new Error('access denied') }, event => traces.push(event)),
-    /liveness is unavailable/,
-  )
-  assert.deepEqual(traces, [{ event: 'commandcode-process-probe', ok: false, platform: process.platform, error: 'access denied' }])
 })
 
 test('native failures use explicit status, normalize volatile details, and never expose the key', async () => {

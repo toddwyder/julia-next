@@ -1,9 +1,8 @@
-import { execFile, spawn } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { homedir } from 'node:os'
-import { readdir, stat } from 'node:fs/promises'
+import { readFile, readdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { promisify } from 'node:util'
 
 import { ControlPageStateSchema } from './contracts.ts'
 import { startControlPageServer } from './control-page.ts'
@@ -11,10 +10,9 @@ import { createInitializationRuntime } from './initialization.ts'
 import { createInitializationActivityRecorder, createObservedLinearClient } from './initialization-observability.ts'
 import { listReadyLinearCards } from './linear.ts'
 import { discoverAcpOffers, discoverCommandCodeOffers, withAcpRoutes } from './routes.ts'
-import { createAgentActivityStore, discoverAgentActivity, findActiveCodexFiles, projectAgentCards } from './agent-activity.ts'
+import { createAgentActivityStore, discoverAgentActivity, projectAgentCards } from './agent-activity.ts'
 
 const CONTROL_PORT = 43123
-const execFileAsync = promisify(execFile)
 
 function requiredSecret(name: 'LINEAR_API_KEY' | 'COMMANDCODE_API_KEY') {
   const value = process.env[name]
@@ -75,49 +73,57 @@ export async function jsonlFiles(root: string, omitCheckpoints = false) {
   }
 }
 
-export function countCommandCodeProcesses(stdout: string, platform = process.platform) {
-  if (platform === 'win32') return Number.parseInt(stdout.trim(), 10) || 0
-  return stdout.split(/\r?\n/).filter(line => /^commandcode\s/i.test(line.trim())).length
-}
-
-export async function commandCodeProcessCount(
-  execute: typeof execFileAsync = execFileAsync,
-  recordTrace: (event: Record<string, unknown>) => void = event => console.log(JSON.stringify(event)),
-) {
+export async function activeCodexFiles(paths: string[], lockRoot: string) {
   try {
-    const { stdout } = process.platform === 'win32'
-      ? await execute('powershell.exe', ['-NoProfile', '-Command', '@(Get-Process -Name CommandCode -ErrorAction SilentlyContinue).Count'])
-      : await execute('ps', ['-eo', 'comm,args'])
-    return countCommandCodeProcesses(stdout)
+    const ids = new Set((await readdir(lockRoot)).filter(name => name.endsWith('.lock') && name !== '.coordination.lock').map(name => name.slice(0, -5)))
+    return paths.filter(path => [...ids].some(id => path.includes(id)))
   } catch (error) {
-    recordTrace({ event: 'commandcode-process-probe', ok: false, platform: process.platform, error: error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200) })
-    throw new Error('CommandCode process liveness is unavailable')
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
+    throw error
   }
 }
 
-export async function discoverAgentDashboard({ codexRoot, commandCodeRoot, mastraTraces, agentStore, controlCards, now = new Date() }: {
+function processAlive(pid: number) {
+  try { process.kill(pid, 0); return true } catch { return false }
+}
+
+export async function activeCommandCodeFiles(paths: string[], ideRoot: string) {
+  try {
+    const records = await Promise.all((await readdir(ideRoot)).filter(name => name.endsWith('.json')).map(async name => JSON.parse(await readFile(join(ideRoot, name), 'utf8')) as { pid?: number; workspaceFolders?: string[] }))
+    const activeProjects = records.filter(record => Number.isInteger(record.pid) && processAlive(record.pid!)).flatMap(record => record.workspaceFolders ?? []).map(folder => folder.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''))
+    return activeProjects.flatMap(project => paths.find(path => path.toLowerCase().replaceAll('\\', '/').includes(`/${project}/`)) ?? []).filter(Boolean)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
+    throw error
+  }
+}
+
+export async function discoverAgentDashboard({ codexRoot, codexLockRoot, commandCodeRoot, commandCodeIdeRoot, mastraTraces, agentStore, controlCards, now = new Date() }: {
   codexRoot: string
+  codexLockRoot?: string
   commandCodeRoot: string
+  commandCodeIdeRoot?: string
   mastraTraces: Record<string, any>[]
   agentStore: Awaited<ReturnType<typeof createAgentActivityStore>>
   controlCards: Array<{ card: { identifier: string; title: string } }>
   now?: Date
 }) {
-  const [codexFiles, commandCodeFiles, commandCodeProcesses] = await Promise.all([
+  const [codexFiles, commandCodeFiles] = await Promise.all([
     jsonlFiles(codexRoot),
     jsonlFiles(commandCodeRoot, true),
-    commandCodeProcessCount(),
   ])
-  const activeCodexFiles = await findActiveCodexFiles(codexFiles)
-  const activeCommandCodeFiles = commandCodeFiles.slice(0, commandCodeProcesses)
-  const discovered = await discoverAgentActivity({ codexFiles: activeCodexFiles, commandCodeFiles: activeCommandCodeFiles, mastraTraces, now, activeCommandCodeFiles })
+  const [codexActive, commandCodeActive] = await Promise.all([
+    activeCodexFiles(codexFiles, codexLockRoot ?? join(homedir(), '.codex', 'thread-writer-locks')),
+    activeCommandCodeFiles(commandCodeFiles, commandCodeIdeRoot ?? join(homedir(), '.commandcode', 'ide')),
+  ])
+  const discovered = await discoverAgentActivity({ codexFiles: codexActive, commandCodeFiles: commandCodeActive, mastraTraces, now, activeCommandCodeFiles: commandCodeActive })
   await agentStore.retain(discovered)
   const trackerTitles = new Map(controlCards.map(item => [item.card.identifier, item.card.title]))
   const cards = projectAgentCards(discovered.map(record => ({
     ...record,
     cardTitle: record.cardIdentifier ? trackerTitles.get(record.cardIdentifier) ?? record.cardTitle : record.cardTitle,
   })), now)
-  return { cards, counts: { codexFiles: codexFiles.length, activeCodexFiles: activeCodexFiles.length, commandCodeFiles: commandCodeFiles.length, activeCommandCodeFiles: activeCommandCodeFiles.length, mastraTraces: mastraTraces.length } }
+  return { cards, counts: { codexFiles: codexFiles.length, activeCodexFiles: codexActive.length, commandCodeFiles: commandCodeFiles.length, activeCommandCodeFiles: commandCodeActive.length, mastraTraces: mastraTraces.length } }
 }
 
 export async function runControlPageServer() {
@@ -127,6 +133,8 @@ export async function runControlPageServer() {
   const runtime = await createInitializationRuntime({ storagePath, activity })
   const agentStore = await createAgentActivityStore(storagePath)
   let latestState = await discoverControlPageState(activity)
+  let agentDashboardCache: { expiresAt: number; state: { updatedAt: string; cards: ReturnType<typeof projectAgentCards> } } | undefined
+  let agentDashboardRefresh: Promise<{ updatedAt: string; cards: ReturnType<typeof projectAgentCards> }> | undefined
   const server = await startControlPageServer({
     port: CONTROL_PORT,
     tailscaleHosts,
@@ -134,8 +142,10 @@ export async function runControlPageServer() {
     getRuns: () => runtime.list(),
     getActivity: () => activity.snapshot(),
     getAgentCards: async () => {
+      if (agentDashboardCache && agentDashboardCache.expiresAt > Date.now()) return agentDashboardCache.state
+      if (agentDashboardRefresh) return agentDashboardRefresh
       const startedAt = performance.now()
-      try {
+      agentDashboardRefresh = (async () => { try {
         const mastraTraces = await runtime.listMastraTraces()
         const { cards, counts } = await discoverAgentDashboard({
           codexRoot: process.env.JULIA_CODEX_SESSIONS ?? join(homedir(), '.codex', 'sessions'),
@@ -143,11 +153,14 @@ export async function runControlPageServer() {
           mastraTraces: mastraTraces as Record<string, any>[], agentStore, controlCards: latestState.cards,
         })
         console.log(JSON.stringify({ event: 'agent-activity-discovery', ok: true, ...counts, runningCards: cards.length, durationMs: performance.now() - startedAt }))
-        return { updatedAt: new Date().toISOString(), cards }
+        const state = { updatedAt: new Date().toISOString(), cards }
+        agentDashboardCache = { expiresAt: Date.now() + 25_000, state }
+        return state
       } catch (error) {
         console.log(JSON.stringify({ event: 'agent-activity-discovery', ok: false, error: error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300), durationMs: performance.now() - startedAt }))
         throw error
-      }
+      } finally { agentDashboardRefresh = undefined } })()
+      return agentDashboardRefresh
     },
     startInitialization: async input => {
       latestState = await discoverControlPageState(activity)

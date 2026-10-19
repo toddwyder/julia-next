@@ -85,36 +85,6 @@ function nativeRunning(entries: Record<string, any>[]) {
   return latestUser >= 0 && latestTerminal < latestUser
 }
 
-async function tailRows(path: string, bytes = 64 * 1024) {
-  const file = await open(path, 'r')
-  try {
-    const { size } = await file.stat()
-    const length = Math.min(size, bytes)
-    const buffer = Buffer.alloc(length)
-    await file.read(buffer, 0, length, size - length)
-    const text = buffer.toString('utf8')
-    return rows(size > length ? text.replace(/^[^\n]*\n/, '') : text)
-  } finally {
-    await file.close()
-  }
-}
-
-export async function findActiveCodexFiles(paths: string[]) {
-  const active: string[] = []
-  for (let offset = 0; offset < paths.length; offset += 16) {
-    const batch = paths.slice(offset, offset + 16)
-    const states = await Promise.all(batch.map(async path => {
-      const entries = await tailRows(path)
-      if (!entries.some(entry => entry.type === 'response_item' || entry.type === 'event_msg' || entry.type === 'agent_settled')) return false
-      const latestUser = entries.findLastIndex(entry => entry.type === 'response_item' && entry.payload?.type === 'message' && entry.payload?.role === 'user')
-      const latestTerminal = entries.findLastIndex(entry => (entry.type === 'event_msg' && ['task_complete', 'turn_aborted'].includes(entry.payload?.type)) || entry.type === 'agent_settled')
-      return latestTerminal < 0 || latestUser > latestTerminal
-    }))
-    states.forEach((running, index) => { if (running) active.push(batch[index]) })
-  }
-  return active
-}
-
 function commandCodeRunning(messages: Record<string, any>[], processRunning: boolean) {
   if (!processRunning) return false
   const latest = messages.at(-1)?.message
