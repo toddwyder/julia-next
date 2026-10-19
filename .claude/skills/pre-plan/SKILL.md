@@ -1,17 +1,17 @@
 ---
 name: pre-plan
-description: Shape a card before triage and confirm it after. Find unknowns, sort scope into keep, split or drop, and check the card can honestly be built. Use before any build card moves to Ready, or when work keeps failing.
+description: Shape a brief, triage it into cards, confirm each card, and check launcher admission in one flow. Use before any build card moves to Ready, or when work keeps failing.
 ---
 
 # Pre-plan
 
-Pre-plan keeps cards small and buildable. It runs twice per card: **Shape** on the draft brief before triage, and **Confirm** on the card after triage. In both it only subtracts, answers, or fills blanks. It never adds a requirement or an acceptance criterion. Every line of the card must trace to the brief's one-sentence outcome.
+Pre-plan keeps cards small and buildable. One invocation runs **Shape**, **Triage**, **Confirm**, and **Admission** in that order, then gives Todd one consolidated settlement summary. It only subtracts, answers, or fills blanks. It never adds a requirement or an acceptance criterion. Every line of every card must trace to the brief's one-sentence outcome.
 
 Use the vocabulary of the `codebase-design` skill exactly: module, interface, seam, adapter. Do not substitute component, service, API or boundary.
 
-Change no code, settings or servers.
+Change no code, settings or servers. Do not move a card to Ready before Todd settles it and its admission check passes.
 
-## Shape (before triage)
+## 1. Shape
 
 Input: the draft brief and its one-sentence outcome.
 
@@ -25,9 +25,13 @@ Input: the draft brief and its one-sentence outcome.
    - **Drop:** nothing needs it now or later. Rejected enhancements go to `.out-of-scope` as triage describes.
    Apply the sort without waiting; Todd can reverse any of it. Then test the size: one card is one proof story. If proving what's left takes more than one real drive, split it into cards.
 
-Output: the trimmed brief, the unknowns with their verdicts, and the splits and drops. End with two lines headed `For Todd:` giving the status and any decision that is truly his (product scope, not design).
+Output: the trimmed brief, the unknowns with their verdicts, and the splits and drops. Carry this output directly into Triage; do not stop with a separate `For Todd` summary.
 
-## Confirm (after triage)
+## 2. Triage
+
+Explicitly invoke Pocock's installed `triage` skill with the complete Shape output and have it write the cards. Its `disable-model-invocation` setting prevents automatic selection, not this required wrapped invocation. Pre-plan wraps triage; do not restate, copy, or modify triage's rules here. For new cards, the Shape output is the detailed triage brief required by the standing issue-work rule: return it to Todd for approval before triage creates anything, then resume this same pre-plan invocation after approval. Ask triage to turn each approved brief into the tracker card and agent brief even though its ordinary specific-item path starts from an existing item. Do not invent identifiers or dependency links before creation. Once triage has written the cards, continue immediately to Confirm.
+
+## 3. Confirm and Admission
 
 Run these on the card. Each finding is a blank to fill or a question. Fill a blank only inside an existing criterion, such as naming the entry point, naming a failure outcome, or linking the companion card. A finding that needs a new criterion is a split or a question for Todd, never an addition.
 
@@ -37,4 +41,16 @@ Run these on the card. Each finding is a blank to fill or a question. Fill a bla
 4. **Real proof.** Each finish condition has a proof. A test counts only if it was seen failing before the change and passing after, and the reviewer reran it. It runs against the real thing, except a rule living entirely inside one module, which a unit test covering every case may prove. Mocks, stubs and fakes never count across a seam. Recipe cards use `verify-julia` and machine cards use `verify-machine`. If the feature isn't mapped, extending the skill with `maintain-verification-skill` is part of the card.
 5. **Nothing that stops the run.** The card tells the agent to stop only for a spend or time cap, a failed production check, two rounds without closing (with the step-back prepared), or an account, money or product decision. Every tool, file and service it relies on exists, and the card says where.
 
-Post one comment: findings by check ("None" if clear), the diagram, and the blanks filled. Confirm runs once, plus one rerun if it found blanks. The card moves to Ready only when Todd says "settled".
+Post one Confirm comment per card: findings by check ("None" if clear), the diagram, and the blanks filled. Confirm runs once, plus one rerun if it found blanks.
+
+After Confirm, run the launcher's admission contract against every card from the repository root:
+
+```powershell
+.\scripts\julia-vault-windows.ps1 -SecretNames LINEAR_API_KEY -RunArguments @('node', '--experimental-strip-types', 'ops/mastra-agents/reviewer/src/mastra/card-admission-check.ts', 'JUL-nnn')
+```
+
+The script reads the current Linear card and checks its description as a prospective Ready card with the launcher's existing `CardAdmissionSchema` in `ops/mastra-agents/reviewer/src/mastra/contracts.ts`; it does not duplicate the admission rules or change the card's state. Run all cards from the triage in one command when there is more than one. Record each result in the final summary. If a card fails, fill only blanks within its existing criteria and rerun once. If passing would require a new requirement, a new criterion, or a product decision, or if the rerun still fails for any reason, report the exact question for Todd. A failing card never moves to Ready.
+
+## 4. For Todd
+
+End with one `For Todd:` summary covering every card. For each card give the Confirm result, admission result, any blanks filled, and any question Todd must settle. Ask Todd to say `settled` only for cards he accepts. When Todd replies, resume this same pre-plan invocation, move only the settled cards with passing admission results to Ready, and report the transitions. Never move a card before Todd says `settled`.
