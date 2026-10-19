@@ -78,7 +78,7 @@ export async function jsonlFiles(root: string, omitCheckpoints = false) {
 export async function commandCodeProcessRunning() {
   try {
     const { stdout } = process.platform === 'win32'
-      ? await execFileAsync('tasklist.exe', ['/FO', 'CSV', '/NH'])
+      ? await execFileAsync('powershell.exe', ['-NoProfile', '-Command', 'Get-Process -Name CommandCode -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty ProcessName'])
       : await execFileAsync('ps', ['-eo', 'comm,args'])
     return /\bcommandcode(?:\.exe)?\b/i.test(stdout)
   } catch {
