@@ -92,16 +92,41 @@ export async function activeCodexFiles(paths: string[], lockRoot: string) {
 
 type ProcessIdentity = { name: string; startedAt: number }
 
+async function inspectWindowsProcesses(pids: number[]) {
+  const script = `$ids=@(${pids.join(',')}); ConvertTo-Json -Compress -InputObject @(Get-Process -Id $ids -ErrorAction SilentlyContinue|%{[pscustomobject]@{pid=$_.Id;name=$_.ProcessName;startedAt=([DateTimeOffset]$_.StartTime).ToUnixTimeMilliseconds()}})`
+  const { stdout } = await execFileAsync('powershell.exe', ['-NoProfile', '-Command', script])
+  const parsed = JSON.parse(stdout) as Array<{ pid: number; name: string; startedAt: number }>
+  return new Map(parsed.map(item => [item.pid, { name: item.name, startedAt: item.startedAt }]))
+}
+
+async function inspectLinuxProcesses(pids: number[]) {
+  const [{ stdout: ticksText }, uptimeText] = await Promise.all([
+    execFileAsync('getconf', ['CLK_TCK']),
+    readFile('/proc/uptime', 'utf8'),
+  ])
+  const ticksPerSecond = Number(ticksText.trim())
+  const bootedAt = Date.now() - Number(uptimeText.split(/\s+/)[0]) * 1_000
+  if (!Number.isFinite(ticksPerSecond) || ticksPerSecond <= 0 || !Number.isFinite(bootedAt)) throw new Error('invalid Linux process clock')
+  const entries = await Promise.all(pids.map(async pid => {
+    try {
+      const [name, processStat] = await Promise.all([readFile(`/proc/${pid}/comm`, 'utf8'), readFile(`/proc/${pid}/stat`, 'utf8')])
+      const fields = processStat.slice(processStat.lastIndexOf(') ') + 2).trim().split(/\s+/)
+      const startedAt = bootedAt + Number(fields[19]) / ticksPerSecond * 1_000
+      if (!Number.isFinite(startedAt)) throw new Error('invalid Linux process start time')
+      return [pid, { name: name.trim(), startedAt }] as const
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined
+      throw error
+    }
+  }))
+  return new Map(entries.filter(entry => entry !== undefined))
+}
+
 async function inspectCommandCodeProcesses(pids: number[]) {
-  if (process.platform !== 'win32' || pids.length === 0) return new Map<number, ProcessIdentity>()
-  try {
-    const script = `$ids=@(${pids.join(',')}); ConvertTo-Json -Compress -InputObject @(Get-Process -Id $ids -ErrorAction SilentlyContinue|%{[pscustomobject]@{pid=$_.Id;name=$_.ProcessName;startedAt=([DateTimeOffset]$_.StartTime).ToUnixTimeMilliseconds()}})`
-    const { stdout } = await execFileAsync('powershell.exe', ['-NoProfile', '-Command', script])
-    const parsed = JSON.parse(stdout) as Array<{ pid: number; name: string; startedAt: number }>
-    return new Map(parsed.map(item => [item.pid, { name: item.name, startedAt: item.startedAt }]))
-  } catch {
-    return new Map<number, ProcessIdentity>()
-  }
+  if (pids.length === 0) return new Map<number, ProcessIdentity>()
+  if (process.platform === 'win32') return inspectWindowsProcesses(pids)
+  if (process.platform === 'linux') return inspectLinuxProcesses(pids)
+  throw new Error(`unsupported process platform: ${process.platform}`)
 }
 
 export async function activeCommandCodeFiles(paths: string[], ideRoot: string, inspectProcesses = inspectCommandCodeProcesses) {
@@ -120,7 +145,7 @@ export async function activeCommandCodeFiles(paths: string[], ideRoot: string, i
     return activeProjects.flatMap(project => paths.find(path => path.toLowerCase().replaceAll('\\', '/').includes(`/${project}/`)) ?? []).filter(Boolean)
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
-    throw error
+    throw new Error('CommandCode IDE liveness inspection failed', { cause: error })
   }
 }
 

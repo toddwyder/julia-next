@@ -130,6 +130,15 @@ test('CommandCode verifies a live provider record against Windows process identi
   assert.deepEqual(await activeCommandCodeFiles([sessionPath], ide), [sessionPath])
 })
 
+test('CommandCode process-inspection failures reject discovery with sanitized context', async () => {
+  const ide = await mkdtemp(join(tmpdir(), 'jul-243-commandcode-probe-failure-'))
+  await writeFile(join(ide, 'code.json'), JSON.stringify({ pid: 4242, ideName: 'code', timestamp: NOW.getTime(), workspaceFolders: ['C:\\Dev\\julia-next'] }))
+  await assert.rejects(
+    activeCommandCodeFiles([], ide, async () => { throw new Error('private provider detail') }),
+    error => error instanceof Error && error.message === 'CommandCode IDE liveness inspection failed' && !error.message.includes('private'),
+  )
+})
+
 test('native failures use explicit status, normalize volatile details, and never expose the key', async () => {
   const root = await mkdtemp(join(tmpdir(), 'jul-243-failures-'))
   const codex = join(root, 'codex.jsonl')
