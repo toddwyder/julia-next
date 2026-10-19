@@ -93,13 +93,41 @@ test('CommandCode provider IDE state maps a live workspace only to its newest se
   ].map(JSON.stringify).join('\n')
   await Promise.all([writeFile(oldPath, session('old', 'JUL-200')), writeFile(activePath, session('active', 'JUL-243'))])
   await Promise.all([
-    writeFile(join(ide, 'code-live.json'), JSON.stringify({ pid: process.pid, workspaceFolders: ['C:\\Dev\\julia-next'] })),
-    writeFile(join(ide, 'code-live-duplicate.json'), JSON.stringify({ pid: process.pid, workspaceFolders: ['C:\\Dev\\julia-next'] })),
+    writeFile(join(ide, 'code-live.json'), JSON.stringify({ pid: process.pid, ideName: 'code', timestamp: NOW.getTime(), workspaceFolders: ['C:\\Dev\\julia-next'] })),
+    writeFile(join(ide, 'code-live-duplicate.json'), JSON.stringify({ pid: process.pid, ideName: 'code', timestamp: NOW.getTime(), workspaceFolders: ['C:\\Dev\\julia-next'] })),
   ])
-  const active = await activeCommandCodeFiles([activePath, oldPath], ide)
+  const active = await activeCommandCodeFiles([activePath, oldPath], ide, async () => new Map([[process.pid, { name: 'Code', startedAt: NOW.getTime() - 60_000 }]]))
   assert.deepEqual(active, [activePath])
   const records = await discoverAgentActivity({ commandCodeFiles: [activePath, oldPath], activeCommandCodeFiles: active, now: NOW })
   assert.deepEqual(projectAgentCards(records, NOW).map(card => card.agentId), ['commandcode:active'])
+})
+
+test('CommandCode rejects a stale IDE record when its PID has been reused', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'jul-243-commandcode-stale-'))
+  const ide = join(root, 'ide')
+  const project = join(root, 'c-dev-julia-next')
+  await Promise.all([mkdir(ide), mkdir(project)])
+  const sessionPath = join(project, 'session.jsonl')
+  const recordedAt = NOW.getTime() - 60_000
+  await Promise.all([
+    writeFile(sessionPath, '{}\n'),
+    writeFile(join(ide, 'code-stale.json'), JSON.stringify({ pid: 4242, ideName: 'code', timestamp: recordedAt, workspaceFolders: ['C:\\Dev\\julia-next'] })),
+  ])
+  const active = await activeCommandCodeFiles([sessionPath], ide, async () => new Map([[4242, { name: 'Code', startedAt: recordedAt + 30_000 }]]))
+  assert.deepEqual(active, [])
+})
+
+test('CommandCode verifies a live provider record against Windows process identity', { skip: process.platform !== 'win32' }, async () => {
+  const root = await mkdtemp(join(tmpdir(), 'jul-243-commandcode-process-'))
+  const ide = join(root, 'ide')
+  const project = join(root, 'c-dev-julia-next')
+  await Promise.all([mkdir(ide), mkdir(project)])
+  const sessionPath = join(project, 'session.jsonl')
+  await Promise.all([
+    writeFile(sessionPath, '{}\n'),
+    writeFile(join(ide, 'node-live.json'), JSON.stringify({ pid: process.pid, ideName: 'node', timestamp: Date.now(), workspaceFolders: ['C:\\Dev\\julia-next'] })),
+  ])
+  assert.deepEqual(await activeCommandCodeFiles([sessionPath], ide), [sessionPath])
 })
 
 test('native failures use explicit status, normalize volatile details, and never expose the key', async () => {

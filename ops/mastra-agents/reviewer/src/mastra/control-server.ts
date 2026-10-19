@@ -1,8 +1,9 @@
-import { spawn } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 import { homedir } from 'node:os'
 import { readFile, readdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { promisify } from 'node:util'
 
 import { ControlPageStateSchema } from './contracts.ts'
 import { startControlPageServer } from './control-page.ts'
@@ -13,6 +14,7 @@ import { discoverAcpOffers, discoverCommandCodeOffers, withAcpRoutes } from './r
 import { createAgentActivityStore, discoverAgentActivity, projectAgentCards } from './agent-activity.ts'
 
 const CONTROL_PORT = 43123
+const execFileAsync = promisify(execFile)
 
 function requiredSecret(name: 'LINEAR_API_KEY' | 'COMMANDCODE_API_KEY') {
   const value = process.env[name]
@@ -88,15 +90,31 @@ export async function activeCodexFiles(paths: string[], lockRoot: string) {
   return paths.filter(path => ids.some(id => path.includes(id)))
 }
 
-function processAlive(pid: number) {
-  try { process.kill(pid, 0); return true } catch { return false }
+type ProcessIdentity = { name: string; startedAt: number }
+
+async function inspectCommandCodeProcesses(pids: number[]) {
+  if (process.platform !== 'win32' || pids.length === 0) return new Map<number, ProcessIdentity>()
+  try {
+    const script = `$ids=@(${pids.join(',')}); ConvertTo-Json -Compress -InputObject @(Get-Process -Id $ids -ErrorAction SilentlyContinue|%{[pscustomobject]@{pid=$_.Id;name=$_.ProcessName;startedAt=([DateTimeOffset]$_.StartTime).ToUnixTimeMilliseconds()}})`
+    const { stdout } = await execFileAsync('powershell.exe', ['-NoProfile', '-Command', script])
+    const parsed = JSON.parse(stdout) as Array<{ pid: number; name: string; startedAt: number }>
+    return new Map(parsed.map(item => [item.pid, { name: item.name, startedAt: item.startedAt }]))
+  } catch {
+    return new Map<number, ProcessIdentity>()
+  }
 }
 
-export async function activeCommandCodeFiles(paths: string[], ideRoot: string) {
+export async function activeCommandCodeFiles(paths: string[], ideRoot: string, inspectProcesses = inspectCommandCodeProcesses) {
   try {
-    const records = await Promise.all((await readdir(ideRoot)).filter(name => name.endsWith('.json')).map(async name => JSON.parse(await readFile(join(ideRoot, name), 'utf8')) as { pid?: number; workspaceFolders?: string[] }))
+    const records = await Promise.all((await readdir(ideRoot)).filter(name => name.endsWith('.json')).map(async name => JSON.parse(await readFile(join(ideRoot, name), 'utf8')) as { pid?: number; ideName?: string; timestamp?: number; workspaceFolders?: string[] }))
+    const pids = [...new Set(records.flatMap(record => Number.isInteger(record.pid) ? [record.pid!] : []))]
+    const identities = await inspectProcesses(pids)
     const activeProjects = [...new Set(records
-      .filter(record => Number.isInteger(record.pid) && processAlive(record.pid!))
+      .filter(record => {
+        const identity = Number.isInteger(record.pid) ? identities.get(record.pid!) : undefined
+        return identity !== undefined && Number.isFinite(record.timestamp) && identity.startedAt <= record.timestamp!
+          && identity.name.replace(/\.exe$/i, '').toLowerCase() === record.ideName?.replace(/\.exe$/i, '').toLowerCase()
+      })
       .flatMap(record => record.workspaceFolders ?? [])
       .map(folder => folder.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')))]
     return activeProjects.flatMap(project => paths.find(path => path.toLowerCase().replaceAll('\\', '/').includes(`/${project}/`)) ?? []).filter(Boolean)
