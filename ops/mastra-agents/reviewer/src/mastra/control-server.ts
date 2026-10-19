@@ -75,14 +75,14 @@ export async function jsonlFiles(root: string, omitCheckpoints = false) {
   }
 }
 
-export async function commandCodeProcessRunning() {
+export async function commandCodeProcessCount() {
   try {
     const { stdout } = process.platform === 'win32'
-      ? await execFileAsync('powershell.exe', ['-NoProfile', '-Command', 'Get-Process -Name CommandCode -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty ProcessName'])
+      ? await execFileAsync('powershell.exe', ['-NoProfile', '-Command', '@(Get-Process -Name CommandCode -ErrorAction SilentlyContinue).Count'])
       : await execFileAsync('ps', ['-eo', 'comm,args'])
-    return /\bcommandcode(?:\.exe)?\b/i.test(stdout)
+    return process.platform === 'win32' ? Number.parseInt(stdout.trim(), 10) || 0 : (stdout.match(/\bcommandcode\b/gi) ?? []).length
   } catch {
-    return false
+    return 0
   }
 }
 
@@ -94,12 +94,12 @@ export async function discoverAgentDashboard({ codexRoot, commandCodeRoot, mastr
   controlCards: Array<{ card: { identifier: string; title: string } }>
   now?: Date
 }) {
-  const [codexFiles, commandCodeFiles, commandCodeActive] = await Promise.all([
+  const [codexFiles, commandCodeFiles, commandCodeProcesses] = await Promise.all([
     jsonlFiles(codexRoot),
     jsonlFiles(commandCodeRoot, true),
-    commandCodeProcessRunning(),
+    commandCodeProcessCount(),
   ])
-  const discovered = await discoverAgentActivity({ codexFiles, commandCodeFiles, mastraTraces, now, commandCodeProcessRunning: commandCodeActive })
+  const discovered = await discoverAgentActivity({ codexFiles, commandCodeFiles, mastraTraces, now, activeCommandCodeFiles: commandCodeFiles.slice(0, commandCodeProcesses) })
   await agentStore.retain(discovered)
   const trackerTitles = new Map(controlCards.map(item => [item.card.identifier, item.card.title]))
   const cards = projectAgentCards(discovered.map(record => ({

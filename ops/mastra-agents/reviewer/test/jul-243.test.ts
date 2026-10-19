@@ -71,6 +71,21 @@ test('native discovery bounds the candidate set before reading session contents'
   assert.equal((await jsonlFiles(root)).length, 16)
 })
 
+test('a CommandCode process activates only its newest mapped session, not old transcripts', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'jul-243-commandcode-active-'))
+  const oldPath = join(root, 'old.jsonl')
+  const activePath = join(root, 'active.jsonl')
+  const session = (id: string, issue: string) => [
+    { type: 'session', id, timestamp: '2026-10-19T14:00:00.000Z' },
+    { type: 'message', timestamp: '2026-10-19T14:01:00.000Z', message: { role: 'user', content: [{ type: 'text', text: `Build ${issue}` }] } },
+    { type: 'message', timestamp: '2026-10-19T14:02:00.000Z', message: { role: 'assistant', content: [{ type: 'tool_use', id: `${id}-tool`, name: 'read', input: {} }] } },
+    { type: 'message', timestamp: '2026-10-19T14:02:01.000Z', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: `${id}-tool`, content: 'done' }] } },
+  ].map(JSON.stringify).join('\n')
+  await Promise.all([writeFile(oldPath, session('old', 'JUL-200')), writeFile(activePath, session('active', 'JUL-243'))])
+  const records = await discoverAgentActivity({ commandCodeFiles: [activePath, oldPath], activeCommandCodeFiles: [activePath], now: NOW })
+  assert.deepEqual(projectAgentCards(records, NOW).map(card => card.agentId), ['commandcode:active'])
+})
+
 test('native failures use explicit status, normalize volatile details, and never expose the key', async () => {
   const root = await mkdtemp(join(tmpdir(), 'jul-243-failures-'))
   const codex = join(root, 'codex.jsonl')
