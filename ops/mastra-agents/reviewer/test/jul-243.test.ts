@@ -57,10 +57,12 @@ test('native lifecycle uses the latest turn and finished CommandCode output is n
   await writeFile(commandCode, [
     { type: 'session', id: 'finished-cc', timestamp: '2026-10-19T14:00:00.000Z' },
     { type: 'message', timestamp: '2026-10-19T14:01:00.000Z', message: { role: 'user', content: [{ type: 'text', text: 'Build JUL-243' }] } },
-    { type: 'message', timestamp: '2026-10-19T14:02:00.000Z', message: { role: 'assistant', content: [{ type: 'text', text: 'Done.' }] } },
+    { type: 'message', timestamp: '2026-10-19T14:02:00.000Z', message: { role: 'assistant', content: [{ type: 'tool_use', id: 'last-tool', name: 'read', input: { path: 'README.md' } }] } },
+    { type: 'message', timestamp: '2026-10-19T14:02:01.000Z', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'last-tool', content: 'done' }] } },
   ].map(JSON.stringify).join('\n'))
   assert.equal((await readCodexActivity(codex, NOW))?.running, true)
   assert.equal((await readCommandCodeActivity(commandCode, NOW))?.running, false)
+  assert.equal((await readCommandCodeActivity(commandCode, NOW, true))?.running, true)
 })
 
 test('native discovery bounds the candidate set before reading session contents', async () => {

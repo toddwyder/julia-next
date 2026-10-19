@@ -1,8 +1,9 @@
-import { spawn } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 import { homedir } from 'node:os'
 import { readdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { promisify } from 'node:util'
 
 import { ControlPageStateSchema } from './contracts.ts'
 import { startControlPageServer } from './control-page.ts'
@@ -13,6 +14,7 @@ import { discoverAcpOffers, discoverCommandCodeOffers, withAcpRoutes } from './r
 import { createAgentActivityStore, discoverAgentActivity, projectAgentCards } from './agent-activity.ts'
 
 const CONTROL_PORT = 43123
+const execFileAsync = promisify(execFile)
 
 function requiredSecret(name: 'LINEAR_API_KEY' | 'COMMANDCODE_API_KEY') {
   const value = process.env[name]
@@ -73,6 +75,40 @@ export async function jsonlFiles(root: string, omitCheckpoints = false) {
   }
 }
 
+export async function commandCodeProcessRunning() {
+  try {
+    const { stdout } = process.platform === 'win32'
+      ? await execFileAsync('tasklist.exe', ['/FO', 'CSV', '/NH'])
+      : await execFileAsync('ps', ['-eo', 'comm,args'])
+    return /\bcommandcode(?:\.exe)?\b/i.test(stdout)
+  } catch {
+    return false
+  }
+}
+
+export async function discoverAgentDashboard({ codexRoot, commandCodeRoot, mastraTraces, agentStore, controlCards, now = new Date() }: {
+  codexRoot: string
+  commandCodeRoot: string
+  mastraTraces: Record<string, any>[]
+  agentStore: Awaited<ReturnType<typeof createAgentActivityStore>>
+  controlCards: Array<{ card: { identifier: string; title: string } }>
+  now?: Date
+}) {
+  const [codexFiles, commandCodeFiles, commandCodeActive] = await Promise.all([
+    jsonlFiles(codexRoot),
+    jsonlFiles(commandCodeRoot, true),
+    commandCodeProcessRunning(),
+  ])
+  const discovered = await discoverAgentActivity({ codexFiles, commandCodeFiles, mastraTraces, now, commandCodeProcessRunning: commandCodeActive })
+  await agentStore.retain(discovered)
+  const trackerTitles = new Map(controlCards.map(item => [item.card.identifier, item.card.title]))
+  const cards = projectAgentCards(discovered.map(record => ({
+    ...record,
+    cardTitle: record.cardIdentifier ? trackerTitles.get(record.cardIdentifier) ?? record.cardTitle : record.cardTitle,
+  })), now)
+  return { cards, counts: { codexFiles: codexFiles.length, commandCodeFiles: commandCodeFiles.length, mastraTraces: mastraTraces.length } }
+}
+
 export async function runControlPageServer() {
   const storagePath = process.env.JULIA_INITIALIZATION_DB ?? join(homedir(), '.julia', 'initialization.db')
   const tailscaleHosts = configuredTailscaleHosts()
@@ -89,19 +125,13 @@ export async function runControlPageServer() {
     getAgentCards: async () => {
       const startedAt = performance.now()
       try {
-        const [codexFiles, commandCodeFiles, mastraTraces] = await Promise.all([
-          jsonlFiles(process.env.JULIA_CODEX_SESSIONS ?? join(homedir(), '.codex', 'sessions')),
-          jsonlFiles(process.env.JULIA_COMMANDCODE_PROJECTS ?? join(homedir(), '.commandcode', 'projects'), true),
-          runtime.listMastraTraces(),
-        ])
-        const discovered = await discoverAgentActivity({ codexFiles, commandCodeFiles, mastraTraces: mastraTraces as Record<string, any>[] })
-        await agentStore.retain(discovered)
-        const trackerTitles = new Map(latestState.cards.map(item => [item.card.identifier, item.card.title]))
-        const cards = projectAgentCards(discovered.map(record => ({
-          ...record,
-          cardTitle: record.cardIdentifier ? trackerTitles.get(record.cardIdentifier) ?? record.cardTitle : record.cardTitle,
-        })))
-        console.log(JSON.stringify({ event: 'agent-activity-discovery', ok: true, codexFiles: codexFiles.length, commandCodeFiles: commandCodeFiles.length, mastraTraces: mastraTraces.length, runningCards: cards.length, durationMs: performance.now() - startedAt }))
+        const mastraTraces = await runtime.listMastraTraces()
+        const { cards, counts } = await discoverAgentDashboard({
+          codexRoot: process.env.JULIA_CODEX_SESSIONS ?? join(homedir(), '.codex', 'sessions'),
+          commandCodeRoot: process.env.JULIA_COMMANDCODE_PROJECTS ?? join(homedir(), '.commandcode', 'projects'),
+          mastraTraces: mastraTraces as Record<string, any>[], agentStore, controlCards: latestState.cards,
+        })
+        console.log(JSON.stringify({ event: 'agent-activity-discovery', ok: true, ...counts, runningCards: cards.length, durationMs: performance.now() - startedAt }))
         return { updatedAt: new Date().toISOString(), cards }
       } catch (error) {
         console.log(JSON.stringify({ event: 'agent-activity-discovery', ok: false, error: error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300), durationMs: performance.now() - startedAt }))

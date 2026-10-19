@@ -86,7 +86,8 @@ function nativeRunning(entries: Record<string, any>[]) {
   return latestUser >= 0 && latestTerminal < latestUser
 }
 
-function commandCodeRunning(messages: Record<string, any>[]) {
+function commandCodeRunning(messages: Record<string, any>[], processRunning: boolean) {
+  if (!processRunning) return false
   const latest = messages.at(-1)?.message
   if (!latest) return false
   if (latest.role !== 'assistant') return true
@@ -123,7 +124,7 @@ export async function readCodexActivity(path: string, now = new Date()): Promise
   })
 }
 
-export async function readCommandCodeActivity(path: string, now = new Date()): Promise<AgentActivityRecord | null> {
+export async function readCommandCodeActivity(path: string, now = new Date(), processRunning = false): Promise<AgentActivityRecord | null> {
   const entries = await sessionRows(path)
   const session = entries.find(entry => entry.type === 'session') ?? {}
   const messages = entries.filter(entry => entry.type === 'message')
@@ -151,7 +152,7 @@ export async function readCommandCodeActivity(path: string, now = new Date()): P
   const updatedAt = timestamps.at(-1)!
   const model = messages.map(entry => entry.message?.model).find(Boolean) ?? 'CommandCode agent'
   return AgentActivityRecordSchema.parse({
-    source: 'commandcode', sourceId: session.id ?? basename(path, '.jsonl'), running: commandCodeRunning(messages),
+    source: 'commandcode', sourceId: session.id ?? basename(path, '.jsonl'), running: commandCodeRunning(messages, processRunning),
     ...identity, role: 'Agent', model, service: 'CommandCode', stage: 'Working', round: 1,
     startedAt: timestamps[0], updatedAt, actions,
   })
@@ -174,12 +175,12 @@ function mastraActivity(trace: Record<string, any>): AgentActivityRecord | null 
   })
 }
 
-export async function discoverAgentActivity({ codexFiles = [], commandCodeFiles = [], mastraTraces = [], now = new Date() }: {
-  codexFiles?: string[]; commandCodeFiles?: string[]; mastraTraces?: Record<string, any>[]; now?: Date
+export async function discoverAgentActivity({ codexFiles = [], commandCodeFiles = [], mastraTraces = [], now = new Date(), commandCodeProcessRunning = false }: {
+  codexFiles?: string[]; commandCodeFiles?: string[]; mastraTraces?: Record<string, any>[]; now?: Date; commandCodeProcessRunning?: boolean
 }) {
   const records = await Promise.all([
     ...codexFiles.map(path => readCodexActivity(path, now)),
-    ...commandCodeFiles.map(path => readCommandCodeActivity(path, now)),
+    ...commandCodeFiles.map(path => readCommandCodeActivity(path, now, commandCodeProcessRunning)),
   ])
   return AgentActivityRecordSchema.array().parse([...records.filter(Boolean), ...mastraTraces.map(trace => mastraActivity(trace)).filter(Boolean)])
 }
