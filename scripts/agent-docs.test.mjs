@@ -30,6 +30,10 @@ test('agent instructions use the Linear delivery route and mark Factory retired'
   }
   assert.match(read('AGENTS.md'), /ordinary signed-in GitHub access/);
   assert.match(read('docs/agents/work-execution.md'), /historical evidence only/);
+  const tracker = read('docs/agents/issue-tracker.md');
+  assert.match(tracker, /New Julia and machine cards live.*Linear/i);
+  assert.match(tracker, /change status to `Ready` only after Todd says `settled` and launcher admission passes/);
+  assert.doesNotMatch(tracker, /Factory's Intake.*current|GitHub issues.*current/i);
 });
 
 test('post-build reviewer checks and the plan-answers/park policy replace stop-and-ask builder gates', () => {
@@ -51,15 +55,24 @@ test('post-build reviewer checks and the plan-answers/park policy replace stop-a
 });
 
 test('the repository-owned pre-plan skill survives Pocock skill upgrades', () => {
+  const prePlan = read('.claude/skills/pre-plan/SKILL.md');
   assert.ok(
     existsSync(new URL('../.claude/skills/pre-plan/SKILL.md', import.meta.url)),
     'repository-owned pre-plan skill must not be removed by a Pocock skill upgrade',
   );
+  const stages = ['## 1. Shape', '## 2. Triage', '## 3. Confirm and Admission', '## 4. For Todd'];
+  for (let index = 1; index < stages.length; index += 1) {
+    assert.ok(prePlan.indexOf(stages[index - 1]) < prePlan.indexOf(stages[index]), `${stages[index]} must follow ${stages[index - 1]}`);
+  }
+  assert.match(prePlan, /invoke Pocock's installed `triage` skill/);
+  assert.match(prePlan, /card-admission-check\.ts/);
+  assert.match(prePlan, /one `For Todd:` summary covering every card/);
+  assert.match(prePlan, /move only the settled cards with passing admission results to Ready/);
   assert.deepEqual(JSON.parse(read('skills-lock.json')).skills['pre-plan'], {
     source: 'toddwyder/julia-next',
     sourceType: 'github',
     ref: 'd250fb51',
     skillPath: '.claude/skills/pre-plan/SKILL.md',
-    computedHash: '58d9b881b38dd8938901315f042bff7e2fd7ba70bd4fadaf3e5af2cafeafcba8',
+    computedHash: '20c3120714734eeeb0f77c13df43a5cfc68e1a86cc4bf71e918455ac7f78e678',
   });
 });

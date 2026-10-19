@@ -1,5 +1,5 @@
-# Triage labels (retired)
+# Triage labels
 
-Retired 2026-10-01. GitHub issues and Factory are the current tracker; no triage label, milestone,
-or readiness gate is required to start work. See `docs/agents/issue-tracker.md` for the current
-repository mapping.
+Linear is the current tracker. The category labels are `bug` and `enhancement`; the state-role
+labels are `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, and `wontfix`.
+See `docs/agents/issue-tracker.md` for their Linear status mapping and the pre-plan settlement gate.
