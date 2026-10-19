@@ -28,7 +28,7 @@ export function commandCodeEvent(value: unknown): EventBody {
     const failed = tool.type === 'tool_errored'
     // Only the explicit error field contributes to failure identity. Tool result/output is excluded.
     const errorCategory = failed ? createHash('sha256').update((tool.error ?? 'unspecified-tool-error').replace(/\s+/g, ' ').trim()).digest('hex') : undefined
-    return { kind: 'action-completed', providerKind: tool.type, providerStatus: failed ? 'errored' : 'completed', action: { id: tool.toolCallId, type: 'tool', name: tool.toolName, outcome: failed ? 'failed' : 'unknown', ...(failed ? { errorCode: 'tool_errored', errorCategory } : {}) } }
+    return { kind: 'action-completed', providerKind: tool.type, providerStatus: failed ? 'errored' : 'completed', action: { id: tool.toolCallId, type: 'tool', name: tool.toolName, outcome: failed ? 'failed' : 'succeeded', ...(failed ? { errorCode: 'tool_errored', errorCategory } : {}) } }
   }
   return { kind: 'unknown', providerKind: frame.event.type.slice(0, 160), providerStatus: 'unknown' }
 }

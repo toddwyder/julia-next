@@ -216,7 +216,7 @@ test('CommandCode explicit tool errors produce stable failure identity; complete
   const other = commandCodeEvent({ type: 'event', event: { type: 'tool_errored', toolCallId: 'failed-2', toolName: 'shell_command', error: 'Permission denied' } })
   assert.notEqual(failed.action?.errorCategory, other.action?.errorCategory)
   const completed = commandCodeEvent({ type: 'event', event: { type: 'tool_completed', toolCallId: 'completed-1', toolName: 'shell_command', result: [{ type: 'text', text: '{"exit_code":1}' }] } })
-  assert.equal(completed.action?.outcome, 'unknown')
+  assert.equal(completed.action?.outcome, 'succeeded')
 })
 
 test('a completed action with unknown outcome breaks the consecutive explicit failure sequence', async () => {
@@ -229,4 +229,13 @@ test('a completed action with unknown outcome breaks the consecutive explicit fa
     assert.equal((await store.cards(new Date(at)))[0].status, 'working')
     assert.equal((await store.records())[0].actions[1].phase, 'completed')
   } finally { store.close() }
+})
+
+test('Codex distinct failing commands produce distinct error categories', async () => {
+  const { codexEvent } = await import('../src/mastra/agent-codex.ts')
+  const cmd1 = codexEvent('item/completed', { threadId: 't1', turnId: 'tu1', item: { id: 'c1', type: 'commandExecution', command: 'git diff', exitCode: 1, status: 'failed' } })
+  const cmd2 = codexEvent('item/completed', { threadId: 't1', turnId: 'tu1', item: { id: 'c2', type: 'commandExecution', command: 'npm test', exitCode: 1, status: 'failed' } })
+  assert.equal(cmd1.action?.outcome, 'failed')
+  assert.equal(cmd2.action?.outcome, 'failed')
+  assert.notEqual(cmd1.action?.errorCategory, cmd2.action?.errorCategory)
 })

@@ -25,11 +25,12 @@ test('Codex item fixture conforms to generated installed 0.163.0 protocol; malfo
   const { execFile } = await import('node:child_process')
   const { promisify } = await import('node:util')
   const { readFile } = await import('node:fs/promises')
-  const { Ajv } = await import('ajv')
+  const AjvModule = await import('ajv')
+  const Ajv = (AjvModule.default ?? AjvModule) as unknown as typeof AjvModule.default
   const root = await mkdtemp(join(tmpdir(), 'jul-243-schema-'))
   await promisify(execFile)('codex', ['app-server', 'generate-json-schema', '--out', root])
   const schema = JSON.parse(await readFile(join(root, 'v2', 'ItemCompletedNotification.json'), 'utf8'))
-  const validate = new Ajv({ strict: false, validateFormats: false }).compile(schema)
+  const validate = new (Ajv as any)({ strict: false, validateFormats: false }).compile(schema)
   const fixture = { completedAtMs: 1792422000000, threadId: 'thread-1', turnId: 'turn-1', item: { id: 'cmd-1', type: 'commandExecution', command: 'echo source', cwd: '/tmp', processId: '123', status: 'completed', commandActions: [], aggregatedOutput: '{"exit_code":1}', exitCode: 0, durationMs: 1 } }
   assert.equal(validate(fixture), true, JSON.stringify(validate.errors))
   assert.equal(validate({ ...fixture, item: { ...fixture.item, status: 'invented' } }), false)
