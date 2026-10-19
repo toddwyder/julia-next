@@ -148,6 +148,49 @@ export const InitializationBoundaryStateSchema = InitializationRunsStateSchema.e
   activity: InitializationActivitySchema,
 }).strict()
 
+export const AgentActivityActionSchema = z.object({
+  id: nonempty,
+  occurredAt: z.string().datetime(),
+  label: nonempty,
+  outcome: z.enum(['succeeded', 'failed', 'unknown']),
+  failureKey: nonempty.optional(),
+}).strict()
+export const AgentActivityRecordSchema = z.object({
+  source: z.enum(['codex', 'commandcode', 'mastra']),
+  sourceId: nonempty,
+  running: z.boolean(),
+  cardIdentifier: z.string().regex(/^[A-Z][A-Z0-9]*-\d+$/).optional(),
+  cardTitle: nonempty.optional(),
+  role: nonempty.optional(),
+  model: nonempty.optional(),
+  service: nonempty,
+  stage: nonempty,
+  round: z.number().int().positive(),
+  startedAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  actions: z.array(AgentActivityActionSchema),
+}).strict()
+export const AgentDashboardCardSchema = z.object({
+  agentId: nonempty,
+  source: AgentActivityRecordSchema.shape.source,
+  cardIdentifier: nonempty,
+  cardTitle: nonempty,
+  role: nonempty,
+  model: nonempty,
+  service: nonempty,
+  stage: nonempty,
+  round: z.number().int().positive(),
+  startedAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  status: z.enum(['working', 'looks-stuck']),
+  statusDetail: nonempty,
+  actions: z.array(AgentActivityActionSchema),
+}).strict()
+export const AgentDashboardStateSchema = z.object({
+  updatedAt: z.string().datetime(),
+  cards: z.array(AgentDashboardCardSchema),
+}).strict()
+
 export const DeliveryRunSnapshotSchema = z.object({ issueId: nonempty, roles: RoleDefaultsSchema, allowSameService: z.boolean().default(false), savedAt: z.string().datetime() }).strict().readonly()
 export const DeliveryStartSchema = z.object({ decision: z.literal('Start'), authorized: z.literal(true), snapshot: DeliveryRunSnapshotSchema }).strict()
 export const WorkflowInputSchema = DeliveryStartSchema

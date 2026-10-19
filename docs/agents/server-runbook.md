@@ -43,6 +43,12 @@ reason; the other Ready cards and the model list still load.
 - **Boundary:** from a tailnet device the Serve URL reaches the loopback listener;
   the public address answers nothing.
 - **Restart:** `sudo systemctl restart julia-control.service`.
+- **Agent dashboard:** `GET /julia-control/api/agents` reads Codex JSONL from
+  `JULIA_CODEX_SESSIONS` (default `~/.codex/sessions`), CommandCode JSONL from
+  `JULIA_COMMANDCODE_PROJECTS` (default `~/.commandcode/projects`), and persisted
+  Mastra traces. Normalized Codex detail is retained across restarts in the
+  Julia-owned `julia_agent_activity_records` table inside the configured
+  `JULIA_INITIALIZATION_DB`; raw prompts and raw tool output are not shown.
 
 ## GitHub write boundaries
 

@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process'
 import { homedir } from 'node:os'
+import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -9,6 +10,7 @@ import { createInitializationRuntime } from './initialization.ts'
 import { createInitializationActivityRecorder, createObservedLinearClient } from './initialization-observability.ts'
 import { listReadyLinearCards } from './linear.ts'
 import { discoverAcpOffers, discoverCommandCodeOffers, withAcpRoutes } from './routes.ts'
+import { createAgentActivityStore, discoverAgentActivity, projectAgentCards } from './agent-activity.ts'
 
 const CONTROL_PORT = 43123
 
@@ -58,11 +60,23 @@ export function configuredTailscaleHosts(environment: NodeJS.ProcessEnv = proces
   return (environment.JULIA_CONTROL_TAILSCALE_HOST ?? '').split(',').map(name => name.trim()).filter(Boolean)
 }
 
+async function jsonlFiles(root: string, omitCheckpoints = false) {
+  try {
+    const entries = await readdir(root, { recursive: true, withFileTypes: true })
+    return entries.filter(entry => entry.isFile() && entry.name.endsWith('.jsonl') && (!omitCheckpoints || !entry.name.endsWith('.checkpoints.jsonl')))
+      .map(entry => join(entry.parentPath, entry.name))
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
+    throw error
+  }
+}
+
 export async function runControlPageServer() {
   const storagePath = process.env.JULIA_INITIALIZATION_DB ?? join(homedir(), '.julia', 'initialization.db')
   const tailscaleHosts = configuredTailscaleHosts()
   const activity = createInitializationActivityRecorder(event => console.log(JSON.stringify(event)))
   const runtime = await createInitializationRuntime({ storagePath, activity })
+  const agentStore = await createAgentActivityStore(storagePath)
   let latestState = await discoverControlPageState(activity)
   const server = await startControlPageServer({
     port: CONTROL_PORT,
@@ -70,6 +84,27 @@ export async function runControlPageServer() {
     getState: async () => { latestState = await discoverControlPageState(activity); return latestState },
     getRuns: () => runtime.list(),
     getActivity: () => activity.snapshot(),
+    getAgentCards: async () => {
+      const startedAt = performance.now()
+      try {
+        const [codexFiles, commandCodeFiles, mastraTraces] = await Promise.all([
+          jsonlFiles(process.env.JULIA_CODEX_SESSIONS ?? join(homedir(), '.codex', 'sessions')),
+          jsonlFiles(process.env.JULIA_COMMANDCODE_PROJECTS ?? join(homedir(), '.commandcode', 'projects'), true),
+          runtime.listMastraTraces(),
+        ])
+        const discovered = await discoverAgentActivity({ codexFiles, commandCodeFiles, mastraTraces: mastraTraces as Record<string, any>[] })
+        await agentStore.retain(discovered)
+        const retained = await agentStore.list()
+        const merged = new Map(retained.map(record => [`${record.source}:${record.sourceId}`, record]))
+        discovered.forEach(record => merged.set(`${record.source}:${record.sourceId}`, record))
+        const cards = projectAgentCards([...merged.values()])
+        console.log(JSON.stringify({ event: 'agent-activity-discovery', ok: true, codexFiles: codexFiles.length, commandCodeFiles: commandCodeFiles.length, mastraTraces: mastraTraces.length, runningCards: cards.length, durationMs: performance.now() - startedAt }))
+        return { updatedAt: new Date().toISOString(), cards }
+      } catch (error) {
+        console.log(JSON.stringify({ event: 'agent-activity-discovery', ok: false, error: error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300), durationMs: performance.now() - startedAt }))
+        throw error
+      }
+    },
     startInitialization: async input => {
       latestState = await discoverControlPageState(activity)
       const result = await runtime.start(input, latestState)
@@ -85,6 +120,7 @@ export async function runControlPageServer() {
     if (closing) return
     closing = true
     await server.close()
+    await agentStore.close()
     await runtime.close()
   }
   process.once('SIGINT', () => { close().then(() => process.exit(0), error => { console.error(error); process.exit(1) }) })

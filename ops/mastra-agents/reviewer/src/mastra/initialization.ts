@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import { Mastra } from '@mastra/core/mastra'
 import { createStep, createWorkflow, createWorkflowStateReader } from '@mastra/core/workflows'
 import { LibSQLStore } from '@mastra/libsql'
+import { MastraStorageExporter, Observability } from '@mastra/observability'
 import type { z } from 'zod/v4'
 import type { InitializationActivityRecorder } from './initialization-observability.ts'
 import { createRoleExecutionWorkflow } from './workflows/delivery.ts'
@@ -90,8 +91,16 @@ export async function createInitializationRuntime({ storagePath, activity }: { s
   const storage = new LibSQLStore({ id: 'julia-initialization-local', url: storageUrl, localPragmas: { mmapSize: 0 } })
   const initializationWorkflow = createInitializationWorkflow()
   const deliveryWorkflow = createRoleExecutionWorkflow({ activity })
-  const mastra = new Mastra({ storage, workflows: { initializationWorkflow, deliveryWorkflow } })
+  const observabilityRuntime = new Observability({
+    configs: { default: { serviceName: 'julia-control', exporters: [new MastraStorageExporter()] } },
+  })
+  const mastra = new Mastra({
+    storage,
+    workflows: { initializationWorkflow, deliveryWorkflow },
+    observability: observabilityRuntime,
+  })
   const workflow = mastra.getWorkflow('initializationWorkflow')
+  const observabilityStore = await storage.getStore('observability')
   const pending = new Map<string, Promise<z.infer<typeof InitializationResultSchema>>>()
 
   const read = async (runId: string, resumed = true) => {
@@ -139,7 +148,30 @@ export async function createInitializationRuntime({ storagePath, activity }: { s
     async runCount() {
       return (await workflow.listWorkflowRuns()).total
     },
+    async listMastraTraces() {
+      await observabilityRuntime.flush()
+      if (!observabilityStore) return []
+      const listed = await observabilityStore.listTraces({ pagination: { page: 0, perPage: 100 }, orderBy: { field: 'startedAt', direction: 'DESC' } })
+      return Promise.all(listed.spans.map(async root => {
+        const trace = await observabilityStore.getTrace({ traceId: root.traceId })
+        return trace ? {
+          traceId: root.traceId,
+          name: root.name,
+          startedAt: root.startedAt.toISOString(),
+          endedAt: root.endedAt?.toISOString(),
+          metadata: root.metadata,
+          spans: trace.spans.map(span => ({
+            ...span,
+            startedAt: span.startedAt.toISOString(),
+            endedAt: span.endedAt?.toISOString(),
+            createdAt: span.createdAt.toISOString(),
+            updatedAt: span.updatedAt?.toISOString(),
+          })),
+        } : null
+      })).then(traces => traces.filter(Boolean))
+    },
     async close() {
+      await observabilityRuntime.shutdown()
       await storage.close()
     },
   }
