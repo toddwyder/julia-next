@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
 import { homedir } from 'node:os'
-import { readdir } from 'node:fs/promises'
+import { readdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -60,11 +60,13 @@ export function configuredTailscaleHosts(environment: NodeJS.ProcessEnv = proces
   return (environment.JULIA_CONTROL_TAILSCALE_HOST ?? '').split(',').map(name => name.trim()).filter(Boolean)
 }
 
-async function jsonlFiles(root: string, omitCheckpoints = false) {
+export async function jsonlFiles(root: string, omitCheckpoints = false) {
   try {
     const entries = await readdir(root, { recursive: true, withFileTypes: true })
-    return entries.filter(entry => entry.isFile() && entry.name.endsWith('.jsonl') && (!omitCheckpoints || !entry.name.endsWith('.checkpoints.jsonl')))
+    const paths = entries.filter(entry => entry.isFile() && entry.name.endsWith('.jsonl') && (!omitCheckpoints || !entry.name.endsWith('.checkpoints.jsonl')))
       .map(entry => join(entry.parentPath, entry.name))
+    const dated = await Promise.all(paths.map(async path => ({ path, mtimeMs: (await stat(path)).mtimeMs })))
+    return dated.sort((left, right) => right.mtimeMs - left.mtimeMs).slice(0, 64).map(item => item.path)
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
     throw error
@@ -94,10 +96,7 @@ export async function runControlPageServer() {
         ])
         const discovered = await discoverAgentActivity({ codexFiles, commandCodeFiles, mastraTraces: mastraTraces as Record<string, any>[] })
         await agentStore.retain(discovered)
-        const retained = await agentStore.list()
-        const merged = new Map(retained.map(record => [`${record.source}:${record.sourceId}`, record]))
-        discovered.forEach(record => merged.set(`${record.source}:${record.sourceId}`, record))
-        const cards = projectAgentCards([...merged.values()])
+        const cards = projectAgentCards(discovered)
         console.log(JSON.stringify({ event: 'agent-activity-discovery', ok: true, codexFiles: codexFiles.length, commandCodeFiles: commandCodeFiles.length, mastraTraces: mastraTraces.length, runningCards: cards.length, durationMs: performance.now() - startedAt }))
         return { updatedAt: new Date().toISOString(), cards }
       } catch (error) {

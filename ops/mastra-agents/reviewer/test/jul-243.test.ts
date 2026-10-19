@@ -9,11 +9,14 @@ import {
   createAgentActivityStore,
   discoverAgentActivity,
   projectAgentCards,
+  readCodexActivity,
+  readCommandCodeActivity,
   type AgentActivityRecord,
 } from '../src/mastra/agent-activity.ts'
 import { createInitializationActivityRecorder } from '../src/mastra/initialization-observability.ts'
 import { createInitializationRuntime } from '../src/mastra/initialization.ts'
 import { startControlPageServer } from '../src/mastra/control-page.ts'
+import { jsonlFiles } from '../src/mastra/control-server.ts'
 
 const NOW = new Date('2026-10-19T15:00:00.000Z')
 
@@ -38,6 +41,55 @@ test('projects one card per running agent from Codex, CommandCode, and Mastra re
   assert.deepEqual(cards.map(card => card.agentId), ['codex:codex-1', 'commandcode:cc-1', 'mastra:trace-1'])
   assert.deepEqual(cards.map(card => card.status), ['working', 'working', 'working'])
   assert.equal(cards[0].actions[0].label, 'Ran tests')
+  assert.equal('failureKey' in cards[0].actions[0], false)
+})
+
+test('native lifecycle uses the latest turn and finished CommandCode output is not running', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'jul-243-lifecycle-'))
+  const codex = join(root, 'codex.jsonl')
+  const commandCode = join(root, 'commandcode.jsonl')
+  await writeFile(codex, [
+    { timestamp: '2026-10-18T10:00:00.000Z', type: 'session_meta', payload: { id: 'multi-turn' } },
+    { timestamp: '2026-10-18T10:01:00.000Z', type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Build JUL-243: Dashboard A + B' }] } },
+    { timestamp: '2026-10-18T10:02:00.000Z', type: 'event_msg', payload: { type: 'task_complete' } },
+    { timestamp: '2026-10-19T14:00:00.000Z', type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Continue JUL-243' }] } },
+  ].map(JSON.stringify).join('\n'))
+  await writeFile(commandCode, [
+    { type: 'session', id: 'finished-cc', timestamp: '2026-10-19T14:00:00.000Z' },
+    { type: 'message', timestamp: '2026-10-19T14:01:00.000Z', message: { role: 'user', content: [{ type: 'text', text: 'Build JUL-243' }] } },
+    { type: 'message', timestamp: '2026-10-19T14:02:00.000Z', message: { role: 'assistant', content: [{ type: 'text', text: 'Done.' }] } },
+  ].map(JSON.stringify).join('\n'))
+  assert.equal((await readCodexActivity(codex, NOW))?.running, true)
+  assert.equal((await readCommandCodeActivity(commandCode, NOW))?.running, false)
+})
+
+test('native discovery bounds the candidate set before reading session contents', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'jul-243-bounded-'))
+  await Promise.all(Array.from({ length: 70 }, (_, index) => writeFile(join(root, `${String(index).padStart(2, '0')}.jsonl`), '{}\n')))
+  assert.equal((await jsonlFiles(root)).length, 64)
+})
+
+test('native failures use explicit status, normalize volatile details, and never expose the key', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'jul-243-failures-'))
+  const codex = join(root, 'codex.jsonl')
+  const entries: object[] = [
+    { timestamp: '2026-10-19T14:50:00.000Z', type: 'session_meta', payload: { id: 'failure-run' } },
+    { timestamp: '2026-10-19T14:50:01.000Z', type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Build JUL-243: Dashboard A + B' }] } },
+    { timestamp: '2026-10-19T14:51:00.000Z', type: 'response_item', payload: { type: 'function_call', call_id: 'ok', name: 'exec_command', arguments: '{"cmd":"npm test"}' } },
+    { timestamp: '2026-10-19T14:51:01.000Z', type: 'response_item', payload: { type: 'function_call_output', call_id: 'ok', output: '{"exit_code":0,"output":"0 errors"}' } },
+  ]
+  for (let index = 1; index <= 3; index += 1) {
+    entries.push(
+      { timestamp: `2026-10-19T14:5${index + 1}:00.000Z`, type: 'response_item', payload: { type: 'function_call', call_id: `bad-${index}`, name: 'exec_command', arguments: '{"cmd":"npm test"}' } },
+      { timestamp: `2026-10-19T14:5${index + 1}:01.000Z`, type: 'response_item', payload: { type: 'function_call_output', call_id: `bad-${index}`, output: `{"exit_code":1,"output":"Error: same assertion at 2026-10-19T14:5${index}:00.000Z after ${index * 10}ms"}` } },
+    )
+  }
+  await writeFile(codex, entries.map(JSON.stringify).join('\n'))
+  const activity = await readCodexActivity(codex, NOW)
+  assert.equal(activity?.actions[0].outcome, 'succeeded')
+  const card = projectAgentCards([activity!], NOW)[0]
+  assert.equal(card.status, 'looks-stuck')
+  assert.equal('failureKey' in card.actions.at(-1)!, false)
 })
 
 test('Looks stuck uses the settled inactivity and repeated-failure thresholds', () => {
@@ -60,7 +112,8 @@ test('discovers native Codex and CommandCode JSONL plus supplied Mastra traces',
   const commandCode = join(root, 'commandcode.jsonl')
   await writeFile(codex, [
     { timestamp: '2026-10-19T14:58:00.000Z', type: 'session_meta', payload: { id: 'codex-native', cwd: '/work/JUL-243' } },
-    { timestamp: '2026-10-19T14:58:01.000Z', type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Build JUL-243 Dashboard A + B' }] } },
+    { timestamp: '2026-10-19T14:58:01.000Z', type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Build JUL-243: Dashboard A + B' }] } },
+    { timestamp: '2026-10-19T14:58:02.000Z', type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'private follow-up must not become a title' }] } },
     { timestamp: '2026-10-19T14:59:00.000Z', type: 'response_item', payload: { type: 'function_call', call_id: 'call-1', name: 'exec_command', arguments: '{"cmd":"npm test"}' } },
     { timestamp: '2026-10-19T14:59:02.000Z', type: 'response_item', payload: { type: 'function_call_output', call_id: 'call-1', output: '3 passed' } },
   ].map(value => JSON.stringify(value)).join('\n'))
@@ -78,6 +131,7 @@ test('discovers native Codex and CommandCode JSONL plus supplied Mastra traces',
 
   assert.deepEqual(records.map(item => item.source), ['codex', 'commandcode', 'mastra'])
   assert.equal(records[0].actions[0].label, 'Ran tests')
+  assert.equal(records[0].cardTitle, 'Dashboard A + B')
   assert.equal(records[1].actions[0].label, 'Read a project file')
   assert.equal(records[2].sourceId, 'mastra-native')
 })

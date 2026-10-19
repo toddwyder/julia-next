@@ -155,6 +155,7 @@ export const AgentActivityActionSchema = z.object({
   outcome: z.enum(['succeeded', 'failed', 'unknown']),
   failureKey: nonempty.optional(),
 }).strict()
+export const AgentDashboardActionSchema = AgentActivityActionSchema.omit({ failureKey: true }).strict()
 export const AgentActivityRecordSchema = z.object({
   source: z.enum(['codex', 'commandcode', 'mastra']),
   sourceId: nonempty,
@@ -184,7 +185,7 @@ export const AgentDashboardCardSchema = z.object({
   updatedAt: z.string().datetime(),
   status: z.enum(['working', 'looks-stuck']),
   statusDetail: nonempty,
-  actions: z.array(AgentActivityActionSchema),
+  actions: z.array(AgentDashboardActionSchema),
 }).strict()
 export const AgentDashboardStateSchema = z.object({
   updatedAt: z.string().datetime(),

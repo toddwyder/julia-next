@@ -151,8 +151,13 @@ export async function createInitializationRuntime({ storagePath, activity }: { s
     async listMastraTraces() {
       await observabilityRuntime.flush()
       if (!observabilityStore) return []
-      const listed = await observabilityStore.listTraces({ pagination: { page: 0, perPage: 100 }, orderBy: { field: 'startedAt', direction: 'DESC' } })
-      return Promise.all(listed.spans.map(async root => {
+      const roots = []
+      for (let page = 0; ; page += 1) {
+        const listed = await observabilityStore.listTraces({ pagination: { page, perPage: 100 }, orderBy: { field: 'startedAt', direction: 'DESC' } })
+        roots.push(...listed.spans)
+        if (listed.spans.length < 100) break
+      }
+      return Promise.all(roots.map(async root => {
         const trace = await observabilityStore.getTrace({ traceId: root.traceId })
         return trace ? {
           traceId: root.traceId,
@@ -172,7 +177,7 @@ export async function createInitializationRuntime({ storagePath, activity }: { s
     },
     async close() {
       await observabilityRuntime.shutdown()
-      await storage.close()
+      await mastra.shutdown()
     },
   }
 }
