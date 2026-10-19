@@ -16,7 +16,7 @@ import {
 import { createInitializationActivityRecorder } from '../src/mastra/initialization-observability.ts'
 import { createInitializationRuntime } from '../src/mastra/initialization.ts'
 import { startControlPageServer } from '../src/mastra/control-page.ts'
-import { jsonlFiles } from '../src/mastra/control-server.ts'
+import { commandCodeProcessCount, countCommandCodeProcesses, jsonlFiles } from '../src/mastra/control-server.ts'
 
 const NOW = new Date('2026-10-19T15:00:00.000Z')
 
@@ -84,6 +84,16 @@ test('a CommandCode process activates only its newest mapped session, not old tr
   await Promise.all([writeFile(oldPath, session('old', 'JUL-200')), writeFile(activePath, session('active', 'JUL-243'))])
   const records = await discoverAgentActivity({ commandCodeFiles: [activePath, oldPath], activeCommandCodeFiles: [activePath], now: NOW })
   assert.deepEqual(projectAgentCards(records, NOW).map(card => card.agentId), ['commandcode:active'])
+})
+
+test('CommandCode process liveness counts POSIX rows once and fails unknown probes closed with context', async () => {
+  assert.equal(countCommandCodeProcesses('COMMAND ARGS\ncommandcode commandcode --session one\nnode server.js\n', 'linux'), 1)
+  const traces: Record<string, unknown>[] = []
+  await assert.rejects(
+    commandCodeProcessCount(async () => { throw new Error('access denied') }, event => traces.push(event)),
+    /liveness is unavailable/,
+  )
+  assert.deepEqual(traces, [{ event: 'commandcode-process-probe', ok: false, platform: process.platform, error: 'access denied' }])
 })
 
 test('native failures use explicit status, normalize volatile details, and never expose the key', async () => {

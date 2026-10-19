@@ -75,14 +75,23 @@ export async function jsonlFiles(root: string, omitCheckpoints = false) {
   }
 }
 
-export async function commandCodeProcessCount() {
+export function countCommandCodeProcesses(stdout: string, platform = process.platform) {
+  if (platform === 'win32') return Number.parseInt(stdout.trim(), 10) || 0
+  return stdout.split(/\r?\n/).filter(line => /^commandcode\s/i.test(line.trim())).length
+}
+
+export async function commandCodeProcessCount(
+  execute: typeof execFileAsync = execFileAsync,
+  recordTrace: (event: Record<string, unknown>) => void = event => console.log(JSON.stringify(event)),
+) {
   try {
     const { stdout } = process.platform === 'win32'
-      ? await execFileAsync('powershell.exe', ['-NoProfile', '-Command', '@(Get-Process -Name CommandCode -ErrorAction SilentlyContinue).Count'])
-      : await execFileAsync('ps', ['-eo', 'comm,args'])
-    return process.platform === 'win32' ? Number.parseInt(stdout.trim(), 10) || 0 : (stdout.match(/\bcommandcode\b/gi) ?? []).length
-  } catch {
-    return 0
+      ? await execute('powershell.exe', ['-NoProfile', '-Command', '@(Get-Process -Name CommandCode -ErrorAction SilentlyContinue).Count'])
+      : await execute('ps', ['-eo', 'comm,args'])
+    return countCommandCodeProcesses(stdout)
+  } catch (error) {
+    recordTrace({ event: 'commandcode-process-probe', ok: false, platform: process.platform, error: error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200) })
+    throw new Error('CommandCode process liveness is unavailable')
   }
 }
 
