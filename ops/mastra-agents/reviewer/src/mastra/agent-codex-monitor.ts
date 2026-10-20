@@ -2,7 +2,7 @@ import { EventEmitter, once } from 'node:events'
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod/v4'
 import { connectCodexProxy } from './agent-codex-connection.ts'
-import { codexEvent } from './agent-codex.ts'
+import { codexEvent, codexReconciliationEvents } from './agent-codex.ts'
 import { agentError } from './agent-errors.ts'
 import type { createAgentActivityStore } from './agent-activity.ts'
 import type { AgentLaunch } from './agent-events.ts'
@@ -54,24 +54,16 @@ export async function createCodexMonitor(store: Awaited<ReturnType<typeof create
         const time = turn.completedAt ?? turn.startedAt
         if (time !== null && time !== undefined) lastAt = new Date(time * 1000).toISOString()
         if (!lastAt) continue // No authoritative timestamp means no invented activity clock.
-        for (const item of turn.items) {
-          const parsed = z.object({ id: z.string(), status: z.string().optional() }).passthrough().parse(item)
-          const method = parsed.status === 'inProgress' ? 'item/started' : 'item/completed'
-          await store.append({ ...codexEvent(method, { item }), launchId: launch.launchId, eventId: `reconcile:${turn.id}:${parsed.id}:${parsed.status ?? 'completed'}`, occurredAt: lastAt })
+        for (const [index, event] of codexReconciliationEvents(turn).entries()) {
+          await store.append({ ...event, launchId: launch.launchId, eventId: `reconcile:${turn.id}:${index}:${turn.status}`, occurredAt: lastAt })
         }
       }
       cursor = page.nextCursor ?? undefined
     } while (cursor)
-    const kind = thread.status.type === 'active' ? 'run-started' : thread.status.type === 'idle' ? 'run-completed' : thread.status.type === 'systemError' ? 'run-failed' : 'disconnected'
+    const kind = thread.status.type === 'active' ? 'run-started' : thread.status.type === 'idle' ? 'unknown' : thread.status.type === 'systemError' ? 'run-failed' : 'disconnected'
     await store.append({ launchId: launch.launchId, eventId: randomUUID(), kind, providerKind: 'thread/read', providerStatus: thread.status.type, occurredAt: lastAt ?? (await store.records()).find(record => record.sourceId === launch.launchId)!.updatedAt })
   }
   try {
-    // A complete official inventory; identity still comes only from Julia's launch registry.
-    let cursor: string | undefined
-    do {
-      const page = z.object({ data: z.array(z.unknown()), nextCursor: z.string().nullable().optional() }).parse(await connection.request('thread/list', { limit: 100, cursor, sourceKinds: ['cli', 'vscode', 'exec', 'appServer', 'subAgent', 'subAgentReview', 'subAgentCompact', 'subAgentThreadSpawn', 'subAgentOther', 'unknown'] }))
-      cursor = page.nextCursor ?? undefined
-    } while (cursor)
     for (const launch of launches) await reconcile(launch)
     while (buffered.length) { const message = buffered.shift()!; await receive(message.method, message.params) }
     ready = true

@@ -126,3 +126,8 @@ The [full stack](evidence/commandcode-preflight-error.txt) is preserved. Follow-
 The restart stops under Todd's explicit failure rule. No model inference, reviewer invocation, purchase, Proof or deployment occurred. The builder did not repair or replace the installed package after the failure.
 
 Proposed next plan, awaiting Todd: disable auto-update on every CommandCode invocation, replace the affected CommandCode installation as a whole with exact 1.72.3 (the adapter's documented version), preserve authentication outside the package, verify public startup/account commands without inference, read its matching documentation again, and then continue the existing approved removal/test/Proof/review sequence. Do not patch a dependency file into the existing installation, spend money, reset the previous Proof rounds or substitute a different reviewer. Complete the full free Proof, including all other providers if the documented zero-credit free-model attempt fails. Gemini review and deployment still require the identical passing candidate. Rebuild nothing until this failure plan is approved.
+
+
+### Todd’s approved continuation, 20 October
+
+The pinned-1.72.3 proposal above is superseded. External coding tools use current stable at run start; only Julia libraries stay locked. CommandCode is replaced as a whole using npm’s stable dist-tag, sign-in retained, automatic updates disabled thereafter, startup/account checked without inference, real contracts rerun and version recorded. Fixable machine defects no longer stop this card. Only a failed independent review, failed Proof, or an account/money/product decision parks execution.

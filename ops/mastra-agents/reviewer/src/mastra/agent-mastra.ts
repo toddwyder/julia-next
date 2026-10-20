@@ -29,17 +29,21 @@ export async function monitorMastraStream<T extends { status: string }>({ store,
   store: Awaited<ReturnType<typeof createAgentActivityStore>>; launch: AgentLaunch;
   stream: { fullStream: AsyncIterable<unknown>; result: Promise<T> }; flush: () => Promise<void>
 }): Promise<T> {
+  const settled = stream.result.then(value => ({ value }), error => ({ error }))
   if (launch.provider !== 'mastra') throw new Error('Mastra launch requires mastra provider')
   await store.register(launch)
   const append = (body: Body) => store.append({ ...body, launchId: launch.launchId, eventId: randomUUID(), occurredAt: new Date().toISOString() })
   try {
     for await (const chunk of stream.fullStream) await append(mastraEvent(chunk))
-    const result = await stream.result
+    const outcome = await settled
+    if ('error' in outcome) throw outcome.error
+    const result = outcome.value
     await flush()
     const kind = result.status === 'success' ? 'run-completed' : result.status === 'suspended' || result.status === 'paused' ? 'run-suspended' : result.status === 'canceled' ? 'run-canceled' : result.status === 'failed' || result.status === 'tripwire' ? 'run-failed' : 'disconnected'
     await append({ kind, providerKind: 'workflow-result', providerStatus: result.status })
     return result
   } catch (error) {
+    await settled
     console.error(JSON.stringify(agentError(error, { provider: 'mastra', runId: launch.providerRunId, eventKind: 'stream-error' })))
     await append({ kind: 'disconnected', providerKind: 'stream-error', providerStatus: 'disconnected' })
     throw new Error('Mastra monitoring failed', { cause: error })

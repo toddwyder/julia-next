@@ -14,7 +14,7 @@ const FrameSchema = z.discriminatedUnion('type', [
 const RunningToolSchema = z.object({ type: z.literal('tool_running'), toolCallId: z.string().min(1), toolName: z.string().min(1).max(160) })
 const ToolEndSchema = z.object({ type: z.enum(['tool_completed', 'tool_errored']), toolCallId: z.string().min(1), toolName: z.string().min(1).max(160), error: z.string().optional() })
 
-/** 1.72.3 bundled headless.md: unknown event kinds are retained without invented semantics. */
+/** 1.84.0 bundled headless.md: unknown event kinds are retained without invented semantics. */
 export function commandCodeEvent(value: unknown): EventBody {
   const frame = FrameSchema.parse(value)
   if (frame.type === 'result') return { kind: frame.subtype === 'success' ? 'run-completed' : 'run-failed', providerKind: 'result', providerStatus: frame.subtype }
@@ -28,23 +28,24 @@ export function commandCodeEvent(value: unknown): EventBody {
     const failed = tool.type === 'tool_errored'
     // Only the explicit error field contributes to failure identity. Tool result/output is excluded.
     const errorCategory = failed ? createHash('sha256').update((tool.error ?? 'unspecified-tool-error').replace(/\s+/g, ' ').trim()).digest('hex') : undefined
-    return { kind: 'action-completed', providerKind: tool.type, providerStatus: failed ? 'errored' : 'completed', action: { id: tool.toolCallId, type: 'tool', name: tool.toolName, outcome: failed ? 'failed' : 'unknown', ...(failed ? { errorCode: 'tool_errored', errorCategory } : {}) } }
+    return { kind: 'action-completed', providerKind: tool.type, providerStatus: failed ? 'errored' : 'completed', action: { id: tool.toolCallId, type: 'tool', name: tool.toolName, outcome: failed ? 'failed' : 'succeeded', ...(failed ? { errorCode: 'tool_errored', errorCategory } : {}) } }
   }
   return { kind: 'unknown', providerKind: frame.event.type.slice(0, 160), providerStatus: 'unknown' }
 }
 
-export async function runMonitoredCommandCode({ store, launch, prompt, cwd, executable = 'command-code', maxTurns = 100, signal, allowTools = false }: {
-  store: Awaited<ReturnType<typeof createAgentActivityStore>>; launch: AgentLaunch; prompt: string; cwd: string; executable?: string; maxTurns?: number; signal?: AbortSignal; allowTools?: boolean
+export async function runMonitoredCommandCode({ store, launch, prompt, cwd, executable = 'command-code', maxTurns = 100, signal, allowTools = false, model, onFrame, onSpawn }: {
+  store: Awaited<ReturnType<typeof createAgentActivityStore>>; launch: AgentLaunch; prompt: string; cwd: string; executable?: string; maxTurns?: number; signal?: AbortSignal; allowTools?: boolean; model?: string; onFrame?: (frame: unknown) => Promise<void>; onSpawn?: (pid: number) => void
 }) {
   if (launch.provider !== 'commandcode') throw new Error('CommandCode launch requires commandcode provider')
   if (!Number.isSafeInteger(maxTurns) || maxTurns < 1) throw new Error('Monitored CommandCode maxTurns must be a positive safe integer')
   await store.register(launch)
-  const child = spawn(executable, ['-p', prompt, '--output-format', 'json', '--max-turns', String(maxTurns), '--skip-onboarding', '--no-auto-update', '--trust', ...(allowTools ? ['--yolo'] : [])], { cwd, signal, stdio: ['ignore', 'pipe', 'pipe'] })
+  const child = spawn(executable, ['-p', prompt, '--output-format', 'json', '--max-turns', String(maxTurns), '--skip-onboarding', '--no-auto-update', '--no-skills', '--trust', ...(model ? ['--model', model] : []), ...(allowTools ? ['--yolo'] : [])], { cwd, signal, stdio: ['ignore', 'pipe', 'pipe'] })
   child.stderr.resume() // Human stderr can contain prompts or credentials; never ingest it.
   const exited = new Promise<{ code: number | null; error?: Error }>(resolve => {
     child.once('error', error => resolve({ code: null, error }))
     child.once('close', code => resolve({ code }))
   })
+  if (child.pid) onSpawn?.(child.pid)
   let started = false
   let terminal = false
   let usage: unknown
@@ -54,6 +55,7 @@ export async function runMonitoredCommandCode({ store, launch, prompt, cwd, exec
       if (!line.trim()) continue
       const raw: unknown = JSON.parse(line)
       const frame = FrameSchema.parse(raw)
+      await onFrame?.(raw)
       const nativeId = frame.type === 'result' ? frame.sessionId : frame.event.sessionId
       if (typeof nativeId === 'string' && nativeId) await store.identify(launch.launchId, nativeId)
       if (!started) {
@@ -69,12 +71,13 @@ export async function runMonitoredCommandCode({ store, launch, prompt, cwd, exec
     }
   } catch (error) {
     child.kill('SIGTERM')
+    await exited
     console.error(JSON.stringify(agentError(error, { provider: 'commandcode', runId: launch.providerRunId, eventKind: 'stream-error' })))
     await append({ kind: 'disconnected', providerKind: 'stream-error', providerStatus: 'invalid-stream' })
     throw new Error('CommandCode stream failed', { cause: error })
   }
   const result = await exited
   if (result.error) console.error(JSON.stringify(agentError(result.error, { provider: 'commandcode', runId: launch.launchId, eventKind: 'child-exit' })))
-  if (result.code !== 0 || !terminal) await append({ kind: result.code === 0 || result.code === null ? 'disconnected' : 'run-failed', providerKind: 'child-exit', providerStatus: result.code === null ? 'spawn-error' : `exit-${result.code}` })
+  if (result.code !== 0 || !terminal) await append({ kind: signal?.aborted ? 'run-canceled' : result.code === 0 || result.code === null ? 'disconnected' : 'run-failed', providerKind: 'child-exit', providerStatus: result.code === null ? 'spawn-error' : `exit-${result.code}` })
   return { exitCode: result.code, terminal, usage }
 }

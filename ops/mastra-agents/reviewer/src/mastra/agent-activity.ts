@@ -54,7 +54,7 @@ function project(launch: AgentLaunch, registeredAt: string, events: AgentEvent[]
 }
 
 export async function createAgentActivityStore(storagePath: string) {
-  const listeners = new Set<(event: AgentEvent) => void>()
+  const listeners = new Set<(event: AgentEvent) => void | Promise<void>>()
   const client = createClient({ url: `file:${storagePath.replaceAll('\\', '/')}` })
   await client.batch([
     `CREATE TABLE IF NOT EXISTS julia_agent_launches (launch_id TEXT PRIMARY KEY, registered_at TEXT NOT NULL, metadata TEXT NOT NULL)`,
@@ -92,10 +92,10 @@ export async function createAgentActivityStore(storagePath: string) {
       const metadata = AgentLaunchSchema.parse(JSON.parse(String(launch.rows[0].metadata)))
       const stored = { ...event, launch: metadata }
       const result = await client.execute({ sql: 'INSERT OR IGNORE INTO julia_agent_events (launch_id,event_id,event_json) VALUES (?,?,?)', args: [event.launchId, event.eventId, JSON.stringify(stored)] })
-      if (result.rowsAffected) for (const listener of listeners) listener(stored)
+      if (result.rowsAffected) for (const listener of listeners) await listener(stored)
     },
     history, records,
-    subscribe(listener: (event: AgentEvent) => void) { listeners.add(listener); return () => { listeners.delete(listener) } },
+    subscribe(listener: (event: AgentEvent) => void | Promise<void>) { listeners.add(listener); return () => { listeners.delete(listener) } },
     async launches(): Promise<AgentLaunch[]> {
       const result = await client.execute('SELECT metadata FROM julia_agent_launches ORDER BY registered_at')
       return result.rows.map(row => AgentLaunchSchema.parse(JSON.parse(String(row.metadata))))

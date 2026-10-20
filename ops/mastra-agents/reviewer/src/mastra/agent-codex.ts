@@ -19,6 +19,7 @@ export function codexEvent(method: string, params: unknown): EventBody {
   }
   if (method === 'item/started' || method === 'item/completed') {
     const { item } = z.object({ item: ItemSchema }).parse(params)
+    if (['reasoning', 'agentMessage', 'plan', 'userMessage'].includes(item.type)) return { kind: 'progress', providerKind: method, providerStatus: item.type }
     const failed = item.status === 'failed' || item.status === 'declined' || (item.type === 'commandExecution' && item.exitCode !== null && item.exitCode !== undefined && item.exitCode !== 0)
     const outcome = method === 'item/started' ? 'unknown' : failed ? 'failed' : item.status === 'completed' || item.status === undefined ? 'succeeded' : 'unknown'
     return { kind: method === 'item/started' ? 'action-started' : 'action-completed', providerKind: method, providerStatus: item.status ?? (method === 'item/started' ? 'inProgress' : 'completed'), ...(item.receiverThreadIds ? { relatedRunIds: item.receiverThreadIds } : {}), action: {
@@ -29,4 +30,14 @@ export function codexEvent(method: string, params: unknown): EventBody {
   }
   if (method === 'thread/closed') return { kind: 'disconnected', providerKind: method, providerStatus: 'closed' }
   return { kind: 'unknown', providerKind: method.slice(0, 160), providerStatus: 'unknown' }
+}
+
+/** A thread being idle does not say whether its last turn succeeded or crashed. */
+export function codexReconciliationEvents(value: unknown): EventBody[] {
+  const turn = TurnSchema.extend({ items: z.array(z.unknown()) }).parse(value)
+  const events = turn.items.map(item => {
+    const parsed = ItemSchema.parse(item)
+    return codexEvent(parsed.status === 'inProgress' ? 'item/started' : 'item/completed', { item })
+  })
+  return [...events, codexEvent(turn.status === 'inProgress' ? 'turn/started' : 'turn/completed', { turn })]
 }

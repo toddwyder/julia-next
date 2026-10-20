@@ -26,13 +26,13 @@ export async function runAgentMonitor(args: string[]) {
   const store = await createAgentActivityStore(configuration.storagePath)
   try {
     if (provider === 'commandcode') {
-      const result = await runMonitoredCommandCode({ store, launch: { ...configuration.launch, providerRunId: `unresolved:${configuration.launch.launchId}` }, prompt, cwd: configuration.cwd, executable: configuration.commandCodeExecutable, maxTurns: configuration.maxTurns, allowTools: configuration.allowTools })
+      const result = await runMonitoredCommandCode({ store, launch: { ...configuration.launch, providerRunId: `unresolved:${configuration.launch.launchId}` }, prompt, cwd: configuration.cwd, executable: configuration.commandCodeExecutable, maxTurns: configuration.maxTurns, allowTools: configuration.allowTools, model: configuration.launch.model })
       console.log(JSON.stringify({ event: 'monitored-commandcode-result', launchId: configuration.launch.launchId, ...result }))
       return result.exitCode ?? 1
     }
     const monitor = await createCodexMonitor(store, { socketPath: configuration.codexSocketPath })
     try {
-      const launch = await monitor.launch(configuration.launch, { cwd: configuration.cwd, model: configuration.launch.model })
+      const launch = await monitor.launch(configuration.launch, { cwd: configuration.cwd, model: configuration.launch.model, sandbox: 'workspace-write', approvalPolicy: 'never' })
       const done = monitor.completed(launch.launchId)
       await monitor.request('turn/start', { threadId: launch.providerRunId, input: [{ type: 'text', text: prompt }] })
       const [result] = await done
