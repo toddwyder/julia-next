@@ -1,0 +1,13 @@
+✔ installed Codex executes a sandbox command and exposes native thread records without inference (491.593802ms)
+✔ installed CommandCode free-model lifecycle produces Working then durable Finished (6891.852698ms)
+✔ real CommandCode killed during its model request becomes Stopped (2868.506101ms)
+✔ real Codex exposes a foreground wait as a running command before completion (25544.717216ms)
+✔ real registered idle Codex thread survives monitor restart before its first message (723.448714ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 37093.215741

@@ -3,6 +3,7 @@ import { promisify } from 'node:util'
 import { once } from 'node:events'
 import WebSocket from 'ws'
 import { z } from 'zod/v4'
+import { agentError } from './agent-errors.ts'
 
 const MessageSchema = z.object({ id: z.union([z.number(), z.string()]).optional(), method: z.string().optional(), params: z.unknown().optional(), result: z.unknown().optional(), error: z.object({ code: z.number(), message: z.string() }).optional() })
 
@@ -19,6 +20,13 @@ export async function connectCodexProxy({ onNotification = async () => {}, onDis
   let nextId = 0
   let closing = false
   let queue = Promise.resolve()
+  let disconnected = false
+  const disconnect = async (error?: Error) => {
+    if (disconnected) return
+    disconnected = true
+    try { await onDisconnect(error) }
+    catch (failure) { console.error(JSON.stringify(agentError(failure, { provider: 'codex', runId: 'connection', eventKind: 'disconnect-report-failed' }))) }
+  }
   const pending = new Map<number | string, { resolve: (value: unknown) => void; reject: (error: Error) => void; timeout: ReturnType<typeof setTimeout> }>()
   const send = (message: unknown) => socket.send(JSON.stringify(message))
   const fail = (error: Error) => {
@@ -29,7 +37,7 @@ export async function connectCodexProxy({ onNotification = async () => {}, onDis
     socket.once('error', error => { fail(error) })
     socket.once('close', () => {
       fail(new Error('Codex app-server proxy disconnected'))
-      queue = queue.then(() => closing ? undefined : onDisconnect())
+      queue = queue.then(() => closing ? undefined : disconnect())
       queue.then(resolve, resolve)
     })
   })
@@ -47,7 +55,7 @@ export async function connectCodexProxy({ onNotification = async () => {}, onDis
         await onNotification(message.method, message.params)
 
       }
-    }).catch(async error => { fail(error); await onDisconnect(error); socket.terminate() })
+    }).catch(async error => { fail(error); try { await disconnect(error) } finally { socket.terminate() } })
   })
   const request = (method: string, params: unknown): Promise<unknown> => new Promise((resolve, reject) => {
     const id = nextId++

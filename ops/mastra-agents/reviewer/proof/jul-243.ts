@@ -31,8 +31,14 @@ const tasks: Promise<unknown>[] = []
 const cancel: (() => Promise<unknown>)[] = []
 const flush: (() => Promise<unknown>)[] = []
 const close: (() => Promise<unknown>)[] = []
-const own = <T>(task: Promise<T>) => { task.catch(() => {}); tasks.push(task); return task }
-const meta = (launchId: string, provider: 'codex' | 'mastra' | 'commandcode', model: string) => ({ launchId, provider, cardIdentifier: 'JUL-243', cardTitle: `Dashboard Proof: ${launchId}`, role: 'Proof', model, stage: 'Proof', round: 1 })
+const own = <T>(task: Promise<T>) => {
+  // A referenced deadline also keeps Node alive until this owned task settles.
+  let timer: ReturnType<typeof setTimeout>
+  const deadline = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('Owned Proof task exceeded 20 minutes')), 1200000) })
+  const bounded = Promise.race([task, deadline]).finally(() => clearTimeout(timer))
+  bounded.catch(() => {}); tasks.push(bounded); return bounded
+}
+const meta = (launchId: string, provider: 'codex' | 'mastra' | 'commandcode', model: string) => ({ launchId, provider, cardIdentifier: 'JUL-243', cardTitle: `Dashboard Proof: ${launchId}`, role: 'Proof', model, stage: 'Proof', round: 2 })
 let failure: string | undefined
 let passed = false
 let candidate = ''
@@ -82,26 +88,40 @@ try {
   await startDashboard()
   const browser = await chromium.launch()
   close.unshift(() => browser.close())
-  const page = await browser.newPage({ viewport: { width: 390, height: 844 } })
   const consoleErrors: string[] = []
-  page.on('console', message => { if (message.type() === 'error') consoleErrors.push(message.text()) })
-  page.on('pageerror', error => consoleErrors.push(error.message))
   const capture = async (name: string) => {
-    assert.equal((await page.goto(dashboardUrl))!.status(), 200)
-    await page.locator('.agent-card').first().waitFor()
-    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
-    await page.screenshot({ path: join(evidence, `${name}.png`), fullPage: true })
-    await save(`${name}.json`, await (await fetch(`${dashboardUrl}/api/agents`)).json())
-    assert.deepEqual(consoleErrors, [])
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 } })
+    page.on('console', message => { if (message.type() === 'error') consoleErrors.push(message.text()) })
+    page.on('pageerror', error => consoleErrors.push(error.message))
+    try {
+      assert.equal((await page.goto(dashboardUrl))!.status(), 200)
+      await page.locator('.agent-card').first().waitFor()
+      const expected: Record<string, [string, string]> = {
+        'commandcode-working': ['commandcode', 'Working'], 'mastra-working': ['mastra', 'Working'],
+        'codex-three-failures': ['codex-failures', 'Stopped'], 'mastra-paused': ['mastra', 'Stopped'],
+        'dying-stopped': ['dying', 'Stopped'], 'idle-stopped': ['idle', 'Stopped'],
+        'long-wait-after-fifteen-minutes': ['long-wait', 'Working'],
+      }
+      if (expected[name]) {
+        const [id, label] = expected[name]
+        await expect(page.locator('.agent-card').filter({ has: page.getByRole('heading', { name: `Dashboard Proof: ${id}`, exact: true }) }).locator('.agent-status')).toContainText(label)
+      }
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+      await page.screenshot({ path: join(evidence, `${name}.png`), fullPage: true })
+      await save(`${name}.json`, await (await fetch(`${dashboardUrl}/api/agents`)).json())
+      assert.deepEqual(consoleErrors, [])
+    } finally { await page.close() }
   }
+  const observations: Promise<unknown>[] = []
+  const observe = (name: string) => { observations.push(own(capture(name))) }
   let commandcodeWorking = false
   let repeatedFailureSeen = false
   let mastraWorking = false
   store.subscribe(async event => {
     const cards = await store.cards()
-    if (event.launchId === 'commandcode' && !commandcodeWorking && cards.some(card => card.agentId === 'commandcode:commandcode' && card.status === 'working')) { commandcodeWorking = true; await capture('commandcode-working') }
-    if (event.launchId === 'mastra' && !mastraWorking && cards.some(card => card.agentId === 'mastra:mastra' && card.status === 'working')) { mastraWorking = true; await capture('mastra-working') }
-    if (event.launchId === 'codex-failures' && !repeatedFailureSeen && cards.some(card => card.agentId === 'codex:codex-failures' && card.status === 'stopped')) { repeatedFailureSeen = true; await capture('codex-three-failures') }
+    if (event.launchId === 'commandcode' && !commandcodeWorking && cards.some(card => card.agentId === 'commandcode:commandcode' && card.status === 'working')) { commandcodeWorking = true; observe('commandcode-working') }
+    if (event.launchId === 'mastra' && !mastraWorking && cards.some(card => card.agentId === 'mastra:mastra' && card.status === 'working')) { mastraWorking = true; observe('mastra-working') }
+    if (event.launchId === 'codex-failures' && !repeatedFailureSeen && cards.some(card => card.agentId === 'codex:codex-failures' && card.status === 'stopped')) { repeatedFailureSeen = true; observe('codex-three-failures') }
   })
   const idle = await monitor.launch(meta('idle', 'codex', model), policy)
   const idleStarted = Date.now()
@@ -115,13 +135,17 @@ try {
   }
   await startTurn(long.providerRunId, 'Execute sleep 920 in the foreground. Keep waiting for it until it finishes. A long wait is the entire task. Do not create files, run anything else, delegate, or request approval. Then reply done.')
   let finished = false
-  longDone.then(() => { finished = true })
+  longDone.then(() => { finished = true }, () => { finished = true })
+  let longAfterFifteenMinutes = false
   const samples: { at: string; status: string; runningActions: number }[] = []
   const longSampling = own(expect.poll(async () => {
     const card = (await store.cards()).find(card => card.agentId === 'codex:long-wait')
     if (card) samples.push({ at: new Date().toISOString(), status: card.status, runningActions: card.actions.filter(action => action.phase === 'running').length })
     await save('long-wait-samples.json', samples)
-    if (Date.now() - idleStarted >= 900000) assert.equal((await store.cards()).find(card => card.agentId === 'codex:idle')!.status, 'stopped')
+    if (Date.now() - idleStarted >= 900000) {
+      assert.equal((await store.cards()).find(card => card.agentId === 'codex:idle')!.status, 'stopped')
+      if (!longAfterFifteenMinutes) { longAfterFifteenMinutes = true; await capture('long-wait-after-fifteen-minutes') }
+    }
     return finished
   }, { timeout: 1050000, intervals: [1000] }).toBe(true))
   const mastraRun = await mastra.getWorkflow('workflow').createRun()
@@ -189,6 +213,7 @@ try {
   await save('retained-history.json', { commandcode: before, mastra: await store.history('mastra'), cards: await store.cards(), consoleErrors })
   assert.equal((await run('git', ['rev-parse', 'HEAD'])).stdout.trim(), candidate)
   assert.equal((await run('git', ['diff', '--binary', 'HEAD'])).stdout, '')
+  await Promise.all(observations)
   passed = true
 } catch (error) {
   failure = error instanceof Error ? error.message : String(error)

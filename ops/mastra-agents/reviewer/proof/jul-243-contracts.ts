@@ -52,3 +52,44 @@ test('real CommandCode killed during its model request becomes Stopped', { skip:
   assert.equal((await store.cards())[0].status, 'stopped')
   assert.equal((await store.history('cutoff')).at(-1)?.kind, 'disconnected')
 })
+
+test('real Codex exposes a foreground wait as a running command before completion', { skip: process.env.JULIA_CODEX_MODEL_CONTRACT !== '1', timeout: 120000 }, async t => {
+  const { createCodexMonitor } = await import('../src/mastra/agent-codex-monitor.ts')
+  const root = await mkdtemp(join(tmpdir(), 'jul243-current-wait-'))
+  const store = await createAgentActivityStore(join(root, 'events.db'))
+  const monitor = await createCodexMonitor(store)
+  t.after(async () => { await monitor.close(); store.close(); await rm(root, { recursive: true, force: true }) })
+  const sandbox = await monitor.request('command/exec', { command: ['/usr/bin/printf', 'sandbox-before-model'], cwd: root, sandboxPolicy: { type: 'workspaceWrite', writableRoots: [root], networkAccess: false }, timeoutMs: 10000 }) as { exitCode: number; stdout: string }
+  assert.deepEqual({ exitCode: sandbox.exitCode, stdout: sandbox.stdout }, { exitCode: 0, stdout: 'sandbox-before-model' })
+  const models = await monitor.request('model/list', {}) as { data: { model: string; isDefault: boolean }[] }
+  const model = models.data.find(item => item.isDefault)!.model
+  const launch = await monitor.launch({ launchId: 'wait', provider: 'codex', cardIdentifier: 'JUL-243', cardTitle: 'Dashboard', role: 'Proof', model, stage: 'Contract', round: 1 }, { cwd: root, model, approvalPolicy: 'never', sandbox: 'workspace-write' })
+  let running = false
+  store.subscribe(async event => { if (event.kind === 'action-started' && event.action?.type === 'commandExecution') running = (await store.cards())[0].status === 'working' })
+  const completed = monitor.completed('wait', AbortSignal.timeout(100000))
+  const start = await monitor.request('turn/start', { threadId: launch.providerRunId, approvalPolicy: 'never', sandboxPolicy: { type: 'workspaceWrite', writableRoots: [root], networkAccess: false }, input: [{ type: 'text', text: 'Run exactly sleep 3 using the command execution tool, wait for completion, then reply done. Do not run other commands or create files.' }] }) as { turn: { id: string } }
+  t.after(async () => { try { await monitor.request('turn/interrupt', { threadId: launch.providerRunId, turnId: start.turn.id }) } catch {} })
+  const [terminal] = await completed as { kind: string }[]
+  assert.equal(terminal.kind, 'run-completed')
+  assert.equal(running, true)
+  const turns = await monitor.request('thread/turns/list', { threadId: launch.providerRunId, limit: 100, itemsView: 'full' }) as { data: { items: { type: string; command?: string; exitCode?: number }[] }[] }
+  assert.equal(turns.data.flatMap(turn => turn.items).some(item => item.type === 'commandExecution' && item.command?.includes('sleep 3') && item.exitCode === 0), true)
+  assert.equal((await store.records())[0].state, 'finished')
+})
+
+test('real registered idle Codex thread survives monitor restart before its first message', async t => {
+  const { createCodexMonitor } = await import('../src/mastra/agent-codex-monitor.ts')
+  const root = await mkdtemp(join(tmpdir(), 'jul243-current-idle-'))
+  const store = await createAgentActivityStore(join(root, 'events.db'))
+  t.after(async () => { store.close(); await rm(root, { recursive: true, force: true }) })
+  const monitor = await createCodexMonitor(store)
+  const launch = await monitor.launch({ launchId: 'idle-restart', provider: 'codex', cardIdentifier: 'JUL-243', cardTitle: 'Dashboard', role: 'Proof', model: 'none', stage: 'Contract', round: 1 }, { cwd: root, approvalPolicy: 'never', sandbox: 'workspace-write' })
+  await monitor.close()
+  const reopened = await createCodexMonitor(store)
+  try {
+    const native = await reopened.request('thread/read', { threadId: launch.providerRunId }) as { thread: { id: string; status: { type: string } } }
+    assert.equal(native.thread.id, launch.providerRunId)
+    assert.equal(native.thread.status.type, 'idle')
+    assert.equal((await store.cards())[0].status, 'working')
+  } finally { await reopened.close() }
+})

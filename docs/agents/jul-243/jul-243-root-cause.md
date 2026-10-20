@@ -167,3 +167,8 @@ Raw databases remain in `.artifacts/jul-243-proof-2026-10-20/` on OVH. Round 2 e
 7. Only after passing complete Proof, push the whole-PR/removal-list Gemini review request to `review/pr-303`, wait for `review.md`, verify no reviewer commits on the PR branch, and require review and Proof to approve the identical candidate. Keep the original merge, branch cleanup, deploy and live Tailscale/clean-console finish line.
 
 No code in this proposed plan has been built after the failed Proof.
+
+
+## Todd’s 20 October continuation correction — round 1 repair
+
+The prior request to await repair approval is superseded. Todd directed the maker to diagnose and fix within two rounds; the failed clean-restart Proof is round 1. Native libSQL 0.18.0 `Config.timeout` defaults to immediate lock failure. A separate Python SQLite process holding a write lock reproduced SQLITE_BUSY; setting the documented native timeout to 5000ms passes the same public ingestion/history test. No custom retry loop was added. Codex terminal events are cached for late waiters; disconnect settles waits even when writes/reporting fail. Tests reproduce both lost completion and a notification/disconnect callback failure. Browser observations are owned separately from ingestion and use separate pages, so they cannot overlap navigation or make an evidence failure disconnect a provider. Referenced bounded task waits keep Node alive for failure handling. Native Codex sandbox + foreground-wait and idle-restart contracts pass; the exact unmaterialized-before-first-message protocol case is treated as empty native history. The full second-round Proof remains required before review.

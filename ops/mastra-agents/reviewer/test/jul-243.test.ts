@@ -1,5 +1,6 @@
 import test, { type TestContext } from 'node:test'
 import assert from 'node:assert/strict'
+import { once } from 'node:events'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -238,4 +239,86 @@ test('a provider result rejected before its stream ends is handled and persisted
   const stream = { result: Promise.reject(Error('native result failed')), fullStream: (async function* () { await new Promise(resolve => setTimeout(resolve, 40)); yield { type: 'workflow-start', payload: {} } })() }
   await assert.rejects(monitorMastraStream({ store, launch: { launchId: 'result-error', provider: 'mastra', providerRunId: 'native', cardIdentifier: 'JUL-243', cardTitle: 'Dashboard', role: 'workflow', model: 'none', stage: 'Test', round: 1 }, stream, flush: async () => {} }), /Mastra monitoring failed/)
   assert.equal((await store.history('result-error')).at(-1)?.kind, 'disconnected')
+})
+
+
+test('a provider event survives another process briefly holding the ledger write lock', async t => {
+  const { spawn } = await import('node:child_process')
+  const dir = await mkdtemp(join(tmpdir(), 'jul243-contention-'))
+  const path = join(dir, 'events.db')
+  const store = await createAgentActivityStore(path)
+  t.after(async () => { store.close(); await rm(dir, { recursive: true, force: true }) })
+  await store.register({ launchId: 'locked', provider: 'codex', providerRunId: 'native', cardIdentifier: 'JUL-243', cardTitle: 'Dashboard', role: 'Proof', model: 'subscription', stage: 'Proof', round: 1 })
+  const locker = spawn('python3', ['-u', '-c', "import sqlite3,sys,time; c=sqlite3.connect(sys.argv[1]); c.execute('BEGIN IMMEDIATE'); print('locked',flush=True); time.sleep(0.25); c.commit()", path])
+  const exited = once(locker, 'exit')
+  t.after(() => { if (locker.exitCode === null) locker.kill() })
+  await once(locker.stdout, 'data')
+  await store.append({ launchId: 'locked', eventId: 'start', kind: 'run-started', providerKind: 'turn/started', providerStatus: 'inProgress', occurredAt: new Date().toISOString() })
+  assert.equal((await store.cards())[0].status, 'working')
+  assert.deepEqual((await store.history('locked')).map(event => event.kind), ['run-started'])
+  assert.equal((await exited)[0], 0)
+})
+
+for (const subscriberFails of [false, true]) test(`Codex completion survives an early terminal event${subscriberFails ? ' and a failed evidence subscriber' : ''}`, async t => {
+  const { WebSocketServer } = await import('ws')
+  const { createCodexMonitor } = await import('../src/mastra/agent-codex-monitor.ts')
+  const dir = await mkdtemp(join(tmpdir(), 'jul243-protocol-'))
+  const socketPath = join(dir, 'codex.sock')
+  // HTTP server listens on a Unix socket, matching the installed daemon's public transport.
+  const { createServer } = await import('node:http')
+  const http = createServer()
+  const ws = new WebSocketServer({ server: http })
+  http.listen(socketPath)
+  await once(http, 'listening')
+  const store = await createAgentActivityStore(join(dir, 'events.db'))
+  const connected = once(ws, 'connection')
+  ws.on('connection', peer => peer.on('message', data => {
+    const message = JSON.parse(data.toString())
+    if (message.id === undefined) return
+    peer.send(JSON.stringify({ id: message.id, result: message.method === 'thread/start' ? { thread: { id: 'native' } } : {} }))
+  }))
+  const monitor = await createCodexMonitor(store, { socketPath })
+  t.after(async () => { await monitor.close(); store.close(); ws.close(); await new Promise<void>(resolve => http.close(() => resolve())); await rm(dir, { recursive: true, force: true }) })
+  await monitor.launch({ launchId: 'terminal', provider: 'codex', cardIdentifier: 'JUL-243', cardTitle: 'Dashboard', role: 'Proof', model: 'subscription', stage: 'Proof', round: 1 })
+  const persisted = new Promise<void>(resolve => store.subscribe(event => { if (event.kind === 'run-completed') { resolve(); if (subscriberFails) throw new Error('evidence disk unavailable') } }))
+  const [peer] = await connected
+  peer.send(JSON.stringify({ method: 'turn/completed', params: { threadId: 'native', turn: { id: 'turn', status: 'completed', items: [] } } }))
+  await persisted
+  await new Promise(resolve => setImmediate(resolve))
+  const completion = await Promise.race([monitor.completed('terminal'), new Promise(resolve => setTimeout(() => resolve('missing completion'), 150))])
+  assert.equal((completion as { kind: string }[])[0]?.kind, subscriberFails ? 'disconnected' : 'run-completed')
+  assert.equal((await store.records())[0].state, 'finished')
+  if (!subscriberFails) {
+    const started = new Promise<void>(resolve => store.subscribe(event => { if (event.kind === 'run-started') resolve() }))
+    peer.send(JSON.stringify({ method: 'turn/started', params: { threadId: 'native', turn: { id: 'second', status: 'inProgress', items: [] } } }))
+    await started
+    await new Promise(resolve => setImmediate(resolve))
+    const second = monitor.completed('terminal')
+    peer.send(JSON.stringify({ method: 'turn/completed', params: { threadId: 'native', turn: { id: 'second', status: 'failed', items: [] } } }))
+    assert.equal(((await second)[0] as { kind: string }).kind, 'run-failed')
+  }
+})
+
+test('a Codex notification failure still closes its connection when disconnect reporting also fails', async t => {
+  const { WebSocketServer } = await import('ws')
+  const { createServer } = await import('node:http')
+  const { connectCodexProxy } = await import('../src/mastra/agent-codex-connection.ts')
+  const dir = await mkdtemp(join(tmpdir(), 'jul243-disconnect-'))
+  const socketPath = join(dir, 'codex.sock')
+  const http = createServer()
+  const ws = new WebSocketServer({ server: http })
+  http.listen(socketPath)
+  await once(http, 'listening')
+  const connected = once(ws, 'connection')
+  ws.on('connection', peer => peer.on('message', data => {
+    const message = JSON.parse(data.toString())
+    if (message.method === 'initialize') peer.send(JSON.stringify({ id: message.id, result: {} }))
+  }))
+  const connection = await connectCodexProxy({ socketPath, onNotification: async () => { throw new Error('notification write failed') }, onDisconnect: async () => { throw new Error('disconnect write failed') } })
+  t.after(async () => { await connection.close(); ws.close(); await new Promise<void>(resolve => http.close(() => resolve())); await rm(dir, { recursive: true, force: true }) })
+  const [peer] = await connected
+  const closed = once(peer, 'close')
+  peer.send(JSON.stringify({ method: 'turn/completed', params: {} }))
+  const result = await Promise.race([closed.then(() => 'closed'), new Promise(resolve => setTimeout(() => resolve('still open'), 200))])
+  assert.equal(result, 'closed')
 })

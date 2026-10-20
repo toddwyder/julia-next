@@ -1,6 +1,6 @@
 # JUL-243 result for Todd — 20 October 2026
 
-**Outcome: failed OVH Proof; stopped pending approval of the proposed repair plan.** Nothing was merged or deployed. All handoffs are pushed GitHub files.
+**Outcome: round 1 Proof failed; evidence-based repairs are in progress under Todd’s 20 October continuation correction.** Nothing was merged or deployed. All handoffs are pushed GitHub files.
 
 Created [PR #303](https://github.com/toddwyder/julia-next/pull/303) from current main. Closed #301 unmerged with a one-line pointer to #303 and deleted its branch. The new PR lists every kept #301 file and its reason. No Gemini `5cfd728`, private-file discovery or controlled-barrier Proof rig was carried over. The approved plan replaces the prior plan, the historical root-cause record remains, and superseded JUL-243 docs were not copied.
 
@@ -33,3 +33,6 @@ Before full Proof, **21 focused tests**, **three real provider contracts**, pack
 **Deployed SHA: none from this restart.** No merge, deployment or service restart occurred. The existing deployed SHA is unestablished because `/opt/julia-control/reviewer` is not a Git checkout.
 
 Open: approve the [proposed repair plan](jul-243-root-cause.md); fix and guard the ledger/browser/completion/cleanup failures test-first; establish the real native long-wait and idle seams; rerun complete Proof on a new pinned candidate; obtain independent Gemini review and repository/server no-trace confirmation; complete CI, merge, both branch deletions, deployment and live Tailscale dashboard/clean-console verification. Failed-Proof evidence remains retained; no failed requirement is marked complete or silently skipped.
+
+
+Round 1 repairs: use libSQL’s documented 5000ms busy timeout, retain Codex completion for late waiters, settle disconnect waits even when persistence/reporting fails, handle a native idle thread with no first message, and move browser captures outside ingestion onto separate pages. Reproductions were written before fixes. Verification: 25 focused tests, five real provider contracts (sandbox, foreground wait, idle restart, free CommandCode success and real cutoff), package suite 156 passed/one existing opt-in skip, typecheck, framework lint and production build pass. No paid model or purchase. Second-round full Proof and Gemini review are still required; production is unchanged.

@@ -55,7 +55,7 @@ function project(launch: AgentLaunch, registeredAt: string, events: AgentEvent[]
 
 export async function createAgentActivityStore(storagePath: string) {
   const listeners = new Set<(event: AgentEvent) => void | Promise<void>>()
-  const client = createClient({ url: `file:${storagePath.replaceAll('\\', '/')}` })
+  const client = createClient({ url: `file:${storagePath.replaceAll('\\', '/')}`, timeout: 5000 })
   await client.batch([
     `CREATE TABLE IF NOT EXISTS julia_agent_launches (launch_id TEXT PRIMARY KEY, registered_at TEXT NOT NULL, metadata TEXT NOT NULL)`,
     `CREATE TABLE IF NOT EXISTS julia_agent_events (sequence INTEGER PRIMARY KEY AUTOINCREMENT, launch_id TEXT NOT NULL, event_id TEXT NOT NULL, event_json TEXT NOT NULL, UNIQUE(launch_id,event_id))`,
