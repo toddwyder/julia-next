@@ -9,6 +9,9 @@ import { createInitializationRuntime } from './initialization.ts'
 import { createInitializationActivityRecorder, createObservedLinearClient } from './initialization-observability.ts'
 import { listReadyLinearCards } from './linear.ts'
 import { discoverAcpOffers, discoverCommandCodeOffers, withAcpRoutes } from './routes.ts'
+import { createAgentActivityStore } from './agent-activity.ts'
+import { createCodexMonitor } from './agent-codex-monitor.ts'
+import { agentError } from './agent-errors.ts'
 
 const CONTROL_PORT = 43123
 
@@ -58,18 +61,26 @@ export function configuredTailscaleHosts(environment: NodeJS.ProcessEnv = proces
   return (environment.JULIA_CONTROL_TAILSCALE_HOST ?? '').split(',').map(name => name.trim()).filter(Boolean)
 }
 
-export async function runControlPageServer() {
-  const storagePath = process.env.JULIA_INITIALIZATION_DB ?? join(homedir(), '.julia', 'initialization.db')
+export async function runControlPageServer({ port = Number(process.env.JULIA_CONTROL_PORT ?? CONTROL_PORT), storagePath = process.env.JULIA_INITIALIZATION_DB ?? join(homedir(), '.julia', 'initialization.db') }: { port?: number; storagePath?: string } = {}) {
+  if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('Invalid Julia control port')
   const tailscaleHosts = configuredTailscaleHosts()
   const activity = createInitializationActivityRecorder(event => console.log(JSON.stringify(event)))
   const runtime = await createInitializationRuntime({ storagePath, activity })
+  const agentStore = await createAgentActivityStore(storagePath)
   let latestState = await discoverControlPageState(activity)
+  await agentStore.disconnectActive('service-restart')
+  let codexMonitor: Awaited<ReturnType<typeof createCodexMonitor>> | undefined
+  if ((await agentStore.launches()).some(launch => launch.provider === 'codex')) {
+    try { codexMonitor = await createCodexMonitor(agentStore, { socketPath: process.env.JULIA_CODEX_SOCKET }) }
+    catch (error) { console.error(JSON.stringify(agentError(error, { provider: 'codex', runId: 'connection', eventKind: 'connect-failed' }))) }
+  }
   const server = await startControlPageServer({
-    port: CONTROL_PORT,
+    port,
     tailscaleHosts,
     getState: async () => { latestState = await discoverControlPageState(activity); return latestState },
     getRuns: () => runtime.list(),
     getActivity: () => activity.snapshot(),
+    getAgentCards: async () => ({ updatedAt: new Date().toISOString(), cards: await agentStore.cards() }),
     startInitialization: async input => {
       latestState = await discoverControlPageState(activity)
       const result = await runtime.start(input, latestState)
@@ -85,6 +96,8 @@ export async function runControlPageServer() {
     if (closing) return
     closing = true
     await server.close()
+    await codexMonitor?.close()
+    await agentStore.close()
     await runtime.close()
   }
   process.once('SIGINT', () => { close().then(() => process.exit(0), error => { console.error(error); process.exit(1) }) })

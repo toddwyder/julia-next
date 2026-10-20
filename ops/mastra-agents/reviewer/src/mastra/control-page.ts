@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
+import { agentError } from './agent-errors.ts'
 
 import {
   ControlPageStateSchema,
@@ -7,6 +8,7 @@ import {
   InitializationResultSchema,
   InitializationRunsStateSchema,
   StartInitializationSchema,
+  AgentDashboardStateSchema,
 } from './contracts.ts'
 import type { z } from 'zod/v4'
 
@@ -52,7 +54,7 @@ async function readJson(request: IncomingMessage) {
   return JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown
 }
 
-export function controlPageHtml() {
+function initializationPageHtml() {
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Julia · Initialize</title>
@@ -88,6 +90,23 @@ fetch(apiPath+'/state').then(response=>response.json().then(body=>{if(!response.
 </script></body></html>`
 }
 
+export function controlPageHtml() {
+  const dashboardStyles = `.dashboard{margin-bottom:24px}.dashboard-header{margin-bottom:16px}.eyebrow,.muted{color:#5e5b53}.eyebrow{font-size:13px;letter-spacing:.02em}.dashboard h1{margin:4px 0 6px;font-size:26px}.agent-card{background:#fff;border:1px solid #e2e0d8;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:14px;margin-top:16px}.card-head h2{overflow-wrap:anywhere}.card-head{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.agent-card h2,.agent-card h3{margin:0}.agent-card h2{font-size:18px}.agent-card h3{font-size:15px}.phase{border-radius:999px;padding:4px 10px;font-size:13px;background:#e6ecfa;color:#1f3f99;white-space:nowrap}.agent-status{border-radius:8px;padding:10px 12px;font-size:14px}.agent-status.working{background:#eef2fc;color:#1f3f99}.agent-status.stopped{background:#fcefe3;color:#8a3d05;font-weight:500}.facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px}.fact-label{font-size:12px;color:#5e5b53}.fact-value{font-size:14px;overflow-wrap:anywhere}.activity{border-top:1px solid #eceae3;padding-top:12px}.activity-list{display:grid;grid-template-columns:56px minmax(0,1fr);gap:8px 10px;font-size:14px;margin-top:8px}.activity-empty{grid-column:1/-1}.activity-time{white-space:nowrap;font-family:ui-monospace,monospace;font-size:13px;color:#5e5b53}`
+  const dashboardScript = `<script>
+const dashboard=document.querySelector('#agent-cards');
+const clock=iso=>{const date=new Date(iso);return (date.getHours()%12||12)+':'+String(date.getMinutes()).padStart(2,'0')};
+const expandedActions=new Set();
+function renderAgents(state){document.querySelector('#agent-updated').textContent='Updated '+clock(state.updatedAt);dashboard.textContent='';if(!state.cards.length){const empty=document.createElement('p');empty.className='muted';empty.textContent='No agents are running.';dashboard.append(empty);return}state.cards.forEach(card=>{const article=document.createElement('article');article.className='agent-card';const head=document.createElement('div');head.className='card-head';const identity=document.createElement('div');identity.innerHTML='<div class="eyebrow"></div><h2></h2>';identity.querySelector('.eyebrow').textContent=card.cardIdentifier;identity.querySelector('h2').textContent=card.cardTitle;const phase=document.createElement('span');phase.className='phase';phase.textContent=card.stage+' · round '+card.round;head.append(identity,phase);article.append(head);const status=document.createElement('div');status.className='agent-status '+card.status;status.textContent=card.statusDetail;article.append(status);const facts=document.createElement('div');facts.className='facts';[['Agent and model',card.role+' · '+card.model+' ('+card.service+')'],['Source',card.source],['Started',clock(card.startedAt)],['Last record',clock(card.updatedAt)]].forEach(([label,value])=>{const fact=document.createElement('div');fact.innerHTML='<div class="fact-label"></div><div class="fact-value"></div>';fact.querySelector('.fact-label').textContent=label;fact.querySelector('.fact-value').textContent=value;facts.append(fact)});article.append(facts);const activity=document.createElement('div');activity.className='activity';activity.innerHTML="<h3>What it actually did</h3><div class='muted' style='font-size:12px'>From the tools' own records. Newest first.</div>";const list=document.createElement('div');list.className='activity-list';card.actions.slice(0,expandedActions.has(card.agentId)?undefined:10).forEach(action=>{const time=document.createElement('span');time.className='activity-time';time.textContent=clock(action.occurredAt);const label=document.createElement('span');label.textContent=action.label+' · ';const outcome=document.createElement('span');outcome.textContent=action.outcome==='succeeded'?'Succeeded':action.outcome==='failed'?'Failed':action.phase==='running'?'In progress':'Outcome unknown';label.append(outcome);list.append(time,label)});if(!card.actions.length){const none=document.createElement('span');none.className='muted activity-empty';none.textContent='No detailed actions recorded yet.';list.append(none)}activity.append(list);if(card.actions.length>10){const show=document.createElement('button');show.type='button';show.textContent=expandedActions.has(card.agentId)?'Show fewer actions':'Show all '+card.actions.length+' actions';show.addEventListener('click',()=>{if(expandedActions.has(card.agentId))expandedActions.delete(card.agentId);else expandedActions.add(card.agentId);renderAgents(state)});activity.append(show)}article.append(activity);const source=document.createElement('div');source.className='muted';source.style.fontSize='12px';source.textContent='Source: '+card.source+' lifecycle events';article.append(source);dashboard.append(article)})}
+function loadAgents(){return fetch('${CONTROL_PATH}/api/agents').then(response=>response.json().then(body=>{if(!response.ok)throw new Error(body.error||'Agent discovery failed');return body})).then(renderAgents).catch(error=>{dashboard.textContent='';const p=document.createElement('p');p.className='status';p.textContent=error.message;dashboard.append(p)})}
+loadAgents();setInterval(loadAgents,30000);
+</script>`
+  return initializationPageHtml()
+    .replace('</style>', `${dashboardStyles}</style>`)
+    .replace('<body><main id="app">', `<body><main><section class="dashboard"><header class="dashboard-header"><div class="eyebrow">Julia control</div><h1>What's running now</h1><p class="muted">Julia-monitored agent runs</p><div id="agent-updated" class="muted">Loading agent records…</div></header><div id="agent-cards"></div></section><section id="app">`)
+    .replace('</main>\n<script>', '</section></main>\n<script>')
+    .replace('</body></html>', `${dashboardScript}</body></html>`)
+}
+
 export async function startControlPageServer({
   port = 43123,
   tailscaleHosts = [],
@@ -95,6 +114,7 @@ export async function startControlPageServer({
   startInitialization,
   getRuns,
   getActivity,
+  getAgentCards = async () => ({ updatedAt: new Date().toISOString(), cards: [] }),
   onRequest = () => {},
 }: {
   port?: number
@@ -103,6 +123,7 @@ export async function startControlPageServer({
   startInitialization: (input: StartInitialization) => Promise<InitializationResult>
   getRuns: () => Promise<InitializationRunsState>
   getActivity: () => InitializationActivity
+  getAgentCards?: () => Promise<unknown>
   onRequest?: (request: { method: string; path: string }) => void
 }) {
   const server = createServer(async (request, response) => {
@@ -129,13 +150,16 @@ export async function startControlPageServer({
           activity: getActivity(),
         }))
       }
+      if (method === 'GET' && url.pathname === `${CONTROL_PATH}/api/agents`) {
+        return sendJson(response, 200, AgentDashboardStateSchema.parse(await getAgentCards()))
+      }
       if (method === 'POST' && url.pathname === `${CONTROL_PATH}/api/start`) {
         return sendJson(response, 200, InitializationResultSchema.parse(await startInitialization(StartInitializationSchema.parse(await readJson(request)))))
       }
       return sendJson(response, 404, { error: 'not found' })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      console.log(JSON.stringify({ event: 'control-page-request-failed', method, path: url.pathname, error: message.slice(0, 300) }))
+      console.log(JSON.stringify({ event: 'control-page-request-failed', ...agentError(error, { provider: 'julia-control', runId: 'request', eventKind: `${method} ${url.pathname}` }) }))
       return sendJson(response, 400, { error: message })
     }
   })

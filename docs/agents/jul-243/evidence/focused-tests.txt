@@ -1,0 +1,22 @@
+✔ a running command stays Working after twenty minutes without a new event (118.582291ms)
+✔ run-failed remains visible as Stopped (39.842113ms)
+✔ disconnected remains visible as Stopped (37.799428ms)
+✔ run-suspended remains visible as Stopped (35.279397ms)
+✔ fifteen idle minutes becomes Stopped at the threshold (28.709331ms)
+✔ three distinct failing commands do not count as the same repeated action (62.413698ms)
+✔ three identical failing commands show Stopped, a successful action resets the streak (50.668214ms)
+✔ Codex derives distinct failure identities from native command and cwd, never the item id (12.373212ms)
+✔ run-completed leaves the active list and retains its event history after restart (38.513608ms)
+✔ run-canceled leaves the active list and retains its event history after restart (31.607001ms)
+No `storage` configured on Mastra — falling back to an in-memory store. In-memory storage is not durable: all data is lost on restart, and it is not safe for production. Configure a persistent storage adapter (e.g. @mastra/libsql, @mastra/pg, @mastra/cloudflare). See https://mastra.ai/docs/storage
+Mastra shutdown completed
+✔ a real Mastra workflow suspended waiting is Stopped (1401.760459ms)
+✔ Proof cleanup settles delayed real workflow persistence before storage closes and records failures (75.500452ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2520.768125

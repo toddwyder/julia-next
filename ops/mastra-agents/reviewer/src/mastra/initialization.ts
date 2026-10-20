@@ -3,9 +3,13 @@ import { resolve } from 'node:path'
 import { Mastra } from '@mastra/core/mastra'
 import { createStep, createWorkflow, createWorkflowStateReader } from '@mastra/core/workflows'
 import { LibSQLStore } from '@mastra/libsql'
+import { MastraStorageExporter, Observability } from '@mastra/observability'
+import { SamplingStrategyType } from '@mastra/core/observability'
 import type { z } from 'zod/v4'
 import type { InitializationActivityRecorder } from './initialization-observability.ts'
 import { createRoleExecutionWorkflow } from './workflows/delivery.ts'
+import { createAgentActivityStore } from './agent-activity.ts'
+import { monitorMastraStream } from './agent-mastra.ts'
 
 import {
   InitializationInputSchema,
@@ -87,11 +91,20 @@ function runIdFor(input: StartInitialization) {
 
 export async function createInitializationRuntime({ storagePath, activity }: { storagePath: string; activity: InitializationActivityRecorder }) {
   const storageUrl = `file:${resolve(storagePath).replaceAll('\\', '/')}`
+  const agentStore = await createAgentActivityStore(storagePath)
   const storage = new LibSQLStore({ id: 'julia-initialization-local', url: storageUrl, localPragmas: { mmapSize: 0 } })
   const initializationWorkflow = createInitializationWorkflow()
   const deliveryWorkflow = createRoleExecutionWorkflow({ activity })
-  const mastra = new Mastra({ storage, workflows: { initializationWorkflow, deliveryWorkflow } })
+  const observabilityRuntime = new Observability({
+    configs: { default: { serviceName: 'julia-control', sampling: { type: SamplingStrategyType.ALWAYS }, exporters: [new MastraStorageExporter()] } },
+  })
+  const mastra = new Mastra({
+    storage,
+    workflows: { initializationWorkflow, deliveryWorkflow },
+    observability: observabilityRuntime,
+  })
   const workflow = mastra.getWorkflow('initializationWorkflow')
+  const observabilityStore = await storage.getStore('observability')
   const pending = new Map<string, Promise<z.infer<typeof InitializationResultSchema>>>()
 
   const read = async (runId: string, resumed = true) => {
@@ -115,9 +128,10 @@ export async function createInitializationRuntime({ storagePath, activity }: { s
       if (active) return active
       const starting = (async () => {
         const run = await workflow.createRun({ runId })
-        const result = await run.start({ inputData: InitializationInputSchema.parse({
+        const stream = run.stream({ inputData: InitializationInputSchema.parse({
           ...parsed, runId, initializedAt: new Date().toISOString(),
-        }) })
+        }), tracingOptions: { metadata: { cardIdentifier: parsed.card.identifier, role: 'Initialization', model: 'Workflow', stage: 'Initialize', round: 1 } } })
+        const result = await monitorMastraStream({ store: agentStore, launch: { launchId: runId, provider: 'mastra', providerRunId: runId, cardIdentifier: parsed.card.identifier, cardTitle: parsed.card.title, role: 'Initialization', model: 'Workflow', stage: 'Initialize', round: 1 }, stream, flush: () => observabilityRuntime.flush() })
         if (result.status !== 'suspended') throw new Error(`initialization run ${runId} did not suspend before delivery`)
         const saved = await read(runId, false)
         if (!saved) throw new Error(`initialization run ${runId} was not persisted`)
@@ -139,8 +153,37 @@ export async function createInitializationRuntime({ storagePath, activity }: { s
     async runCount() {
       return (await workflow.listWorkflowRuns()).total
     },
+    async listMastraTraces() {
+      await observabilityRuntime.flush()
+      if (!observabilityStore) return []
+      const roots = []
+      for (let page = 0; ; page += 1) {
+        const listed = await observabilityStore.listTraces({ pagination: { page, perPage: 100 }, orderBy: { field: 'startedAt', direction: 'DESC' } })
+        roots.push(...listed.spans)
+        if (listed.spans.length < 100) break
+      }
+      return Promise.all(roots.map(async root => {
+        const trace = await observabilityStore.getTrace({ traceId: root.traceId })
+        return trace ? {
+          traceId: root.traceId,
+          name: root.name,
+          startedAt: root.startedAt.toISOString(),
+          endedAt: root.endedAt?.toISOString(),
+          metadata: root.metadata,
+          spans: trace.spans.map(span => ({
+            ...span,
+            startedAt: span.startedAt.toISOString(),
+            endedAt: span.endedAt?.toISOString(),
+            createdAt: span.createdAt.toISOString(),
+            updatedAt: span.updatedAt?.toISOString(),
+          })),
+        } : null
+      })).then(traces => traces.filter(Boolean))
+    },
     async close() {
-      await storage.close()
+      await observabilityRuntime.shutdown()
+      await mastra.shutdown()
+      agentStore.close()
     },
   }
 }
