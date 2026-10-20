@@ -81,6 +81,8 @@ Todd for a workaround.
 
 Work to the brief's finish line. A completed step is not a stopping point. Waiting on CI or any background job is not a stop: wait for it and continue.
 
+A single failed review or failed Proof is round 1: diagnose from evidence, fix test-first and continue. The root-cause report and restart plan below apply only when a card stops for exactly one of these reasons: two rounds without closing, a spend cap, or a time cap.
+
 Whenever a card stops for any reason: two rounds without closing, a spend cap or a time cap, the agent writes a root-cause report that proposes no fix, then a restart plan, and nothing is rebuilt until Todd approves the restart plan. Every restart plan and brief must state what happens to code already built for the card that doesn’t meet its acceptance criteria:
 - It is removed from the repo and from the machines it was installed or configured on. Delete exactly that piece and everything belonging to it; the reviewer confirms a search finds no trace.
 - It is never worked around.
@@ -90,7 +92,7 @@ Whenever a card stops for any reason: two rounds without closing, a spend cap or
 
 Before any task, verify the applicable entry points, the launcher's accepted command list,
 configuration and authorized spend limits, required credentials, and branch/worktree state. Fix
-what is safely fixable before starting work. Spend limits belong in
+what is safely fixable before starting work. Confirm each tool the card uses is at the version its brief or lockfile names, and that its automatic updates are off. Spend limits belong in
 accepted ADRs and dated card decisions, never in prompts. The reviewer limit is **$1.00 per card**.
 [Permanent machine parts](docs/agents/permanent-machine-parts.json) are preflight prerequisites and no cleanup ever removes them.
 On Windows, every local command that needs a Julia vault secret must run through
@@ -101,7 +103,7 @@ service account. Never use personal 1Password desktop authentication for those c
 ## Server and domain
 
 Keep SSH and sudo outside automated runners; an authorized operator uses the laptop's Tailscale
-route. See `docs/agents/server-runbook.md`. Domain model: `GLOSSARY.md`; decisions: `docs/adr/`;
+route. Server cleanup is verified by the maker's own checksummed readback. The report labels it a self-check, never independent review. Never ask Todd for an exception for it. See `docs/agents/server-runbook.md`. Domain model: `GLOSSARY.md`; decisions: `docs/adr/`;
 routes: `docs/agents/work-execution.md`. The former Factory decision record is historical only.
 
 <!-- BEGIN:nextjs-agent-rules -->
