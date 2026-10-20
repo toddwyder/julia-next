@@ -1,3 +1,4 @@
+import { AgentTelemetrySchema } from './agent-events.ts'
 import { z } from 'zod/v4'
 import { frameworkMapFindings } from './framework-map.ts'
 
@@ -185,6 +186,7 @@ export const AgentActivityRecordSchema = z.object({
   startedAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
   actions: z.array(AgentActivityActionSchema),
+  telemetry: AgentTelemetrySchema.optional(),
 }).strict()
 export const AgentDashboardCardSchema = z.object({
   agentId: nonempty,
@@ -201,6 +203,7 @@ export const AgentDashboardCardSchema = z.object({
   status: z.enum(['working', 'stopped']),
   statusDetail: nonempty,
   actions: z.array(AgentDashboardActionSchema),
+  telemetry: AgentTelemetrySchema,
 }).strict()
 export const AgentDashboardStateSchema = z.object({
   updatedAt: z.string().datetime(),

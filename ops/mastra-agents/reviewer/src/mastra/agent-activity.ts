@@ -25,6 +25,7 @@ export function projectAgentCards(records: AgentActivityRecord[], now = new Date
       status, statusDetail: record.state === 'stopped' ? 'Stopped: '+record.stopReason
         : repeatedFailure ? 'Stopped: the same action failing the same way 3 times in a row.'
         : status === 'stopped' ? `Stopped: no new action for ${minutes} min.` : activeCommand ? 'Working: command or tool running.' : `Working. Last action ${minutes} min ago.`,
+      telemetry: record.telemetry ?? { context: null, compactions: null, handoffs: null, checklist: null },
       actions: actions.map(({ failureKey: _failureKey, ...action }) => action),
     })
   })
@@ -32,11 +33,19 @@ export function projectAgentCards(records: AgentActivityRecord[], now = new Date
 
 function project(launch: AgentLaunch, registeredAt: string, events: AgentEvent[]): AgentActivityRecord {
   const actions = new Map<string, AgentActivityRecord['actions'][number]>()
+  const telemetry = { context: null, compactions: null, handoffs: null, checklist: null } as NonNullable<AgentActivityRecord['telemetry']>
   let running = false
   let state: 'working' | 'stopped' | 'finished' = 'working'
   let stopReason = ''
   let updatedAt = registeredAt
   for (const event of events) {
+    if (event.telemetry) {
+      const { compactionId, ...update } = event.telemetry
+      Object.assign(telemetry, update)
+      if (compactionId && !telemetry.compactions?.some(item => item.id === compactionId)) {
+        (telemetry.compactions ??= []).push({ id: compactionId, occurredAt: event.occurredAt })
+      }
+    }
     if (event.kind === 'run-started') { running = true; state = 'working'; stopReason = '' }
     if (['run-completed', 'run-canceled'].includes(event.kind)) { running = false; state = 'finished' }
     if (['run-failed', 'run-suspended', 'disconnected'].includes(event.kind)) { running = false; state = 'stopped'; stopReason = event.kind === 'run-suspended' ? 'workflow paused waiting.' : event.kind === 'disconnected' ? 'connection lost.' : 'run failed unexpectedly.' }
@@ -50,7 +59,7 @@ function project(launch: AgentLaunch, registeredAt: string, events: AgentEvent[]
   }
   return AgentActivityRecordSchema.parse({ source: launch.provider, sourceId: launch.launchId, running, state, stopReason,
     cardIdentifier: launch.cardIdentifier, cardTitle: launch.cardTitle, role: launch.role, model: launch.model,
-    service: launch.provider, stage: launch.stage, round: launch.round, startedAt: registeredAt, updatedAt, actions: [...actions.values()] })
+    service: launch.provider, stage: launch.stage, round: launch.round, startedAt: registeredAt, updatedAt, telemetry, actions: [...actions.values()] })
 }
 
 export async function createAgentActivityStore(storagePath: string) {

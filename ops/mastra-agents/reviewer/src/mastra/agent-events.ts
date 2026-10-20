@@ -1,5 +1,15 @@
 import { z } from 'zod/v4'
 
+export const AgentTelemetrySchema = z.object({
+  context: z.object({ percent: z.number().min(0).max(100), usedTokens: z.number().nonnegative(), windowTokens: z.number().positive() }).strict().nullable(),
+  compactions: z.array(z.object({ id: z.string().min(1), occurredAt: z.string().datetime() }).strict()).nullable(),
+  handoffs: z.number().int().nonnegative().nullable(),
+  checklist: z.array(z.object({ step: z.string(), status: z.enum(['pending', 'inProgress', 'completed']) }).strict()).nullable(),
+}).strict()
+export const AgentTelemetryUpdateSchema = AgentTelemetrySchema.partial().extend({
+  compactionId: z.string().min(1).optional(),
+}).strict()
+
 export const AgentLaunchSchema = z.object({
   launchId: z.string().min(1), provider: z.enum(['codex', 'commandcode', 'mastra']),
   providerRunId: z.string().min(1), cardIdentifier: z.string().regex(/^[A-Z][A-Z0-9]*-\d+$/),
@@ -13,6 +23,7 @@ export const AgentEventSchema = z.object({
   occurredAt: z.string().datetime(),
   relatedRunIds: z.array(z.string().min(1)).optional(),
   launch: AgentLaunchSchema.optional(),
+  telemetry: AgentTelemetryUpdateSchema.optional(),
   action: z.object({ id: z.string().min(1), type: z.string().min(1).max(160), name: z.string().min(1).max(160), outcome: z.enum(['succeeded', 'failed', 'unknown']), actionKey: z.string().max(160).optional(), errorCode: z.string().max(160).optional(), errorCategory: z.string().max(160).optional() }).strict().optional(),
 }).strict()
 export type AgentLaunch = z.infer<typeof AgentLaunchSchema>

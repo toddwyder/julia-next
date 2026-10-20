@@ -95,6 +95,7 @@ export async function createCodexMonitor(store: Awaited<ReturnType<typeof create
         const launch = { ...metadata, providerRunId: result.thread.id }
         await store.register(launch)
         byThread.set(launch.providerRunId, launch)
+      await store.append({ ...codexEvent('thread/started', result), launchId: launch.launchId, eventId: 'thread-started', occurredAt: new Date().toISOString() })
         return launch
       },
       async close() { await connection.close(); await disconnect() },

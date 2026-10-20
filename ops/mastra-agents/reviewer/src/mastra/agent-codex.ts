@@ -9,9 +9,20 @@ const labels: Record<string, string> = { commandExecution: 'Command execution', 
 
 /** Semantic fields come from the installed 0.163.0 app-server schema, never output. */
 export function codexEvent(method: string, params: unknown): EventBody {
+  if (method === 'thread/started') return { kind: 'progress', providerKind: method, providerStatus: 'started', telemetry: { compactions: [], checklist: [] } }
+  if (method === 'thread/tokenUsage/updated') {
+    const { tokenUsage } = z.object({ tokenUsage: z.object({ last: z.object({ totalTokens: z.number().int().nonnegative() }), modelContextWindow: z.number().int().nullable().optional() }) }).parse(params)
+    const usedTokens = tokenUsage.last.totalTokens
+    const windowTokens = tokenUsage.modelContextWindow
+    return { kind: 'progress', providerKind: method, providerStatus: 'updated', telemetry: { context: windowTokens && windowTokens > 0 ? { percent: Math.min(100, Math.round(usedTokens / windowTokens * 100)), usedTokens, windowTokens } : null } }
+  }
+  if (method === 'turn/plan/updated') {
+    const { plan } = z.object({ plan: z.array(z.object({ step: z.string(), status: z.enum(['pending', 'inProgress', 'completed']) })) }).parse(params)
+    return { kind: 'progress', providerKind: method, providerStatus: 'updated', telemetry: { checklist: plan } }
+  }
   if (method === 'turn/started' || method === 'turn/completed') {
     const { turn } = z.object({ turn: TurnSchema }).parse(params)
-    return { kind: turn.status === 'inProgress' ? 'run-started' : turn.status === 'completed' ? 'run-completed' : turn.status === 'interrupted' ? 'run-canceled' : 'run-failed', providerKind: method, providerStatus: turn.status }
+    return { kind: turn.status === 'inProgress' ? 'run-started' : turn.status === 'completed' ? 'run-completed' : turn.status === 'interrupted' ? 'run-canceled' : 'run-failed', providerKind: method, providerStatus: turn.status, ...(method === 'turn/started' ? { telemetry: { checklist: [] } } : {}) }
   }
   if (method === 'thread/status/changed') {
     const { status } = z.object({ status: z.object({ type: z.enum(['active', 'idle', 'notLoaded', 'systemError']) }) }).parse(params)
@@ -20,6 +31,7 @@ export function codexEvent(method: string, params: unknown): EventBody {
   if (method === 'item/started' || method === 'item/completed') {
     const { item } = z.object({ item: ItemSchema }).parse(params)
     if (['reasoning', 'agentMessage', 'plan', 'userMessage'].includes(item.type)) return { kind: 'progress', providerKind: method, providerStatus: item.type }
+    if (item.type === 'contextCompaction') return { kind: 'progress', providerKind: method, providerStatus: item.status ?? 'unknown', ...(method === 'item/completed' ? { telemetry: { compactionId: item.id } } : {}) }
     const failed = item.status === 'failed' || item.status === 'declined' || (item.type === 'commandExecution' && item.exitCode !== null && item.exitCode !== undefined && item.exitCode !== 0)
     const outcome = method === 'item/started' ? 'unknown' : failed ? 'failed' : item.status === 'completed' || item.status === undefined ? 'succeeded' : 'unknown'
     return { kind: method === 'item/started' ? 'action-started' : 'action-completed', providerKind: method, providerStatus: item.status ?? (method === 'item/started' ? 'inProgress' : 'completed'), ...(item.receiverThreadIds ? { relatedRunIds: item.receiverThreadIds } : {}), action: {
