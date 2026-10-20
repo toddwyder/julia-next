@@ -356,7 +356,7 @@ function assertionPasses(assertion: () => unknown) {
 }
 
 test('admission requires the complete settled card shape and Ready state', () => {
-  const complete = { identifier: 'JUL-225', state: 'Ready', description: '# Outcome\nA\n# Requirements\nB\n# Contracts\nC\n# Finish conditions\nD\n# Proof\nE' }
+  const complete = { identifier: 'JUL-225', state: 'Ready', description: '# Outcome\nA\n# Requirements\nB\n# Contracts\nC\n# Acceptance criteria\nD\n# Proof\nE' }
   assert.equal(CardAdmissionSchema.parse(complete).identifier, 'JUL-225')
   assert.throws(() => CardAdmissionSchema.parse({ ...complete, state: 'Backlog' }))
   assert.throws(() => CardAdmissionSchema.parse({ ...complete, description: '# Outcome\nA' }))
@@ -367,11 +367,11 @@ test('admission requires the complete settled card shape and Ready state', () =>
     assert.ok(messages.includes('expected Ready state'))
     assert.ok(messages.includes('missing nonempty Requirements section'))
     assert.ok(messages.includes('missing nonempty Contracts section'))
-    assert.ok(messages.includes('missing nonempty Finish conditions section'))
+    assert.ok(messages.includes('missing nonempty Acceptance criteria section'))
     assert.ok(messages.includes('missing nonempty Proof section'))
   }
   assert.throws(() => CardAdmissionSchema.parse({ ...complete, description: `${complete.description}\nTODO: decision` }))
-  const linear = { ...complete, description: '**Outcome**\nA\n\n**Requirements**\nB\n\n**Contracts**\nC\n\n**Finish conditions**\nD\n\n**Proof**\nE' }
+  const linear = { ...complete, description: '**Outcome**\nA\n\n**Requirements**\nB\n\n**Contracts**\nC\n\n**Acceptance criteria**\nD\n\n**Proof**\nE' }
   assert.throws(() => CardAdmissionSchema.parse(linear), /missing nonempty Outcome section/)
 })
 
@@ -385,7 +385,7 @@ test('admission keeps ordinary bold paragraphs inside a section', () => {
     'B',
     '# Contracts',
     'C',
-    '# Finish conditions',
+    '# Acceptance criteria',
     'D',
     '# Proof',
     'E',
@@ -405,7 +405,7 @@ test('admission keeps ordinary bold paragraphs inside a section', () => {
 })
 
 test('admission rejects unresolved decision markers embedded in prose', () => {
-  const description = '# Outcome\nA\n# Requirements\nStatus: TBD before delivery.\n# Contracts\nC\n# Finish conditions\nD\n# Proof\nE'
+  const description = '# Outcome\nA\n# Requirements\nStatus: TBD before delivery.\n# Contracts\nC\n# Acceptance criteria\nD\n# Proof\nE'
   assert.throws(() => CardAdmissionSchema.parse({ identifier: 'JUL-225', state: 'Ready', description }), /unresolved decision marker/)
   assert.throws(() => CardAdmissionSchema.parse({ identifier: 'JUL-225', state: 'Ready', description: description.replace('Status: TBD before delivery.', '- TODO choose provider') }), /unresolved decision marker/)
   assert.throws(() => CardAdmissionSchema.parse({ identifier: 'JUL-225', state: 'Ready', description: description.replace('Status: TBD before delivery.', 'Status: unresolved decision — choose provider') }), /unresolved decision marker/)
@@ -415,7 +415,7 @@ test('admission rejects unresolved decision markers embedded in prose', () => {
   assert.throws(() => CardAdmissionSchema.parse({ identifier: 'JUL-225', state: 'Ready', description: description.replace('Status: TBD before delivery.', 'Unresolved decisions: choose provider') }), /unresolved decision marker/)
   assert.doesNotThrow(() => CardAdmissionSchema.parse({
     identifier: 'JUL-225', state: 'Ready',
-    description: '# Outcome\nA\n# Requirements\nA complete card has no unresolved decision marker.\n# Contracts\nC\n# Finish conditions\nD\n# Proof\nE',
+    description: '# Outcome\nA\n# Requirements\nA complete card has no unresolved decision marker.\n# Contracts\nC\n# Acceptance criteria\nD\n# Proof\nE',
   }))
 })
 

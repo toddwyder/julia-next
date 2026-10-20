@@ -10,11 +10,15 @@ One requirement.
 
 One contract.
 
-## Finish conditions
+## Acceptance criteria
 
-One finish condition.
+One acceptance criterion.
 
 ## Proof
 
 One proof.
 `
+
+export const legacyFinishConditionsCardDescription = completeCardDescription
+  .replace('## Acceptance criteria', '## Finish conditions')
+  .replace('One acceptance criterion.', 'One finish condition.')

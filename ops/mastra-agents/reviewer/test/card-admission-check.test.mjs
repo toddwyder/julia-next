@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
 import { checkLinearCardAdmission } from '../src/mastra/card-admission-check.ts'
-import { completeCardDescription } from '../support/card-admission-test-fixtures/card-admission-descriptions.mjs'
+import { completeCardDescription, legacyFinishConditionsCardDescription } from '../support/card-admission-test-fixtures/card-admission-descriptions.mjs'
 
 function linearResponse(description) {
   return async () => new Response(JSON.stringify({
@@ -30,6 +30,13 @@ test('checks a Linear card as a Ready candidate without changing its current sta
   })
 })
 
+test('keeps accepting the legacy Finish conditions heading', async () => {
+  const result = await checkLinearCardAdmission('JUL-243', 'reference-only', linearResponse(legacyFinishConditionsCardDescription))
+
+  assert.equal(result.admitted, true)
+  assert.deepEqual(result.issues, [])
+})
+
 test('returns the launcher contract findings for an inadmissible card', async () => {
   const result = await checkLinearCardAdmission('JUL-243', 'reference-only', linearResponse('## Outcome\n\nOne outcome.'))
 
@@ -37,7 +44,7 @@ test('returns the launcher contract findings for an inadmissible card', async ()
   assert.deepEqual(result.issues, [
     'missing nonempty Requirements section',
     'missing nonempty Contracts section',
-    'missing nonempty Finish conditions section',
+    'missing nonempty Acceptance criteria section',
     'missing nonempty Proof section',
   ])
 })
@@ -62,7 +69,7 @@ test('the command checks every requested card and exits nonzero when one fails',
       issues: [
         'missing nonempty Requirements section',
         'missing nonempty Contracts section',
-        'missing nonempty Finish conditions section',
+        'missing nonempty Acceptance criteria section',
         'missing nonempty Proof section',
       ],
     },

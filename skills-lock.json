@@ -118,7 +118,7 @@
       "sourceType": "github",
       "ref": "d250fb51",
       "skillPath": ".claude/skills/pre-plan/SKILL.md",
-      "computedHash": "9a8cde5c0e43deae9a1e6105e67d0f366d751fd6dcf271e31f51efaf4a513b26"
+      "computedHash": "cd3323d8edef8b8add285b239f57aa01c3d8e0b1cc5cdf0bb2e1c39032ca7aec"
     },
     "prototype": {
       "source": "mattpocock/skills",

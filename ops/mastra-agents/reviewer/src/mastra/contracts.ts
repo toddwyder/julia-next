@@ -48,7 +48,13 @@ export const RoleDefaultsSchema = z.object({
   fixReviewer: ModelSelectionSchema,
 }).strict()
 
-const requiredSections = ['Outcome', 'Requirements', 'Contracts', 'Finish conditions', 'Proof'] as const
+const requiredSections = [
+  { names: ['Outcome'] },
+  { names: ['Requirements'] },
+  { names: ['Contracts'] },
+  { names: ['Acceptance criteria', 'Finish conditions'], missingName: 'Acceptance criteria' },
+  { names: ['Proof'] },
+] as const
 const requiredAgentBriefFields = ['Category', 'Summary', 'Current behavior', 'Desired behavior', 'Key interfaces', 'Acceptance criteria', 'Out of scope'] as const
 const markdownHeading = /^#{1,6}(?:[ \t]+.*)?$/im
 
@@ -69,15 +75,16 @@ function validateCardAdmission(card: { state: string; description: string }, con
     }
   } else {
     for (const section of requiredSections) {
-      const title = section.replace(' ', '[ \\t]+')
-      const pattern = new RegExp(`^#{1,6}[ \\t]+${title}[ \\t]*$`, 'im')
+      const headings = section.names.map(name => name.replace(' ', '[ \\t]+')).join('|')
+      const pattern = new RegExp(`^#{1,6}[ \\t]+(?:${headings})[ \\t]*$`, 'im')
       const heading = pattern.exec(card.description)
+      const displayName = 'missingName' in section ? section.missingName : section.names[0]
       if (!heading) {
-        context.addIssue({ code: 'custom', path: ['description'], message: `missing nonempty ${section} section` })
+        context.addIssue({ code: 'custom', path: ['description'], message: `missing nonempty ${displayName} section` })
         continue
       }
       const content = card.description.slice(heading.index + heading[0].length).split(markdownHeading)[0]?.trim()
-      if (!content) context.addIssue({ code: 'custom', path: ['description'], message: `empty ${section} section` })
+      if (!content) context.addIssue({ code: 'custom', path: ['description'], message: `empty ${displayName} section` })
     }
   }
   const decisionText = card.description.replace(/\b(?:no|rejects?)\s+unresolved(?:[\s-]+)decisions?(?:\s+markers?)?\b/gi, '')

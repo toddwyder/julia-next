@@ -122,7 +122,7 @@ test('a Ready card that fails admission is reported as not startable without bre
     admitted: false,
     card: {
       identifier: 'JUL-242', title: 'Card 1: Server setup', state: 'Ready',
-      reason: 'Cannot start: missing the Outcome section; missing the Contracts section; missing the Finish conditions section; missing the Proof section',
+      reason: 'Cannot start: missing the Outcome section; missing the Contracts section; missing the Acceptance criteria section; missing the Proof section',
     },
   })
   assert.equal(second.admitted, true)
