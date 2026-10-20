@@ -1,0 +1,54 @@
+[
+  {
+    "method": "thread/tokenUsage/updated",
+    "params": {
+      "threadId": "01a15b1e-830a-7180-b6d2-1a589044bb6b",
+      "turnId": "01a15b1e-856b-7190-84ff-767d101d62d9",
+      "tokenUsage": {
+        "total": {
+          "totalTokens": 15795,
+          "inputTokens": 15633,
+          "cachedInputTokens": 12288,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 162,
+          "reasoningOutputTokens": 0
+        },
+        "last": {
+          "totalTokens": 15795,
+          "inputTokens": 15633,
+          "cachedInputTokens": 12288,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 162,
+          "reasoningOutputTokens": 0
+        },
+        "modelContextWindow": 475000
+      }
+    }
+  },
+  {
+    "method": "thread/tokenUsage/updated",
+    "params": {
+      "threadId": "01a15b1e-830a-7180-b6d2-1a589044bb6b",
+      "turnId": "01a15b1e-856b-7190-84ff-767d101d62d9",
+      "tokenUsage": {
+        "total": {
+          "totalTokens": 31657,
+          "inputTokens": 31471,
+          "cachedInputTokens": 27776,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 186,
+          "reasoningOutputTokens": 0
+        },
+        "last": {
+          "totalTokens": 15862,
+          "inputTokens": 15838,
+          "cachedInputTokens": 15488,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 24,
+          "reasoningOutputTokens": 0
+        },
+        "modelContextWindow": 475000
+      }
+    }
+  }
+]

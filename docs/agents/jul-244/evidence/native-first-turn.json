@@ -1,0 +1,48 @@
+{
+  "data": [
+    {
+      "id": "01a15b1e-856b-7190-84ff-767d101d62d9",
+      "rootTurnId": "01a15b1e-856b-7190-84ff-767d101d62d9",
+      "items": [
+        {
+          "type": "userMessage",
+          "id": "01a15b1e-8887-7100-804f-3481e7905a81",
+          "clientId": null,
+          "content": [
+            {
+              "type": "text",
+              "text": "This is a telemetry proof. Use update_plan to create exactly these two steps: Read proof brief (completed), Verify telemetry (in_progress). Then run exactly sleep 20 as a foreground shell command. Then use update_plan to mark both steps completed. Reply DONE. Do not read or change files, call other tools, or delegate.",
+              "text_elements": []
+            }
+          ]
+        },
+        {
+          "type": "agentMessage",
+          "id": "msg_02961631a4011cce016ad7d6ab66f0819ab3d7436c57da4efb",
+          "text": "I’ll create the two-step plan, run `sleep 20`, and mark both steps completed.",
+          "phase": "commentary",
+          "memoryCitation": null,
+          "delivery": null,
+          "questions": null
+        },
+        {
+          "type": "agentMessage",
+          "id": "msg_02961631a4011cce016ad7d6aeead4819a944a33f5ca15f5d9",
+          "text": "I couldn’t complete the proof because `update_plan` is unavailable. No shell command was run.",
+          "phase": "final_answer",
+          "memoryCitation": null,
+          "delivery": null,
+          "questions": null
+        }
+      ],
+      "itemsView": "full",
+      "status": "completed",
+      "error": null,
+      "startedAt": 1792530089,
+      "completedAt": 1792530095,
+      "durationMs": 5999
+    }
+  ],
+  "nextCursor": null,
+  "backwardsCursor": "{\"requestedThreadId\":\"01a15b1e-830a-7180-b6d2-1a589044bb6b\",\"rolloutOrdinal\":1,\"includeAnchor\":true,\"scope\":{\"kind\":\"turns\"}}"
+}

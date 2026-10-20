@@ -1,0 +1,46 @@
+✔ a running command stays Working after twenty minutes without a new event (73.346812ms)
+✔ run-failed remains visible as Stopped (28.197137ms)
+✔ disconnected remains visible as Stopped (12.338227ms)
+✔ run-suspended remains visible as Stopped (17.095218ms)
+✔ fifteen idle minutes becomes Stopped at the threshold (16.103598ms)
+✔ three distinct failing commands do not count as the same repeated action (36.193302ms)
+✔ three identical failing commands show Stopped, a successful action resets the streak (24.406875ms)
+✔ Codex derives distinct failure identities from native command and cwd, never the item id (8.650939ms)
+✔ run-completed leaves the active list and retains its event history after restart (20.616042ms)
+✔ run-canceled leaves the active list and retains its event history after restart (21.199174ms)
+No `storage` configured on Mastra — falling back to an in-memory store. In-memory storage is not durable: all data is lost on restart, and it is not safe for production. Configure a persistent storage adapter (e.g. @mastra/libsql, @mastra/pg, @mastra/cloudflare). See https://mastra.ai/docs/storage
+Mastra shutdown completed
+✔ a real Mastra workflow suspended waiting is Stopped (1094.291672ms)
+✔ Proof cleanup settles delayed real workflow persistence before storage closes and records failures (58.148662ms)
+✔ CommandCode explicit completion is success even when its result contains failure-like text (7.120856ms)
+✔ native idle status does not turn an unexpected Codex failure into Finished (17.483256ms)
+✔ append waits for asynchronous event consumers to finish their writes (52.252555ms)
+✔ reconciled Codex idle thread retains authoritative failed turn status (17.067601ms)
+✔ Codex reasoning messages between commands do not fabricate a successful tool action (0.795686ms)
+✔ phone browser shows Working and Stopped cards, action outcomes and a clean console (930.662823ms)
+✔ monitored child exposes its owned PID and receives the explicit model with updates disabled (89.49798ms)
+This storage provider does not support batch creating metrics
+MastraStorageExporter shutdown complete
+[OBSERVABILITY] [Observability] Shutdown completed [name=cleanup-test]
+Mastra shutdown completed
+✔ failed journey cleanup waits for a real LibSQL-backed workflow result and trace before closing storage (306.612418ms)
+{"provider":"mastra","runId":"native","eventKind":"stream-error","error":{"name":"Error","message":"native result failed"}}
+✔ a provider result rejected before its stream ends is handled and persisted as disconnected (58.296339ms)
+✔ a provider event survives another process briefly holding the ledger write lock (304.779318ms)
+✔ Codex completion survives an early terminal event (65.893032ms)
+{"provider":"codex","runId":"connection","eventKind":"disconnect","error":{"name":"Error","message":"evidence disk unavailable"}}
+✔ Codex completion survives an early terminal event and a failed evidence subscriber (25.210908ms)
+{"provider":"codex","runId":"connection","eventKind":"disconnect-report-failed","error":{"name":"Error","message":"disconnect write failed"}}
+✔ a Codex notification failure still closes its connection when disconnect reporting also fails (6.725745ms)
+✔ context fullness uses the last exchange and survives durable reopen (50.957946ms)
+✔ native checklist ticks replace earlier wording and compaction replay counts once (63.273187ms)
+✔ phone shows context bar, separate unknown handoffs, literal checklist ticks and unavailable fallback (1208.542379ms)
+✔ newly observed Codex thread records zero compactions but missing capacity remains unavailable (2.839778ms)
+ℹ tests 29
+ℹ suites 0
+ℹ pass 29
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3921.945876

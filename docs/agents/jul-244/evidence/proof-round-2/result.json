@@ -1,0 +1,12 @@
+{
+  "ok": false,
+  "candidateCommit": "c208766b40f6f7c5b1936ed97286f8db40e16441",
+  "exitCode": 1,
+  "failure": "AbortError: The operation was aborted",
+  "consoleErrors": [],
+  "cleanupErrors": [
+    "Error: Codex protocol error -32600: no active turn to interrupt"
+  ],
+  "dashboardExited": true,
+  "finishedAt": "2026-10-20T21:05:27.847Z"
+}

@@ -1,0 +1,42 @@
+✔ context fullness uses the last exchange and survives durable reopen (79.449326ms)
+✔ native checklist ticks replace earlier wording and compaction replay counts once (45.824215ms)
+✔ phone shows context bar, separate unknown handoffs, literal checklist ticks and unavailable fallback (1178.593133ms)
+✔ newly observed Codex thread records zero compactions but missing capacity remains unavailable (2.468665ms)
+✖ reconciling an active turn preserves the recorded checklist (2.941723ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 4
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1753.238177
+
+✖ failing tests:
+
+test at ops/mastra-agents/reviewer/test/jul-244.test.ts:79:1
+✖ reconciling an active turn preserves the recorded checklist (2.941723ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+      {
+        kind: 'run-started',
+        providerKind: 'turn/started',
+        providerStatus: 'inProgress',
+  +     telemetry: {
+  +       checklist: []
+  +     }
+      }
+    ]
+  
+      at TestContext.<anonymous> (file:///home/ubuntu/julia-next/ops/mastra-agents/reviewer/test/jul-244.test.ts:82:10)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ { kind: 'run-started', providerKind: 'turn/started', providerStatus: 'inProgress', telemetry: [Object] } ],
+    expected: [ { kind: 'run-started', providerKind: 'turn/started', providerStatus: 'inProgress' } ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

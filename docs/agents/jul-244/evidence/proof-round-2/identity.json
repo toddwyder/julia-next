@@ -1,0 +1,8 @@
+{
+  "candidateCommit": "c208766b40f6f7c5b1936ed97286f8db40e16441",
+  "dirtyTreeDigest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "startedAt": "2026-10-20T21:01:25.907Z",
+  "node": "v24.14.1",
+  "codex": "codex-cli 0.163.0",
+  "commandcode": "1.84.0"
+}

@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>What's running now</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#2F5BD3}a:hover{color:#1F3F99}
+</style>
+</helmet>
+<div style="width: 390px; height: 2500px; box-sizing: border-box; background: #F6F5F1; color: #1C1C1A; font-family: 'IBM Plex Sans', system-ui, sans-serif; padding: 20px 16px 32px; display: flex; flex-direction: column; gap: 16px">
+
+  <div style="display: flex; flex-direction: column; gap: 4px">
+    <div style="font-size: 13px; color: #5E5B53; letter-spacing: 0.02em">Julia control</div>
+    <h1 style="margin: 0; font-size: 26px; font-weight: 600">What's running now</h1>
+    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13px; color: #5E5B53">
+      <span>Updated 2:44 pm</span>
+      <span style="background: #ECEAE3; border-radius: 999px; padding: 2px 10px; color: #3D3B36">Sample data</span>
+    </div>
+  </div>
+
+  <section style="background: #FFFFFF; border: 1px solid #E2E0D8; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 14px">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px">
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <div style="font-size: 13px; color: #5E5B53">JUL-208</div>
+        <h2 style="margin: 0; font-size: 18px; font-weight: 600">Keep a private recipe</h2>
+      </div>
+      <span style="background: #E6ECFA; color: #1F3F99; border-radius: 999px; padding: 4px 10px; font-size: 13px; font-weight: 500; white-space: nowrap">Building · round 1</span>
+    </div>
+
+    <sc-if value="{{notStuck}}" hint-placeholder-val="{{ true }}">
+      <div style="background: #EEF2FC; border-radius: 8px; padding: 10px 12px; font-size: 14px; color: #1F3F99">Working. Last action 1 min ago.</div>
+    </sc-if>
+    <sc-if value="{{stuck}}" hint-placeholder-val="{{ false }}">
+      <div style="background: #FCEFE3; border-radius: 8px; padding: 10px 12px; font-size: 14px; color: #8A3D05; font-weight: 500">Looks stuck: no new action for 47 min. Last thing it did was run the tests.</div>
+    </sc-if>
+
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px">
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <div style="font-size: 12px; color: #5E5B53">Agent and model</div>
+        <div style="font-size: 14px">Builder · DeepSeek Flash (CommandCode)</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <div style="font-size: 12px; color: #5E5B53">Time in stage</div>
+        <div style="font-size: 14px">42 min · attempt 1</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <div style="font-size: 12px; color: #5E5B53">Spend</div>
+        <div style="font-size: 14px">$0.38 of $3.00 cap</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <div style="font-size: 12px; color: #5E5B53">Active time</div>
+        <div style="font-size: 14px">38 of 90 min cap</div>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 6px">
+      <div style="display: flex; justify-content: space-between; font-size: 13px">
+        <span>Context 61% full</span>
+        <span style="color: #5E5B53">1 compaction, 2:21 pm</span>
+      </div>
+      <div style="height: 8px; background: #ECEAE3; border-radius: 999px; overflow: hidden">
+        <div style="width: 61%; height: 8px; background: #2F5BD3; border-radius: 999px"></div>
+      </div>
+    </div>
+
+    <div style="border-top: 1px solid #ECEAE3; padding-top: 12px; display: flex; flex-direction: column; gap: 8px">
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <h3 style="margin: 0; font-size: 15px; font-weight: 600">The agent's own checklist</h3>
+        <div style="font-size: 12px; color: #5E5B53">Written by the agent. Check it against what it actually did, below.</div>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center; font-size: 14px">
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3 3 7-7" fill="none" stroke="#2F5BD3" stroke-width="2"></path></svg>
+        <span>Read the card and what "done" means</span>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center; font-size: 14px">
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3 3 7-7" fill="none" stroke="#2F5BD3" stroke-width="2"></path></svg>
+        <span>Find where recipes are saved</span>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center; font-size: 14px">
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3 3 7-7" fill="none" stroke="#2F5BD3" stroke-width="2"></path></svg>
+        <span>Write a test for the private setting</span>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center; font-size: 14px; font-weight: 500">
+        <span style="width: 13px; height: 13px; border: 1.5px solid #2F5BD3; border-radius: 3px; display: inline-block; margin: 0 1px"></span>
+        <span>Add the private setting to saving (working on)</span>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center; font-size: 14px; color: #5E5B53">
+        <span style="width: 13px; height: 13px; border: 1.5px solid #8A877E; border-radius: 3px; display: inline-block; margin: 0 1px"></span>
+        <span>Hide private recipes from the shared list</span>
+      </div>
+    </div>
+
+    <div style="border-top: 1px solid #ECEAE3; padding-top: 12px; display: flex; flex-direction: column; gap: 8px">
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <h3 style="margin: 0; font-size: 15px; font-weight: 600">What it actually did</h3>
+        <div style="font-size: 12px; color: #5E5B53">From the tools' own records. Newest first.</div>
+      </div>
+      <div style="display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 8px 10px; font-size: 14px">
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #5E5B53">2:44</span>
+        <span>Ran tests: 2 passed, 1 failed</span>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #5E5B53">2:41</span>
+        <span>Changed the recipe-saving file</span>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #5E5B53">2:33</span>
+        <span>Changed the recipe-saving file</span>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #5E5B53">2:22</span>
+        <span>Wrote a new test file for private recipes</span>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #5E5B53">2:21</span>
+        <span>Context compacted (it was 92% full)</span>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #5E5B53">2:15</span>
+        <span>Searched the code for where recipes are shared</span>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #5E5B53">2:08</span>
+        <span>Read the recipe list file</span>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #5E5B53">2:03</span>
+        <span>Read the card</span>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #5E5B53">2:02</span>
+        <span>Started round 1</span>
+      </div>
+      <a href="#" style="font-size: 14px; padding: 10px 0">Show all 46 actions</a>
+    </div>
+
+    <div style="font-size: 12px; color: #5E5B53; border-top: 1px solid #ECEAE3; padding-top: 10px">Sources: Mastra step log, CommandCode usage, Git</div>
+  </section>
+
+  <section style="background: #FFFFFF; border: 1px solid #E2E0D8; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 14px">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px">
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <div style="font-size: 13px; color: #5E5B53">JUL-215</div>
+        <h2 style="margin: 0; font-size: 18px; font-weight: 600">Scale a recipe</h2>
+      </div>
+      <span style="background: #F3E9DA; color: #7A4508; border-radius: 999px; padding: 4px 10px; font-size: 13px; font-weight: 500; white-space: nowrap">Reviewing · round 1</span>
+    </div>
+
+    <div style="background: #EEF2FC; border-radius: 8px; padding: 10px 12px; font-size: 14px; color: #1F3F99">Working. Last action 3 min ago.</div>
+
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px">
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <div style="font-size: 12px; color: #5E5B53">Agent and model</div>
+        <div style="font-size: 14px">Reviewer · Codex (ChatGPT Plus)</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <div style="font-size: 12px; color: #5E5B53">Time in stage</div>
+        <div style="font-size: 14px">12 min · attempt 1</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <div style="font-size: 12px; color: #5E5B53">Allowance</div>
+        <div style="font-size: 14px">6% of the 5-hour window</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <div style="font-size: 12px; color: #5E5B53">Active time</div>
+        <div style="font-size: 14px">11 of 45 min cap</div>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 6px">
+      <div style="display: flex; justify-content: space-between; font-size: 13px">
+        <span>Context 28% full</span>
+        <span style="color: #5E5B53">No compactions</span>
+      </div>
+      <div style="height: 8px; background: #ECEAE3; border-radius: 999px; overflow: hidden">
+        <div style="width: 28%; height: 8px; background: #2F5BD3; border-radius: 999px"></div>
+      </div>
+    </div>
+
+    <div style="border-top: 1px solid #ECEAE3; padding-top: 12px; font-size: 14px; color: #5E5B53">No checklist: the agent didn't make one this time.</div>
+
+    <div style="border-top: 1px solid #ECEAE3; padding-top: 12px; display: flex; flex-direction: column; gap: 8px">
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <h3 style="margin: 0; font-size: 15px; font-weight: 600">What it actually did</h3>
+        <div style="font-size: 12px; color: #5E5B53">From the tools' own records. Newest first.</div>
+      </div>
+      <div style="display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 8px 10px; font-size: 14px">
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #5E5B53">2:41</span>
+        <span>Ran tests: all 14 passed</span>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #5E5B53">2:37</span>
+        <span>Read the scaling change (4 files)</span>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #5E5B53">2:33</span>
+        <span>Read the card</span>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #5E5B53">2:32</span>
+        <span>Started round 1</span>
+      </div>
+    </div>
+
+    <div style="border-top: 1px solid #ECEAE3; padding-top: 12px; display: flex; justify-content: space-between; font-size: 14px">
+      <span style="font-weight: 600">Verdict</span>
+      <span style="color: #5E5B53">Not in yet</span>
+    </div>
+
+    <div style="font-size: 12px; color: #5E5B53; border-top: 1px solid #ECEAE3; padding-top: 10px">Sources: Codex session, Mastra step log, Git</div>
+  </section>
+
+  <section style="background: #FFFFFF; border: 2px solid #D9822B; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 14px">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px">
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <div style="font-size: 13px; color: #5E5B53">JUL-212</div>
+        <h2 style="margin: 0; font-size: 18px; font-weight: 600">Print a recipe</h2>
+      </div>
+      <span style="background: #E6ECFA; color: #1F3F99; border-radius: 999px; padding: 4px 10px; font-size: 13px; font-weight: 500; white-space: nowrap">Building · round 2</span>
+    </div>
+
+    <div style="background: #FCEFE3; border-radius: 8px; padding: 10px 12px; font-size: 14px; color: #8A3D05; font-weight: 500">Looks stuck: no new action for 47 min. The last 6 actions were the same test run, failing the same way.</div>
+
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px">
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <div style="font-size: 12px; color: #5E5B53">Agent and model</div>
+        <div style="font-size: 14px">Builder · DeepSeek Flash (CommandCode)</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <div style="font-size: 12px; color: #5E5B53">Time in stage</div>
+        <div style="font-size: 14px">2 h 10 min · attempt 2</div>
+      </div>
+    </div>
+
+    <div style="border-top: 1px solid #ECEAE3; padding-top: 12px; display: flex; flex-direction: column; gap: 8px">
+      <h3 style="margin: 0; font-size: 15px; font-weight: 600">What it actually did</h3>
+      <div style="display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 8px 10px; font-size: 14px">
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #5E5B53">1:57</span>
+        <span>Ran tests: 1 failed (same as before)</span>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #5E5B53">1:49</span>
+        <span>Ran tests: 1 failed (same as before)</span>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #5E5B53">1:41</span>
+        <span>Ran tests: 1 failed (same as before)</span>
+      </div>
+    </div>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 10px">
+    <h2 style="margin: 0; font-size: 17px; font-weight: 600">Recent review verdicts</h2>
+    <div style="background: #FFFFFF; border: 1px solid #E2E0D8; border-radius: 12px; padding: 12px 16px; display: flex; flex-direction: column; gap: 4px">
+      <div style="display: flex; justify-content: space-between; gap: 8px; font-size: 14px">
+        <span style="font-weight: 500">JUL-207 · round 2</span>
+        <span style="color: #1F3F99; font-weight: 500">Approved</span>
+      </div>
+      <div style="font-size: 13px; color: #5E5B53">1:10 pm · Qwen (CommandCode)</div>
+    </div>
+    <div style="background: #FFFFFF; border: 1px solid #E2E0D8; border-radius: 12px; padding: 12px 16px; display: flex; flex-direction: column; gap: 4px">
+      <div style="display: flex; justify-content: space-between; gap: 8px; font-size: 14px">
+        <span style="font-weight: 500">JUL-207 · round 1</span>
+        <span style="color: #8A3D05; font-weight: 500">Changes asked for (3)</span>
+      </div>
+      <div style="font-size: 13px; color: #5E5B53">11:52 am · Qwen (CommandCode)</div>
+    </div>
+  </section>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"showStuck":{"editor":"boolean","default":false},"$preview":{"width":390,"height":2500}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const stuck = this.props.showStuck ?? false;
+    return { stuck: stuck, notStuck: !stuck };
+  }
+}
+</script>
+</body>
+</html>

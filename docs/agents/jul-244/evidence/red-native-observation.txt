@@ -1,0 +1,51 @@
+✔ context fullness uses the last exchange and survives durable reopen (58.151414ms)
+✔ native checklist ticks replace earlier wording and compaction replay counts once (38.513213ms)
+✔ phone shows context bar, separate unknown handoffs, literal checklist ticks and unavailable fallback (1016.519048ms)
+✔ newly observed Codex thread records zero compactions but missing capacity remains unavailable (2.386639ms)
+✔ reconciling an active turn preserves the recorded checklist (1.309521ms)
+✖ monitor provides native telemetry evidence after persisting the same notification (286.373816ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 5
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1797.041545
+
+✖ failing tests:
+
+test at ops/mastra-agents/reviewer/test/jul-244.test.ts:85:1
+✖ monitor provides native telemetry evidence after persisting the same notification (286.373816ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + undefined
+  - {
+  -   context: {
+  -     percent: 61,
+  -     usedTokens: 610,
+  -     windowTokens: 1000
+  -   },
+  -   method: 'thread/tokenUsage/updated',
+  -   params: {
+  -     threadId: 'native',
+  -     tokenUsage: {
+  -       last: {
+  -         totalTokens: 610
+  -       },
+  -       modelContextWindow: 1000
+  -     }
+  -   }
+  - }
+  
+      at TestContext.<anonymous> (file:///home/ubuntu/julia-next/ops/mastra-agents/reviewer/test/jul-244.test.ts:115:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: { method: 'thread/tokenUsage/updated', params: { threadId: 'native', tokenUsage: [Object] }, context: { percent: 61, usedTokens: 610, windowTokens: 1000 } },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

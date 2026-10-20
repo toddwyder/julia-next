@@ -1,0 +1,10 @@
+{
+  "ok": false,
+  "candidateCommit": "dc095f6500679f45d61389b8b8fb1d50dfeb2def",
+  "exitCode": 1,
+  "failure": "Error: Codex protocol error -32600: no rollout found for thread id 01a15b1d-08bc-7d83-99a6-ec6c4d8ccd1b",
+  "consoleErrors": [],
+  "cleanupErrors": [],
+  "dashboardExited": true,
+  "finishedAt": "2026-10-20T20:59:52.077Z"
+}

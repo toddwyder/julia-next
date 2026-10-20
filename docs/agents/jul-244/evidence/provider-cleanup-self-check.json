@@ -1,0 +1,17 @@
+[
+  {
+    "round": "proof-round-1",
+    "threadId": "01a15b1d-08bc-7d83-99a6-ec6c4d8ccd1b",
+    "status": {
+      "type": "idle"
+    }
+  },
+  {
+    "round": "proof-round-2",
+    "threadId": "01a15b1e-830a-7180-b6d2-1a589044bb6b",
+    "status": {
+      "type": "idle"
+    },
+    "archived": true
+  }
+]

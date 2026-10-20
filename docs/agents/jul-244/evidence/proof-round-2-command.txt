@@ -1,0 +1,16 @@
+AbortError: The operation was aborted
+    at AbortSignal.abortListener (node:events:998:14)
+    at [nodejs.internal.kHybridDispatch] (node:internal/event_target:843:20)
+    at AbortSignal.dispatchEvent (node:internal/event_target:776:26)
+    at runAbort (node:internal/abort_controller:488:10)
+    at abortSignal (node:internal/abort_controller:459:3)
+    at Timeout._onTimeout (node:internal/abort_controller:152:7)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7) {
+  code: 'ABORT_ERR',
+  [cause]: DOMException [TimeoutError]: The operation was aborted due to timeout
+      at new DOMException (node:internal/per_context/domexception:76:18)
+      at Timeout._onTimeout (node:internal/abort_controller:154:9)
+      at listOnTimeout (node:internal/timers:605:17)
+      at process.processTimers (node:internal/timers:541:7)
+}
