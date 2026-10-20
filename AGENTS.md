@@ -100,6 +100,10 @@ On Windows, every local command that needs a Julia vault secret must run through
 service account. Never use personal 1Password desktop authentication for those commands. Direct
 `julia-vault.mjs` key operations fail closed when the service-account bootstrap is absent.
 
+### Delivery finish line
+
+Publishing is part of the card's finish line, so work to it without stopping. When review and Proof pass: push the exact reviewed candidate to a branch, open or resume one pull request, and wait for CI on that exact commit. A machine card then merges without asking Todd, and the agent confirms main contains the merged commit. A Julia product card stops for Todd's household test of the preview and merges only the commit he tested. After merging, post the result and links on the card and delete every branch and file you created that the card's brief doesn't name. Use ordinary signed-in GitHub access. Never ask Todd to run any of these steps or to relay a message between agents.
+
 ## Server and domain
 
 Keep SSH and sudo outside automated runners; an authorized operator uses the laptop's Tailscale
