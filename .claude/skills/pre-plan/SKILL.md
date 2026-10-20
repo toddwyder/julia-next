@@ -27,7 +27,12 @@ Input: the draft brief and its one-sentence outcome.
    - **Drop:** nothing needs it now or later. Rejected enhancements go to `.out-of-scope` as triage describes.
    Apply the sort without waiting; Todd can reverse any of it. Then test the size: one card is one proof story. If proving what's left takes more than one real drive, split it into cards.
 
-Output: the trimmed brief, the unknowns with their verdicts, and the splits and drops. Carry this output directly into Triage; do not stop with a separate `For Todd` summary.
+When a card has a rule about the order of events (concurrency, retries, restarts, state machines, “only once”), its Proof includes formal verification of that rule using these skills (`create-formal-verification-skill` and `maintain-formal-verification-skill`), in addition to the real run.
+
+Output: the trimmed brief, the unknowns with their verdicts, and the splits and drops. Carry this output directly into Triage; do not stop with a separate `For Todd` summary. Every brief must state what happens to code already built for the card that doesn’t meet its acceptance criteria:
+- It is removed from the repo and from the machines it was installed or configured on. Delete exactly that piece and everything belonging to it; the reviewer confirms a search finds no trace.
+- It is never worked around.
+- Undoing (a revert, or restarting from main and carrying over only what meets the criteria) is offered before patching.
 
 ## 2. Triage
 
@@ -41,9 +46,12 @@ Run these on the card. Each finding is a blank to fill or a question. Fill a bla
 2. **Contracts.** Draw a Mermaid diagram with a box per part and an arrow per handoff, labelled with its contract. A contract is the type-level part of an interface: one Zod schema, defined once and shared by provider and users. The interface also carries rules the schema can't, such as ordering, error behavior and restart behavior. Each offering and using part names a real check of its own side, covering those rules too. A changed contract lists every other user whose check must rerun.
 3. **Citations.** Open every cited link and check that it says what the card or Framework Map claims. A card that names a tool's private files instead of an official interface does not go to Ready.
 4. **Acceptance criteria.** Each is a checkable outcome, not a process step. If removing it leaves the requirement complete, cut it. Each acceptance criterion lists every case Proof must cover. The reviewer checks the Evidence against that list; any missing case means the card is not done.
-5. **Real Proof.** Each acceptance criterion has Proof. A test counts only if it was seen failing before the change and passing after, and the reviewer reran it. It runs against the real thing, except a rule living entirely inside one module, which a unit test covering every case may prove. Mocks, stubs and fakes never count across a seam. Recipe cards use `verify-julia` and machine cards use `verify-machine`. If the feature isn't mapped, extending the skill with `maintain-verification-skill` is part of the card.
+5. **Real Proof.** Each acceptance criterion has Proof. A test counts only if it was seen failing before the change and passing after, and the reviewer reran it. It runs against the real thing, except a rule living entirely inside one module, which a unit test covering every case may prove. Mocks, stubs and fakes never count across a seam. Recipe cards use `verify-julia` and machine cards use `verify-machine`. If the feature isn't mapped, extending the skill with `maintain-verification-skill` is part of the card. When a card has a rule about the order of events (concurrency, retries, restarts, state machines, “only once”), its Proof includes formal verification of that rule using these skills (`create-formal-verification-skill` and `maintain-formal-verification-skill`), in addition to the real run.
 6. **Mockups.** Give every mockup element a numbered callout. Each card lists the callout numbers it delivers. Confirm that every callout number belongs to exactly one card. The reviewer and Proof check the delivered result by callout number.
-7. **Nothing that stops the run.** The card tells the agent to stop only for a spend or time cap, a failed production check, two rounds without closing (with the step-back prepared), or an account, money or product decision. Every tool, file and service it relies on exists, and the card says where.
+7. **Nothing that stops the run.** The card tells the agent to stop only for a spend or time cap, a failed production check, two rounds without closing (with the step-back prepared), or an account, money or product decision. Every tool, file and service it relies on exists, and the card says where. Whenever a card stops for any reason: two rounds without closing, a spend cap or a time cap, the agent writes a root-cause report that proposes no fix, then a restart plan, and nothing is rebuilt until Todd approves the restart plan. Every restart plan and brief must state what happens to code already built for the card that doesn’t meet its acceptance criteria:
+   - It is removed from the repo and from the machines it was installed or configured on. Delete exactly that piece and everything belonging to it; the reviewer confirms a search finds no trace.
+   - It is never worked around.
+   - Undoing (a revert, or restarting from main and carrying over only what meets the criteria) is offered before patching.
 
 Post one Confirm comment per card as a record of what changed in the card text, including the filled blanks and Todd's answers ("None" if nothing changed). The separate Framework Map comment remains the citation record. Confirm runs once, plus one rerun if it found blanks.
 

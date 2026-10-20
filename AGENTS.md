@@ -81,7 +81,10 @@ Todd for a workaround.
 
 Work to the brief's finish line. A completed step is not a stopping point. Waiting on CI or any background job is not a stop: wait for it and continue.
 
-After two rounds without closing, stop and write a root-cause report that proposes no fix. Then write a restart plan. Nothing is rebuilt until Todd approves that restart plan.
+Whenever a card stops for any reason: two rounds without closing, a spend cap or a time cap, the agent writes a root-cause report that proposes no fix, then a restart plan, and nothing is rebuilt until Todd approves the restart plan. Every restart plan and brief must state what happens to code already built for the card that doesn’t meet its acceptance criteria:
+- It is removed from the repo and from the machines it was installed or configured on. Delete exactly that piece and everything belonging to it; the reviewer confirms a search finds no trace.
+- It is never worked around.
+- Undoing (a revert, or restarting from main and carrying over only what meets the criteria) is offered before patching.
 
 ### Preflight
 
