@@ -110,3 +110,19 @@ Codex and CommandCode files exposed history, but the code guessed running state,
 Mastra had a real trace API and was the least problematic source.
 The card left “running,” “detailed retention,” and “what it did” undefined for each tool, even though triage called them settled.
 The dashboard worked on OVH for one Codex happy path, but that could not prove the broader card.
+
+## 20 October approved clean restart: CommandCode preflight stop
+
+The restart's sandbox prerequisite check passed: Codex 0.163.0 executed a real `printf` via official `command/exec` with explicit workspaceWrite sandbox, exit 0, expected stdout and empty stderr. No model turn was used. The installed schema's no-approval enum value is `never`.
+
+Later, `command-code whoami` failed during module loading, before an account/balance result:
+
+```
+Error: ENOENT: no such file or directory, open '/opt/node-v24.14.1/lib/node_modules/command-code/node_modules/highlight.js/lib/languages/mipsasm.js'
+```
+
+The [full stack](evidence/commandcode-preflight-error.txt) is preserved. Follow-up filesystem inspection found the file present; package.json reported CommandCode 1.84.0, confirmed by `command-code --no-auto-update --version`. The package metadata and file timestamps were 2026-10-20 12:28:39/43 UTC. The earlier installed version in the handoff was 1.72.3. The catalog/account preflight commands omitted `--no-auto-update`, so automatic runtime replacement is a plausible cause of the transient missing file. This omission was the builder's mistake. The exact updater/process provenance is not established; do not claim permanent file absence or a proved race from the stack alone.
+
+The restart stops under Todd's explicit failure rule. No model inference, reviewer invocation, purchase, Proof or deployment occurred. The builder did not repair or replace the installed package after the failure.
+
+Proposed next plan, awaiting Todd: disable auto-update on every CommandCode invocation, replace the affected CommandCode installation as a whole with exact 1.72.3 (the adapter's documented version), preserve authentication outside the package, verify public startup/account commands without inference, read its matching documentation again, and then continue the existing approved removal/test/Proof/review sequence. Do not patch a dependency file into the existing installation, spend money, reset the previous Proof rounds or substitute a different reviewer. Complete the full free Proof, including all other providers if the documented zero-credit free-model attempt fails. Gemini review and deployment still require the identical passing candidate. Rebuild nothing until this failure plan is approved.
