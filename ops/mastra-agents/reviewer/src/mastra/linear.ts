@@ -1,7 +1,8 @@
 import { ControlPageCardSchema, ReadyCardSchema } from './contracts.ts'
 import type { LinearQueryClient } from './initialization-observability.ts'
+import { isFrameworkMapRecord } from './framework-map.ts'
 
-export type LinearIssue = { identifier: string; title?: string; description: string; state: { name: string } }
+export type LinearIssue = { identifier: string; title?: string; description: string; state: { name: string }; comments?: { nodes: { body: string; createdAt?: string }[]; pageInfo: { hasNextPage: boolean; endCursor?: string } } }
 export type LinearReadTrace = {
   operation: 'linear-read'
   issueId: string
@@ -19,6 +20,40 @@ export type LinearReadyListTrace = {
   cardCount?: number
   inadmissibleCount?: number
   errorCategory?: 'http' | 'graphql' | 'invalid-response'
+}
+
+export function cardAdmissionInput(issue: LinearIssue) {
+  const comments = issue.comments
+  const maps = comments?.nodes.filter(comment => isFrameworkMapRecord(comment.body)) ?? []
+  // Undated records cannot establish supersession: retain all and fail closed.
+  const dated = maps.every(comment => Number.isFinite(Date.parse(comment.createdAt ?? '')))
+  const selected = dated
+    ? [...maps].sort((left, right) => Date.parse(right.createdAt!) - Date.parse(left.createdAt!)).slice(0, 1)
+    : maps
+  return {
+    identifier: issue.identifier, state: issue.state.name, description: issue.description,
+    ...(comments ? { frameworkMaps: selected.map(comment => comment.body) } : {}),
+  }
+}
+
+async function completeIssueComments(issue: LinearIssue, client: LinearQueryClient) {
+  const seen = new Set<string>()
+  while (issue.comments?.pageInfo.hasNextPage) {
+    const after = issue.comments.pageInfo.endCursor
+    if (!after || seen.has(after)) throw new Error('Linear comment pagination returned an invalid cursor')
+    seen.add(after)
+    const response = await client.query(
+      'query CardComments($id:String!,$after:String!){issue(id:$id){comments(first:250,after:$after){nodes{body createdAt} pageInfo{hasNextPage endCursor}}}}',
+      { id: issue.identifier, after },
+    )
+    const body = await response.json() as { data?: { issue?: Pick<LinearIssue, 'comments'> }; errors?: unknown }
+    const next = body.data?.issue?.comments
+    if (!response.ok || body.errors || !Array.isArray(next?.nodes) || typeof next?.pageInfo?.hasNextPage !== 'boolean') {
+      throw new Error(`Linear ${issue.identifier} comment read failed with HTTP ${response.status}`)
+    }
+    issue.comments = { nodes: [...issue.comments.nodes, ...next.nodes], pageInfo: next.pageInfo }
+  }
+  return issue
 }
 
 function admissionReason(error: { issues: { message: string }[] }) {
@@ -40,7 +75,7 @@ function admissionReason(error: { issues: { message: string }[] }) {
 export function admitReadyCards(issues: LinearIssue[]) {
   return issues.map(issue => {
     const admitted = ReadyCardSchema.safeParse({
-      identifier: issue.identifier, title: issue.title, description: issue.description, state: issue.state.name,
+      ...cardAdmissionInput(issue), title: issue.title,
     })
     if (admitted.success) return ControlPageCardSchema.parse({ admitted: true, card: admitted.data })
     return ControlPageCardSchema.parse({
@@ -66,7 +101,7 @@ export async function listReadyLinearCards(
     let after: string | null = null
     do {
       const response = await client.query(
-        'query ReadyCards($after:String) { issues(first: 50, after: $after, filter: { state: { name: { eq: "Ready" } } }) { nodes { identifier title description state { name } } pageInfo { hasNextPage endCursor } } }',
+        'query ReadyCards($after:String) { issues(first: 50, after: $after, filter: { state: { name: { eq: "Ready" } } }) { nodes { identifier title description state { name } comments(first: 250) { nodes { body createdAt } pageInfo { hasNextPage endCursor } } } pageInfo { hasNextPage endCursor } } }',
         { after },
       )
       status = response.status
@@ -96,6 +131,7 @@ export async function listReadyLinearCards(
         throw new Error(`Linear Ready-card list failed with HTTP ${status} (invalid-response)`)
       }
     } while (after !== null)
+    await Promise.all(issues.map(issue => completeIssueComments(issue, client)))
     const cards = admitReadyCards(issues)
     await recordTrace({
       operation: 'linear-ready-list', ok: true, status, cardCount: cards.length,
@@ -120,7 +156,7 @@ export async function fetchLinearIssue(
   try {
     const response = await fetchImpl('https://api.linear.app/graphql', {
       method: 'POST', headers: { Authorization: apiKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: 'query Card($id:String!){issue(id:$id){identifier title description state{name}}}', variables: { id: issueId } }),
+      body: JSON.stringify({ query: 'query Card($id:String!){issue(id:$id){identifier title description state{name} comments(first:250){nodes{body createdAt} pageInfo{hasNextPage endCursor}}}}', variables: { id: issueId } }),
     })
     status = response.status
     const body = await response.json() as { data?: { issue?: LinearIssue }; errors?: unknown }
@@ -129,6 +165,10 @@ export async function fetchLinearIssue(
       await recordTrace({ operation: 'linear-read', issueId, ok: false, status, errorCategory, durationMs: performance.now() - started })
       throw new Error(`Linear ${issueId} read failed with HTTP ${status} (${errorCategory})`)
     }
+    await completeIssueComments(body.data!.issue!, { query: (query, variables) => fetchImpl('https://api.linear.app/graphql', {
+      method: 'POST', headers: { Authorization: apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, variables }),
+    }) })
     await recordTrace({ operation: 'linear-read', issueId, ok: true, status, durationMs: performance.now() - started })
     return body.data!.issue!
   } catch (error) {

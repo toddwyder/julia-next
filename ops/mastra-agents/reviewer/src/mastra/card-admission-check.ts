@@ -2,7 +2,7 @@ import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { CardAdmissionSchema } from './contracts.ts'
-import { fetchLinearIssue } from './linear.ts'
+import { cardAdmissionInput, fetchLinearIssue } from './linear.ts'
 
 export type CardAdmissionResult = {
   identifier: string
@@ -19,8 +19,7 @@ export async function checkLinearCardAdmission(
   if (!apiKey) throw new Error('LINEAR_API_KEY was not resolved by the Julia vault launcher')
   const issue = await fetchLinearIssue(issueId, apiKey, fetchImpl)
   const candidate = CardAdmissionSchema.safeParse({
-    identifier: issue.identifier,
-    description: issue.description,
+    ...cardAdmissionInput(issue),
     state: 'Ready',
   })
   return {
