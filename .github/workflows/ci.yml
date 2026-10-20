@@ -93,6 +93,8 @@ jobs:
           node-version: 22.23.2
       - name: Test bad-submissions rejection gates on Windows
         run: node --test scripts/bad-submissions.test.mjs
+      - name: Install root dependencies for Framework Map installed-document checks
+        run: npm ci
       - name: Install pinned Mastra reviewer dependencies
         working-directory: ops/mastra-agents/reviewer
         run: npm ci

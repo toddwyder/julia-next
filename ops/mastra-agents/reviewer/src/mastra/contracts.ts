@@ -1,4 +1,5 @@
 import { z } from 'zod/v4'
+import { frameworkMapFindings } from './framework-map.ts'
 
 const nonempty = z.string().trim().min(1)
 export const RouteSchema = z.enum(['antigravity', 'claude', 'commandcode'])
@@ -58,7 +59,10 @@ const requiredSections = [
 const requiredAgentBriefFields = ['Category', 'Summary', 'Current behavior', 'Desired behavior', 'Key interfaces', 'Acceptance criteria', 'Out of scope'] as const
 const markdownHeading = /^#{1,6}(?:[ \t]+.*)?$/im
 
-function validateCardAdmission(card: { state: string; description: string }, context: z.RefinementCtx) {
+function validateCardAdmission(card: { state: string; description: string; frameworkMaps?: string[] }, context: z.RefinementCtx) {
+  for (const message of frameworkMapFindings(card.description, card.frameworkMaps)) {
+    context.addIssue({ code: 'custom', path: ['frameworkMaps'], message })
+  }
   if (card.state !== 'Ready') {
     context.addIssue({ code: 'custom', path: ['state'], message: 'expected Ready state' })
   }
@@ -97,6 +101,7 @@ const cardIdentityShape = {
   identifier: z.string().regex(/^[A-Z][A-Z0-9]*-\d+$/),
   state: nonempty,
   description: nonempty,
+  frameworkMaps: z.array(z.string()).optional(),
 }
 
 export const CardAdmissionSchema = z.object(cardIdentityShape).strict().superRefine(validateCardAdmission)
