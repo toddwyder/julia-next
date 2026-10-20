@@ -1,0 +1,1299 @@
+[
+  {
+    "launch": {
+      "launchId": "idle",
+      "provider": "codex",
+      "providerRunId": "01a15979-22a6-7bf2-a2c8-31a38c0a69b6",
+      "cardIdentifier": "JUL-243",
+      "cardTitle": "Dashboard Proof: idle",
+      "role": "Proof",
+      "model": "gpt-6.1-sol",
+      "stage": "Proof",
+      "round": 1
+    },
+    "events": [
+      {
+        "launchId": "idle",
+        "eventId": "b0ba476d-069e-4390-a65f-cf36fef5a909",
+        "kind": "unknown",
+        "providerKind": "thread/started",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:13.492Z",
+        "launch": {
+          "launchId": "idle",
+          "provider": "codex",
+          "providerRunId": "01a15979-22a6-7bf2-a2c8-31a38c0a69b6",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: idle",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "idle",
+        "eventId": "ac413888-326c-4006-9d20-65e71edaf91e",
+        "kind": "unknown",
+        "providerKind": "mcpServer/startupStatus/updated",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:13.512Z",
+        "launch": {
+          "launchId": "idle",
+          "provider": "codex",
+          "providerRunId": "01a15979-22a6-7bf2-a2c8-31a38c0a69b6",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: idle",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "idle",
+        "eventId": "ede4d642-d381-42a6-9048-8a5354645a30",
+        "kind": "unknown",
+        "providerKind": "mcpServer/startupStatus/updated",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:14.509Z",
+        "launch": {
+          "launchId": "idle",
+          "provider": "codex",
+          "providerRunId": "01a15979-22a6-7bf2-a2c8-31a38c0a69b6",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: idle",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      }
+    ]
+  },
+  {
+    "launch": {
+      "launchId": "long-wait",
+      "provider": "codex",
+      "providerRunId": "01a15979-236e-7fd0-a8fb-b99056e8c22d",
+      "cardIdentifier": "JUL-243",
+      "cardTitle": "Dashboard Proof: long-wait",
+      "role": "Proof",
+      "model": "gpt-6.1-sol",
+      "stage": "Proof",
+      "round": 1
+    },
+    "events": [
+      {
+        "launchId": "long-wait",
+        "eventId": "8c92d1cc-6a4f-4f95-a0bf-4089da4fd855",
+        "kind": "unknown",
+        "providerKind": "thread/started",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:13.670Z",
+        "launch": {
+          "launchId": "long-wait",
+          "provider": "codex",
+          "providerRunId": "01a15979-236e-7fd0-a8fb-b99056e8c22d",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: long-wait",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "long-wait",
+        "eventId": "43a0d04b-8688-4f92-97d4-1ecf60a46ced",
+        "kind": "unknown",
+        "providerKind": "mcpServer/startupStatus/updated",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:13.698Z",
+        "launch": {
+          "launchId": "long-wait",
+          "provider": "codex",
+          "providerRunId": "01a15979-236e-7fd0-a8fb-b99056e8c22d",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: long-wait",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "long-wait",
+        "eventId": "18bdaeaa-df6d-4c41-809a-8a1a28800a83",
+        "kind": "run-started",
+        "providerKind": "thread/status/changed",
+        "providerStatus": "active",
+        "occurredAt": "2026-10-20T13:21:13.663Z",
+        "launch": {
+          "launchId": "long-wait",
+          "provider": "codex",
+          "providerRunId": "01a15979-236e-7fd0-a8fb-b99056e8c22d",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: long-wait",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "long-wait",
+        "eventId": "00fedbca-17bf-4905-8723-eb8763bca341",
+        "kind": "run-started",
+        "providerKind": "turn/started",
+        "providerStatus": "inProgress",
+        "occurredAt": "2026-10-20T13:21:13.000Z",
+        "launch": {
+          "launchId": "long-wait",
+          "provider": "codex",
+          "providerRunId": "01a15979-236e-7fd0-a8fb-b99056e8c22d",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: long-wait",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "long-wait",
+        "eventId": "98283a08-c57a-48b9-8a83-97046188416c",
+        "kind": "unknown",
+        "providerKind": "mcpServer/startupStatus/updated",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:14.579Z",
+        "launch": {
+          "launchId": "long-wait",
+          "provider": "codex",
+          "providerRunId": "01a15979-236e-7fd0-a8fb-b99056e8c22d",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: long-wait",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "long-wait",
+        "eventId": "7daf87ea-1a95-4f37-95e0-f017179f486f",
+        "kind": "progress",
+        "providerKind": "item/started",
+        "providerStatus": "userMessage",
+        "occurredAt": "2026-10-20T13:21:15.107Z",
+        "launch": {
+          "launchId": "long-wait",
+          "provider": "codex",
+          "providerRunId": "01a15979-236e-7fd0-a8fb-b99056e8c22d",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: long-wait",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "long-wait",
+        "eventId": "3bbefcb8-efa3-483e-9b95-a77740efea01",
+        "kind": "progress",
+        "providerKind": "item/completed",
+        "providerStatus": "userMessage",
+        "occurredAt": "2026-10-20T13:21:15.107Z",
+        "launch": {
+          "launchId": "long-wait",
+          "provider": "codex",
+          "providerRunId": "01a15979-236e-7fd0-a8fb-b99056e8c22d",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: long-wait",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "long-wait",
+        "eventId": "24cd0e1a-a7fb-4a75-af52-d3821ab7c4c3",
+        "kind": "progress",
+        "providerKind": "item/started",
+        "providerStatus": "agentMessage",
+        "occurredAt": "2026-10-20T13:21:16.853Z",
+        "launch": {
+          "launchId": "long-wait",
+          "provider": "codex",
+          "providerRunId": "01a15979-236e-7fd0-a8fb-b99056e8c22d",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: long-wait",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "long-wait",
+        "eventId": "f51d41b5-348e-4166-828f-eba12f535c36",
+        "kind": "unknown",
+        "providerKind": "item/agentMessage/delta",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:16.887Z",
+        "launch": {
+          "launchId": "long-wait",
+          "provider": "codex",
+          "providerRunId": "01a15979-236e-7fd0-a8fb-b99056e8c22d",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: long-wait",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "long-wait",
+        "eventId": "0a765bf0-2a37-4366-9953-f4a1d8050fc8",
+        "kind": "unknown",
+        "providerKind": "item/agentMessage/delta",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:16.903Z",
+        "launch": {
+          "launchId": "long-wait",
+          "provider": "codex",
+          "providerRunId": "01a15979-236e-7fd0-a8fb-b99056e8c22d",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: long-wait",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "long-wait",
+        "eventId": "f1ca9b4e-461d-4237-8958-6dc7e154a923",
+        "kind": "unknown",
+        "providerKind": "item/agentMessage/delta",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:16.916Z",
+        "launch": {
+          "launchId": "long-wait",
+          "provider": "codex",
+          "providerRunId": "01a15979-236e-7fd0-a8fb-b99056e8c22d",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: long-wait",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "long-wait",
+        "eventId": "50ce984d-76c1-4ab2-8bab-4fb2170e6623",
+        "kind": "unknown",
+        "providerKind": "item/agentMessage/delta",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:16.931Z",
+        "launch": {
+          "launchId": "long-wait",
+          "provider": "codex",
+          "providerRunId": "01a15979-236e-7fd0-a8fb-b99056e8c22d",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: long-wait",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "long-wait",
+        "eventId": "6df9999d-8f00-477a-b70e-6292eed98e08",
+        "kind": "unknown",
+        "providerKind": "item/agentMessage/delta",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:16.941Z",
+        "launch": {
+          "launchId": "long-wait",
+          "provider": "codex",
+          "providerRunId": "01a15979-236e-7fd0-a8fb-b99056e8c22d",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: long-wait",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "long-wait",
+        "eventId": "4a65eef3-4daa-4187-977c-6a0e84347364",
+        "kind": "disconnected",
+        "providerKind": "connection-closed",
+        "providerStatus": "disconnected",
+        "occurredAt": "2026-10-20T13:21:17.096Z",
+        "launch": {
+          "launchId": "long-wait",
+          "provider": "codex",
+          "providerRunId": "01a15979-236e-7fd0-a8fb-b99056e8c22d",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: long-wait",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "long-wait",
+        "eventId": "7c8e89de-1593-412b-944c-37279a5f515c",
+        "kind": "unknown",
+        "providerKind": "item/agentMessage/delta",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:17.196Z",
+        "launch": {
+          "launchId": "long-wait",
+          "provider": "codex",
+          "providerRunId": "01a15979-236e-7fd0-a8fb-b99056e8c22d",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: long-wait",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "long-wait",
+        "eventId": "1cc44b62-5bb4-4d5c-a634-9d51274ff78e",
+        "kind": "unknown",
+        "providerKind": "item/agentMessage/delta",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:17.237Z",
+        "launch": {
+          "launchId": "long-wait",
+          "provider": "codex",
+          "providerRunId": "01a15979-236e-7fd0-a8fb-b99056e8c22d",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: long-wait",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "long-wait",
+        "eventId": "6dedb3fa-4d81-4360-be4d-95894b360c60",
+        "kind": "unknown",
+        "providerKind": "item/agentMessage/delta",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:17.251Z",
+        "launch": {
+          "launchId": "long-wait",
+          "provider": "codex",
+          "providerRunId": "01a15979-236e-7fd0-a8fb-b99056e8c22d",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: long-wait",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "long-wait",
+        "eventId": "bfdb459c-76d6-4a70-9637-774528eda7cb",
+        "kind": "unknown",
+        "providerKind": "item/agentMessage/delta",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:17.262Z",
+        "launch": {
+          "launchId": "long-wait",
+          "provider": "codex",
+          "providerRunId": "01a15979-236e-7fd0-a8fb-b99056e8c22d",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: long-wait",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "long-wait",
+        "eventId": "c5a85727-c418-4e8f-a849-8c4cac5e02a5",
+        "kind": "unknown",
+        "providerKind": "item/agentMessage/delta",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:17.275Z",
+        "launch": {
+          "launchId": "long-wait",
+          "provider": "codex",
+          "providerRunId": "01a15979-236e-7fd0-a8fb-b99056e8c22d",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: long-wait",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "long-wait",
+        "eventId": "58d58136-65dd-455b-bfaa-56dd24fa0bfb",
+        "kind": "unknown",
+        "providerKind": "item/agentMessage/delta",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:17.287Z",
+        "launch": {
+          "launchId": "long-wait",
+          "provider": "codex",
+          "providerRunId": "01a15979-236e-7fd0-a8fb-b99056e8c22d",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: long-wait",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "long-wait",
+        "eventId": "904a7b68-e0e8-49d3-b854-49dcf8968b16",
+        "kind": "unknown",
+        "providerKind": "item/agentMessage/delta",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:17.296Z",
+        "launch": {
+          "launchId": "long-wait",
+          "provider": "codex",
+          "providerRunId": "01a15979-236e-7fd0-a8fb-b99056e8c22d",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: long-wait",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "long-wait",
+        "eventId": "7c6ebac5-954a-429f-b676-7be38b6a24f9",
+        "kind": "unknown",
+        "providerKind": "item/agentMessage/delta",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:17.308Z",
+        "launch": {
+          "launchId": "long-wait",
+          "provider": "codex",
+          "providerRunId": "01a15979-236e-7fd0-a8fb-b99056e8c22d",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: long-wait",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "long-wait",
+        "eventId": "569e6f38-3a91-456b-8a30-1d77d2a89f28",
+        "kind": "unknown",
+        "providerKind": "item/agentMessage/delta",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:17.318Z",
+        "launch": {
+          "launchId": "long-wait",
+          "provider": "codex",
+          "providerRunId": "01a15979-236e-7fd0-a8fb-b99056e8c22d",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: long-wait",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "long-wait",
+        "eventId": "b30a07eb-6277-4549-a88a-eeaced7a432c",
+        "kind": "unknown",
+        "providerKind": "item/agentMessage/delta",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:17.330Z",
+        "launch": {
+          "launchId": "long-wait",
+          "provider": "codex",
+          "providerRunId": "01a15979-236e-7fd0-a8fb-b99056e8c22d",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: long-wait",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      }
+    ]
+  },
+  {
+    "launch": {
+      "launchId": "mastra",
+      "provider": "mastra",
+      "providerRunId": "a1ff06c2-c155-4fbf-82b6-56d7635066d2",
+      "cardIdentifier": "JUL-243",
+      "cardTitle": "Dashboard Proof: mastra",
+      "role": "Proof",
+      "model": "workflow",
+      "stage": "Proof",
+      "round": 1
+    },
+    "events": [
+      {
+        "launchId": "mastra",
+        "eventId": "f2d58615-c231-4b39-9091-a91ef4adb5d5",
+        "kind": "run-started",
+        "providerKind": "workflow-start",
+        "providerStatus": "running",
+        "occurredAt": "2026-10-20T13:21:13.761Z",
+        "launch": {
+          "launchId": "mastra",
+          "provider": "mastra",
+          "providerRunId": "a1ff06c2-c155-4fbf-82b6-56d7635066d2",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: mastra",
+          "role": "Proof",
+          "model": "workflow",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "mastra",
+        "eventId": "5bbc7116-64fd-4bdf-ae7a-be201e559f8c",
+        "kind": "action-started",
+        "providerKind": "workflow-step-start",
+        "providerStatus": "running",
+        "occurredAt": "2026-10-20T13:21:14.589Z",
+        "launch": {
+          "launchId": "mastra",
+          "provider": "mastra",
+          "providerRunId": "a1ff06c2-c155-4fbf-82b6-56d7635066d2",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: mastra",
+          "role": "Proof",
+          "model": "workflow",
+          "stage": "Proof",
+          "round": 1
+        },
+        "action": {
+          "id": "2b97d9fa-6ff7-4e87-9815-99cb383e28fb",
+          "type": "workflow-step",
+          "name": "work-then-pause",
+          "outcome": "unknown"
+        }
+      },
+      {
+        "launchId": "mastra",
+        "eventId": "e6147ce6-9961-4f19-a364-eef686d40cb4",
+        "kind": "run-suspended",
+        "providerKind": "workflow-step-suspended",
+        "providerStatus": "suspended",
+        "occurredAt": "2026-10-20T13:21:16.794Z",
+        "launch": {
+          "launchId": "mastra",
+          "provider": "mastra",
+          "providerRunId": "a1ff06c2-c155-4fbf-82b6-56d7635066d2",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: mastra",
+          "role": "Proof",
+          "model": "workflow",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "mastra",
+        "eventId": "c028ec44-2f8f-4065-9423-5a787707cf53",
+        "kind": "unknown",
+        "providerKind": "workflow-finish",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:16.819Z",
+        "launch": {
+          "launchId": "mastra",
+          "provider": "mastra",
+          "providerRunId": "a1ff06c2-c155-4fbf-82b6-56d7635066d2",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: mastra",
+          "role": "Proof",
+          "model": "workflow",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "mastra",
+        "eventId": "3925d478-6954-4d9e-9923-f54c85160b25",
+        "kind": "run-suspended",
+        "providerKind": "workflow-result",
+        "providerStatus": "suspended",
+        "occurredAt": "2026-10-20T13:21:16.863Z",
+        "launch": {
+          "launchId": "mastra",
+          "provider": "mastra",
+          "providerRunId": "a1ff06c2-c155-4fbf-82b6-56d7635066d2",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: mastra",
+          "role": "Proof",
+          "model": "workflow",
+          "stage": "Proof",
+          "round": 1
+        }
+      }
+    ]
+  },
+  {
+    "launch": {
+      "launchId": "commandcode",
+      "provider": "commandcode",
+      "providerRunId": "6c80be6c-5adc-4719-b607-74773b98f477",
+      "cardIdentifier": "JUL-243",
+      "cardTitle": "Dashboard Proof: commandcode",
+      "role": "Proof",
+      "model": "poolside/laguna-s-2.1-free",
+      "stage": "Proof",
+      "round": 1
+    },
+    "events": [
+      {
+        "launchId": "commandcode",
+        "eventId": "83fe3994-cb41-4b6e-b670-8d758cbb1fe8",
+        "kind": "run-started",
+        "providerKind": "event-stream-start",
+        "providerStatus": "running",
+        "occurredAt": "2026-10-20T13:21:16.991Z",
+        "launch": {
+          "launchId": "commandcode",
+          "provider": "commandcode",
+          "providerRunId": "6c80be6c-5adc-4719-b607-74773b98f477",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: commandcode",
+          "role": "Proof",
+          "model": "poolside/laguna-s-2.1-free",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "commandcode",
+        "eventId": "cafec855-a0e8-4241-8950-f42dd9500253",
+        "kind": "run-started",
+        "providerKind": "run_start",
+        "providerStatus": "running",
+        "occurredAt": "2026-10-20T13:21:17.679Z",
+        "launch": {
+          "launchId": "commandcode",
+          "provider": "commandcode",
+          "providerRunId": "6c80be6c-5adc-4719-b607-74773b98f477",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: commandcode",
+          "role": "Proof",
+          "model": "poolside/laguna-s-2.1-free",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "commandcode",
+        "eventId": "cc8583e9-1954-4262-a437-80673c34b676",
+        "kind": "progress",
+        "providerKind": "turn_start",
+        "providerStatus": "turn_start",
+        "occurredAt": "2026-10-20T13:21:17.690Z",
+        "launch": {
+          "launchId": "commandcode",
+          "provider": "commandcode",
+          "providerRunId": "6c80be6c-5adc-4719-b607-74773b98f477",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: commandcode",
+          "role": "Proof",
+          "model": "poolside/laguna-s-2.1-free",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "commandcode",
+        "eventId": "4edae6bc-58c3-4542-afa8-37268dde910c",
+        "kind": "unknown",
+        "providerKind": "message_start",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:17.701Z",
+        "launch": {
+          "launchId": "commandcode",
+          "provider": "commandcode",
+          "providerRunId": "6c80be6c-5adc-4719-b607-74773b98f477",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: commandcode",
+          "role": "Proof",
+          "model": "poolside/laguna-s-2.1-free",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "commandcode",
+        "eventId": "8735146e-1dc4-4aa7-abe9-3e02c2eb80a9",
+        "kind": "progress",
+        "providerKind": "model_request_start",
+        "providerStatus": "model_request_start",
+        "occurredAt": "2026-10-20T13:21:17.713Z",
+        "launch": {
+          "launchId": "commandcode",
+          "provider": "commandcode",
+          "providerRunId": "6c80be6c-5adc-4719-b607-74773b98f477",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: commandcode",
+          "role": "Proof",
+          "model": "poolside/laguna-s-2.1-free",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "commandcode",
+        "eventId": "2b9656c8-ae09-442a-9420-e1ef0ebfe2ba",
+        "kind": "unknown",
+        "providerKind": "model_trace",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:17.721Z",
+        "launch": {
+          "launchId": "commandcode",
+          "provider": "commandcode",
+          "providerRunId": "6c80be6c-5adc-4719-b607-74773b98f477",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: commandcode",
+          "role": "Proof",
+          "model": "poolside/laguna-s-2.1-free",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "commandcode",
+        "eventId": "9713b96b-97b6-419a-b4d4-521f2d17af7b",
+        "kind": "unknown",
+        "providerKind": "model_trace",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:18.805Z",
+        "launch": {
+          "launchId": "commandcode",
+          "provider": "commandcode",
+          "providerRunId": "6c80be6c-5adc-4719-b607-74773b98f477",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: commandcode",
+          "role": "Proof",
+          "model": "poolside/laguna-s-2.1-free",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "commandcode",
+        "eventId": "1a53e0b8-bc39-4887-9178-9b43091c05ec",
+        "kind": "unknown",
+        "providerKind": "model_trace",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:20.236Z",
+        "launch": {
+          "launchId": "commandcode",
+          "provider": "commandcode",
+          "providerRunId": "6c80be6c-5adc-4719-b607-74773b98f477",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: commandcode",
+          "role": "Proof",
+          "model": "poolside/laguna-s-2.1-free",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "commandcode",
+        "eventId": "5f9de202-6cab-474e-ab1c-fe9700dece88",
+        "kind": "unknown",
+        "providerKind": "api_retry",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:20.729Z",
+        "launch": {
+          "launchId": "commandcode",
+          "provider": "commandcode",
+          "providerRunId": "6c80be6c-5adc-4719-b607-74773b98f477",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: commandcode",
+          "role": "Proof",
+          "model": "poolside/laguna-s-2.1-free",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "commandcode",
+        "eventId": "04ec6f0c-cb28-4bac-ad49-cc36ba525d38",
+        "kind": "unknown",
+        "providerKind": "model_trace",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:21.731Z",
+        "launch": {
+          "launchId": "commandcode",
+          "provider": "commandcode",
+          "providerRunId": "6c80be6c-5adc-4719-b607-74773b98f477",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: commandcode",
+          "role": "Proof",
+          "model": "poolside/laguna-s-2.1-free",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "commandcode",
+        "eventId": "ff4fc705-9e69-466e-9c88-7376b1e49170",
+        "kind": "unknown",
+        "providerKind": "text_delta",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:32.522Z",
+        "launch": {
+          "launchId": "commandcode",
+          "provider": "commandcode",
+          "providerRunId": "6c80be6c-5adc-4719-b607-74773b98f477",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: commandcode",
+          "role": "Proof",
+          "model": "poolside/laguna-s-2.1-free",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "commandcode",
+        "eventId": "90851c98-b7f5-4b92-8bcb-4c72a4069785",
+        "kind": "unknown",
+        "providerKind": "message_update",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:32.540Z",
+        "launch": {
+          "launchId": "commandcode",
+          "provider": "commandcode",
+          "providerRunId": "6c80be6c-5adc-4719-b607-74773b98f477",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: commandcode",
+          "role": "Proof",
+          "model": "poolside/laguna-s-2.1-free",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "commandcode",
+        "eventId": "7ebb021c-4571-457a-881c-e3923bf8a2a4",
+        "kind": "unknown",
+        "providerKind": "text_delta",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:32.552Z",
+        "launch": {
+          "launchId": "commandcode",
+          "provider": "commandcode",
+          "providerRunId": "6c80be6c-5adc-4719-b607-74773b98f477",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: commandcode",
+          "role": "Proof",
+          "model": "poolside/laguna-s-2.1-free",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "commandcode",
+        "eventId": "5f953621-4973-445d-b908-ff663519ca64",
+        "kind": "unknown",
+        "providerKind": "message_update",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:32.561Z",
+        "launch": {
+          "launchId": "commandcode",
+          "provider": "commandcode",
+          "providerRunId": "6c80be6c-5adc-4719-b607-74773b98f477",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: commandcode",
+          "role": "Proof",
+          "model": "poolside/laguna-s-2.1-free",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "commandcode",
+        "eventId": "1f8b420a-a4cf-4c9a-9b18-7f88fc5bc4d2",
+        "kind": "progress",
+        "providerKind": "model_request_end",
+        "providerStatus": "model_request_end",
+        "occurredAt": "2026-10-20T13:21:32.598Z",
+        "launch": {
+          "launchId": "commandcode",
+          "provider": "commandcode",
+          "providerRunId": "6c80be6c-5adc-4719-b607-74773b98f477",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: commandcode",
+          "role": "Proof",
+          "model": "poolside/laguna-s-2.1-free",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "commandcode",
+        "eventId": "fd37060e-6f22-4f7a-b548-447d0e4f4ddf",
+        "kind": "unknown",
+        "providerKind": "message_end",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:32.606Z",
+        "launch": {
+          "launchId": "commandcode",
+          "provider": "commandcode",
+          "providerRunId": "6c80be6c-5adc-4719-b607-74773b98f477",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: commandcode",
+          "role": "Proof",
+          "model": "poolside/laguna-s-2.1-free",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "commandcode",
+        "eventId": "dec843dd-6295-497b-9c06-3ac3f9dbd8bf",
+        "kind": "progress",
+        "providerKind": "turn_end",
+        "providerStatus": "turn_end",
+        "occurredAt": "2026-10-20T13:21:32.615Z",
+        "launch": {
+          "launchId": "commandcode",
+          "provider": "commandcode",
+          "providerRunId": "6c80be6c-5adc-4719-b607-74773b98f477",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: commandcode",
+          "role": "Proof",
+          "model": "poolside/laguna-s-2.1-free",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "commandcode",
+        "eventId": "c55ad3b7-6815-4057-8762-56afbe7f4cf5",
+        "kind": "unknown",
+        "providerKind": "run_end",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:32.627Z",
+        "launch": {
+          "launchId": "commandcode",
+          "provider": "commandcode",
+          "providerRunId": "6c80be6c-5adc-4719-b607-74773b98f477",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: commandcode",
+          "role": "Proof",
+          "model": "poolside/laguna-s-2.1-free",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "commandcode",
+        "eventId": "90c2305d-e6c5-4303-a679-7d452d63824b",
+        "kind": "run-completed",
+        "providerKind": "result",
+        "providerStatus": "success",
+        "occurredAt": "2026-10-20T13:21:32.638Z",
+        "launch": {
+          "launchId": "commandcode",
+          "provider": "commandcode",
+          "providerRunId": "6c80be6c-5adc-4719-b607-74773b98f477",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: commandcode",
+          "role": "Proof",
+          "model": "poolside/laguna-s-2.1-free",
+          "stage": "Proof",
+          "round": 1
+        }
+      }
+    ]
+  },
+  {
+    "launch": {
+      "launchId": "codex-failures",
+      "provider": "codex",
+      "providerRunId": "01a15979-241c-73b1-aefa-a25e3a0fefe0",
+      "cardIdentifier": "JUL-243",
+      "cardTitle": "Dashboard Proof: codex-failures",
+      "role": "Proof",
+      "model": "gpt-6.1-sol",
+      "stage": "Proof",
+      "round": 1
+    },
+    "events": [
+      {
+        "launchId": "codex-failures",
+        "eventId": "5c52b87f-d2fc-4a56-aa39-e1d792efd870",
+        "kind": "unknown",
+        "providerKind": "thread/started",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:13.863Z",
+        "launch": {
+          "launchId": "codex-failures",
+          "provider": "codex",
+          "providerRunId": "01a15979-241c-73b1-aefa-a25e3a0fefe0",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: codex-failures",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "codex-failures",
+        "eventId": "76efcc5d-a49d-4d3f-b796-869454e1cb7e",
+        "kind": "unknown",
+        "providerKind": "mcpServer/startupStatus/updated",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:13.877Z",
+        "launch": {
+          "launchId": "codex-failures",
+          "provider": "codex",
+          "providerRunId": "01a15979-241c-73b1-aefa-a25e3a0fefe0",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: codex-failures",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "codex-failures",
+        "eventId": "a984aae6-fbc0-4913-aa2f-9d83ec94af91",
+        "kind": "run-started",
+        "providerKind": "thread/status/changed",
+        "providerStatus": "active",
+        "occurredAt": "2026-10-20T13:21:13.852Z",
+        "launch": {
+          "launchId": "codex-failures",
+          "provider": "codex",
+          "providerRunId": "01a15979-241c-73b1-aefa-a25e3a0fefe0",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: codex-failures",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "codex-failures",
+        "eventId": "3bd661ab-10d8-43e5-919e-9f728afd7f98",
+        "kind": "run-started",
+        "providerKind": "turn/started",
+        "providerStatus": "inProgress",
+        "occurredAt": "2026-10-20T13:21:13.000Z",
+        "launch": {
+          "launchId": "codex-failures",
+          "provider": "codex",
+          "providerRunId": "01a15979-241c-73b1-aefa-a25e3a0fefe0",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: codex-failures",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "codex-failures",
+        "eventId": "c5052b9a-6459-4294-abf9-6de30e3b677b",
+        "kind": "unknown",
+        "providerKind": "mcpServer/startupStatus/updated",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:15.001Z",
+        "launch": {
+          "launchId": "codex-failures",
+          "provider": "codex",
+          "providerRunId": "01a15979-241c-73b1-aefa-a25e3a0fefe0",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: codex-failures",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "codex-failures",
+        "eventId": "5891f6c1-3761-424d-86a7-b3cb89e275dc",
+        "kind": "progress",
+        "providerKind": "item/started",
+        "providerStatus": "userMessage",
+        "occurredAt": "2026-10-20T13:21:15.109Z",
+        "launch": {
+          "launchId": "codex-failures",
+          "provider": "codex",
+          "providerRunId": "01a15979-241c-73b1-aefa-a25e3a0fefe0",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: codex-failures",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "codex-failures",
+        "eventId": "5a7c4c46-4967-4801-837f-d01598d00678",
+        "kind": "progress",
+        "providerKind": "item/completed",
+        "providerStatus": "userMessage",
+        "occurredAt": "2026-10-20T13:21:15.109Z",
+        "launch": {
+          "launchId": "codex-failures",
+          "provider": "codex",
+          "providerRunId": "01a15979-241c-73b1-aefa-a25e3a0fefe0",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: codex-failures",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "codex-failures",
+        "eventId": "d2e57896-9f4b-460d-bb8e-442036c0cece",
+        "kind": "progress",
+        "providerKind": "item/started",
+        "providerStatus": "agentMessage",
+        "occurredAt": "2026-10-20T13:21:17.008Z",
+        "launch": {
+          "launchId": "codex-failures",
+          "provider": "codex",
+          "providerRunId": "01a15979-241c-73b1-aefa-a25e3a0fefe0",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: codex-failures",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "codex-failures",
+        "eventId": "d2a8a10d-8ce9-4934-a413-e4a7a2032a9a",
+        "kind": "unknown",
+        "providerKind": "item/agentMessage/delta",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:17.032Z",
+        "launch": {
+          "launchId": "codex-failures",
+          "provider": "codex",
+          "providerRunId": "01a15979-241c-73b1-aefa-a25e3a0fefe0",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: codex-failures",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "codex-failures",
+        "eventId": "d5fb14a7-499a-4a1b-8626-04e22ed654c3",
+        "kind": "unknown",
+        "providerKind": "item/agentMessage/delta",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:17.043Z",
+        "launch": {
+          "launchId": "codex-failures",
+          "provider": "codex",
+          "providerRunId": "01a15979-241c-73b1-aefa-a25e3a0fefe0",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: codex-failures",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "codex-failures",
+        "eventId": "e53d68ff-2f3f-447e-b2ff-dfcde3aaa75e",
+        "kind": "unknown",
+        "providerKind": "item/agentMessage/delta",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:17.060Z",
+        "launch": {
+          "launchId": "codex-failures",
+          "provider": "codex",
+          "providerRunId": "01a15979-241c-73b1-aefa-a25e3a0fefe0",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: codex-failures",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "codex-failures",
+        "eventId": "d8be6e13-3833-48d0-b231-de353fceaf11",
+        "kind": "unknown",
+        "providerKind": "item/agentMessage/delta",
+        "providerStatus": "unknown",
+        "occurredAt": "2026-10-20T13:21:17.071Z",
+        "launch": {
+          "launchId": "codex-failures",
+          "provider": "codex",
+          "providerRunId": "01a15979-241c-73b1-aefa-a25e3a0fefe0",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: codex-failures",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      },
+      {
+        "launchId": "codex-failures",
+        "eventId": "0fafead2-c673-487c-a196-700a1bab0bcd",
+        "kind": "disconnected",
+        "providerKind": "connection-closed",
+        "providerStatus": "disconnected",
+        "occurredAt": "2026-10-20T13:21:17.112Z",
+        "launch": {
+          "launchId": "codex-failures",
+          "provider": "codex",
+          "providerRunId": "01a15979-241c-73b1-aefa-a25e3a0fefe0",
+          "cardIdentifier": "JUL-243",
+          "cardTitle": "Dashboard Proof: codex-failures",
+          "role": "Proof",
+          "model": "gpt-6.1-sol",
+          "stage": "Proof",
+          "round": 1
+        }
+      }
+    ]
+  }
+]

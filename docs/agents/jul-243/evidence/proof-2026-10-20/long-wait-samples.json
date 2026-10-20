@@ -1,0 +1,27 @@
+[
+  {
+    "at": "2026-10-20T13:21:13.724Z",
+    "status": "working",
+    "runningActions": 0
+  },
+  {
+    "at": "2026-10-20T13:21:14.903Z",
+    "status": "working",
+    "runningActions": 0
+  },
+  {
+    "at": "2026-10-20T13:21:15.913Z",
+    "status": "working",
+    "runningActions": 0
+  },
+  {
+    "at": "2026-10-20T13:21:16.957Z",
+    "status": "working",
+    "runningActions": 0
+  },
+  {
+    "at": "2026-10-20T13:21:17.965Z",
+    "status": "stopped",
+    "runningActions": 0
+  }
+]

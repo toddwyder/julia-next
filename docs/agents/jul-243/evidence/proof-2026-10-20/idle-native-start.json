@@ -1,0 +1,47 @@
+{
+  "thread": {
+    "id": "01a15979-22a6-7bf2-a2c8-31a38c0a69b6",
+    "environments": [
+      {
+        "environmentId": "local",
+        "cwd": "/tmp/jul243-current-proof-wZOyZg",
+        "runtimeWorkspaceRoots": [
+          "/tmp/jul243-current-proof-wZOyZg"
+        ]
+      }
+    ],
+    "extra": null,
+    "sessionId": "01a15979-22a6-7bf2-a2c8-31a38c0a69b6",
+    "forkedFromId": null,
+    "parentThreadId": null,
+    "preview": "",
+    "ephemeral": false,
+    "section": null,
+    "sectionEnteredAt": null,
+    "projectId": null,
+    "historyMode": "paginated",
+    "modelProvider": "openai",
+    "model": "gpt-6.1-sol",
+    "reasoningEffort": null,
+    "createdAt": 1792502473,
+    "updatedAt": 1792502473,
+    "recencyAt": 1792502473,
+    "status": {
+      "type": "idle"
+    },
+    "path": "/home/ubuntu/.codex/sessions/2026/10/20/rollout-2026-10-20T13-21-13-01a15979-22a6-7bf2-a2c8-31a38c0a69b6.jsonl",
+    "cwd": "/tmp/jul243-current-proof-wZOyZg",
+    "cliVersion": "0.163.0",
+    "originator": "codex-tui",
+    "source": "vscode",
+    "canAcceptDirectInput": true,
+    "threadSource": null,
+    "agentNickname": null,
+    "agentRole": null,
+    "gitInfo": null,
+    "name": null,
+    "daybreakEnabled": null,
+    "turns": []
+  },
+  "readState": null
+}

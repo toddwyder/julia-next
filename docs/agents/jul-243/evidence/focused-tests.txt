@@ -1,0 +1,40 @@
+
+> julia-mastra-reviewer@1.0.0 test:jul-243
+> node --experimental-strip-types --test test/jul-243.test.ts
+
+✔ a running command stays Working after twenty minutes without a new event (87.537292ms)
+✔ run-failed remains visible as Stopped (38.766012ms)
+✔ disconnected remains visible as Stopped (29.622661ms)
+✔ run-suspended remains visible as Stopped (35.97583ms)
+✔ fifteen idle minutes becomes Stopped at the threshold (23.363724ms)
+✔ three distinct failing commands do not count as the same repeated action (50.797642ms)
+✔ three identical failing commands show Stopped, a successful action resets the streak (38.092703ms)
+✔ Codex derives distinct failure identities from native command and cwd, never the item id (11.867218ms)
+✔ run-completed leaves the active list and retains its event history after restart (28.37829ms)
+✔ run-canceled leaves the active list and retains its event history after restart (28.06511ms)
+No `storage` configured on Mastra — falling back to an in-memory store. In-memory storage is not durable: all data is lost on restart, and it is not safe for production. Configure a persistent storage adapter (e.g. @mastra/libsql, @mastra/pg, @mastra/cloudflare). See https://mastra.ai/docs/storage
+Mastra shutdown completed
+✔ a real Mastra workflow suspended waiting is Stopped (1378.489489ms)
+✔ Proof cleanup settles delayed real workflow persistence before storage closes and records failures (71.759686ms)
+✔ CommandCode explicit completion is success even when its result contains failure-like text (13.582807ms)
+✔ native idle status does not turn an unexpected Codex failure into Finished (27.810981ms)
+✔ append waits for asynchronous event consumers to finish their writes (62.657059ms)
+✔ reconciled Codex idle thread retains authoritative failed turn status (24.100463ms)
+✔ Codex reasoning messages between commands do not fabricate a successful tool action (0.94989ms)
+✔ phone browser shows Working and Stopped cards, action outcomes and a clean console (1244.821265ms)
+✔ monitored child exposes its owned PID and receives the explicit model with updates disabled (120.827297ms)
+This storage provider does not support batch creating metrics
+MastraStorageExporter shutdown complete
+[OBSERVABILITY] [Observability] Shutdown completed [name=cleanup-test]
+Mastra shutdown completed
+✔ failed journey cleanup waits for a real LibSQL-backed workflow result and trace before closing storage (374.191427ms)
+{"provider":"mastra","runId":"native","eventKind":"stream-error","error":{"name":"Error","message":"native result failed"}}
+✔ a provider result rejected before its stream ends is handled and persisted as disconnected (85.825548ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4512.57629

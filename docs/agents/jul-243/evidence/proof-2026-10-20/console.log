@@ -1,0 +1,14 @@
+
+> julia-mastra-reviewer@1.0.0 proof:jul-243
+> node --experimental-strip-types proof/jul-243.ts /home/ubuntu/julia-next/.artifacts/jul-243-proof-2026-10-20
+
+This storage provider does not support batch creating metrics
+{"provider":"codex","runId":"connection","eventKind":"disconnect","error":{"name":"LibsqlError","message":"SQLITE_BUSY: database is locked","cause":{"name":"SqliteError","message":"database is locked"}}}
+{"provider":"codex","runId":"connection","eventKind":"disconnect","error":{"name":"Error","message":"page.goto: Navigation to \"http://127.0.0.1:37261/julia-control\" is interrupted by another navigation to \"http://127.0.0.1:37261/julia-control\"\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:37261/julia-control\", waiting until \"load\"\u001b[22m\n"}}
+{"provider":"codex","runId":"connection","eventKind":"disconnect","error":{"name":"LibsqlError","message":"SQLITE_BUSY: database is locked","cause":{"name":"SqliteError","message":"database is locked"}}}
+Warning: Detected unsettled top-level await at file:///home/ubuntu/julia-next/ops/mastra-agents/reviewer/proof/jul-243.ts:147
+  await failuresDone
+  ^
+
+
+
