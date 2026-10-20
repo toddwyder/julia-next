@@ -1,16 +1,35 @@
-# JUL-243 result for Todd — current execution checkpoint
+# JUL-243 result for Todd — 20 October 2026
 
-The approved restart is running on OVH. Handoffs are GitHub files; nothing goes to the laptop. This is an execution checkpoint, not a claim that delivery is finished. A final result follows the exact-candidate Proof, independent review and deployment gates.
+**Outcome: failed OVH Proof; stopped pending approval of the proposed repair plan.** Nothing was merged or deployed. All handoffs are pushed GitHub files.
 
-- [PR #303](https://github.com/toddwyder/julia-next/pull/303) starts from current main. #301 is closed unmerged with a pointer to #303; its branch is deleted. Every retained #301 file and reason is listed in #303. No Gemini `5cfd728`, private discovery or controlled-barrier rig was carried over.
-- Repository: the approved plan replaces the old plan, the root-cause record is retained and superseded JUL-243 docs were not copied. The dashboard uses Working/Stopped/Finished semantics and official registered provider lifecycles. Tests were written first for the behavior fixes.
-- Server: [204 exact earlier-run paths](server-removed.json) were removed and checked absent. [Removal/retention dispositions](removal-list.md) and [24 retained browser packages](retained-browser-packages.json) are recorded. Round 2 evidence, permanent prerequisites, sign-ins and production initialization state remain. Independent no-trace confirmation is still pending.
-- Sandbox: Ubuntu bubblewrap/AppArmor prerequisites installed and profile loaded without disabling the namespace restriction. A real Codex 0.163.0 workspaceWrite command passed before any model turn; installed schema's no-approval value is `never`.
-- Machine repair: the transient CommandCode dependency failure is recorded in [root cause](jul-243-root-cause.md). Under Todd’s 20 October approval, the package was replaced as a whole with current stable **1.84.0**, sign-in preserved, and automatic updates disabled thereafter. Startup/account checks passed without inference; genuine free-model completion and mid-request SIGKILL contracts passed. The smallest reversible repair replaced the tool itself, without patching a dependency file.
-- Spend: **$0** new model charges or purchases. CommandCode uses documented free `poolside/laguna-s-2.1-free`. The actual account shows $5 extra credits; Todd explicitly approved using the free model with $0 spend rather than requiring a zero balance. No balance was altered. Codex uses the existing signed-in route; no paid API fallback is used.
-- Verification: focused tests include the actual phone browser/clean console and real Mastra workflow persistence/trace cleanup/reopen. Native Codex sandbox/thread and real CommandCode contracts pass. Exact-candidate full OVH Proof is next; these checks are maker evidence, not independent review.
-- Review verdict: not issued. Gemini must review only, covering the complete PR and both removal surfaces, and push `review.md` to `review/pr-303` without touching the PR branch. Review and Proof must pass on the identical candidate. The unrelated PR #302 review remains queued until JUL-243 finishes.
-- Proof links: new raw checks are under `.artifacts/jul-243-approved-restart/` on OVH; exact-candidate full Proof will be under its distinct directory and linked from the review branch. Historical failed Round 2 remains `.artifacts/jul-243-round2-proof/` and [the original report](https://github.com/toddwyder/julia-next/pull/301#issuecomment-6279707937).
-- Deployed SHA: none from this restart yet. Existing julia-control.service remains unchanged. Its previously deployed SHA is unestablished because `/opt/julia-control/reviewer` is not a Git checkout.
+Created [PR #303](https://github.com/toddwyder/julia-next/pull/303) from current main. Closed #301 unmerged with a one-line pointer to #303 and deleted its branch. The new PR lists every kept #301 file and its reason. No Gemini `5cfd728`, private-file discovery or controlled-barrier Proof rig was carried over. The approved plan replaces the prior plan, the historical root-cause record remains, and superseded JUL-243 docs were not copied.
 
-Open: complete real OVH Proof (including the genuine long wait and 15-minute idle), independent Gemini review and no-trace confirmation, final CI, merge, both branch deletions, deployment and live Tailscale browser/console confirmation. A fixable machine defect is repaired and recorded; failed independent review, failed Proof, or an account/money/product decision stops the card under Todd’s latest rule.
+## Removed from OVH
+
+[204 exact earlier-run paths](server-removed.json) were removed and verified absent: obsolete scripts, smoke/test workspaces and databases, old evidence except Round 2, temporary review tooling and duplicate handoffs. [Removal and retention details](removal-list.md) and [24 retained browser packages](retained-browser-packages.json) are recorded. Permanent prerequisites, sign-ins, production initialization state and Round 2 evidence remain.
+
+CommandCode was replaced as a whole with current stable **1.84.0**, preserving sign-in and disabling updates for the rest of the run. That fixed the transient incomplete-installation error without patching a dependency file. Startup/account access passed without inference. Real free-model completion and mid-request cutoff contracts passed. This was the smallest reversible machine repair authorized by Todd's continuation decision.
+
+Codex’s Ubuntu sandbox prerequisites were installed and its AppArmor profile loaded without disabling the namespace restriction. Current-stable Codex **0.163.0** ran a real workspaceWrite command successfully before any model turn. Its generated schema confirms no-approval value `never`. No approval-handling code was added.
+
+## Proof and review
+
+Failed candidate: **`3d68cef9dfef59042769cafd9538992c474c9339`**, clean-tree digest recorded in [identity](evidence/proof-2026-10-20/identity.json).
+
+The real Proof exposed concurrent ledger `SQLITE_BUSY` errors and overlapping Playwright navigations. Its completion wait then stranded the process; it exited **13** without writing its own failure/result/cleanup records. [Root cause and proposed plan](jul-243-root-cause.md) describe the demonstrated defects and unproved cases. No source repair or repeat Proof followed this failure.
+
+Evidence: [manifest](evidence/proof-2026-10-20/manifest.json), [console](evidence/proof-2026-10-20/console.log), [native Codex commands/cancellation](evidence/proof-2026-10-20/operator-native-cancellation.json), [CommandCode result](evidence/proof-2026-10-20/commandcode-native.json), [Mastra paused state](evidence/proof-2026-10-20/mastra-paused.json), [retained real trace](evidence/proof-2026-10-20/operator-mastra-traces.json), and [operator cleanup](evidence/proof-2026-10-20/operator-cleanup.json). Raw databases remain at `.artifacts/jul-243-proof-2026-10-20/` on OVH.
+
+Operator cleanup interrupted the owned long Codex turn through the official API, confirmed terminal native state, terminated/joined only the identified Proof process tree and removed its temporary workspace. No owned process remained at readback. These operator records do **not** turn the missing script cleanup record into a pass; Mastra result-promise settlement was not proved. Production remains active, PID 50029.
+
+Before full Proof, **21 focused tests**, **three real provider contracts**, package tests, typecheck, framework lint and production build passed. These are maker checks and did not catch the real concurrency failures; they do not approve delivery. The complete long-wait/15-minute-idle/dying/restart/console Proof journey did not pass.
+
+**Independent review verdict: not run.** Failed Proof blocks the review gate. No Gemini reviewer was invoked and no reviewer commits were added. `review/pr-303` review request/findings remain outstanding. PR #302's unrelated review remains queued until JUL-243 finishes.
+
+## Cost, deployment and open work
+
+**New cost: $0.** CommandCode used documented free `poolside/laguna-s-2.1-free`; Codex used the existing ChatGPT sign-in. No paid API fallback or credit purchase was used. The account's real observed extra-credit balance was $5; Todd approved free-model use with $0 spend instead of requiring a zero balance. No balance was altered. Historical billing is not claimed to be zero.
+
+**Deployed SHA: none from this restart.** No merge, deployment or service restart occurred. The existing deployed SHA is unestablished because `/opt/julia-control/reviewer` is not a Git checkout.
+
+Open: approve the [proposed repair plan](jul-243-root-cause.md); fix and guard the ledger/browser/completion/cleanup failures test-first; establish the real native long-wait and idle seams; rerun complete Proof on a new pinned candidate; obtain independent Gemini review and repository/server no-trace confirmation; complete CI, merge, both branch deletions, deployment and live Tailscale dashboard/clean-console verification. Failed-Proof evidence remains retained; no failed requirement is marked complete or silently skipped.

@@ -1,0 +1,103 @@
+[
+  {
+    "traceId": "107302dc3d6f4dc995699a0e7bb8bb66",
+    "spans": [
+      {
+        "traceId": "107302dc3d6f4dc995699a0e7bb8bb66",
+        "spanId": "0d6f2f8d9130fd27",
+        "name": "workflow run: 'jul243-real-proof'",
+        "spanType": "workflow_run",
+        "isEvent": false,
+        "startedAt": "2026-10-20T13:21:13.731Z",
+        "parentSpanId": null,
+        "entityType": "workflow_run",
+        "entityId": "jul243-real-proof",
+        "entityName": "jul243-real-proof",
+        "parentEntityType": null,
+        "parentEntityId": null,
+        "parentEntityName": null,
+        "rootEntityType": null,
+        "rootEntityId": null,
+        "rootEntityName": null,
+        "userId": null,
+        "organizationId": null,
+        "resourceId": null,
+        "runId": "a1ff06c2-c155-4fbf-82b6-56d7635066d2",
+        "sessionId": null,
+        "threadId": null,
+        "requestId": null,
+        "environment": null,
+        "serviceName": null,
+        "scope": null,
+        "entityVersionId": null,
+        "parentEntityVersionId": null,
+        "rootEntityVersionId": null,
+        "experimentId": null,
+        "source": null,
+        "metadata": {
+          "runId": "a1ff06c2-c155-4fbf-82b6-56d7635066d2"
+        },
+        "tags": null,
+        "attributes": {
+          "status": "suspended"
+        },
+        "links": null,
+        "input": {},
+        "output": null,
+        "error": null,
+        "endedAt": "2026-10-20T13:21:16.812Z",
+        "requestContext": null,
+        "createdAt": "2026-10-20T13:21:16.846Z",
+        "updatedAt": "2026-10-20T13:21:16.859Z"
+      },
+      {
+        "traceId": "107302dc3d6f4dc995699a0e7bb8bb66",
+        "spanId": "5215dc1853153b3a",
+        "name": "workflow step: 'work-then-pause'",
+        "spanType": "workflow_step",
+        "isEvent": false,
+        "startedAt": "2026-10-20T13:21:13.773Z",
+        "parentSpanId": "0d6f2f8d9130fd27",
+        "entityType": "workflow_step",
+        "entityId": "work-then-pause",
+        "entityName": "jul243-real-proof",
+        "parentEntityType": null,
+        "parentEntityId": null,
+        "parentEntityName": null,
+        "rootEntityType": null,
+        "rootEntityId": null,
+        "rootEntityName": null,
+        "userId": null,
+        "organizationId": null,
+        "resourceId": null,
+        "runId": "a1ff06c2-c155-4fbf-82b6-56d7635066d2",
+        "sessionId": null,
+        "threadId": null,
+        "requestId": null,
+        "environment": null,
+        "serviceName": null,
+        "scope": null,
+        "entityVersionId": null,
+        "parentEntityVersionId": null,
+        "rootEntityVersionId": null,
+        "experimentId": null,
+        "source": null,
+        "metadata": {
+          "runId": "a1ff06c2-c155-4fbf-82b6-56d7635066d2"
+        },
+        "tags": null,
+        "attributes": {
+          "status": "suspended"
+        },
+        "links": null,
+        "input": {},
+        "output": null,
+        "error": null,
+        "endedAt": "2026-10-20T13:21:16.796Z",
+        "requestContext": null,
+        "createdAt": "2026-10-20T13:21:16.846Z",
+        "updatedAt": "2026-10-20T13:21:16.859Z"
+      }
+    ]
+  }
+]

@@ -1,0 +1,253 @@
+{
+  "version": "1.84.0",
+  "result": {
+    "exitCode": 0,
+    "terminal": true,
+    "usage": {
+      "inputTokens": 13283,
+      "outputTokens": 3,
+      "cacheReadTokens": 5952,
+      "cacheWriteTokens": 0
+    }
+  },
+  "frames": [
+    {
+      "type": "event",
+      "event": {
+        "type": "run_start",
+        "sessionId": "6c80be6c-5adc-4719-b607-74773b98f477"
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "turn_start",
+        "turnNumber": 1
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "message_start"
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "model_request_start",
+        "model": "poolside/laguna-s-2.1-free"
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "model_trace",
+        "traceId": "a0d9540682908d21aeaed319a9eec70b"
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "model_trace",
+        "traceId": "a0d9540682908d21aeaed319a9eec70b"
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "model_trace",
+        "traceId": "a0d9540682908d21aeaed319a9eec70b"
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "api_retry",
+        "attempt": 3,
+        "error": "The request limited providers for this model and they are currently at capacity. Add more providers or remove restrictions for automatic fallback. Providers considered: poolside.",
+        "delayMs": 1000
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "model_trace",
+        "traceId": "a0d9540682908d21aeaed319a9eec70b"
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "text_delta",
+        "delta": "OK"
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "message_update",
+        "content": [
+          {
+            "type": "text",
+            "text": "OK"
+          }
+        ]
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "text_delta",
+        "delta": "."
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "message_update",
+        "content": [
+          {
+            "type": "text",
+            "text": "OK."
+          }
+        ]
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "model_request_end",
+        "model": "poolside/laguna-s-2.1-free",
+        "usage": {
+          "inputTokens": 13283,
+          "outputTokens": 3,
+          "cacheReadTokens": 5952,
+          "cacheWriteTokens": 0
+        },
+        "stopReason": "stop"
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "message_end",
+        "content": [
+          {
+            "type": "text",
+            "text": "OK."
+          }
+        ]
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "turn_end",
+        "turnNumber": 1,
+        "hadToolCalls": false,
+        "usage": {
+          "inputTokens": 13283,
+          "outputTokens": 3,
+          "cacheReadTokens": 5952,
+          "cacheWriteTokens": 0
+        }
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "run_end",
+        "result": {
+          "finalText": "OK.",
+          "stopReason": "end_turn",
+          "turnCount": 1,
+          "usage": {
+            "inputTokens": 13283,
+            "outputTokens": 3,
+            "cacheReadTokens": 5952,
+            "cacheWriteTokens": 0
+          },
+          "systemPromptTokens": null,
+          "nextState": {
+            "sessionId": "6c80be6c-5adc-4719-b607-74773b98f477",
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Reply exactly OK. Do not call tools."
+                  }
+                ],
+                "meta": {
+                  "source": "user",
+                  "createdAt": 1792502476969,
+                  "messageId": "af1f68ea-5ed9-4f09-bddf-bf0eba66d39f"
+                }
+              },
+              {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "OK."
+                  }
+                ],
+                "meta": {
+                  "source": "model",
+                  "createdAt": 1792502492597,
+                  "messageId": "ed48387f-cb93-4a7e-8bf3-8476940c6335"
+                }
+              }
+            ],
+            "interrupted": false,
+            "modState": {
+              "workspace": {
+                "cwd": "/tmp/jul243-current-proof-wZOyZg",
+                "platform": "linux",
+                "branch": null,
+                "gitStatus": null,
+                "recentCommits": [],
+                "additionalDirectories": []
+              },
+              "compaction": {
+                "tokens": 13290,
+                "basis": {
+                  "role": "assistant",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "OK."
+                    }
+                  ],
+                  "meta": {
+                    "source": "model",
+                    "createdAt": 1792502492597,
+                    "messageId": "ed48387f-cb93-4a7e-8bf3-8476940c6335"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "result",
+      "subtype": "success",
+      "sessionId": "6c80be6c-5adc-4719-b607-74773b98f477",
+      "stopReason": "end_turn",
+      "usage": {
+        "inputTokens": 13283,
+        "outputTokens": 3,
+        "cacheReadTokens": 5952,
+        "cacheWriteTokens": 0
+      },
+      "durationMs": 15870,
+      "finalText": "OK."
+    }
+  ],
+  "freeTariff": "$0 input/output/cache per installed models.md",
+  "actualExtraCreditBalance": 5,
+  "authorizedSpend": 0
+}

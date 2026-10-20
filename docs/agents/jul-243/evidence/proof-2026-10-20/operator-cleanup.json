@@ -1,0 +1,97 @@
+{
+  "ok": false,
+  "operatorCleanup": true,
+  "scriptCleanupRecordPresent": false,
+  "terminatedIsolatedOwnerBeforeStorageReadback": true,
+  "signals": [
+    {
+      "pid": 80042,
+      "signal": "SIGTERM"
+    },
+    {
+      "pid": 80026,
+      "signal": "SIGTERM"
+    },
+    {
+      "pid": 80024,
+      "signal": "SIGTERM"
+    },
+    {
+      "pid": 80009,
+      "signal": "SIGTERM"
+    },
+    {
+      "pid": 80008,
+      "signal": "SIGTERM"
+    },
+    {
+      "pid": 80006,
+      "signal": "SIGTERM"
+    },
+    {
+      "pid": 79991,
+      "signal": "SIGTERM"
+    },
+    {
+      "pid": 79916,
+      "signal": "SIGTERM"
+    }
+  ],
+  "remainingOwnedPids": [],
+  "nativeTurnsCanceledThroughOfficialApi": true,
+  "mastraWorkflowResultPromiseVerified": false,
+  "retainedMastraTables": [
+    "mastra_scorers",
+    "mastra_workflow_snapshot",
+    "mastra_workflow_definitions",
+    "mastra_threads",
+    "mastra_messages",
+    "mastra_resources",
+    "mastra_observational_memory",
+    "mastra_knowledge_nodes",
+    "mastra_knowledge_records",
+    "mastra_knowledge_mentions",
+    "mastra_knowledge_cursors",
+    "mastra_knowledge_activity",
+    "mastra_knowledge_semantic_outbox",
+    "mastra_ai_spans",
+    "mastra_agents",
+    "mastra_agent_versions",
+    "mastra_channel_installations",
+    "mastra_channel_config",
+    "mastra_datasets",
+    "mastra_dataset_items",
+    "mastra_dataset_versions",
+    "mastra_experiments",
+    "mastra_experiment_results",
+    "mastra_prompt_blocks",
+    "mastra_prompt_block_versions",
+    "mastra_scorer_definitions",
+    "mastra_scorer_definition_versions",
+    "mastra_mcp_clients",
+    "mastra_mcp_client_versions",
+    "mastra_mcp_servers",
+    "mastra_mcp_server_versions",
+    "mastra_workspaces",
+    "mastra_workspace_versions",
+    "mastra_skills",
+    "mastra_skill_versions",
+    "mastra_favorites",
+    "mastra_skill_blobs",
+    "mastra_background_tasks",
+    "mastra_schedules",
+    "mastra_schedule_triggers",
+    "mastra_harness_sessions",
+    "mastra_tool_provider_connections",
+    "mastra_notifications",
+    "mastra_thread_state"
+  ],
+  "note": "Failed Proof; no claim that workflow-result settlement or cleanup requirements passed",
+  "removedOwnedTemporaryDirectories": [
+    "/tmp/jul243-current-proof-wZOyZg"
+  ],
+  "proofExitCode": 13,
+  "journalModeObserved": "delete",
+  "scriptFailureRecordPresent": false,
+  "scriptResultRecordPresent": false
+}
