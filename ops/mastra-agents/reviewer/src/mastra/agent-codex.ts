@@ -51,5 +51,6 @@ export function codexReconciliationEvents(value: unknown): EventBody[] {
     const parsed = ItemSchema.parse(item)
     return codexEvent(parsed.status === 'inProgress' ? 'item/started' : 'item/completed', { item })
   })
-  return [...events, codexEvent(turn.status === 'inProgress' ? 'turn/started' : 'turn/completed', { turn })]
+  const { telemetry: _telemetry, ...lifecycle } = codexEvent(turn.status === 'inProgress' ? 'turn/started' : 'turn/completed', { turn })
+  return [...events, lifecycle]
 }

@@ -75,3 +75,43 @@ test('newly observed Codex thread records zero compactions but missing capacity 
   for (const modelContextWindow of [null, 0, -1, undefined]) assert.deepEqual(codexEvent('thread/tokenUsage/updated', { tokenUsage: { last: { totalTokens: 500 }, modelContextWindow } }).telemetry, { context: null })
   assert.deepEqual(codexEvent('thread/tokenUsage/updated', { tokenUsage: { last: { totalTokens: 1500 }, modelContextWindow: 1000 } }).telemetry, { context: { percent: 100, usedTokens: 1500, windowTokens: 1000 } })
 })
+
+test('reconciling an active turn preserves the recorded checklist', async () => {
+  const { codexReconciliationEvents } = await import('../src/mastra/agent-codex.ts')
+  const events = codexReconciliationEvents({ id: 't', status: 'inProgress', items: [] })
+  assert.deepEqual(events, [{ kind: 'run-started', providerKind: 'turn/started', providerStatus: 'inProgress' }])
+})
+
+test('monitor provides native telemetry evidence after persisting the same notification', async () => {
+  const { once } = await import('node:events')
+  const { createServer } = await import('node:http')
+  const { WebSocketServer } = await import('ws')
+  const { createCodexMonitor } = await import('../src/mastra/agent-codex-monitor.ts')
+  const root = await mkdtemp(join(tmpdir(), 'jul244-notification-'))
+  const socketPath = join(root, 'codex.sock')
+  const http = createServer()
+  const ws = new WebSocketServer({ server: http })
+  http.listen(socketPath)
+  await once(http, 'listening')
+  const peerReady = once(ws, 'connection')
+  ws.on('connection', peer => peer.on('message', data => {
+    const message = JSON.parse(data.toString())
+    if (message.id !== undefined) peer.send(JSON.stringify({ id: message.id, result: message.method === 'thread/start' ? { thread: { id: 'native' } } : {} }))
+  }))
+  const store = await createAgentActivityStore(join(root, 'events.db'))
+  let evidence: unknown
+  const received = Promise.withResolvers<void>()
+  const monitor = await createCodexMonitor(store, { socketPath, onNotification: async (method, params) => {
+    if (method !== 'thread/tokenUsage/updated') return
+    evidence = { method, params, context: (await store.cards())[0].telemetry.context }
+    received.resolve()
+  } })
+  try {
+    await monitor.launch({ launchId: 'c', provider: 'codex', cardIdentifier: 'JUL-244', cardTitle: 'Telemetry', role: 'Proof', model: 'subscription', stage: 'Proof', round: 1 })
+    const [peer] = await peerReady
+    const params = { threadId: 'native', tokenUsage: { last: { totalTokens: 610 }, modelContextWindow: 1000 } }
+    peer.send(JSON.stringify({ method: 'thread/tokenUsage/updated', params }))
+    await Promise.race([received.promise, new Promise(resolve => setTimeout(resolve, 250))])
+    assert.deepEqual(evidence, { method: 'thread/tokenUsage/updated', params, context: { percent: 61, usedTokens: 610, windowTokens: 1000 } })
+  } finally { await monitor.close(); store.close(); ws.close(); await new Promise<void>(resolve => http.close(() => resolve())); await rm(root, { recursive: true, force: true }) }
+})

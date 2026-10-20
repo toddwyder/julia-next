@@ -11,7 +11,7 @@ const ThreadSchema = z.object({ id: z.string(), status: z.object({ type: z.enum(
 const TurnSchema = z.object({ id: z.string(), status: z.enum(['inProgress', 'completed', 'interrupted', 'failed']), startedAt: z.number().nullable().optional(), completedAt: z.number().nullable().optional(), items: z.array(z.unknown()) })
 const TurnPageSchema = z.object({ data: z.array(TurnSchema), nextCursor: z.string().nullable().optional() })
 
-export async function createCodexMonitor(store: Awaited<ReturnType<typeof createAgentActivityStore>>, options: { socketPath?: string } = {}) {
+export async function createCodexMonitor(store: Awaited<ReturnType<typeof createAgentActivityStore>>, options: { socketPath?: string; onNotification?: (method: string, params: unknown) => Promise<void> } = {}) {
   const completions = new EventEmitter()
   const terminal = new Map<string, unknown>()
   const complete = (id: string, event: unknown) => { terminal.set(id, event); completions.emit(id, event) }
@@ -31,6 +31,7 @@ export async function createCodexMonitor(store: Awaited<ReturnType<typeof create
     const previous = method === 'thread/status/changed' ? (await store.records()).find(record => record.sourceId === launch.launchId)?.updatedAt : undefined
     await store.append({ ...event, launchId: launch.launchId, eventId: randomUUID(), occurredAt: time === undefined ? previous ?? new Date().toISOString() : new Date(time).toISOString() })
     if (['run-completed', 'run-failed', 'run-canceled', 'disconnected'].includes(event.kind)) complete(launch.launchId, event)
+    await options.onNotification?.(method, params)
   }
   const disconnect = async (error?: Error) => {
     if (error) console.error(JSON.stringify(agentError(error, { provider: 'codex', runId: 'connection', eventKind: 'disconnect' })))

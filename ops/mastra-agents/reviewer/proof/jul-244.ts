@@ -14,7 +14,6 @@ import { LibSQLStore } from '@mastra/libsql'
 import { z } from 'zod/v4'
 import { createAgentActivityStore } from '../src/mastra/agent-activity.ts'
 import { createCodexMonitor } from '../src/mastra/agent-codex-monitor.ts'
-import { connectCodexProxy } from '../src/mastra/agent-codex-connection.ts'
 import { runMonitoredCommandCode } from '../src/mastra/agent-commandcode.ts'
 import { monitorMastraStream } from '../src/mastra/agent-mastra.ts'
 
@@ -35,12 +34,11 @@ await storage.init()
 const signal = AbortSignal.timeout(240000)
 const events = new EventEmitter()
 const native: { method: string; params: unknown }[] = []
-const proxy = await connectCodexProxy({ onNotification: async (method, params) => {
+const monitor = await createCodexMonitor(store, { onNotification: async (method, params) => {
   const body = params as { item?: { type: string }; threadId?: string }
   if (['thread/tokenUsage/updated', 'turn/plan/updated'].includes(method) || body.item?.type === 'contextCompaction') { native.push({ method, params }) }
   events.emit(method, params)
 } })
-const monitor = await createCodexMonitor(store)
 const browser = await chromium.launch()
 const dashboard = fork(fileURLToPath(new URL('./jul-243-dashboard.ts', import.meta.url)), [database], { execArgv: ['--experimental-strip-types'], stdio: ['ignore', 'pipe', 'pipe', 'ipc'] })
 dashboard.stdout?.resume(); dashboard.stderr?.resume()
@@ -73,7 +71,6 @@ try {
   const models = await monitor.request('model/list', {}) as { data: { model: string; isDefault: boolean }[] }
   const model = models.data.find(item => item.isDefault)!.model
   launch = await monitor.launch(meta('codex', 'codex', model), { cwd: root, model, approvalPolicy: 'never', sandbox: 'workspace-write' })
-  await proxy.request('thread/resume', { threadId: launch.providerRunId, excludeTurns: true })
   await capture('no-checklist', launch.cardTitle, async card => {
     await expect(card.getByText("No checklist: the agent didn't make one this time.", { exact: true })).toBeVisible()
     await expect(card.getByText('No compactions', { exact: true })).toBeVisible()
@@ -100,8 +97,10 @@ try {
   await compacted
   await compactionDone
   // A new real model turn exposes the retained compaction and records a no-checklist turn.
+  const secondStarted = once(events, 'turn/started', { signal })
   const second = await monitor.request('turn/start', { threadId: launch.providerRunId, input: [{ type: 'text', text: 'Run exactly sleep 20 as a foreground shell command. Do not create a checklist, read/change files or delegate. Then reply DONE.' }] }) as { turn: { id: string } }
   turnId = second.turn.id
+  await secondStarted
   const nextDone = monitor.completed('codex', signal)
   await capture('compaction-separate', launch.cardTitle, async card => {
     await expect(card.getByText(/1 compaction, /)).toBeVisible()
@@ -116,11 +115,11 @@ try {
     const result = await runMonitoredCommandCode({ store, launch: { ...meta('commandcode', 'commandcode', free), providerRunId: 'unresolved:jul244-proof' }, model: free, cwd: root, prompt: 'Reply exactly OK. Do not call tools.', maxTurns: 1, signal, onFrame: async frame => { frames.push(frame) } })
     await save('commandcode.json', { result, frames })
     assert.equal(result.exitCode, 0); assert.equal(result.terminal, true)
-    const usage = z.object({ totalTokens: z.number().nonnegative() }).parse(result.usage)
+    const usage = z.object({ inputTokens: z.number().nonnegative(), outputTokens: z.number().nonnegative() }).parse(result.usage)
     await capture('mastra-commandcode-unavailable', 'Dashboard C: mastra', async card => {
       for (const text of ['Context unavailable', 'Compactions: unavailable', 'Handoffs: unavailable', 'Checklist: unavailable']) await expect(card.getByText(text, { exact: true })).toBeVisible()
     })
-    return { totalTokens: usage.totalTokens }
+    return { totalTokens: usage.inputTokens + usage.outputTokens }
   } })
   const workflow = createWorkflow({ id: 'jul244-real-workflow', inputSchema: schema, outputSchema: z.object({ totalTokens: z.number() }) }).then(step).commit()
   mastra = new Mastra({ storage, workflows: { workflow } })
@@ -146,7 +145,7 @@ finally {
   const errors: string[] = []
   const attempt = async (fn: () => Promise<unknown>) => { try { await fn() } catch (error) { errors.push(String(error)) } }
   if (turnId && launch) await attempt(() => monitor.request('turn/interrupt', { threadId: launch!.providerRunId, turnId }))
-  await attempt(() => monitor.close()); await attempt(() => proxy.close())
+  await attempt(() => monitor.close())
   await attempt(() => mastra?.shutdown() ?? Promise.resolve()); await attempt(() => storage.close())
   await attempt(() => browser.close())
   await attempt(async () => { const exited = once(dashboard, 'exit', { signal: AbortSignal.timeout(15000) }); dashboard.kill('SIGTERM'); await exited })
