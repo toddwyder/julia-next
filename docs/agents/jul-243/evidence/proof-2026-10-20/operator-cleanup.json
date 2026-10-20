@@ -93,5 +93,15 @@
   "proofExitCode": 13,
   "journalModeObserved": "delete",
   "scriptFailureRecordPresent": false,
-  "scriptResultRecordPresent": false
+  "scriptResultRecordPresent": false,
+  "removedTemporaryOperatorHelpers": [
+    "/tmp/jul-243-sandbox-check.mjs",
+    "/tmp/jul-243-installed-schema",
+    "/tmp/jul243-current-inventory.py",
+    "/tmp/jul243-current-cancel-proof.mjs",
+    "/tmp/jul243-current-contract",
+    "/tmp/jul-243-pr303-body.md",
+    "/tmp/jul-243-pr303-update.json",
+    "/tmp/jul-243-new-pr-body.md"
+  ]
 }

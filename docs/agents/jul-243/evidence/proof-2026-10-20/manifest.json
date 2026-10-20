@@ -64,8 +64,8 @@
     },
     {
       "file": "operator-cleanup.json",
-      "bytes": 2407,
-      "sha256": "03b4ca888515b3960450c821611339e851423f1b4dad6d85aa9280d2e7e2093b"
+      "bytes": 2752,
+      "sha256": "eaca94206dadb9b8960fa1a44f952fe112e121c0a93dae69d0f1f5dcb7963637"
     },
     {
       "file": "operator-failure.json",
