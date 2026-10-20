@@ -343,7 +343,7 @@ Either a fact a card relies on but can't cite (what an existing module's interfa
 _Avoid_: Risk, gap, mechanism
 
 **Proof**:
-The process: a real pstack verification run against the real thing. It reports each acceptance criterion met or not met from Evidence tied to the exact candidate. Any source change makes it stale.
+The process: a real pstack verification run against the real thing. It reports each acceptance criterion met or not met from Evidence tied to the exact candidate commit and dirty-tree digest. Any source change makes it stale.
 _Avoid_: Verify run
 
 **Work session**:

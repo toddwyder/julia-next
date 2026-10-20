@@ -102,6 +102,7 @@ test('Todd\'s 19 October process vocabulary and restart stop are explicit', () =
 
   assert.match(glossary, /\*\*Acceptance criterion\*\*:\s*\nWhat must be true when the card is done\./);
   assert.match(glossary, /\*\*Proof\*\*:\s*\nThe process: a real pstack verification run against the real thing\./);
+  assert.match(glossary, /\*\*Proof\*\*:[^\n]*\n[^\n]*tied to the exact candidate commit and dirty-tree digest\./);
   assert.match(glossary, /\*\*Evidence\*\*:\s*\nWhat Proof produces, showing that every acceptance criterion was met\. No Evidence means not done\./);
   assert.doesNotMatch(glossary, /_Avoid_: Pstack verification/);
   assert.match(agents, /Whenever a card stops for any reason: two rounds without closing, a spend cap or a time cap, the agent writes a root-cause report that proposes no fix, then a restart plan, and nothing is rebuilt until Todd approves the restart plan\./);
