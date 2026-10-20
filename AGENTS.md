@@ -12,7 +12,7 @@ complete test suite must pass on Todd's Windows laptop before it is used for del
 Todd testing the Vercel preview before merge, following the card's steps as a household member would.
 
 Use ordinary signed-in GitHub access for delivery. Keep SSH and sudo outside automated runners;
-an authorized operator uses the laptop's Tailscale route.
+an authorized operator uses the laptop's Tailscale route. Delivery sessions on the server use the saved Codex profile; the only privileged command it allows is the fixed deploy-and-restart script, and everything else keeps that restriction.
 
 ## Building and reviewing
 
@@ -107,7 +107,7 @@ Publishing is part of the card's finish line, so work to it without stopping. Wh
 ## Server and domain
 
 Keep SSH and sudo outside automated runners; an authorized operator uses the laptop's Tailscale
-route. Server cleanup is verified by the maker's own checksummed readback. The report labels it a self-check, never independent review. Never ask Todd for an exception for it. See `docs/agents/server-runbook.md`. Domain model: `GLOSSARY.md`; decisions: `docs/adr/`;
+route. Delivery sessions on the server use the saved Codex profile; the only privileged command it allows is the fixed deploy-and-restart script, and everything else keeps that restriction. Server cleanup is verified by the maker's own checksummed readback. The report labels it a self-check, never independent review. Never ask Todd for an exception for it. See `docs/agents/server-runbook.md`. Domain model: `GLOSSARY.md`; decisions: `docs/adr/`;
 routes: `docs/agents/work-execution.md`. The former Factory decision record is historical only.
 
 <!-- BEGIN:nextjs-agent-rules -->
