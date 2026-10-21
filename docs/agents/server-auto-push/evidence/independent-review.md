@@ -9,3 +9,9 @@ Spec: installed hook matches snapshot and mode755; include resolves in five Juli
 Both requested an explicit pushed SHA inside reports, rather than relying only on final response. Standards also requested required npm run lint:framework execution. Follow-up: reports now name pushed 7cf07f8807c9c986a365eb1f4f0eebcc57baabcc; preplan report names cead8dc61e4bfa104484599f244946e1f180c927. Framework lint exits0, honestly reporting absent graph/langgraph rather than claiming shell lint coverage. The real Git tests provide hook proof.
 
 Limits: no independent observation of the historical absence of manual push; maker execution record plus GitHub arrival supports that assertion. CI/main merge remain separate finish gates.
+
+## Follow-up verdicts
+
+Standards PASS for `ed1f65cb462ad84603e1d915841961c065712923`: complete documentation delta reviewed, explicit pushed identities present; required lint independently reran exit0, absent-target limitation disclosed. Prior actual Git behavior and all five checks remain applicable. Candidate clean and unchanged after review.
+
+Spec PASS for server `ed1f65cb462ad84603e1d915841961c065712923` and preplan `3a4a130`: explicit pushed identities close the concern; both tips match GitHub. No hook/config/source change, no remaining Spec blocker. CI and main merge remain separate finish gates. This appended verdict record changes no executable candidate.
