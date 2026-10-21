@@ -13,3 +13,5 @@ Commands and results:
 - `ss -ltnp`: exit 0; no listeners on 8443, 6083, 5913, 5900 or 9337; Julia's 43123 listener remains. Readbacks are in `server-auto-push/evidence/`.
 
 Rclone authorization had already exited; no running authorization process was retained. Installed prerequisites, sign-ins, private rclone configuration and private browser profile remain untouched. No key was copied, no account revoked, and no Cloud project modified. These are maker self-checks. The final report names the pushed commit containing this record.
+
+Pushed implementation/evidence commit: `7cf07f8807c9c986a365eb1f4f0eebcc57baabcc`. The subsequent documentation commit records review and publication; the final response names its main merge.

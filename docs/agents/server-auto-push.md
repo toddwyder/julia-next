@@ -20,3 +20,7 @@ Installed for Julia repositories through `/home/ubuntu/.gitconfig` with the requ
 Maker self-check: actual Git commits and bare-origin ref comparisons plus real GitHub ref readback. The proof exercises the requested OVH server path. Julia product UI, Windows launcher/vault and delivery runner were unchanged, so Windows machine UAT and browser console checks do not apply. No synthetic AI result is presented as a passing model Proof. Hook push failures identify the failed operation and preserve Git diagnostics; no secrets are printed.
 
 Evidence is in `server-auto-push/evidence/`. The final delivery response names the pushed candidate and main merge commits.
+
+Pushed implementation/evidence commit: `7cf07f8807c9c986a365eb1f4f0eebcc57baabcc`. The subsequent documentation commit records review and publication; the final response names its main merge.
+
+Required `npm run lint:framework` ran in this candidate worktree: exit 0. It reports `graph/langgraph does not exist yet; passing.` This is an existing skipped lint target, not evidence that the installed shell hook was linted. Actual hook behavior is proven by the retained Git tests.
