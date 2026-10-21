@@ -1,0 +1,13 @@
+#!/bin/sh
+# Preserve the repository's conventional post-commit hook, including linked worktrees.
+common_dir=$(git rev-parse --git-common-dir 2>/dev/null) || exit 0
+own_hook="$common_dir/hooks/post-commit"
+if [ -x "$own_hook" ] && ! [ "$own_hook" -ef "$0" ]; then
+    "$own_hook" "$@" || printf '%s\n' 'Julia auto-push: repository post-commit failed; continuing.' >&2
+fi
+branch=$(git symbolic-ref --quiet --short HEAD 2>/dev/null) || exit 0
+[ "$branch" = main ] && exit 0
+if ! git push -u origin HEAD; then
+    printf '%s\n' 'Julia auto-push: push failed; the local commit is preserved.' >&2
+fi
+exit 0

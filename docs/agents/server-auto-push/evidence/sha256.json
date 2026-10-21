@@ -1,0 +1,14 @@
+{
+  "config-readback.txt": "3dfe618adf1978aa001e4de564d0e45bc2cf1fedc75ec1d1cfefd57afd1e4af5",
+  "framework-lint.txt": "6f229f81aa7ef0b8edc226732551a45a2667c4635882db223dc0e92cc6636fc4",
+  "github-empty-commit.json": "fc280e5ddc678ee9415f9b2260af2e57b0f9808a1ad1d83ca16c9c5bfa90d4a9",
+  "hook-behavior-test.py": "81491cf2e5a97b64eabc194dfa82e1da048b6ecef491cb16627e57a7fe34b93f",
+  "hook-green.json": "e93b76699249c915444213c5da7b621c4e6b40721494d73e8562e5e40f56afc3",
+  "hook-red.txt": "c48eca0488b7f9c47f7bbcfdc263ab5dc35b010941b7999352ddbf537e91130f",
+  "independent-review.md": "86df7c362e8cd1943e8b49c0079733888bfdea20cb03cc4a6a677c6a00c9b7fb",
+  "julia-auto-push.gitconfig": "3a275c6fb782edf3296382368786393cc66e9a0c86ef05103e89e87adfd8f4cd",
+  "listeners-after.txt": "aae1bdf1942d22e33b5c7e3968fb3468846e29f197ea598479950525982f3a2e",
+  "post-commit": "541abc66e0802ea428f187c811acd02fc8ec43fa3c02649960a79a4d2eced418",
+  "serve-after.txt": "42ee857b352ee9c7e3ff451f47213878bbca5e832119ec0d096cd82e521fe2d8",
+  "stopped-processes.json": "7bc57ec3803a4354239a463a97c8744cf67fb2848b81683160a37441e96100ee"
+}
