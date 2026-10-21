@@ -1,0 +1,11 @@
+Traceback (most recent call last):
+  File "/tmp/julia-auto-push-test.py", line 15, in <module>
+    assert (repo/'.git/own-hook-ran').read_text().splitlines()==['main-skipped'];results.append('main skipped; own failing hook ran; commit succeeded')
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/pathlib.py", line 1029, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/pathlib.py", line 1015, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/tmp/julia-hook-test-p4_xdbm9/repo/.git/own-hook-ran'

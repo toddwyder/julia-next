@@ -74,6 +74,8 @@ When a skill says to ask the user for access, evidence, or permission to add tem
 
 ### Standing stop policy
 
+Every report and its evidence is committed under docs/agents/<card>/ (evidence copied into docs/agents/<card>/evidence/) and pushed before it is reported to Todd. The report names the pushed commit.
+
 On any blocker other than (a) an account action, (b) money beyond the authorized limit, or
 (c) a product decision, make the smallest reversible repository fix and continue. Record that
 choice in the final report. Do not use a reversible repository defect as a reason to stop or ask

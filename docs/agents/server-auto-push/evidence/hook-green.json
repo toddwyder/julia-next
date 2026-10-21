@@ -1,0 +1,9 @@
+{
+  "hook": "/home/ubuntu/.config/git/julia-hooks/post-commit",
+  "passed": [
+    "main skipped; own failing hook ran; commit succeeded",
+    "feature automatically pushed with upstream after own hook",
+    "detached HEAD skipped; commit succeeded",
+    "push failure preserved local commit and commit exit 0"
+  ]
+}

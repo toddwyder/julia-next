@@ -1,0 +1,2 @@
+[core]
+    hooksPath = /home/ubuntu/.config/git/julia-hooks
