@@ -19,8 +19,7 @@ prefix_rule(pattern = ["git", ["switch", "checkout", "branch", "pull", "rev-pars
 prefix_rule(pattern = ["gh", "pr", ["list", "diff"]], decision = "allow")
 prefix_rule(pattern = ["gh", "run", ["list", "view", "watch"]], decision = "allow")
 prefix_rule(pattern = ["gh", "auth", "status"], decision = "allow")
-# Requested fixed helpers. These allow entries document the authorized prefixes;
-# the catch-all below currently overrides them (see the explicit failed checks).
+# Authorized fixed helper prefixes.
 prefix_rule(pattern = ["sudo", "-n", "/usr/local/sbin/julia-control-deploy-and-restart"], decision = "allow")
 prefix_rule(pattern = ["sudo", "-n", "/usr/local/sbin/julia-framework-learning-run"], decision = "allow")
 prefix_rule(pattern = ["systemctl", ["restart", "start", "stop", "reload", "try-restart", "reload-or-restart", "enable", "disable", "mask", "unmask", "edit", "daemon-reload", "reboot", "poweroff"]], decision = "forbidden", justification = "Use the fixed no-argument Julia helper.")
