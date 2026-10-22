@@ -1,0 +1,1 @@
+{"matchedRules":[{"prefixRuleMatch":{"matchedPrefix":["sudo","-n","/usr/local/sbin/julia-control-deploy-and-restart"],"decision":"allow"}}],"decision":"allow"}
