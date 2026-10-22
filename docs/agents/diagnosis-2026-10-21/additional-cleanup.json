@@ -1,0 +1,63 @@
+[
+  {
+    "action": "remove uncommitted 21 October policy prose",
+    "path": "AGENTS.md",
+    "before_sha256": "17d1d1ebf10b93e7676d54c4c94e7dd7a6e2f3f2fbc95dad940fccd6f70d1bc0",
+    "restored_from": "fb27092a86b96ab81c8f1e6294cd3a1fa711f3fb",
+    "readback_matches_HEAD": true
+  },
+  {
+    "action": "remove uncommitted 21 October policy prose",
+    "path": "CLAUDE.md",
+    "before_sha256": "bb3d28ffc98beced3a40076ac88a2ba2538b06b714d6b941ec401f25b04c63c5",
+    "restored_from": "fb27092a86b96ab81c8f1e6294cd3a1fa711f3fb",
+    "readback_matches_HEAD": true
+  },
+  {
+    "action": "retain loose prior diagnostic evidence under requested destination",
+    "from": "docs/agents/ovh-20261021/dependency-inventory-before.json",
+    "to": "docs/agents/diagnosis-2026-10-21/previous-session/dependency-inventory-before.json"
+  },
+  {
+    "action": "retain loose prior diagnostic evidence under requested destination",
+    "from": "docs/agents/ovh-20261021/migration-attempt.json",
+    "to": "docs/agents/diagnosis-2026-10-21/previous-session/migration-attempt.json"
+  },
+  {
+    "action": "retain loose prior diagnostic evidence under requested destination",
+    "from": "docs/agents/ovh-20261021/resolution-before.json",
+    "to": "docs/agents/diagnosis-2026-10-21/previous-session/resolution-before.json"
+  },
+  {
+    "action": "retain loose prior diagnostic evidence under requested destination",
+    "from": "docs/agents/ovh-20261021/session-settings.json",
+    "to": "docs/agents/diagnosis-2026-10-21/previous-session/session-settings.json"
+  },
+  {
+    "action": "retain loose prior diagnostic evidence under requested destination",
+    "from": "docs/agents/ovh-20261021/status.md",
+    "to": "docs/agents/diagnosis-2026-10-21/previous-session/status.md"
+  },
+  {
+    "command": [
+      "git",
+      "worktree",
+      "remove",
+      "/home/ubuntu/julia-drive-evidence-setup"
+    ],
+    "exit": 255,
+    "stdout": "",
+    "stderr": "error: failed to delete '/home/ubuntu/julia-drive-evidence-setup': Read-only file system\nerror: failed to delete '.git/worktrees/julia-drive-evidence-setup': Read-only file system\n"
+  },
+  {
+    "command": [
+      "git",
+      "branch",
+      "-D",
+      "ops/drive-evidence-setup-20261021"
+    ],
+    "exit": 1,
+    "stdout": "",
+    "stderr": "error: cannot delete branch 'ops/drive-evidence-setup-20261021' used by worktree at '/home/ubuntu/julia-drive-evidence-setup'\n"
+  }
+]

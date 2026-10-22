@@ -1,0 +1,14 @@
+[
+  {
+    "action": "remove abandoned rclone binary",
+    "path": "/usr/local/bin/rclone",
+    "result": "[Errno 30] Read-only file system: '/usr/local/bin/rclone'",
+    "exists_after": true
+  },
+  {
+    "action": "remove misplaced paragraph locally",
+    "path": "/home/ubuntu/julia-jul-231/AGENTS.md",
+    "result": "[Errno 30] Read-only file system: '/home/ubuntu/julia-jul-231/AGENTS.md'",
+    "remains_after": true
+  }
+]

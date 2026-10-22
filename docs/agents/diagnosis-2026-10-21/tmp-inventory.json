@@ -1,0 +1,583 @@
+[
+  {
+    "path": "/tmp/julia-sdk-memory-aIGd2u",
+    "mtime": "2026-10-21T17:52:55.167429+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-sdk-memory-LW5wmH",
+    "mtime": "2026-10-21T18:49:07.847435+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-askpass-4FST0M",
+    "mtime": "2026-10-20T19:24:29.798723+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-FDT0iv",
+    "mtime": "2026-10-20T19:31:37.064305+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-askpass-sltjSg",
+    "mtime": "2026-10-20T20:43:05.085606+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-sdk-memory-V4F86Z",
+    "mtime": "2026-10-21T17:51:04.637539+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-ruG1nW",
+    "mtime": "2026-10-20T20:43:05.091606+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-framework-map-admission-handoff.md",
+    "mtime": "2026-10-20T18:54:26.178887+00:00",
+    "uid": 1000,
+    "directory": false,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-drive-policy-index.html.json",
+    "mtime": "2026-10-21T20:25:51.498984+00:00",
+    "uid": 1000,
+    "directory": false,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-sTNQUj",
+    "mtime": "2026-10-20T20:43:05.081606+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-AvzHrb",
+    "mtime": "2026-10-20T19:19:33.008582+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/configure-termius-tmux.py",
+    "mtime": "2026-10-19T21:34:27.620177+00:00",
+    "uid": 1000,
+    "directory": false,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-npm-ci-cache",
+    "mtime": "2026-10-21T23:35:35.424048+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-diagnosis-20261021",
+    "mtime": "2026-10-22T02:48:04.035689+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-OY3d2Z",
+    "mtime": "2026-10-20T19:19:33.007582+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-askpass-TkJ0Cs",
+    "mtime": "2026-10-20T19:19:33.005582+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/jul231-control-state.json",
+    "mtime": "2026-10-21T06:22:50.253264+00:00",
+    "uid": 1000,
+    "directory": false,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-MQjqVQ",
+    "mtime": "2026-10-20T20:43:05.082606+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-sdk-memory-YOpa25",
+    "mtime": "2026-10-21T17:50:54.233737+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-sdk-memory-XxpdSH",
+    "mtime": "2026-10-21T17:50:40.495999+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-3jXsXh",
+    "mtime": "2026-10-20T20:43:05.090606+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-qruNaT",
+    "mtime": "2026-10-20T19:24:29.793724+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-7ErSGa",
+    "mtime": "2026-10-20T19:24:29.804723+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/framework-sdk-f50e509",
+    "mtime": "2026-10-21T19:41:49.917229+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-kVLEpN",
+    "mtime": "2026-10-20T19:19:33.010582+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-AawFOR",
+    "mtime": "2026-10-20T19:24:29.813723+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-drive-browser-start.py",
+    "mtime": "2026-10-21T20:07:06.258575+00:00",
+    "uid": 1000,
+    "directory": false,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-gLIFHI",
+    "mtime": "2026-10-20T20:43:05.092606+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-FlGc6Y",
+    "mtime": "2026-10-20T19:19:33.004582+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-drive-policy-privacy.html.json",
+    "mtime": "2026-10-21T20:25:51.498984+00:00",
+    "uid": 1000,
+    "directory": false,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-1mSwKd",
+    "mtime": "2026-10-20T19:19:06.749109+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-mz2pgk",
+    "mtime": "2026-10-20T19:24:29.809723+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-hU6W1K",
+    "mtime": "2026-10-20T19:24:29.806723+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-F6jvQp",
+    "mtime": "2026-10-20T19:24:29.792724+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-NHDh4p",
+    "mtime": "2026-10-20T19:31:37.084304+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/jul231-standards-contract.txt",
+    "mtime": "2026-10-21T17:11:51.478786+00:00",
+    "uid": 1000,
+    "directory": false,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-sdk-memory-YctwFZ",
+    "mtime": "2026-10-21T17:53:00.197333+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-M4I9ax",
+    "mtime": "2026-10-20T19:19:33.010582+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/jul231-npm-test.log",
+    "mtime": "2026-10-21T18:52:56.036643+00:00",
+    "uid": 1000,
+    "directory": false,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-QC5avZ",
+    "mtime": "2026-10-20T19:19:33.004582+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-rclone-v1.75.2.zip",
+    "mtime": "2026-10-21T20:05:08.885401+00:00",
+    "uid": 1000,
+    "directory": false,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/framework-sdk-memory-88JVhY",
+    "mtime": "2026-10-21T22:43:15.211806+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-ZiK4Gk",
+    "mtime": "2026-10-20T19:19:33.009582+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-YvqbBk",
+    "mtime": "2026-10-20T19:31:37.065305+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-drive-authorize-start.py",
+    "mtime": "2026-10-21T20:29:53.789925+00:00",
+    "uid": 1000,
+    "directory": false,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-drive-setup-audit.py",
+    "mtime": "2026-10-21T20:27:26.134004+00:00",
+    "uid": 1000,
+    "directory": false,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-askpass-a9FpKp",
+    "mtime": "2026-10-20T19:31:37.072304+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-rclone-v1.75.2",
+    "mtime": "2026-10-21T20:05:17.891181+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-JbDiA7",
+    "mtime": "2026-10-20T19:31:37.077304+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-79eXxM",
+    "mtime": "2026-10-20T19:24:29.810723+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-RLAABH",
+    "mtime": "2026-10-20T19:19:06.747109+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/framework-guardrails-shape-handoff-2026-10-21.md",
+    "mtime": "2026-10-21T22:28:17.800964+00:00",
+    "uid": 1000,
+    "directory": false,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-sdk-memory-owHwzm",
+    "mtime": "2026-10-21T18:57:04.893466+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-drive-policy-pages.py",
+    "mtime": "2026-10-21T20:25:51.369987+00:00",
+    "uid": 1000,
+    "directory": false,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-8e09ks",
+    "mtime": "2026-10-20T20:43:05.093606+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-2TZx2B",
+    "mtime": "2026-10-20T19:24:29.811723+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-xvxvz0",
+    "mtime": "2026-10-20T19:19:33.013582+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-o1R0hU",
+    "mtime": "2026-10-20T19:19:06.754109+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-G9pWyw",
+    "mtime": "2026-10-20T19:19:06.752109+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-drive-configure.py",
+    "mtime": "2026-10-21T20:29:23.116564+00:00",
+    "uid": 1000,
+    "directory": false,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/codex-tool-usage-proof.mjs",
+    "mtime": "2026-10-18T19:17:40.285811+00:00",
+    "uid": 1000,
+    "directory": false,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-KCRnRm",
+    "mtime": "2026-10-20T19:19:06.737109+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-8oTAKH",
+    "mtime": "2026-10-20T19:24:29.807723+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-C5aUgy",
+    "mtime": "2026-10-20T19:31:37.080304+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-askpass-jRxZ9J",
+    "mtime": "2026-10-20T19:19:06.743109+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-free-catalog-ryloTq",
+    "mtime": "2026-10-21T18:44:55.645768+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-F17GFq",
+    "mtime": "2026-10-20T19:31:37.083304+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-auto-push-pr-body.md",
+    "mtime": "2026-10-21T20:54:59.964733+00:00",
+    "uid": 1000,
+    "directory": false,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-9VOJiO",
+    "mtime": "2026-10-20T19:31:37.080304+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-8L6n08",
+    "mtime": "2026-10-20T19:19:06.751109+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-aAo6DC",
+    "mtime": "2026-10-20T20:43:05.089606+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-AejvrB",
+    "mtime": "2026-10-20T19:31:37.078304+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-fq05BN",
+    "mtime": "2026-10-20T20:43:05.088606+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/cleanup-proof.sh",
+    "mtime": "2026-10-19T18:15:19.159619+00:00",
+    "uid": 1000,
+    "directory": false,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-free-catalog-QAZdDX",
+    "mtime": "2026-10-21T18:45:17.163311+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-vdMsnr",
+    "mtime": "2026-10-20T19:19:06.755109+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-YNuvDV",
+    "mtime": "2026-10-20T19:19:33.012582+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-InH7OB",
+    "mtime": "2026-10-20T19:19:06.750109+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-8YKee0",
+    "mtime": "2026-10-20T19:19:06.735110+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-xG9n4s",
+    "mtime": "2026-10-20T20:43:05.091606+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/framework-codex-qrYMPT",
+    "mtime": "2026-10-21T21:09:54.817838+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-publisher-gitconfig-I7pK0j",
+    "mtime": "2026-10-20T19:31:37.075304+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  },
+  {
+    "path": "/tmp/julia-sdk-memory-dWn676",
+    "mtime": "2026-10-21T18:46:25.531863+00:00",
+    "uid": 1000,
+    "directory": true,
+    "symlink": false
+  }
+]

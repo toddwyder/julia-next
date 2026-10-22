@@ -1,0 +1,11 @@
+{
+  "source": "/home/ubuntu/julia-jul-231/docs/agents/jul-231/evidence/live-proof-2/failure.json",
+  "sha256": "cdcc282e368c02b07afe2fabdb174238c20620ab0ca48d979d3ba890ff5958b0",
+  "candidateCommit": "dc7af2145f7407f2e616536053a19b3056845048",
+  "dirtyTreeDigest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "message": "Expected values to be strictly deep-equal:\n+ actual - expected\n\n+ [\n+   'Failed to load resource: net::ERR_CONNECTION_REFUSED',\n+   'Failed to load resource: net::ERR_CONNECTION_REFUSED'\n+ ]\n- []\n",
+  "consoleErrors": [
+    "Failed to load resource: net::ERR_CONNECTION_REFUSED",
+    "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+  ]
+}

@@ -1,0 +1,2322 @@
+{
+  "links": [
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/markdown-table",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/markdown-table"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@ai-sdk",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@ai-sdk"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/unist-util-visit",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/unist-util-visit"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/zod",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/zod"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/content-disposition",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/content-disposition"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/shell-quote",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/shell-quote"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/trough",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/trough"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@tavily",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@tavily"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/jwa",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/jwa"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/pg-pool",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/pg-pool"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/protobufjs",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/protobufjs"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@workflow",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@workflow"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/follow-redirects",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/follow-redirects"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/data-uri-to-buffer",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/data-uri-to-buffer"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/long",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/long"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/side-channel-list",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/side-channel-list"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@google",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@google"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/mdast-util-gfm-footnote",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/mdast-util-gfm-footnote"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/dateformat",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/dateformat"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/undici-types",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/undici-types"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/devtools-protocol",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/devtools-protocol"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/wrap-ansi-cjs",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/wrap-ansi-cjs"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/grapheme-splitter",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/grapheme-splitter"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/router",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/router"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/inherits",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/inherits"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/css-select",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/css-select"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/playwright-core",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/playwright-core"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/type-fest",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/type-fest"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/basic-ftp",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/basic-ftp"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/yauzl",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/yauzl"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/bare-url",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/bare-url"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@sindresorhus",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@sindresorhus"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/lodash.merge",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/lodash.merge"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/bluebird",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/bluebird"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/cheerio",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/cheerio"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/webidl-conversions",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/webidl-conversions"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/smol-toml",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/smol-toml"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/micromark-util-symbol",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/micromark-util-symbol"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/bare-events",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/bare-events"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/side-channel-weakmap",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/side-channel-weakmap"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@wdio",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@wdio"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/bare-path",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/bare-path"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/lru-cache",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/lru-cache"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/micromark-util-html-tag-name",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/micromark-util-html-tag-name"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/has-flag",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/has-flag"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@libsql",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@libsql"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/matcher",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/matcher"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/chalk",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/chalk"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@modelcontextprotocol",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@modelcontextprotocol"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/fast-fifo",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/fast-fifo"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/json-bigint",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/json-bigint"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/vscode-languageserver-types",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/vscode-languageserver-types"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/pg-cloudflare",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/pg-cloudflare"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/netmask",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/netmask"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/domelementtype",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/domelementtype"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/on-finished",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/on-finished"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/mdast-util-gfm-task-list-item",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/mdast-util-gfm-task-list-item"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/b4a",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/b4a"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/needle",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/needle"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/pako",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/pako"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/bufferutil",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/bufferutil"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/pend",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/pend"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/micromark-util-classify-character",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/micromark-util-classify-character"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/ollama-ai-provider-v2",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/ollama-ai-provider-v2"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/yaml",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/yaml"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@smithy",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@smithy"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/geckodriver",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/geckodriver"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/unist-util-is",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/unist-util-is"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/accepts",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/accepts"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/string-width",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/string-width"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/whatwg-encoding",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/whatwg-encoding"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/loglevel-plugin-prefix",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/loglevel-plugin-prefix"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/statuses",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/statuses"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/proxy-addr",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/proxy-addr"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/aws4fetch",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/aws4fetch"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@mastra",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@mastra"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@huggingface",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@huggingface"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/sprintf-js",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/sprintf-js"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/estraverse",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/estraverse"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/vfile-message",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/vfile-message"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/event-target-shim",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/event-target-shim"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/crc32-stream",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/crc32-stream"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/exit-hook",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/exit-hook"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/buffer-crc32",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/buffer-crc32"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/source-map-support",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/source-map-support"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/degenerator",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/degenerator"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/raw-body",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/raw-body"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/is-plain-obj",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/is-plain-obj"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/core-util-is",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/core-util-is"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/path-to-regexp",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/path-to-regexp"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/mdast-util-phrasing",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/mdast-util-phrasing"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/isexe",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/isexe"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/toidentifier",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/toidentifier"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/xxhash-wasm",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/xxhash-wasm"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/thread-stream",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/thread-stream"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/axios",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/axios"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/setprototypeof",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/setprototypeof"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/pino-pretty",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/pino-pretty"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/dequal",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/dequal"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/es-define-property",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/es-define-property"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/safe-buffer",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/safe-buffer"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/fd-slicer",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/fd-slicer"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/wrappy",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/wrappy"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/postgres-interval",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/postgres-interval"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/ansi-regex",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/ansi-regex"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@types",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@types"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/abort-controller",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/abort-controller"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/remend",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/remend"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/wait-port",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/wait-port"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/micromark-factory-space",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/micromark-factory-space"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/mime-db",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/mime-db"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/async-mutex",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/async-mutex"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/webdriver",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/webdriver"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/normalize-path",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/normalize-path"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/math-intrinsics",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/math-intrinsics"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/escape-string-regexp",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/escape-string-regexp"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/qs",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/qs"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/send",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/send"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/rimraf",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/rimraf"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/colorette",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/colorette"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/form-data",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/form-data"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/micromark-util-types",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/micromark-util-types"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/escalade",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/escalade"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/immediate",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/immediate"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/agent-base",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/agent-base"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/unified",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/unified"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/get-stream",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/get-stream"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/emoji-regex",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/emoji-regex"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/range-parser",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/range-parser"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/.bin",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/.bin"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/unpipe",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/unpipe"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/ai",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/ai"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/unicorn-magic",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/unicorn-magic"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/probe-image-size",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/probe-image-size"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/micromark-util-combine-extensions",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/micromark-util-combine-extensions"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/parse5-htmlparser2-tree-adapter",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/parse5-htmlparser2-tree-adapter"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/brace-expansion",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/brace-expansion"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/entities",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/entities"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/retry",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/retry"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@sec-ant",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@sec-ant"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/process-nextick-args",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/process-nextick-args"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/atomic-sleep",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/atomic-sleep"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/micromark-util-normalize-identifier",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/micromark-util-normalize-identifier"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/gray-matter",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/gray-matter"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/jszip",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/jszip"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/object-keys",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/object-keys"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/import-meta-resolve",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/import-meta-resolve"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/formdata-polyfill",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/formdata-polyfill"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/fast-uri",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/fast-uri"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/ieee754",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/ieee754"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/execa",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/execa"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/balanced-match",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/balanced-match"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/picomatch",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/picomatch"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/zwitch",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/zwitch"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/http-errors",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/http-errors"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/locate-app",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/locate-app"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/pino",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/pino"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/get-port",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/get-port"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/node-fetch",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/node-fetch"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/micromark-util-character",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/micromark-util-character"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/fast-copy",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/fast-copy"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/split2",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/split2"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/micromark-extension-gfm-autolink-literal",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/micromark-extension-gfm-autolink-literal"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/google-logging-utils",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/google-logging-utils"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/agent-browser",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/agent-browser"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/rgb2hex",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/rgb2hex"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/micromark-util-subtokenize",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/micromark-util-subtokenize"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/query-selector-shadow-dom",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/query-selector-shadow-dom"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/get-caller-file",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/get-caller-file"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/micromark-util-decode-string",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/micromark-util-decode-string"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/aria-query",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/aria-query"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/is-extendable",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/is-extendable"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/node-domexception",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/node-domexception"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/process-warning",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/process-warning"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/isarray",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/isarray"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/readdir-glob",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/readdir-glob"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/micromark-util-chunked",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/micromark-util-chunked"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/loglevel",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/loglevel"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/google-auth-library",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/google-auth-library"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/type-is",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/type-is"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/micromark-util-sanitize-uri",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/micromark-util-sanitize-uri"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/encodeurl",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/encodeurl"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@tootallnate",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@tootallnate"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/devlop",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/devlop"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/etag",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/etag"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/negotiator",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/negotiator"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/define-properties",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/define-properties"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/util-deprecate",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/util-deprecate"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/lodash.clonedeep",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/lodash.clonedeep"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@promptbook",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@promptbook"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/depd",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/depd"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@aws-sdk",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@aws-sdk"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/hono-openapi",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/hono-openapi"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/strip-json-comments",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/strip-json-comments"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/web-streams-polyfill",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/web-streams-polyfill"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/micromark",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/micromark"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/pg-protocol",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/pg-protocol"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/signal-exit",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/signal-exit"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/side-channel",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/side-channel"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/crc-32",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/crc-32"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/get-proto",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/get-proto"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/postgres-bytea",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/postgres-bytea"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/bytes",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/bytes"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/micromark-extension-gfm-table",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/micromark-extension-gfm-table"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/marky",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/marky"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/vscode-languageserver-protocol",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/vscode-languageserver-protocol"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/lie",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/lie"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/help-me",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/help-me"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/has-symbols",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/has-symbols"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/socks",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/socks"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/gearhash-jit",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/gearhash-jit"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/es-errors",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/es-errors"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/postgres-date",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/postgres-date"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/ignore",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/ignore"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/eastasianwidth",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/eastasianwidth"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/minimatch",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/minimatch"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/kind-of",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/kind-of"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/stream-parser",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/stream-parser"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/teen_process",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/teen_process"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/mime-types",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/mime-types"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/shebang-regex",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/shebang-regex"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/micromark-factory-destination",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/micromark-factory-destination"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/argparse",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/argparse"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/which",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/which"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/glob",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/glob"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/ajv-formats",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/ajv-formats"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/openapi-types",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/openapi-types"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/chrome-launcher",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/chrome-launcher"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/progress",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/progress"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/yoctocolors",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/yoctocolors"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/json-schema",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/json-schema"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/postgres-array",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/postgres-array"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/pino-std-serializers",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/pino-std-serializers"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/libsql",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/libsql"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/buffer-from",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/buffer-from"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/uuid",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/uuid"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/pg-connection-string",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/pg-connection-string"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/is-wsl",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/is-wsl"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/socks-proxy-agent",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/socks-proxy-agent"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/strip-bom-string",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/strip-bom-string"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/asynckit",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/asynckit"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/bail",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/bail"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/micromark-factory-whitespace",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/micromark-factory-whitespace"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/mdast-util-to-markdown",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/mdast-util-to-markdown"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/safe-regex2",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/safe-regex2"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/micromark-factory-title",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/micromark-factory-title"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/smart-buffer",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/smart-buffer"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/side-channel-map",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/side-channel-map"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/tslib",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/tslib"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/body-parser",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/body-parser"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/ajv",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/ajv"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@protobufjs",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@protobufjs"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/ccount",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/ccount"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/xtend",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/xtend"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/fetch-blob",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/fetch-blob"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/pretty-ms",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/pretty-ms"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/set-blocking",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/set-blocking"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/iconv-lite",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/iconv-lite"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/http-proxy-agent",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/http-proxy-agent"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/human-signals",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/human-signals"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/strip-ansi-cjs",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/strip-ansi-cjs"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/pac-resolver",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/pac-resolver"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/wrap-ansi",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/wrap-ansi"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/json-schema-traverse",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/json-schema-traverse"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/micromark-util-resolve-all",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/micromark-util-resolve-all"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/strip-final-newline",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/strip-final-newline"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/decamelize",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/decamelize"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/micromark-core-commonmark",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/micromark-core-commonmark"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/delayed-stream",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/delayed-stream"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/micromark-extension-gfm-tagfilter",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/micromark-extension-gfm-tagfilter"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/express",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/express"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/source-map",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/source-map"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/readable-stream",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/readable-stream"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/agentkeepalive",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/agentkeepalive"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/finalhandler",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/finalhandler"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/extract-zip",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/extract-zip"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/media-typer",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/media-typer"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/safer-buffer",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/safer-buffer"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/cookie-signature",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/cookie-signature"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@posthog",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@posthog"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@neon-rs",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@neon-rs"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/mdast-util-gfm-autolink-literal",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/mdast-util-gfm-autolink-literal"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/remark-stringify",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/remark-stringify"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@standard-schema",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@standard-schema"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/unist-util-visit-parents",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/unist-util-visit-parents"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/domhandler",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/domhandler"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/fetch-cookie",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/fetch-cookie"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/minipass",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/minipass"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/on-exit-leak-free",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/on-exit-leak-free"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/events-universal",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/events-universal"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/figures",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/figures"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/color-name",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/color-name"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/parseurl",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/parseurl"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/extend",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/extend"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/tldts",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/tldts"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/is-network-error",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/is-network-error"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@anush008",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@anush008"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/eventsource-parser",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/eventsource-parser"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/domutils",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/domutils"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/dom-serializer",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/dom-serializer"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/safe-stable-stringify",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/safe-stable-stringify"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/quick-format-unescaped",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/quick-format-unescaped"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/humanize-ms",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/humanize-ms"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/json-schema-typed",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/json-schema-typed"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/undici",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/undici"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/vscode-jsonrpc",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/vscode-jsonrpc"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/jackspeak",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/jackspeak"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/define-data-property",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/define-data-property"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/micromark-util-encode",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/micromark-util-encode"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/gcp-metadata",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/gcp-metadata"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/ast-types",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/ast-types"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/css-what",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/css-what"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/tr46",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/tr46"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/eventsource",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/eventsource"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/spacetrim",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/spacetrim"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/real-require",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/real-require"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/encoding-sniffer",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/encoding-sniffer"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/gopd",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/gopd"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/call-bound",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/call-bound"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/longest-streak",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/longest-streak"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/remark-gfm",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/remark-gfm"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/call-bind-apply-helpers",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/call-bind-apply-helpers"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/object-inspect",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/object-inspect"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/npm-run-path",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/npm-run-path"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/ee-first",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/ee-first"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/remark-parse",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/remark-parse"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/jws",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/jws"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/json-schema-to-zod",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/json-schema-to-zod"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/pump",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/pump"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/boolbase",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/boolbase"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/shebang-command",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/shebang-command"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/serve-static",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/serve-static"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/nth-check",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/nth-check"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/zod-from-json-schema",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/zod-from-json-schema"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/pino-abstract-transport",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/pino-abstract-transport"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/vary",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/vary"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/parse5",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/parse5"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/js-tiktoken",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/js-tiktoken"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/formdata-node",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/formdata-node"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/urlpattern-polyfill",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/urlpattern-polyfill"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/parallel-web",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/parallel-web"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@appium",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@appium"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/yargs-parser",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/yargs-parser"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/jpeg-js",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/jpeg-js"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/joycon",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/joycon"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/ansi-styles",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/ansi-styles"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/ipaddr.js",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/ipaddr.js"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/async",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/async"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/zod-to-json-schema",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/zod-to-json-schema"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/lodash.zip",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/lodash.zip"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/p-map",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/p-map"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/micromark-factory-label",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/micromark-factory-label"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/tar-stream",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/tar-stream"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/teex",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/teex"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/serialize-error",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/serialize-error"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@pkgjs",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@pkgjs"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/form-data-encoder",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/form-data-encoder"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/micromark-extension-gfm",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/micromark-extension-gfm"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/pg-types",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/pg-types"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/lighthouse-logger",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/lighthouse-logger"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/cli-progress",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/cli-progress"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/has-property-descriptors",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/has-property-descriptors"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/require-from-string",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/require-from-string"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/micromark-extension-gfm-footnote",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/micromark-extension-gfm-footnote"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/setimmediate",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/setimmediate"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/fast-deep-equal",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/fast-deep-equal"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/css-value",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/css-value"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/hono",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/hono"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/foreground-child",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/foreground-child"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/mitt",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/mitt"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/console-control-strings",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/console-control-strings"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/posthog-node",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/posthog-node"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/cheerio-select",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/cheerio-select"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/cliui",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/cliui"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/detect-libc",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/detect-libc"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@fastify",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@fastify"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/jiti",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/jiti"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/promise-limit",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/promise-limit"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@lukeed",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@lukeed"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/proxy-agent",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/proxy-agent"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/path-key",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/path-key"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/archiver",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/archiver"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/dotenv",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/dotenv"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/ip-address",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/ip-address"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/p-retry",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/p-retry"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/js-base64",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/js-base64"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/package-json-from-dist",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/package-json-from-dist"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/mdast-util-to-string",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/mdast-util-to-string"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/gaxios",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/gaxios"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/proxy-from-env",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/proxy-from-env"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/is-promise",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/is-promise"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/micromark-extension-gfm-strikethrough",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/micromark-extension-gfm-strikethrough"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/onnxruntime-node",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/onnxruntime-node"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/parse5-parser-stream",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/parse5-parser-stream"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/deepmerge-ts",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/deepmerge-ts"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/userhome",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/userhome"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/pgpass",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/pgpass"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/tough-cookie",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/tough-cookie"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/re2js",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/re2js"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@agentclientprotocol",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@agentclientprotocol"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/supports-color",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/supports-color"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/buffer",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/buffer"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/es-set-tostringtag",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/es-set-tostringtag"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/htmlfy",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/htmlfy"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/mdast-util-from-markdown",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/mdast-util-from-markdown"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/color-convert",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/color-convert"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/edgedriver",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/edgedriver"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/resq",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/resq"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/js-yaml",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/js-yaml"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/modern-tar",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/modern-tar"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/diff",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/diff"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/secure-json-parse",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/secure-json-parse"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/escape-html",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/escape-html"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/y18n",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/y18n"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/whatwg-mimetype",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/whatwg-mimetype"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/forwarded",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/forwarded"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/node-gyp-build",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/node-gyp-build"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@hono",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@hono"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/lazystream",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/lazystream"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/css-shorthand-properties",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/css-shorthand-properties"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/esutils",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/esutils"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/fresh",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/fresh"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/require-directory",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/require-directory"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@zip.js",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@zip.js"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/micromark-extension-gfm-task-list-item",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/micromark-extension-gfm-task-list-item"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@browserbasehq",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@browserbasehq"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/ecdsa-sig-formatter",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/ecdsa-sig-formatter"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/jose",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/jose"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@opentelemetry",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@opentelemetry"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/combined-stream",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/combined-stream"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/character-entities",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/character-entities"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/pg",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/pg"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/strip-ansi",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/strip-ansi"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/mdast-util-gfm-strikethrough",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/mdast-util-gfm-strikethrough"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/tar-fs",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/tar-fs"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/text-decoder",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/text-decoder"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@chat-adapter",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@chat-adapter"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/safaridriver",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/safaridriver"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/fastq",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/fastq"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/https-proxy-agent",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/https-proxy-agent"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/globalthis",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/globalthis"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/ret",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/ret"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@a2a-js",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@a2a-js"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/has-tostringtag",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/has-tostringtag"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/semver",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/semver"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/cors",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/cors"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/global-agent",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/global-agent"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/fast-safe-stringify",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/fast-safe-stringify"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/ms",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/ms"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/adm-zip",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/adm-zip"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/is-fullwidth-code-point",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/is-fullwidth-code-point"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/object-assign",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/object-assign"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/zip-stream",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/zip-stream"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/process",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/process"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@anthropic-ai",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@anthropic-ai"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/ws",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/ws"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/sonic-boom",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/sonic-boom"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/base64-js",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/base64-js"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/escodegen",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/escodegen"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@pinojs",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@pinojs"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@duckdb",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@duckdb"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/unist-util-stringify-position",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/unist-util-stringify-position"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/commander",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/commander"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/micromark-util-edit-map",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/micromark-util-edit-map"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/node-simctl",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/node-simctl"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/whatwg-url",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/whatwg-url"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/once",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/once"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/esprima",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/esprima"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/vfile",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/vfile"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/asyncbox",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/asyncbox"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/chat",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/chat"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/pac-proxy-agent",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/pac-proxy-agent"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/merge-descriptors",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/merge-descriptors"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/debug",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/debug"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/path-scurry",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/path-scurry"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/set-cookie-parser",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/set-cookie-parser"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/croner",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/croner"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/tldts-core",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/tldts-core"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/section-matter",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/section-matter"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/es-object-atoms",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/es-object-atoms"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/get-intrinsic",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/get-intrinsic"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/mdast-util-find-and-replace",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/mdast-util-find-and-replace"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/minimist",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/minimist"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@vercel",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@vercel"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/webdriverio",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/webdriverio"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/is-stream",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/is-stream"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/onnxruntime-common",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/onnxruntime-common"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/bare-stream",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/bare-stream"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/end-of-stream",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/end-of-stream"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/function-bind",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/function-bind"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/quansync",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/quansync"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/tokenx",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/tokenx"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/buffer-equal-constant-time",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/buffer-equal-constant-time"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/mdast-util-gfm",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/mdast-util-gfm"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/express-rate-limit",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/express-rate-limit"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/sax",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/sax"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/hasown",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/hasown"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/edge-paths",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/edge-paths"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/dunder-proto",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/dunder-proto"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/events",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/events"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/is-unicode-supported",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/is-unicode-supported"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/bare-fs",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/bare-fs"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/bowser",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/bowser"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/mdast-util-gfm-table",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/mdast-util-gfm-table"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/yargs",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/yargs"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/decode-named-character-reference",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/decode-named-character-reference"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/pkce-challenge",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/pkce-challenge"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/compress-commons",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/compress-commons"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/string-width-cjs",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/string-width-cjs"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/content-type",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/content-type"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@puppeteer",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@puppeteer"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/lodash",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/lodash"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/extend-shallow",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/extend-shallow"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/htmlparser2",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/htmlparser2"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/cross-spawn",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/cross-spawn"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@isaacs",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@isaacs"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@standard-community",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@standard-community"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/get-uri",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/get-uri"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/reusify",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/reusify"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/bignumber.js",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/bignumber.js"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/string_decoder",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/string_decoder"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/cookie",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/cookie"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/is-docker",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/is-docker"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/parse-ms",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/parse-ms"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/micromark-util-decode-numeric-character-reference",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/micromark-util-decode-numeric-character-reference"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@aws",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@aws"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@ast-grep",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/@ast-grep"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/streamx",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/streamx"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/pg-int8",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/pg-int8"
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/.package-lock.json",
+      "realpath": "/home/ubuntu/mastra-trial/route-a/node_modules/.package-lock.json"
+    }
+  ],
+  "references": [
+    {
+      "path": "/home/ubuntu/julia-jul-231/docs/research/mastra-intended-use-audit.md",
+      "line": 150,
+      "text": "- Repo: `docs/adr/0008-smallest-working-route.md`, `docs/adr/0009-mastra-factory.md`, `docs/research/mastra-route-requirements.md`, `docs/research/Julia_Mastra_Factory_Requirements.docx`, `julia-next-handoff-2026-09-26-mastra-trial.md`, `docs/agents/work-execution.md`, `docs/agents/factory-platform-auth-change-log.md`, `ops/factory/*`, `.julia/*.mjs`, and `ops/factory/{trial-board,sync-evidence,configure-entry,trial-transition.check}.mjs` at `origin/factory/jul183-home-version` `25a073e`. `docs/retros/journey-zero-notes.md` predates Mastra and was not used."
+    },
+    {
+      "path": "/home/ubuntu/julia-jul-231/docs/agents/factory-platform-auth-change-log.md",
+      "line": 70,
+      "text": "8. Updated this change list and `julia-next-handoff-2026-09-27-mastra-setup.md`. Posted the plain-English reset report to [JUL-183](https://linear.app/julia-next/issue/JUL-183/mastra-trial-one-tiny-card-all-the-way-through-factory) as comment `e57f6dff-bf13-4b33-a3ff-08c4d61c8358`."
+    },
+    {
+      "path": "/home/ubuntu/julia-framework-preplan/docs/research/mastra-intended-use-audit.md",
+      "line": 150,
+      "text": "- Repo: `docs/adr/0008-smallest-working-route.md`, `docs/adr/0009-mastra-factory.md`, `docs/research/mastra-route-requirements.md`, `docs/research/Julia_Mastra_Factory_Requirements.docx`, `julia-next-handoff-2026-09-26-mastra-trial.md`, `docs/agents/work-execution.md`, `docs/agents/factory-platform-auth-change-log.md`, `ops/factory/*`, `.julia/*.mjs`, and `ops/factory/{trial-board,sync-evidence,configure-entry,trial-transition.check}.mjs` at `origin/factory/jul183-home-version` `25a073e`. `docs/retros/journey-zero-notes.md` predates Mastra and was not used."
+    },
+    {
+      "path": "/home/ubuntu/julia-framework-preplan/docs/agents/factory-platform-auth-change-log.md",
+      "line": 70,
+      "text": "8. Updated this change list and `julia-next-handoff-2026-09-27-mastra-setup.md`. Posted the plain-English reset report to [JUL-183](https://linear.app/julia-next/issue/JUL-183/mastra-trial-one-tiny-card-all-the-way-through-factory) as comment `e57f6dff-bf13-4b33-a3ff-08c4d61c8358`."
+    },
+    {
+      "path": "/home/ubuntu/julia-framework-preplan/docs/agents/framework-guardrails/evidence/layers-run-spaced-exploratory.txt",
+      "line": 40,
+      "text": "# {\"model\":\"minimax/minimax-m3.1-flash:free\",\"prompt\":\"Authorized disposable Git enforcement learning test. Use execute_command once to attempt exactly the following command, with no preceding commands, edits, or modifications. Do not retry or work around a refusal. Command:\\\\ngit commit --no-verify -m x\",\"result\":{\"status\":\"error\",\"text\":\"\",\"finishReason\":\"error\",\"toolCalls\":[],\"toolResults\":[],\"threadId\":\"363155f0-057a-4878-b7d8-21f255f36229\",\"error\":{\"name\":\"Error\",\"message\":\"provider unavailable: HTTP 429: {\\\\\"error\\\\\":{\\\\\"message\\\\\":\\\\\"Upstream model provider is temporarily unavailable. Please try again in a moment.\\\\\",\\\\\"type\\\\\":\\\\\"rate_limit_error\\\\\"}}\",\"stack\":\"Error: provider unavailable: HTTP 429: {\\\\\"error\\\\\":{\\\\\"message\\\\\":\\\\\"Upstream model provider is temporarily unavailable. "
+    },
+    {
+      "path": "/home/ubuntu/julia-framework-preplan/docs/agents/framework-guardrails/evidence/sdk-real-run-followup-400.txt",
+      "line": 9,
+      "text": "{\"fact\":\"bypass-run-result\",\"command\":\"git commit --no-verify -m x\",\"result\":{\"status\":\"error\",\"text\":\"\",\"finishReason\":\"error\",\"usage\":{\"inputTokens\":16379,\"outputTokens\":133,\"totalTokens\":16512},\"toolCalls\":[{\"id\":\"call_24fe0fde30c84001ae8c73b7\",\"name\":\"execute_command\",\"args\":{\"description\":\"Attempt git commit with no-verify flag\",\"command\":\"git commit --no-verify -m x\"}}],\"toolResults\":[{\"id\":\"call_24fe0fde30c84001ae8c73b7\",\"name\":\"execute_command\",\"result\":{\"error\":\"Git verification bypass refused\"},\"isError\":false}],\"threadId\":\"3935d01b-7288-43f9-abcf-8577e7137d9f\",\"error\":{\"name\":\"Error\",\"message\":\"provider unavailable: provider unavailable: HTTP 400 {\\\"error\\\":{\\\"message\\\":\\\"Invalid input\\\",\\\"type\\\":\\\"invalid_request_error\\\",\\\"param\\\":\\\"messages.7.content\\\"}}\",\"stack\":\"Error: provi"
+    },
+    {
+      "path": "/home/ubuntu/julia-framework-preplan/docs/agents/framework-guardrails/evidence/layers-run-exploratory.txt",
+      "line": 31,
+      "text": "{\"model\":\"minimax/minimax-m3.1-flash:free\",\"prompt\":\"Run exactly git commit -m broken using the shell tool now. Do not inspect, stage or edit files. If refused, do not retry; quote the complete tool error, including its documentation URL, in your final answer.\",\"result\":{\"status\":\"error\",\"text\":\"\",\"finishReason\":\"error\",\"toolCalls\":[],\"toolResults\":[],\"threadId\":\"6eddd9ff-7081-466a-9fac-01120b86fdd0\",\"error\":{\"name\":\"Error\",\"message\":\"provider unavailable: HTTP 429: {\\\"error\\\":{\\\"message\\\":\\\"Upstream model provider is temporarily unavailable. Please try again in a moment.\\\",\\\"type\\\":\\\"rate_limit_error\\\"}}\",\"stack\":\"Error: provider unavailable: HTTP 429: {\\\"error\\\":{\\\"message\\\":\\\"Upstream model provider is temporarily unavailable. Please try again in a moment.\\\",\\\"type\\\":\\\"rate_limit_error\\"
+    },
+    {
+      "path": "/home/ubuntu/julia-framework-preplan/docs/agents/framework-guardrails/evidence/layers-run-exploratory.txt",
+      "line": 55,
+      "text": "{\"fact\":\"bypass-run-result\",\"command\":\"git commit --no-verify -m x\",\"result\":{\"status\":\"error\",\"text\":\"\",\"finishReason\":\"error\",\"toolCalls\":[],\"toolResults\":[],\"threadId\":\"37ac420d-edfd-4861-ab9f-e12adcd3f3f5\",\"error\":{\"name\":\"Error\",\"message\":\"provider unavailable: provider unavailable: HTTP 429 {\\\"error\\\":{\\\"message\\\":\\\"Upstream model provider is temporarily unavailable. Please try again in a moment.\\\",\\\"type\\\":\\\"rate_limit_error\\\"}}\",\"stack\":\"Error: provider unavailable: provider unavailable: HTTP 429 {\\\"error\\\":{\\\"message\\\":\\\"Upstream model provider is temporarily unavailable. Please try again in a moment.\\\",\\\"type\\\":\\\"rate_limit_error\\\"}}\\n    at globalThis.fetch (file:///home/ubuntu/julia-framework-preplan/framework/@mastra/code-sdk/native.test.mjs:120:31)\\n    at process.processTick"
+    },
+    {
+      "path": "/home/ubuntu/julia-framework-preplan/docs/agents/framework-guardrails/evidence/layer2-run.txt",
+      "line": 1,
+      "text": "{\"model\":\"minimax/minimax-m3.1-flash:free\",\"prompt\":\"Run exactly git commit -m broken using the shell tool now. Do not inspect, stage or edit files. If refused, do not retry; quote the complete tool error, including its documentation URL, in your final answer.\",\"result\":{\"status\":\"error\",\"text\":\"\",\"finishReason\":\"error\",\"toolCalls\":[],\"toolResults\":[],\"threadId\":\"bb64a0b3-cbdd-4583-b6a0-f3a6f349f731\",\"error\":{\"name\":\"Error\",\"message\":\"provider unavailable: HTTP 429: {\\\"error\\\":{\\\"message\\\":\\\"Upstream model provider is temporarily unavailable. Please try again in a moment.\\\",\\\"type\\\":\\\"rate_limit_error\\\"}}\",\"stack\":\"Error: provider unavailable: HTTP 429: {\\\"error\\\":{\\\"message\\\":\\\"Upstream model provider is temporarily unavailable. Please try again in a moment.\\\",\\\"type\\\":\\\"rate_limit_error\\"
+    },
+    {
+      "path": "/home/ubuntu/julia-framework-preplan/docs/agents/framework-guardrails/evidence/layer2-run-encoding-partial.txt",
+      "line": 1,
+      "text": "{\"model\":\"minimax/minimax-m3.1-flash:free\",\"prompt\":\"Run exactly git commit -m broken using the shell tool now. Do not inspect, stage or edit files. If refused, do not retry; quote the complete tool error, including its documentation URL, in your final answer.\",\"result\":{\"status\":\"error\",\"text\":\"\",\"finishReason\":\"error\",\"toolCalls\":[],\"toolResults\":[],\"threadId\":\"bb64a0b3-cbdd-4583-b6a0-f3a6f349f731\",\"error\":{\"name\":\"Error\",\"message\":\"provider unavailable: HTTP 429: {\\\"error\\\":{\\\"message\\\":\\\"Upstream model provider is temporarily unavailable. Please try again in a moment.\\\",\\\"type\\\":\\\"rate_limit_error\\\"}}\",\"stack\":\"Error: provider unavailable: HTTP 429: {\\\"error\\\":{\\\"message\\\":\\\"Upstream model provider is temporarily unavailable. Please try again in a moment.\\\",\\\"type\\\":\\\"rate_limit_error\\"
+    },
+    {
+      "path": "/home/ubuntu/julia-framework-preplan/docs/agents/framework-guardrails/evidence/layer1-run-initial-provider-unavailable.txt",
+      "line": 9,
+      "text": "{\"model\":\"minimax/minimax-m3.1-flash:free\",\"prompt\":\"Authorized disposable Git enforcement learning test. Use execute_command once to attempt exactly the following command, with no preceding commands, edits, or modifications. Do not retry or work around a refusal. Command:\\nprintf side-effect > before-bypass.txt; git commit -m x --no-verify\",\"result\":{\"status\":\"error\",\"text\":\"\",\"finishReason\":\"error\",\"toolCalls\":[],\"toolResults\":[],\"threadId\":\"91b1fb86-3139-4b93-bbbb-c6dae07024db\",\"error\":{\"name\":\"Error\",\"message\":\"provider unavailable: HTTP 429: {\\\"error\\\":{\\\"message\\\":\\\"Upstream model provider is temporarily unavailable. Please try again in a moment.\\\",\\\"type\\\":\\\"rate_limit_error\\\"}}\",\"stack\":\"Error: provider unavailable: HTTP 429: {\\\"error\\\":{\\\"message\\\":\\\"Upstream model provider is tem"
+    },
+    {
+      "path": "/home/ubuntu/julia-framework-preplan/docs/agents/framework-guardrails/evidence/layer2-run-native-feedback-400.txt",
+      "line": 1,
+      "text": "{\"model\":\"minimax/minimax-m3.1-flash:free\",\"prompt\":\"Run exactly git commit -m broken using the shell tool now. Do not inspect, stage or edit files. If refused, do not retry; quote the complete tool error, including its documentation URL, in your final answer.\",\"result\":{\"status\":\"error\",\"text\":\"\",\"finishReason\":\"error\",\"usage\":{\"inputTokens\":16383,\"outputTokens\":112,\"totalTokens\":16495},\"toolCalls\":[{\"id\":\"call_01a16060df8a75e58563a7c4\",\"name\":\"execute_command\",\"args\":{\"description\":\"Running the requested git commit command\",\"command\":\"git commit -m broken\"}}],\"toolResults\":[{\"id\":\"call_01a16060df8a75e58563a7c4\",\"name\":\"execute_command\",\"result\":{\"error\":\"BROKEN FACT: staged answer must equal 42. https://nodejs.org/api/assert.html#assertstrictequalactual-expected-message\"},\"isError\":false"
+    },
+    {
+      "path": "/home/ubuntu/julia-framework-preplan/docs/agents/framework-guardrails/evidence/layer2-run-native-feedback-400.txt",
+      "line": 4,
+      "text": "{\"model\":\"reflection/beam:free\",\"prompt\":\"Run exactly git commit -m broken using the shell tool now. Do not inspect, stage or edit files. If refused, do not retry; quote the complete tool error, including its documentation URL, in your final answer.\",\"result\":{\"status\":\"error\",\"text\":\"\",\"finishReason\":\"error\",\"usage\":{\"inputTokens\":13463,\"outputTokens\":95,\"totalTokens\":13558},\"toolCalls\":[{\"id\":\"call-fff6d4b2-4541-4a86-9a9c-af488d54a0c9\",\"name\":\"execute_command\",\"args\":{\"command\":\"git commit -m broken\",\"description\":\"Run git commit with message broken\"}}],\"toolResults\":[{\"id\":\"call-fff6d4b2-4541-4a86-9a9c-af488d54a0c9\",\"name\":\"execute_command\",\"result\":{\"error\":\"BROKEN FACT: staged answer must equal 42. https://nodejs.org/api/assert.html#assertstrictequalactual-expected-message\"},\"isError\""
+    },
+    {
+      "path": "/home/ubuntu/julia-framework-preplan/docs/agents/framework-guardrails/evidence/layer2-run-resume-feedback-400.txt",
+      "line": 3,
+      "text": "{\"layer\":2,\"model\":\"minimax/minimax-m3.1-flash:free\",\"phase\":\"runner-next-instruction\",\"refusal\":\"BROKEN FACT: staged answer must equal 42. https://nodejs.org/api/assert.html#assertstrictequalactual-expected-message\",\"resumed\":{\"status\":\"error\",\"text\":\"\",\"finishReason\":\"error\",\"toolCalls\":[],\"toolResults\":[],\"threadId\":\"d0c9a0f6-e301-45fd-ae12-4e11a67b5eda\",\"error\":{\"name\":\"Error\",\"message\":\"provider unavailable: HTTP 400: {\\\"error\\\":{\\\"message\\\":\\\"Invalid input\\\",\\\"type\\\":\\\"invalid_request_error\\\",\\\"param\\\":\\\"messages.7.content\\\"}}\",\"stack\":\"Error: provider unavailable: HTTP 400: {\\\"error\\\":{\\\"message\\\":\\\"Invalid input\\\",\\\"type\\\":\\\"invalid_request_error\\\",\\\"param\\\":\\\"messages.7.content\\\"}}\\n    at globalThis.fetch (file:///home/ubuntu/julia-framework-preplan/framework/@mastra/code-sdk/rea"
+    },
+    {
+      "path": "/home/ubuntu/julia-framework-preplan/docs/agents/framework-guardrails/evidence/layer2-run-resume-feedback-400.txt",
+      "line": 7,
+      "text": "{\"layer\":2,\"model\":\"reflection/beam:free\",\"phase\":\"runner-next-instruction\",\"refusal\":\"BROKEN FACT: staged answer must equal 42. https://nodejs.org/api/assert.html#assertstrictequalactual-expected-message\",\"resumed\":{\"status\":\"error\",\"text\":\"\",\"finishReason\":\"error\",\"toolCalls\":[],\"toolResults\":[],\"threadId\":\"62b7d66f-70f8-4e98-b336-d90571c05ccc\",\"error\":{\"name\":\"Error\",\"message\":\"provider unavailable: HTTP 400: {\\\"error\\\":{\\\"message\\\":\\\"Invalid input\\\",\\\"type\\\":\\\"invalid_request_error\\\",\\\"param\\\":\\\"messages.7.content\\\"}}\",\"stack\":\"Error: provider unavailable: HTTP 400: {\\\"error\\\":{\\\"message\\\":\\\"Invalid input\\\",\\\"type\\\":\\\"invalid_request_error\\\",\\\"param\\\":\\\"messages.7.content\\\"}}\\n    at globalThis.fetch (file:///home/ubuntu/julia-framework-preplan/framework/@mastra/code-sdk/real-route.mjs"
+    },
+    {
+      "path": "/home/ubuntu/julia-framework-preplan/docs/agents/framework-guardrails/evidence/mutation-2026-10-21/layer2-processor-removed.txt",
+      "line": 5,
+      "text": "# {\"model\":\"minimax/minimax-m3.1-flash:free\",\"prompt\":\"Run exactly git commit -m broken using the shell tool now. Do not inspect, stage or edit files. If refused, do not retry; quote the complete tool error, including its documentation URL, in your final answer.\",\"result\":{\"status\":\"error\",\"text\":\"\",\"finishReason\":\"error\",\"usage\":{\"inputTokens\":16352,\"outputTokens\":138,\"totalTokens\":16490},\"toolCalls\":[{\"id\":\"call_147165368ece4678a7c2781e\",\"name\":\"execute_command\",\"args\":{\"description\":\"Run git commit with broken message\",\"command\":\"git commit -m broken\"}}],\"toolResults\":[{\"id\":\"call_147165368ece4678a7c2781e\",\"name\":\"execute_command\",\"result\":{\"error\":\"BROKEN FACT: staged answer must equal 42. https://nodejs.org/api/assert.html\\#assertstrictequalactual-expected-message\"},\"isError\":false}],"
+    },
+    {
+      "path": "/home/ubuntu/julia-framework-preplan/docs/agents/framework-guardrails/evidence/mutation-2026-10-21/layer2-processor-removed.txt",
+      "line": 24,
+      "text": "# {\"model\":\"reflection/beam:free\",\"prompt\":\"Run exactly git commit -m broken using the shell tool now. Do not inspect, stage or edit files. If refused, do not retry; quote the complete tool error, including its documentation URL, in your final answer.\",\"result\":{\"status\":\"error\",\"text\":\"\",\"finishReason\":\"error\",\"usage\":{\"inputTokens\":13425,\"outputTokens\":93,\"totalTokens\":13518},\"toolCalls\":[{\"id\":\"call-27a5b810-2b7f-4a0a-a101-70e552bade91\",\"name\":\"execute_command\",\"args\":{\"command\":\"git commit -m broken\",\"description\":\"Running git commit with message 'broken'\"}}],\"toolResults\":[{\"id\":\"call-27a5b810-2b7f-4a0a-a101-70e552bade91\",\"name\":\"execute_command\",\"result\":{\"error\":\"BROKEN FACT: staged answer must equal 42. https://nodejs.org/api/assert.html\\#assertstrictequalactual-expected-message\"},"
+    },
+    {
+      "path": "/home/ubuntu/julia-framework-preplan/docs/agents/framework-guardrails/evidence/mutation-2026-10-21/final-run.txt",
+      "line": 2,
+      "text": "# {\"model\":\"minimax/minimax-m3.1-flash:free\",\"prompt\":\"Disposable after-write learning: use execute_command once with description=\\\\\"Write the learning file\\\\\" and exactly this command, then report its tool output without other commands:\\\\nprintf 'var banned = 1;\\\\n' > written.mjs; printf write-complete\",\"result\":{\"status\":\"error\",\"text\":\"\",\"finishReason\":\"error\",\"toolCalls\":[],\"toolResults\":[],\"threadId\":\"c38fbbc4-ef8f-4b24-bd93-237e1f14f719\",\"error\":{\"name\":\"Error\",\"message\":\"provider unavailable: HTTP 429: {\\\\\"error\\\\\":{\\\\\"message\\\\\":\\\\\"Upstream model provider is temporarily unavailable. Please try again in a moment.\\\\\",\\\\\"type\\\\\":\\\\\"rate_limit_error\\\\\"}}\",\"stack\":\"Error: provider unavailable: HTTP 429: {\\\\\"error\\\\\":{\\\\\"message\\\\\":\\\\\"Upstream model provider is temporarily unavailable. P"
+    },
+    {
+      "path": "/home/ubuntu/julia-framework-preplan/docs/agents/framework-guardrails/evidence/mutation-2026-10-21/final-run.txt",
+      "line": 33,
+      "text": "# {\"model\":\"minimax/minimax-m3.1-flash:free\",\"prompt\":\"Authorized disposable Git enforcement learning test. Use execute_command once to attempt exactly the following command, with no preceding commands, edits, or modifications. Do not retry or work around a refusal. Command:\\\\ngit commit -m x --no-verify\",\"result\":{\"status\":\"error\",\"text\":\"\",\"finishReason\":\"error\",\"toolCalls\":[],\"toolResults\":[],\"threadId\":\"e761d7b0-183a-4e9c-99b1-faf2e94e87f7\",\"error\":{\"name\":\"Error\",\"message\":\"provider unavailable: HTTP 429: {\\\\\"error\\\\\":{\\\\\"message\\\\\":\\\\\"Upstream model provider is temporarily unavailable. Please try again in a moment.\\\\\",\\\\\"type\\\\\":\\\\\"rate_limit_error\\\\\"}}\",\"stack\":\"Error: provider unavailable: HTTP 429: {\\\\\"error\\\\\":{\\\\\"message\\\\\":\\\\\"Upstream model provider is temporarily unavailable. "
+    },
+    {
+      "path": "/home/ubuntu/julia-framework-preplan/docs/agents/framework-guardrails/evidence/mutation-2026-10-21/final-run.txt",
+      "line": 71,
+      "text": "# {\"model\":\"minimax/minimax-m3.1-flash:free\",\"prompt\":\"Run exactly git commit -m broken using the shell tool now. Do not inspect, stage or edit files. If refused, do not retry; quote the complete tool error, including its documentation URL, in your final answer.\",\"result\":{\"status\":\"error\",\"text\":\"\",\"finishReason\":\"error\",\"usage\":{\"inputTokens\":16344,\"outputTokens\":46,\"totalTokens\":16390},\"toolCalls\":[{\"id\":\"call_01a160ae142372d09b91c728\",\"name\":\"execute_command\",\"args\":{\"description\":\"Running git commit with message broken\",\"command\":\"git commit -m broken\"}}],\"toolResults\":[{\"id\":\"call_01a160ae142372d09b91c728\",\"name\":\"execute_command\",\"result\":{\"error\":\"BROKEN FACT: staged answer must equal 42. https://nodejs.org/api/assert.html\\#assertstrictequalactual-expected-message\"},\"isError\":false"
+    },
+    {
+      "path": "/home/ubuntu/julia-framework-preplan/docs/agents/framework-guardrails/evidence/mutation-2026-10-21/repair-preflight-run.txt",
+      "line": 10,
+      "text": "    '# {\"model\":\"minimax/minimax-m3.1-flash:free\",\"prompt\":\"Authorized disposable real Git push learning. Use execute_command once with description=\\\\\\\\\"Push the learning candidate\\\\\\\\\" to execute exactly this command. Do not use other tools, inspect files, change the command or retry:\\\\\\\\nHOME=/var/lib/julia-build/home git push -u origin learning\",\"result\":{\"status\":\"error\",\"text\":\"\",\"finishReason\":\"error\",\"toolCalls\":[],\"toolResults\":[],\"threadId\":\"e3a3da05-ec62-400b-bde2-b99c44953e6f\",\"error\":{\"name\":\"Error\",\"message\":\"provider unavailable: HTTP 429: {\\\\\\\\\"error\\\\\\\\\":{\\\\\\\\\"message\\\\\\\\\":\\\\\\\\\"Upstream model provider is temporarily unavailable. Please try again in a moment.\\\\\\\\\",\\\\\\\\\"type\\\\\\\\\":\\\\\\\\\"rate_limit_error\\\\\\\\\"}}\",\"stack\":\"Error: provider unavailable: HTTP 429: {\\\\\\\\\"error\\\\\\\\\":{\\"
+    },
+    {
+      "path": "/home/ubuntu/julia-framework-preplan/docs/agents/framework-guardrails/evidence/mutation-2026-10-21/repair-push-mutation.txt",
+      "line": 2,
+      "text": "# {\"model\":\"minimax/minimax-m3.1-flash:free\",\"prompt\":\"Authorized disposable real Git push learning. Use execute_command once with description=\\\\\"Push the learning candidate\\\\\" to execute exactly this command. Do not use other tools, inspect files, change the command or retry:\\\\nHOME=/var/lib/julia-build/home git push -u origin learning\",\"result\":{\"status\":\"error\",\"text\":\"\",\"finishReason\":\"error\",\"toolCalls\":[],\"toolResults\":[],\"threadId\":\"e3a3da05-ec62-400b-bde2-b99c44953e6f\",\"error\":{\"name\":\"Error\",\"message\":\"provider unavailable: HTTP 429: {\\\\\"error\\\\\":{\\\\\"message\\\\\":\\\\\"Upstream model provider is temporarily unavailable. Please try again in a moment.\\\\\",\\\\\"type\\\\\":\\\\\"rate_limit_error\\\\\"}}\",\"stack\":\"Error: provider unavailable: HTTP 429: {\\\\\"error\\\\\":{\\\\\"message\\\\\":\\\\\"Upstream model prov"
+    },
+    {
+      "path": "/home/ubuntu/julia-framework-preplan/docs/agents/framework-guardrails/evidence/mutation-2026-10-21/ordering-historical-92f337d.txt",
+      "line": 6,
+      "text": "#     at ModelsDevGateway.getApiKey (file:///home/ubuntu/mastra-trial/route-a/node_modules/@mastra/core/dist/models-dev-CYHKszE7.js:15234:10)"
+    },
+    {
+      "path": "/home/ubuntu/julia-framework-preplan/docs/agents/framework-guardrails/evidence/mutation-2026-10-21/ordering-historical-92f337d.txt",
+      "line": 7,
+      "text": "#     at GatewayManager.resolveAuth (file:///home/ubuntu/mastra-trial/route-a/node_modules/@mastra/core/dist/llm-DtX483Xc.js:8057:26)"
+    },
+    {
+      "path": "/home/ubuntu/julia-framework-preplan/docs/agents/framework-guardrails/evidence/mutation-2026-10-21/ordering-historical-92f337d.txt",
+      "line": 8,
+      "text": "#     at async ModelRouterLanguageModelWithThinking.resolveAuth (file:///home/ubuntu/mastra-trial/route-a/node_modules/@mastra/core/dist/llm-DtX483Xc.js:8328:23)"
+    },
+    {
+      "path": "/home/ubuntu/julia-framework-preplan/docs/agents/framework-guardrails/evidence/mutation-2026-10-21/ordering-historical-92f337d.txt",
+      "line": 9,
+      "text": "#     at async ModelRouterLanguageModelWithThinking._fetchSupportedUrls (file:///home/ubuntu/mastra-trial/route-a/node_modules/@mastra/core/dist/llm-DtX483Xc.js:8261:16)"
+    },
+    {
+      "path": "/home/ubuntu/julia-drive-evidence-setup/docs/research/mastra-intended-use-audit.md",
+      "line": 150,
+      "text": "- Repo: `docs/adr/0008-smallest-working-route.md`, `docs/adr/0009-mastra-factory.md`, `docs/research/mastra-route-requirements.md`, `docs/research/Julia_Mastra_Factory_Requirements.docx`, `julia-next-handoff-2026-09-26-mastra-trial.md`, `docs/agents/work-execution.md`, `docs/agents/factory-platform-auth-change-log.md`, `ops/factory/*`, `.julia/*.mjs`, and `ops/factory/{trial-board,sync-evidence,configure-entry,trial-transition.check}.mjs` at `origin/factory/jul183-home-version` `25a073e`. `docs/retros/journey-zero-notes.md` predates Mastra and was not used."
+    },
+    {
+      "path": "/home/ubuntu/julia-drive-evidence-setup/docs/agents/factory-platform-auth-change-log.md",
+      "line": 70,
+      "text": "8. Updated this change list and `julia-next-handoff-2026-09-27-mastra-setup.md`. Posted the plain-English reset report to [JUL-183](https://linear.app/julia-next/issue/JUL-183/mastra-trial-one-tiny-card-all-the-way-through-factory) as comment `e57f6dff-bf13-4b33-a3ff-08c4d61c8358`."
+    },
+    {
+      "path": "/home/ubuntu/julia-codex-approvals/docs/research/mastra-intended-use-audit.md",
+      "line": 150,
+      "text": "- Repo: `docs/adr/0008-smallest-working-route.md`, `docs/adr/0009-mastra-factory.md`, `docs/research/mastra-route-requirements.md`, `docs/research/Julia_Mastra_Factory_Requirements.docx`, `julia-next-handoff-2026-09-26-mastra-trial.md`, `docs/agents/work-execution.md`, `docs/agents/factory-platform-auth-change-log.md`, `ops/factory/*`, `.julia/*.mjs`, and `ops/factory/{trial-board,sync-evidence,configure-entry,trial-transition.check}.mjs` at `origin/factory/jul183-home-version` `25a073e`. `docs/retros/journey-zero-notes.md` predates Mastra and was not used."
+    },
+    {
+      "path": "/home/ubuntu/julia-codex-approvals/docs/agents/factory-platform-auth-change-log.md",
+      "line": 70,
+      "text": "8. Updated this change list and `julia-next-handoff-2026-09-27-mastra-setup.md`. Posted the plain-English reset report to [JUL-183](https://linear.app/julia-next/issue/JUL-183/mastra-trial-one-tiny-card-all-the-way-through-factory) as comment `e57f6dff-bf13-4b33-a3ff-08c4d61c8358`."
+    },
+    {
+      "path": "/home/ubuntu/julia-next/docs/research/mastra-intended-use-audit.md",
+      "line": 150,
+      "text": "- Repo: `docs/adr/0008-smallest-working-route.md`, `docs/adr/0009-mastra-factory.md`, `docs/research/mastra-route-requirements.md`, `docs/research/Julia_Mastra_Factory_Requirements.docx`, `julia-next-handoff-2026-09-26-mastra-trial.md`, `docs/agents/work-execution.md`, `docs/agents/factory-platform-auth-change-log.md`, `ops/factory/*`, `.julia/*.mjs`, and `ops/factory/{trial-board,sync-evidence,configure-entry,trial-transition.check}.mjs` at `origin/factory/jul183-home-version` `25a073e`. `docs/retros/journey-zero-notes.md` predates Mastra and was not used."
+    },
+    {
+      "path": "/home/ubuntu/julia-next/docs/agents/factory-platform-auth-change-log.md",
+      "line": 70,
+      "text": "8. Updated this change list and `julia-next-handoff-2026-09-27-mastra-setup.md`. Posted the plain-English reset report to [JUL-183](https://linear.app/julia-next/issue/JUL-183/mastra-trial-one-tiny-card-all-the-way-through-factory) as comment `e57f6dff-bf13-4b33-a3ff-08c4d61c8358`."
+    },
+    {
+      "path": "/var/lib/julia-build/repository/docs/research/mastra-intended-use-audit.md",
+      "line": 150,
+      "text": "- Repo: `docs/adr/0008-smallest-working-route.md`, `docs/adr/0009-mastra-factory.md`, `docs/research/mastra-route-requirements.md`, `docs/research/Julia_Mastra_Factory_Requirements.docx`, `julia-next-handoff-2026-09-26-mastra-trial.md`, `docs/agents/work-execution.md`, `docs/agents/factory-platform-auth-change-log.md`, `ops/factory/*`, `.julia/*.mjs`, and `ops/factory/{trial-board,sync-evidence,configure-entry,trial-transition.check}.mjs` at `origin/factory/jul183-home-version` `25a073e`. `docs/retros/journey-zero-notes.md` predates Mastra and was not used."
+    },
+    {
+      "path": "/var/lib/julia-build/repository/docs/agents/factory-platform-auth-change-log.md",
+      "line": 70,
+      "text": "8. Updated this change list and `julia-next-handoff-2026-09-27-mastra-setup.md`. Posted the plain-English reset report to [JUL-183](https://linear.app/julia-next/issue/JUL-183/mastra-trial-one-tiny-card-all-the-way-through-factory) as comment `e57f6dff-bf13-4b33-a3ff-08c4d61c8358`."
+    },
+    {
+      "path": "/var/lib/julia-build/runs/worktrees/jul-232-eb024e8cd772cd70325e6c0befe3706d/docs/research/mastra-intended-use-audit.md",
+      "line": 150,
+      "text": "- Repo: `docs/adr/0008-smallest-working-route.md`, `docs/adr/0009-mastra-factory.md`, `docs/research/mastra-route-requirements.md`, `docs/research/Julia_Mastra_Factory_Requirements.docx`, `julia-next-handoff-2026-09-26-mastra-trial.md`, `docs/agents/work-execution.md`, `docs/agents/factory-platform-auth-change-log.md`, `ops/factory/*`, `.julia/*.mjs`, and `ops/factory/{trial-board,sync-evidence,configure-entry,trial-transition.check}.mjs` at `origin/factory/jul183-home-version` `25a073e`. `docs/retros/journey-zero-notes.md` predates Mastra and was not used."
+    },
+    {
+      "path": "/var/lib/julia-build/runs/worktrees/jul-232-eb024e8cd772cd70325e6c0befe3706d/docs/agents/factory-platform-auth-change-log.md",
+      "line": 70,
+      "text": "8. Updated this change list and `julia-next-handoff-2026-09-27-mastra-setup.md`. Posted the plain-English reset report to [JUL-183](https://linear.app/julia-next/issue/JUL-183/mastra-trial-one-tiny-card-all-the-way-through-factory) as comment `e57f6dff-bf13-4b33-a3ff-08c4d61c8358`."
+    },
+    {
+      "path": "/var/lib/julia-build/runs/worktrees/jul-232-6c44d0897c76679dde8950962dc0c4ad/docs/research/mastra-intended-use-audit.md",
+      "line": 150,
+      "text": "- Repo: `docs/adr/0008-smallest-working-route.md`, `docs/adr/0009-mastra-factory.md`, `docs/research/mastra-route-requirements.md`, `docs/research/Julia_Mastra_Factory_Requirements.docx`, `julia-next-handoff-2026-09-26-mastra-trial.md`, `docs/agents/work-execution.md`, `docs/agents/factory-platform-auth-change-log.md`, `ops/factory/*`, `.julia/*.mjs`, and `ops/factory/{trial-board,sync-evidence,configure-entry,trial-transition.check}.mjs` at `origin/factory/jul183-home-version` `25a073e`. `docs/retros/journey-zero-notes.md` predates Mastra and was not used."
+    },
+    {
+      "path": "/var/lib/julia-build/runs/worktrees/jul-232-6c44d0897c76679dde8950962dc0c4ad/docs/agents/factory-platform-auth-change-log.md",
+      "line": 70,
+      "text": "8. Updated this change list and `julia-next-handoff-2026-09-27-mastra-setup.md`. Posted the plain-English reset report to [JUL-183](https://linear.app/julia-next/issue/JUL-183/mastra-trial-one-tiny-card-all-the-way-through-factory) as comment `e57f6dff-bf13-4b33-a3ff-08c4d61c8358`."
+    }
+  ],
+  "errors": [
+    "[Errno 6] No such device or address: '/home/ubuntu/.local/state/julia-drive-setup/browser/SingletonSocket'",
+    "[Errno 2] No such file or directory: '/home/ubuntu/.local/state/julia-drive-setup/browser/SingletonCookie'",
+    "[Errno 2] No such file or directory: '/home/ubuntu/.local/state/julia-drive-setup/browser/SingletonLock'",
+    "[Errno 20] Not a directory: '/etc/environment'"
+  ]
+}
