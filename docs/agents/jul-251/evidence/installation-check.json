@@ -1,0 +1,14 @@
+{
+  "mirror_commit": "e44668c2aad92eacf4e84df47984121fefb11b82",
+  "skill_count": 59,
+  "all_mirror_files_match": true,
+  "generated_skills_unchanged": true,
+  "checklist_config_enabled": true,
+  "fresh_session_real_checklist_event": true,
+  "main_commit": "97724ad3fb63937a7d5771ddbb63bc96c95ceaee",
+  "next_block_unchanged": true,
+  "parent_card_text_unchanged": true,
+  "linear_card": "JUL-251",
+  "linear_status": "Triage",
+  "related_to": "JUL-249"
+}

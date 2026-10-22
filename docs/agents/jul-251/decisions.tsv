@@ -1,0 +1,8 @@
+ts	phase	decision	why	evidence	result
+2026-10-22T20:41:33Z	fork	Use isolated worktree from origin/main 97724ad	Todd requires main and existing work untouched	../../AGENTS.md; commit dbfb572	pushed
+2026-10-22T20:41:33Z	install	Install every mirror skill including three automation skills; retain generated verification skills	Todd requested every pstack skill	../../../.agents/skills/PSTACK-SOURCE.md; evidence/installation-check.json	59 skills installed
+2026-10-22T20:41:33Z	models	All roles inherit parent; no cross-model review	Todd's trial rulebook overrides upstream model defaults and this task excludes review	../../../AGENTS.md	$0 execution policy
+2026-10-22T20:41:33Z	checklist	Enable global update_plan and test in fresh signed-in Codex session	Need actual checklist behavior	evidence/fresh-codex-check.jsonl	completed checklist event
+2026-10-22T20:41:33Z	triage	Create JUL-251 in Triage as related to JUL-249 without changing parent text	Todd authorized item 1 pre-plan only	card-brief.md	readback confirmed
+2026-10-22T20:41:33Z	proof	Describe $1 cap proofs using durable local state and actual refusal paths	Trial authorizes no paid requests	card-brief.md	planned proofs only
+2026-10-22T20:45:00Z	audit	Correct fork rulebook evidence pointer to ../../../AGENTS.md	Original relative pointer was one directory short	../../../AGENTS.md; dbfb572	pointer corrected
