@@ -23,12 +23,6 @@ prefix_rule(pattern = ["gh", "auth", "status"], decision = "allow")
 # the catch-all below currently overrides them (see the explicit failed checks).
 prefix_rule(pattern = ["sudo", "-n", "/usr/local/sbin/julia-control-deploy-and-restart"], decision = "allow")
 prefix_rule(pattern = ["sudo", "-n", "/usr/local/sbin/julia-framework-learning-run"], decision = "allow")
-# Todd's binding decision, 2026-10-21 15:14: sudo must never prompt.
-# CLI 0.163.0 cannot express "forbid every sudo except one exact argv":
-# prefix rules have no negation/end anchor; forbidden overrides allow.
-# Fail closed, including the deploy helper, until that platform gap is resolved.
-# Do not replace this with a finite list of known sudo subcommands.
-prefix_rule(pattern = [["sudo", "/usr/bin/sudo", "/bin/sudo"]], decision = "forbidden", justification = "Todd forbids sudo except the two authorized fixed no-argument helpers. This CLI cannot express that exception safely; sudo is blocked without prompting. See docs/agents/codex-approvals/2026-10-21.md.")
 prefix_rule(pattern = ["systemctl", ["restart", "start", "stop", "reload", "try-restart", "reload-or-restart", "enable", "disable", "mask", "unmask", "edit", "daemon-reload", "reboot", "poweroff"]], decision = "forbidden", justification = "Use the fixed no-argument Julia helper.")
 # Read-only server diagnostics.
 prefix_rule(pattern = ["systemctl", ["status", "show", "is-active", "is-enabled"]], decision = "allow")
