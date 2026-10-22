@@ -1,0 +1,4 @@
+couldn't start daemon: open /run/user/1000/op-daemon.pid: read-only file system
+(node:34) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+{"memory":"off","observation":false,"reflection":false,"requests":0}

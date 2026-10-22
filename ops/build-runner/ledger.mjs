@@ -41,6 +41,7 @@ export class CardLedger {
       PRAGMA busy_timeout = 10000;
       PRAGMA journal_mode = WAL;
       PRAGMA synchronous = FULL;
+      CREATE TABLE IF NOT EXISTS stops (card TEXT PRIMARY KEY, reason TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS requests (
         card TEXT NOT NULL, id TEXT NOT NULL, model TEXT NOT NULL, role TEXT NOT NULL,
         maximum_nano INTEGER NOT NULL CHECK(maximum_nano >= 0),
@@ -79,6 +80,7 @@ export class CardLedger {
     const boundsJson = json(bounds, 'bounds');
     return this.transaction(() => {
       const snapshot = this.snapshot();
+      if (snapshot.stopped) throw new Error('Card stopped after nonzero cost readback');
       if (maximumNano > 0 && snapshot.pricedBlocked) throw new Error('Priced requests blocked by unresolved accounting');
       if (maximumNano > 0 && BigInt(snapshot.spentNano) + BigInt(snapshot.heldNano) + BigInt(maximumNano) > BigInt(CEILING_NANO)) {
         throw new Error('Card cost ceiling exceeded');
@@ -134,10 +136,16 @@ export class CardLedger {
     const numeric = (value) => value <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(value) : value.toString();
     return {
       card: this.card, ceilingNano: CEILING_NANO,
+      stopped: Boolean(this.db.prepare('SELECT reason FROM stops WHERE card = ?').get(this.card)),
       spentNano: numeric(spent), heldNano: numeric(held),
       remainingNano: Number(BigInt(CEILING_NANO) > spent + held ? BigInt(CEILING_NANO) - spent - held : 0n),
       pricedBlocked, requests,
     };
+  }
+
+  stop(reason) {
+    nonempty(reason, 'reason');
+    this.db.prepare('INSERT OR IGNORE INTO stops (card, reason) VALUES (?, ?)').run(this.card, reason);
   }
 
   close() { this.db.close(); }

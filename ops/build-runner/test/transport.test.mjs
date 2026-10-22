@@ -11,7 +11,7 @@ async function fixture(t, handler) {
   const server = createServer(async (req, res) => {
     let text = '';
     for await (const chunk of req) text += chunk;
-    const body = text ? JSON.parse(text) : null;
+    const body = text ? req.headers['content-type']?.includes('application/x-www-form-urlencoded') ? Object.fromEntries(new URLSearchParams(text)) : JSON.parse(text) : null;
     arrivals.push({ url: req.url, body });
     handler(req, res, body);
   });
@@ -104,6 +104,9 @@ test('provider reported cost stops even a configured free route', async t => {
   const f = await fixture(t, (_req, res) => json(res, { usage: { cost: 0.01 } }));
   await assert.rejects(send(transport(f), f.endpoint), /STOP WORK/);
   assert.equal(f.ledger.snapshot().requests[0].state, 'unknown');
+  await assert.rejects(send(transport(f), f.endpoint), /STOP WORK/);
+  assert.equal(f.arrivals.length, 1);
+  assert.equal(f.ledger.snapshot().stopped, true);
 });
 
 test('allowlisted authentication cannot carry inference payloads and redirects never follow', async t => {
@@ -135,11 +138,15 @@ test('decimal rates round nano dollars upward without floating point drift', asy
   const price = { ...free, input: 0.001 };
   await send(transport(f, { price }, false), f.endpoint);
   assert.equal(f.ledger.snapshot().spentNano, 7);
+  const tiny = await fixture(t, (_req, res) => json(res, { usage: { prompt_tokens: 3, completion_tokens: 1, prompt_tokens_details: { cached_tokens: 1, cache_write_tokens: 1 } } }));
+  const tinyPrice = { input: 0.0000001, output: 0.0000001, cacheRead: 0.0000001, cacheWrite: 0.0000001 };
+  await send(transport(tiny, { price: tinyPrice }, false), tiny.endpoint);
+  assert.equal(tiny.ledger.snapshot().spentNano, 1, 'round the complete request once');
 });
 
 test('ledger errors never reveal their underlying body or credentials', async t => {
   const f = await fixture(t, (_req, res) => json(res, {}));
-  const fetch = createTransport({ ledger: { reserve() { throw new Error('secret-example-value'); } }, role: 'builder', settings: { models: { configured: f.spec } } });
+  const fetch = createTransport({ ledger: { snapshot() { return { stopped: false }; }, reserve() { throw new Error('secret-example-value'); } }, role: 'builder', settings: { models: { configured: f.spec } } });
   await assert.rejects(send(fetch, f.endpoint), error => !error.message.includes('secret-example-value'));
   assert.equal(f.arrivals.length, 0);
 });
@@ -150,8 +157,10 @@ test('authentication and catalog are confined to their exact allowlisted URL', a
   const fetch = transport(f, {}, true, { networkAllow: [auth] });
   assert.equal((await fetch(auth)).status, 200);
   assert.equal((await fetch(auth, { method: 'POST', body: JSON.stringify({ token: 'opaque' }) })).status, 200);
+  assert.equal((await fetch(auth, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'grant_type=refresh_token&refresh_token=synthetic' })).status, 200);
+  await assert.rejects(fetch(auth, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'model=hidden' }));
   await assert.rejects(fetch(`${auth}/child`));
-  assert.equal(f.arrivals.length, 2);
+  assert.equal(f.arrivals.length, 3);
   assert.equal(f.ledger.snapshot().requests.length, 0);
 });
 

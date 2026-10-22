@@ -1,0 +1,23 @@
+couldn't start daemon: open /run/user/1000/op-daemon.pid: read-only file system
+node:internal/fs/promises:956
+  const result = await PromisePrototypeThen(
+                 ^
+
+Error: EACCES: permission denied, scandir '/tmp/codex-daemon-1000'
+    at async readdir (node:internal/fs/promises:956:18)
+    at async directoryBytes (file:///home/ubuntu/<concealed by 1Password>-hybrid-pstack-trial/ops/mastra-agents/reviewer/src/run-file.mjs:11:25)
+    at async directoryBytes (file:///home/ubuntu/<concealed by 1Password>-hybrid-pstack-trial/ops/mastra-agents/reviewer/src/run-file.mjs:13:38)
+    at async file:///home/ubuntu/<concealed by 1Password>-hybrid-pstack-trial/ops/mastra-agents/reviewer/src/run-file.mjs:30:9
+    at async withFileLock (file:///home/ubuntu/<concealed by 1Password>-hybrid-pstack-trial/ops/mastra-agents/reviewer/src/run-file.mjs:54:16)
+    at async durableWrite (file:///home/ubuntu/<concealed by 1Password>-hybrid-pstack-trial/ops/mastra-agents/reviewer/src/run-file.mjs:29:3)
+    at async file:///home/ubuntu/<concealed by 1Password>-hybrid-pstack-trial/scripts/commandcode-requests.mjs:38:194
+    at async withFileLock (file:///home/ubuntu/<concealed by 1Password>-hybrid-pstack-trial/ops/mastra-agents/reviewer/src/run-file.mjs:54:16)
+    at async createRequestTracker (file:///home/ubuntu/<concealed by 1Password>-hybrid-pstack-trial/scripts/commandcode-requests.mjs:38:97)
+    at async file:///home/ubuntu/<concealed by 1Password>-hybrid-pstack-trial/[eval1]:3:1 {
+  errno: -13,
+  code: 'EACCES',
+  syscall: 'scandir',
+  path: '/tmp/codex-daemon-1000'
+}
+
+Node.js v24.14.1

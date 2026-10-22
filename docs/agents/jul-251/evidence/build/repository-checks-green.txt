@@ -1,0 +1,28 @@
+✔ coding standards retain framework rules and the trial retains learning tests (2.697971ms)
+✔ agent instructions use the trial rulebook and the runbook marks Factory retired (1.129022ms)
+✔ post-build reviewer checks and the plan-answers/park policy replace stop-and-ask builder gates (3.281639ms)
+✔ the repository-owned pre-plan skill survives Pocock skill upgrades (2.345064ms)
+✔ Todd's 19 October process vocabulary and restart stop are explicit (0.72742ms)
+✔ formal verification skills retain exact pinned hashes under the trial mirror (1.501279ms)
+✔ .gitattributes sets LF for every text file, and for the files installed on the server (1.511216ms)
+✔ no tracked text file is committed with CRLF line endings (163.589157ms)
+✔ no script under scripts/ or ops/ hardcodes a personal-machine path (C:\Users\<name>) (12.401967ms)
+✔ a personal path in a nested folder is caught and reported by the scan (1.709927ms)
+✔ a fixture file that contains the escaped form C:\\Users\\name is flagged (6.611732ms)
+✔ findPersonalPaths flags single-backslash form C:\Users\name (0.53608ms)
+✔ findPersonalPaths flags escaped double-backslash form C:\\Users\\name (0.341084ms)
+✔ findPersonalPaths flags forward-slash form C:/Users/name (0.317381ms)
+✔ findPersonalPaths matches case-insensitively (0.238039ms)
+✔ findPersonalPaths finds multiple paths in text (0.746258ms)
+✔ findPersonalPaths returns empty array when no personal-machine paths exist (0.38724ms)
+✔ findPersonalPaths handles non-string inputs safely (0.248223ms)
+✔ findPersonalPaths handles usernames with dots, hyphens, and underscores (0.374543ms)
+✔ PERSONAL_PATH regex pattern is exported and matches personal paths (1.011725ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 284.346623

@@ -43,6 +43,7 @@ test('free requests remain usable without usage when priced accounting is unknow
   ledger.unknown(paid.id, 'connection lost');
   const free = ledger.reserve(input());
   assert.equal(ledger.settle(free.id, { costNano: 0 }).state, 'settled');
+  assert.equal(ledger.snapshot().spentNano, 0);
   assert.equal(ledger.snapshot().heldNano, 20);
   assert.equal(ledger.snapshot().pricedBlocked, true);
   assert.throws(() => ledger.reserve(input(1)), /blocked/);

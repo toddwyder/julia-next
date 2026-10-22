@@ -17,22 +17,22 @@
 ## Build authorized by Todd
 
 - [x] Read the Principles section of the poteto-mode skill.
-- [ ] Phase A: Frame
-- [ ] Phase B: Design the workflow
-- [ ] Phase C: Run the loop
-- [ ] Phase D: Keep the audit trail
+- [x] Phase A: Frame
+- [x] Phase B: Design the workflow
+- [x] Phase C: Run the loop
+- [x] Phase D: Keep the audit trail
 - [ ] Phase E: Verify and hand back
 
 ### Designed workflow
 
-- [ ] Ground installed SDK routing, memory, credentials and current learning tests with `how`.
-- [ ] Compare two independent architecture sketches and synthesize the request boundary.
-- [ ] Install SDK 1.14.0 from the owning lockfile and capture framework baseline.
-- [ ] Build durable per-card accounting and prove refusal, unknown usage, restarts and concurrency.
-- [ ] Build one settings-driven SDK adapter and command credential boundary.
-- [ ] Prove free-model routing, commands and stock Auto memory on the real adapter.
-- [ ] Break each new guard, retain failing evidence, restore it and rerun.
-- [ ] Review the diff and comments, commit and push coherent units.
+- [x] Ground installed SDK routing, memory, credentials and current learning tests with `how`.
+- [x] Compare two independent architecture sketches and synthesize the request boundary.
+- [x] Install SDK 1.14.0 from the owning lockfile and capture framework baseline.
+- [x] Build durable per-card accounting and prove refusal, unknown usage, restarts and concurrency.
+- [x] Build one settings-driven SDK adapter and command credential boundary.
+- [x] Prove free-model routing, commands and stock Auto memory on the real adapter.
+- [x] Break each new guard, retain failing evidence, restore it and rerun.
+- [x] Review the diff and comments, commit and push coherent units.
 - [ ] Open a PR to main with evidence, audit the trail and report remaining limitations.
 
 ### Throughput checkpoint

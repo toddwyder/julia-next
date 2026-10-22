@@ -3,12 +3,21 @@ const categories = ['input', 'output', 'cacheRead', 'cacheWrite'];
 const fail = message => new Error(message);
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const count = value => Number.isSafeInteger(value) && value >= 0;
-function charge(tokens, rate) {
+function charge(tokens, rate, exact = false) {
   const [coefficient, exponent = '0'] = String(rate).split('e');
   const [whole, fraction = ''] = coefficient.split('.');
   const scale = fraction.length - Number(exponent);
   const numerator = BigInt(tokens) * BigInt(whole + fraction) * 1000n;
+  if (exact) return { numerator, scale };
   if (scale <= 0) return Number(numerator * 10n ** BigInt(-scale));
+  const denominator = 10n ** BigInt(scale);
+  return Number((numerator + denominator - 1n) / denominator);
+}
+
+function totalCharge(usage, price) {
+  const parts = categories.map(key => charge(usage[key], price[key], true));
+  const scale = Math.max(0, ...parts.map(part => part.scale));
+  const numerator = parts.reduce((sum, part) => sum + part.numerator * 10n ** BigInt(scale - part.scale), 0n);
   const denominator = 10n ** BigInt(scale);
   return Number((numerator + denominator - 1n) / denominator);
 }
@@ -133,13 +142,17 @@ export function createTransport({ ledger, settings, role, fetch: upstream = glob
     try { return await ledger[method](...args); } catch { throw fail('Request ledger refused operation'); }
   }
   return async function guardedFetch(input, init) {
+    if ((await ledgerCall('snapshot')).stopped) throw fail('STOP WORK: card stopped after nonzero cost');
     let request;
     try { request = new Request(input, init); } catch { throw fail('Invalid HTTP request'); }
     const endpoint = request.url;
     if (request.method === 'GET' && allowed.has(endpoint)) return upstream(new Request(request, { redirect: 'error' }));
     if (request.method !== 'POST') throw fail('HTTP route is not configured');
     let body;
-    try { body = await request.clone().json(); } catch { throw fail('Request must contain a JSON object'); }
+    try {
+      if (allowed.has(endpoint) && request.headers.get('content-type')?.includes('application/x-www-form-urlencoded')) body = Object.fromEntries(new URLSearchParams(await request.clone().text()));
+      else body = await request.clone().json();
+    } catch { throw fail('Request must contain a JSON object'); }
     if (!object(body)) throw fail('Request must contain a JSON object');
     const spec = routes.get(JSON.stringify([endpoint, body.model]));
     if (!spec) {
@@ -160,6 +173,7 @@ export function createTransport({ ledger, settings, role, fetch: upstream = glob
     const reservation = await ledgerCall('reserve', { model: spec.model, role, maximumNano: spec.maximumNano, price: spec.price, bounds: { maxInputTokens: spec.maxInputTokens, maxOutputTokens: spec.maxOutputTokens } });
     const id = reservation?.id ?? reservation;
     let response;
+    let settled = false;
     try {
       response = await upstream(new Request(request, { body: JSON.stringify(bounded), redirect: 'error' }));
       if (response.status >= 300 && response.status < 400) throw fail('Redirect refused');
@@ -170,13 +184,16 @@ export function createTransport({ ledger, settings, role, fetch: upstream = glob
         if (error.message.startsWith('STOP WORK')) throw error;
         if (spec.paid) throw fail('Paid request usage is unavailable');
       }
-      const costNano = usage ? categories.reduce((sum, key) => sum + charge(usage[key], spec.price[key]), 0) : 0;
-      if (!Number.isSafeInteger(costNano) || costNano > spec.maximumNano) throw fail('Request usage exceeds reserved bound');
+      const costNano = usage ? totalCharge(usage, spec.price) : 0;
+      if (!Number.isSafeInteger(costNano)) throw fail('Invalid request cost');
       await ledgerCall('settle', id, { usage: usage ?? null, costNano });
+      settled = true;
+      if (costNano > spec.maximumNano) throw fail('Request usage exceeds reserved bound');
       return response;
     } catch (error) {
       if (response?.body) void response.body.cancel().catch(() => {});
-      await ledgerCall('unknown', id, error.message?.startsWith('STOP WORK') ? 'Provider reported nonzero cost' : 'Request outcome unavailable');
+      if (error.message?.startsWith('STOP WORK')) await ledgerCall('stop', 'Provider reported nonzero cost');
+      if (!settled) await ledgerCall('unknown', id, error.message?.startsWith('STOP WORK') ? 'Provider reported nonzero cost' : 'Request outcome unavailable');
       if (error.message?.startsWith('STOP WORK')) throw error;
       throw fail('Request outcome unavailable');
     }
