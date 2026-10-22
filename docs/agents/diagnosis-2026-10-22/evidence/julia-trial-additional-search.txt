@@ -1,0 +1,6 @@
+/var/lib/julia-build/runs/worktrees/jul-232-6c44d0897c76679dde8950962dc0c4ad/docs/agents/factory-platform-auth-change-log.md
+/var/lib/julia-build/runs/worktrees/jul-232-6c44d0897c76679dde8950962dc0c4ad/docs/research/mastra-intended-use-audit.md
+/var/lib/julia-build/runs/worktrees/jul-232-eb024e8cd772cd70325e6c0befe3706d/docs/agents/factory-platform-auth-change-log.md
+/var/lib/julia-build/runs/worktrees/jul-232-eb024e8cd772cd70325e6c0befe3706d/docs/research/mastra-intended-use-audit.md
+/var/lib/julia-build/repository/docs/agents/factory-platform-auth-change-log.md
+/var/lib/julia-build/repository/docs/research/mastra-intended-use-audit.md
