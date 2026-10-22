@@ -1,0 +1,5 @@
+
+> julia-next@0.0.0 lint:framework
+> node scripts/lint-framework.mjs
+
+graph/langgraph does not exist yet; passing.

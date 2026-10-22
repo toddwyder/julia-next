@@ -49,7 +49,18 @@ Run these on the card. Each finding is a blank to fill or a question. Fill a bla
 
 Post one Confirm comment per card as a record of what changed in the card text, including the filled blanks and Todd's answers ("None" if nothing changed). The separate Framework Map comment remains the citation record. Confirm runs once, plus one rerun if it found blanks.
 
-After Confirm, run the launcher's admission contract against every card from the repository root:
+After Confirm, run the launcher's admission contract against every card from the repository root.
+Server agents use the provisioned agents-only pass through stock op run:
+
+```sh
+node scripts/julia-agents.mjs -- node --experimental-strip-types ops/mastra-agents/reviewer/src/mastra/card-admission-check.ts JUL-nnn
+```
+
+Server agents continue as `ubuntu` on the existing connection; `julia-agent` stays unused.
+The bootstrap uses `/home/ubuntu/.config/julia-agents/service-account-token` and the
+references-only `scripts/julia-agents.env`; missing authentication fails as provider unavailable
+before the child command. Never reread the completed one-time bootstrap item or fall back to the
+control-page pass. Use the following command only for commands actually run on Windows:
 
 ```powershell
 .\scripts\julia-vault-windows.ps1 -SecretNames LINEAR_API_KEY -RunArguments @('node', '--experimental-strip-types', 'ops/mastra-agents/reviewer/src/mastra/card-admission-check.ts', 'JUL-nnn')

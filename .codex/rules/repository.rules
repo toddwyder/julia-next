@@ -21,7 +21,6 @@ prefix_rule(pattern = ["gh", "run", ["list", "view", "watch"]], decision = "allo
 prefix_rule(pattern = ["gh", "auth", "status"], decision = "allow")
 # Authorized fixed helper prefixes.
 prefix_rule(pattern = ["sudo", "-n", "/usr/local/sbin/julia-control-deploy-and-restart"], decision = "allow")
-prefix_rule(pattern = ["sudo", "-n", "/usr/local/sbin/julia-framework-learning-run"], decision = "allow")
 prefix_rule(pattern = ["systemctl", ["restart", "start", "stop", "reload", "try-restart", "reload-or-restart", "enable", "disable", "mask", "unmask", "edit", "daemon-reload", "reboot", "poweroff"]], decision = "forbidden", justification = "Use the fixed no-argument Julia helper.")
 # Read-only server diagnostics.
 prefix_rule(pattern = ["systemctl", ["status", "show", "is-active", "is-enabled"]], decision = "allow")

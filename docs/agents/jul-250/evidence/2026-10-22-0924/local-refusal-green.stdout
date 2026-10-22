@@ -1,0 +1,17 @@
+TAP version 13
+# {"fact":"framework-only-drive","inferenceAttempts":0}
+# Subtest: explicit canonical model override refuses locally before any model request
+ok 1 - explicit canonical model override refuses locally before any model request
+  ---
+  duration_ms: 4395.699489
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4587.288025

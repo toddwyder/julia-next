@@ -1,0 +1,16 @@
+{
+  "source": "Todd supplied Claude account-page observation; accepted by Todd 22Oct2026 07:35-07:44",
+  "observedAt": "2026-10-22 06:58 (Todd\u2019s stated time)",
+  "account": "CommandCode toddwyder",
+  "model": "reflection/beam:free",
+  "costPerRequestUsd": "0.0000",
+  "page": "Todd\u2019s CommandCode usage page",
+  "independentlyReadByThisAgent": false,
+  "furtherCostProofRequired": false,
+  "machineryOnly": true,
+  "droppedModels": [
+    "minimax/minimax-m3.1-flash:free",
+    "poolside/laguna-s-2.1-free",
+    "stealth/glyph-cluster:free"
+  ]
+}

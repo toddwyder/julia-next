@@ -52,6 +52,7 @@ test('verify-machine skill and feature map keep the generated public contract', 
     'check-permanent-prerequisites.md',
     'initialize-ready-card.md',
     'run-named-secret-command.md',
+    'server-agents-command.md',
     'verify-restricted-secrets.md',
   ]);
 
@@ -66,7 +67,7 @@ test('verify-machine skill and feature map keep the generated public contract', 
     assert.deepEqual(headings.slice(0, 2), ['Sub-features', 'How to get to it (user POV)']);
     assert.match(headings[2], /^Driving it with (?!<harness>|TODO|TBD).+/);
     assert.equal(headings[3], 'Gotchas');
-    assert.match(feature, /```powershell\r?\n[\s\S]+?\r?\n```/, `${file} must include a literal PowerShell drive`);
+    assert.match(feature, /```(?:powershell|sh)\r?\n[\s\S]+?\r?\n```/, `${file} must include a literal PowerShell drive`);
     assert.match(feature, /observable (?:success|result)|success (?:is|looks like)|succeeds when/i, `${file} must state observable success`);
   }
 

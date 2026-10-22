@@ -1,0 +1,15 @@
+# JUL-250 Framework Map — ubuntu continuation after Todd's 09:24 correction
+
+This operative map replaces the superseded account-lockdown map. JUL-250 has four criteria. Agents remain ubuntu; julia-agent is unused. No accepted-risk safeguards or denial checks are introduced.
+
+| Job | Exact interface documentation read | Adaptation |
+| --- | --- | --- |
+| Authenticate and resolve copied fields | op 2.40.0 installed op run --help, op user get --help, op vault list --help, op item list --help; https://www.1password.dev/cli/secrets-environment-variables | Thin token-file/argv bootstrap; stock op owns service-account authentication, reference resolution, masking and child execution. Existing refs and fields unchanged. |
+| Framework facts without a model | @mastra/code-sdk1.14.0 public dist/hooks/manager.d.ts and dist/agents/tools.d.ts; @mastra/core1.78.0 bundled reference-workspace-workspace-class.md Tool hooks and public workspace/tools/tools.d.ts | Direct stock Workspace command tools plus SDK hooks/awaited observer; real Git and ESLint effects. No model chooses framework-fact calls. |
+| Local settings, threads, memory switch | SDK public onboarding/settings.d.ts and session declarations; @mastra/memory1.38.0 public Memory constructor/omEngine and bundled docs-memory-observational-memory.md; @mastra/libsql1.26.2 bundled integrations-databases-libsql.md | Real local persistence/switch checks without inference; constructor state is not proof of actual observation/reflection. That conditional Proof remains JUL-249. |
+| Two model-side learning cases | SDK1.14.0 public bootLocalAgentController/runMC/inputProcessors; core public processLLMRequest; https://commandcode.ai/docs/provider | Beam resolution and actual hook refusal arriving in the next real request; unchanged real response. Missing attempted model step is inconclusive with one rerun. Accepted Beam $0.0000 evidence is Todd's supplied Claude usage-page observation. |
+| Admission | Existing cardAdmissionInput/CardAdmissionSchema; reviewer owning lockfile Zod4.6.5 and Node24.14.1; https://nodejs.org/docs/v24.14.1/api/typescript.html | Actual live Linear read through op run, with prospective Ready schema state; missing-Acceptance-criteria copy must refuse. Implementation is the actual team status. |
+| Server Proof | Existing verify-machine recipe extended only for this server-only command journey | Required actual op run/learning/admission readbacks; no Windows prerequisite claims or accepted-risk denial/tamper checks. Laptop recipes remain unchanged in scope. |
+| Publication | gh2.45.0 installed pr create/merge/checks help and ordinary Git HTTPS | Exact reviewed candidate, PR/CI/main containment. Current candidate is in a clean worktree, not the retired or unverified delivery runner. |
+
+Original Julia items and laptop/control-page references are not rewired. The one-time bootstrap is complete and is not repeated. Provider account findings are supplied observations with source distinctions, not a claimed browser inspection by this agent. Runner monetary enforcement belongs to JUL-249; account allowance is not a per-card cap.

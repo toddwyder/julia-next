@@ -1,0 +1,35 @@
+✔ coding standards seed reflects the framework-first rules and is linked from AGENTS.md (2.857809ms)
+✔ agent instructions use the Linear delivery route and mark Factory retired (1.431716ms)
+✔ post-build reviewer checks and the plan-answers/park policy replace stop-and-ask builder gates (1.035517ms)
+✔ the repository-owned pre-plan skill survives Pocock skill upgrades (2.793247ms)
+✔ Todd's 19 October process vocabulary and restart stop are explicit (2.907238ms)
+✔ formal verification skills are installed and pinned to exact hashes in PSTACK-SOURCE.md (2.839545ms)
+✔ routes representative changed paths to their focused CI gates (5.446599ms)
+✔ unions applicable gates and treats workflow changes as high-risk (0.342202ms)
+✔ runner code, new regressions and shared safety dependencies select the Windows gate (0.869398ms)
+✔ server agents route resolves all eight fields and forwards literal arguments through real op (2102.332587ms)
+✔ unavailable agent passes fail before child effects without inherited authentication fallback (300.799654ms)
+✔ real op ignores inherited desktop Connect and no-masking overrides and preserves child exit (1990.801915ms)
+✔ .gitattributes sets LF for every text file, and for the files installed on the server (3.093785ms)
+✔ no tracked text file is committed with CRLF line endings (110.544649ms)
+✔ no script under scripts/ or ops/ hardcodes a personal-machine path (C:\Users\<name>) (11.513345ms)
+✔ a personal path in a nested folder is caught and reported by the scan (4.009229ms)
+✔ a fixture file that contains the escaped form C:\\Users\\name is flagged (9.917698ms)
+✔ findPersonalPaths flags single-backslash form C:\Users\name (0.418167ms)
+✔ findPersonalPaths flags escaped double-backslash form C:\\Users\\name (0.338738ms)
+✔ findPersonalPaths flags forward-slash form C:/Users/name (0.37448ms)
+✔ findPersonalPaths matches case-insensitively (0.336274ms)
+✔ findPersonalPaths finds multiple paths in text (0.280755ms)
+✔ findPersonalPaths returns empty array when no personal-machine paths exist (0.44015ms)
+✔ findPersonalPaths handles non-string inputs safely (0.342782ms)
+✔ findPersonalPaths handles usernames with dots, hyphens, and underscores (0.334221ms)
+✔ PERSONAL_PATH regex pattern is exported and matches personal paths (0.864769ms)
+✔ verify-machine skill and feature map keep the generated public contract (22.752177ms)
+ℹ tests 27
+ℹ suites 0
+ℹ pass 27
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4543.716246

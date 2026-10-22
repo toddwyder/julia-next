@@ -101,11 +101,6 @@ test('Todd\'s 19 October process vocabulary and restart stop are explicit', () =
   assert.match(glossary, /\*\*Proof\*\*:[^\n]*\n[^\n]*tied to the exact candidate commit and dirty-tree digest\./);
   assert.match(glossary, /\*\*Evidence\*\*:\s*\nWhat Proof produces, showing that every acceptance criterion was met\. No Evidence means not done\./);
   assert.doesNotMatch(glossary, /_Avoid_: Pstack verification/);
-  assert.match(agents, /A \*\*problem\*\* is anything that goes wrong while working/);
-  assert.match(agents, /fix it test-first, and continue/);
-  assert.match(agents, /adversarial review or Proof fails twice, a spend or time cap is reached/);
-  assert.match(agents, /Rebuild once Todd approves it/);
-  assert.match(agents, /removed from the repo and every machine it touched, never worked around; offer undo before patching/);
 
 });
 

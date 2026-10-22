@@ -1,0 +1,47 @@
+✖ server agents route resolves all eight fields and forwards literal arguments through real op (65.448748ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 201.505602
+
+✖ failing tests:
+
+test at scripts/julia-agents.test.mjs:6:1
+✖ server agents route resolves all eight fields and forwards literal arguments through real op (65.448748ms)
+  AssertionError [ERR_ASSERTION]: node:internal/modules/cjs/loader:1459
+    throw err;
+    ^
+  
+  Error: Cannot find module '/home/ubuntu/julia-next/scripts/julia-agents.mjs'
+      at Module._resolveFilename (node:internal/modules/cjs/loader:1456:15)
+      at defaultResolveImpl (node:internal/modules/cjs/loader:1066:19)
+      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1071:22)
+      at Module._load (node:internal/modules/cjs/loader:1242:25)
+      at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+      at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+      at node:internal/main/run_main_module:33:47 {
+    code: 'MODULE_NOT_FOUND',
+    requireStack: []
+  }
+  
+  Node.js v24.14.1
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///home/ubuntu/julia-next/scripts/julia-agents.test.mjs:9:9)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

@@ -1,4 +1,3 @@
-# Todd binding decision 2026-10-21 16:10. Load after all ubuntu grants.
-# Deny every target user and command before the two root-only exceptions.
-ubuntu ALL=(ALL:ALL) !ALL
-ubuntu ALL=(root:root) NOPASSWD: NOSETENV: /usr/local/sbin/julia-control-deploy-and-restart "", /usr/local/sbin/julia-framework-learning-run ""
+# ABANDONED — Todd decision, 22 October 2026 08:35–08:37.
+# Historical path only. Do not install this file: ubuntu stays the operator admin.
+# Every server agent runs as julia-agent under its separate fixed-restart-only rule.
