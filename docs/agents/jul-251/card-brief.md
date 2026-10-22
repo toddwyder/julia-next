@@ -24,13 +24,9 @@ Use Mastra's stock Auto memory, with observational memory on, stock thresholds a
 
 1. The runner uses Mastra's stock model routing, and Todd can change which model serves each role through settings without changing core code.
 2. Every request contributes its tokens at the configured published API rates to the same durable card total, including subscription, retry and memory requests; free requests contribute $0, and restarting or concurrent work does not reset or evade the total.
-3. A model without a price is refused, and the next request that could take the card past $1.00 is refused before it is sent.
+3. A model without a price is refused, and the next request that could take the card past $1.00 is refused before it is sent. A priced model's request with missing usage is refused, and further priced requests on that card are blocked while its usage is unknown. Free models ($0) pass with or without usage.
 4. Builder commands and builder-readable files contain neither provider keys nor subscription sign-in credentials.
 5. Mastra's stock Auto memory is active with observational memory on.
-
-## Question for Todd
-
-Stock routing does not guarantee token usage from every custom provider. To keep every request within the $1 ceiling, should a source that omits usage be refused, with further card requests blocked while its usage is unknown?
 
 ## Out of scope
 
