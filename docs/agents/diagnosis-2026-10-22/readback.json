@@ -1,0 +1,20 @@
+{
+  "config": {
+    "sandbox_mode": "\"danger-full-access\"",
+    "approval_policy": "\"never\""
+  },
+  "session": {
+    "sandbox_mode": "danger-full-access",
+    "approval_policy": "never"
+  },
+  "repository_rules_sha256": "9477fc66dd58c1b6810bc6b5154b2bc8319980d47de537594cbcf7e3795111f6",
+  "sudo_catchall_absent": true,
+  "prompt_rules_absent": true,
+  "rclone_config_absent": true,
+  "stale_checkouts_absent": {
+    "julia-drive-evidence-setup": true,
+    "julia-codex-approvals": true
+  },
+  "trial_absent": true,
+  "dedicated_drive_credentials_and_profile_absent": true
+}
