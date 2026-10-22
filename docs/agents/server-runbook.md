@@ -61,7 +61,17 @@ No further privilege changes are required.
 
 Machinery learning/Proof uses Beam alone under Todd's 22 October 07:35–07:44 rule in AGENTS.md;
 Claude's 06:58 $0.0000 Beam usage-page read is accepted evidence. No further cost polling is needed.
-Real building remains Codex GPT-6 Sol and real review remains DeepSeek through CommandCode under $1/card.
+Real building remains Codex GPT-6 Sol. Todd’s 22 October 11:54 decision keeps
+/code-review inside Implement, once the build is done, with Standards and Spec
+helpers in the builder’s own session/model. Never send code review outside the
+session or to a paid model. Adversarial review is a separate Gemini step; no
+Gemini request runs until Todd names its exact model and route. Ask him in one
+line only when a card reaches that step. One candidate’s angles/calls are one
+round; the recheck after fixes is round two, and there is no round three.
+JUL-250 is explicitly authorized to finish its own code review, Proof and tests,
+then merge without waiting for Gemini. DeepSeek has no review role. The shared
+adapter admits Beam machinery only and retains completed costs plus unresolved
+reservations without opening room for more review.
 
 ## Control page over Tailscale Serve
 
