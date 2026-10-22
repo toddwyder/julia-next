@@ -1,0 +1,90 @@
+{
+  "source": "/home/ubuntu/julia-framework-preplan/docs/agents/framework-guardrails/evidence/mutation-2026-10-21/final-outcome.json",
+  "source_sha256": "6d60804b9e1ea3407a3af48d241909ff9e2ce89cd2f60ab411ab7d019fe47906",
+  "historical_not_new_run": true,
+  "outcome": {
+    "base": "0d36377d359b6c40a2cfa73b0514cd64ba485406",
+    "framework_source_digest": "e0738a1e227443ac9ae6561e50fe722231bfc5bd02748cee745197b5c4ffd9dc",
+    "test_count": 14,
+    "pass": 10,
+    "fail": 4,
+    "skip": 0,
+    "exit": 1,
+    "cases": [
+      {
+        "test": "PostToolUse runs lint but does not feed its result into builder: minimax/minimax-m3.1-flash:free",
+        "broken_guard": "red",
+        "unbroken": "provider unavailable: HTTP 429"
+      },
+      {
+        "test": "PostToolUse runs lint but does not feed its result into builder: reflection/beam:free",
+        "broken_guard": "red",
+        "unbroken": "green"
+      },
+      {
+        "test": "stock PreToolUse blocks bypass before all effects: minimax/minimax-m3.1-flash:free",
+        "broken_guard": "red",
+        "unbroken": "provider unavailable: HTTP 429"
+      },
+      {
+        "test": "stock PreToolUse blocks bypass before all effects: reflection/beam:free",
+        "broken_guard": "red",
+        "unbroken": "green"
+      },
+      {
+        "test": "PreToolUse checks staged tree and returns broken fact to minimax/minimax-m3.1-flash:free",
+        "broken_guard": "red",
+        "unbroken": "provider unavailable: HTTP 429"
+      },
+      {
+        "test": "PreToolUse checks staged tree and returns broken fact to reflection/beam:free",
+        "broken_guard": "red",
+        "unbroken": "green"
+      },
+      {
+        "test": "observe and check each actual builder commit before readiness: minimax/minimax-m3.1-flash:free",
+        "broken_guard": "red",
+        "unbroken": "green"
+      },
+      {
+        "test": "observe and check each actual builder commit before readiness: reflection/beam:free",
+        "broken_guard": "red",
+        "unbroken": "green"
+      },
+      {
+        "test": "stock native memory retains the active thread and its resource identity",
+        "broken_guard": "red",
+        "unbroken": "green"
+      },
+      {
+        "test": "thread created first preserves saved model through runMC without override and real free model answers",
+        "broken_guard": "red",
+        "unbroken": "green"
+      },
+      {
+        "test": "switch before a new thread loses selection; switching after keeps it",
+        "broken_guard": "red",
+        "unbroken": "provider unavailable: HTTP 429"
+      },
+      {
+        "test": "explicit saved canonical model override is refused with Unknown model (passing SDK fact)",
+        "broken_guard": "red",
+        "unbroken": "green"
+      },
+      {
+        "test": "builder can push a real local origin under dedicated HOME: minimax/minimax-m3.1-flash:free",
+        "broken_guard": "red",
+        "unbroken": "green"
+      },
+      {
+        "test": "builder can push a real local origin under dedicated HOME: reflection/beam:free",
+        "broken_guard": "red",
+        "unbroken": "green"
+      }
+    ],
+    "deleted": "default settings round-trip through one file",
+    "only_remaining_failure_cause": "actual free-provider HTTP 429; no retry/fallback/skip or paid call",
+    "rules_commit": "39cb3ea239fa1be02438810f9cc6248312dc2b8f",
+    "source_hashes_verified_after_execution": true
+  }
+}

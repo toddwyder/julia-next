@@ -1,0 +1,21 @@
+{
+  "npm_ci": {
+    "argv": [
+      "npm",
+      "ci",
+      "--no-audit",
+      "--no-fund",
+      "--cache",
+      "/tmp/julia-npm-ci-cache"
+    ],
+    "cwd": "/home/ubuntu/julia-jul-231/ops/build-runner",
+    "exit": 226,
+    "error": "EROFS: read-only file system, unlink '/home/ubuntu/julia-jul-231/ops/build-runner/node_modules/.bin'",
+    "log": "/tmp/julia-npm-ci-cache/_logs/2026-10-21T23_35_34_871Z-debug-0.log"
+  },
+  "remaining_links_into_trial": 530,
+  "lock_local_or_link_entries": [],
+  "NODE_PATH": null,
+  "trial_still_exists": true,
+  "restriction": "Current session workspace-write roots exclude build-runner and sudoers; approval_policy never prohibits requesting escalation. Loaded sudo rule forbids both helpers before OS execution."
+}

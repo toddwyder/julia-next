@@ -1,0 +1,37 @@
+{
+  "context_counts": [
+    {
+      "approval_policy": "never",
+      "sandbox": "danger-full-access",
+      "count": 132
+    },
+    {
+      "approval_policy": "never",
+      "sandbox": "workspace-write",
+      "count": 2
+    },
+    {
+      "approval_policy": "on-request",
+      "sandbox": "workspace-write",
+      "count": 1
+    }
+  ],
+  "non_never_contexts": [
+    {
+      "source": "/home/ubuntu/.codex/sessions/2026/10/21/rollout-2026-10-21T23-10-08-01a160ba-a9c6-78c3-b5d1-4a1fb159f005.jsonl",
+      "line": 8,
+      "timestamp": "2026-10-21T23:10:31.985Z",
+      "approval_policy": "on-request",
+      "sandbox_policy": {
+        "type": "workspace-write",
+        "writable_roots": [
+          "/opt/julia-control"
+        ],
+        "network_access": true,
+        "exclude_tmpdir_env_var": false,
+        "exclude_slash_tmp": false
+      }
+    }
+  ],
+  "laptop": "Not available through this host filesystem or an installed machine connector; no reverse SSH configuration or private key present. Unknown, not inferred."
+}

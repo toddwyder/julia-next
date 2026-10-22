@@ -1,0 +1,272 @@
+[
+  {
+    "session": "rollout-2026-10-21T14-29-09-01a15edd-b054-7962-84b9-8b63728c9be1.jsonl",
+    "line": 280,
+    "timestamp": "2026-10-21T14:41:35.887Z",
+    "tool": "exec",
+    "call_id": "call_016239977db54cd2b1f545efbe8b5f64",
+    "contains_direct_sudo_cat_pattern": false,
+    "mentions_fixed_helper": false,
+    "command_sha256": "bab28e6d93a5deb2bba49eab3ed84dcca002287cc993ef94d569c910daade0cd"
+  },
+  {
+    "session": "rollout-2026-10-21T21-28-07-01a1605d-43c8-77e0-932a-773403fefc3b.jsonl",
+    "line": 111,
+    "timestamp": "2026-10-21T21:29:45.415Z",
+    "tool": "exec",
+    "call_id": "call_d646f5b2fc3545a58ee37e198cd415b1",
+    "contains_direct_sudo_cat_pattern": false,
+    "mentions_fixed_helper": false,
+    "command_sha256": "87c3c2c706a625a315009ecca4992c1d5ff5851250915c1cc340c3c26b0a1b52"
+  },
+  {
+    "session": "rollout-2026-10-21T18-36-07-01a15fbf-ca22-77c2-9d11-b7005e1dfa23.jsonl",
+    "line": 545,
+    "timestamp": "2026-10-21T18:42:27.801Z",
+    "tool": "exec",
+    "call_id": "call_7d09a38d4ace4c5eb235d7ca2c319806",
+    "contains_direct_sudo_cat_pattern": false,
+    "mentions_fixed_helper": false,
+    "command_sha256": "a7716fa53b228815f57fb8fb2b79b80a3a845696ad56e6aca6f171476d349c52"
+  },
+  {
+    "session": "rollout-2026-10-21T18-36-07-01a15fbf-ca22-77c2-9d11-b7005e1dfa23.jsonl",
+    "line": 654,
+    "timestamp": "2026-10-21T18:44:32.788Z",
+    "tool": "exec",
+    "call_id": "call_868c5193272440eb83394ff17d4af516",
+    "contains_direct_sudo_cat_pattern": false,
+    "mentions_fixed_helper": false,
+    "command_sha256": "6d95e9043098977c9f2100fad21073729c3cdc95808a60081166b29d9625e3d6"
+  },
+  {
+    "session": "rollout-2026-10-21T18-36-07-01a15fbf-ca22-77c2-9d11-b7005e1dfa23.jsonl",
+    "line": 1040,
+    "timestamp": "2026-10-21T18:51:44.957Z",
+    "tool": "exec",
+    "call_id": "call_40c9b243c82e44e9baf5534b59fae87c",
+    "contains_direct_sudo_cat_pattern": false,
+    "mentions_fixed_helper": false,
+    "command_sha256": "4ac496e63dde92cfb4e779a838e174e008fb5f6f274c60000febb90104650707"
+  },
+  {
+    "session": "rollout-2026-10-21T18-36-07-01a15fbf-ca22-77c2-9d11-b7005e1dfa23.jsonl",
+    "line": 1047,
+    "timestamp": "2026-10-21T18:51:53.254Z",
+    "tool": "exec",
+    "call_id": "call_3fd44da8b1f3482aae95d2fd46e3c249",
+    "contains_direct_sudo_cat_pattern": false,
+    "mentions_fixed_helper": false,
+    "command_sha256": "149de86122d1b6d0effb2bf23730db02f885a3a7affb366fbe9a2d1cab025c09"
+  },
+  {
+    "session": "rollout-2026-10-21T18-36-07-01a15fbf-ca22-77c2-9d11-b7005e1dfa23.jsonl",
+    "line": 1076,
+    "timestamp": "2026-10-21T18:52:35.611Z",
+    "tool": "exec",
+    "call_id": "call_7f12ee867129464e83cc520c3c53b0b5",
+    "contains_direct_sudo_cat_pattern": false,
+    "mentions_fixed_helper": false,
+    "command_sha256": "5f3e5e3f66a148f3f72ba8f9693a1e399c6711b5619530e233dc9f7307dd302c"
+  },
+  {
+    "session": "rollout-2026-10-21T04-30-33-01a15cb9-a95b-78a3-b4d2-c128b173b848.jsonl",
+    "line": 89,
+    "timestamp": "2026-10-21T04:33:00.586Z",
+    "tool": "exec",
+    "call_id": "call_7f6146e8563c4c84be8c27311c5975cb",
+    "contains_direct_sudo_cat_pattern": false,
+    "mentions_fixed_helper": false,
+    "command_sha256": "34276802627835630dd9ac29603ad227b39cedacdb45719c007d2fc4227d2c20"
+  },
+  {
+    "session": "rollout-2026-10-21T04-30-33-01a15cb9-a95b-78a3-b4d2-c128b173b848.jsonl",
+    "line": 420,
+    "timestamp": "2026-10-21T04:44:21.273Z",
+    "tool": "exec",
+    "call_id": "call_6211689a340e451e96e894e3354cb0c3",
+    "contains_direct_sudo_cat_pattern": false,
+    "mentions_fixed_helper": false,
+    "command_sha256": "8f3f09b69d8173d36425cfeda23db472bbb23bea8f33a2f2c38c1cec521f4cdc"
+  },
+  {
+    "session": "rollout-2026-10-21T05-53-01-01a15d05-2646-7730-b7c7-80c23e3afe9a.jsonl",
+    "line": 413,
+    "timestamp": "2026-10-21T06:19:10.008Z",
+    "tool": "exec",
+    "call_id": "call_a89715fecf5044a7b85a9fdabbc198ef",
+    "contains_direct_sudo_cat_pattern": false,
+    "mentions_fixed_helper": false,
+    "command_sha256": "c748c3fb8ebb791f25b09403e39886364fb6aca40f63cca0783c6195571fc31a"
+  },
+  {
+    "session": "rollout-2026-10-21T16-33-22-01a15f4f-6b53-7b61-874a-e8ba9d59f880.jsonl",
+    "line": 585,
+    "timestamp": "2026-10-21T17:01:56.977Z",
+    "tool": "exec",
+    "call_id": "call_6472dd1e74674333a4925d97236f7cef",
+    "contains_direct_sudo_cat_pattern": false,
+    "mentions_fixed_helper": false,
+    "command_sha256": "a27a097a175659ffeb7d77b0902a6b09f50b3b7d8e35a47e3d1a2c9f657a96d4"
+  },
+  {
+    "session": "rollout-2026-10-21T16-33-22-01a15f4f-6b53-7b61-874a-e8ba9d59f880.jsonl",
+    "line": 850,
+    "timestamp": "2026-10-21T17:12:15.990Z",
+    "tool": "exec",
+    "call_id": "call_4c466181c30440998be90871eddaf51a",
+    "contains_direct_sudo_cat_pattern": false,
+    "mentions_fixed_helper": false,
+    "command_sha256": "d38ae82b88774a2c65f12ac553cede7318bd6267ef505cc2a3af337aa9afe765"
+  },
+  {
+    "session": "rollout-2026-10-21T13-35-46-01a15eac-d0e0-7673-a295-f7dc29545181.jsonl",
+    "line": 106,
+    "timestamp": "2026-10-21T13:37:53.807Z",
+    "tool": "exec",
+    "call_id": "call_1dc04f6c70f24569b0dc8a52385e468d",
+    "contains_direct_sudo_cat_pattern": false,
+    "mentions_fixed_helper": false,
+    "command_sha256": "c82efb420b1004b32cd6659648212200d72cec7de7579c1973f3149533dfa57d"
+  },
+  {
+    "session": "rollout-2026-10-21T13-35-46-01a15eac-d0e0-7673-a295-f7dc29545181.jsonl",
+    "line": 214,
+    "timestamp": "2026-10-21T13:42:02.181Z",
+    "tool": "exec",
+    "call_id": "call_a73f7d16d09d4381b943ffcb6f64db5b",
+    "contains_direct_sudo_cat_pattern": false,
+    "mentions_fixed_helper": false,
+    "command_sha256": "4b0cd97961e431f0d514d2dcd30ca02e8cdc9d818e49d65d6726125449e71fdf"
+  },
+  {
+    "session": "rollout-2026-10-21T21-08-27-01a1604b-448e-7290-a1ba-751d4e0dedc2.jsonl",
+    "line": 105,
+    "timestamp": "2026-10-21T21:09:39.058Z",
+    "tool": "exec",
+    "call_id": "call_2d8b2a6df350428cb9971c28e7237bda",
+    "contains_direct_sudo_cat_pattern": false,
+    "mentions_fixed_helper": false,
+    "command_sha256": "317bcc23efcf4ed41653396f136bc3a9f9cb440b8a52151dcb4c042495091609"
+  },
+  {
+    "session": "rollout-2026-10-21T21-08-27-01a1604b-448e-7290-a1ba-751d4e0dedc2.jsonl",
+    "line": 114,
+    "timestamp": "2026-10-21T21:09:48.545Z",
+    "tool": "exec",
+    "call_id": "call_f04eaa16a4fa42de91af99bb304ce77e",
+    "contains_direct_sudo_cat_pattern": false,
+    "mentions_fixed_helper": false,
+    "command_sha256": "2c82e84b52e4506b2b589ed330efef017c3648917a6dae864c7593d3b4943dcf"
+  },
+  {
+    "session": "rollout-2026-10-21T21-08-27-01a1604b-448e-7290-a1ba-751d4e0dedc2.jsonl",
+    "line": 147,
+    "timestamp": "2026-10-21T21:10:57.923Z",
+    "tool": "exec",
+    "call_id": "call_96b885b008bc41bbaf77088da513d63c",
+    "contains_direct_sudo_cat_pattern": true,
+    "mentions_fixed_helper": false,
+    "command_sha256": "3ea393d6c49dbe035d8166e03f1d02a52ce030792e2f175fc50b89cffc926484"
+  },
+  {
+    "session": "rollout-2026-10-21T21-08-27-01a1604b-448e-7290-a1ba-751d4e0dedc2.jsonl",
+    "line": 189,
+    "timestamp": "2026-10-21T21:11:35.318Z",
+    "tool": "exec",
+    "call_id": "call_8b39597b15ea40569f4f6f4b11e6aef9",
+    "contains_direct_sudo_cat_pattern": true,
+    "mentions_fixed_helper": false,
+    "command_sha256": "b899a984c6d57851cfe9b68565d423ac6fd5b323089e98fdbb32b32969b1d843"
+  },
+  {
+    "session": "rollout-2026-10-21T21-08-27-01a1604b-448e-7290-a1ba-751d4e0dedc2.jsonl",
+    "line": 222,
+    "timestamp": "2026-10-21T21:12:45.208Z",
+    "tool": "exec",
+    "call_id": "call_e22c04e282c746dca55696bfb65990c4",
+    "contains_direct_sudo_cat_pattern": true,
+    "mentions_fixed_helper": false,
+    "command_sha256": "3e8adb3bc89136d401b9876135173b1aa5d83463fb8c313824cee019f80dfe4b"
+  },
+  {
+    "session": "rollout-2026-10-21T21-08-27-01a1604b-448e-7290-a1ba-751d4e0dedc2.jsonl",
+    "line": 252,
+    "timestamp": "2026-10-21T21:13:48.847Z",
+    "tool": "exec",
+    "call_id": "call_8b6bdea070bd4f2b812c224a3fd35b3f",
+    "contains_direct_sudo_cat_pattern": true,
+    "mentions_fixed_helper": false,
+    "command_sha256": "3ccd0aad58b2f7c39fe8c492386731b2d0c2a2f245e160570109daaf24d419d6"
+  },
+  {
+    "session": "rollout-2026-10-21T21-08-27-01a1604b-448e-7290-a1ba-751d4e0dedc2.jsonl",
+    "line": 402,
+    "timestamp": "2026-10-21T21:29:00.742Z",
+    "tool": "exec",
+    "call_id": "call_1cf99b76578b4b869fd43e202b4c2c5f",
+    "contains_direct_sudo_cat_pattern": true,
+    "mentions_fixed_helper": false,
+    "command_sha256": "b5d2884333d2c1cfc71e7103c4c02510282854896f18611ae8f77b3e7e1f4d79"
+  },
+  {
+    "session": "rollout-2026-10-21T21-08-27-01a1604b-448e-7290-a1ba-751d4e0dedc2.jsonl",
+    "line": 860,
+    "timestamp": "2026-10-21T21:44:39.535Z",
+    "tool": "exec",
+    "call_id": "call_fd7fc902a57b4ab7b1008f96da982384",
+    "contains_direct_sudo_cat_pattern": true,
+    "mentions_fixed_helper": false,
+    "command_sha256": "6298004b1c0ad6b8880357ffbddb047f8f216b3835c3b1de672695578181caf3"
+  },
+  {
+    "session": "rollout-2026-10-21T22-28-55-01a16094-efa1-73f3-b7b7-e4465736e10d.jsonl",
+    "line": 107,
+    "timestamp": "2026-10-21T22:30:19.099Z",
+    "tool": "exec",
+    "call_id": "call_8cef1701b5f3406fa67757429749f1f0",
+    "contains_direct_sudo_cat_pattern": false,
+    "mentions_fixed_helper": false,
+    "command_sha256": "dadf543fef32d7559d546894e37895f5cc994f86aaa4983d6d52d547d46a3443"
+  },
+  {
+    "session": "rollout-2026-10-21T22-28-55-01a16094-efa1-73f3-b7b7-e4465736e10d.jsonl",
+    "line": 213,
+    "timestamp": "2026-10-21T22:33:01.256Z",
+    "tool": "exec",
+    "call_id": "call_445af4e125b64e399ff903f94243ea38",
+    "contains_direct_sudo_cat_pattern": true,
+    "mentions_fixed_helper": false,
+    "command_sha256": "8db9a8101b234550270ebbd7c1c3b9b1f2baacc3e8415da625a6c219eaeaf473"
+  },
+  {
+    "session": "rollout-2026-10-21T22-28-55-01a16094-efa1-73f3-b7b7-e4465736e10d.jsonl",
+    "line": 229,
+    "timestamp": "2026-10-21T22:33:52.156Z",
+    "tool": "exec",
+    "call_id": "call_bcbe15274db94da2a792393b836efcc3",
+    "contains_direct_sudo_cat_pattern": false,
+    "mentions_fixed_helper": false,
+    "command_sha256": "d5dddcbc96580ca2b47934369a41802ce9166b074612c53d0ffcbe8398ab86ff"
+  },
+  {
+    "session": "rollout-2026-10-21T22-28-55-01a16094-efa1-73f3-b7b7-e4465736e10d.jsonl",
+    "line": 264,
+    "timestamp": "2026-10-21T22:34:54.835Z",
+    "tool": "exec",
+    "call_id": "call_1ba57eb552b14eeaa3488ac73f373214",
+    "contains_direct_sudo_cat_pattern": true,
+    "mentions_fixed_helper": false,
+    "command_sha256": "3046d9f9c065acd7eaeaa37bdb715c850f8e2dd54b08aae964ddd8e7923d2340"
+  },
+  {
+    "session": "rollout-2026-10-21T22-28-55-01a16094-efa1-73f3-b7b7-e4465736e10d.jsonl",
+    "line": 286,
+    "timestamp": "2026-10-21T22:36:05.311Z",
+    "tool": "exec",
+    "call_id": "call_6c13bc3d5b6d465f909d0446f610d285",
+    "contains_direct_sudo_cat_pattern": false,
+    "mentions_fixed_helper": true,
+    "command_sha256": "64528480c8e2cdfbe4cc883afb20156674a2961c4956e5455328d2a7b63d3750"
+  }
+]
