@@ -42,3 +42,14 @@ test('unknown response usage blocks paid retry after restart and the cap blocks 
   await assert.rejects(reopened.reserve({model:req.model,max_tokens:16},'review','reviewer'),/cap/)
  }finally{await rm(directory,{recursive:true,force:true})}
 })
+test('a small review request fits the real remaining budget instead of reserving the full model context',async()=>{
+ const {createRequestTracker}=await import('./commandcode-requests.mjs')
+ const {mkdtemp,rm}=await import('node:fs/promises');const {tmpdir}=await import('node:os');const {join}=await import('node:path')
+ const directory=await mkdtemp(join(tmpdir(),'request-small-'))
+ try{
+  const tracker=await createRequestTracker({path:join(directory,'card.json'),initialCostUsd:.99})
+  const request=await tracker.reserve({model:'deepseek/deepseek-v4.1-flash',max_tokens:16,messages:[{role:'user',content:'Review this small delta.'}]},'review','reviewer')
+  await tracker.settle(request.id,{id:'small',model:request.model,created:1792693610,usage:{prompt_tokens:53,completion_tokens:16}})
+  assert.equal((await tracker.snapshot()).spentUsd,.99001755)
+ }finally{await rm(directory,{recursive:true,force:true})}
+})

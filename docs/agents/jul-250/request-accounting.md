@@ -27,9 +27,11 @@ One durable card ledger serializes reservation and settlement, includes the
 supplied prior settlement, and saves every request's identity, model, purpose,
 role, usage, completed cost and pricing provenance before returning its response
 to the SDK. Retries are new requests. Unknown paid responses retain their
-reservation and refuse another paid dispatch across restart. Reservations cover
-the model's full one-million-token input context and the finite output ceiling,
-using the highest rate reachable during the enforced five-minute timeout.
+reservation and refuse another paid dispatch across restart. Reservations bound input by treating every serialized UTF-8 byte as a token,
+adding protocol/per-message framing allowance, and capping at the model's full
+context. They also cover the finite output ceiling and highest rate reachable
+during the enforced five-minute timeout. This lets a small review call use the
+actual remaining budget without reserving an unrelated million-token prompt.
 A completed charge is recorded even if unexpectedly over its bound; it is never
 hidden to preserve a passing total. This is the requested JUL-250 repair;
 JUL-249 still owns the production runner adapter.

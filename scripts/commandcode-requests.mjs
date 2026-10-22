@@ -42,10 +42,13 @@ export async function createRequestTracker({path,initialCostUsd}){
   if(!Number.isInteger(body.max_tokens)||body.max_tokens<1||body.max_tokens>65536)throw Error('request refused: finite output bound required')
   const now=Date.now()
   const peak=isPeak(new Date(now))||isPeak(new Date(now+300_000))
-  const maximumCostUsd=body.model==='reflection/beam:free'?0:(1_000_000*(peak?.30:.15)+body.max_tokens*(peak?1.20:.60))/1e6
+  // Treat each serialized UTF-8 byte as a token, plus conservative per-message
+  // and protocol framing allowance, capped by the model's full context.
+  const maximumInputTokens=Math.min(1_000_000,Buffer.byteLength(JSON.stringify(body))+4096+1024*(body.messages?.length??0))
+  const maximumCostUsd=body.model==='reflection/beam:free'?0:(maximumInputTokens*(peak?.30:.15)+body.max_tokens*(peak?1.20:.60))/1e6
   if(state.requests.some(r=>r.status==='pending'&&r.maximumCostUsd>0))throw Error('request refused: unresolved paid request')
   if(state.spentUsd+maximumCostUsd>state.maxUsd)throw Error('request refused: shared $1 card cap')
-  const request={id:randomUUID(),model:body.model,purpose,role,maximumCostUsd,status:'pending',at:new Date().toISOString()}
+  const request={id:randomUUID(),model:body.model,purpose,role,maximumInputTokens,maximumCostUsd,status:'pending',at:new Date().toISOString()}
   state.requests.push(request);return request
  })
  const settle=(id,body)=>change(state=>{
