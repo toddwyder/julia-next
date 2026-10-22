@@ -1,0 +1,2 @@
+RED @mastra/core: /home/ubuntu/mastra-trial/route-a/node_modules/@mastra/core/dist/index.cjs
+RED @ai-sdk/openai-compatible: /home/ubuntu/mastra-trial/route-a/node_modules/@ai-sdk/openai-compatible/dist/index.js

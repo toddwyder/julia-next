@@ -1,0 +1,2 @@
+{"command": ["npm", "ci", "--no-audit", "--no-fund", "--cache", "<disposable-cache>"], "exit": 0, "seconds": 52.315, "red": false}
+GREEN npm ci completed

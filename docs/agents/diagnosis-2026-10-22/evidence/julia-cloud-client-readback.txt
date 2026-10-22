@@ -1,0 +1,39 @@
+Skip to main content
+Keyboard shortcuts
+Accessibility Help 
+Accessibility Feedback 
+Julia Evidence Drop
+Search
+1
+Google Auth Platform
+/
+Clients
+Google Auth Platform
+Overview
+Branding
+Audience
+Clients
+Data Access
+Verification Center
+Settings
+Clients
+Create client
+Delete
+Restore deleted OAuth clients
+OAuth 2.0 Client IDs
+	
+Name
+	
+Creation date
+	
+Type
+	
+Client ID
+	
+Actions
+
+No OAuth clients to display
+Project scheduled for deletion
+Project julia-evidence-20261021 is shut down and scheduled to be deleted. A project owner can cancel the shutdown on the projects list page.
+Close
+Go to pending deletion page
