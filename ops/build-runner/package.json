@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "@mastra/code-sdk": "1.14.0"
+  },
+  "name": "julia-build-runner",
+  "private": true,
+  "type": "module"
+}

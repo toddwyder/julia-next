@@ -1,0 +1,38 @@
+(node:9) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ priced requests hold budget, settle once, and enforce the card ceiling (24.688965ms)
+✔ free requests remain usable without usage when priced accounting is unknown (22.195358ms)
+✔ reopening retains unresolved holds, snapshots, and settled costs per card (18.015022ms)
+✔ actual cost above a reservation is durable and blocks priced work (17.923442ms)
+✔ invalid monetary inputs cannot change durable budget (12.178663ms)
+✔ separate processes cannot jointly reserve beyond the ceiling (111.846246ms)
+✔ a process exit after reservation never releases an uncertain request (84.490779ms)
+(node:10) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ free requests arrive with enforced limits and settle without usage (82.550226ms)
+✔ paid missing usage refuses result and prevents the next arrival (22.165353ms)
+✔ chat JSON settles cache categories once (20.060216ms)
+✔ chat SSE settles cache categories once (13.424058ms)
+✔ responses JSON settles cache categories once (12.895837ms)
+✔ responses SSE settles cache categories once (10.773399ms)
+✔ messages JSON settles cache categories once (13.459283ms)
+✔ messages SSE settles cache categories once (8.976157ms)
+✔ wrong model, endpoint, missing prices and trial paid routes send nothing (3.847578ms)
+✔ separate HTTP attempts create separate durable records (14.671337ms)
+✔ card ceiling refuses an oversized reservation before HTTP (2.554739ms)
+✔ provider reported cost stops even a configured free route (8.621237ms)
+✔ allowlisted authentication cannot carry inference payloads and redirects never follow (7.076742ms)
+✔ invalid cache count -1 retains paid hold (9.304699ms)
+✔ invalid cache count 0.5 retains paid hold (7.680288ms)
+✔ bounded buffering refuses a large result without releasing its reservation (10.294375ms)
+✔ decimal rates round nano dollars upward without floating point drift (8.72807ms)
+✔ ledger errors never reveal their underlying body or credentials (2.581347ms)
+✔ authentication and catalog are confined to their exact allowlisted URL (10.795958ms)
+ℹ tests 26
+ℹ suites 0
+ℹ pass 26
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 432.561021
