@@ -1,0 +1,37 @@
+TAP version 13
+# {"fact":"framework-only-drive","inferenceAttempts":0}
+# Subtest: public command tool refuses bypass before Git and sentinel effects without inference
+not ok 1 - public command tool refuses bypass before Git and sentinel effects without inference
+  ---
+  duration_ms: 2269.137307
+  type: 'test'
+  location: '/tmp/framework-direct-red-LiqgVj/layer1.test.mjs:24:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + undefined
+    - 'Runner refuses Git verification bypass before execution'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'Runner refuses Git verification bypass before execution'
+  operator: 'strictEqual'
+  stack: |-
+    file:///tmp/framework-direct-red-LiqgVj/layer1.test.mjs:49:14
+    async file:///tmp/framework-direct-red-LiqgVj/framework-runtime.mjs:45:11
+    async withoutModel (file:///tmp/framework-direct-red-LiqgVj/framework-runtime.mjs:29:13)
+    async TestContext.<anonymous> (file:///tmp/framework-direct-red-LiqgVj/layer1.test.mjs:26:3)
+    async Test.run (node:internal/test_runner/test:1125:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2451.422936

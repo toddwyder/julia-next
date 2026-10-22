@@ -1,0 +1,27 @@
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+
++ [
++   'Framework Map: installed file not found: agents/custom-provider-source.d.ts',
++   'Framework Map: installed file not found: gateway/custom-providers.d.ts'
++ ]
+- []
+
+    at file:///home/ubuntu/<concealed by 1Password>-jul-250-delivery/docs/agents/jul-250/evidence/2026-10-22-0924/server-admission.mjs:13:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: [
+    'Framework Map: installed file not found: agents/custom-provider-source.d.ts',
+    'Framework Map: installed file not found: gateway/custom-providers.d.ts'
+  ],
+  expected: [],
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.14.1

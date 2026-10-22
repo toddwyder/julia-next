@@ -1,0 +1,119 @@
+TAP version 13
+# {"fact":"framework-only-drive","inferenceAttempts":0}
+# Subtest: public command runs PostToolUse lint without replacing command output
+ok 1 - public command runs PostToolUse lint without replacing command output
+  ---
+  duration_ms: 2318.989487
+  type: 'test'
+  ...
+# {"fact":"framework-only-drive","inferenceAttempts":0}
+# Subtest: public command tool refuses bypass before Git and sentinel effects without inference
+ok 2 - public command tool refuses bypass before Git and sentinel effects without inference
+  ---
+  duration_ms: 2607.35223
+  type: 'test'
+  ...
+# {"fact":"framework-only-drive","inferenceAttempts":0}
+# Subtest: public tool checks the staged tree and refuses failure before commit, without inference
+ok 3 - public tool checks the staged tree and refuses failure before commit, without inference
+  ---
+  duration_ms: 2476.135375
+  type: 'test'
+  ...
+# {"layer":3,"observations":[{"commit":"1e2bf5439067dd60f8a0604f2aca692b0f58bda2","tree":"f62a5d51e835b88aeed8c376d214e0c909a950d3","status":1,"stdout":"node:internal/modules/run_main:107\\n    triggerUncaughtException(\\n    ^\\n\\nAssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\\n\\n41 !== 42\\n\\n    at file:///tmp/commit-learning-gasC7Z/answer.test.mjs:1:88\\n    at ModuleJob.run (node:internal/modules/esm/module_job:430:25)\\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {\\n  generatedMessage: true,\\n  code: 'ERR_ASSERTION',\\n  actual: 41,\\n  expected: 42,\\n  operator: 'strictEqual',\\n  diff: 'simple'\\n}\\n\\nNode.js v24.14.1\\n✖ answer.test.mjs (81.502015ms)\\nℹ tests 1\\nℹ suites 0\\nℹ pass 0\\nℹ fail 1\\nℹ cancelled 0\\nℹ skipped 0\\nℹ todo 0\\nℹ duration_ms 95.619462\\n\\n✖ failing tests:\\n\\ntest at answer.test.mjs:1:1\\n✖ answer.test.mjs (81.502015ms)\\n  'test failed'\\n","stderr":"","beforeExecuteResolved":true},{"commit":"bdcda00d7d7baf4c5e8a3f9d0386b18d9b7ada99","tree":"29719619da6cb77fb75671fa97ea1b5a7bf17c57","status":0,"stdout":"✔ answer.test.mjs (76.361109ms)\\nℹ tests 1\\nℹ suites 0\\nℹ pass 1\\nℹ fail 0\\nℹ cancelled 0\\nℹ skipped 0\\nℹ todo 0\\nℹ duration_ms 91.821018\\n","stderr":"","beforeExecuteResolved":true}],"readiness":"refused for failing exact commit"}
+# {"layer":3,"checkedCommit":"bdcda00d7d7baf4c5e8a3f9d0386b18d9b7ada99","readiness":"saved for passing exact commit"}
+# {"fact":"framework-only-drive","inferenceAttempts":0}
+# Subtest: public tool awaits every exact-commit observation before returning
+ok 4 - public tool awaits every exact-commit observation before returning
+  ---
+  duration_ms: 2428.467291
+  type: 'test'
+  ...
+# {"fact":"model did not attempt","outcome":"inconclusive","attempt":1,"test":"classification unit","guardVerdict":null}
+# {"fact":"model did not attempt","outcome":"inconclusive","attempt":2,"test":"classification unit","guardVerdict":null}
+# Subtest: missing model step gets exactly one rerun and an inconclusive outcome, never a guard verdict
+ok 5 - missing model step gets exactly one rerun and an inconclusive outcome, never a guard verdict
+  ---
+  duration_ms: 3.109493
+  type: 'test'
+  ...
+# {"fact":"free-provider-attempt","url":"https://api.commandcode.ai/provider/v1/chat/completions","at":"2026-10-22T17:15:03.604Z","status":200,"requestSha256":"f4c14f220a31b6da1b504deeec88174a4f91afc5b956ea57b3e95b51e85942ad","bytes":69576,"model":"ornith/ornith-1.5-122b"}
+# {"model":"ornith/ornith-1.5-122b","prompt":"Hello.","result":{"status":"completed","text":"\\n\\nHello! How can I help you today?","finishReason":"complete","usage":{"inputTokens":16681,"outputTokens":33,"totalTokens":16714},"toolCalls":[],"toolResults":[],"threadId":"1b6391e0-74ad-472d-9b17-eee598a11a0e","exitCode":0},"requests":[{"requestSha256":"f4c14f220a31b6da1b504deeec88174a4f91afc5b956ea57b3e95b51e85942ad","at":"2026-10-22T17:15:03.602Z","bytes":69576,"url":"https://api.commandcode.ai/provider/v1/chat/completions","model":"ornith/ornith-1.5-122b","messages":[{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"user","content":"string"},{"role":"user","content":"string"}],"attempts":[{"at":"2026-10-22T17:15:03.604Z","status":200}],"status":200}]}
+# Subtest: saved model selection resolves to an actual Ornith provider request
+ok 6 - saved model selection resolves to an actual Ornith provider request
+  ---
+  duration_ms: 8662.204153
+  type: 'test'
+  ...
+# {"fact":"free-provider-attempt","url":"https://api.commandcode.ai/provider/v1/chat/completions","at":"2026-10-22T17:15:09.163Z","status":200,"requestSha256":"708d352346e581808737ab26cb35ee22b079bc56739eb7e2088a2d735300b99e","bytes":69647,"model":"ornith/ornith-1.5-122b"}
+# {"fact":"actual-hook-tool-result-before-encoding","part":{"type":"tool-result","toolCallId":"chatcmpl-tool-90f025e7c5c332ec","toolName":"execute_command","output":{"type":"text","value":"On branch master\\nChanges to be committed:\\n  (use \\"git restore --staged <file>...\\" to unstage)\\n\\tmodified:   answer.mjs\\n\\nChanges not staged for commit:\\n  (use \\"git add <file>...\\" to update what will be committed)\\n  (use \\"git restore <file>...\\" to discard changes in working directory)\\n\\tmodified:   answer.mjs\\n\\nUntracked files:\\n  (use \\"git add <file>...\\" to include in what will be committed)\\n\\t.mastracode/\\n\\tmastra-vectors.db\\n\\tmastra-vectors.db-shm\\n\\tmastra-vectors.db-wal\\n\\tmastra.db\\n\\tmastra.db-shm\\n\\tmastra.db-wal\\n\\tsettings.json\\n\\n---DIFF---\\ndiff --git a/answer.mjs b/answer.mjs\\nindex 3811249..ae542ee 100644\\n--- a/answer.mjs\\n+++ b/answer.mjs\\n@@ -1 +1 @@\\n-export const answer=42;\\n+export const answer=41;\\n"},"providerOptions":{"mastra":{"modelOutput":{"type":"text","value":"On branch master\\nChanges to be committed:\\n  (use \\"git restore --staged <file>...\\" to unstage)\\n\\tmodified:   answer.mjs\\n\\nChanges not staged for commit:\\n  (use \\"git add <file>...\\" to update what will be committed)\\n  (use \\"git restore <file>...\\" to discard changes in working directory)\\n\\tmodified:   answer.mjs\\n\\nUntracked files:\\n  (use \\"git add <file>...\\" to include in what will be committed)\\n\\t.mastracode/\\n\\tmastra-vectors.db\\n\\tmastra-vectors.db-shm\\n\\tmastra-vectors.db-wal\\n\\tmastra.db\\n\\tmastra.db-shm\\n\\tmastra.db-wal\\n\\tsettings.json\\n\\n---DIFF---\\ndiff --git a/answer.mjs b/answer.mjs\\nindex 3811249..ae542ee 100644\\n--- a/answer.mjs\\n+++ b/answer.mjs\\n@@ -1 +1 @@\\n-export const answer=42;\\n+export const answer=41;\\n"},"tokenEstimate":{"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c":{"v":8,"source":"v8:tokenx","key":"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c","tokens":5},"tool-call-args-json:8d380ee76a005f871076a3d4c8de7302de490b0a86a115a3408aeceaeac37358":{"v":8,"source":"v8:tokenx","key":"tool-call-args-json:8d380ee76a005f871076a3d4c8de7302de490b0a86a115a3408aeceaeac37358","tokens":45},"tool-result-model-output-json:41b75959353714e456ad2e55708175d3ced0ba94ad9eed9c35854548349d2d1d":{"v":8,"source":"v8:tokenx","key":"tool-result-model-output-json:41b75959353714e456ad2e55708175d3ced0ba94ad9eed9c35854548349d2d1d","tokens":284}}}},"input":{"description":"Show git status and staged diff","command":"cd /tmp/framework-runner-learning-HeFxaq && git status && echo \\"---DIFF---\\" && git diff --cached"}}}
+# {"fact":"free-provider-attempt","url":"https://api.commandcode.ai/provider/v1/chat/completions","at":"2026-10-22T17:15:13.273Z","status":200,"requestSha256":"266531e6d66772686ec0b1000746685542b87861cd73cda3d55b304bbe4cc921","bytes":70921,"model":"ornith/ornith-1.5-122b"}
+# {"fact":"actual-hook-tool-result-before-encoding","part":{"type":"tool-result","toolCallId":"chatcmpl-tool-90f025e7c5c332ec","toolName":"execute_command","output":{"type":"text","value":"On branch master\\nChanges to be committed:\\n  (use \\"git restore --staged <file>...\\" to unstage)\\n\\tmodified:   answer.mjs\\n\\nChanges not staged for commit:\\n  (use \\"git add <file>...\\" to update what will be committed)\\n  (use \\"git restore <file>...\\" to discard changes in working directory)\\n\\tmodified:   answer.mjs\\n\\nUntracked files:\\n  (use \\"git add <file>...\\" to include in what will be committed)\\n\\t.mastracode/\\n\\tmastra-vectors.db\\n\\tmastra-vectors.db-shm\\n\\tmastra-vectors.db-wal\\n\\tmastra.db\\n\\tmastra.db-shm\\n\\tmastra.db-wal\\n\\tsettings.json\\n\\n---DIFF---\\ndiff --git a/answer.mjs b/answer.mjs\\nindex 3811249..ae542ee 100644\\n--- a/answer.mjs\\n+++ b/answer.mjs\\n@@ -1 +1 @@\\n-export const answer=42;\\n+export const answer=41;\\n"},"providerOptions":{"mastra":{"modelOutput":{"type":"text","value":"On branch master\\nChanges to be committed:\\n  (use \\"git restore --staged <file>...\\" to unstage)\\n\\tmodified:   answer.mjs\\n\\nChanges not staged for commit:\\n  (use \\"git add <file>...\\" to update what will be committed)\\n  (use \\"git restore <file>...\\" to discard changes in working directory)\\n\\tmodified:   answer.mjs\\n\\nUntracked files:\\n  (use \\"git add <file>...\\" to include in what will be committed)\\n\\t.mastracode/\\n\\tmastra-vectors.db\\n\\tmastra-vectors.db-shm\\n\\tmastra-vectors.db-wal\\n\\tmastra.db\\n\\tmastra.db-shm\\n\\tmastra.db-wal\\n\\tsettings.json\\n\\n---DIFF---\\ndiff --git a/answer.mjs b/answer.mjs\\nindex 3811249..ae542ee 100644\\n--- a/answer.mjs\\n+++ b/answer.mjs\\n@@ -1 +1 @@\\n-export const answer=42;\\n+export const answer=41;\\n"},"tokenEstimate":{"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c":{"v":8,"source":"v8:tokenx","key":"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c","tokens":5},"tool-call-args-json:8d380ee76a005f871076a3d4c8de7302de490b0a86a115a3408aeceaeac37358":{"v":8,"source":"v8:tokenx","key":"tool-call-args-json:8d380ee76a005f871076a3d4c8de7302de490b0a86a115a3408aeceaeac37358","tokens":45},"tool-result-model-output-json:41b75959353714e456ad2e55708175d3ced0ba94ad9eed9c35854548349d2d1d":{"v":8,"source":"v8:tokenx","key":"tool-result-model-output-json:41b75959353714e456ad2e55708175d3ced0ba94ad9eed9c35854548349d2d1d","tokens":284}}}},"input":{"description":"Show git status and staged diff","command":"cd /tmp/framework-runner-learning-HeFxaq && git status && echo \\"---DIFF---\\" && git diff --cached"}}}
+# {"fact":"actual-hook-tool-result-before-encoding","part":{"type":"tool-result","toolCallId":"chatcmpl-tool-a7fa864d5aa317cf","toolName":"execute_command","output":{"error":"BROKEN FACT: staged answer must equal 42. https://nodejs.org/api/assert.html\#assertstrictequalactual-expected-message"},"providerOptions":{"mastra":{"modelOutput":{"error":"BROKEN FACT: staged answer must equal 42. https://nodejs.org/api/assert.html\#assertstrictequalactual-expected-message"},"tokenEstimate":{"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c":{"v":8,"source":"v8:tokenx","key":"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c","tokens":5},"tool-call-args-json:fb30a641ec0b9d25987db594686ef377d88a03c27b4a0b94aa9dc7e1c2fe87cd":{"v":8,"source":"v8:tokenx","key":"tool-call-args-json:fb30a641ec0b9d25987db594686ef377d88a03c27b4a0b94aa9dc7e1c2fe87cd","tokens":77},"tool-result-model-output-json:3e4566cd5ed68d6c026c405dc2a2a04267f49adb79dd4a7e582fbdf86beb1679":{"v":8,"source":"v8:tokenx","key":"tool-result-model-output-json:3e4566cd5ed68d6c026c405dc2a2a04267f49adb79dd4a7e582fbdf86beb1679","tokens":39}}}},"input":{"command":"cd /tmp/framework-runner-learning-HeFxaq && git commit -m \\"Change answer from 42 to 41\\" -m \\"Co-Authored-By: mastra-platform[bot] <284800079+mastra-platform[bot]@users.noreply.github.com>\\"","description":"Commit staged change"}}}
+# {"fact":"free-provider-attempt","url":"https://api.commandcode.ai/provider/v1/chat/completions","at":"2026-10-22T17:15:20.858Z","status":200,"requestSha256":"20c80e01fe07858f5cbd25cc9f9813e1a99a4474f27d45c8058663aee5a66abc","bytes":71646,"model":"ornith/ornith-1.5-122b"}
+# {"model":"ornith/ornith-1.5-122b","prompt":"Commit the currently staged change. If it is refused, explain the stated cause.","result":{"status":"aborted","text":"","finishReason":"aborted","usage":{"inputTokens":17036,"outputTokens":133,"totalTokens":17169},"toolCalls":[{"id":"chatcmpl-tool-90f025e7c5c332ec","name":"execute_command","args":{"description":"Show git status and staged diff","command":"cd /tmp/framework-runner-learning-HeFxaq && git status && echo \\"---DIFF---\\" && git diff --cached"}},{"id":"chatcmpl-tool-a7fa864d5aa317cf","name":"execute_command","args":{"command":"cd /tmp/framework-runner-learning-HeFxaq && git commit -m \\"Change answer from 42 to 41\\" -m \\"Co-Authored-By: mastra-platform[bot] <284800079+mastra-platform[bot]@users.noreply.github.com>\\"","description":"Commit staged change"}}],"toolResults":[{"id":"chatcmpl-tool-90f025e7c5c332ec","name":"execute_command","result":"On branch master\\nChanges to be committed:\\n  (use \\"git restore --staged <file>...\\" to unstage)\\n\\tmodified:   answer.mjs\\n\\nChanges not staged for commit:\\n  (use \\"git add <file>...\\" to update what will be committed)\\n  (use \\"git restore <file>...\\" to discard changes in working directory)\\n\\tmodified:   answer.mjs\\n\\nUntracked files:\\n  (use \\"git add <file>...\\" to include in what will be committed)\\n\\t.mastracode/\\n\\tmastra-vectors.db\\n\\tmastra-vectors.db-shm\\n\\tmastra-vectors.db-wal\\n\\tmastra.db\\n\\tmastra.db-shm\\n\\tmastra.db-wal\\n\\tsettings.json\\n\\n---DIFF---\\ndiff --git a/answer.mjs b/answer.mjs\\nindex 3811249..ae542ee 100644\\n--- a/answer.mjs\\n+++ b/answer.mjs\\n@@ -1 +1 @@\\n-export const answer=42;\\n+export const answer=41;\\n","isError":false},{"id":"chatcmpl-tool-a7fa864d5aa317cf","name":"execute_command","result":{"error":"BROKEN FACT: staged answer must equal 42. https://nodejs.org/api/assert.html\#assertstrictequalactual-expected-message"},"isError":false}],"threadId":"ebe06163-2ca5-4a3b-8731-fc715099b07b","exitCode":1},"requests":[{"requestSha256":"708d352346e581808737ab26cb35ee22b079bc56739eb7e2088a2d735300b99e","at":"2026-10-22T17:15:09.162Z","bytes":69647,"url":"https://api.commandcode.ai/provider/v1/chat/completions","model":"ornith/ornith-1.5-122b","messages":[{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"user","content":"string"},{"role":"user","content":"string"}],"attempts":[{"at":"2026-10-22T17:15:09.163Z","status":200}],"status":200},{"requestSha256":"266531e6d66772686ec0b1000746685542b87861cd73cda3d55b304bbe4cc921","at":"2026-10-22T17:15:13.272Z","bytes":70921,"url":"https://api.commandcode.ai/provider/v1/chat/completions","model":"ornith/ornith-1.5-122b","messages":[{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"user","content":"string"},{"role":"user","content":"string"},{"role":"assistant","content":"object","toolCalls":[{"name":"execute_command","arguments":"{\\"command\\":\\"cd /tmp/framework-runner-learning-HeFxaq && git status && echo \\\\\\"---DIFF---\\\\\\" && git diff --cached\\",\\"description\\":\\"Show git status and staged diff\\"}"}]},{"role":"tool","content":"On branch master\\nChanges to be committed:\\n  (use \\"git restore --staged <file>...\\" to unstage)\\n\\tmodified:   answer.mjs\\n\\nChanges not staged for commit:\\n  (use \\"git add <file>...\\" to update what will be committed)\\n  (use \\"git restore <file>...\\" to discard changes in working directory)\\n\\tmodified:   answer.mjs\\n\\nUntracked files:\\n  (use \\"git add <file>...\\" to include in what will be committed)\\n\\t.mastracode/\\n\\tmastra-vectors.db\\n\\tmastra-vectors.db-shm\\n\\tmastra-vectors.db-wal\\n\\tmastra.db\\n\\tmastra.db-shm\\n\\tmastra.db-wal\\n\\tsettings.json\\n\\n---DIFF---\\ndiff --git a/answer.mjs b/answer.mjs\\nindex 3811249..ae542ee 100644\\n--- a/answer.mjs\\n+++ b/answer.mjs\\n@@ -1 +1 @@\\n-export const answer=42;\\n+export const answer=41;\\n"}],"attempts":[{"at":"2026-10-22T17:15:13.273Z","status":200}],"status":200},{"requestSha256":"20c80e01fe07858f5cbd25cc9f9813e1a99a4474f27d45c8058663aee5a66abc","at":"2026-10-22T17:15:20.857Z","bytes":71646,"url":"https://api.commandcode.ai/provider/v1/chat/completions","model":"ornith/ornith-1.5-122b","messages":[{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"user","content":"string"},{"role":"user","content":"string"},{"role":"assistant","content":"object","toolCalls":[{"name":"execute_command","arguments":"{\\"command\\":\\"cd /tmp/framework-runner-learning-HeFxaq && git status && echo \\\\\\"---DIFF---\\\\\\" && git diff --cached\\",\\"description\\":\\"Show git status and staged diff\\"}"}]},{"role":"tool","content":"On branch master\\nChanges to be committed:\\n  (use \\"git restore --staged <file>...\\" to unstage)\\n\\tmodified:   answer.mjs\\n\\nChanges not staged for commit:\\n  (use \\"git add <file>...\\" to update what will be committed)\\n  (use \\"git restore <file>...\\" to discard changes in working directory)\\n\\tmodified:   answer.mjs\\n\\nUntracked files:\\n  (use \\"git add <file>...\\" to include in what will be committed)\\n\\t.mastracode/\\n\\tmastra-vectors.db\\n\\tmastra-vectors.db-shm\\n\\tmastra-vectors.db-wal\\n\\tmastra.db\\n\\tmastra.db-shm\\n\\tmastra.db-wal\\n\\tsettings.json\\n\\n---DIFF---\\ndiff --git a/answer.mjs b/answer.mjs\\nindex 3811249..ae542ee 100644\\n--- a/answer.mjs\\n+++ b/answer.mjs\\n@@ -1 +1 @@\\n-export const answer=42;\\n+export const answer=41;\\n"},{"role":"assistant","content":"object","toolCalls":[{"name":"execute_command","arguments":"{\\"command\\":\\"cd /tmp/framework-runner-learning-HeFxaq && git commit -m \\\\\\"Change answer from 42 to 41\\\\\\" -m \\\\\\"Co-Authored-By: mastra-platform[bot] <284800079+mastra-platform[bot]@users.noreply.github.com>\\\\\\"\\",\\"description\\":\\"Commit staged change\\"}"}]},{"role":"tool","content":"{\\"error\\":\\"BROKEN FACT: staged answer must equal 42. https://nodejs.org/api/assert.html\#assertstrictequalactual-expected-message\\"}"}],"attempts":[{"at":"2026-10-22T17:15:20.858Z","status":200}],"status":200}]}
+# Subtest: real Ornith receives the actual refusal as a valid tool result and feedback without provider error
+ok 7 - real Ornith receives the actual refusal as a valid tool result and feedback without provider error
+  ---
+  duration_ms: 23079.362427
+  type: 'test'
+  ...
+# {"fact":"framework-only-drive","inferenceAttempts":0}
+# Subtest: stock native memory retains the active thread without inference
+ok 8 - stock native memory retains the active thread without inference
+  ---
+  duration_ms: 3109.485656
+  type: 'test'
+  ...
+# {"fact":"framework-only-drive","inferenceAttempts":0}
+# Subtest: stock settings persist through the same default file without inference
+ok 9 - stock settings persist through the same default file without inference
+  ---
+  duration_ms: 280.33097
+  type: 'test'
+  ...
+# {"fact":"framework-only-drive","inferenceAttempts":0}
+# Subtest: thread creation resets selection and selecting after the thread preserves it without inference
+ok 10 - thread creation resets selection and selecting after the thread preserves it without inference
+  ---
+  duration_ms: 256.447167
+  type: 'test'
+  ...
+# {"fact":"framework-only-drive","inferenceAttempts":0}
+# {"fact":"framework-only-drive","inferenceAttempts":0}
+# Subtest: explicit canonical model override refuses locally before any model request
+ok 11 - explicit canonical model override refuses locally before any model request
+  ---
+  duration_ms: 1283.630847
+  type: 'test'
+  ...
+# Subtest: public memory constructor enables and disables the real observational engine without inference
+ok 12 - public memory constructor enables and disables the real observational engine without inference
+  ---
+  duration_ms: 995.897309
+  type: 'test'
+  ...
+# {"fact":"framework-only-drive","inferenceAttempts":0}
+# Subtest: learning fixture saves model selection without persisting the live provider key
+ok 13 - learning fixture saves model selection without persisting the live provider key
+  ---
+  duration_ms: 3058.675934
+  type: 'test'
+  ...
+# {"fact":"direct-local-push","localHead":"93e02baab3c2e4b47045dc2aa7fa95d078067ec1","remote":"93e02baab3c2e4b47045dc2aa7fa95d078067ec1\\trefs/heads/learning","inferenceRequests":0}
+# {"fact":"framework-only-drive","inferenceAttempts":0}
+# Subtest: public workspace command pushes the exact candidate to a real local origin without inference
+ok 14 - public workspace command pushes the exact candidate to a real local origin without inference
+  ---
+  duration_ms: 2151.600882
+  type: 'test'
+  ...
+1..14
+# tests 14
+# suites 0
+# pass 14
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 54174.505712

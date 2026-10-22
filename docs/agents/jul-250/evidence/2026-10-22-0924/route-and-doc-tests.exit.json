@@ -1,0 +1,1 @@
+{"exit": 0, "command": ["node", "--test", "scripts/julia-agents.test.mjs", "scripts/agent-docs.test.mjs", "scripts/no-personal-paths.test.mjs", "scripts/personal-paths.test.mjs"]}

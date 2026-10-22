@@ -13,6 +13,14 @@ machine part.
 
 ## Launch
 
+For JUL-250's server-only agents command journey, use the scoped
+[server agents command](features/server-agents-command.md) recipe. Its actual
+entry point is the ubuntu stock op run route. Windows prerequisite/PowerShell
+recipes below still apply to laptop changes; they are not server prerequisites.
+The server recipe retains candidate identity, installed Node/op versions and
+actual route/readback evidence. It introduces no privilege-denial or admin-risk
+checks; Todd has accepted those risks.
+
 There is no server or shared session to launch. Use the checked-out candidate from the repository
 root. The surface is a set of short-lived Node and Windows PowerShell commands, plus an on-demand
 loopback-only control page for card initialization. If either lockfile's installed tree is stale,

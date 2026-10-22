@@ -1,0 +1,14 @@
+{
+  "at": "2026-10-22T17:09:36.033Z",
+  "oldModel": "stealth/glyph-cluster:free",
+  "model": "poolside/laguna-s-2.1-free",
+  "listing": "https://commandcode.ai/docs/resources/pricing-limits",
+  "listingDescription": "Laguna S2.1 free input/output/cache, while capacity lasts",
+  "status": 429,
+  "body": {
+    "error": {
+      "message": "Upstream model provider is temporarily unavailable. Please try again in a moment.",
+      "type": "rate_limit_error"
+    }
+  }
+}

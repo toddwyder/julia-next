@@ -1,0 +1,35 @@
+TAP version 13
+# {"fact":"free-provider-attempt","url":"https://api.commandcode.ai/provider/v1/chat/completions","at":"2026-10-22T17:09:00.339Z","status":429,"requestSha256":"1cb565d16e86c2c035339c4ab5512fa4ebae25994fcd1c2befb47de3e36585f7","bytes":69651,"model":"stealth/glyph-cluster:free"}
+# {"fact":"free-provider-attempt","url":"https://api.commandcode.ai/provider/v1/chat/completions","at":"2026-10-22T17:09:01.151Z","status":429,"requestSha256":"1cb565d16e86c2c035339c4ab5512fa4ebae25994fcd1c2befb47de3e36585f7","bytes":69651,"model":"stealth/glyph-cluster:free"}
+# {"model":"stealth/glyph-cluster:free","prompt":"Commit the currently staged change. If it is refused, explain the stated cause.","result":{"status":"error","text":"","finishReason":"error","toolCalls":[],"toolResults":[],"threadId":"6ff33645-37e6-4509-a5e4-640a4da17d17","error":{"name":"AI_APICallError","message":"Upstream model provider is temporarily unavailable. Please try again in a moment.","stack":"AI_APICallError: Upstream model provider is temporarily unavailable. Please try again in a moment.\\n    at file:///home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@ai-sdk/openai-compatible/node_modules/@ai-sdk/provider-utils/dist/index.mjs:3045:14\\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\\n    at async postToApi (file:///home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@ai-sdk/openai-compatible/node_modules/@ai-sdk/provider-utils/dist/index.mjs:2741:28)\\n    at async OpenAICompatibleChatLanguageModel.doStream (file:///home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@ai-sdk/openai-compatible/dist/index.mjs:650:50)\\n    at async AISDKV6LanguageModel.doStream (file:///home/ubuntu/julia-jul-231/ops/build-runner/node_modules/@mastra/core/dist/llm-DtX483Xc.js:105:10)"},"exitCode":1},"requests":[{"requestSha256":"1cb565d16e86c2c035339c4ab5512fa4ebae25994fcd1c2befb47de3e36585f7","at":"2026-10-22T17:09:00.338Z","bytes":69651,"url":"https://api.commandcode.ai/provider/v1/chat/completions","model":"stealth/glyph-cluster:free","messages":[{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"user","content":"string"},{"role":"user","content":"string"}],"attempts":[{"at":"2026-10-22T17:09:00.339Z","status":429}],"status":429},{"requestSha256":"1cb565d16e86c2c035339c4ab5512fa4ebae25994fcd1c2befb47de3e36585f7","at":"2026-10-22T17:09:01.150Z","bytes":69651,"url":"https://api.commandcode.ai/provider/v1/chat/completions","model":"stealth/glyph-cluster:free","messages":[{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"user","content":"string"},{"role":"user","content":"string"}],"attempts":[{"at":"2026-10-22T17:09:01.151Z","status":429}],"status":429}]}
+# Subtest: real Glyph receives the actual refusal as a valid tool result and feedback without provider error
+not ok 1 - real Glyph receives the actual refusal as a valid tool result and feedback without provider error
+  ---
+  duration_ms: 5643.890672
+  type: 'test'
+  location: '/home/ubuntu/julia-jul-250-delivery/framework/@mastra/code-sdk/model-side.test.mjs:20:1'
+  failureType: 'testCodeFailure'
+  error: 'provider error is not a missing model step'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    withProbe.inputProcessors (file:///home/ubuntu/julia-jul-250-delivery/framework/@mastra/code-sdk/model-side.test.mjs:27:12)
+    async withProbe (file:///home/ubuntu/julia-jul-250-delivery/framework/@mastra/code-sdk/real-route.mjs:82:5)
+    async file:///home/ubuntu/julia-jul-250-delivery/framework/@mastra/code-sdk/model-side.test.mjs:23:3
+    async modelAttempt (file:///home/ubuntu/julia-jul-250-delivery/framework/@mastra/code-sdk/model-attempt.mjs:4:6)
+    async TestContext.<anonymous> (file:///home/ubuntu/julia-jul-250-delivery/framework/@mastra/code-sdk/model-side.test.mjs:21:2)
+    async Test.run (node:internal/test_runner/test:1125:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5869.200652

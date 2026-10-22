@@ -6,6 +6,13 @@ installed state** observed during the recorded `create-verification-skill` inter
 is pending, administrative, composite, or currently broken is accounted for below and is not shown
 as a working feature.
 
+## Server-only scope
+
+[Server agents command](./server-agents-command.md) is the JUL-250 server route.
+Its installed versions and immutable source identity are read before driving the
+real op run entry point. Windows/laptop prerequisites below do not apply to this
+server-only feature. No privilege-denial or accepted-risk protection is tested.
+
 ## Baseline preconditions
 
 - Work from the repository root on Todd's Windows laptop.

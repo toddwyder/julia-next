@@ -1,0 +1,18 @@
+TAP version 13
+# {"fact":"direct-local-push","localHead":"46e7f7401908212a5aeeeb741b7020f6c064af32","remote":"46e7f7401908212a5aeeeb741b7020f6c064af32\\trefs/heads/learning","inferenceRequests":0}
+# {"fact":"framework-only-drive","inferenceAttempts":0}
+# Subtest: public workspace command pushes the exact candidate to a real local origin without inference
+ok 1 - public workspace command pushes the exact candidate to a real local origin without inference
+  ---
+  duration_ms: 2161.155321
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2378.744425

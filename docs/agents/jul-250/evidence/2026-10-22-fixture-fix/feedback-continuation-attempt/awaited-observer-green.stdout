@@ -1,0 +1,19 @@
+TAP version 13
+# {"layer":3,"observations":[{"commit":"d51d006645d30713250c7ef412507195571d028f","tree":"f62a5d51e835b88aeed8c376d214e0c909a950d3","status":1,"stdout":"node:internal/modules/run_main:107\\n    triggerUncaughtException(\\n    ^\\n\\nAssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\\n\\n41 !== 42\\n\\n    at file:///tmp/commit-learning-paOx26/answer.test.mjs:1:88\\n    at ModuleJob.run (node:internal/modules/esm/module_job:430:25)\\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {\\n  generatedMessage: true,\\n  code: 'ERR_ASSERTION',\\n  actual: 41,\\n  expected: 42,\\n  operator: 'strictEqual',\\n  diff: 'simple'\\n}\\n\\nNode.js v24.14.1\\n✖ answer.test.mjs (94.120419ms)\\nℹ tests 1\\nℹ suites 0\\nℹ pass 0\\nℹ fail 1\\nℹ cancelled 0\\nℹ skipped 0\\nℹ todo 0\\nℹ duration_ms 109.303216\\n\\n✖ failing tests:\\n\\ntest at answer.test.mjs:1:1\\n✖ answer.test.mjs (94.120419ms)\\n  'test failed'\\n","stderr":"","beforeExecuteResolved":true},{"commit":"2a67a07e41be071095e7b6bf143d919e218de2c6","tree":"29719619da6cb77fb75671fa97ea1b5a7bf17c57","status":0,"stdout":"✔ answer.test.mjs (93.797016ms)\\nℹ tests 1\\nℹ suites 0\\nℹ pass 1\\nℹ fail 0\\nℹ cancelled 0\\nℹ skipped 0\\nℹ todo 0\\nℹ duration_ms 109.677464\\n","stderr":"","beforeExecuteResolved":true}],"readiness":"refused for failing exact commit"}
+# {"layer":3,"checkedCommit":"2a67a07e41be071095e7b6bf143d919e218de2c6","readiness":"saved for passing exact commit"}
+# {"fact":"framework-only-drive","inferenceAttempts":0}
+# Subtest: public tool awaits every exact-commit observation before returning
+ok 1 - public tool awaits every exact-commit observation before returning
+  ---
+  duration_ms: 2654.200867
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2842.161872

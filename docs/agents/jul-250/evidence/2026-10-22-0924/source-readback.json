@@ -1,0 +1,15 @@
+{
+  "allLearningSourceHashesMatch": true,
+  "model": "reflection/beam:free",
+  "frameworkFactTests": 10,
+  "modelSideTests": 2,
+  "classifierTests": 1,
+  "modelRequestsRetained": 52,
+  "costSource": "Todd-accepted Claude06:58 usage-page $0.0000; raw HTTP/usage retained without manufacturing a dollar field",
+  "node": "v24.14.1",
+  "op": "2.40.0",
+  "sdkOwner": "/home/ubuntu/julia-jul-231/ops/build-runner",
+  "sdkOwnerLockSha256": "2ba94a3efee1111515b64d3303e96b733d7188b8eefdf3051f1d07f28909c433",
+  "reviewerOwnerLockSha256": "9e7ade8f87cbaf60f9107e65a9c856ff7796c74355b471ae79f7a03539f7273d",
+  "ordinarySetupError": "Reviewer owning dependencies absent in fresh worktree; npm ci in that package fixed missing zod; admission rerun passed."
+}

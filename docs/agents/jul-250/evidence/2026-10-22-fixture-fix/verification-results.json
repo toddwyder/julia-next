@@ -1,0 +1,30 @@
+{
+  "learningExit": 0,
+  "learningTests": 14,
+  "learningSkips": 0,
+  "frameworkIndependentTests": 11,
+  "routeDocumentationMapTests": 10,
+  "routeDocumentationMapExit": 0,
+  "validAdmissionExit": 0,
+  "brokenAdmissionExit": 1,
+  "brokenAdmissionFinding": "missing nonempty Acceptance criteria section",
+  "writeAttemptExit": 12,
+  "writeAttemptOutcome": "You do not have permission to perform this action",
+  "model": "ornith/ornith-1.5-122b",
+  "sourceHashes": {
+    "framework/@mastra/code-sdk/after-write.test.mjs": "b88e708a5b5d09a8efc4311543f232e2f1c5be3a6403e984a58e3c94a786413f",
+    "framework/@mastra/code-sdk/framework-runtime.mjs": "57588f1d2684b050fc6997bd08e29d67bdc4cf8d623846af347e0b4cb58013d7",
+    "framework/@mastra/code-sdk/layer1.test.mjs": "59316365dcc42a8ae8480c280c0c7e515cc737fc77d23f07d9033730706ca0e4",
+    "framework/@mastra/code-sdk/layer2.test.mjs": "7b9a96d22111ee8ce0446a2e4bdbb04515ec7de8dd3cdb36a43d6378dde0fd13",
+    "framework/@mastra/code-sdk/layer3.test.mjs": "ac0a922f90c90308d98d532a0ff5c249bbcb1706effd0b01b0f8ad4d3cdbe0a7",
+    "framework/@mastra/code-sdk/model-attempt.mjs": "c6efaa90247891a4f20779faa315f8838ea87f8265a03ae6a5ca38a65e447c67",
+    "framework/@mastra/code-sdk/model-attempt.test.mjs": "384a34c6d5ca28cafb29064c92618658cb7ecbea8b07c1bc0a3779d9f3de8038",
+    "framework/@mastra/code-sdk/model-side.test.mjs": "4a5ae0fcafc0f5660970cf29b44b0fabf5f90ec18c33e9604ff651b864b9da66",
+    "framework/@mastra/code-sdk/native-facts.mjs": "ac0ce248a6cd8ff979d06d359289c466a183116ca790ef5f1caba57bc4c87db5",
+    "framework/@mastra/code-sdk/native.test.mjs": "51e7fc881b9af144cc56c2c8dc2dadf73556b77ae2e332e060e51b6b612d20f1",
+    "framework/@mastra/code-sdk/provider-settings.test.mjs": "ee6c086bdaee48bc639070c0171e72209f4ec464d65455c05a6486ba0205dada",
+    "framework/@mastra/code-sdk/push-route.test.mjs": "e343dea56f8503117943d4c30d508c48e57ef2eacd033b5258537688d31306a8",
+    "framework/@mastra/code-sdk/real-route.mjs": "654631c641283a7b03bb9d83dbf6e1263b399385f9d6a5dbd1bb048b1470eb2f",
+    "framework/@mastra/code-sdk/staged-guard.mjs": "2044fe8407a5e4a664e0a20bfcb0b2f85845a65b8c9b44632d993c37defc94f8"
+  }
+}

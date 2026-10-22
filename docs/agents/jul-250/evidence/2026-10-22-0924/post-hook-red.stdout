@@ -1,0 +1,30 @@
+TAP version 13
+# {"fact":"framework-only-drive","inferenceAttempts":0}
+# Subtest: public command runs PostToolUse lint without replacing command output
+not ok 1 - public command runs PostToolUse lint without replacing command output
+  ---
+  duration_ms: 2253.504075
+  type: 'test'
+  location: '/tmp/framework-direct-red-XSuTxR/after-write.test.mjs:19:1'
+  failureType: 'testCodeFailure'
+  error: "ENOENT: no such file or directory, open '/tmp/framework-direct-R8VAon/after-write.jsonl'"
+  code: 'ENOENT'
+  stack: |-
+    async open (node:internal/fs/promises:640:25)
+    async readFile (node:internal/fs/promises:1283:14)
+    async file:///tmp/framework-direct-red-XSuTxR/after-write.test.mjs:32:18
+    async file:///tmp/framework-direct-red-XSuTxR/framework-runtime.mjs:45:11
+    async withoutModel (file:///tmp/framework-direct-red-XSuTxR/framework-runtime.mjs:29:13)
+    async TestContext.<anonymous> (file:///tmp/framework-direct-red-XSuTxR/after-write.test.mjs:20:3)
+    async Test.run (node:internal/test_runner/test:1125:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2502.001051

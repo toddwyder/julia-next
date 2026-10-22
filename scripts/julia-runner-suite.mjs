@@ -16,6 +16,19 @@ const SHARED_TESTS = new Set([
 // Unknown tests default to execution so a new subprocess-only regression cannot
 // trigger the Windows job and then silently disappear from its file list.
 const NON_RUNNER_TESTS = new Set([
+  // JUL-250 owns these server op-run checks and retained SDK learning tests.
+  // The Windows delivery journey has neither that owning install nor its pass.
+  // Exact entries keep new, uninventoried regressions discoverable by default.
+  'scripts/julia-agents.test.mjs',
+  'framework/@mastra/code-sdk/after-write.test.mjs',
+  'framework/@mastra/code-sdk/layer1.test.mjs',
+  'framework/@mastra/code-sdk/layer2.test.mjs',
+  'framework/@mastra/code-sdk/layer3.test.mjs',
+  'framework/@mastra/code-sdk/model-attempt.test.mjs',
+  'framework/@mastra/code-sdk/model-side.test.mjs',
+  'framework/@mastra/code-sdk/native.test.mjs',
+  'framework/@mastra/code-sdk/provider-settings.test.mjs',
+  'framework/@mastra/code-sdk/push-route.test.mjs',
   'scripts/agent-docs.test.mjs',
   'scripts/dynamic-route.test.mjs', 'scripts/framework-lint.test.mjs', 'scripts/health-route.test.mjs',
   'scripts/merge-pr.test.mjs',

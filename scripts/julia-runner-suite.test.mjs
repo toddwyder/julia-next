@@ -124,3 +124,26 @@ test('a new subprocess-only runner regression is executed even without a runner 
   assert.match(result.stdout, /scripts\/check-runner-output\.test\.mjs/);
   assert.match(result.stdout, /subprocess-only runner regression/);
 });
+
+test('Windows delivery discovery leaves named server learning tests with their server owner and still runs new regressions', (t) => {
+  const root = fixture(t, {
+    'scripts/julia-agents.test.mjs': '',
+    'framework/@mastra/code-sdk/after-write.test.mjs': '',
+    'framework/@mastra/code-sdk/layer1.test.mjs': '',
+    'framework/@mastra/code-sdk/layer2.test.mjs': '',
+    'framework/@mastra/code-sdk/layer3.test.mjs': '',
+    'framework/@mastra/code-sdk/model-attempt.test.mjs': '',
+    'framework/@mastra/code-sdk/model-side.test.mjs': '',
+    'framework/@mastra/code-sdk/native.test.mjs': '',
+    'framework/@mastra/code-sdk/provider-settings.test.mjs': '',
+    'framework/@mastra/code-sdk/push-route.test.mjs': '',
+    'framework/@mastra/code-sdk/new-fact.test.mjs': '',
+    'scripts/julia-init.test.mjs': '',
+    'scripts/new-safety.test.mjs': '',
+  });
+  assert.deepEqual(discoverRunnerTests(root), [
+    'framework/@mastra/code-sdk/new-fact.test.mjs',
+    'scripts/julia-init.test.mjs',
+    'scripts/new-safety.test.mjs',
+  ]);
+});
