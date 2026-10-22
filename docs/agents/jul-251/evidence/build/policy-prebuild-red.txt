@@ -18,7 +18,7 @@
 test at ../../../tmp/jul251-prebuild/scripts/agent-docs.test.mjs:8:1
 ✖ coding standards seed reflects the framework-first rules and is linked from AGENTS.md (3.208647ms)
   AssertionError [ERR_ASSERTION]: The input did not match the regular expression /\[CODING_STANDARDS\.md\]\(CODING_STANDARDS\.md\)/. Input:
-  
+
   '# AGENTS.md — hybrid trial\n' +
     '\n' +
     'This branch trials a looser way of working. pstack builds and proves. This file is the whole rulebook.\n' +
@@ -50,7 +50,7 @@ test at ../../../tmp/jul251-prebuild/scripts/agent-docs.test.mjs:8:1
     'This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.\n' +
     '\n' +
     '<!-- END:nextjs-agent-rules -->\n'
-  
+
       at TestContext.<anonymous> (file:///tmp/jul251-prebuild/scripts/agent-docs.test.mjs:18:10)
       at Test.runInAsyncScope (node:async_hooks:228:14)
       at Test.run (node:internal/test_runner/test:1118:25)
@@ -67,7 +67,7 @@ test at ../../../tmp/jul251-prebuild/scripts/agent-docs.test.mjs:8:1
 test at ../../../tmp/jul251-prebuild/scripts/agent-docs.test.mjs:21:1
 ✖ agent instructions use the Linear delivery route and mark Factory retired (0.933168ms)
   AssertionError [ERR_ASSERTION]: The input did not match the regular expression /RETIRED/. Input:
-  
+
   '# AGENTS.md — hybrid trial\n' +
     '\n' +
     'This branch trials a looser way of working. pstack builds and proves. This file is the whole rulebook.\n' +
@@ -99,7 +99,7 @@ test at ../../../tmp/jul251-prebuild/scripts/agent-docs.test.mjs:21:1
     'This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.\n' +
     '\n' +
     '<!-- END:nextjs-agent-rules -->\n'
-  
+
       at TestContext.<anonymous> (file:///tmp/jul251-prebuild/scripts/agent-docs.test.mjs:25:12)
       at Test.runInAsyncScope (node:async_hooks:228:14)
       at Test.run (node:internal/test_runner/test:1118:25)
@@ -118,7 +118,7 @@ test at ../../../tmp/jul251-prebuild/scripts/agent-docs.test.mjs:21:1
 test at ../../../tmp/jul251-prebuild/scripts/agent-docs.test.mjs:107:1
 ✖ formal verification skills are installed and pinned to exact hashes in PSTACK-SOURCE.md (0.666822ms)
   AssertionError [ERR_ASSERTION]: The input did not match the regular expression /github\.com\/cursor\/plugins/. Input:
-  
+
   '# pstack source\n' +
     '\n' +
     'Mirror: https://github.com/backnotprop/pstack\n' +
@@ -129,7 +129,7 @@ test at ../../../tmp/jul251-prebuild/scripts/agent-docs.test.mjs:107:1
     '- deslop skipped: external cursor-team-kit skill, not shipped by pstack; reread diffs locally.\n' +
     '- control-cli skipped: external cursor-team-kit skill, not shipped by pstack.\n' +
     '- control-ui skipped: external cursor-team-kit skill, not shipped by pstack.\n'
-  
+
       at TestContext.<anonymous> (file:///tmp/jul251-prebuild/scripts/agent-docs.test.mjs:109:10)
       at Test.runInAsyncScope (node:async_hooks:228:14)
       at Test.run (node:internal/test_runner/test:1118:25)

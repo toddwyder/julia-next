@@ -41,9 +41,9 @@
 test at framework/@mastra/code-sdk/after-write.test.mjs:19:1
 ✖ public command runs PostToolUse lint without replacing command output (2279.859757ms)
   AssertionError [ERR_ASSERTION]: The input did not match the regular expression /no-var/. Input:
-  
+
   ''
-  
+
       at file:///home/ubuntu/julia-hybrid-pstack-trial/framework/@mastra/code-sdk/after-write.test.mjs:35:12
       at async file:///home/ubuntu/julia-hybrid-pstack-trial/framework/@mastra/code-sdk/framework-runtime.mjs:45:11
       at async withoutModel (file:///home/ubuntu/julia-hybrid-pstack-trial/framework/@mastra/code-sdk/framework-runtime.mjs:29:13)
