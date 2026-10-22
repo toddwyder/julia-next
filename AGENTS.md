@@ -76,19 +76,13 @@ When a skill says to ask the user for access, evidence, or permission to add tem
 
 Every report and its evidence is committed under docs/agents/<card>/ (evidence copied into docs/agents/<card>/evidence/) and pushed before it is reported to Todd. The report names the pushed commit.
 
-On any blocker other than (a) an account action, (b) money beyond the authorized limit, or
-(c) a product decision, make the smallest reversible repository fix and continue. Record that
-choice in the final report. Do not use a reversible repository defect as a reason to stop or ask
-Todd for a workaround.
+A **problem** is anything that goes wrong while working: a failing test, a setup error, a wrong fact about a tool. Diagnose it with `.claude/skills/diagnosing-bugs/SKILL.md`, fix it test-first, and continue.
 
 Work to the brief's finish line. A completed step is not a stopping point. Waiting on CI or any background job is not a stop: wait for it and continue.
 
-A single failed review or failed Proof is round 1: diagnose from evidence, fix test-first and continue. The root-cause report and restart plan below apply only when a card stops for exactly one of these reasons: two rounds without closing, a spend cap, or a time cap.
+A card **stops** only when its adversarial review or Proof fails twice, a spend or time cap is reached, or Todd must make an account, money or product decision.
 
-Whenever a card stops for any reason: two rounds without closing, a spend cap or a time cap, the agent writes a root-cause report that proposes no fix, then a restart plan, and nothing is rebuilt until Todd approves the restart plan. Every restart plan and brief must state what happens to code already built for the card that doesn’t meet its acceptance criteria:
-- It is removed from the repo and from the machines it was installed or configured on. Delete exactly that piece and everything belonging to it; the reviewer confirms a search finds no trace.
-- It is never worked around.
-- Undoing (a revert, or restarting from main and carrying over only what meets the criteria) is offered before patching.
+On a stop, run `diagnosing-bugs` until the cause is reproduced and proven, then write a restart plan with the fix. Rebuild once Todd approves it. Code that misses the acceptance criteria is removed from the repo and every machine it touched, never worked around; offer undo before patching.
 
 ### Preflight
 
