@@ -23,3 +23,7 @@ The SDK retry fixture returns HTTP 503 once, then success. Both arrivals must ha
 The trial model configuration makes all review roles inherit the builder's signed-in model. The design judge and code reviewer were fresh agents of that model. They are not different-maker adversarial review. The comment review found no comments or suppressions to remove.
 
 The sandbox makes the shared worktree gitdir read-only. Delivery commands use `GIT_DIR=.julia/git` with local metadata and shared read-only objects. The original `.git` pointer and shared refs were left intact. The PR branch is still `hybrid/pstack-trial` on GitHub.
+
+The inherited documentation checks also pass after aligning their obsolete rulebook and source assertions with the approved trial. The same three failures were reproduced at pre-build commit `9518419`; the formal skill bytes and their exact hash assertions are unchanged. See `evidence/build/policy-prebuild-red.txt` and `evidence/build/repository-checks-green.txt`. All 33 delivery checks pass in `evidence/build/delivery-checks.txt`.
+
+Publication is blocked by the GitHub connector. Its create-pull-request call returned `MCP tool call requires approval, but approval policy is never`. No PR was created, and the subsequent read-only PR list was empty. The ready description is [pull-request.md](pull-request.md). The branch is pushed as `hybrid/pstack-trial`; target `main`. Opening that PR remains an account action. This card is not marked complete.

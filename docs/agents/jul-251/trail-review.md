@@ -24,3 +24,7 @@ The first transcript line has cwd /home/ubuntu/julia-hybrid-pstack-trial. Scope 
 - The proof correctly limits paid accounting to local HTTP fixtures and makes no live subscription or renewal claim. Paid provider limits remain an assumption requiring separate route-specific evidence before lifting the trial's zero-price restriction. No paid-route readiness should be inferred from the free live proof.
 
 No flag here asserts an implementation defect. The outstanding points concern completeness and durability of the review record. PR creation, final delivery checks and updated todo completion were still parent work in progress at review time.
+
+## Parent follow-through
+
+The mutation-driven assertion and fixture corrections, normal-hook delivery commits, exact fractional-cost correction and inherited policy-test alignment now have appended decision rows. The final mutation artifact records 43 detected mutations with restored source and 36 passing local tests. The separate real memory guard check rejects disabled OM with zero inference. The transaction-lock-only mutation limitation remains disclosed in the retro and proposed PR description. Publication was attempted through the required GitHub tool and rejected by its approval policy; no PR exists.
