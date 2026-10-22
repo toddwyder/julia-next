@@ -21,7 +21,7 @@ Todd’s latest 22 October 2026 decision keeps agents as ubuntu on the existing 
 julia-agent remains in place, unused. The builder’s admin rights, control-page pass access,
 ability to change runner limits and deployed-code route are accepted. The ubuntu lockdown,
 account handoff and related denial/tamper-protection proof are dropped. No new safeguards
-are introduced for those risks. Only an actual occurrence of an accepted risk stops for Todd’s response. Ordinary tool/test errors are diagnosed and fixed in place.
+are introduced for those risks. Todd’s 22 October 09:52 decision limits stops to an indispensable Todd account action, spending beyond the cap, or a household product decision. Decide and record other matters, including security and credentials; ordinary errors are fixed in place. The observed CommandCode-key exposure is accepted without rotation.
 
 Julia worktrees, GitHub sign-in, post-commit push setup, Codex config/auth and agents pass
 are restored under /home/ubuntu. Existing worktree links are repaired. The old learning

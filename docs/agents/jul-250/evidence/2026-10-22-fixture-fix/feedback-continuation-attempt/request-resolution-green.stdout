@@ -1,0 +1,18 @@
+TAP version 13
+# {"fact":"free-provider-attempt","url":"https://api.commandcode.ai/provider/v1/chat/completions","at":"2026-10-22T17:01:33.103Z","status":200,"requestSha256":"0230208b6e796efeef729b6de32f28efe3fd1145564837f9f989dad2a59f2f80","bytes":69580,"model":"stealth/glyph-cluster:free"}
+# {"model":"stealth/glyph-cluster:free","prompt":"Hello.","result":{"status":"completed","text":"Hello! How can I help you today?","finishReason":"complete","usage":{"inputTokens":13358,"outputTokens":31,"totalTokens":13389},"toolCalls":[],"toolResults":[],"threadId":"756cfc2c-d67b-4854-8d9b-573d4ac176d3","exitCode":0},"requests":[{"requestSha256":"0230208b6e796efeef729b6de32f28efe3fd1145564837f9f989dad2a59f2f80","at":"2026-10-22T17:01:33.102Z","bytes":69580,"url":"https://api.commandcode.ai/provider/v1/chat/completions","model":"stealth/glyph-cluster:free","messages":[{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"user","content":"string"},{"role":"user","content":"string"}],"attempts":[{"at":"2026-10-22T17:01:33.103Z","status":200}],"status":200}]}
+# Subtest: saved model selection resolves to an actual Glyph provider request
+ok 1 - saved model selection resolves to an actual Glyph provider request
+  ---
+  duration_ms: 14218.991653
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 14488.069052

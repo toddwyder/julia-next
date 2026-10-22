@@ -1,0 +1,38 @@
+TAP version 13
+# {"fact":"framework-only-drive","inferenceAttempts":0}
+# Subtest: public tool checks the staged tree and refuses failure before commit, without inference
+not ok 1 - public tool checks the staged tree and refuses failure before commit, without inference
+  ---
+  duration_ms: 2134.665708
+  type: 'test'
+  location: '/tmp/framework-direct-red-8kcA6Q/layer2.test.mjs:9:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    broken staged tree must never become a commit
+    + actual - expected
+    
+    + 'a545248588c145498b8559b3630367c33c10173c'
+    - 'f67ce133e15eee3ab19c7898bcec77e93e5c8e35'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'f67ce133e15eee3ab19c7898bcec77e93e5c8e35'
+  actual: 'a545248588c145498b8559b3630367c33c10173c'
+  operator: 'strictEqual'
+  stack: |-
+    file:///tmp/framework-direct-red-8kcA6Q/layer2.test.mjs:13:10
+    async file:///tmp/framework-direct-red-8kcA6Q/framework-runtime.mjs:45:11
+    async withoutModel (file:///tmp/framework-direct-red-8kcA6Q/framework-runtime.mjs:29:13)
+    async TestContext.<anonymous> (file:///tmp/framework-direct-red-8kcA6Q/layer2.test.mjs:10:2)
+    async Test.run (node:internal/test_runner/test:1125:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2316.874102

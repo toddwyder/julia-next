@@ -33,17 +33,17 @@ node scripts/julia-agents.mjs -- node --experimental-strip-types ops/mastra-agen
 
 For the learning drive, set FRAMEWORK_RUNNER_ROOT and FRAMEWORK_LOCKFILE to the
 retained SDK learning installation /home/ubuntu/julia-jul-231/ops/build-runner
-and its package-lock.json. Use the retained Beam observation preload in
-NODE_OPTIONS, then run the complete thirteen-test suite through op run:
+and its package-lock.json. Use the retained provider observation preload in
+NODE_OPTIONS, then run the complete fourteen-test suite through op run:
 
 ```sh
 node scripts/julia-agents.mjs -- node --test --test-reporter=tap --test-concurrency=1 framework/@mastra/code-sdk/*.test.mjs
 ```
 
 Observable success is all three real-op route tests passing, valid live admission,
-the broken admission copy refusing for missing Acceptance criteria, and thirteen
+the broken admission copy refusing for missing Acceptance criteria, and fourteen
 learning tests passing together with zero skipped/inconclusive guard verdicts.
-Retain provider HTTP/usage readbacks and Todd's accepted 06:58 Beam $0.0000 evidence;
+Retain provider HTTP/usage readbacks and the current model’s standing-rule free listing/HTTP 200 evidence;
 do not fabricate a dollar field or poll for extra cost proof. The retained
 run-learning.mjs drives the required broken/restored guard mutations and full run.
 

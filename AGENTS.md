@@ -40,6 +40,10 @@ one HTTP 200 is enough to switch. If the usage page later shows any cost for tha
 model, the adapter refuses it from then on and the card stops. Paid models remain
 Todd’s decision.
 
+Current machinery model under this rule — 22 October 2026: `ornith/ornith-1.5-122b`.
+Beam and then Glyph returned HTTP 429; the GOAT pricing page lists Ornith free,
+and its replacement request returned HTTP 200. Exact switch evidence lives on JUL-250.
+
 This rule never applies to real work. Real card building uses Todd’s chosen builder,
 Codex GPT-6 Sol. Real review uses his chosen reviewer, DeepSeek through CommandCode,
 under the $1.00 per-card cap. Changing either is Todd’s decision. The adapter refuses
@@ -103,12 +107,14 @@ When a skill says to ask the user for access, evidence, or permission to add tem
 
 Every report and its evidence is committed under docs/agents/<card>/ (evidence copied into docs/agents/<card>/evidence/) and pushed before it is reported to Todd. The report names the pushed commit.
 
-If one of Todd’s accepted admin/control-pass/runner-limit/deployed-code risks actually happens,
-stop and report what happened; Todd decides the response. Ordinary errors, including failed
-tool calls and failing tests, are diagnosed with `.claude/skills/diagnosing-bugs/SKILL.md`,
-fixed test-first in place, and never cause a stop. Report to Todd at each merge or at a blocker
-needing his account, money or product decision. Work to the authorized finish line between
-reports; waiting for CI is not a stop.
+Todd’s decision, 22 October 2026 09:52: ask Todd only when the next step physically
+requires his account action and work cannot continue without it, spending would exceed
+the cap, or a choice changes what Julia does for the household. Decide everything else,
+including security, credentials and risk, using Todd’s standard: accept unlikely risks;
+act only on actual harm or misuse. Record the decision in one line on the card and continue.
+The observed CommandCode-key exposure is accepted; do not rotate. Ordinary errors are
+diagnosed with `.claude/skills/diagnosing-bugs/SKILL.md` and fixed test-first in place.
+Report only at each merge or those account/money/product blockers. Waiting for CI is not a stop.
 
 Linear statuses: Triage, Backlog, Ready, Implementation, Code review, Evidence review,
 Remediation, Staging/smoke test, UAT, Complete. Use Implementation for active building;

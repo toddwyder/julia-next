@@ -1,0 +1,44 @@
+TAP version 13
+# {"fact":"framework-only-drive","inferenceAttempts":0}
+# Subtest: public tool awaits every exact-commit observation before returning
+not ok 1 - public tool awaits every exact-commit observation before returning
+  ---
+  duration_ms: 2100.618049
+  type: 'test'
+  location: '/tmp/framework-direct-red-tV1hV8/layer3.test.mjs:16:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+    + []
+    - [
+    -   'b136ab478f26d36831e7fc5336f9e830374969fe',
+    -   '40864734195bbe9453fe0aa2ae8f1ac4811aa8c2'
+    - ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'b136ab478f26d36831e7fc5336f9e830374969fe'
+    1: '40864734195bbe9453fe0aa2ae8f1ac4811aa8c2'
+  actual:
+  operator: 'deepStrictEqual'
+  stack: |-
+    file:///tmp/framework-direct-red-tV1hV8/layer3.test.mjs:48:12
+    process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    async file:///tmp/framework-direct-red-tV1hV8/framework-runtime.mjs:45:11
+    async withoutModel (file:///tmp/framework-direct-red-tV1hV8/framework-runtime.mjs:29:13)
+    async TestContext.<anonymous> (file:///tmp/framework-direct-red-tV1hV8/layer3.test.mjs:35:3)
+    async Test.run (node:internal/test_runner/test:1125:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2274.710479

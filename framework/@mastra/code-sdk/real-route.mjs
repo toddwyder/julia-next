@@ -22,9 +22,7 @@ export const sdk = subpath => {
   assert.ok(entry?.import?.default, `public SDK export missing: ${key}`)
   return import(pathToFileURL(join(sdkDirectory, entry.import.default.replace('*', key.slice(2)))))
 }
-export const freeModels = ['reflection/beam:free']
-export const modelsUnderTest = process.env.FRAMEWORK_MODEL ? [process.env.FRAMEWORK_MODEL] : freeModels
-assert.ok(modelsUnderTest.every(model => freeModels.includes(model)), 'only authorized free-model matrix cases may run')
+export const freeModels = ['ornith/ornith-1.5-122b']
 export const upstream = 'https://api.commandcode.ai/provider/v1'
 export const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 export async function forwardFreeRequest(originalFetch, input, init, payload, requests) {
@@ -54,41 +52,50 @@ export async function withProbe(model, setup, body, bootOptions = {}) {
   process.env.MASTRA_APP_DATA_DIR = directory
   const originalFetch = globalThis.fetch
   const requests = []
+  let onProviderResponse=()=>{}
   globalThis.fetch = async (input, init) => {
     const url = String(input instanceof Request ? input.url : input)
     if (!/chat\/completions|\/responses|\/messages/.test(url)) return originalFetch(input, init)
     assert.equal(url, `${upstream}/chat/completions`, 'alternate inference refused')
     const payload = JSON.parse(init?.body ?? await input.clone().text())
     assert.equal(payload.model, model, 'paid or different inference refused')
-    return forwardFreeRequest(originalFetch, input, init, payload, requests)
+    const response=await forwardFreeRequest(originalFetch, input, init, payload, requests)
+    onProviderResponse(requests.at(-1))
+    return response
   }
   let runtime
+  const {setCustomProvidersSource}=await sdk('agents/custom-provider-source.js')
   try {
     const { loadSettings, saveSettings } = await sdk('onboarding/settings.js')
     const { upsertCustomProviderInSettings } = await sdk('onboarding/custom-providers.js')
     const settings = loadSettings()
-    upsertCustomProviderInSettings(settings, { name: 'CommandCode Free', url: upstream, apiKey: process.env.COMMANDCODE_API_KEY, models: freeModels })
+    upsertCustomProviderInSettings(settings, { name: 'CommandCode Free', url: upstream, models: freeModels })
+    setCustomProvidersSource(()=>[{name:'CommandCode Free',url:upstream,apiKey:process.env.COMMANDCODE_API_KEY,models:freeModels}])
     settings.models.activeOmPackId = null
     settings.models.omModelOverride = `commandcode-free/${model}`
     saveSettings(settings)
     await setup(directory)
     const { bootLocalAgentController, runMC } = await sdk('index.js')
     runtime = await bootLocalAgentController({ cwd: directory, homeDir: directory, ...bootOptions })
-    await body({ directory, runtime, runMC, model, savedModel: `commandcode-free/${model}`, requests })
+    await body({ directory, runtime, runMC, model, savedModel: `commandcode-free/${model}`, requests, onProviderResponse: callback=>{onProviderResponse=callback} })
   } finally {
     if (runtime) { await runtime.controller.destroy(); await runtime.observability.shutdown() }
+    setCustomProvidersSource(undefined)
     globalThis.fetch = originalFetch
     if (previous === undefined) delete process.env.MASTRA_APP_DATA_DIR
     else process.env.MASTRA_APP_DATA_DIR = previous
     await rm(directory, { recursive: true, force: true })
   }
 }
-export async function prompt(ctx, text, { stopAfterTool = false, onEvent = () => {}, returnErrors = false } = {}) {
+export async function prompt(ctx, text, { stopAfterTool = false, stopAfterToolResult = null, onEvent = () => {}, returnErrors = false } = {}) {
   const { runtime, runMC, savedModel } = ctx
   const thread = await runtime.session.thread.create({ title: 'Runner learning' })
   await runtime.session.model.switch(savedModel)
   const stop = new AbortController()
   const events = []
+  ctx.onProviderResponse(record=>{
+    if(stopAfterToolResult && record.status===200 && record.messages.some(m=>m.role==='tool' && (JSON.stringify(m.content)??'').includes(stopAfterToolResult)))stop.abort()
+  })
   const unsubscribe = runtime.session.subscribe(event => {
     events.push(event)
     onEvent(event)
@@ -96,7 +103,7 @@ export async function prompt(ctx, text, { stopAfterTool = false, onEvent = () =>
   })
   try {
     const result = await runMC({ controller: runtime.controller, session: runtime.session, thread: { id: thread.id }, prompt: text, signal: stop.signal, timeoutMs: 150000, maxTurns: 6 }).result
-    console.log(JSON.stringify({ model: ctx.model, prompt: text, result, requests: ctx.requests }))
+    console.log(JSON.stringify({ model: ctx.model, prompt: text, result, requests: ctx.requests }).replaceAll(process.env.COMMANDCODE_API_KEY,'[REDACTED:COMMANDCODE_API_KEY]'))
     if (result.status === 'error' && !returnErrors) throw new Error(result.error?.message ?? 'provider unavailable or SDK error')
     return { result, events, thread }
   } finally { unsubscribe() }
