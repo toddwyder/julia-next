@@ -1,4 +1,4 @@
-// Rewritten framework facts are driven directly; only two model-side subjects use Ornith.
+// Rewritten framework facts are driven directly; only two model-side subjects use Beam.
 import assert from 'node:assert/strict'
 import {readFileSync,writeFileSync,readdirSync,mkdtempSync,rmSync} from 'node:fs'
 import {spawnSync} from 'node:child_process'
@@ -7,7 +7,7 @@ import {tmpdir} from 'node:os'
 import {fileURLToPath} from 'node:url'
 import {createHash} from 'node:crypto'
 const root=resolve(fileURLToPath(new URL('../../../../../',import.meta.url)))
-const base=fileURLToPath(new URL('./',import.meta.url))
+const base=process.env.JULIA_LEARNING_EVIDENCE_DIR??fileURLToPath(new URL('./',import.meta.url))
 const suite=join(root,'framework/@mastra/code-sdk')
 const sources=Object.fromEntries(readdirSync(suite).filter(f=>f.endsWith('.mjs')).map(f=>[f,readFileSync(join(suite,f),'utf8')]))
 const sha=s=>createHash('sha256').update(s).digest('hex')
@@ -24,8 +24,8 @@ const cases=[
  {id:'ordering',file:'native.test.mjs',name:'thread creation resets selection and selecting after the thread preserves it without inference',last:true,before:'  await runtime.session.model.switch(selectedModel)\n  assert.equal(runtime.session.model.get(),selectedModel)',after:'  // corrective switch removed\n  assert.equal(runtime.session.model.get(),selectedModel)',error:/Expected|ERR_ASSERTION/},
  {id:'local-refusal',file:'native.test.mjs',name:'explicit canonical model override refuses locally before any model request',before:'model:selectedModel,prompt:',after:'prompt:',error:/framework fact|Expected|ERR_ASSERTION/},
  {id:'memory-switch',file:'native.test.mjs',name:'public memory constructor enables and disables the real observational engine without inference',before:'observationalMemory:true',after:'observationalMemory:false',error:/enabled switch must construct/},
- {id:'request-resolution',file:'model-side.test.mjs',name:'saved model selection resolves to an actual Ornith provider request',target:'real-route.mjs',before:'thread: { id: thread.id }, prompt: text',after:'thread: { id: thread.id }, model: savedModel, prompt: text',error:/Unknown model/},
- {id:'model-feedback',file:'model-side.test.mjs',name:'real Ornith receives the actual refusal as a valid tool result and feedback without provider error',before:'{inputProcessors:[feedback]}',after:'{inputProcessors:[]}',error:/400|Expected|ERR_ASSERTION|tool.result/i},
+ {id:'request-resolution',file:'model-side.test.mjs',name:'saved model selection resolves to an actual Beam provider request',target:'real-route.mjs',before:'thread: { id: thread.id }, prompt: text',after:'thread: { id: thread.id }, model: savedModel, prompt: text',error:/Unknown model/},
+ {id:'model-feedback',file:'model-side.test.mjs',name:'real Beam receives the actual refusal as a valid tool result and feedback without provider error',before:'{inputProcessors:[feedback]}',after:'{inputProcessors:[]}',error:/400|Expected|ERR_ASSERTION|tool.result/i},
  {id:'inconclusive-once',file:'model-attempt.test.mjs',target:'model-attempt.mjs',before:'attempt<=2',after:'attempt<=1',error:/1 !== 2|Expected|ERR_ASSERTION/},
 ]
 const results=[]
@@ -63,7 +63,7 @@ const files=Object.keys(sources).filter(f=>f.endsWith('.test.mjs'))
 const full=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-concurrency=1',...files.map(f=>join(suite,f))],{cwd:root,env:{...process.env,JULIA_LEARNING_PHASE:'complete-suite-fixture-fix'},encoding:'utf8',timeout:600000,maxBuffer:32*1024*1024})
 writeFileSync(join(base,'complete-suite.stdout'),full.stdout??'');writeFileSync(join(base,'complete-suite.stderr'),full.stderr??'')
 const skipped=Number(full.stdout.match(/^# skipped (\d+)/m)?.[1]??0)
-writeFileSync(join(base,'complete-suite-result.json'),JSON.stringify({exit:skipped?2:full.status,nodeExit:full.status,skipped,sourceHashes:hashes,frameworkFactTests:11,realModelTests:2,classifierTests:1,model:'ornith/ornith-1.5-122b'},null,2)+'\n')
+writeFileSync(join(base,'complete-suite-result.json'),JSON.stringify({exit:skipped?2:full.status,nodeExit:full.status,skipped,sourceHashes:hashes,frameworkFactTests:11,realModelTests:2,classifierTests:1,model:'reflection/beam:free'},null,2)+'\n')
 assert.equal(full.status,0);assert.equal(skipped,0,'inconclusive is not a completed guard proof');assert.match(full.stdout,/# tests 14\n/);assert.match(full.stdout,/# pass 14\n/)
 for(const [name,text]of Object.entries(sources))assert.equal(readFileSync(join(suite,name),'utf8'),text)
-console.log('Complete suite: fourteen passed; eleven framework facts without inference, two Ornith-side cases, one classifier check')
+console.log('Complete suite: fourteen passed; eleven framework facts without inference, two Beam-side cases, one classifier check')

@@ -1,5 +1,5 @@
 // @mastra/code-sdk@1.14.0 public boot/runMC/inputProcessors; core@1.78.0
-// processLLMRequest. Only these model/provider-side subjects use real Ornith.
+// processLLMRequest. Only these model/provider-side subjects use real Beam.
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {access} from 'node:fs/promises'
@@ -7,8 +7,8 @@ import {join} from 'node:path'
 import {withProbe,prompt} from './real-route.mjs'
 import {setupStagedGuard,feedback,fact} from './staged-guard.mjs'
 import {modelAttempt} from './model-attempt.mjs'
-const model='ornith/ornith-1.5-122b'
-test('saved model selection resolves to an actual Ornith provider request',async()=>{
+const model='reflection/beam:free'
+test('saved model selection resolves to an actual Beam provider request',async()=>{
  await withProbe(model,async()=>{},async ctx=>{
   const {result}=await prompt(ctx,'Hello.')
   assert.equal(result.status,'completed')
@@ -17,7 +17,7 @@ test('saved model selection resolves to an actual Ornith provider request',async
   assert.equal(ctx.runtime.session.model.get(),ctx.savedModel)
  })
 })
-test('real Ornith receives the actual refusal as a valid tool result and feedback without provider error',async t=>{
+test('real Beam receives the actual refusal as a valid tool result and feedback without provider error',async t=>{
  await modelAttempt(t,async()=>{
   let attempted=false
   await withProbe(model,setupStagedGuard,async ctx=>{

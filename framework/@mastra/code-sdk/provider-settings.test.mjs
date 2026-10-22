@@ -9,10 +9,10 @@ import {withProbe} from './real-route.mjs'
 import {withoutModel} from './framework-runtime.mjs'
 test('learning fixture saves model selection without persisting the live provider key',async()=>{
  let visited=false
- await withoutModel(()=>withProbe('ornith/ornith-1.5-122b',async()=>{},async ctx=>{
+ await withoutModel(()=>withProbe('reflection/beam:free',async()=>{},async ctx=>{
   visited=true
   const settings=JSON.parse(await readFile(join(ctx.directory,'settings.json'),'utf8'))
-  assert.equal(settings.models.omModelOverride,'commandcode-free/ornith/ornith-1.5-122b')
+  assert.equal(settings.models.omModelOverride,'commandcode-free/reflection/beam:free')
   assert.equal(JSON.stringify(settings).includes(process.env.COMMANDCODE_API_KEY),false,'live key must not be in settings.json')
  }))
  assert.equal(visited,true,'fixture must execute the public settings readback')

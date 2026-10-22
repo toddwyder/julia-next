@@ -22,7 +22,8 @@ export const sdk = subpath => {
   assert.ok(entry?.import?.default, `public SDK export missing: ${key}`)
   return import(pathToFileURL(join(sdkDirectory, entry.import.default.replace('*', key.slice(2)))))
 }
-export const freeModels = ['ornith/ornith-1.5-122b']
+const {admitModel,createRequestTracker}=await import(pathToFileURL(resolve('scripts/commandcode-requests.mjs')))
+export const freeModels = ['reflection/beam:free']
 export const upstream = 'https://api.commandcode.ai/provider/v1'
 export const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 export async function forwardFreeRequest(originalFetch, input, init, payload, requests) {
@@ -33,7 +34,9 @@ export async function forwardFreeRequest(originalFetch, input, init, payload, re
   const attempt = { at: new Date().toISOString() }
   record.attempts = [attempt]
   try {
-    const response = await originalFetch(input, init)
+    admitModel(payload.model,'learning','machinery')
+    const tracker=await createRequestTracker({path:process.env.JULIA_CARD_COST_PATH??'/tmp/jul250-cost/card.json'})
+    const response = await tracker.fetch(input, init,'learning','machinery')
     record.status = attempt.status = response.status
     return response
   } catch (error) {

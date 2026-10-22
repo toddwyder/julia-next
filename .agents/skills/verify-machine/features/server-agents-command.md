@@ -43,8 +43,11 @@ node scripts/julia-agents.mjs -- node --test --test-reporter=tap --test-concurre
 Observable success is all three real-op route tests passing, valid live admission,
 the broken admission copy refusing for missing Acceptance criteria, and fourteen
 learning tests passing together with zero skipped/inconclusive guard verdicts.
-Retain provider HTTP/usage readbacks and the current model’s standing-rule free listing/HTTP 200 evidence;
-do not fabricate a dollar field or poll for extra cost proof. The retained
+Retain the shared tracker ledger from JULIA_CARD_COST_PATH (default
+/tmp/jul250-cost/card.json), including request identity, exact model/purpose/role,
+response usage, pricing provenance and immediate cost settlement. Beam alone is
+admitted for this drive; Ornith and Glyph are refused before network. Do not
+fabricate a provider dollar field or ask for human receipt readbacks. The retained
 run-learning.mjs drives the required broken/restored guard mutations and full run.
 
 ## Gotchas

@@ -40,9 +40,14 @@ one HTTP 200 is enough to switch. If the usage page later shows any cost for tha
 model, the adapter refuses it from then on and the card stops. Paid models remain
 Todd’s decision.
 
-Current machinery model under this rule — 22 October 2026: `ornith/ornith-1.5-122b`.
-Beam and then Glyph returned HTTP 429; the GOAT pricing page lists Ornith free,
-and its replacement request returned HTTP 200. Exact switch evidence lives on JUL-250.
+Latest decision — Todd, 22 October 2026 11:18 PT: machinery checks use only
+`reflection/beam:free`; review uses only `deepseek/deepseek-v4.1-flash`.
+The learning fixture and Proof preload share scripts/commandcode-requests.mjs
+admission and durable response-cost settlement. Ornith was charged and is denied;
+Glyph remains dropped. JUL-250's prior account settlement is $0.4824 including
+Ornith's $0.0297. Capture each completed request's response usage/cost immediately;
+never ask Todd or Claude for receipts again. Historical free-listing replacement
+entries do not authorize bypassing the current purpose/role allowlist.
 
 This rule never applies to real work. Real card building uses Todd’s chosen builder,
 Codex GPT-6 Sol. Real review uses his chosen reviewer, DeepSeek through CommandCode,
