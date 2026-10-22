@@ -4,7 +4,6 @@ This branch trials a looser way of working. pstack builds and proves. This file 
 
 ## Work
 - Build with the poteto-mode skill and follow it as written.
-- Every pstack model role runs on the parent model (inherit-parent).
 - Spending is $0: Codex runs on Todd's signed-in plan; real request checks use a model CommandCode's billing page lists as free. Any cost readback above $0 stops the work.
 - Framework facts come from the installed packages, their version-matched official docs, and the learning tests under framework/. The learning tests stay green.
 - Commit and push as you go. The poteto-mode todo list and show-me-your-work decision log are committed under docs/agents/<card>/.
