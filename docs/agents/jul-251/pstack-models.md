@@ -13,8 +13,8 @@ why investigators: inherit-parent
 why synthesizer: inherit-parent
 reflect tooling: inherit-parent
 reflect judgment, divergent, synthesizer: inherit-parent
-arena runners: inherit-parent
+arena runners: inherit-parent, inherit-parent
 arena cross-judge pool: inherit-parent
 swarm workers: inherit-parent
-architect runners: inherit-parent
-interrogate reviewers: inherit-parent
+architect runners: inherit-parent, inherit-parent
+interrogate reviewers: inherit-parent, inherit-parent
