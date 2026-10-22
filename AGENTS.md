@@ -40,20 +40,27 @@ one HTTP 200 is enough to switch. If the usage page later shows any cost for tha
 model, the adapter refuses it from then on and the card stops. Paid models remain
 Todd’s decision.
 
-Latest decision — Todd, 22 October 2026 11:18 PT: machinery checks use only
-`reflection/beam:free`; review uses only `deepseek/deepseek-v4.1-flash`.
-The learning fixture and Proof preload share scripts/commandcode-requests.mjs
-admission and durable response-cost settlement. Ornith was charged and is denied;
-Glyph remains dropped. JUL-250's prior account settlement is $0.4824 including
-Ornith's $0.0297. Capture each completed request's response usage/cost immediately;
-never ask Todd or Claude for receipts again. Historical free-listing replacement
-entries do not authorize bypassing the current purpose/role allowlist.
+Latest review decision — Todd, 22 October 2026 11:54 PT:
+Code review belongs to Implement. Run /code-review once after the build is done;
+Standards and Spec helpers run in this session on this model. Never send code
+review to a paid or outside model. Real building remains Codex GPT-6 Sol.
+Adversarial review is separate, after Implement, by Gemini. DeepSeek has no
+review role. Until Todd names the exact Gemini model and route, no adversarial
+review runs; ask him in one line when a card reaches that step.
 
-This rule never applies to real work. Real card building uses Todd’s chosen builder,
-Codex GPT-6 Sol. Real review uses his chosen reviewer, DeepSeek through CommandCode,
-under the $1.00 per-card cap. Changing either is Todd’s decision. The adapter refuses
-free models for real build and review roles; free models are allowed only for
-learning tests and Proof drives.
+One adversarial round reviews one candidate, including all its angles/calls.
+A recheck after fixes is round two. There is no round three: stop the card under
+the stop rule. Supply the spec, pinned changed files/callers and evidence once
+per round. JUL-249's runner enforces runner-only launch and the durable two-round
+maximum in code; the builder cannot call a reviewer model.
+
+JUL-250 has no paid review left. Finish its own /code-review, Proof and tests,
+then merge; this card does not wait for Gemini configuration. Do not loosen the
+tracker to make room for more review. The shared CommandCode allowlist now admits
+only reflection/beam:free for machinery learning/Proof. No external code-review
+or adversarial model is admitted. Ornith is denied and Glyph remains dropped.
+The learning route and Proof preload use the same durable tracker. Retain actual
+completed response costs and unresolved reservations; never ask for receipts.
 
 ## Look it up, don't recall it
 
@@ -93,8 +100,10 @@ rerun it before review. Missing, failed, unavailable, stale, or identity-mismatc
 review blocker, not a pass or an implied not-applicable result.
 A check by the same maker as the work is a self-check; never call it independent.
 
-Machine changes use the project-local adversarial-review skill
-(`.agents/skills/adversarial-review/SKILL.md`), followed by Proof:
+Machine changes finish in-session code review, then use Gemini with the project-local
+adversarial-review skill (`.agents/skills/adversarial-review/SKILL.md`), followed by Proof.
+JUL-250 follows Todd’s 11:54 exception above: its own code review, tests and Proof, then merge.
+Proof recipe:
 `docs/agents/machine-pstack-verification.md`; it runs `verify-machine` as machine UAT.
 
 ## Authorization and blockers

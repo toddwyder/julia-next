@@ -2,7 +2,6 @@
 const providerFetch=globalThis.fetch
 export function admitModel(model,purpose,role){
  if(model==='reflection/beam:free'&&['learning','proof'].includes(purpose)&&role==='machinery')return model
- if(model==='deepseek/deepseek-v4.1-flash'&&purpose==='review'&&role==='reviewer')return model
  throw Error(`model admission refused: ${model} for ${purpose}/${role}`)
 }
 function isPeak(at){
@@ -46,8 +45,9 @@ export async function createRequestTracker({path,initialCostUsd}){
   // and protocol framing allowance, capped by the model's full context.
   const maximumInputTokens=Math.min(1_000_000,Buffer.byteLength(JSON.stringify(body))+4096+1024*(body.messages?.length??0))
   const maximumCostUsd=body.model==='reflection/beam:free'?0:(maximumInputTokens*(peak?.30:.15)+body.max_tokens*(peak?1.20:.60))/1e6
-  if(state.requests.some(r=>r.status==='pending'&&r.maximumCostUsd>0))throw Error('request refused: unresolved paid request')
-  if(state.spentUsd+maximumCostUsd>state.maxUsd)throw Error('request refused: shared $1 card cap')
+  const unresolved=state.requests.filter(r=>r.status==='pending').reduce((sum,r)=>sum+r.maximumCostUsd,0)
+  if(maximumCostUsd>0&&unresolved>0)throw Error('request refused: unresolved paid request')
+  if(state.spentUsd+unresolved+maximumCostUsd>state.maxUsd)throw Error('request refused: shared $1 card cap')
   const request={id:randomUUID(),model:body.model,purpose,role,maximumInputTokens,maximumCostUsd,status:'pending',at:new Date().toISOString()}
   state.requests.push(request);return request
  })

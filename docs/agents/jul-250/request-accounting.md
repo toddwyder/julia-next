@@ -1,3 +1,11 @@
+# Latest review decision — Todd 22 October 2026 11:54 PT
+
+Paid review was stopped immediately. DeepSeek has no review role. The current
+CommandCode allowlist admits only Beam machinery; Gemini is not configured.
+JUL-250 finishes its own in-session /code-review, Proof and tests, then merges.
+No tracker limit is raised and no canceled request is assumed free. The older
+review authorization and reservation experiments below are historical.
+
 # JUL-250 request accounting repair
 
 Todd's 22 October 2026 11:18 PT continuation supersedes the prior receipt blocker.
@@ -19,7 +27,7 @@ in the account. The misleading GOAT free listing did not make Ornith free.
 
 All current learning forwarding and both retained Proof preload entry points
 now use scripts/commandcode-requests.mjs. It admits Beam only for machinery
-learning/Proof and DeepSeek only for reviewer review. Historical replacement
+learning/Proof and refuses every external review model. Historical replacement
 scripts check that admission before their old request and are refused. They
 remain historical evidence; their responses are not rewritten.
 
