@@ -2,39 +2,36 @@
 
 ## Outcome
 
-Connect the hybrid trial's model core through one stock Mastra SDK adapter under `ops/build-runner`, with model admission, durable shared cost accounting, keyless builder commands and stock Auto observational memory.
+The hybrid trial has one stock Mastra model-connection core, with models chosen by settings, every request counted toward one $1.00 card ceiling, and keys and subscription sign-ins kept out of the builder's reach.
 
 ## Source and scope
 
-Extract only guardrail item 1, its requirements and acceptance criterion 1 from [JUL-249](<https://linear.app/julia-next/issue/JUL-249/build-the-stock-runner-core-with-framework-guardrails>), using [Todd's approved Shape at 5d37cfd](<https://github.com/toddwyder/julia-next/blob/5d37cfd/docs/agents/framework-guardrails-shape-2026-10-21.md>) as source context.
+Guardrail item 1 of [JUL-249 — Build the stock runner core with framework guardrails](<https://linear.app/julia-next/issue/JUL-249/build-the-stock-runner-core-with-framework-guardrails>), narrowed by Todd's 22 October 2026 decisions at 13:48, 13:55 and 13:59–14:04 PT and the [three Narrow Shape answers](<https://github.com/toddwyder/julia-next/blob/hybrid/pstack-trial/docs/agents/jul-251/narrow-shape.md>). This description replaces the 14:05 PT rewrite as instructed by Todd.
 
-Todd's 22 October 2026 13:20–13:38 PT decisions govern this trial on `hybrid/pstack-trial`. This is a loose pre-plan, not authorization to build. Leave in Triage until Todd starts the build. All pstack roles inherit the parent model. Execution spending is $0 on Todd's signed-in Codex plan; real request checks use a model CommandCode's billing page lists as free. Any cost readback above $0 stops work. The $1.00 cap below is behavior the core must enforce, not permission to spend $1 in this trial.
+Work stays on `hybrid/pstack-trial`. Trial spending remains $0; the $1.00 ceiling is behavior to build, not permission to spend. This card remains in Triage; this research and triage task does not start the build.
 
 ## Requirements
 
-The stock SDK adapter is the sole production importer and model connection route for this core. Install it with npm ci in its owning directory from its own committed package-lock.json and verify installed versions against that lockfile. Use stock public interfaces and runtime custom-provider resolution.
+Use one stock SDK adapter under `ops/build-runner`, installed from its own committed lockfile and the sole production importer of the SDK. Connect through Mastra's stock model routing for API-key, subscription-sign-in and custom-provider sources. Model and provider choices belong in settings, with no model- or provider-specific handling in the core's code.
 
-Commit a model allowlist and check model and purpose before outbound inference. Refuse unlisted or unpriced models and unknown cost. No automatic paid model replacement or paid memory override.
+Count every request, across roles, retries and memory, in one durable per-card total. Multiply each request's reported tokens by that model's price settings. Use published API rates even for subscription models; free models are priced $0. Refuse a model without a price and refuse the next request that could take the total past $1.00. Concurrent work and restarts cannot reset or evade that ceiling.
 
-Keep one durable per-card total shared by build, review, retries and memory requests. Free requests count $0. At $1.00 refuse the next paid request. Serialize admission and settlement, persist bounded in-flight reservations before dispatch, reconcile authoritative provider usage before further paid dispatch, and refuse an unbounded request. Unknown, malformed, missing or unreconciled usage after timeout/crash remains unknown across restart. Concurrent requests, retries and restart cannot reset or evade the shared budget. Review contributes to accounting only; implementing or running review is outside this card.
+Keep provider keys and subscription sign-ins out of builder commands, including nested commands, and builder-readable files. Use stock runtime credential sources rather than secret-bearing builder settings. Todd's accepted ubuntu/admin risk remains accepted; this is functional isolation.
 
-Provider keys stay inside the adapter process through the public runtime custom-provider source. Do not persist plaintext keys in settings, run files or builder-readable configuration. Builder commands, including nested commands, receive neither provider keys nor the vault service-account token and have no inherited authentication fallback. Todd accepts ubuntu admin access and its existing risks; this is functional environment isolation.
+Use Mastra's stock Auto memory, with observational memory on, stock thresholds and buffering, and the stock local store. Proof uses the free model. The branch rulebook retains the learning-test rule.
 
-Keep stock Auto memory and observational memory enabled at $0 with stock thresholds and buffering. Use the stock local memory store. Retain thread-before-model-selection and settings-to-actual-request behavior from the learning evidence.
+## Acceptance criteria
 
-## Acceptance criteria and real proofs
+1. The runner uses Mastra's stock model routing, and Todd can change which model serves each role through settings without changing core code.
+2. Every request contributes its tokens at the configured published API rates to the same durable card total, including subscription, retry and memory requests; free requests contribute $0, and restarting or concurrent work does not reset or evade the total.
+3. A model without a price is refused, and the next request that could take the card past $1.00 is refused before it is sent.
+4. Builder commands and builder-readable files contain neither provider keys nor subscription sign-in credentials.
+5. Mastra's stock Auto memory is active with observational memory on.
 
-1. **Owning install and real model connection.** npm ci succeeds under ops/build-runner from its committed lockfile; installed SDK versions match. A real free request uses the selected model after creating its thread, and the configured provider actually resolves at inference time. **Proof:** retain install/version readback, actual resolved model/request and response; applicable assertions fail against historical regressions f50e509, 1cc879d and 92f337d and pass with the core.
-2. **Model and cost refusals precede requests.** Disallowed models, unknown cost, unbounded paid requests and paid requests at the $1.00 total are refused before provider dispatch. **Proof:** issue actual adapter attempts for each case; retain refusal output and outbound-attempt counts showing no provider call. Use durable local card state at the cap and real public adapter calls so no paid request is needed.
-3. **One durable shared budget.** Build, review, retry and memory purposes share the same total; free requests settle at $0. Admission/reservation/settlement survives restart and concurrent attempts. Missing, malformed or unreconciled usage after timeout/crash blocks further paid requests. **Proof:** drive the actual adapter and its persisted ledger through these cases, restart it, and retain before/after totals, reservation/settlement readbacks and refused outbound-attempt counts. Read actual free-request usage and cost; exercise nonzero budget states with durable local state, without purchasing inference or running review.
-4. **Builder commands are keyless.** The adapter resolves the provider key only in its own process; no plaintext key is persisted in settings or run/config files. Direct and nested builder commands have no provider keys or vault service-account token. **Proof:** run real child commands that report presence booleans without printing secrets, inspect actual persisted files for secret presence without exposing values, and retain child output plus a successful real adapter request.
-5. **Stock Auto memory works at $0.** The first configuration run shows observation, reflection, condensed context used in a later real request and recall of information absent from raw history; with observational memory disabled neither agent runs. Stock thresholds/buffering remain intact. **Proof:** run the real stock memory/store/request drive with a billing-page-free model; retain observed calls, persisted memory, later context/recall and $0 cost readback. Break each on/off guard and see the intended assertion fail, then restore it and pass.
-6. **Applicable learning tests stay green.** All applicable retained tests pass in one invocation. The observational-memory test runs for memory configuration changes, the observational-memory switch, SDK/core version changes and CI on main; unrelated changes omit only that conditional test. **Proof:** retain the complete invocation output, drive each trigger and a non-trigger through the real test selector, and exercise the main CI scheduling condition on this branch without changing main.
+## Question for Todd
 
-## Confirmation
-
-Every criterion above states an observable result and has a corresponding real proof. These are planned proofs, not claims of completed implementation or passing evidence.
+Stock routing does not guarantee token usage from every custom provider. To keep every request within the $1 ceiling, should a source that omits usage be refused, with further card requests blocked while its usage is unknown?
 
 ## Out of scope
 
-Guardrail items 2–6, review workflows or review execution, Start-to-saved-result, Shape research, Framework Map comments, contract diagrams, citation checks, admission checks and formal verification. No change to <issue id="7e1f0975-dd63-4720-b8d8-0201f4dde60a" href="https://linear.app/julia-next/issue/JUL-249/build-the-stock-runner-core-with-framework-guardrails">JUL-249</issue>'s text or main's rulebook. Build waits for Todd.
+Guardrail items 2–6, running review, Start-to-saved-result, and changing JUL-249. Build awaits Todd's start.
