@@ -1,0 +1,14 @@
+✔ coding standards seed reflects the framework-first rules and is linked from AGENTS.md (2.826974ms)
+✔ agent instructions use the Linear delivery route and mark Factory retired (1.190159ms)
+✔ post-build reviewer checks and the plan-answers/park policy replace stop-and-ask builder gates (0.839979ms)
+✔ the repository-owned pre-plan skill survives Pocock skill upgrades (2.556613ms)
+✔ Todd's 19 October process vocabulary and restart stop are explicit (0.813749ms)
+✔ formal verification skills are installed and pinned to exact hashes in PSTACK-SOURCE.md (3.703142ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 174.529774

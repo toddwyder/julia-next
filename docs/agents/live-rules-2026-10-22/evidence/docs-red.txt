@@ -1,0 +1,233 @@
+✔ coding standards seed reflects the framework-first rules and is linked from AGENTS.md (2.959801ms)
+✔ agent instructions use the Linear delivery route and mark Factory retired (1.936319ms)
+✔ post-build reviewer checks and the plan-answers/park policy replace stop-and-ask builder gates (1.058467ms)
+✖ the repository-owned pre-plan skill survives Pocock skill upgrades (3.666892ms)
+✖ Todd's 19 October process vocabulary and restart stop are explicit (5.879426ms)
+✔ formal verification skills are installed and pinned to exact hashes in PSTACK-SOURCE.md (3.140931ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 4
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 175.482897
+
+✖ failing tests:
+
+test at scripts/agent-docs.test.mjs:58:1
+✖ the repository-owned pre-plan skill survives Pocock skill upgrades (3.666892ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Every brief must state what happens to code already built for the card that doesn’t meet its acceptance criteria/. Input:
+  
+  '---\n' +
+    'name: pre-plan\n' +
+    'description: Shape a brief, triage it into cards, confirm each card, and check launcher admission in one flow. Use before any build card moves to Ready, or when work keeps failing.\n' +
+    '---\n' +
+    '\n' +
+    '# Pre-plan\n' +
+    '\n' +
+    "Pre-plan keeps cards small and buildable. One invocation runs **Shape**, **Triage**, **Confirm**, and **Admission** in that order, then gives Todd one consolidated settlement summary. It only subtracts, answers, or fills blanks. It never adds a requirement or an acceptance criterion. Every line of every card must trace to the brief's one-sentence outcome.\n" +
+    '\n' +
+    'Use the vocabulary of the `codebase-design` skill exactly: module, interface, seam, adapter. Do not substitute component, service, API or boundary.\n' +
+    '\n' +
+    'Change no code, settings or servers. Do not move a card to Ready before Todd settles it and its admission check passes.\n' +
+    '\n' +
+    '## 1. Shape\n' +
+    '\n' +
+    'Input: the draft brief and its one-sentence outcome.\n' +
+    '\n' +
+    '1. **Find the unknowns.** List every existing module and adapter the brief depends on, and every new module or seam it introduces. An unknown is one of two kinds:\n' +
+    "   - **Fact unknown:** an existing module or adapter whose interface you can't cite. The interface includes its rules, ordering, error behavior, configuration and performance, not just its types. It is known only if you can cite a precedent in this repo (a path, found by searching the concept, not the brief's wording) or a primary source you opened (`package@version path:line`, or an official doc URL). No citation means unknown, however sure the brief sounds.\n" +
+    '   - **Design unknown:** a new module, a new seam, or a state model nobody has built here. Sketch it twice, from two different model families: types and signatures with `not implemented` bodies. Wide disagreement means unknown. Anything that outlives the process (restart, recovery, duplicate-safety) is a design unknown until a sketch or prototype shows its rules.\n' +
+    '2. **Map the tools before choosing an approach.** For every third-party tool a card touches, open its full official, version-matched documentation index and list every feature relevant to the job, with a link to the official page for each feature. Do this research with cheap sub-agents, one per tool or settling question. Each sub-agent returns only a short answer and the official links. Do not choose an approach until all of those feature lists are complete.\n' +
+    "3. **Model the words.** Run Pocock's installed `domain-modeling` skill on the key words in the card. A word defined by a third-party tool takes its meaning from that tool's official documentation. A word owned by Julia takes its meaning from `GLOSSARY.md`. Define every remaining undefined word before the card moves on.\n" +
+    '4. **Answer the unknowns.** Write the question that settles each one. A fact unknown goes to the `research` skill, run in the background without asking. A design unknown about a state model or logic goes to the `prototype` skill: throwaway code, and only its verdict survives. Fold each verdict into the brief as one plain statement. Do not paste research or prototypes into the card.\n' +
+    '5. **Sort the scope.** Give every line of the brief one outcome:\n' +
+    "   - **Keep:** one real drive can't show the outcome without it, or something the brief names needs it. Record why, so no later reviewer reopens it.\n" +
+    `   - **Split:** real work that this outcome doesn't need. Add one line to the Parking lot document in Linear: the date, why it came up, and optionally a "revisit at" milestone. Do not create a card.\n` +
+    '   - **Drop:** nothing needs it now or later. Rejected enhancements go to `.out-of-scope` as triage describes.\n' +
+    "   Apply the sort without waiting; Todd can reverse any of it. Then test the size: one card is one proof story. If proving what's left takes more than one real drive, split it into cards.\n" +
+    '\n' +
+    'When a card has a rule about the order of events (concurrency, retries, restarts, state machines, “only once”), its Proof includes formal verification of that rule using these skills (`create-formal-verification-skill` and `maintain-formal-verification-skill`), in addition to the real run.\n' +
+    '\n' +
+    'Output: the trimmed brief, the unknowns with their verdicts, and the splits and drops. Carry this output directly into Triage; do not stop with a separate `For Todd` summary. Stops follow the stop rule in AGENTS.md.\n' +
+    '\n' +
+    '## 2. Triage\n' +
+    '\n' +
+    "Explicitly invoke Pocock's installed `triage` skill with the complete Shape output and have it write the cards. Its `disable-model-invocation` setting prevents automatic selection, not this required wrapped invocation. Pre-plan wraps triage; do not restate, copy, or modify triage's rules here. For new cards, the Shape output is the detailed triage brief required by the standing issue-work rule: return it to Todd for approval before triage creates anything, then resume this same pre-plan invocation after approval. Ask triage to turn each approved brief into the tracker card and agent brief even though its ordinary specific-item path starts from an existing item. Do not invent identifiers or dependency links before creation. Once triage has written the cards, continue immediately to Confirm.\n" +
+    '\n' +
+    '## 3. Confirm and Admission\n' +
+    '\n' +
+    "Run these on the card. Each finding is a blank to fill or a question. Fill a blank only inside an existing criterion, such as naming the entry point, naming a failure outcome, or linking the companion card. A finding that needs a new criterion is a split or a question for Todd, never an addition. Write every filled blank and Todd's answers into the card text itself, inside the existing criteria; never leave operative content only in a comment. Add this exact line to each card's text: `Read the Framework Map comment before building.`\n" +
+    '\n' +
+    '1. **Built the Mastra way.** Each job cites the stock feature in the installed packages (`package@version path:line`). A job with no citation is custom: list it with the reason. Flag any difference from the official docs and starter layout. Put citations in a separate Framework Map comment, not in the card.\n' +
+    "2. **Contracts.** Draw a Mermaid diagram with a box per part and an arrow per handoff, labelled with its contract. A contract is the type-level part of an interface: one Zod schema, defined once and shared by provider and users. The interface also carries rules the schema can't, such as ordering, error behavior and restart behavior. Each offering and using part names a real check of its own side, covering those rules too. A changed contract lists every other user whose check must rerun.\n" +
+    "3. **Citations.** Open every cited link and check that it says what the card or Framework Map claims. A card that names a tool's private files instead of an official interface does not go to Ready.\n" +
+    '4. **Acceptance criteria.** Each is a checkable outcome, not a process step. If removing it leaves the requirement complete, cut it. Each acceptance criterion lists every case Proof must cover. The reviewer checks the Evidence against that list; any missing case means the card is not done.\n' +
+    "5. **Real Proof.** Each acceptance criterion has Proof. A test counts only if it was seen failing before the change and passing after, and the reviewer reran it. It runs against the real thing, except a rule living entirely inside one module, which a unit test covering every case may prove. Mocks, stubs and fakes never count across a seam. Recipe cards use `verify-julia` and machine cards use `verify-machine`. If the feature isn't mapped, extending the skill with `maintain-verification-skill` is part of the card. When a card has a rule about the order of events (concurrency, retries, restarts, state machines, “only once”), its Proof includes formal verification of that rule using these skills (`create-formal-verification-skill` and `maintain-formal-verification-skill`), in addition to the real run.\n" +
+    '6. **Mockups.** Give every mockup element a numbered callout. Each card lists the callout numbers it delivers. Confirm that every callout number belongs to exactly one card. The reviewer and Proof check the delivered result by callout number.\n' +
+    '7. Stops follow the stop rule in AGENTS.md.\n' +
+    '\n' +
+    `Post one Confirm comment per card as a record of what changed in the card text, including the filled blanks and Todd's answers ("None" if nothing changed). The separate Framework Map comment remains the citation record. Confirm runs once, plus one rerun if it found blanks.\n` +
+    '\n' +
+    "After Confirm, run the launcher's admission contract against every card from the repository root:\n" +
+    '\n' +
+    '```powershell\n' +
+    ".\\scripts\\julia-vault-windows.ps1 -SecretNames LINEAR_API_KEY -RunArguments @('node', '--experimental-strip-types', 'ops/mastra-agents/reviewer/src/mastra/card-admission-check.ts', 'JUL-nnn')\n" +
+    '```\n' +
+    '\n' +
+    "The script reads the current Linear card and checks its description as a prospective Ready card with the launcher's existing `CardAdmissionSchema` in `ops/mastra-agents/reviewer/src/mastra/contracts.ts`; it does not duplicate the admission rules or change the card's state. Run all cards from the triage in one command when there is more than one. Record each result in the final summary. If a card fails, fill only blanks within its existing criteria and rerun once. If passing would require a new requirement, a new criterion, or a product decision, or if the rerun still fails for any reason, report the exact question for Todd. A failing card never moves to Ready.\n" +
+    '\n' +
+    '## 4. For Todd\n' +
+    '\n' +
+    'End with one `For Todd:` summary covering every card. For each card give the Confirm result, admission result, any blanks filled, and any question Todd must settle. Ask Todd to say `settled` only for cards he accepts. When Todd replies, resume this same pre-plan invocation, move only the settled cards with passing admission results to Ready, and report the transitions. Never move a card before Todd says `settled`.\n'
+  
+      at TestContext.<anonymous> (file:///home/ubuntu/julia-next/scripts/agent-docs.test.mjs:85:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '---\nname: pre-plan\ndescription: Shape a brief, triage it into cards, confirm each card, and check launcher admission in one flow. Use before any build card moves to Ready, or when work keeps failing.\n---\n\n# Pre-plan\n\nPre-plan keeps cards small and buildable. One invocation runs **Shape**, **Triage**, **Confirm**, and **Admission** in that order, then gives Todd one consolidated settlement summary. It only subtracts, answers, or fills blanks. It never adds a requirement or an acceptance criterion. Every line of every card must trace to the brief\'s one-sentence outcome.\n\nUse the vocabulary of the `codebase-design` skill exactly: module, interface, seam, adapter. Do not substitute component, service, API or boundary.\n\nChange no code, settings or servers. Do not move a card to Ready before Todd settles it and its admission check passes.\n\n## 1. Shape\n\nInput: the draft brief and its one-sentence outcome.\n\n1. **Find the unknowns.** List every existing module and adapter the brief depends on, and every new module or seam it introduces. An unknown is one of two kinds:\n   - **Fact unknown:** an existing module or adapter whose interface you can\'t cite. The interface includes its rules, ordering, error behavior, configuration and performance, not just its types. It is known only if you can cite a precedent in this repo (a path, found by searching the concept, not the brief\'s wording) or a primary source you opened (`package@version path:line`, or an official doc URL). No citation means unknown, however sure the brief sounds.\n   - **Design unknown:** a new module, a new seam, or a state model nobody has built here. Sketch it twice, from two different model families: types and signatures with `not implemented` bodies. Wide disagreement means unknown. Anything that outlives the process (restart, recovery, duplicate-safety) is a design unknown until a sketch or prototype shows its rules.\n2. **Map the tools before choosing an approach.** For every third-party tool a card touches, open its full official, version-matched documentation index and list every feature relevant to the job, with a link to the official page for each feature. Do this research with cheap sub-agents, one per tool or settling question. Each sub-agent returns only a short answer and the official links. Do not choose an approach until all of those feature lists are complete.\n3. **Model the words.** Run Pocock\'s installed `domain-modeling` skill on the key words in the card. A word defined by a third-party tool takes its meaning from that tool\'s official documentation. A word owned by Julia takes its meaning from `GLOSSARY.md`. Define every remaining undefined word before the card moves on.\n4. **Answer the unknowns.** Write the question that settles each one. A fact unknown goes to the `research` skill, run in the background without asking. A design unknown about a state model or logic goes to the `prototype` skill: throwaway code, and only its verdict survives. Fold each verdict into the brief as one plain statement. Do not paste research or prototypes into the card.\n5. **Sort the scope.** Give every line of the brief one outcome:\n   - **Keep:** one real drive can\'t show the outcome without it, or something the brief names needs it. Record why, so no later reviewer reopens it.\n   - **Split:** real work that this outcome doesn\'t need. Add one line to the Parking lot document in Linear: the date, why it came up, and optionally a "revisit at" milestone. Do not create a card.\n   - **Drop:** nothing needs it now or later. Rejected enhancements go to `.out-of-scope` as triage describes.\n   Apply the sort without waiting; Todd can reverse any of it. Then test the size: one card is one proof story. If proving what\'s left takes more than one real drive, split it into cards.\n\nWhen a card has a rule about the order of events (concurrency, retries, restarts, state machines, “only once”), its Proof includes formal verification of that rule using these skills (`create-formal-verification-skill` and `maintain-formal-verification-skill`), in addition to the real run.\n\nOutput: the trimmed brief, the unknowns with their verdicts, and the splits and drops. Carry this output directly into Triage; do not stop with a separate `For Todd` summary. Stops follow the stop rule in AGENTS.md.\n\n## 2. Triage\n\nExplicitly invoke Pocock\'s installed `triage` skill with the complete Shape output and have it write the cards. Its `disable-model-invocation` setting prevents automatic selection, not this required wrapped invocation. Pre-plan wraps triage; do not restate, copy, or modify triage\'s rules here. For new cards, the Shape output is the detailed triage brief required by the standing issue-work rule: return it to Todd for approval before triage creates anything, then resume this same pre-plan invocation after approval. Ask triage to turn each approved brief into the tracker card and agent brief even though its ordinary specific-item path starts from an existing item. Do not invent identifiers or dependency links before creation. Once triage has written the cards, continue immediately to Confirm.\n\n## 3. Confirm and Admission\n\nRun these on the card. Each finding is a blank to fill or a question. Fill a blank only inside an existing criterion, such as naming the entry point, naming a failure outcome, or linking the companion card. A finding that needs a new criterion is a split or a question for Todd, never an addition. Write every filled blank and Todd\'s answers into the card text itself, inside the existing criteria; never leave operative content only in a comment. Add this exact line to each card\'s text: `Read the Framework Map comment before building.`\n\n1. **Built the Mastra way.** Each job cites the stock feature in the installed packages (`package@version path:line`). A job with no citation is custom: list it with the reason. Flag any difference from the official docs and starter layout. Put citations in a separate Framework Map comment, not in the card.\n2. **Contracts.** Draw a Mermaid diagram with a box per part and an arrow per handoff, labelled with its contract. A contract is the type-level part of an interface: one Zod schema, defined once and shared by provider and users. The interface also carries rules the schema can\'t, such as ordering, error behavior and restart behavior. Each offering and using part names a real check of its own side, covering those rules too. A changed contract lists every other user whose check must rerun.\n3. **Citations.** Open every cited link and check that it says what the card or Framework Map claims. A card that names a tool\'s private files instead of an official interface does not go to Ready.\n4. **Acceptance criteria.** Each is a checkable outcome, not a process step. If removing it leaves the requirement complete, cut it. Each acceptance criterion lists every case Proof must cover. The reviewer checks the Evidence against that list; any missing case means the card is not done.\n5. **Real Proof.** Each acceptance criterion has Proof. A test counts only if it was seen failing before the change and passing after, and the reviewer reran it. It runs against the real thing, except a rule living entirely inside one module, which a unit test covering every case may prove. Mocks, stubs and fakes never count across a seam. Recipe cards use `verify-julia` and machine cards use `verify-machine`. If the feature isn\'t mapped, extending the skill with `maintain-verification-skill` is part of the card. When a card has a rule about the order of events (concurrency, retries, restarts, state machines, “only once”), its Proof includes formal verification of that rule using these skills (`create-formal-verification-skill` and `maintain-formal-verification-skill`), in addition to the real run.\n6. **Mockups.** Give every mockup element a numbered callout. Each card lists the callout numbers it delivers. Confirm that every callout number belongs to exactly one card. The reviewer and Proof check the delivered result by callout number.\n7. Stops follow the stop rule in AGENTS.md.\n\nPost one Confirm comment per card as a record of what changed in the card text, including the filled blanks and Todd\'s answers ("None" if nothing changed). The separate Framework Map comment remains the citation record. Confirm runs once, plus one rerun if it found blanks.\n\nAfter Confirm, run the launcher\'s admission contract against every card from the repository root:\n\n```powershell\n.\\scripts\\julia-vault-windows.ps1 -SecretNames LINEAR_API_KEY -RunArguments @(\'node\', \'--experimental-strip-types\', \'ops/mastra-agents/reviewer/src/mastra/card-admission-check.ts\', \'JUL-nnn\')\n```\n\nThe script reads the current Linear card and checks its description as a prospective Ready card with the launcher\'s existing `CardAdmissionSchema` in `ops/mastra-agents/reviewer/src/mastra/contracts.ts`; it does not duplicate the admission rules or change the card\'s state. Run all cards from the triage in one command when there is more than one. Record each result in the final summary. If a card fails, fill only blanks within its existing criteria and rerun once. If passing would require a new requirement, a new criterion, or a product decision, or if the rerun still fails for any reason, report the exact question for Todd. A failing card never moves to Ready.\n\n## 4. For Todd\n\nEnd with one `For Todd:` summary covering every card. For each card give the Confirm result, admission result, any blanks filled, and any question Todd must settle. Ask Todd to say `settled` only for cards he accepts. When Todd replies, resume this same pre-plan invocation, move only the settled cards with passing admission results to Ready, and report the transitions. Never move a card before Todd says `settled`.\n',
+    expected: /Every brief must state what happens to code already built for the card that doesn’t meet its acceptance criteria/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/agent-docs.test.mjs:99:1
+✖ Todd's 19 October process vocabulary and restart stop are explicit (5.879426ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Whenever a card stops for any reason: two rounds without closing, a spend cap or a time cap, the agent writes a root-cause report that proposes no fix, then a restart plan, and nothing is rebuilt until Todd approves the restart plan\./. Input:
+  
+  '# AGENTS.md\n' +
+    '\n' +
+    'Mastra Factory is **RETIRED**. Its server, public endpoint, credentials, database, timers,\n' +
+    'and repository source have been removed. Do not create, restart, or repair a Factory route.\n' +
+    '\n' +
+    'New Julia and machine cards live in Linear. Linear owns cards, requirements, acceptance criteria,\n' +
+    'and status; GitHub owns code, commits, pull requests, and CI; Run files own execution state. The\n' +
+    "intended route is the adapted JUL-122 runner, started on Todd's Windows laptop with `$init JUL-nnn`.\n" +
+    'The adapted runner and `$init` wrapper are pending implementation and verification. This\n' +
+    "documentation checkpoint does not authorize starting delivery through them. The adapted runner's\n" +
+    "complete test suite must pass on Todd's Windows laptop before it is used for delivery. UAT means\n" +
+    "Todd testing the Vercel preview before merge, following the card's steps as a household member would.\n" +
+    '\n' +
+    'Use ordinary signed-in GitHub access for delivery. Keep SSH and sudo outside automated runners;\n' +
+    "an authorized operator uses the laptop's Tailscale route. Delivery sessions on the server use the saved Codex profile; the only privileged command it allows is the fixed deploy-and-restart script, and everything else keeps that restriction.\n" +
+    '\n' +
+    '## Building and reviewing\n' +
+    '\n' +
+    'Accepted ADRs and Todd’s dated card decisions bind. Proposed ADRs and other docs do not.\n' +
+    'When records disagree, Todd’s latest dated decision wins.\n' +
+    '\n' +
+    "## Look it up, don't recall it\n" +
+    '\n' +
+    'Before using or configuring a tool, read the documentation matching the installed version. Start\n' +
+    "with documentation bundled in the installed package. When none is bundled, use the publisher's\n" +
+    'official `llms.txt` as an index and fetch only the applicable individual page; never fetch\n' +
+    '`llms-full.txt`. The Mastra docs MCP server is a fallback only. A framework map names the exact\n' +
+    'page read for each job, even when the job uses a tool not listed here.\n' +
+    '\n' +
+    '| Tool | Version-matched documentation source, in lookup order |\n' +
+    '| --- | --- |\n' +
+    "| Mastra (`@mastra/*`) | The relevant installed package's `dist/docs/` under `ops/mastra-agents/reviewer/node_modules/@mastra/`; fall back to the pinned Mastra docs MCP server only if the package omits the page. |\n" +
+    '| Next.js | `node_modules/next/dist/docs/` (currently Next 16.3.5). Heed deprecation notices; `next dev` maintains the agent-rules marker at the end of this file. |\n' +
+    '| AI SDK OpenAI-compatible provider | `ops/mastra-agents/reviewer/node_modules/@ai-sdk/openai-compatible/docs/index.mdx` (currently 2.0.81). |\n' +
+    "| React | [React's official `llms.txt`](https://react.dev/llms.txt), then the individual `.md` page it indexes (currently React 19.3.0). |\n" +
+    "| Zod | [Zod's official `llms.txt`](https://zod.dev/llms.txt), then the applicable individual API page (currently Zod 4.6.5 in the reviewer). |\n" +
+    "| DuckDB | Mastra's installed `@mastra/duckdb/dist/docs/` first; for DuckDB itself use [DuckDB's official `llms.txt`](https://duckdb.org/llms.txt), then one indexed page. |\n" +
+    "| Turso/libSQL | Mastra's installed `@mastra/libsql/dist/docs/` first; otherwise [Turso's official `llms.txt`](https://docs.turso.tech/llms.txt), then one indexed page. |\n" +
+    "| Sentry | [Sentry's official `llms.txt`](https://docs.sentry.io/llms.txt), then one indexed page (currently `@sentry/node` 10.75.0). |\n" +
+    "| Firebase | [Firebase's official `llms.txt`](https://firebase.google.com/docs/llms.txt), then one indexed page. |\n" +
+    "| Linear | [Linear's official `llms.txt`](https://linear.app/llms.txt), then one indexed developer page. |\n" +
+    "| GitHub | [GitHub Docs' official `llms.txt`](https://docs.github.com/llms.txt), then one indexed page or Docs API article. |\n" +
+    "| GitHub CLI (`gh`) | The installed command's `gh <command> --help`; use GitHub Docs only for concepts the CLI help does not cover. |\n" +
+    "| CommandCode | [CommandCode's official `llms.txt`](https://commandcode.ai/docs/llms.txt), then its single applicable provider page, [BYOK Providers](https://commandcode.ai/docs/byok). |\n" +
+    '| ESLint | The installed package README and `npx eslint --help`; when agent-oriented lookup is needed use the [official ESLint MCP server](https://eslint.org/docs/latest/use/mcp). ESLint publishes no `llms.txt`. |\n' +
+    '| FastEmbed JS | `ops/mastra-agents/reviewer/node_modules/@mastra/fastembed/README.md`; the installed package bundles no fuller docs tree. |\n' +
+    '| Playwright | The installed `node_modules/playwright/README.md` and `node_modules/@playwright/test/README.md`, then the linked individual [Playwright docs page](https://playwright.dev/docs/intro). Playwright publishes no `llms.txt`. |\n' +
+    '\n' +
+    'Follow the approved plan; it answers the questions skills ask (scope, seams, acceptance criteria,\n' +
+    'verification, observability). Build test-first with `.claude/skills/tdd/SKILL.md`; review with\n' +
+    '`.claude/skills/code-review/SKILL.md` against [CODING_STANDARDS.md](CODING_STANDARDS.md). The\n' +
+    'reviewer records evidence for the five checks in `CODING_STANDARDS.md`, or explains why a check\n' +
+    'does not apply. Before handing a Julia user-facing change to independent review, run the relevant\n' +
+    'proof in `.agents/skills/verify-julia/SKILL.md` and retain behavior evidence that identifies the\n' +
+    'exact candidate commit and dirty-tree digest. Any source change after proof makes that proof stale;\n' +
+    'rerun it before review. Missing, failed, unavailable, stale, or identity-mismatched proof is a\n' +
+    'review blocker, not a pass or an implied not-applicable result.\n' +
+    'A check by the same maker as the work is a self-check; never call it independent.\n' +
+    '\n' +
+    'Machine changes use the project-local adversarial-review skill\n' +
+    '(`.agents/skills/adversarial-review/SKILL.md`), followed by Proof:\n' +
+    '`docs/agents/machine-pstack-verification.md`; it runs `verify-machine` as machine UAT.\n' +
+    '\n' +
+    '## Authorization and blockers\n' +
+    '\n' +
+    "Keep Todd's start authorization and explicit model/spend choices. Never ask Todd for an exception\n" +
+    'or workaround approval. If an authorization boundary or platform limit blocks the next required\n' +
+    "action, park the Linear card with one line explaining why; do not use Factory's Needs attention\n" +
+    'route: Factory is retired.\n' +
+    '\n' +
+    "Before asking for any approval: find where the thing lives today and why the current path can't reach it. Ask only if no existing path works, and include that trace in the request.\n" +
+    '\n' +
+    'When a skill says to ask the user for access, evidence, or permission to add temporary logging, get it yourself. Temporary logging is pre-approved and removed when the analysis is done. Ask Todd only for an account action, money beyond the limit, or a product decision.\n' +
+    '\n' +
+    '### Standing stop policy\n' +
+    '\n' +
+    'Every report and its evidence is committed under docs/agents/<card>/ (evidence copied into docs/agents/<card>/evidence/) and pushed before it is reported to Todd. The report names the pushed commit.\n' +
+    '\n' +
+    'A **problem** is anything that goes wrong while working: a failing test, a setup error, a wrong fact about a tool. Diagnose it with `.claude/skills/diagnosing-bugs/SKILL.md`, fix it test-first, and continue.\n' +
+    '\n' +
+    "Work to the brief's finish line. A completed step is not a stopping point. Waiting on CI or any background job is not a stop: wait for it and continue.\n" +
+    '\n' +
+    'A card **stops** only when its adversarial review or Proof fails twice, a spend or time cap is reached, or Todd must make an account, money or product decision.\n' +
+    '\n' +
+    'On a stop, run `diagnosing-bugs` until the cause is reproduced and proven, then write a restart plan with the fix. Rebuild once Todd approves it. Code that misses the acceptance criteria is removed from the repo and every machine it touched, never worked around; offer undo before patching.\n' +
+    '\n' +
+    '### Preflight\n' +
+    '\n' +
+    "Before any task, verify the applicable entry points, the launcher's accepted command list,\n" +
+    'configuration and authorized spend limits, required credentials, and branch/worktree state. Fix\n' +
+    'what is safely fixable before starting work. Confirm each tool the card uses is at the version its brief or lockfile names, and that its automatic updates are off. Spend limits belong in\n' +
+    'accepted ADRs and dated card decisions, never in prompts. The reviewer limit is **$1.00 per card**.\n' +
+    '[Permanent machine parts](docs/agents/permanent-machine-parts.json) are preflight prerequisites and no cleanup ever removes them.\n' +
+    'On Windows, every local command that needs a Julia vault secret must run through\n' +
+    '`scripts/julia-vault-windows.ps1`; its default configuration is the provisioned restricted Julia\n' +
+    'service account. Never use personal 1Password desktop authentication for those commands. Direct\n' +
+    '`julia-vault.mjs` key operations fail closed when the service-account bootstrap is absent.\n' +
+    '\n' +
+    '### Delivery finish line\n' +
+    '\n' +
+    "Publishing is part of the card's finish line, so work to it without stopping. When review and Proof pass: push the exact reviewed candidate to a branch, open or resume one pull request, and wait for CI on that exact commit. A machine card then merges without asking Todd, and the agent confirms main contains the merged commit. A Julia product card stops for Todd's household test of the preview and merges only the commit he tested. After merging, post the result and links on the card and delete every branch and file you created that the card's brief doesn't name. Use ordinary signed-in GitHub access. Never ask Todd to run any of these steps or to relay a message between agents.\n" +
+    '\n' +
+    '## Server and domain\n' +
+    '\n' +
+    "Keep SSH and sudo outside automated runners; an authorized operator uses the laptop's Tailscale\n" +
+    "route. Delivery sessions on the server use the saved Codex profile; the only privileged command it allows is the fixed deploy-and-restart script, and everything else keeps that restriction. Server cleanup is verified by the maker's own checksummed readback. The report labels it a self-check, never independent review. Never ask Todd for an exception for it. See `docs/agents/server-runbook.md`. Domain model: `GLOSSARY.md`; decisions: `docs/adr/`;\n" +
+    'routes: `docs/agents/work-execution.md`. The former Factory decision record is historical only.\n' +
+    '\n' +
+    '<!-- BEGIN:nextjs-agent-rules -->\n' +
+    '\n' +
+    '# This is NOT the Next.js you know\n' +
+    '\n' +
+    "Follow the version-matched Next.js entry in “Look it up, don't recall it” above.\n" +
+    '\n' +
+    'This'... 266 more characters
+  
+      at TestContext.<anonymous> (file:///home/ubuntu/julia-next/scripts/agent-docs.test.mjs:108:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: "# AGENTS.md\n\nMastra Factory is **RETIRED**. Its server, public endpoint, credentials, database, timers,\nand repository source have been removed. Do not create, restart, or repair a Factory route.\n\nNew Julia and machine cards live in Linear. Linear owns cards, requirements, acceptance criteria,\nand status; GitHub owns code, commits, pull requests, and CI; Run files own execution state. The\nintended route is the adapted JUL-122 runner, started on Todd's Windows laptop with `$init JUL-nnn`.\nThe adapted runner and `$init` wrapper are pending implementation and verification. This\ndocumentation checkpoint does not authorize starting delivery through them. The adapted runner's\ncomplete test suite must pass on Todd's Windows laptop before it is used for delivery. UAT means\nTodd testing the Vercel preview before merge, following the card's steps as a household member would.\n\nUse ordinary signed-in GitHub access for delivery. Keep SSH and sudo outside automated runners;\nan authorized operator uses the laptop's Tailscale route. Delivery sessions on the server use the saved Codex profile; the only privileged command it allows is the fixed deploy-and-restart script, and everything else keeps that restriction.\n\n## Building and reviewing\n\nAccepted ADRs and Todd’s dated card decisions bind. Proposed ADRs and other docs do not.\nWhen records disagree, Todd’s latest dated decision wins.\n\n## Look it up, don't recall it\n\nBefore using or configuring a tool, read the documentation matching the installed version. Start\nwith documentation bundled in the installed package. When none is bundled, use the publisher's\nofficial `llms.txt` as an index and fetch only the applicable individual page; never fetch\n`llms-full.txt`. The Mastra docs MCP server is a fallback only. A framework map names the exact\npage read for each job, even when the job uses a tool not listed here.\n\n| Tool | Version-matched documentation source, in lookup order |\n| --- | --- |\n| Mastra (`@mastra/*`) | The relevant installed package's `dist/docs/` under `ops/mastra-agents/reviewer/node_modules/@mastra/`; fall back to the pinned Mastra docs MCP server only if the package omits the page. |\n| Next.js | `node_modules/next/dist/docs/` (currently Next 16.3.5). Heed deprecation notices; `next dev` maintains the agent-rules marker at the end of this file. |\n| AI SDK OpenAI-compatible provider | `ops/mastra-agents/reviewer/node_modules/@ai-sdk/openai-compatible/docs/index.mdx` (currently 2.0.81). |\n| React | [React's official `llms.txt`](https://react.dev/llms.txt), then the individual `.md` page it indexes (currently React 19.3.0). |\n| Zod | [Zod's official `llms.txt`](https://zod.dev/llms.txt), then the applicable individual API page (currently Zod 4.6.5 in the reviewer). |\n| DuckDB | Mastra's installed `@mastra/duckdb/dist/docs/` first; for DuckDB itself use [DuckDB's official `llms.txt`](https://duckdb.org/llms.txt), then one indexed page. |\n| Turso/libSQL | Mastra's installed `@mastra/libsql/dist/docs/` first; otherwise [Turso's official `llms.txt`](https://docs.turso.tech/llms.txt), then one indexed page. |\n| Sentry | [Sentry's official `llms.txt`](https://docs.sentry.io/llms.txt), then one indexed page (currently `@sentry/node` 10.75.0). |\n| Firebase | [Firebase's official `llms.txt`](https://firebase.google.com/docs/llms.txt), then one indexed page. |\n| Linear | [Linear's official `llms.txt`](https://linear.app/llms.txt), then one indexed developer page. |\n| GitHub | [GitHub Docs' official `llms.txt`](https://docs.github.com/llms.txt), then one indexed page or Docs API article. |\n| GitHub CLI (`gh`) | The installed command's `gh <command> --help`; use GitHub Docs only for concepts the CLI help does not cover. |\n| CommandCode | [CommandCode's official `llms.txt`](https://commandcode.ai/docs/llms.txt), then its single applicable provider page, [BYOK Providers](https://commandcode.ai/docs/byok). |\n| ESLint | The installed package README and `npx eslint --help`; when agent-oriented lookup is needed use the [official ESLint MCP server](https://eslint.org/docs/latest/use/mcp). ESLint publishes no `llms.txt`. |\n| FastEmbed JS | `ops/mastra-agents/reviewer/node_modules/@mastra/fastembed/README.md`; the installed package bundles no fuller docs tree. |\n| Playwright | The installed `node_modules/playwright/README.md` and `node_modules/@playwright/test/README.md`, then the linked individual [Playwright docs page](https://playwright.dev/docs/intro). Playwright publishes no `llms.txt`. |\n\nFollow the approved plan; it answers the questions skills ask (scope, seams, acceptance criteria,\nverification, observability). Build test-first with `.claude/skills/tdd/SKILL.md`; review with\n`.claude/skills/code-review/SKILL.md` against [CODING_STANDARDS.md](CODING_STANDARDS.md). The\nreviewer records evidence for the five checks in `CODING_STANDARDS.md`, or explains why a check\ndoes not apply. Before handing a Julia user-facing change to independent review, run the relevant\nproof in `.agents/skills/verify-julia/SKILL.md` and retain behavior evidence that identifies the\nexact candidate commit and dirty-tree digest. Any source change after proof makes that proof stale;\nrerun it before review. Missing, failed, unavailable, stale, or identity-mismatched proof is a\nreview blocker, not a pass or an implied not-applicable result.\nA check by the same maker as the work is a self-check; never call it independent.\n\nMachine changes use the project-local adversarial-review skill\n(`.agents/skills/adversarial-review/SKILL.md`), followed by Proof:\n`docs/agents/machine-pstack-verification.md`; it runs `verify-machine` as machine UAT.\n\n## Authorization and blockers\n\nKeep Todd's start authorization and explicit model/spend choices. Never ask Todd for an exception\nor workaround approval. If an authorization boundary or platform limit blocks the next required\naction, park the Linear card with one line explaining why; do not use Factory's Needs attention\nroute: Factory is retired.\n\nBefore asking for any approval: find where the thing lives today and why the current path can't reach it. Ask only if no existing path works, and include that trace in the request.\n\nWhen a skill says to ask the user for access, evidence, or permission to add temporary logging, get it yourself. Temporary logging is pre-approved and removed when the analysis is done. Ask Todd only for an account action, money beyond the limit, or a product decision.\n\n### Standing stop policy\n\nEvery report and its evidence is committed under docs/agents/<card>/ (evidence copied into docs/agents/<card>/evidence/) and pushed before it is reported to Todd. The report names the pushed commit.\n\nA **problem** is anything that goes wrong while working: a failing test, a setup error, a wrong fact about a tool. Diagnose it with `.claude/skills/diagnosing-bugs/SKILL.md`, fix it test-first, and continue.\n\nWork to the brief's finish line. A completed step is not a stopping point. Waiting on CI or any background job is not a stop: wait for it and continue.\n\nA card **stops** only when its adversarial review or Proof fails twice, a spend or time cap is reached, or Todd must make an account, money or product decision.\n\nOn a stop, run `diagnosing-bugs` until the cause is reproduced and proven, then write a restart plan with the fix. Rebuild once Todd approves it. Code that misses the acceptance criteria is removed from the repo and every machine it touched, never worked around; offer undo before patching.\n\n### Preflight\n\nBefore any task, verify the applicable entry points, the launcher's accepted command list,\nconfiguration and authorized spend limits, required credentials, and branch/worktree state. Fix\nwhat is safely fixable before starting work. Confirm each tool the card uses is at the version its brief or lockfile names, and that its automatic updates are off. Spend limits belong in\naccepted ADRs and dated card decisions, never in prompts. The reviewer limit is **$1.00 per card**.\n[Permanent machine parts](docs/agents/permanent-machine-parts.json) are preflight prerequisites and no cleanup ever removes them.\nOn Windows, every local command that needs a Julia vault secret must run through\n`scripts/julia-vault-windows.ps1`; its default configuration is the provisioned restricted Julia\nservice account. Never use personal 1Password desktop authentication for those commands. Direct\n`julia-vault.mjs` key operations fail closed when the service-account bootstrap is absent.\n\n### Delivery finish line\n\nPublishing is part of the card's finish line, so work to it without stopping. When review and Proof pass: push the exact reviewed candidate to a branch, open or resume one pull request, and wait for CI on that exact commit. A machine card then merges without asking Todd, and the agent confirms main contains the merged commit. A Julia product card stops for Todd's household test of the preview and merges only the commit he tested. After merging, post the result and links on the card and delete every branch and file you created that the card's brief doesn't name. Use ordinary signed-in GitHub access. Never ask Todd to run any of these steps or to relay a message between agents.\n\n## Server and domain\n\nKeep SSH and sudo outside automated runners; an authorized operator uses the laptop's Tailscale\nroute. Delivery sessions on the server use the saved Codex profile; the only privileged command it allows is the fixed deploy-and-restart script, and everything else keeps that restriction. Server cleanup is verified by the maker's own checksummed readback. The report labels it a self-check, never independent review. Never ask Todd for an exception for it. See `docs/agents/server-runbook.md`. Domain model: `GLOSSARY.md`; decisions: `docs/adr/`;\nroutes: `docs/agents/work-execution.md`. The former Factory decision record is historical only.\n\n<!-- BEGIN:nextjs-agent-rules -->\n\n# This is NOT the Next.js you know\n\nFollow the version-matched Next.js entry in “Look it up, don't recall it” above.\n\nThis"... 266 more characters,
+    expected: /Whenever a card stops for any reason: two rounds without closing, a spend cap or a time cap, the agent writes a root-cause report that proposes no fix, then a restart plan, and nothing is rebuilt until Todd approves the restart plan\./,
+    operator: 'match',
+    diff: 'simple'
+  }

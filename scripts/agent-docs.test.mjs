@@ -82,11 +82,7 @@ test('the repository-owned pre-plan skill survives Pocock skill upgrades', () =>
   assert.match(prePlan, /move only the settled cards with passing admission results to Ready/);
   assert.match(prePlan, /rule about the order of events \(concurrency, retries, restarts, state machines, “only once”\)/);
   assert.match(prePlan, /create-formal-verification-skill.*maintain-formal-verification-skill/);
-  assert.match(prePlan, /Every brief must state what happens to code already built for the card that doesn’t meet its acceptance criteria/);
-  assert.match(prePlan, /removed from the repo and from the machines it was installed or configured on/);
-  assert.match(prePlan, /Delete exactly that piece and everything belonging to it; the reviewer confirms a search finds no trace/);
-  assert.match(prePlan, /never worked around/);
-  assert.match(prePlan, /Undoing \(a revert, or restarting from main and carrying over only what meets the criteria\) is offered before patching/);
+  assert.match(prePlan, /Stops follow the stop rule in AGENTS\.md/);
   assert.deepEqual(JSON.parse(read('skills-lock.json')).skills['pre-plan'], {
     source: 'toddwyder/julia-next',
     sourceType: 'github',
@@ -105,12 +101,12 @@ test('Todd\'s 19 October process vocabulary and restart stop are explicit', () =
   assert.match(glossary, /\*\*Proof\*\*:[^\n]*\n[^\n]*tied to the exact candidate commit and dirty-tree digest\./);
   assert.match(glossary, /\*\*Evidence\*\*:\s*\nWhat Proof produces, showing that every acceptance criterion was met\. No Evidence means not done\./);
   assert.doesNotMatch(glossary, /_Avoid_: Pstack verification/);
-  assert.match(agents, /Whenever a card stops for any reason: two rounds without closing, a spend cap or a time cap, the agent writes a root-cause report that proposes no fix, then a restart plan, and nothing is rebuilt until Todd approves the restart plan\./);
-  assert.match(agents, /Every restart plan and brief must state what happens to code already built for the card that doesn’t meet its acceptance criteria/);
-  assert.match(agents, /removed from the repo and from the machines it was installed or configured on/);
-  assert.match(agents, /Delete exactly that piece and everything belonging to it; the reviewer confirms a search finds no trace/);
-  assert.match(agents, /never worked around/);
-  assert.match(agents, /Undoing \(a revert, or restarting from main and carrying over only what meets the criteria\) is offered before patching/);
+  assert.match(agents, /A \*\*problem\*\* is anything that goes wrong while working/);
+  assert.match(agents, /fix it test-first, and continue/);
+  assert.match(agents, /adversarial review or Proof fails twice, a spend or time cap is reached/);
+  assert.match(agents, /Rebuild once Todd approves it/);
+  assert.match(agents, /removed from the repo and every machine it touched, never worked around; offer undo before patching/);
+
 });
 
 test('formal verification skills are installed and pinned to exact hashes in PSTACK-SOURCE.md', () => {
