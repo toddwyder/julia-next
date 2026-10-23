@@ -19,7 +19,7 @@ Ask Todd only when a step needs him in his own account, spending would rise abov
 - Linear holds cards and requirements. GitHub holds code.
 
 ## Finish
-An open PR to main with the proof in it. Todd decides the merge after the retro.
+An open PR to main with the proof in it and CI green.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

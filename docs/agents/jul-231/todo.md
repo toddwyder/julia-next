@@ -32,3 +32,19 @@
 - [x] Pick
 - [x] Graft
 - [x] Verify
+
+## PR #316 corrections
+
+- [x] Reproduce package-tests on the actual command boundary before editing.
+- [x] Binary-search the cause with the CI system-config condition.
+- [x] Plan and delegate isolated repairs.
+- [ ] Verify the original CI failure, annotations, main services and pstack Start journey.
+- [ ] Commit evidence and review the pinned candidate.
+- [ ] Keep the same PR open with proof and green CI.
+
+## Correction throughput checkpoint
+
+- Blocking first steps. Pin 1a4e91a and reproduce the Git failure with an existing system config.
+- Independent workstreams. Model helpers, test annotations and main services have separate owners.
+- Shared mutable state. All source stays on the same branch. Only the lead commits and pushes. Proof uses separate ports and durable state.
+- Smallest safe decomposition. The worker owner keeps model configuration and evidence recognition together. The lead owns the command-boundary fix and real proof integration.

@@ -57,6 +57,7 @@ if __name__ == "__main__":
             "HOME": config["home"],
             "TMPDIR": config["home"],
             "LANG": "C.UTF-8",
+            "GIT_CONFIG_NOSYSTEM": "1",
         })
     except Exception:
         print("builder command refused: filesystem boundary unavailable", file=sys.stderr)
