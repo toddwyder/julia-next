@@ -1,8 +1,8 @@
 # JUL-231 build todo
 
-- [ ] 1. `how` over the affected subsystem.
-- [ ] 2. `architect` for parallel design exploration.
-- [ ] 3. Write the throughput checkpoint as four todo items.
+- [x] 1. `how` over the affected subsystem.
+- [x] 2. `architect` for parallel design exploration.
+- [x] 3. Write the throughput checkpoint as four todo items.
 - [ ] 4. Delegate code-writing to a subagent using your configured feature model.
 - [ ] 5. Verify on the matching surface.
 - [ ] 6. Rebase into small, ordered commits. Stack follow-ups.
@@ -18,17 +18,17 @@
 
 ## Architect phases
 
-- [ ] Ground
-- [ ] Sketch
-- [ ] Agree
+- [x] Ground
+- [x] Sketch
+- [x] Agree
 - [ ] Implement
 - [ ] Scrap if the architecture is wrong
 
 ## Arena phases
 
-- [ ] Frame
-- [ ] Fan out
-- [ ] Cross-judge
-- [ ] Pick
-- [ ] Graft
+- [x] Frame
+- [x] Fan out
+- [x] Cross-judge
+- [x] Pick
+- [x] Graft
 - [ ] Verify

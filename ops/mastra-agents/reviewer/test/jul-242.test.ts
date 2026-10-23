@@ -134,7 +134,7 @@ test('Start stays blocked for a card that failed admission', () => {
   const offer = { route: 'commandcode', modelId: 'vendor/one', name: 'Vendor One', company: 'Vendor', service: 'CommandCode', wire: 'chat', codingCapable: true, supportedEfforts: ['low', 'medium', 'high'] }
   const other = { ...offer, modelId: 'other/two', name: 'Other Two', company: 'Other' }
   const selection = pick => ({ route: pick.route, modelId: pick.modelId, company: pick.company, service: pick.service, wire: pick.wire, effort: 'medium' })
-  const roles = { builder: selection(offer), reviewer: selection(other), crashFixer: selection(offer), crashReviewer: selection(other) }
+  const roles = { orchestrator: selection(offer), coder: selection(other) }
   const state = {
     cards: [{ admitted: false, card: { identifier: 'JUL-242', title: 'Card 1: Server setup', state: 'Ready', reason: 'Cannot start: missing the Proof section' } }],
     offers: [offer, other],

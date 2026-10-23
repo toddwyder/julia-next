@@ -63,7 +63,7 @@ function initializationPageHtml() {
 </style></head><body><main id="app"><h1>Initialize a Ready card</h1><p>Loading real Ready cards and current model choices…</p></main>
 <script>
 const app=document.querySelector('#app');
-const roleLabels={builder:'Builder',reviewer:'Reviewer',crashFixer:'Crash fixer',crashReviewer:'Crash reviewer'};
+const roleLabels={orchestrator:'Orchestrator',coder:'Coder'};
 const apiPath='${CONTROL_PATH}/api';
 const optionKey=offer=>offer.route+'::'+offer.modelId;
 function selectionFor(offer,effort){const value={route:offer.route,modelId:offer.modelId,company:offer.company,service:offer.service,effort};if(offer.wire)value.wire=offer.wire;return value}
