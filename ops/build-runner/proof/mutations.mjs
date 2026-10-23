@@ -16,6 +16,10 @@ const tests = file => `ops/build-runner/test/${file}.test.mjs`;
 const edit = (file, before, after, occurrences = 1) => ({ file, before, after, occurrences });
 const cases = [
   {
+    id: 'unreachable-long-context-rate-reserved', file: 'transport', test: 'reservation uses only context tiers reachable within 150000 input tokens',
+    edits: [edit(transport, '(spec.priceTiers ?? []).filter(tier => inputBound > tier.aboveInputTokens)', '(spec.priceTiers ?? [])')],
+  },
+  {
     id: 'logged-request-forwarded-after-body-transfer', file: 'request-observer', test: 'observing a stock streamed Request preserves its body for accounting and dispatch',
     edits: [edit('ops/build-runner/request-observer.mjs', 'transportFetch(request)', 'transportFetch(input, init)')],
   },

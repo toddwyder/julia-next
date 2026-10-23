@@ -322,3 +322,26 @@ test('local estimates include tools and refuse hidden conversation state before 
   assert.ok(f.ledger.snapshot().requests[1].maximumNano > plain);
   assert.equal(f.arrivals.length, 2);
 });
+
+for (const [maxInputTokens, expectedMaximum, spentBefore] of [[150000, 456920000, 1152772468], [272000, 761920000, 0], [272001, 1482885000, 0]]) {
+  test(`reservation uses only context tiers reachable within ${maxInputTokens} input tokens`, async () => {
+    const ledger = new CardLedger({ path: ':memory:', card: 'JUL-254' });
+    try {
+      if (spentBefore) {
+        const previous = ledger.reserve({ model: 'previous', role: 'orchestrator', maximumNano: spentBefore, price: {}, bounds: {} });
+        ledger.settle(previous.id, { usage: { input: 1, output: 0, cacheRead: 0, cacheWrite: 0 }, costNano: spentBefore });
+      }
+      let attempts = 0;
+      const guarded = createTransport({ ledger, role: 'orchestrator', settings: { models: { fixture: {
+        endpoint: 'https://example.invalid/infer', wireModel: 'fixture', protocol: 'chat', maxInputTokens, maxOutputTokens: 8192,
+        price: { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
+        priceTiers: [{ aboveInputTokens: 272000, price: { input: 4, output: 15, cacheRead: 0.4, cacheWrite: 5 } }],
+      } } }, fetch: async () => { attempts++; throw new Error('Deliberate local dispatch failure'); } });
+      await assert.rejects(guarded('https://example.invalid/infer', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"model":"fixture","messages":[{"role":"user","content":"Hello"}]}' }));
+      assert.equal(attempts, 1);
+      assert.equal(ledger.snapshot().requests.at(-1).maximumNano, expectedMaximum);
+      assert.equal(ledger.snapshot().spentNano, spentBefore);
+      assert.equal(ledger.snapshot().heldNano, expectedMaximum);
+    } finally { ledger.close(); }
+  });
+}

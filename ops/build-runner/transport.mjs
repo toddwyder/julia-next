@@ -218,7 +218,9 @@ export function createTransport({ ledger, settings, role, fetch: upstream = glob
       if (!count(result.input_tokens) || result.input_tokens > spec.maxInputTokens) throw fail('Invalid provider input count');
       inputBound = result.input_tokens;
     }
-    const maximumNano = charge(inputBound, Math.max(spec.maximumPrice.input, spec.maximumPrice.cacheRead, spec.maximumPrice.cacheWrite)) + charge(spec.maxOutputTokens, spec.maximumPrice.output);
+    const reachablePrices = [spec.price, ...(spec.priceTiers ?? []).filter(tier => inputBound > tier.aboveInputTokens).map(tier => tier.price)];
+    const reservationPrice = Object.fromEntries(categories.map(key => [key, Math.max(...reachablePrices.map(price => price[key]))]));
+    const maximumNano = charge(inputBound, Math.max(reservationPrice.input, reservationPrice.cacheRead, reservationPrice.cacheWrite)) + charge(spec.maxOutputTokens, reservationPrice.output);
     const reservation = await ledgerCall('reserve', { model: spec.model, role, maximumNano, price: spec.price, bounds: { maxInputTokens: inputBound, maxOutputTokens: spec.maxOutputTokens, ...(spec.inputTokenEstimate ? { inputCountBasis: `local ${spec.inputTokenEstimate.method === 'utf8' ? 'UTF-8' : 'o200k_base'} estimate` } : {}) } });
     const id = reservation?.id ?? reservation;
     let response;
