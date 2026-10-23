@@ -64,6 +64,7 @@ export function inspectPstackRun({ events, requests, coderModel, reviewModel, ma
     if (!requests.some(request => review.modelId.endsWith(String(request.model)) && String(request.refusal).includes('Trial forbids nonzero model prices'))) throw new Error('missing connection-core refusal')
   } else if (end.isError || !end.result) throw new Error('pstack review failed')
   if (!checklist?.trim()) throw new Error('missing pstack checklist')
+  if (checklist.split('\n').some(line => /delegat.*(?:skip|n\/a)/i.test(line))) throw new Error('pstack checklist contradicts the observed completed coder task')
   if (!decisions?.trim()) throw new Error('missing pstack decision log')
   return { events, starts, ends, hasCoder: true, hasReviewer: !end.isError, reviewHandoff: { ...review, result: end.result, refused: refusal }, checklist, decisions, deepseekRefusal: machineryProof && refusal, deepseekSent: requests.some(request => /deepseek/i.test(String(request.model)) && request.status != null) }
 }

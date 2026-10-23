@@ -114,7 +114,7 @@ async function main() {
     let decisions
     let internalReview
     try {
-      for (let turn = 0; turn < 3; turn += 1) {
+      for (let turn = 0; turn < 4; turn += 1) {
         const instruction = turn === 0 ? prompt : workflowFeedback.at(-1)
         receipt = await runner.run({ prompt: instruction, ...(receipt?.threadId ? { threadId: receipt.threadId } : {}), maxTurns: 100, timeoutMs: 900000 })
         receipts.push(receipt)
@@ -125,8 +125,8 @@ async function main() {
           internalReview = { ...inspectPstackRun({ events, requests, coderModel, reviewModel, machineryProof, checklist, decisions }), effectiveModels: effectiveTable }
           break
         } catch (error) {
-          if (turn === 2) throw error
-          workflowFeedback.push(`The selected workflow is incomplete. Observed missing evidence: ${error.message}. Continue poteto-mode in this same session. Read the selected playbook and follow every mandatory step rather than waiving it for task size. Use the configured model-role table and retain the required workflow artifacts. The saved card remains unchanged.`)
+          if (turn === 3) throw error
+          workflowFeedback.push(`The selected workflow is incomplete. Observed missing evidence: ${error.message}. Continue poteto-mode in this same session. Read the selected playbook and follow every mandatory step rather than waiving it for task size. Use the configured model-role table and retain the required workflow artifacts. Update the checklist to reflect actual completed work and append corrections to the decision log where earlier entries were mistaken. The saved card remains unchanged.`)
         }
       }
     } finally {

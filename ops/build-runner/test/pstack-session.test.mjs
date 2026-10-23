@@ -37,6 +37,7 @@ test('proof attributes a refused review to its actual task and distinct model in
   ]
   const requests = [{ model: 'deepseek/deepseek-v4.1-flash', refusal: 'Trial forbids nonzero model prices' }]
   const evidence = inspectPstackRun({ events, requests, coderModel: beam, reviewModel: deepseek, machineryProof: true, checklist: '- [x] Build\n- [x] Proof\n', decisions: 'ts\tphase\tdecision\n2026-10-23\tbuild\tUse marker\n' })
+  assert.throws(() => inspectPstackRun({ events, requests, coderModel: beam, reviewModel: deepseek, machineryProof: true, checklist: '- [x] Delegate code-writing. skip: done directly', decisions: 'Decision' }), /checklist contradicts/)
   assert.equal(evidence.reviewHandoff.modelId, deepseek)
   assert.equal(evidence.reviewHandoff.refused, true)
   assert.throws(() => inspectPstackRun({ events: [events[2], events[3], events[0], events[1]], requests, coderModel: beam, reviewModel: deepseek, machineryProof: true, checklist: 'Build', decisions: 'Decision' }), /review handoff/)
