@@ -93,4 +93,4 @@ The agreed fixes from the JUL-231 retro are folded into the cards below.
 7. Staging: regression suite against the Vercel preview; `verify-julia` rewritten for Linux and a given address.
 8. UAT and merge: notification, accept/send-back, automatic merge, live check, revert/rollback.
 9. Automatic retro: `/correct` after merge, plain-English list, Todd approves.
-From card 2 on, the machine builds the cards itself; the planner agent shapes cards with Todd.
+Cards 1–4 are built by the planner agent in fresh sessions. From card 5 on, the machine builds the cards itself (Start's admission check accepts the short brief once card 4 lands, and card 1 lets the machine use paid models); the planner agent shapes cards with Todd. (Todd, 13:33)
