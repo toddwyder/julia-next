@@ -3,8 +3,8 @@
 - [x] Read the Principles section of the poteto-mode skill.
 - [x] Phase A: Frame.
 - [x] Phase B: Design the workflow.
-- [ ] Phase C: Run the loop.
-- [ ] Phase D: Keep the audit trail.
+- [x] Phase C: Run the loop.
+- [x] Phase D: Keep the audit trail.
 - [ ] Phase E: Verify and hand back.
 
 Finish when one open PR contains a destination check that rejects the actual past mistakes, the current instructions pass that same check, and CI passes. Todd owns merge.
@@ -16,3 +16,5 @@ Compare two shapes. Generating all agent instructions from one template removes 
 The throughput checkpoint is one check, one class commit, historical replay, current-tree proof, fresh review and one PR. Existing structural CI ownership discovers the new test, which invokes the same check command used locally. Keep accepted risks and already-covered mistake classes outside this change.
 
 Verification covers inline Markdown links and slash-containing repository file/directory paths in AGENTS.md, CLAUDE.md and CODING_STANDARDS.md. Dependency-owned node_modules paths are outside this source-only check. Template paths are examples. Historical reports and the skill catalog are outside this entry-point check.
+
+Publication snapshot. [PR #317](https://github.com/toddwyder/julia-next/pull/317) is open. Final review and local proof pass. Phase E awaits CI on the final published head; its live result is retained by GitHub. No merge is authorized.

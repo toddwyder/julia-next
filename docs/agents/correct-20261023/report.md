@@ -14,6 +14,8 @@ This would block a directory move without updating these instructions, a removed
 
 Architecture was considered first. Generating all instruction prose from one file would not stop referenced directories or headings moving. The destination belongs to its actual file or directory, so checking that artifact is the useful boundary. JavaScript types cannot establish a separate Markdown file's headings or filesystem existence. The rule table in AGENTS.md names the executable enforcement.
 
+[PR #317](https://github.com/toddwyder/julia-next/pull/317) is open for Todd. The source and proof are in pushed commit `4cedf2b7f617e57df2f44f8f862567adb50c8345`. [Fresh final review](review.md) passes. Later reporting changes leave that source unchanged. CI results for the final PR head are retained in the [PR checks](https://github.com/toddwyder/julia-next/pull/317/checks). No merge is authorized.
+
 ## Proof
 
 - [Current-tree red](evidence/current-red.txt) shows the new regression failing on the real remaining CLAUDE.md error before its correction.
