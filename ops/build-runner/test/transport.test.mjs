@@ -255,3 +255,70 @@ test('a configured unavailable model does not need invented prices and never dis
   assert.equal(f.arrivals.length, 1);
   assert.equal(f.ledger.snapshot().spentNano, 0);
 });
+
+test('local text estimate reserves framing and UTF-8 bytes without a credential or count request', async t => {
+  const f = await fixture(t, (_req, res) => json(res, { usage: { input_tokens: 10, output_tokens: 2 } }));
+  await send(transport(f, {
+    protocol: 'responses', maxInputTokens: 1000000,
+    price: { ...free, input: 4, output: 15 },
+    inputTokenEstimate: { method: 'utf8', multiplier: 2, framingTokens: 100 },
+  }), f.endpoint, { input: 'hello', messages: undefined });
+  assert.equal(f.arrivals.length, 1);
+  assert.equal(f.ledger.snapshot().requests[0].maximumNano, 990000);
+  assert.equal(f.ledger.snapshot().requests[0].bounds.inputCountBasis, 'local UTF-8 estimate');
+  assert.equal(f.ledger.snapshot().spentNano, 70000);
+});
+
+test('a provider input count above the local estimate settles actual cost and stops later work', async t => {
+  const f = await fixture(t, (_req, res) => json(res, { usage: { input_tokens: 211, output_tokens: 0 } }));
+  const guarded = transport(f, {
+    protocol: 'responses', maxInputTokens: 1000000,
+    price: { ...free, input: 4, output: 15 },
+    inputTokenEstimate: { method: 'utf8', multiplier: 2, framingTokens: 100 },
+  });
+  await assert.rejects(send(guarded, f.endpoint, { input: 'hello', messages: undefined }), /local input estimate/);
+  assert.equal(f.ledger.snapshot().spentNano, 844000);
+  assert.equal(f.ledger.snapshot().stopped, true);
+  assert.equal(f.ledger.snapshot().heldNano, 0);
+  await assert.rejects(send(guarded, f.endpoint, { input: 'hello', messages: undefined }));
+  assert.equal(f.arrivals.length, 1);
+});
+
+test('a stock Codex stream without a content-type header settles its completed usage', async t => {
+  const f = await fixture(t, (_req, res) => {
+    res.writeHead(200);
+    res.end('event: response.completed\ndata: {"type":"response.completed","response":{"usage":{"input_tokens":20,"output_tokens":9,"input_tokens_details":{"cached_tokens":0,"cache_write_tokens":0}}}}\n\n');
+  });
+  await send(transport(f, { protocol: 'responses', price: paid }), f.endpoint, { stream: true });
+  assert.equal(f.ledger.snapshot().spentNano, 67000);
+  assert.equal(f.ledger.snapshot().heldNano, 0);
+  assert.equal(f.ledger.snapshot().requests[0].state, 'settled');
+});
+
+for (const [input, maximumNano] of [['hello', 670000], ['こんにちは👋', 686000]]) {
+  test(`bundled local tokenizer reserves padded complete request for ${input}`, async t => {
+    const f = await fixture(t, (_req, res) => json(res, { usage: { input_tokens: 10, output_tokens: 2 } }));
+    await send(transport(f, {
+      protocol: 'responses', maxInputTokens: 1000000,
+      price: { ...free, input: 4, output: 15 },
+      inputTokenEstimate: { method: 'o200k_base', multiplier: 2, framingTokens: 100 },
+    }), f.endpoint, { input, messages: undefined });
+    assert.equal(f.arrivals.length, 1);
+    assert.equal(f.ledger.snapshot().requests[0].maximumNano, maximumNano);
+    assert.equal(f.ledger.snapshot().requests[0].bounds.inputCountBasis, 'local o200k_base estimate');
+    assert.equal(f.ledger.snapshot().spentNano, 70000);
+  });
+}
+
+test('local estimates include tools and refuse hidden conversation state before dispatch', async t => {
+  const f = await fixture(t, (_req, res) => json(res, { usage: { prompt_tokens: 10, completion_tokens: 2 } }));
+  const guarded = transport(f, { price: { ...free, input: 4, output: 15 }, maxInputTokens: 1000000, inputTokenEstimate: { method: 'utf8', multiplier: 2, framingTokens: 100 } });
+  await assert.rejects(send(guarded, f.endpoint, { previous_response_id: 'hidden' }), /explicit conversation/);
+  await assert.rejects(send(guarded, f.endpoint, { conversation: 'hidden' }), /explicit conversation/);
+  assert.equal(f.arrivals.length, 0);
+  await send(guarded, f.endpoint);
+  const plain = f.ledger.snapshot().requests[0].maximumNano;
+  await send(guarded, f.endpoint, { tools: [{ type: 'function', name: 'read', description: 'Read text files', parameters: { type: 'object', properties: {} } }] });
+  assert.ok(f.ledger.snapshot().requests[1].maximumNano > plain);
+  assert.equal(f.arrivals.length, 2);
+});

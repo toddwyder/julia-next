@@ -1,3 +1,7 @@
+import { Tiktoken } from 'js-tiktoken/lite';
+import o200kBase from 'js-tiktoken/ranks/o200k_base';
+
+let localEncoding;
 const protocols = new Set(['chat', 'responses', 'messages']);
 const categories = ['input', 'output', 'cacheRead', 'cacheWrite'];
 const fail = message => new Error(message);
@@ -39,6 +43,7 @@ function configuration(settings) {
       const counter = new URL(spec.inputTokenCountEndpoint);
       if (spec.protocol !== 'responses' || !['http:', 'https:'].includes(counter.protocol) || counter.username || counter.password || counter.hash || counter.href === spec.endpoint) throw fail('Invalid input count endpoint');
     }
+    if (spec.inputTokenEstimate && (spec.inputTokenCountEndpoint || !['utf8', 'o200k_base'].includes(spec.inputTokenEstimate.method) || !count(spec.inputTokenEstimate.multiplier) || spec.inputTokenEstimate.multiplier < 1 || !count(spec.inputTokenEstimate.framingTokens) || spec.inputTokenEstimate.framingTokens < 1)) throw fail('Invalid local input estimate');
     const paid = prices.some(price => categories.some(key => price[key] > 0));
     const maximumPrice = Object.fromEntries(categories.map(key => [key, Math.max(...prices.map(price => price[key]))]));
     const maximumNano = charge(spec.maxInputTokens, Math.max(maximumPrice.input, maximumPrice.cacheRead, maximumPrice.cacheWrite)) + charge(spec.maxOutputTokens, maximumPrice.output);
@@ -192,6 +197,14 @@ export function createTransport({ ledger, settings, role, fetch: upstream = glob
     if (spec.paid && body.service_tier && !['default', 'standard'].includes(body.service_tier)) throw fail('Unpriced service tier');
     if (spec.paid && body.speed) throw fail('Unpriced inference speed');
     let inputBound = spec.maxInputTokens;
+    if (spec.inputTokenEstimate) {
+      if (body.previous_response_id || body.conversation) throw fail('Local input estimate requires explicit conversation input');
+      const estimate = spec.inputTokenEstimate;
+      const serialized = JSON.stringify(bounded);
+      const units = estimate.method === 'utf8' ? Buffer.byteLength(serialized, 'utf8') : (localEncoding ??= new Tiktoken(o200kBase)).encode(serialized, [], []).length;
+      inputBound = units * estimate.multiplier + estimate.framingTokens;
+      if (!count(inputBound) || inputBound > spec.maxInputTokens) throw fail('Local input estimate exceeds configured context');
+    }
     if (spec.inputTokenCountEndpoint) {
       const countBody = Object.fromEntries(['model', 'input', 'instructions', 'tools', 'text', 'truncation', 'previous_response_id', 'conversation', 'tool_choice', 'parallel_tool_calls', 'reasoning'].filter(key => key in bounded).map(key => [key, bounded[key]]));
       let result;
@@ -206,7 +219,7 @@ export function createTransport({ ledger, settings, role, fetch: upstream = glob
       inputBound = result.input_tokens;
     }
     const maximumNano = charge(inputBound, Math.max(spec.maximumPrice.input, spec.maximumPrice.cacheRead, spec.maximumPrice.cacheWrite)) + charge(spec.maxOutputTokens, spec.maximumPrice.output);
-    const reservation = await ledgerCall('reserve', { model: spec.model, role, maximumNano, price: spec.price, bounds: { maxInputTokens: inputBound, maxOutputTokens: spec.maxOutputTokens } });
+    const reservation = await ledgerCall('reserve', { model: spec.model, role, maximumNano, price: spec.price, bounds: { maxInputTokens: inputBound, maxOutputTokens: spec.maxOutputTokens, ...(spec.inputTokenEstimate ? { inputCountBasis: `local ${spec.inputTokenEstimate.method === 'utf8' ? 'UTF-8' : 'o200k_base'} estimate` } : {}) } });
     const id = reservation?.id ?? reservation;
     let response;
     let settled = false;
@@ -216,7 +229,7 @@ export function createTransport({ ledger, settings, role, fetch: upstream = glob
       const text = await responseText(response.clone(), maximum);
       let usage;
       let reportedNano = 0;
-      try { ({ usage, reportedNano } = parseResponse(text, response.headers.get('content-type') ?? '', spec)); }
+      try { ({ usage, reportedNano } = parseResponse(text, response.headers.get('content-type') ?? (bounded.stream ? 'text/event-stream' : ''), spec)); }
       catch (error) {
         if (spec.paid) throw fail('Paid request usage is unavailable');
       }
@@ -229,6 +242,10 @@ export function createTransport({ ledger, settings, role, fetch: upstream = glob
       if (costNano > maximumNano) {
         await ledgerCall('stop', 'Request cost exceeds configured reservation');
         throw fail('STOP WORK: request cost exceeds configured reservation');
+      }
+      if (spec.inputTokenEstimate && inputTokens > inputBound) {
+        await ledgerCall('stop', 'Provider usage exceeds local input estimate');
+        throw fail('STOP WORK: provider usage exceeds local input estimate');
       }
       return response;
     } catch (error) {

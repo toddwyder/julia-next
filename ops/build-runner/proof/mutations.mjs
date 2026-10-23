@@ -16,6 +16,26 @@ const tests = file => `ops/build-runner/test/${file}.test.mjs`;
 const edit = (file, before, after, occurrences = 1) => ({ file, before, after, occurrences });
 const cases = [
   {
+    id: 'local-estimate-not-used', file: 'transport', test: 'local text estimate reserves framing and UTF-8 bytes without a credential or count request',
+    edits: [edit(transport, 'inputBound = units * estimate.multiplier + estimate.framingTokens;', 'inputBound = spec.maxInputTokens;')],
+  },
+  {
+    id: 'local-estimate-padding-removed', file: 'transport', test: 'bundled local tokenizer reserves padded complete request for hello',
+    edits: [edit(transport, 'inputBound = units * estimate.multiplier + estimate.framingTokens;', 'inputBound = units;')],
+  },
+  {
+    id: 'local-estimate-overrun-ignored', file: 'transport', test: 'a provider input count above the local estimate settles actual cost and stops later work',
+    edits: [edit(transport, 'spec.inputTokenEstimate && inputTokens > inputBound', 'false')],
+  },
+  {
+    id: 'stock-sse-without-content-type-not-parsed', file: 'transport', test: 'a stock Codex stream without a content-type header settles its completed usage',
+    edits: [edit(transport, "response.headers.get('content-type') ?? (bounded.stream ? 'text/event-stream' : '')", "response.headers.get('content-type') ?? ''")],
+  },
+  {
+    id: 'hidden-conversation-not-refused', file: 'transport', test: 'local estimates include tools and refuse hidden conversation state before dispatch',
+    edits: [edit(transport, "if (body.previous_response_id || body.conversation) throw fail('Local input estimate requires explicit conversation input');", '')],
+  },
+  {
     id: 'stock-hosted-search-not-disabled', file: 'subscription-tools', test: 'stock subscription requests can dispatch without unpriced hosted search',
     edits: [edit(adapter, ", disabledTools: ['web_search']", '')],
   },
