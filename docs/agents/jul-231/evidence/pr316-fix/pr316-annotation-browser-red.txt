@@ -1,0 +1,44 @@
+✔ new tests inherit the nearest locked dependency owner and server execution from their folder (303.176144ms)
+✔ new tests execute with their owner dependencies and isolated Git process state (511.051898ms)
+✔ server tests are absent from local execution and execute on the server route (557.534709ms)
+✔ a nested browser suite uses its owner executable, configuration, and relative test paths (3454.518356ms)
+✔ browser installation installs locked browser owners and leaves other owners untouched (1861.72666ms)
+✔ a Node test owner declaring Playwright gets its browser runtime without a test-name entry (1258.104735ms)
+✔ failing Node tests emit one readable annotation each, without suite duplicates or passing tests (779.824988ms)
+✔ failing Bun tests include names and only the first error line, without native duplicate annotations (335.457228ms)
+✖ browser failures emit a repository-relative test annotation from the real owner runner (6712.863776ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 8
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 16070.490927
+
+✖ failing tests:
+
+test at scripts/test-owners.test.mjs:169:1
+✖ browser failures emit a repository-relative test annotation from the real owner runner (6712.863776ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + []
+  - [
+  -   '::error file=packages/browser-owner/test/failure.spec.mjs,title=browser runner failure::browser runner failure: Error: browser first error line'
+  - ]
+  
+      at TestContext.<anonymous> (file:///home/ubuntu/julia-jul-231-build/scripts/test-owners.test.mjs:182:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [],
+    expected: [ '::error file=packages/browser-owner/test/failure.spec.mjs,title=browser runner failure::browser runner failure: Error: browser first error line' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
