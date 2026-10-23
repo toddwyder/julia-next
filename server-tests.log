@@ -1,0 +1,248 @@
+Installing locked dependencies for .
+
+added 128 packages, and audited 129 packages in 16s
+
+25 packages are looking for funding
+  run `npm fund` for details
+
+3 vulnerabilities (2 high, 1 critical)
+
+To address all issues, run:
+  npm audit fix
+
+Run `npm audit` for details.
+Installing locked dependencies for .agents/skills/poteto-mode/scripts
+bun install v1.4.4 (38afee6c8)
+
++ bun-types@1.3.14
++ typescript@7.0.2
++ commander@14.0.0
+
+6 packages installed [43.00ms]
+Installing locked dependencies for ops/build-runner
+
+added 745 packages, and audited 746 packages in 41s
+
+193 packages are looking for funding
+  run `npm fund` for details
+
+40 vulnerabilities (19 moderate, 21 high)
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+Installing locked dependencies for ops/mastra-agents/reviewer
+
+added 185 packages, and audited 186 packages in 7s
+
+85 packages are looking for funding
+  run `npm fund` for details
+
+4 vulnerabilities (3 low, 1 high)
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues, run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+Installing locked dependencies for ops/server-tests
+
+up to date, audited 1 package in 391ms
+
+found 0 vulnerabilities
+Installing locked dependencies for ops/verification-maintenance
+
+up to date, audited 1 package in 340ms
+
+found 0 vulnerabilities
+
+npm warn deprecated whatwg-encoding@3.1.1: Use @exodus/bytes instead for a more spec-conformant and faster implementation
+npm warn deprecated @anush008/tokenizers@0.6.0: This package has been archived. Please use the official and updated "huggingface/tokenizers" package.
+npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+
+Installing dependencies...
+Switching to root user to install dependencies...
+Get:1 https://pkgs.tailscale.com/stable/ubuntu noble InRelease
+Hit:2 http://security.ubuntu.com/ubuntu noble-security InRelease
+Hit:3 http://nova.clouds.archive.ubuntu.com/ubuntu noble InRelease
+Get:4 http://nova.clouds.archive.ubuntu.com/ubuntu noble-updates InRelease [126 kB]
+Hit:5 http://nova.clouds.archive.ubuntu.com/ubuntu noble-backports InRelease
+Fetched 133 kB in 2s (72.6 kB/s)
+Reading package lists...
+Reading package lists...
+Building dependency tree...
+Reading state information...
+libasound2t64 is already the newest version (1.2.11-1ubuntu0.3).
+libatk-bridge2.0-0t64 is already the newest version (2.52.0-1build1).
+libatk1.0-0t64 is already the newest version (2.52.0-1build1).
+libatspi2.0-0t64 is already the newest version (2.52.0-1build1).
+libcairo2 is already the newest version (1.18.0-3build1).
+libcups2t64 is already the newest version (2.4.7-1.2ubuntu7.14).
+libdbus-1-3 is already the newest version (1.14.10-4ubuntu4.1).
+libdrm2 is already the newest version (2.4.125-1ubuntu0.1~24.04.2).
+libgbm1 is already the newest version (25.2.8-0ubuntu0.24.04.4).
+libglib2.0-0t64 is already the newest version (2.80.0-6ubuntu3.10).
+libnspr4 is already the newest version (2:4.35-1.1build1).
+libnss3 is already the newest version (2:3.98-1ubuntu0.3).
+libpango-1.0-0 is already the newest version (1.52.1+ds-1build1).
+libx11-6 is already the newest version (2:1.8.7-1ubuntu0.1).
+libxcb1 is already the newest version (1.15-1ubuntu2).
+libxcomposite1 is already the newest version (1:0.4.5-1build3).
+libxdamage1 is already the newest version (1:1.1.6-1build1).
+libxext6 is already the newest version (2:1.3.4-1build2).
+libxfixes3 is already the newest version (1:6.0.0-2build1).
+libxkbcommon0 is already the newest version (1.6.0-1build1).
+libxrandr2 is already the newest version (2:1.5.2-2build1).
+xvfb is already the newest version (2:21.1.12-1ubuntu1.9).
+fonts-noto-color-emoji is already the newest version (2.047-0ubuntu0.24.04.1).
+fonts-unifont is already the newest version (1:15.1.01-1build1).
+libfontconfig1 is already the newest version (2.15.0-1.1ubuntu2).
+libfreetype6 is already the newest version (2.13.2+dfsg-1ubuntu0.2).
+xfonts-cyrillic is already the newest version (1:1.0.5+nmu1).
+xfonts-scalable is already the newest version (1:1.0.3-1.3).
+fonts-liberation is already the newest version (1:2.1.5-3).
+fonts-ipafont-gothic is already the newest version (00303-21ubuntu1).
+fonts-wqy-zenhei is already the newest version (0.9.45-8).
+fonts-tlwg-loma-otf is already the newest version (1:0.7.3-1).
+fonts-freefont-ttf is already the newest version (20211204+svn4273-2).
+The following packages were automatically installed and are no longer required:
+  libdebuginfod-common libfwupd2 libgusb2
+Use 'sudo apt autoremove' to remove them.
+0 upgraded, 0 newly installed, 0 to remove and 5 not upgraded.
+Installing dependencies...
+Switching to root user to install dependencies...
+Get:1 https://pkgs.tailscale.com/stable/ubuntu noble InRelease
+Hit:2 http://security.ubuntu.com/ubuntu noble-security InRelease
+Hit:3 http://nova.clouds.archive.ubuntu.com/ubuntu noble InRelease
+Hit:4 http://nova.clouds.archive.ubuntu.com/ubuntu noble-updates InRelease
+Hit:5 http://nova.clouds.archive.ubuntu.com/ubuntu noble-backports InRelease
+Fetched 6649 B in 1s (9029 B/s)
+Reading package lists...
+Reading package lists...
+Building dependency tree...
+Reading state information...
+libasound2t64 is already the newest version (1.2.11-1ubuntu0.3).
+libatk-bridge2.0-0t64 is already the newest version (2.52.0-1build1).
+libatk1.0-0t64 is already the newest version (2.52.0-1build1).
+libatspi2.0-0t64 is already the newest version (2.52.0-1build1).
+libcairo2 is already the newest version (1.18.0-3build1).
+libcups2t64 is already the newest version (2.4.7-1.2ubuntu7.14).
+libdbus-1-3 is already the newest version (1.14.10-4ubuntu4.1).
+libdrm2 is already the newest version (2.4.125-1ubuntu0.1~24.04.2).
+libgbm1 is already the newest version (25.2.8-0ubuntu0.24.04.4).
+libglib2.0-0t64 is already the newest version (2.80.0-6ubuntu3.10).
+libnspr4 is already the newest version (2:4.35-1.1build1).
+libnss3 is already the newest version (2:3.98-1ubuntu0.3).
+libpango-1.0-0 is already the newest version (1.52.1+ds-1build1).
+libx11-6 is already the newest version (2:1.8.7-1ubuntu0.1).
+libxcb1 is already the newest version (1.15-1ubuntu2).
+libxcomposite1 is already the newest version (1:0.4.5-1build3).
+libxdamage1 is already the newest version (1:1.1.6-1build1).
+libxext6 is already the newest version (2:1.3.4-1build2).
+libxfixes3 is already the newest version (1:6.0.0-2build1).
+libxkbcommon0 is already the newest version (1.6.0-1build1).
+libxrandr2 is already the newest version (2:1.5.2-2build1).
+xvfb is already the newest version (2:21.1.12-1ubuntu1.9).
+fonts-noto-color-emoji is already the newest version (2.047-0ubuntu0.24.04.1).
+fonts-unifont is already the newest version (1:15.1.01-1build1).
+libfontconfig1 is already the newest version (2.15.0-1.1ubuntu2).
+libfreetype6 is already the newest version (2.13.2+dfsg-1ubuntu0.2).
+xfonts-cyrillic is already the newest version (1:1.0.5+nmu1).
+xfonts-scalable is already the newest version (1:1.0.3-1.3).
+fonts-liberation is already the newest version (1:2.1.5-3).
+fonts-ipafont-gothic is already the newest version (00303-21ubuntu1).
+fonts-wqy-zenhei is already the newest version (0.9.45-8).
+fonts-tlwg-loma-otf is already the newest version (1:0.7.3-1).
+fonts-freefont-ttf is already the newest version (20211204+svn4273-2).
+The following packages were automatically installed and are no longer required:
+  libdebuginfod-common libfwupd2 libgusb2
+Use 'sudo apt autoremove' to remove them.
+0 upgraded, 0 newly installed, 0 to remove and 5 not upgraded.
+
+
+{"owner":".","lockfile":"package-lock.json","runtime":"node","environment":"server","tests":["scripts/server/<concealed by 1Password>-agents.test.mjs"]}
+✔ server agents route resolves all eight fields and forwards literal arguments through real op (1932.147818ms)
+✔ unavailable agent passes fail before child effects without inherited authentication fallback (308.928401ms)
+✔ real op ignores inherited desktop Connect and no-masking overrides and preserves child exit (1943.374717ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4314.709575
+{"owner":"ops/build-runner","lockfile":"ops/build-runner/package-lock.json","runtime":"node","environment":"server","tests":["ops/build-runner/framework/@mastra/code-sdk/server/model-side.test.mjs","ops/build-runner/framework/@mastra/code-sdk/server/provider-settings.test.mjs"]}
+{"fact":"free-provider-attempt","url":"https://api.commandcode.ai/provider/v1/chat/completions","at":"2026-10-23T03:49:07.658Z","status":200,"requestSha256":"a8d6b33515adc3f35fe908f2670d7dbac83f7a5487bdc5c43da4fc3bde813717","bytes":69514,"model":"reflection/beam:free"}
+{"model":"reflection/beam:free","prompt":"Hello.","result":{"status":"completed","text":"Hello! How can I help you today?","finishReason":"complete","usage":{"inputTokens":13404,"outputTokens":35,"totalTokens":13439},"toolCalls":[],"toolResults":[],"threadId":"a6dbf981-a35c-4196-912a-ec96ffe806c9","exitCode":0},"requests":[{"requestSha256":"a8d6b33515adc3f35fe908f2670d7dbac83f7a5487bdc5c43da4fc3bde813717","at":"2026-10-23T03:49:07.657Z","bytes":69514,"url":"https://api.commandcode.ai/provider/v1/chat/completions","model":"reflection/beam:free","messages":[{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"user","content":"string"},{"role":"user","content":"string"}],"attempts":[{"at":"2026-10-23T03:49:07.658Z","status":200}],"status":200}]}
+✔ saved model selection resolves to an actual Beam provider request (5866.339139ms)
+{"fact":"free-provider-attempt","url":"https://api.commandcode.ai/provider/v1/chat/completions","at":"2026-10-23T03:49:09.893Z","status":200,"requestSha256":"f75f17ee02a928f6d7bbc4be81c102d220145239f0681ee8531c05fdc7384f5d","bytes":69585,"model":"reflection/beam:free"}
+{"fact":"actual-hook-tool-result-before-encoding","part":{"type":"tool-result","toolCallId":"call-1a5c70ed-b210-49e0-bb13-b9fd4a816bd0","toolName":"execute_command","output":{"type":"error-json","value":{"error":true,"message":"Tool input validation failed for execute_command. Please fix the following errors and try again:\n- description: Invalid input: expected string, received undefined\n\nProvided arguments: {\n  \"command\": \"cd /tmp/framework-runner-learning-aH0AJr && git status\"\n}","validationErrors":{"errors":[],"fields":{"description":{"errors":["Invalid input: expected string, received undefined"],"fields":{}}}}}},"providerOptions":{"mastra":{"modelOutput":{"type":"error-json","value":{"error":true,"message":"Tool input validation failed for execute_command. Please fix the following errors and try again:\n- description: Invalid input: expected string, received undefined\n\nProvided arguments: {\n  \"command\": \"cd /tmp/framework-runner-learning-aH0AJr && git status\"\n}","validationErrors":{"errors":[],"fields":{"description":{"errors":["Invalid input: expected string, received undefined"],"fields":{}}}}}},"tokenEstimate":{"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c":{"v":8,"source":"v8:tokenx","key":"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c","tokens":5},"tool-call-args-json:efc93cb226c83925d9d81f9e2e516dac4a40bb3b83cd1f47b10ce80455f0ece0":{"v":8,"source":"v8:tokenx","key":"tool-call-args-json:efc93cb226c83925d9d81f9e2e516dac4a40bb3b83cd1f47b10ce80455f0ece0","tokens":21},"tool-result-model-output-json:10f3b3f2191341d85566ef7eeb0873f90437bd56edf8579fd12c81a71a594daf":{"v":8,"source":"v8:tokenx","key":"tool-result-model-output-json:10f3b3f2191341d85566ef7eeb0873f90437bd56edf8579fd12c81a71a594daf","tokens":159}}}},"input":{"command":"cd /tmp/framework-runner-learning-aH0AJr && git status"}}}
+{"fact":"free-provider-attempt","url":"https://api.commandcode.ai/provider/v1/chat/completions","at":"2026-10-23T03:49:11.433Z","status":200,"requestSha256":"f379bc065c3d4d1d72c9489437c8699fc093cb73e995c3ed79d69fdd73133c9f","bytes":70512,"model":"reflection/beam:free"}
+{"fact":"actual-hook-tool-result-before-encoding","part":{"type":"tool-result","toolCallId":"call-1a5c70ed-b210-49e0-bb13-b9fd4a816bd0","toolName":"execute_command","output":{"type":"error-json","value":{"error":true,"message":"Tool input validation failed for execute_command. Please fix the following errors and try again:\n- description: Invalid input: expected string, received undefined\n\nProvided arguments: {\n  \"command\": \"cd /tmp/framework-runner-learning-aH0AJr && git status\"\n}","validationErrors":{"errors":[],"fields":{"description":{"errors":["Invalid input: expected string, received undefined"],"fields":{}}}}}},"providerOptions":{"mastra":{"modelOutput":{"type":"error-json","value":{"error":true,"message":"Tool input validation failed for execute_command. Please fix the following errors and try again:\n- description: Invalid input: expected string, received undefined\n\nProvided arguments: {\n  \"command\": \"cd /tmp/framework-runner-learning-aH0AJr && git status\"\n}","validationErrors":{"errors":[],"fields":{"description":{"errors":["Invalid input: expected string, received undefined"],"fields":{}}}}}},"tokenEstimate":{"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c":{"v":8,"source":"v8:tokenx","key":"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c","tokens":5},"tool-call-args-json:efc93cb226c83925d9d81f9e2e516dac4a40bb3b83cd1f47b10ce80455f0ece0":{"v":8,"source":"v8:tokenx","key":"tool-call-args-json:efc93cb226c83925d9d81f9e2e516dac4a40bb3b83cd1f47b10ce80455f0ece0","tokens":21},"tool-result-model-output-json:10f3b3f2191341d85566ef7eeb0873f90437bd56edf8579fd12c81a71a594daf":{"v":8,"source":"v8:tokenx","key":"tool-result-model-output-json:10f3b3f2191341d85566ef7eeb0873f90437bd56edf8579fd12c81a71a594daf","tokens":159}}}},"input":{"command":"cd /tmp/framework-runner-learning-aH0AJr && git status"}}}
+{"fact":"actual-hook-tool-result-before-encoding","part":{"type":"tool-result","toolCallId":"call-6fb606c2-9fea-4bda-a8d3-ba9ee1a0e56c","toolName":"execute_command","output":{"type":"text","value":"On branch master\nChanges to be committed:\n  (use \"git restore --staged <file>...\" to unstage)\n\tmodified:   answer.mjs\n\nChanges not staged for commit:\n  (use \"git add <file>...\" to update what will be committed)\n  (use \"git restore <file>...\" to discard changes in working directory)\n\tmodified:   answer.mjs\n\nUntracked files:\n  (use \"git add <file>...\" to include in what will be committed)\n\t.mastracode/\n\tmastra-vectors.db\n\tmastra-vectors.db-shm\n\tmastra-vectors.db-wal\n\tmastra.db\n\tmastra.db-shm\n\tmastra.db-wal\n\tsettings.json\n\n"},"providerOptions":{"mastra":{"modelOutput":{"type":"text","value":"On branch master\nChanges to be committed:\n  (use \"git restore --staged <file>...\" to unstage)\n\tmodified:   answer.mjs\n\nChanges not staged for commit:\n  (use \"git add <file>...\" to update what will be committed)\n  (use \"git restore <file>...\" to discard changes in working directory)\n\tmodified:   answer.mjs\n\nUntracked files:\n  (use \"git add <file>...\" to include in what will be committed)\n\t.mastracode/\n\tmastra-vectors.db\n\tmastra-vectors.db-shm\n\tmastra-vectors.db-wal\n\tmastra.db\n\tmastra.db-shm\n\tmastra.db-wal\n\tsettings.json\n\n"},"tokenEstimate":{"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c":{"v":8,"source":"v8:tokenx","key":"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c","tokens":5},"tool-call-args-json:ff5398ebdd69ab4bcc060596704d130ca08e4353bde2ab4981ae0f31d7ae0c8a":{"v":8,"source":"v8:tokenx","key":"tool-call-args-json:ff5398ebdd69ab4bcc060596704d130ca08e4353bde2ab4981ae0f31d7ae0c8a","tokens":34},"tool-result-model-output-json:c9c00dec5d50745741219b7fb51dbe5cdf356adeec21fe7414b7aac39178265a":{"v":8,"source":"v8:tokenx","key":"tool-result-model-output-json:c9c00dec5d50745741219b7fb51dbe5cdf356adeec21fe7414b7aac39178265a","tokens":216}}}},"input":{"command":"cd /tmp/framework-runner-learning-aH0AJr && git status","description":"Checking staged changes and repository status"}}}
+{"fact":"free-provider-attempt","url":"https://api.commandcode.ai/provider/v1/chat/completions","at":"2026-10-23T03:49:14.146Z","status":200,"requestSha256":"58ad20c8ba26a332a81ef63b32619b15dcc46890dc3165b993acc8f751fb6d62","bytes":71523,"model":"reflection/beam:free"}
+{"fact":"actual-hook-tool-result-before-encoding","part":{"type":"tool-result","toolCallId":"call-1a5c70ed-b210-49e0-bb13-b9fd4a816bd0","toolName":"execute_command","output":{"type":"error-json","value":{"error":true,"message":"Tool input validation failed for execute_command. Please fix the following errors and try again:\n- description: Invalid input: expected string, received undefined\n\nProvided arguments: {\n  \"command\": \"cd /tmp/framework-runner-learning-aH0AJr && git status\"\n}","validationErrors":{"errors":[],"fields":{"description":{"errors":["Invalid input: expected string, received undefined"],"fields":{}}}}}},"providerOptions":{"mastra":{"modelOutput":{"type":"error-json","value":{"error":true,"message":"Tool input validation failed for execute_command. Please fix the following errors and try again:\n- description: Invalid input: expected string, received undefined\n\nProvided arguments: {\n  \"command\": \"cd /tmp/framework-runner-learning-aH0AJr && git status\"\n}","validationErrors":{"errors":[],"fields":{"description":{"errors":["Invalid input: expected string, received undefined"],"fields":{}}}}}},"tokenEstimate":{"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c":{"v":8,"source":"v8:tokenx","key":"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c","tokens":5},"tool-call-args-json:efc93cb226c83925d9d81f9e2e516dac4a40bb3b83cd1f47b10ce80455f0ece0":{"v":8,"source":"v8:tokenx","key":"tool-call-args-json:efc93cb226c83925d9d81f9e2e516dac4a40bb3b83cd1f47b10ce80455f0ece0","tokens":21},"tool-result-model-output-json:10f3b3f2191341d85566ef7eeb0873f90437bd56edf8579fd12c81a71a594daf":{"v":8,"source":"v8:tokenx","key":"tool-result-model-output-json:10f3b3f2191341d85566ef7eeb0873f90437bd56edf8579fd12c81a71a594daf","tokens":159}}}},"input":{"command":"cd /tmp/framework-runner-learning-aH0AJr && git status"}}}
+{"fact":"actual-hook-tool-result-before-encoding","part":{"type":"tool-result","toolCallId":"call-6fb606c2-9fea-4bda-a8d3-ba9ee1a0e56c","toolName":"execute_command","output":{"type":"text","value":"On branch master\nChanges to be committed:\n  (use \"git restore --staged <file>...\" to unstage)\n\tmodified:   answer.mjs\n\nChanges not staged for commit:\n  (use \"git add <file>...\" to update what will be committed)\n  (use \"git restore <file>...\" to discard changes in working directory)\n\tmodified:   answer.mjs\n\nUntracked files:\n  (use \"git add <file>...\" to include in what will be committed)\n\t.mastracode/\n\tmastra-vectors.db\n\tmastra-vectors.db-shm\n\tmastra-vectors.db-wal\n\tmastra.db\n\tmastra.db-shm\n\tmastra.db-wal\n\tsettings.json\n\n"},"providerOptions":{"mastra":{"modelOutput":{"type":"text","value":"On branch master\nChanges to be committed:\n  (use \"git restore --staged <file>...\" to unstage)\n\tmodified:   answer.mjs\n\nChanges not staged for commit:\n  (use \"git add <file>...\" to update what will be committed)\n  (use \"git restore <file>...\" to discard changes in working directory)\n\tmodified:   answer.mjs\n\nUntracked files:\n  (use \"git add <file>...\" to include in what will be committed)\n\t.mastracode/\n\tmastra-vectors.db\n\tmastra-vectors.db-shm\n\tmastra-vectors.db-wal\n\tmastra.db\n\tmastra.db-shm\n\tmastra.db-wal\n\tsettings.json\n\n"},"tokenEstimate":{"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c":{"v":8,"source":"v8:tokenx","key":"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c","tokens":5},"tool-call-args-json:ff5398ebdd69ab4bcc060596704d130ca08e4353bde2ab4981ae0f31d7ae0c8a":{"v":8,"source":"v8:tokenx","key":"tool-call-args-json:ff5398ebdd69ab4bcc060596704d130ca08e4353bde2ab4981ae0f31d7ae0c8a","tokens":34},"tool-result-model-output-json:c9c00dec5d50745741219b7fb51dbe5cdf356adeec21fe7414b7aac39178265a":{"v":8,"source":"v8:tokenx","key":"tool-result-model-output-json:c9c00dec5d50745741219b7fb51dbe5cdf356adeec21fe7414b7aac39178265a","tokens":216}}}},"input":{"command":"cd /tmp/framework-runner-learning-aH0AJr && git status","description":"Checking staged changes and repository status"}}}
+{"fact":"actual-hook-tool-result-before-encoding","part":{"type":"tool-result","toolCallId":"call-61771868-225d-4ead-a4a4-0e7b37b814bd","toolName":"execute_command","output":{"type":"text","value":"diff --git a/answer.mjs b/answer.mjs\nindex 3811249..ae542ee 100644\n--- a/answer.mjs\n+++ b/answer.mjs\n@@ -1 +1 @@\n-export const answer=42;\n+export const answer=41;\n"},"providerOptions":{"mastra":{"modelOutput":{"type":"text","value":"diff --git a/answer.mjs b/answer.mjs\nindex 3811249..ae542ee 100644\n--- a/answer.mjs\n+++ b/answer.mjs\n@@ -1 +1 @@\n-export const answer=42;\n+export const answer=41;\n"},"tokenEstimate":{"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c":{"v":8,"source":"v8:tokenx","key":"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c","tokens":5},"tool-call-args-json:7eccea897fab8ce9d6624bbf0c27e2fdc98516d7cd9043414ab25e818f1d1659":{"v":8,"source":"v8:tokenx","key":"tool-call-args-json:7eccea897fab8ce9d6624bbf0c27e2fdc98516d7cd9043414ab25e818f1d1659","tokens":35},"tool-result-model-output-json:0f7dce4430854a6dfaa77880b63ba85dba2b1db3d1a748fbbea8de8a4f8e5dd6":{"v":8,"source":"v8:tokenx","key":"tool-result-model-output-json:0f7dce4430854a6dfaa77880b63ba85dba2b1db3d1a748fbbea8de8a4f8e5dd6","tokens":79}}}},"input":{"command":"cd /tmp/framework-runner-learning-aH0AJr && git diff --cached","description":"Viewing staged diff for answer.mjs"}}}
+{"fact":"free-provider-attempt","url":"https://api.commandcode.ai/provider/v1/chat/completions","at":"2026-10-23T03:49:15.468Z","status":200,"requestSha256":"7629ec39d26333c52a87f9e2312e0dbefd2bb2673d4f35dfac2e1117f3532cee","bytes":72200,"model":"reflection/beam:free"}
+{"fact":"actual-hook-tool-result-before-encoding","part":{"type":"tool-result","toolCallId":"call-1a5c70ed-b210-49e0-bb13-b9fd4a816bd0","toolName":"execute_command","output":{"type":"error-json","value":{"error":true,"message":"Tool input validation failed for execute_command. Please fix the following errors and try again:\n- description: Invalid input: expected string, received undefined\n\nProvided arguments: {\n  \"command\": \"cd /tmp/framework-runner-learning-aH0AJr && git status\"\n}","validationErrors":{"errors":[],"fields":{"description":{"errors":["Invalid input: expected string, received undefined"],"fields":{}}}}}},"providerOptions":{"mastra":{"modelOutput":{"type":"error-json","value":{"error":true,"message":"Tool input validation failed for execute_command. Please fix the following errors and try again:\n- description: Invalid input: expected string, received undefined\n\nProvided arguments: {\n  \"command\": \"cd /tmp/framework-runner-learning-aH0AJr && git status\"\n}","validationErrors":{"errors":[],"fields":{"description":{"errors":["Invalid input: expected string, received undefined"],"fields":{}}}}}},"tokenEstimate":{"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c":{"v":8,"source":"v8:tokenx","key":"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c","tokens":5},"tool-call-args-json:efc93cb226c83925d9d81f9e2e516dac4a40bb3b83cd1f47b10ce80455f0ece0":{"v":8,"source":"v8:tokenx","key":"tool-call-args-json:efc93cb226c83925d9d81f9e2e516dac4a40bb3b83cd1f47b10ce80455f0ece0","tokens":21},"tool-result-model-output-json:10f3b3f2191341d85566ef7eeb0873f90437bd56edf8579fd12c81a71a594daf":{"v":8,"source":"v8:tokenx","key":"tool-result-model-output-json:10f3b3f2191341d85566ef7eeb0873f90437bd56edf8579fd12c81a71a594daf","tokens":159}}}},"input":{"command":"cd /tmp/framework-runner-learning-aH0AJr && git status"}}}
+{"fact":"actual-hook-tool-result-before-encoding","part":{"type":"tool-result","toolCallId":"call-6fb606c2-9fea-4bda-a8d3-ba9ee1a0e56c","toolName":"execute_command","output":{"type":"text","value":"On branch master\nChanges to be committed:\n  (use \"git restore --staged <file>...\" to unstage)\n\tmodified:   answer.mjs\n\nChanges not staged for commit:\n  (use \"git add <file>...\" to update what will be committed)\n  (use \"git restore <file>...\" to discard changes in working directory)\n\tmodified:   answer.mjs\n\nUntracked files:\n  (use \"git add <file>...\" to include in what will be committed)\n\t.mastracode/\n\tmastra-vectors.db\n\tmastra-vectors.db-shm\n\tmastra-vectors.db-wal\n\tmastra.db\n\tmastra.db-shm\n\tmastra.db-wal\n\tsettings.json\n\n"},"providerOptions":{"mastra":{"modelOutput":{"type":"text","value":"On branch master\nChanges to be committed:\n  (use \"git restore --staged <file>...\" to unstage)\n\tmodified:   answer.mjs\n\nChanges not staged for commit:\n  (use \"git add <file>...\" to update what will be committed)\n  (use \"git restore <file>...\" to discard changes in working directory)\n\tmodified:   answer.mjs\n\nUntracked files:\n  (use \"git add <file>...\" to include in what will be committed)\n\t.mastracode/\n\tmastra-vectors.db\n\tmastra-vectors.db-shm\n\tmastra-vectors.db-wal\n\tmastra.db\n\tmastra.db-shm\n\tmastra.db-wal\n\tsettings.json\n\n"},"tokenEstimate":{"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c":{"v":8,"source":"v8:tokenx","key":"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c","tokens":5},"tool-call-args-json:ff5398ebdd69ab4bcc060596704d130ca08e4353bde2ab4981ae0f31d7ae0c8a":{"v":8,"source":"v8:tokenx","key":"tool-call-args-json:ff5398ebdd69ab4bcc060596704d130ca08e4353bde2ab4981ae0f31d7ae0c8a","tokens":34},"tool-result-model-output-json:c9c00dec5d50745741219b7fb51dbe5cdf356adeec21fe7414b7aac39178265a":{"v":8,"source":"v8:tokenx","key":"tool-result-model-output-json:c9c00dec5d50745741219b7fb51dbe5cdf356adeec21fe7414b7aac39178265a","tokens":216}}}},"input":{"command":"cd /tmp/framework-runner-learning-aH0AJr && git status","description":"Checking staged changes and repository status"}}}
+{"fact":"actual-hook-tool-result-before-encoding","part":{"type":"tool-result","toolCallId":"call-61771868-225d-4ead-a4a4-0e7b37b814bd","toolName":"execute_command","output":{"type":"text","value":"diff --git a/answer.mjs b/answer.mjs\nindex 3811249..ae542ee 100644\n--- a/answer.mjs\n+++ b/answer.mjs\n@@ -1 +1 @@\n-export const answer=42;\n+export const answer=41;\n"},"providerOptions":{"mastra":{"modelOutput":{"type":"text","value":"diff --git a/answer.mjs b/answer.mjs\nindex 3811249..ae542ee 100644\n--- a/answer.mjs\n+++ b/answer.mjs\n@@ -1 +1 @@\n-export const answer=42;\n+export const answer=41;\n"},"tokenEstimate":{"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c":{"v":8,"source":"v8:tokenx","key":"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c","tokens":5},"tool-call-args-json:7eccea897fab8ce9d6624bbf0c27e2fdc98516d7cd9043414ab25e818f1d1659":{"v":8,"source":"v8:tokenx","key":"tool-call-args-json:7eccea897fab8ce9d6624bbf0c27e2fdc98516d7cd9043414ab25e818f1d1659","tokens":35},"tool-result-model-output-json:0f7dce4430854a6dfaa77880b63ba85dba2b1db3d1a748fbbea8de8a4f8e5dd6":{"v":8,"source":"v8:tokenx","key":"tool-result-model-output-json:0f7dce4430854a6dfaa77880b63ba85dba2b1db3d1a748fbbea8de8a4f8e5dd6","tokens":79}}}},"input":{"command":"cd /tmp/framework-runner-learning-aH0AJr && git diff --cached","description":"Viewing staged diff for answer.mjs"}}}
+{"fact":"actual-hook-tool-result-before-encoding","part":{"type":"tool-result","toolCallId":"call-7289c569-f4f7-4b30-9cda-0b7df1027ffe","toolName":"execute_command","output":{"error":"BROKEN FACT: staged answer must equal 42. https://nodejs.org/api/assert.html#assertstrictequalactual-expected-message"},"providerOptions":{"mastra":{"modelOutput":{"error":"BROKEN FACT: staged answer must equal 42. https://nodejs.org/api/assert.html#assertstrictequalactual-expected-message"},"tokenEstimate":{"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c":{"v":8,"source":"v8:tokenx","key":"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c","tokens":5},"tool-call-args-json:db9c83c8d0c7f6f64d5ea77e40c0442e9c75360f7f0b6ccf8b9110e7daf59931":{"v":8,"source":"v8:tokenx","key":"tool-call-args-json:db9c83c8d0c7f6f64d5ea77e40c0442e9c75360f7f0b6ccf8b9110e7daf59931","tokens":42},"tool-result-model-output-json:3e4566cd5ed68d6c026c405dc2a2a04267f49adb79dd4a7e582fbdf86beb1679":{"v":8,"source":"v8:tokenx","key":"tool-result-model-output-json:3e4566cd5ed68d6c026c405dc2a2a04267f49adb79dd4a7e582fbdf86beb1679","tokens":39}}}},"input":{"command":"cd /tmp/framework-runner-learning-aH0AJr && git commit -m \"Update answer to 41\"","description":"Committing staged change in answer.mjs"}}}
+{"fact":"free-provider-attempt","url":"https://api.commandcode.ai/provider/v1/chat/completions","at":"2026-10-23T03:49:18.888Z","status":200,"requestSha256":"b798acdfce2264acde7678e5062467670652cb4d6999462b1f91f606b8fbb94b","bytes":72928,"model":"reflection/beam:free"}
+{"model":"reflection/beam:free","prompt":"Commit the currently staged change. If it is refused, explain the stated cause.","result":{"status":"aborted","text":"","finishReason":"aborted","usage":{"inputTokens":13957,"outputTokens":93,"totalTokens":14050},"toolCalls":[{"id":"call-1a5c70ed-b210-49e0-bb13-b9fd4a816bd0","name":"execute_command","args":{"command":"cd /tmp/framework-runner-learning-aH0AJr && git status"}},{"id":"call-6fb606c2-9fea-4bda-a8d3-ba9ee1a0e56c","name":"execute_command","args":{"command":"cd /tmp/framework-runner-learning-aH0AJr && git status","description":"Checking staged changes and repository status"}},{"id":"call-61771868-225d-4ead-a4a4-0e7b37b814bd","name":"execute_command","args":{"command":"cd /tmp/framework-runner-learning-aH0AJr && git diff --cached","description":"Viewing staged diff for answer.mjs"}},{"id":"call-7289c569-f4f7-4b30-9cda-0b7df1027ffe","name":"execute_command","args":{"command":"cd /tmp/framework-runner-learning-aH0AJr && git commit -m \"Update answer to 41\"","description":"Committing staged change in answer.mjs"}}],"toolResults":[{"id":"call-1a5c70ed-b210-49e0-bb13-b9fd4a816bd0","name":"execute_command","result":{"error":true,"message":"Tool input validation failed for execute_command. Please fix the following errors and try again:\n- description: Invalid input: expected string, received undefined\n\nProvided arguments: {\n  \"command\": \"cd /tmp/framework-runner-learning-aH0AJr && git status\"\n}","validationErrors":{"errors":[],"fields":{"description":{"errors":["Invalid input: expected string, received undefined"],"fields":{}}}}},"isError":false},{"id":"call-6fb606c2-9fea-4bda-a8d3-ba9ee1a0e56c","name":"execute_command","result":"On branch master\nChanges to be committed:\n  (use \"git restore --staged <file>...\" to unstage)\n\tmodified:   answer.mjs\n\nChanges not staged for commit:\n  (use \"git add <file>...\" to update what will be committed)\n  (use \"git restore <file>...\" to discard changes in working directory)\n\tmodified:   answer.mjs\n\nUntracked files:\n  (use \"git add <file>...\" to include in what will be committed)\n\t.mastracode/\n\tmastra-vectors.db\n\tmastra-vectors.db-shm\n\tmastra-vectors.db-wal\n\tmastra.db\n\tmastra.db-shm\n\tmastra.db-wal\n\tsettings.json\n\n","isError":false},{"id":"call-61771868-225d-4ead-a4a4-0e7b37b814bd","name":"execute_command","result":"diff --git a/answer.mjs b/answer.mjs\nindex 3811249..ae542ee 100644\n--- a/answer.mjs\n+++ b/answer.mjs\n@@ -1 +1 @@\n-export const answer=42;\n+export const answer=41;\n","isError":false},{"id":"call-7289c569-f4f7-4b30-9cda-0b7df1027ffe","name":"execute_command","result":{"error":"BROKEN FACT: staged answer must equal 42. https://nodejs.org/api/assert.html#assertstrictequalactual-expected-message"},"isError":false}],"threadId":"d7de1471-038c-4196-bb03-e88a7e9efa9e","exitCode":1},"requests":[{"requestSha256":"f75f17ee02a928f6d7bbc4be81c102d220145239f0681ee8531c05fdc7384f5d","at":"2026-10-23T03:49:09.892Z","bytes":69585,"url":"https://api.commandcode.ai/provider/v1/chat/completions","model":"reflection/beam:free","messages":[{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"user","content":"string"},{"role":"user","content":"string"}],"attempts":[{"at":"2026-10-23T03:49:09.893Z","status":200}],"status":200},{"requestSha256":"f379bc065c3d4d1d72c9489437c8699fc093cb73e995c3ed79d69fdd73133c9f","at":"2026-10-23T03:49:11.432Z","bytes":70512,"url":"https://api.commandcode.ai/provider/v1/chat/completions","model":"reflection/beam:free","messages":[{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"user","content":"string"},{"role":"user","content":"string"},{"role":"assistant","content":"object","toolCalls":[{"name":"execute_command","arguments":"{\"command\":\"cd /tmp/framework-runner-learning-aH0AJr && git status\"}"}]},{"role":"tool","content":"{\"error\":true,\"message\":\"Tool input validation failed for execute_command. Please fix the following errors and try again:\\n- description: Invalid input: expected string, received undefined\\n\\nProvided arguments: {\\n  \\\"command\\\": \\\"cd /tmp/framework-runner-learning-aH0AJr && git status\\\"\\n}\",\"validationErrors\":{\"errors\":[],\"fields\":{\"description\":{\"errors\":[\"Invalid input: expected string, received undefined\"],\"fields\":{}}}}}"}],"attempts":[{"at":"2026-10-23T03:49:11.433Z","status":200}],"status":200},{"requestSha256":"58ad20c8ba26a332a81ef63b32619b15dcc46890dc3165b993acc8f751fb6d62","at":"2026-10-23T03:49:14.145Z","bytes":71523,"url":"https://api.commandcode.ai/provider/v1/chat/completions","model":"reflection/beam:free","messages":[{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"user","content":"string"},{"role":"user","content":"string"},{"role":"assistant","content":"object","toolCalls":[{"name":"execute_command","arguments":"{\"command\":\"cd /tmp/framework-runner-learning-aH0AJr && git status\"}"}]},{"role":"tool","content":"{\"error\":true,\"message\":\"Tool input validation failed for execute_command. Please fix the following errors and try again:\\n- description: Invalid input: expected string, received undefined\\n\\nProvided arguments: {\\n  \\\"command\\\": \\\"cd /tmp/framework-runner-learning-aH0AJr && git status\\\"\\n}\",\"validationErrors\":{\"errors\":[],\"fields\":{\"description\":{\"errors\":[\"Invalid input: expected string, received undefined\"],\"fields\":{}}}}}"},{"role":"assistant","content":"object","toolCalls":[{"name":"execute_command","arguments":"{\"command\":\"cd /tmp/framework-runner-learning-aH0AJr && git status\",\"description\":\"Checking staged changes and repository status\"}"}]},{"role":"tool","content":"On branch master\nChanges to be committed:\n  (use \"git restore --staged <file>...\" to unstage)\n\tmodified:   answer.mjs\n\nChanges not staged for commit:\n  (use \"git add <file>...\" to update what will be committed)\n  (use \"git restore <file>...\" to discard changes in working directory)\n\tmodified:   answer.mjs\n\nUntracked files:\n  (use \"git add <file>...\" to include in what will be committed)\n\t.mastracode/\n\tmastra-vectors.db\n\tmastra-vectors.db-shm\n\tmastra-vectors.db-wal\n\tmastra.db\n\tmastra.db-shm\n\tmastra.db-wal\n\tsettings.json\n\n"}],"attempts":[{"at":"2026-10-23T03:49:14.146Z","status":200}],"status":200},{"requestSha256":"7629ec39d26333c52a87f9e2312e0dbefd2bb2673d4f35dfac2e1117f3532cee","at":"2026-10-23T03:49:15.467Z","bytes":72200,"url":"https://api.commandcode.ai/provider/v1/chat/completions","model":"reflection/beam:free","messages":[{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"user","content":"string"},{"role":"user","content":"string"},{"role":"assistant","content":"object","toolCalls":[{"name":"execute_command","arguments":"{\"command\":\"cd /tmp/framework-runner-learning-aH0AJr && git status\"}"}]},{"role":"tool","content":"{\"error\":true,\"message\":\"Tool input validation failed for execute_command. Please fix the following errors and try again:\\n- description: Invalid input: expected string, received undefined\\n\\nProvided arguments: {\\n  \\\"command\\\": \\\"cd /tmp/framework-runner-learning-aH0AJr && git status\\\"\\n}\",\"validationErrors\":{\"errors\":[],\"fields\":{\"description\":{\"errors\":[\"Invalid input: expected string, received undefined\"],\"fields\":{}}}}}"},{"role":"assistant","content":"object","toolCalls":[{"name":"execute_command","arguments":"{\"command\":\"cd /tmp/framework-runner-learning-aH0AJr && git status\",\"description\":\"Checking staged changes and repository status\"}"}]},{"role":"tool","content":"On branch master\nChanges to be committed:\n  (use \"git restore --staged <file>...\" to unstage)\n\tmodified:   answer.mjs\n\nChanges not staged for commit:\n  (use \"git add <file>...\" to update what will be committed)\n  (use \"git restore <file>...\" to discard changes in working directory)\n\tmodified:   answer.mjs\n\nUntracked files:\n  (use \"git add <file>...\" to include in what will be committed)\n\t.mastracode/\n\tmastra-vectors.db\n\tmastra-vectors.db-shm\n\tmastra-vectors.db-wal\n\tmastra.db\n\tmastra.db-shm\n\tmastra.db-wal\n\tsettings.json\n\n"},{"role":"assistant","content":"object","toolCalls":[{"name":"execute_command","arguments":"{\"command\":\"cd /tmp/framework-runner-learning-aH0AJr && git diff --cached\",\"description\":\"Viewing staged diff for answer.mjs\"}"}]},{"role":"tool","content":"diff --git a/answer.mjs b/answer.mjs\nindex 3811249..ae542ee 100644\n--- a/answer.mjs\n+++ b/answer.mjs\n@@ -1 +1 @@\n-export const answer=42;\n+export const answer=41;\n"}],"attempts":[{"at":"2026-10-23T03:49:15.468Z","status":200}],"status":200},{"requestSha256":"b798acdfce2264acde7678e5062467670652cb4d6999462b1f91f606b8fbb94b","at":"2026-10-23T03:49:18.886Z","bytes":72928,"url":"https://api.commandcode.ai/provider/v1/chat/completions","model":"reflection/beam:free","messages":[{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"user","content":"string"},{"role":"user","content":"string"},{"role":"assistant","content":"object","toolCalls":[{"name":"execute_command","arguments":"{\"command\":\"cd /tmp/framework-runner-learning-aH0AJr && git status\"}"}]},{"role":"tool","content":"{\"error\":true,\"message\":\"Tool input validation failed for execute_command. Please fix the following errors and try again:\\n- description: Invalid input: expected string, received undefined\\n\\nProvided arguments: {\\n  \\\"command\\\": \\\"cd /tmp/framework-runner-learning-aH0AJr && git status\\\"\\n}\",\"validationErrors\":{\"errors\":[],\"fields\":{\"description\":{\"errors\":[\"Invalid input: expected string, received undefined\"],\"fields\":{}}}}}"},{"role":"assistant","content":"object","toolCalls":[{"name":"execute_command","arguments":"{\"command\":\"cd /tmp/framework-runner-learning-aH0AJr && git status\",\"description\":\"Checking staged changes and repository status\"}"}]},{"role":"tool","content":"On branch master\nChanges to be committed:\n  (use \"git restore --staged <file>...\" to unstage)\n\tmodified:   answer.mjs\n\nChanges not staged for commit:\n  (use \"git add <file>...\" to update what will be committed)\n  (use \"git restore <file>...\" to discard changes in working directory)\n\tmodified:   answer.mjs\n\nUntracked files:\n  (use \"git add <file>...\" to include in what will be committed)\n\t.mastracode/\n\tmastra-vectors.db\n\tmastra-vectors.db-shm\n\tmastra-vectors.db-wal\n\tmastra.db\n\tmastra.db-shm\n\tmastra.db-wal\n\tsettings.json\n\n"},{"role":"assistant","content":"object","toolCalls":[{"name":"execute_command","arguments":"{\"command\":\"cd /tmp/framework-runner-learning-aH0AJr && git diff --cached\",\"description\":\"Viewing staged diff for answer.mjs\"}"}]},{"role":"tool","content":"diff --git a/answer.mjs b/answer.mjs\nindex 3811249..ae542ee 100644\n--- a/answer.mjs\n+++ b/answer.mjs\n@@ -1 +1 @@\n-export const answer=42;\n+export const answer=41;\n"},{"role":"assistant","content":"object","toolCalls":[{"name":"execute_command","arguments":"{\"command\":\"cd /tmp/framework-runner-learning-aH0AJr && git commit -m \\\"Update answer to 41\\\"\",\"description\":\"Committing staged change in answer.mjs\"}"}]},{"role":"tool","content":"{\"error\":\"BROKEN FACT: staged answer must equal 42. https://nodejs.org/api/assert.html#assertstrictequalactual-expected-message\"}"}],"attempts":[{"at":"2026-10-23T03:49:18.888Z","status":200}],"status":200}]}
+✔ real Beam receives the actual refusal as a valid tool result and feedback without provider error (11225.808539ms)
+{"fact":"framework-only-drive","inferenceAttempts":0}
+✔ learning fixture saves model selection without persisting the live provider key (3428.494567ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 20974.917671
+{"owner":"ops/mastra-agents/reviewer","lockfile":"ops/mastra-agents/reviewer/package-lock.json","runtime":"node","environment":"server","tests":["ops/mastra-agents/reviewer/test/server/commandcode-provider-probe.test.mjs"]}
+✔ CommandCode recorder probe corrects a stand-in call, submits, and records cost evidence (513.244455ms)
+Error in agent stream {
+  error: Error: reviewer refused: saved budget has an unresolved paid request
+      at beforeRequest (file:///home/ubuntu/.local/state/<concealed by 1Password>-server-tests/a22a340cf14ad4e984e22887fed6b907cc17cbc1/checkout/ops/mastra-agents/reviewer/src/review-budget.mjs:89:32)
+      at checkedFetch (file:///home/ubuntu/.local/state/<concealed by 1Password>-server-tests/a22a340cf14ad4e984e22887fed6b907cc17cbc1/checkout/ops/mastra-agents/reviewer/src/reviewer.mjs:70:9)
+      at Object.fetchWithBudgets [as fetch] (file:///home/ubuntu/.local/state/<concealed by 1Password>-server-tests/a22a340cf14ad4e984e22887fed6b907cc17cbc1/checkout/ops/mastra-agents/reviewer/src/reviewer.mjs:161:20)
+      at async postToApi (file:///home/ubuntu/.local/state/<concealed by 1Password>-server-tests/a22a340cf14ad4e984e22887fed6b907cc17cbc1/checkout/ops/mastra-agents/reviewer/node_modules/@ai-sdk/provider-utils/dist/index.js:3543:20)
+      at async postJsonToApi (file:///home/ubuntu/.local/state/<concealed by 1Password>-server-tests/a22a340cf14ad4e984e22887fed6b907cc17cbc1/checkout/ops/mastra-agents/reviewer/node_modules/@ai-sdk/provider-utils/dist/index.js:3514:127)
+      at async OpenAICompatibleChatLanguageModel.doGenerate (file:///home/ubuntu/.local/state/<concealed by 1Password>-server-tests/a22a340cf14ad4e984e22887fed6b907cc17cbc1/checkout/ops/mastra-agents/reviewer/node_modules/@ai-sdk/openai-compatible/dist/index.js:462:75)
+      at async AISDKV7LanguageModel.doGenerate (file:///home/ubuntu/.local/state/<concealed by 1Password>-server-tests/a22a340cf14ad4e984e22887fed6b907cc17cbc1/checkout/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/llm-BycEcjTn.js:294:18),
+  runId: 'fafe6ad8-4a04-4bbb-b597-9e289e9d429a',
+  provider: 'commandcode.chat',
+  modelId: 'deepseek/deepseek-v4.1-flash'
+}
+✔ CommandCode recorder probe refuses redirects without contacting their target (3115.828429ms)
+﹣ authorized CommandCode recorder probe runs once and retains its evidence (0.719799ms) # operator opt-in required: JUL223_COMMANDCODE_REAL_PROOF=1; no provider call in ordinary suite
+ℹ tests 3
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 4982.032251
+{"owner":"ops/verification-maintenance","lockfile":"ops/verification-maintenance/package-lock.json","runtime":"node","environment":"server","tests":["ops/verification-maintenance/test/server/sandbox.test.mjs"]}
+✔ discovery follows skill-local feature maps and real sandbox rejects product edits (76.566903ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 195.752335
+
