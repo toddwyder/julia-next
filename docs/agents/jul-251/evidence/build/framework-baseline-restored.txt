@@ -1,0 +1,37 @@
+{"fact":"framework-only-drive","inferenceAttempts":0}
+✔ public command runs PostToolUse lint without replacing command output (2716.321403ms)
+{"fact":"framework-only-drive","inferenceAttempts":0}
+✔ stock credential storage persists API keys and OAuth tokens in the app-data auth.json (84.668575ms)
+{"fact":"framework-only-drive","inferenceAttempts":0}
+✔ runtime custom-provider keys resolve without being saved in settings or exported to the environment (1291.944111ms)
+{"fact":"framework-only-drive","inferenceAttempts":0}
+✔ public command tool refuses bypass before Git and sentinel effects without inference (2694.859241ms)
+{"fact":"framework-only-drive","inferenceAttempts":0}
+✔ public tool checks the staged tree and refuses failure before commit, without inference (2979.916352ms)
+{"layer":3,"observations":[{"commit":"6862b9a39a2ae3f3a740cf33d361c59250ff9c7d","tree":"f62a5d51e835b88aeed8c376d214e0c909a950d3","status":1,"stdout":"node:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n\n41 !== 42\n\n    at file:///tmp/commit-learning-PuvHpl/answer.test.mjs:1:88\n    at ModuleJob.run (node:internal/modules/esm/module_job:430:25)\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: 41,\n  expected: 42,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n\nNode.js v24.14.1\n✖ answer.test.mjs (109.806249ms)\nℹ tests 1\nℹ suites 0\nℹ pass 0\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 124.742208\n\n✖ failing tests:\n\ntest at answer.test.mjs:1:1\n✖ answer.test.mjs (109.806249ms)\n  'test failed'\n","stderr":"","beforeExecuteResolved":true},{"commit":"3c733d8f729dda5b5ad924274be57f86da6f4ba6","tree":"29719619da6cb77fb75671fa97ea1b5a7bf17c57","status":0,"stdout":"✔ answer.test.mjs (79.575489ms)\nℹ tests 1\nℹ suites 0\nℹ pass 1\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 95.189165\n","stderr":"","beforeExecuteResolved":true}],"readiness":"refused for failing exact commit"}
+{"layer":3,"checkedCommit":"3c733d8f729dda5b5ad924274be57f86da6f4ba6","readiness":"saved for passing exact commit"}
+{"fact":"framework-only-drive","inferenceAttempts":0}
+✔ public tool awaits every exact-commit observation before returning (2866.900308ms)
+{"fact":"framework-only-drive","inferenceAttempts":0}
+✔ stock native memory retains the active thread without inference (3538.648804ms)
+{"fact":"framework-only-drive","inferenceAttempts":0}
+✔ stock settings persist through the same default file without inference (310.686275ms)
+{"fact":"framework-only-drive","inferenceAttempts":0}
+✔ thread creation resets selection and selecting after the thread preserves it without inference (333.914865ms)
+{"fact":"framework-only-drive","inferenceAttempts":0}
+{"fact":"framework-only-drive","inferenceAttempts":0}
+✔ explicit canonical model override refuses locally before any model request (1372.157585ms)
+✔ public memory constructor enables and disables the real observational engine without inference (961.982096ms)
+{"fact":"direct-local-push","localHead":"2990d29eda28c11cd07e45c8e2e95bafe5018903","remote":"2990d29eda28c11cd07e45c8e2e95bafe5018903\trefs/heads/learning","inferenceRequests":0}
+{"fact":"framework-only-drive","inferenceAttempts":0}
+✔ public workspace command pushes the exact candidate to a real local origin without inference (2222.065357ms)
+{"observedRequests":1,"networkDispatches":0,"stream":true,"asksForUsage":false}
+✔ stock custom-provider streaming does not ask the provider for token usage (1365.2014ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9609.235399

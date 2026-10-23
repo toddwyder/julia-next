@@ -158,6 +158,7 @@ test('phone browser shows Working and Stopped cards, action outcomes and a clean
   await store.register({ launchId: 'stopped', provider: 'mastra', providerRunId: 'native', cardIdentifier: 'JUL-243', cardTitle: 'Paused workflow', role: 'workflow', model: 'none', stage: 'Proof', round: 1 }, at)
   await store.append({ launchId: 'stopped', eventId: 'pause', kind: 'run-suspended', providerKind: 'workflow-result', providerStatus: 'suspended', occurredAt: at })
   const server = await startControlPageServer({ port: 0, getState: async () => ({ cards: [], offers: [{ route: 'commandcode', modelId: 'free-test', name: 'Free', company: 'Test', service: 'CommandCode', codingCapable: true, supportedEfforts: ['low'] }] }), startInitialization: async () => { throw Error('not used') }, getRuns: async () => ({ runs: [], totalRuns: 0 }), getActivity: () => ({ roleDispatches: { builder: 0, reviewer: 0, crashFixer: 0, crashReviewer: 0 }, llmInferenceCalls: 0, linearQueries: 0, linearMutations: 0 }), getAgentCards: async () => ({ updatedAt: new Date().toISOString(), cards: await store.cards(later) }) })
+  t.after(() => server.close())
   const browser = await chromium.launch()
   try {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 } })
@@ -172,7 +173,7 @@ test('phone browser shows Working and Stopped cards, action outcomes and a clean
     assert.equal(await page.getByText('What it actually did', { exact: true }).count(), 2)
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
     assert.deepEqual(errors, [])
-  } finally { await browser.close(); await server.close() }
+  } finally { await browser.close() }
 })
 
 test('monitored child exposes its owned PID and receives the explicit model with updates disabled', async t => {

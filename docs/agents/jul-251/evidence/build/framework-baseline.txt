@@ -1,0 +1,59 @@
+{"fact":"framework-only-drive","inferenceAttempts":0}
+✖ public command runs PostToolUse lint without replacing command output (2279.859757ms)
+{"fact":"framework-only-drive","inferenceAttempts":0}
+✔ stock credential storage persists API keys and OAuth tokens in the app-data auth.json (77.421403ms)
+{"fact":"framework-only-drive","inferenceAttempts":0}
+✔ runtime custom-provider keys resolve without being saved in settings or exported to the environment (1396.522039ms)
+{"fact":"framework-only-drive","inferenceAttempts":0}
+✔ public command tool refuses bypass before Git and sentinel effects without inference (2791.799314ms)
+{"fact":"framework-only-drive","inferenceAttempts":0}
+✔ public tool checks the staged tree and refuses failure before commit, without inference (2837.583307ms)
+{"layer":3,"observations":[{"commit":"da6d9187b0fa3805c0fe6eb4159cccbdbc305838","tree":"f62a5d51e835b88aeed8c376d214e0c909a950d3","status":1,"stdout":"node:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n\n41 !== 42\n\n    at file:///tmp/commit-learning-9IsaoO/answer.test.mjs:1:88\n    at ModuleJob.run (node:internal/modules/esm/module_job:430:25)\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: 41,\n  expected: 42,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n\nNode.js v24.14.1\n✖ answer.test.mjs (72.354975ms)\nℹ tests 1\nℹ suites 0\nℹ pass 0\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 86.62565\n\n✖ failing tests:\n\ntest at answer.test.mjs:1:1\n✖ answer.test.mjs (72.354975ms)\n  'test failed'\n","stderr":"","beforeExecuteResolved":true},{"commit":"4b00923314c591ce0196e93a3d23947cf685baad","tree":"29719619da6cb77fb75671fa97ea1b5a7bf17c57","status":0,"stdout":"✔ answer.test.mjs (75.699363ms)\nℹ tests 1\nℹ suites 0\nℹ pass 1\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 88.75142\n","stderr":"","beforeExecuteResolved":true}],"readiness":"refused for failing exact commit"}
+{"layer":3,"checkedCommit":"4b00923314c591ce0196e93a3d23947cf685baad","readiness":"saved for passing exact commit"}
+{"fact":"framework-only-drive","inferenceAttempts":0}
+✔ public tool awaits every exact-commit observation before returning (2477.348976ms)
+{"fact":"framework-only-drive","inferenceAttempts":0}
+✔ stock native memory retains the active thread without inference (3521.341526ms)
+{"fact":"framework-only-drive","inferenceAttempts":0}
+✔ stock settings persist through the same default file without inference (322.874102ms)
+{"fact":"framework-only-drive","inferenceAttempts":0}
+✔ thread creation resets selection and selecting after the thread preserves it without inference (233.921019ms)
+{"fact":"framework-only-drive","inferenceAttempts":0}
+{"fact":"framework-only-drive","inferenceAttempts":0}
+✔ explicit canonical model override refuses locally before any model request (1423.183447ms)
+✔ public memory constructor enables and disables the real observational engine without inference (918.240927ms)
+{"fact":"direct-local-push","localHead":"a026e8dde3a09d9eb317e7f74edf0b8f823d9660","remote":"a026e8dde3a09d9eb317e7f74edf0b8f823d9660\trefs/heads/learning","inferenceRequests":0}
+{"fact":"framework-only-drive","inferenceAttempts":0}
+✔ public workspace command pushes the exact candidate to a real local origin without inference (2217.573756ms)
+{"observedRequests":1,"networkDispatches":0,"stream":true,"asksForUsage":false}
+✔ stock custom-provider streaming does not ask the provider for token usage (1502.032663ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 12
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9596.929192
+
+✖ failing tests:
+
+test at framework/@mastra/code-sdk/after-write.test.mjs:19:1
+✖ public command runs PostToolUse lint without replacing command output (2279.859757ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /no-var/. Input:
+
+  ''
+
+      at file:///home/ubuntu/julia-hybrid-pstack-trial/framework/@mastra/code-sdk/after-write.test.mjs:35:12
+      at async file:///home/ubuntu/julia-hybrid-pstack-trial/framework/@mastra/code-sdk/framework-runtime.mjs:45:11
+      at async withoutModel (file:///home/ubuntu/julia-hybrid-pstack-trial/framework/@mastra/code-sdk/framework-runtime.mjs:29:13)
+      at async TestContext.<anonymous> (file:///home/ubuntu/julia-hybrid-pstack-trial/framework/@mastra/code-sdk/after-write.test.mjs:20:3)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '',
+    expected: /no-var/,
+    operator: 'match',
+    diff: 'simple'
+  }

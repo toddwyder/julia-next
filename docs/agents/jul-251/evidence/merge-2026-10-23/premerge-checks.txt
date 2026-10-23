@@ -1,0 +1,6 @@
+Maker self-check, 23 October 2026.
+Acceptance criteria read back from Linear and matched the pre-edit section verbatim.
+node --test scripts/agent-docs.test.mjs scripts/line-endings.test.mjs: 8 passed, 0 failed, 0 skipped.
+git diff --check: passed.
+Installed maintenance.mjs and notify-blocked.mjs hashes match the PR candidate.
+Maintenance timer active; main cursor unchanged before the merge.

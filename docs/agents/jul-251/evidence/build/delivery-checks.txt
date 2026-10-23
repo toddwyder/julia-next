@@ -1,0 +1,41 @@
+✔ routes representative changed paths to their focused CI gates (3.922346ms)
+✔ unions applicable gates and treats workflow changes as high-risk (0.52507ms)
+✔ runner code, new regressions and shared safety dependencies select the Windows gate (0.747671ms)
+✔ mints a publisher token scoped to the target repo, then merges via the REST API (3.662613ms)
+✔ never exposes the installation token in its return value, even on failure (1.436259ms)
+✔ rejects a non-positive-integer PR number instead of forwarding caller-supplied text into the API path (PR #3 review) (0.542373ms)
+✔ rejects a repo other than toddwyder/julia-next or toddwyder/Julia (no scope creep via CLI args) (0.413791ms)
+✔ rejects a missing or malformed expectedHeadSha before ever calling the API (JUL-61 step 4) (0.986581ms)
+✔ a PR head that moved since review is refused, not merged (JUL-61 step 4: merge pins the reviewed commit) (5.786623ms)
+✔ pushBranch refuses a real repo-local insteadOf rewrite before minting a token or attempting a push (68.790631ms)
+✔ pushBranch accepts a clean real repository under the isolated global-config setup (regression: GIT_CONFIG_GLOBAL must point at an existing empty file before git runs) (70.456491ms)
+✔ pushBranch without insteadOf rewrites really pushes HEAD into the bare repository (81.386361ms)
+✔ pushBranch mints a scoped token, writes an askpass helper with no token in its own file content, and pushes via env only (6.353439ms)
+✔ the real askpass helper file never contains the token itself, only a reference to the env var (2.926649ms)
+✔ pushBranch refuses to push at all when the repo has a url.*.insteadOf rewrite configured (fix-verification finding: repo-local config can redirect the push and exfiltrate the token even with hooks/helpers disabled) (1.64652ms)
+✔ pushBranch proceeds normally when the repo has no url.*.insteadOf rewrites (2.729323ms)
+✔ pushBranch scopes safe.directory to exactly the passed cwd, on both the rewrite check and the push itself (JUL-71: orchestrator-svc pushing a runner-owned worktree hits git's dubious-ownership guard otherwise) (1.934208ms)
+✔ pushBranch rejects a repo outside the approved publisher targets (0.407136ms)
+✔ pushBranch never exposes the token in its return value or a thrown error (0.985718ms)
+✔ pushBranch never repeats raw git stderr in its thrown error, even if a hook printed a credential into it (finding S1) (0.835452ms)
+✔ openPullRequest mints a token, opens the PR via the REST API, and returns only {url, number} (4.387454ms)
+✔ openPullRequest can create a draft for machine work (0.811927ms)
+✔ readyPullRequest marks only the pinned draft head ready through the publisher App (1.235074ms)
+✔ openPullRequest rejects a repo outside the approved publisher targets (0.662413ms)
+✔ refuses to publish when JULIA_PUBLISHER_APP_ID/PRIVATE_KEY are missing (2.275114ms)
+✔ mints a JWT signed by the App's own private key, verifiable with its public key (6.549114ms)
+✔ mints an installation token via the standard two-call GitHub App flow, scoped to the repo JULIA_PUBLISHER_REPO names (3.148395ms)
+✔ defaults JULIA_PUBLISHER_REPO to julia-next when it is unset (3.368555ms)
+✔ a repo the App is not installed on fails clearly instead of falling back to Julia (5.403014ms)
+✔ loadPublisherCredentialFile loads JULIA_PUBLISHER_* vars from a dotenv-style file into the given env object (1.288986ms)
+✔ loadPublisherCredentialFile never overwrites a credential already present in env (an explicit --env-file wins) (0.884732ms)
+✔ loadPublisherCredentialFile is a silent no-op when the file does not exist, so a dev machine or CI box is unaffected (0.632619ms)
+✔ base64url encodes without padding or unsafe characters (0.535687ms)
+ℹ tests 33
+ℹ suites 0
+ℹ pass 33
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 391.282905

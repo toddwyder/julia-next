@@ -1,0 +1,26 @@
+✖ a Node test owner declaring Playwright gets its browser runtime without a test-name entry (129.483926ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 270.351882
+
+✖ failing tests:
+
+test at scripts/test-owners.test.mjs:119:1
+✖ a Node test owner declaring Playwright gets its browser runtime without a test-name entry (129.483926ms)
+  Error: ENOENT: no such file or directory, open '/tmp/test-owners-LOrGSY/packages/node-browser/runtime-installed.json'
+      at readFileSync (node:fs:440:20)
+      at TestContext.<anonymous> (file:///home/ubuntu/julia-hybrid-pstack-trial/scripts/test-owners.test.mjs:131:31)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'open',
+    path: '/tmp/test-owners-LOrGSY/packages/node-browser/runtime-installed.json'
+  }

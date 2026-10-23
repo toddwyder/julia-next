@@ -20,8 +20,8 @@ Julia publishes a same-origin web manifest that describes its standalone install
 
 Preconditions:
 
-- `$run` contains the JSON returned by `node scripts/verify-julia.mjs launch` in this same PowerShell session.
-- `node scripts/verify-julia.mjs doctor` passes immediately before driving.
+- `$run` contains the JSON returned by `node .agents/skills/verify-julia/verify-julia.mjs launch` in this same PowerShell session.
+- `node .agents/skills/verify-julia/verify-julia.mjs doctor` passes immediately before driving.
 - The named CLI session is open at Julia's root page.
 
 - **Check the user's manifest entry point.** Read the actual manifest link from the home page. Run `npx --no-install playwright cli -s="$($run.session)" --raw eval "() => ({pageOrigin:location.origin,manifestHref:document.querySelector('link[rel=manifest]')?.href,faviconCount:document.querySelectorAll('link[rel=icon]').length})" | Set-Content -Encoding utf8 "$($run.evidenceDir)\manifest-entry.json"`. The raw CLI result is a JSON object (not a JSON-encoded string); parse the saved file with `Get-Content ... -Raw | ConvertFrom-Json`. The link exists, resolves to the same origin as `$run.url`, and at least one favicon link is present.

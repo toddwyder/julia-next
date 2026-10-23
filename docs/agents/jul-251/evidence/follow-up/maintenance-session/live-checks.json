@@ -1,0 +1,7 @@
+{
+  "doctor_exit": 0,
+  "drive_exit": 0,
+  "stdout_exact": true,
+  "stderr_empty": true,
+  "child_exited": true
+}

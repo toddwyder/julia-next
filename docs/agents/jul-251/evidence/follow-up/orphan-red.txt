@@ -1,0 +1,25 @@
+✖ verify-machine skill and feature map keep the generated public contract (8.953296ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 153.183184
+
+✖ failing tests:
+
+test at scripts/verify-machine-skill.test.mjs:10:1
+✖ verify-machine skill and feature map keep the generated public contract (8.953296ms)
+  Error: ENOENT: no such file or directory, open '/home/ubuntu/julia-hybrid-pstack-trial/.agents/skills/verify-machine/generation.json'
+      at async open (node:internal/fs/promises:640:25)
+      at async readFile (node:internal/fs/promises:1283:14)
+      at async TestContext.<anonymous> (file:///home/ubuntu/julia-hybrid-pstack-trial/scripts/verify-machine-skill.test.mjs:13:33)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'open',
+    path: '/home/ubuntu/julia-hybrid-pstack-trial/.agents/skills/verify-machine/generation.json'
+  }

@@ -1,0 +1,32 @@
+{
+  "branch": "hybrid/pstack-trial",
+  "startCommit": "3ea502aa96076b9caa96dd627aa49f7da2fb9308",
+  "researchInstall": "/home/ubuntu/julia-jul-231/ops/build-runner",
+  "versions": {
+    "@mastra/code-sdk": {
+      "installed": "1.14.0",
+      "lockfile": "1.14.0"
+    },
+    "@mastra/core": {
+      "installed": "1.78.0",
+      "lockfile": "1.78.0"
+    },
+    "@ai-sdk/openai": {
+      "installed": "3.0.131",
+      "lockfile": "3.0.131"
+    },
+    "@ai-sdk/openai-compatible": {
+      "installed": "2.0.87",
+      "lockfile": "2.0.87"
+    },
+    "@ai-sdk/provider": {
+      "installed": "2.0.5",
+      "lockfile": "2.0.5"
+    }
+  },
+  "lockfileSha256": "2ba94a3efee1111515b64d3303e96b733d7188b8eefdf3051f1d07f28909c433",
+  "trialSpendUsd": 0,
+  "inferenceRequests": 0,
+  "updates": "No installation, upgrade, or updater invoked; learning helpers assert SDK 1.14.0 against research lockfile. This is research, not owning-install delivery proof.",
+  "entryPoints": "node --test via FRAMEWORK_RUNNER_ROOT; Linear via scripts/julia-agents.mjs -- node; no adapted delivery launcher used."
+}

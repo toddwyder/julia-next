@@ -1,0 +1,579 @@
+julia-init-windows	Test active runner and shared safety regressions without provider calls	﻿2026-10-22T22:29:09.9336826Z ##[group]Run node scripts/julia-runner-suite.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:09.9337289Z [36;1mnode scripts/julia-runner-suite.mjs[0m
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:09.9408306Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:09.9408664Z ##[endgroup]
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3052114Z Runner suite: 47 files
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3052659Z app/api/observability-proof/route.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3053323Z framework/@mastra/code-sdk/credentials.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3054157Z framework/@mastra/code-sdk/usage-request.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3055350Z lib/delivery-events.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3055946Z ops/build-runner/test/adapter.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3057009Z ops/build-runner/test/ledger.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3057781Z ops/build-runner/test/review-regressions.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3058525Z ops/build-runner/test/transport.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3059342Z ops/mastra-agents/reviewer/audit/jul-223-stage2-stock.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3060313Z ops/mastra-agents/reviewer/test/card-admission-check.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3061318Z ops/mastra-agents/reviewer/test/commandcode-provider-probe.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3061907Z ops/mastra-agents/reviewer/test/contract.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3062432Z ops/mastra-agents/reviewer/test/delivery-workflow.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3062970Z ops/mastra-agents/reviewer/test/model-journal.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3063494Z ops/mastra-agents/reviewer/test/quote-check.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3063913Z ops/mastra-agents/reviewer/test/raw-answer.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3064311Z ops/mastra-agents/reviewer/test/recorded-review.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3064729Z ops/mastra-agents/reviewer/test/recording-engine.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3065142Z ops/mastra-agents/reviewer/test/repository-root.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3065536Z ops/mastra-agents/reviewer/test/reset-stage.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3065924Z ops/mastra-agents/reviewer/test/resource-budget.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3066326Z ops/mastra-agents/reviewer/test/review-budget.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3066718Z ops/mastra-agents/reviewer/test/review-runtime.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3067428Z ops/mastra-agents/reviewer/test/reviewer-entrypoint.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3067853Z ops/mastra-agents/reviewer/test/run-file.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3068264Z ops/mastra-agents/reviewer/test/tool-input-failure.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3068703Z ops/mastra-agents/reviewer/test/worst-case-offline.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3069079Z ops/service-dropbox/run-agy-seat.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3090839Z scripts/acceptance-check.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3091326Z scripts/bad-submissions.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3091802Z scripts/ci-routing.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3092295Z scripts/commandcode-requests.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3092823Z scripts/delivery-tool-updates.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3093363Z scripts/julia-delivery-boundaries.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3093707Z scripts/julia-delivery-recovery.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3094036Z scripts/julia-delivery-state.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3094365Z scripts/julia-delivery-workspace.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3094690Z scripts/julia-retired-controller.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3095408Z scripts/julia-runner-suite.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3095732Z scripts/julia-runner-time-limit.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3096020Z scripts/julia-vault.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3096269Z scripts/line-endings.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3096519Z scripts/linear-cli.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3096795Z scripts/no-personal-paths.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3097079Z scripts/personal-paths.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3097381Z scripts/verify-machine-skill.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.3097693Z scripts/verify-reviewer-worktree.test.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5018278Z ✔ controlled application error is disabled by default and only an exact secret can trigger it (40.5959ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5243590Z node:internal/modules/cjs/loader:1430
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5251912Z   const err = new Error(message);
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5252683Z               ^
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5253135Z
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5253686Z Error: Cannot find module '@mastra/code-sdk/package.json'
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5254829Z Require stack:
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5255652Z - D:\a\julia-next\julia-next\ops\build-runner\package.json
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5256535Z     at Function._resolveFilename (node:internal/modules/cjs/loader:1430:15)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5257639Z     at Function.resolve (node:internal/modules/helpers:157:19)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5259065Z     at file:///D:/a/julia-next/julia-next/framework/@mastra/code-sdk/framework-runtime.mjs:13:41
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5260521Z     at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5262292Z     at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:681:26)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5263709Z     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5) {
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5264802Z   code: 'MODULE_NOT_FOUND',
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5265752Z   requireStack: [ 'D:\\a\\julia-next\\julia-next\\ops\\build-runner\\package.json' ]
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5266782Z }
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5267184Z
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5267514Z Node.js v22.23.2
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5268680Z ✖ framework\@mastra\code-sdk\credentials.test.mjs (87.8745ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5308044Z node:internal/modules/cjs/loader:1430
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5309447Z   const err = new Error(message);
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5310868Z               ^
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5311492Z
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5312095Z Error: Cannot find module '@mastra/code-sdk/package.json'
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5313598Z Require stack:
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5314586Z - D:\a\julia-next\julia-next\ops\build-runner\package.json
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5315700Z     at Function._resolveFilename (node:internal/modules/cjs/loader:1430:15)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5316749Z     at Function.resolve (node:internal/modules/helpers:157:19)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5317961Z     at file:///D:/a/julia-next/julia-next/framework/@mastra/code-sdk/framework-runtime.mjs:13:41
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5320472Z     at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5322011Z     at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:681:26)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5323386Z     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5) {
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5324436Z   code: 'MODULE_NOT_FOUND',
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5325390Z   requireStack: [ 'D:\\a\\julia-next\\julia-next\\ops\\build-runner\\package.json' ]
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5326334Z }
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5326659Z
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5326953Z Node.js v22.23.2
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5327948Z ✖ framework\@mastra\code-sdk\usage-request.test.mjs (78.7949ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5613125Z ✔ application exception is captured and flushed, without request data (2.2951ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5663507Z ✔ operational event allows selected fields and checks ingestion response (1.5247ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:10.5682878Z ✔ missing configuration and vendor failures do not masquerade as successful proof (0.2567ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.0406754Z ✖ stock adapter request works while direct and nested builder commands cannot read credentials (448.0594ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.3325057Z (node:7172) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.3358515Z (Use `node --trace-warnings ...` to show where the warning was created)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.3399200Z ✔ priced requests hold budget, settle once, and enforce the card ceiling (59.899ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.3442809Z ✔ free requests remain usable without usage when priced accounting is unknown (213.8749ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.3528566Z ✔ reopening retains unresolved holds, snapshots, and settled costs per card (215.7674ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.3536017Z ✔ actual cost above a reservation is durable and blocks priced work (76.5933ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.3538257Z ✔ invalid monetary inputs cannot change durable budget (74.8371ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.4720969Z ✔ separate processes cannot jointly reserve beyond the ceiling (204.9095ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.6755676Z ✔ a process exit after reservation never releases an uncertain request (207.7256ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.7114540Z (node:5480) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.7116479Z (Use `node --trace-warnings ...` to show where the warning was created)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.7120113Z ✖ review durable stop survives reopen and blocks free and paid routes only for its card (405.5298ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.7122265Z ✔ review stopped card blocks allowlisted metadata GET (5.7658ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.7123838Z ✔ review oversized known usage records actual cost and refuses result (3.8638ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.7126181Z ✔ review stock adapter rejects state symlink into builder before runtime (126.4967ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.7128455Z ✔ review stock adapter rejects auth-file symlink into builder before runtime (159.9752ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.7130318Z ✔ review stock adapter rejects auth-parent symlink into builder before runtime (111.2947ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.7132270Z ✖ review replacing builder home after boot cannot expose outside auth (206.3066ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.7461776Z (node:6184) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.7463398Z (Use `node --trace-warnings ...` to show where the warning was created)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.7491032Z ✔ free requests arrive with enforced limits and settle without usage (79.8848ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.7628038Z ✔ paid missing usage refuses result and prevents the next arrival (14.9304ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.7682120Z ✔ chat JSON settles cache categories once (12.0152ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.7684744Z ✔ chat SSE settles cache categories once (12.5736ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.7686078Z ✔ responses JSON settles cache categories once (13.1539ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.7688799Z ✔ responses SSE settles cache categories once (8.6157ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.7697104Z ✔ messages JSON settles cache categories once (8.8867ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.7699825Z ✔ messages SSE settles cache categories once (8.6861ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.7702124Z ✔ wrong model, endpoint, missing prices and trial paid routes send nothing (17.1221ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.7704713Z ✔ separate HTTP attempts create separate durable records (41.1284ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.7706995Z ✔ card ceiling refuses an oversized reservation before HTTP (3.216ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.7709287Z ✔ provider reported cost stops even a configured free route (9.5169ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.7712537Z ✔ allowlisted authentication cannot carry inference payloads and redirects never follow (21.8228ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.7715359Z ✔ invalid cache count -1 retains paid hold (7.0941ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.7716473Z ✔ invalid cache count 0.5 retains paid hold (7.1774ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.7717810Z ✔ bounded buffering refuses a large result without releasing its reservation (5.7344ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.7719485Z ✔ decimal rates round nano dollars upward without floating point drift (12.3422ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.7720914Z ✔ ledger errors never reveal their underlying body or credentials (6.5415ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.7722452Z ✔ authentication and catalog are confined to their exact allowlisted URL (26.2397ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.7723940Z ✔ connection failure after arrival retains the paid reservation (8.4782ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:11.7725341Z ✔ a truncated paid stream retains the reservation despite partial usage (7.72ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:13.0691538Z ✔ installed Mastra combines a tool loop with inline structured output on an OpenAI-compatible connection (312.323ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:13.1124838Z ✔ checks a Linear card as a Ready candidate without changing its current state (46.15ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:13.1126947Z ✔ keeps accepting the legacy Finish conditions heading (2.0192ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:13.1128037Z ✔ returns the launcher contract findings for an inadmissible card (2.2967ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:13.1129065Z ✔ the command checks every requested card and exits nonzero when one fails (409.0708ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:13.1129651Z ✔ the command refuses an empty card list (330.3791ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:13.1130203Z ✔ refuses a fabricated installed section in the Framework Map comment (3.912ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:13.1130789Z ✔ admission checks package version is not a file citation (1.5911ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:13.1131298Z ✔ admission checks unscoped package citation (1.8133ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:13.1131743Z ✔ admission checks Windows installed citation (1.7617ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:13.1132183Z ✔ admission checks prose installed citation (1.7954ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:13.1132603Z ✔ admission checks prose framework gap (1.7893ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:13.1133006Z ✔ admission checks plain installed path (0.9418ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:13.1133446Z ✔ admission checks versioned installed citation (1.4534ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:13.1133885Z ✔ admission checks missing installed file (0.737ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:13.1134807Z ✔ admission checks non-Markdown installed file (0.8128ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:13.1135649Z ✔ admission checks real installed section (0.7238ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:13.1136403Z ✔ admission checks unapproved framework gap (0.429ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:13.1136894Z ✔ admission checks private files behind generic docs (0.3798ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:13.1137352Z ✔ admission checks linked Todd decision (0.3451ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:13.1137784Z ✔ admission checks unrelated link is no decision (0.3543ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:13.1138200Z ✔ admission checks bullet citation (1.2299ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:13.1138910Z ✔ admission checks section before citation (2.7846ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:13.1139827Z ✔ follows a repository map reference and admits the current JUL-243 map (6.3804ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:13.1140868Z ✔ a later comment page cannot hide a Framework Map refusal (1.6864ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:13.1141924Z ✔ replays the exact refused JUL-243 map and the settled main map (13.3384ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:13.1143161Z ✔ the newest dated Framework Map replaces historical maps regardless of page order (15.9003ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:13.9583651Z ✔ CommandCode recorder probe corrects a stand-in call, submits, and records cost evidence (901.8037ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:17.1446666Z Error in agent stream {
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:17.1490377Z   error: Error: reviewer refused: saved budget has an unresolved paid request
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:17.1491758Z       at beforeRequest (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/src/review-budget.mjs:89:32)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:17.1493801Z       at checkedFetch (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/src/reviewer.mjs:70:9)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:17.1496659Z       at Object.fetchWithBudgets [as fetch] (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/src/reviewer.mjs:161:20)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:17.1498754Z       at async postToApi (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/node_modules/@ai-sdk/provider-utils/dist/index.js:3543:20)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:17.1501769Z       at async postJsonToApi (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/node_modules/@ai-sdk/provider-utils/dist/index.js:3514:127)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:17.1506025Z       at async OpenAICompatibleChatLanguageModel.doGenerate (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/node_modules/@ai-sdk/openai-compatible/dist/index.js:462:75)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:17.1509303Z       at async AISDKV7LanguageModel.doGenerate (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/llm-BycEcjTn.js:294:18),
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:17.1511005Z   runId: '0b9efbb5-e5a9-4a24-a4ae-17bc64b9c27b',
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:17.1511652Z   provider: 'commandcode.chat',
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:17.1516485Z   modelId: 'deepseek/deepseek-v4.1-flash'
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:17.1519315Z }
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:17.1564706Z ✔ CommandCode recorder probe refuses redirects without contacting their target (3197.6245ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:17.1570806Z ﹣ authorized CommandCode recorder probe runs once and retains its evidence (0.3033ms) # operator opt-in required: JUL223_COMMANDCODE_REAL_PROOF=1; no provider call in ordinary suite
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:17.1939910Z ✔ the reviewer uses the approved stock generation bounds (1.8573ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:17.1941570Z ✔ reviewer step budget follows the immutable file inventory and contract phases (0.7949ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:17.1943124Z ✔ structured output accepts exactly the immutable changed-file inventory (2.7143ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:17.1944684Z ✔ the model prompt keeps requirements and proof but reads candidate bytes through tools (0.5578ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:17.1946061Z ✔ per-card reviewer model overrides the CommandCode default (0.3316ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:17.1947833Z ✔ published CommandCode prices produce a labeled estimate from every token category (0.8763ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:17.1949537Z ✔ raw CommandCode tokens survive schema normalization and carry the published-price estimate (0.8955ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:17.1951654Z ✔ a verdict fails closed unless it accounts for every changed file exactly once (1.094ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:17.9205961Z ✔ green build, checks and independent review write one waiting record, pause, and accept after a runtime restart (285.3859ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:17.9209578Z ✔ a card missing agreed seams parks immediately without a builder or repair round (158.0208ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:17.9212466Z ✔ a failed worker CLI update parks before any worker launches (116.8396ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:17.9214277Z ✔ a separate process resumes the saved pause without duplicate launches or notices (2936.7873ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:18.2065176Z ✔ reject resumes the suspended run and stops with Todd's reason (285.8737ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:18.4144614Z ✔ two failed reviews park without a waiting record or a third builder launch (207.63ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:18.6332605Z ✔ a reviewer-launcher crash gets one recovery cycle, never becomes review FAIL, and launches no product builder (218.56ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:18.9240032Z ✔ uncertain paid reviewer acceptance parks without recovery or another model call (290.5098ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:18.9342560Z ✔ a replayed durable crash incident parks without a second recovery cycle (10.4192ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:18.9552179Z ✔ recovery evidence cannot resume a step other than the crashed step (20.1745ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:19.1324503Z ✔ the intentional production reviewer gate parks at zero cost without crash recovery (177.4452ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:19.5245750Z ✔ accepting a changed candidate discards the answer, reruns checks and review, and pauses again (392.5586ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:19.6822761Z ✔ workflow step handoffs expose paths and round metadata, never file contents (156.7928ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:19.8840305Z ✔ a failed existing boundary parks and still writes one complete permanent summary (195.656ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:19.9193884Z ✔ production adapter glue invokes the existing launcher for builder and Mastra reviewer (41.8947ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:19.9917840Z ✔ production adapter repair consumes prior findings and reviews the checks current candidate (71.601ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:19.9992507Z ✔ production adapter refuses a reviewer from the observed builder maker (7.3802ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:20.0722580Z ✔ production adapter preserves a failed review report for the next repair (73.5759ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:20.2352487Z [WORKFLOW] Error executing step workflow.julia-delivery-round.step.build: Error: builder step did not return a result path
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:20.2354219Z     at requireResultPath (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/src/delivery-workflow.mjs:91:11)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:20.2355820Z     at Object.execute (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/src/delivery-workflow.mjs:205:33)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:20.2357876Z     at async engine.executeStepWithRetry.retries.retries (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/agent-BSre8QnL.js:4014:18)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:20.2360398Z     at async DefaultExecutionEngine.executeStepWithRetry (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/agent-BSre8QnL.js:4515:14)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:20.2496687Z     at async executeStep (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/agent-BSre8QnL.js:3978:26)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:20.2498637Z     at async executeEntry (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/agent-BSre8QnL.js:2966:50)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:20.2500796Z     at async DefaultExecutionEngine.execute (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/agent-BSre8QnL.js:4848:17)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:20.2502884Z     at async Run._start (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/agent-BSre8QnL.js:7577:18)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:20.2504878Z     at async Workflow.execute (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/agent-BSre8QnL.js:6975:15)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:20.2507145Z     at async engine.executeStepWithRetry.retries.retries (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/agent-BSre8QnL.js:4014:18)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:20.2509224Z [WORKFLOW] Error executing step workflow.julia-delivery-cycle.step.julia-delivery-round: undefined
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:20.2510674Z [WORKFLOW] Error executing step workflow.julia-delivery.step.julia-delivery-cycle: undefined
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:20.2577917Z ✔ an unhandled workflow failure still ends with an ADR 0017 summary line (185.7323ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:20.2611382Z ✔ a recovered terminal write does not duplicate the run summary line (2.7221ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0798822Z ✔ provider dispatch durably journals one request and its exact response (141.5314ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0800132Z ✔ journal overflow fails before a verdict and becomes a warning after one (37.3355ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0801218Z ✔ a restarted journal retains earlier provider events (72.4057ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0802606Z ✔ the evidence ceiling includes other run files and atomic-write headroom (46.9712ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0804937Z ✔ quote check accepts an exact quote only (1.8477ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0807241Z ✔ quote check discovers every nested initial or repair citation (1.0086ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0808509Z ✔ quote check prefers the authoritative cumulative diff and deleted-file sources (0.433ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0809830Z ✔ the model-facing quote verifier accepts only exact immutable candidate text (0.3826ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0811506Z ✔ serialized source control characters are repaired only to exact source text (0.3856ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0812679Z ✔ the live failure fixtures are copied byte-for-byte (9.3921ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0813857Z ✔ the recorded malformed answer is durable before it becomes a technical failure (183.4623ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0815178Z ✔ a valid-looking single-shot JSON answer cannot bypass the recording tools (54.7512ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0816951Z ✔ killing the transport process after the raw answer arrives leaves the complete file (1117.9306ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0818416Z Error converting tool call input to JSON { toolCallId: 'malformed', toolName: 'record_piece', inputLength: 21 }
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0820031Z ✔ real Agent.generate records a complete review and recovers each scripted report failure (1501.3777ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0821351Z ✔ real Agent.generate records and submits the repair-report shape (173.6958ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0823864Z ✔ a rejected piece cannot add serialized-quote repair audit metadata (20.327ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0825662Z ✔ interruption keeps accepted pieces and records their names in the technical failure (495.5958ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0827186Z ✔ accepted pieces are durable and can be replaced, removed, inspected, and submitted (94.4354ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0829277Z ✔ the same engine records an unrelated packing-list schema without engine changes (336.79ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0831317Z ✔ the reviewer locates its enclosing Git repository (71.7713ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0833313Z ✔ the six standing rules are part of the fixed reviewer instructions (1.4828ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0837130Z ✔ the stage-one reset refuses reviewer execution before any provider request (1.0457ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0839285Z ✔ free-disk preflight stops before start and durably records SYSTEM_ERROR progress (38.1407ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0841552Z ✔ memory reservation stops before peak RSS can cross 768 MiB and saves progress (34.2619ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0842954Z ✔ memory sampling retains a transient peak across the complete agent step (48.5486ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0843810Z ✔ disk-growth reservation stops before atomic evidence can cross 128 MiB (22.423ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0844943Z ✔ the durable budget reserves each request before dispatch and charges validated usage (76.6383ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0846233Z ✔ the durable budget refuses a request whose worst-case price exceeds the authorization (18.4931ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0847445Z ✔ provider dispatch does not occur when the durable budget refuses the pending request (32.2456ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0848560Z ✔ a restart preserves charges and refuses to retry an unresolved paid request (113.7706ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0849610Z ✔ separate run ledgers share the cumulative card ceiling (240.952ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0850629Z ✔ a missing cumulative card ledger cannot reset previously authorized spend (100.1112ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0851363Z ✔ malformed saved measurements and costs above a reservation fail closed (26.629ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0852042Z ✔ future clocks, busy card ledgers, and mismatched reservations fail closed (84.1089ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0852813Z ✔ the offline runtime wires stock bounds, authorization, durable budget, and provider journal (185.1461ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0853319Z Error in agent stream {
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0853713Z   error: Error: reviewer refused: pending request would cross the 20 minute limit
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0854402Z       at beforeRequest (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/src/review-budget.mjs:92:47)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0855169Z       at checkedFetch (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/src/reviewer.mjs:70:9)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0856222Z       at Object.fetchWithBudgets [as fetch] (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/src/reviewer.mjs:161:20)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0857686Z       at async postToApi (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/node_modules/@ai-sdk/provider-utils/dist/index.js:3543:20)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0858729Z       at async postJsonToApi (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/node_modules/@ai-sdk/provider-utils/dist/index.js:3514:127)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0859925Z       at async OpenAICompatibleChatLanguageModel.doGenerate (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/node_modules/@ai-sdk/openai-compatible/dist/index.js:462:75)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0861189Z       at async AISDKV7LanguageModel.doGenerate (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/llm-BycEcjTn.js:294:18),
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0861937Z   runId: 'ec3164d0-7aa5-4fef-8a3c-f89bc80bcadc',
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0862228Z   provider: 'offline.chat',
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0862457Z   modelId: 'offline-reviewer'
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0862684Z }
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0863271Z ✔ elapsed refusal through Agent.generate ends as SYSTEM_ERROR with saved progress before dispatch (251.9732ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0863781Z Error in agent stream {
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0864238Z   error: Error: reviewer refused: sampled memory reached the 736 MiB guard before the 768 MiB ceiling
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0864746Z       at node:internal/deps/undici/undici:15157:13
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0865178Z       at processTicksAndRejections (node:internal/process/task_queues:103:5)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0865649Z       at runNextTicks (node:internal/process/task_queues:68:3)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0866034Z       at listOnTimeout (node:internal/timers:547:9)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0867182Z       at process.processTimers (node:internal/timers:521:7)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0868178Z       at async checkedFetch (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/src/reviewer.mjs:72:20)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0869638Z       at async Object.fetchWithBudgets [as fetch] (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/src/reviewer.mjs:161:14)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0870644Z       at async postToApi (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/node_modules/@ai-sdk/provider-utils/dist/index.js:3543:20)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0871667Z       at async postJsonToApi (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/node_modules/@ai-sdk/provider-utils/dist/index.js:3514:127)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0873022Z       at async OpenAICompatibleChatLanguageModel.doGenerate (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/node_modules/@ai-sdk/openai-compatible/dist/index.js:462:75),
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0874841Z   runId: '1a000322-5f3d-4290-b8f6-b4ef29e3e7c1',
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0875170Z   provider: 'offline.chat',
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0875414Z   modelId: 'offline-reviewer'
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0875718Z }
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0876325Z ✔ in-step RSS guard aborts Agent.generate below 768 MiB and saves SYSTEM_ERROR progress (4157.4697ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0877111Z ✔ the runtime refuses an authorization other than the approved per-review amount (0.4514ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0877935Z ✔ the Windows reviewer entry point reads a piped request and records the pre-provider paid gate (316.7538ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0878683Z ✔ concurrent durable writers cannot overrun the shared evidence quota (35.4463ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0879387Z Error converting tool call input to JSON { toolCallId: 'record-1', toolName: 'record_item', inputLength: 81 }
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0880170Z Error converting tool call input to JSON { toolCallId: 'record-1', toolName: 'record_item', inputLength: 81 }
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:29:47.0880977Z ✔ real Mastra generate reports bad tool calls to the model and accepts a corrected call (367.7214ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:11.7940048Z ✔ offline maximum-length installed Agent.generate review measures every one-review budget (48730.2861ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.3605462Z ✔ the 70-step stock ceiling prevents step 71 and saves SYSTEM_ERROR progress (20566.9452ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.4398226Z Error in agent stream {
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.4399053Z   error: Error: reviewer refused: pending request would cross the $0.5 limit
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.4400173Z       at beforeRequest (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/src/review-budget.mjs:94:66)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.4401474Z       at checkedFetch (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/src/reviewer.mjs:70:9)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.4402998Z       at Object.fetchWithBudgets [as fetch] (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/src/reviewer.mjs:161:20)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.4404045Z       at async postToApi (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/node_modules/@ai-sdk/provider-utils/dist/index.js:3543:20)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.4405186Z       at async postJsonToApi (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/node_modules/@ai-sdk/provider-utils/dist/index.js:3514:127)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.4406625Z       at async OpenAICompatibleChatLanguageModel.doGenerate (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/node_modules/@ai-sdk/openai-compatible/dist/index.js:462:75)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.4408805Z       at async AISDKV7LanguageModel.doGenerate (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/llm-BycEcjTn.js:294:18),
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.4409596Z   runId: '9bb5ce7c-e421-4412-9c39-1c43fc10ee8d',
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.4409897Z   provider: 'offline.chat',
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.4410137Z   modelId: 'offline-reviewer'
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.4410667Z }
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.4554907Z ✔ the $0.50 reservation refuses an oversized request before network dispatch and saves SYSTEM_ERROR (94.1421ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5174415Z Error in agent stream {
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5175263Z   error: Error: reviewer refused: durable evidence limit of 67043328 bytes would be exceeded
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5176316Z       at file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/src/run-file.mjs:31:13
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5177427Z       at async withFileLock (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/src/run-file.mjs:54:16)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5178706Z       at async durableWrite (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/src/run-file.mjs:29:3)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5179807Z       at async file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/src/review-budget.mjs:101:9
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5181071Z       at async withFileLock (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/src/run-file.mjs:54:16)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5182180Z       at async beforeRequest (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/src/review-budget.mjs:96:7)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5183104Z       at async checkedFetch (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/src/reviewer.mjs:70:3)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5184380Z       at async Object.fetchWithBudgets [as fetch] (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/src/reviewer.mjs:161:14)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5185538Z       at async postToApi (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/node_modules/@ai-sdk/provider-utils/dist/index.js:3543:20)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5187587Z       at async postJsonToApi (file:///D:/a/julia-next/julia-next/ops/mastra-agents/reviewer/node_modules/@ai-sdk/provider-utils/dist/index.js:3514:127),
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5188418Z   runId: 'fd9f4e2e-1e23-45f0-bf4f-f41cb4cdcd3d',
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5188765Z   provider: 'offline.chat',
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5189037Z   modelId: 'offline-reviewer'
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5189296Z }
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5343371Z ✔ the 64 MiB evidence reservation refuses the crossing write and retains SYSTEM_ERROR progress (79.9628ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5723665Z ✔ delivery recovery uses the current default model and records the model agy actually reports (2.28ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5725589Z ✔ delivery model evidence rejects an ambiguous or unrelated agy log (0.1738ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5726690Z ✔ delivery result rejects incomplete, denied, and mismatched turns (0.2618ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5728324Z ✔ JUL-92's real card: two criteria (the struck-through one is not a criterion) and three UAT-plan items (3.1118ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5730062Z ✔ JUL-92 on 23 Sep, replayed: the hand-in that reached UAT had no per-item evidence and is refused on all seven gaps (0.4735ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5731214Z ✔ everything present, by id and by name: PASS (1.2025ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5732093Z ✔ A CARD WITH A MISSING ITEM IS REFUSED, and the refusal names it (0.8703ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5732839Z ✔ BY NAME: the right id on the wrong criterion does not count, a small copy difference does (0.2311ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5733533Z ✔ a card with no criteria or no UAT items can never pass (0.2771ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5734280Z ✔ ticking touches only the open criterion boxes -- not the struck line, not boxes in other sections (0.3067ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5735154Z ✔ THE GUARD on the live card: every box ticked AND every UAT item in the evidence comment, or no UAT (1.5208ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5735886Z ✔ the CLI: PASS and exit 0, or one MISSING line per gap and exit 1 (123.8734ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5736650Z ✔ finding 1: a criterion after a bold sub-label, or a UAT item after a deeper heading, is still required (0.7547ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5737401Z ✔ finding 2: two criteria that start alike cannot stand in for each other (0.2835ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5737989Z ✔ finding 3: the guard judges the NEWEST evidence comment (13.8459ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5738608Z ✔ finding 4: a same-worded box in another section is not ticked; CRLF is kept (0.2032ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5739230Z ✔ finding 5: nested or repeated numbers cannot hide a UAT item (0.1602ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5741004Z ✔ a UAT item indented 1-2 spaces is still a top-level item; 3 or more is a sub-step (0.1397ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5742226Z ✔ the guard picks the newest evidence comment by its own time when Linear gives one, whatever the order (0.3338ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5743111Z ✔ each expected.json has a valid refusedBy and non-empty reason (2.1539ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5743896Z ✔ work-mismatch assertions execute from a fixture path with spaces and a URL fragment character (373.6489ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5744711Z ✔ tests-fail: check fails in child process, evidence passes acceptance-check (172.6081ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5745454Z ✔ evidence-missing: check passes, acceptance-check fails naming AC5 and UAT3 only (156.1471ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5746334Z ✔ work-mismatch: check passes, acceptance-check passes, module makes one request and no per-step results (156.4968ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5747094Z ✔ routes representative changed paths to their focused CI gates (2.6907ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5747712Z ✔ unions applicable gates and treats workflow changes as high-risk (0.286ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5748419Z ✔ runner code, new regressions and shared safety dependencies select the Windows gate (1.0935ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5749199Z ✔ only Beam machinery is admitted; outside code review and unconfigured Gemini are refused (1.5613ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5750092Z ✔ completed provider usage is priced at its response timestamp and includes cached tokens and reasoning output (1.2101ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5751068Z ✔ request transport refuses the leaked model before dispatch and preserves completed response cost across reopen (53.5286ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5751958Z ✔ historical unresolved paid usage survives restart and cannot be reset by a new tracker (28.2673ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5752677Z ✔ updates every configured worker CLI and records the resulting versions (3.0253ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5753319Z ✔ a failed update stops before any later tool or worker can launch (1.0201ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5756649Z ✔ rejects an unapproved executable instead of constructing an update command (0.6916ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5757936Z ✔ authorization and canonical builder prompt retain the approved production boundaries (1.5756ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5758753Z ✔ candidate processes receive operating-system plumbing but no controller secrets (7.4888ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5759455Z ✔ an ambiguous in-flight worker is journaled and never launched twice (9.0451ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5760057Z ✔ acceptance replay reuses the exact-commit record (10.1729ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5760694Z ✔ production waiting record is immutable and exactly once for a reviewed commit (10.7326ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5761425Z ✔ external card updates retain their result and refuse ambiguous duplicate notices (7.4504ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5762441Z ✔ production card intake refuses the wrong Linear actor before a start update (3.7963ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5763346Z ✔ production card intake records a missing seam problem before workspace setup or start update (18.6499ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5764274Z ✔ production card intake records missing acceptance criteria before workspace setup or start update (18.9211ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5765079Z ✔ production park journal binds the verified Linear actor and known issue UUID (8.9276ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5766223Z ✔ a Codex recovery fix is independently reviewed by unpinned Gemini, verified, and preserves the Julia candidate (13.6718ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5767727Z ✔ a recovery fix without a durable Codex diagnosis parks before independent review (5.3864ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5768414Z ✔ same-maker recovery review parks before verification (5.3792ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5769069Z ✔ a failed Gemini recovery review retains its diagnostic text and artifact paths (6.1936ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5769946Z ✔ saveJson keeps the complete old state during transient Windows rename failures, then atomically replaces it (32.9708ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5771144Z ✔ saveJson stops bounded Windows retries on permanent failure, keeps old content, and removes its temporary file (18.7737ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5772170Z ✔ saveJson closes its temporary handle and removes incomplete content when flushing fails, without attempting rename (8.6773ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5773085Z ✔ saveJson propagates non-transient errors and never retries rename faults outside Windows (52.3918ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5773824Z ✔ saveJson retries each Windows sharing error only at the rename boundary (38.1933ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5774565Z ✔ the real JUL-208 to-spec behavior list selects changed tests for before-and-after proof (2.3986ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5775353Z ✔ to-spec behavior seams still require their changed tests to fail before and pass after (782.2255ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5776144Z ✔ retired controller and OVH-only routes are not executable source or deployable config (3.4407ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5777403Z ✔ the active suite has no retired controller or OVH-only registration (0.4695ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5778775Z ✔ only worker support used by the Mastra delivery path remains available (0.2847ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5779965Z ✔ $init and the Mastra workflow are the only delivery start route (21.7628ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5781594Z ✔ discovers new and nested runner tests, shared safety tests, and unwrapped runner regressions (22.6757ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5783201Z ✔ the local gate runs discovered files with spaces and propagates a failing test despite inherited test context (223.8291ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5784642Z ✔ an empty suite fails closed instead of invoking repository-wide Node discovery (62.4036ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5785722Z ✔ the Windows CI job invokes the same complete local gate (0.6009ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5786932Z ✔ new unwrapped shared safety regressions are discovered beside their imported dependencies (7.5435ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5787952Z ✔ shared regressions run directly once (5.719ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5789064Z ✔ the full runner gate includes the retained reviewer contract, quote and repository-root checks (6.9486ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5790615Z ✔ new transport regressions are discovered beside the retained shared module (2.9882ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5792019Z ✔ a new subprocess-only runner regression is executed even without a runner filename or module import (279.2775ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5793720Z ✔ Windows delivery discovery leaves named server learning tests with their server owner and still runs new regressions (18.8795ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5795077Z ✔ Windows time limit stops the worker and its child process (1741.0528ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5796206Z ✔ Windows time limit forcibly stops a worker with a SIGTERM handler and its child (1639.8794ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5797417Z ✔ a worker that finishes in time retains its exit code and is not stopped (54.7094ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5798449Z ✔ Windows timeout leaves an unrelated process running (1715.8543ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5799600Z ✔ Windows provisioning parks after account creation followed by failed persistence (4243.1158ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5801159Z ✔ Windows vault wrapper keeps workflow routes and adds a named-secret command route (0.3669ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5802422Z ✔ migration pipes secrets, verifies readback and returns references only (1.0603ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5803608Z ✔ migration refuses an existing conflicting item instead of overwriting it (0.7162ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5804992Z ✔ CommandCode migrates through stdin and launches from a Julia reference without stale plaintext (1.9518ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5806175Z ✔ failed readback returns no replacement references (0.3252ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5807300Z ✔ vault probe verifies resolution without starting delivery or displaying values (114.3466ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5808751Z ✔ vault launcher loads only references in the designated vault, preserves masking and child exit code (1.106ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5809955Z ✔ vault launcher permits the read-only Linear entry point (1.801ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5811337Z ✔ vault launcher rejects retired reviewer and arbitrary entry points (2.5643ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5812373Z ✔ vault command exposes only the named secret and never invokes a shell (1.7055ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5813547Z ✔ vault command refuses missing names, missing fields, and invalid unselected references (1.0487ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5814951Z ✔ Windows key operations require the restricted helper marker and service account (0.3608ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5816199Z ✔ vault command wrapper removes bootstrap state before launching the target (99.9857ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5817477Z ✔ omitted service secrets do not inherit stale plaintext or unrelated vault references (0.4606ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5819001Z ✔ plaintext, foreign vault references and bootstrap tokens in reference files are refused before launch (0.2808ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5820441Z ✔ .gitattributes sets LF for every text file, and for the files installed on the server (1.4674ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5821995Z ✔ no tracked text file is committed with CRLF line endings (161.8732ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5822943Z ✔ linearGraphQL refuses to run without an API key (1.9564ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5824378Z ✔ linearGraphQL sends the key as the Authorization header, not a Bearer-prefixed one -- Linear expects the raw key (0.3148ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5825846Z ✔ linearGraphQL throws with the response errors on a non-ok or errored response (0.3148ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5826842Z ✔ getIssue reads back the issue fields (1.0212ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5827998Z ✔ getIssue asks Linear for the issue labels (and its state), so the coordinator can resolve the seats (0.7098ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5829448Z ✔ postComment resolves the identifier to a UUID first, then creates the comment against it (0.6913ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5830767Z ✔ postCommentToIssueId uses the already-read UUID without another card lookup (0.3081ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5831882Z ✔ postComment throws when Linear reports success: false (0.3577ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5833075Z ✔ checkForToddGuard: a bare WAITING ON YOU with no category is refused (rule: category) (0.946ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5835577Z ✔ checkForToddGuard: WAITING ON YOU is matched case-insensitively (1.4711ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5837766Z ✔ checkForToddGuard: WAITING ON YOU accepts each of the three markers (0.2589ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5838507Z ✔ checkForToddGuard: WAITING ON YOU accepts each category vocabulary word (0.3768ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5839806Z ✔ checkForToddGuard: "waiting on yourself" is not the WAITING ON YOU marker (0.1212ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5841148Z ✔ checkForToddGuard: each forbidden word alone in a For Todd line is refused (rule: git-vocabulary) (0.6897ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5841945Z ✔ checkForToddGuard: common inflections in a For Todd line are refused (0.2942ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5842787Z ✔ checkForToddGuard: the same words OUTSIDE a For Todd line are accepted -- the rule is about For Todd lines (0.1203ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5843811Z ✔ checkForToddGuard: word-boundary near-misses inside a For Todd line are accepted (commitment, approach, imprint, PRint) (0.1101ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5844755Z ✔ checkForToddGuard: a git word on the content line after the For Todd: header is refused (0.1117ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5845531Z ✔ checkForToddGuard: the plain progress comment and "For Todd: nothing" pass untouched (0.1186ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5846222Z ✔ checkForToddGuard: never throws on a missing or non-string body (0.1106ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5846976Z ✔ JUL-79 acceptance: asking Todd to merge is rejected (0.1033ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5847991Z ✔ JUL-79 acceptance: WAITING ON YOU with no category is rejected (0.0995ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5848629Z ✔ JUL-79 acceptance: a valid categorized park is accepted (0.1038ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5849431Z ✔ postComment refuses a For Todd git request before any Linear API call, naming the rule and the acting instruction (0.3565ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5850273Z ✔ postComment refuses an uncategorized WAITING ON YOU before any Linear API call (0.2106ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5851117Z ✔ postComment still posts a body that passes the guard (0.1907ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5851777Z ✔ a Linear failure carries its HTTP status and parsed body on the thrown error (0.3176ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5852507Z ✔ a 200 response carrying GraphQL errors also throws with its status and body attached (0.3096ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5853341Z ✔ delivery specification fetch includes complete comment evidence and refuses partial discussion (0.366ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5854184Z ✔ no script under scripts/ or ops/ hardcodes a personal-machine path (C:\Users\<name>) (12.3491ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5854921Z ✔ a personal path in a nested folder is caught and reported by the scan (5.2065ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5855613Z ✔ a fixture file that contains the escaped form C:\\Users\\name is flagged (5.4617ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5856252Z ✔ findPersonalPaths flags single-backslash form C:\Users\name (0.2869ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5856892Z ✔ findPersonalPaths flags escaped double-backslash form C:\\Users\\name (0.1586ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5858017Z ✔ findPersonalPaths flags forward-slash form C:/Users/name (0.1548ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5858710Z ✔ findPersonalPaths matches case-insensitively (0.253ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5859370Z ✔ findPersonalPaths finds multiple paths in text (0.1552ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5860007Z ✔ findPersonalPaths returns empty array when no personal-machine paths exist (0.2758ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5860974Z ✔ findPersonalPaths handles non-string inputs safely (0.1475ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5861623Z ✔ findPersonalPaths handles usernames with dots, hyphens, and underscores (0.443ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5862304Z ✔ PERSONAL_PATH regex pattern is exported and matches personal paths (0.6704ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5862963Z ✖ verify-machine skill and feature map keep the generated public contract (5.2978ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5863655Z ✔ a clean reviewer worktree (no changes since the candidate commit) passes (496.4786ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5864386Z ✔ a reviewer that edits a file (uncommitted) has its review rejected (JUL-61 step 5) (474.5819ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5865323Z ✔ a reviewer that commits its own edit is caught too, not just uncommitted diffs (590.1266ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5865971Z ✔ rejects a candidateCommit that is not a plausible SHA (0.4347ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5867144Z ✔ scopes safe.directory to exactly the passed worktreePath (JUL-73: orchestrator-svc verifying a runner-owned reviewer worktree hits git's dubious-ownership guard otherwise, live-verified) (0.3603ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5868029Z ℹ tests 283
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5868225Z ℹ suites 0
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5868411Z ℹ pass 276
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5868596Z ℹ fail 6
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5868798Z ℹ cancelled 0
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5868999Z ℹ skipped 1
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5869188Z ℹ todo 0
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5869395Z ℹ duration_ms 82209.9327
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5869542Z
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5869639Z ✖ failing tests:
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5869758Z
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5869988Z test at framework\@mastra\code-sdk\credentials.test.mjs:1:1
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5870503Z ✖ framework\@mastra\code-sdk\credentials.test.mjs (87.8745ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5870842Z   'test failed'
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5870954Z
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5871174Z test at framework\@mastra\code-sdk\usage-request.test.mjs:1:1
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5871688Z ✖ framework\@mastra\code-sdk\usage-request.test.mjs (78.7949ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5872024Z   'test failed'
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5872138Z
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5872313Z test at ops\build-runner\test\adapter.test.mjs:9:1
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5872991Z ✖ stock adapter request works while direct and nested builder commands cannot read credentials (448.0594ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5873853Z   AssertionError [ERR_ASSERTION]: (node:9136) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5874556Z   (Use `node --trace-warnings ...` to show where the warning was created)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5874981Z   node:internal/modules/package_json_reader:314
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5875525Z     throw new ERR_MODULE_NOT_FOUND(packageName, fileURLToPath(base), null);
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5875892Z           ^
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5876058Z
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5876625Z   Error [ERR_MODULE_NOT_FOUND]: Cannot find package '@mastra/code-sdk' imported from D:\a\julia-next\julia-next\ops\build-runner\adapter.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5877406Z       at Object.getPackageJSONURL (node:internal/modules/package_json_reader:314:9)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5877935Z       at packageResolve (node:internal/modules/esm/resolve:768:81)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5878368Z       at moduleResolve (node:internal/modules/esm/resolve:855:18)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5878792Z       at defaultResolve (node:internal/modules/esm/resolve:985:11)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5879245Z       at #cachedDefaultResolve (node:internal/modules/esm/loader:747:20)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5879730Z       at ModuleLoader.resolve (node:internal/modules/esm/loader:724:38)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5880282Z       at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:320:38)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5881240Z       at onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:680:36)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5881789Z       at TracingChannel.tracePromise (node:diagnostics_channel:350:14)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5882270Z       at ModuleLoader.import (node:internal/modules/esm/loader:679:21) {
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5882653Z     code: 'ERR_MODULE_NOT_FOUND'
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5882884Z   }
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5883035Z
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5883194Z   Node.js v22.23.2
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5883373Z
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5883521Z
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5883671Z   1 !== 0
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5883825Z
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5884314Z       at TestContext.<anonymous> (file:///D:/a/julia-next/julia-next/ops/build-runner/test/adapter.test.mjs:46:12)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5885024Z       at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5885535Z       at async Test.run (node:internal/test_runner/test:1054:7)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5886041Z       at async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3) {
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5887598Z     generatedMessage: false,
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5887845Z     code: 'ERR_ASSERTION',
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5888062Z     actual: 1,
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5888242Z     expected: 0,
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5888440Z     operator: 'strictEqual',
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5888659Z     diff: 'simple'
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5888840Z   }
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5888936Z
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5889167Z test at ops\build-runner\test\review-regressions.test.mjs:28:1
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5890171Z ✖ review durable stop survives reopen and blocks free and paid routes only for its card (405.5298ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5891612Z   [Error: EBUSY: resource busy or locked, unlink 'C:\Users\RUNNER~1\AppData\Local\Temp\jul251-review-WODefN\cards.sqlite'] { errno: -4082, code: 'EBUSY', syscall: 'unlink', path: 'C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\jul251-review-WODefN\\cards.sqlite' }
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5892776Z
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5893024Z test at ops\build-runner\test\review-regressions.test.mjs:131:1
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5893694Z ✖ review replacing builder home after boot cannot expose outside auth (206.3066ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5894460Z   AssertionError [ERR_ASSERTION]: (node:7384) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5895162Z   (Use `node --trace-warnings ...` to show where the warning was created)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5895585Z   node:internal/modules/package_json_reader:314
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5896028Z     throw new ERR_MODULE_NOT_FOUND(packageName, fileURLToPath(base), null);
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5896385Z           ^
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5896550Z
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5897114Z   Error [ERR_MODULE_NOT_FOUND]: Cannot find package '@mastra/code-sdk' imported from D:\a\julia-next\julia-next\ops\build-runner\adapter.mjs
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5897887Z       at Object.getPackageJSONURL (node:internal/modules/package_json_reader:314:9)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5898829Z       at packageResolve (node:internal/modules/esm/resolve:768:81)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5899371Z       at moduleResolve (node:internal/modules/esm/resolve:855:18)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5899802Z       at defaultResolve (node:internal/modules/esm/resolve:985:11)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5900259Z       at #cachedDefaultResolve (node:internal/modules/esm/loader:747:20)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5900740Z       at ModuleLoader.resolve (node:internal/modules/esm/loader:724:38)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5901673Z       at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:320:38)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5902264Z       at onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:680:36)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5902781Z       at TracingChannel.tracePromise (node:diagnostics_channel:350:14)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5903264Z       at ModuleLoader.import (node:internal/modules/esm/loader:679:21) {
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5903635Z     code: 'ERR_MODULE_NOT_FOUND'
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5903870Z   }
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5904023Z
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5904187Z   Node.js v22.23.2
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5904361Z
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5904505Z
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5904652Z   1 !== 0
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5904818Z
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5905317Z       at adapterFixture (file:///D:/a/julia-next/julia-next/ops/build-runner/test/review-regressions.test.mjs:123:10)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5906072Z       at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5906592Z       at async Test.run (node:internal/test_runner/test:1054:7)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5907102Z       at async Test.processPendingSubtests (node:internal/test_runner/test:744:7) {
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5907521Z     generatedMessage: false,
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5907760Z     code: 'ERR_ASSERTION',
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5907979Z     actual: 1,
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5908158Z     expected: 0,
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5908360Z     operator: 'strictEqual',
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5908593Z     diff: 'simple'
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5908768Z   }
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5909038Z
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5909229Z test at scripts\verify-machine-skill.test.mjs:10:1
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5909879Z ✖ verify-machine skill and feature map keep the generated public contract (5.2978ms)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5910655Z   Error: ENOENT: no such file or directory, open 'D:\a\julia-next\julia-next\.agents\skills\verify-machine\generation.json'
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5911280Z       at async open (node:internal/fs/promises:639:25)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5911661Z       at async readFile (node:internal/fs/promises:1252:14)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5912303Z       at async TestContext.<anonymous> (file:///D:/a/julia-next/julia-next/scripts/verify-machine-skill.test.mjs:13:33)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5912938Z       at async Test.run (node:internal/test_runner/test:1054:7)
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5913450Z       at async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3) {
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5913875Z     errno: -4058,
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5914068Z     code: 'ENOENT',
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5914262Z     syscall: 'open',
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5914683Z     path: 'D:\\a\\julia-next\\julia-next\\.agents\\skills\\verify-machine\\generation.json'
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.5915098Z   }
+julia-init-windows	Test active runner and shared safety regressions without provider calls	2026-10-22T22:30:32.6820320Z ##[error]Process completed with exit code 1.

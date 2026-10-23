@@ -1,0 +1,63 @@
+{
+  "selection": "User task instructions and final assistant reports only; excludes tool arguments, internal reasoning, and raw authentication data. Reports are historical claims, checked against artifacts separately.",
+  "sources": [
+    {
+      "path": "/home/ubuntu/.codex/sessions/2026/10/22/rollout-2026-10-22T21-51-45-01a16599-42ad-7102-a563-9d57898bf42d.jsonl",
+      "sha256": "6bf7e9e2856dd929872129e630261c40447685e8edcb488ef0b07ff11c843648"
+    },
+    {
+      "path": "/home/ubuntu/.codex/sessions/2026/10/22/rollout-2026-10-22T21-52-40-01a1659a-1ab0-72e1-a620-deb3db4ddd72.jsonl",
+      "sha256": "e9508fcf67a3e5f3b0e2cf9a1905a93b27443eef6fe6903a2fdc29cae58dcc58"
+    }
+  ],
+  "messages": [
+    {
+      "source": "2026/10/22/rollout-2026-10-22T21-51-45-01a16599-42ad-7102-a563-9d57898bf42d.jsonl",
+      "timestamp": "2026-10-22T21:51:54.190Z",
+      "role": "user",
+      "text": "Todd settled JUL-251 at 14:50 PT. Move it to Ready.\n\nStart a new Codex session in the hybrid/pstack-trial worktree whose only input is:\n\"Use the poteto-mode skill to build JUL-251.\"\nThat session works from the card, the trial rulebook and the pstack settings alone, with nothing from this conversation. Let poteto-mode pick and run its playbook as written.\n\nDone when: that session ends with an open PR to main, or stops on one of the three cases in the rulebook's Todd section.\n\nReport to Todd: the playbook poteto-mode picked, the PR link, the decision-log path, and one plain-English paragraph on what happened."
+    },
+    {
+      "source": "2026/10/22/rollout-2026-10-22T21-51-45-01a16599-42ad-7102-a563-9d57898bf42d.jsonl",
+      "timestamp": "2026-10-22T22:21:31.735Z",
+      "role": "assistant",
+      "text": "JUL-251 was moved to Ready, then a fresh session ran with only your exact prompt.\n\n- **Playbook:** `figure-it-out`.\n- **PR:** None created.\n- **Decision log:** [`docs/agents/jul-251/decisions.tsv`](https://github.com/toddwyder/julia-next/blob/eab4626fabe8bd33a87fb28d599d6b572794afc4/docs/agents/jul-251/decisions.tsv).\n- **Pushed commit:** `eab4626`.\n\nThe session built and pushed the adapter and proof, reporting 36 local tests, 17 framework tests and 43 guard mutations passing at $0. It then stopped, treating PR publication as an account-action blocker. I verified the pushed commit and confirmed no PR is open; the requested PR finish line remains unmet.\n\nAutomatic approval rejected PR creation because the GitHub connector requires approval while the session\u2019s policy is `never`. The prepared PR description is committed."
+    },
+    {
+      "source": "2026/10/22/rollout-2026-10-22T21-51-45-01a16599-42ad-7102-a563-9d57898bf42d.jsonl",
+      "timestamp": "2026-10-22T22:27:24.984Z",
+      "role": "user",
+      "text": "Todd's decision, 22 October 2026 15:27 PT: publication uses ordinary signed-in GitHub, as on main. The gh CLI is the standard route here, not a bypass.\n\nOpen a ready PR from hybrid/pstack-trial to main with gh, using docs/agents/jul-251/pull-request.md as the body. Do not merge. Add one decision-log row for this, then push.\n\nReport: the PR link and its CI status."
+    },
+    {
+      "source": "2026/10/22/rollout-2026-10-22T21-51-45-01a16599-42ad-7102-a563-9d57898bf42d.jsonl",
+      "timestamp": "2026-10-22T22:30:58.522Z",
+      "role": "assistant",
+      "text": "[PR #314](https://github.com/toddwyder/julia-next/pull/314) is ready against `main`, unmerged. Decision-log row pushed in `eacf19e`.\n\nCI is **failing**: Windows checks report missing `@mastra/code-sdk` and `verify-machine/generation.json`. Baseline, docs policy and Vercel passed."
+    },
+    {
+      "source": "2026/10/22/rollout-2026-10-22T21-51-45-01a16599-42ad-7102-a563-9d57898bf42d.jsonl",
+      "timestamp": "2026-10-23T03:07:54.084Z",
+      "role": "user",
+      "text": "JUL-251 follow-up on hybrid/pstack-trial (PR #314). Do not merge. Spending stays $0. Where a part below is already done, verify it and keep it.\n\n1. CI fix. Claude's technical decision under Todd's 09:52 rule: builds run on the server, so the Windows laptop-runner CI gate is retired. Use the correct skill on this mistake class: tests fail in CI because a hand-kept inclusion/exclusion list decides where they run, and a skill's test lives outside its skill.\n   - Retire the Windows runner gate in CI.\n   - Each test runs where its owner's dependencies are installed, decided by structure (owning package and lockfile), never by a hand-kept list. A new test lands in the right place with no list edit.\n   - Tests that need the server's keys or a live provider run on the server, also decided by structure.\n   - A skill's tests live inside that skill's folder, so removing a skill removes its tests. Delete the orphaned verify-machine test.\n   Prove it: replay the two tests that broke PR #314's first CI run and show they now land correctly.\n\n2. Maintenance on merge. Todd's decision, 22 October 2026 20:06 PT: verification skills are maintained on every merge to main. Build it as structure, not a rule an agent must remember: when main gains a merge, the server automatically starts a fresh Codex session that runs the maintain-verification-skill skill on each project verification skill (today: verify-julia). Use the skill's own outcomes: clean (nothing to do), changed (one PR of proven corrections, confined to the skill's folder), blocked (one line to Todd). It never edits product code. Prove it: a test merge to a throwaway branch standing in for main triggers exactly one maintenance run, and no merge triggers none.\n\nRecord decisions in the JUL-251 decision log and push.\n\nDone when: PR #314's CI is green on the fixed head and both proofs are pushed.\n\nReport: what structure now decides where each test runs, what triggers maintenance and where it runs, the CI result, and both proof results."
+    },
+    {
+      "source": "2026/10/22/rollout-2026-10-22T21-51-45-01a16599-42ad-7102-a563-9d57898bf42d.jsonl",
+      "timestamp": "2026-10-23T03:50:34.515Z",
+      "role": "assistant",
+      "text": "[PR #314](https://github.com/toddwyder/julia-next/pull/314) is **CI green at `a22a340`**, open and unmerged. Spending stayed $0.\n\n- **Test structure:** the nearest package and lockfile own dependencies. `server` folders route key/live-provider tests to ubuntu. Browser runtimes follow declared dependencies. Skill tests live inside their skill; the Windows gate is retired.\n- **Maintenance:** an enabled server timer detects new main merges and starts one fresh Codex session to maintain discovered verification skills, currently `verify-julia`. Product files are read-only.\n- **CI proof:** the SDK regression passes under its owning install; the orphaned test is deleted and absent from discovery.\n- **Merge proof:** a real throwaway merge launched exactly one session and completed clean against a CLI fixture. No merge, direct commit and repeated polls launched none.\n\nBoth proofs and decisions are pushed in the [follow-up report](https://github.com/toddwyder/julia-next/blob/a22a340/docs/agents/jul-251/follow-up-report.md)."
+    },
+    {
+      "source": "2026/10/22/rollout-2026-10-22T21-52-40-01a1659a-1ab0-72e1-a620-deb3db4ddd72.jsonl",
+      "timestamp": "2026-10-22T21:52:42.141Z",
+      "role": "user",
+      "text": "Use the poteto-mode skill to build JUL-251."
+    },
+    {
+      "source": "2026/10/22/rollout-2026-10-22T21-52-40-01a1659a-1ab0-72e1-a620-deb3db4ddd72.jsonl",
+      "timestamp": "2026-10-22T22:20:57.720Z",
+      "role": "assistant",
+      "text": "Built and pushed JUL-251 on [hybrid/pstack-trial](https://github.com/toddwyder/julia-next/tree/hybrid/pstack-trial). Recorded spending remains $0.\n\nPassed 36 local tests, 17 framework tests and 43 guard mutations. Real memory, credential-isolation and restart proofs passed. [Proof and retro](docs/agents/jul-251/proof.md) document the results.\n\nModel the Domain shaped durable request states. Prove It Works drove the live checks.\n\nPR creation remains blocked. Automatic approval rejected it because the GitHub tool requires approval while this session\u2019s policy is `never`. The [prepared PR description](docs/agents/jul-251/pull-request.md) is committed for submission to `main`.\n\n**Attention.**\nReviewed by gpt-6.1-sol.\nConcurrent-process checks pass; transaction-lock removal alone remains untested."
+    }
+  ]
+}

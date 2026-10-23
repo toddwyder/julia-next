@@ -1,0 +1,23 @@
+(node:9) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ decimal rates round nano dollars upward without floating point drift (89.093936ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 324.682995
+
+✖ failing tests:
+
+test at ops/build-runner/test/transport.test.mjs:136:1
+✖ decimal rates round nano dollars upward without floating point drift (89.093936ms)
+  Error: Request outcome unavailable
+      at fail (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/build-runner/transport.mjs:3:25)
+      at guardedFetch (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/build-runner/transport.mjs:189:13)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/build-runner/test/transport.test.mjs:143:3)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)
