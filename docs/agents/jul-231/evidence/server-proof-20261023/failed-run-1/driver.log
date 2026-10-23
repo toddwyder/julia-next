@@ -1,0 +1,9 @@
+file:///home/ubuntu/julia-jul-231-build/ops/build-runner/proof/start.mjs:111
+  if (finalJob.state === 'failed') throw new Error(finalJob.error?.message ?? 'job failed');
+                                         ^
+
+Error: missing coder start
+    at file:///home/ubuntu/julia-jul-231-build/ops/build-runner/proof/start.mjs:111:42
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+Node.js v24.14.1

@@ -6,18 +6,16 @@ import { join } from 'node:path'
 import { execFile as execFileCb } from 'node:child_process'
 import { promisify } from 'node:util'
 import { EventEmitter } from 'node:events'
+import { fileURLToPath } from 'node:url'
 import { startJob, readJob, listJobs, startRunnerServer } from '../jobs.mjs'
 
 const execFile = promisify(execFileCb)
 
 test('jobs', async () => {
   const tmp = await mkdtemp(join(tmpdir(), 'jobs-test-'))
-  let repoDir
-  let worktreePath
   let server
   try {
     const repo = join(tmp, 'repo')
-    repoDir = repo
     await mkdir(repo)
     await execFile('git', ['init', repo])
     await execFile('git', ['-C', repo, 'config', 'user.email', 'test@example.com'])
@@ -52,7 +50,6 @@ test('jobs', async () => {
     const initResult = { runId, state: 'ready-for-build', snapshot }
     const options = { jobsDir, repo, base, settingsPath, port: 0, spawn: fakeSpawn }
     const [job, duplicate] = await Promise.all([startJob(initResult, options), startJob(initResult, options)])
-    worktreePath = job.worktree
     assert.equal(spawns, 1)
     assert.equal(job.runId, runId)
     assert.deepStrictEqual(job.snapshot, snapshot)
@@ -84,6 +81,11 @@ test('jobs', async () => {
     assert.equal(spawns, 1)
     const fresh = await readJob(runId, options)
     assert.deepStrictEqual(fresh, job)
+    const builderHome = join(job.worktree, '.builder-home')
+    await mkdir(builderHome, { recursive: true })
+    const boundaryLauncher = fileURLToPath(new URL('../command-boundary.py', import.meta.url))
+    const { stdout } = await execFile('python3', [boundaryLauncher, JSON.stringify({workspace:job.worktree,home:builderHome,cwd:job.worktree,executable:process.execPath}), 'git status --porcelain && git rev-parse HEAD'])
+    assert.equal(stdout.trim(), base)
     const jobs = await listJobs(options)
     assert.equal(jobs.length, 1)
     assert.deepStrictEqual(jobs[0], fresh)
@@ -114,11 +116,6 @@ test('jobs', async () => {
     if (server) {
       server.close()
       await new Promise((resolve) => server.on('close', resolve))
-    }
-    if (worktreePath) {
-      try {
-        await execFile('git', ['-C', repoDir, 'worktree', 'remove', '--force', worktreePath])
-      } catch {}
     }
     await rm(tmp, { recursive: true, force: true })
   }

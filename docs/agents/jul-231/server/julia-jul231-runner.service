@@ -3,7 +3,7 @@ Description=Julia JUL-231 build runner
 
 [Service]
 WorkingDirectory=/home/ubuntu/julia-jul-231-build
-Environment=BUILD_RUNNER_JOBS_DIR=/home/ubuntu/.local/state/julia-jul231/jobs
+Environment=BUILD_RUNNER_JOBS_DIR=/home/ubuntu/.local/state/julia-jul231/jobs-attempt-2
 Environment=BUILD_RUNNER_REPO=/home/ubuntu/julia-jul-231-build
 Environment=BUILD_RUNNER_SETTINGS=/home/ubuntu/julia-jul-231-build/ops/build-runner/machine-settings.json
 Environment=BUILD_RUNNER_PORT=43127

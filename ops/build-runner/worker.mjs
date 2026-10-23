@@ -86,6 +86,16 @@ async function main() {
   await atomicWriteJson(effectiveSettingsPath, settings)
 
   const pstackModels = await readFile(new URL('./pstack-models.md', import.meta.url), 'utf8')
+  const effectivePstackModels = machineryProof
+    ? pstackModels.split(/\r?\n/).map(line => {
+        const trimmed = line.trimStart()
+        if (!trimmed || trimmed.startsWith('#')) return line
+        const colon = line.indexOf(':')
+        if (colon === -1) return line
+        const value = line.slice(colon + 1)
+        return line.slice(0, colon + 1) + value.replace(/[^,\s][^,]*/g, coderModel)
+      }).join('\n')
+    : pstackModels
   const configuredHelpers = Array.isArray(settings.helpers) ? settings.helpers : Array.isArray(settings.subagents) ? settings.subagents : []
   const normalizeHelper = h => {
     const rawModel = h.defaultModelId ?? h.modelId ?? h.model
@@ -110,9 +120,9 @@ async function main() {
   }
   if (!orchestratorModel || !settings.models?.[orchestratorModel]) throw new Error(`unknown model: ${orchestratorModel}`)
   if (!coderModel || !settings.models?.[coderModel]) throw new Error(`unknown model: ${coderModel}`)
-  const effectiveTable = { orchestrator: orchestratorModel, coder: coderModel, helpers: helpers.map(h => ({ id: h.id, modelId: h.defaultModelId })) }
+  const effectiveTable = { orchestrator: orchestratorModel, coder: coderModel, helpers: helpers.map(h => ({ id: h.id, modelId: h.defaultModelId })), pstackModels: effectivePstackModels, pstackModelsPath: join(jobDir, 'state', '.agents', 'pstack-models.md') }
   const overrideSection = machineryProof ? `\n\nMachinery proof helper overrides:\n${helpers.map(h => `- ${h.id}: ${h.defaultModelId}`).join('\n')}` : ''
-  const hostInstructions = `${pstackModels}\n\nRequirements:\n${description}${overrideSection}`
+  const hostInstructions = `${effectivePstackModels}\n\nRequirements:\n${description}${overrideSection}`
 
   await mkdir(join(jobDir, 'state'), { recursive: true })
   const stateDir = join(jobDir, 'state')
@@ -125,6 +135,16 @@ async function main() {
     const prefix = existingExclude.length && !existingExclude.endsWith('\n') ? '\n' : ''
     await appendFile(excludePath, `${prefix}.builder-home/\n`)
   }
+
+  const seedPstackModels = async dir => {
+    const agentsDir = join(dir, '.agents')
+    await mkdir(agentsDir, { recursive: true })
+    await writeFile(join(agentsDir, 'pstack-models.md'), effectivePstackModels)
+  }
+  await seedPstackModels(stateDir)
+  const builderHome = join(job.worktree, '.builder-home')
+  await mkdir(builderHome, { recursive: true })
+  await seedPstackModels(builderHome)
 
   let runner
   const events = []

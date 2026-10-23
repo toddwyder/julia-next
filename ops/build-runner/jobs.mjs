@@ -92,7 +92,10 @@ export async function startJob(input, options = {}) {
       const jobDir = join(opts.jobsDir, runId)
       await mkdir(jobDir, { recursive: true })
       const worktree = join(jobDir, 'worktree')
-      await execFile('git', ['-C', opts.repo, 'worktree', 'add', '--detach', worktree, baseCommit])
+      await execFile('git', ['clone', '--no-local', '--no-checkout', opts.repo, worktree])
+      await execFile('git', ['-C', worktree, 'checkout', '--detach', baseCommit])
+      await execFile('git', ['-C', worktree, 'config', 'user.name', 'Julia Build'])
+      await execFile('git', ['-C', worktree, 'config', 'user.email', 'julia-build@localhost'])
       await writeFile(join(jobDir, 'snapshot.json'), JSON.stringify(input, null, 2))
 
       const job = {
