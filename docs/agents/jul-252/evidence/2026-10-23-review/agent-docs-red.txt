@@ -1,0 +1,66 @@
+✖ coding standards retain framework rules and the trial retains learning tests (4.511925ms)
+✔ agent instructions use the trial rulebook and the runbook marks Factory retired (1.599879ms)
+✔ post-build reviewer checks and the plan-answers/park policy replace stop-and-ask builder gates (1.08782ms)
+✔ the repository-owned pre-plan skill survives Pocock skill upgrades (2.957946ms)
+✔ Todd's 19 October process vocabulary and restart stop are explicit (1.039659ms)
+✔ formal verification skills retain exact pinned hashes under the trial mirror (3.748874ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 5
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 170.286347
+
+✖ failing tests:
+
+test at scripts/agent-docs.test.mjs:8:1
+✖ coding standards retain framework rules and the trial retains learning tests (4.511925ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /learning tests under framework\//. Input:
+  
+  '# AGENTS.md — Julia\n' +
+    '\n' +
+    'Julia uses the pstack way of working on probation since 22 October 2026. pstack builds and proves. The Build card runs the same way; its retro decides keep, adjust or revert. This file is the whole rulebook.\n' +
+    '\n' +
+    '## Work\n' +
+    '- Build with the poteto-mode skill and follow it as written.\n' +
+    "- Spending is $0: Codex runs on Todd's signed-in plan; real request checks use a model CommandCode's billing page lists as free. Any cost readback above $0 stops the work.\n" +
+    '- Framework facts come from the installed packages, their version-matched official docs, and the learning tests under ops/build-runner/framework/. The learning tests stay green.\n' +
+    '- Commit and push as you go. The poteto-mode todo list and show-me-your-work decision log are committed under docs/agents/<card>/.\n' +
+    '- Publish with gh using the ordinary signed-in GitHub access.\n' +
+    '\n' +
+    '## Todd\n' +
+    'Ask Todd only when a step needs him in his own account, spending would rise above $0, or a choice changes what Julia does for the household. Decide everything else and record it in the decision log.\n' +
+    '\n' +
+    '## Server\n' +
+    '- Agents run as ubuntu with admin rights; Todd accepts the risks.\n' +
+    '- Commands needing Julia keys: node scripts/julia-agents.mjs -- <command>.\n' +
+    '- Server: docs/agents/server-runbook.md. Domain words: GLOSSARY.md.\n' +
+    '- Linear holds cards and requirements. GitHub holds code.\n' +
+    '\n' +
+    '## Finish\n' +
+    'An open PR to main with the proof in it. Todd decides the merge after the retro.\n' +
+    '\n' +
+    '<!-- BEGIN:nextjs-agent-rules -->\n' +
+    '\n' +
+    '# This is NOT the Next.js you know\n' +
+    '\n' +
+    "This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.\n" +
+    '\n' +
+    'This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.\n' +
+    '\n' +
+    '<!-- END:nextjs-agent-rules -->\n'
+  
+      at TestContext.<anonymous> (file:///tmp/julia-review-rulebook-20261023/scripts/agent-docs.test.mjs:18:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: "# AGENTS.md — Julia\n\nJulia uses the pstack way of working on probation since 22 October 2026. pstack builds and proves. The Build card runs the same way; its retro decides keep, adjust or revert. This file is the whole rulebook.\n\n## Work\n- Build with the poteto-mode skill and follow it as written.\n- Spending is $0: Codex runs on Todd's signed-in plan; real request checks use a model CommandCode's billing page lists as free. Any cost readback above $0 stops the work.\n- Framework facts come from the installed packages, their version-matched official docs, and the learning tests under ops/build-runner/framework/. The learning tests stay green.\n- Commit and push as you go. The poteto-mode todo list and show-me-your-work decision log are committed under docs/agents/<card>/.\n- Publish with gh using the ordinary signed-in GitHub access.\n\n## Todd\nAsk Todd only when a step needs him in his own account, spending would rise above $0, or a choice changes what Julia does for the household. Decide everything else and record it in the decision log.\n\n## Server\n- Agents run as ubuntu with admin rights; Todd accepts the risks.\n- Commands needing Julia keys: node scripts/julia-agents.mjs -- <command>.\n- Server: docs/agents/server-runbook.md. Domain words: GLOSSARY.md.\n- Linear holds cards and requirements. GitHub holds code.\n\n## Finish\nAn open PR to main with the proof in it. Todd decides the merge after the retro.\n\n<!-- BEGIN:nextjs-agent-rules -->\n\n# This is NOT the Next.js you know\n\nThis version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.\n\nThis block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.\n\n<!-- END:nextjs-agent-rules -->\n",
+    expected: /learning tests under framework\//,
+    operator: 'match',
+    diff: 'simple'
+  }

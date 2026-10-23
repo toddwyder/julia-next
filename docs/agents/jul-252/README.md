@@ -13,6 +13,8 @@ Triage searched current Review cards and the existing initialization/delivery wo
 
 Evidence is in evidence/2026-10-23-review/readback.json. CI and merge will be checked on the exact PR candidate before the final report.
 
+The first CI run failed because scripts/agent-docs.test.mjs still required the old path. The same focused command failed locally. Updated its single literal assertion to Todd's corrected path; all six documentation tests then passed. This keeps the existing documentation contract check aligned with the requested wording. Red and green outputs are retained beside the readback evidence.
+
 Framework map: connected Linear tools and https://linear.app/developers/graphql, reached through its llms.txt; installed gh 2.45.0 help for pr create, checks and merge. This changes documentation only.
 
 User instructions override the skill's generic approval and prose templates: create the settled card now, use the exact one-line cancellation, post only a link in the reply, and merge after green CI.
