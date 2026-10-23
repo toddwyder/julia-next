@@ -9,6 +9,20 @@ const models = Object.fromEntries([beam, deepseek, sol].map(id => [id, { wireMod
 const snapshot = { card: { identifier: 'JUL-253', title: 'Model split', description: 'Ship the agreed model split.' }, roles: { orchestrator: sol, coder: deepseek } }
 const table = `feature, refactoring: ${deepseek}\nmain session: ${sol}\nhardest tasks: ${sol}\ninterrogate reviewers: ${sol}, ${deepseek}\n`
 
+test('an unrelated review model cannot replace the configured Sol and DeepSeek panel', () => {
+  const events = [
+    { type: 'subagent_start', toolCallId: 'build', modelId: deepseek, task: 'Implement marker.txt' },
+    { type: 'subagent_tool_end', toolCallId: 'build', subToolName: 'write_file', isError: false },
+    { type: 'subagent_end', toolCallId: 'build', result: 'Built marker', isError: false },
+    { type: 'subagent_start', toolCallId: 'review', modelId: 'anthropic/claude-haiku-5-5', task: 'Review marker.txt' },
+    { type: 'subagent_end', toolCallId: 'review', result: 'Reviewed', isError: false },
+  ];
+  assert.throws(() => inspectPstackRun({ events, requests: [], coderModel: deepseek,
+    reviewModels: [sol, deepseek], machineryProof: false, changedFiles: ['marker.txt'],
+    checklist: '- [x] Build', decisions: 'Reviewed',
+  }), /review handoff/);
+});
+
 test('normal session keeps the configured Sol/DeepSeek split and every exact model', () => {
   const session = createPstackSession({ models }, snapshot, table)
   assert.equal(session.orchestratorModel, sol)
@@ -52,11 +66,13 @@ test('normal proof requires successful distinct-model review of actual changed f
   const review = [
     { type: 'subagent_start', toolCallId: 'review', modelId: sol, task: 'Review marker.txt against the saved requirements' },
     { type: 'subagent_end', toolCallId: 'review', result: 'Review passed', isError: false },
+    { type: 'subagent_start', toolCallId: 'review-deepseek', modelId: deepseek, task: 'Review marker.txt against the saved requirements' },
+    { type: 'subagent_end', toolCallId: 'review-deepseek', result: 'Review passed', isError: false },
   ]
   const input = {
     events: [...build, ...review],
     requests: [{ model: 'deepseek/deepseek-v4.1-flash', status: 200 }, { model: 'gpt-6-sol', status: 200 }],
-    coderModel: deepseek, reviewModel: undefined, machineryProof: false,
+    coderModel: deepseek, reviewModel: undefined, reviewModels: [sol, deepseek], machineryProof: false,
     cardId: 'JUL-253', changedFiles: ['marker.txt'],
     checklist: '- [x] Build\n- [x] Proof\n',
     decisions: 'ts\tphase\tdecision\n2026-10-23\tbuild\tUse marker\n',
@@ -66,6 +82,7 @@ test('normal proof requires successful distinct-model review of actual changed f
   assert.equal(evidence.hasReviewer, true)
   assert.equal(evidence.reviewHandoff.modelId, sol)
   assert.equal(evidence.reviewHandoff.refused, false)
+  assert.deepEqual(evidence.reviewHandoffs.map(review => review.modelId), [sol, deepseek])
   assert.equal(evidence.deepseekRefusal, false)
   assert.equal(evidence.deepseekSent, true)
   assert.deepEqual(evidence.events, input.events)

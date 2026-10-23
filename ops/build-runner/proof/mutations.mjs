@@ -10,9 +10,18 @@ const ledger = 'ops/build-runner/ledger.mjs';
 const transport = 'ops/build-runner/transport.mjs';
 const adapter = 'ops/build-runner/adapter.mjs';
 const boundary = 'ops/build-runner/command-boundary.py';
+const session = 'ops/build-runner/pstack-session.mjs';
 const tests = file => `ops/build-runner/test/${file}.test.mjs`;
 const edit = (file, before, after, occurrences = 1) => ({ file, before, after, occurrences });
 const cases = [
+  {
+    id: 'maximum-charge-recovery-not-final', file: 'ledger', test: 'charging an unknown request at its full maximum never releases budget or invents usage',
+    edits: [edit(ledger, "if (current.state === 'unknown' && current.costNano !== null) throw new Error('Maximum-charge recovery is final; actual usage remains unknown');", '')],
+  },
+  {
+    id: 'configured-panel-replaced-by-unrelated-model', file: 'pstack-session', test: 'an unrelated review model cannot replace the configured Sol and DeepSeek panel',
+    edits: [edit(session, 'return start.modelId === model', 'return start.modelId !== coderModel')],
+  },
   {
     id: 'unknown-maximum-charged-as-zero', file: 'ledger', test: 'charging an unknown request at its full maximum never releases budget or invents usage',
     edits: [edit(ledger, 'cost_nano = maximum_nano, reason = ?', 'cost_nano = 0, reason = ?')],

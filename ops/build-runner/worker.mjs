@@ -50,7 +50,7 @@ async function main() {
   settings.ledgerPath ??= join(dirname(jobDir), 'cards.sqlite')
   const pstackModels = await readFile(new URL('./pstack-models.md', import.meta.url), 'utf8')
   const session = createPstackSession(settings, { ...snapshot, machineryProof: job.machineryProof === true || snapshot.machineryProof }, pstackModels)
-  const { orchestratorModel, coderModel, machineryProof, reviewModel, helpers, hostInstructions, prompt } = session
+  const { orchestratorModel, coderModel, machineryProof, reviewModel, reviewModels, helpers, hostInstructions, prompt } = session
   const potetoSkill = await readFile(join(job.worktree, ".agents/skills/poteto-mode/SKILL.md"), "utf8")
   const workflowInstructions = `${hostInstructions}\n\nSelected workflow skill (authoritative):\n${potetoSkill}`
   const effectivePstackModels = session.pstackModels
@@ -126,7 +126,7 @@ async function main() {
           const trackedChanges = (await execFile('git', ['-C', job.worktree, 'diff', '--name-only', job.baseCommit])).stdout
           const newFiles = (await execFile('git', ['-C', job.worktree, 'ls-files', '--others', '--exclude-standard'])).stdout
           const changedFiles = (trackedChanges + '\n' + newFiles).split(/\r?\n/).filter(Boolean)
-          internalReview = { ...inspectPstackRun({ events, requests, coderModel, reviewModel, machineryProof, checklist, decisions, cardId, changedFiles }), effectiveModels: effectiveTable }
+          internalReview = { ...inspectPstackRun({ events, requests, coderModel, reviewModel, reviewModels, machineryProof, checklist, decisions, cardId, changedFiles }), effectiveModels: effectiveTable }
           break
         } catch (error) {
           if (turn === 3) throw error

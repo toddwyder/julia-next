@@ -99,6 +99,7 @@ export class CardLedger {
     const usageJson = usage === undefined ? null : json(usage, 'usage');
     return this.transaction(() => {
       const current = this.get(id);
+      if (current.state === 'unknown' && current.costNano !== null) throw new Error('Maximum-charge recovery is final; actual usage remains unknown');
       if (current.state === 'settled' || current.state === 'accounting_failure') {
         if (current.costNano !== costNano || !isDeepStrictEqual(current.usage, usageJson === null ? null : JSON.parse(usageJson))) {
           throw new Error('Settlement differs from recorded settlement');

@@ -88,6 +88,7 @@ test('charging an unknown request at its full maximum never releases budget or i
   assert.equal(charged.usage, null);
   assert.equal(charged.costNano, 300000000);
   assert.equal(charged.costBasis, 'reservation maximum; actual usage unknown');
+  assert.throws(() => ledger.settle(request.id, { usage: { input: 1 }, costNano: 1 }), /final/);
   assert.equal(ledger.chargeUnknownMaximum(request.id).costNano, 300000000);
   assert.equal(files.open().snapshot().remainingNano, 1700000000);
   assert.equal(files.open().snapshot().heldNano, 0);
