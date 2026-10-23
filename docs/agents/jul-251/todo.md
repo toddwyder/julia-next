@@ -21,7 +21,7 @@
 - [x] Phase B: Design the workflow
 - [x] Phase C: Run the loop
 - [x] Phase D: Keep the audit trail
-- [ ] Phase E: Verify and hand back
+- [x] Phase E: Verify and hand back
 
 ### Designed workflow
 
@@ -33,7 +33,7 @@
 - [x] Prove free-model routing, commands and stock Auto memory on the real adapter.
 - [x] Break each new guard, retain failing evidence, restore it and rerun.
 - [x] Review the diff and comments, commit and push coherent units.
-- [ ] Open a PR to main with evidence, audit the trail and report remaining limitations.
+- [x] Open a PR to main with evidence, audit the trail and report remaining limitations.
 
 ### Throughput checkpoint
 
@@ -44,20 +44,20 @@
 
 ## Follow-up on test ownership and merge maintenance
 
-- [ ] Reproduce it yourself on the matching surface.
-- [ ] Binary-search the cause.
-- [ ] Plan the fix.
-- [ ] Verify on the same surface.
-- [ ] Stage the commits so the failing repro lands before the fix in git history.
-- [ ] Run Opening a PR, resuming PR #314 without merging.
+- [x] Reproduce it yourself on the matching surface.
+- [x] Binary-search the cause.
+- [x] Plan the fix.
+- [x] Verify on the same surface.
+- [x] Stage the commits so the failing repro lands before the fix in git history.
+- [x] Run Opening a PR, resuming PR #314 without merging.
 
 ### Maintenance phases
 
-- [ ] Ground.
-- [ ] Sketch.
-- [ ] Agree. Proceed under the authorized scope.
-- [ ] Implement.
-- [ ] Scrap if runtime evidence rejects the design.
+- [x] Ground.
+- [x] Sketch.
+- [x] Agree. Proceed under the authorized scope.
+- [x] Implement.
+- [x] Scrap if runtime evidence rejects the design. skip: review corrections fit the chosen design.
 
 ### Throughput checkpoint
 
@@ -65,3 +65,5 @@
 - Independent workstreams. CI discovery and the maintenance package have distinct owners and file scopes.
 - Shared mutable state. The merge cursor and run records have one server poller owner. Git publication remains with the coordinator.
 - Smallest safe decomposition. Two implementation owners plus a fresh reviewer; proofs run after integration.
+
+Both follow-up proofs and implementation are pushed. The final handoff waits for green checks on PR #314's exact head; no merge is authorized.
