@@ -2,7 +2,7 @@
 
 Date: 2026-10-13
 
-Status: Accepted (Todd, in conversation, 13 Oct 2026)
+Status: Accepted (Todd, in conversation, 13 Oct 2026). The role budgets below are superseded by [ADR 0022](0022-subscriptions-and-card-cap.md), accepted 23 October 2026.
 
 Julia exposes one builder/reviewer contract over stock Mastra connection types: Mastra's coding
 agent for ordinary model APIs, official Mastra SDK adapters for service-owned coding runtimes, and

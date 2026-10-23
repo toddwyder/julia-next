@@ -1,0 +1,1 @@
+Agent entry-point destinations exist and heading links resolve.

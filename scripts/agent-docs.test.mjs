@@ -27,7 +27,8 @@ test('agent instructions use the trial rulebook and the runbook marks Factory re
   }
   const trial = read('AGENTS.md');
   assert.match(trial, /poteto-mode skill/);
-  assert.match(trial, /Spending is \$0/);
+  assert.match(trial, /one \$2 total model budget/);
+  assert.doesNotMatch(trial, /Spending is \$0|cost readback above \$0 stops/);
   assert.match(trial, /Linear holds cards and requirements\. GitHub holds code/);
   assert.match(trial, /node scripts\/julia-agents\.mjs/);
   assert.match(trial, /open PR to main/);

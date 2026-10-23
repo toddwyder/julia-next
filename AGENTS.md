@@ -6,13 +6,13 @@ Julia uses the pstack way of working, adopted 22 October 2026 and kept after the
 - Build with the poteto-mode skill and follow it as written.
 - Todd's agreed delivery flow, decisions and order of work: [docs/plans/path-forward.md](docs/plans/path-forward.md).
 - Fix every correction as high in [the inverse pyramid](docs/principles/inverse-pyramid.md) as it will go; a written rule is the last resort.
-- Spending is $0: Codex runs on Todd's signed-in plan; real request checks use a model CommandCode's billing page lists as free. Any cost readback above $0 stops the work.
+- Every card has one $2 total model budget across all roles, retries and runs. Count subscriptions at published API prices too. Prices, sources and request bounds live in the runner settings. Refuse unpriced or unbounded requests before dispatch. See [docs/adr/0022-subscriptions-and-card-cap.md](docs/adr/0022-subscriptions-and-card-cap.md).
 - Framework facts come from the installed packages, their version-matched official docs, and the learning tests under ops/build-runner/framework/. The learning tests stay green.
 - Commit and push as you go. The poteto-mode todo list and show-me-your-work decision log are committed under docs/agents/<card>/.
 - Publish with gh using the ordinary signed-in GitHub access.
 
 ## Todd
-Ask Todd only when a step needs him in his own account, spending would rise above $0, or a choice changes what Julia does for the household. Decide everything else and record it in the decision log.
+Ask Todd only when a step needs him in his own account or a choice changes what Julia does for the household. Continue all independent work while an account action is pending. Decide everything else and record it in the decision log.
 
 ## Server
 - Agents run as ubuntu with admin rights; Todd accepts the risks.

@@ -1,0 +1,88 @@
+✖ normal session keeps the configured Sol/DeepSeek split and every exact model (5.724148ms)
+✖ machinery selects Beam for every role and describes a self-check, not independent review (0.344148ms)
+✖ normal proof requires successful distinct-model review of actual changed files (3.896815ms)
+✖ machinery proof completes a successful Beam self-check without DeepSeek dispatch (0.522143ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 0
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 220.968113
+
+✖ failing tests:
+
+test at ops/build-runner/test/pstack-session.test.mjs:12:1
+✖ normal session keeps the configured Sol/DeepSeek split and every exact model (5.724148ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /successful review by a different model of the actual changed files/i. Input:
+  
+  'The selected poteto-mode skill and its routed playbooks govern this session. They take precedence over generic SDK suggestions about task size, direct execution, or limiting helpers to parallel work. Read and follow the selected playbook, including its required artifacts. Do not waive mandatory steps based on task size. The saved card describes the code change; its exclusions of downstream delivery phases do not waive the selected skill’s internal build, review and proof work.\n' +
+    '\n' +
+    'Pstack model settings:\n' +
+    'feature, refactoring: commandcode/deepseek/deepseek-v4.1-flash\n' +
+    'main session: openai/gpt-6-sol\n' +
+    'hardest tasks: openai/gpt-6-sol\n' +
+    'interrogate reviewers: openai/gpt-6-sol, commandcode/deepseek/deepseek-v4.1-flash\n' +
+    '\n' +
+    '\n' +
+    'Harness mapping:\n' +
+    'Task means the subagent tool. Choose the helper whose name is the exact model ID required by the role. Each helper is general purpose; the task supplies its role.\n' +
+    "Home is .builder-home. Retain the pstack-authored checklist and decision log as run evidence. These required run artifacts belong at .builder-home/pstack/checklist.md and .builder-home/pstack/decisions.tsv. These files are excluded from the card's candidate diff and retained by the host as run evidence. Keep them factual. This session owns Build only; the host owns publishing the parent PR. Publishing is outside this saved-card session. Mark that playbook step out of scope rather than claiming a PR was opened or waiting for GitHub authentication. A different helper instance using the same model is a same-model check. A paid review refused by the connection core is a refused handoff, never a completed model-diverse review; record that distinction in both checklist and decision log.\n" +
+    'Unavailable configured models:\n' +
+    'None'
+  
+      at TestContext.<anonymous> (file:///home/ubuntu/julia-jul-253/ops/build-runner/test/pstack-session.test.mjs:25:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: "The selected poteto-mode skill and its routed playbooks govern this session. They take precedence over generic SDK suggestions about task size, direct execution, or limiting helpers to parallel work. Read and follow the selected playbook, including its required artifacts. Do not waive mandatory steps based on task size. The saved card describes the code change; its exclusions of downstream delivery phases do not waive the selected skill’s internal build, review and proof work.\n\nPstack model settings:\nfeature, refactoring: commandcode/deepseek/deepseek-v4.1-flash\nmain session: openai/gpt-6-sol\nhardest tasks: openai/gpt-6-sol\ninterrogate reviewers: openai/gpt-6-sol, commandcode/deepseek/deepseek-v4.1-flash\n\n\nHarness mapping:\nTask means the subagent tool. Choose the helper whose name is the exact model ID required by the role. Each helper is general purpose; the task supplies its role.\nHome is .builder-home. Retain the pstack-authored checklist and decision log as run evidence. These required run artifacts belong at .builder-home/pstack/checklist.md and .builder-home/pstack/decisions.tsv. These files are excluded from the card's candidate diff and retained by the host as run evidence. Keep them factual. This session owns Build only; the host owns publishing the parent PR. Publishing is outside this saved-card session. Mark that playbook step out of scope rather than claiming a PR was opened or waiting for GitHub authentication. A different helper instance using the same model is a same-model check. A paid review refused by the connection core is a refused handoff, never a completed model-diverse review; record that distinction in both checklist and decision log.\nUnavailable configured models:\nNone",
+    expected: /successful review by a different model of the actual changed files/i,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at ops/build-runner/test/pstack-session.test.mjs:29:1
+✖ machinery selects Beam for every role and describes a self-check, not independent review (0.344148ms)
+  Error: distinct machinery review model required
+      at createPstackSession (file:///home/ubuntu/julia-jul-253/ops/build-runner/pstack-session.mjs:23:96)
+      at TestContext.<anonymous> (file:///home/ubuntu/julia-jul-253/ops/build-runner/test/pstack-session.test.mjs:30:19)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)
+
+test at ops/build-runner/test/pstack-session.test.mjs:43:1
+✖ normal proof requires successful distinct-model review of actual changed files (3.896815ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file:///home/ubuntu/julia-jul-253/ops/build-runner/test/pstack-session.test.mjs:71:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /review handoff/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at ops/build-runner/test/pstack-session.test.mjs:80:1
+✖ machinery proof completes a successful Beam self-check without DeepSeek dispatch (0.522143ms)
+  Error: missing distinct-model review handoff
+      at inspectPstackRun (file:///home/ubuntu/julia-jul-253/ops/build-runner/pstack-session.mjs:62:30)
+      at TestContext.<anonymous> (file:///home/ubuntu/julia-jul-253/ops/build-runner/test/pstack-session.test.mjs:98:20)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7)

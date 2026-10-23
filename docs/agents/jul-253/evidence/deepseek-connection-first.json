@@ -1,0 +1,1084 @@
+{
+  "model": "commandcode/deepseek/deepseek-v4.1-flash",
+  "status": "max_turns",
+  "text": "JUL253_CONNECTION_OK",
+  "requestsAdded": 1,
+  "costNano": 3585900,
+  "account": {
+    "card": "JUL-253",
+    "ceilingNano": 2000000000,
+    "stopped": false,
+    "spentNano": 87982644,
+    "heldNano": 0,
+    "remainingNano": 1912017356,
+    "pricedBlocked": false,
+    "requests": [
+      {
+        "id": "47952e08-4adc-4656-b5e8-5a0ec4cf3718",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 19382,
+          "output": 199,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "costNano": 6053400,
+        "reason": null
+      },
+      {
+        "id": "b5905637-495f-49bd-9ba4-15214035b3f4",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 364,
+          "output": 213,
+          "cacheRead": 19328,
+          "cacheWrite": 0
+        },
+        "costNano": 422784,
+        "reason": null
+      },
+      {
+        "id": "073739e4-239d-4165-b013-26f5a5dec734",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1073,
+          "output": 178,
+          "cacheRead": 19584,
+          "cacheWrite": 0
+        },
+        "costNano": 594252,
+        "reason": null
+      },
+      {
+        "id": "4fae683a-619d-4963-9769-52175777588c",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 7881,
+          "output": 280,
+          "cacheRead": 20608,
+          "cacheWrite": 0
+        },
+        "costNano": 2762124,
+        "reason": null
+      },
+      {
+        "id": "d3d87b90-1247-4938-a386-e1b4f4ad72ce",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 4958,
+          "output": 332,
+          "cacheRead": 28416,
+          "cacheWrite": 0
+        },
+        "costNano": 1971048,
+        "reason": null
+      },
+      {
+        "id": "052b8270-f0de-4298-b060-8beaaad6a975",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 2653,
+          "output": 390,
+          "cacheRead": 33280,
+          "cacheWrite": 0
+        },
+        "costNano": 1363740,
+        "reason": null
+      },
+      {
+        "id": "d4c4eb18-2a4c-43d7-9cf9-7ac522db505b",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 2355,
+          "output": 369,
+          "cacheRead": 35840,
+          "cacheWrite": 0
+        },
+        "costNano": 1256820,
+        "reason": null
+      },
+      {
+        "id": "85fcd5ca-26ed-4536-a981-4f2e012ec5e5",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 4065,
+          "output": 587,
+          "cacheRead": 38144,
+          "cacheWrite": 0
+        },
+        "costNano": 2038332,
+        "reason": null
+      },
+      {
+        "id": "bacb8918-388f-46b1-a2fe-f6644cae282d",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 4626,
+          "output": 6608,
+          "cacheRead": 42112,
+          "cacheWrite": 0
+        },
+        "costNano": 9443736,
+        "reason": null
+      },
+      {
+        "id": "ee1eab1d-270f-4379-8a56-6b30b99d9b1b",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 8870,
+          "output": 243,
+          "cacheRead": 46720,
+          "cacheWrite": 0
+        },
+        "costNano": 3092760,
+        "reason": null
+      },
+      {
+        "id": "c8cbbad1-6566-47c4-a100-c86b83dabb1c",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 2355,
+          "output": 174,
+          "cacheRead": 55552,
+          "cacheWrite": 0
+        },
+        "costNano": 1081956,
+        "reason": null
+      },
+      {
+        "id": "927472e2-e3a2-46c5-8802-512b05fb7923",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1257,
+          "output": 205,
+          "cacheRead": 57856,
+          "cacheWrite": 0
+        },
+        "costNano": 796668,
+        "reason": null
+      },
+      {
+        "id": "7bc9e127-9455-44fd-823f-87e9b3c08378",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 885,
+          "output": 184,
+          "cacheRead": 59008,
+          "cacheWrite": 0
+        },
+        "costNano": 663324,
+        "reason": null
+      },
+      {
+        "id": "b35a3f5f-b171-4b04-97c8-732cb983fad9",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 435,
+          "output": 6818,
+          "cacheRead": 59776,
+          "cacheWrite": 0
+        },
+        "costNano": 8491428,
+        "reason": null
+      },
+      {
+        "id": "1a2ded00-ed82-44af-9b8e-5d29097d57e2",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 6900,
+          "output": 214,
+          "cacheRead": 60160,
+          "cacheWrite": 0
+        },
+        "costNano": 2507280,
+        "reason": null
+      },
+      {
+        "id": "1af26b4b-7a2f-4ab2-9d6a-541c81146112",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1855,
+          "output": 634,
+          "cacheRead": 66944,
+          "cacheWrite": 0
+        },
+        "costNano": 1518132,
+        "reason": null
+      },
+      {
+        "id": "a8090ab5-9daf-4999-b4ba-f6ea739f9dae",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 731,
+          "output": 942,
+          "cacheRead": 68736,
+          "cacheWrite": 0
+        },
+        "costNano": 1555908,
+        "reason": null
+      },
+      {
+        "id": "72ef959e-cfaa-40a9-948c-551563003bf0",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1067,
+          "output": 1769,
+          "cacheRead": 69376,
+          "cacheWrite": 0
+        },
+        "costNano": 2651028,
+        "reason": null
+      },
+      {
+        "id": "7a71e918-e486-4e36-9edd-037a89e18e42",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1846,
+          "output": 133,
+          "cacheRead": 70400,
+          "cacheWrite": 0
+        },
+        "costNano": 924600,
+        "reason": null
+      },
+      {
+        "id": "c18a17a5-0c74-456c-8eb3-29d241a4e33c",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 217,
+          "output": 1053,
+          "cacheRead": 72192,
+          "cacheWrite": 0
+        },
+        "costNano": 1545276,
+        "reason": null
+      },
+      {
+        "id": "6809ac19-8d1e-42b3-a48e-7f85295e04b3",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1266,
+          "output": 142,
+          "cacheRead": 72320,
+          "cacheWrite": 0
+        },
+        "costNano": 767160,
+        "reason": null
+      },
+      {
+        "id": "c9c9d932-defe-4c17-b89d-1094814b1c8b",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 413,
+          "output": 357,
+          "cacheRead": 73472,
+          "cacheWrite": 0
+        },
+        "costNano": 772716,
+        "reason": null
+      },
+      {
+        "id": "191c9a61-4a5a-4769-af30-93aaac553f64",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 492,
+          "output": 1537,
+          "cacheRead": 73856,
+          "cacheWrite": 0
+        },
+        "costNano": 2213568,
+        "reason": null
+      },
+      {
+        "id": "bf4fa34d-44ba-4d8c-b344-5d95d0d56a5d",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1679,
+          "output": 162,
+          "cacheRead": 74240,
+          "cacheWrite": 0
+        },
+        "costNano": 920820,
+        "reason": null
+      },
+      {
+        "id": "e9fbabf9-866d-400f-a711-0484463cccba",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 334,
+          "output": 232,
+          "cacheRead": 75904,
+          "cacheWrite": 0
+        },
+        "costNano": 606312,
+        "reason": null
+      },
+      {
+        "id": "8b28fb29-fe53-46ce-b30e-e9478c068fa7",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 3256,
+          "output": 342,
+          "cacheRead": 76160,
+          "cacheWrite": 0
+        },
+        "costNano": 1615680,
+        "reason": null
+      },
+      {
+        "id": "7b4136a7-8a28-4afc-8fae-484b4e0b9062",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1321,
+          "output": 255,
+          "cacheRead": 79360,
+          "cacheWrite": 0
+        },
+        "costNano": 940380,
+        "reason": null
+      },
+      {
+        "id": "0eaddc6a-f474-490f-b02b-cff2a0750f6f",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1171,
+          "output": 191,
+          "cacheRead": 80640,
+          "cacheWrite": 0
+        },
+        "costNano": 822420,
+        "reason": null
+      },
+      {
+        "id": "b7170466-4623-4363-907a-98825d0256b0",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 2057,
+          "output": 466,
+          "cacheRead": 81792,
+          "cacheWrite": 0
+        },
+        "costNano": 1421676,
+        "reason": null
+      },
+      {
+        "id": "48a7161c-70e1-4bd9-b841-e72060505269",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 3115,
+          "output": 701,
+          "cacheRead": 83840,
+          "cacheWrite": 0
+        },
+        "costNano": 2027220,
+        "reason": null
+      },
+      {
+        "id": "1175f901-a473-4684-ac63-095baa1a75cf",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 831,
+          "output": 1282,
+          "cacheRead": 86912,
+          "cacheWrite": 0
+        },
+        "costNano": 2048436,
+        "reason": null
+      },
+      {
+        "id": "95fe00c3-2ba9-4110-a3d0-264e5fe2bf65",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1535,
+          "output": 927,
+          "cacheRead": 87680,
+          "cacheWrite": 0
+        },
+        "costNano": 1835940,
+        "reason": null
+      },
+      {
+        "id": "6be1c5f7-d058-4789-b198-ffb1b19175be",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1490,
+          "output": 536,
+          "cacheRead": 89088,
+          "cacheWrite": 0
+        },
+        "costNano": 1357464,
+        "reason": null
+      },
+      {
+        "id": "6f6b5341-7b42-4ba7-b645-cc2379f47662",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1015,
+          "output": 501,
+          "cacheRead": 90496,
+          "cacheWrite": 0
+        },
+        "costNano": 1177188,
+        "reason": null
+      },
+      {
+        "id": "0fc5b9f1-2b6b-4338-901a-7cc8bb23814e",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1201,
+          "output": 528,
+          "cacheRead": 91392,
+          "cacheWrite": 0
+        },
+        "costNano": 1268076,
+        "reason": null
+      },
+      {
+        "id": "59e9679d-a73d-4e05-bf84-31d736bc2f24",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1664,
+          "output": 4473,
+          "cacheRead": 92544,
+          "cacheWrite": 0
+        },
+        "costNano": 6144432,
+        "reason": null
+      },
+      {
+        "id": "9d21fe49-ac33-4153-9df4-de9f19cdb805",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 4509,
+          "output": 244,
+          "cacheRead": 94208,
+          "cacheWrite": 0
+        },
+        "costNano": 1928124,
+        "reason": null
+      },
+      {
+        "id": "31e4752a-ae0d-415f-bba2-09b0f2b0ba8f",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 430,
+          "output": 1276,
+          "cacheRead": 98688,
+          "cacheWrite": 0
+        },
+        "costNano": 1956264,
+        "reason": null
+      },
+      {
+        "id": "7719f49f-f5d2-4dc8-aaab-65f5590dea89",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1375,
+          "output": 327,
+          "cacheRead": 99072,
+          "cacheWrite": 0
+        },
+        "costNano": 1102116,
+        "reason": null
+      },
+      {
+        "id": "bf4ca038-590c-4964-9dc2-5e6ff96af7f8",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 441,
+          "output": 1919,
+          "cacheRead": 100352,
+          "cacheWrite": 0
+        },
+        "costNano": 2736156,
+        "reason": null
+      },
+      {
+        "id": "4e0ebe1a-42de-4f3d-b96a-67d7088070d4",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "proof",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 11921,
+          "output": 8,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "costNano": 3585900,
+        "reason": null
+      }
+    ]
+  }
+}

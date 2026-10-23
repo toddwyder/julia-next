@@ -1,0 +1,123 @@
+(node:510227) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ all roles share the two-dollar card ceiling across reopen and settle once (27.608536ms)
+✔ free requests remain usable without usage when priced accounting is unknown (17.672069ms)
+✔ reopening retains unresolved holds, snapshots, and settled costs per card (28.071304ms)
+✔ actual cost above a reservation is durable and blocks priced work (15.672123ms)
+✔ invalid monetary inputs cannot change durable budget (11.942689ms)
+✔ separate processes cannot jointly reserve beyond the ceiling (141.400689ms)
+✔ a process exit after reservation never releases an uncertain request (124.230755ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 6
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 487.502561
+
+✖ failing tests:
+
+test at ops/build-runner/test/ledger.test.mjs:22:1
+✖ all roles share the two-dollar card ceiling across reopen and settle once (27.608536ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 400000000
+  - 1400000000
+  
+      at TestContext.<anonymous> (file:///home/ubuntu/julia-jul-253/ops/build-runner/test/ledger.test.mjs:34:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 400000000,
+    expected: 1400000000,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+(node:510360) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ all roles share the two-dollar card ceiling across reopen and settle once (20.197542ms)
+✖ simultaneous cross-role reservations share held budget and settle in either order (15.111863ms)
+✔ free requests remain usable without usage when priced accounting is unknown (22.506098ms)
+✔ reopening retains unresolved holds, snapshots, and settled costs per card (21.085658ms)
+✔ actual cost above a reservation is durable and blocks priced work (20.161422ms)
+✔ invalid monetary inputs cannot change durable budget (17.04518ms)
+✔ separate processes cannot jointly reserve beyond the ceiling (96.532438ms)
+✖ a process exit after reservation never releases an uncertain request (88.015937ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 5
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 449.36402
+
+✖ failing tests:
+
+test at ops/build-runner/test/ledger.test.mjs:22:1
+✖ all roles share the two-dollar card ceiling across reopen and settle once (20.197542ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///home/ubuntu/julia-jul-253/ops/build-runner/test/ledger.test.mjs:27:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at ops/build-runner/test/ledger.test.mjs:45:1
+✖ simultaneous cross-role reservations share held budget and settle in either order (15.111863ms)
+  Error: Priced requests blocked by unresolved accounting
+      at file:///home/ubuntu/julia-jul-253/ops/build-runner/ledger.mjs:84:60
+      at CardLedger.transaction (file:///home/ubuntu/julia-jul-253/ops/build-runner/ledger.mjs:59:22)
+      at CardLedger.reserve (file:///home/ubuntu/julia-jul-253/ops/build-runner/ledger.mjs:81:17)
+      at TestContext.<anonymous> (file:///home/ubuntu/julia-jul-253/ops/build-runner/test/ledger.test.mjs:50:26)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+test at ops/build-runner/test/ledger.test.mjs:146:1
+✖ a process exit after reservation never releases an uncertain request (88.015937ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /ceiling/. Input:
+  
+  'Error: Priced requests blocked by unresolved accounting'
+  
+      at TestContext.<anonymous> (file:///home/ubuntu/julia-jul-253/ops/build-runner/test/ledger.test.mjs:155:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: Priced requests blocked by unresolved accounting
+        at file:///home/ubuntu/julia-jul-253/ops/build-runner/ledger.mjs:84:60
+        at CardLedger.transaction (file:///home/ubuntu/julia-jul-253/ops/build-runner/ledger.mjs:59:22)
+        at CardLedger.reserve (file:///home/ubuntu/julia-jul-253/ops/build-runner/ledger.mjs:81:17)
+        at file:///home/ubuntu/julia-jul-253/ops/build-runner/test/ledger.test.mjs:155:33
+        at getActual (node:assert:611:5)
+        at strict.throws (node:assert:759:24)
+        at TestContext.<anonymous> (file:///home/ubuntu/julia-jul-253/ops/build-runner/test/ledger.test.mjs:155:10)
+        at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        at async Test.run (node:internal/test_runner/test:1125:7)
+        at async Test.processPendingSubtests (node:internal/test_runner/test:787:7),
+    expected: /ceiling/,
+    operator: 'throws',
+    diff: 'simple'
+  }

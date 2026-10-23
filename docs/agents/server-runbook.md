@@ -59,19 +59,24 @@ or recreate the account. Later agent commands authenticate only with the new age
 former item-23 ubuntu lockdown is abandoned. The latest decision keeps agents as ubuntu; julia-agent stays unused.
 No further privilege changes are required.
 
-Machinery learning/Proof uses Beam alone under Todd's 22 October 07:35–07:44 rule in AGENTS.md;
-Claude's 06:58 $0.0000 Beam usage-page read is accepted evidence. No further cost polling is needed.
-Real building remains Codex GPT-6 Sol. Todd’s 22 October 11:54 decision keeps
-/code-review inside Implement, once the build is done, with Standards and Spec
-helpers in the builder’s own session/model. Never send code review outside the
-session or to a paid model. Adversarial review is a separate Gemini step; no
-Gemini request runs until Todd names its exact model and route. Ask him in one
-line only when a card reaches that step. One candidate’s angles/calls are one
-round; the recheck after fixes is round two, and there is no round three.
-JUL-250 is explicitly authorized to finish its own code review, Proof and tests,
-then merge without waiting for Gemini. DeepSeek has no review role. The shared
-adapter admits Beam machinery only and retains completed costs plus unresolved
-reservations without opening room for more review.
+Todd's 23 October decision in JUL-253 replaces the zero-spend trial. Sol handles
+main sessions and hardest work; DeepSeek handles ordinary coding and swarm workers;
+panels use one of each. Beam handles free machinery checks. All roles, retries and
+runs share one $2 card account, with subscriptions counted at API prices.
+
+Stock subscription sign-ins use `node ops/build-runner/connections.mjs login
+ops/build-runner/machine-settings.json openai-codex` or the same command with
+`anthropic`. ChatGPT uses the stock device-code flow. Claude uses the stock hosted
+paste-code flow. Todd completes only the account approval. The agent handles setup
+and verification and continues independent work while authorization is pending.
+OAuth links and one-time codes are shown to Todd when he requests the sign-in;
+access and refresh tokens never enter reports or repository files.
+
+`machine-settings.json` identifies the shared stock `authPath` and card `ledgerPath`
+outside all job worktrees. Never replace these with per-run stores. The stock SDK
+owns token renewal. Sources, published rates, price tiers and request bounds stay
+in settings. Read [ADR 0022](../adr/0022-subscriptions-and-card-cap.md) for the settled
+Claude decision and aggregate cap.
 
 ## Control page over Tailscale Serve
 

@@ -2,7 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 
-export const CEILING_NANO = 1_000_000_000;
+export const CEILING_NANO = 2_000_000_000;
 
 function nonempty(value, name) {
   if (typeof value !== 'string' || !value.trim()) throw new TypeError(`${name} must be nonempty`);
@@ -80,7 +80,7 @@ export class CardLedger {
     const boundsJson = json(bounds, 'bounds');
     return this.transaction(() => {
       const snapshot = this.snapshot();
-      if (snapshot.stopped) throw new Error('Card stopped after nonzero cost readback');
+      if (snapshot.stopped) throw new Error('Card account is stopped');
       if (maximumNano > 0 && snapshot.pricedBlocked) throw new Error('Priced requests blocked by unresolved accounting');
       if (maximumNano > 0 && BigInt(snapshot.spentNano) + BigInt(snapshot.heldNano) + BigInt(maximumNano) > BigInt(CEILING_NANO)) {
         throw new Error('Card cost ceiling exceeded');
@@ -131,7 +131,7 @@ export class CardLedger {
     for (const row of requests) {
       spent += BigInt(row.costNano ?? 0);
       if (row.state === 'reserved' || row.state === 'unknown') held += BigInt(row.maximumNano);
-      if ((row.maximumNano > 0 && (row.state === 'reserved' || row.state === 'unknown')) || row.state === 'accounting_failure') pricedBlocked = true;
+      if ((row.maximumNano > 0 && row.state === 'unknown') || row.state === 'accounting_failure') pricedBlocked = true;
     }
     const numeric = (value) => value <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(value) : value.toString();
     return {

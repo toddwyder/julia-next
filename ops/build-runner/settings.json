@@ -18,7 +18,7 @@
       "endpoint": "https://api.commandcode.ai/provider/v1/chat/completions",
       "wireModel": "reflection/beam:free",
       "protocol": "chat",
-      "maxInputTokens": 262144,
+      "maxInputTokens": 1048576,
       "maxOutputTokens": 8192,
       "price": {
         "input": 0,
@@ -26,10 +26,13 @@
         "cacheRead": 0,
         "cacheWrite": 0
       },
-      "source": "https://commandcode.ai/pricing"
+      "source": "https://commandcode.ai/pricing",
+      "boundsSource": "https://commandcode.ai/docs/resources/pricing-limits"
     }
   },
   "networkAllow": [
     "https://api.commandcode.ai/provider/v1/models"
-  ]
+  ],
+  "authPath": "/home/ubuntu/.local/share/mastracode/auth.json",
+  "ledgerPath": "/home/ubuntu/.local/state/julia-machine/cards.sqlite"
 }

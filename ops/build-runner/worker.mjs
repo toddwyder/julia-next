@@ -47,6 +47,7 @@ async function main() {
   const savedRoles = snapshot.roles ?? {}
   const settingsPathValue = job.settingsPath ?? process.env.BUILD_RUNNER_SETTINGS ?? argValue('--settings') ?? resolve(process.cwd(), 'ops/build-runner/settings.json')
   const settings = JSON.parse(await readFile(settingsPathValue, 'utf8'))
+  settings.ledgerPath ??= join(dirname(jobDir), 'cards.sqlite')
   const pstackModels = await readFile(new URL('./pstack-models.md', import.meta.url), 'utf8')
   const session = createPstackSession(settings, { ...snapshot, machineryProof: job.machineryProof === true || snapshot.machineryProof }, pstackModels)
   const { orchestratorModel, coderModel, machineryProof, reviewModel, helpers, hostInstructions, prompt } = session
@@ -138,15 +139,14 @@ async function main() {
     threadId = receipt.threadId
     account = receipt.account ?? runner.snapshot()
 
-    if (internalReview.deepseekSent && machineryProof) throw new Error('deepseek dispatched')
+    if (machineryProof && internalReview.deepseekSent) throw new Error('deepseek dispatched during machinery self-check')
     await atomicWriteText(join(jobDir, 'pstack-checklist.md'), checklist)
     await atomicWriteText(join(jobDir, 'pstack-decisions.tsv'), decisions)
     await atomicWriteJson(join(jobDir, 'pstack-state.json'), runner.runtime.session.state.get())
 
     if (runner.runtime?.session?.model?.get?.() !== orchestratorModel) throw new Error('session model mismatch')
     if (account?.stopped !== false) throw new Error('account stopped')
-    if (Number(account?.spentNano ?? 0) !== 0) throw new Error('nonzero spent')
-    if (Number(account?.heldNano ?? 0) !== 0) throw new Error('nonzero held')
+    if (Number(account?.heldNano ?? 0) !== 0) throw new Error('unsettled card reservations')
 
     const { stdout: statusBefore } = await execFile('git', ['-C', job.worktree, 'status', '--porcelain'])
     if (statusBefore.trim()) {

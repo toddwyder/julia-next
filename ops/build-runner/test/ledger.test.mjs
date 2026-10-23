@@ -19,21 +19,47 @@ function fixture(t) {
   return { path, open(card = 'JUL-test') { const ledger = new CardLedger({ path, card }); ledgers.push(ledger); return ledger; } };
 }
 
-test('priced requests hold budget, settle once, and enforce the card ceiling', (t) => {
-  const ledger = fixture(t).open();
-  const first = ledger.reserve(input(600_000_000));
+test('all roles share the two-dollar card ceiling across reopen and settle once', (t) => {
+  const files = fixture(t);
+  let ledger = files.open();
+  const first = ledger.reserve({ ...input(600_000_000), model: 'openai/gpt-6-sol', role: 'orchestrator' });
   assert.equal(ledger.snapshot().heldNano, 600_000_000);
-  assert.throws(() => ledger.reserve(input(1)), /blocked/);
+  assert.equal(ledger.snapshot().pricedBlocked, false);
   const usage = { inputTokens: 10, outputTokens: 20 };
   ledger.settle(first.id, { usage, costNano: 600_000_000 });
   assert.deepEqual(ledger.settle(first.id, { costNano: 600_000_000, usage: { outputTokens: 20, inputTokens: 10 } }).usage, usage);
   assert.throws(() => ledger.settle(first.id, { usage, costNano: 1 }), /differs/);
-  assert.throws(() => ledger.reserve(input(400_000_001)), /ceiling/);
-  const last = ledger.reserve(input(400_000_000));
-  ledger.settle(last.id, { usage, costNano: 400_000_000 });
-  assert.equal(ledger.snapshot().spentNano, 1_000_000_000);
+  ledger.close();
+  ledger = files.open();
+  assert.equal(ledger.snapshot().remainingNano, 1_400_000_000);
+  assert.throws(() => ledger.reserve({ ...input(1_400_000_001), role: 'reviewer' }), /ceiling/);
+  const last = ledger.reserve({ ...input(1_400_000_000), model: 'deepseek/deepseek-v4.1-flash', role: 'coder' });
+  ledger.settle(last.id, { usage, costNano: 1_400_000_000 });
+  assert.equal(ledger.snapshot().spentNano, 2_000_000_000);
   assert.equal(ledger.snapshot().remainingNano, 0);
-  assert.throws(() => ledger.reserve(input(1)), /ceiling/);
+  assert.throws(() => ledger.reserve({ ...input(1), role: 'proof' }), /ceiling/);
+  assert.deepEqual(ledger.snapshot().requests.map(request => request.role), ['orchestrator', 'coder']);
+  assert.equal(files.open('different-card').snapshot().remainingNano, 2_000_000_000);
+});
+
+test('simultaneous cross-role reservations share held budget and settle in either order', (t) => {
+  const files = fixture(t);
+  const orchestrator = files.open();
+  const coder = files.open();
+  const sol = orchestrator.reserve({ ...input(1_200_000_000), model: 'openai/gpt-6-sol', role: 'orchestrator' });
+  const deepseek = coder.reserve({ ...input(800_000_000), model: 'deepseek/deepseek-v4.1-flash', role: 'coder' });
+  assert.equal(orchestrator.snapshot().heldNano, 2_000_000_000);
+  assert.equal(orchestrator.snapshot().remainingNano, 0);
+  assert.throws(() => coder.reserve({ ...input(1), role: 'reviewer' }), /ceiling/);
+  coder.settle(deepseek.id, { usage: { tokens: 1 }, costNano: 500_000_000 });
+  assert.equal(orchestrator.snapshot().heldNano, 1_200_000_000);
+  assert.equal(orchestrator.snapshot().remainingNano, 300_000_000);
+  const review = coder.reserve({ ...input(300_000_000), role: 'reviewer' });
+  orchestrator.settle(sol.id, { usage: { tokens: 1 }, costNano: 1_200_000_000 });
+  coder.settle(review.id, { usage: { tokens: 1 }, costNano: 300_000_000 });
+  assert.equal(files.open().snapshot().spentNano, 2_000_000_000);
+  assert.equal(files.open().snapshot().heldNano, 0);
+  assert.throws(() => files.open().reserve(input(1)), /ceiling/);
 });
 
 test('free requests remain usable without usage when priced accounting is unknown', (t) => {
@@ -112,9 +138,9 @@ test('separate processes cannot jointly reserve beyond the ceiling', async (t) =
     const ledger = new CardLedger({path: process.argv[1], card: 'JUL-test'});
     try { ledger.reserve(JSON.parse(process.argv[2])); console.log('accepted'); }
     catch { console.log('refused'); } finally { ledger.close(); }`;
-  const outcomes = await Promise.all([child(source, [files.path, JSON.stringify(input(600_000_000))]), child(source, [files.path, JSON.stringify(input(600_000_000))])]);
+  const outcomes = await Promise.all([child(source, [files.path, JSON.stringify(input(1_200_000_000))]), child(source, [files.path, JSON.stringify(input(1_200_000_000))])]);
   assert.deepEqual(outcomes.sort(), ['accepted', 'refused']);
-  assert.equal(files.open().snapshot().heldNano, 600_000_000);
+  assert.equal(files.open().snapshot().heldNano, 1_200_000_000);
 });
 
 test('a process exit after reservation never releases an uncertain request', async (t) => {
@@ -125,6 +151,7 @@ test('a process exit after reservation never releases an uncertain request', asy
     ledger.reserve(JSON.parse(process.argv[2])); process.exit(0);`, [files.path, JSON.stringify(input(900_000_000))]);
   const restarted = files.open();
   assert.equal(restarted.snapshot().heldNano, 900_000_000);
-  assert.throws(() => restarted.reserve(input(1)), /blocked/);
+  assert.equal(restarted.snapshot().remainingNano, 1_100_000_000);
+  assert.throws(() => restarted.reserve(input(1_100_000_001)), /ceiling/);
   restarted.settle(restarted.reserve(input()).id, { costNano: 0 });
 });

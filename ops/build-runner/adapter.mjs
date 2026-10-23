@@ -39,13 +39,21 @@ export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'bu
   }
   const authInside = relative(cwd, authPath)
   if (!authInside.startsWith('..') && !isAbsolute(authInside)) throw Error('credentials must be outside builder workspace')
+  let ledgerPath = resolve(settings.ledgerPath ?? join(stateDir, 'cards.sqlite'))
+  await mkdir(dirname(ledgerPath), { recursive: true, mode: 0o700 })
+  try { ledgerPath = await realpath(ledgerPath) } catch (error) {
+    if (error.code !== 'ENOENT') throw error
+    ledgerPath = join(await realpath(dirname(ledgerPath)), basename(ledgerPath))
+  }
+  const ledgerInside = relative(cwd, ledgerPath)
+  if (!ledgerInside.startsWith('..') && !isAbsolute(ledgerInside)) throw Error('card ledger must be outside builder workspace')
   const path = process.env.PATH
   for (const key of Object.keys(process.env)) delete process.env[key]
   Object.assign(process.env, { PATH: path ?? '/usr/local/bin:/usr/bin:/bin', HOME: stateDir, LANG: 'C.UTF-8', MASTRA_APP_DATA_DIR: appDir })
   if (settings.memory === false) process.env.MASTRACODE_DISABLE_OBSERVATIONAL_MEMORY = '1'
-  const ledger = new CardLedger({ path: join(stateDir, 'cards.sqlite'), card })
+  const ledger = new CardLedger({ path: ledgerPath, card })
   const originalFetch = globalThis.fetch
-  globalThis.fetch = createTransport({ settings, ledger, role, fetch: originalFetch, trial: true })
+  globalThis.fetch = createTransport({ settings, ledger, role, fetch: originalFetch })
   opened = true
   let runtime
   let workspace

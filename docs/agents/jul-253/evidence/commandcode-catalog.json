@@ -1,0 +1,29 @@
+{
+  "status": 200,
+  "models": [
+    {
+      "id": "deepseek/deepseek-v4.1-flash",
+      "object": "model",
+      "created": 1792788544,
+      "owned_by": "command-code",
+      "name": "DeepSeek V4.1 Flash (latest)",
+      "context_length": 1000000,
+      "supported_endpoints": [
+        "/chat/completions",
+        "/responses"
+      ]
+    },
+    {
+      "id": "reflection/beam:free",
+      "object": "model",
+      "created": 1792788544,
+      "owned_by": "command-code",
+      "name": "Beam 1.0",
+      "context_length": 1048576,
+      "supported_endpoints": [
+        "/chat/completions",
+        "/responses"
+      ]
+    }
+  ]
+}
