@@ -39,6 +39,8 @@ test('proof attributes a refused review to its actual task and distinct model in
   const evidence = inspectPstackRun({ events, requests, coderModel: beam, reviewModel: deepseek, machineryProof: true, checklist: '- [x] Build\n- [x] Proof\n', decisions: 'ts\tphase\tdecision\n2026-10-23\tbuild\tUse marker\n' })
   assert.equal(evidence.reviewHandoff.modelId, deepseek)
   assert.equal(evidence.reviewHandoff.refused, true)
+  assert.throws(() => inspectPstackRun({ events: [events[2], events[3], events[0], events[1]], requests, coderModel: beam, reviewModel: deepseek, machineryProof: true, checklist: 'Build', decisions: 'Decision' }), /review handoff/)
   assert.equal(evidence.hasCoder, true)
+  assert.deepEqual(evidence.events, events)
   assert.throws(() => inspectPstackRun({ events: events.map(e => e.toolCallId === 'review' ? { ...e, task: 'Run a trivial cap check' } : e), requests, coderModel: beam, reviewModel: deepseek, machineryProof: true, checklist: 'Build', decisions: 'Decision' }), /review handoff/)
 })

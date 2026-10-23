@@ -15,6 +15,6 @@
   "evidenceDirectory": "/home/ubuntu/.local/state/julia-machine/deployments",
   "healthChecks": [
     "http://127.0.0.1:43127/health",
-    "http://127.0.0.1:43126/"
+    "http://127.0.0.1:43126/julia-control"
   ]
 }
