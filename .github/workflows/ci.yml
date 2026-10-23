@@ -10,42 +10,52 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  changes:
+  package-tests:
     runs-on: ubuntu-22.04
-    outputs:
-      baseline: ${{ steps.routes.outputs.baseline }}
-      julia_init_windows: ${{ steps.routes.outputs.julia_init_windows }}
-      web: ${{ steps.routes.outputs.web }}
-      docs_policy: ${{ steps.routes.outputs.docs_policy }}
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: 22.23.2
-      - name: Select CI gates from changed paths
-        id: routes
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-          HEAD_SHA: ${{ github.sha }}
+          node-version: 24.14.1
+      - name: Install pinned Bun runtime
+        run: npm install --global bun@1.4.4
+      - name: Discover test ownership
+        run: node scripts/test-owners.mjs --plan
+      - name: Install each owner's locked dependencies
+        run: node scripts/test-owners.mjs --install
+      - name: Run every local package test
+        run: node scripts/test-owners.mjs --run local
+      - name: Builder client must never read the Axiom credential
         run: |
           set -euo pipefail
-          if [[ -n "$BASE_SHA" ]] && git cat-file -e "$BASE_SHA^{commit}"; then
-            routes="$(node scripts/ci-routing.mjs --github-output "$BASE_SHA" "$HEAD_SHA")"
-            echo "Changed paths:"
-            git diff --name-status --no-renames "$BASE_SHA" "$HEAD_SHA"
-            echo "Selected gates:"
-            printf '%s\n' "$routes"
-            printf '%s\n' "$routes" >> "$GITHUB_OUTPUT"
-          else
-            echo "Changed paths unavailable; selecting every gate."
-            echo "Selected gates: all"
-            printf '%s\n' baseline=true julia_init_windows=true web=true docs_policy=true >> "$GITHUB_OUTPUT"
+          if grep -rE 'process\.env\.AXIOM_(TOKEN|DATASET)' scripts/; then
+            echo "::error::builder-side script under scripts/ reads an Axiom credential env var directly"
+            exit 1
           fi
 
-  baseline:
-    needs: changes
+  web:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.14.1
+      - name: Install application dependencies
+        run: npm ci
+      - name: Install browser owners' locked dependencies
+        run: node scripts/test-owners.mjs --install browser
+      - name: Install each browser owner's Chromium
+        run: node scripts/test-owners.mjs --install-browsers
+      - name: Run skill-owned browser tests
+        run: node scripts/test-owners.mjs --run browser
+      - name: Lint framework code
+        run: npm run lint:framework
+      - name: Build application
+        run: npm run build
+
+  server-tests:
     runs-on: ubuntu-22.04
     permissions:
       contents: read
@@ -55,114 +65,24 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: 22.23.2
-      - name: Test CI gate routing
-        run: node --test scripts/ci-routing.test.mjs
-      - name: Check repository line endings
-        run: node --test scripts/line-endings.test.mjs
-      - name: Test bad-submissions rejection gates on POSIX
-        run: node --test scripts/bad-submissions.test.mjs
-      - name: Syntax-check changed scripts and operations modules
+          node-version: 24.14.1
+      - name: Await exact candidate's server-owned tests
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-          HEAD_SHA: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          if [[ -n "$BASE_SHA" ]] && git cat-file -e "$BASE_SHA^{commit}"; then
-            node scripts/ci-routing.mjs --syntax-check "$BASE_SHA" "$HEAD_SHA"
-          else
-            find scripts ops -name '*.mjs' -print0 | xargs -0 -n1 node --check
-          fi
-      - name: Builder client must never read the Axiom credential
-        run: |
-          set -euo pipefail
-          if grep -rE 'process\.env\.AXIOM_(TOKEN|DATASET)' scripts/; then
-            echo "::error::builder-side script under scripts/ reads an Axiom credential env var directly"
-            exit 1
-          fi
-          echo "OK: no Axiom credential read under scripts/"
-
-  julia-init-windows:
-    needs: changes
-    if: needs.changes.outputs.julia_init_windows == 'true'
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22.23.2
-      - name: Test bad-submissions rejection gates on Windows
-        run: node --test scripts/bad-submissions.test.mjs
-      - name: Install root dependencies for Framework Map installed-document checks
-        run: npm ci
-      - name: Install pinned Mastra reviewer dependencies
-        working-directory: ops/mastra-agents/reviewer
-        run: npm ci
-      - name: Test active runner and shared safety regressions without provider calls
-        run: node scripts/julia-runner-suite.mjs
-
-  web:
-    needs: changes
-    if: needs.changes.outputs.web == 'true'
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22.23.2
-      - name: Install application dependencies
-        run: npm ci
-      - name: Run current application tests
-        run: node --test scripts/health-route.test.mjs scripts/dynamic-route.test.mjs scripts/web-app.test.mjs scripts/framework-lint.test.mjs
-      - name: Install Chromium
-        run: npx playwright install chromium
-      - name: Run browser tests
-        run: npx playwright test
-      - name: Lint framework code
-        run: npm run lint:framework
-      - name: Build application
-        run: npm run build
-
-  docs-policy:
-    needs: changes
-    if: needs.changes.outputs.docs_policy == 'true'
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22.23.2
-      - name: Run documentation and policy tests
-        run: |
-          node --test scripts/agent-docs.test.mjs \
-            scripts/no-personal-paths.test.mjs scripts/personal-paths.test.mjs scripts/merge-pr.test.mjs \
-            scripts/publish-pr.test.mjs scripts/publish-pr.real-git.test.mjs \
-            scripts/publish-via-github-app.test.mjs
+          CANDIDATE_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: node scripts/await-server-tests.mjs "$CANDIDATE_HEAD"
 
   checks:
-    needs: [changes, baseline, julia-init-windows, web, docs-policy]
+    needs: [package-tests, web, server-tests]
     if: always()
     runs-on: ubuntu-22.04
     env:
-      GATE_CHANGES: ${{ needs.changes.result }}
-      GATE_BASELINE: ${{ needs.baseline.result }}
-      GATE_JULIA_INIT_WINDOWS: ${{ needs.julia-init-windows.result }}
-      GATE_WEB: ${{ needs.web.result }}
-      GATE_DOCS_POLICY: ${{ needs.docs-policy.result }}
+      PACKAGE_TESTS: ${{ needs.package-tests.result }}
+      WEB: ${{ needs.web.result }}
+      SERVER_TESTS: ${{ needs.server-tests.result }}
     steps:
-      - name: Verify selected gates completed
+      - name: Require every test environment to pass
         run: |
           set -euo pipefail
-          gates=(changes baseline julia-init-windows web docs-policy)
-          results=("$GATE_CHANGES" "$GATE_BASELINE" "$GATE_JULIA_INIT_WINDOWS" "$GATE_WEB" "$GATE_DOCS_POLICY")
-          status=0
-          for index in "${!gates[@]}"; do
-            gate="${gates[$index]}"
-            result="${results[$index]}"
-            case "$result" in
-              success) echo "$gate completed successfully" ;;
-              skipped) echo "$gate not applicable (skipped)" ;;
-              *) echo "::error::$gate ended with $result"; status=1 ;;
-            esac
-          done
-          exit "$status"
+          [[ "$PACKAGE_TESTS" == success ]]
+          [[ "$WEB" == success ]]
+          [[ "$SERVER_TESTS" == success ]]
