@@ -3,10 +3,10 @@
 - [x] 1. `how` over the affected subsystem.
 - [x] 2. `architect` for parallel design exploration.
 - [x] 3. Write the throughput checkpoint as four todo items.
-- [ ] 4. Delegate code-writing to a subagent using your configured feature model.
-- [ ] 5. Verify on the matching surface.
-- [ ] 6. Rebase into small, ordered commits. Stack follow-ups.
-- [ ] 7. If the design is contested, `interrogate` before shipping.
+- [x] 4. Delegate code-writing to a subagent using your configured feature model.
+- [x] 5. Verify on the matching surface.
+- [x] 6. Rebase into small, ordered commits. Stack follow-ups.
+- [x] 7. If the design is contested, `interrogate` before shipping.
 - [ ] 8. Run **Opening a PR**.
 
 ## Throughput checkpoint
@@ -21,8 +21,8 @@
 - [x] Ground
 - [x] Sketch
 - [x] Agree
-- [ ] Implement
-- [ ] Scrap if the architecture is wrong
+- [x] Implement
+- [x] Scrap if the architecture is wrong. The detached-child premise was rejected after reading systemd.kill(5).
 
 ## Arena phases
 
@@ -31,4 +31,4 @@
 - [x] Cross-judge
 - [x] Pick
 - [x] Graft
-- [ ] Verify
+- [x] Verify

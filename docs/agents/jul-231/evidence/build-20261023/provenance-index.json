@@ -283,5 +283,50 @@
     "member": "worker-v2-response.json",
     "bytes": 13582,
     "sha256": "0dcccda3f7c94dbbfe6c4676543bfc3b4a05eaa6398ce5200f2c5b34413506be"
+  },
+  {
+    "member": "boundary-test-fix-ledger.json",
+    "bytes": 187084,
+    "sha256": "a9771ffe24c4636969bc5353f821c0e6d4253690d16697e77e314ccaa5bd6226"
+  },
+  {
+    "member": "boundary-test-fix-response.json",
+    "bytes": 2023,
+    "sha256": "a380c2697e989d2a5d0898eaeaba44ce25a12162bc774223ccfe6ac4dc31970f"
+  },
+  {
+    "member": "build-ledger.json",
+    "bytes": 185893,
+    "sha256": "d86f23ae365fb00c2dd9ffbc7cff84d0765c0aaa7f3ef092e5c4ef2280f9c4c3"
+  },
+  {
+    "member": "final-source-review-ledger.json",
+    "bytes": 188276,
+    "sha256": "d648d4fa9bb09e63015c0fd6f74cbf81a5d5fcfebfd53f1863e6ed08c344a898"
+  },
+  {
+    "member": "final-source-review-response.json",
+    "bytes": 728,
+    "sha256": "16778f628e80dfb455afdc28577526c12a20f502af4228169321586f42fba57b"
+  },
+  {
+    "member": "git-checkout-fix-ledger.json",
+    "bytes": 186489,
+    "sha256": "49929e8ec8e487a0091df34d5e259319cf0d96ec44e0847f6f190a376f345d47"
+  },
+  {
+    "member": "git-checkout-fix-response.json",
+    "bytes": 6826,
+    "sha256": "1f92b99c37a55a3c408da9e7e44c9e7d1672d61dc81993e30af658ed9b2ab536"
+  },
+  {
+    "member": "trail-audit-ledger.json",
+    "bytes": 187679,
+    "sha256": "f8b6f136ca47eedca031de67c0d9472d4ea379b5d732e80734e2af44efb3a164"
+  },
+  {
+    "member": "trail-audit-response.json",
+    "bytes": 2964,
+    "sha256": "91ba4d1fa23464fa173ee8ab0b3e0a42a64810d154f4ec8047b664a66e2d0f0d"
   }
 ]
