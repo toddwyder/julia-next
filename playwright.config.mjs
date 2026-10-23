@@ -3,7 +3,9 @@ import { defineConfig } from '@playwright/test';
 const targetUrl = process.env.JULIA_VERIFY_URL;
 
 export default defineConfig({
-  testDir: './e2e',
+  testDir: '.',
+  respectGitIgnore: true,
+  testMatch: /\.spec\.[cm]?[jt]sx?$/,
   use: { baseURL: targetUrl ?? 'http://127.0.0.1:3000' },
   ...(targetUrl ? {} : {
     webServer: {

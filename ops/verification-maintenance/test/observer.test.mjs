@@ -1,0 +1,102 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { poll, command } from '../maintenance.mjs';
+const git = (repo, ...args) => command('git', args, repo);
+function fixture() {
+  const root = mkdtempSync(join(tmpdir(), 'maintenance-unit-'));
+  const repo = join(root, 'repository');
+  mkdirSync(repo);
+  git(repo, 'init', '-b', 'trial');
+  git(repo, 'config', 'user.email', 'fixture@example.invalid');
+  git(repo, 'config', 'user.name', 'Fixture');
+  writeFileSync(join(repo, 'app.mjs'), 'console.log("ready");\n');
+  git(repo, 'add', '.'); git(repo, 'commit', '-m', 'baseline');
+  return { root, repo, config: { repository: repo, branch: 'trial', state: join(root, 'state') } };
+}
+function merge(repo) {
+  git(repo, 'checkout', '-b', 'feature');
+  writeFileSync(join(repo, 'feature.txt'), 'merged\n');
+  git(repo, 'add', '.'); git(repo, 'commit', '-m', 'feature');
+  git(repo, 'checkout', 'trial'); git(repo, 'merge', '--no-ff', 'feature', '-m', 'test merge');
+}
+test('baseline, no merge, direct push, one merge, and repeated poll expose exactly one run', () => {
+  const { repo, config } = fixture();
+  let calls = 0;
+  const run = (_config, record) => { calls++; return { ...record, state: 'clean' }; };
+  assert.equal(poll(config, run).launched, 0);
+  assert.equal(poll(config, run).launched, 0);
+  writeFileSync(join(repo, 'direct.txt'), 'direct\n');
+  git(repo, 'add', '.'); git(repo, 'commit', '-m', 'direct commit');
+  assert.equal(poll(config, run).launched, 0);
+  merge(repo);
+  assert.equal(poll(config, run).launched, 1);
+  assert.equal(poll(config, run).launched, 0);
+  assert.equal(calls, 1);
+  assert.equal(readdirSync(join(config.state, 'runs')).length, 1);
+});
+test('launch failure is retained as blocked and never relaunched', () => {
+  const { repo, config } = fixture();
+  poll(config); merge(repo);
+  let calls = 0;
+  poll(config, () => { calls++; throw new Error('fixture launcher failed'); });
+  poll(config, () => { calls++; });
+  assert.equal(calls, 1);
+  const sha = readdirSync(join(config.state, 'runs'))[0];
+  assert.match(readFileSync(join(config.state, 'runs', sha, 'TODD.txt'), 'utf8'), /fixture launcher failed/);
+});
+test('blocked notification runs its configured child once and repeated polling does not repeat delivery', () => {
+  const { repo, root, config } = fixture();
+  const program = join(root, 'notify.mjs');
+  const marker = join(root, 'notifications.json');
+  writeFileSync(program, `import {readFileSync,writeFileSync,existsSync} from 'node:fs'; const [marker,body] = process.argv.slice(2); const previous = existsSync(marker) ? JSON.parse(readFileSync(marker,'utf8')) : []; previous.push(body); writeFileSync(marker,JSON.stringify(previous)); console.log(JSON.stringify({id:'comment-1',url:'https://linear.app/comment-1'}));`);
+  config.notification = { program: [process.execPath, program, marker] };
+  poll(config); merge(repo);
+  let calls = 0;
+  const run = (_config, record) => { calls++; return { ...record, state: 'blocked', result: { summary: 'Coverage\ncould not finish.' } }; };
+  poll(config, run); poll(config, run);
+  assert.equal(calls, 1);
+  const notifications = JSON.parse(readFileSync(marker, 'utf8'));
+  assert.equal(notifications.length, 1);
+  assert.equal(notifications[0].includes('\n'), false);
+  assert.match(notifications[0], /Coverage could not finish\./);
+  const sha = readdirSync(join(config.state, 'runs'))[0];
+  const saved = JSON.parse(readFileSync(join(config.state, 'runs', sha, 'run.json'), 'utf8'));
+  assert.equal(saved.notification.id, 'comment-1');
+});
+test('failed notification remains pending and is retried on the next no-merge poll', () => {
+  const { repo, root, config } = fixture();
+  const program = join(root, 'notify.mjs');
+  const marker = join(root, 'attempts.txt');
+  writeFileSync(program, `import {appendFileSync} from 'node:fs'; appendFileSync(process.argv[2],'attempt\\n'); process.exit(1);`);
+  config.notification = { program: [process.execPath, program, marker] };
+  poll(config); merge(repo);
+  let calls = 0;
+  const run = (_config, record) => { calls++; return { ...record, state: 'blocked', error: 'Cannot finish coverage' }; };
+  poll(config, run);
+  const sha = readdirSync(join(config.state, 'runs'))[0];
+  assert.match(JSON.parse(readFileSync(join(config.state, 'runs', sha, 'run.json'), 'utf8')).notificationError, /node failed/);
+  writeFileSync(program, `import {appendFileSync} from 'node:fs'; appendFileSync(process.argv[2],'attempt\\n'); console.log(JSON.stringify({id:'retried-comment',url:'https://linear.app/retried'}));`);
+  poll(config, run); poll(config, run);
+  assert.equal(calls, 1);
+  assert.equal(readFileSync(marker, 'utf8'), 'attempt\nattempt\n');
+  assert.equal(JSON.parse(readFileSync(join(config.state, 'runs', sha, 'run.json'), 'utf8')).notification.id, 'retried-comment');
+});
+test('notification helper recovers a delivered Linear marker without posting twice', () => {
+  const { root } = fixture();
+  mkdirSync(join(root, 'scripts'));
+  const state = join(root, 'comments.json');
+  writeFileSync(state, '[]');
+  writeFileSync(join(root, 'scripts/linear-cli.mjs'), `import {readFileSync,writeFileSync} from 'node:fs'; import {fileURLToPath} from 'node:url'; const state = ${JSON.stringify(state)}; export async function getIssue(id, options) { if (!options.includeComments) throw Error('comment readback required'); return {comments:{nodes:JSON.parse(readFileSync(state,'utf8'))}}; } if (process.argv[1] === fileURLToPath(import.meta.url)) { const [verb,issue,body] = process.argv.slice(2); if (verb !== 'comment' || issue !== 'JUL-251') throw Error('wrong comment route'); const comments=JSON.parse(readFileSync(state,'utf8')); const comment={id:'linear-comment-1',url:'https://linear.app/comment-1',body}; comments.push(comment); writeFileSync(state,JSON.stringify(comments)); console.log(JSON.stringify(comment)); }`);
+  const sha = 'a'.repeat(40);
+  const body = `Verification maintenance blocked. (maintenance ${sha})`;
+  const helper = new URL('../notify-blocked.mjs', import.meta.url).pathname;
+  const first = JSON.parse(command(process.execPath, [helper, root, 'JUL-251', sha, body]));
+  const recovered = JSON.parse(command(process.execPath, [helper, root, 'JUL-251', sha, body]));
+  assert.equal(first.id, 'linear-comment-1');
+  assert.equal(recovered.id, 'linear-comment-1');
+  assert.equal(recovered.recovered, true);
+  assert.equal(JSON.parse(readFileSync(state, 'utf8')).length, 1);
+});

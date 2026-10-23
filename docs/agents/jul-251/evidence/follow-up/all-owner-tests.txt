@@ -1,0 +1,684 @@
+{"owner":".","lockfile":"package-lock.json","runtime":"node","environment":"local","tests":["app/api/observability-proof/route.test.mjs","lib/delivery-events.test.mjs","ops/service-dropbox/run-agy-seat.test.mjs","scripts/acceptance-check.test.mjs","scripts/agent-docs.test.mjs","scripts/bad-submissions.test.mjs","scripts/commandcode-requests.test.mjs","scripts/delivery-tool-updates.test.mjs","scripts/dynamic-route.test.mjs","scripts/framework-lint.test.mjs","scripts/health-route.test.mjs","scripts/julia-delivery-boundaries.test.mjs","scripts/julia-delivery-recovery.test.mjs","scripts/julia-delivery-state.test.mjs","scripts/julia-delivery-workspace.test.mjs","scripts/julia-retired-controller.test.mjs","scripts/julia-runner-time-limit.test.mjs","scripts/julia-vault.test.mjs","scripts/line-endings.test.mjs","scripts/linear-cli.test.mjs","scripts/merge-pr.test.mjs","scripts/no-personal-paths.test.mjs","scripts/personal-paths.test.mjs","scripts/publish-pr.real-git.test.mjs","scripts/publish-pr.test.mjs","scripts/publish-via-github-app.test.mjs","scripts/test-owners.test.mjs","scripts/verify-reviewer-worktree.test.mjs","scripts/web-app.test.mjs"]}
+✔ controlled application error is disabled by default and only an exact secret can trigger it (71.766381ms)
+✔ application exception is captured and flushed, without request data (3.286567ms)
+✔ operational event allows selected fields and checks ingestion response (1.718148ms)
+✔ missing configuration and vendor failures do not masquerade as successful proof (0.40904ms)
+✔ delivery recovery uses the current default model and records the model agy actually reports (4.417132ms)
+✔ delivery model evidence rejects an ambiguous or unrelated agy log (0.474177ms)
+✔ delivery result rejects incomplete, denied, and mismatched turns (0.599599ms)
+✔ JUL-92's real card: two criteria (the struck-through one is not a criterion) and three UAT-plan items (5.92759ms)
+✔ JUL-92 on 23 Sep, replayed: the hand-in that reached UAT had no per-item evidence and is refused on all seven gaps (0.930773ms)
+✔ everything present, by id and by name: PASS (2.138481ms)
+✔ A CARD WITH A MISSING ITEM IS REFUSED, and the refusal names it (1.716825ms)
+✔ BY NAME: the right id on the wrong criterion does not count, a small copy difference does (3.223264ms)
+✔ a card with no criteria or no UAT items can never pass (0.502539ms)
+✔ ticking touches only the open criterion boxes -- not the struck line, not boxes in other sections (0.835714ms)
+✔ THE GUARD on the live card: every box ticked AND every UAT item in the evidence comment, or no UAT (4.440939ms)
+✔ the CLI: PASS and exit 0, or one MISSING line per gap and exit 1 (182.0623ms)
+✔ finding 1: a criterion after a bold sub-label, or a UAT item after a deeper heading, is still required (1.000866ms)
+✔ finding 2: two criteria that start alike cannot stand in for each other (0.560079ms)
+✔ finding 3: the guard judges the NEWEST evidence comment (24.505198ms)
+✔ finding 4: a same-worded box in another section is not ticked; CRLF is kept (0.445909ms)
+✔ finding 5: nested or repeated numbers cannot hide a UAT item (0.333195ms)
+✔ a UAT item indented 1-2 spaces is still a top-level item; 3 or more is a sub-step (0.320224ms)
+✔ the guard picks the newest evidence comment by its own time when Linear gives one, whatever the order (1.78602ms)
+✔ coding standards retain framework rules and the trial retains learning tests (3.234713ms)
+✔ agent instructions use the trial rulebook and the runbook marks Factory retired (1.689476ms)
+✔ post-build reviewer checks and the plan-answers/park policy replace stop-and-ask builder gates (0.914576ms)
+✔ the repository-owned pre-plan skill survives Pocock skill upgrades (2.979512ms)
+✔ Todd's 19 October process vocabulary and restart stop are explicit (1.220075ms)
+✔ formal verification skills retain exact pinned hashes under the trial mirror (2.787656ms)
+✔ each expected.json has a valid refusedBy and non-empty reason (3.518686ms)
+✔ work-mismatch assertions execute from a fixture path with spaces and a URL fragment character (522.355062ms)
+✔ tests-fail: check fails in child process, evidence passes acceptance-check (246.599732ms)
+✔ evidence-missing: check passes, acceptance-check fails naming AC5 and UAT3 only (237.027203ms)
+✔ work-mismatch: check passes, acceptance-check passes, module makes one request and no per-step results (231.056549ms)
+✔ only Beam machinery is admitted; outside code review and unconfigured Gemini are refused (3.323309ms)
+✔ completed provider usage is priced at its response timestamp and includes cached tokens and reasoning output (2.342402ms)
+✔ request transport refuses the leaked model before dispatch and preserves completed response cost across reopen (53.074801ms)
+✔ historical unresolved paid usage survives restart and cannot be reset by a new tracker (18.798909ms)
+✔ updates every configured worker CLI and records the resulting versions (4.079261ms)
+✔ a failed update stops before any later tool or worker can launch (1.243359ms)
+✔ rejects an unapproved executable instead of constructing an update command (3.103536ms)
+✔ at least one app/**/route.js opts out of static rendering (3.277939ms)
+✔ max-lines: fails with rule name max-lines when file exceeds 400 lines (293.756649ms)
+✔ no-restricted-globals: fails with rule name no-restricted-globals when setTimeout/setInterval are used (25.807026ms)
+✔ no-restricted-syntax: fails with rule name no-restricted-syntax when while (true) or for (;;) are used (12.882252ms)
+✔ no-restricted-syntax: fails with rule name no-restricted-syntax when while (1) is used (8.076984ms)
+✔ no-restricted-syntax: fails with rule name no-restricted-syntax when do { } while (true) is used (9.255633ms)
+✔ no-restricted-imports: fails with rule name no-restricted-imports when file write functions are imported (10.12886ms)
+✔ no-restricted-imports: fails with rule name no-restricted-imports when timer functions are imported from node:timers/promises, timers/promises, timers, node:timers (7.934797ms)
+✔ no-restricted-properties: fails with rule name no-restricted-properties when fs write methods are called (7.192874ms)
+✔ no-restricted-properties: fails with rule name no-restricted-properties when setTimeout/setInterval are called on globalThis, global, or window (7.334251ms)
+✔ eslint-comments/no-unlimited-disable: fails with rule name eslint-comments/no-unlimited-disable when unlimited disable is used (8.461354ms)
+✔ eslint-comments/require-description: fails with rule name eslint-comments/require-description when skip has no reason (8.18312ms)
+✔ clean LangGraph fixture: passes lint with checkpointer, interrupt(), new Command({ resume }), retryPolicy, and recursionLimit (16.941896ms)
+✔ skip with reason: passes lint and records justification for listing (8.905437ms)
+✔ graph/langgraph folder total lines, not counting tests, is at most 400 lines (0.678537ms)
+✔ countFolderCodeLines: excludes test files and correctly sums non-test lines (1.125305ms)
+✔ countFolderCodeLines: a folder of exactly 400 lines passes, 401 fails (0.868238ms)
+graph/non-existent-langgraph does not exist yet; passing.
+✔ eslint.config.mjs: normal configuration ignores files outside graph/langgraph/** (16.606867ms)
+✔ lintFramework: passes and reports folder does not exist yet when graph/langgraph is absent (2.641241ms)
+Framework lint skips (1) [JUL-115]:
+  - graph/fixtures/framework-first/skip-with-reason/controller.mjs:3 (no-restricted-globals): permitted wait loop per JUL-115 docs https://example.com/docs/retry
+✔ lintFramework: correctly extracts skips from fixture folder (24.332099ms)
+✔ GET /api/health returns 200 JSON with the exact health body (58.03321ms)
+✔ authorization and canonical builder prompt retain the approved production boundaries (2.40654ms)
+✔ candidate processes receive operating-system plumbing but no controller secrets (13.292209ms)
+✔ an ambiguous in-flight worker is journaled and never launched twice (14.566488ms)
+✔ acceptance replay reuses the exact-commit record (11.592883ms)
+✔ production waiting record is immutable and exactly once for a reviewed commit (12.16077ms)
+✔ external card updates retain their result and refuse ambiguous duplicate notices (10.322591ms)
+✔ production card intake refuses the wrong Linear actor before a start update (8.468765ms)
+✔ production card intake records a missing seam problem before workspace setup or start update (14.241203ms)
+✔ production card intake records missing acceptance criteria before workspace setup or start update (8.0738ms)
+✔ production park journal binds the verified Linear actor and known issue UUID (10.177401ms)
+✔ a Codex recovery fix is independently reviewed by unpinned Gemini, verified, and preserves the Julia candidate (19.576642ms)
+✔ a recovery fix without a durable Codex diagnosis parks before independent review (6.986975ms)
+✔ same-maker recovery review parks before verification (5.430992ms)
+✔ a failed Gemini recovery review retains its diagnostic text and artifact paths (5.377964ms)
+✔ saveJson keeps the complete old state during transient Windows rename failures, then atomically replaces it (31.334274ms)
+✔ saveJson stops bounded Windows retries on permanent failure, keeps old content, and removes its temporary file (12.124522ms)
+✔ saveJson closes its temporary handle and removes incomplete content when flushing fails, without attempting rename (7.405069ms)
+✔ saveJson propagates non-transient errors and never retries rename faults outside Windows (32.010299ms)
+✔ saveJson retries each Windows sharing error only at the rename boundary (25.238655ms)
+✔ the real JUL-208 to-spec behavior list selects changed tests for before-and-after proof (6.553311ms)
+✔ to-spec behavior seams still require their changed tests to fail before and pass after (126.432691ms)
+✔ retired controller and OVH-only routes are not executable source or deployable config (3.558126ms)
+✔ the active suite has no retired controller or OVH-only registration (0.888327ms)
+✔ only worker support used by the Mastra delivery path remains available (0.391604ms)
+✔ $init and the Mastra workflow are the only delivery start route (17.635372ms)
+﹣ Windows time limit stops the worker and its child process (1.969233ms) # SKIP
+﹣ Windows time limit forcibly stops a worker with a SIGTERM handler and its child (0.334092ms) # SKIP
+✔ a worker that finishes in time retains its exit code and is not stopped (63.380911ms)
+﹣ Windows timeout leaves an unrelated process running (0.67279ms) # SKIP
+﹣ Windows provisioning parks after account creation followed by failed persistence (1.875216ms) # SKIP
+✔ Windows vault wrapper keeps workflow routes and adds a named-secret command route (0.791109ms)
+✔ migration pipes secrets, verifies readback and returns references only (1.829806ms)
+✔ migration refuses an existing conflicting item instead of overwriting it (1.119409ms)
+✔ CommandCode migrates through stdin and launches from a Julia reference without stale plaintext (2.49851ms)
+✔ failed readback returns no replacement references (0.487456ms)
+✔ vault probe verifies resolution without starting delivery or displaying values (152.063745ms)
+✔ vault launcher loads only references in the designated vault, preserves masking and child exit code (1.15649ms)
+✔ vault launcher permits the read-only Linear entry point (1.026438ms)
+✔ vault launcher rejects retired reviewer and arbitrary entry points (1.260096ms)
+✔ vault command exposes only the named secret and never invokes a shell (1.153167ms)
+✔ vault command refuses missing names, missing fields, and invalid unselected references (0.792918ms)
+✔ Windows key operations require the restricted helper marker and service account (0.448365ms)
+✔ vault command wrapper removes bootstrap state before launching the target (129.480686ms)
+✔ omitted service secrets do not inherit stale plaintext or unrelated vault references (0.935078ms)
+✔ plaintext, foreign vault references and bootstrap tokens in reference files are refused before launch (0.795215ms)
+✔ .gitattributes sets LF for every text file, and for the files installed on the server (2.341724ms)
+✔ no tracked text file is committed with CRLF line endings (171.924679ms)
+✔ linearGraphQL refuses to run without an API key (3.68167ms)
+✔ linearGraphQL sends the key as the Authorization header, not a Bearer-prefixed one -- Linear expects the raw key (0.758492ms)
+✔ linearGraphQL throws with the response errors on a non-ok or errored response (0.7309ms)
+✔ getIssue reads back the issue fields (2.190036ms)
+✔ getIssue asks Linear for the issue labels (and its state), so the coordinator can resolve the seats (1.204449ms)
+✔ postComment resolves the identifier to a UUID first, then creates the comment against it (1.424922ms)
+✔ postCommentToIssueId uses the already-read UUID without another card lookup (0.584873ms)
+✔ postComment throws when Linear reports success: false (0.843617ms)
+✔ checkForToddGuard: a bare WAITING ON YOU with no category is refused (rule: category) (1.399437ms)
+✔ checkForToddGuard: WAITING ON YOU is matched case-insensitively (1.069758ms)
+✔ checkForToddGuard: WAITING ON YOU accepts each of the three markers (0.473021ms)
+✔ checkForToddGuard: WAITING ON YOU accepts each category vocabulary word (2.67006ms)
+✔ checkForToddGuard: "waiting on yourself" is not the WAITING ON YOU marker (0.408913ms)
+✔ checkForToddGuard: each forbidden word alone in a For Todd line is refused (rule: git-vocabulary) (1.226353ms)
+✔ checkForToddGuard: common inflections in a For Todd line are refused (0.456503ms)
+✔ checkForToddGuard: the same words OUTSIDE a For Todd line are accepted -- the rule is about For Todd lines (0.217569ms)
+✔ checkForToddGuard: word-boundary near-misses inside a For Todd line are accepted (commitment, approach, imprint, PRint) (0.20442ms)
+✔ checkForToddGuard: a git word on the content line after the For Todd: header is refused (0.183891ms)
+✔ checkForToddGuard: the plain progress comment and "For Todd: nothing" pass untouched (0.212577ms)
+✔ checkForToddGuard: never throws on a missing or non-string body (0.186733ms)
+✔ JUL-79 acceptance: asking Todd to merge is rejected (0.186845ms)
+✔ JUL-79 acceptance: WAITING ON YOU with no category is rejected (0.194529ms)
+✔ JUL-79 acceptance: a valid categorized park is accepted (0.194717ms)
+✔ postComment refuses a For Todd git request before any Linear API call, naming the rule and the acting instruction (0.630661ms)
+✔ postComment refuses an uncategorized WAITING ON YOU before any Linear API call (0.35604ms)
+✔ postComment still posts a body that passes the guard (0.353664ms)
+✔ a Linear failure carries its HTTP status and parsed body on the thrown error (0.471018ms)
+✔ a 200 response carrying GraphQL errors also throws with its status and body attached (0.520798ms)
+✔ delivery specification fetch includes complete comment evidence and refuses partial discussion (0.846556ms)
+✔ mints a publisher token scoped to the target repo, then merges via the REST API (4.444397ms)
+✔ never exposes the installation token in its return value, even on failure (1.566059ms)
+✔ rejects a non-positive-integer PR number instead of forwarding caller-supplied text into the API path (PR #3 review) (0.759711ms)
+✔ rejects a repo other than toddwyder/julia-next or toddwyder/Julia (no scope creep via CLI args) (0.331449ms)
+✔ rejects a missing or malformed expectedHeadSha before ever calling the API (JUL-61 step 4) (0.811012ms)
+✔ a PR head that moved since review is refused, not merged (JUL-61 step 4: merge pins the reviewed commit) (2.877018ms)
+✔ no script under scripts/ or ops/ hardcodes a personal-machine path (C:\Users\<name>) (13.074654ms)
+✔ a personal path in a nested folder is caught and reported by the scan (2.728517ms)
+✔ a fixture file that contains the escaped form C:\\Users\\name is flagged (5.749142ms)
+✔ findPersonalPaths flags single-backslash form C:\Users\name (0.46994ms)
+✔ findPersonalPaths flags escaped double-backslash form C:\\Users\\name (0.42994ms)
+✔ findPersonalPaths flags forward-slash form C:/Users/name (0.309376ms)
+✔ findPersonalPaths matches case-insensitively (0.546847ms)
+✔ findPersonalPaths finds multiple paths in text (0.406081ms)
+✔ findPersonalPaths returns empty array when no personal-machine paths exist (0.409451ms)
+✔ findPersonalPaths handles non-string inputs safely (0.265506ms)
+✔ findPersonalPaths handles usernames with dots, hyphens, and underscores (0.315087ms)
+✔ PERSONAL_PATH regex pattern is exported and matches personal paths (1.141821ms)
+✔ pushBranch refuses a real repo-local insteadOf rewrite before minting a token or attempting a push (59.672333ms)
+✔ pushBranch accepts a clean real repository under the isolated global-config setup (regression: GIT_CONFIG_GLOBAL must point at an existing empty file before git runs) (70.580219ms)
+✔ pushBranch without insteadOf rewrites really pushes HEAD into the bare repository (82.213377ms)
+✔ pushBranch mints a scoped token, writes an askpass helper with no token in its own file content, and pushes via env only (6.677562ms)
+✔ the real askpass helper file never contains the token itself, only a reference to the env var (3.641336ms)
+✔ pushBranch refuses to push at all when the repo has a url.*.insteadOf rewrite configured (fix-verification finding: repo-local config can redirect the push and exfiltrate the token even with hooks/helpers disabled) (2.093449ms)
+✔ pushBranch proceeds normally when the repo has no url.*.insteadOf rewrites (2.232147ms)
+✔ pushBranch scopes safe.directory to exactly the passed cwd, on both the rewrite check and the push itself (JUL-71: orchestrator-svc pushing a runner-owned worktree hits git's dubious-ownership guard otherwise) (2.165672ms)
+✔ pushBranch rejects a repo outside the approved publisher targets (0.607401ms)
+✔ pushBranch never exposes the token in its return value or a thrown error (1.278817ms)
+✔ pushBranch never repeats raw git stderr in its thrown error, even if a hook printed a credential into it (finding S1) (1.319322ms)
+✔ openPullRequest mints a token, opens the PR via the REST API, and returns only {url, number} (1.610186ms)
+✔ openPullRequest can create a draft for machine work (3.270854ms)
+✔ readyPullRequest marks only the pinned draft head ready through the publisher App (2.086632ms)
+✔ openPullRequest rejects a repo outside the approved publisher targets (0.680731ms)
+✔ refuses to publish when JULIA_PUBLISHER_APP_ID/PRIVATE_KEY are missing (3.085674ms)
+✔ mints a JWT signed by the App's own private key, verifiable with its public key (8.850274ms)
+✔ mints an installation token via the standard two-call GitHub App flow, scoped to the repo JULIA_PUBLISHER_REPO names (4.530528ms)
+✔ defaults JULIA_PUBLISHER_REPO to julia-next when it is unset (4.071896ms)
+✔ a repo the App is not installed on fails clearly instead of falling back to Julia (7.355768ms)
+✔ loadPublisherCredentialFile loads JULIA_PUBLISHER_* vars from a dotenv-style file into the given env object (1.404799ms)
+✔ loadPublisherCredentialFile never overwrites a credential already present in env (an explicit --env-file wins) (0.951899ms)
+✔ loadPublisherCredentialFile is a silent no-op when the file does not exist, so a dev machine or CI box is unaffected (0.936674ms)
+✔ base64url encodes without padding or unsafe characters (0.457215ms)
+✔ new tests inherit the nearest locked dependency owner and server execution from their folder (239.267764ms)
+✔ new tests execute with their owner dependencies and isolated Git process state (363.711979ms)
+✔ a clean reviewer worktree (no changes since the candidate commit) passes (104.716816ms)
+✔ a reviewer that edits a file (uncommitted) has its review rejected (JUL-61 step 5) (83.772693ms)
+✔ a reviewer that commits its own edit is caught too, not just uncommitted diffs (113.204084ms)
+✔ rejects a candidateCommit that is not a plausible SHA (0.626204ms)
+✔ scopes safe.directory to exactly the passed worktreePath (JUL-73: orchestrator-svc verifying a runner-owned reviewer worktree hits git's dubious-ownership guard otherwise, live-verified) (0.703115ms)
+julia-next: axiom boot event failed: network unavailable
+julia-next: sentry boot event failed: sentry unavailable
+julia-next: sentry boot event failed: sentry capture failed
+✔ (a) every required web-app file exists (6.566659ms)
+✔ (c) no literal Sentry DSN or Axiom token under app/ or lib/ (4.249413ms)
+✔ (d) .env.example lists placeholders only (1.729825ms)
+✔ (e) empty env skips both halves, makes zero fetches, and never throws (1.110723ms)
+✔ (f) a configured Axiom half posts exactly one event to the dataset URL (2.283474ms)
+✔ (h) the credential tripwires match real credential prefixes (0.810911ms)
+✔ (g) a rejecting fetch implementation is swallowed (2.245001ms)
+✔ a configured Sentry half initializes once and captures one boot message (0.76314ms)
+✔ a failing Sentry implementation is swallowed (0.96981ms)
+✔ a rejecting Sentry captureMessage promise is swallowed without an unhandled rejection (20.610122ms)
+ℹ tests 197
+ℹ suites 0
+ℹ pass 193
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 4
+ℹ todo 0
+ℹ duration_ms 9853.227531
+{"owner":".agents/skills/poteto-mode/scripts","lockfile":".agents/skills/poteto-mode/scripts/bun.lock","runtime":"bun","environment":"local","tests":[".agents/skills/poteto-mode/scripts/check-plan.test.ts",".agents/skills/poteto-mode/scripts/orch/orch.test.ts",".agents/skills/poteto-mode/scripts/watch-pr/cli.test.ts",".agents/skills/poteto-mode/scripts/watch-pr/github.test.ts",".agents/skills/poteto-mode/scripts/watch-pr/policy.test.ts"]}
+bun test v1.4.4 (38afee6c8)
+
+.agents/skills/poteto-mode/scripts/check-plan.test.ts:
+(pass) accepts ordinary, indented, and longer closing fences [451.99ms]
+(pass) accepts nested backticks and tilde info strings [160.22ms]
+(pass) keeps mismatched, shorter, and suffixed closers inside the fence [252.13ms]
+(pass) rejects headings and prose outside a proper close [268.86ms]
+(pass) rejects backtick info strings containing a backtick [89.51ms]
+
+.agents/skills/poteto-mode/scripts/orch/orch.test.ts:
+(pass) Store > initializes an idempotent plain-file store and releases its lock [15.36ms]
+(pass) Store > composes unit add, set, get, list, and counts [12.31ms]
+(pass) Store > records, replaces, checks, and summarizes typed ledger verdicts [9.03ms]
+(pass) Store > pushes, peeks, and atomically drains inbox pointers [9.37ms]
+(pass) Store > replaces a stale lock whose holder pid is dead [7.98ms]
+(pass) Store > blocks a writer and steals the pid lock only with force [7.93ms]
+(pass) Store > parks gates, stores standing orders, and renders status [17.89ms]
+(pass) Store > resolves the ordered frontier from the gh base chain and validates an optional pin [432.13ms]
+(pass) Store > rejects unparseable gh output loudly [172.61ms]
+(pass) Store > resolves the ordered frontier from the origin base chain and validates an optional pin [401.97ms]
+(pass) Store > rejects unparseable origin output loudly [154.79ms]
+(pass) Store > names the missing pull request when a chain branch has none [166.77ms]
+(pass) Store > rejects malformed TSV, verdict, frontier, and inbox data [13.70ms]
+(pass) Store > rejects operations after close [6.48ms]
+(pass) orch CLI > prints commander help and rejects invalid parsing with exit 1 [261.28ms]
+(pass) orch CLI > accepts ORCH_STORE and emits complete JSON [150.20ms]
+(pass) orch CLI > maps user and not-found outcomes to the preserved exit codes [374.81ms]
+
+.agents/skills/poteto-mode/scripts/watch-pr/cli.test.ts:
+(pass) parseArgs > uses the specified defaults [6.49ms]
+(pass) parseArgs > parses a frozen queued stack bottom-to-top [1.76ms]
+(pass) parseArgs > rejects every invalid mode and numeric shape as usage [7.06ms]
+(pass) rendering > emits compact valid JSON by default [0.24ms]
+(pass) rendering > renders the Markdown table from the same verdict only [0.53ms]
+(pass) main > returns EX_USAGE 64 and writes usage errors only to stderr [0.53ms]
+(pass) main > bypasses the queue machine for queued-stack status-only [4.38ms]
+(pass) main > returns exit 4 for a hidden GitHub-side CI refusal [1.29ms]
+(pass) main > shows help without touching the reader [6.87ms]
+
+.agents/skills/poteto-mode/scripts/watch-pr/github.test.ts:
+(pass) checks fallback chain > uses a non-empty fast-path result without a rollup query [0.28ms]
+(pass) checks fallback chain > paginates GraphQL when the fast path is unusable [0.31ms]
+(pass) checks fallback chain > falls back when valid fast-path JSON represented an empty list [0.19ms]
+(pass) checks fallback chain > fails closed when both paths are empty [0.40ms]
+(pass) rollup node mapping > maps terminal and non-terminal CheckRun states fail closed [0.38ms]
+(pass) rollup node mapping > classifies an in-progress Code Review Gate from the rollup as the gate [0.06ms]
+(pass) rollup node mapping > classifies a Code Review Gate waiting on an owner approval as the gate [0.04ms]
+(pass) rollup node mapping > classifies a fast-path Code Review Gate waiting on an owner approval as the gate [0.11ms]
+(pass) rollup node mapping > maps StatusContext states and drops unknown typenames [0.04ms]
+(pass) closed enum parsing > accepts mergeStateStatus CONFLICTING [0.18ms]
+(pass) closed enum parsing > reads gh's empty reviewDecision as no decision rather than a parse failure [0.02ms]
+(pass) closed enum parsing > still rejects an unknown reviewDecision [0.18ms]
+(pass) closed enum parsing > rejects unknown enum values as retryable errors carrying the raw value [0.10ms]
+(pass) annotates Bugbot threads with distinct review-pass counts [0.83ms]
+(pass) review thread pagination > keeps walking pages until the cursor is exhausted [0.27ms]
+(pass) review thread pagination > sees an unresolved thread that sits past the first page [0.19ms]
+(pass) review thread pagination > stops after a single page when the cursor is exhausted [0.12ms]
+(pass) review thread pagination > counts Bugbot review passes across every page [0.23ms]
+(pass) review thread pagination > drops resolved threads from later pages too [0.15ms]
+(pass) review thread pagination > rejects a page that omits pageInfo instead of assuming one page [0.15ms]
+(pass) context and stack discovery > returns a fully explicit context without any reader call [0.13ms]
+(pass) context and stack discovery > uses the local origin before currentPr for an explicit number [0.21ms]
+(pass) context and stack discovery > orders the connected stack bottom-to-top [0.50ms]
+
+.agents/skills/poteto-mode/scripts/watch-pr/policy.test.ts:
+(pass) readiness truth table > covers every specified row and every UNKNOWN rollup value [0.09ms]
+(pass) readiness truth table > turns a clean visible list plus GitHub refusal into an explicit CI blocker [0.28ms]
+(pass) snapshot query planning > does not query commit rollups while queued checks are pending [0.21ms]
+(pass) snapshot query planning > queries rollups for settled and failed lists [0.24ms]
+(pass) snapshot query planning > short-circuits merged rows before threads and checks [0.14ms]
+(pass) scans stacks tier-major so an upstack conflict outranks frontier CI [0.56ms]
+(pass) attributes a stack wait to the PR whose checks are pending, not the bottom [0.48ms]
+(pass) waits on a draft while checks are pending, then reports the draft gate [0.27ms]
+(pass) queued-stack cadence > drops a sweep head only after its snapshot succeeds [0.54ms]
+(pass) queued-stack cadence > resumes the sweep at the PR whose read failed [1.80ms]
+(pass) queued-stack cadence > emits a completed sweep only after its final successful snapshot [0.38ms]
+(pass) queued-stack cadence > ADVANCE continues directly to the new frontier without sleeping [0.91ms]
+(pass) queued-stack cadence > deduplicates identical waits and schedules the next due sweep [0.41ms]
+(pass) uses the specified retry floor and cap [0.06ms]
+
+ 68 pass
+ 0 fail
+ 246 expect() calls
+Ran 68 tests across 5 files. [3.54s]
+{"owner":"ops/build-runner","lockfile":"ops/build-runner/package-lock.json","runtime":"node","environment":"local","tests":["ops/build-runner/framework/@mastra/code-sdk/after-write.test.mjs","ops/build-runner/framework/@mastra/code-sdk/credentials.test.mjs","ops/build-runner/framework/@mastra/code-sdk/layer1.test.mjs","ops/build-runner/framework/@mastra/code-sdk/layer2.test.mjs","ops/build-runner/framework/@mastra/code-sdk/layer3.test.mjs","ops/build-runner/framework/@mastra/code-sdk/model-attempt.test.mjs","ops/build-runner/framework/@mastra/code-sdk/native.test.mjs","ops/build-runner/framework/@mastra/code-sdk/push-route.test.mjs","ops/build-runner/framework/@mastra/code-sdk/usage-request.test.mjs","ops/build-runner/test/adapter.test.mjs","ops/build-runner/test/ledger.test.mjs","ops/build-runner/test/review-regressions.test.mjs","ops/build-runner/test/transport.test.mjs"]}
+{"fact":"framework-only-drive","inferenceAttempts":0}
+✔ public command runs PostToolUse lint without replacing command output (2723.549241ms)
+{"fact":"framework-only-drive","inferenceAttempts":0}
+✔ stock credential storage persists API keys and OAuth tokens in the app-data auth.json (101.661153ms)
+{"fact":"framework-only-drive","inferenceAttempts":0}
+✔ runtime custom-provider keys resolve without being saved in settings or exported to the environment (1340.302933ms)
+{"fact":"framework-only-drive","inferenceAttempts":0}
+✔ public command tool refuses bypass before Git and sentinel effects without inference (3098.986747ms)
+{"fact":"framework-only-drive","inferenceAttempts":0}
+✔ public tool checks the staged tree and refuses failure before commit, without inference (2730.970575ms)
+{"layer":3,"observations":[{"commit":"6393aded9e71e2c7dd29e682797ea7195a1c3eeb","tree":"f62a5d51e835b88aeed8c376d214e0c909a950d3","status":1,"stdout":"node:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n\n41 !== 42\n\n    at file:///tmp/commit-learning-z2MzlE/answer.test.mjs:1:88\n    at ModuleJob.run (node:internal/modules/esm/module_job:430:25)\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: 41,\n  expected: 42,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n\nNode.js v24.14.1\n✖ answer.test.mjs (80.184953ms)\nℹ tests 1\nℹ suites 0\nℹ pass 0\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 96.322881\n\n✖ failing tests:\n\ntest at answer.test.mjs:1:1\n✖ answer.test.mjs (80.184953ms)\n  'test failed'\n","stderr":"","beforeExecuteResolved":true},{"commit":"c1761757d150fc70c0209b986c0823c89e9a3d46","tree":"29719619da6cb77fb75671fa97ea1b5a7bf17c57","status":0,"stdout":"✔ answer.test.mjs (70.563345ms)\nℹ tests 1\nℹ suites 0\nℹ pass 1\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 85.504874\n","stderr":"","beforeExecuteResolved":true}],"readiness":"refused for failing exact commit"}
+{"layer":3,"checkedCommit":"c1761757d150fc70c0209b986c0823c89e9a3d46","readiness":"saved for passing exact commit"}
+{"fact":"framework-only-drive","inferenceAttempts":0}
+✔ public tool awaits every exact-commit observation before returning (2621.188049ms)
+{"fact":"model did not attempt","outcome":"inconclusive","attempt":1,"test":"classification unit","guardVerdict":null}
+{"fact":"model did not attempt","outcome":"inconclusive","attempt":2,"test":"classification unit","guardVerdict":null}
+✔ missing model step gets exactly one rerun and an inconclusive outcome, never a guard verdict (3.873947ms)
+{"fact":"framework-only-drive","inferenceAttempts":0}
+✔ stock native memory retains the active thread without inference (3477.792106ms)
+{"fact":"framework-only-drive","inferenceAttempts":0}
+✔ stock settings persist through the same default file without inference (284.53524ms)
+{"fact":"framework-only-drive","inferenceAttempts":0}
+✔ thread creation resets selection and selecting after the thread preserves it without inference (274.422936ms)
+{"fact":"framework-only-drive","inferenceAttempts":0}
+{"fact":"framework-only-drive","inferenceAttempts":0}
+✔ explicit canonical model override refuses locally before any model request (1576.014944ms)
+✔ public memory constructor enables and disables the real observational engine without inference (1310.01195ms)
+{"fact":"direct-local-push","localHead":"510105359f4ac429fecb06a4495dcb644ecdd2a8","remote":"510105359f4ac429fecb06a4495dcb644ecdd2a8\trefs/heads/learning","inferenceRequests":0}
+{"fact":"framework-only-drive","inferenceAttempts":0}
+✔ public workspace command pushes the exact candidate to a real local origin without inference (2232.443906ms)
+{"observedRequests":1,"networkDispatches":0,"stream":true,"asksForUsage":false}
+✔ stock custom-provider streaming does not ask the provider for token usage (1640.529357ms)
+(node:287393) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+{"direct":"isolated","nested":"isolated","provider":"JUL251_OK","spentNano":0,"attempts":2}
+
+✔ stock adapter request works while direct and nested builder commands cannot read credentials (5383.947415ms)
+(node:287603) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ priced requests hold budget, settle once, and enforce the card ceiling (28.958663ms)
+✔ free requests remain usable without usage when priced accounting is unknown (26.570689ms)
+✔ reopening retains unresolved holds, snapshots, and settled costs per card (23.761221ms)
+✔ actual cost above a reservation is durable and blocks priced work (22.169747ms)
+✔ invalid monetary inputs cannot change durable budget (15.624907ms)
+✔ separate processes cannot jointly reserve beyond the ceiling (106.349014ms)
+✔ a process exit after reservation never releases an uncertain request (127.290561ms)
+(node:287648) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ review durable stop survives reopen and blocks free and paid routes only for its card (103.401367ms)
+✔ review stopped card blocks allowlisted metadata GET (7.128203ms)
+✔ review oversized known usage records actual cost and refuses result (6.560649ms)
+✔ review stock adapter rejects state symlink into builder before runtime (123.626599ms)
+✔ review stock adapter rejects auth-file symlink into builder before runtime (129.343602ms)
+✔ review stock adapter rejects auth-parent symlink into builder before runtime (107.257291ms)
+✔ review replacing builder home after boot cannot expose outside auth (4039.250857ms)
+(node:287725) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ free requests arrive with enforced limits and settle without usage (93.700704ms)
+✔ paid missing usage refuses result and prevents the next arrival (23.380951ms)
+✔ chat JSON settles cache categories once (18.843903ms)
+✔ chat SSE settles cache categories once (12.835433ms)
+✔ responses JSON settles cache categories once (11.846794ms)
+✔ responses SSE settles cache categories once (12.661211ms)
+✔ messages JSON settles cache categories once (15.55116ms)
+✔ messages SSE settles cache categories once (11.919886ms)
+✔ wrong model, endpoint, missing prices and trial paid routes send nothing (6.890611ms)
+✔ separate HTTP attempts create separate durable records (26.454156ms)
+✔ card ceiling refuses an oversized reservation before HTTP (3.760407ms)
+✔ provider reported cost stops even a configured free route (13.738203ms)
+✔ allowlisted authentication cannot carry inference payloads and redirects never follow (11.545427ms)
+✔ invalid cache count -1 retains paid hold (10.676605ms)
+✔ invalid cache count 0.5 retains paid hold (12.37222ms)
+✔ bounded buffering refuses a large result without releasing its reservation (16.029765ms)
+✔ decimal rates round nano dollars upward without floating point drift (15.936786ms)
+✔ ledger errors never reveal their underlying body or credentials (4.19409ms)
+✔ authentication and catalog are confined to their exact allowlisted URL (16.725257ms)
+✔ connection failure after arrival retains the paid reservation (9.54817ms)
+✔ a truncated paid stream retains the reservation despite partial usage (7.933919ms)
+ℹ tests 50
+ℹ suites 0
+ℹ pass 50
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 36248.134986
+{"owner":"ops/mastra-agents/reviewer","lockfile":"ops/mastra-agents/reviewer/package-lock.json","runtime":"node","environment":"local","tests":["ops/mastra-agents/reviewer/audit/jul-223-stage2-stock.test.mjs","ops/mastra-agents/reviewer/test/card-admission-check.test.mjs","ops/mastra-agents/reviewer/test/contract.test.mjs","ops/mastra-agents/reviewer/test/delivery-workflow.test.mjs","ops/mastra-agents/reviewer/test/jul-225.test.ts","ops/mastra-agents/reviewer/test/jul-230.test.ts","ops/mastra-agents/reviewer/test/jul-242.test.ts","ops/mastra-agents/reviewer/test/jul-243.test.ts","ops/mastra-agents/reviewer/test/model-journal.test.mjs","ops/mastra-agents/reviewer/test/quote-check.test.mjs","ops/mastra-agents/reviewer/test/raw-answer.test.mjs","ops/mastra-agents/reviewer/test/recorded-review.test.mjs","ops/mastra-agents/reviewer/test/recording-engine.test.mjs","ops/mastra-agents/reviewer/test/repository-root.test.mjs","ops/mastra-agents/reviewer/test/reset-stage.test.mjs","ops/mastra-agents/reviewer/test/resource-budget.test.mjs","ops/mastra-agents/reviewer/test/review-budget.test.mjs","ops/mastra-agents/reviewer/test/review-runtime.test.mjs","ops/mastra-agents/reviewer/test/reviewer-entrypoint.test.mjs","ops/mastra-agents/reviewer/test/run-file.test.mjs","ops/mastra-agents/reviewer/test/tool-input-failure.test.mjs","ops/mastra-agents/reviewer/test/verify-machine.test.ts","ops/mastra-agents/reviewer/test/worst-case-offline.test.mjs"]}
+✔ installed Mastra combines a tool loop with inline structured output on an OpenAI-compatible connection (267.944948ms)
+✔ checks a Linear card as a Ready candidate without changing its current state (79.420904ms)
+✔ keeps accepting the legacy Finish conditions heading (2.714293ms)
+✔ returns the launcher contract findings for an inadmissible card (2.773842ms)
+✔ the command checks every requested card and exits nonzero when one fails (426.928571ms)
+✔ the command refuses an empty card list (324.523287ms)
+✔ refuses a fabricated installed section in the Framework Map comment (5.88591ms)
+✔ admission checks package version is not a file citation (2.328301ms)
+✔ admission checks unscoped package citation (2.471926ms)
+✔ admission checks Windows installed citation (1.754552ms)
+✔ admission checks prose installed citation (1.974234ms)
+✔ admission checks prose framework gap (1.11684ms)
+✔ admission checks plain installed path (1.930949ms)
+✔ admission checks versioned installed citation (2.277066ms)
+✔ admission checks missing installed file (1.664908ms)
+✔ admission checks non-Markdown installed file (1.415536ms)
+✔ admission checks real installed section (1.136219ms)
+✔ admission checks unapproved framework gap (0.72241ms)
+✔ admission checks private files behind generic docs (0.844142ms)
+✔ admission checks linked Todd decision (0.654283ms)
+✔ admission checks unrelated link is no decision (0.688212ms)
+✔ admission checks bullet citation (0.762771ms)
+✔ admission checks section before citation (5.872431ms)
+✔ follows a repository map reference and admits the current JUL-243 map (4.09505ms)
+✔ a later comment page cannot hide a Framework Map refusal (1.835345ms)
+✔ replays the exact refused JUL-243 map and the settled main map (7.279697ms)
+✔ the newest dated Framework Map replaces historical maps regardless of page order (11.522139ms)
+✔ the reviewer uses the approved stock generation bounds (3.596779ms)
+✔ reviewer step budget follows the immutable file inventory and contract phases (0.899226ms)
+✔ structured output accepts exactly the immutable changed-file inventory (3.214608ms)
+✔ the model prompt keeps requirements and proof but reads candidate bytes through tools (0.635499ms)
+✔ per-card reviewer model overrides the CommandCode default (0.359512ms)
+✔ published CommandCode prices produce a labeled estimate from every token category (0.683985ms)
+✔ raw CommandCode tokens survive schema normalization and carry the published-price estimate (1.017552ms)
+✔ a verdict fails closed unless it accounts for every changed file exactly once (0.861049ms)
+✔ green build, checks and independent review write one waiting record, pause, and accept after a runtime restart (331.774417ms)
+✔ a card missing agreed seams parks immediately without a builder or repair round (126.090686ms)
+✔ a failed worker CLI update parks before any worker launches (112.683925ms)
+✔ a separate process resumes the saved pause without duplicate launches or notices (3418.059603ms)
+✔ reject resumes the suspended run and stops with Todd's reason (196.368319ms)
+✔ two failed reviews park without a waiting record or a third builder launch (149.530855ms)
+✔ a reviewer-launcher crash gets one recovery cycle, never becomes review FAIL, and launches no product builder (162.78584ms)
+✔ uncertain paid reviewer acceptance parks without recovery or another model call (139.639548ms)
+✔ a replayed durable crash incident parks without a second recovery cycle (20.064644ms)
+✔ recovery evidence cannot resume a step other than the crashed step (9.317208ms)
+✔ the intentional production reviewer gate parks at zero cost without crash recovery (280.830127ms)
+✔ accepting a changed candidate discards the answer, reruns checks and review, and pauses again (229.320198ms)
+✔ workflow step handoffs expose paths and round metadata, never file contents (120.879841ms)
+✔ a failed existing boundary parks and still writes one complete permanent summary (118.86209ms)
+✔ production adapter glue invokes the existing launcher for builder and Mastra reviewer (13.784954ms)
+✔ production adapter repair consumes prior findings and reviews the checks current candidate (10.875254ms)
+✔ production adapter refuses a reviewer from the observed builder maker (7.640983ms)
+✔ production adapter preserves a failed review report for the next repair (9.80576ms)
+[WORKFLOW] Error executing step workflow.julia-delivery-round.step.build: Error: builder step did not return a result path
+    at requireResultPath (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/src/delivery-workflow.mjs:91:11)
+    at Object.execute (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/src/delivery-workflow.mjs:205:33)
+    at async engine.executeStepWithRetry.retries.retries (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/agent-BSre8QnL.js:4014:18)
+    at async DefaultExecutionEngine.executeStepWithRetry (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/agent-BSre8QnL.js:4515:14)
+    at async executeStep (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/agent-BSre8QnL.js:3978:26)
+    at async executeEntry (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/agent-BSre8QnL.js:2966:50)
+    at async DefaultExecutionEngine.execute (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/agent-BSre8QnL.js:4848:17)
+    at async Run._start (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/agent-BSre8QnL.js:7577:18)
+    at async Workflow.execute (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/agent-BSre8QnL.js:6975:15)
+    at async engine.executeStepWithRetry.retries.retries (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/agent-BSre8QnL.js:4014:18)
+[WORKFLOW] Error executing step workflow.julia-delivery-cycle.step.julia-delivery-round: undefined
+[WORKFLOW] Error executing step workflow.julia-delivery.step.julia-delivery-cycle: undefined
+✔ an unhandled workflow failure still ends with an ADR 0017 summary line (110.677356ms)
+✔ a recovered terminal write does not duplicate the run summary line (3.413761ms)
+✔ secret and persisted connection contracts reject secret values (11.265835ms)
+{"event":"model-discovery","route":"commandcode","operation":"models/list","ok":true,"status":200,"offerCount":3,"durationMs":7.688297000000148}
+✔ real file-backed connection lifecycle persists only parsed records and redacted output (78.533768ms)
+✔ model offers keep duplicate IDs distinct by route (2.49304ms)
+✔ Claude discovery offers only exact provider model IDs from the session config option (4.941049ms)
+✔ Claude selection and restart reapply the same exact provider model ID (2.428176ms)
+✔ Claude aliases cannot be saved as role defaults (3.368858ms)
+✔ Claude selection refuses a saved model that the new session no longer offers (0.753271ms)
+✔ Claude selection refuses a bridge response that does not confirm the exact saved ID (0.60424ms)
+✔ Claude route accepts only the bridge auth-status extension notification (1.11676ms)
+✔ CommandCode discovery keeps coding endpoints and rejects decision-only models (9.445067ms)
+✔ standalone ACP route scope disconnects and cleans only processes it created (9.6495ms)
+✔ four-role company and normal service rules are exhaustive (4.539073ms)
+✔ admission requires the complete settled card shape and Ready state (6.305921ms)
+✔ admission keeps ordinary bold paragraphs inside a section (1.111841ms)
+✔ admission rejects unresolved decision markers embedded in prose (2.560879ms)
+✔ serialized Linear intake rejects an incomplete Ready card (2.14128ms)
+✔ Cancel never dispatches and restart reuses the immutable snapshot (1.015264ms)
+✔ admission refuses stale defaults that are not in the current route offers (2.512363ms)
+{"event":"delivery-route-failed","role":"reviewer","route":"claude","modelId":"claude-sonnet-4-6","startedAt":"2026-10-23T03:18:16.904Z","durationMs":0.36302699999987453,"error":"reviewer output was truncated by the model limit"}
+Error executing step workflow.julia-delivery-roles.step.execute-four-role-snapshot: Error: reviewer output was truncated by the model limit
+    at Object.execute (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/src/mastra/workflows/delivery.ts:46:57)
+    at async engine.executeStepWithRetry.retries.retries (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/agent-BSre8QnL.js:4014:18)
+    at async DefaultExecutionEngine.executeStepWithRetry (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/agent-BSre8QnL.js:4515:14)
+    at async executeStep (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/agent-BSre8QnL.js:3978:26)
+    at async executeEntry (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/agent-BSre8QnL.js:2966:50)
+    at async DefaultExecutionEngine.execute (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/agent-BSre8QnL.js:4848:17)
+    at async Run._start (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/agent-BSre8QnL.js:7577:18)
+    at async TestContext.<anonymous> (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/test/jul-225.test.ts:617:18)
+    at async Test.run (node:internal/test_runner/test:1125:7)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:787:7)
+✔ restart reuses the exact persisted four-role snapshot after live defaults change (8.456664ms)
+✔ every named Start precondition fails before dispatch (2.826142ms)
+✔ every CLI and workflow handoff contract accepts its exact shape and rejects drift (12.757693ms)
+✔ a route failure emits correlated role, route, model, timing, and error evidence (23.365217ms)
+✔ later workflow roles receive the exact earlier role outputs (4.168602ms)
+✔ workflow rejects a route response truncated by its model limit (3.993115ms)
+✔ Ready card admission accepts the authoritative Agent Brief and rejects unresolved decisions (14.376901ms)
+✔ control-page contracts carry complete offers and exact route-supported role selections (11.01806ms)
+✔ initialization observability counts actual boundary activity instead of asserting zeroes (3.27043ms)
+✔ the observed Linear capability measures queries and mutations at the request seam (5.625193ms)
+✔ the proof launcher can suppress the uncontrolled desktop browser without changing ordinary launches (0.496734ms)
+✔ the production role workflow records each dispatch and inference at its actual seam (27.958524ms)
+✔ Linear Ready-card discovery paginates every complete card with read-only queries (6.444551ms)
+✔ model discovery records a sanitized success or failure trace for every service connection (3.414998ms)
+✔ CommandCode discovery rejects a malformed success payload instead of tracing an unknown count as zero (2.925839ms)
+This storage provider does not support batch creating metrics
+MastraStorageExporter shutdown complete
+[OBSERVABILITY] [Observability] Shutdown completed [name=julia-control]
+Mastra shutdown completed
+MastraStorageExporter shutdown complete
+[OBSERVABILITY] [Observability] Shutdown completed [name=julia-control]
+Mastra shutdown completed
+✔ Start creates one restart-surviving suspended run and returns it for the same confirmed input (356.142284ms)
+✔ Cancel closes the browser form locally without another server request (715.935397ms)
+✔ the control boundary rejects a non-loopback Host header (15.115778ms)
+✔ browser Start sends the exact changed card and four selections through the local boundary (36365.677196ms)
+✔ the control boundary accepts this server’s Tailscale Serve name and refuses every other host (62.379982ms)
+✔ the control boundary refuses the Tailscale name when the server is not configured with it (13.584597ms)
+✔ host matching keeps loopback and the configured Tailscale name, and refuses the rest (0.718044ms)
+✔ an ACP route whose agent is not installed on this host contributes no offers (3.450236ms)
+✔ a genuine ACP failure still fails discovery rather than being silently dropped (2.561703ms)
+✔ a Ready card that fails admission is reported as not startable without breaking the list (12.490974ms)
+✔ Start stays blocked for a card that failed admission (6.868339ms)
+✔ the page lists every Ready card and blocks Start for one that cannot start (624.873642ms)
+✔ a running command stays Working after twenty minutes without a new event (77.378213ms)
+✔ run-failed remains visible as Stopped (29.781121ms)
+✔ disconnected remains visible as Stopped (25.302212ms)
+✔ run-suspended remains visible as Stopped (28.085329ms)
+✔ fifteen idle minutes becomes Stopped at the threshold (22.034462ms)
+✔ three distinct failing commands do not count as the same repeated action (51.852485ms)
+✔ three identical failing commands show Stopped, a successful action resets the streak (43.231114ms)
+✔ Codex derives distinct failure identities from native command and cwd, never the item id (9.124372ms)
+✔ run-completed leaves the active list and retains its event history after restart (31.683597ms)
+✔ run-canceled leaves the active list and retains its event history after restart (27.730705ms)
+No `storage` configured on Mastra — falling back to an in-memory store. In-memory storage is not durable: all data is lost on restart, and it is not safe for production. Configure a persistent storage adapter (e.g. @mastra/libsql, @mastra/pg, @mastra/cloudflare). See https://mastra.ai/docs/storage
+Mastra shutdown completed
+✔ a real Mastra workflow suspended waiting is Stopped (1540.176706ms)
+✔ Proof cleanup settles delayed real workflow persistence before storage closes and records failures (112.709507ms)
+✔ CommandCode explicit completion is success even when its result contains failure-like text (12.247438ms)
+✔ native idle status does not turn an unexpected Codex failure into Finished (39.145572ms)
+✔ append waits for asynchronous event consumers to finish their writes (66.315884ms)
+✔ reconciled Codex idle thread retains authoritative failed turn status (30.676855ms)
+✔ Codex reasoning messages between commands do not fabricate a successful tool action (1.032203ms)
+✔ phone browser shows Working and Stopped cards, action outcomes and a clean console (1201.614844ms)
+✔ monitored child exposes its owned PID and receives the explicit model with updates disabled (83.699868ms)
+This storage provider does not support batch creating metrics
+MastraStorageExporter shutdown complete
+[OBSERVABILITY] [Observability] Shutdown completed [name=cleanup-test]
+Mastra shutdown completed
+✔ failed journey cleanup waits for a real LibSQL-backed workflow result and trace before closing storage (383.00684ms)
+{"provider":"mastra","runId":"native","eventKind":"stream-error","error":{"name":"Error","message":"native result failed"}}
+✔ a provider result rejected before its stream ends is handled and persisted as disconnected (70.525663ms)
+✔ a provider event survives another process briefly holding the ledger write lock (333.45413ms)
+✔ Codex completion survives an early terminal event (78.250085ms)
+{"provider":"codex","runId":"connection","eventKind":"disconnect","error":{"name":"Error","message":"evidence disk unavailable"}}
+✔ Codex completion survives an early terminal event and a failed evidence subscriber (28.881567ms)
+{"provider":"codex","runId":"connection","eventKind":"disconnect-report-failed","error":{"name":"Error","message":"disconnect write failed"}}
+✔ a Codex notification failure still closes its connection when disconnect reporting also fails (7.563193ms)
+✔ provider dispatch durably journals one request and its exact response (112.204579ms)
+✔ journal overflow fails before a verdict and becomes a warning after one (23.139189ms)
+✔ a restarted journal retains earlier provider events (22.783678ms)
+✔ the evidence ceiling includes other run files and atomic-write headroom (12.787872ms)
+✔ quote check accepts an exact quote only (1.385802ms)
+✔ quote check discovers every nested initial or repair citation (2.797697ms)
+✔ quote check prefers the authoritative cumulative diff and deleted-file sources (0.640682ms)
+✔ the model-facing quote verifier accepts only exact immutable candidate text (0.51704ms)
+✔ serialized source control characters are repaired only to exact source text (0.562541ms)
+✔ the live failure fixtures are copied byte-for-byte (14.460625ms)
+✔ the recorded malformed answer is durable before it becomes a technical failure (260.505013ms)
+✔ a valid-looking single-shot JSON answer cannot bypass the recording tools (63.617909ms)
+✔ killing the transport process after the raw answer arrives leaves the complete file (1518.007361ms)
+Error converting tool call input to JSON { toolCallId: 'malformed', toolName: 'record_piece', inputLength: 21 }
+✔ real Agent.generate records a complete review and recovers each scripted report failure (1045.930672ms)
+✔ real Agent.generate records and submits the repair-report shape (130.813731ms)
+✔ a rejected piece cannot add serialized-quote repair audit metadata (11.804233ms)
+✔ interruption keeps accepted pieces and records their names in the technical failure (499.269434ms)
+✔ accepted pieces are durable and can be replaced, removed, inspected, and submitted (62.523724ms)
+✔ the same engine records an unrelated packing-list schema without engine changes (326.181113ms)
+✔ the reviewer locates its enclosing Git repository (10.680362ms)
+✔ the six standing rules are part of the fixed reviewer instructions (2.717257ms)
+✔ the stage-one reset refuses reviewer execution before any provider request (3.360743ms)
+✔ free-disk preflight stops before start and durably records SYSTEM_ERROR progress (38.07718ms)
+✔ memory reservation stops before peak RSS can cross 768 MiB and saves progress (14.66648ms)
+✔ memory sampling retains a transient peak across the complete agent step (33.733613ms)
+✔ disk-growth reservation stops before atomic evidence can cross 128 MiB (15.433364ms)
+✔ the durable budget reserves each request before dispatch and charges validated usage (54.0532ms)
+✔ the durable budget refuses a request whose worst-case price exceeds the authorization (17.235251ms)
+✔ provider dispatch does not occur when the durable budget refuses the pending request (18.323094ms)
+✔ a restart preserves charges and refuses to retry an unresolved paid request (45.901311ms)
+✔ separate run ledgers share the cumulative card ceiling (128.352015ms)
+✔ a missing cumulative card ledger cannot reset previously authorized spend (132.34989ms)
+✔ malformed saved measurements and costs above a reservation fail closed (24.776371ms)
+✔ future clocks, busy card ledgers, and mismatched reservations fail closed (85.762802ms)
+✔ the offline runtime wires stock bounds, authorization, durable budget, and provider journal (181.05302ms)
+Error in agent stream {
+  error: Error: reviewer refused: pending request would cross the 20 minute limit
+      at beforeRequest (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/src/review-budget.mjs:92:47)
+      at checkedFetch (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/src/reviewer.mjs:70:9)
+      at Object.fetchWithBudgets [as fetch] (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/src/reviewer.mjs:161:20)
+      at async postToApi (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/node_modules/@ai-sdk/provider-utils/dist/index.js:3543:20)
+      at async postJsonToApi (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/node_modules/@ai-sdk/provider-utils/dist/index.js:3514:127)
+      at async OpenAICompatibleChatLanguageModel.doGenerate (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/node_modules/@ai-sdk/openai-compatible/dist/index.js:462:75)
+      at async AISDKV7LanguageModel.doGenerate (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/llm-BycEcjTn.js:294:18),
+  runId: '3d7bb221-82c2-4846-ba49-59a529ce332b',
+  provider: 'offline.chat',
+  modelId: 'offline-reviewer'
+}
+✔ elapsed refusal through Agent.generate ends as SYSTEM_ERROR with saved progress before dispatch (215.105745ms)
+Error in agent stream {
+  error: [Error: reviewer refused: sampled memory reached the 736 MiB guard before the 768 MiB ceiling],
+  runId: '01467a6f-4d3f-4ab8-95e2-23c4ba0b4ded',
+  provider: 'offline.chat',
+  modelId: 'offline-reviewer'
+}
+✔ in-step RSS guard aborts Agent.generate below 768 MiB and saves SYSTEM_ERROR progress (166.494762ms)
+✔ the runtime refuses an authorization other than the approved per-review amount (0.785057ms)
+✔ the Windows reviewer entry point reads a piped request and records the pre-provider paid gate (549.763405ms)
+✔ concurrent durable writers cannot overrun the shared evidence quota (27.41495ms)
+Error converting tool call input to JSON { toolCallId: 'record-1', toolName: 'record_item', inputLength: 81 }
+Error converting tool call input to JSON { toolCallId: 'record-1', toolName: 'record_item', inputLength: 81 }
+✔ real Mastra generate reports bad tool calls to the model and accepts a corrected call (605.233033ms)
+✔ Doctor reads the permanent-parts inventory and fails closed on a missing controlled part (49.853618ms)
+✔ candidate identity hashes tracked and untracked changes in a real Git repository (145.889845ms)
+✔ rehearsal candidate identity stability rejects commit or dirty-tree drift (1.255933ms)
+✔ F10 reads JUL-208 without admission and gives the reviewer the exact builder proposal (8.293779ms)
+✔ F10 records a sanitized Linear trace when GraphQL fails with HTTP 200 (2.133509ms)
+✔ F10 refuses future-intent text in place of reviewer findings (0.970445ms)
+✔ offline maximum-length installed Agent.generate review measures every one-review budget (48297.664961ms)
+✔ the 70-step stock ceiling prevents step 71 and saves SYSTEM_ERROR progress (19485.312211ms)
+Error in agent stream {
+  error: Error: reviewer refused: pending request would cross the $0.5 limit
+      at beforeRequest (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/src/review-budget.mjs:94:66)
+      at checkedFetch (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/src/reviewer.mjs:70:9)
+      at Object.fetchWithBudgets [as fetch] (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/src/reviewer.mjs:161:20)
+      at async postToApi (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/node_modules/@ai-sdk/provider-utils/dist/index.js:3543:20)
+      at async postJsonToApi (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/node_modules/@ai-sdk/provider-utils/dist/index.js:3514:127)
+      at async OpenAICompatibleChatLanguageModel.doGenerate (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/node_modules/@ai-sdk/openai-compatible/dist/index.js:462:75)
+      at async AISDKV7LanguageModel.doGenerate (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/llm-BycEcjTn.js:294:18),
+  runId: '85b3e94d-1b36-4bb2-8472-ade8d3f897d7',
+  provider: 'offline.chat',
+  modelId: 'offline-reviewer'
+}
+✔ the $0.50 reservation refuses an oversized request before network dispatch and saves SYSTEM_ERROR (102.732297ms)
+Error in agent stream {
+  error: Error: reviewer refused: durable evidence limit of 67043328 bytes would be exceeded
+      at file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/src/run-file.mjs:31:13
+      at async withFileLock (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/src/run-file.mjs:54:16)
+      at async durableWrite (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/src/run-file.mjs:29:3)
+      at async file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/src/review-budget.mjs:101:9
+      at async withFileLock (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/src/run-file.mjs:54:16)
+      at async beforeRequest (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/src/review-budget.mjs:96:7)
+      at async checkedFetch (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/src/reviewer.mjs:70:3)
+      at async Object.fetchWithBudgets [as fetch] (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/src/reviewer.mjs:161:14)
+      at async postToApi (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/node_modules/@ai-sdk/provider-utils/dist/index.js:3543:20)
+      at async postJsonToApi (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/node_modules/@ai-sdk/provider-utils/dist/index.js:3514:127),
+  runId: '850fa7ba-6c84-4635-a871-b9cccdd6abd8',
+  provider: 'offline.chat',
+  modelId: 'offline-reviewer'
+}
+✔ the 64 MiB evidence reservation refuses the crossing write and retains SYSTEM_ERROR progress (70.549479ms)
+ℹ tests 176
+ℹ suites 0
+ℹ pass 176
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 148495.577912
+{"owner":"ops/server-tests","lockfile":"ops/server-tests/package-lock.json","runtime":"node","environment":"local","tests":["ops/server-tests/test/worker.test.mjs"]}
+fatal: not a git repository (or any of the parent directories): .git
+✔ an exact candidate runs once on the server and publishes a git result consumed by CI (685.12573ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 815.770539
+{"owner":"ops/verification-maintenance","lockfile":"ops/verification-maintenance/package-lock.json","runtime":"node","environment":"local","tests":["ops/verification-maintenance/test/observer.test.mjs"]}
+✔ baseline, no merge, direct push, one merge, and repeated poll expose exactly one run (363.35818ms)
+✔ launch failure is retained as blocked and never relaunched (238.4483ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 764.559775

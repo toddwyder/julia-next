@@ -41,3 +41,27 @@
 - Independent workstreams. Architecture candidates write distinct files in /tmp. Implementation stays with one owner because routing and accounting share a request boundary.
 - Shared mutable state. One durable card total is a requirement; reserve each request transactionally before dispatch, and retain unresolved reservations after crashes.
 - Smallest safe decomposition. Separate the ledger, credential boundary and SDK adapter into verifiable units. Do not build delivery orchestration or review.
+
+## Follow-up on test ownership and merge maintenance
+
+- [ ] Reproduce it yourself on the matching surface.
+- [ ] Binary-search the cause.
+- [ ] Plan the fix.
+- [ ] Verify on the same surface.
+- [ ] Stage the commits so the failing repro lands before the fix in git history.
+- [ ] Run Opening a PR, resuming PR #314 without merging.
+
+### Maintenance phases
+
+- [ ] Ground.
+- [ ] Sketch.
+- [ ] Agree. Proceed under the authorized scope.
+- [ ] Implement.
+- [ ] Scrap if runtime evidence rejects the design.
+
+### Throughput checkpoint
+
+- Blocking first steps. Reproduce the first CI failures and inspect server launch paths.
+- Independent workstreams. CI discovery and the maintenance package have distinct owners and file scopes.
+- Shared mutable state. The merge cursor and run records have one server poller owner. Git publication remains with the coordinator.
+- Smallest safe decomposition. Two implementation owners plus a fresh reviewer; proofs run after integration.

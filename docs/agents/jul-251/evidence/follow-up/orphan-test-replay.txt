@@ -1,0 +1,13 @@
+{
+  "orphanSourceExists": false,
+  "orphanScheduled": false,
+  "replayedAdapterOwner": "ops/build-runner",
+  "installedLockfile": "ops/build-runner/package-lock.json",
+  "adapterAndSdkRegressions": "local",
+  "serverTests": [
+    "scripts/server/julia-agents.test.mjs",
+    "ops/build-runner/framework/@mastra/code-sdk/server/model-side.test.mjs",
+    "ops/build-runner/framework/@mastra/code-sdk/server/provider-settings.test.mjs",
+    "ops/mastra-agents/reviewer/test/server/commandcode-provider-probe.test.mjs"
+  ]
+}

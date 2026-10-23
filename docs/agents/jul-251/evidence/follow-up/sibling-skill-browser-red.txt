@@ -1,0 +1,34 @@
+✖ a sibling skill browser test runs without changing Playwright ownership configuration (1359.000144ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1511.312443
+
+✖ failing tests:
+
+test at .agents/skills/verify-julia/browser-discovery.test.mjs:9:1
+✖ a sibling skill browser test runs without changing Playwright ownership configuration (1359.000144ms)
+  AssertionError [ERR_ASSERTION]: Error: No tests found.
+  Make sure that arguments are regular expressions matching test files.
+  You may need to escape symbols like "$" or "*" and quote the arguments.
+
+
+
+  1 !== 0
+
+      at TestContext.<anonymous> (file:///home/ubuntu/julia-hybrid-pstack-trial/.agents/skills/verify-julia/browser-discovery.test.mjs:30:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

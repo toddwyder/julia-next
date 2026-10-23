@@ -1,0 +1,10 @@
+[Unit]
+Description=Observe Julia candidate heads for server-owned tests
+
+[Timer]
+OnBootSec=30s
+OnUnitInactiveSec=30s
+Unit=julia-server-tests.service
+
+[Install]
+WantedBy=timers.target

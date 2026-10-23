@@ -1,0 +1,114 @@
+✖ new tests inherit the nearest locked dependency owner and server execution from their folder (96.002827ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 248.524168
+
+✖ failing tests:
+
+test at scripts/test-owners.test.mjs:27:1
+✖ new tests inherit the nearest locked dependency owner and server execution from their folder (96.002827ms)
+  AssertionError [ERR_ASSERTION]: node:internal/modules/cjs/loader:1459
+    throw err;
+    ^
+
+  Error: Cannot find module '/home/ubuntu/julia-hybrid-pstack-trial/scripts/test-owners.mjs'
+      at Module._resolveFilename (node:internal/modules/cjs/loader:1456:15)
+      at defaultResolveImpl (node:internal/modules/cjs/loader:1066:19)
+      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1071:22)
+      at Module._load (node:internal/modules/cjs/loader:1242:25)
+      at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+      at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+      at node:internal/main/run_main_module:33:47 {
+    code: 'MODULE_NOT_FOUND',
+    requireStack: []
+  }
+
+  Node.js v24.14.1
+
+
+  1 !== 0
+
+      at TestContext.<anonymous> (file:///home/ubuntu/julia-hybrid-pstack-trial/scripts/test-owners.test.mjs:34:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+✔ new tests inherit the nearest locked dependency owner and server execution from their folder (290.793161ms)
+✖ new tests execute with their owner dependencies and isolated Git process state (413.595921ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 858.128295
+
+✖ failing tests:
+
+test at scripts/test-owners.test.mjs:45:1
+✖ new tests execute with their owner dependencies and isolated Git process state (413.595921ms)
+  AssertionError [ERR_ASSERTION]: /opt/node-v24.14.1/bin/node exited 1
+  {"owner":"ops/feature","lockfile":"ops/feature/package-lock.json","runtime":"node","environment":"local","tests":["ops/feature/test/brand-new.test.mjs"]}
+  ✖ newly introduced test executes (3.286167ms)
+  ℹ tests 1
+  ℹ suites 0
+  ℹ pass 0
+  ℹ fail 1
+  ℹ cancelled 0
+  ℹ skipped 0
+  ℹ todo 0
+  ℹ duration_ms 173.396841
+
+  ✖ failing tests:
+
+  test at ops/feature/test/brand-new.test.mjs:5:1
+  ✖ newly introduced test executes (3.286167ms)
+    AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+    + actual - expected
+
+    + '/tmp/test-owners-8UAkMW/.git'
+    - undefined
+
+        at TestContext.<anonymous> (file:///tmp/test-owners-8UAkMW/ops/feature/test/brand-new.test.mjs:7:10)
+        at Test.runInAsyncScope (node:async_hooks:228:14)
+        at Test.run (node:internal/test_runner/test:1118:25)
+        at Test.start (node:internal/test_runner/test:1015:17)
+        at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
+      generatedMessage: true,
+      code: 'ERR_ASSERTION',
+      actual: '/tmp/test-owners-8UAkMW/.git',
+      expected: undefined,
+      operator: 'strictEqual',
+      diff: 'simple'
+    }
+
+
+  1 !== 0
+
+      at TestContext.<anonymous> (file:///home/ubuntu/julia-hybrid-pstack-trial/scripts/test-owners.test.mjs:62:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

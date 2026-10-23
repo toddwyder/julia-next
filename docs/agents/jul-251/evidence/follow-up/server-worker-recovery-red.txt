@@ -1,0 +1,26 @@
+✖ a dead claim without a result is recovered and does not starve the next candidate (79.444933ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 229.602173
+
+✖ failing tests:
+
+test at ops/server-tests/test/worker.test.mjs:38:1
+✖ a dead claim without a result is recovered and does not starve the next candidate (79.444933ms)
+  Error: ENOENT: no such file or directory, open '/tmp/server-tests-recovery-joddUC/state/926370b8d4b78d596c4a156da402ff47e9345126/result.json'
+      at async open (node:internal/fs/promises:640:25)
+      at async readFile (node:internal/fs/promises:1283:14)
+      at async runHead (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/server-tests/worker.mjs:17:31)
+      at async TestContext.<anonymous> (file:///home/ubuntu/julia-hybrid-pstack-trial/ops/server-tests/test/worker.test.mjs:51:18)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'open',
+    path: '/tmp/server-tests-recovery-joddUC/state/926370b8d4b78d596c4a156da402ff47e9345126/result.json'
+  }

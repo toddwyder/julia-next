@@ -1,0 +1,156 @@
+{
+  "owners": [
+    {
+      "directory": ".",
+      "lockfile": "package-lock.json",
+      "runtime": "node",
+      "tests": {
+        "local": [
+          ".agents/skills/verify-julia/browser-discovery.test.mjs",
+          ".agents/skills/verify-julia/process-platform.test.mjs",
+          "app/api/observability-proof/route.test.mjs",
+          "lib/delivery-events.test.mjs",
+          "ops/service-dropbox/run-agy-seat.test.mjs",
+          "scripts/acceptance-check.test.mjs",
+          "scripts/agent-docs.test.mjs",
+          "scripts/bad-submissions.test.mjs",
+          "scripts/commandcode-requests.test.mjs",
+          "scripts/delivery-tool-updates.test.mjs",
+          "scripts/dynamic-route.test.mjs",
+          "scripts/framework-lint.test.mjs",
+          "scripts/health-route.test.mjs",
+          "scripts/julia-delivery-boundaries.test.mjs",
+          "scripts/julia-delivery-recovery.test.mjs",
+          "scripts/julia-delivery-state.test.mjs",
+          "scripts/julia-delivery-workspace.test.mjs",
+          "scripts/julia-retired-controller.test.mjs",
+          "scripts/julia-runner-time-limit.test.mjs",
+          "scripts/julia-vault.test.mjs",
+          "scripts/line-endings.test.mjs",
+          "scripts/linear-cli.test.mjs",
+          "scripts/merge-pr.test.mjs",
+          "scripts/no-personal-paths.test.mjs",
+          "scripts/personal-paths.test.mjs",
+          "scripts/publish-pr.real-git.test.mjs",
+          "scripts/publish-pr.test.mjs",
+          "scripts/publish-via-github-app.test.mjs",
+          "scripts/test-owners.test.mjs",
+          "scripts/verify-reviewer-worktree.test.mjs",
+          "scripts/web-app.test.mjs"
+        ],
+        "server": [
+          "scripts/server/julia-agents.test.mjs"
+        ],
+        "browser": [
+          ".agents/skills/verify-julia/tests/home.spec.mjs",
+          ".agents/skills/verify-julia/tests/release.spec.mjs"
+        ]
+      }
+    },
+    {
+      "directory": ".agents/skills/poteto-mode/scripts",
+      "lockfile": ".agents/skills/poteto-mode/scripts/bun.lock",
+      "runtime": "bun",
+      "tests": {
+        "local": [
+          ".agents/skills/poteto-mode/scripts/check-plan.test.ts",
+          ".agents/skills/poteto-mode/scripts/orch/orch.test.ts",
+          ".agents/skills/poteto-mode/scripts/watch-pr/cli.test.ts",
+          ".agents/skills/poteto-mode/scripts/watch-pr/github.test.ts",
+          ".agents/skills/poteto-mode/scripts/watch-pr/policy.test.ts"
+        ],
+        "server": [],
+        "browser": []
+      }
+    },
+    {
+      "directory": "ops/build-runner",
+      "lockfile": "ops/build-runner/package-lock.json",
+      "runtime": "node",
+      "tests": {
+        "local": [
+          "ops/build-runner/framework/@mastra/code-sdk/after-write.test.mjs",
+          "ops/build-runner/framework/@mastra/code-sdk/credentials.test.mjs",
+          "ops/build-runner/framework/@mastra/code-sdk/layer1.test.mjs",
+          "ops/build-runner/framework/@mastra/code-sdk/layer2.test.mjs",
+          "ops/build-runner/framework/@mastra/code-sdk/layer3.test.mjs",
+          "ops/build-runner/framework/@mastra/code-sdk/model-attempt.test.mjs",
+          "ops/build-runner/framework/@mastra/code-sdk/native.test.mjs",
+          "ops/build-runner/framework/@mastra/code-sdk/push-route.test.mjs",
+          "ops/build-runner/framework/@mastra/code-sdk/usage-request.test.mjs",
+          "ops/build-runner/test/adapter.test.mjs",
+          "ops/build-runner/test/ledger.test.mjs",
+          "ops/build-runner/test/review-regressions.test.mjs",
+          "ops/build-runner/test/transport.test.mjs"
+        ],
+        "server": [
+          "ops/build-runner/framework/@mastra/code-sdk/server/model-side.test.mjs",
+          "ops/build-runner/framework/@mastra/code-sdk/server/provider-settings.test.mjs"
+        ],
+        "browser": []
+      }
+    },
+    {
+      "directory": "ops/mastra-agents/reviewer",
+      "lockfile": "ops/mastra-agents/reviewer/package-lock.json",
+      "runtime": "node",
+      "tests": {
+        "local": [
+          "ops/mastra-agents/reviewer/audit/jul-223-stage2-stock.test.mjs",
+          "ops/mastra-agents/reviewer/test/card-admission-check.test.mjs",
+          "ops/mastra-agents/reviewer/test/contract.test.mjs",
+          "ops/mastra-agents/reviewer/test/delivery-workflow.test.mjs",
+          "ops/mastra-agents/reviewer/test/jul-225.test.ts",
+          "ops/mastra-agents/reviewer/test/jul-230.test.ts",
+          "ops/mastra-agents/reviewer/test/jul-242.test.ts",
+          "ops/mastra-agents/reviewer/test/jul-243.test.ts",
+          "ops/mastra-agents/reviewer/test/model-journal.test.mjs",
+          "ops/mastra-agents/reviewer/test/quote-check.test.mjs",
+          "ops/mastra-agents/reviewer/test/raw-answer.test.mjs",
+          "ops/mastra-agents/reviewer/test/recorded-review.test.mjs",
+          "ops/mastra-agents/reviewer/test/recording-engine.test.mjs",
+          "ops/mastra-agents/reviewer/test/repository-root.test.mjs",
+          "ops/mastra-agents/reviewer/test/reset-stage.test.mjs",
+          "ops/mastra-agents/reviewer/test/resource-budget.test.mjs",
+          "ops/mastra-agents/reviewer/test/review-budget.test.mjs",
+          "ops/mastra-agents/reviewer/test/review-runtime.test.mjs",
+          "ops/mastra-agents/reviewer/test/reviewer-entrypoint.test.mjs",
+          "ops/mastra-agents/reviewer/test/run-file.test.mjs",
+          "ops/mastra-agents/reviewer/test/tool-input-failure.test.mjs",
+          "ops/mastra-agents/reviewer/test/verify-machine.test.ts",
+          "ops/mastra-agents/reviewer/test/worst-case-offline.test.mjs"
+        ],
+        "server": [
+          "ops/mastra-agents/reviewer/test/server/commandcode-provider-probe.test.mjs"
+        ],
+        "browser": []
+      }
+    },
+    {
+      "directory": "ops/server-tests",
+      "lockfile": "ops/server-tests/package-lock.json",
+      "runtime": "node",
+      "tests": {
+        "local": [
+          "ops/server-tests/test/worker.test.mjs"
+        ],
+        "server": [],
+        "browser": []
+      }
+    },
+    {
+      "directory": "ops/verification-maintenance",
+      "lockfile": "ops/verification-maintenance/package-lock.json",
+      "runtime": "node",
+      "tests": {
+        "local": [
+          "ops/verification-maintenance/test/observer.test.mjs"
+        ],
+        "server": [
+          "ops/verification-maintenance/test/server/sandbox.test.mjs"
+        ],
+        "browser": []
+      }
+    }
+  ]
+}

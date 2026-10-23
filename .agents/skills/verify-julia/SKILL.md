@@ -13,7 +13,7 @@ Install exactly the locked candidate dependencies from the repository root when 
 
 ```powershell
 npm ci
-$run = node scripts/verify-julia.mjs launch | ConvertFrom-Json
+$run = node .agents/skills/verify-julia/verify-julia.mjs launch | ConvertFrom-Json
 $run | ConvertTo-Json | Set-Content -Encoding utf8 "$($run.evidenceDir)\launch.json"
 ```
 
@@ -24,7 +24,7 @@ The helper chooses an unused ephemeral localhost port and creates a unique run I
 Run before driving and after any unexpected failure:
 
 ```powershell
-$doctorOutput = node scripts/verify-julia.mjs doctor 2>&1
+$doctorOutput = node .agents/skills/verify-julia/verify-julia.mjs doctor 2>&1
 $doctorExit = $LASTEXITCODE
 $doctorOutput | Set-Content -Encoding utf8 "$($run.evidenceDir)\doctor.json"
 if ($doctorExit -ne 0) { throw "Doctor failed with exit code $doctorExit" }
@@ -61,7 +61,7 @@ Close only this run's named CLI session, then stop only the verified Next.js pro
 
 ```powershell
 if (npx --no-install playwright cli list | Select-String -SimpleMatch $run.session) { npx --no-install playwright cli "-s=$($run.session)" close }
-node scripts/verify-julia.mjs cleanup
+node .agents/skills/verify-julia/verify-julia.mjs cleanup
 Test-Path $run.evidenceDir
 Get-Content "$($run.evidenceDir)\launch.json" -TotalCount 20
 ```
@@ -70,11 +70,11 @@ Cleanup can run even if server startup failed or the server has already exited. 
 
 ## Helpers
 
-The executable lifecycle helper is `scripts/verify-julia.mjs`. Its supported commands are `launch`, `doctor`, and `cleanup`; invocation is shown above. Launch selects an ephemeral free port and writes the run record to `.artifacts/verify-julia/run.json`. `JULIA_VERIFY_URL` tells the existing Playwright config to use that exact running server and skip its default port-3000 webServer:
+The executable lifecycle helper is `.agents/skills/verify-julia/verify-julia.mjs`. Its supported commands are `launch`, `doctor`, and `cleanup`; invocation is shown above. Launch selects an ephemeral free port and writes the run record to `.artifacts/verify-julia/run.json`. `JULIA_VERIFY_URL` tells the existing Playwright config to use that exact running server and skip its default port-3000 webServer:
 
 ```powershell
 $env:JULIA_VERIFY_URL = $run.url
-$testOutput = npm exec -- playwright test e2e/home.spec.mjs --reporter=line 2>&1
+$testOutput = npm exec -- playwright test .agents/skills/verify-julia/tests/home.spec.mjs --reporter=line 2>&1
 $testExit = $LASTEXITCODE
 $testOutput | Set-Content -Encoding utf8 "$($run.evidenceDir)\playwright-test.txt"
 "exitCode=$testExit" | Add-Content -Encoding utf8 "$($run.evidenceDir)\playwright-test.txt"

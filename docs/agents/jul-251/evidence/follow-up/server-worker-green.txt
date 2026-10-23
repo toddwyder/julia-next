@@ -1,0 +1,13 @@
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+✔ an exact candidate runs once on the server and publishes a git result consumed by CI (1289.450257ms)
+fatal: not a git repository (or any of the parent directories): .git
+✔ a dead claim without a result is recovered and does not starve the next candidate (420.200919ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1870.11262

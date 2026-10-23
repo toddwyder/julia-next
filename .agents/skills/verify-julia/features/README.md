@@ -4,8 +4,8 @@ This map covers Julia's two existing browser surfaces: home content and install 
 
 ## Baseline preconditions
 
-- From the repository root, run `node scripts/verify-julia.mjs launch` and capture its JSON output as `$run`: `$run = node scripts/verify-julia.mjs launch | ConvertFrom-Json`.
-- Run `node scripts/verify-julia.mjs doctor`, capture its output and exit code, and require success before driving. Require it to report this candidate commit, matching dirty-tree digest, exact Next process, listener ownership, and healthy response.
+- From the repository root, run `node .agents/skills/verify-julia/verify-julia.mjs launch` and capture its JSON output as `$run`: `$run = node .agents/skills/verify-julia/verify-julia.mjs launch | ConvertFrom-Json`.
+- Run `node .agents/skills/verify-julia/verify-julia.mjs doctor`, capture its output and exit code, and require success before driving. Require it to report this candidate commit, matching dirty-tree digest, exact Next process, listener ownership, and healthy response.
 - Keep the same PowerShell session so `$run.url`, `$run.session`, and `$run.evidenceDir` stay available. If the shell is reopened, restore them with `$run = Get-Content .artifacts/verify-julia/run.json -Raw | ConvertFrom-Json`.
 - Open only the browser session named in `$run.session`; it is unique to this run and uses an in-memory profile.
 

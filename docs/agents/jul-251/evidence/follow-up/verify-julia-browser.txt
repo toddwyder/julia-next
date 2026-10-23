@@ -1,0 +1,16 @@
+
+Running 3 tests using 2 workers
+
+(node:289013) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+(node:289012) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1/3] .agents/skills/verify-julia/tests/release.spec.mjs:2:1 › production serves the merged commit without browser errors
+[2/3] .agents/skills/verify-julia/tests/home.spec.mjs:6:1 › home page shows Julia, the application version, and a welcome line
+[3/3] .agents/skills/verify-julia/tests/home.spec.mjs:19:1 › home page exposes an installable Julia manifest and decodable icons
+  1 skipped
+  2 passed (7.9s)
