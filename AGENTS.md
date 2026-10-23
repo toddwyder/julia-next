@@ -15,11 +15,17 @@ Ask Todd only when a step needs him in his own account, spending would rise abov
 ## Server
 - Agents run as ubuntu with admin rights; Todd accepts the risks.
 - Commands needing Julia keys: node scripts/julia-agents.mjs -- <command>.
-- Server: docs/agents/server-runbook.md. Domain words: GLOSSARY.md.
+- Server: docs/agents/server-runbook.md. Domain words: [GLOSSARY.md](GLOSSARY.md).
 - Linear holds cards and requirements. GitHub holds code.
 
 ## Finish
 An open PR to main with the proof in it and CI green.
+
+## Enforced rules
+
+| Rule | Enforcement |
+| --- | --- |
+| Inline Markdown links and slash-containing source paths in the entry points resolve. | `node scripts/check-agent-links.mjs` checks AGENTS.md, CLAUDE.md and CODING_STANDARDS.md locally and in CI. |
 
 <!-- BEGIN:nextjs-agent-rules -->
 

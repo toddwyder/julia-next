@@ -1,0 +1,33 @@
+✖ agent entry points resolve their actual destinations (88.560993ms)
+✔ missing learning directories and removed headings fail with the source line and repair (153.295235ms)
+✔ relative links, duplicate headings and source paths are checked without treating external URLs or templates as local files (255.233318ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 2
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 612.491279
+
+✖ failing tests:
+
+test at scripts/check-agent-links.test.mjs:19:1
+✖ agent entry points resolve their actual destinations (88.560993ms)
+  AssertionError [ERR_ASSERTION]: CLAUDE.md:24: AGENTS.md#building-and-reviewing has no matching heading; link to a current heading in AGENTS.md
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///home/ubuntu/julia-correct-20261023/scripts/check-agent-links.test.mjs:21:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

@@ -1,0 +1,8 @@
+ts	phase	decision	why	evidence	result
+2026-10-23T19:32:55.971358+00:00	frame	Use a clean main worktree and leave one PR open	The original checkout has unrelated edits and Todd owns retro merges	2a7b101; todo.md	scoped
+2026-10-23T19:32:55.971411+00:00	scope	Fix broken entry-point destinations as one repeated class	Other repeated CI classes already have structural checks	report.md	one class
+2026-10-23T19:32:55.971416+00:00	design	Check real paths and headings through a dependency-free CLI	Generating prose cannot prevent a target move; types cannot check Markdown headings	scripts/check-agent-links.mjs	implemented
+2026-10-23T19:32:55.971421+00:00	proof	Correct the historical attribution after the first replay	framework/ existed in dbfb572 and was removed by d87e80c	evidence/historical-red.txt	three historical trees rejected
+2026-10-23T19:32:55.971425+00:00	verification	Replace the remembered directory assertion and fix the stale heading link	The CLI must validate the actual destination	evidence/current-red.txt; evidence/current-green.txt	nine tests pass
+2026-10-23T19:33:45.076374+00:00	publication	Use existing test-owner CI instead of editing workflow YAML	Signed-in Git push refused workflow scope; existing CI already discovers the CLI regression	scripts/check-agent-links.test.mjs; .github/workflows/ci.yml	workflow diff removed
+2026-10-23T19:36:12.701184+00:00	review	Link root glossary references and check other source extensions	Fresh reviewers reproduced missing root files and PowerShell paths; broad bare-filename guessing also mistakes product names for files	evidence/review-gap-red.txt; evidence/review-gap-green.txt	root references are links; slash paths accept source extensions

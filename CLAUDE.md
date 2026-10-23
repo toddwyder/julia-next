@@ -21,7 +21,7 @@ action, park the Linear card with one line explaining why.
 
 ## Building and reviewing
 
-Follow the repository's [AGENTS.md building and reviewing requirements](AGENTS.md#building-and-reviewing).
+Follow the repository's [AGENTS.md work requirements](AGENTS.md#work).
 
 ## Reaching the server
 
@@ -37,7 +37,7 @@ Details are in `docs/agents/server-runbook.md`.
 
 ## Domain and tracker
 
-Domain model: `GLOSSARY.md`. Decisions: `docs/adr/`. New Julia and machine work goes in Linear;
+Domain model: [GLOSSARY.md](GLOSSARY.md). Decisions: `docs/adr/`. New Julia and machine work goes in Linear;
 Linear owns cards, requirements, acceptance criteria, and status. GitHub owns code, commits, pull
 requests, and CI. Run files own execution state. GitHub issues are not the active card tracker.
 
