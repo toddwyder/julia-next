@@ -53,8 +53,8 @@ function xmlText(value) {
 }
 
 function reportFailures(report, root, cwd) {
-  for (const [, attributes, body] of report.matchAll(/<testcase\b([^>]*?)(?<!\/)>([\s\S]*?)<\/testcase>/g)) {
-    const failure = body.match(/<(?:failure|error)\b([^>]*?)(?:\/>|>)/);
+  for (const [, attributes, body] of report.matchAll(/<testcase\b((?:"[^"]*"|'[^']*'|[^'">])*)(?<!\/)>([\s\S]*?)<\/testcase>/g)) {
+    const failure = body.match(/<(?:failure|error)\b((?:"[^"]*"|'[^']*'|[^'">])*)(?:\/>|>)/);
     if (!failure) continue;
     const parse = value => Object.fromEntries([...value.matchAll(/([\w-]+)="([^"]*)"/g)].map(([, name, text]) => [name, xmlText(text)]));
     const test = parse(attributes);

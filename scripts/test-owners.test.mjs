@@ -183,3 +183,17 @@ test('browser runner failure', () => { throw new Error('browser first error line
     '::error file=packages/browser-owner/test/failure.spec.mjs,title=browser runner failure::browser runner failure: Error: browser first error line',
   ]);
 });
+
+test('a passing Node test name containing an XML delimiter cannot hide a later file failure', t => {
+  const f = fixture(t);
+  f.write('test/01-pass.test.mjs', `import { test } from 'node:test';
+test('a passing path <name> with a > delimiter', () => {});`);
+  f.write('test/02-fail.test.mjs', `import { test } from 'node:test';
+test('later failing file', () => { throw new Error('expected value > actual value'); });`);
+  const result = f.run('--run', 'local');
+  assert.equal(result.status, 1);
+  assert.deepEqual(result.stdout.split('\n').filter(line => line.startsWith('::error ')), [
+    '::error file=test/02-fail.test.mjs,title=later failing file::later failing file: expected value > actual value',
+  ]);
+  assert.doesNotMatch(result.stderr, /paths\[1\]/);
+});
