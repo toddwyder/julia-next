@@ -1,5 +1,6 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -31,9 +32,41 @@ export function testOwners(root = process.cwd()) {
   return { owners };
 }
 
-function execute(command, args, cwd) {
-  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => key !== 'NODE_TEST_CONTEXT' && !key.startsWith('GIT_')));
+function annotationData(value) {
+  return value.replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A');
+}
+
+function annotationProperty(value) {
+  return annotationData(value).replaceAll(':', '%3A').replaceAll(',', '%2C');
+}
+
+export function annotateFailure({ file, name, message }, root = process.cwd()) {
+  const path = relative(root, resolve(file)).replaceAll('\\', '/');
+  console.log(`::error file=${annotationProperty(path)},title=${annotationProperty(name)}::${annotationData(`${name}: ${message.split(/\r?\n/)[0]}`)}`);
+}
+
+function xmlText(value) {
+  return value.replace(/&(#x[\da-f]+|#\d+|amp|lt|gt|quot|apos);/gi, (_, entity) => {
+    if (entity.startsWith('#')) return String.fromCodePoint(Number(entity[1] === 'x' ? `0x${entity.slice(2)}` : entity.slice(1)));
+    return { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" }[entity];
+  });
+}
+
+function reportFailures(report, root, cwd) {
+  for (const [, attributes, body] of report.matchAll(/<testcase\b((?:"[^"]*"|'[^']*'|[^'">])*)(?<!\/)>([\s\S]*?)<\/testcase>/g)) {
+    const failure = body.match(/<(?:failure|error)\b((?:"[^"]*"|'[^']*'|[^'">])*)(?:\/>|>)/);
+    if (!failure) continue;
+    const parse = value => Object.fromEntries([...value.matchAll(/([\w-]+)="([^"]*)"/g)].map(([, name, text]) => [name, xmlText(text)]));
+    const test = parse(attributes);
+    const error = parse(failure[1]);
+    annotateFailure({ file: resolve(cwd, test.file), name: test.name, message: error.message ?? error.type ?? 'test failed' }, root);
+  }
+}
+
+function execute(command, args, cwd, { report, root = cwd, environment = {} } = {}) {
+  const env = { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => key !== 'NODE_TEST_CONTEXT' && !key.startsWith('GIT_'))), ...environment };
   const result = spawnSync(command, args, { cwd, env, stdio: 'inherit' });
+  if (report && existsSync(report)) reportFailures(readFileSync(report, 'utf8'), root, cwd);
   if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(`${command} exited ${result.status ?? result.signal}`);
 }
@@ -44,12 +77,17 @@ export function runOwnedTests(environment, { root = process.cwd(), plan = testOw
     const files = owner.tests[environment];
     if (!files.length) continue;
     console.log(JSON.stringify({ owner: owner.directory, lockfile: owner.lockfile, runtime: owner.runtime, environment, tests: files }));
-    if (environment === 'browser') {
-      const cwd = resolve(root, owner.directory);
-      execute('npx', ['--no-install', 'playwright', 'test', ...files.map(path => relative(cwd, resolve(root, path)))], cwd);
-    }
-    else if (owner.runtime === 'bun') execute('bun', ['test', ...files.map(path => `./${path}`)], root);
-    else execute(process.execPath, ['--test', '--test-concurrency=1', ...files], root);
+    const directory = mkdtempSync(join(tmpdir(), 'test-owners-report-'));
+    const report = join(directory, 'results.xml');
+    try {
+      if (environment === 'browser') {
+        const cwd = resolve(root, owner.directory);
+        const reporter = fileURLToPath(new URL('./test-owners-playwright.mjs', import.meta.url));
+        execute('npx', ['--no-install', 'playwright', 'test', `--reporter=line,${reporter}`, ...files.map(path => relative(cwd, resolve(root, path)))], cwd, { environment: { TEST_OWNERS_ROOT: root } });
+      }
+      else if (owner.runtime === 'bun') execute('bun', ['test', '--reporter=junit', `--reporter-outfile=${report}`, ...files.map(path => `./${path}`)], root, { report, environment: { GITHUB_ACTIONS: '' } });
+      else execute(process.execPath, ['--test', '--test-concurrency=1', '--test-reporter=spec', '--test-reporter-destination=stdout', '--test-reporter=junit', `--test-reporter-destination=${report}`, ...files], root, { report });
+    } finally { rmSync(directory, { recursive: true, force: true }); }
   }
 }
 

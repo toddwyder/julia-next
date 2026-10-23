@@ -1,0 +1,31 @@
+{
+  "restartStart": "2026-10-23T17:02:39.162Z",
+  "controlReady": {
+    "time": "2026-10-23T17:02:43.362387+00:00",
+    "message": "{\"status\":\"ready\",\"url\":\"http://127.0.0.1:43226/<concealed by 1Password>-control\",\"storage\":\"/home/ubuntu/.local/state/<concealed by 1Password>-pr316-proof/initialization.db\",\"tailscaleHosts\":[]}"
+  },
+  "expectedDowntimeFailures": [
+    {
+      "url": "http://127.0.0.1:43226/julia-control/api/builds",
+      "time": "2026-10-23T17:02:41.157Z",
+      "error": "net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "url": "http://127.0.0.1:43226/julia-control/api/builds",
+      "time": "2026-10-23T17:02:43.160Z",
+      "error": "net::ERR_CONNECTION_REFUSED"
+    }
+  ],
+  "expectedConsoleErrors": [
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    }
+  ],
+  "unexpectedConsoleErrors": [],
+  "pageErrors": []
+}

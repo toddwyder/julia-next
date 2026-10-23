@@ -1,0 +1,45 @@
+✔ new tests inherit the nearest locked dependency owner and server execution from their folder (247.31877ms)
+✔ new tests execute with their owner dependencies and isolated Git process state (359.123734ms)
+✔ server tests are absent from local execution and execute on the server route (434.976782ms)
+✔ a nested browser suite uses its owner executable, configuration, and relative test paths (1656.440297ms)
+✔ browser installation installs locked browser owners and leaves other owners untouched (627.269414ms)
+✔ a Node test owner declaring Playwright gets its browser runtime without a test-name entry (701.987402ms)
+✔ failing Node tests emit one readable annotation each, without suite duplicates or passing tests (309.02004ms)
+✖ failing Bun tests include names and only the first error line, without native duplicate annotations (123.792817ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 7
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4608.37076
+
+✖ failing tests:
+
+test at scripts/test-owners.test.mjs:150:1
+✖ failing Bun tests include names and only the first error line, without native duplicate annotations (123.792817ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+  +   '::error file=packages/bun-owner/failure.test.ts,line=4,col=95,title=error: first error line::second error line%0A      at <anonymous> (/tmp/test-owners-ce2v8C/packages/bun-owner/failure.test.ts:4:95)',
+  +   '::error file=packages/bun-owner/failure.test.ts,line=5,col=69,title=error: another error::%0A      at <anonymous> (/tmp/test-owners-ce2v8C/packages/bun-owner/failure.test.ts:5:69)'
+  -   '::error file=packages/bun-owner/failure.test.ts,title=failed <test> & "name"::failed <test> & "name": first error line',
+  -   '::error file=packages/bun-owner/failure.test.ts,title=second failed test::second failed test: another error'
+    ]
+  
+      at TestContext.<anonymous> (file:///home/ubuntu/julia-jul-231-build/scripts/test-owners.test.mjs:163:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ '::error file=packages/bun-owner/failure.test.ts,line=4,col=95,title=error: first error line::second error line%0A      at <anonymous> (/tmp/test-owners-ce2v8C/packages/bun-owner/failure.test.ts:4:95)', '::error file=packages/bun-owner/failure.test.ts,line=5,col=69,title=error: another error::%0A      at <anonymous> (/tmp/test-owners-ce2v8C/packages/bun-owner/failure.test.ts:5:69)' ],
+    expected: [ '::error file=packages/bun-owner/failure.test.ts,title=failed <test> & "name"::failed <test> & "name": first error line', '::error file=packages/bun-owner/failure.test.ts,title=second failed test::second failed test: another error' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

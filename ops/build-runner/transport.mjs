@@ -26,6 +26,7 @@ function configuration(settings, trial) {
   if (!object(settings?.models)) throw fail('Invalid model configuration');
   const routes = new Map();
   for (const [model, spec] of Object.entries(settings.models)) {
+    if (object(spec) && typeof spec.unavailable === 'string' && spec.unavailable.trim()) continue;
     if (!object(spec) || !protocols.has(spec.protocol) || typeof spec.wireModel !== 'string' || !spec.wireModel || typeof spec.endpoint !== 'string') throw fail('Invalid model configuration');
     const url = new URL(spec.endpoint);
     if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.hash) throw fail('Invalid model endpoint');
@@ -154,6 +155,8 @@ export function createTransport({ ledger, settings, role, fetch: upstream = glob
       else body = await request.clone().json();
     } catch { throw fail('Request must contain a JSON object'); }
     if (!object(body)) throw fail('Request must contain a JSON object');
+    const unavailable = Object.entries(settings.models).find(([id, model]) => model.unavailable && (body.model === id || body.model === model.wireModel));
+    if (unavailable) throw fail(`provider unavailable: ${unavailable[1].unavailable}`);
     const spec = routes.get(JSON.stringify([endpoint, body.model]));
     if (!spec) {
       if (allowed.has(endpoint) && !['model', 'messages', 'input'].some(key => key in body)) return upstream(new Request(request, { redirect: 'error' }));

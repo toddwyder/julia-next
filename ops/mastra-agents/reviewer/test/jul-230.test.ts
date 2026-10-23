@@ -60,7 +60,7 @@ test('control-page contracts carry complete offers and exact route-supported rol
   const selection = RoleSelectionSchema.parse({
     route: offer.route, modelId: offer.modelId, company: offer.company, service: offer.service, effort: 'xhigh',
   })
-  const roles = { builder: selection, reviewer: selection, crashFixer: selection, crashReviewer: selection }
+  const roles = { orchestrator: selection, coder: selection }
   assert.deepEqual(ControlPageStateSchema.parse({ cards: [{ admitted: true, card }], offers: [offer] }), { cards: [{ admitted: true, card }], offers: [offer] })
   assert.deepEqual(StartInitializationSchema.parse({ card, roles }), { card, roles })
   assert.throws(() => RoleSelectionSchema.parse({ ...selection, effort: 'unbounded' }))
@@ -212,10 +212,8 @@ test('Start creates one restart-surviving suspended run and returns it for the s
     { route: 'claude', modelId: 'claude-sonnet-4-6', name: 'Sonnet 4.6', company: 'Anthropic', service: 'Claude', codingCapable: true, supportedEfforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
   ].map(offer => ModelOfferSchema.parse(offer))
   const input = StartInitializationSchema.parse({ card, roles: {
-    builder: { route: 'antigravity', modelId: 'gemini-pro', company: 'Google', service: 'Antigravity', effort: 'high' },
-    reviewer: { route: 'commandcode', modelId: 'deepseek-v3', company: 'DeepSeek', service: 'CommandCode', wire: 'chat', effort: 'medium' },
-    crashFixer: { route: 'claude', modelId: 'claude-sonnet-4-6', company: 'Anthropic', service: 'Claude', effort: 'low' },
-    crashReviewer: { route: 'antigravity', modelId: 'gemini-pro', company: 'Google', service: 'Antigravity', effort: 'xhigh' },
+    orchestrator: { route: 'antigravity', modelId: 'gemini-pro', company: 'Google', service: 'Antigravity', effort: 'high' },
+    coder: { route: 'commandcode', modelId: 'deepseek-v3', company: 'DeepSeek', service: 'CommandCode', wire: 'chat', effort: 'medium' },
   } })
 
   const firstRuntime = await createInitializationRuntime({ storagePath, activity: createInitializationActivityRecorder() })
@@ -332,10 +330,8 @@ test('browser Start sends the exact changed card and four selections through the
   await page.goto(server.url)
   await page.getByRole('heading', { name: 'Initialize a Ready card' }).waitFor()
   const choices = [
-    ['Builder', 'antigravity::gemini-pro', 'high'],
-    ['Reviewer', 'commandcode::deepseek-v3', 'low'],
-    ['Crash fixer', 'claude::claude-sonnet-4-6', 'xhigh'],
-    ['Crash reviewer', 'antigravity::gemini-pro', 'max'],
+    ['Orchestrator', 'antigravity::gemini-pro', 'high'],
+    ['Coder', 'commandcode::deepseek-v3', 'low'],
   ] as const
   for (const [role, model, effort] of choices) {
     const field = page.getByRole('group', { name: role, exact: true })
@@ -348,7 +344,5 @@ test('browser Start sends the exact changed card and four selections through the
   assert.deepEqual(Object.values(received!.roles).map(selection => [selection.route, selection.modelId, selection.effort]), [
     ['antigravity', 'gemini-pro', 'high'],
     ['commandcode', 'deepseek-v3', 'low'],
-    ['claude', 'claude-sonnet-4-6', 'xhigh'],
-    ['antigravity', 'gemini-pro', 'max'],
   ])
 })

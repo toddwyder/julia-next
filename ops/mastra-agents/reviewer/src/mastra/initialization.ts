@@ -41,12 +41,6 @@ export function ensureInitializationSelectionsOffered(input: StartInitialization
       throw new Error(`${role} effort ${selection.effort} is not supported by ${selection.route}:${selection.modelId}`)
     }
   }
-  if (parsed.roles.builder.company.toLowerCase() === parsed.roles.reviewer.company.toLowerCase()) {
-    throw new Error('builder and reviewer must use different companies')
-  }
-  if (parsed.roles.crashFixer.company.toLowerCase() === parsed.roles.crashReviewer.company.toLowerCase()) {
-    throw new Error('crash-fixer and crash reviewer must use different companies')
-  }
   return parsed
 }
 

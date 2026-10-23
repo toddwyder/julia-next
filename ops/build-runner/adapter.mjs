@@ -7,7 +7,7 @@ import { createTransport } from './transport.mjs'
 const quote = value => "'" + String(value).replaceAll("'", "'\\''") + "'"
 let opened = false
 
-export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'builder' }) {
+export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'builder', hostInstructions, subagents, helpers, helperDefinitions, subagentDefinitions }) {
   if (opened) throw Error('one runner per process required')
   if (!/^[A-Z]+-\d+$/.test(card)) throw Error('valid card ID required')
   const settings = JSON.parse(await readFile(settingsPath, 'utf8'))
@@ -19,8 +19,10 @@ export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'bu
   const inside = relative(cwd, stateDir)
   if (!inside.startsWith('..') && !isAbsolute(inside)) throw Error('adapter state must be outside builder workspace')
   const appDir = join(stateDir, 'sdk')
-  const home = join(cwd, '.builder-home')
-  await mkdir(home, { recursive: true })
+  const sdkHome = join(stateDir, 'home')
+  const commandHome = join(cwd, '.builder-home')
+  await mkdir(commandHome, { recursive: true })
+  await mkdir(sdkHome, { recursive: true, mode: 0o700 })
   await mkdir(appDir, { recursive: true, mode: 0o700 })
   const runtimeProviders = (settings.providers ?? []).map(provider => {
     const { credentialEnv, ...publicProvider } = provider
@@ -47,6 +49,7 @@ export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'bu
   opened = true
   let runtime
   let workspace
+  const providedSubagents = (subagents ?? helpers ?? helperDefinitions ?? subagentDefinitions) ?? []
   try {
     const [{ bootLocalAgentController, runMC }, { setCredentialStoreProvider }, { setCustomProvidersSource }, { AuthStorage }, { loadSettings, saveSettings }, { Workspace, LocalFilesystem, LocalSandbox, createWorkspaceTools }, { RequestContext }] = await Promise.all([
       import('@mastra/code-sdk'),
@@ -72,20 +75,21 @@ export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'bu
     sdkSettings.models.omReflectionThreshold = null
     sdkSettings.customProviders = runtimeProviders.map(({ apiKey, ...provider }) => provider)
     saveSettings(sdkSettings)
-    const sandbox = new LocalSandbox({ workingDirectory: cwd, env: { HOME: home, TMPDIR: home }, timeout: 30_000 })
+    const sandbox = new LocalSandbox({ workingDirectory: cwd, env: { HOME: commandHome, TMPDIR: commandHome }, timeout: 30_000 })
     const spawn = sandbox.processes.spawn.bind(sandbox.processes)
     const launcher = fileURLToPath(new URL('./command-boundary.py', import.meta.url))
     sandbox.processes.spawn = (command, options = {}) => {
-      const config = JSON.stringify({ workspace: cwd, home, cwd: resolve(cwd, options.cwd ?? '.'), executable: process.execPath })
+      const config = JSON.stringify({ workspace: cwd, home: commandHome, cwd: resolve(cwd, options.cwd ?? '.'), executable: process.execPath })
       return spawn(`/usr/bin/python3 ${quote(launcher)} ${quote(config)} ${quote(command)}`, { ...options, env: {} })
     }
-    workspace = new Workspace({ filesystem: new LocalFilesystem({ basePath: cwd, contained: true }), sandbox, tools: { mastra_workspace_execute_command: { name: 'execute_command' } } })
+    workspace = new Workspace({ filesystem: new LocalFilesystem({ basePath: cwd, contained: true }), sandbox, tools: { mastra_workspace_execute_command: { name: 'execute_command' } }, skills: ['.agents/skills'] })
     await workspace.init()
     runtime = await bootLocalAgentController({
-      cwd, homeDir: home, workspace, modes: false, subagents: [], intervalHandlers: [],
-      disableMcp: true, disablePlugins: true, disableEnvFile: true, disableHooks: true, disableGithubSignals: true,
+      cwd, homeDir: sdkHome, workspace, modes: false, subagents: providedSubagents, intervalHandlers: [],
+      hostInstructions, disableMcp: true, disablePlugins: true, disableEnvFile: true, disableHooks: true, disableGithubSignals: true,
     })
     const tools = await createWorkspaceTools(workspace)
+    const availableSkills = await workspace.skills?.list?.() ?? []
     return {
       snapshot: () => ledger.snapshot(),
       execute: async command => tools.execute_command.execute({ command }, {}),
@@ -94,6 +98,8 @@ export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'bu
         requestContext.set('controller', { session: { modelId: runtime.session.model.get() }, state: runtime.session.state.get(), getState: () => runtime.session.state.get(), threadId: runtime.session.thread.requireId() })
         return typeof runtime.memory === 'function' ? runtime.memory({ requestContext }) : runtime.memory
       },
+      skills: workspace.skills,
+      availableSkills,
       runtime,
       async run({ prompt, threadId, maxTurns = 6, timeoutMs = 180_000 }) {
         if (typeof prompt !== 'string' || !prompt.trim()) throw Error('prompt required')
@@ -122,17 +128,20 @@ export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'bu
   }
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  try {
-    const [card, cwd, stateDir, settingsPath, prompt] = process.argv.slice(2)
-    const runner = await openRunner({ card, cwd, stateDir, settingsPath })
+if (fileURLToPath(import.meta.url)===process.argv[1]) {
+  const [card, cwd, stateDir, settingsPath, prompt] = process.argv.slice(2)
+  ;(async () => {
     try {
-      const receipt = await runner.run({ prompt })
-      console.log(JSON.stringify(receipt))
-      if (receipt.result.status !== 'completed') process.exitCode = 1
-    } finally { await runner.close() }
-  } catch {
-    console.error('runner refused or provider unavailable; inspect sanitized card ledger')
-    process.exitCode = 1
-  }
+      const runner = await openRunner({ card, cwd, stateDir, settingsPath })
+      try {
+        const receipt = await runner.run({ prompt })
+        console.log(JSON.stringify(receipt))
+      } finally {
+        await runner.close()
+      }
+    } catch (error) {
+      console.error(error?.message ?? String(error))
+      process.exitCode = 1
+    }
+  })()
 }

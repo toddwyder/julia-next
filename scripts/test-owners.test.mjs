@@ -93,7 +93,7 @@ fs.writeFileSync('browser-result.json', JSON.stringify({ config, args: process.a
   const result = f.run('--run', 'browser');
   assert.equal(result.status, 0, result.stderr + result.stdout);
   assert.deepEqual(JSON.parse(readFileSync(join(f.root, 'packages/browser-owner/browser-result.json'), 'utf8')), {
-    config: 'nested owner configuration', args: ['test', 'test/new.spec.mjs'],
+    config: 'nested owner configuration', args: ['test', `--reporter=line,${join(import.meta.dirname, 'test-owners-playwright.mjs')}`, 'test/new.spec.mjs'],
   });
   assert.equal(existsSync(join(f.root, 'browser-result.json')), false);
   const install = f.run('--install-browsers');
@@ -129,4 +129,71 @@ require('node:fs').writeFileSync('runtime-installed.json',JSON.stringify(process
   const result = f.run('--install-browsers', 'local');
   assert.equal(result.status, 0, result.stderr + result.stdout);
   assert.deepEqual(JSON.parse(readFileSync(join(f.root, 'packages/node-browser/runtime-installed.json'), 'utf8')), ['install', '--with-deps', 'chromium']);
+});
+
+test('failing Node tests emit one readable annotation each, without suite duplicates or passing tests', t => {
+  const f = fixture(t);
+  f.write('test/failure.test.mjs', `import { test, describe } from 'node:test';
+describe('containing suite', () => {
+  test('first, failing % test', () => { throw new Error('first error line\\nsecond error line'); });
+  test('second failing test', () => { throw new Error('another error'); });
+  test('passing test', () => {});
+});`);
+  const result = f.run('--run', 'local');
+  assert.equal(result.status, 1);
+  assert.deepEqual(result.stdout.split('\n').filter(line => line.startsWith('::error ')), [
+    '::error file=test/failure.test.mjs,title=first%2C failing %25 test::first, failing %25 test: first error line',
+    '::error file=test/failure.test.mjs,title=second failing test::second failing test: another error',
+  ]);
+});
+
+test('failing Bun tests include names and only the first error line, without native duplicate annotations', t => {
+  const f = fixture(t);
+  f.write('packages/bun-owner/package.json', '{"type":"module"}');
+  f.write('packages/bun-owner/bun.lock', '');
+  f.write('packages/bun-owner/failure.test.ts', `import { test, describe } from 'bun:test';
+describe('containing suite', () => {
+  test('passing test', () => {});
+  test('failed <test> & "name"', () => { throw new Error('first error line\\nsecond error line'); });
+  test('second failed test', () => { throw new Error('another error'); });
+});`);
+  const env = { ...process.env, GITHUB_ACTIONS: 'true' }; delete env.GIT_DIR; delete env.GIT_WORK_TREE; delete env.NODE_TEST_CONTEXT;
+  const result = spawnSync(process.execPath, [cli, '--run', 'local'], { cwd: f.root, encoding: 'utf8', env });
+  assert.equal(result.status, 1);
+  assert.deepEqual((result.stdout + result.stderr).split('\n').filter(line => line.startsWith('::error ')), [
+    '::error file=packages/bun-owner/failure.test.ts,title=failed <test> & "name"::failed <test> & "name": first error line',
+    '::error file=packages/bun-owner/failure.test.ts,title=second failed test::second failed test: another error',
+  ]);
+});
+
+test('browser failures emit a repository-relative test annotation from the real owner runner', t => {
+  const f = fixture(t);
+  f.owner('packages/browser-owner');
+  f.write('.gitignore', 'node_modules/\n');
+  f.write('packages/browser-owner/node_modules/.bin/playwright', `#!/usr/bin/env node
+require(${JSON.stringify(join(import.meta.dirname, '../node_modules/playwright/cli.js'))});
+`);
+  chmodSync(join(f.root, 'packages/browser-owner/node_modules/.bin/playwright'), 0o755);
+  f.write('packages/browser-owner/playwright.config.mjs', 'export default { testDir: "./test", retries: 0 };');
+  f.write('packages/browser-owner/test/failure.spec.mjs', `import { test } from ${JSON.stringify(join(import.meta.dirname, '../node_modules/@playwright/test/index.mjs'))};
+test('browser runner failure', () => { throw new Error('browser first error line\\nsecond error line'); });`);
+  const result = f.run('--run', 'browser');
+  assert.equal(result.status, 1);
+  assert.deepEqual(result.stdout.split('\n').filter(line => line.startsWith('::error ')), [
+    '::error file=packages/browser-owner/test/failure.spec.mjs,title=browser runner failure::browser runner failure: Error: browser first error line',
+  ]);
+});
+
+test('a passing Node test name containing an XML delimiter cannot hide a later file failure', t => {
+  const f = fixture(t);
+  f.write('test/01-pass.test.mjs', `import { test } from 'node:test';
+test('a passing path <name> with a > delimiter', () => {});`);
+  f.write('test/02-fail.test.mjs', `import { test } from 'node:test';
+test('later failing file', () => { throw new Error('expected value > actual value'); });`);
+  const result = f.run('--run', 'local');
+  assert.equal(result.status, 1);
+  assert.deepEqual(result.stdout.split('\n').filter(line => line.startsWith('::error ')), [
+    '::error file=test/02-fail.test.mjs,title=later failing file::later failing file: expected value > actual value',
+  ]);
+  assert.doesNotMatch(result.stderr, /paths\[1\]/);
 });

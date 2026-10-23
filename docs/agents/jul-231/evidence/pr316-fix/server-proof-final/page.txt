@@ -1,0 +1,246 @@
+Julia control
+What's running now
+
+Julia-monitored agent runs
+
+Updated 5:04
+JUL-232
+Add the JUL-231 Build-phase rehearsal marker
+Initialize · round 1
+Stopped: workflow paused waiting.
+Agent and model
+Initialization · Workflow (mastra)
+Source
+mastra
+Started
+5:02
+Last record
+5:02
+What it actually did
+From the tools' own records. Newest first.
+5:02
+suspend-ready-for-build · In progress
+Source: mastra lifecycle events
+Initialize a Ready card
+
+Start saves the card/models and starts Build.
+
+Ready card
+JUL-232 — Add the JUL-231 Build-phase rehearsal marker
+Orchestrator
+Route and model
+CommandCode · Claude Sonnet 5.5 (Anthropic)
+CommandCode · Claude Sonnet 5 (Anthropic)
+CommandCode · Claude Sonnet 4.6 (Anthropic)
+CommandCode · Claude Fable 5.1 (Anthropic)
+CommandCode · Claude Fable 5 (Anthropic)
+CommandCode · Claude Opus 5.5 (Anthropic)
+CommandCode · Claude Opus 5 (Anthropic)
+CommandCode · Claude Opus 4.8 (Anthropic)
+CommandCode · Claude Opus 4.7 (Anthropic)
+CommandCode · Claude Haiku 5.5 (Anthropic)
+CommandCode · Claude Haiku 4.5 (Anthropic)
+CommandCode · GPT-6 Astra (OpenAI)
+CommandCode · GPT-6.1 Sol (OpenAI)
+CommandCode · GPT-6 Sol (OpenAI)
+CommandCode · GPT-6 Luna (OpenAI)
+CommandCode · GPT-5.6 Sol (OpenAI)
+CommandCode · GPT-5.6 Terra (OpenAI)
+CommandCode · GPT-5.6 Luna (OpenAI)
+CommandCode · GPT-5.5 (OpenAI)
+CommandCode · GPT-5.4 (OpenAI)
+CommandCode · GPT-5.3 Codex (OpenAI)
+CommandCode · GPT-5.4 Mini (OpenAI)
+CommandCode · DeepSeek V4 Pro (latest) (DeepSeek)
+CommandCode · DeepSeek V4 Flash (latest) (DeepSeek)
+CommandCode · DeepSeek V4 Flash Vision (exp) (DeepSeek)
+CommandCode · DeepSeek V4 Flash Fast (DeepSeek)
+CommandCode · DeepSeek V4.1 Flash (latest) (DeepSeek)
+CommandCode · DeepSeek V4.1 Flash Fast (latest) (DeepSeek)
+CommandCode · Kimi K3 (moonshotai)
+CommandCode · Kimi K2.7 Code (moonshotai)
+CommandCode · Kimi K2.7 Code HighSpeed (moonshotai)
+CommandCode · Kimi K2.6 (moonshotai)
+CommandCode · Kimi K2.5 (moonshotai)
+CommandCode · GLM-5.3 Flash (z-ai)
+CommandCode · GLM-5.3 FlashX (z-ai)
+CommandCode · GLM-5.3 (zai-org)
+CommandCode · GLM-5.2 (zai-org)
+CommandCode · GLM-5.2 Fast (zai-org)
+CommandCode · GLM-5.1 (zai-org)
+CommandCode · GLM-5 (zai-org)
+CommandCode · MiniMax M3.1 Flash (minimax)
+CommandCode · MiniMax M3 (MiniMaxAI)
+CommandCode · MiniMax M2.7 (MiniMaxAI)
+CommandCode · MiniMax M2.5 (MiniMaxAI)
+CommandCode · Ornith 1.5 122B (ornith)
+CommandCode · MiMo V2.6 Pro (xiaomi)
+CommandCode · MiMo V2.6 Pro UltraSpeed (xiaomi)
+CommandCode · MiMo V2.6 Flash (xiaomi)
+CommandCode · Qwen 3.8 Omni Flash (Alibaba)
+CommandCode · Qwen 3.8 Max Prime (Alibaba)
+CommandCode · Qwen 3.8 Max 0902 (Alibaba)
+CommandCode · Qwen 3.8 Max (Alibaba)
+CommandCode · Qwen 3.8 27B (Alibaba)
+CommandCode · Qwen 3.8 Flash (Alibaba)
+CommandCode · Qwen 3.7 Max (Alibaba)
+CommandCode · Qwen 3.7 Plus (Alibaba)
+CommandCode · Qwen 3.7 Flash (Alibaba)
+CommandCode · Qwen 3.6 Max Preview (Alibaba)
+CommandCode · Qwen 3.6 Plus (Alibaba)
+CommandCode · LongCat 2.0 (meituan)
+CommandCode · Step 5 Preview (stepfun)
+CommandCode · Step 3.7 Flash (stepfun)
+CommandCode · Step 3.5 Flash (stepfun)
+CommandCode · Tencent Hy3 (tencent)
+CommandCode · Tencent Hy4 Preview (tencent)
+CommandCode · Gemini 4 Argon (Google)
+CommandCode · Gemini 3.8 Flash (Google)
+CommandCode · Gemini 3.7 Flash (Google)
+CommandCode · Gemini 3.6 Flash (Google)
+CommandCode · Gemini 3.5 Flash (Google)
+CommandCode · Gemini 3.5 Flash Lite (Google)
+CommandCode · Gemini 3.1 Flash Lite (Google)
+CommandCode · Fugu Ultra (sakana)
+CommandCode · Nemotron 3 Ultra (nvidia)
+CommandCode · Nemotron 3.5 Super VL (nvidia)
+CommandCode · Inkling (thinkingmachines)
+CommandCode · Inkling Small (thinkingmachines)
+CommandCode · Glyph Cluster (stealth)
+CommandCode · Beam 1.0 (reflection)
+CommandCode · Laguna S 2.1 (poolside)
+CommandCode · Ling 3.1 Flash (inclusionai)
+CommandCode · Muse Spark 1.1 (meta)
+CommandCode · Muse Spark 1.2 (meta)
+CommandCode · Muse Spark 1.2 Contributor (meta)
+CommandCode · Muse Spark 1.3 (meta)
+CommandCode · Muse Spark 1.3 Contributor (meta)
+CommandCode · Muse Spark Open (meta)
+CommandCode · Muse Wonder (meta)
+CommandCode · Grok 4.5 (xai)
+CommandCode · Grok 4.6 (xai)
+CommandCode · Grok 4.7 (xai)
+CommandCode · Mistral Large 4 (Mistral)
+Effort
+low
+medium
+high
+Coder
+Route and model
+CommandCode · Claude Sonnet 5.5 (Anthropic)
+CommandCode · Claude Sonnet 5 (Anthropic)
+CommandCode · Claude Sonnet 4.6 (Anthropic)
+CommandCode · Claude Fable 5.1 (Anthropic)
+CommandCode · Claude Fable 5 (Anthropic)
+CommandCode · Claude Opus 5.5 (Anthropic)
+CommandCode · Claude Opus 5 (Anthropic)
+CommandCode · Claude Opus 4.8 (Anthropic)
+CommandCode · Claude Opus 4.7 (Anthropic)
+CommandCode · Claude Haiku 5.5 (Anthropic)
+CommandCode · Claude Haiku 4.5 (Anthropic)
+CommandCode · GPT-6 Astra (OpenAI)
+CommandCode · GPT-6.1 Sol (OpenAI)
+CommandCode · GPT-6 Sol (OpenAI)
+CommandCode · GPT-6 Luna (OpenAI)
+CommandCode · GPT-5.6 Sol (OpenAI)
+CommandCode · GPT-5.6 Terra (OpenAI)
+CommandCode · GPT-5.6 Luna (OpenAI)
+CommandCode · GPT-5.5 (OpenAI)
+CommandCode · GPT-5.4 (OpenAI)
+CommandCode · GPT-5.3 Codex (OpenAI)
+CommandCode · GPT-5.4 Mini (OpenAI)
+CommandCode · DeepSeek V4 Pro (latest) (DeepSeek)
+CommandCode · DeepSeek V4 Flash (latest) (DeepSeek)
+CommandCode · DeepSeek V4 Flash Vision (exp) (DeepSeek)
+CommandCode · DeepSeek V4 Flash Fast (DeepSeek)
+CommandCode · DeepSeek V4.1 Flash (latest) (DeepSeek)
+CommandCode · DeepSeek V4.1 Flash Fast (latest) (DeepSeek)
+CommandCode · Kimi K3 (moonshotai)
+CommandCode · Kimi K2.7 Code (moonshotai)
+CommandCode · Kimi K2.7 Code HighSpeed (moonshotai)
+CommandCode · Kimi K2.6 (moonshotai)
+CommandCode · Kimi K2.5 (moonshotai)
+CommandCode · GLM-5.3 Flash (z-ai)
+CommandCode · GLM-5.3 FlashX (z-ai)
+CommandCode · GLM-5.3 (zai-org)
+CommandCode · GLM-5.2 (zai-org)
+CommandCode · GLM-5.2 Fast (zai-org)
+CommandCode · GLM-5.1 (zai-org)
+CommandCode · GLM-5 (zai-org)
+CommandCode · MiniMax M3.1 Flash (minimax)
+CommandCode · MiniMax M3 (MiniMaxAI)
+CommandCode · MiniMax M2.7 (MiniMaxAI)
+CommandCode · MiniMax M2.5 (MiniMaxAI)
+CommandCode · Ornith 1.5 122B (ornith)
+CommandCode · MiMo V2.6 Pro (xiaomi)
+CommandCode · MiMo V2.6 Pro UltraSpeed (xiaomi)
+CommandCode · MiMo V2.6 Flash (xiaomi)
+CommandCode · Qwen 3.8 Omni Flash (Alibaba)
+CommandCode · Qwen 3.8 Max Prime (Alibaba)
+CommandCode · Qwen 3.8 Max 0902 (Alibaba)
+CommandCode · Qwen 3.8 Max (Alibaba)
+CommandCode · Qwen 3.8 27B (Alibaba)
+CommandCode · Qwen 3.8 Flash (Alibaba)
+CommandCode · Qwen 3.7 Max (Alibaba)
+CommandCode · Qwen 3.7 Plus (Alibaba)
+CommandCode · Qwen 3.7 Flash (Alibaba)
+CommandCode · Qwen 3.6 Max Preview (Alibaba)
+CommandCode · Qwen 3.6 Plus (Alibaba)
+CommandCode · LongCat 2.0 (meituan)
+CommandCode · Step 5 Preview (stepfun)
+CommandCode · Step 3.7 Flash (stepfun)
+CommandCode · Step 3.5 Flash (stepfun)
+CommandCode · Tencent Hy3 (tencent)
+CommandCode · Tencent Hy4 Preview (tencent)
+CommandCode · Gemini 4 Argon (Google)
+CommandCode · Gemini 3.8 Flash (Google)
+CommandCode · Gemini 3.7 Flash (Google)
+CommandCode · Gemini 3.6 Flash (Google)
+CommandCode · Gemini 3.5 Flash (Google)
+CommandCode · Gemini 3.5 Flash Lite (Google)
+CommandCode · Gemini 3.1 Flash Lite (Google)
+CommandCode · Fugu Ultra (sakana)
+CommandCode · Nemotron 3 Ultra (nvidia)
+CommandCode · Nemotron 3.5 Super VL (nvidia)
+CommandCode · Inkling (thinkingmachines)
+CommandCode · Inkling Small (thinkingmachines)
+CommandCode · Glyph Cluster (stealth)
+CommandCode · Beam 1.0 (reflection)
+CommandCode · Laguna S 2.1 (poolside)
+CommandCode · Ling 3.1 Flash (inclusionai)
+CommandCode · Muse Spark 1.1 (meta)
+CommandCode · Muse Spark 1.2 (meta)
+CommandCode · Muse Spark 1.2 Contributor (meta)
+CommandCode · Muse Spark 1.3 (meta)
+CommandCode · Muse Spark 1.3 Contributor (meta)
+CommandCode · Muse Spark Open (meta)
+CommandCode · Muse Wonder (meta)
+CommandCode · Grok 4.5 (xai)
+CommandCode · Grok 4.6 (xai)
+CommandCode · Grok 4.7 (xai)
+CommandCode · Mistral Large 4 (Mistral)
+Effort
+low
+medium
+high
+Start
+Cancel
+JUL-232 · ready-for-review
+
+Run jul-232-3d22a3d2f54e68315fda93af97733fcf · Worktree /home/ubuntu/.local/state/julia-pr316-proof/jobs/jul-232-3d22a3d2f54e68315fda93af97733fcf/worktree · Candidate b1ae9b4cd9affa81dafae06d103613ffaf9676ba
+
+Downstream Review has not started
+
+{
+  "state": "ready-for-review",
+  "card": "JUL-232",
+  "candidateCommit": "b1ae9b4cd9affa81dafae06d103613ffaf9676ba",
+  "baseCommit": "b29522115e3bfc9a44c3057c571aa850b1d6f17f",
+  "worktree": "/home/ubuntu/.local/state/julia-pr316-proof/jobs/jul-232-3d22a3d2f54e68315fda93af97733fcf/worktree",
+  "models": {
+    "orchestrator": "commandcode-free/reflection/beam:free",
+    "coder": "commandcode-free/reflection/beam:free"
+  },
+  "spentNano": 0,
+  "downstreamReviewStarted": false
+}

@@ -1,5 +1,4 @@
 import { z } from 'zod/v4'
-import { frameworkMapFindings } from './framework-map.ts'
 
 const nonempty = z.string().trim().min(1)
 export const RouteSchema = z.enum(['antigravity', 'claude', 'commandcode'])
@@ -37,10 +36,8 @@ function validateModelSelection(selection: { route: z.infer<typeof RouteSchema>;
 export const ModelSelectionSchema = z.object(modelSelectionShape).strict().superRefine(validateModelSelection)
 export const RoleSelectionSchema = z.object({ ...modelSelectionShape, effort: EffortSchema }).strict().superRefine(validateModelSelection)
 export const InitializationRolesSchema = z.object({
-  builder: RoleSelectionSchema,
-  reviewer: RoleSelectionSchema,
-  crashFixer: RoleSelectionSchema,
-  crashReviewer: RoleSelectionSchema,
+  orchestrator: RoleSelectionSchema,
+  coder: RoleSelectionSchema,
 }).strict()
 export const RoleDefaultsSchema = z.object({
   builder: ModelSelectionSchema,
@@ -60,9 +57,6 @@ const requiredAgentBriefFields = ['Category', 'Summary', 'Current behavior', 'De
 const markdownHeading = /^#{1,6}(?:[ \t]+.*)?$/im
 
 function validateCardAdmission(card: { state: string; description: string; frameworkMaps?: string[] }, context: z.RefinementCtx) {
-  for (const message of frameworkMapFindings(card.description, card.frameworkMaps)) {
-    context.addIssue({ code: 'custom', path: ['frameworkMaps'], message })
-  }
   if (card.state !== 'Ready') {
     context.addIssue({ code: 'custom', path: ['state'], message: 'expected Ready state' })
   }

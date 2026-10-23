@@ -1,0 +1,43 @@
+✔ new tests inherit the nearest locked dependency owner and server execution from their folder (238.942362ms)
+✔ new tests execute with their owner dependencies and isolated Git process state (337.755742ms)
+✔ server tests are absent from local execution and execute on the server route (408.673096ms)
+✔ a nested browser suite uses its owner executable, configuration, and relative test paths (1584.866196ms)
+✔ browser installation installs locked browser owners and leaves other owners untouched (711.53542ms)
+✔ a Node test owner declaring Playwright gets its browser runtime without a test-name entry (720.205909ms)
+✖ failing Node tests emit one readable annotation each, without suite duplicates or passing tests (301.45387ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 6
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4451.907197
+
+✖ failing tests:
+
+test at scripts/test-owners.test.mjs:134:1
+✖ failing Node tests emit one readable annotation each, without suite duplicates or passing tests (301.45387ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + []
+  - [
+  -   '::error file=test/failure.test.mjs,title=first%2C failing %25 test::first, failing %25 test: first error line',
+  -   '::error file=test/failure.test.mjs,title=second failing test::second failing test: another error'
+  - ]
+  
+      at TestContext.<anonymous> (file:///home/ubuntu/julia-jul-231-build/scripts/test-owners.test.mjs:144:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [],
+    expected: [ '::error file=test/failure.test.mjs,title=first%2C failing %25 test::first, failing %25 test: first error line', '::error file=test/failure.test.mjs,title=second failing test::second failing test: another error' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

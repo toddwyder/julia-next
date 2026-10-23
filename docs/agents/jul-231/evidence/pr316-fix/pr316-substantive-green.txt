@@ -1,0 +1,11 @@
+✔ session exposes every exact model through a neutral helper and hands the saved card to pstack (6.075176ms)
+✔ machinery uses Beam for work while keeping the configured diverse review model reachable (7.114762ms)
+✔ proof requires actual coder tool activity and a later review of the changed candidate (3.027463ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 185.055693

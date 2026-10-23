@@ -1,0 +1,262 @@
+{"owner":"ops/mastra-agents/reviewer","lockfile":"ops/mastra-agents/reviewer/package-lock.json","runtime":"node","environment":"local","tests":["ops/mastra-agents/reviewer/audit/jul-223-stage2-stock.test.mjs","ops/mastra-agents/reviewer/test/card-admission-check.test.mjs","ops/mastra-agents/reviewer/test/contract.test.mjs","ops/mastra-agents/reviewer/test/delivery-workflow.test.mjs","ops/mastra-agents/reviewer/test/jul-225.test.ts","ops/mastra-agents/reviewer/test/jul-230.test.ts","ops/mastra-agents/reviewer/test/jul-231.test.ts","ops/mastra-agents/reviewer/test/jul-242.test.ts","ops/mastra-agents/reviewer/test/jul-243.test.ts","ops/mastra-agents/reviewer/test/model-journal.test.mjs","ops/mastra-agents/reviewer/test/quote-check.test.mjs","ops/mastra-agents/reviewer/test/raw-answer.test.mjs","ops/mastra-agents/reviewer/test/recorded-review.test.mjs","ops/mastra-agents/reviewer/test/recording-engine.test.mjs","ops/mastra-agents/reviewer/test/repository-root.test.mjs","ops/mastra-agents/reviewer/test/reset-stage.test.mjs","ops/mastra-agents/reviewer/test/resource-budget.test.mjs","ops/mastra-agents/reviewer/test/review-budget.test.mjs","ops/mastra-agents/reviewer/test/review-runtime.test.mjs","ops/mastra-agents/reviewer/test/reviewer-entrypoint.test.mjs","ops/mastra-agents/reviewer/test/run-file.test.mjs","ops/mastra-agents/reviewer/test/tool-input-failure.test.mjs","ops/mastra-agents/reviewer/test/verify-machine.test.ts","ops/mastra-agents/reviewer/test/worst-case-offline.test.mjs"]}
+✔ installed Mastra combines a tool loop with inline structured output on an OpenAI-compatible connection (296.833088ms)
+✔ checks a Linear card as a Ready candidate without changing its current state (57.351682ms)
+✔ keeps accepting the legacy Finish conditions heading (2.408958ms)
+✔ returns the launcher contract findings for an inadmissible card (8.744549ms)
+✔ the command checks every requested card and exits nonzero when one fails (434.082416ms)
+✔ the command refuses an empty card list (343.009393ms)
+✔ obsolete Framework Map refusals cannot block an otherwise admissible card (2.403687ms)
+✔ historical Framework Map comments on later pages do not change admission (3.958394ms)
+✔ ignoring Framework Maps still requires the card acceptance criteria (1.496546ms)
+✔ the reviewer uses the approved stock generation bounds (3.027228ms)
+✔ reviewer step budget follows the immutable file inventory and contract phases (1.337886ms)
+✔ structured output accepts exactly the immutable changed-file inventory (3.377825ms)
+✔ the model prompt keeps requirements and proof but reads candidate bytes through tools (0.6986ms)
+✔ per-card reviewer model overrides the CommandCode default (0.447207ms)
+✔ published CommandCode prices produce a labeled estimate from every token category (0.848297ms)
+✔ raw CommandCode tokens survive schema normalization and carry the published-price estimate (0.796416ms)
+✔ a verdict fails closed unless it accounts for every changed file exactly once (0.615606ms)
+✔ green build, checks and independent review write one waiting record, pause, and accept after a runtime restart (363.044982ms)
+✔ a card missing agreed seams parks immediately without a builder or repair round (107.010318ms)
+✔ a failed worker CLI update parks before any worker launches (110.022337ms)
+✔ a separate process resumes the saved pause without duplicate launches or notices (3502.722895ms)
+✔ reject resumes the suspended run and stops with Todd's reason (317.853859ms)
+✔ two failed reviews park without a waiting record or a third builder launch (166.868108ms)
+✔ a reviewer-launcher crash gets one recovery cycle, never becomes review FAIL, and launches no product builder (131.204768ms)
+✔ uncertain paid reviewer acceptance parks without recovery or another model call (132.493443ms)
+✔ a replayed durable crash incident parks without a second recovery cycle (5.543933ms)
+✔ recovery evidence cannot resume a step other than the crashed step (7.263092ms)
+✔ the intentional production reviewer gate parks at zero cost without crash recovery (115.361037ms)
+✔ accepting a changed candidate discards the answer, reruns checks and review, and pauses again (321.206086ms)
+✔ workflow step handoffs expose paths and round metadata, never file contents (144.554721ms)
+✔ a failed existing boundary parks and still writes one complete permanent summary (131.218735ms)
+✔ production adapter glue invokes the existing launcher for builder and Mastra reviewer (15.978067ms)
+✔ production adapter repair consumes prior findings and reviews the checks current candidate (7.744633ms)
+✔ production adapter refuses a reviewer from the observed builder maker (5.070277ms)
+✔ production adapter preserves a failed review report for the next repair (10.756974ms)
+[WORKFLOW] Error executing step workflow.julia-delivery-round.step.build: Error: builder step did not return a result path
+    at requireResultPath (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/src/delivery-workflow.mjs:91:11)
+    at Object.execute (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/src/delivery-workflow.mjs:205:33)
+    at async engine.executeStepWithRetry.retries.retries (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/agent-BSre8QnL.js:4014:18)
+    at async DefaultExecutionEngine.executeStepWithRetry (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/agent-BSre8QnL.js:4515:14)
+    at async executeStep (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/agent-BSre8QnL.js:3978:26)
+    at async executeEntry (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/agent-BSre8QnL.js:2966:50)
+    at async DefaultExecutionEngine.execute (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/agent-BSre8QnL.js:4848:17)
+    at async Run._start (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/agent-BSre8QnL.js:7577:18)
+    at async Workflow.execute (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/agent-BSre8QnL.js:6975:15)
+    at async engine.executeStepWithRetry.retries.retries (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/agent-BSre8QnL.js:4014:18)
+[WORKFLOW] Error executing step workflow.julia-delivery-cycle.step.julia-delivery-round: undefined
+[WORKFLOW] Error executing step workflow.julia-delivery.step.julia-delivery-cycle: undefined
+✔ an unhandled workflow failure still ends with an ADR 0017 summary line (92.72775ms)
+✔ a recovered terminal write does not duplicate the run summary line (2.720289ms)
+✔ secret and persisted connection contracts reject secret values (8.001273ms)
+{"event":"model-discovery","route":"commandcode","operation":"models/list","ok":true,"status":200,"offerCount":3,"durationMs":11.647874999999885}
+✔ real file-backed connection lifecycle persists only parsed records and redacted output (70.936166ms)
+✔ model offers keep duplicate IDs distinct by route (4.061438ms)
+✔ Claude discovery offers only exact provider model IDs from the session config option (6.155025ms)
+✔ Claude selection and restart reapply the same exact provider model ID (2.126667ms)
+✔ Claude aliases cannot be saved as role defaults (3.497ms)
+✔ Claude selection refuses a saved model that the new session no longer offers (0.855529ms)
+✔ Claude selection refuses a bridge response that does not confirm the exact saved ID (0.701401ms)
+✔ Claude route accepts only the bridge auth-status extension notification (2.424695ms)
+✔ CommandCode discovery keeps coding endpoints and rejects decision-only models (12.857382ms)
+✔ standalone ACP route scope disconnects and cleans only processes it created (9.807836ms)
+✔ four-role company and normal service rules are exhaustive (6.031651ms)
+✔ admission requires the complete settled card shape and Ready state (5.171749ms)
+✔ admission keeps ordinary bold paragraphs inside a section (2.076584ms)
+✔ admission rejects unresolved decision markers embedded in prose (2.559715ms)
+✔ serialized Linear intake rejects an incomplete Ready card (2.189262ms)
+✔ Cancel never dispatches and restart reuses the immutable snapshot (0.793965ms)
+✔ admission refuses stale defaults that are not in the current route offers (3.015819ms)
+{"event":"delivery-route-failed","role":"reviewer","route":"claude","modelId":"claude-sonnet-4-6","startedAt":"2026-10-23T16:38:05.264Z","durationMs":0.3715939999999591,"error":"reviewer output was truncated by the model limit"}
+Error executing step workflow.julia-delivery-roles.step.execute-four-role-snapshot: Error: reviewer output was truncated by the model limit
+    at Object.execute (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/src/mastra/workflows/delivery.ts:46:57)
+    at async engine.executeStepWithRetry.retries.retries (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/agent-BSre8QnL.js:4014:18)
+    at async DefaultExecutionEngine.executeStepWithRetry (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/agent-BSre8QnL.js:4515:14)
+    at async executeStep (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/agent-BSre8QnL.js:3978:26)
+    at async executeEntry (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/agent-BSre8QnL.js:2966:50)
+    at async DefaultExecutionEngine.execute (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/agent-BSre8QnL.js:4848:17)
+    at async Run._start (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/agent-BSre8QnL.js:7577:18)
+    at async TestContext.<anonymous> (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/test/jul-225.test.ts:617:18)
+    at async Test.run (node:internal/test_runner/test:1125:7)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:787:7)
+✔ restart reuses the exact persisted four-role snapshot after live defaults change (9.214983ms)
+✔ every named Start precondition fails before dispatch (2.796626ms)
+✔ every CLI and workflow handoff contract accepts its exact shape and rejects drift (11.525045ms)
+✔ a route failure emits correlated role, route, model, timing, and error evidence (23.533492ms)
+✔ later workflow roles receive the exact earlier role outputs (4.251075ms)
+✔ workflow rejects a route response truncated by its model limit (4.145844ms)
+✔ Ready card admission accepts the authoritative Agent Brief and rejects unresolved decisions (13.362577ms)
+✔ control-page contracts carry complete offers and exact route-supported role selections (8.53787ms)
+✔ initialization observability counts actual boundary activity instead of asserting zeroes (2.839161ms)
+✔ the observed Linear capability measures queries and mutations at the request seam (4.946974ms)
+✔ the proof launcher can suppress the uncontrolled desktop browser without changing ordinary launches (0.465765ms)
+✔ the production role workflow records each dispatch and inference at its actual seam (23.944482ms)
+✔ Linear Ready-card discovery paginates every complete card with read-only queries (5.646809ms)
+✔ model discovery records a sanitized success or failure trace for every service connection (2.861963ms)
+✔ CommandCode discovery rejects a malformed success payload instead of tracing an unknown count as zero (2.676842ms)
+This storage provider does not support batch creating metrics
+MastraStorageExporter shutdown complete
+[OBSERVABILITY] [Observability] Shutdown completed [name=julia-control]
+Mastra shutdown completed
+MastraStorageExporter shutdown complete
+[OBSERVABILITY] [Observability] Shutdown completed [name=julia-control]
+Mastra shutdown completed
+✔ Start creates one restart-surviving suspended run and returns it for the same confirmed input (254.766372ms)
+✔ Cancel closes the browser form locally without another server request (609.259596ms)
+✔ the control boundary rejects a non-loopback Host header (12.94453ms)
+✔ browser Start sends the exact changed card and four selections through the local boundary (602.452772ms)
+✔ control page shows running then saved review result (3279.484047ms)
+✔ build runner client captures init and validates jobs (17.857542ms)
+✔ the control boundary accepts this server’s Tailscale Serve name and refuses every other host (56.823686ms)
+✔ the control boundary refuses the Tailscale name when the server is not configured with it (8.68885ms)
+✔ host matching keeps loopback and the configured Tailscale name, and refuses the rest (0.631231ms)
+✔ an ACP route whose agent is not installed on this host contributes no offers (3.098209ms)
+✔ a genuine ACP failure still fails discovery rather than being silently dropped (1.611769ms)
+✔ a Ready card that fails admission is reported as not startable without breaking the list (21.701197ms)
+✔ Start stays blocked for a card that failed admission (6.276419ms)
+✔ the page lists every Ready card and blocks Start for one that cannot start (724.269741ms)
+✔ a running command stays Working after twenty minutes without a new event (92.832764ms)
+✔ run-failed remains visible as Stopped (23.679832ms)
+✔ disconnected remains visible as Stopped (27.799171ms)
+✔ run-suspended remains visible as Stopped (20.233003ms)
+✔ fifteen idle minutes becomes Stopped at the threshold (17.648978ms)
+✔ three distinct failing commands do not count as the same repeated action (46.736575ms)
+✔ three identical failing commands show Stopped, a successful action resets the streak (33.699011ms)
+✔ Codex derives distinct failure identities from native command and cwd, never the item id (10.999117ms)
+✔ run-completed leaves the active list and retains its event history after restart (45.524336ms)
+✔ run-canceled leaves the active list and retains its event history after restart (43.872745ms)
+No `storage` configured on Mastra — falling back to an in-memory store. In-memory storage is not durable: all data is lost on restart, and it is not safe for production. Configure a persistent storage adapter (e.g. @mastra/libsql, @mastra/pg, @mastra/cloudflare). See https://mastra.ai/docs/storage
+Mastra shutdown completed
+✔ a real Mastra workflow suspended waiting is Stopped (1494.446724ms)
+✔ Proof cleanup settles delayed real workflow persistence before storage closes and records failures (65.976757ms)
+✔ CommandCode explicit completion is success even when its result contains failure-like text (13.045586ms)
+✔ native idle status does not turn an unexpected Codex failure into Finished (28.358067ms)
+✔ append waits for asynchronous event consumers to finish their writes (64.172123ms)
+✔ reconciled Codex idle thread retains authoritative failed turn status (32.14554ms)
+✔ Codex reasoning messages between commands do not fabricate a successful tool action (0.901799ms)
+✔ phone browser shows Working and Stopped cards, action outcomes and a clean console (1168.114451ms)
+✔ monitored child exposes its owned PID and receives the explicit model with updates disabled (92.374859ms)
+This storage provider does not support batch creating metrics
+MastraStorageExporter shutdown complete
+[OBSERVABILITY] [Observability] Shutdown completed [name=cleanup-test]
+Mastra shutdown completed
+✔ failed journey cleanup waits for a real LibSQL-backed workflow result and trace before closing storage (394.154766ms)
+{"provider":"mastra","runId":"native","eventKind":"stream-error","error":{"name":"Error","message":"native result failed"}}
+✔ a provider result rejected before its stream ends is handled and persisted as disconnected (67.601719ms)
+✔ a provider event survives another process briefly holding the ledger write lock (324.430365ms)
+✔ Codex completion survives an early terminal event (87.682158ms)
+{"provider":"codex","runId":"connection","eventKind":"disconnect","error":{"name":"Error","message":"evidence disk unavailable"}}
+✔ Codex completion survives an early terminal event and a failed evidence subscriber (41.234453ms)
+{"provider":"codex","runId":"connection","eventKind":"disconnect-report-failed","error":{"name":"Error","message":"disconnect write failed"}}
+✔ a Codex notification failure still closes its connection when disconnect reporting also fails (10.249768ms)
+✔ provider dispatch durably journals one request and its exact response (100.919359ms)
+✔ journal overflow fails before a verdict and becomes a warning after one (25.090287ms)
+✔ a restarted journal retains earlier provider events (38.58973ms)
+✔ the evidence ceiling includes other run files and atomic-write headroom (13.44332ms)
+✔ quote check accepts an exact quote only (1.691958ms)
+✔ quote check discovers every nested initial or repair citation (3.102307ms)
+✔ quote check prefers the authoritative cumulative diff and deleted-file sources (0.932692ms)
+✔ the model-facing quote verifier accepts only exact immutable candidate text (0.91904ms)
+✔ serialized source control characters are repaired only to exact source text (0.595111ms)
+✔ the live failure fixtures are copied byte-for-byte (20.038274ms)
+✔ the recorded malformed answer is durable before it becomes a technical failure (243.271405ms)
+✔ a valid-looking single-shot JSON answer cannot bypass the recording tools (57.872689ms)
+✔ killing the transport process after the raw answer arrives leaves the complete file (1563.242989ms)
+Error converting tool call input to JSON { toolCallId: 'malformed', toolName: 'record_piece', inputLength: 21 }
+✔ real Agent.generate records a complete review and recovers each scripted report failure (1193.005078ms)
+✔ real Agent.generate records and submits the repair-report shape (154.604374ms)
+✔ a rejected piece cannot add serialized-quote repair audit metadata (17.198643ms)
+✔ interruption keeps accepted pieces and records their names in the technical failure (476.290518ms)
+✔ accepted pieces are durable and can be replaced, removed, inspected, and submitted (74.004866ms)
+✔ the same engine records an unrelated packing-list schema without engine changes (394.163202ms)
+✔ the reviewer locates its enclosing Git repository (8.933152ms)
+✔ the six standing rules are part of the fixed reviewer instructions (1.960971ms)
+✔ the stage-one reset refuses reviewer execution before any provider request (1.510089ms)
+✔ free-disk preflight stops before start and durably records SYSTEM_ERROR progress (33.550168ms)
+✔ memory reservation stops before peak RSS can cross 768 MiB and saves progress (11.717434ms)
+✔ memory sampling retains a transient peak across the complete agent step (30.086709ms)
+✔ disk-growth reservation stops before atomic evidence can cross 128 MiB (20.438436ms)
+✔ the durable budget reserves each request before dispatch and charges validated usage (46.077721ms)
+✔ the durable budget refuses a request whose worst-case price exceeds the authorization (17.659176ms)
+✔ provider dispatch does not occur when the durable budget refuses the pending request (10.36151ms)
+✔ a restart preserves charges and refuses to retry an unresolved paid request (30.360801ms)
+✔ separate run ledgers share the cumulative card ceiling (61.719015ms)
+✔ a missing cumulative card ledger cannot reset previously authorized spend (67.467211ms)
+✔ malformed saved measurements and costs above a reservation fail closed (22.020426ms)
+✔ future clocks, busy card ledgers, and mismatched reservations fail closed (86.348833ms)
+✔ the offline runtime wires stock bounds, authorization, durable budget, and provider journal (160.506743ms)
+Error in agent stream {
+  error: Error: reviewer refused: pending request would cross the 20 minute limit
+      at beforeRequest (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/src/review-budget.mjs:92:47)
+      at checkedFetch (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/src/reviewer.mjs:70:9)
+      at Object.fetchWithBudgets [as fetch] (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/src/reviewer.mjs:161:20)
+      at async postToApi (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/node_modules/@ai-sdk/provider-utils/dist/index.js:3543:20)
+      at async postJsonToApi (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/node_modules/@ai-sdk/provider-utils/dist/index.js:3514:127)
+      at async OpenAICompatibleChatLanguageModel.doGenerate (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/node_modules/@ai-sdk/openai-compatible/dist/index.js:462:75)
+      at async AISDKV7LanguageModel.doGenerate (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/llm-BycEcjTn.js:294:18),
+  runId: '4d7ea7f0-0dcf-44aa-abb7-582d5994652b',
+  provider: 'offline.chat',
+  modelId: 'offline-reviewer'
+}
+✔ elapsed refusal through Agent.generate ends as SYSTEM_ERROR with saved progress before dispatch (251.570991ms)
+Error in agent stream {
+  error: [Error: reviewer refused: sampled memory reached the 736 MiB guard before the 768 MiB ceiling],
+  runId: '571f0798-e10f-4506-93ed-a2ba4c83520f',
+  provider: 'offline.chat',
+  modelId: 'offline-reviewer'
+}
+✔ in-step RSS guard aborts Agent.generate below 768 MiB and saves SYSTEM_ERROR progress (151.658449ms)
+✔ the runtime refuses an authorization other than the approved per-review amount (0.505579ms)
+✔ the Windows reviewer entry point reads a piped request and records the pre-provider paid gate (443.361926ms)
+✔ concurrent durable writers cannot overrun the shared evidence quota (39.588675ms)
+Error converting tool call input to JSON { toolCallId: 'record-1', toolName: 'record_item', inputLength: 81 }
+Error converting tool call input to JSON { toolCallId: 'record-1', toolName: 'record_item', inputLength: 81 }
+✔ real Mastra generate reports bad tool calls to the model and accepts a corrected call (577.765612ms)
+✔ Doctor reads the permanent-parts inventory and fails closed on a missing controlled part (57.590768ms)
+✔ candidate identity hashes tracked and untracked changes in a real Git repository (107.482173ms)
+✔ rehearsal candidate identity stability rejects commit or dirty-tree drift (1.375317ms)
+✔ F10 reads JUL-208 without admission and gives the reviewer the exact builder proposal (8.040414ms)
+✔ F10 records a sanitized Linear trace when GraphQL fails with HTTP 200 (1.329027ms)
+✔ F10 refuses future-intent text in place of reviewer findings (0.641388ms)
+✔ offline maximum-length installed Agent.generate review measures every one-review budget (45711.561428ms)
+✔ the 70-step stock ceiling prevents step 71 and saves SYSTEM_ERROR progress (19528.273911ms)
+Error in agent stream {
+  error: Error: reviewer refused: pending request would cross the $0.5 limit
+      at beforeRequest (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/src/review-budget.mjs:94:66)
+      at checkedFetch (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/src/reviewer.mjs:70:9)
+      at Object.fetchWithBudgets [as fetch] (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/src/reviewer.mjs:161:20)
+      at async postToApi (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/node_modules/@ai-sdk/provider-utils/dist/index.js:3543:20)
+      at async postJsonToApi (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/node_modules/@ai-sdk/provider-utils/dist/index.js:3514:127)
+      at async OpenAICompatibleChatLanguageModel.doGenerate (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/node_modules/@ai-sdk/openai-compatible/dist/index.js:462:75)
+      at async AISDKV7LanguageModel.doGenerate (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/node_modules/@mastra/core/dist/llm-BycEcjTn.js:294:18),
+  runId: 'b8afcbcb-7754-4c8a-aa74-877dd7d134eb',
+  provider: 'offline.chat',
+  modelId: 'offline-reviewer'
+}
+✔ the $0.50 reservation refuses an oversized request before network dispatch and saves SYSTEM_ERROR (127.880578ms)
+Error in agent stream {
+  error: Error: reviewer refused: durable evidence limit of 67043328 bytes would be exceeded
+      at file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/src/run-file.mjs:31:13
+      at async withFileLock (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/src/run-file.mjs:54:16)
+      at async durableWrite (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/src/run-file.mjs:29:3)
+      at async file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/src/review-budget.mjs:101:9
+      at async withFileLock (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/src/run-file.mjs:54:16)
+      at async beforeRequest (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/src/review-budget.mjs:96:7)
+      at async checkedFetch (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/src/reviewer.mjs:70:3)
+      at async Object.fetchWithBudgets [as fetch] (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/src/reviewer.mjs:161:14)
+      at async postToApi (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/node_modules/@ai-sdk/provider-utils/dist/index.js:3543:20)
+      at async postJsonToApi (file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/node_modules/@ai-sdk/provider-utils/dist/index.js:3514:127),
+  runId: '30bf3fb8-68ed-4035-9968-e189d2b17a9e',
+  provider: 'offline.chat',
+  modelId: 'offline-reviewer'
+}
+✔ the 64 MiB evidence reservation refuses the crossing write and retains SYSTEM_ERROR progress (71.720968ms)
+ℹ tests 160
+ℹ suites 0
+ℹ pass 160
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 112719.185122

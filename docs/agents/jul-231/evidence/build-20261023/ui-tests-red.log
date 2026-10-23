@@ -1,0 +1,125 @@
+✔ Ready card admission accepts the authoritative Agent Brief and rejects unresolved decisions (26.20925ms)
+✔ control-page contracts carry complete offers and exact route-supported role selections (14.377281ms)
+✔ initialization observability counts actual boundary activity instead of asserting zeroes (3.742197ms)
+✔ the observed Linear capability measures queries and mutations at the request seam (8.766235ms)
+✔ the proof launcher can suppress the uncontrolled desktop browser without changing ordinary launches (1.120936ms)
+✔ the production role workflow records each dispatch and inference at its actual seam (26.374701ms)
+✔ Linear Ready-card discovery paginates every complete card with read-only queries (9.519902ms)
+✔ model discovery records a sanitized success or failure trace for every service connection (4.123355ms)
+✔ CommandCode discovery rejects a malformed success payload instead of tracing an unknown count as zero (6.080124ms)
+This storage provider does not support batch creating metrics
+MastraStorageExporter shutdown complete
+[OBSERVABILITY] [Observability] Shutdown completed [name=julia-control]
+Mastra shutdown completed
+MastraStorageExporter shutdown complete
+[OBSERVABILITY] [Observability] Shutdown completed [name=julia-control]
+Mastra shutdown completed
+✔ Start creates one restart-surviving suspended run and returns it for the same confirmed input (393.700837ms)
+✔ Cancel closes the browser form locally without another server request (1080.226856ms)
+✔ the control boundary rejects a non-loopback Host header (14.541317ms)
+✔ browser Start sends the exact changed card and four selections through the local boundary (632.104524ms)
+file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/test/jul-231.test.ts:31
+const job = BuildJobSchema.parse({
+                           ^
+
+ZodError: [
+  {
+    "expected": "string",
+    "code": "invalid_type",
+    "path": [
+      "runId"
+    ],
+    "message": "Invalid input: expected string, received undefined"
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max"
+    ],
+    "path": [
+      "snapshot",
+      "roles",
+      "orchestrator",
+      "effort"
+    ],
+    "message": "Invalid option: expected one of \"low\"|\"medium\"|\"high\"|\"xhigh\"|\"max\""
+  },
+  {
+    "code": "unrecognized_keys",
+    "keys": [
+      "name",
+      "codingCapable",
+      "supportedEfforts"
+    ],
+    "path": [
+      "snapshot",
+      "roles",
+      "orchestrator"
+    ],
+    "message": "Unrecognized keys: \"name\", \"codingCapable\", \"supportedEfforts\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max"
+    ],
+    "path": [
+      "snapshot",
+      "roles",
+      "coder",
+      "effort"
+    ],
+    "message": "Invalid option: expected one of \"low\"|\"medium\"|\"high\"|\"xhigh\"|\"max\""
+  },
+  {
+    "code": "unrecognized_keys",
+    "keys": [
+      "name",
+      "codingCapable",
+      "supportedEfforts"
+    ],
+    "path": [
+      "snapshot",
+      "roles",
+      "coder"
+    ],
+    "message": "Unrecognized keys: \"name\", \"codingCapable\", \"supportedEfforts\""
+  }
+]
+    at file:///home/ubuntu/julia-jul-231-build/ops/mastra-agents/reviewer/test/jul-231.test.ts:31:28
+    at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v24.14.1
+✖ test/jul-231.test.ts (1578.865887ms)
+✔ the control boundary accepts this server’s Tailscale Serve name and refuses every other host (138.252821ms)
+✔ the control boundary refuses the Tailscale name when the server is not configured with it (10.96052ms)
+✔ host matching keeps loopback and the configured Tailscale name, and refuses the rest (0.63284ms)
+✔ an ACP route whose agent is not installed on this host contributes no offers (11.033561ms)
+✔ a genuine ACP failure still fails discovery rather than being silently dropped (7.910634ms)
+✔ a Ready card that fails admission is reported as not startable without breaking the list (15.762403ms)
+✔ Start stays blocked for a card that failed admission (8.80129ms)
+✔ the page lists every Ready card and blocks Start for one that cannot start (1200.281542ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 21
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5616.955166
+
+✖ failing tests:
+
+test at test/jul-231.test.ts:1:1
+✖ test/jul-231.test.ts (1578.865887ms)
+  'test failed'

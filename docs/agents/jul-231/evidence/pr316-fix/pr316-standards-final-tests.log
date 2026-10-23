@@ -1,0 +1,62 @@
+✔ jobs (405.421641ms)
+✔ machine-settings contains beam proof config and deepseek paid refusal (15.874899ms)
+✔ session exposes every exact model through a neutral helper and hands the saved card to pstack (7.067834ms)
+✔ machinery uses Beam for work while keeping the configured diverse review model reachable (1.408328ms)
+✔ proof requires actual coder tool activity and a later review of the changed candidate (5.517984ms)
+Cloning into '/tmp/server-main-OvDsSD/checkout'...
+done.
+Switched to a new branch 'feature'
+Switched to branch 'main'
+Cloning into '/tmp/server-main-BYyHLw/checkout'...
+done.
+Switched to a new branch 'later-feature'
+Switched to branch 'main'
+Cloning into '/tmp/server-main-wsExpD/checkout'...
+done.
+Switched to a new branch 'feature'
+Switched to branch 'main'
+✔ the service checkout advances only for a merge, then repeated polls leave it alone (1068.169453ms)
+✔ activation waits for the named PR and recognizes its squash merge from GitHub metadata (1334.958706ms)
+✔ a service restart failure is retried after checkout already advanced (943.525922ms)
+(node:453410) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ free requests arrive with enforced limits and settle without usage (110.889688ms)
+✔ paid missing usage refuses result and prevents the next arrival (32.515682ms)
+✔ chat JSON settles cache categories once (25.655086ms)
+✔ chat SSE settles cache categories once (16.812017ms)
+✔ responses JSON settles cache categories once (20.433061ms)
+✔ responses SSE settles cache categories once (17.491503ms)
+✔ messages JSON settles cache categories once (19.496026ms)
+✔ messages SSE settles cache categories once (12.804109ms)
+✔ wrong model, endpoint, missing prices and trial paid routes send nothing (6.965421ms)
+✔ separate HTTP attempts create separate durable records (45.623499ms)
+✔ card ceiling refuses an oversized reservation before HTTP (8.903057ms)
+✔ provider reported cost stops even a configured free route (26.365019ms)
+✔ allowlisted authentication cannot carry inference payloads and redirects never follow (13.796403ms)
+✔ invalid cache count -1 retains paid hold (11.449691ms)
+✔ invalid cache count 0.5 retains paid hold (17.449399ms)
+✔ bounded buffering refuses a large result without releasing its reservation (26.914615ms)
+✔ decimal rates round nano dollars upward without floating point drift (22.537716ms)
+✔ ledger errors never reveal their underlying body or credentials (3.069323ms)
+✔ authentication and catalog are confined to their exact allowlisted URL (15.028576ms)
+✔ connection failure after arrival retains the paid reservation (10.16022ms)
+✔ a truncated paid stream retains the reservation despite partial usage (9.122083ms)
+✔ a configured unavailable model does not need invented prices and never dispatches (10.791028ms)
+✔ new tests inherit the nearest locked dependency owner and server execution from their folder (274.000624ms)
+✔ new tests execute with their owner dependencies and isolated Git process state (396.343887ms)
+✔ server tests are absent from local execution and execute on the server route (437.284997ms)
+✔ a nested browser suite uses its owner executable, configuration, and relative test paths (1552.213295ms)
+✔ browser installation installs locked browser owners and leaves other owners untouched (715.77418ms)
+✔ a Node test owner declaring Playwright gets its browser runtime without a test-name entry (735.407627ms)
+✔ failing Node tests emit one readable annotation each, without suite duplicates or passing tests (321.64063ms)
+✔ failing Bun tests include names and only the first error line, without native duplicate annotations (129.226842ms)
+✔ browser failures emit a repository-relative test annotation from the real owner runner (3109.42351ms)
+✔ a passing Node test name containing an XML delimiter cannot hide a later file failure (423.260475ms)
+ℹ tests 40
+ℹ suites 0
+ℹ pass 40
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8996.647317
