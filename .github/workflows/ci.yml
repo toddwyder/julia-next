@@ -25,6 +25,8 @@ jobs:
         run: node scripts/test-owners.mjs --plan
       - name: Install each owner's locked dependencies
         run: node scripts/test-owners.mjs --install
+      - name: Install browser runtimes declared by local test owners
+        run: node scripts/test-owners.mjs --install-browsers local
       - name: Run every local package test
         run: node scripts/test-owners.mjs --run local
       - name: Builder client must never read the Axiom credential
@@ -47,7 +49,7 @@ jobs:
       - name: Install browser owners' locked dependencies
         run: node scripts/test-owners.mjs --install browser
       - name: Install each browser owner's Chromium
-        run: node scripts/test-owners.mjs --install-browsers
+        run: node scripts/test-owners.mjs --install-browsers browser
       - name: Run skill-owned browser tests
         run: node scripts/test-owners.mjs --run browser
       - name: Lint framework code
