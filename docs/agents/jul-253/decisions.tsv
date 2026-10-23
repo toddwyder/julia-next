@@ -1,0 +1,4 @@
+ts	phase	decision	why	evidence	result
+2026-10-23T20:33:22Z	preflight	Create build/jul-253 from current origin/main in a separate worktree	The original checkout has unrelated uncommitted changes	1009fde68bb43368ea95ab2e43ed2e7d04b409be	isolated
+2026-10-23T20:35:06Z	preflight	Trace the runner's own credential paths instead of inferring authentication from Codex's signed-in session	The adapter registers an explicit stock AuthStorage and disables environment fallback	docs/agents/jul-253/evidence/credential-path-trace.txt	no subscription credentials found
+2026-10-23T20:35:06Z	preflight	Park before implementation at the missing account authorizations	The supplied AGENTS instructions require credentials in preflight and parking at an account authorization boundary	docs/agents/jul-253/evidence/preflight.json	blocked on Todd's stock subscription sign-ins
