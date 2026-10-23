@@ -1,0 +1,31 @@
+✔ session exposes every exact model through a neutral helper and hands the saved card to pstack (4.959507ms)
+✔ machinery uses Beam for work while keeping the configured diverse review model reachable (4.35863ms)
+✖ proof requires actual coder tool activity and a later review of the changed candidate (3.560669ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 2
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 188.014013
+
+✖ failing tests:
+
+test at ops/build-runner/test/pstack-session.test.mjs:31:1
+✖ proof requires actual coder tool activity and a later review of the changed candidate (3.560669ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file:///home/ubuntu/julia-jul-231-build/ops/build-runner/test/pstack-session.test.mjs:54:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /coder tool activity/,
+    operator: 'throws',
+    diff: 'simple'
+  }

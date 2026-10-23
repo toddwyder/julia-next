@@ -1,0 +1,1 @@
+This drive is not acceptance evidence. Its driver passed, but independent evidence review found incorrect labels claiming completed model-diverse review. DeepSeek was refused at the cap; a fresh Beam helper completed a same-model check. The next candidate adds factual harness definitions and strengthens actual coder activity and changed-candidate review attribution.

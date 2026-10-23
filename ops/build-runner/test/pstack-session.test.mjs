@@ -28,20 +28,33 @@ test('machinery uses Beam for work while keeping the configured diverse review m
   assert.throws(() => createPstackSession({ models }, snapshot, 'feature: DeepSeek'), /unknown pstack model/)
 })
 
-test('proof attributes a refused review to its actual task and distinct model instead of accepting a cap probe', () => {
-  const events = [
-    { type: 'subagent_start', toolCallId: 'build', modelId: beam, task: 'Implement the marker' },
+test('proof requires actual coder tool activity and a later review of the changed candidate', () => {
+  const build = [
+    { type: 'subagent_start', toolCallId: 'build', modelId: beam, task: 'Implement marker.txt' },
+    { type: 'subagent_tool_end', toolCallId: 'build', subToolName: 'mastra_workspace_write_file', subToolResult: 'Wrote 36 bytes to marker.txt', isError: false },
     { type: 'subagent_end', toolCallId: 'build', result: 'Built marker', isError: false },
-    { type: 'subagent_start', toolCallId: 'review', modelId: deepseek, task: 'Review the marker against the saved requirements' },
+  ]
+  const review = [
+    { type: 'subagent_start', toolCallId: 'review', modelId: deepseek, task: 'Review marker.txt against the saved requirements' },
     { type: 'subagent_end', toolCallId: 'review', result: 'Trial forbids nonzero model prices', isError: true },
   ]
-  const requests = [{ model: 'deepseek/deepseek-v4.1-flash', refusal: 'Trial forbids nonzero model prices' }]
-  const evidence = inspectPstackRun({ events, requests, coderModel: beam, reviewModel: deepseek, machineryProof: true, checklist: '- [x] Build\n- [x] Proof\n', decisions: 'ts\tphase\tdecision\n2026-10-23\tbuild\tUse marker\n' })
-  assert.throws(() => inspectPstackRun({ events, requests, coderModel: beam, reviewModel: deepseek, machineryProof: true, checklist: '- [x] Delegate code-writing. skip: done directly', decisions: 'Decision' }), /checklist contradicts/)
+  const input = {
+    events: [...build, ...review],
+    requests: [{ model: 'deepseek/deepseek-v4.1-flash', refusal: 'Trial forbids nonzero model prices' }],
+    coderModel: beam, reviewModel: deepseek, machineryProof: true,
+    cardId: 'JUL-232', changedFiles: ['marker.txt'],
+    checklist: '- [x] Build\n- [x] Proof\n',
+    decisions: 'ts\tphase\tdecision\n2026-10-23\tbuild\tUse marker\n',
+  }
+  const evidence = inspectPstackRun(input)
+  assert.equal(evidence.hasCoder, true)
   assert.equal(evidence.reviewHandoff.modelId, deepseek)
   assert.equal(evidence.reviewHandoff.refused, true)
-  assert.throws(() => inspectPstackRun({ events: [events[2], events[3], events[0], events[1]], requests, coderModel: beam, reviewModel: deepseek, machineryProof: true, checklist: 'Build', decisions: 'Decision' }), /review handoff/)
-  assert.equal(evidence.hasCoder, true)
-  assert.deepEqual(evidence.events, events)
-  assert.throws(() => inspectPstackRun({ events: events.map(e => e.toolCallId === 'review' ? { ...e, task: 'Run a trivial cap check' } : e), requests, coderModel: beam, reviewModel: deepseek, machineryProof: true, checklist: 'Build', decisions: 'Decision' }), /review handoff/)
+  assert.deepEqual(evidence.events, input.events)
+  assert.throws(() => inspectPstackRun({ ...input, events: input.events.filter(e => e.type !== 'subagent_tool_end') }), /coder tool activity/)
+  assert.throws(() => inspectPstackRun({ ...input, events: [...build, { ...review[0], task: 'Review checklist spelling only' }, review[1]] }), /review handoff/)
+  assert.throws(() => inspectPstackRun({ ...input, events: [...review, ...build] }), /review handoff/)
+  assert.throws(() => inspectPstackRun({ ...input, events: [...build, { ...review[0], task: 'Run a trivial cap check' }, review[1]] }), /review handoff/)
+  assert.throws(() => inspectPstackRun({ ...input, checklist: '- [x] Delegate code-writing. skip: done directly' }), /checklist contradicts/)
+  assert.throws(() => inspectPstackRun({ ...input, checklist: '- [ ] Build\n- [ ] Review\n- [ ] Proof' }), /completed checklist item/)
 })

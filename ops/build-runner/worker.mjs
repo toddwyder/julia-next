@@ -122,7 +122,10 @@ async function main() {
         try {
           checklist = await readFile(join(builderHome, 'pstack', 'checklist.md'), 'utf8')
           decisions = await readFile(join(builderHome, 'pstack', 'decisions.tsv'), 'utf8')
-          internalReview = { ...inspectPstackRun({ events, requests, coderModel, reviewModel, machineryProof, checklist, decisions }), effectiveModels: effectiveTable }
+          const trackedChanges = (await execFile('git', ['-C', job.worktree, 'diff', '--name-only', job.baseCommit])).stdout
+          const newFiles = (await execFile('git', ['-C', job.worktree, 'ls-files', '--others', '--exclude-standard'])).stdout
+          const changedFiles = (trackedChanges + '\n' + newFiles).split(/\r?\n/).filter(Boolean)
+          internalReview = { ...inspectPstackRun({ events, requests, coderModel, reviewModel, machineryProof, checklist, decisions, cardId, changedFiles }), effectiveModels: effectiveTable }
           break
         } catch (error) {
           if (turn === 3) throw error

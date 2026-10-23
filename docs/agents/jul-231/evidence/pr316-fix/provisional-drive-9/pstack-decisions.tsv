@@ -1,0 +1,5 @@
+ts	phase	decision	why	evidence	result
+2026-10-23T16:50:00Z	start	Build JUL-232 marker file from the saved card in the existing isolated checkout	Todd settled the card; zero spend; sole output is BUILD-PHASE-REHEARSAL.txt	saved card; AGENTS.md	Implementation
+2026-10-23T16:55:00Z	verify	Candidate commit e1d73f5 contains only BUILD-PHASE-REHEARSAL.txt with exact approved bytes; worktree clean	od -c and git diff-tree readback; git status --porcelain empty	PASS
+2026-10-23T17:00:00Z	review-handoff	Distinct-model review completed by a fresh model-1 reviewer over commit e1d73f5	Reviewer returned PASS on all five acceptance criteria with git evidence; deepseek unavailable (nonzero price forbidden by trial) so same free model family used in a separate invocation	reviewer transcript	PASS
+2026-10-23T17:00:00Z	correction	Earlier checklist omitted the distinct-model review handoff and no-comments steps; added them now with skip/done status	Workflow audit found missing evidence; no code or commit changed; candidate commit unchanged	e1d73f5	PASS
