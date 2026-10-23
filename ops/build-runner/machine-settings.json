@@ -42,11 +42,16 @@
         "cacheWrite": 0
       },
       "source": "https://commandcode.ai/docs/resources/pricing-limits"
+    },
+    "openai/gpt-6-sol": {
+      "unavailable": "Todd's ChatGPT-plan connection is not configured; signing it in is outside JUL-231.",
+      "wireModel": "gpt-6-sol"
     }
   },
   "networkAllow": [
     "https://api.commandcode.ai/provider/v1/models"
   ],
   "memory": false,
-  "machineryProof": true
+  "machineryProof": true,
+  "machineryReviewModel": "commandcode-free/deepseek/deepseek-v4.1-flash"
 }

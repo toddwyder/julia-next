@@ -1,0 +1,23 @@
+Cloning into '/tmp/server-main-369Gpl/checkout'...
+done.
+Switched to a new branch 'feature'
+Switched to branch 'main'
+Cloning into '/tmp/server-main-HJYK05/checkout'...
+done.
+Switched to a new branch 'later-feature'
+Switched to branch 'main'
+Cloning into '/tmp/server-main-JaUig4/checkout'...
+done.
+Switched to a new branch 'feature'
+Switched to branch 'main'
+✔ the service checkout advances only for a merge, then repeated polls leave it alone (786.441886ms)
+✔ activation waits for the named PR and recognizes its squash merge from GitHub metadata (1261.002981ms)
+✔ a service restart failure is retried after checkout already advanced (814.791495ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2997.911619

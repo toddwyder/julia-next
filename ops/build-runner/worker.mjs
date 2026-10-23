@@ -1,12 +1,11 @@
 import { readFile, writeFile, rename, mkdir, appendFile } from 'node:fs/promises'
 import { join, resolve, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { execFile as execFileCb } from 'node:child_process'
 import { promisify } from 'node:util'
 import { openRunner } from './adapter.mjs'
+import { createPstackSession, inspectPstackRun } from './pstack-session.mjs'
 
 const execFile = promisify(execFileCb)
-const __dirname = dirname(fileURLToPath(import.meta.url))
 
 function argValue(name) {
   const idx = process.argv.indexOf(name)
@@ -33,34 +32,6 @@ async function writeJsonl(file, values) {
   await atomicWriteText(file, values.map(v => JSON.stringify(v)).join('\n') + (values.length ? '\n' : ''))
 }
 
-function resolveModelKey(settings, role) {
-  const raw = typeof role === 'string' ? role : (role?.modelId ?? role?.model)
-  if (!raw) return undefined
-  const spec = settings.models?.[raw]
-  if (spec) {
-    if (role && typeof role !== 'string') {
-      for (const field of ['provider', 'route', 'service', 'wire', 'company']) {
-        const expected = role[field] ?? (field === 'provider' ? role.route : undefined)
-        const actual = spec[field] ?? (field === 'provider' ? spec.route : undefined)
-        if (expected != null && actual != null && expected !== actual) throw new Error(`model provider mismatch: ${raw}`)
-      }
-    }
-    return raw
-  }
-  const matches = Object.keys(settings.models ?? {}).filter(key => settings.models[key]?.wireModel === raw)
-  if (matches.length === 1) return matches[0]
-  if (matches.length > 1) throw new Error(`ambiguous model: ${raw}`)
-  return raw
-}
-
-function deepSeekKey(settings) {
-  for (const [key, spec] of Object.entries(settings.models ?? {})) {
-    const hay = [key, spec?.modelId, spec?.wireModel, spec?.id, spec?.name].join(' ').toLowerCase()
-    if (hay.includes('deepseek')) return key
-  }
-  return undefined
-}
-
 async function main() {
   let job
   const deadline = Date.now() + 2000
@@ -73,56 +44,19 @@ async function main() {
   const snapshot = job.snapshot?.snapshot ?? job.snapshot ?? {}
   const card = snapshot.card ?? {}
   const cardId = card.identifier
-  const description = card.description ?? ''
   const savedRoles = snapshot.roles ?? {}
   const settingsPathValue = job.settingsPath ?? process.env.BUILD_RUNNER_SETTINGS ?? argValue('--settings') ?? resolve(process.cwd(), 'ops/build-runner/settings.json')
   const settings = JSON.parse(await readFile(settingsPathValue, 'utf8'))
-  const orchestratorModel = resolveModelKey(settings, savedRoles.orchestrator)
-  const coderModel = resolveModelKey(settings, savedRoles.coder)
-  const machineryProof = job.machineryProof === true || snapshot.machineryProof === true || settings.machineryProof === true
-  const deepseekModel = machineryProof ? deepSeekKey(settings) : undefined
+  const pstackModels = await readFile(new URL('./pstack-models.md', import.meta.url), 'utf8')
+  const session = createPstackSession(settings, { ...snapshot, machineryProof: job.machineryProof === true || snapshot.machineryProof }, pstackModels)
+  const { orchestratorModel, coderModel, machineryProof, reviewModel, helpers, hostInstructions, prompt } = session
+  const potetoSkill = await readFile(join(job.worktree, ".agents/skills/poteto-mode/SKILL.md"), "utf8")
+  const workflowInstructions = `${hostInstructions}\n\nSelected workflow skill (authoritative):\n${potetoSkill}`
+  const effectivePstackModels = session.pstackModels
   settings.roles = { orchestrator: orchestratorModel, coder: coderModel }
   const effectiveSettingsPath = join(jobDir, 'settings.json')
   await atomicWriteJson(effectiveSettingsPath, settings)
-
-  const pstackModels = await readFile(new URL('./pstack-models.md', import.meta.url), 'utf8')
-  const effectivePstackModels = machineryProof
-    ? pstackModels.split(/\r?\n/).map(line => {
-        const trimmed = line.trimStart()
-        if (!trimmed || trimmed.startsWith('#')) return line
-        const colon = line.indexOf(':')
-        if (colon === -1) return line
-        const value = line.slice(colon + 1)
-        return line.slice(0, colon + 1) + value.replace(/[^,\s][^,]*/g, coderModel)
-      }).join('\n')
-    : pstackModels
-  const configuredHelpers = Array.isArray(settings.helpers) ? settings.helpers : Array.isArray(settings.subagents) ? settings.subagents : []
-  const normalizeHelper = h => {
-    const rawModel = h.defaultModelId ?? h.modelId ?? h.model
-    const resolvedModel = resolveModelKey(settings, rawModel)
-    if (!resolvedModel || !settings.models?.[resolvedModel]) throw new Error(`unknown model: ${rawModel}`)
-    return {
-      id: h.id ?? h.agentType ?? h.name,
-      name: h.name ?? h.id ?? h.agentType,
-      description: h.description ?? '',
-      instructions: h.instructions ?? h.prompt ?? '',
-      defaultModelId: machineryProof ? coderModel : resolvedModel,
-      ...(Array.isArray(h.allowedWorkspaceTools) ? { allowedWorkspaceTools: h.allowedWorkspaceTools } : {}),
-      ...(Number.isFinite(h.maxSteps) ? { maxSteps: h.maxSteps } : {}),
-    }
-  }
-  const coderHelper = { id: 'coder', name: 'Coder', description: 'Implements the build.', instructions: 'Implement the requested build changes in the worktree.', defaultModelId: coderModel, allowedWorkspaceTools: ['execute_command', 'mastra_workspace_read_file', 'mastra_workspace_write_file', 'mastra_workspace_edit_file', 'mastra_workspace_list_files'], maxSteps: 12 }
-    const reviewerHelper = { id: 'reviewer', name: 'Internal Reviewer', description: 'Reviews and proves the build.', instructions: `Review and prove the build changes. Check actual changed files against the saved card acceptance criteria using workspace tools. Run actual file/command checks for content. The host owns the Git commit/clean-candidate check after model work, so do not retry Git administrative-path permission failures. Return the final literal REVIEW_AND_PROOF_PASSED only if all actual checks pass; otherwise return REVIEW_AND_PROOF_FAILED with reason.\n\nAuthoritative saved description:\n${description}`, defaultModelId: coderModel, maxSteps: 12 }
-  const helpers = [coderHelper, reviewerHelper, ...configuredHelpers.map(normalizeHelper)]
-  if (machineryProof) {
-    if (!deepseekModel || !settings.models?.[deepseekModel]) throw new Error(`unknown model: ${deepseekModel ?? 'deepseek'}`)
-    helpers.push({ id: 'cap-check', name: 'Cap Check', description: 'Cap check helper.', instructions: 'Run a trivial request to check the cap.', defaultModelId: deepseekModel, maxSteps: 1 })
-  }
-  if (!orchestratorModel || !settings.models?.[orchestratorModel]) throw new Error(`unknown model: ${orchestratorModel}`)
-  if (!coderModel || !settings.models?.[coderModel]) throw new Error(`unknown model: ${coderModel}`)
   const effectiveTable = { orchestrator: orchestratorModel, coder: coderModel, helpers: helpers.map(h => ({ id: h.id, modelId: h.defaultModelId })), pstackModels: effectivePstackModels, pstackModelsPath: join(jobDir, 'state', '.agents', 'pstack-models.md') }
-  const overrideSection = machineryProof ? `\n\nMachinery proof helper overrides:\n${helpers.map(h => `- ${h.id}: ${h.defaultModelId}`).join('\n')}` : ''
-  const hostInstructions = `${effectivePstackModels}\n\nRequirements:\n${description}${overrideSection}`
 
   await mkdir(join(jobDir, 'state'), { recursive: true })
   const stateDir = join(jobDir, 'state')
@@ -155,7 +89,7 @@ async function main() {
   let candidateCommit
   let account
   try {
-    runner = await openRunner({ card: cardId, settingsPath: effectiveSettingsPath, cwd: job.worktree, stateDir, role: 'orchestrator', hostInstructions, subagents: helpers })
+    runner = await openRunner({ card: cardId, settingsPath: effectiveSettingsPath, cwd: job.worktree, stateDir, role: 'orchestrator', hostInstructions: workflowInstructions, subagents: helpers })
     const transportFetch = globalThis.fetch
     globalThis.fetch = async (input, init) => {
       const request = new Request(input, init)
@@ -172,44 +106,25 @@ async function main() {
         throw error
       }
     }
-    const allowedEventTypes = new Set(['subagent_start', 'subagent_end', 'subagent_tool_start', 'subagent_tool_end', 'tool_start', 'tool_end', 'agent_start', 'agent_end', 'error'])
+    const allowedEventTypes = new Set(['subagent_start', 'subagent_end', 'subagent_tool_start', 'subagent_tool_end', 'tool_start', 'tool_end', 'agent_start', 'agent_end', 'error', 'task_updated', 'state_changed', 'message_end'])
     const unsubscribe = runner.runtime.session.subscribe(e => { if (allowedEventTypes.has(e?.type)) events.push(e) })
-    const prompt = machineryProof
-      ? `You are the orchestrator for ${cardId}.\n\nRequirements:\n${description}\n\nFirst read .agents/skills/poteto-mode/SKILL.md and follow it for this task, before delegating coder/reviewer/proof.\n\nDelegate implementation to the coder helper, then internal review and proof to the reviewer helper, then run the cap-check helper once. Do not override helper models or retry the expected DeepSeek refusal. Report completion after all three.`
-      : `You are the orchestrator for ${cardId}.\n\nRequirements:\n${description}\n\nFirst read .agents/skills/poteto-mode/SKILL.md and follow it for this task, before delegating coder/reviewer/proof.\n\nDelegate implementation to the coder helper, then internal review and proof to the reviewer helper. Report completion after both.`
     try {
-      receipt = await runner.run({ prompt, maxTurns: 30, timeoutMs: 300000 })
+      receipt = await runner.run({ prompt, maxTurns: 100, timeoutMs: 900000 })
     } finally {
       unsubscribe()
     }
     threadId = receipt.threadId
     account = receipt.account ?? runner.snapshot()
 
-    const starts = events.filter(e => e.type === 'subagent_start')
-    const ends = events.filter(e => e.type === 'subagent_end')
-    const coderStart = starts.find(e => e.agentType === 'coder')
-    const reviewerStart = starts.find(e => e.agentType === 'reviewer')
-    const coderEnd = ends.find(e => e.agentType === 'coder')
-    const reviewerEnd = ends.find(e => e.agentType === 'reviewer')
-    const deepseekStart = starts.find(e => e.agentType === 'cap-check')
-    const deepseekEnd = ends.find(e => e.agentType === 'cap-check')
-    const deepseekRefusal = requests.some(r => /deepseek/i.test(String(r.model)) && String(r.refusal ?? '').includes('Trial forbids nonzero model prices'))
-    const deepseekSent = requests.some(r => /deepseek/i.test(String(r.model)) && r.status != null)
-
     if (receipt?.result?.status !== 'completed') throw new Error('session not completed')
-    if (!coderStart || coderStart.modelId !== coderHelper.defaultModelId) throw new Error('missing coder start')
-    if (!reviewerStart || reviewerStart.modelId !== reviewerHelper.defaultModelId) throw new Error('missing reviewer start')
-    if (!coderEnd || coderEnd.isError || !coderEnd.result) throw new Error('coder failed')
-    if (!reviewerEnd || reviewerEnd.isError || !reviewerEnd.result) throw new Error('reviewer failed')
-    if (!String(reviewerEnd.result ?? '').includes('REVIEW_AND_PROOF_PASSED')) throw new Error('reviewer failed')
-    if (String(reviewerEnd.result ?? '').includes('REVIEW_AND_PROOF_FAILED')) throw new Error('reviewer failed')
-    if (!events.some(e => e?.type === 'subagent_tool_end' && e?.agentType === 'reviewer' && e?.isError === false)) throw new Error('reviewer failed')
-    if (machineryProof) {
-      if (!deepseekStart || deepseekStart.modelId !== deepseekModel) throw new Error('missing deepseek start')
-      if (!deepseekEnd || !deepseekEnd.isError || !String(deepseekEnd.result ?? '').includes('Trial forbids nonzero model prices')) throw new Error('missing deepseek refusal')
-      if (!deepseekRefusal) throw new Error('missing deepseek refusal')
-      if (deepseekSent) throw new Error('deepseek dispatched')
-    }
+    const checklist = await readFile(join(builderHome, 'pstack', 'checklist.md'), 'utf8')
+    const decisions = await readFile(join(builderHome, 'pstack', 'decisions.tsv'), 'utf8')
+    const internalReview = { ...inspectPstackRun({ events, requests, coderModel, reviewModel, machineryProof, checklist, decisions }), effectiveModels: effectiveTable }
+    if (internalReview.deepseekSent && machineryProof) throw new Error('deepseek dispatched')
+    await atomicWriteText(join(jobDir, 'pstack-checklist.md'), checklist)
+    await atomicWriteText(join(jobDir, 'pstack-decisions.tsv'), decisions)
+    await atomicWriteJson(join(jobDir, 'pstack-state.json'), runner.runtime.session.state.get())
+
     if (runner.runtime?.session?.model?.get?.() !== orchestratorModel) throw new Error('session model mismatch')
     if (account?.stopped !== false) throw new Error('account stopped')
     if (Number(account?.spentNano ?? 0) !== 0) throw new Error('nonzero spent')
@@ -228,7 +143,6 @@ async function main() {
     if (!changedOut.trim() || candidateCommit === job.baseCommit) throw new Error('empty candidate diff')
     await execFile('git', ['-C', job.worktree, 'merge-base', '--is-ancestor', job.baseCommit, candidateCommit])
 
-    const internalReview = { events, starts, ends, hasCoder: !!coderStart, hasReviewer: !!reviewerEnd, reviewerErrors: ends.some(e => e.agentType === 'reviewer' && e.isError), deepseekRefusal, deepseekSent, effectiveModels: effectiveTable }
     const successResult = {
       card,
       roles: savedRoles,

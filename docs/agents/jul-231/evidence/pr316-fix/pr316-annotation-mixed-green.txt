@@ -1,0 +1,18 @@
+✔ new tests inherit the nearest locked dependency owner and server execution from their folder (284.394706ms)
+✔ new tests execute with their owner dependencies and isolated Git process state (432.412405ms)
+✔ server tests are absent from local execution and execute on the server route (478.123913ms)
+✔ a nested browser suite uses its owner executable, configuration, and relative test paths (1616.018619ms)
+✔ browser installation installs locked browser owners and leaves other owners untouched (748.563376ms)
+✔ a Node test owner declaring Playwright gets its browser runtime without a test-name entry (795.763207ms)
+✔ failing Node tests emit one readable annotation each, without suite duplicates or passing tests (348.188082ms)
+✔ failing Bun tests include names and only the first error line, without native duplicate annotations (141.472312ms)
+✔ browser failures emit a repository-relative test annotation from the real owner runner (3288.150098ms)
+✔ a passing Node test name containing an XML delimiter cannot hide a later file failure (482.524289ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8848.085732

@@ -131,7 +131,7 @@ try {
   assert.equal(typeof result.actualModels.orchestrator, 'string');
   assert.equal(typeof result.actualModels.coder, 'string');
 
-  const names = ['settings.json', 'events.jsonl', 'requests.jsonl', 'ledger.json', 'receipt.json', 'job.json'];
+  const names = ['settings.json', 'events.jsonl', 'requests.jsonl', 'ledger.json', 'receipt.json', 'job.json', 'pstack-checklist.md', 'pstack-decisions.tsv', 'pstack-state.json'];
   for (const name of names) await copyFile(path.join(path.dirname(finalJob.worktree), name), path.join(outputDir, 'job-files', name));
   const settings = JSON.parse(await readFile(path.join(outputDir, 'job-files', 'settings.json'), 'utf8'));
   const events = (await readFile(path.join(outputDir, 'job-files', 'events.jsonl'), 'utf8')).trim().split(/\n/).filter(Boolean).map(JSON.parse);
@@ -144,27 +144,23 @@ try {
     assert.equal(wireModel, initialJob.snapshot.roles[role].modelId);
     assert.equal(wireModel, 'reflection/beam:free');
   }
-  const coderStart = events.find(e => e.type === 'subagent_start' && e.agentType === 'coder');
-  const reviewerStart = events.find(e => e.type === 'subagent_start' && e.agentType === 'reviewer');
-  const coderEnd = events.find(e => e.type === 'subagent_end' && e.agentType === 'coder');
-  const reviewerEnd = events.find(e => e.type === 'subagent_end' && e.agentType === 'reviewer');
-  const capStart = events.find(e => e.type === 'subagent_start' && e.agentType === 'cap-check');
-  const capEnd = events.find(e => e.type === 'subagent_end' && e.agentType === 'cap-check');
-  assert(coderStart);
-  assert.equal(coderStart.modelId, result.actualModels.coder);
-  assert(reviewerStart);
-  assert.equal(reviewerStart.modelId, result.actualModels.coder);
-  assert(coderEnd);
-  assert.equal(coderEnd.isError, false);
-  assert(coderEnd.result);
-  assert(reviewerEnd);
-  assert.equal(reviewerEnd.isError, false);
-  assert(reviewerEnd.result);
-  assert(capStart);
-  assert.match(capStart.modelId, /deepseek/i);
-  assert(capEnd);
-  assert.equal(capEnd.isError, true);
-  assert(String(capEnd.result).includes('Trial forbids nonzero model prices'));
+  const coderStart = events.find(e => e.type === 'subagent_start' && e.modelId === result.actualModels.coder && /implement|build|write|code/i.test(e.task ?? '') && !/review/i.test(e.task ?? ''));
+  assert(coderStart, 'pstack delegated implementation to the saved coder model');
+  const coderEnd = events.find(e => e.type === 'subagent_end' && e.toolCallId === coderStart.toolCallId);
+  assert.equal(coderEnd?.isError, false);
+  const handoff = result.internalReview.reviewHandoff;
+  assert(handoff, 'pstack handed review to a distinct model');
+  assert.notEqual(handoff.modelId, coderStart.modelId);
+  assert.match(handoff.modelId, /deepseek/i);
+  assert.match(handoff.task, /review|audit|judge/i);
+  assert.equal(handoff.refused, true);
+  assert(String(handoff.result).includes('Trial forbids nonzero model prices'));
+  const checklist = await readFile(path.join(outputDir, 'job-files', 'pstack-checklist.md'), 'utf8');
+  const decisions = await readFile(path.join(outputDir, 'job-files', 'pstack-decisions.tsv'), 'utf8');
+  assert(checklist.trim(), 'pstack authored a checklist');
+  assert(decisions.trim(), 'pstack authored a decision log');
+  assert.equal(checklist, result.internalReview.checklist);
+  assert.equal(decisions, result.internalReview.decisions);
 
   const deepseekRequests = requests.filter(r => String(r.model).includes('deepseek'));
   assert(deepseekRequests.length >= 1);
@@ -240,6 +236,7 @@ try {
     git: { base, candidate, changedFiles, markerContent: markerBuffer.toString('utf8'), clean: true },
     account: result.account,
     deepseekRefused: true,
+    pstack: { checklist, decisions, reviewHandoff: handoff },
     pageSavedResult: true,
     network: { failures: networkFailures, console: consoleMessages, pageErrors }
   };

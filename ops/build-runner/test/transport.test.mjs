@@ -180,3 +180,12 @@ test('a truncated paid stream retains the reservation despite partial usage', as
   await assert.rejects(send(transport(f, { price: { ...free, input: 1 } }, false), f.endpoint));
   assert.equal(f.ledger.snapshot().pricedBlocked, true);
 });
+
+test('a configured unavailable model does not need invented prices and never dispatches', async t => {
+  const f = await fixture(t, (_req, res) => json(res, { result: 'free works' }));
+  const fetch = transport(f, {}, true, { models: { configured: f.spec, 'openai/gpt-6-sol': { wireModel: 'gpt-6-sol', unavailable: 'ChatGPT plan is not connected' } } });
+  assert.equal((await send(fetch, f.endpoint)).status, 200);
+  await assert.rejects(send(fetch, f.endpoint, { model: 'gpt-6-sol' }), /provider unavailable/);
+  assert.equal(f.arrivals.length, 1);
+  assert.equal(f.ledger.snapshot().spentNano, 0);
+});

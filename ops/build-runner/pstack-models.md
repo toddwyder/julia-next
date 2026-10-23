@@ -1,21 +1,21 @@
 # pstack model configuration. One line per role. Delete a line to fall back to the skill default.
 # `inherit-parent` or `auto` as a value: the role runs on the parent chat model (omit the subagent `model`). Alias entries in a panel list still count toward its fan-out.
 # budget: large (xhigh)
-feature, refactoring: DeepSeek
-bug-fix: DeepSeek
-perf-issue: DeepSeek
-hillclimb: DeepSeek
-swarm workers: DeepSeek
-arena runners: GPT-6 Sol, DeepSeek
-arena cross-judge pool: GPT-6 Sol, DeepSeek
-architect runners: GPT-6 Sol, DeepSeek
-interrogate reviewers: GPT-6 Sol, DeepSeek
-hardest tasks: GPT-6 Sol
-main session: GPT-6 Sol
-judgment and prose: GPT-6 Sol
-how explorer: GPT-6 Sol
-how explainer: GPT-6 Sol
-why investigators: GPT-6 Sol
-why synthesizer: GPT-6 Sol
-reflect tooling: GPT-6 Sol
-reflect judgment, divergent, synthesizer: GPT-6 Sol
+feature, refactoring: commandcode-free/deepseek/deepseek-v4.1-flash
+bug-fix: commandcode-free/deepseek/deepseek-v4.1-flash
+perf-issue: commandcode-free/deepseek/deepseek-v4.1-flash
+hillclimb: commandcode-free/deepseek/deepseek-v4.1-flash
+swarm workers: commandcode-free/deepseek/deepseek-v4.1-flash
+arena runners: openai/gpt-6-sol, commandcode-free/deepseek/deepseek-v4.1-flash
+arena cross-judge pool: openai/gpt-6-sol, commandcode-free/deepseek/deepseek-v4.1-flash
+architect runners: openai/gpt-6-sol, commandcode-free/deepseek/deepseek-v4.1-flash
+interrogate reviewers: openai/gpt-6-sol, commandcode-free/deepseek/deepseek-v4.1-flash
+hardest tasks: openai/gpt-6-sol
+main session: openai/gpt-6-sol
+judgment and prose: openai/gpt-6-sol
+how explorer: openai/gpt-6-sol
+how explainer: openai/gpt-6-sol
+why investigators: openai/gpt-6-sol
+why synthesizer: openai/gpt-6-sol
+reflect tooling: openai/gpt-6-sol
+reflect judgment, divergent, synthesizer: openai/gpt-6-sol

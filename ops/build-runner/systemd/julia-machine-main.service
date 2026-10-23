@@ -1,0 +1,8 @@
+[Unit]
+Description=Update Julia machine after merges to main
+
+[Service]
+Type=oneshot
+Environment=PATH=%h/.local/bin:/opt/node-v24.14.1/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/flock --nonblock %h/.local/state/julia-machine/update.lock /usr/local/bin/node %h/.local/lib/julia-machine/server-main.mjs poll %h/.config/julia-machine/config.json
+TimeoutStartSec=20min
