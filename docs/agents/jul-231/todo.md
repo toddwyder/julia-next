@@ -38,8 +38,8 @@
 - [x] Reproduce package-tests on the actual command boundary before editing.
 - [x] Binary-search the cause with the CI system-config condition.
 - [x] Plan and delegate isolated repairs.
-- [ ] Verify the original CI failure, annotations, main services and pstack Start journey.
-- [ ] Commit evidence and review the pinned candidate.
+- [x] Verify the original CI failure, annotations, prepared main services and pstack Start journey. Live main transition remains gated on merge.
+- [x] Review pinned b295221 and retain final evidence; publish it with the report.
 - [ ] Keep the same PR open with proof and green CI.
 
 ## Correction throughput checkpoint
@@ -48,3 +48,6 @@
 - Independent workstreams. Model helpers, test annotations and main services have separate owners.
 - Shared mutable state. All source stays on the same branch. Only the lead commits and pushes. Proof uses separate ports and durable state.
 - Smallest safe decomposition. The worker owner keeps model configuration and evidence recognition together. The lead owns the command-boundary fix and real proof integration.
+
+- [ ] Read final published head CI green.
+- [ ] After merge, read both generic services from main at the merge commit and old units gone. Required before card Done.

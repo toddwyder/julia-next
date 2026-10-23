@@ -1,0 +1,1415 @@
+{
+  "card": "JUL-232",
+  "ceilingNano": 1000000000,
+  "stopped": false,
+  "spentNano": 0,
+  "heldNano": 0,
+  "remainingNano": 1000000000,
+  "pricedBlocked": false,
+  "requests": [
+    {
+      "id": "f697f66c-b3ba-4372-991d-53139379507d",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 19215,
+        "output": 87,
+        "cacheRead": 4288,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "a20eba2c-882e-4aa7-adc4-2e8fe34c0d2f",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 5708,
+        "output": 300,
+        "cacheRead": 23488,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "0b806cca-d68f-4c02-8e93-1fbaeec696ac",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 29631,
+        "output": 46,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "e053d28e-3b62-44f7-91de-74cb23011b59",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 852,
+        "output": 635,
+        "cacheRead": 29568,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "832a29e0-3f4a-4be1-949d-0267bc0884bf",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 1116,
+        "output": 268,
+        "cacheRead": 30400,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "56106252-dbd6-4779-a3ef-cfc2cdafdd38",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 1800,
+        "output": 165,
+        "cacheRead": 31488,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "f89eb390-292b-48f6-b313-91def9c96654",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 345,
+        "output": 112,
+        "cacheRead": 33280,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "201cceec-fb88-4574-b2a9-bb7f81976fab",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 430,
+        "output": 226,
+        "cacheRead": 33600,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "32187a4c-0825-4855-b623-c3acd0ff3292",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 334,
+        "output": 47,
+        "cacheRead": 33984,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "3fb99907-b805-41a7-a6e7-ca9fa55f35aa",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 1773,
+        "output": 153,
+        "cacheRead": 34304,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "180c4d82-2638-4482-b02d-bf098a7d88ec",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 293,
+        "output": 43,
+        "cacheRead": 36032,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "21d028fc-acc9-4c91-ad84-3cbfd2042dbf",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 813,
+        "output": 59,
+        "cacheRead": 36288,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "a3298946-5238-448e-bd3c-f7a3f044d588",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 8805,
+        "output": 155,
+        "cacheRead": 29184,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "90f421ec-5a44-4988-a116-c513a53a9966",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 489,
+        "output": 397,
+        "cacheRead": 37952,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "b37a8b0e-dc40-4f34-88d9-de5939dc0d57",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 716,
+        "output": 224,
+        "cacheRead": 38400,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "1f88ee1f-2dc0-45fe-917f-f24117ac9ef7",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 281,
+        "output": 81,
+        "cacheRead": 39104,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "a3a16b98-1be7-44ae-831a-c18ea1d33104",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 2538,
+        "output": 82,
+        "cacheRead": 37056,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "12147858-e88e-45c1-a8c7-68414536942a",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 632,
+        "output": 59,
+        "cacheRead": 39360,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "08ecd6e3-31e1-45da-b1c6-6ce14cac6978",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 154,
+        "output": 429,
+        "cacheRead": 39936,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "73cf3d0e-f721-4d59-80c8-afa6d2912dfd",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 523,
+        "output": 584,
+        "cacheRead": 40064,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "5035b8c7-0c7e-4a13-89c4-a498e20dc51b",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 1496,
+        "output": 216,
+        "cacheRead": 40576,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "ff9f80e6-75fa-4001-af79-1568cb8b5308",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 364,
+        "output": 65,
+        "cacheRead": 42048,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "b8bf0d26-f827-464e-a80a-b7bd0f98dd32",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 629,
+        "output": 91,
+        "cacheRead": 42368,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "d3ecf12f-6823-4ca9-a8f5-f403d81c5131",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 511,
+        "output": 201,
+        "cacheRead": 42944,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "3cfadffe-60e2-495e-a380-84ceb774a142",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 341,
+        "output": 70,
+        "cacheRead": 43392,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "023b0b62-ab1e-4f3f-9230-6f625a59645f",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 2536,
+        "output": 463,
+        "cacheRead": 43712,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "1e19bcde-99a6-48a9-bc83-a5ef11077e1f",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 593,
+        "output": 1083,
+        "cacheRead": 46208,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "ecfea8d6-a31f-4a66-adc9-0ac4094ee275",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 1184,
+        "output": 270,
+        "cacheRead": 46784,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "16556c8f-cd77-475d-b5ce-5b6d97d9ad31",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 793,
+        "output": 534,
+        "cacheRead": 47936,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "80f21587-78c9-4d1c-93bf-463168c8fbfb",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 1794,
+        "output": 215,
+        "cacheRead": 48704,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "2e6a9a53-fc7c-402b-b219-f6798eee6262",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 3154,
+        "output": 59,
+        "cacheRead": 50496,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "b61fafc2-5613-4abd-a9ea-a30a43a08d76",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 1104,
+        "output": 805,
+        "cacheRead": 53632,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "bb29e44b-5ec7-4092-8fba-fb84a423cdd9",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 341,
+        "output": 106,
+        "cacheRead": 9344,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "ef24c96b-25f2-4967-b701-478a7eaba084",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 267,
+        "output": 98,
+        "cacheRead": 9664,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "01dfc3e9-3c93-4e4c-9709-9616cf92cb0d",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 145,
+        "output": 106,
+        "cacheRead": 9920,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "7dbee507-539a-4988-80d7-23412d52d75c",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 138,
+        "output": 127,
+        "cacheRead": 10048,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "3d827e4a-4ddf-4b3c-a74c-2092fd5907c9",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 301,
+        "output": 127,
+        "cacheRead": 10176,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "47dc67c0-5d1e-48aa-aad4-20d7ac7c064a",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 1337,
+        "output": 104,
+        "cacheRead": 9344,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "e836f03b-96d8-491b-9061-7b8229bd8e2b",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 328,
+        "output": 120,
+        "cacheRead": 10624,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "33ea330f-72a4-4d07-8f53-c53230ac43cb",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 951,
+        "output": 209,
+        "cacheRead": 54720,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "48a7bfb4-e756-4091-a56a-0a14f9824053",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 14683,
+        "output": 487,
+        "cacheRead": 16384,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "b41e4ded-a7c6-43fe-8467-11c35f4519ca",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 12928,
+        "output": 183,
+        "cacheRead": 23488,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "f1b6d42c-05da-4b33-93ef-9f7013bb9495",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 3136,
+        "output": 209,
+        "cacheRead": 36416,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "8aa99941-7c95-4515-a215-8d1f78b22f84",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 256,
+        "output": 558,
+        "cacheRead": 39552,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "fc0fb660-db6d-4855-b67e-8443569ccb66",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 729,
+        "output": 100,
+        "cacheRead": 39808,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "e32ebf91-f9ba-4ea7-a81d-7d47f5cd5ca5",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 209,
+        "output": 223,
+        "cacheRead": 40512,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "4c230b06-3436-4b10-b3cb-4c315a25863e",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 428,
+        "output": 315,
+        "cacheRead": 40704,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "bfb5966d-fd48-4624-98b9-c8daac1dbc7b",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 1343,
+        "output": 936,
+        "cacheRead": 41088,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "fe3a5b9f-7412-4d8d-8dea-54c4b0df092f",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 1062,
+        "output": 493,
+        "cacheRead": 42368,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "4c5ba36a-7885-49b9-a2cf-b0e2f5a3273f",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 564,
+        "output": 124,
+        "cacheRead": 43392,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "bd71da78-88a1-496d-9864-6330c35f2c57",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 380,
+        "output": 49,
+        "cacheRead": 43904,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "2a958971-a6d6-420d-9985-d1aff83ec5a0",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 1099,
+        "output": 47,
+        "cacheRead": 44224,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "ed1295ea-e298-456e-83a7-9114205ebfac",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 681,
+        "output": 107,
+        "cacheRead": 45312,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    },
+    {
+      "id": "c0dba9f4-96a1-4147-8211-d68590426bc9",
+      "card": "JUL-232",
+      "model": "commandcode-free/reflection/beam:free",
+      "role": "orchestrator",
+      "maximumNano": 0,
+      "price": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 8192
+      },
+      "state": "settled",
+      "usage": {
+        "input": 185,
+        "output": 162,
+        "cacheRead": 45952,
+        "cacheWrite": 0
+      },
+      "costNano": 0,
+      "reason": null
+    }
+  ]
+}

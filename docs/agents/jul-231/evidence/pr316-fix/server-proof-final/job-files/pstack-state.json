@@ -1,0 +1,13 @@
+{
+  "projectPath": "/home/ubuntu/.local/state/julia-pr316-proof/jobs/jul-232-3d22a3d2f54e68315fda93af97733fcf/worktree",
+  "projectName": "julia-jul-231-build",
+  "gitBranch": "HEAD",
+  "pluginSkillPaths": [],
+  "pluginCommandPaths": [],
+  "pluginInstructions": [],
+  "yolo": true,
+  "observerModelSelection": "auto",
+  "reflectorModelSelection": "auto",
+  "observeAttachments": "auto",
+  "configDir": ".mastracode"
+}
