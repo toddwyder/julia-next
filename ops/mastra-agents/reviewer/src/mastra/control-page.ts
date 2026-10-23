@@ -1,11 +1,11 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { agentError } from './agent-errors.ts'
+import { BuildJobSchema, BuildStartResultSchema } from './build-client.ts'
 
 import {
   ControlPageStateSchema,
   InitializationActivitySchema,
   InitializationBoundaryStateSchema,
-  InitializationResultSchema,
   InitializationRunsStateSchema,
   StartInitializationSchema,
   AgentDashboardStateSchema,
@@ -14,9 +14,9 @@ import type { z } from 'zod/v4'
 
 type ControlPageState = z.infer<typeof ControlPageStateSchema>
 type StartInitialization = z.infer<typeof StartInitializationSchema>
-type InitializationResult = z.infer<typeof InitializationResultSchema>
 type InitializationRunsState = z.infer<typeof InitializationRunsStateSchema>
 type InitializationActivity = z.infer<typeof InitializationActivitySchema>
+type BuildStartResult = z.infer<typeof BuildStartResultSchema>
 
 const CONTROL_PATH = '/julia-control'
 
@@ -60,16 +60,23 @@ function initializationPageHtml() {
 <title>Julia · Initialize</title>
 <style>
 :root{font-family:ui-sans-serif,system-ui,sans-serif;color:#211b16;background:#f4efe7}body{margin:0;padding:2rem}main{max-width:58rem;margin:auto;background:#fffaf2;border:1px solid #d9cdbc;border-radius:18px;padding:2rem;box-shadow:0 18px 48px #4a38201f}h1{margin-top:0}p{line-height:1.5}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}fieldset{border:1px solid #d9cdbc;border-radius:12px;padding:1rem}label{display:block;font-weight:650;margin:.75rem 0 .3rem}select{width:100%;padding:.65rem;border:1px solid #9f907d;border-radius:8px;background:white}button{padding:.72rem 1.1rem;border-radius:9px;border:1px solid #6f5c46;font-weight:700;cursor:pointer}.actions{display:flex;gap:.75rem;margin-top:1.25rem}.start{background:#355c43;color:white}.cancel{background:transparent}.status{padding:1rem;border-radius:10px;background:#edf4ee}pre{white-space:pre-wrap;overflow-wrap:anywhere}@media(max-width:700px){.grid{grid-template-columns:1fr}body{padding:.75rem}main{padding:1.2rem}}
-</style></head><body><main id="app"><h1>Initialize a Ready card</h1><p>Loading real Ready cards and current model choices…</p></main>
+</style></head><body><main id="app"><h1>Initialize a Ready card</h1><p>Loading real Ready cards and current model choices…</p><div id="build-jobs"></div></main>
 <script>
 const app=document.querySelector('#app');
 const roleLabels={orchestrator:'Orchestrator',coder:'Coder'};
 const apiPath='${CONTROL_PATH}/api';
+let buildPollTimer=null;
+function buildJobsContainer(){let container=document.getElementById('build-jobs');if(!container){container=document.createElement('div');container.id='build-jobs';const appEl=document.getElementById('app')||document.body;appEl.append(container)}return container}
+function isTerminalState(state){return state==='ready-for-review'||state==='failed'}
+function scheduleBuildPoll(){if(buildPollTimer)return;buildPollTimer=setTimeout(function(){buildPollTimer=null;refreshBuildJobs()},2000)}
+function clearBuildPoll(){if(buildPollTimer){clearTimeout(buildPollTimer);buildPollTimer=null}}
+function renderBuildJobs(jobs){const container=buildJobsContainer();container.textContent='';const list=Array.isArray(jobs)?jobs:[];if(!list.length){const empty=document.createElement('p');empty.textContent='No build jobs.';container.append(empty);return}list.forEach(function(job){const card=document.createElement('article');const heading=document.createElement('h3');heading.textContent=job.snapshot.card.identifier+' · '+job.state;card.append(heading);const meta=document.createElement('p');meta.textContent='Run '+job.runId+' · Worktree '+(job.worktree||'none')+' · Candidate '+(job.result?.candidateCommit||'none');card.append(meta);if(job.state==='running'){const running=document.createElement('p');running.textContent=job.state+' · '+JSON.stringify(job.snapshot.roles)+' · '+(job.worktree||'none');card.append(running)}if(job.result){if(job.result.downstreamReviewStarted===false){const review=document.createElement('p');review.textContent='Downstream Review has not started';card.append(review)}const pre=document.createElement('pre');if(job.state==='ready-for-review')pre.setAttribute('data-testid','saved-build-result');pre.textContent=JSON.stringify({state:job.result.state,card:job.result.card.identifier,candidateCommit:job.result.candidateCommit,baseCommit:job.result.baseCommit,worktree:job.result.worktree,models:job.result.actualModels,spentNano:job.result.account.spentNano,downstreamReviewStarted:job.result.downstreamReviewStarted},null,2);card.append(pre)}if(job.state==='failed'&&job.error){const error=document.createElement('p');error.textContent=job.error.message;card.append(error)}container.append(card)})}
+async function refreshBuildJobs(){try{const response=await fetch(apiPath+'/builds');const body=await response.json();if(!response.ok)throw new Error(body.error||'Build discovery failed');const jobs=Array.isArray(body)?body:[];renderBuildJobs(jobs);if(jobs.some(function(job){return job.state==='running'}))scheduleBuildPoll();else clearBuildPoll()}catch(error){scheduleBuildPoll()}}
 const optionKey=offer=>offer.route+'::'+offer.modelId;
 function selectionFor(offer,effort){const value={route:offer.route,modelId:offer.modelId,company:offer.company,service:offer.service,effort};if(offer.wire)value.wire=offer.wire;return value}
 function render(state){
   app.textContent='';const title=document.createElement('h1');title.textContent='Initialize a Ready card';app.append(title);
-  const note=document.createElement('p');note.textContent='Choose the exact route, model, and advertised effort for every role. Start creates only a durable ready-for-build run.';app.append(note);
+  const note=document.createElement('p');note.textContent='Start saves the card/models and starts Build.';app.append(note);
   const form=document.createElement('form');
   const cardLabel=document.createElement('label');cardLabel.textContent='Ready card';const cardSelect=document.createElement('select');cardSelect.name='card';
   state.cards.forEach((entry,index)=>{const option=document.createElement('option');option.value=String(index);option.textContent=entry.card.identifier+' — '+entry.card.title+(entry.admitted?'':' (cannot start)');cardSelect.append(option)});cardLabel.append(cardSelect);form.append(cardLabel);
@@ -84,9 +91,9 @@ function render(state){
   cardSelect.addEventListener('change',syncCard);syncCard();
   cancel.addEventListener('click',()=>{form.remove();const closed=document.createElement('p');closed.className='status';closed.textContent='Initialization closed. Nothing was sent or saved.';app.append(closed)});
   form.addEventListener('submit',async event=>{event.preventDefault();const entry=state.cards[Number(cardSelect.value)];if(!entry||!entry.admitted){syncCard();return}start.disabled=true;const roles={};for(const [role,control] of Object.entries(controls)){const offer=state.offers.find(item=>optionKey(item)===control.model.value);roles[role]=selectionFor(offer,control.effort.value)}
-    try{const response=await fetch(apiPath+'/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({card:entry.card,roles})});const body=await response.json();if(!response.ok)throw new Error(body.error||'Start failed');form.remove();const done=document.createElement('div');done.className='status';done.innerHTML='<strong>Ready for build</strong><pre></pre>';done.querySelector('pre').textContent=JSON.stringify(body,null,2);app.append(done)}catch(error){start.disabled=false;const message=document.createElement('p');message.className='status';message.textContent=error.message;form.append(message)}})
+    try{const response=await fetch(apiPath+'/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({card:entry.card,roles})});const body=await response.json();if(!response.ok)throw new Error(body.error||'Start failed');form.remove();if(body.build){renderBuildJobs([body.build]);refreshBuildJobs()}else{const done=document.createElement('div');done.className='status';done.innerHTML='<strong>Ready for build</strong><pre></pre>';done.querySelector('pre').textContent=JSON.stringify(body,null,2);app.append(done)}}catch(error){start.disabled=false;const message=document.createElement('p');message.className='status';message.textContent=error.message;form.append(message)}})
 }
-fetch(apiPath+'/state').then(response=>response.json().then(body=>{if(!response.ok)throw new Error(body.error||'Discovery failed');return body})).then(render).catch(error=>{app.textContent='';const h=document.createElement('h1');h.textContent='Initialize a Ready card';const p=document.createElement('p');p.className='status';p.textContent=error.message;app.append(h,p)});
+fetch(apiPath+'/state').then(response=>response.json().then(body=>{if(!response.ok)throw new Error(body.error||'Discovery failed');return body})).then(render).then(function(){refreshBuildJobs()}).catch(error=>{app.textContent='';const h=document.createElement('h1');h.textContent='Initialize a Ready card';const p=document.createElement('p');p.className='status';p.textContent=error.message;app.append(h,p);refreshBuildJobs()});
 </script></body></html>`
 }
 
@@ -115,15 +122,17 @@ export async function startControlPageServer({
   getRuns,
   getActivity,
   getAgentCards = async () => ({ updatedAt: new Date().toISOString(), cards: [] }),
+  getBuildJobs = async () => [],
   onRequest = () => {},
 }: {
   port?: number
   tailscaleHosts?: readonly string[]
   getState: () => Promise<ControlPageState>
-  startInitialization: (input: StartInitialization) => Promise<InitializationResult>
+  startInitialization: (input: StartInitialization) => Promise<BuildStartResult>
   getRuns: () => Promise<InitializationRunsState>
   getActivity: () => InitializationActivity
   getAgentCards?: () => Promise<unknown>
+  getBuildJobs?: () => Promise<unknown>
   onRequest?: (request: { method: string; path: string }) => void
 }) {
   const server = createServer(async (request, response) => {
@@ -154,7 +163,10 @@ export async function startControlPageServer({
         return sendJson(response, 200, AgentDashboardStateSchema.parse(await getAgentCards()))
       }
       if (method === 'POST' && url.pathname === `${CONTROL_PATH}/api/start`) {
-        return sendJson(response, 200, InitializationResultSchema.parse(await startInitialization(StartInitializationSchema.parse(await readJson(request)))))
+        return sendJson(response, 200, BuildStartResultSchema.parse(await startInitialization(StartInitializationSchema.parse(await readJson(request)))))
+      }
+      if (method === 'GET' && url.pathname === `${CONTROL_PATH}/api/builds`) {
+        return sendJson(response, 200, BuildJobSchema.array().parse(await getBuildJobs()))
       }
       return sendJson(response, 404, { error: 'not found' })
     } catch (error) {

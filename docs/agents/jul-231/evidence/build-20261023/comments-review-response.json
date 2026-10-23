@@ -1,0 +1,33 @@
+{
+  "id": "gen_01M5MMHHGSNJKKBJDYR9N6BJ3T",
+  "object": "chat.completion",
+  "created": 1792767755,
+  "model": "reflection/beam:free",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Touched files: none\nDeletion count: 0\nMUST KILL: none\nSkips: no comment meat, suppressions, or justifications in provided scope; accepted risk areas untouched."
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 11454,
+    "completion_tokens": 3093,
+    "total_tokens": 14547,
+    "prompt_tokens_details": {
+      "cached_tokens": 128,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 3043,
+      "image_tokens": 0
+    },
+    "cache_creation_input_tokens": 0
+  },
+  "system_fingerprint": "fp_nu48x3j0xa"
+}

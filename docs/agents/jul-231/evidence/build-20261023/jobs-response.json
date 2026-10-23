@@ -1,0 +1,33 @@
+{
+  "id": "gen_01M5MK9KYVQHVQRY1SCD2WP8DR",
+  "object": "chat.completion",
+  "created": 1792766473,
+  "model": "reflection/beam:free",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": ""
+      },
+      "logprobs": null,
+      "finish_reason": "length"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 3270,
+    "completion_tokens": 8192,
+    "total_tokens": 11462,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 8191,
+      "image_tokens": 0
+    },
+    "cache_creation_input_tokens": 0
+  },
+  "system_fingerprint": "fp_amva8xcsei"
+}

@@ -1,0 +1,33 @@
+{
+  "id": "gen_01M5MMCWN7G2Q4GXGRD0F38S8F",
+  "object": "chat.completion",
+  "created": 1792767587,
+  "model": "reflection/beam:free",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"edits\":[{\"path\":\"ops/mastra-agents/reviewer/test/jul-231.test.ts\",\"old\":\"page.locator('article').getByText(/running/i)\",\"new\":\"page.getByRole('heading', { name: 'JUL-232 \u00b7 running', exact: true })\"},{\"path\":\"ops/mastra-agents/reviewer/test/jul-231.test.ts\",\"old\":\"page.getByText(/ready-for-review/i)\",\"new\":\"page.getByRole('heading', { name: 'JUL-232 \u00b7 ready-for-review', exact: true })\"}]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 292,
+    "completion_tokens": 160,
+    "total_tokens": 452,
+    "prompt_tokens_details": {
+      "cached_tokens": 128,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 33,
+      "image_tokens": 0
+    },
+    "cache_creation_input_tokens": 0
+  },
+  "system_fingerprint": "fp_qglytr375p"
+}

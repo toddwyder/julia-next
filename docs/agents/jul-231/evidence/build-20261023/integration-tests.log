@@ -1,0 +1,38 @@
+✔ Ready card admission accepts the authoritative Agent Brief and rejects unresolved decisions (14.340134ms)
+✔ control-page contracts carry complete offers and exact route-supported role selections (19.275956ms)
+✔ initialization observability counts actual boundary activity instead of asserting zeroes (3.172381ms)
+✔ the observed Linear capability measures queries and mutations at the request seam (5.046843ms)
+✔ the proof launcher can suppress the uncontrolled desktop browser without changing ordinary launches (0.867173ms)
+✔ the production role workflow records each dispatch and inference at its actual seam (26.492571ms)
+✔ Linear Ready-card discovery paginates every complete card with read-only queries (7.522415ms)
+✔ model discovery records a sanitized success or failure trace for every service connection (3.310208ms)
+✔ CommandCode discovery rejects a malformed success payload instead of tracing an unknown count as zero (3.867508ms)
+This storage provider does not support batch creating metrics
+MastraStorageExporter shutdown complete
+[OBSERVABILITY] [Observability] Shutdown completed [name=julia-control]
+Mastra shutdown completed
+MastraStorageExporter shutdown complete
+[OBSERVABILITY] [Observability] Shutdown completed [name=julia-control]
+Mastra shutdown completed
+✔ Start creates one restart-surviving suspended run and returns it for the same confirmed input (335.343008ms)
+✔ Cancel closes the browser form locally without another server request (1085.212957ms)
+✔ the control boundary rejects a non-loopback Host header (14.477391ms)
+✔ browser Start sends the exact changed card and four selections through the local boundary (648.704754ms)
+✔ control page shows running then saved review result (3974.631952ms)
+✔ build runner client captures init and validates jobs (24.978789ms)
+✔ the control boundary accepts this server’s Tailscale Serve name and refuses every other host (72.603408ms)
+✔ the control boundary refuses the Tailscale name when the server is not configured with it (11.194497ms)
+✔ host matching keeps loopback and the configured Tailscale name, and refuses the rest (0.614718ms)
+✔ an ACP route whose agent is not installed on this host contributes no offers (3.668574ms)
+✔ a genuine ACP failure still fails discovery rather than being silently dropped (1.874375ms)
+✔ a Ready card that fails admission is reported as not startable without breaking the list (10.005137ms)
+✔ Start stays blocked for a card that failed admission (6.679058ms)
+✔ the page lists every Ready card and blocks Start for one that cannot start (1050.573698ms)
+ℹ tests 23
+ℹ suites 0
+ℹ pass 23
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6583.037787

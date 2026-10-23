@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 
 import { ControlPageStateSchema } from './contracts.ts'
 import { startControlPageServer } from './control-page.ts'
+import { createBuildRunnerClient } from './build-client.ts'
 import { createInitializationRuntime } from './initialization.ts'
 import { createInitializationActivityRecorder, createObservedLinearClient } from './initialization-observability.ts'
 import { listReadyLinearCards } from './linear.ts'
@@ -74,6 +75,9 @@ export async function runControlPageServer({ port = Number(process.env.JULIA_CON
     try { codexMonitor = await createCodexMonitor(agentStore, { socketPath: process.env.JULIA_CODEX_SOCKET }) }
     catch (error) { console.error(JSON.stringify(agentError(error, { provider: 'codex', runId: 'connection', eventKind: 'connect-failed' }))) }
   }
+  const buildRunner = process.env.JULIA_BUILD_RUNNER_URL
+    ? createBuildRunnerClient(process.env.JULIA_BUILD_RUNNER_URL)
+    : undefined
   const server = await startControlPageServer({
     port,
     tailscaleHosts,
@@ -81,10 +85,15 @@ export async function runControlPageServer({ port = Number(process.env.JULIA_CON
     getRuns: () => runtime.list(),
     getActivity: () => activity.snapshot(),
     getAgentCards: async () => ({ updatedAt: new Date().toISOString(), cards: await agentStore.cards() }),
+    getBuildJobs: () => buildRunner ? buildRunner.list() : Promise.resolve([]),
     startInitialization: async input => {
       latestState = await discoverControlPageState(activity)
       const result = await runtime.start(input, latestState)
       console.log(JSON.stringify({ event: 'initialization-ready-for-build', card: input.card.identifier, runId: result.runId, resumed: result.resumed, state: result.state }))
+      if (buildRunner) {
+        const build = await buildRunner.start(result)
+        return { ...result, build }
+      }
       return result
     },
     onRequest: request => console.log(JSON.stringify({ event: 'control-page-request', ...request })),

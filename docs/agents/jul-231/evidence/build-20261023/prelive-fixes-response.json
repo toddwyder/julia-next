@@ -1,0 +1,33 @@
+{
+  "id": "gen_01M5MM6H1GXX5XJ57GHR98MNKB",
+  "object": "chat.completion",
+  "created": 1792767403,
+  "model": "reflection/beam:free",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"edits\":[{\"path\":\"ops/mastra-agents/reviewer/src/mastra/control-page.ts\",\"old\":\"meta.textContent='Run '+job.runId+' \u00b7 Worktree '+(job.snapshot.worktree||'none')+' \u00b7 Candidate '+(job.result?.candidateCommit||'none');card.append(meta);\",\"new\":\"meta.textContent='Run '+job.runId+' \u00b7 Worktree '+(job.worktree||'none')+' \u00b7 Candidate '+(job.result?.candidateCommit||'none');card.append(meta);\"},{\"path\":\"ops/mastra-agents/reviewer/src/mastra/control-page.ts\",\"old\":\"running.textContent=job.state+' \u00b7 '+JSON.stringify(job.snapshot.roles)+' \u00b7 '+(job.snapshot.worktree||'none');card.append(running)\",\"new\":\"running.textContent=job.state+' \u00b7 '+JSON.stringify(job.snapshot.roles)+' \u00b7 '+(job.worktree||'none');card.append(running)\"},{\"path\":\"ops/build-runner/worker.mjs\",\"old\":\"    const prompt = machineryProof\\n      ? `You are the orchestrator for ${cardId}.\\\\n\\\\nRequirements:\\\\n${description}\\\\n\\\\nDelegate implementation to the coder helper, then internal review and proof to the reviewer helper, then run the cap-check helper once. Do not override helper models or retry the expected DeepSeek refusal. Report completion after all three.`\\n      : `You are the orchestrator for ${cardId}.\\\\n\\\\nRequirements:\\\\n${description}\\\\n\\\\nDelegate implementation to the coder helper, then internal review and proof to the reviewer helper. Report completion after both.`\",\"new\":\"    const prompt = machineryProof\\n      ? `You are the orchestrator for ${cardId}.\\\\n\\\\nRequirements:\\\\n${description}\\\\n\\\\nFirst read .agents/skills/poteto-mode/SKILL.md and follow it for this task, before delegating coder/reviewer/proof.\\\\n\\\\nDelegate implementation to the coder helper, then internal review and proof to the reviewer helper, then run the cap-check helper once. Do not override helper models or retry the expected DeepSeek refusal. Report completion after all three.`\\n      : `You are the orchestrator for ${cardId}.\\\\n\\\\nRequirements:\\\\n${description}\\\\n\\\\nFirst read .agents/skills/poteto-mode/SKILL.md and follow it for this task, before delegating coder/reviewer/proof.\\\\n\\\\nDelegate implementation to the coder helper, then internal review and proof to the reviewer helper. Report completion after both.`\"},{\"path\":\"ops/build-runner/proof/start.mjs\",\"old\":\"  assert.deepEqual(result.account, { spentNano: 0, heldNano: 0, stopped: false });\",\"new\":\"  assert.strictEqual(result.account.spentNano, 0);\\n  assert.strictEqual(result.account.heldNano, 0);\\n  assert.strictEqual(result.account.stopped, false);\"},{\"path\":\"ops/build-runner/proof/start.mjs\",\"old\":\"  const coderStart = events.find(e => e.agentType === 'coder' && e.type === 'start');\\n  assert(coderStart);\\n  assert.equal(coderStart.modelId, result.actualModels.coder);\\n  assert(result.internalReview.starts.every(e => e?.isError !== true));\\n  assert(result.internalReview.ends.every(e => e?.isError !== true));\\n  const reviewEvents = result.internalReview.events;\\n  assert(reviewEvents.some(e => String(e.model).includes('deepseek')));\\n  assert(reviewEvents.some(e => e.isError === true && String(e.result).includes('Trial forbids nonzero model prices')));\",\"new\":\"  const coderStart = events.find(e => e.type === 'subagent_start' && e.agentType === 'coder');\\n  const reviewerStart = events.find(e => e.type === 'subagent_start' && e.agentType === 'reviewer');\\n  const coderEnd = events.find(e => e.type === 'subagent_end' && e.agentType === 'coder');\\n  const reviewerEnd = events.find(e => e.type === 'subagent_end' && e.agentType === 'reviewer');\\n  const capStart = events.find(e => e.type === 'subagent_start' && e.agentType === 'cap-check');\\n  const capEnd = events.find(e => e.type === 'subagent_end' && e.agentType === 'cap-check');\\n  assert(coderStart);\\n  assert.equal(coderStart.modelId, result.actualModels.coder);\\n  assert(reviewerStart);\\n  assert.equal(reviewerStart.modelId, result.actualModels.coder);\\n  assert(coderEnd);\\n  assert.equal(coderEnd.isError, false);\\n  assert(coderEnd.result);\\n  assert(reviewerEnd);\\n  assert.equal(reviewerEnd.isError, false);\\n  assert(reviewerEnd.result);\\n  assert(capStart);\\n  assert.match(capStart.modelId, /deepseek/i);\\n  assert(capEnd);\\n  assert.equal(capEnd.isError, true);\\n  assert(String(capEnd.result).includes('Trial forbids nonzero model prices'));\"},{\"path\":\"ops/build-runner/proof/start.mjs\",\"old\":\"  assert.equal(await article.getByText(/downstream review.*started/i).count(), 0);\",\"new\":\"  assert.equal(await article.getByText('Downstream Review has not started', { exact: true }).count(), 1);\"},{\"path\":\"ops/build-runner/proof/start.mjs\",\"old\":\"  let workerAliveAfterRestart = true;\\n  try {\\n    process.kill(workerPid, 0);\\n    assert.equal(await procStarttime(workerPid), workerStarttime);\\n  } catch {\\n    workerAliveAfterRestart = false;\\n  }\",\"new\":\"  let workerAliveAfterRestart = true;\\n  let workerReadbackAfterRestart = null;\\n  try {\\n    process.kill(workerPid, 0);\\n    assert.equal(await procStarttime(workerPid), workerStarttime);\\n  } catch (error) {\\n    const code = error?.code;\\n    if (code !== 'ESRCH' && code !== 'ENOENT') throw error;\\n    workerAliveAfterRestart = false;\\n    const readbackRes = await fetch(`${runnerURL}/jobs/${runId}`);\\n    assert.equal(readbackRes.ok, true);\\n    const readbackJob = await readbackRes.json();\\n    workerReadbackAfterRestart = readbackJob;\\n    assert.equal(readbackJob.state, 'ready-for-review');\\n  }\"},{\"path\":\"ops/build-runner/proof/start.mjs\",\"old\":\"  const restart = { start: restartStart, end: restartEnd, workerAliveAfterRestart };\",\"new\":\"  const restart = { start: restartStart, end: restartEnd, workerAliveAfterRestart, workerReadbackAfterRestart };\"}]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 11912,
+    "completion_tokens": 7932,
+    "total_tokens": 19844,
+    "prompt_tokens_details": {
+      "cached_tokens": 128,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 6487,
+      "image_tokens": 0
+    },
+    "cache_creation_input_tokens": 0
+  },
+  "system_fingerprint": "fp_4yatjeleyy"
+}
