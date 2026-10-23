@@ -1,0 +1,4 @@
+ts	phase	decision	why	evidence	result
+2026-10-23T05:38:20Z	cards	Created JUL-252 and updated the two old cards	Todd supplied the settled scope and authorized creation	evidence/2026-10-23-review/readback.json	live readback passed
+2026-10-23T05:40:00Z	rulebook	Changed only the framework learning-test path	The tests live under the runner package	AGENTS.md	path exists and exact diff checked
+2026-10-23T05:40:00Z	publication	Used gh and a fresh worktree from main	Todd requested gh and the original checkout has unrelated changes	README.md	ready for CI

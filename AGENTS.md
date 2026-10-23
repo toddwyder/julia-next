@@ -5,7 +5,7 @@ Julia uses the pstack way of working on probation since 22 October 2026. pstack 
 ## Work
 - Build with the poteto-mode skill and follow it as written.
 - Spending is $0: Codex runs on Todd's signed-in plan; real request checks use a model CommandCode's billing page lists as free. Any cost readback above $0 stops the work.
-- Framework facts come from the installed packages, their version-matched official docs, and the learning tests under framework/. The learning tests stay green.
+- Framework facts come from the installed packages, their version-matched official docs, and the learning tests under ops/build-runner/framework/. The learning tests stay green.
 - Commit and push as you go. The poteto-mode todo list and show-me-your-work decision log are committed under docs/agents/<card>/.
 - Publish with gh using the ordinary signed-in GitHub access.
 

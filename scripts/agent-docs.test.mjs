@@ -15,7 +15,7 @@ test('coding standards retain framework rules and the trial retains learning tes
   assert.match(standards, /retry or wait loops/i);
   assert.match(standards, /controller code over 400 lines/i);
   assert.match(standards, /built-in feature/i);
-  assert.match(read('AGENTS.md'), /learning tests under framework\//);
+  assert.match(read('AGENTS.md'), /learning tests under ops\/build-runner\/framework\//);
 });
 
 test('agent instructions use the trial rulebook and the runbook marks Factory retired', () => {
