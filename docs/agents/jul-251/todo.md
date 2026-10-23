@@ -66,4 +66,14 @@
 - Shared mutable state. The merge cursor and run records have one server poller owner. Git publication remains with the coordinator.
 - Smallest safe decomposition. Two implementation owners plus a fresh reviewer; proofs run after integration.
 
-Both follow-up proofs and implementation are pushed. The final handoff waits for green checks on PR #314's exact head; no merge is authorized.
+Both follow-up proofs and implementation are pushed. Todd authorized merge at 21:16 PT on 22 October 2026, after green CI on the final head, followed by the real maintenance-timer readback.
+
+## Main adoption on probation — Todd 22 October 2026 21:16 PT
+
+- [x] Adapt the short rulebook for main and state ordinary signed-in gh publication.
+- [x] Bring the dated retrospective and evidence onto the PR branch.
+- [x] Reconcile the publication record and card history, preserving acceptance criteria.
+- [x] Record Todd's acceptance of the concurrency and maintenance correction-path limits.
+- [ ] Push the final head and wait for green CI.
+- [ ] Merge PR #314 with gh and confirm main contains it; move JUL-251 to Complete.
+- [ ] Retain the automatically triggered maintenance outcome and report it.
