@@ -1,0 +1,4 @@
+ts	phase	decision	why	evidence	result
+2026-10-23T14:19:00Z	start	Build from current main in an isolated checkout with Beam only	Todd settled the card and requires zero spend	AGENTS.md; Linear JUL-231	Implementation
+2026-10-23T14:25:00Z	ground	Use short Beam sessions after the initial history error	A provider rejected missing reasoning_content in a long history; a delegated fresh session completed	evidence/build-20261023/first-session-events.jsonl; evidence/build-20261023/ground-receipt.json	Grounding saved with zero spend
+2026-10-23T14:25:00Z	baseline	Reuse existing root dependencies for the lint learning test	Its real ESLint command needs the root installation	evidence/build-20261023/baseline-learning-rerun.log	14 learning tests and 36 core tests pass

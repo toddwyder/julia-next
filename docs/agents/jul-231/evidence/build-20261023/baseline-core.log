@@ -1,0 +1,54 @@
+(node:382163) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+{"direct":"isolated","nested":"isolated","provider":"JUL251_OK","spentNano":0,"attempts":2}
+
+✔ stock adapter request works while direct and nested builder commands cannot read credentials (5802.307834ms)
+(node:382134) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ priced requests hold budget, settle once, and enforce the card ceiling (50.751996ms)
+✔ free requests remain usable without usage when priced accounting is unknown (29.9833ms)
+✔ reopening retains unresolved holds, snapshots, and settled costs per card (31.212209ms)
+✔ actual cost above a reservation is durable and blocks priced work (28.884579ms)
+✔ invalid monetary inputs cannot change durable budget (35.659319ms)
+✔ separate processes cannot jointly reserve beyond the ceiling (184.353435ms)
+✔ a process exit after reservation never releases an uncertain request (129.145012ms)
+(node:382140) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ review durable stop survives reopen and blocks free and paid routes only for its card (130.163159ms)
+✔ review stopped card blocks allowlisted metadata GET (11.118772ms)
+✔ review oversized known usage records actual cost and refuses result (8.118211ms)
+✔ review stock adapter rejects state symlink into builder before runtime (144.502403ms)
+✔ review stock adapter rejects auth-file symlink into builder before runtime (147.836734ms)
+✔ review stock adapter rejects auth-parent symlink into builder before runtime (155.760966ms)
+✔ review replacing builder home after boot cannot expose outside auth (4150.363837ms)
+(node:382224) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ free requests arrive with enforced limits and settle without usage (103.121446ms)
+✔ paid missing usage refuses result and prevents the next arrival (37.411366ms)
+✔ chat JSON settles cache categories once (36.701259ms)
+✔ chat SSE settles cache categories once (15.325849ms)
+✔ responses JSON settles cache categories once (27.022135ms)
+✔ responses SSE settles cache categories once (23.069165ms)
+✔ messages JSON settles cache categories once (21.953584ms)
+✔ messages SSE settles cache categories once (12.128588ms)
+✔ wrong model, endpoint, missing prices and trial paid routes send nothing (5.573254ms)
+✔ separate HTTP attempts create separate durable records (44.007001ms)
+✔ card ceiling refuses an oversized reservation before HTTP (10.61749ms)
+✔ provider reported cost stops even a configured free route (27.260201ms)
+✔ allowlisted authentication cannot carry inference payloads and redirects never follow (26.57885ms)
+✔ invalid cache count -1 retains paid hold (18.782738ms)
+✔ invalid cache count 0.5 retains paid hold (26.572444ms)
+✔ bounded buffering refuses a large result without releasing its reservation (30.550861ms)
+✔ decimal rates round nano dollars upward without floating point drift (22.097716ms)
+✔ ledger errors never reveal their underlying body or credentials (3.52659ms)
+✔ authentication and catalog are confined to their exact allowlisted URL (18.694853ms)
+✔ connection failure after arrival retains the paid reservation (14.561819ms)
+✔ a truncated paid stream retains the reservation despite partial usage (11.961913ms)
+ℹ tests 36
+ℹ suites 0
+ℹ pass 36
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6010.641633
