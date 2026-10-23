@@ -44,3 +44,19 @@ node scripts/julia-agents.mjs -- node ops/build-runner/proof/memory.mjs \
 ```
 
 The proof forces one observation through the public stock API. It repeats that real observation as fixture input until it crosses the unchanged reflection threshold, then drives a normal Auto turn. It verifies a reflection generation and recall after deleting the source message. This proves the real memory operations, rather than a natural long conversation reaching those thresholds.
+
+## Start a saved card
+
+The control page posts its saved initialization result to the separate runner's `POST /jobs`. `GET /jobs` and `GET /jobs/:runId` return the persisted job. A duplicate Start returns the same saved job. The worker uses the saved card, orchestrator and coder selections in one Mastra Code session, then saves `ready-for-review` after its internal review, proof and candidate checks pass.
+
+Set `BUILD_RUNNER_JOBS_DIR`, `BUILD_RUNNER_REPO`, `BUILD_RUNNER_SETTINGS` and `BUILD_RUNNER_PORT`, then launch `jobs.mjs` through `scripts/julia-agents.mjs`. Set the control service's `JULIA_BUILD_RUNNER_URL` to that runner. The exact server units used for JUL-231 are under `docs/agents/jul-231/server/`. The two services have separate lifetimes.
+
+`machine-settings.json` selects Beam for both machinery roles. Its configured DeepSeek helper is refused by the connection core's active zero-spend trial policy before upstream dispatch. `pstack-models.md` records Todd's normal Sol/DeepSeek split; it does not alter Codex's settings.
+
+Run the real browser/server Proof with the installed candidate services.
+
+```sh
+node ops/build-runner/proof/start.mjs \
+  http://127.0.0.1:43126/julia-control http://127.0.0.1:43127 \
+  julia-jul231-control.service docs/agents/jul-231/evidence/server-proof-20261023
+```

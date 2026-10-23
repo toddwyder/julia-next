@@ -39,7 +39,7 @@ try {
   assert(offer);
 
   await page.goto(controlURL, { waitUntil: 'networkidle' });
-  const readyCard = page.getByLabel('Ready card', { exact: true });
+  const readyCard = page.locator('select[name="card"]');
   await readyCard.waitFor();
   await readyCard.selectOption(String(cardIndex));
   for (const legend of ['Orchestrator', 'Coder']) {
