@@ -84,6 +84,8 @@ async function main() {
   const events = []
   const requests = []
   let receipt
+  const receipts = []
+  const workflowFeedback = []
   let failure = null
   let threadId
   let candidateCommit
@@ -108,18 +110,31 @@ async function main() {
     }
     const allowedEventTypes = new Set(['subagent_start', 'subagent_end', 'subagent_tool_start', 'subagent_tool_end', 'tool_start', 'tool_end', 'agent_start', 'agent_end', 'error', 'task_updated', 'state_changed', 'message_end'])
     const unsubscribe = runner.runtime.session.subscribe(e => { if (allowedEventTypes.has(e?.type)) events.push(e) })
+    let checklist
+    let decisions
+    let internalReview
     try {
-      receipt = await runner.run({ prompt, maxTurns: 100, timeoutMs: 900000 })
+      for (let turn = 0; turn < 3; turn += 1) {
+        const instruction = turn === 0 ? prompt : workflowFeedback.at(-1)
+        receipt = await runner.run({ prompt: instruction, ...(receipt?.threadId ? { threadId: receipt.threadId } : {}), maxTurns: 100, timeoutMs: 900000 })
+        receipts.push(receipt)
+        if (receipt?.result?.status !== 'completed') throw new Error('session not completed')
+        try {
+          checklist = await readFile(join(builderHome, 'pstack', 'checklist.md'), 'utf8')
+          decisions = await readFile(join(builderHome, 'pstack', 'decisions.tsv'), 'utf8')
+          internalReview = { ...inspectPstackRun({ events, requests, coderModel, reviewModel, machineryProof, checklist, decisions }), effectiveModels: effectiveTable }
+          break
+        } catch (error) {
+          if (turn === 2) throw error
+          workflowFeedback.push(`The selected workflow is incomplete. Observed missing evidence: ${error.message}. Continue poteto-mode in this same session. Read the selected playbook and follow every mandatory step rather than waiving it for task size. Use the configured model-role table and retain the required workflow artifacts. The saved card remains unchanged.`)
+        }
+      }
     } finally {
       unsubscribe()
     }
     threadId = receipt.threadId
     account = receipt.account ?? runner.snapshot()
 
-    if (receipt?.result?.status !== 'completed') throw new Error('session not completed')
-    const checklist = await readFile(join(builderHome, 'pstack', 'checklist.md'), 'utf8')
-    const decisions = await readFile(join(builderHome, 'pstack', 'decisions.tsv'), 'utf8')
-    const internalReview = { ...inspectPstackRun({ events, requests, coderModel, reviewModel, machineryProof, checklist, decisions }), effectiveModels: effectiveTable }
     if (internalReview.deepseekSent && machineryProof) throw new Error('deepseek dispatched')
     await atomicWriteText(join(jobDir, 'pstack-checklist.md'), checklist)
     await atomicWriteText(join(jobDir, 'pstack-decisions.tsv'), decisions)
@@ -167,6 +182,8 @@ async function main() {
   } finally {
     try {
       await atomicWriteJson(join(jobDir, 'receipt.json'), receipt ?? {})
+      await atomicWriteJson(join(jobDir, 'receipts.json'), receipts)
+      await atomicWriteJson(join(jobDir, 'workflow-feedback.json'), workflowFeedback)
       await atomicWriteJson(join(jobDir, 'events.json'), events)
       await writeJsonl(join(jobDir, 'events.jsonl'), events)
       await atomicWriteJson(join(jobDir, 'requests.json'), requests)
