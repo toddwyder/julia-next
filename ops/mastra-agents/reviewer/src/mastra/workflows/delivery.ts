@@ -40,6 +40,7 @@ export function createRoleExecutionWorkflow({
             if (result.finishReason === 'length') throw new Error(`${role} output was truncated by the model limit`)
             results[role] = result.text
           } else {
+            if (selection.route === 'openai-codex') throw new Error('ChatGPT subscription models use the stock Start build, not the legacy delivery workflow')
             await selectAcpModel(routes, selection)
             activity?.recordLlmInference()
             const result = await routes[selection.route].generate(prompt)

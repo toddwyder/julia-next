@@ -223,6 +223,7 @@ export async function selectAcpModel(routes: ReturnType<typeof createAcpRoutes>,
     ...(selection.wire ? { wire: selection.wire } : {}),
   })
   if (parsed.route === 'commandcode') throw new Error('CommandCode is not an ACP route')
+  if (parsed.route === 'openai-codex') throw new Error('ChatGPT subscription models use the stock Start build, not ACP')
   if (parsed.route === 'claude') return selectClaudeModel(routes.claude, parsed.modelId)
   await routes[parsed.route].setModel(parsed.modelId)
 }

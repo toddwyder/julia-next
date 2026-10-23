@@ -1,18 +1,16 @@
 export function resolveModelKey(settings, role) {
   const raw = typeof role === 'string' ? role : (role?.modelId ?? role?.model)
-  if (settings.models?.[raw]) {
-    if (role && typeof role !== 'string') {
-      for (const field of ['provider', 'route', 'service', 'wire', 'company']) {
-        const expected = role[field] ?? (field === 'provider' ? role.route : undefined)
-        const actual = settings.models[raw][field] ?? (field === 'provider' ? settings.models[raw].route : undefined)
-        if (expected != null && actual != null && expected !== actual) throw new Error(`model provider mismatch: ${raw}`)
-      }
+  const matches = settings.models?.[raw] ? [raw] : Object.keys(settings.models ?? {}).filter(key => settings.models[key]?.wireModel === raw)
+  if (matches.length !== 1) throw new Error(`unknown or ambiguous model: ${raw}`)
+  const key = matches[0]
+  if (role && typeof role !== 'string') {
+    for (const field of ['provider', 'route', 'service', 'wire', 'company']) {
+      const expected = role[field] ?? (field === 'provider' ? role.route : undefined)
+      const actual = settings.models[key][field] ?? (field === 'provider' ? settings.models[key].route : undefined)
+      if (expected != null && actual != null && expected !== actual) throw new Error(`model provider mismatch: ${raw}`)
     }
-    return raw
   }
-  const matches = Object.keys(settings.models ?? {}).filter(key => settings.models[key]?.wireModel === raw)
-  if (matches.length === 1) return matches[0]
-  throw new Error(`unknown or ambiguous model: ${raw}`)
+  return key
 }
 
 export function createPstackSession(settings, snapshot, table) {

@@ -51,7 +51,11 @@
         "multiplier": 2,
         "framingTokens": 4096
       },
-      "inputTokenEstimateSource": "https://developers.openai.com/api/docs/guides/token-counting"
+      "inputTokenEstimateSource": "https://developers.openai.com/api/docs/guides/token-counting",
+      "route": "commandcode",
+      "service": "CommandCode",
+      "company": "DeepSeek",
+      "wire": "chat"
     },
     "openai/gpt-6-sol": {
       "endpoint": "https://chatgpt.com/backend-api/codex/responses",
@@ -83,7 +87,11 @@
         "multiplier": 2,
         "framingTokens": 4096
       },
-      "inputTokenEstimateSource": "https://developers.openai.com/api/docs/guides/token-counting"
+      "inputTokenEstimateSource": "https://developers.openai.com/api/docs/guides/token-counting",
+      "route": "openai-codex",
+      "service": "ChatGPT plan",
+      "company": "OpenAI",
+      "wire": "responses"
     },
     "anthropic/claude-haiku-5-5": {
       "endpoint": "https://api.anthropic.com/v1/messages",
@@ -116,7 +124,11 @@
         "multiplier": 2,
         "framingTokens": 4096
       },
-      "inputTokenEstimateSource": "https://developers.openai.com/api/docs/guides/token-counting"
+      "inputTokenEstimateSource": "https://developers.openai.com/api/docs/guides/token-counting",
+      "route": "claude",
+      "service": "Claude subscription",
+      "company": "Anthropic",
+      "wire": "messages"
     }
   },
   "networkAllow": [

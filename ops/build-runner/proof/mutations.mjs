@@ -16,6 +16,14 @@ const tests = file => `ops/build-runner/test/${file}.test.mjs`;
 const edit = (file, before, after, occurrences = 1) => ({ file, before, after, occurrences });
 const cases = [
   {
+    id: 'raw-model-provider-route-not-checked', file: 'pstack-session', test: 'a raw model ID cannot silently change the selected provider route',
+    edits: [edit(session, 'expected != null && actual != null && expected !== actual', 'false')],
+  },
+  {
+    id: 'unavailable-subscription-offered', file: 'connections', test: 'an explicitly unavailable or invalidly priced configured model is not advertised',
+    edits: [edit('ops/build-runner/connections.mjs', ' || spec.unavailable', '')],
+  },
+  {
     id: 'local-estimate-not-used', file: 'transport', test: 'local text estimate reserves framing and UTF-8 bytes without a credential or count request',
     edits: [edit(transport, 'inputBound = units * estimate.multiplier + estimate.framingTokens;', 'inputBound = spec.maxInputTokens;')],
   },

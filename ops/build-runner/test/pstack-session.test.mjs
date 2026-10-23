@@ -125,3 +125,11 @@ test('machinery proof completes a successful Beam self-check without DeepSeek di
   assert.throws(() => inspectPstackRun({ ...input, events: [...build, { ...selfCheck[0], task: 'Self-check JUL-253 requirements' }, selfCheck[1]] }), /machinery self-check/)
   assert.throws(() => inspectPstackRun({ ...input, events: [...build, selfCheck[0], { ...selfCheck[1], isError: true, result: 'Self-check refused' }] }), /machinery self-check failed/)
 })
+
+test('a raw model ID cannot silently change the selected provider route', () => {
+  const settings = { models: { ...models, [sol]: { wireModel: 'gpt-6-sol', route: 'openai-codex', company: 'OpenAI', service: 'ChatGPT plan', wire: 'responses' } } };
+  const input = { ...snapshot, roles: { ...snapshot.roles, orchestrator: { modelId: 'gpt-6-sol', route: 'commandcode', company: 'OpenAI', service: 'CommandCode', wire: 'chat' } } };
+  assert.throws(() => createPstackSession(settings, input, table), /provider mismatch/);
+  input.roles.orchestrator = { modelId: 'gpt-6-sol', route: 'openai-codex', company: 'OpenAI', service: 'ChatGPT plan', wire: 'responses' };
+  assert.equal(createPstackSession(settings, input, table).orchestratorModel, sol);
+});
