@@ -1,9 +1,11 @@
 # AGENTS.md — Julia
 
-Julia uses the pstack way of working on probation since 22 October 2026. pstack builds and proves. The Build card runs the same way; its retro decides keep, adjust or revert. This file is the whole rulebook.
+Julia uses the pstack way of working, adopted 22 October 2026 and kept after the JUL-231 retro on 23 October. pstack builds and proves. This file is the whole rulebook.
 
 ## Work
 - Build with the poteto-mode skill and follow it as written.
+- Todd's agreed delivery flow, decisions and order of work: [docs/plans/path-forward.md](docs/plans/path-forward.md).
+- Fix every correction as high in [the inverse pyramid](docs/principles/inverse-pyramid.md) as it will go; a written rule is the last resort.
 - Spending is $0: Codex runs on Todd's signed-in plan; real request checks use a model CommandCode's billing page lists as free. Any cost readback above $0 stops the work.
 - Framework facts come from the installed packages, their version-matched official docs, and the learning tests under ops/build-runner/framework/. The learning tests stay green.
 - Commit and push as you go. The poteto-mode todo list and show-me-your-work decision log are committed under docs/agents/<card>/.
