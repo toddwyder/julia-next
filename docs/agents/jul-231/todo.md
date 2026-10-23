@@ -7,7 +7,7 @@
 - [x] 5. Verify on the matching surface.
 - [x] 6. Rebase into small, ordered commits. Stack follow-ups.
 - [x] 7. If the design is contested, `interrogate` before shipping.
-- [ ] 8. Run **Opening a PR**.
+- [x] 8. Run **Opening a PR**.
 
 ## Throughput checkpoint
 

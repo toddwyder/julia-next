@@ -35,3 +35,5 @@ The final run satisfies the core proof checks shown in the supplied evidence, bu
 7. The core ledger retains the shared host role label. Stock subagent_start events independently name coder/reviewer and their actual model IDs. The actual request observer confirms Beam dispatches and the DeepSeek refusal.
 
 No unresolved evidence gap remains for the card's Proof. This remains a same-family Beam audit with lead self-checks.
+
+PR #316 is now open to main and linked on JUL-231. All audit items are resolved by the linked actual artifacts and the final source review. No open flags.
