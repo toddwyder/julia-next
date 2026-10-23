@@ -11,9 +11,18 @@ const transport = 'ops/build-runner/transport.mjs';
 const adapter = 'ops/build-runner/adapter.mjs';
 const boundary = 'ops/build-runner/command-boundary.py';
 const session = 'ops/build-runner/pstack-session.mjs';
+const machineSettings = 'ops/build-runner/machine-settings.json';
 const tests = file => `ops/build-runner/test/${file}.test.mjs`;
 const edit = (file, before, after, occurrences = 1) => ({ file, before, after, occurrences });
 const cases = [
+  {
+    id: 'cache-ttl-mismatch-accepted', file: 'transport', test: 'stock Claude conversation caching uses its configured one-hour API price',
+    edits: [edit(transport, "if (value.cache_control && (value.cache_control.ttl ?? '5m') !== cacheWriteTtl) return true;", '')],
+  },
+  {
+    id: 'one-hour-cache-write-charged-at-five-minute-rate', file: 'transport', test: 'stock Claude conversation caching uses its configured one-hour API price',
+    edits: [edit(machineSettings, '"cacheWrite": 0.2', '"cacheWrite": 0.125')],
+  },
   {
     id: 'maximum-charge-recovery-not-final', file: 'ledger', test: 'charging an unknown request at its full maximum never releases budget or invents usage',
     edits: [edit(ledger, "if (current.state === 'unknown' && current.costNano !== null) throw new Error('Maximum-charge recovery is final; actual usage remains unknown');", '')],

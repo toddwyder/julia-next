@@ -1,10 +1,11 @@
 {
   "schema": 1,
-  "plannedMutations": 45,
+  "plannedMutations": 47,
   "sourceHashes": {
+    "ops/build-runner/transport.mjs": "f941dc55240e2b3142f6d10df276ee23b40012157ac6a65925be8575b90490f7",
+    "ops/build-runner/machine-settings.json": "da22a1adf40aac3bb6d3c6e4161a7047604123335fb8605db89db2e5bea2f40f",
     "ops/build-runner/ledger.mjs": "bca64b13018c6f15a25873259129ce520a387cfa393efe60811b8c32f60a2801",
     "ops/build-runner/pstack-session.mjs": "9ce11eae6dc62b2ab34059fd91c24bdb8a2aee3b3a6ce9579815df10aa7e8562",
-    "ops/build-runner/transport.mjs": "9b6f0ba304e06826fd74ec7c781d3221fe0134c78802e160e9de5c1f64f8c5f4",
     "ops/build-runner/adapter.mjs": "4cb401ed6abf54fb101fe2cf56845283628357bd0e1ac9627ec99e1251daf6c9",
     "ops/build-runner/command-boundary.py": "a763dbe91272f284b5f32a392d4ed09be7821c5b0c4fb35785ff6802e9a6f438"
   },
@@ -29,10 +30,60 @@
     "selectedTest": null,
     "selectedPassed": null,
     "selectedFailed": null,
-    "passedCount": 58,
+    "passedCount": 59,
     "failedCount": 0
   },
   "mutations": [
+    {
+      "id": "cache-ttl-mismatch-accepted",
+      "files": [
+        "ops/build-runner/transport.mjs"
+      ],
+      "test": "stock Claude conversation caching uses its configured one-hour API price",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^stock Claude conversation caching uses its configured one-hour API price$",
+          "ops/build-runner/test/transport.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "stock Claude conversation caching uses its configured one-hour API price",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "one-hour-cache-write-charged-at-five-minute-rate",
+      "files": [
+        "ops/build-runner/machine-settings.json"
+      ],
+      "test": "stock Claude conversation caching uses its configured one-hour API price",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^stock Claude conversation caching uses its configured one-hour API price$",
+          "ops/build-runner/test/transport.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "stock Claude conversation caching uses its configured one-hour API price",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
     {
       "id": "maximum-charge-recovery-not-final",
       "files": [
@@ -1181,7 +1232,7 @@
     "selectedTest": null,
     "selectedPassed": null,
     "selectedFailed": null,
-    "passedCount": 58,
+    "passedCount": 59,
     "failedCount": 0
   },
   "gaps": [

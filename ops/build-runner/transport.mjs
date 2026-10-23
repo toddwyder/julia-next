@@ -85,12 +85,12 @@ function reportedCost(value) {
   return maximum;
 }
 
-function unsupportedPaidContent(value) {
-  if (Array.isArray(value)) return value.some(unsupportedPaidContent);
+function unsupportedPaidContent(value, cacheWriteTtl) {
+  if (Array.isArray(value)) return value.some(item => unsupportedPaidContent(item, cacheWriteTtl));
   if (!object(value)) return false;
   if (typeof value.type === 'string' && /image|audio|video|file|document/.test(value.type)) return true;
-  if (value.cache_control?.ttl && value.cache_control.ttl !== '5m') return true;
-  return Object.values(value).some(unsupportedPaidContent);
+  if (value.cache_control && (value.cache_control.ttl ?? '5m') !== cacheWriteTtl) return true;
+  return Object.values(value).some(item => unsupportedPaidContent(item, cacheWriteTtl));
 }
 
 function parseResponse(text, contentType, spec) {
@@ -187,7 +187,7 @@ export function createTransport({ ledger, settings, role, fetch: upstream = glob
       bounded.max_tokens = spec.maxOutputTokens;
       if (spec.protocol === 'chat' && bounded.stream) bounded.stream_options = { ...bounded.stream_options, include_usage: true };
     }
-    if (spec.paid && (['audio', 'modalities', 'prompt'].some(key => key in body) || unsupportedPaidContent(body))) throw fail('Unsupported paid request shape');
+    if (spec.paid && (['audio', 'modalities', 'prompt'].some(key => key in body) || unsupportedPaidContent(body, spec.cacheWriteTtl ?? '5m'))) throw fail('Unsupported paid request shape');
     if (spec.paid && body.tools?.some(tool => tool.type && tool.type !== 'function')) throw fail('Unpriced hosted tool');
     if (spec.paid && body.service_tier && !['default', 'standard'].includes(body.service_tier)) throw fail('Unpriced service tier');
     if (spec.paid && body.speed) throw fail('Unpriced inference speed');

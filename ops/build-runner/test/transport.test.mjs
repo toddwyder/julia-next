@@ -6,6 +6,26 @@ import { createTransport } from '../transport.mjs';
 
 const free = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
 const paid = { input: 2, output: 3, cacheRead: 1, cacheWrite: 4 };
+
+test('stock Claude conversation caching uses its configured one-hour API price', async t => {
+  const { createPromptCacheMiddleware } = await import('@mastra/code-sdk/providers/claude-max');
+  const { readFile } = await import('node:fs/promises');
+  const settings = JSON.parse(await readFile(new URL('../machine-settings.json', import.meta.url), 'utf8'));
+  const model = settings.models['anthropic/claude-haiku-5-5'];
+  const transformed = await createPromptCacheMiddleware('conversation').transformParams({ params: {
+    prompt: [{ role: 'system', content: 'system' }, { role: 'user', content: 'hello' }],
+  } });
+  const cache_control = transformed.prompt[0].providerOptions.anthropic.cacheControl;
+  assert.equal(cache_control.ttl, '1h');
+  const f = await fixture(t, (_req, res) => json(res, { usage: {
+    input_tokens: 0, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 10,
+  } }));
+  const request = { messages: [{ role: 'user', content: [{ type: 'text', text: 'hello', cache_control }] }] };
+  await send(transport(f, { ...model, endpoint: f.endpoint, wireModel: 'wire' }), f.endpoint, request);
+  assert.equal(f.ledger.snapshot().spentNano, 2500);
+  await assert.rejects(send(transport(f, { ...model, endpoint: f.endpoint, wireModel: 'wire', cacheWriteTtl: '5m' }), f.endpoint, request), /Unsupported paid/);
+  assert.equal(f.arrivals.length, 1);
+});
 async function fixture(t, handler) {
   const arrivals = [];
   const server = createServer(async (req, res) => {

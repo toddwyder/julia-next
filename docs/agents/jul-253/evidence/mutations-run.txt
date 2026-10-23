@@ -1,3 +1,5 @@
+{"mutation":"cache-ttl-mismatch-accepted","test":"stock Claude conversation caching uses its configured one-hour API price","status":"caught"}
+{"mutation":"one-hour-cache-write-charged-at-five-minute-rate","test":"stock Claude conversation caching uses its configured one-hour API price","status":"caught"}
 {"mutation":"maximum-charge-recovery-not-final","test":"charging an unknown request at its full maximum never releases budget or invents usage","status":"caught"}
 {"mutation":"configured-panel-replaced-by-unrelated-model","test":"an unrelated review model cannot replace the configured Sol and DeepSeek panel","status":"caught"}
 {"mutation":"unknown-maximum-charged-as-zero","test":"charging an unknown request at its full maximum never releases budget or invents usage","status":"caught"}
@@ -43,4 +45,4 @@
 {"mutation":"auth-parent-not-canonicalized","test":"review stock adapter rejects auth-parent symlink into builder before runtime","status":"caught"}
 {"mutation":"mutable-home-granted-outside-workspace","test":"review replacing builder home after boot cannot expose outside auth","status":"caught"}
 {"mutation":"credential-filesystem-boundary-removed","test":"stock adapter request works while direct and nested builder commands cannot read credentials","status":"caught"}
-{"status":"passed","caught":45,"total":45,"restored":true,"final":"green"}
+{"status":"passed","caught":47,"total":47,"restored":true,"final":"green"}
