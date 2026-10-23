@@ -1,9 +1,9 @@
 {
   "schema": 1,
-  "plannedMutations": 42,
+  "plannedMutations": 43,
   "sourceHashes": {
+    "ops/build-runner/ledger.mjs": "0ad5e1d509cf3d86543f7a2fbd88ad79527f90be90b69f8a1345fd416591a18a",
     "ops/build-runner/transport.mjs": "9b6f0ba304e06826fd74ec7c781d3221fe0134c78802e160e9de5c1f64f8c5f4",
-    "ops/build-runner/ledger.mjs": "e0e3a22223505bfd608ab918e40cfb72d0e9883023c3e15c4df5ebb8c27d17e2",
     "ops/build-runner/adapter.mjs": "4cb401ed6abf54fb101fe2cf56845283628357bd0e1ac9627ec99e1251daf6c9",
     "ops/build-runner/command-boundary.py": "a763dbe91272f284b5f32a392d4ed09be7821c5b0c4fb35785ff6802e9a6f438"
   },
@@ -28,10 +28,35 @@
     "selectedTest": null,
     "selectedPassed": null,
     "selectedFailed": null,
-    "passedCount": 56,
+    "passedCount": 57,
     "failedCount": 0
   },
   "mutations": [
+    {
+      "id": "unknown-maximum-charged-as-zero",
+      "files": [
+        "ops/build-runner/ledger.mjs"
+      ],
+      "test": "charging an unknown request at its full maximum never releases budget or invents usage",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^charging an unknown request at its full maximum never releases budget or invents usage$",
+          "ops/build-runner/test/ledger.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "charging an unknown request at its full maximum never releases budget or invents usage",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
     {
       "id": "chat-sse-charge-corrupted",
       "files": [
@@ -1105,7 +1130,7 @@
     "selectedTest": null,
     "selectedPassed": null,
     "selectedFailed": null,
-    "passedCount": 56,
+    "passedCount": 57,
     "failedCount": 0
   },
   "gaps": [

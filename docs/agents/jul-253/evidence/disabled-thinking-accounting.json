@@ -1,0 +1,29 @@
+{
+  "charged": [
+    {
+      "id": "000b10fc-4af7-4a45-aad1-76a1a9ec28f7",
+      "card": "JUL-253",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "role": "review",
+      "maximumNano": 304915200,
+      "price": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.003,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 1000000,
+        "maxOutputTokens": 4096
+      },
+      "state": "unknown",
+      "usage": null,
+      "costNano": 304915200,
+      "reason": "Request outcome unavailable; full reserved maximum charged; actual usage unavailable",
+      "costBasis": "reservation maximum; actual usage unknown"
+    }
+  ],
+  "remainingBefore": 1148689112,
+  "remainingAfter": 1148689112,
+  "spentNano": 851310888
+}

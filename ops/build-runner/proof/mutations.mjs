@@ -13,6 +13,10 @@ const boundary = 'ops/build-runner/command-boundary.py';
 const tests = file => `ops/build-runner/test/${file}.test.mjs`;
 const edit = (file, before, after, occurrences = 1) => ({ file, before, after, occurrences });
 const cases = [
+  {
+    id: 'unknown-maximum-charged-as-zero', file: 'ledger', test: 'charging an unknown request at its full maximum never releases budget or invents usage',
+    edits: [edit(ledger, 'cost_nano = maximum_nano, reason = ?', 'cost_nano = 0, reason = ?')],
+  },
   ...['chat SSE', 'responses SSE', 'messages JSON', 'messages SSE'].map(protocol => ({
     id: `${protocol.replaceAll(' ', '-').toLowerCase()}-charge-corrupted`, file: 'transport', test: `${protocol} settles cache categories once`,
     edits: [edit(transport, 'const costNano = Math.max(usage ? totalCharge', 'const costNano = 1 + Math.max(usage ? totalCharge')],

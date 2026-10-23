@@ -1,0 +1,37 @@
+{
+  "before": {
+    "spentNano": 224294988,
+    "heldNano": 309830400,
+    "remainingNano": 1465874612
+  },
+  "charged": [
+    {
+      "id": "6e1ee776-acda-4ed8-be0a-b8e1cb3e57a6",
+      "card": "JUL-253",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "role": "review",
+      "maximumNano": 309830400,
+      "price": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.003,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 1000000,
+        "maxOutputTokens": 8192
+      },
+      "state": "unknown",
+      "usage": null,
+      "costNano": 309830400,
+      "reason": "Request outcome unavailable; full reserved maximum charged; actual usage unavailable",
+      "costBasis": "reservation maximum; actual usage unknown"
+    }
+  ],
+  "after": {
+    "spentNano": 534125388,
+    "heldNano": 0,
+    "remainingNano": 1465874612,
+    "pricedBlocked": false
+  }
+}

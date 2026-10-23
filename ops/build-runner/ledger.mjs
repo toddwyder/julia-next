@@ -30,6 +30,7 @@ function request(row) {
     maximumNano: row.maximum_nano, price: JSON.parse(row.price), bounds: JSON.parse(row.bounds),
     state: row.state, usage: row.usage === null ? null : JSON.parse(row.usage),
     costNano: row.cost_nano, reason: row.reason,
+    costBasis: row.state === 'unknown' && row.cost_nano !== null ? 'reservation maximum; actual usage unknown' : row.cost_nano === null ? 'unsettled' : 'reported usage',
   };
 }
 
@@ -123,6 +124,17 @@ export class CardLedger {
     });
   }
 
+  chargeUnknownMaximum(id) {
+    return this.transaction(() => {
+      const current = this.get(id);
+      if (current.state !== 'unknown') throw new Error('Only an unknown request can consume its reserved maximum');
+      if (current.costNano !== null) return current;
+      this.db.prepare('UPDATE requests SET cost_nano = maximum_nano, reason = ? WHERE card = ? AND id = ?')
+        .run(`${current.reason}; full reserved maximum charged; actual usage unavailable`, this.card, id);
+      return this.get(id);
+    });
+  }
+
   snapshot() {
     const requests = this.db.prepare('SELECT * FROM requests WHERE card = ? ORDER BY rowid').all(this.card).map(request);
     let spent = 0n;
@@ -130,8 +142,8 @@ export class CardLedger {
     let pricedBlocked = false;
     for (const row of requests) {
       spent += BigInt(row.costNano ?? 0);
-      if (row.state === 'reserved' || row.state === 'unknown') held += BigInt(row.maximumNano);
-      if ((row.maximumNano > 0 && row.state === 'unknown') || row.state === 'accounting_failure') pricedBlocked = true;
+      if (row.state === 'reserved' || row.state === 'unknown') held += BigInt(row.maximumNano) - BigInt(row.costNano ?? 0);
+      if ((row.maximumNano > 0 && row.state === 'unknown' && row.costNano === null) || row.state === 'accounting_failure') pricedBlocked = true;
     }
     const numeric = (value) => value <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(value) : value.toString();
     return {

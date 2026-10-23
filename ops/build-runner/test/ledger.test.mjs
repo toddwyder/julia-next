@@ -77,6 +77,26 @@ test('free requests remain usable without usage when priced accounting is unknow
   assert.equal(ledger.snapshot().pricedBlocked, false);
 });
 
+test('charging an unknown request at its full maximum never releases budget or invents usage', t => {
+  const files = fixture(t);
+  const ledger = files.open();
+  const request = ledger.reserve(input(300000000));
+  ledger.unknown(request.id, 'review timed out');
+  assert.equal(ledger.snapshot().remainingNano, 1700000000);
+  const charged = ledger.chargeUnknownMaximum(request.id);
+  assert.equal(charged.state, 'unknown');
+  assert.equal(charged.usage, null);
+  assert.equal(charged.costNano, 300000000);
+  assert.equal(charged.costBasis, 'reservation maximum; actual usage unknown');
+  assert.equal(ledger.chargeUnknownMaximum(request.id).costNano, 300000000);
+  assert.equal(files.open().snapshot().remainingNano, 1700000000);
+  assert.equal(files.open().snapshot().heldNano, 0);
+  const next = files.open().reserve(input(1700000000));
+  ledger.settle(next.id, { usage: { input: 1 }, costNano: 1700000000 });
+  assert.equal(ledger.snapshot().spentNano, 2000000000);
+  assert.throws(() => ledger.reserve(input(1)), /ceiling/);
+});
+
 test('reopening retains unresolved holds, snapshots, and settled costs per card', (t) => {
   const files = fixture(t);
   const ledger = files.open();
