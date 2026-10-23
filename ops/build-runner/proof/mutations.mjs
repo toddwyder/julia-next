@@ -16,6 +16,10 @@ const tests = file => `ops/build-runner/test/${file}.test.mjs`;
 const edit = (file, before, after, occurrences = 1) => ({ file, before, after, occurrences });
 const cases = [
   {
+    id: 'logged-request-forwarded-after-body-transfer', file: 'request-observer', test: 'observing a stock streamed Request preserves its body for accounting and dispatch',
+    edits: [edit('ops/build-runner/request-observer.mjs', 'transportFetch(request)', 'transportFetch(input, init)')],
+  },
+  {
     id: 'raw-model-provider-route-not-checked', file: 'pstack-session', test: 'a raw model ID cannot silently change the selected provider route',
     edits: [edit(session, 'expected != null && actual != null && expected !== actual', 'false')],
   },

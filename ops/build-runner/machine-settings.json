@@ -62,7 +62,7 @@
       "wireModel": "gpt-6-sol",
       "protocol": "responses",
       "maxInputTokens": 1050000,
-      "maxOutputTokens": 4096,
+      "maxOutputTokens": 8192,
       "price": {
         "input": 2,
         "output": 10,

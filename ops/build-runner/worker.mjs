@@ -1,3 +1,4 @@
+import { observeRequests } from './request-observer.mjs'
 import { readFile, writeFile, rename, mkdir, appendFile } from 'node:fs/promises'
 import { join, resolve, dirname } from 'node:path'
 import { execFile as execFileCb } from 'node:child_process'
@@ -93,22 +94,7 @@ async function main() {
   let account
   try {
     runner = await openRunner({ card: cardId, settingsPath: effectiveSettingsPath, cwd: job.worktree, stateDir, role: 'orchestrator', hostInstructions: workflowInstructions, subagents: helpers })
-    const transportFetch = globalThis.fetch
-    globalThis.fetch = async (input, init) => {
-      const request = new Request(input, init)
-      let body
-      try { body = await request.clone().json() } catch {}
-      const entry = { model: body?.model, method: request.method, url: request.url }
-      requests.push(entry)
-      try {
-        const response = await transportFetch(input, init)
-        entry.status = response.status
-        return response
-      } catch (error) {
-        entry.refusal = error.message
-        throw error
-      }
-    }
+    globalThis.fetch = observeRequests(globalThis.fetch, requests)
     const allowedEventTypes = new Set(['subagent_start', 'subagent_end', 'subagent_tool_start', 'subagent_tool_end', 'tool_start', 'tool_end', 'agent_start', 'agent_end', 'error', 'task_updated', 'state_changed', 'message_end'])
     const unsubscribe = runner.runtime.session.subscribe(e => { if (allowedEventTypes.has(e?.type)) events.push(e) })
     let checklist
