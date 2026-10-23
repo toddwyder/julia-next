@@ -93,7 +93,7 @@ export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'bu
     workspace = new Workspace({ filesystem: new LocalFilesystem({ basePath: cwd, contained: true }), sandbox, tools: { mastra_workspace_execute_command: { name: 'execute_command' } }, skills: ['.agents/skills'] })
     await workspace.init()
     runtime = await bootLocalAgentController({
-      cwd, homeDir: sdkHome, workspace, modes: false, subagents: providedSubagents, intervalHandlers: [],
+      cwd, homeDir: sdkHome, workspace, modes: false, subagents: providedSubagents, intervalHandlers: [], disabledTools: ['web_search'],
       hostInstructions, disableMcp: true, disablePlugins: true, disableEnvFile: true, disableHooks: true, disableGithubSignals: true,
     })
     const tools = await createWorkspaceTools(workspace)

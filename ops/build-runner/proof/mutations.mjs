@@ -16,6 +16,10 @@ const tests = file => `ops/build-runner/test/${file}.test.mjs`;
 const edit = (file, before, after, occurrences = 1) => ({ file, before, after, occurrences });
 const cases = [
   {
+    id: 'stock-hosted-search-not-disabled', file: 'subscription-tools', test: 'stock subscription requests can dispatch without unpriced hosted search',
+    edits: [edit(adapter, ", disabledTools: ['web_search']", '')],
+  },
+  {
     id: 'cache-ttl-mismatch-accepted', file: 'transport', test: 'stock Claude conversation caching uses its configured one-hour API price',
     edits: [edit(transport, "if (value.cache_control && (value.cache_control.ttl ?? '5m') !== cacheWriteTtl) return true;", '')],
   },
