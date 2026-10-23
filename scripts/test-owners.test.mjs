@@ -115,3 +115,18 @@ test('browser installation installs locked browser owners and leaves other owner
   assert.equal(readFileSync(join(f.root, 'node_modules/untouched.marker'), 'utf8'), 'root dependencies');
   assert.equal(existsSync(join(f.root, 'packages/new-browser/node_modules/stale.marker')), false);
 });
+
+test('a Node test owner declaring Playwright gets its browser runtime without a test-name entry', t => {
+  const f = fixture(t);
+  f.owner('packages/node-browser');
+  f.write('.gitignore', 'node_modules/\n');
+  f.write('packages/node-browser/package.json', JSON.stringify({ name: 'node-browser', type: 'module', devDependencies: { playwright: '1.63.0' } }));
+  f.write('packages/node-browser/test/surface.test.mjs', '');
+  f.write('packages/node-browser/node_modules/.bin/playwright', `#!/usr/bin/env node
+require('node:fs').writeFileSync('runtime-installed.json',JSON.stringify(process.argv.slice(2)));
+`);
+  chmodSync(join(f.root, 'packages/node-browser/node_modules/.bin/playwright'), 0o755);
+  const result = f.run('--install-browsers', 'local');
+  assert.equal(result.status, 0, result.stderr + result.stdout);
+  assert.deepEqual(JSON.parse(readFileSync(join(f.root, 'packages/node-browser/runtime-installed.json'), 'utf8')), ['install', '--with-deps', 'chromium']);
+});

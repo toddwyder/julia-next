@@ -4,7 +4,7 @@ The Windows laptop-runner CI gate is retired under Todd's server-build decision.
 
 ## Test ownership
 
-`scripts/test-owners.mjs` discovers tests from Git source identity. The nearest package manifest and lockfile own dependency installation. A `server` ancestor selects server execution. Browser specs run with their owner's Playwright executable and configuration; the repository config accepts sibling skill specs without another path entry. There are no per-test inclusion or exclusion lists.
+`scripts/test-owners.mjs` discovers tests from Git source identity. The nearest package manifest and lockfile own dependency installation. A `server` ancestor selects server execution. Browser runtimes follow the owner's declared Playwright dependency, including Node tests that launch Chromium. Browser specs run with their owner's Playwright executable and configuration; the repository config accepts sibling skill specs without another path entry. There are no per-test inclusion or exclusion lists.
 
 The root and nested package tests run in Linux GitHub Actions after their owners' locked installs. Live-provider and server-key tests run on this ubuntu server through `scripts/julia-agents.mjs`. The server worker discovers open same-repository PR heads and main, checks out the exact SHA, installs discovered owners, and publishes the result and log on `refs/notes/julia-server-tests/<SHA>`. The Actions server-tests job reads that exact result using its checkout authentication. This route needs ordinary Git contents access, already available; the current GitHub token's status-write and runner-registration endpoints returned HTTP 403.
 
@@ -23,5 +23,7 @@ The [real merge replay](evidence/follow-up/maintenance-proof.json) used an actua
 The [installed service readback](evidence/follow-up/maintenance-install.json) and [production no-merge readback](evidence/follow-up/maintenance-production-no-merge.json) show main's current baseline and no runs. Runtime state is under `/home/ubuntu/.local/state/julia-verification-maintenance`; installed source is under `/home/ubuntu/.local/share/julia-verification-maintenance`. Blocked reports stay beside each run's sessions and proof.
 
 ## CI
+
+Fresh CI exposed Node tests that launch Chromium without a browser-spec suffix. Runtime installation now follows declared package dependencies for each execution environment. The actual missing-browser probe also exposed one HTTP-fixture cleanup registered too late; its failing-before hang, prompt-failure-after and real browser pass are retained in the follow-up evidence.
 
 The authoritative result is PR #314's checks on its exact pushed head. This report and both proofs are committed before the final CI report. No merge is performed.

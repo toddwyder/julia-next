@@ -1,0 +1,35 @@
+PLAYWRIGHT_BROWSERS_PATH=/tmp/jul251-missing-browser-probe timeout 10s node --test --test-name-pattern=phone browser shows ops/mastra-agents/reviewer/test/jul-243.test.ts
+✖ phone browser shows Working and Stopped cards, action outcomes and a clean console (770.302769ms)
+✖ ops/mastra-agents/reviewer/test/jul-243.test.ts (9909.857088ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 1
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9925.67976
+
+✖ failing tests:
+
+test at ops/mastra-agents/reviewer/test/jul-243.test.ts:153:1
+✖ phone browser shows Working and Stopped cards, action outcomes and a clean console (770.302769ms)
+  browserType.launch: Executable doesn't exist at /tmp/jul251-missing-browser-probe/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell
+  ╔════════════════════════════════════════════════════════════╗
+  ║ Looks like Playwright was just installed or updated.       ║
+  ║ Please run the following command to download new browsers: ║
+  ║                                                            ║
+  ║     npx playwright install                                 ║
+  ║                                                            ║
+  ║ <3 Playwright Team                                         ║
+  ╚════════════════════════════════════════════════════════════╝
+      at TestContext.<anonymous> (/home/ubuntu/julia-hybrid-pstack-trial/ops/mastra-agents/reviewer/test/jul-243.test.ts:161:34) {
+    name: 'Error',
+    log: []
+  }
+
+test at ops/mastra-agents/reviewer/test/jul-243.test.ts:1:1
+✖ ops/mastra-agents/reviewer/test/jul-243.test.ts (9909.857088ms)
+  'Promise resolution is still pending but the event loop has already resolved'
+
+exit_code=124

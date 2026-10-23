@@ -1,0 +1,14 @@
+✔ new tests inherit the nearest locked dependency owner and server execution from their folder (242.815988ms)
+✔ new tests execute with their owner dependencies and isolated Git process state (352.419635ms)
+✔ server tests are absent from local execution and execute on the server route (378.304559ms)
+✔ a nested browser suite uses its owner executable, configuration, and relative test paths (1486.334211ms)
+✔ browser installation installs locked browser owners and leaves other owners untouched (1052.954649ms)
+✔ a Node test owner declaring Playwright gets its browser runtime without a test-name entry (692.092121ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4350.346382

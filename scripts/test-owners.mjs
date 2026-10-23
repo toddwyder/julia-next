@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -57,7 +57,13 @@ export function main(args = process.argv.slice(2)) {
   const plan = testOwners();
   if (args[0] === '--plan') console.log(JSON.stringify(plan, null, 2));
   else if (args[0] === '--install-browsers') {
-    for (const owner of plan.owners.filter(owner => owner.tests.browser.length)) {
+    const environment = args[1];
+    if (environment && !['local', 'server', 'browser'].includes(environment)) throw new Error('Browser install environment must be local, server, or browser');
+    for (const owner of plan.owners) {
+      if (environment && !owner.tests[environment].length) continue;
+      const manifest = JSON.parse(readFileSync(join(owner.directory, 'package.json'), 'utf8'));
+      const dependencies = { ...manifest.dependencies, ...manifest.devDependencies };
+      if (!owner.tests.browser.length && !dependencies.playwright && !dependencies['@playwright/test']) continue;
       execute('npx', ['--no-install', 'playwright', 'install', '--with-deps', 'chromium'], resolve(owner.directory));
     }
   } else if (args[0] === '--install') {
@@ -68,7 +74,7 @@ export function main(args = process.argv.slice(2)) {
       execute(owner.runtime === 'bun' ? 'bun' : 'npm', owner.runtime === 'bun' ? ['install', '--frozen-lockfile'] : ['ci'], resolve(owner.directory));
     }
   } else if (args[0] === '--run') runOwnedTests(args[1], { plan });
-  else throw new Error('usage: node scripts/test-owners.mjs --plan | --install [local|server|browser] | --install-browsers | --run local|server|browser');
+  else throw new Error('usage: node scripts/test-owners.mjs --plan | --install [local|server|browser] | --install-browsers [local|server|browser] | --run local|server|browser');
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

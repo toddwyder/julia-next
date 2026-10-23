@@ -43,6 +43,7 @@ export async function runHead({ repository, state }, head, { env = process.env }
     const { GIT_DIR, GIT_WORK_TREE, NODE_TEST_CONTEXT, ...cleanEnv } = env;
     for (const args of [
       ['scripts/test-owners.mjs', '--install'],
+      ['scripts/test-owners.mjs', '--install-browsers', 'server'],
       ['scripts/julia-agents.mjs', '--', process.execPath, 'scripts/test-owners.mjs', '--run', 'server'],
     ]) {
       const run = spawnSync(process.execPath, args, { cwd: work, env: cleanEnv, encoding: 'utf8', timeout: 1_800_000, maxBuffer: 32 * 1024 * 1024 });
