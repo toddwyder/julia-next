@@ -47,6 +47,7 @@ test('proof requires actual coder tool activity and a later review of the change
     decisions: 'ts\tphase\tdecision\n2026-10-23\tbuild\tUse marker\n',
   }
   const evidence = inspectPstackRun(input)
+  assert.throws(() => inspectPstackRun({ ...input, checklist: '- [x] Build\n- [x] 8. Opening a PR: open PR to main.' }), /publishing is outside/)
   assert.equal(evidence.hasCoder, true)
   assert.equal(evidence.reviewHandoff.modelId, deepseek)
   assert.equal(evidence.reviewHandoff.refused, true)
