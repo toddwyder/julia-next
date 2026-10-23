@@ -17,14 +17,18 @@ test('coding standards retain framework rules and the trial retains learning tes
   assert.match(standards, /built-in feature/i);
 });
 
+test('CLAUDE.md loads AGENTS.md as the one rulebook', () => {
+  const claude = read('CLAUDE.md');
+  assert.match(claude, /^@AGENTS\.md$/m);
+  assert.ok(claude.split('\n').filter(Boolean).length <= 5, 'CLAUDE.md keeps no rules of its own');
+});
+
 test('agent instructions use the trial rulebook and the runbook marks Factory retired', () => {
-  for (const path of ['CLAUDE.md', 'docs/agents/server-runbook.md']) {
-    const text = read(path);
-    assert.match(text, /GitHub/);
-    assert.match(text, /retired/i);
-    assert.match(text, /Todd/);
-    assert.doesNotMatch(text, /Tick as you go|Finish the card/);
-  }
+  const runbook = read('docs/agents/server-runbook.md');
+  assert.match(runbook, /GitHub/);
+  assert.match(runbook, /retired/i);
+  assert.match(runbook, /Todd/);
+  assert.doesNotMatch(runbook, /Tick as you go|Finish the card/);
   const trial = read('AGENTS.md');
   assert.match(trial, /poteto-mode skill/);
   assert.match(trial, /one \$2 total model budget/);
