@@ -1,0 +1,28 @@
+✔ coding standards retain framework rules and the trial retains learning tests (2.875465ms)
+✔ agent instructions use the trial rulebook and the runbook marks Factory retired (1.305012ms)
+✔ post-build reviewer checks and the plan-answers/park policy replace stop-and-ask builder gates (1.010913ms)
+✔ the repository-owned pre-plan skill survives Pocock skill upgrades (2.438531ms)
+✔ Todd's 19 October process vocabulary and restart stop are explicit (1.167177ms)
+✔ formal verification skills retain exact pinned hashes under the trial mirror (2.091658ms)
+✔ agent entry points resolve their actual destinations (100.582086ms)
+✔ missing learning directories and removed headings fail with the source line and repair (213.849317ms)
+✔ relative links, duplicate headings and source paths are checked without treating external URLs or templates as local files (337.042099ms)
+✔ root file references and source files beyond JavaScript must exist (152.787742ms)
+✔ new tests inherit the nearest locked dependency owner and server execution from their folder (295.141039ms)
+✔ new tests execute with their owner dependencies and isolated Git process state (365.075644ms)
+✔ server tests are absent from local execution and execute on the server route (387.663357ms)
+✔ a nested browser suite uses its owner executable, configuration, and relative test paths (1294.814498ms)
+✔ browser installation installs locked browser owners and leaves other owners untouched (674.961289ms)
+✔ a Node test owner declaring Playwright gets its browser runtime without a test-name entry (639.665487ms)
+✔ failing Node tests emit one readable annotation each, without suite duplicates or passing tests (355.063299ms)
+✔ failing Bun tests include names and only the first error line, without native duplicate annotations (123.929594ms)
+✔ browser failures emit a repository-relative test annotation from the real owner runner (2599.480989ms)
+✔ a passing Node test name containing an XML delimiter cannot hide a later file failure (396.791583ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7290.40561

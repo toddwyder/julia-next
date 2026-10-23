@@ -1,0 +1,24 @@
+{
+  "commit": "dbfb57267f4e3ddee03d97ea27fb01f27025aba7",
+  "command": "node scripts/check-agent-links.mjs",
+  "sourceSha256": "249e629d5f31ca836d1d2e8dc2611fc3905eeafe11f67be1b5c64f4bb281a65c",
+  "exitCode": 1,
+  "stdout": "",
+  "stderr": "CLAUDE.md:24: AGENTS.md#building-and-reviewing has no matching heading; link to a current heading in AGENTS.md\n"
+}
+{
+  "commit": "d87e80c8d15bcc98b2abbcd51dd82aa145ff5298",
+  "command": "node scripts/check-agent-links.mjs",
+  "sourceSha256": "249e629d5f31ca836d1d2e8dc2611fc3905eeafe11f67be1b5c64f4bb281a65c",
+  "exitCode": 1,
+  "stdout": "",
+  "stderr": "AGENTS.md:8: framework/ does not exist; fix the reference or restore framework\nCLAUDE.md:24: AGENTS.md#building-and-reviewing has no matching heading; link to a current heading in AGENTS.md\n"
+}
+{
+  "commit": "a451f738873d8cedcf84d43a7fa359f3d27269db",
+  "command": "node scripts/check-agent-links.mjs",
+  "sourceSha256": "249e629d5f31ca836d1d2e8dc2611fc3905eeafe11f67be1b5c64f4bb281a65c",
+  "exitCode": 1,
+  "stdout": "",
+  "stderr": "CLAUDE.md:24: AGENTS.md#building-and-reviewing has no matching heading; link to a current heading in AGENTS.md\n"
+}

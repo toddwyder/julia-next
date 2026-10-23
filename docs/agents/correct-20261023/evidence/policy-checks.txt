@@ -1,0 +1,12 @@
+✔ .gitattributes sets LF for every text file, and for the files installed on the server (1.951712ms)
+✔ no tracked text file is committed with CRLF line endings (204.679986ms)
+✔ no script under scripts/ or ops/ hardcodes a personal-machine path (C:\Users\<name>) (15.341924ms)
+✔ a personal path in a nested folder is caught and reported by the scan (4.267055ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 337.087805
