@@ -10,7 +10,53 @@ import { createServer } from 'node:http'
 const execFile = promisify(execFileCb)
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const RUN_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
+const CHECKLIST_LIMIT = 256 * 1024
 const pendingStarts = new Map()
+
+export function parseChecklist(text) {
+  const items = []
+  for (const line of String(text).split(/\r?\n/)) {
+    const match = /^([ \t]*)(?:[-*]|\d+[.)])\s+\[([ xX])\]\s+(.+)$/.exec(line)
+    if (!match) continue
+    const item = match[3].trim()
+    if (!item) continue
+    items.push({ text: item, done: match[2].toLowerCase() === 'x', depth: Math.floor(match[1].replace(/\t/g, '  ').length / 2) })
+  }
+  return items
+}
+
+async function readChecklistFile(file) {
+  try {
+    const info = await stat(file)
+    if (!info.isFile() || info.size > CHECKLIST_LIMIT) return null
+    return { items: parseChecklist(await readFile(file, 'utf8')), updatedAt: info.mtime.toISOString() }
+  } catch (error) {
+    if (error?.code === 'ENOENT') return null
+    throw error
+  }
+}
+
+async function withChecklist(job, jobsDir) {
+  if (!job || typeof job !== 'object') return job
+  const candidates = []
+  if (typeof job.worktree === 'string' && job.worktree) candidates.push(join(job.worktree, '.builder-home', 'pstack', 'checklist.md'))
+  if (typeof job.runId === 'string' && RUN_ID_RE.test(job.runId)) candidates.push(join(jobsDir, job.runId, 'pstack-checklist.md'))
+  for (const file of candidates) {
+    const checklist = await readChecklistFile(file)
+    if (checklist) return { ...job, checklist }
+  }
+  return { ...job, checklist: { items: [], updatedAt: null } }
+}
+
+async function isMachineryPractice(snapshot, settingsPath) {
+  if (!settingsPath) return false
+  let settings
+  try { settings = JSON.parse(await readFile(settingsPath, 'utf8')) } catch { return false }
+  const key = settings?.machineryModel
+  const wire = key ? settings.models?.[key]?.wireModel : undefined
+  if (!wire) return false
+  return snapshot.roles?.orchestrator?.modelId === wire && snapshot.roles?.coder?.modelId === wire
+}
 
 function resolveOpts(options = {}) {
   const jobsDir = options.jobsDir ?? process.env.BUILD_RUNNER_JOBS_DIR ?? null
@@ -83,7 +129,7 @@ export async function startJob(input, options = {}) {
         await stat(jobPath(opts.jobsDir, runId))
         const existing = await readJobFile(opts.jobsDir, runId)
         if (JSON.stringify(existing?.snapshot) !== JSON.stringify(snapshot)) throw new Error(`conflicting input for ${runId}`)
-        return existing
+        return await withChecklist(existing, opts.jobsDir)
       } catch (error) {
         if (error?.code !== 'ENOENT') throw error
       }
@@ -111,6 +157,7 @@ export async function startJob(input, options = {}) {
         result: null,
         error: null,
         createdAt: new Date().toISOString(),
+        ...(await isMachineryPractice(snapshot, opts.settingsPath) ? { machineryProof: true } : {}),
       }
       await writeJobFile(opts.jobsDir, runId, job)
 
@@ -127,7 +174,7 @@ export async function startJob(input, options = {}) {
       }
       job.workerPid = child?.pid ?? null
       await writeJobFile(opts.jobsDir, runId, job)
-      return await readJobFile(opts.jobsDir, runId)
+      return await withChecklist(await readJobFile(opts.jobsDir, runId), opts.jobsDir)
     } finally {
       pendingStarts.delete(key)
     }
@@ -141,7 +188,7 @@ export async function startJob(input, options = {}) {
 export async function readJob(runId, options = {}) {
   if (typeof runId !== 'string' || !RUN_ID_RE.test(runId)) throw new Error('runId required')
   const opts = resolveOpts(options)
-  return await readJobFile(opts.jobsDir, runId)
+  return await withChecklist(await readJobFile(opts.jobsDir, runId), opts.jobsDir)
 }
 
 export async function listJobs(options = {}) {
@@ -151,7 +198,7 @@ export async function listJobs(options = {}) {
   for (const entry of entries) {
     if (!entry.isDirectory()) continue
     try {
-      jobs.push(await readJobFile(opts.jobsDir, entry.name))
+      jobs.push(await withChecklist(await readJobFile(opts.jobsDir, entry.name), opts.jobsDir))
     } catch {}
   }
   return jobs
