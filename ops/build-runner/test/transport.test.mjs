@@ -70,6 +70,15 @@ test('paid missing usage refuses result and prevents the next arrival', async t 
   assert.equal(f.ledger.snapshot().pricedBlocked, true);
 });
 
+test('paid provider failure preserves bounded status and message while retaining reservation', async t => {
+  const f = await fixture(t, (_req, res) => json(res, { error: { message: 'model route unavailable\nretry later' } }, 400));
+  const fetch = transport(f, { price: paid });
+  await assert.rejects(send(fetch, f.endpoint), /HTTP 400.*model route unavailable retry later/);
+  const request = f.ledger.snapshot().requests[0];
+  assert.equal(request.state, 'unknown');
+  assert.match(request.reason, /HTTP 400.*model route unavailable retry later/);
+});
+
 test('priced requests count published token prices and positive provider charges without the retired trial stop', async t => {
   const f = await fixture(t, (_req, res) => json(res, {
     result: 'allowed', usage: { prompt_tokens: 10, completion_tokens: 2, cost_usd: 0.00002 },

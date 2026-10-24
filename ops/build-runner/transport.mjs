@@ -132,6 +132,17 @@ function parseResponse(text, contentType, spec) {
   return { usage, reportedNano: costNano };
 }
 
+function providerFailure(response, text) {
+  if (response.ok) return null;
+  let detail = '';
+  try {
+    const parsed = JSON.parse(text);
+    const message = parsed?.error?.message;
+    if (typeof message === 'string' && message.trim()) detail = `: ${message.trim().replace(/[\r\n\t]+/g, ' ').slice(0, 500)}`;
+  } catch {}
+  return `Provider request failed (HTTP ${response.status})${detail}`;
+}
+
 async function responseText(response, maximum) {
   if (!response.body) return '';
   const reader = response.body.getReader();
@@ -229,6 +240,8 @@ export function createTransport({ ledger, settings, role, fetch: upstream = glob
       response = await upstream(new Request(request, { body: JSON.stringify(bounded), redirect: 'error' }));
       if (response.status >= 300 && response.status < 400) throw fail('Redirect refused');
       const text = await responseText(response.clone(), maximum);
+      const providerError = providerFailure(response, text);
+      if (spec.paid && providerError) throw fail(providerError);
       let usage;
       let reportedNano = 0;
       try { ({ usage, reportedNano } = parseResponse(text, response.headers.get('content-type') ?? (bounded.stream ? 'text/event-stream' : ''), spec)); }
@@ -252,9 +265,12 @@ export function createTransport({ ledger, settings, role, fetch: upstream = glob
       return response;
     } catch (error) {
       if (response?.body) void response.body.cancel().catch(() => {});
-      if (!settled) await ledgerCall('unknown', id, 'Request outcome unavailable');
+      const reason = error instanceof Error && error.message.startsWith('Provider request failed')
+        ? `Request outcome unavailable: ${error.message}`
+        : 'Request outcome unavailable';
+      if (!settled) await ledgerCall('unknown', id, reason);
       if (error.message?.startsWith('STOP WORK')) throw error;
-      throw fail('Request outcome unavailable');
+      throw fail(reason);
     }
   };
 }
