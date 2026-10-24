@@ -1,0 +1,100 @@
+{
+  "start-selected": {
+    "takenAt": "2026-10-24T16:00:20.300Z",
+    "state": null,
+    "runId": null,
+    "pageHeading": null,
+    "checklist": {
+      "finished": 0,
+      "skipped": 0,
+      "pending": 0,
+      "total": 0
+    },
+    "cardShot": false,
+    "items": []
+  },
+  "running": {
+    "takenAt": "2026-10-24T16:00:25.995Z",
+    "state": null,
+    "runId": null,
+    "pageHeading": null,
+    "checklist": {
+      "finished": 0,
+      "skipped": 0,
+      "pending": 0,
+      "total": 0
+    },
+    "cardShot": false,
+    "items": []
+  },
+  "start": {
+    "takenAt": "2026-10-24T16:02:45.017Z",
+    "state": "running",
+    "runId": "jul-267-c84f78e6d1c4bc3d135879bddc81edde",
+    "pageHeading": "JUL-267 · running",
+    "checklist": {
+      "finished": 4,
+      "skipped": 0,
+      "pending": 0,
+      "total": 4
+    },
+    "cardShot": true,
+    "items": [
+      {
+        "text": "None. Single marker file, no gates before fan-out.",
+        "status": "finished",
+        "depth": 0
+      },
+      {
+        "text": "One workstream: create and verify `JUL-263-START-PRACTICE-4.txt`. No disjoint files or layers to parallelize.",
+        "status": "finished",
+        "depth": 0
+      },
+      {
+        "text": "None. Single new file, no concurrent writers.",
+        "status": "finished",
+        "depth": 0
+      },
+      {
+        "text": "One worker (subagent, model-1 / commandcode/reflection/beam:free) owns the diff; this agent reviews via byte and diff verification. Review separation achieved through delegation.",
+        "status": "finished",
+        "depth": 0
+      }
+    ]
+  },
+  "end": {
+    "takenAt": "2026-10-24T16:02:48.618Z",
+    "state": "ready-for-review",
+    "runId": "jul-267-c84f78e6d1c4bc3d135879bddc81edde",
+    "pageHeading": "JUL-267 · ready-for-review",
+    "checklist": {
+      "finished": 4,
+      "skipped": 0,
+      "pending": 0,
+      "total": 4
+    },
+    "cardShot": true,
+    "items": [
+      {
+        "text": "None. Single marker file, no gates before fan-out.",
+        "status": "finished",
+        "depth": 0
+      },
+      {
+        "text": "One workstream: create and verify `JUL-263-START-PRACTICE-4.txt`. No disjoint files or layers to parallelize.",
+        "status": "finished",
+        "depth": 0
+      },
+      {
+        "text": "None. Single new file, no concurrent writers.",
+        "status": "finished",
+        "depth": 0
+      },
+      {
+        "text": "One worker (subagent, model-1 / commandcode/reflection/beam:free) owns the diff; this agent reviews via byte and diff verification. Review separation achieved through delegation.",
+        "status": "finished",
+        "depth": 0
+      }
+    ]
+  }
+}

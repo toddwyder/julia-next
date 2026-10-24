@@ -1,37 +1,40 @@
-# Final proof — JUL-263 live view
+# Final proof — skipped checklist steps
 
-A Beam practice build through the Tailscale Start page, with the pstack checklist
-on the dashboard ticking while it ran.
+A Beam practice build through the Tailscale Start page, with the dashboard showing
+skipped steps as their own state.
 
 | | |
 |---|---|
-| Card | JUL-266 |
-| Run | `jul-266-a3207dc745f39cb952b983776715a2ef` |
+| Card | JUL-267 |
+| Run | `jul-267-ecc8a6659f46657442c219729c2ea95e` |
 | Start page | `https://ovh.tail91f394.ts.net/julia-control` |
 | Roles | Beam (`reflection/beam:free`) for orchestrator and coder |
 | Result | `ready-for-review` |
-| Candidate | `12a9643530cc8ca91d8bf97bf8b44d08f5f3860e` |
-| Base | `6cfe443eec779e0a7eb60fc15a43b0714d7887e8` |
-| Change | `JUL-263-START-PRACTICE-3.txt` only, 32 bytes: `Julia live view practice three.\n` |
-| Spend | $0. 69 settled Beam requests at the published $0 price; ledger spent and held are both zero. |
+| Candidate | `63d2dbfa3dc4a436c7e369fd85e4ae0fd9e2ec02` |
+| Base | `e23d702aac4613ec55b67ef13eb019c63e2800ee` (the skipped-state build) |
+| Change | `JUL-263-START-PRACTICE-4.txt` only, 31 bytes: `Julia live view practice four.\n` |
+| Spend | $0. 135 settled Beam requests at the published $0 price; ledger spent and held are both zero. |
 
 ## Screenshots
 
-- [start.png](start.png): `JUL-266 · running`, 2 of 8 steps finished.
-- [middle.png](middle.png): `JUL-266 · running`, 3 of 8 steps finished. The third
-  tick arrived while the build was still running.
-- [end.png](end.png): `JUL-266 · ready-for-review`, 3 of 8 steps finished. Steps
-  4, 5 and 6 are finished; steps 1–3 and 7–8 were skipped and stay unticked.
+- [start.png](start.png) and [start-card.png](start-card.png):
+  `JUL-267 · running`, **0 finished, 5 skipped, 3 pending**. Five steps carry
+  the skipped marker and badge; three wait with the open marker.
+- [middle.png](middle.png) and [middle-card.png](middle-card.png):
+  `JUL-267 · running`, **2 finished, 6 skipped**. Two steps have ticked.
+- [end.png](end.png) and [end-card.png](end-card.png):
+  `JUL-267 · ready-for-review`, **3 finished, 5 skipped**. The page itself shows
+  the finished build, its candidate `63d2dbf`, the three ticked steps, the five
+  skipped steps, and the saved result.
 
-[start-selected.png](start-selected.png) shows Beam chosen for both roles before
-Start. [running.png](running.png) is the first frame after the job appeared.
-`screenshots.json` records the exact checklist items and counts at each shot.
-`checklist.jsonl` is the two-second tick timeline. `final-job.json` is the saved
-job and ledger.
+`screenshots.json` records the page heading and the counts at each shot.
+`checklist.jsonl` is the two-second timeline, including the jump to
+`ready-for-review`. `final-job.json` is the saved job and ledger.
 
-## What was fixed to get here
+## How the end shot was taken
 
-Attempts 1–6 are recorded beside this directory. The live view fixes were the
-checklist parser (numbered steps and `done:` markers), the tool-free plan turn,
-and keeping a real build contained and out of publishing. The final run is the
-one where Beam used a subagent for both the coding and the machinery self-check.
+The driver waited for the run's own card heading to read `ready-for-review`
+before capturing. Two runs of JUL-267 both read `ready-for-review`, so the wait
+filters by this run's ID rather than the page-wide heading. The start and middle
+shots come from the same run; the end shot is the same run after the page showed
+its finished state.
