@@ -2,7 +2,7 @@
   "authPath": "/home/ubuntu/.local/share/mastracode/auth.json",
   "ledgerPath": "/home/ubuntu/.local/state/julia-machine/cards.sqlite",
   "roles": {
-    "orchestrator": "openai/gpt-6-sol",
+    "orchestrator": "anthropic/claude-haiku-5-5",
     "coder": "commandcode/deepseek/deepseek-v4.1-flash"
   },
   "providers": [

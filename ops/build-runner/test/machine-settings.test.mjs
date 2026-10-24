@@ -6,24 +6,24 @@ import { createPstackSession } from '../pstack-session.mjs'
 const settings = JSON.parse(await readFile(new URL('../machine-settings.json', import.meta.url), 'utf8'))
 const table = await readFile(new URL('../pstack-models.md', import.meta.url), 'utf8')
 
-test('normal machine sessions use Sol and DeepSeek and preserve the two-model panels', () => {
+test('normal machine sessions use Claude and DeepSeek and preserve the two-model panels', () => {
   const session = createPstackSession(settings, { roles: settings.roles, card: { identifier: 'JUL-253' } }, table)
-  assert.equal(session.orchestratorModel, 'openai/gpt-6-sol')
+  assert.equal(session.orchestratorModel, 'anthropic/claude-haiku-5-5')
   assert.equal(session.coderModel, 'commandcode/deepseek/deepseek-v4.1-flash')
   assert.equal(session.machineryProof, false)
   const entries = Object.fromEntries(session.pstackModels.split('\n').filter(line => line && !line.startsWith('#')).map(line => {
     const split = line.indexOf(':')
     return [line.slice(0, split), line.slice(split + 1).trim().split(', ')]
   }))
-  assert.deepEqual(entries['main session'], ['openai/gpt-6-sol'])
-  assert.deepEqual(entries['hardest tasks'], ['openai/gpt-6-sol'])
+  assert.deepEqual(entries['main session'], ['anthropic/claude-haiku-5-5'])
+  assert.deepEqual(entries['hardest tasks'], ['anthropic/claude-haiku-5-5'])
   assert.deepEqual(entries['swarm workers'], ['commandcode/deepseek/deepseek-v4.1-flash'])
   for (const role of ['how explorer', 'how explainer', 'why investigators']) {
     assert.deepEqual(entries[role], ['commandcode/deepseek/deepseek-v4.1-flash'])
   }
-  assert.deepEqual(entries['why synthesizer'], ['openai/gpt-6-sol'])
+  assert.deepEqual(entries['why synthesizer'], ['anthropic/claude-haiku-5-5'])
   for (const role of ['arena runners', 'architect runners', 'interrogate reviewers']) {
-    assert.deepEqual(entries[role], ['openai/gpt-6-sol', 'commandcode/deepseek/deepseek-v4.1-flash'])
+    assert.deepEqual(entries[role], ['anthropic/claude-haiku-5-5', 'commandcode/deepseek/deepseek-v4.1-flash'])
   }
   for (const model of Object.values(settings.models)) {
     assert.ok(model.source.startsWith('https://'))
