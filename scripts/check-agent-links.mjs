@@ -51,8 +51,8 @@ export function checkAgentLinks(root = process.cwd()) {
       const isSkill = file.endsWith('/SKILL.md');
       const references = [...line.matchAll(/\[[^\]]*\]\(([^\s)]+)\)/g)]
         .map(match => match[1])
-        .map(destination => ({ destination, base: dirname(source) }));
-      for (const match of line.matchAll(/^@([^\s]+)$/g)) references.push({ destination: match[1], base: dirname(source) });
+        .map(destination => ({ destination, bases: [dirname(source)] }));
+      for (const match of line.matchAll(/^@([^\s]+)$/g)) references.push({ destination: match[1], bases: [dirname(source)] });
       const prose = line.replace(/\[[^\]]*\]\([^)]*\)/g, '').replace(/\b[\w+.-]+:\/\/\S+/g, '');
       for (const match of prose.matchAll(/(?<![\w:/\\])(?:\.?[\w@-]+\/)+[\w@.-]*/g)) {
         const destination = match[0].replace(/\.$/, '');
@@ -62,16 +62,18 @@ export function checkAgentLinks(root = process.cwd()) {
         const isSkillResource = /^(?:references|playbooks)\//.test(destination)
           || /^scripts\/.+\.[a-z][\w-]*$/i.test(destination);
         if (!isEntryPoint && !isRepositoryPath && !(isSkill && isSkillResource)) continue;
-        const sourceRelative = isSkill && isSkillResource;
-        const base = sourceRelative ? dirname(source) : root;
-        if (destination.endsWith('/') || /\.[a-z][\w-]*$/i.test(destination)) references.push({ destination, base });
+        const bases = isSkill && isSkillResource ? [dirname(source), root] : [root];
+        if (destination.endsWith('/') || /\.[a-z][\w-]*$/i.test(destination)) references.push({ destination, bases });
       }
-      for (const { destination, base } of references) {
+      for (const { destination, bases } of references) {
         if (/^[\w+.-]+:/.test(destination)) continue;
         const [path, fragment] = destination.split('#');
-        const target = path ? resolve(base, decodeURIComponent(path)) : source;
+        const targets = path
+          ? [...new Set(bases.map(base => resolve(base, decodeURIComponent(path))))]
+          : [source];
+        const target = targets.find(existsSync);
         const label = `${file}:${index + 1}: ${destination}`;
-        if (!existsSync(target)) failures.push(`${label} does not exist; fix the reference or restore ${relative(root, target)}`);
+        if (!target) failures.push(`${label} does not exist; fix the reference or restore ${targets.map(candidate => relative(root, candidate)).join(' or ')}`);
         else if (fragment && !headingIds(readFileSync(target, 'utf8')).includes(decodeURIComponent(fragment))) {
           failures.push(`${label} has no matching heading; link to a current heading in ${relative(root, target)}`);
         }

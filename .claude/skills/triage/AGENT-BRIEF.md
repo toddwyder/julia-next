@@ -29,6 +29,8 @@ Describe **what** the system should do, not **how** to implement it. The agent w
 
 The agent needs to know when it's done. Every agent brief must have concrete, testable acceptance criteria. Each criterion should be independently verifiable.
 
+Run `node scripts/check-agent-brief.mjs <draft-file>` before posting. It refuses text copied from repository docs, criteria written as steps, implementation words, and negations.
+
 - **Good:** "Running `gh issue list --label needs-triage` returns issues that have been through initial classification"
 - **Bad:** "Triage should work correctly"
 
