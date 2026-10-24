@@ -1,0 +1,170 @@
+{
+  "start-selected": {
+    "takenAt": "2026-10-24T14:27:15.997Z",
+    "state": null,
+    "runId": null,
+    "checklist": {
+      "done": 0,
+      "total": 0
+    },
+    "items": []
+  },
+  "running": {
+    "takenAt": "2026-10-24T14:27:18.867Z",
+    "state": null,
+    "runId": null,
+    "checklist": {
+      "done": 0,
+      "total": 0
+    },
+    "items": []
+  },
+  "start": {
+    "takenAt": "2026-10-24T14:29:30.804Z",
+    "state": "running",
+    "runId": "jul-265-77711946ccc44652a874d42a9cc20f73",
+    "checklist": {
+      "done": 2,
+      "total": 8
+    },
+    "items": [
+      {
+        "text": "1. `how` over the affected subsystem.",
+        "done": false,
+        "depth": 0
+      },
+      {
+        "text": "2. `architect` for parallel design exploration.",
+        "done": false,
+        "depth": 0
+      },
+      {
+        "text": "3. Write the throughput checkpoint as four todo items.",
+        "done": false,
+        "depth": 0
+      },
+      {
+        "text": "4. Create marker file JUL-263-START-PRACTICE-2.txt with exact bytes.",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "5. Verify marker bytes and confirm no other working-tree changes.",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "6. Run the Beam practice build through the server Start page. (skip: no Tailscale/server access or secrets in this sandbox)",
+        "done": false,
+        "depth": 0
+      },
+      {
+        "text": "7. Verify candidate commit base-to-candidate diff contains only marker.",
+        "done": false,
+        "depth": 0
+      },
+      {
+        "text": "8. Open a PR to main with marker proof.",
+        "done": false,
+        "depth": 0
+      }
+    ]
+  },
+  "middle": {
+    "takenAt": "2026-10-24T14:29:33.598Z",
+    "state": "running",
+    "runId": "jul-265-77711946ccc44652a874d42a9cc20f73",
+    "checklist": {
+      "done": 2,
+      "total": 8
+    },
+    "items": [
+      {
+        "text": "1. `how` over the affected subsystem.",
+        "done": false,
+        "depth": 0
+      },
+      {
+        "text": "2. `architect` for parallel design exploration.",
+        "done": false,
+        "depth": 0
+      },
+      {
+        "text": "3. Write the throughput checkpoint as four todo items.",
+        "done": false,
+        "depth": 0
+      },
+      {
+        "text": "4. Create marker file JUL-263-START-PRACTICE-2.txt with exact bytes.",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "5. Verify marker bytes and confirm no other working-tree changes.",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "6. Run the Beam practice build through the server Start page. (skip: no Tailscale/server access or secrets in this sandbox)",
+        "done": false,
+        "depth": 0
+      },
+      {
+        "text": "7. Verify candidate commit base-to-candidate diff contains only marker.",
+        "done": false,
+        "depth": 0
+      },
+      {
+        "text": "8. Open a PR to main with marker proof.",
+        "done": false,
+        "depth": 0
+      }
+    ]
+  },
+  "end": {
+    "takenAt": "2026-10-24T14:31:14.487Z",
+    "state": "ready-for-review",
+    "runId": "jul-265-77711946ccc44652a874d42a9cc20f73",
+    "checklist": {
+      "done": 7,
+      "total": 7
+    },
+    "items": [
+      {
+        "text": "1. `how` over the affected subsystem. (n/a: single marker file, no subsystem)",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "2. `architect` for parallel design exploration. (n/a: single file, no design)",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "3. Write the throughput checkpoint. (checklist.md + decisions.tsv retained)",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "4. Create marker file JUL-263-START-PRACTICE-2.txt with exact bytes. (delegated to pstack coder subagent; verified 30 bytes)",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "5. Verify marker bytes and confirm no other working-tree changes.",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "7. Verify candidate commit base-to-candidate diff contains only marker.",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "7b. Machinery self-check (Beam) of actual changed files. PASS.",
+        "done": true,
+        "depth": 0
+      }
+    ]
+  }
+}

@@ -103,8 +103,9 @@ export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'bu
     await workspace.init()
     const planningDynamicTools = ['request_access', 'create-workflow', 'list-workflows', 'get-workflow', 'run-workflow', 'delete-workflow', 'schedule_list', 'schedule_update', 'schedule_create', 'schedule_resume', 'schedule_run', 'web_search', 'notification_inbox']
     const planningBuiltinTools = ['ask_user', 'submit_plan', 'task_write', 'task_update', 'task_complete', 'task_check', 'subagent']
+    const planningWorkspaceTools = ['execute_command', 'mastra_workspace_read_file', 'mastra_workspace_write_file', 'mastra_workspace_edit_file', 'mastra_workspace_list_files', 'mastra_workspace_delete', 'mastra_workspace_file_stat', 'mastra_workspace_mkdir', 'mastra_workspace_grep', 'mastra_workspace_ast_edit']
     runtime = await bootLocalAgentController({
-      cwd, homeDir: sdkHome, workspace, modes: false, subagents: planOnly ? [] : providedSubagents, intervalHandlers: [], disabledTools: planOnly ? planningDynamicTools : ['web_search'],
+      cwd, homeDir: sdkHome, workspace, modes: false, subagents: planOnly ? [] : providedSubagents, intervalHandlers: [], disabledTools: planOnly ? [...planningDynamicTools, ...planningWorkspaceTools] : ['web_search'],
       disableBuiltinTools: planOnly ? planningBuiltinTools : undefined,
       hostInstructions: planOnly ? 'Return only the requested plan text. No tools, skills, files, commands, research, or delegation are available.' : hostInstructions,
       disableMcp: true, disablePlugins: true, disableEnvFile: true, disableHooks: true, disableGithubSignals: true,
