@@ -44,17 +44,26 @@ function jobFor(list) {
 }
 
 function counts(job) {
+  const summary = job?.checklist?.summary
+  if (summary) return { finished: summary.finished, skipped: summary.skipped, pending: summary.pending, total: summary.finished + summary.skipped + summary.pending }
   const items = job?.checklist?.items ?? []
-  return { done: items.filter(item => item.done).length, total: items.length }
+  return {
+    finished: items.filter(item => item.status === 'finished').length,
+    skipped: items.filter(item => item.status === 'skipped').length,
+    pending: items.filter(item => item.status === 'pending').length,
+    total: items.length,
+  }
 }
 
 async function shot(name, job) {
   await page.evaluate(() => window.scrollTo(0, 0))
   await page.screenshot({ path: join(outDir, `${name}.png`), fullPage: true })
   let cardShot = false
+  let pageHeading = null
   if (job?.runId) {
     const card = page.locator('article.build-card').filter({ hasText: job.runId }).first()
     if (await card.count()) {
+      pageHeading = (await card.locator('h3').textContent())?.trim() ?? null
       await card.screenshot({ path: join(outDir, `${name}-card.png`) })
       cardShot = true
     }
@@ -63,6 +72,7 @@ async function shot(name, job) {
     takenAt: new Date().toISOString(),
     state: job?.state ?? null,
     runId: job?.runId ?? null,
+    pageHeading,
     checklist: counts(job),
     cardShot,
     items: job?.checklist?.items ?? [],
@@ -111,29 +121,32 @@ try {
   await shot('running', null)
   let startShot = false
   let middleShot = false
-  let startDone = null
+  let startFinished = null
   const startFallback = Date.now() + 180000
   while (Date.now() - started < timeoutMs) {
     const list = await jobs()
     const current = jobFor(list)
     if (current) job = current
     const countsNow = counts(job)
-    snapshots.push({ at: new Date().toISOString(), state: job.state, done: countsNow.done, total: countsNow.total })
+    snapshots.push({ at: new Date().toISOString(), state: job.state, ...countsNow })
     await appendFile(join(outDir, 'checklist.jsonl'), JSON.stringify(snapshots.at(-1)) + '\n')
 
     if (!startShot && (countsNow.total > 0 || Date.now() > startFallback)) {
       startShot = true
-      startDone = countsNow.done
+      startFinished = countsNow.finished
       await shot('start', job)
-    } else if (startShot && !middleShot && job.state === 'running' && countsNow.total > 0 && countsNow.done !== startDone) {
+    } else if (startShot && !middleShot && job.state === 'running' && countsNow.total > 0 && countsNow.finished !== startFinished) {
       middleShot = true
       await shot('middle', job)
     }
     if (job.state === 'ready-for-review') {
+      await page.getByRole('heading', { name: `${card} · ready-for-review`, exact: true }).waitFor({ timeout: 20000 })
       await shot('end', job)
+      if (!String(shots.end?.pageHeading ?? '').includes('ready-for-review')) throw new Error(`end screenshot does not show the finished build: ${shots.end?.pageHeading}`)
       break
     }
     if (job.state === 'failed') {
+      await page.getByRole('heading', { name: `${card} · failed`, exact: true }).waitFor({ timeout: 20000 }).catch(() => {})
       await shot('end-failed', job)
       break
     }

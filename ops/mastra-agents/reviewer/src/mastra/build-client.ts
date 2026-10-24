@@ -35,17 +35,33 @@ export const BuildResultSchema = z
 export const BuildChecklistItemSchema = z
   .object({
     text: z.string().min(1),
-    done: z.boolean(),
+    status: z.enum(['finished', 'skipped', 'pending']),
     depth: z.number().int().nonnegative().optional(),
+  })
+  .strict();
+
+export const BuildChecklistSummarySchema = z
+  .object({
+    finished: z.number().int().nonnegative(),
+    skipped: z.number().int().nonnegative(),
+    pending: z.number().int().nonnegative(),
   })
   .strict();
 
 export const BuildChecklistSchema = z
   .object({
     items: z.array(BuildChecklistItemSchema),
+    summary: BuildChecklistSummarySchema,
     updatedAt: z.string().datetime().nullable().optional(),
   })
-  .passthrough();
+  .passthrough()
+  .superRefine((value, context) => {
+    const counts = { finished: 0, skipped: 0, pending: 0 };
+    for (const item of value.items) counts[item.status] += 1;
+    if (counts.finished !== value.summary.finished || counts.skipped !== value.summary.skipped || counts.pending !== value.summary.pending) {
+      context.addIssue({ code: 'custom', message: 'checklist summary must match its items' });
+    }
+  });
 
 export const BuildJobSchema = z
   .object({
