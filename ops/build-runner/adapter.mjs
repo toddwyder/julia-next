@@ -48,6 +48,11 @@ export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'bu
   }
   const ledgerInside = relative(cwd, ledgerPath)
   if (!ledgerInside.startsWith('..') && !isAbsolute(ledgerInside)) throw Error('card ledger must be outside builder workspace')
+  const inheritedEnv = { ...process.env }
+  const restoreEnv = () => {
+    for (const key of Object.keys(process.env)) delete process.env[key]
+    Object.assign(process.env, inheritedEnv)
+  }
   const path = process.env.PATH
   for (const key of Object.keys(process.env)) delete process.env[key]
   Object.assign(process.env, { PATH: path ?? '/usr/local/bin:/usr/bin:/bin', HOME: stateDir, LANG: 'C.UTF-8', MASTRA_APP_DATA_DIR: appDir })
@@ -137,6 +142,7 @@ export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'bu
           globalThis.fetch = originalFetch
           ledger.close()
           opened = false
+          restoreEnv()
         }
       },
     }
@@ -146,6 +152,7 @@ export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'bu
     globalThis.fetch = originalFetch
     ledger.close()
     opened = false
+    restoreEnv()
     throw error
   }
 }

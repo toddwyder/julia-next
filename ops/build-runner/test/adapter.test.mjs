@@ -49,3 +49,25 @@ test('stock adapter request works while direct and nested builder commands canno
     console.log(output)
   } finally { await new Promise(resolve => server.close(resolve)); await rm(directory, { recursive: true, force: true }) }
 })
+
+test('a second runner in one worker process still sees the provider credential', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'jul262-sequential-'))
+  const cwd = join(directory, 'workspace')
+  const { mkdir } = await import('node:fs/promises')
+  await mkdir(cwd)
+  const url = 'http://127.0.0.1:1/v1'
+  const settingsPath = join(directory, 'settings.json')
+  await writeFile(settingsPath, JSON.stringify({
+    roles: { builder: 'local-fixture/fixture' }, memory: false,
+    providers: [{ name: 'Local Fixture', url, models: ['fixture'], credentialEnv: 'PROOF_API_KEY' }],
+    models: { 'local-fixture/fixture': { endpoint: url + '/chat/completions', wireModel: 'fixture', protocol: 'chat', maxInputTokens: 100000, maxOutputTokens: 128, price: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } } },
+  }))
+  try {
+    const child = spawn(process.execPath, ['ops/build-runner/test/sequential-runner-driver.mjs', settingsPath, cwd, join(directory, 'state')], { env: { ...process.env, PROOF_API_KEY: 'synthetic-secret-marker' }, stdio: ['ignore', 'pipe', 'pipe'] })
+    let output = ''
+    for (const stream of [child.stdout, child.stderr]) stream.on('data', data => { output += data })
+    const code = await new Promise(resolve => child.on('close', resolve))
+    assert.equal(code, 0, output)
+    assert.match(output, /sequential runners ok/)
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
