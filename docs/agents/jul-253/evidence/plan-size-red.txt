@@ -1,0 +1,46 @@
+(node:751428) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ planning accepts a plan within the short-plan bound (35.302519ms)
+✖ an oversized plan is rejected and retained for diagnosis (15.556171ms)
+✔ planning fails if the model changes repository files or writes an oversized plan (26.292527ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 1
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 711.637841
+
+✖ failing tests:
+
+test at ops/build-runner/test/builder-plan.test.mjs:106:1
+✖ planning accepts a plan within the short-plan bound (35.302519ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(Buffer.byteLength(body) > 1500 && Buffer.byteLength(body) <= 4000)
+  
+      at TestContext.<anonymous> (file:///home/ubuntu/<concealed by 1Password>-builder/ops/build-runner/test/builder-plan.test.mjs:115:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at ops/build-runner/test/builder-plan.test.mjs:131:1
+✖ an oversized plan is rejected and retained for diagnosis (15.556171ms)
+  Error: ENOENT: no such file or directory, open '/tmp/builder-plan-oversized-tdhnPM/job/pstack-plan-rejected.md'
+      at async open (node:internal/fs/promises:640:25)
+      at async readFile (node:internal/fs/promises:1283:14)
+      at async TestContext.<anonymous> (file:///home/ubuntu/<concealed by 1Password>-builder/ops/build-runner/test/builder-plan.test.mjs:142:18)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'open',
+    path: '/tmp/builder-plan-oversized-tdhnPM/job/pstack-plan-rejected.md'
+  }

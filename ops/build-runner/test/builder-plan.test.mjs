@@ -103,6 +103,48 @@ test('planning accepts markdown section headings', async () => {
   }
 })
 
+test('planning accepts a plan within the short-plan bound', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'builder-plan-size-'))
+  const worktree = join(root, 'worktree')
+  const builderHome = join(worktree, '.builder-home')
+  const jobDir = join(root, 'job')
+  try {
+    await mkdir(join(builderHome, 'pstack'), { recursive: true })
+    await mkdir(jobDir)
+    const body = `${'Files\n' + '- `marker.txt`: exact content and one newline.\n'.repeat(34)}\nSteps\n1. Write the exact line.\n`
+    assert.ok(Buffer.byteLength(body) > 1500 && Buffer.byteLength(body) <= 4000)
+    const runner = { run: async () => ({ result: { status: 'completed', text: body }, threadId: 'plan-size' }) }
+    await captureBuilderPlan({
+      runner,
+      builderHome,
+      jobDir,
+      card: { identifier: 'JUL-262', description: 'Create marker.txt with one exact line.' },
+      events: [],
+      status: async () => '',
+    })
+    assert.equal(await readFile(join(jobDir, 'pstack-plan.md'), 'utf8'), `${body.trim()}\n`)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('an oversized plan is rejected and retained for diagnosis', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'builder-plan-oversized-'))
+  const worktree = join(root, 'worktree')
+  const builderHome = join(worktree, '.builder-home')
+  const jobDir = join(root, 'job')
+  try {
+    await mkdir(join(builderHome, 'pstack'), { recursive: true })
+    await mkdir(jobDir)
+    const body = `Files\n${'x'.repeat(4200)}\nSteps\n1. Work.`
+    const runner = { run: async () => ({ result: { status: 'completed', text: body }, threadId: 'plan-big' }) }
+    await assert.rejects(captureBuilderPlan({ runner, builderHome, jobDir, card: { identifier: 'JUL-262', description: 'one line' }, events: [], status: async () => '' }), /plan.*short/i)
+    assert.match(await readFile(join(jobDir, 'pstack-plan-rejected.md'), 'utf8'), /^Files/m)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('planning rejects any exposed tool before the plan', async () => {
   const root = await mkdtemp(join(tmpdir(), 'builder-plan-tools-'))
   const builderHome = join(root, 'worktree', '.builder-home')

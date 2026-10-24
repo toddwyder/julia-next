@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-const MAX_PLAN_BYTES = 1500
+const MAX_PLAN_BYTES = 4000
 const sectionHeading = name => new RegExp(`^(?:#{1,6}[ \\t]*)?(?:\\*\\*)?${name}(?:\\*\\*)?[ \\t]*:?[ \\t]*$`, 'im')
 
 export async function captureBuilderPlan({ runner, builderHome, jobDir, card, status, events }) {
@@ -19,6 +19,7 @@ export async function captureBuilderPlan({ runner, builderHome, jobDir, card, st
   const after = await status()
   if (after.trim()) throw new Error('planning turn changed repository files')
   if (Buffer.byteLength(plan) > MAX_PLAN_BYTES || !sectionHeading('Files').test(plan) || !sectionHeading('Steps').test(plan)) {
+    await writeFile(join(jobDir, 'pstack-plan-rejected.md'), plan)
     throw new Error('builder plan must be short and name files and steps')
   }
   await writeFile(join(builderHome, 'pstack', 'plan.md'), plan)
