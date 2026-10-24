@@ -52,6 +52,20 @@ Fix, test first:
   longer fails the turn. A subagent start still fails it.
 - A malformed plan gets one retry before the run stops.
 
+## Attempt 4: request_access
+
+JUL-266's plan passed, but the build turn then searched for a git remote and
+GitHub credentials and called `request_access`. The runtime granted access to
+`/home/ubuntu`, the session suspended and then aborted, and the build stopped
+before writing its checklist. The failed screenshots and job are under
+[proof/attempt-4-request-access](proof/attempt-4-request-access).
+
+Fix, test first:
+- A real build no longer has `request_access`; the builder stays inside its
+  contained filesystem.
+- The host instructions now say the host owns git remotes, branches, publishing,
+  pull requests and GitHub credentials, and the build must not search for them.
+
 ## Proof
 
 `proof-drive.mjs` drives `https://ovh.tail91f394.ts.net/julia-control`, selects

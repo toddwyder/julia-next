@@ -5,3 +5,5 @@
 2026-10-24	The plan-only turn disables workspace tools too	Beam read repository files during planning and the build failed closed.
 2026-10-24	A refused tool call is not tool exposure	The runtime returned `Tool "..." not found`; nothing ran, so the plan is not contaminated.
 2026-10-24	A malformed plan gets one retry	Beam's plan shape varies; a second short attempt keeps practice runs from stopping on prose.
+2026-10-24	A real build cannot request broader filesystem access	Beam asked for /home/ubuntu, the session suspended and aborted; the builder stays contained.
+2026-10-24	The host instructions name the publishing boundary	Beam searched for git remotes and GitHub credentials; the host owns those.

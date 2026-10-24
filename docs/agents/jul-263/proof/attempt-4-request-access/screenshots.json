@@ -1,0 +1,42 @@
+{
+  "start-selected": {
+    "takenAt": "2026-10-24T14:53:18.928Z",
+    "state": null,
+    "runId": null,
+    "checklist": {
+      "done": 0,
+      "total": 0
+    },
+    "items": []
+  },
+  "running": {
+    "takenAt": "2026-10-24T14:53:22.761Z",
+    "state": null,
+    "runId": null,
+    "checklist": {
+      "done": 0,
+      "total": 0
+    },
+    "items": []
+  },
+  "end-failed": {
+    "takenAt": "2026-10-24T14:54:17.997Z",
+    "state": "failed",
+    "runId": "jul-266-9ed0f4e88b6aab456a6a7bbddf95f959",
+    "checklist": {
+      "done": 0,
+      "total": 0
+    },
+    "items": []
+  },
+  "end": {
+    "takenAt": "2026-10-24T14:54:18.537Z",
+    "state": "failed",
+    "runId": "jul-266-9ed0f4e88b6aab456a6a7bbddf95f959",
+    "checklist": {
+      "done": 0,
+      "total": 0
+    },
+    "items": []
+  }
+}
