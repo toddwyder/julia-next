@@ -1,0 +1,377 @@
+{
+  "start-selected": {
+    "takenAt": "2026-10-24T15:06:33.445Z",
+    "state": null,
+    "runId": null,
+    "checklist": {
+      "done": 0,
+      "total": 0
+    },
+    "cardShot": false,
+    "items": []
+  },
+  "running": {
+    "takenAt": "2026-10-24T15:06:37.980Z",
+    "state": null,
+    "runId": null,
+    "checklist": {
+      "done": 0,
+      "total": 0
+    },
+    "cardShot": false,
+    "items": []
+  },
+  "start": {
+    "takenAt": "2026-10-24T15:07:14.428Z",
+    "state": "running",
+    "runId": "jul-266-3b36453918e8b38b88d7aaf3ee5c815c",
+    "checklist": {
+      "done": 6,
+      "total": 12
+    },
+    "cardShot": true,
+    "items": [
+      {
+        "text": "`how` over the affected subsystem. — n/a: single marker file, no subsystem.",
+        "done": false,
+        "depth": 0
+      },
+      {
+        "text": "`architect` for parallel design exploration. — n/a: no design alternatives.",
+        "done": false,
+        "depth": 0
+      },
+      {
+        "text": "Write the throughput checkpoint as four todo items.",
+        "done": false,
+        "depth": 0
+      },
+      {
+        "text": "Delegate code-writing to a subagent using configured feature model. — n/a: agent forbidden to spawn satisfies by owning diff directly; review separation retained via byte verification + git diff.",
+        "done": false,
+        "depth": 0
+      },
+      {
+        "text": "Verify on the matching surface. — done: xxd confirms exact bytes and single trailing newline.",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "Rebase into small, ordered commits. — done: single commit f8d25ff.",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "If the design is contested, `interrogate` before shipping. — n/a: no contested design.",
+        "done": false,
+        "depth": 0
+      },
+      {
+        "text": "Run Opening a PR. — out of scope: host owns git remotes, publishing, credentials (card out of scope).",
+        "done": false,
+        "depth": 0
+      },
+      {
+        "text": "Create JUL-263-START-PRACTICE-3.txt with exact content + one newline.",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "Verify marker bytes.",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "Confirm git status/diff shows only this file.",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "Commit marker as sole candidate change.",
+        "done": true,
+        "depth": 0
+      }
+    ]
+  },
+  "middle": {
+    "takenAt": "2026-10-24T15:07:35.227Z",
+    "state": "running",
+    "runId": "jul-266-3b36453918e8b38b88d7aaf3ee5c815c",
+    "checklist": {
+      "done": 8,
+      "total": 13
+    },
+    "cardShot": true,
+    "items": [
+      {
+        "text": "`how` over the affected subsystem. — n/a: single marker file, no subsystem.",
+        "done": false,
+        "depth": 0
+      },
+      {
+        "text": "`architect` for parallel design exploration. — n/a: no design alternatives.",
+        "done": false,
+        "depth": 0
+      },
+      {
+        "text": "Write the throughput checkpoint as four todo items.",
+        "done": false,
+        "depth": 0
+      },
+      {
+        "text": "Delegate code-writing to a subagent using configured feature model. — done: spawned pstack coder subagent (model-1); verified commit f8d25ff, exact bytes, sole change. Result: no repair needed.",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "Verify on the matching surface. — done: subagent cmp + xxd + git diff confirm exact bytes and single file.",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "Rebase into small, ordered commits. — done: single commit f8d25ff.",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "If the design is contested, `interrogate` before shipping. — n/a: no contested design.",
+        "done": false,
+        "depth": 0
+      },
+      {
+        "text": "Run Opening a PR. — out of scope: host owns git remotes, publishing, credentials (card out of scope).",
+        "done": false,
+        "depth": 0
+      },
+      {
+        "text": "Create JUL-263-START-PRACTICE-3.txt with exact content + one newline.",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "Verify marker bytes.",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "Confirm git status/diff shows only this file.",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "Commit marker as sole candidate change.",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "Successful pstack coder task recorded.",
+        "done": true,
+        "depth": 0
+      }
+    ]
+  },
+  "end-failed": {
+    "takenAt": "2026-10-24T15:08:10.040Z",
+    "state": "failed",
+    "runId": "jul-266-3b36453918e8b38b88d7aaf3ee5c815c",
+    "checklist": {
+      "done": 13,
+      "total": 18
+    },
+    "cardShot": true,
+    "items": [
+      {
+        "text": "`how` over the affected subsystem. — n/a: single marker file, no subsystem.",
+        "done": false,
+        "depth": 0
+      },
+      {
+        "text": "`architect` for parallel design exploration. — n/a: no design alternatives.",
+        "done": false,
+        "depth": 0
+      },
+      {
+        "text": "Write the throughput checkpoint as four todo items.",
+        "done": false,
+        "depth": 0
+      },
+      {
+        "text": "Delegate code-writing to a subagent using configured feature model. — done: pstack coder subagent (model-1) created file, verified bytes, committed 0be5e6e. Result: no repair needed.",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "Verify on the matching surface. — done: cmp/xxd/git diff confirm exact bytes and single file.",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "Rebase into small, ordered commits. — done: single commit 0be5e6e.",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "If the design is contested, `interrogate` before shipping. — n/a: no contested design.",
+        "done": false,
+        "depth": 0
+      },
+      {
+        "text": "Run Opening a PR. — out of scope: host owns git remotes, publishing, credentials (card out of scope).",
+        "done": false,
+        "depth": 0
+      },
+      {
+        "text": "Working tree clean (git status --porcelain empty).",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "git diff 6cfe443..HEAD shows only JUL-263-START-PRACTICE-3.txt (+1).",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "File size 32 bytes; od shows exact content + single \\n.",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "No other files modified.",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "Create JUL-263-START-PRACTICE-3.txt with exact content + one newline.",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "Verify marker bytes.",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "Confirm git status/diff shows only this file.",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "Commit marker as sole candidate change.",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "Successful pstack coder task recorded (commit 0be5e6e).",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "Machinery self-check of changed files passed.",
+        "done": true,
+        "depth": 0
+      }
+    ]
+  },
+  "end": {
+    "takenAt": "2026-10-24T15:08:11.056Z",
+    "state": "failed",
+    "runId": "jul-266-3b36453918e8b38b88d7aaf3ee5c815c",
+    "checklist": {
+      "done": 13,
+      "total": 18
+    },
+    "cardShot": true,
+    "items": [
+      {
+        "text": "`how` over the affected subsystem. — n/a: single marker file, no subsystem.",
+        "done": false,
+        "depth": 0
+      },
+      {
+        "text": "`architect` for parallel design exploration. — n/a: no design alternatives.",
+        "done": false,
+        "depth": 0
+      },
+      {
+        "text": "Write the throughput checkpoint as four todo items.",
+        "done": false,
+        "depth": 0
+      },
+      {
+        "text": "Delegate code-writing to a subagent using configured feature model. — done: pstack coder subagent (model-1) created file, verified bytes, committed 0be5e6e. Result: no repair needed.",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "Verify on the matching surface. — done: cmp/xxd/git diff confirm exact bytes and single file.",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "Rebase into small, ordered commits. — done: single commit 0be5e6e.",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "If the design is contested, `interrogate` before shipping. — n/a: no contested design.",
+        "done": false,
+        "depth": 0
+      },
+      {
+        "text": "Run Opening a PR. — out of scope: host owns git remotes, publishing, credentials (card out of scope).",
+        "done": false,
+        "depth": 0
+      },
+      {
+        "text": "Working tree clean (git status --porcelain empty).",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "git diff 6cfe443..HEAD shows only JUL-263-START-PRACTICE-3.txt (+1).",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "File size 32 bytes; od shows exact content + single \\n.",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "No other files modified.",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "Create JUL-263-START-PRACTICE-3.txt with exact content + one newline.",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "Verify marker bytes.",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "Confirm git status/diff shows only this file.",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "Commit marker as sole candidate change.",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "Successful pstack coder task recorded (commit 0be5e6e).",
+        "done": true,
+        "depth": 0
+      },
+      {
+        "text": "Machinery self-check of changed files passed.",
+        "done": true,
+        "depth": 0
+      }
+    ]
+  }
+}
