@@ -1,0 +1,1448 @@
+{
+  "schema": 1,
+  "plannedMutations": 55,
+  "sourceHashes": {
+    "ops/build-runner/pstack-session.mjs": "38678120da31be04e05b7553d9b0bb6b548e8632a6d49ab2508e5f99bdbe3ddb",
+    "ops/build-runner/connections.mjs": "d68f308e5b077cf4339d006464765a39492061125fea0653216b60f0173b9dee",
+    "ops/build-runner/transport.mjs": "6f6df7ccf94d61a4dd62fddba81b2f1378e920d2d65f60b2e556c21b3ca0eff9",
+    "ops/build-runner/adapter.mjs": "72505444fe5998f67e108f1014bb5c1b01f436eb8ac8180d3b9c516513ee202c",
+    "ops/build-runner/machine-settings.json": "893723d1b3214932a7db29c3cfa5afed716b43ee6ca030b1ef95cee51c9cead5",
+    "ops/build-runner/ledger.mjs": "bca64b13018c6f15a25873259129ce520a387cfa393efe60811b8c32f60a2801",
+    "ops/build-runner/command-boundary.py": "a763dbe91272f284b5f32a392d4ed09be7821c5b0c4fb35785ff6802e9a6f438"
+  },
+  "baseline": {
+    "command": [
+      "node",
+      "--test",
+      "--test-reporter=tap",
+      "ops/build-runner/test/adapter.test.mjs",
+      "ops/build-runner/test/connections.test.mjs",
+      "ops/build-runner/test/jobs.test.mjs",
+      "ops/build-runner/test/ledger.test.mjs",
+      "ops/build-runner/test/machine-settings.test.mjs",
+      "ops/build-runner/test/pstack-session.test.mjs",
+      "ops/build-runner/test/review-regressions.test.mjs",
+      "ops/build-runner/test/server-main.test.mjs",
+      "ops/build-runner/test/shared-ledger.test.mjs",
+      "ops/build-runner/test/subscription-tools.test.mjs",
+      "ops/build-runner/test/transport.test.mjs"
+    ],
+    "exitCode": 0,
+    "signal": null,
+    "status": "green",
+    "selectedTest": null,
+    "selectedPassed": null,
+    "selectedFailed": null,
+    "passedCount": 73,
+    "failedCount": 0
+  },
+  "mutations": [
+    {
+      "id": "raw-model-provider-route-not-checked",
+      "files": [
+        "ops/build-runner/pstack-session.mjs"
+      ],
+      "test": "a raw model ID cannot silently change the selected provider route",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^a raw model ID cannot silently change the selected provider route$",
+          "ops/build-runner/test/pstack-session.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "a raw model ID cannot silently change the selected provider route",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "unavailable-subscription-offered",
+      "files": [
+        "ops/build-runner/connections.mjs"
+      ],
+      "test": "an explicitly unavailable or invalidly priced configured model is not advertised",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^an explicitly unavailable or invalidly priced configured model is not advertised$",
+          "ops/build-runner/test/connections.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "an explicitly unavailable or invalidly priced configured model is not advertised",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "local-estimate-not-used",
+      "files": [
+        "ops/build-runner/transport.mjs"
+      ],
+      "test": "local text estimate reserves framing and UTF-8 bytes without a credential or count request",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^local text estimate reserves framing and UTF-8 bytes without a credential or count request$",
+          "ops/build-runner/test/transport.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "local text estimate reserves framing and UTF-8 bytes without a credential or count request",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "local-estimate-padding-removed",
+      "files": [
+        "ops/build-runner/transport.mjs"
+      ],
+      "test": "bundled local tokenizer reserves padded complete request for hello",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^bundled local tokenizer reserves padded complete request for hello$",
+          "ops/build-runner/test/transport.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "bundled local tokenizer reserves padded complete request for hello",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "local-estimate-overrun-ignored",
+      "files": [
+        "ops/build-runner/transport.mjs"
+      ],
+      "test": "a provider input count above the local estimate settles actual cost and stops later work",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^a provider input count above the local estimate settles actual cost and stops later work$",
+          "ops/build-runner/test/transport.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "a provider input count above the local estimate settles actual cost and stops later work",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "stock-sse-without-content-type-not-parsed",
+      "files": [
+        "ops/build-runner/transport.mjs"
+      ],
+      "test": "a stock Codex stream without a content-type header settles its completed usage",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^a stock Codex stream without a content-type header settles its completed usage$",
+          "ops/build-runner/test/transport.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "a stock Codex stream without a content-type header settles its completed usage",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "hidden-conversation-not-refused",
+      "files": [
+        "ops/build-runner/transport.mjs"
+      ],
+      "test": "local estimates include tools and refuse hidden conversation state before dispatch",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^local estimates include tools and refuse hidden conversation state before dispatch$",
+          "ops/build-runner/test/transport.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "local estimates include tools and refuse hidden conversation state before dispatch",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "stock-hosted-search-not-disabled",
+      "files": [
+        "ops/build-runner/adapter.mjs"
+      ],
+      "test": "stock subscription requests can dispatch without unpriced hosted search",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^stock subscription requests can dispatch without unpriced hosted search$",
+          "ops/build-runner/test/subscription-tools.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "stock subscription requests can dispatch without unpriced hosted search",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "cache-ttl-mismatch-accepted",
+      "files": [
+        "ops/build-runner/transport.mjs"
+      ],
+      "test": "stock Claude conversation caching uses its configured one-hour API price",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^stock Claude conversation caching uses its configured one-hour API price$",
+          "ops/build-runner/test/transport.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "stock Claude conversation caching uses its configured one-hour API price",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "one-hour-cache-write-charged-at-five-minute-rate",
+      "files": [
+        "ops/build-runner/machine-settings.json"
+      ],
+      "test": "stock Claude conversation caching uses its configured one-hour API price",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^stock Claude conversation caching uses its configured one-hour API price$",
+          "ops/build-runner/test/transport.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "stock Claude conversation caching uses its configured one-hour API price",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "maximum-charge-recovery-not-final",
+      "files": [
+        "ops/build-runner/ledger.mjs"
+      ],
+      "test": "charging an unknown request at its full maximum never releases budget or invents usage",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^charging an unknown request at its full maximum never releases budget or invents usage$",
+          "ops/build-runner/test/ledger.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "charging an unknown request at its full maximum never releases budget or invents usage",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "configured-panel-replaced-by-unrelated-model",
+      "files": [
+        "ops/build-runner/pstack-session.mjs"
+      ],
+      "test": "an unrelated review model cannot replace the configured Sol and DeepSeek panel",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^an unrelated review model cannot replace the configured Sol and DeepSeek panel$",
+          "ops/build-runner/test/pstack-session.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "an unrelated review model cannot replace the configured Sol and DeepSeek panel",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "unknown-maximum-charged-as-zero",
+      "files": [
+        "ops/build-runner/ledger.mjs"
+      ],
+      "test": "charging an unknown request at its full maximum never releases budget or invents usage",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^charging an unknown request at its full maximum never releases budget or invents usage$",
+          "ops/build-runner/test/ledger.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "charging an unknown request at its full maximum never releases budget or invents usage",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "chat-sse-charge-corrupted",
+      "files": [
+        "ops/build-runner/transport.mjs"
+      ],
+      "test": "chat SSE settles cache categories once",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^chat SSE settles cache categories once$",
+          "ops/build-runner/test/transport.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "chat SSE settles cache categories once",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "responses-sse-charge-corrupted",
+      "files": [
+        "ops/build-runner/transport.mjs"
+      ],
+      "test": "responses SSE settles cache categories once",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^responses SSE settles cache categories once$",
+          "ops/build-runner/test/transport.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "responses SSE settles cache categories once",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "messages-json-charge-corrupted",
+      "files": [
+        "ops/build-runner/transport.mjs"
+      ],
+      "test": "messages JSON settles cache categories once",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^messages JSON settles cache categories once$",
+          "ops/build-runner/test/transport.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "messages JSON settles cache categories once",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "messages-sse-charge-corrupted",
+      "files": [
+        "ops/build-runner/transport.mjs"
+      ],
+      "test": "messages SSE settles cache categories once",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^messages SSE settles cache categories once$",
+          "ops/build-runner/test/transport.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "messages SSE settles cache categories once",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "invalid-money-defaulted-to-zero",
+      "files": [
+        "ops/build-runner/ledger.mjs"
+      ],
+      "test": "invalid monetary inputs cannot change durable budget",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^invalid monetary inputs cannot change durable budget$",
+          "ops/build-runner/test/ledger.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "invalid monetary inputs cannot change durable budget",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "concurrent-admission-checks-removed",
+      "files": [
+        "ops/build-runner/ledger.mjs"
+      ],
+      "test": "separate processes cannot jointly reserve beyond the ceiling",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^separate processes cannot jointly reserve beyond the ceiling$",
+          "ops/build-runner/test/ledger.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "separate processes cannot jointly reserve beyond the ceiling",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "connection-failure-not-marked-unknown",
+      "files": [
+        "ops/build-runner/transport.mjs"
+      ],
+      "test": "connection failure after arrival retains the paid reservation",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^connection failure after arrival retains the paid reservation$",
+          "ops/build-runner/test/transport.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "connection failure after arrival retains the paid reservation",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "card-ceiling-removed",
+      "files": [
+        "ops/build-runner/ledger.mjs"
+      ],
+      "test": "all roles share the two-dollar card ceiling across reopen and settle once",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^all roles share the two-dollar card ceiling across reopen and settle once$",
+          "ops/build-runner/test/ledger.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "all roles share the two-dollar card ceiling across reopen and settle once",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "unresolved-priced-block-removed",
+      "files": [
+        "ops/build-runner/ledger.mjs"
+      ],
+      "test": "free requests remain usable without usage when priced accounting is unknown",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^free requests remain usable without usage when priced accounting is unknown$",
+          "ops/build-runner/test/ledger.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "free requests remain usable without usage when priced accounting is unknown",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "zero-settlement-corrupted",
+      "files": [
+        "ops/build-runner/ledger.mjs"
+      ],
+      "test": "free requests remain usable without usage when priced accounting is unknown",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^free requests remain usable without usage when priced accounting is unknown$",
+          "ops/build-runner/test/ledger.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "free requests remain usable without usage when priced accounting is unknown",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "persistent-storage-replaced-with-memory",
+      "files": [
+        "ops/build-runner/ledger.mjs"
+      ],
+      "test": "reopening retains unresolved holds, snapshots, and settled costs per card",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^reopening retains unresolved holds, snapshots, and settled costs per card$",
+          "ops/build-runner/test/ledger.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "reopening retains unresolved holds, snapshots, and settled costs per card",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "process-exit-hold-not-persisted",
+      "files": [
+        "ops/build-runner/ledger.mjs"
+      ],
+      "test": "a process exit after reservation never releases an uncertain request",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^a process exit after reservation never releases an uncertain request$",
+          "ops/build-runner/test/ledger.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "a process exit after reservation never releases an uncertain request",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "priced-settlement-usage-check-removed",
+      "files": [
+        "ops/build-runner/ledger.mjs"
+      ],
+      "test": "free requests remain usable without usage when priced accounting is unknown",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^free requests remain usable without usage when priced accounting is unknown$",
+          "ops/build-runner/test/ledger.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "free requests remain usable without usage when priced accounting is unknown",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "settlement-idempotency-check-removed",
+      "files": [
+        "ops/build-runner/ledger.mjs"
+      ],
+      "test": "all roles share the two-dollar card ceiling across reopen and settle once",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^all roles share the two-dollar card ceiling across reopen and settle once$",
+          "ops/build-runner/test/ledger.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "all roles share the two-dollar card ceiling across reopen and settle once",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "overrun-block-removed",
+      "files": [
+        "ops/build-runner/ledger.mjs"
+      ],
+      "test": "actual cost above a reservation is durable and blocks priced work",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^actual cost above a reservation is durable and blocks priced work$",
+          "ops/build-runner/test/ledger.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "actual cost above a reservation is durable and blocks priced work",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "unpriced-model-defaulted-to-free",
+      "files": [
+        "ops/build-runner/transport.mjs"
+      ],
+      "test": "wrong model, endpoint, missing prices and bounds send nothing",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^wrong model, endpoint, missing prices and bounds send nothing$",
+          "ops/build-runner/test/transport.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "wrong model, endpoint, missing prices and bounds send nothing",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "ceiling-http-dispatch-allowed",
+      "files": [
+        "ops/build-runner/ledger.mjs"
+      ],
+      "test": "card ceiling refuses an oversized reservation before HTTP",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^card ceiling refuses an oversized reservation before HTTP$",
+          "ops/build-runner/test/transport.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "card ceiling refuses an oversized reservation before HTTP",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "http-attempt-identifier-reused",
+      "files": [
+        "ops/build-runner/ledger.mjs"
+      ],
+      "test": "separate HTTP attempts create separate durable records",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^separate HTTP attempts create separate durable records$",
+          "ops/build-runner/test/transport.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "separate HTTP attempts create separate durable records",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "unknown-route-falls-back-to-first-model",
+      "files": [
+        "ops/build-runner/transport.mjs"
+      ],
+      "test": "wrong model, endpoint, missing prices and bounds send nothing",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^wrong model, endpoint, missing prices and bounds send nothing$",
+          "ops/build-runner/test/transport.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "wrong model, endpoint, missing prices and bounds send nothing",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "chat-output-limit-removed",
+      "files": [
+        "ops/build-runner/transport.mjs"
+      ],
+      "test": "free requests arrive with enforced limits and settle without usage",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^free requests arrive with enforced limits and settle without usage$",
+          "ops/build-runner/test/transport.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "free requests arrive with enforced limits and settle without usage",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "responses-output-limit-removed",
+      "files": [
+        "ops/build-runner/transport.mjs"
+      ],
+      "test": "responses JSON settles cache categories once",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^responses JSON settles cache categories once$",
+          "ops/build-runner/test/transport.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "responses JSON settles cache categories once",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "missing-paid-usage-accepted",
+      "files": [
+        "ops/build-runner/transport.mjs",
+        "ops/build-runner/ledger.mjs"
+      ],
+      "test": "paid missing usage refuses result and prevents the next arrival",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^paid missing usage refuses result and prevents the next arrival$",
+          "ops/build-runner/test/transport.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "paid missing usage refuses result and prevents the next arrival",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "reported-cost-not-counted",
+      "files": [
+        "ops/build-runner/transport.mjs"
+      ],
+      "test": "provider cost above a configured free reservation is recorded and stops its card",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^provider cost above a configured free reservation is recorded and stops its card$",
+          "ops/build-runner/test/transport.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "provider cost above a configured free reservation is recorded and stops its card",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "over-reservation-stop-not-persisted",
+      "files": [
+        "ops/build-runner/transport.mjs"
+      ],
+      "test": "provider cost above a configured free reservation is recorded and stops its card",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^provider cost above a configured free reservation is recorded and stops its card$",
+          "ops/build-runner/test/transport.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "provider cost above a configured free reservation is recorded and stops its card",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "stop-marker-not-persisted",
+      "files": [
+        "ops/build-runner/ledger.mjs"
+      ],
+      "test": "review durable stop survives reopen and blocks free and paid routes only for its card",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^review durable stop survives reopen and blocks free and paid routes only for its card$",
+          "ops/build-runner/test/review-regressions.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "review durable stop survives reopen and blocks free and paid routes only for its card",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "stop-marker-lost-on-reopen",
+      "files": [
+        "ops/build-runner/ledger.mjs"
+      ],
+      "test": "review durable stop survives reopen and blocks free and paid routes only for its card",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^review durable stop survives reopen and blocks free and paid routes only for its card$",
+          "ops/build-runner/test/review-regressions.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "review durable stop survives reopen and blocks free and paid routes only for its card",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "stopped-card-metadata-allowed",
+      "files": [
+        "ops/build-runner/transport.mjs"
+      ],
+      "test": "review stopped card blocks allowlisted metadata GET",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^review stopped card blocks allowlisted metadata GET$",
+          "ops/build-runner/test/review-regressions.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "review stopped card blocks allowlisted metadata GET",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "known-overbound-usage-not-recorded",
+      "files": [
+        "ops/build-runner/transport.mjs"
+      ],
+      "test": "review oversized known usage records actual cost and refuses result",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^review oversized known usage records actual cost and refuses result$",
+          "ops/build-runner/test/review-regressions.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "review oversized known usage records actual cost and refuses result",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "known-overbound-result-accepted",
+      "files": [
+        "ops/build-runner/transport.mjs"
+      ],
+      "test": "review oversized known usage records actual cost and refuses result",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^review oversized known usage records actual cost and refuses result$",
+          "ops/build-runner/test/review-regressions.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "review oversized known usage records actual cost and refuses result",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "cached-input-double-counted",
+      "files": [
+        "ops/build-runner/transport.mjs"
+      ],
+      "test": "chat JSON settles cache categories once",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^chat JSON settles cache categories once$",
+          "ops/build-runner/test/transport.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "chat JSON settles cache categories once",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "nano-dollar-conversion-corrupted",
+      "files": [
+        "ops/build-runner/transport.mjs"
+      ],
+      "test": "decimal rates round nano dollars upward without floating point drift",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^decimal rates round nano dollars upward without floating point drift$",
+          "ops/build-runner/test/transport.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "decimal rates round nano dollars upward without floating point drift",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "cache-write-input-double-counted",
+      "files": [
+        "ops/build-runner/transport.mjs"
+      ],
+      "test": "responses JSON settles cache categories once",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^responses JSON settles cache categories once$",
+          "ops/build-runner/test/transport.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "responses JSON settles cache categories once",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "truncated-paid-sse-accepted",
+      "files": [
+        "ops/build-runner/transport.mjs"
+      ],
+      "test": "a truncated paid stream retains the reservation despite partial usage",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^a truncated paid stream retains the reservation despite partial usage$",
+          "ops/build-runner/test/transport.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "a truncated paid stream retains the reservation despite partial usage",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "redirects-followed",
+      "files": [
+        "ops/build-runner/transport.mjs"
+      ],
+      "test": "allowlisted authentication cannot carry inference payloads and redirects never follow",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^allowlisted authentication cannot carry inference payloads and redirects never follow$",
+          "ops/build-runner/test/transport.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "allowlisted authentication cannot carry inference payloads and redirects never follow",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "response-buffer-bound-removed",
+      "files": [
+        "ops/build-runner/transport.mjs"
+      ],
+      "test": "bounded buffering refuses a large result without releasing its reservation",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^bounded buffering refuses a large result without releasing its reservation$",
+          "ops/build-runner/test/transport.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "bounded buffering refuses a large result without releasing its reservation",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "metadata-child-url-allowed",
+      "files": [
+        "ops/build-runner/transport.mjs"
+      ],
+      "test": "authentication and catalog are confined to their exact allowlisted URL",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^authentication and catalog are confined to their exact allowlisted URL$",
+          "ops/build-runner/test/transport.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "authentication and catalog are confined to their exact allowlisted URL",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "ledger-errors-no-longer-sanitized",
+      "files": [
+        "ops/build-runner/transport.mjs"
+      ],
+      "test": "ledger errors never reveal their underlying body or credentials",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^ledger errors never reveal their underlying body or credentials$",
+          "ops/build-runner/test/transport.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "ledger errors never reveal their underlying body or credentials",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "state-and-ledger-paths-not-canonicalized",
+      "files": [
+        "ops/build-runner/adapter.mjs"
+      ],
+      "test": "review stock adapter rejects state symlink into builder before runtime",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^review stock adapter rejects state symlink into builder before runtime$",
+          "ops/build-runner/test/review-regressions.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "review stock adapter rejects state symlink into builder before runtime",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "auth-file-not-canonicalized",
+      "files": [
+        "ops/build-runner/adapter.mjs"
+      ],
+      "test": "review stock adapter rejects auth-file symlink into builder before runtime",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^review stock adapter rejects auth-file symlink into builder before runtime$",
+          "ops/build-runner/test/review-regressions.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "review stock adapter rejects auth-file symlink into builder before runtime",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "auth-parent-not-canonicalized",
+      "files": [
+        "ops/build-runner/adapter.mjs"
+      ],
+      "test": "review stock adapter rejects auth-parent symlink into builder before runtime",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^review stock adapter rejects auth-parent symlink into builder before runtime$",
+          "ops/build-runner/test/review-regressions.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "review stock adapter rejects auth-parent symlink into builder before runtime",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "mutable-home-granted-outside-workspace",
+      "files": [
+        "ops/build-runner/command-boundary.py"
+      ],
+      "test": "review replacing builder home after boot cannot expose outside auth",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^review replacing builder home after boot cannot expose outside auth$",
+          "ops/build-runner/test/review-regressions.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "review replacing builder home after boot cannot expose outside auth",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    },
+    {
+      "id": "credential-filesystem-boundary-removed",
+      "files": [
+        "ops/build-runner/command-boundary.py"
+      ],
+      "test": "stock adapter request works while direct and nested builder commands cannot read credentials",
+      "status": "caught",
+      "result": {
+        "command": [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern=^stock adapter request works while direct and nested builder commands cannot read credentials$",
+          "ops/build-runner/test/adapter.test.mjs"
+        ],
+        "exitCode": 1,
+        "signal": null,
+        "status": "red",
+        "selectedTest": "stock adapter request works while direct and nested builder commands cannot read credentials",
+        "selectedPassed": false,
+        "selectedFailed": true,
+        "passedCount": 0,
+        "failedCount": 1
+      }
+    }
+  ],
+  "final": {
+    "command": [
+      "node",
+      "--test",
+      "--test-reporter=tap",
+      "ops/build-runner/test/adapter.test.mjs",
+      "ops/build-runner/test/connections.test.mjs",
+      "ops/build-runner/test/jobs.test.mjs",
+      "ops/build-runner/test/ledger.test.mjs",
+      "ops/build-runner/test/machine-settings.test.mjs",
+      "ops/build-runner/test/pstack-session.test.mjs",
+      "ops/build-runner/test/review-regressions.test.mjs",
+      "ops/build-runner/test/server-main.test.mjs",
+      "ops/build-runner/test/shared-ledger.test.mjs",
+      "ops/build-runner/test/subscription-tools.test.mjs",
+      "ops/build-runner/test/transport.test.mjs"
+    ],
+    "exitCode": 0,
+    "signal": null,
+    "status": "green",
+    "selectedTest": null,
+    "selectedPassed": null,
+    "selectedFailed": null,
+    "passedCount": 73,
+    "failedCount": 0
+  },
+  "gaps": [
+    "Removing the transaction lock is not tested here. The current process race has no deterministic barrier."
+  ],
+  "restored": true,
+  "status": "passed"
+}

@@ -1,0 +1,4 @@
+model	requests	input_tokens	output_tokens	cache_read_tokens	cost_nano	state
+openai/gpt-6-sol	33	670153	4929	633600	1516316000	settled
+commandcode/deepseek/deepseek-v4.1-flash	30	65819	13661	1195392	39725076	settled
+TOTAL	63	735972	18590	1828992	1556041076	settled

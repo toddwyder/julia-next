@@ -1,0 +1,22 @@
+(node:530669) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ 'max_turns'
+- 'completed'
+
+    at file:///home/ubuntu/<concealed by 1Password>-jul-253/ops/build-runner/proof/connections.mjs:31:10 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 'max_turns',
+  expected: 'completed',
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.14.1

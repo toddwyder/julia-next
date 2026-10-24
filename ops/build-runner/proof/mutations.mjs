@@ -10,12 +10,74 @@ const ledger = 'ops/build-runner/ledger.mjs';
 const transport = 'ops/build-runner/transport.mjs';
 const adapter = 'ops/build-runner/adapter.mjs';
 const boundary = 'ops/build-runner/command-boundary.py';
+const session = 'ops/build-runner/pstack-session.mjs';
+const machineSettings = 'ops/build-runner/machine-settings.json';
 const tests = file => `ops/build-runner/test/${file}.test.mjs`;
 const edit = (file, before, after, occurrences = 1) => ({ file, before, after, occurrences });
 const cases = [
+  {
+    id: 'unreachable-long-context-rate-reserved', file: 'transport', test: 'reservation uses only context tiers reachable within 150000 input tokens',
+    edits: [edit(transport, '(spec.priceTiers ?? []).filter(tier => inputBound > tier.aboveInputTokens)', '(spec.priceTiers ?? [])')],
+  },
+  {
+    id: 'logged-request-forwarded-after-body-transfer', file: 'request-observer', test: 'observing a stock streamed Request preserves its body for accounting and dispatch',
+    edits: [edit('ops/build-runner/request-observer.mjs', 'transportFetch(request)', 'transportFetch(input, init)')],
+  },
+  {
+    id: 'raw-model-provider-route-not-checked', file: 'pstack-session', test: 'a raw model ID cannot silently change the selected provider route',
+    edits: [edit(session, 'expected != null && actual != null && expected !== actual', 'false')],
+  },
+  {
+    id: 'unavailable-subscription-offered', file: 'connections', test: 'an explicitly unavailable or invalidly priced configured model is not advertised',
+    edits: [edit('ops/build-runner/connections.mjs', ' || spec.unavailable', '')],
+  },
+  {
+    id: 'local-estimate-not-used', file: 'transport', test: 'local text estimate reserves framing and UTF-8 bytes without a credential or count request',
+    edits: [edit(transport, 'inputBound = units * estimate.multiplier + estimate.framingTokens;', 'inputBound = spec.maxInputTokens;')],
+  },
+  {
+    id: 'local-estimate-padding-removed', file: 'transport', test: 'bundled local tokenizer reserves padded complete request for hello',
+    edits: [edit(transport, 'inputBound = units * estimate.multiplier + estimate.framingTokens;', 'inputBound = units;')],
+  },
+  {
+    id: 'local-estimate-overrun-ignored', file: 'transport', test: 'a provider input count above the local estimate settles actual cost and stops later work',
+    edits: [edit(transport, 'spec.inputTokenEstimate && inputTokens > inputBound', 'false')],
+  },
+  {
+    id: 'stock-sse-without-content-type-not-parsed', file: 'transport', test: 'a stock Codex stream without a content-type header settles its completed usage',
+    edits: [edit(transport, "response.headers.get('content-type') ?? (bounded.stream ? 'text/event-stream' : '')", "response.headers.get('content-type') ?? ''")],
+  },
+  {
+    id: 'hidden-conversation-not-refused', file: 'transport', test: 'local estimates include tools and refuse hidden conversation state before dispatch',
+    edits: [edit(transport, "if (body.previous_response_id || body.conversation) throw fail('Local input estimate requires explicit conversation input');", '')],
+  },
+  {
+    id: 'stock-hosted-search-not-disabled', file: 'subscription-tools', test: 'stock subscription requests can dispatch without unpriced hosted search',
+    edits: [edit(adapter, ", disabledTools: ['web_search']", '')],
+  },
+  {
+    id: 'cache-ttl-mismatch-accepted', file: 'transport', test: 'stock Claude conversation caching uses its configured one-hour API price',
+    edits: [edit(transport, "if (value.cache_control && (value.cache_control.ttl ?? '5m') !== cacheWriteTtl) return true;", '')],
+  },
+  {
+    id: 'one-hour-cache-write-charged-at-five-minute-rate', file: 'transport', test: 'stock Claude conversation caching uses its configured one-hour API price',
+    edits: [edit(machineSettings, '"cacheWrite": 0.2', '"cacheWrite": 0.125')],
+  },
+  {
+    id: 'maximum-charge-recovery-not-final', file: 'ledger', test: 'charging an unknown request at its full maximum never releases budget or invents usage',
+    edits: [edit(ledger, "if (current.state === 'unknown' && current.costNano !== null) throw new Error('Maximum-charge recovery is final; actual usage remains unknown');", '')],
+  },
+  {
+    id: 'configured-panel-replaced-by-unrelated-model', file: 'pstack-session', test: 'an unrelated review model cannot replace the configured Sol and DeepSeek panel',
+    edits: [edit(session, 'return start.modelId === model', 'return start.modelId !== coderModel')],
+  },
+  {
+    id: 'unknown-maximum-charged-as-zero', file: 'ledger', test: 'charging an unknown request at its full maximum never releases budget or invents usage',
+    edits: [edit(ledger, 'cost_nano = maximum_nano, reason = ?', 'cost_nano = 0, reason = ?')],
+  },
   ...['chat SSE', 'responses SSE', 'messages JSON', 'messages SSE'].map(protocol => ({
     id: `${protocol.replaceAll(' ', '-').toLowerCase()}-charge-corrupted`, file: 'transport', test: `${protocol} settles cache categories once`,
-    edits: [edit(transport, 'const costNano = usage ? totalCharge', 'const costNano = usage ? 1 + totalCharge')],
+    edits: [edit(transport, 'const costNano = Math.max(usage ? totalCharge', 'const costNano = 1 + Math.max(usage ? totalCharge')],
   })),
   {
     id: 'invalid-money-defaulted-to-zero', file: 'ledger', test: 'invalid monetary inputs cannot change durable budget',
@@ -30,10 +92,10 @@ const cases = [
   },
   {
     id: 'connection-failure-not-marked-unknown', file: 'transport', test: 'connection failure after arrival retains the paid reservation',
-    edits: [edit(transport, "if (!settled) await ledgerCall('unknown', id, error.message?.startsWith('STOP WORK') ? 'Provider reported nonzero cost' : 'Request outcome unavailable');", '')],
+    edits: [edit(transport, "if (!settled) await ledgerCall('unknown', id, 'Request outcome unavailable');", '')],
   },
   {
-    id: 'card-ceiling-removed', file: 'ledger', test: 'priced requests hold budget, settle once, and enforce the card ceiling',
+    id: 'card-ceiling-removed', file: 'ledger', test: 'all roles share the two-dollar card ceiling across reopen and settle once',
     edits: [edit(ledger, 'BigInt(snapshot.spentNano) + BigInt(snapshot.heldNano) + BigInt(maximumNano) > BigInt(CEILING_NANO)', 'false')],
   },
   {
@@ -57,7 +119,7 @@ const cases = [
     edits: [edit(ledger, "if (current.maximumNano > 0 && (usage === undefined || usage === null)) throw new Error('Priced settlement requires usage');", '')],
   },
   {
-    id: 'settlement-idempotency-check-removed', file: 'ledger', test: 'priced requests hold budget, settle once, and enforce the card ceiling',
+    id: 'settlement-idempotency-check-removed', file: 'ledger', test: 'all roles share the two-dollar card ceiling across reopen and settle once',
     edits: [edit(ledger, 'current.costNano !== costNano || !isDeepStrictEqual(current.usage, usageJson === null ? null : JSON.parse(usageJson))', 'false')],
   },
   {
@@ -65,12 +127,8 @@ const cases = [
     edits: [edit(ledger, 'const failure = costNano > current.maximumNano;', 'const failure = false;')],
   },
   {
-    id: 'unpriced-model-defaulted-to-free', file: 'transport', test: 'wrong model, endpoint, missing prices and trial paid routes send nothing',
-    edits: [edit(transport, "if (!object(spec.price) || categories.some(key => !Number.isFinite(spec.price[key]) || spec.price[key] < 0)) throw fail('Missing model price');", "spec.price ??= Object.fromEntries(categories.map(key => [key, 0]));\n    if (!object(spec.price) || categories.some(key => !Number.isFinite(spec.price[key]) || spec.price[key] < 0)) throw fail('Missing model price');")],
-  },
-  {
-    id: 'trial-paid-dispatch-allowed', file: 'transport', test: 'wrong model, endpoint, missing prices and trial paid routes send nothing',
-    edits: [edit(transport, "if (trial && spec.paid) throw fail('Trial forbids nonzero model prices');", '')],
+    id: 'unpriced-model-defaulted-to-free', file: 'transport', test: 'wrong model, endpoint, missing prices and bounds send nothing',
+    edits: [edit(transport, 'const prices = [spec.price, ...tiers.map(tier => tier.price)];', 'spec.price ??= Object.fromEntries(categories.map(key => [key, 0])); const prices = [spec.price, ...tiers.map(tier => tier.price)];')],
   },
   {
     id: 'ceiling-http-dispatch-allowed', file: 'transport', test: 'card ceiling refuses an oversized reservation before HTTP',
@@ -81,7 +139,7 @@ const cases = [
     edits: [edit(ledger, 'const id = randomUUID();', "const id = 'reused-attempt-id';")],
   },
   {
-    id: 'unknown-route-falls-back-to-first-model', file: 'transport', test: 'wrong model, endpoint, missing prices and trial paid routes send nothing',
+    id: 'unknown-route-falls-back-to-first-model', file: 'transport', test: 'wrong model, endpoint, missing prices and bounds send nothing',
     edits: [edit(transport, 'const spec = routes.get(JSON.stringify([endpoint, body.model]));', 'const spec = routes.get(JSON.stringify([endpoint, body.model])) ?? routes.values().next().value;')],
   },
   {
@@ -100,12 +158,12 @@ const cases = [
     ],
   },
   {
-    id: 'provider-nonzero-cost-stop-disabled', file: 'transport', test: 'provider reported cost stops even a configured free route',
-    edits: [edit(transport, "if (reportedCost(value)) throw fail('STOP WORK: provider reported nonzero cost');", '', 2)],
+    id: 'reported-cost-not-counted', file: 'transport', test: 'provider cost above a configured free reservation is recorded and stops its card',
+    edits: [edit(transport, 'reportedNano);', '0);')],
   },
   {
-    id: 'provider-nonzero-cost-durable-stop-removed', file: 'transport', test: 'provider reported cost stops even a configured free route',
-    edits: [edit(transport, "if (error.message?.startsWith('STOP WORK')) await ledgerCall('stop', 'Provider reported nonzero cost');", '')],
+    id: 'over-reservation-stop-not-persisted', file: 'transport', test: 'provider cost above a configured free reservation is recorded and stops its card',
+    edits: [edit(transport, "await ledgerCall('stop', 'Request cost exceeds configured reservation');", '')],
   },
   {
     id: 'stop-marker-not-persisted', file: 'review-regressions', test: 'review durable stop survives reopen and blocks free and paid routes only for its card',
@@ -117,17 +175,15 @@ const cases = [
   },
   {
     id: 'stopped-card-metadata-allowed', file: 'review-regressions', test: 'review stopped card blocks allowlisted metadata GET',
-    edits: [edit(transport, "if ((await ledgerCall('snapshot')).stopped) throw fail('STOP WORK: card stopped after nonzero cost');", '')],
+    edits: [edit(transport, "if ((await ledgerCall('snapshot')).stopped) throw fail('STOP WORK: card account is stopped');", '')],
   },
   {
     id: 'known-overbound-usage-not-recorded', file: 'review-regressions', test: 'review oversized known usage records actual cost and refuses result',
-    edits: [edit(transport,
-      "await ledgerCall('settle', id, { usage: usage ?? null, costNano });\n      settled = true;\n      if (costNano > spec.maximumNano) throw fail('Request usage exceeds reserved bound');",
-      "if (costNano > spec.maximumNano) throw fail('Request usage exceeds reserved bound');\n      await ledgerCall('settle', id, { usage: usage ?? null, costNano });\n      settled = true;")],
+    edits: [edit(transport, "await ledgerCall('settle', id, { usage: usage ?? null, costNano });", '')],
   },
   {
     id: 'known-overbound-result-accepted', file: 'review-regressions', test: 'review oversized known usage records actual cost and refuses result',
-    edits: [edit(transport, "if (costNano > spec.maximumNano) throw fail('Request usage exceeds reserved bound');", '')],
+    edits: [edit(transport, 'if (costNano > maximumNano) {', 'if (false) {')],
   },
   {
     id: 'cached-input-double-counted', file: 'transport', test: 'chat JSON settles cache categories once',
@@ -148,7 +204,7 @@ const cases = [
   {
     id: 'redirects-followed', file: 'transport', test: 'allowlisted authentication cannot carry inference payloads and redirects never follow',
     edits: [
-      edit(transport, "redirect: 'error'", "redirect: 'follow'", 3),
+      edit(transport, "redirect: 'error'", "redirect: 'follow'", 4),
       edit(transport, "if (response.status >= 300 && response.status < 400) throw fail('Redirect refused');", ''),
     ],
   },
@@ -165,8 +221,14 @@ const cases = [
     edits: [edit(transport, "catch { throw fail('Request ledger refused operation'); }", 'catch (error) { throw error; }')],
   },
   {
-    id: 'state-directory-not-canonicalized', file: 'review-regressions', test: 'review stock adapter rejects state symlink into builder before runtime',
-    edits: [edit(adapter, 'stateDir = await realpath(stateDir)', 'stateDir = resolve(stateDir)')],
+    id: 'state-and-ledger-paths-not-canonicalized', file: 'review-regressions', test: 'review stock adapter rejects state symlink into builder before runtime',
+    edits: [
+      edit(adapter, 'stateDir = await realpath(stateDir)', 'stateDir = resolve(stateDir)'),
+      edit(adapter, `  try { ledgerPath = await realpath(ledgerPath) } catch (error) {
+    if (error.code !== 'ENOENT') throw error
+    ledgerPath = join(await realpath(dirname(ledgerPath)), basename(ledgerPath))
+  }`, ''),
+    ],
   },
   {
     id: 'auth-file-not-canonicalized', file: 'review-regressions', test: 'review stock adapter rejects auth-file symlink into builder before runtime',

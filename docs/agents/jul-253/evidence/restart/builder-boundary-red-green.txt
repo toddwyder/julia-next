@@ -1,0 +1,30 @@
+Pre-fix command:
+node --test C:\Users\toddw\AppData\Local\Temp\jul253-boundary-red\ops\build-runner\test\pstack-session.test.mjs
+
+Pre-fix result:
+✖ the internal builder keeps the repository task separate from the host Start proof
+ℹ tests 7
+ℹ suites 0
+ℹ pass 6
+ℹ fail 1
+
+Failure:
+AssertionError [ERR_ASSERTION]: The input did not match the regular expression /implement only the.*repository.*Desired behavior/i.
+
+Post-fix command:
+node --test ops/build-runner/test/pstack-session.test.mjs ops/build-runner/test/machine-settings.test.mjs
+
+Post-fix result:
+✔ normal machine sessions use Sol and DeepSeek and preserve the two-model panels
+✔ an explicit machinery drive uses Beam for the session and every helper
+✔ an unrelated review model cannot replace the configured Sol and DeepSeek panel
+✔ normal session keeps the configured Sol/DeepSeek split and every exact model
+✔ the internal builder keeps the repository task separate from the host Start proof
+✔ machinery selects Beam for every role and describes a self-check, not independent review
+✔ normal proof requires successful distinct-model review of actual changed files
+✔ machinery proof completes a successful Beam self-check without DeepSeek dispatch
+✔ a raw model ID cannot silently change the selected provider route
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0

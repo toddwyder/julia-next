@@ -122,7 +122,7 @@ try {
   assert.strictEqual(result.account.spentNano, 0);
   assert.strictEqual(result.account.heldNano, 0);
   assert.strictEqual(result.account.stopped, false);
-  assert.equal(result.internalReview.deepseekRefusal, true);
+  assert.equal(result.internalReview.deepseekRefusal, false);
   assert.equal(result.internalReview.deepseekSent, false);
   assert.equal(result.downstreamReviewStarted, false);
   assert(Array.isArray(result.internalReview.starts) && result.internalReview.starts.length > 0);
@@ -131,7 +131,7 @@ try {
   assert.equal(typeof result.actualModels.orchestrator, 'string');
   assert.equal(typeof result.actualModels.coder, 'string');
 
-  const names = ['settings.json', 'events.jsonl', 'requests.jsonl', 'ledger.json', 'receipt.json', 'job.json', 'pstack-checklist.md', 'pstack-decisions.tsv', 'pstack-state.json', 'receipts.json', 'workflow-feedback.json'];
+  const names = ['settings.json', 'events.jsonl', 'requests.jsonl', 'ledger.json', 'receipt.json', 'job.json', 'pstack-plan.md', 'pstack-checklist.md', 'pstack-decisions.tsv', 'pstack-state.json', 'receipts.json', 'workflow-feedback.json'];
   for (const name of names) await copyFile(path.join(path.dirname(finalJob.worktree), name), path.join(outputDir, 'job-files', name));
   const settings = JSON.parse(await readFile(path.join(outputDir, 'job-files', 'settings.json'), 'utf8'));
   const events = (await readFile(path.join(outputDir, 'job-files', 'events.jsonl'), 'utf8')).trim().split(/\n/).filter(Boolean).map(JSON.parse);
@@ -149,12 +149,12 @@ try {
   const coderEnd = events.find(e => e.type === 'subagent_end' && e.toolCallId === coderStart.toolCallId);
   assert.equal(coderEnd?.isError, false);
   const handoff = result.internalReview.reviewHandoff;
-  assert(handoff, 'pstack handed review to a distinct model');
-  assert.notEqual(handoff.modelId, coderStart.modelId);
-  assert.match(handoff.modelId, /deepseek/i);
-  assert.match(handoff.task, /review|audit|judge/i);
-  assert.equal(handoff.refused, true);
-  assert(String(handoff.result).includes('Trial forbids nonzero model prices'));
+  assert(handoff, 'pstack completed its machinery self-check');
+  assert.equal(handoff.modelId, coderStart.modelId);
+  assert.equal(handoff.modelId, result.actualModels.coder);
+  assert.match(handoff.task, /review|audit|judge|self-check/i);
+  assert.equal(handoff.refused, false);
+  assert(handoff.result);
   const checklist = await readFile(path.join(outputDir, 'job-files', 'pstack-checklist.md'), 'utf8');
   const decisions = await readFile(path.join(outputDir, 'job-files', 'pstack-decisions.tsv'), 'utf8');
   assert(checklist.trim(), 'pstack authored a checklist');
@@ -163,11 +163,7 @@ try {
   assert.equal(decisions, result.internalReview.decisions);
 
   const deepseekRequests = requests.filter(r => String(r.model).includes('deepseek'));
-  assert(deepseekRequests.length >= 1);
-  for (const request of deepseekRequests) {
-    assert(!Object.prototype.hasOwnProperty.call(request, 'status'));
-    assert(String(request.refusal).includes('Trial forbids nonzero model prices'));
-  }
+  assert.equal(deepseekRequests.length, 0, 'machinery drive must not dispatch DeepSeek');
   const successfulRequests = requests.filter(r => r.model && typeof r.status === 'number' && r.status >= 200 && r.status < 300);
   assert(successfulRequests.length > 0);
   assert(successfulRequests.every(r => r.model === 'reflection/beam:free'));
@@ -235,7 +231,8 @@ try {
     restart,
     git: { base, candidate, changedFiles, markerContent: markerBuffer.toString('utf8'), clean: true },
     account: result.account,
-    deepseekRefused: true,
+    deepseekRefused: false,
+    machinerySelfCheck: true,
     pstack: { checklist, decisions, reviewHandoff: handoff },
     pageSavedResult: true,
     network: { failures: networkFailures, console: consoleMessages, pageErrors }

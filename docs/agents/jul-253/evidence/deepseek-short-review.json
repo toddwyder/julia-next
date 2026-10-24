@@ -1,0 +1,3758 @@
+{
+  "status": 200,
+  "model": "deepseek/deepseek-v4.1-flash",
+  "report": "## Requirements and simplest sufficient design\n\nOne shared per-card SQLite ledger at a fixed path; every role/retry/restart uses it. Reservations carry a bounded maximum. Paid requests must reserve at API rates before dispatch, settle only from reported usage, and any unknown outcome keeps a full hold until an explicit recovery charges the full reserved maximum while leaving usage `UNKNOWN`. Sol gets documented input counting and must refuse inference if counting is unavailable; DeepSeek is ordinary/swarm; Beam is machinery-only. Normal panels require one Sol and one DeepSeek. Subscription proofs are UNVERIFIED and cannot be accepted. Native parent-chat usage is not in this ledger and must not be presented as counted.\n\n## Code defects\n\n### D1 — `ledger.mjs` `settle()` can reverse `chargeUnknownMaximum()` and release budget\n\n`chargeUnknownMaximum()` correctly changes an unknown request from a full hold to a full spent maximum while keeping `state='unknown'` and `usage=null`. But `settle()` still accepts that same row because it only rejects `settled`/`accounting_failure`. A later `settle(id, { usage, costNano })` can overwrite `cost_nano` downward and change the state to `settled`, releasing the charged maximum. This violates “Unknown request holds cannot release budget” and the recovery contract “keeping usage UNKNOWN.”\n\n**STATIC TRACE 1 (not executed test):**\n1. `reserve(max=300_000_000)` → held 300M.\n2. `unknown(id)` → state unknown, cost null, held 300M, `pricedBlocked=true`.\n3. `chargeUnknownMaximum(id)` → state unknown, usage null, cost 300M, spent 300M, held 0.\n4. `settle(id, { usage:{...}, costNano:100_000_000 })` → current state is unknown, usage is present, cost <= max, so UPDATE sets `state='settled'` and `cost_nano=100M`.\n5. `snapshot()` now spends 100M, not 300M, and remaining budget increases by 200M.\n\n**Fix:** make full-max recovery terminal for settlement, or in `settle()` reject `current.state==='unknown' && current.costNano!==null`; alternatively allow only non-decreasing cost and never convert recovered-unknown usage to counted usage. Add a regression test: recover then attempt lower settle and assert refusal/no budget release.\n\n### D2 — `pstack-session.mjs` `inspectPstackRun()` does not enforce the Sol/DeepSeek panel\n\nFor normal proof it accepts any reviewer whose `modelId !== coderModel`. It does not require Sol or a Sol+DeepSeek pair. Because `settings.models` includes `anthropic/claude-haiku-5-5`, a coder DeepSeek run with an Anthropic review event passes the inspection, violating “panels one Sol+one DeepSeek” and “DeepSeek ordinary/swarm, Sol main/hardest.”\n\n**STATIC TRACE 2 (not executed test):**\n1. Build events: coder `commandcode/deepseek/deepseek-v4.1-flash`, successful tool activity, completed.\n2. Review event: `modelId='anthropic/claude-haiku-5-5'`, task includes `Review marker.txt`, completed.\n3. `inspectPstackRun` finds `review` because task matches `/review/`, changed file matches, and model differs from coder.\n4. It returns `hasReviewer=true`.\n\n**Fix:** pass required review model(s)/panel role into `inspectPstackRun`; require normal review `modelId` be the configured Sol role (or explicitly the Sol+DeepSeek pair where required), reject Beam/Anthropic as normal reviewers, and add a negative test.\n\n## Standards checks\n\n1. **Unit:** Ledger/transport units are broad, but missing: settle-after-full-max-recovery, normal-reviewer panel enforcement, and unavailable-model wireModel shadowing valid routes. Add those tests. New recovery test was red→green locally, but not CI checked.\n2. **Real integration:** Local HTTP fixtures are not live integration. DeepSeek literal `JUL253_CONNECTION_OK` with settled charge is provider evidence for that path only. Sol documented input-count endpoint exists, but legacy OAuth compatibility is unverified; unavailable count must refuse inference. Need a guarded live run proving Sol count failure refuses before dispatch and DeepSeek settles at configured peak rates.\n3. **User journey:** No demonstrated end-to-end JUL-253 worker journey: `openRunner` → pstack panel → candidate commit → ledger snapshot → restart/shared-card check. Add one with Sol+DeepSeek panel and Beam machinery only.\n4. **Browser console:** No evidence. If this runner has no browser surface, record N/A with rationale; otherwise capture console/network errors for the journey.\n5. **Logging:** Worker writes events/requests/ledger, but no evidence these logs redact credentials and do not count native parent-chat usage. Add log inspection assertions and explicit `UNKNOWN` labeling for recovery.\n\n## Spec status\n\n- Subscription sign-in code exists, but subscription proofs remain **UNVERIFIED** and cannot support acceptance.\n- Native parent-chat usage is not visible in this ledger; do not represent it as counted.\n- DeepSeek actual request succeeded with literal `JUL253_CONNECTION_OK` and settled charge; keep that as limited evidence.\n- Beam is machinery-only in `createPstackSession`, but D2 weakens normal panel enforcement.\n- Prior source candidate `5b8949b` passed CI; the new recovery change is **not CI checked**.\n\n**Grouped unchanged historical/evidence docs:** prior 42 caught mutations, 14 SDK learning tests, 3 server learning tests, 198 root passes/4 skips, prior CI pass, fixtures, summaries, and subscription connection records are historical evidence only. They do not prove the new recovery behavior or live subscription behavior.\n\n**Overall acceptance verdict: FAIL** due to D1, a demonstrated code bug that can release budget after full-max unknown recovery. Full acceptance is not approved.",
+  "finishReason": "stop",
+  "usage": {
+    "prompt_tokens": 24517,
+    "completion_tokens": 9971,
+    "total_tokens": 34488,
+    "prompt_tokens_details": {
+      "audio_tokens": 0,
+      "cached_tokens": 0,
+      "cache_write_tokens": 0,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 0,
+      "text_tokens": 0,
+      "image_tokens": 0,
+      "video_tokens": 0
+    },
+    "completion_tokens_details": {
+      "audio_tokens": 0,
+      "reasoning_tokens": 8654,
+      "accepted_prediction_tokens": 0,
+      "rejected_prediction_tokens": 0,
+      "text_tokens": 0,
+      "image_tokens": 0,
+      "video_tokens": 0
+    }
+  },
+  "account": {
+    "card": "JUL-253",
+    "ceilingNano": 2000000000,
+    "stopped": false,
+    "spentNano": 870631188,
+    "heldNano": 0,
+    "remainingNano": 1129368812,
+    "pricedBlocked": false,
+    "requests": [
+      {
+        "id": "47952e08-4adc-4656-b5e8-5a0ec4cf3718",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 19382,
+          "output": 199,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "costNano": 6053400,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "b5905637-495f-49bd-9ba4-15214035b3f4",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 364,
+          "output": 213,
+          "cacheRead": 19328,
+          "cacheWrite": 0
+        },
+        "costNano": 422784,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "073739e4-239d-4165-b013-26f5a5dec734",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1073,
+          "output": 178,
+          "cacheRead": 19584,
+          "cacheWrite": 0
+        },
+        "costNano": 594252,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "4fae683a-619d-4963-9769-52175777588c",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 7881,
+          "output": 280,
+          "cacheRead": 20608,
+          "cacheWrite": 0
+        },
+        "costNano": 2762124,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "d3d87b90-1247-4938-a386-e1b4f4ad72ce",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 4958,
+          "output": 332,
+          "cacheRead": 28416,
+          "cacheWrite": 0
+        },
+        "costNano": 1971048,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "052b8270-f0de-4298-b060-8beaaad6a975",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 2653,
+          "output": 390,
+          "cacheRead": 33280,
+          "cacheWrite": 0
+        },
+        "costNano": 1363740,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "d4c4eb18-2a4c-43d7-9cf9-7ac522db505b",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 2355,
+          "output": 369,
+          "cacheRead": 35840,
+          "cacheWrite": 0
+        },
+        "costNano": 1256820,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "85fcd5ca-26ed-4536-a981-4f2e012ec5e5",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 4065,
+          "output": 587,
+          "cacheRead": 38144,
+          "cacheWrite": 0
+        },
+        "costNano": 2038332,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "bacb8918-388f-46b1-a2fe-f6644cae282d",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 4626,
+          "output": 6608,
+          "cacheRead": 42112,
+          "cacheWrite": 0
+        },
+        "costNano": 9443736,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "ee1eab1d-270f-4379-8a56-6b30b99d9b1b",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 8870,
+          "output": 243,
+          "cacheRead": 46720,
+          "cacheWrite": 0
+        },
+        "costNano": 3092760,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "c8cbbad1-6566-47c4-a100-c86b83dabb1c",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 2355,
+          "output": 174,
+          "cacheRead": 55552,
+          "cacheWrite": 0
+        },
+        "costNano": 1081956,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "927472e2-e3a2-46c5-8802-512b05fb7923",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1257,
+          "output": 205,
+          "cacheRead": 57856,
+          "cacheWrite": 0
+        },
+        "costNano": 796668,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "7bc9e127-9455-44fd-823f-87e9b3c08378",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 885,
+          "output": 184,
+          "cacheRead": 59008,
+          "cacheWrite": 0
+        },
+        "costNano": 663324,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "b35a3f5f-b171-4b04-97c8-732cb983fad9",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 435,
+          "output": 6818,
+          "cacheRead": 59776,
+          "cacheWrite": 0
+        },
+        "costNano": 8491428,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "1a2ded00-ed82-44af-9b8e-5d29097d57e2",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 6900,
+          "output": 214,
+          "cacheRead": 60160,
+          "cacheWrite": 0
+        },
+        "costNano": 2507280,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "1af26b4b-7a2f-4ab2-9d6a-541c81146112",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1855,
+          "output": 634,
+          "cacheRead": 66944,
+          "cacheWrite": 0
+        },
+        "costNano": 1518132,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "a8090ab5-9daf-4999-b4ba-f6ea739f9dae",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 731,
+          "output": 942,
+          "cacheRead": 68736,
+          "cacheWrite": 0
+        },
+        "costNano": 1555908,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "72ef959e-cfaa-40a9-948c-551563003bf0",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1067,
+          "output": 1769,
+          "cacheRead": 69376,
+          "cacheWrite": 0
+        },
+        "costNano": 2651028,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "7a71e918-e486-4e36-9edd-037a89e18e42",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1846,
+          "output": 133,
+          "cacheRead": 70400,
+          "cacheWrite": 0
+        },
+        "costNano": 924600,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "c18a17a5-0c74-456c-8eb3-29d241a4e33c",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 217,
+          "output": 1053,
+          "cacheRead": 72192,
+          "cacheWrite": 0
+        },
+        "costNano": 1545276,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "6809ac19-8d1e-42b3-a48e-7f85295e04b3",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1266,
+          "output": 142,
+          "cacheRead": 72320,
+          "cacheWrite": 0
+        },
+        "costNano": 767160,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "c9c9d932-defe-4c17-b89d-1094814b1c8b",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 413,
+          "output": 357,
+          "cacheRead": 73472,
+          "cacheWrite": 0
+        },
+        "costNano": 772716,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "191c9a61-4a5a-4769-af30-93aaac553f64",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 492,
+          "output": 1537,
+          "cacheRead": 73856,
+          "cacheWrite": 0
+        },
+        "costNano": 2213568,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "bf4fa34d-44ba-4d8c-b344-5d95d0d56a5d",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1679,
+          "output": 162,
+          "cacheRead": 74240,
+          "cacheWrite": 0
+        },
+        "costNano": 920820,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "e9fbabf9-866d-400f-a711-0484463cccba",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 334,
+          "output": 232,
+          "cacheRead": 75904,
+          "cacheWrite": 0
+        },
+        "costNano": 606312,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "8b28fb29-fe53-46ce-b30e-e9478c068fa7",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 3256,
+          "output": 342,
+          "cacheRead": 76160,
+          "cacheWrite": 0
+        },
+        "costNano": 1615680,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "7b4136a7-8a28-4afc-8fae-484b4e0b9062",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1321,
+          "output": 255,
+          "cacheRead": 79360,
+          "cacheWrite": 0
+        },
+        "costNano": 940380,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "0eaddc6a-f474-490f-b02b-cff2a0750f6f",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1171,
+          "output": 191,
+          "cacheRead": 80640,
+          "cacheWrite": 0
+        },
+        "costNano": 822420,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "b7170466-4623-4363-907a-98825d0256b0",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 2057,
+          "output": 466,
+          "cacheRead": 81792,
+          "cacheWrite": 0
+        },
+        "costNano": 1421676,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "48a7161c-70e1-4bd9-b841-e72060505269",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 3115,
+          "output": 701,
+          "cacheRead": 83840,
+          "cacheWrite": 0
+        },
+        "costNano": 2027220,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "1175f901-a473-4684-ac63-095baa1a75cf",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 831,
+          "output": 1282,
+          "cacheRead": 86912,
+          "cacheWrite": 0
+        },
+        "costNano": 2048436,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "95fe00c3-2ba9-4110-a3d0-264e5fe2bf65",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1535,
+          "output": 927,
+          "cacheRead": 87680,
+          "cacheWrite": 0
+        },
+        "costNano": 1835940,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "6be1c5f7-d058-4789-b198-ffb1b19175be",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1490,
+          "output": 536,
+          "cacheRead": 89088,
+          "cacheWrite": 0
+        },
+        "costNano": 1357464,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "6f6b5341-7b42-4ba7-b645-cc2379f47662",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1015,
+          "output": 501,
+          "cacheRead": 90496,
+          "cacheWrite": 0
+        },
+        "costNano": 1177188,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "0fc5b9f1-2b6b-4338-901a-7cc8bb23814e",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1201,
+          "output": 528,
+          "cacheRead": 91392,
+          "cacheWrite": 0
+        },
+        "costNano": 1268076,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "59e9679d-a73d-4e05-bf84-31d736bc2f24",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1664,
+          "output": 4473,
+          "cacheRead": 92544,
+          "cacheWrite": 0
+        },
+        "costNano": 6144432,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "9d21fe49-ac33-4153-9df4-de9f19cdb805",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 4509,
+          "output": 244,
+          "cacheRead": 94208,
+          "cacheWrite": 0
+        },
+        "costNano": 1928124,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "31e4752a-ae0d-415f-bba2-09b0f2b0ba8f",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 430,
+          "output": 1276,
+          "cacheRead": 98688,
+          "cacheWrite": 0
+        },
+        "costNano": 1956264,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "7719f49f-f5d2-4dc8-aaab-65f5590dea89",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1375,
+          "output": 327,
+          "cacheRead": 99072,
+          "cacheWrite": 0
+        },
+        "costNano": 1102116,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "bf4ca038-590c-4964-9dc2-5e6ff96af7f8",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "builder",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 441,
+          "output": 1919,
+          "cacheRead": 100352,
+          "cacheWrite": 0
+        },
+        "costNano": 2736156,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "4e0ebe1a-42de-4f3d-b96a-67d7088070d4",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "proof",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 11921,
+          "output": 8,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "costNano": 3585900,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "d16106f3-9be8-41e3-9637-4274e8c4712b",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "proof",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 11921,
+          "output": 20,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "costNano": 3600300,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "0fb4e842-a10d-46ce-a01f-7acc505b201f",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 17626,
+          "output": 142,
+          "cacheRead": 2048,
+          "cacheWrite": 0
+        },
+        "costNano": 5464344,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "fcf5af0e-6dfb-4209-8972-1f7ac20c0e9f",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1198,
+          "output": 455,
+          "cacheRead": 19584,
+          "cacheWrite": 0
+        },
+        "costNano": 964152,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "6c53dd44-4601-4142-9ccc-ae31871a2b3c",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 739,
+          "output": 132,
+          "cacheRead": 20736,
+          "cacheWrite": 0
+        },
+        "costNano": 442308,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "ff73f636-acb0-4cf9-abac-158b4860ae84",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 4040,
+          "output": 148,
+          "cacheRead": 21376,
+          "cacheWrite": 0
+        },
+        "costNano": 1453728,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "3904e96b-a386-4e7f-a611-4c42ac5355aa",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 4978,
+          "output": 1162,
+          "cacheRead": 25344,
+          "cacheWrite": 0
+        },
+        "costNano": 2963832,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "18a377a1-b7e1-47cc-b539-25bb9d22a9df",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 3208,
+          "output": 246,
+          "cacheRead": 30208,
+          "cacheWrite": 0
+        },
+        "costNano": 1348224,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "121d1dd8-636d-43fa-9321-d8c9fa9d2e3f",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 534,
+          "output": 433,
+          "cacheRead": 33408,
+          "cacheWrite": 0
+        },
+        "costNano": 780024,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "79dfcbd3-2d2d-4a3b-b514-5b67eb320a0d",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 801,
+          "output": 247,
+          "cacheRead": 33920,
+          "cacheWrite": 0
+        },
+        "costNano": 638460,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "7b4be41f-f6bd-4375-a2bf-b16a6ef640af",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 556,
+          "output": 90,
+          "cacheRead": 34688,
+          "cacheWrite": 0
+        },
+        "costNano": 378864,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "0d9b93c0-ed82-4e6d-bc34-cbefc609085e",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 2756,
+          "output": 433,
+          "cacheRead": 35200,
+          "cacheWrite": 0
+        },
+        "costNano": 1452000,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "b26f4e22-5cdf-4e07-8bd1-73d3b8b61216",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 4059,
+          "output": 106,
+          "cacheRead": 37888,
+          "cacheWrite": 0
+        },
+        "costNano": 1458564,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "1da93353-6b5c-43c4-bdf7-3c58cd8e4d0e",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 2988,
+          "output": 151,
+          "cacheRead": 41856,
+          "cacheWrite": 0
+        },
+        "costNano": 1203168,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "b819846f-9bcb-4c9e-b75f-15b7309c334c",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1963,
+          "output": 197,
+          "cacheRead": 44800,
+          "cacheWrite": 0
+        },
+        "costNano": 959700,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "29272da7-d617-4f56-af49-d2f5831c3a4d",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 833,
+          "output": 2170,
+          "cacheRead": 46720,
+          "cacheWrite": 0
+        },
+        "costNano": 2994060,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "5441809c-1ed7-4381-8fb7-b804976152ad",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 2381,
+          "output": 636,
+          "cacheRead": 47488,
+          "cacheWrite": 0
+        },
+        "costNano": 1619964,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "f91f157c-62d0-4eb5-8d0a-7d8a67b80a86",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 975,
+          "output": 523,
+          "cacheRead": 49792,
+          "cacheWrite": 0
+        },
+        "costNano": 1069476,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "31383745-6df7-4fb5-9652-1c37c186895f",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1239,
+          "output": 509,
+          "cacheRead": 50688,
+          "cacheWrite": 0
+        },
+        "costNano": 1134564,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "93b1e632-7221-4777-b7df-8df03d6e1b3a",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 2517,
+          "output": 110,
+          "cacheRead": 51840,
+          "cacheWrite": 0
+        },
+        "costNano": 1042620,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "b603a0a0-b36c-4ccf-9dcc-29fe6bcddba3",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 765,
+          "output": 271,
+          "cacheRead": 54272,
+          "cacheWrite": 0
+        },
+        "costNano": 717516,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "aac768a7-f246-4255-b541-51ae7b0bb625",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1117,
+          "output": 89,
+          "cacheRead": 54912,
+          "cacheWrite": 0
+        },
+        "costNano": 606636,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "f6b0b976-5bb4-4aa4-9c1c-7e71c0402dd3",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1470,
+          "output": 168,
+          "cacheRead": 55936,
+          "cacheWrite": 0
+        },
+        "costNano": 810408,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "3aa7f95c-d483-4ac6-a93e-5f79d9733244",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1930,
+          "output": 91,
+          "cacheRead": 57344,
+          "cacheWrite": 0
+        },
+        "costNano": 860232,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "8ff985c5-64a5-4768-aeaf-1fa12d71d24c",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1815,
+          "output": 269,
+          "cacheRead": 59264,
+          "cacheWrite": 0
+        },
+        "costNano": 1045092,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "ed848100-6eab-4350-b3ac-bb10ceee1726",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 2069,
+          "output": 90,
+          "cacheRead": 61056,
+          "cacheWrite": 0
+        },
+        "costNano": 911868,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "e159dbcd-5eec-479f-8268-cde013b74989",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1415,
+          "output": 572,
+          "cacheRead": 63104,
+          "cacheWrite": 0
+        },
+        "costNano": 1300212,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "c10e99b3-12e2-47d3-b4aa-f879797214b9",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1596,
+          "output": 429,
+          "cacheRead": 64512,
+          "cacheWrite": 0
+        },
+        "costNano": 1187136,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "90d96b75-6df6-4e87-9858-b15e6db12e24",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 2546,
+          "output": 295,
+          "cacheRead": 66048,
+          "cacheWrite": 0
+        },
+        "costNano": 1315944,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "245e1174-6444-44d8-9435-c6ea6a21fa30",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 2205,
+          "output": 93,
+          "cacheRead": 68480,
+          "cacheWrite": 0
+        },
+        "costNano": 978540,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "2fe15154-aac9-41c2-b497-5f0e97d2fb94",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 2106,
+          "output": 111,
+          "cacheRead": 70656,
+          "cacheWrite": 0
+        },
+        "costNano": 976968,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "03f9c54b-1d72-4fc4-8b56-1bce04c81468",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1349,
+          "output": 454,
+          "cacheRead": 72704,
+          "cacheWrite": 0
+        },
+        "costNano": 1167612,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "eaf5f7e1-4765-4195-81c0-d39996ae49c7",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 3250,
+          "output": 281,
+          "cacheRead": 73984,
+          "cacheWrite": 0
+        },
+        "costNano": 1534152,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "1f794a01-2b54-4391-919a-31932c9df862",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1621,
+          "output": 201,
+          "cacheRead": 77184,
+          "cacheWrite": 0
+        },
+        "costNano": 959052,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "27893252-c4c8-4900-be42-362bcf3bb76d",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 717,
+          "output": 243,
+          "cacheRead": 78720,
+          "cacheWrite": 0
+        },
+        "costNano": 742860,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "1783e8d3-3886-4704-a238-3e3cbc967274",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1011,
+          "output": 544,
+          "cacheRead": 79360,
+          "cacheWrite": 0
+        },
+        "costNano": 1194180,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "3c68daec-020f-473a-bff1-ace51972839a",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1250,
+          "output": 131,
+          "cacheRead": 80256,
+          "cacheWrite": 0
+        },
+        "costNano": 772968,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "90847b56-f2f5-4379-b412-cb1d9356d3d7",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 666,
+          "output": 973,
+          "cacheRead": 81408,
+          "cacheWrite": 0
+        },
+        "costNano": 1611624,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "367c83cb-e121-486b-a225-8282eed7690e",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1747,
+          "output": 88,
+          "cacheRead": 82048,
+          "cacheWrite": 0
+        },
+        "costNano": 875844,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "3fa51c5d-1413-4c63-86c1-520d44fee12d",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1680,
+          "output": 1527,
+          "cacheRead": 83712,
+          "cacheWrite": 0
+        },
+        "costNano": 2587536,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "0101650d-c42c-401b-b09e-2413fa70cf66",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 4782,
+          "output": 319,
+          "cacheRead": 85376,
+          "cacheWrite": 0
+        },
+        "costNano": 2073528,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "920c0c59-92fd-4c6c-beae-20a1ca35a9ee",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 419,
+          "output": 226,
+          "cacheRead": 90112,
+          "cacheWrite": 0
+        },
+        "costNano": 667236,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "0b69867a-5b41-412d-af7d-2dff60c63091",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 985,
+          "output": 306,
+          "cacheRead": 90496,
+          "cacheWrite": 0
+        },
+        "costNano": 934188,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "2bcc5cb0-b794-4b6f-884f-f186600a3b30",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1723,
+          "output": 426,
+          "cacheRead": 91392,
+          "cacheWrite": 0
+        },
+        "costNano": 1302276,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "3dd45087-841f-4fdd-b5b4-58acc6772763",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1177,
+          "output": 1181,
+          "cacheRead": 93056,
+          "cacheWrite": 0
+        },
+        "costNano": 2049468,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "203236e7-4618-49c2-8321-ca2d52b504e3",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 2872,
+          "output": 491,
+          "cacheRead": 94208,
+          "cacheWrite": 0
+        },
+        "costNano": 1733424,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "f5d1c6d0-2597-4048-901b-47dea4b8d60f",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 2568,
+          "output": 213,
+          "cacheRead": 97024,
+          "cacheWrite": 0
+        },
+        "costNano": 1317072,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "3d7c37e2-20f7-4d36-b0cf-851e8e6a3042",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1707,
+          "output": 2377,
+          "cacheRead": 99584,
+          "cacheWrite": 0
+        },
+        "costNano": 3663252,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "e0e84507-09b7-4793-82be-edcd1c1c0931",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 2884,
+          "output": 575,
+          "cacheRead": 101248,
+          "cacheWrite": 0
+        },
+        "costNano": 1858944,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "b2cab9fc-a160-45a2-8824-682ce0e8c6d6",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1210,
+          "output": 231,
+          "cacheRead": 104064,
+          "cacheWrite": 0
+        },
+        "costNano": 952392,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "ad21a6fd-8002-4a3c-9a12-51e6572d19d8",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 630,
+          "output": 1992,
+          "cacheRead": 105216,
+          "cacheWrite": 0
+        },
+        "costNano": 2895048,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "aaf6e267-f8db-4e23-b40f-f039c2708aa0",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 2840,
+          "output": 146,
+          "cacheRead": 105728,
+          "cacheWrite": 0
+        },
+        "costNano": 1344384,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "ea647d73-0cec-4084-81b1-40a1c44fc926",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1229,
+          "output": 236,
+          "cacheRead": 108544,
+          "cacheWrite": 0
+        },
+        "costNano": 977532,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "342fb7e2-1db3-4558-8251-ff62daf23eca",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 630,
+          "output": 210,
+          "cacheRead": 109696,
+          "cacheWrite": 0
+        },
+        "costNano": 770088,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "725cc79c-1d3e-4207-81eb-38f8f506f50b",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 2983,
+          "output": 588,
+          "cacheRead": 110208,
+          "cacheWrite": 0
+        },
+        "costNano": 1931124,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "2244d052-5aa4-4fc9-b3ed-9d707e7427c8",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 866,
+          "output": 417,
+          "cacheRead": 113152,
+          "cacheWrite": 0
+        },
+        "costNano": 1099656,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "f3335365-0158-4ddf-aabb-d6ccfc150f10",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 622,
+          "output": 583,
+          "cacheRead": 113920,
+          "cacheWrite": 0
+        },
+        "costNano": 1227960,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "4953406f-4e21-4cdd-a0e4-88b153197eda",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 790,
+          "output": 100,
+          "cacheRead": 114432,
+          "cacheWrite": 0
+        },
+        "costNano": 700296,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "58afc0bf-f071-42cd-9fff-a1172c11db70",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 727,
+          "output": 271,
+          "cacheRead": 115200,
+          "cacheWrite": 0
+        },
+        "costNano": 888900,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "855417d5-e7af-4608-af9d-725c3c168fbc",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 482,
+          "output": 103,
+          "cacheRead": 115840,
+          "cacheWrite": 0
+        },
+        "costNano": 615720,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "49572227-baf5-4705-83ee-275b84efe2f4",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1134,
+          "output": 141,
+          "cacheRead": 116224,
+          "cacheWrite": 0
+        },
+        "costNano": 858072,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "5085358e-1f47-4aa1-bcbc-d5d02432fce2",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1091,
+          "output": 232,
+          "cacheRead": 117248,
+          "cacheWrite": 0
+        },
+        "costNano": 957444,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "6a948555-e00e-48b8-a497-70af68b0e12c",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1076,
+          "output": 97,
+          "cacheRead": 118272,
+          "cacheWrite": 0
+        },
+        "costNano": 794016,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "9820f949-3540-4fbb-8f43-2c03b1ed10a0",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1010,
+          "output": 307,
+          "cacheRead": 119296,
+          "cacheWrite": 0
+        },
+        "costNano": 1029288,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "6ebbb1c9-f0e9-4cd3-919d-a0c4d5613d9d",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 448,
+          "output": 99,
+          "cacheRead": 120192,
+          "cacheWrite": 0
+        },
+        "costNano": 613776,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "9f4ce941-366c-4947-b6ac-3060c705dce0",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 851,
+          "output": 331,
+          "cacheRead": 120576,
+          "cacheWrite": 0
+        },
+        "costNano": 1014228,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "8a99547d-c183-47d8-9138-6a41871bc39c",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 812,
+          "output": 349,
+          "cacheRead": 121344,
+          "cacheWrite": 0
+        },
+        "costNano": 1026432,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "b0a8cd1c-5b80-4206-b852-5683f94e9187",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1461,
+          "output": 996,
+          "cacheRead": 122112,
+          "cacheWrite": 0
+        },
+        "costNano": 1999836,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "7ff992e1-9c8c-45b8-9949-1cf9b7510f89",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1292,
+          "output": 932,
+          "cacheRead": 123520,
+          "cacheWrite": 0
+        },
+        "costNano": 1876560,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "758fea12-0c84-4a6c-b6f8-c5df6a713df4",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1024,
+          "output": 302,
+          "cacheRead": 124800,
+          "cacheWrite": 0
+        },
+        "costNano": 1044000,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "ada1beab-3e43-466e-8690-56ee48383d1f",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 553,
+          "output": 154,
+          "cacheRead": 125824,
+          "cacheWrite": 0
+        },
+        "costNano": 728172,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "3245296d-ca98-4e98-be13-f758ec325261",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 735,
+          "output": 193,
+          "cacheRead": 126336,
+          "cacheWrite": 0
+        },
+        "costNano": 831108,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "5c35e34a-8afe-478b-abfd-4169063aa035",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 430,
+          "output": 128,
+          "cacheRead": 126976,
+          "cacheWrite": 0
+        },
+        "costNano": 663528,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "b964184e-2631-4742-bc6f-d45ee7479a63",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1084,
+          "output": 187,
+          "cacheRead": 127360,
+          "cacheWrite": 0
+        },
+        "costNano": 931680,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "2d2a8b27-f4af-45c3-8c4e-a864d103a0da",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 491,
+          "output": 1801,
+          "cacheRead": 128384,
+          "cacheWrite": 0
+        },
+        "costNano": 2693652,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "65cb13e7-5101-4348-8e12-16f054fcfc6a",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1996,
+          "output": 1340,
+          "cacheRead": 128768,
+          "cacheWrite": 0
+        },
+        "costNano": 2593104,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "d0fead88-b9c4-46a9-8be4-b339038fd684",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1515,
+          "output": 345,
+          "cacheRead": 130688,
+          "cacheWrite": 0
+        },
+        "costNano": 1260564,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "4888b672-8caf-4d16-a939-d2df4e3b8435",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 654,
+          "output": 251,
+          "cacheRead": 132096,
+          "cacheWrite": 0
+        },
+        "costNano": 893688,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "d2545461-9930-457f-a991-0c355037e233",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1460,
+          "output": 1066,
+          "cacheRead": 132736,
+          "cacheWrite": 0
+        },
+        "costNano": 2115408,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "e2dc6ab7-ff54-4d6f-a504-5b4ad2077cff",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1711,
+          "output": 1871,
+          "cacheRead": 134144,
+          "cacheWrite": 0
+        },
+        "costNano": 3160932,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "283b197f-e9ce-4638-8429-c459d6798373",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 3162,
+          "output": 951,
+          "cacheRead": 135808,
+          "cacheWrite": 0
+        },
+        "costNano": 2497224,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "f1ae5110-baa6-499c-95fd-9484a4e2f3a7",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1429,
+          "output": 188,
+          "cacheRead": 138880,
+          "cacheWrite": 0
+        },
+        "costNano": 1070940,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "54be1916-3751-49ee-9eaf-64ed05fe7efc",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1968,
+          "output": 571,
+          "cacheRead": 140288,
+          "cacheWrite": 0
+        },
+        "costNano": 1696464,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "6dd59367-6cae-42bd-9fda-2071e065f8b6",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1568,
+          "output": 1050,
+          "cacheRead": 142208,
+          "cacheWrite": 0
+        },
+        "costNano": 2157024,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "32bf7380-d171-4040-a114-b1f708ab4602",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1104,
+          "output": 146,
+          "cacheRead": 143744,
+          "cacheWrite": 0
+        },
+        "costNano": 937632,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "ecefd9fd-fc38-4779-b8d7-df7d8c65cbe8",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 954,
+          "output": 1574,
+          "cacheRead": 144768,
+          "cacheWrite": 0
+        },
+        "costNano": 2609304,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "5ef50031-fd1d-435e-8fc8-05e5ac60beba",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 2078,
+          "output": 1013,
+          "cacheRead": 145664,
+          "cacheWrite": 0
+        },
+        "costNano": 2275992,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "2610fc4f-d203-497c-a829-ff30767de33f",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1429,
+          "output": 512,
+          "cacheRead": 147712,
+          "cacheWrite": 0
+        },
+        "costNano": 1486236,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "b8ccebb6-c87d-4249-afe9-33387e921f45",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 618,
+          "output": 1688,
+          "cacheRead": 149120,
+          "cacheWrite": 0
+        },
+        "costNano": 2658360,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "3ae6227f-1451-494a-865e-42e9bb8ae984",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 2097,
+          "output": 149,
+          "cacheRead": 149632,
+          "cacheWrite": 0
+        },
+        "costNano": 1256796,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "1b0aebfb-2247-4ce6-b74a-0df9f0db68c4",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 386,
+          "output": 840,
+          "cacheRead": 151680,
+          "cacheWrite": 0
+        },
+        "costNano": 1578840,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "20a1536b-0bfb-49c0-855d-f3798bfd5169",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 1396,
+          "output": 2516,
+          "cacheRead": 152064,
+          "cacheWrite": 0
+        },
+        "costNano": 3894192,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "55fdd961-ce93-48e8-8117-d8934715c77c",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 3509,
+          "output": 415,
+          "cacheRead": 153344,
+          "cacheWrite": 0
+        },
+        "costNano": 2010732,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "980c5f97-2f30-4111-b80b-2be3c2255098",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "settled",
+        "usage": {
+          "input": 961,
+          "output": 176,
+          "cacheRead": 156800,
+          "cacheWrite": 0
+        },
+        "costNano": 969900,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "6e1ee776-acda-4ed8-be0a-b8e1cb3e57a6",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 309830400,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 8192
+        },
+        "state": "unknown",
+        "usage": null,
+        "costNano": 309830400,
+        "reason": "Request outcome unavailable; full reserved maximum charged; actual usage unavailable",
+        "costBasis": "reservation maximum; actual usage unknown"
+      },
+      {
+        "id": "73bbfe6f-73e0-4c48-873a-b6ccd8325e89",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 304915200,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 4096
+        },
+        "state": "settled",
+        "usage": {
+          "input": 24517,
+          "output": 4096,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "costNano": 12270300,
+        "reason": null,
+        "costBasis": "reported usage"
+      },
+      {
+        "id": "000b10fc-4af7-4a45-aad1-76a1a9ec28f7",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 304915200,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 4096
+        },
+        "state": "unknown",
+        "usage": null,
+        "costNano": 304915200,
+        "reason": "Request outcome unavailable; full reserved maximum charged; actual usage unavailable",
+        "costBasis": "reservation maximum; actual usage unknown"
+      },
+      {
+        "id": "88cd82da-5062-4b77-b76c-f0aff47e61cf",
+        "card": "JUL-253",
+        "model": "commandcode/deepseek/deepseek-v4.1-flash",
+        "role": "review",
+        "maximumNano": 319660800,
+        "price": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.003,
+          "cacheWrite": 0
+        },
+        "bounds": {
+          "maxInputTokens": 1000000,
+          "maxOutputTokens": 16384
+        },
+        "state": "settled",
+        "usage": {
+          "input": 24517,
+          "output": 9971,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "costNano": 19320300,
+        "reason": null,
+        "costBasis": "reported usage"
+      }
+    ]
+  },
+  "costNano": 19320300
+}

@@ -10,6 +10,7 @@ import { createInitializationRuntime } from './initialization.ts'
 import { createInitializationActivityRecorder, createObservedLinearClient } from './initialization-observability.ts'
 import { listReadyLinearCards } from './linear.ts'
 import { discoverAcpOffers, discoverCommandCodeOffers, withAcpRoutes } from './routes.ts'
+import { stockSubscriptionOffers } from '../../../../build-runner/connections.mjs'
 import { createAgentActivityStore } from './agent-activity.ts'
 import { createCodexMonitor } from './agent-codex-monitor.ts'
 import { agentError } from './agent-errors.ts'
@@ -30,11 +31,17 @@ export async function discoverControlPageState(activity: InitializationActivityR
   const linear = createObservedLinearClient(linearKey, activity)
   const cardsPromise = listReadyLinearCards(linear, trace => console.log(JSON.stringify(trace)))
   const offersPromise = withAcpRoutes(async routes => {
-    const [acp, commandCode] = await Promise.all([
+    const [acp, commandCode, stock] = await Promise.all([
       discoverAcpOffers(routes, trace => console.log(JSON.stringify(trace))),
       discoverCommandCodeOffers(commandCodeKey, fetch, trace => console.log(JSON.stringify(trace))),
+      stockSubscriptionOffers(),
     ])
-    const offers = [...acp, ...commandCode]
+    const stockKeys = new Set(stock.map(offer => `${offer.route}::${offer.modelId}`))
+    const offers = [
+      ...acp.filter(offer => !stockKeys.has(`${offer.route}::${offer.modelId}`)),
+      ...commandCode,
+      ...stock,
+    ]
     console.log(JSON.stringify({ event: 'model-discovery-completed', offerCount: offers.length, routes: [...new Set(offers.map(offer => offer.route))] }))
     return offers
   })

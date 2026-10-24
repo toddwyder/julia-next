@@ -97,7 +97,7 @@ export async function recoverDeliveryCrash(input, {
 
     const fixerPrompt = [
       `A delivery reviewer launcher crashed. This is recovery incident ${crash.incidentId}.`,
-      `Read and follow .agents/skills/diagnosing-bugs/SKILL.md. Diagnose and fix only the confirmed cause in the delivery machinery at ${input.repoRoot}.`,
+      `Read and follow .agents/skills/reproduce-and-fix-issues/SKILL.md. Diagnose and fix only the confirmed cause in the delivery machinery at ${input.repoRoot}.`,
       `Crash evidence: ${input.crashPath}. The Julia candidate is separate and must not be changed: ${input.candidate.path} at ${input.candidate.commit}.`,
       'Run only the tight regression for the confirmed cause and any directly affected test file. Do not run the complete runner suite; the controller runs it after independent review.',
       'Do not put TEMP or TMP inside the repository. Remove throwaway repro files and debug instrumentation, then leave the delivery source ready for the controller-owned recovery commit.',

@@ -1,0 +1,8 @@
+
+> julia-mastra-reviewer@1.0.0 typecheck
+> tsc --noEmit
+
+src/mastra/routes.ts(227,9): error TS7053: Element implicitly has an 'any' type because expression of type '"antigravity" | "openai-codex"' can't be used to index type '{ antigravity: AcpAgent<string, unknown>; claude: AcpAgent<string, unknown>; }'.
+  Property 'openai-codex' does not exist on type '{ antigravity: AcpAgent<string, unknown>; claude: AcpAgent<string, unknown>; }'.
+src/mastra/workflows/delivery.ts(45,34): error TS7053: Element implicitly has an 'any' type because expression of type '"antigravity" | "claude" | "openai-codex"' can't be used to index type '{ antigravity: AcpAgent<string, unknown>; claude: AcpAgent<string, unknown>; }'.
+  Property 'openai-codex' does not exist on type '{ antigravity: AcpAgent<string, unknown>; claude: AcpAgent<string, unknown>; }'.

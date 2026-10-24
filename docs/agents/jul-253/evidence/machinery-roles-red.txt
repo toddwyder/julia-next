@@ -1,0 +1,32 @@
+✖ an explicit machinery drive uses Beam for the session and every helper (4.098051ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 141.608345
+
+✖ failing tests:
+
+test at ops/build-runner/test/machine-settings.test.mjs:36:1
+✖ an explicit machinery drive uses Beam for the session and every helper (4.098051ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'openai/gpt-6-sol'
+  - 'commandcode/reflection/beam:free'
+  
+      at TestContext.<anonymous> (file:///home/ubuntu/julia-jul-253/ops/build-runner/test/machine-settings.test.mjs:38:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'openai/gpt-6-sol',
+    expected: 'commandcode/reflection/beam:free',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

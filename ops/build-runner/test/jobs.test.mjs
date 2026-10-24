@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
+import { mkdtemp, mkdir, writeFile, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFile as execFileCb } from 'node:child_process'
@@ -21,6 +21,12 @@ test('jobs', async () => {
     await execFile('git', ['-C', repo, 'config', 'user.email', 'test@example.com'])
     await execFile('git', ['-C', repo, 'config', 'user.name', 'Test'])
     await writeFile(join(repo, 'README.md'), 'hello\n')
+    await mkdir(join(repo, 'docs', 'agents'), { recursive: true })
+    await writeFile(join(repo, 'docs', 'agents', 'old-proof.txt'), 'historical evidence\n')
+    await mkdir(join(repo, '.audit'), { recursive: true })
+    await writeFile(join(repo, '.audit', 'old-run.tsv'), 'historical audit\n')
+    await mkdir(join(repo, 'agent-transcripts'), { recursive: true })
+    await writeFile(join(repo, 'agent-transcripts', 'old-session.jsonl'), '{}\n')
     await execFile('git', ['-C', repo, 'add', '.'])
     await execFile('git', ['-C', repo, 'commit', '-m', 'init'])
     const base = (await execFile('git', ['-C', repo, 'rev-parse', 'HEAD'])).stdout.trim()
@@ -61,6 +67,10 @@ test('jobs', async () => {
     assert.deepStrictEqual(duplicate, job)
     const head = (await execFile('git', ['-C', job.worktree, 'rev-parse', 'HEAD'])).stdout.trim()
     assert.equal(head, base)
+    await stat(join(job.worktree, 'README.md'))
+    for (const excluded of ['docs/agents', '.audit', 'agent-transcripts']) {
+      await assert.rejects(stat(join(job.worktree, excluded)), { code: 'ENOENT' })
+    }
     const changed = JSON.parse(JSON.stringify(initResult))
     changed.snapshot.card.title = 'Changed'
     let rejected = false

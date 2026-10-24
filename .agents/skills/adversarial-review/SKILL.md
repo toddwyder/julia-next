@@ -54,7 +54,7 @@ disposable area and report its result. Never claim a mental mutation was execute
 Fixtures prove the tested machinery; they do not prove real provider behavior.
 
 For Standards, reuse `CODING_STANDARDS.md` and the standards and code-smell
-guidance in `.agents/skills/code-review/SKILL.md`. Record all five repository
+guidance in `.claude/skills/code-review/SKILL.md`. Record all five repository
 checks with proof or a justified not-applicable result. Keep Standards and Spec
 separate; do not duplicate their rules or let one passing axis hide another.
 

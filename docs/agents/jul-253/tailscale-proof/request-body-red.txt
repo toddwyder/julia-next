@@ -1,0 +1,15 @@
+✖ observing a stock streamed Request preserves its body for accounting and dispatch (36.979062ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 203.478589
+
+✖ failing tests:
+
+test at ops/build-runner/test/request-observer.test.mjs:7:1
+✖ observing a stock streamed Request preserves its body for accounting and dispatch (36.979062ms)
+  [TypeError: Cannot construct a Request with a Request object that has already been used.]

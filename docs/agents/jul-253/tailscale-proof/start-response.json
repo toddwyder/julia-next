@@ -1,0 +1,81 @@
+{
+  "url": "https://ovh.tail91f394.ts.net/julia-control/api/start",
+  "status": 200,
+  "body": {
+    "runId": "jul-254-a5e7237716de0621d9adb2f00c469726",
+    "state": "ready-for-build",
+    "snapshot": {
+      "runId": "jul-254-a5e7237716de0621d9adb2f00c469726",
+      "card": {
+        "identifier": "JUL-254",
+        "state": "Ready",
+        "description": "## Agent Brief\n\n**Category:** enhancement / machine proof fixture\n\n**Summary:** Run the marker-file practice build requested by Todd for [JUL-253](https://linear.app/julia-next/issue/JUL-253/connect-subscriptions-and-enforce-the-dollar2-card-cap) through the server Start page.\n\n**Current behavior:**\n\nThis practice marker is absent from the [JUL-253](https://linear.app/julia-next/issue/JUL-253/connect-subscriptions-and-enforce-the-dollar2-card-cap) candidate.\n\n**Desired behavior:**\n\nCreate `JUL-253-START-PRACTICE.txt` containing exactly `Julia subscriptions build through Start.` followed by exactly one newline. The resulting clean candidate commit contains this marker as its repository change.\n\n**Key interfaces:**\n\n`JUL-253-START-PRACTICE.txt` is the requested output. The server Start page supplies the saved card to the machine.\n\n**Acceptance criteria:**\n\n* The marker exists in the candidate commit with exactly the approved sentence and one newline.\n* The candidate commit is clean and non-empty, with the marker as its sole repository change.\n* The saved build uses Sol for the main session and DeepSeek for coding, with their actual requests and API-price debits recorded in this practice card's shared ledger under the existing $2 cap.\n\n**Proof:**\n\nUse the real server Start page through Todd's Tailscale address. Read the marker bytes from the exact resulting commit. Retain the Start response, job result, pstack checklist/events and ledger entries for Sol and DeepSeek.\n\n**Out of scope:**\n\nPublishing or merging the marker into Julia. Production deployment, household behavior and cleanup of pre-existing OVH leftovers belong outside this practice fixture. Pstack's internal build, code review and verification remain part of the machine run.\n\n**Authorization:**\n\nTodd explicitly requested one practice-card build through the server Start route for [JUL-253](https://linear.app/julia-next/issue/JUL-253/connect-subscriptions-and-enforce-the-dollar2-card-cap) on 23 October 2026 after the OVH readback was pushed. This card records that authorized practice scope. The $2 per-card cap and agreed model split remain unchanged.",
+        "frameworkMaps": [],
+        "title": "Practice JUL-253 through server Start"
+      },
+      "roles": {
+        "orchestrator": {
+          "route": "openai-codex",
+          "modelId": "gpt-6-sol",
+          "company": "OpenAI",
+          "service": "ChatGPT plan",
+          "wire": "responses",
+          "effort": "medium"
+        },
+        "coder": {
+          "route": "commandcode",
+          "modelId": "deepseek/deepseek-v4.1-flash",
+          "company": "DeepSeek",
+          "service": "CommandCode",
+          "wire": "chat",
+          "effort": "medium"
+        }
+      },
+      "state": "ready-for-build",
+      "initializedAt": "2026-10-23T22:55:28.425Z"
+    },
+    "resumed": false,
+    "build": {
+      "runId": "jul-254-a5e7237716de0621d9adb2f00c469726",
+      "snapshot": {
+        "runId": "jul-254-a5e7237716de0621d9adb2f00c469726",
+        "card": {
+          "identifier": "JUL-254",
+          "state": "Ready",
+          "description": "## Agent Brief\n\n**Category:** enhancement / machine proof fixture\n\n**Summary:** Run the marker-file practice build requested by Todd for [JUL-253](https://linear.app/julia-next/issue/JUL-253/connect-subscriptions-and-enforce-the-dollar2-card-cap) through the server Start page.\n\n**Current behavior:**\n\nThis practice marker is absent from the [JUL-253](https://linear.app/julia-next/issue/JUL-253/connect-subscriptions-and-enforce-the-dollar2-card-cap) candidate.\n\n**Desired behavior:**\n\nCreate `JUL-253-START-PRACTICE.txt` containing exactly `Julia subscriptions build through Start.` followed by exactly one newline. The resulting clean candidate commit contains this marker as its repository change.\n\n**Key interfaces:**\n\n`JUL-253-START-PRACTICE.txt` is the requested output. The server Start page supplies the saved card to the machine.\n\n**Acceptance criteria:**\n\n* The marker exists in the candidate commit with exactly the approved sentence and one newline.\n* The candidate commit is clean and non-empty, with the marker as its sole repository change.\n* The saved build uses Sol for the main session and DeepSeek for coding, with their actual requests and API-price debits recorded in this practice card's shared ledger under the existing $2 cap.\n\n**Proof:**\n\nUse the real server Start page through Todd's Tailscale address. Read the marker bytes from the exact resulting commit. Retain the Start response, job result, pstack checklist/events and ledger entries for Sol and DeepSeek.\n\n**Out of scope:**\n\nPublishing or merging the marker into Julia. Production deployment, household behavior and cleanup of pre-existing OVH leftovers belong outside this practice fixture. Pstack's internal build, code review and verification remain part of the machine run.\n\n**Authorization:**\n\nTodd explicitly requested one practice-card build through the server Start route for [JUL-253](https://linear.app/julia-next/issue/JUL-253/connect-subscriptions-and-enforce-the-dollar2-card-cap) on 23 October 2026 after the OVH readback was pushed. This card records that authorized practice scope. The $2 per-card cap and agreed model split remain unchanged.",
+          "frameworkMaps": [],
+          "title": "Practice JUL-253 through server Start"
+        },
+        "roles": {
+          "orchestrator": {
+            "route": "openai-codex",
+            "modelId": "gpt-6-sol",
+            "company": "OpenAI",
+            "service": "ChatGPT plan",
+            "wire": "responses",
+            "effort": "medium"
+          },
+          "coder": {
+            "route": "commandcode",
+            "modelId": "deepseek/deepseek-v4.1-flash",
+            "company": "DeepSeek",
+            "service": "CommandCode",
+            "wire": "chat",
+            "effort": "medium"
+          }
+        },
+        "state": "ready-for-build",
+        "initializedAt": "2026-10-23T22:55:28.425Z"
+      },
+      "settingsPath": "/home/ubuntu/julia-jul-253/ops/build-runner/machine-settings.json",
+      "worktree": "/home/ubuntu/.local/state/julia-jul253-start-proof/jobs/jul-254-a5e7237716de0621d9adb2f00c469726/worktree",
+      "baseCommit": "b08bedc1d571b7da3a3f646dd2a19d70b9e2418a",
+      "state": "running",
+      "runnerPid": 581247,
+      "workerPid": 581625,
+      "result": null,
+      "error": null,
+      "createdAt": "2026-10-23T22:55:33.315Z"
+    }
+  }
+}

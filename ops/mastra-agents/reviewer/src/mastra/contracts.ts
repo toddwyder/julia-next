@@ -1,7 +1,7 @@
 import { z } from 'zod/v4'
 
 const nonempty = z.string().trim().min(1)
-export const RouteSchema = z.enum(['antigravity', 'claude', 'commandcode'])
+export const RouteSchema = z.enum(['antigravity', 'claude', 'commandcode', 'openai-codex'])
 export const EffortSchema = z.enum(['low', 'medium', 'high', 'xhigh', 'max'])
 
 export const SecretReferenceSchema = z.string().trim().regex(/^[A-Z][A-Z0-9_]{2,63}$/, 'secret references must be environment names, never values')

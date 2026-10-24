@@ -1,0 +1,1775 @@
+{
+  "card": "JUL-255",
+  "ceilingNano": 2000000000,
+  "stopped": false,
+  "spentNano": 1556041076,
+  "heldNano": 0,
+  "remainingNano": 443958924,
+  "pricedBlocked": false,
+  "requests": [
+    {
+      "id": "fa2d8fe9-04db-4de5-a745-de9926511bc2",
+      "card": "JUL-255",
+      "model": "openai/gpt-6-sol",
+      "role": "orchestrator",
+      "maximumNano": 232555000,
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cacheRead": 0.2,
+        "cacheWrite": 2.5
+      },
+      "bounds": {
+        "maxInputTokens": 60254,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local o200k_base estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 18692,
+        "output": 36,
+        "cacheRead": 6016,
+        "cacheWrite": 0
+      },
+      "costNano": 38947200,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "e491579f-4a7f-4936-b6d8-fc67a98a7b70",
+      "card": "JUL-255",
+      "model": "openai/gpt-6-sol",
+      "role": "orchestrator",
+      "maximumNano": 267750000,
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cacheRead": 0.2,
+        "cacheWrite": 2.5
+      },
+      "bounds": {
+        "maxInputTokens": 74332,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local o200k_base estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 30336,
+        "output": 144,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "costNano": 62112000,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "f0a03cc9-9fab-4ed6-bf92-f5b528849b99",
+      "card": "JUL-255",
+      "model": "openai/gpt-6-sol",
+      "role": "orchestrator",
+      "maximumNano": 319290000,
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cacheRead": 0.2,
+        "cacheWrite": 2.5
+      },
+      "bounds": {
+        "maxInputTokens": 94948,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local o200k_base estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 32685,
+        "output": 150,
+        "cacheRead": 6016,
+        "cacheWrite": 0
+      },
+      "costNano": 68073200,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "dfc154bd-94ba-4cf0-915f-254aed1fbc71",
+      "card": "JUL-255",
+      "model": "openai/gpt-6-sol",
+      "role": "orchestrator",
+      "maximumNano": 344720000,
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cacheRead": 0.2,
+        "cacheWrite": 2.5
+      },
+      "bounds": {
+        "maxInputTokens": 105120,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local o200k_base estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 11851,
+        "output": 286,
+        "cacheRead": 30208,
+        "cacheWrite": 0
+      },
+      "costNano": 32603600,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "544e18db-b870-4240-a811-e3b8d6c38bee",
+      "card": "JUL-255",
+      "model": "openai/gpt-6-sol",
+      "role": "orchestrator",
+      "maximumNano": 356500000,
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cacheRead": 0.2,
+        "cacheWrite": 2.5
+      },
+      "bounds": {
+        "maxInputTokens": 109832,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local o200k_base estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 43015,
+        "output": 192,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "costNano": 87950000,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "305cafa6-c994-418a-81e7-81af93d632f8",
+      "card": "JUL-255",
+      "model": "openai/gpt-6-sol",
+      "role": "orchestrator",
+      "maximumNano": 256065000,
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cacheRead": 0.2,
+        "cacheWrite": 2.5
+      },
+      "bounds": {
+        "maxInputTokens": 69658,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local o200k_base estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 28022,
+        "output": 32,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "costNano": 56364000,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "497b9dee-63be-45f6-a5c8-cfe566f64820",
+      "card": "JUL-255",
+      "model": "openai/gpt-6-sol",
+      "role": "orchestrator",
+      "maximumNano": 291160000,
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cacheRead": 0.2,
+        "cacheWrite": 2.5
+      },
+      "bounds": {
+        "maxInputTokens": 83696,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local o200k_base estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 27630,
+        "output": 100,
+        "cacheRead": 6016,
+        "cacheWrite": 0
+      },
+      "costNano": 57463200,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "730ab987-cf0a-4bef-aaaf-ad64334b9001",
+      "card": "JUL-255",
+      "model": "openai/gpt-6-sol",
+      "role": "orchestrator",
+      "maximumNano": 327675000,
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cacheRead": 0.2,
+        "cacheWrite": 2.5
+      },
+      "bounds": {
+        "maxInputTokens": 98302,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local o200k_base estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 6864,
+        "output": 133,
+        "cacheRead": 33536,
+        "cacheWrite": 0
+      },
+      "costNano": 21765200,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "5cd340cb-0728-4df9-bb0e-98409267c897",
+      "card": "JUL-255",
+      "model": "openai/gpt-6-sol",
+      "role": "orchestrator",
+      "maximumNano": 351460000,
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cacheRead": 0.2,
+        "cacheWrite": 2.5
+      },
+      "bounds": {
+        "maxInputTokens": 107816,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local o200k_base estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 43442,
+        "output": 75,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "costNano": 87634000,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "f073655a-3a38-4cc9-b8ee-a19cf33be6f6",
+      "card": "JUL-255",
+      "model": "openai/gpt-6-sol",
+      "role": "orchestrator",
+      "maximumNano": 362945000,
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cacheRead": 0.2,
+        "cacheWrite": 2.5
+      },
+      "bounds": {
+        "maxInputTokens": 112410,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local o200k_base estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 16542,
+        "output": 64,
+        "cacheRead": 27904,
+        "cacheWrite": 0
+      },
+      "costNano": 39304800,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "8a1b4ec8-1566-4a3c-9fcd-9d3a442488cc",
+      "card": "JUL-255",
+      "model": "openai/gpt-6-sol",
+      "role": "orchestrator",
+      "maximumNano": 365535000,
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cacheRead": 0.2,
+        "cacheWrite": 2.5
+      },
+      "bounds": {
+        "maxInputTokens": 113446,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local o200k_base estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 20311,
+        "output": 218,
+        "cacheRead": 24576,
+        "cacheWrite": 0
+      },
+      "costNano": 47717200,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "8ffa9cdf-1ec8-46f4-afcf-c22a81ae07ee",
+      "card": "JUL-255",
+      "model": "openai/gpt-6-sol",
+      "role": "orchestrator",
+      "maximumNano": 395775000,
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cacheRead": 0.2,
+        "cacheWrite": 2.5
+      },
+      "bounds": {
+        "maxInputTokens": 125542,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local o200k_base estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 26610,
+        "output": 105,
+        "cacheRead": 23936,
+        "cacheWrite": 0
+      },
+      "costNano": 59057200,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "81d90831-ce58-48cf-9c4e-ff9428847f6b",
+      "card": "JUL-255",
+      "model": "openai/gpt-6-sol",
+      "role": "orchestrator",
+      "maximumNano": 408150000,
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cacheRead": 0.2,
+        "cacheWrite": 2.5
+      },
+      "bounds": {
+        "maxInputTokens": 130492,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local o200k_base estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 6337,
+        "output": 74,
+        "cacheRead": 44800,
+        "cacheWrite": 0
+      },
+      "costNano": 22374000,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "9a364988-e296-4757-ab16-d29e43f3fbf9",
+      "card": "JUL-255",
+      "model": "openai/gpt-6-sol",
+      "role": "orchestrator",
+      "maximumNano": 418405000,
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cacheRead": 0.2,
+        "cacheWrite": 2.5
+      },
+      "bounds": {
+        "maxInputTokens": 134594,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local o200k_base estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 51711,
+        "output": 399,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "costNano": 107412000,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "35e40f93-daea-4880-88e5-8df6ef52dc3e",
+      "card": "JUL-255",
+      "model": "openai/gpt-6-sol",
+      "role": "orchestrator",
+      "maximumNano": 153175000,
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cacheRead": 0.2,
+        "cacheWrite": 2.5
+      },
+      "bounds": {
+        "maxInputTokens": 28502,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local o200k_base estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 10271,
+        "output": 31,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "costNano": 20852000,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "704170a3-dfdb-4e87-a015-fd89a7b51b8b",
+      "card": "JUL-255",
+      "model": "openai/gpt-6-sol",
+      "role": "orchestrator",
+      "maximumNano": 188050000,
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cacheRead": 0.2,
+        "cacheWrite": 2.5
+      },
+      "bounds": {
+        "maxInputTokens": 42452,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local o200k_base estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 15894,
+        "output": 212,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "costNano": 33908000,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "762953e9-b018-4a3b-91e7-6be333462d8b",
+      "card": "JUL-255",
+      "model": "openai/gpt-6-sol",
+      "role": "orchestrator",
+      "maximumNano": 228980000,
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cacheRead": 0.2,
+        "cacheWrite": 2.5
+      },
+      "bounds": {
+        "maxInputTokens": 58824,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local o200k_base estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 22292,
+        "output": 256,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "costNano": 47144000,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "8e001eb9-6025-494b-8a38-7542a5599a4c",
+      "card": "JUL-255",
+      "model": "openai/gpt-6-sol",
+      "role": "orchestrator",
+      "maximumNano": 261680000,
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cacheRead": 0.2,
+        "cacheWrite": 2.5
+      },
+      "bounds": {
+        "maxInputTokens": 71904,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local o200k_base estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 17030,
+        "output": 148,
+        "cacheRead": 10112,
+        "cacheWrite": 0
+      },
+      "costNano": 37562400,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "e73b4cb7-c584-48dd-b600-269299093ca3",
+      "card": "JUL-255",
+      "model": "openai/gpt-6-sol",
+      "role": "orchestrator",
+      "maximumNano": 278870000,
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cacheRead": 0.2,
+        "cacheWrite": 2.5
+      },
+      "bounds": {
+        "maxInputTokens": 78780,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local o200k_base estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 29188,
+        "output": 154,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "costNano": 59916000,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "1403b9b8-f0b4-4409-b3c6-1e9721357f4c",
+      "card": "JUL-255",
+      "model": "openai/gpt-6-sol",
+      "role": "orchestrator",
+      "maximumNano": 291940000,
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cacheRead": 0.2,
+        "cacheWrite": 2.5
+      },
+      "bounds": {
+        "maxInputTokens": 84008,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local o200k_base estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 30467,
+        "output": 131,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "costNano": 62244000,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "4248c607-2566-4e3e-80a8-42cf1fdfff25",
+      "card": "JUL-255",
+      "model": "openai/gpt-6-sol",
+      "role": "orchestrator",
+      "maximumNano": 303015000,
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cacheRead": 0.2,
+        "cacheWrite": 2.5
+      },
+      "bounds": {
+        "maxInputTokens": 88438,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local o200k_base estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 15731,
+        "output": 33,
+        "cacheRead": 15744,
+        "cacheWrite": 0
+      },
+      "costNano": 34940800,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "bc5e5c82-5e9f-4342-9dee-5725fe52e7d2",
+      "card": "JUL-255",
+      "model": "openai/gpt-6-sol",
+      "role": "orchestrator",
+      "maximumNano": 312505000,
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cacheRead": 0.2,
+        "cacheWrite": 2.5
+      },
+      "bounds": {
+        "maxInputTokens": 92234,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local o200k_base estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 1816,
+        "output": 22,
+        "cacheRead": 30336,
+        "cacheWrite": 0
+      },
+      "costNano": 9919200,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "39889139-c477-469f-abc1-cac0fe0809a8",
+      "card": "JUL-255",
+      "model": "openai/gpt-6-sol",
+      "role": "orchestrator",
+      "maximumNano": 314150000,
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cacheRead": 0.2,
+        "cacheWrite": 2.5
+      },
+      "bounds": {
+        "maxInputTokens": 92892,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local o200k_base estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 5422,
+        "output": 53,
+        "cacheRead": 27008,
+        "cacheWrite": 0
+      },
+      "costNano": 16775600,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "82fef930-f90e-4a64-a8bd-3f2d97f61165",
+      "card": "JUL-255",
+      "model": "openai/gpt-6-sol",
+      "role": "orchestrator",
+      "maximumNano": 323750000,
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cacheRead": 0.2,
+        "cacheWrite": 2.5
+      },
+      "bounds": {
+        "maxInputTokens": 96732,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local o200k_base estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 2254,
+        "output": 53,
+        "cacheRead": 32000,
+        "cacheWrite": 0
+      },
+      "costNano": 11438000,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "6cc77784-561e-423e-9f85-85464adbe0d0",
+      "card": "JUL-255",
+      "model": "openai/gpt-6-sol",
+      "role": "orchestrator",
+      "maximumNano": 332990000,
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cacheRead": 0.2,
+        "cacheWrite": 2.5
+      },
+      "bounds": {
+        "maxInputTokens": 100428,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local o200k_base estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 13874,
+        "output": 53,
+        "cacheRead": 22144,
+        "cacheWrite": 0
+      },
+      "costNano": 32706800,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "c23da253-e983-43fc-a258-f221b293b7e9",
+      "card": "JUL-255",
+      "model": "openai/gpt-6-sol",
+      "role": "orchestrator",
+      "maximumNano": 337435000,
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cacheRead": 0.2,
+        "cacheWrite": 2.5
+      },
+      "bounds": {
+        "maxInputTokens": 102206,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local o200k_base estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 36803,
+        "output": 901,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "costNano": 82616000,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "998d4404-433b-472e-b2c1-a17c4cf1506d",
+      "card": "JUL-255",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "role": "orchestrator",
+      "maximumNano": 37394400,
+      "price": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.003,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 91880,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local UTF-8 estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 7230,
+        "output": 117,
+        "cacheRead": 4096,
+        "cacheWrite": 0
+      },
+      "costNano": 2321688,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "2e3f0a21-61ce-4a92-a48f-2bd8aebe7ce2",
+      "card": "JUL-255",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "role": "orchestrator",
+      "maximumNano": 44681400,
+      "price": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.003,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 116170,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local UTF-8 estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 3009,
+        "output": 214,
+        "cacheRead": 11264,
+        "cacheWrite": 0
+      },
+      "costNano": 1193292,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "8d9cc7b6-f4d2-4495-aee7-60df9c9522a0",
+      "card": "JUL-255",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "role": "orchestrator",
+      "maximumNano": 51957000,
+      "price": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.003,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 140422,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local UTF-8 estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 3246,
+        "output": 178,
+        "cacheRead": 14208,
+        "cacheWrite": 0
+      },
+      "costNano": 1230024,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "f0b94829-d192-4999-89a9-9155ab201ef9",
+      "card": "JUL-255",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "role": "orchestrator",
+      "maximumNano": 59144400,
+      "price": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.003,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 164380,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local UTF-8 estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 3205,
+        "output": 377,
+        "cacheRead": 17408,
+        "cacheWrite": 0
+      },
+      "costNano": 1466124,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "0c0c5e5b-7420-412c-a1ab-180af02a06a5",
+      "card": "JUL-255",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "role": "orchestrator",
+      "maximumNano": 62205000,
+      "price": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.003,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 174582,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local UTF-8 estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 1301,
+        "output": 146,
+        "cacheRead": 20608,
+        "cacheWrite": 0
+      },
+      "costNano": 627324,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "ba4cdad1-2705-4288-8242-b79e4f4133ac",
+      "card": "JUL-255",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "role": "orchestrator",
+      "maximumNano": 67176600,
+      "price": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.003,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 191154,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local UTF-8 estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 2022,
+        "output": 288,
+        "cacheRead": 21888,
+        "cacheWrite": 0
+      },
+      "costNano": 1017864,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "cc3ec3f3-6420-44c4-b050-3aa6216563b6",
+      "card": "JUL-255",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "role": "orchestrator",
+      "maximumNano": 68332800,
+      "price": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.003,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 195008,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local UTF-8 estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 598,
+        "output": 218,
+        "cacheRead": 23808,
+        "cacheWrite": 0
+      },
+      "costNano": 512424,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "0b865ac0-c71b-4e70-a2d9-7851df6a774b",
+      "card": "JUL-255",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "role": "orchestrator",
+      "maximumNano": 69862800,
+      "price": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.003,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 200108,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local UTF-8 estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 765,
+        "output": 423,
+        "cacheRead": 24320,
+        "cacheWrite": 0
+      },
+      "costNano": 810060,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "162079d1-c014-4b89-b47c-eef3ed2b7038",
+      "card": "JUL-255",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "role": "orchestrator",
+      "maximumNano": 77674200,
+      "price": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.003,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 226146,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local UTF-8 estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 3024,
+        "output": 756,
+        "cacheRead": 24960,
+        "cacheWrite": 0
+      },
+      "costNano": 1889280,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "3a3dd49a-362b-4442-9091-347f9f5eb6ac",
+      "card": "JUL-255",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "role": "orchestrator",
+      "maximumNano": 81711600,
+      "price": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.003,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 239604,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local UTF-8 estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 1692,
+        "output": 230,
+        "cacheRead": 27904,
+        "cacheWrite": 0
+      },
+      "costNano": 867312,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "79e1c11f-3b77-42de-827a-70499d1b375e",
+      "card": "JUL-255",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "role": "orchestrator",
+      "maximumNano": 87758400,
+      "price": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.003,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 259760,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local UTF-8 estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 2877,
+        "output": 193,
+        "cacheRead": 29568,
+        "cacheWrite": 0
+      },
+      "costNano": 1183404,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "3ed02030-410d-4602-9c92-ddc6990da091",
+      "card": "JUL-255",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "role": "orchestrator",
+      "maximumNano": 92990400,
+      "price": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.003,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 277200,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local UTF-8 estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 2434,
+        "output": 203,
+        "cacheRead": 32384,
+        "cacheWrite": 0
+      },
+      "costNano": 1070952,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "368cf8ea-c95d-4ff9-ace8-e663ead73b47",
+      "card": "JUL-255",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "role": "orchestrator",
+      "maximumNano": 102621000,
+      "price": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.003,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 309302,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local UTF-8 estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 4406,
+        "output": 125,
+        "cacheRead": 34816,
+        "cacheWrite": 0
+      },
+      "costNano": 1576248,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "09ac11b9-1ae6-450c-8ab3-4e9b971e59dc",
+      "card": "JUL-255",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "role": "orchestrator",
+      "maximumNano": 106116000,
+      "price": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.003,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 320952,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local UTF-8 estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 1571,
+        "output": 1012,
+        "cacheRead": 39168,
+        "cacheWrite": 0
+      },
+      "costNano": 1803204,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "479edbe3-0304-4ca1-86d8-99dcbfa3eea7",
+      "card": "JUL-255",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "role": "orchestrator",
+      "maximumNano": 113777400,
+      "price": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.003,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 346490,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local UTF-8 estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 3348,
+        "output": 268,
+        "cacheRead": 40704,
+        "cacheWrite": 0
+      },
+      "costNano": 1448112,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "b68bab85-060b-42c8-bea8-26c5d355e785",
+      "card": "JUL-255",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "role": "orchestrator",
+      "maximumNano": 114480000,
+      "price": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.003,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 348832,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local UTF-8 estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 326,
+        "output": 153,
+        "cacheRead": 44032,
+        "cacheWrite": 0
+      },
+      "costNano": 413496,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "7beee74c-3b29-4a55-abdc-1eb7d770e0c9",
+      "card": "JUL-255",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "role": "orchestrator",
+      "maximumNano": 115381800,
+      "price": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.003,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 351838,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local UTF-8 estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 473,
+        "output": 110,
+        "cacheRead": 44288,
+        "cacheWrite": 0
+      },
+      "costNano": 406764,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "610d5831-523b-4118-ab6b-3330e8ee6be5",
+      "card": "JUL-255",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "role": "orchestrator",
+      "maximumNano": 120540000,
+      "price": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.003,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 369032,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local UTF-8 estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 2285,
+        "output": 306,
+        "cacheRead": 44672,
+        "cacheWrite": 0
+      },
+      "costNano": 1186716,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "231a5ec6-97ad-4e18-9e73-586436c36d84",
+      "card": "JUL-255",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "role": "orchestrator",
+      "maximumNano": 123343200,
+      "price": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.003,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 378376,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local UTF-8 estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 1247,
+        "output": 205,
+        "cacheRead": 46848,
+        "cacheWrite": 0
+      },
+      "costNano": 760644,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "1e2de616-0743-4fe4-a86f-4e6f7d3be268",
+      "card": "JUL-255",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "role": "orchestrator",
+      "maximumNano": 130609200,
+      "price": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.003,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 402596,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local UTF-8 estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 3136,
+        "output": 1132,
+        "cacheRead": 48000,
+        "cacheWrite": 0
+      },
+      "costNano": 2443200,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "92a87238-30af-4702-b552-84a1b8441d19",
+      "card": "JUL-255",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "role": "orchestrator",
+      "maximumNano": 134252400,
+      "price": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.003,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 414740,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local UTF-8 estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 1573,
+        "output": 612,
+        "cacheRead": 51072,
+        "cacheWrite": 0
+      },
+      "costNano": 1359516,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "4cc6d007-6548-4ca0-a683-be0217fd1a13",
+      "card": "JUL-255",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "role": "orchestrator",
+      "maximumNano": 144618600,
+      "price": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.003,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 449294,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local UTF-8 estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 4264,
+        "output": 466,
+        "cacheRead": 52608,
+        "cacheWrite": 0
+      },
+      "costNano": 1996224,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "fb8c162d-caea-4d65-8dd9-9d9095de3f4b",
+      "card": "JUL-255",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "role": "orchestrator",
+      "maximumNano": 148648200,
+      "price": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.003,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 462726,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local UTF-8 estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 1666,
+        "output": 369,
+        "cacheRead": 56832,
+        "cacheWrite": 0
+      },
+      "costNano": 1113096,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "122777d7-94ce-4377-b7b3-41eec3b6b757",
+      "card": "JUL-255",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "role": "orchestrator",
+      "maximumNano": 153903000,
+      "price": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.003,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 480242,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local UTF-8 estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 2312,
+        "output": 362,
+        "cacheRead": 58496,
+        "cacheWrite": 0
+      },
+      "costNano": 1303488,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "6d9a74d7-24d9-48d1-91ae-5762f10860f0",
+      "card": "JUL-255",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "role": "orchestrator",
+      "maximumNano": 156758400,
+      "price": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.003,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 489760,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local UTF-8 estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 1130,
+        "output": 654,
+        "cacheRead": 60800,
+        "cacheWrite": 0
+      },
+      "costNano": 1306200,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "cb3da846-3566-4fa6-ba7d-340fc7c2d7eb",
+      "card": "JUL-255",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "role": "orchestrator",
+      "maximumNano": 158631600,
+      "price": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.003,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 496004,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local UTF-8 estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 988,
+        "output": 316,
+        "cacheRead": 61824,
+        "cacheWrite": 0
+      },
+      "costNano": 861072,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "0333e296-d782-44af-aa5e-5fdad225d523",
+      "card": "JUL-255",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "role": "orchestrator",
+      "maximumNano": 160792200,
+      "price": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.003,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 503206,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local UTF-8 estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 998,
+        "output": 450,
+        "cacheRead": 62720,
+        "cacheWrite": 0
+      },
+      "costNano": 1027560,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "a7e2baa9-9104-449d-8aca-120d0918c288",
+      "card": "JUL-255",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "role": "orchestrator",
+      "maximumNano": 164602800,
+      "price": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.003,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 515908,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local UTF-8 estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 1972,
+        "output": 1423,
+        "cacheRead": 63616,
+        "cacheWrite": 0
+      },
+      "costNano": 2490048,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "0cf9741c-c59b-485d-85b7-092aa2430d56",
+      "card": "JUL-255",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "role": "orchestrator",
+      "maximumNano": 168121200,
+      "price": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.003,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 527636,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local UTF-8 estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 1505,
+        "output": 585,
+        "cacheRead": 65536,
+        "cacheWrite": 0
+      },
+      "costNano": 1350108,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "74bc98ce-9526-45a6-aa26-11f1c1ee02ea",
+      "card": "JUL-255",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "role": "orchestrator",
+      "maximumNano": 170525400,
+      "price": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.003,
+        "cacheWrite": 0
+      },
+      "bounds": {
+        "maxInputTokens": 535650,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local UTF-8 estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 1216,
+        "output": 1770,
+        "cacheRead": 66944,
+        "cacheWrite": 0
+      },
+      "costNano": 2689632,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "926dec83-3908-4057-a42c-6ab3976185f5",
+      "card": "JUL-255",
+      "model": "openai/gpt-6-sol",
+      "role": "orchestrator",
+      "maximumNano": 425675000,
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cacheRead": 0.2,
+        "cacheWrite": 2.5
+      },
+      "bounds": {
+        "maxInputTokens": 137502,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local o200k_base estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 2587,
+        "output": 245,
+        "cacheRead": 50432,
+        "cacheWrite": 0
+      },
+      "costNano": 17710400,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "2690b999-6b3f-45a2-bd53-d363c1ee2fe7",
+      "card": "JUL-255",
+      "model": "openai/gpt-6-sol",
+      "role": "orchestrator",
+      "maximumNano": 444970000,
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cacheRead": 0.2,
+        "cacheWrite": 2.5
+      },
+      "bounds": {
+        "maxInputTokens": 145220,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local o200k_base estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 4356,
+        "output": 166,
+        "cacheRead": 50944,
+        "cacheWrite": 0
+      },
+      "costNano": 20560800,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "0ac05377-1042-4bf0-bdaa-1a4e987f50f1",
+      "card": "JUL-255",
+      "model": "openai/gpt-6-sol",
+      "role": "orchestrator",
+      "maximumNano": 457035000,
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cacheRead": 0.2,
+        "cacheWrite": 2.5
+      },
+      "bounds": {
+        "maxInputTokens": 150046,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local o200k_base estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 1170,
+        "output": 201,
+        "cacheRead": 55168,
+        "cacheWrite": 0
+      },
+      "costNano": 15383600,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "6ee15690-aa7b-4b36-90c8-6e50e79417e8",
+      "card": "JUL-255",
+      "model": "openai/gpt-6-sol",
+      "role": "orchestrator",
+      "maximumNano": 466165000,
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cacheRead": 0.2,
+        "cacheWrite": 2.5
+      },
+      "bounds": {
+        "maxInputTokens": 153698,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local o200k_base estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 56692,
+        "output": 116,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "costNano": 114544000,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "9fbad822-8137-4369-a0bc-10a6506cf9be",
+      "card": "JUL-255",
+      "model": "openai/gpt-6-sol",
+      "role": "orchestrator",
+      "maximumNano": 477230000,
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cacheRead": 0.2,
+        "cacheWrite": 2.5
+      },
+      "bounds": {
+        "maxInputTokens": 158124,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local o200k_base estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 1153,
+        "output": 47,
+        "cacheRead": 56192,
+        "cacheWrite": 0
+      },
+      "costNano": 14014400,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "02a6540f-c0d6-4d90-84a0-32a1a3228cb1",
+      "card": "JUL-255",
+      "model": "openai/gpt-6-sol",
+      "role": "orchestrator",
+      "maximumNano": 489375000,
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cacheRead": 0.2,
+        "cacheWrite": 2.5
+      },
+      "bounds": {
+        "maxInputTokens": 162982,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local o200k_base estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 2962,
+        "output": 55,
+        "cacheRead": 56576,
+        "cacheWrite": 0
+      },
+      "costNano": 17789200,
+      "reason": null,
+      "costBasis": "reported usage"
+    },
+    {
+      "id": "1ed99bb7-6630-4f29-bd0d-ebe25a660d5e",
+      "card": "JUL-255",
+      "model": "openai/gpt-6-sol",
+      "role": "orchestrator",
+      "maximumNano": 499130000,
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cacheRead": 0.2,
+        "cacheWrite": 2.5
+      },
+      "bounds": {
+        "maxInputTokens": 166884,
+        "maxOutputTokens": 8192,
+        "inputCountBasis": "local o200k_base estimate"
+      },
+      "state": "settled",
+      "usage": {
+        "input": 36143,
+        "output": 44,
+        "cacheRead": 23936,
+        "cacheWrite": 0
+      },
+      "costNano": 77513200,
+      "reason": null,
+      "costBasis": "reported usage"
+    }
+  ]
+}

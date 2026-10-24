@@ -1,0 +1,14 @@
+✔ a logged-out stock AuthStorage offers no subscription models (19.352682ms)
+✔ signed-in stock subscriptions offer literal native model metadata without tokens (12.052357ms)
+✔ only the signed-in provider contributes stock offers (6.292833ms)
+✔ settings without a shared authPath offer nothing (4.908511ms)
+✔ a missing settings file fails visibly instead of inventing availability (8.115281ms)
+✔ an explicitly unavailable or invalidly priced configured model is not advertised (16.302992ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 268.09343

@@ -22,6 +22,11 @@ function merge(repo) {
   git(repo, 'add', '.'); git(repo, 'commit', '-m', 'feature');
   git(repo, 'checkout', 'trial'); git(repo, 'merge', '--no-ff', 'feature', '-m', 'test merge');
 }
+test('installer defaults blocked notifications to the maintained main checkout', () => {
+  const installer = readFileSync(new URL('../install.mjs', import.meta.url), 'utf8');
+  assert.match(installer, /notification \?\?= \{ root: '\/home\/ubuntu\/julia-machine-main'/);
+  assert.doesNotMatch(installer, /notification \?\?= \{ root: '\/home\/ubuntu\/julia-next'/);
+});
 test('baseline, no merge, direct push, one merge, and repeated poll expose exactly one run', () => {
   const { repo, config } = fixture();
   let calls = 0;

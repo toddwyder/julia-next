@@ -3,11 +3,12 @@ import { join, resolve, relative, isAbsolute, dirname, basename } from 'node:pat
 import { fileURLToPath } from 'node:url'
 import { CardLedger } from './ledger.mjs'
 import { createTransport } from './transport.mjs'
+import { PlanFilesystem } from './plan-filesystem.mjs'
 
 const quote = value => "'" + String(value).replaceAll("'", "'\\''") + "'"
 let opened = false
 
-export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'builder', hostInstructions, subagents, helpers, helperDefinitions, subagentDefinitions }) {
+export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'builder', hostInstructions, subagents, helpers, helperDefinitions, subagentDefinitions, planOnly = false }) {
   if (opened) throw Error('one runner per process required')
   if (!/^[A-Z]+-\d+$/.test(card)) throw Error('valid card ID required')
   const settings = JSON.parse(await readFile(settingsPath, 'utf8'))
@@ -39,13 +40,26 @@ export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'bu
   }
   const authInside = relative(cwd, authPath)
   if (!authInside.startsWith('..') && !isAbsolute(authInside)) throw Error('credentials must be outside builder workspace')
+  let ledgerPath = resolve(settings.ledgerPath ?? join(stateDir, 'cards.sqlite'))
+  await mkdir(dirname(ledgerPath), { recursive: true, mode: 0o700 })
+  try { ledgerPath = await realpath(ledgerPath) } catch (error) {
+    if (error.code !== 'ENOENT') throw error
+    ledgerPath = join(await realpath(dirname(ledgerPath)), basename(ledgerPath))
+  }
+  const ledgerInside = relative(cwd, ledgerPath)
+  if (!ledgerInside.startsWith('..') && !isAbsolute(ledgerInside)) throw Error('card ledger must be outside builder workspace')
+  const inheritedEnv = { ...process.env }
+  const restoreEnv = () => {
+    for (const key of Object.keys(process.env)) delete process.env[key]
+    Object.assign(process.env, inheritedEnv)
+  }
   const path = process.env.PATH
   for (const key of Object.keys(process.env)) delete process.env[key]
   Object.assign(process.env, { PATH: path ?? '/usr/local/bin:/usr/bin:/bin', HOME: stateDir, LANG: 'C.UTF-8', MASTRA_APP_DATA_DIR: appDir })
   if (settings.memory === false) process.env.MASTRACODE_DISABLE_OBSERVATIONAL_MEMORY = '1'
-  const ledger = new CardLedger({ path: join(stateDir, 'cards.sqlite'), card })
+  const ledger = new CardLedger({ path: ledgerPath, card })
   const originalFetch = globalThis.fetch
-  globalThis.fetch = createTransport({ settings, ledger, role, fetch: originalFetch, trial: true })
+  globalThis.fetch = createTransport({ settings, ledger, role, fetch: originalFetch })
   opened = true
   let runtime
   let workspace
@@ -75,18 +89,25 @@ export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'bu
     sdkSettings.models.omReflectionThreshold = null
     sdkSettings.customProviders = runtimeProviders.map(({ apiKey, ...provider }) => provider)
     saveSettings(sdkSettings)
-    const sandbox = new LocalSandbox({ workingDirectory: cwd, env: { HOME: commandHome, TMPDIR: commandHome }, timeout: 30_000 })
-    const spawn = sandbox.processes.spawn.bind(sandbox.processes)
-    const launcher = fileURLToPath(new URL('./command-boundary.py', import.meta.url))
-    sandbox.processes.spawn = (command, options = {}) => {
-      const config = JSON.stringify({ workspace: cwd, home: commandHome, cwd: resolve(cwd, options.cwd ?? '.'), executable: process.execPath })
-      return spawn(`/usr/bin/python3 ${quote(launcher)} ${quote(config)} ${quote(command)}`, { ...options, env: {} })
+    if (planOnly) workspace = new Workspace({ filesystem: new PlanFilesystem({ basePath: commandHome }) })
+    else {
+      const sandbox = new LocalSandbox({ workingDirectory: cwd, env: { HOME: commandHome, TMPDIR: commandHome }, timeout: 30_000 })
+      const spawn = sandbox.processes.spawn.bind(sandbox.processes)
+      const launcher = fileURLToPath(new URL('./command-boundary.py', import.meta.url))
+      sandbox.processes.spawn = (command, options = {}) => {
+        const config = JSON.stringify({ workspace: cwd, home: commandHome, cwd: resolve(cwd, options.cwd ?? '.'), executable: process.execPath })
+        return spawn(`/usr/bin/python3 ${quote(launcher)} ${quote(config)} ${quote(command)}`, { ...options, env: {} })
+      }
+      workspace = new Workspace({ filesystem: new LocalFilesystem({ basePath: cwd, contained: true }), sandbox, tools: { mastra_workspace_execute_command: { name: 'execute_command' } }, skills: ['.agents/skills'] })
     }
-    workspace = new Workspace({ filesystem: new LocalFilesystem({ basePath: cwd, contained: true }), sandbox, tools: { mastra_workspace_execute_command: { name: 'execute_command' } }, skills: ['.agents/skills'] })
     await workspace.init()
+    const planningDynamicTools = ['request_access', 'create-workflow', 'list-workflows', 'get-workflow', 'run-workflow', 'delete-workflow', 'schedule_list', 'schedule_update', 'schedule_create', 'schedule_resume', 'schedule_run', 'web_search', 'notification_inbox']
+    const planningBuiltinTools = ['ask_user', 'submit_plan', 'task_write', 'task_update', 'task_complete', 'task_check', 'subagent']
     runtime = await bootLocalAgentController({
-      cwd, homeDir: sdkHome, workspace, modes: false, subagents: providedSubagents, intervalHandlers: [],
-      hostInstructions, disableMcp: true, disablePlugins: true, disableEnvFile: true, disableHooks: true, disableGithubSignals: true,
+      cwd, homeDir: sdkHome, workspace, modes: false, subagents: planOnly ? [] : providedSubagents, intervalHandlers: [], disabledTools: planOnly ? planningDynamicTools : ['web_search'],
+      disableBuiltinTools: planOnly ? planningBuiltinTools : undefined,
+      hostInstructions: planOnly ? 'Return only the requested plan text. No tools, skills, files, commands, research, or delegation are available.' : hostInstructions,
+      disableMcp: true, disablePlugins: true, disableEnvFile: true, disableHooks: true, disableGithubSignals: true,
     })
     const tools = await createWorkspaceTools(workspace)
     const availableSkills = await workspace.skills?.list?.() ?? []
@@ -101,6 +122,7 @@ export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'bu
       skills: workspace.skills,
       availableSkills,
       runtime,
+      workspace,
       async run({ prompt, threadId, maxTurns = 6, timeoutMs = 180_000 }) {
         if (typeof prompt !== 'string' || !prompt.trim()) throw Error('prompt required')
         const thread = threadId ? { id: threadId } : await runtime.session.thread.create({ title: card })
@@ -109,14 +131,19 @@ export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'bu
         return { result, threadId: thread.id, account: ledger.snapshot() }
       },
       async close() {
-        await runtime.memory?.settled?.()
-        await runtime.controller.destroy()
-        await runtime.observability.shutdown()
-        await workspace.destroy()
-        setCredentialStoreProvider(undefined)
-        setCustomProvidersSource(undefined)
-        globalThis.fetch = originalFetch
-        ledger.close()
+        try {
+          await runtime.memory?.settled?.()
+          await runtime.controller.destroy()
+          await runtime.observability.shutdown()
+          await workspace.destroy()
+        } finally {
+          setCredentialStoreProvider(undefined)
+          setCustomProvidersSource(undefined)
+          globalThis.fetch = originalFetch
+          ledger.close()
+          opened = false
+          restoreEnv()
+        }
       },
     }
   } catch (error) {
@@ -124,6 +151,8 @@ export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'bu
     await workspace?.destroy()
     globalThis.fetch = originalFetch
     ledger.close()
+    opened = false
+    restoreEnv()
     throw error
   }
 }

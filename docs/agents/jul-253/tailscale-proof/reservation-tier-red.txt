@@ -1,0 +1,53 @@
+(node:589562) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ reservation uses only context tiers reachable within 150000 input tokens (22.545856ms)
+✖ reservation uses only context tiers reachable within 272000 input tokens (5.152264ms)
+✔ reservation uses only context tiers reachable within 272001 input tokens (5.110422ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 1
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 248.055807
+
+✖ failing tests:
+
+test at ops/build-runner/test/transport.test.mjs:327:3
+✖ reservation uses only context tiers reachable within 150000 input tokens (22.545856ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///home/ubuntu/julia-jul-253/ops/build-runner/test/transport.test.mjs:341:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at ops/build-runner/test/transport.test.mjs:327:3
+✖ reservation uses only context tiers reachable within 272000 input tokens (5.152264ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 1482880000
+  - 761920000
+  
+      at TestContext.<anonymous> (file:///home/ubuntu/julia-jul-253/ops/build-runner/test/transport.test.mjs:342:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1482880000,
+    expected: 761920000,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

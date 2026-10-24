@@ -1,0 +1,14 @@
+✔ normal machine sessions use Sol and DeepSeek and preserve the two-model panels (3.239427ms)
+✔ an explicit machinery drive uses Beam for the session and every helper (0.599992ms)
+✔ normal session keeps the configured Sol/DeepSeek split and every exact model (3.50497ms)
+✔ machinery selects Beam for every role and describes a self-check, not independent review (1.247948ms)
+✔ normal proof requires successful distinct-model review of actual changed files (3.716874ms)
+✔ machinery proof completes a successful Beam self-check without DeepSeek dispatch (0.578641ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 146.961892

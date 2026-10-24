@@ -1,0 +1,45 @@
+✖ an explicitly unavailable or invalidly priced configured model is not advertised (32.601288ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 235.805626
+
+✖ failing tests:
+
+test at ops/build-runner/test/connections.test.mjs:129:1
+✖ an explicitly unavailable or invalidly priced configured model is not advertised (32.601288ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + [
+  +   {
+  +     codingCapable: true,
+  +     company: 'Anthropic',
+  +     modelId: 'claude-haiku-5-5',
+  +     name: 'claude-haiku-5-5',
+  +     route: 'claude',
+  +     service: 'Claude subscription',
+  +     supportedEfforts: [
+  +       'low',
+  +       'medium',
+  +       'high'
+  +     ],
+  +     wire: 'messages'
+  +   }
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file:///home/ubuntu/julia-jul-253/ops/build-runner/test/connections.test.mjs:137:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ { route: 'claude', modelId: 'claude-haiku-5-5', name: 'claude-haiku-5-5', company: 'Anthropic', service: 'Claude subscription', codingCapable: true, supportedEfforts: [Array], wire: 'messages' } ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

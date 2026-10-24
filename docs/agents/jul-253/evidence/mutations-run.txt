@@ -1,0 +1,48 @@
+{"mutation":"cache-ttl-mismatch-accepted","test":"stock Claude conversation caching uses its configured one-hour API price","status":"caught"}
+{"mutation":"one-hour-cache-write-charged-at-five-minute-rate","test":"stock Claude conversation caching uses its configured one-hour API price","status":"caught"}
+{"mutation":"maximum-charge-recovery-not-final","test":"charging an unknown request at its full maximum never releases budget or invents usage","status":"caught"}
+{"mutation":"configured-panel-replaced-by-unrelated-model","test":"an unrelated review model cannot replace the configured Sol and DeepSeek panel","status":"caught"}
+{"mutation":"unknown-maximum-charged-as-zero","test":"charging an unknown request at its full maximum never releases budget or invents usage","status":"caught"}
+{"mutation":"chat-sse-charge-corrupted","test":"chat SSE settles cache categories once","status":"caught"}
+{"mutation":"responses-sse-charge-corrupted","test":"responses SSE settles cache categories once","status":"caught"}
+{"mutation":"messages-json-charge-corrupted","test":"messages JSON settles cache categories once","status":"caught"}
+{"mutation":"messages-sse-charge-corrupted","test":"messages SSE settles cache categories once","status":"caught"}
+{"mutation":"invalid-money-defaulted-to-zero","test":"invalid monetary inputs cannot change durable budget","status":"caught"}
+{"mutation":"concurrent-admission-checks-removed","test":"separate processes cannot jointly reserve beyond the ceiling","status":"caught"}
+{"mutation":"connection-failure-not-marked-unknown","test":"connection failure after arrival retains the paid reservation","status":"caught"}
+{"mutation":"card-ceiling-removed","test":"all roles share the two-dollar card ceiling across reopen and settle once","status":"caught"}
+{"mutation":"unresolved-priced-block-removed","test":"free requests remain usable without usage when priced accounting is unknown","status":"caught"}
+{"mutation":"zero-settlement-corrupted","test":"free requests remain usable without usage when priced accounting is unknown","status":"caught"}
+{"mutation":"persistent-storage-replaced-with-memory","test":"reopening retains unresolved holds, snapshots, and settled costs per card","status":"caught"}
+{"mutation":"process-exit-hold-not-persisted","test":"a process exit after reservation never releases an uncertain request","status":"caught"}
+{"mutation":"priced-settlement-usage-check-removed","test":"free requests remain usable without usage when priced accounting is unknown","status":"caught"}
+{"mutation":"settlement-idempotency-check-removed","test":"all roles share the two-dollar card ceiling across reopen and settle once","status":"caught"}
+{"mutation":"overrun-block-removed","test":"actual cost above a reservation is durable and blocks priced work","status":"caught"}
+{"mutation":"unpriced-model-defaulted-to-free","test":"wrong model, endpoint, missing prices and bounds send nothing","status":"caught"}
+{"mutation":"ceiling-http-dispatch-allowed","test":"card ceiling refuses an oversized reservation before HTTP","status":"caught"}
+{"mutation":"http-attempt-identifier-reused","test":"separate HTTP attempts create separate durable records","status":"caught"}
+{"mutation":"unknown-route-falls-back-to-first-model","test":"wrong model, endpoint, missing prices and bounds send nothing","status":"caught"}
+{"mutation":"chat-output-limit-removed","test":"free requests arrive with enforced limits and settle without usage","status":"caught"}
+{"mutation":"responses-output-limit-removed","test":"responses JSON settles cache categories once","status":"caught"}
+{"mutation":"missing-paid-usage-accepted","test":"paid missing usage refuses result and prevents the next arrival","status":"caught"}
+{"mutation":"reported-cost-not-counted","test":"provider cost above a configured free reservation is recorded and stops its card","status":"caught"}
+{"mutation":"over-reservation-stop-not-persisted","test":"provider cost above a configured free reservation is recorded and stops its card","status":"caught"}
+{"mutation":"stop-marker-not-persisted","test":"review durable stop survives reopen and blocks free and paid routes only for its card","status":"caught"}
+{"mutation":"stop-marker-lost-on-reopen","test":"review durable stop survives reopen and blocks free and paid routes only for its card","status":"caught"}
+{"mutation":"stopped-card-metadata-allowed","test":"review stopped card blocks allowlisted metadata GET","status":"caught"}
+{"mutation":"known-overbound-usage-not-recorded","test":"review oversized known usage records actual cost and refuses result","status":"caught"}
+{"mutation":"known-overbound-result-accepted","test":"review oversized known usage records actual cost and refuses result","status":"caught"}
+{"mutation":"cached-input-double-counted","test":"chat JSON settles cache categories once","status":"caught"}
+{"mutation":"nano-dollar-conversion-corrupted","test":"decimal rates round nano dollars upward without floating point drift","status":"caught"}
+{"mutation":"cache-write-input-double-counted","test":"responses JSON settles cache categories once","status":"caught"}
+{"mutation":"truncated-paid-sse-accepted","test":"a truncated paid stream retains the reservation despite partial usage","status":"caught"}
+{"mutation":"redirects-followed","test":"allowlisted authentication cannot carry inference payloads and redirects never follow","status":"caught"}
+{"mutation":"response-buffer-bound-removed","test":"bounded buffering refuses a large result without releasing its reservation","status":"caught"}
+{"mutation":"metadata-child-url-allowed","test":"authentication and catalog are confined to their exact allowlisted URL","status":"caught"}
+{"mutation":"ledger-errors-no-longer-sanitized","test":"ledger errors never reveal their underlying body or credentials","status":"caught"}
+{"mutation":"state-and-ledger-paths-not-canonicalized","test":"review stock adapter rejects state symlink into builder before runtime","status":"caught"}
+{"mutation":"auth-file-not-canonicalized","test":"review stock adapter rejects auth-file symlink into builder before runtime","status":"caught"}
+{"mutation":"auth-parent-not-canonicalized","test":"review stock adapter rejects auth-parent symlink into builder before runtime","status":"caught"}
+{"mutation":"mutable-home-granted-outside-workspace","test":"review replacing builder home after boot cannot expose outside auth","status":"caught"}
+{"mutation":"credential-filesystem-boundary-removed","test":"stock adapter request works while direct and nested builder commands cannot read credentials","status":"caught"}
+{"status":"passed","caught":47,"total":47,"restored":true,"final":"green"}

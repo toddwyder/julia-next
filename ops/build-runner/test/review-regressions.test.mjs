@@ -22,7 +22,7 @@ async function directory(t) {
 }
 
 function transport(ledger, price, upstream) {
-  return createTransport({ ledger, settings: settings(price), role: 'builder', trial: false, fetch: upstream });
+  return createTransport({ ledger, settings: settings(price), role: 'builder', fetch: upstream });
 }
 
 test('review durable stop survives reopen and blocks free and paid routes only for its card', async t => {

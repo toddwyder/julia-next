@@ -1,9 +1,11 @@
+import { observeRequests } from './request-observer.mjs'
 import { readFile, writeFile, rename, mkdir, appendFile } from 'node:fs/promises'
 import { join, resolve, dirname } from 'node:path'
 import { execFile as execFileCb } from 'node:child_process'
 import { promisify } from 'node:util'
 import { openRunner } from './adapter.mjs'
 import { createPstackSession, inspectPstackRun } from './pstack-session.mjs'
+import { captureBuilderPlan } from './builder-boundary.mjs'
 
 const execFile = promisify(execFileCb)
 
@@ -47,9 +49,10 @@ async function main() {
   const savedRoles = snapshot.roles ?? {}
   const settingsPathValue = job.settingsPath ?? process.env.BUILD_RUNNER_SETTINGS ?? argValue('--settings') ?? resolve(process.cwd(), 'ops/build-runner/settings.json')
   const settings = JSON.parse(await readFile(settingsPathValue, 'utf8'))
+  settings.ledgerPath ??= join(dirname(jobDir), 'cards.sqlite')
   const pstackModels = await readFile(new URL('./pstack-models.md', import.meta.url), 'utf8')
   const session = createPstackSession(settings, { ...snapshot, machineryProof: job.machineryProof === true || snapshot.machineryProof }, pstackModels)
-  const { orchestratorModel, coderModel, machineryProof, reviewModel, helpers, hostInstructions, prompt } = session
+  const { orchestratorModel, coderModel, machineryProof, reviewModel, reviewModels, helpers, hostInstructions, prompt } = session
   const potetoSkill = await readFile(join(job.worktree, ".agents/skills/poteto-mode/SKILL.md"), "utf8")
   const workflowInstructions = `${hostInstructions}\n\nSelected workflow skill (authoritative):\n${potetoSkill}`
   const effectivePstackModels = session.pstackModels
@@ -81,6 +84,7 @@ async function main() {
   await seedPstackModels(builderHome)
 
   let runner
+  let planRunner
   const events = []
   const requests = []
   let receipt
@@ -90,33 +94,40 @@ async function main() {
   let threadId
   let candidateCommit
   let account
+  let plan
   try {
-    runner = await openRunner({ card: cardId, settingsPath: effectiveSettingsPath, cwd: job.worktree, stateDir, role: 'orchestrator', hostInstructions: workflowInstructions, subagents: helpers })
-    const transportFetch = globalThis.fetch
-    globalThis.fetch = async (input, init) => {
-      const request = new Request(input, init)
-      let body
-      try { body = await request.clone().json() } catch {}
-      const entry = { model: body?.model, method: request.method, url: request.url }
-      requests.push(entry)
-      try {
-        const response = await transportFetch(input, init)
-        entry.status = response.status
-        return response
-      } catch (error) {
-        entry.refusal = error.message
-        throw error
-      }
-    }
     const allowedEventTypes = new Set(['subagent_start', 'subagent_end', 'subagent_tool_start', 'subagent_tool_end', 'tool_start', 'tool_end', 'agent_start', 'agent_end', 'error', 'task_updated', 'state_changed', 'message_end'])
+    planRunner = await openRunner({ card: cardId, settingsPath: effectiveSettingsPath, cwd: job.worktree, stateDir, role: 'orchestrator', planOnly: true })
+    globalThis.fetch = observeRequests(globalThis.fetch, requests)
+    const unsubscribePlan = planRunner.runtime.session.subscribe(e => { if (allowedEventTypes.has(e?.type)) events.push(e) })
+    try {
+      receipt = await captureBuilderPlan({
+        runner: planRunner,
+        builderHome,
+        jobDir,
+        card,
+        events,
+        status: async () => (await execFile('git', ['-C', job.worktree, 'status', '--porcelain'])).stdout,
+      })
+      receipts.push(receipt)
+      account = receipt.account ?? planRunner.snapshot()
+    } finally {
+      unsubscribePlan()
+      await planRunner.close()
+      planRunner = undefined
+    }
+    plan = await readFile(join(jobDir, 'pstack-plan.md'), 'utf8')
+
+    runner = await openRunner({ card: cardId, settingsPath: effectiveSettingsPath, cwd: job.worktree, stateDir, role: 'orchestrator', hostInstructions: workflowInstructions, subagents: helpers })
+    globalThis.fetch = observeRequests(globalThis.fetch, requests)
     const unsubscribe = runner.runtime.session.subscribe(e => { if (allowedEventTypes.has(e?.type)) events.push(e) })
     let checklist
     let decisions
     let internalReview
     try {
       for (let turn = 0; turn < 4; turn += 1) {
-        const instruction = turn === 0 ? prompt : workflowFeedback.at(-1)
-        receipt = await runner.run({ prompt: instruction, ...(receipt?.threadId ? { threadId: receipt.threadId } : {}), maxTurns: 100, timeoutMs: 900000 })
+        const instruction = turn === 0 ? `${prompt}\n\nSol's retained plan:\n${plan}` : workflowFeedback.at(-1)
+        receipt = await runner.run({ prompt: instruction, ...(turn > 0 && receipt?.threadId ? { threadId: receipt.threadId } : {}), maxTurns: 100, timeoutMs: 900000 })
         receipts.push(receipt)
         if (receipt?.result?.status !== 'completed') throw new Error('session not completed')
         try {
@@ -125,7 +136,7 @@ async function main() {
           const trackedChanges = (await execFile('git', ['-C', job.worktree, 'diff', '--name-only', job.baseCommit])).stdout
           const newFiles = (await execFile('git', ['-C', job.worktree, 'ls-files', '--others', '--exclude-standard'])).stdout
           const changedFiles = (trackedChanges + '\n' + newFiles).split(/\r?\n/).filter(Boolean)
-          internalReview = { ...inspectPstackRun({ events, requests, coderModel, reviewModel, machineryProof, checklist, decisions, cardId, changedFiles }), effectiveModels: effectiveTable }
+          internalReview = { ...inspectPstackRun({ events, requests, coderModel, reviewModel, reviewModels, machineryProof, checklist, decisions, cardId, changedFiles }), effectiveModels: effectiveTable }
           break
         } catch (error) {
           if (turn === 3) throw error
@@ -138,15 +149,13 @@ async function main() {
     threadId = receipt.threadId
     account = receipt.account ?? runner.snapshot()
 
-    if (internalReview.deepseekSent && machineryProof) throw new Error('deepseek dispatched')
+    if (machineryProof && internalReview.deepseekSent) throw new Error('deepseek dispatched during machinery self-check')
     await atomicWriteText(join(jobDir, 'pstack-checklist.md'), checklist)
     await atomicWriteText(join(jobDir, 'pstack-decisions.tsv'), decisions)
     await atomicWriteJson(join(jobDir, 'pstack-state.json'), runner.runtime.session.state.get())
-
     if (runner.runtime?.session?.model?.get?.() !== orchestratorModel) throw new Error('session model mismatch')
     if (account?.stopped !== false) throw new Error('account stopped')
-    if (Number(account?.spentNano ?? 0) !== 0) throw new Error('nonzero spent')
-    if (Number(account?.heldNano ?? 0) !== 0) throw new Error('nonzero held')
+    if (Number(account?.heldNano ?? 0) !== 0) throw new Error('unsettled card reservations')
 
     const { stdout: statusBefore } = await execFile('git', ['-C', job.worktree, 'status', '--porcelain'])
     if (statusBefore.trim()) {
@@ -170,6 +179,7 @@ async function main() {
       baseCommit: job.baseCommit,
       candidateCommit,
       account,
+      plan,
       internalReview,
       downstreamReviewStarted: false,
       completedAt: new Date().toISOString(),
@@ -194,6 +204,7 @@ async function main() {
       await atomicWriteJson(join(jobDir, 'ledger.json'), account ?? runner?.snapshot?.() ?? {})
     } catch {}
     try { await runner?.close() } catch {}
+    try { await planRunner?.close() } catch {}
     try { if (job) await atomicWriteJson(join(jobDir, 'job.json'), job) } catch {}
   }
   if (failure) process.exitCode = 1

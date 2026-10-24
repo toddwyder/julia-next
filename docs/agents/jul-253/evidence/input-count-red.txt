@@ -1,0 +1,24 @@
+(node:514079) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ an exact provider input count admits a short request whose full-context reservation exceeds the card cap (36.411672ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 282.614971
+
+✖ failing tests:
+
+test at ops/build-runner/test/transport.test.mjs:73:1
+✖ an exact provider input count admits a short request whose full-context reservation exceeds the card cap (36.411672ms)
+  Error: Request ledger refused operation
+      at fail (file:///home/ubuntu/julia-jul-253/ops/build-runner/transport.mjs:3:25)
+      at ledgerCall (file:///home/ubuntu/julia-jul-253/ops/build-runner/transport.mjs:154:65)
+      at guardedFetch (file:///home/ubuntu/julia-jul-253/ops/build-runner/transport.mjs:186:31)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (file:///home/ubuntu/julia-jul-253/ops/build-runner/test/transport.test.mjs:77:3)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)

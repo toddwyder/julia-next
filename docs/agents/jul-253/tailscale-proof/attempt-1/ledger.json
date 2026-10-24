@@ -1,0 +1,10 @@
+{
+  "card": "JUL-254",
+  "ceilingNano": 2000000000,
+  "stopped": false,
+  "spentNano": 0,
+  "heldNano": 0,
+  "remainingNano": 2000000000,
+  "pricedBlocked": false,
+  "requests": []
+}

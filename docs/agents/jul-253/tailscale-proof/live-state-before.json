@@ -1,0 +1,1311 @@
+{
+  "url": "https://ovh.tail91f394.ts.net/julia-control/api/state",
+  "status": 200,
+  "body": {
+    "cards": [],
+    "offers": [
+      {
+        "route": "commandcode",
+        "modelId": "claude-sonnet-5-5",
+        "name": "Claude Sonnet 5.5",
+        "company": "Anthropic",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "messages"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "claude-sonnet-5",
+        "name": "Claude Sonnet 5",
+        "company": "Anthropic",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "messages"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "claude-sonnet-4-6",
+        "name": "Claude Sonnet 4.6",
+        "company": "Anthropic",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "messages"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "claude-fable-5-1",
+        "name": "Claude Fable 5.1",
+        "company": "Anthropic",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "messages"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "claude-fable-5",
+        "name": "Claude Fable 5",
+        "company": "Anthropic",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "messages"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "claude-opus-5-5",
+        "name": "Claude Opus 5.5",
+        "company": "Anthropic",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "messages"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "claude-opus-5",
+        "name": "Claude Opus 5",
+        "company": "Anthropic",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "messages"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "claude-opus-4-8",
+        "name": "Claude Opus 4.8",
+        "company": "Anthropic",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "messages"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "claude-opus-4-7",
+        "name": "Claude Opus 4.7",
+        "company": "Anthropic",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "messages"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "claude-haiku-5-5",
+        "name": "Claude Haiku 5.5",
+        "company": "Anthropic",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "messages"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "claude-haiku-4-5-20251001",
+        "name": "Claude Haiku 4.5",
+        "company": "Anthropic",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "messages"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "gpt-6-astra",
+        "name": "GPT-6 Astra",
+        "company": "OpenAI",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "gpt-6.1-sol",
+        "name": "GPT-6.1 Sol",
+        "company": "OpenAI",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "gpt-6-sol",
+        "name": "GPT-6 Sol",
+        "company": "OpenAI",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "gpt-6-luna",
+        "name": "GPT-6 Luna",
+        "company": "OpenAI",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "gpt-5.6-sol",
+        "name": "GPT-5.6 Sol",
+        "company": "OpenAI",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "gpt-5.6-terra",
+        "name": "GPT-5.6 Terra",
+        "company": "OpenAI",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "gpt-5.6-luna",
+        "name": "GPT-5.6 Luna",
+        "company": "OpenAI",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "gpt-5.5",
+        "name": "GPT-5.5",
+        "company": "OpenAI",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "gpt-5.4",
+        "name": "GPT-5.4",
+        "company": "OpenAI",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "gpt-5.3-codex",
+        "name": "GPT-5.3 Codex",
+        "company": "OpenAI",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "gpt-5.4-mini",
+        "name": "GPT-5.4 Mini",
+        "company": "OpenAI",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "deepseek/deepseek-v4-pro",
+        "name": "DeepSeek V4 Pro (latest)",
+        "company": "DeepSeek",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "deepseek/deepseek-v4-flash",
+        "name": "DeepSeek V4 Flash (latest)",
+        "company": "DeepSeek",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "deepseek/deepseek-v4-flash-vision-exp",
+        "name": "DeepSeek V4 Flash Vision (exp)",
+        "company": "DeepSeek",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "deepseek/deepseek-v4-flash-fast",
+        "name": "DeepSeek V4 Flash Fast",
+        "company": "DeepSeek",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "deepseek/deepseek-v4.1-flash",
+        "name": "DeepSeek V4.1 Flash (latest)",
+        "company": "DeepSeek",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "deepseek/deepseek-v4.1-flash-fast",
+        "name": "DeepSeek V4.1 Flash Fast (latest)",
+        "company": "DeepSeek",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "moonshotai/Kimi-K3.1-Pro",
+        "name": "Kimi K3.1 Pro",
+        "company": "moonshotai",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "moonshotai/Kimi-K3",
+        "name": "Kimi K3",
+        "company": "moonshotai",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "moonshotai/Kimi-K2.7-Code",
+        "name": "Kimi K2.7 Code",
+        "company": "moonshotai",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "moonshotai/Kimi-K2.7-Code-Highspeed",
+        "name": "Kimi K2.7 Code HighSpeed",
+        "company": "moonshotai",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "moonshotai/Kimi-K2.6",
+        "name": "Kimi K2.6",
+        "company": "moonshotai",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "moonshotai/Kimi-K2.5",
+        "name": "Kimi K2.5",
+        "company": "moonshotai",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "z-ai/glm-5.3-flash",
+        "name": "GLM-5.3 Flash",
+        "company": "z-ai",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "z-ai/glm-5.3-flashx",
+        "name": "GLM-5.3 FlashX",
+        "company": "z-ai",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "zai-org/GLM-5.3",
+        "name": "GLM-5.3",
+        "company": "zai-org",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "zai-org/GLM-5.2",
+        "name": "GLM-5.2",
+        "company": "zai-org",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "zai-org/GLM-5.2-Fast",
+        "name": "GLM-5.2 Fast",
+        "company": "zai-org",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "zai-org/GLM-5.1",
+        "name": "GLM-5.1",
+        "company": "zai-org",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "zai-org/GLM-5",
+        "name": "GLM-5",
+        "company": "zai-org",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "minimax/minimax-m3.1-flash",
+        "name": "MiniMax M3.1 Flash",
+        "company": "minimax",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "MiniMaxAI/MiniMax-M3",
+        "name": "MiniMax M3",
+        "company": "MiniMaxAI",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "MiniMaxAI/MiniMax-M2.7",
+        "name": "MiniMax M2.7",
+        "company": "MiniMaxAI",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "MiniMaxAI/MiniMax-M2.5",
+        "name": "MiniMax M2.5",
+        "company": "MiniMaxAI",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "ornith/ornith-1.5-122b",
+        "name": "Ornith 1.5 122B",
+        "company": "ornith",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "xiaomi/mimo-v2.6-pro",
+        "name": "MiMo V2.6 Pro",
+        "company": "xiaomi",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "xiaomi/mimo-v2.6-pro-ultraspeed",
+        "name": "MiMo V2.6 Pro UltraSpeed",
+        "company": "xiaomi",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "xiaomi/mimo-v2.6-flash",
+        "name": "MiMo V2.6 Flash",
+        "company": "xiaomi",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "Qwen/Qwen3.8-Omni-Flash",
+        "name": "Qwen 3.8 Omni Flash",
+        "company": "Alibaba",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "Qwen/Qwen3.8-Max-Prime",
+        "name": "Qwen 3.8 Max Prime",
+        "company": "Alibaba",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "Qwen/Qwen3.8-Max-0902",
+        "name": "Qwen 3.8 Max 0902",
+        "company": "Alibaba",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "Qwen/Qwen3.8-Max",
+        "name": "Qwen 3.8 Max",
+        "company": "Alibaba",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "Qwen/Qwen3.8-27B",
+        "name": "Qwen 3.8 27B",
+        "company": "Alibaba",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "Qwen/Qwen3.8-Flash",
+        "name": "Qwen 3.8 Flash",
+        "company": "Alibaba",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "Qwen/Qwen3.7-Max",
+        "name": "Qwen 3.7 Max",
+        "company": "Alibaba",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "Qwen/Qwen3.7-Plus",
+        "name": "Qwen 3.7 Plus",
+        "company": "Alibaba",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "Qwen/Qwen3.7-Flash",
+        "name": "Qwen 3.7 Flash",
+        "company": "Alibaba",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "Qwen/Qwen3.6-Max-Preview",
+        "name": "Qwen 3.6 Max Preview",
+        "company": "Alibaba",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "Qwen/Qwen3.6-Plus",
+        "name": "Qwen 3.6 Plus",
+        "company": "Alibaba",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "meituan/LongCat-2.0",
+        "name": "LongCat 2.0",
+        "company": "meituan",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "stepfun/Step-5-Preview",
+        "name": "Step 5 Preview",
+        "company": "stepfun",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "stepfun/Step-3.7-Flash",
+        "name": "Step 3.7 Flash",
+        "company": "stepfun",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "stepfun/Step-3.5-Flash",
+        "name": "Step 3.5 Flash",
+        "company": "stepfun",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "tencent/hy3-paid",
+        "name": "Tencent Hy3",
+        "company": "tencent",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "tencent/hy4-preview",
+        "name": "Tencent Hy4 Preview",
+        "company": "tencent",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "google/gemini-4-argon",
+        "name": "Gemini 4 Argon",
+        "company": "Google",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "google/gemini-3.8-flash",
+        "name": "Gemini 3.8 Flash",
+        "company": "Google",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "google/gemini-3.7-flash",
+        "name": "Gemini 3.7 Flash",
+        "company": "Google",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "google/gemini-3.6-flash",
+        "name": "Gemini 3.6 Flash",
+        "company": "Google",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "google/gemini-3.5-flash",
+        "name": "Gemini 3.5 Flash",
+        "company": "Google",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "google/gemini-3.5-flash-lite",
+        "name": "Gemini 3.5 Flash Lite",
+        "company": "Google",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "google/gemini-3.1-flash-lite",
+        "name": "Gemini 3.1 Flash Lite",
+        "company": "Google",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "sakana/fugu-ultra",
+        "name": "Fugu Ultra",
+        "company": "sakana",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "nvidia/nemotron-3-ultra-550b-a55b",
+        "name": "Nemotron 3 Ultra",
+        "company": "nvidia",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "nvidia/nemotron-3.5-super-vl",
+        "name": "Nemotron 3.5 Super VL",
+        "company": "nvidia",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "thinkingmachines/inkling",
+        "name": "Inkling",
+        "company": "thinkingmachines",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "thinkingmachines/inkling-small",
+        "name": "Inkling Small",
+        "company": "thinkingmachines",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "stealth/glyph-cluster:free",
+        "name": "Glyph Cluster",
+        "company": "stealth",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "reflection/beam:free",
+        "name": "Beam 1.0",
+        "company": "reflection",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "poolside/laguna-s-2.1-free",
+        "name": "Laguna S 2.1",
+        "company": "poolside",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "inclusionai/ling-3.1-flash",
+        "name": "Ling 3.1 Flash",
+        "company": "inclusionai",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "meta/muse-spark-1.1",
+        "name": "Muse Spark 1.1",
+        "company": "meta",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "meta/muse-spark-1.2",
+        "name": "Muse Spark 1.2",
+        "company": "meta",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "meta/muse-spark-1.2-contributor",
+        "name": "Muse Spark 1.2 Contributor",
+        "company": "meta",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "meta/muse-spark-1.3",
+        "name": "Muse Spark 1.3",
+        "company": "meta",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "meta/muse-spark-1.3-contributor",
+        "name": "Muse Spark 1.3 Contributor",
+        "company": "meta",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "meta/muse-spark-open",
+        "name": "Muse Spark Open",
+        "company": "meta",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "meta/muse-wonder-1.0",
+        "name": "Muse Wonder",
+        "company": "meta",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "xai/grok-4.5",
+        "name": "Grok 4.5",
+        "company": "xai",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "xai/grok-4.6",
+        "name": "Grok 4.6",
+        "company": "xai",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "xai/grok-4.7",
+        "name": "Grok 4.7",
+        "company": "xai",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      },
+      {
+        "route": "commandcode",
+        "modelId": "mistral/mistral-large-4",
+        "name": "Mistral Large 4",
+        "company": "Mistral",
+        "service": "CommandCode",
+        "codingCapable": true,
+        "supportedEfforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "wire": "chat"
+      }
+    ]
+  }
+}

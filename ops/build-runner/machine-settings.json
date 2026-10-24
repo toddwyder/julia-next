@@ -1,11 +1,13 @@
 {
+  "authPath": "/home/ubuntu/.local/share/mastracode/auth.json",
+  "ledgerPath": "/home/ubuntu/.local/state/julia-machine/cards.sqlite",
   "roles": {
-    "orchestrator": "commandcode-free/reflection/beam:free",
-    "coder": "commandcode-free/reflection/beam:free"
+    "orchestrator": "anthropic/claude-haiku-5-5",
+    "coder": "commandcode/deepseek/deepseek-v4.1-flash"
   },
   "providers": [
     {
-      "name": "CommandCode Free",
+      "name": "CommandCode",
       "url": "https://api.commandcode.ai/provider/v1",
       "models": [
         "reflection/beam:free",
@@ -15,11 +17,11 @@
     }
   ],
   "models": {
-    "commandcode-free/reflection/beam:free": {
+    "commandcode/reflection/beam:free": {
       "endpoint": "https://api.commandcode.ai/provider/v1/chat/completions",
       "wireModel": "reflection/beam:free",
       "protocol": "chat",
-      "maxInputTokens": 262144,
+      "maxInputTokens": 1048576,
       "maxOutputTokens": 8192,
       "price": {
         "input": 0,
@@ -27,13 +29,14 @@
         "cacheRead": 0,
         "cacheWrite": 0
       },
-      "source": "https://commandcode.ai/pricing"
+      "source": "https://commandcode.ai/pricing",
+      "boundsSource": "https://commandcode.ai/docs/resources/pricing-limits"
     },
-    "commandcode-free/deepseek/deepseek-v4.1-flash": {
+    "commandcode/deepseek/deepseek-v4.1-flash": {
       "endpoint": "https://api.commandcode.ai/provider/v1/chat/completions",
       "wireModel": "deepseek/deepseek-v4.1-flash",
       "protocol": "chat",
-      "maxInputTokens": 262144,
+      "maxInputTokens": 1000000,
       "maxOutputTokens": 8192,
       "price": {
         "input": 0.3,
@@ -41,17 +44,98 @@
         "cacheRead": 0.003,
         "cacheWrite": 0
       },
-      "source": "https://commandcode.ai/docs/resources/pricing-limits"
+      "source": "https://commandcode.ai/docs/resources/pricing-limits",
+      "boundsSource": "https://commandcode.ai/docs/resources/pricing-limits",
+      "inputTokenEstimate": {
+        "method": "utf8",
+        "multiplier": 2,
+        "framingTokens": 4096
+      },
+      "inputTokenEstimateSource": "https://developers.openai.com/api/docs/guides/token-counting",
+      "route": "commandcode",
+      "service": "CommandCode",
+      "company": "DeepSeek",
+      "wire": "chat"
     },
     "openai/gpt-6-sol": {
-      "unavailable": "Todd's ChatGPT-plan connection is not configured; signing it in is outside JUL-231.",
-      "wireModel": "gpt-6-sol"
+      "endpoint": "https://chatgpt.com/backend-api/codex/responses",
+      "wireModel": "gpt-6-sol",
+      "protocol": "responses",
+      "maxInputTokens": 1050000,
+      "maxOutputTokens": 8192,
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cacheRead": 0.2,
+        "cacheWrite": 2.5
+      },
+      "priceTiers": [
+        {
+          "aboveInputTokens": 272000,
+          "price": {
+            "input": 4,
+            "output": 15,
+            "cacheRead": 0.4,
+            "cacheWrite": 5
+          }
+        }
+      ],
+      "source": "https://developers.openai.com/api/docs/models/gpt-6-sol",
+      "boundsSource": "https://developers.openai.com/api/docs/models/gpt-6-sol",
+      "inputTokenEstimate": {
+        "method": "o200k_base",
+        "multiplier": 2,
+        "framingTokens": 4096
+      },
+      "inputTokenEstimateSource": "https://developers.openai.com/api/docs/guides/token-counting",
+      "route": "openai-codex",
+      "service": "ChatGPT plan",
+      "company": "OpenAI",
+      "wire": "responses"
+    },
+    "anthropic/claude-haiku-5-5": {
+      "endpoint": "https://api.anthropic.com/v1/messages",
+      "wireModel": "claude-haiku-5-5",
+      "protocol": "messages",
+      "maxInputTokens": 1000000,
+      "maxOutputTokens": 8192,
+      "price": {
+        "input": 0.1,
+        "output": 0.5,
+        "cacheRead": 0.01,
+        "cacheWrite": 0.2
+      },
+      "priceTiers": [
+        {
+          "aboveInputTokens": 100000,
+          "price": {
+            "input": 0.5,
+            "output": 2.5,
+            "cacheRead": 0.05,
+            "cacheWrite": 1
+          }
+        }
+      ],
+      "source": "https://platform.claude.com/docs/en/models/haiku-5-5/overview",
+      "boundsSource": "https://platform.claude.com/docs/en/models/haiku-5-5/overview",
+      "cacheWriteTtl": "1h",
+      "inputTokenEstimate": {
+        "method": "utf8",
+        "multiplier": 2,
+        "framingTokens": 4096
+      },
+      "inputTokenEstimateSource": "https://developers.openai.com/api/docs/guides/token-counting",
+      "route": "claude",
+      "service": "Claude subscription",
+      "company": "Anthropic",
+      "wire": "messages"
     }
   },
   "networkAllow": [
-    "https://api.commandcode.ai/provider/v1/models"
+    "https://api.commandcode.ai/provider/v1/models",
+    "https://auth.openai.com/oauth/token",
+    "https://console.anthropic.com/v1/oauth/token"
   ],
   "memory": false,
-  "machineryProof": true,
-  "machineryReviewModel": "commandcode-free/deepseek/deepseek-v4.1-flash"
+  "machineryModel": "commandcode/reflection/beam:free"
 }

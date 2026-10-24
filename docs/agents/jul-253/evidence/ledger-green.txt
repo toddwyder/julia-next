@@ -1,0 +1,35 @@
+(node:510321) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ all roles share the two-dollar card ceiling across reopen and settle once (40.850785ms)
+✔ free requests remain usable without usage when priced accounting is unknown (20.067433ms)
+✔ reopening retains unresolved holds, snapshots, and settled costs per card (15.158572ms)
+✔ actual cost above a reservation is durable and blocks priced work (17.3949ms)
+✔ invalid monetary inputs cannot change durable budget (9.673485ms)
+✔ separate processes cannot jointly reserve beyond the ceiling (140.499097ms)
+✔ a process exit after reservation never releases an uncertain request (103.408647ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 513.829193
+(node:510440) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ all roles share the two-dollar card ceiling across reopen and settle once (37.634879ms)
+✔ simultaneous cross-role reservations share held budget and settle in either order (25.72438ms)
+✔ free requests remain usable without usage when priced accounting is unknown (20.881414ms)
+✔ reopening retains unresolved holds, snapshots, and settled costs per card (23.814603ms)
+✔ actual cost above a reservation is durable and blocks priced work (15.322433ms)
+✔ invalid monetary inputs cannot change durable budget (12.256192ms)
+✔ separate processes cannot jointly reserve beyond the ceiling (131.032098ms)
+✔ a process exit after reservation never releases an uncertain request (144.492151ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 595.739837

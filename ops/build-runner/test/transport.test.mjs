@@ -6,6 +6,26 @@ import { createTransport } from '../transport.mjs';
 
 const free = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
 const paid = { input: 2, output: 3, cacheRead: 1, cacheWrite: 4 };
+
+test('stock Claude conversation caching uses its configured one-hour API price', async t => {
+  const { createPromptCacheMiddleware } = await import('@mastra/code-sdk/providers/claude-max');
+  const { readFile } = await import('node:fs/promises');
+  const settings = JSON.parse(await readFile(new URL('../machine-settings.json', import.meta.url), 'utf8'));
+  const model = settings.models['anthropic/claude-haiku-5-5'];
+  const transformed = await createPromptCacheMiddleware('conversation').transformParams({ params: {
+    prompt: [{ role: 'system', content: 'system' }, { role: 'user', content: 'hello' }],
+  } });
+  const cache_control = transformed.prompt[0].providerOptions.anthropic.cacheControl;
+  assert.equal(cache_control.ttl, '1h');
+  const f = await fixture(t, (_req, res) => json(res, { usage: {
+    input_tokens: 0, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 10,
+  } }));
+  const request = { messages: [{ role: 'user', content: [{ type: 'text', text: 'hello', cache_control }] }] };
+  await send(transport(f, { ...model, endpoint: f.endpoint, wireModel: 'wire' }), f.endpoint, request);
+  assert.equal(f.ledger.snapshot().spentNano, 2500);
+  await assert.rejects(send(transport(f, { ...model, endpoint: f.endpoint, wireModel: 'wire', cacheWriteTtl: '5m' }), f.endpoint, request), /Unsupported paid/);
+  assert.equal(f.arrivals.length, 1);
+});
 async function fixture(t, handler) {
   const arrivals = [];
   const server = createServer(async (req, res) => {
@@ -23,8 +43,8 @@ async function fixture(t, handler) {
   const spec = { endpoint, wireModel: 'wire', protocol: 'chat', maxInputTokens: 100, maxOutputTokens: 10, price: free, source: 'fixture' };
   return { endpoint, arrivals, ledger, spec };
 }
-function transport(f, overrides = {}, trial = true, extra = {}) {
-  return createTransport({ ledger: f.ledger, role: 'builder', trial, settings: { models: { configured: { ...f.spec, ...overrides } }, ...extra } });
+function transport(f, overrides = {}, extra = {}) {
+  return createTransport({ ledger: f.ledger, role: 'builder', settings: { models: { configured: { ...f.spec, ...overrides } }, ...extra } });
 }
 function send(fetch, endpoint, extra = {}) {
   return fetch(endpoint, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ model: 'wire', messages: [{ role: 'user', content: 'Hello' }], ...extra }) });
@@ -42,13 +62,85 @@ test('free requests arrive with enforced limits and settle without usage', async
 
 test('paid missing usage refuses result and prevents the next arrival', async t => {
   const f = await fixture(t, (_req, res) => json(res, { result: 'ok' }));
-  const fetch = transport(f, { price: paid }, false);
+  const fetch = transport(f, { price: paid });
   await assert.rejects(send(fetch, f.endpoint));
   await assert.rejects(send(fetch, f.endpoint));
   assert.equal(f.arrivals.length, 1);
   assert.equal(f.ledger.snapshot().heldNano, 430000);
   assert.equal(f.ledger.snapshot().pricedBlocked, true);
 });
+
+test('paid provider failure preserves bounded status and message while retaining reservation', async t => {
+  const f = await fixture(t, (_req, res) => json(res, { error: { message: 'model route unavailable\nretry later' } }, 400));
+  const fetch = transport(f, { price: paid });
+  await assert.rejects(send(fetch, f.endpoint), /HTTP 400.*model route unavailable retry later/);
+  const request = f.ledger.snapshot().requests[0];
+  assert.equal(request.state, 'unknown');
+  assert.match(request.reason, /HTTP 400.*model route unavailable retry later/);
+});
+
+test('paid authentication rejection settles zero and remains visible for stock refresh retry', async t => {
+  let attempts = 0;
+  const f = await fixture(t, (_req, res) => {
+    attempts += 1;
+    if (attempts === 1) return json(res, { error: { message: 'expired' } }, 401);
+    return json(res, { usage: { prompt_tokens: 10, completion_tokens: 2 } });
+  });
+  const fetch = transport(f, { price: { input: 2, output: 3, cacheRead: 0, cacheWrite: 0 } });
+  assert.equal((await send(fetch, f.endpoint)).status, 401);
+  assert.equal((await send(fetch, f.endpoint)).status, 200);
+  const requests = f.ledger.snapshot().requests;
+  assert.equal(requests.length, 2);
+  assert.deepEqual(requests[0].usage, { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 });
+  assert.equal(requests[0].costNano, 0);
+  assert.equal(requests[1].state, 'settled');
+});
+
+test('priced requests count published token prices and positive provider charges without the retired trial stop', async t => {
+  const f = await fixture(t, (_req, res) => json(res, {
+    result: 'allowed', usage: { prompt_tokens: 10, completion_tokens: 2, cost_usd: 0.00002 },
+  }));
+  const fetch = transport(f, { price: { ...free, input: 1, output: 1 } });
+  assert.equal((await (await send(fetch, f.endpoint)).json()).result, 'allowed');
+  assert.equal(f.ledger.snapshot().spentNano, 20000);
+  assert.equal(f.ledger.snapshot().stopped, false);
+  await send(fetch, f.endpoint);
+  assert.equal(f.ledger.snapshot().spentNano, 40000);
+  assert.equal(f.arrivals.length, 2);
+});
+
+test('long-context price tiers determine both the reservation and the settled cost', async t => {
+  const f = await fixture(t, (_req, res) => json(res, { usage: { prompt_tokens: 11, completion_tokens: 2 } }));
+  await send(transport(f, { price: { ...free, input: 0.1, output: 0.1 }, priceTiers: [{ aboveInputTokens: 10, price: { ...free, input: 1, output: 1 } }] }), f.endpoint);
+  assert.equal(f.ledger.snapshot().spentNano, 13000);
+  assert.equal(f.ledger.snapshot().requests[0].maximumNano, 110000);
+});
+
+test('an exact provider input count admits a short request whose full-context reservation exceeds the card cap', async t => {
+  const f = await fixture(t, (req, res, body) => req.url === '/infer/count'
+    ? json(res, { input_tokens: 10 })
+    : json(res, { usage: { input_tokens: 10, output_tokens: 2 } }));
+  await send(transport(f, {
+    protocol: 'responses', maxInputTokens: 1000000,
+    price: { ...free, input: 4, output: 15 }, inputTokenCountEndpoint: `${f.endpoint}/count`,
+  }), f.endpoint, { input: 'hello', messages: undefined });
+  assert.equal(f.arrivals.length, 2);
+  assert.deepEqual(f.arrivals[0].body, { model: 'wire', input: 'hello' });
+  assert.equal(f.ledger.snapshot().requests[0].maximumNano, 190000);
+  assert.equal(f.ledger.snapshot().spentNano, 70000);
+});
+
+for (const input_tokens of [undefined, -1, 0.5, 1000001]) {
+  test(`invalid provider input count ${input_tokens} never starts inference`, async t => {
+    const f = await fixture(t, (_req, res) => json(res, { input_tokens }));
+    await assert.rejects(send(transport(f, {
+      protocol: 'responses', maxInputTokens: 1000000,
+      price: { ...free, input: 4, output: 15 }, inputTokenCountEndpoint: `${f.endpoint}/count`,
+    }), f.endpoint, { input: 'hello', messages: undefined }), /input count/);
+    assert.deepEqual(f.arrivals.map(arrival => arrival.url), ['/infer/count']);
+    assert.equal(f.ledger.snapshot().requests.length, 0);
+  });
+}
 
 for (const protocol of ['chat', 'responses', 'messages']) {
   for (const stream of [false, true]) {
@@ -64,7 +156,7 @@ for (const protocol of ['chat', 'responses', 'messages']) {
         res.writeHead(200, { 'content-type': 'text/event-stream' });
         res.end(events.map(event => `data:${JSON.stringify(event)}\r\n\r\n`).join('') + 'data: [DONE]\n\n');
       });
-      await send(transport(f, { protocol, price: paid }, false), f.endpoint, { stream });
+      await send(transport(f, { protocol, price: paid }), f.endpoint, { stream });
       const snapshot = f.ledger.snapshot();
       assert.equal(snapshot.spentNano, 25000);
       assert.deepEqual(snapshot.requests[0].usage, { input: 6, output: 2, cacheRead: 3, cacheWrite: 1 });
@@ -74,13 +166,12 @@ for (const protocol of ['chat', 'responses', 'messages']) {
   }
 }
 
-test('wrong model, endpoint, missing prices and trial paid routes send nothing', async t => {
+test('wrong model, endpoint, missing prices and bounds send nothing', async t => {
   const f = await fixture(t, (_req, res) => json(res, {}));
   await assert.rejects(send(transport(f), f.endpoint, { model: 'wrong' }));
   await assert.rejects(send(transport(f), `${f.endpoint}/wrong`));
   assert.throws(() => transport(f, { price: undefined }));
   assert.throws(() => transport(f, { maxInputTokens: undefined }));
-  await assert.rejects(send(transport(f, { price: paid }), f.endpoint));
   assert.equal(f.arrivals.length, 0);
 });
 
@@ -96,14 +187,15 @@ test('separate HTTP attempts create separate durable records', async t => {
 
 test('card ceiling refuses an oversized reservation before HTTP', async t => {
   const f = await fixture(t, (_req, res) => json(res, {}));
-  await assert.rejects(send(transport(f, { price: paid, maxInputTokens: 300000 }, false), f.endpoint));
+  await assert.rejects(send(transport(f, { price: paid, maxInputTokens: 600000 }), f.endpoint));
   assert.equal(f.arrivals.length, 0);
 });
 
-test('provider reported cost stops even a configured free route', async t => {
+test('provider cost above a configured free reservation is recorded and stops its card', async t => {
   const f = await fixture(t, (_req, res) => json(res, { usage: { cost: 0.01 } }));
   await assert.rejects(send(transport(f), f.endpoint), /STOP WORK/);
-  assert.equal(f.ledger.snapshot().requests[0].state, 'unknown');
+  assert.equal(f.ledger.snapshot().requests[0].state, 'accounting_failure');
+  assert.equal(f.ledger.snapshot().spentNano, 10000000);
   await assert.rejects(send(transport(f), f.endpoint), /STOP WORK/);
   assert.equal(f.arrivals.length, 1);
   assert.equal(f.ledger.snapshot().stopped, true);
@@ -111,7 +203,7 @@ test('provider reported cost stops even a configured free route', async t => {
 
 test('allowlisted authentication cannot carry inference payloads and redirects never follow', async t => {
   const f = await fixture(t, (_req, res) => { res.writeHead(307, { location: '/second' }); res.end(); });
-  const fetch = transport(f, {}, true, { networkAllow: [`${f.endpoint}/auth`] });
+  const fetch = transport(f, {}, { networkAllow: [`${f.endpoint}/auth`] });
   await assert.rejects(send(fetch, `${f.endpoint}/auth`));
   assert.equal(f.arrivals.length, 0);
   await assert.rejects(send(fetch, f.endpoint));
@@ -122,25 +214,25 @@ test('allowlisted authentication cannot carry inference payloads and redirects n
 for (const cache of [-1, 0.5]) {
   test(`invalid cache count ${cache} retains paid hold`, async t => {
     const f = await fixture(t, (_req, res) => json(res, { usage: { prompt_tokens: 10, completion_tokens: 2, prompt_tokens_details: { cached_tokens: cache, cache_write_tokens: 0 } } }));
-    await assert.rejects(send(transport(f, { price: paid }, false), f.endpoint));
+    await assert.rejects(send(transport(f, { price: paid }), f.endpoint));
     assert.equal(f.ledger.snapshot().pricedBlocked, true);
   });
 }
 
 test('bounded buffering refuses a large result without releasing its reservation', async t => {
   const f = await fixture(t, (_req, res) => json(res, { result: 'x'.repeat(1000) }));
-  await assert.rejects(send(transport(f, {}, true, { maxResponseBytes: 64 }), f.endpoint));
+  await assert.rejects(send(transport(f, {}, { maxResponseBytes: 64 }), f.endpoint));
   assert.equal(f.ledger.snapshot().requests[0].state, 'unknown');
 });
 
 test('decimal rates round nano dollars upward without floating point drift', async t => {
   const f = await fixture(t, (_req, res) => json(res, { usage: { prompt_tokens: 7, completion_tokens: 0 } }));
   const price = { ...free, input: 0.001 };
-  await send(transport(f, { price }, false), f.endpoint);
+  await send(transport(f, { price }), f.endpoint);
   assert.equal(f.ledger.snapshot().spentNano, 7);
   const tiny = await fixture(t, (_req, res) => json(res, { usage: { prompt_tokens: 3, completion_tokens: 1, prompt_tokens_details: { cached_tokens: 1, cache_write_tokens: 1 } } }));
   const tinyPrice = { input: 0.0000001, output: 0.0000001, cacheRead: 0.0000001, cacheWrite: 0.0000001 };
-  await send(transport(tiny, { price: tinyPrice }, false), tiny.endpoint);
+  await send(transport(tiny, { price: tinyPrice }), tiny.endpoint);
   assert.equal(tiny.ledger.snapshot().spentNano, 1, 'round the complete request once');
 });
 
@@ -154,7 +246,7 @@ test('ledger errors never reveal their underlying body or credentials', async t 
 test('authentication and catalog are confined to their exact allowlisted URL', async t => {
   const f = await fixture(t, (_req, res) => json(res, { ok: true }));
   const auth = `${f.endpoint}/auth`;
-  const fetch = transport(f, {}, true, { networkAllow: [auth] });
+  const fetch = transport(f, {}, { networkAllow: [auth] });
   assert.equal((await fetch(auth)).status, 200);
   assert.equal((await fetch(auth, { method: 'POST', body: JSON.stringify({ token: 'opaque' }) })).status, 200);
   assert.equal((await fetch(auth, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'grant_type=refresh_token&refresh_token=synthetic' })).status, 200);
@@ -166,7 +258,7 @@ test('authentication and catalog are confined to their exact allowlisted URL', a
 
 test('connection failure after arrival retains the paid reservation', async t => {
   const f = await fixture(t, (req) => req.socket.destroy());
-  await assert.rejects(send(transport(f, { price: paid }, false), f.endpoint));
+  await assert.rejects(send(transport(f, { price: paid }), f.endpoint));
   assert.equal(f.arrivals.length, 1);
   assert.equal(f.ledger.snapshot().requests[0].state, 'unknown');
   assert.equal(f.ledger.snapshot().heldNano, 430000);
@@ -177,15 +269,105 @@ test('a truncated paid stream retains the reservation despite partial usage', as
     res.writeHead(200, { 'content-type': 'text/event-stream' });
     res.end(`data: ${JSON.stringify({ usage: { prompt_tokens: 1, completion_tokens: 1 } })}\n\n`);
   });
-  await assert.rejects(send(transport(f, { price: { ...free, input: 1 } }, false), f.endpoint));
+  await assert.rejects(send(transport(f, { price: { ...free, input: 1 } }), f.endpoint));
   assert.equal(f.ledger.snapshot().pricedBlocked, true);
 });
 
 test('a configured unavailable model does not need invented prices and never dispatches', async t => {
   const f = await fixture(t, (_req, res) => json(res, { result: 'free works' }));
-  const fetch = transport(f, {}, true, { models: { configured: f.spec, 'openai/gpt-6-sol': { wireModel: 'gpt-6-sol', unavailable: 'ChatGPT plan is not connected' } } });
+  const fetch = transport(f, {}, { models: { configured: f.spec, 'openai/gpt-6-sol': { wireModel: 'gpt-6-sol', unavailable: 'ChatGPT plan is not connected' } } });
   assert.equal((await send(fetch, f.endpoint)).status, 200);
   await assert.rejects(send(fetch, f.endpoint, { model: 'gpt-6-sol' }), /provider unavailable/);
   assert.equal(f.arrivals.length, 1);
   assert.equal(f.ledger.snapshot().spentNano, 0);
 });
+
+test('local text estimate reserves framing and UTF-8 bytes without a credential or count request', async t => {
+  const f = await fixture(t, (_req, res) => json(res, { usage: { input_tokens: 10, output_tokens: 2 } }));
+  await send(transport(f, {
+    protocol: 'responses', maxInputTokens: 1000000,
+    price: { ...free, input: 4, output: 15 },
+    inputTokenEstimate: { method: 'utf8', multiplier: 2, framingTokens: 100 },
+  }), f.endpoint, { input: 'hello', messages: undefined });
+  assert.equal(f.arrivals.length, 1);
+  assert.equal(f.ledger.snapshot().requests[0].maximumNano, 990000);
+  assert.equal(f.ledger.snapshot().requests[0].bounds.inputCountBasis, 'local UTF-8 estimate');
+  assert.equal(f.ledger.snapshot().spentNano, 70000);
+});
+
+test('a provider input count above the local estimate settles actual cost and stops later work', async t => {
+  const f = await fixture(t, (_req, res) => json(res, { usage: { input_tokens: 211, output_tokens: 0 } }));
+  const guarded = transport(f, {
+    protocol: 'responses', maxInputTokens: 1000000,
+    price: { ...free, input: 4, output: 15 },
+    inputTokenEstimate: { method: 'utf8', multiplier: 2, framingTokens: 100 },
+  });
+  await assert.rejects(send(guarded, f.endpoint, { input: 'hello', messages: undefined }), /local input estimate/);
+  assert.equal(f.ledger.snapshot().spentNano, 844000);
+  assert.equal(f.ledger.snapshot().stopped, true);
+  assert.equal(f.ledger.snapshot().heldNano, 0);
+  await assert.rejects(send(guarded, f.endpoint, { input: 'hello', messages: undefined }));
+  assert.equal(f.arrivals.length, 1);
+});
+
+test('a stock Codex stream without a content-type header settles its completed usage', async t => {
+  const f = await fixture(t, (_req, res) => {
+    res.writeHead(200);
+    res.end('event: response.completed\ndata: {"type":"response.completed","response":{"usage":{"input_tokens":20,"output_tokens":9,"input_tokens_details":{"cached_tokens":0,"cache_write_tokens":0}}}}\n\n');
+  });
+  await send(transport(f, { protocol: 'responses', price: paid }), f.endpoint, { stream: true });
+  assert.equal(f.ledger.snapshot().spentNano, 67000);
+  assert.equal(f.ledger.snapshot().heldNano, 0);
+  assert.equal(f.ledger.snapshot().requests[0].state, 'settled');
+});
+
+for (const [input, maximumNano] of [['hello', 670000], ['こんにちは👋', 686000]]) {
+  test(`bundled local tokenizer reserves padded complete request for ${input}`, async t => {
+    const f = await fixture(t, (_req, res) => json(res, { usage: { input_tokens: 10, output_tokens: 2 } }));
+    await send(transport(f, {
+      protocol: 'responses', maxInputTokens: 1000000,
+      price: { ...free, input: 4, output: 15 },
+      inputTokenEstimate: { method: 'o200k_base', multiplier: 2, framingTokens: 100 },
+    }), f.endpoint, { input, messages: undefined });
+    assert.equal(f.arrivals.length, 1);
+    assert.equal(f.ledger.snapshot().requests[0].maximumNano, maximumNano);
+    assert.equal(f.ledger.snapshot().requests[0].bounds.inputCountBasis, 'local o200k_base estimate');
+    assert.equal(f.ledger.snapshot().spentNano, 70000);
+  });
+}
+
+test('local estimates include tools and refuse hidden conversation state before dispatch', async t => {
+  const f = await fixture(t, (_req, res) => json(res, { usage: { prompt_tokens: 10, completion_tokens: 2 } }));
+  const guarded = transport(f, { price: { ...free, input: 4, output: 15 }, maxInputTokens: 1000000, inputTokenEstimate: { method: 'utf8', multiplier: 2, framingTokens: 100 } });
+  await assert.rejects(send(guarded, f.endpoint, { previous_response_id: 'hidden' }), /explicit conversation/);
+  await assert.rejects(send(guarded, f.endpoint, { conversation: 'hidden' }), /explicit conversation/);
+  assert.equal(f.arrivals.length, 0);
+  await send(guarded, f.endpoint);
+  const plain = f.ledger.snapshot().requests[0].maximumNano;
+  await send(guarded, f.endpoint, { tools: [{ type: 'function', name: 'read', description: 'Read text files', parameters: { type: 'object', properties: {} } }] });
+  assert.ok(f.ledger.snapshot().requests[1].maximumNano > plain);
+  assert.equal(f.arrivals.length, 2);
+});
+
+for (const [maxInputTokens, expectedMaximum, spentBefore] of [[150000, 456920000, 1152772468], [272000, 761920000, 0], [272001, 1482885000, 0]]) {
+  test(`reservation uses only context tiers reachable within ${maxInputTokens} input tokens`, async () => {
+    const ledger = new CardLedger({ path: ':memory:', card: 'JUL-254' });
+    try {
+      if (spentBefore) {
+        const previous = ledger.reserve({ model: 'previous', role: 'orchestrator', maximumNano: spentBefore, price: {}, bounds: {} });
+        ledger.settle(previous.id, { usage: { input: 1, output: 0, cacheRead: 0, cacheWrite: 0 }, costNano: spentBefore });
+      }
+      let attempts = 0;
+      const guarded = createTransport({ ledger, role: 'orchestrator', settings: { models: { fixture: {
+        endpoint: 'https://example.invalid/infer', wireModel: 'fixture', protocol: 'chat', maxInputTokens, maxOutputTokens: 8192,
+        price: { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
+        priceTiers: [{ aboveInputTokens: 272000, price: { input: 4, output: 15, cacheRead: 0.4, cacheWrite: 5 } }],
+      } } }, fetch: async () => { attempts++; throw new Error('Deliberate local dispatch failure'); } });
+      await assert.rejects(guarded('https://example.invalid/infer', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"model":"fixture","messages":[{"role":"user","content":"Hello"}]}' }));
+      assert.equal(attempts, 1);
+      assert.equal(ledger.snapshot().requests.at(-1).maximumNano, expectedMaximum);
+      assert.equal(ledger.snapshot().spentNano, spentBefore);
+      assert.equal(ledger.snapshot().heldNano, expectedMaximum);
+    } finally { ledger.close(); }
+  });
+}
