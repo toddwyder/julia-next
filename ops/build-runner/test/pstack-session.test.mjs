@@ -65,6 +65,7 @@ test('machinery selects Beam for every role and describes a self-check, not inde
   }
   assert.match(session.hostInstructions, /machinery self-check/i)
   assert.match(session.hostInstructions, /not independent review/i)
+  assert.match(session.hostInstructions, /host owns git remotes, branches, publishing, pull requests and GitHub credentials/i)
   assert.doesNotMatch(session.hostInstructions, /paid review|Trial forbids|connection core/i)
   assert.throws(() => createPstackSession({ models, machineryProof: true }, machinerySnapshot, table), /machinery model/)
   assert.throws(() => createPstackSession({ models }, machinerySnapshot, 'feature: DeepSeek'), /unknown pstack model/)

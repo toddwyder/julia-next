@@ -8,6 +8,14 @@ import { PlanFilesystem } from './plan-filesystem.mjs'
 const quote = value => "'" + String(value).replaceAll("'", "'\\''") + "'"
 let opened = false
 
+const planningDynamicTools = ['request_access', 'create-workflow', 'list-workflows', 'get-workflow', 'run-workflow', 'delete-workflow', 'schedule_list', 'schedule_update', 'schedule_create', 'schedule_resume', 'schedule_run', 'web_search', 'notification_inbox']
+const planningBuiltinTools = ['ask_user', 'submit_plan', 'task_write', 'task_update', 'task_complete', 'task_check', 'subagent']
+const planningWorkspaceTools = ['execute_command', 'mastra_workspace_read_file', 'mastra_workspace_write_file', 'mastra_workspace_edit_file', 'mastra_workspace_list_files', 'mastra_workspace_delete', 'mastra_workspace_file_stat', 'mastra_workspace_mkdir', 'mastra_workspace_grep', 'mastra_workspace_ast_edit']
+
+export function disabledRunnerTools(planOnly) {
+  return planOnly ? [...planningDynamicTools, ...planningWorkspaceTools] : ['web_search', 'request_access']
+}
+
 export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'builder', hostInstructions, subagents, helpers, helperDefinitions, subagentDefinitions, planOnly = false }) {
   if (opened) throw Error('one runner per process required')
   if (!/^[A-Z]+-\d+$/.test(card)) throw Error('valid card ID required')
@@ -101,11 +109,8 @@ export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'bu
       workspace = new Workspace({ filesystem: new LocalFilesystem({ basePath: cwd, contained: true }), sandbox, tools: { mastra_workspace_execute_command: { name: 'execute_command' } }, skills: ['.agents/skills'] })
     }
     await workspace.init()
-    const planningDynamicTools = ['request_access', 'create-workflow', 'list-workflows', 'get-workflow', 'run-workflow', 'delete-workflow', 'schedule_list', 'schedule_update', 'schedule_create', 'schedule_resume', 'schedule_run', 'web_search', 'notification_inbox']
-    const planningBuiltinTools = ['ask_user', 'submit_plan', 'task_write', 'task_update', 'task_complete', 'task_check', 'subagent']
-    const planningWorkspaceTools = ['execute_command', 'mastra_workspace_read_file', 'mastra_workspace_write_file', 'mastra_workspace_edit_file', 'mastra_workspace_list_files', 'mastra_workspace_delete', 'mastra_workspace_file_stat', 'mastra_workspace_mkdir', 'mastra_workspace_grep', 'mastra_workspace_ast_edit']
     runtime = await bootLocalAgentController({
-      cwd, homeDir: sdkHome, workspace, modes: false, subagents: planOnly ? [] : providedSubagents, intervalHandlers: [], disabledTools: planOnly ? [...planningDynamicTools, ...planningWorkspaceTools] : ['web_search'],
+      cwd, homeDir: sdkHome, workspace, modes: false, subagents: planOnly ? [] : providedSubagents, intervalHandlers: [], disabledTools: disabledRunnerTools(planOnly),
       disableBuiltinTools: planOnly ? planningBuiltinTools : undefined,
       hostInstructions: planOnly ? 'Return only the requested plan text. No tools, skills, files, commands, research, or delegation are available.' : hostInstructions,
       disableMcp: true, disablePlugins: true, disableEnvFile: true, disableHooks: true, disableGithubSignals: true,
