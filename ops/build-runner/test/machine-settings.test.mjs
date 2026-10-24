@@ -18,6 +18,10 @@ test('normal machine sessions use Sol and DeepSeek and preserve the two-model pa
   assert.deepEqual(entries['main session'], ['openai/gpt-6-sol'])
   assert.deepEqual(entries['hardest tasks'], ['openai/gpt-6-sol'])
   assert.deepEqual(entries['swarm workers'], ['commandcode/deepseek/deepseek-v4.1-flash'])
+  for (const role of ['how explorer', 'how explainer', 'why investigators']) {
+    assert.deepEqual(entries[role], ['commandcode/deepseek/deepseek-v4.1-flash'])
+  }
+  assert.deepEqual(entries['why synthesizer'], ['openai/gpt-6-sol'])
   for (const role of ['arena runners', 'architect runners', 'interrogate reviewers']) {
     assert.deepEqual(entries[role], ['openai/gpt-6-sol', 'commandcode/deepseek/deepseek-v4.1-flash'])
   }

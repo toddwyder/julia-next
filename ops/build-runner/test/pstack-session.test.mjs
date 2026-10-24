@@ -40,19 +40,14 @@ test('normal session keeps the configured Sol/DeepSeek split and every exact mod
   assert.doesNotMatch(session.hostInstructions, /paid review|Trial forbids|connection core/i)
 })
 
-test('the internal builder keeps the repository task separate from the host Start proof', () => {
+test('the internal builder boundary is structural rather than a prose prohibition', () => {
   const card = {
     identifier: 'JUL-255',
     description: '**Desired behavior:** Create JUL-253-START-PRACTICE-2.txt containing exactly Julia cleaned Start proof. followed by one newline.\n\n**Acceptance criteria:** Use the real Tailscale Start page, drive its browser, restart the server, and retain the ledger and candidate evidence.',
   }
   const session = createPstackSession({ models }, { ...snapshot, card }, table)
-  assert.match(session.prompt, /implement only the.*repository.*Desired behavior/i)
-  assert.match(session.prompt, /host.*outer.*workflow.*context/i)
-  assert.match(session.hostInstructions, /host owns the outer Start route, browser drive, server lifecycle, and.*evidence gates/i)
-  assert.match(session.hostInstructions, /do not drive or re-investigate the outer control path/i)
-  assert.match(session.hostInstructions, /do not.*call its APIs.*run its browser proof.*restart its servers/i)
-  assert.match(session.hostInstructions, /do not.*reread prior proof trees/i)
-  assert.match(session.hostInstructions, /required coder delegation.*local verification.*remain mandatory/i)
+  assert.doesNotMatch(session.prompt, /Implement only the saved card's repository Desired behavior|subject to the internal Build boundary/i)
+  assert.doesNotMatch(session.hostInstructions, /host owns the outer Start route|do not drive or re-investigate|reread prior proof trees/i)
   assert.match(session.hostInstructions, /Both configured panel models.*must complete their reviews/)
   assert.match(session.hostInstructions, /\.builder-home\/pstack\/checklist\.md/)
   assert.match(session.hostInstructions, /\.builder-home\/pstack\/decisions\.tsv/)
