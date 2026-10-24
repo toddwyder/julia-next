@@ -90,7 +90,7 @@ function trackedTestFiles(root) {
 }
 
 function changedTestFiles(root, base) {
-  const diff = execFileSync('git', ['diff', '--name-only', '--diff-filter=ACMR', `${base}...HEAD`], { cwd: root, encoding: 'utf8' });
+  const diff = execFileSync('git', ['diff', '--name-only', '--diff-filter=ACMR', base, 'HEAD'], { cwd: root, encoding: 'utf8' });
   const untracked = execFileSync('git', ['ls-files', '--others', '--exclude-standard', '-z'], { cwd: root, encoding: 'utf8' });
   return [...new Set([...diff.split('\n'), ...untracked.split('\0')])].filter(path => path && isTestFile(path));
 }
