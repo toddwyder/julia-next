@@ -32,6 +32,21 @@ export const BuildResultSchema = z
   })
   .passthrough();
 
+export const BuildChecklistItemSchema = z
+  .object({
+    text: z.string().min(1),
+    done: z.boolean(),
+    depth: z.number().int().nonnegative().optional(),
+  })
+  .strict();
+
+export const BuildChecklistSchema = z
+  .object({
+    items: z.array(BuildChecklistItemSchema),
+    updatedAt: z.string().datetime().nullable().optional(),
+  })
+  .passthrough();
+
 export const BuildJobSchema = z
   .object({
     runId: z.string().min(1),
@@ -44,6 +59,7 @@ export const BuildJobSchema = z
     workerPid: z.number().int().positive().nullable(),
     result: BuildResultSchema.nullable(),
     error: z.object({ message: z.string() }).passthrough().nullable(),
+    checklist: BuildChecklistSchema.optional(),
     createdAt: z.string().datetime().optional(),
   })
   .passthrough()
