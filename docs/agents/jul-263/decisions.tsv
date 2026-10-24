@@ -7,3 +7,5 @@
 2026-10-24	A malformed plan gets one retry	Beam's plan shape varies; a second short attempt keeps practice runs from stopping on prose.
 2026-10-24	A real build cannot request broader filesystem access	Beam asked for /home/ubuntu, the session suspended and aborted; the builder stays contained.
 2026-10-24	The host instructions name the publishing boundary	Beam searched for git remotes and GitHub credentials; the host owns those.
+2026-10-24	Final proof uses the JUL-266 run with Beam both roles	It reached ready-for-review and the dashboard ticked 2 of 8, then 3 of 8, then 3 of 8, for $0.
+2026-10-24	A self-check done without a subagent fails the build	Beam used direct commands in attempt 6; the structural evidence requires a subagent handoff.

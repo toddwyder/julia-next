@@ -51,11 +51,20 @@ function counts(job) {
 async function shot(name, job) {
   await page.evaluate(() => window.scrollTo(0, 0))
   await page.screenshot({ path: join(outDir, `${name}.png`), fullPage: true })
+  let cardShot = false
+  if (job?.runId) {
+    const card = page.locator('article.build-card').filter({ hasText: job.runId }).first()
+    if (await card.count()) {
+      await card.screenshot({ path: join(outDir, `${name}-card.png`) })
+      cardShot = true
+    }
+  }
   shots[name] = {
     takenAt: new Date().toISOString(),
     state: job?.state ?? null,
     runId: job?.runId ?? null,
     checklist: counts(job),
+    cardShot,
     items: job?.checklist?.items ?? [],
   }
 }

@@ -68,6 +68,16 @@ Fix, test first:
 
 ## Proof
 
+The Beam practice build on JUL-266 passed: `ready-for-review`, candidate
+`12a9643530cc8ca91d8bf97bf8b44d08f5f3860e`, the marker as the only change, and
+$0 spent. The dashboard showed 2 of 8 steps finished, then 3 of 8 while still
+running, then 3 of 8 at the end. See [proof/final](proof/final/README.md).
+
+Attempt 6 is kept as a flake: Beam ran the machinery self-check with direct
+commands instead of a subagent, so the structural check refused it even though
+its checklist claimed the check passed. The check is doing its job; the proof
+uses the successful run.
+
 `proof-drive.mjs` drives `https://ovh.tail91f394.ts.net/julia-control`, selects
 the practice card and Beam for both roles, clicks Start, and captures screenshots
 when the checklist first appears, when its tick count moves, and when the build
