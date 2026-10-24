@@ -51,7 +51,6 @@ export function checkAgentLinks(root = process.cwd()) {
       const isSkill = file.endsWith('/SKILL.md');
       const references = [...line.matchAll(/\[[^\]]*\]\(([^\s)]+)\)/g)]
         .map(match => match[1])
-        .filter(destination => !isSkill || !destination.startsWith('./'))
         .map(destination => ({ destination, base: dirname(source) }));
       for (const match of line.matchAll(/^@([^\s]+)$/g)) references.push({ destination: match[1], base: dirname(source) });
       const prose = line.replace(/\[[^\]]*\]\([^)]*\)/g, '').replace(/\b[\w+.-]+:\/\/\S+/g, '');

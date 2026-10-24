@@ -69,9 +69,10 @@ test('root file references and source files beyond JavaScript must exist', t => 
 test('skill instructions cannot point agents at missing files regardless of phrasing', t => {
   const f = fixture(t);
   f.write('.agents/skills/recovery/SKILL.md', 'Review guidance is in `.agents/skills/code-review/SKILL.md`.\n');
-  f.write('.claude/skills/review/SKILL.md', 'Use `.claude/skills/missing/SKILL.md`.\n');
+  f.write('.claude/skills/review/SKILL.md', 'Use `.claude/skills/missing/SKILL.md` and [the local guide](./references/missing.md).\n');
   const result = f.run();
   assert.equal(result.status, 1);
   assert.match(result.stderr, /\.agents\/skills\/recovery\/SKILL\.md:1: \.agents\/skills\/code-review\/SKILL\.md does not exist/);
   assert.match(result.stderr, /\.claude\/skills\/review\/SKILL\.md:1: \.claude\/skills\/missing\/SKILL\.md does not exist/);
+  assert.match(result.stderr, /\.claude\/skills\/review\/SKILL\.md:1: \.\/references\/missing\.md does not exist/);
 });
