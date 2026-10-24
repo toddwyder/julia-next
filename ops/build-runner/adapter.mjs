@@ -7,7 +7,7 @@ import { createTransport } from './transport.mjs'
 const quote = value => "'" + String(value).replaceAll("'", "'\\''") + "'"
 let opened = false
 
-export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'builder', hostInstructions, subagents, helpers, helperDefinitions, subagentDefinitions }) {
+export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'builder', hostInstructions, subagents, helpers, helperDefinitions, subagentDefinitions, planOnly = false }) {
   if (opened) throw Error('one runner per process required')
   if (!/^[A-Z]+-\d+$/.test(card)) throw Error('valid card ID required')
   const settings = JSON.parse(await readFile(settingsPath, 'utf8'))
@@ -83,18 +83,25 @@ export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'bu
     sdkSettings.models.omReflectionThreshold = null
     sdkSettings.customProviders = runtimeProviders.map(({ apiKey, ...provider }) => provider)
     saveSettings(sdkSettings)
-    const sandbox = new LocalSandbox({ workingDirectory: cwd, env: { HOME: commandHome, TMPDIR: commandHome }, timeout: 30_000 })
-    const spawn = sandbox.processes.spawn.bind(sandbox.processes)
-    const launcher = fileURLToPath(new URL('./command-boundary.py', import.meta.url))
-    sandbox.processes.spawn = (command, options = {}) => {
-      const config = JSON.stringify({ workspace: cwd, home: commandHome, cwd: resolve(cwd, options.cwd ?? '.'), executable: process.execPath })
-      return spawn(`/usr/bin/python3 ${quote(launcher)} ${quote(config)} ${quote(command)}`, { ...options, env: {} })
+    if (planOnly) workspace = new Workspace({})
+    else {
+      const sandbox = new LocalSandbox({ workingDirectory: cwd, env: { HOME: commandHome, TMPDIR: commandHome }, timeout: 30_000 })
+      const spawn = sandbox.processes.spawn.bind(sandbox.processes)
+      const launcher = fileURLToPath(new URL('./command-boundary.py', import.meta.url))
+      sandbox.processes.spawn = (command, options = {}) => {
+        const config = JSON.stringify({ workspace: cwd, home: commandHome, cwd: resolve(cwd, options.cwd ?? '.'), executable: process.execPath })
+        return spawn(`/usr/bin/python3 ${quote(launcher)} ${quote(config)} ${quote(command)}`, { ...options, env: {} })
+      }
+      workspace = new Workspace({ filesystem: new LocalFilesystem({ basePath: cwd, contained: true }), sandbox, tools: { mastra_workspace_execute_command: { name: 'execute_command' } }, skills: ['.agents/skills'] })
     }
-    workspace = new Workspace({ filesystem: new LocalFilesystem({ basePath: cwd, contained: true }), sandbox, tools: { mastra_workspace_execute_command: { name: 'execute_command' } }, skills: ['.agents/skills'] })
     await workspace.init()
+    const planningDynamicTools = ['request_access', 'create-workflow', 'list-workflows', 'get-workflow', 'run-workflow', 'delete-workflow', 'schedule_list', 'schedule_update', 'schedule_create', 'schedule_resume', 'schedule_run', 'web_search', 'notification_inbox']
+    const planningBuiltinTools = ['ask_user', 'submit_plan', 'task_write', 'task_update', 'task_complete', 'task_check', 'subagent']
     runtime = await bootLocalAgentController({
-      cwd, homeDir: sdkHome, workspace, modes: false, subagents: providedSubagents, intervalHandlers: [], disabledTools: ['web_search'],
-      hostInstructions, disableMcp: true, disablePlugins: true, disableEnvFile: true, disableHooks: true, disableGithubSignals: true,
+      cwd, homeDir: sdkHome, workspace, modes: false, subagents: planOnly ? [] : providedSubagents, intervalHandlers: [], disabledTools: planOnly ? planningDynamicTools : ['web_search'],
+      disableBuiltinTools: planOnly ? planningBuiltinTools : undefined,
+      hostInstructions: planOnly ? 'Return only the requested plan text. No tools, skills, files, commands, research, or delegation are available.' : hostInstructions,
+      disableMcp: true, disablePlugins: true, disableEnvFile: true, disableHooks: true, disableGithubSignals: true,
     })
     const tools = await createWorkspaceTools(workspace)
     const availableSkills = await workspace.skills?.list?.() ?? []
@@ -117,14 +124,18 @@ export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'bu
         return { result, threadId: thread.id, account: ledger.snapshot() }
       },
       async close() {
-        await runtime.memory?.settled?.()
-        await runtime.controller.destroy()
-        await runtime.observability.shutdown()
-        await workspace.destroy()
-        setCredentialStoreProvider(undefined)
-        setCustomProvidersSource(undefined)
-        globalThis.fetch = originalFetch
-        ledger.close()
+        try {
+          await runtime.memory?.settled?.()
+          await runtime.controller.destroy()
+          await runtime.observability.shutdown()
+          await workspace.destroy()
+        } finally {
+          setCredentialStoreProvider(undefined)
+          setCustomProvidersSource(undefined)
+          globalThis.fetch = originalFetch
+          ledger.close()
+          opened = false
+        }
       },
     }
   } catch (error) {
@@ -132,6 +143,7 @@ export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'bu
     await workspace?.destroy()
     globalThis.fetch = originalFetch
     ledger.close()
+    opened = false
     throw error
   }
 }

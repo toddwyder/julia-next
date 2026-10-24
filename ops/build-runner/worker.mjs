@@ -84,6 +84,7 @@ async function main() {
   await seedPstackModels(builderHome)
 
   let runner
+  let planRunner
   const events = []
   const requests = []
   let receipt
@@ -93,17 +94,15 @@ async function main() {
   let threadId
   let candidateCommit
   let account
+  let plan
   try {
-    runner = await openRunner({ card: cardId, settingsPath: effectiveSettingsPath, cwd: job.worktree, stateDir, role: 'orchestrator', hostInstructions: workflowInstructions, subagents: helpers })
-    globalThis.fetch = observeRequests(globalThis.fetch, requests)
     const allowedEventTypes = new Set(['subagent_start', 'subagent_end', 'subagent_tool_start', 'subagent_tool_end', 'tool_start', 'tool_end', 'agent_start', 'agent_end', 'error', 'task_updated', 'state_changed', 'message_end'])
-    const unsubscribe = runner.runtime.session.subscribe(e => { if (allowedEventTypes.has(e?.type)) events.push(e) })
-    let checklist
-    let decisions
-    let internalReview
+    planRunner = await openRunner({ card: cardId, settingsPath: effectiveSettingsPath, cwd: job.worktree, stateDir, role: 'orchestrator', planOnly: true })
+    globalThis.fetch = observeRequests(globalThis.fetch, requests)
+    const unsubscribePlan = planRunner.runtime.session.subscribe(e => { if (allowedEventTypes.has(e?.type)) events.push(e) })
     try {
       receipt = await captureBuilderPlan({
-        runner,
+        runner: planRunner,
         builderHome,
         jobDir,
         card,
@@ -111,9 +110,24 @@ async function main() {
         status: async () => (await execFile('git', ['-C', job.worktree, 'status', '--porcelain'])).stdout,
       })
       receipts.push(receipt)
+      account = receipt.account ?? planRunner.snapshot()
+    } finally {
+      unsubscribePlan()
+      await planRunner.close()
+      planRunner = undefined
+    }
+    plan = await readFile(join(jobDir, 'pstack-plan.md'), 'utf8')
+
+    runner = await openRunner({ card: cardId, settingsPath: effectiveSettingsPath, cwd: job.worktree, stateDir, role: 'orchestrator', hostInstructions: workflowInstructions, subagents: helpers })
+    globalThis.fetch = observeRequests(globalThis.fetch, requests)
+    const unsubscribe = runner.runtime.session.subscribe(e => { if (allowedEventTypes.has(e?.type)) events.push(e) })
+    let checklist
+    let decisions
+    let internalReview
+    try {
       for (let turn = 0; turn < 4; turn += 1) {
-        const instruction = turn === 0 ? prompt : workflowFeedback.at(-1)
-        receipt = await runner.run({ prompt: instruction, ...(receipt?.threadId ? { threadId: receipt.threadId } : {}), maxTurns: 100, timeoutMs: 900000 })
+        const instruction = turn === 0 ? `${prompt}\n\nSol's retained plan:\n${plan}` : workflowFeedback.at(-1)
+        receipt = await runner.run({ prompt: instruction, ...(turn > 0 && receipt?.threadId ? { threadId: receipt.threadId } : {}), maxTurns: 100, timeoutMs: 900000 })
         receipts.push(receipt)
         if (receipt?.result?.status !== 'completed') throw new Error('session not completed')
         try {
@@ -139,8 +153,6 @@ async function main() {
     await atomicWriteText(join(jobDir, 'pstack-checklist.md'), checklist)
     await atomicWriteText(join(jobDir, 'pstack-decisions.tsv'), decisions)
     await atomicWriteJson(join(jobDir, 'pstack-state.json'), runner.runtime.session.state.get())
-    const plan = await readFile(join(jobDir, 'pstack-plan.md'), 'utf8')
-
     if (runner.runtime?.session?.model?.get?.() !== orchestratorModel) throw new Error('session model mismatch')
     if (account?.stopped !== false) throw new Error('account stopped')
     if (Number(account?.heldNano ?? 0) !== 0) throw new Error('unsettled card reservations')
@@ -192,6 +204,7 @@ async function main() {
       await atomicWriteJson(join(jobDir, 'ledger.json'), account ?? runner?.snapshot?.() ?? {})
     } catch {}
     try { await runner?.close() } catch {}
+    try { await planRunner?.close() } catch {}
     try { if (job) await atomicWriteJson(join(jobDir, 'job.json'), job) } catch {}
   }
   if (failure) process.exitCode = 1
