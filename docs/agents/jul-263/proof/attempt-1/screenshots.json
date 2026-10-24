@@ -1,0 +1,32 @@
+{
+  "start-selected": {
+    "takenAt": "2026-10-24T14:07:55.572Z",
+    "state": null,
+    "runId": null,
+    "checklist": {
+      "done": 0,
+      "total": 0
+    },
+    "items": []
+  },
+  "start": {
+    "takenAt": "2026-10-24T14:08:04.120Z",
+    "state": "running",
+    "runId": "jul-264-1b51b4084d0b8a82f7af3c722d5f7896",
+    "checklist": {
+      "done": 0,
+      "total": 0
+    },
+    "items": []
+  },
+  "end": {
+    "takenAt": "2026-10-24T14:12:40.644Z",
+    "state": "ready-for-review",
+    "runId": "jul-264-1b51b4084d0b8a82f7af3c722d5f7896",
+    "checklist": {
+      "done": 0,
+      "total": 0
+    },
+    "items": []
+  }
+}

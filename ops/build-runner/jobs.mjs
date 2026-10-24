@@ -16,11 +16,19 @@ const pendingStarts = new Map()
 export function parseChecklist(text) {
   const items = []
   for (const line of String(text).split(/\r?\n/)) {
-    const match = /^([ \t]*)(?:[-*]|\d+[.)])\s+\[([ xX])\]\s+(.+)$/.exec(line)
-    if (!match) continue
-    const item = match[3].trim()
+    const indent = /^([ \t]*)/.exec(line)?.[1] ?? ''
+    const depth = Math.floor(indent.replace(/\t/g, '  ').length / 2)
+    const checkbox = /^[ \t]*(?:[-*]|\d+[.)])\s+\[([ xX])\]\s+(.+)$/.exec(line)
+    if (checkbox) {
+      const item = checkbox[2].trim()
+      if (item) items.push({ text: item, done: checkbox[1].toLowerCase() === 'x', depth })
+      continue
+    }
+    const numbered = /^[ \t]*\d+[.)]\s+(.+)$/.exec(line)
+    if (!numbered) continue
+    const item = numbered[1].trim()
     if (!item) continue
-    items.push({ text: item, done: match[2].toLowerCase() === 'x', depth: Math.floor(match[1].replace(/\t/g, '  ').length / 2) })
+    items.push({ text: item, done: /\bdone:/i.test(item), depth })
   }
   return items
 }

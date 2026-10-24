@@ -1,0 +1,4 @@
+2026-10-24	The runner returns the build checklist on every job record	The dashboard needs the same live data the build writes, not a second status store.
+2026-10-24	The checklist parser accepts numbered steps and the done marker	The first real Beam practice build wrote numbered steps with `done:` and the dashboard showed nothing.
+2026-10-24	Practice runs are builds whose two roles are the machinery model	Practice uses Beam; the runner can recognise that from the saved roles.
+2026-10-24	Card JUL-263 created in Ready with two criteria	No Live view card existed; Todd settled the card and asked for Ready.
