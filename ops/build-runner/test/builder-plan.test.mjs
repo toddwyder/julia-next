@@ -75,6 +75,34 @@ test('the real plan workspace runs on Beam and may write only the plan file', {
   }
 })
 
+test('planning accepts markdown section headings', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'builder-plan-headings-'))
+  const worktree = join(root, 'worktree')
+  const builderHome = join(worktree, '.builder-home')
+  const jobDir = join(root, 'job')
+  try {
+    await mkdir(join(builderHome, 'pstack'), { recursive: true })
+    await mkdir(jobDir)
+    const runner = {
+      run: async () => ({
+        result: { status: 'completed', text: '## Files\n\n- `marker.txt`\n\n## Steps\n\n1. Write the exact line.\n' },
+        threadId: 'plan-headings',
+      }),
+    }
+    await captureBuilderPlan({
+      runner,
+      builderHome,
+      jobDir,
+      card: { identifier: 'JUL-262', description: 'Create marker.txt with one exact line.' },
+      events: [],
+      status: async () => '',
+    })
+    assert.match(await readFile(join(jobDir, 'pstack-plan.md'), 'utf8'), /^## Files/m)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('planning rejects any exposed tool before the plan', async () => {
   const root = await mkdtemp(join(tmpdir(), 'builder-plan-tools-'))
   const builderHome = join(root, 'worktree', '.builder-home')

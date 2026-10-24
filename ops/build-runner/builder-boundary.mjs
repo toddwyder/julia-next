@@ -2,6 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 const MAX_PLAN_BYTES = 1500
+const sectionHeading = name => new RegExp(`^(?:#{1,6}[ \\t]*)?(?:\\*\\*)?${name}(?:\\*\\*)?[ \\t]*:?[ \\t]*$`, 'im')
 
 export async function captureBuilderPlan({ runner, builderHome, jobDir, card, status, events }) {
   await mkdir(join(builderHome, 'pstack'), { recursive: true })
@@ -17,7 +18,7 @@ export async function captureBuilderPlan({ runner, builderHome, jobDir, card, st
   const plan = `${receipt.result.text?.trim() ?? ''}\n`
   const after = await status()
   if (after.trim()) throw new Error('planning turn changed repository files')
-  if (Buffer.byteLength(plan) > MAX_PLAN_BYTES || !/^Files\b/im.test(plan) || !/^Steps\b/im.test(plan)) {
+  if (Buffer.byteLength(plan) > MAX_PLAN_BYTES || !sectionHeading('Files').test(plan) || !sectionHeading('Steps').test(plan)) {
     throw new Error('builder plan must be short and name files and steps')
   }
   await writeFile(join(builderHome, 'pstack', 'plan.md'), plan)
