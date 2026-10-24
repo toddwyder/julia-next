@@ -1,175 +1,63 @@
 {
   "start-selected": {
-    "takenAt": "2026-10-24T15:03:31.421Z",
+    "takenAt": null,
     "state": null,
     "runId": null,
+    "pageHeading": null,
     "checklist": {
-      "done": 0,
+      "finished": 0,
+      "skipped": 0,
+      "pending": 0,
       "total": 0
-    },
-    "items": []
+    }
   },
   "running": {
-    "takenAt": "2026-10-24T15:03:35.991Z",
+    "takenAt": null,
     "state": null,
     "runId": null,
+    "pageHeading": null,
     "checklist": {
-      "done": 0,
+      "finished": 0,
+      "skipped": 0,
+      "pending": 0,
       "total": 0
-    },
-    "items": []
+    }
   },
   "start": {
-    "takenAt": "2026-10-24T15:04:30.419Z",
+    "takenAt": "2026-10-24T16:05:37.322Z",
     "state": "running",
-    "runId": "jul-266-a3207dc745f39cb952b983776715a2ef",
+    "runId": "jul-267-ecc8a6659f46657442c219729c2ea95e",
+    "pageHeading": "JUL-267 · running",
     "checklist": {
-      "done": 2,
+      "finished": 0,
+      "skipped": 5,
+      "pending": 3,
       "total": 8
-    },
-    "items": [
-      {
-        "text": "`how` over the affected subsystem. — skip: single marker file, no subsystem.",
-        "done": false,
-        "depth": 0
-      },
-      {
-        "text": "`architect` for parallel design exploration. — skip: no design choice.",
-        "done": false,
-        "depth": 0
-      },
-      {
-        "text": "Write the throughput checkpoint as four todo items. — skip: single file, no fan-out.",
-        "done": false,
-        "depth": 0
-      },
-      {
-        "text": "Delegate code-writing to a subagent. — skip: trivial mechanical edit done directly; laziness protocol / smallest change.",
-        "done": false,
-        "depth": 0
-      },
-      {
-        "text": "Verify on the matching surface. — done: read marker bytes with xxd; git status confirms only marker.",
-        "done": true,
-        "depth": 0
-      },
-      {
-        "text": "Rebase into small, ordered commits. — done: one commit.",
-        "done": true,
-        "depth": 0
-      },
-      {
-        "text": "If the design is contested, `interrogate` before shipping. — skip: no design.",
-        "done": false,
-        "depth": 0
-      },
-      {
-        "text": "Run Opening a PR. — see below (publishing is host-owned, out of scope).",
-        "done": false,
-        "depth": 0
-      }
-    ]
+    }
   },
   "middle": {
-    "takenAt": "2026-10-24T15:05:04.730Z",
+    "takenAt": "2026-10-24T16:05:49.118Z",
     "state": "running",
-    "runId": "jul-266-a3207dc745f39cb952b983776715a2ef",
+    "runId": "jul-267-ecc8a6659f46657442c219729c2ea95e",
+    "pageHeading": "JUL-267 · running",
     "checklist": {
-      "done": 3,
+      "finished": 2,
+      "skipped": 6,
+      "pending": 0,
       "total": 8
-    },
-    "items": [
-      {
-        "text": "`how` over the affected subsystem. — skip: single marker file, no subsystem.",
-        "done": false,
-        "depth": 0
-      },
-      {
-        "text": "`architect` for parallel design exploration. — skip: no design choice.",
-        "done": false,
-        "depth": 0
-      },
-      {
-        "text": "Write the throughput checkpoint as four todo items. — skip: single file, no fan-out.",
-        "done": false,
-        "depth": 0
-      },
-      {
-        "text": "Delegate code-writing to a subagent. — done: subagent (model-1 / commandcode/reflection/beam:free) created marker and committed 12a9643. Review separation achieved.",
-        "done": true,
-        "depth": 0
-      },
-      {
-        "text": "Verify on the matching surface. — done: xxd shows 32 bytes ending 0a; git status clean; base..HEAD diff is marker only.",
-        "done": true,
-        "depth": 0
-      },
-      {
-        "text": "Rebase into small, ordered commits. — done: one commit 12a9643.",
-        "done": true,
-        "depth": 0
-      },
-      {
-        "text": "If the design is contested, `interrogate` before shipping. — skip: no design.",
-        "done": false,
-        "depth": 0
-      },
-      {
-        "text": "Run Opening a PR. — skip: host owns git remotes, publishing, credentials (card out of scope).",
-        "done": false,
-        "depth": 0
-      }
-    ]
+    }
   },
   "end": {
-    "takenAt": "2026-10-24T15:05:19.867Z",
+    "takenAt": "2026-10-24T16:09:38.001Z",
     "state": "ready-for-review",
-    "runId": "jul-266-a3207dc745f39cb952b983776715a2ef",
+    "runId": "jul-267-ecc8a6659f46657442c219729c2ea95e",
+    "pageHeading": "JUL-267 · ready-for-review",
     "checklist": {
-      "done": 3,
+      "finished": 3,
+      "skipped": 5,
+      "pending": 0,
       "total": 8
     },
-    "items": [
-      {
-        "text": "`how` over the affected subsystem. — skip: single marker file, no subsystem.",
-        "done": false,
-        "depth": 0
-      },
-      {
-        "text": "`architect` for parallel design exploration. — skip: no design choice.",
-        "done": false,
-        "depth": 0
-      },
-      {
-        "text": "Write the throughput checkpoint as four todo items. — skip: single file, no fan-out.",
-        "done": false,
-        "depth": 0
-      },
-      {
-        "text": "Delegate code-writing to a subagent. — done: subagent (model-1 / commandcode/reflection/beam:free) created marker and committed 12a9643.",
-        "done": true,
-        "depth": 0
-      },
-      {
-        "text": "Verify on the matching surface. — done: xxd 32 bytes ending 0a; git status clean; base..HEAD diff marker only.",
-        "done": true,
-        "depth": 0
-      },
-      {
-        "text": "Rebase into small, ordered commits. — done: one commit 12a9643.",
-        "done": true,
-        "depth": 0
-      },
-      {
-        "text": "If the design is contested, `interrogate` before shipping. — skip: no design.",
-        "done": false,
-        "depth": 0
-      },
-      {
-        "text": "Run Opening a PR. — skip: host owns git remotes, publishing, credentials (card out of scope).",
-        "done": false,
-        "depth": 0
-      }
-    ]
+    "cardShot": true
   }
 }

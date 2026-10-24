@@ -68,15 +68,18 @@ Fix, test first:
 
 ## Proof
 
-The Beam practice build on JUL-266 passed: `ready-for-review`, candidate
-`12a9643530cc8ca91d8bf97bf8b44d08f5f3860e`, the marker as the only change, and
-$0 spent. The dashboard showed 2 of 8 steps finished, then 3 of 8 while still
-running, then 3 of 8 at the end. See [proof/final](proof/final/README.md).
+The Beam practice build on JUL-267 passed: `ready-for-review`, candidate
+`63d2dbfa3dc4a436c7e369fd85e4ae0fd9e2ec02`, the 31-byte marker as the only
+change, and $0 spent. The dashboard showed **0 finished, 5 skipped, 3 pending**
+at the start, **2 finished, 6 skipped** in the middle, and **3 finished, 5
+skipped** at the end. The end shot is the page showing the finished build itself,
+with its candidate and saved result. See [proof/final](proof/final/README.md).
 
-Attempt 6 is kept as a flake: Beam ran the machinery self-check with direct
-commands instead of a subagent, so the structural check refused it even though
-its checklist claimed the check passed. The check is doing its job; the proof
-uses the successful run.
+Attempt 7 is the earlier JUL-266 proof before the skipped state. Attempt 8 is a
+JUL-267 run where Beam compressed its checklist to four steps, so it proved the
+counts but not skipped steps. Attempt 6 is kept as a flake: Beam ran the
+machinery self-check with direct commands instead of a subagent, so the
+structural check refused it.
 
 `proof-drive.mjs` drives `https://ovh.tail91f394.ts.net/julia-control`, selects
 the practice card and Beam for both roles, clicks Start, and captures screenshots

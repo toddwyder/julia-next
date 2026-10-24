@@ -140,13 +140,15 @@ try {
       await shot('middle', job)
     }
     if (job.state === 'ready-for-review') {
-      await page.getByRole('heading', { name: `${card} · ready-for-review`, exact: true }).waitFor({ timeout: 20000 })
+      const finishedCard = page.locator('article.build-card').filter({ hasText: pinned.runId }).first()
+      await finishedCard.locator('h3', { hasText: 'ready-for-review' }).waitFor({ timeout: 20000 })
       await shot('end', job)
       if (!String(shots.end?.pageHeading ?? '').includes('ready-for-review')) throw new Error(`end screenshot does not show the finished build: ${shots.end?.pageHeading}`)
       break
     }
     if (job.state === 'failed') {
-      await page.getByRole('heading', { name: `${card} · failed`, exact: true }).waitFor({ timeout: 20000 }).catch(() => {})
+      const failedCard = page.locator('article.build-card').filter({ hasText: pinned.runId }).first()
+      await failedCard.locator('h3', { hasText: 'failed' }).waitFor({ timeout: 20000 }).catch(() => {})
       await shot('end-failed', job)
       break
     }
