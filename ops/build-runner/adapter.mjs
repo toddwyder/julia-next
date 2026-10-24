@@ -3,6 +3,7 @@ import { join, resolve, relative, isAbsolute, dirname, basename } from 'node:pat
 import { fileURLToPath } from 'node:url'
 import { CardLedger } from './ledger.mjs'
 import { createTransport } from './transport.mjs'
+import { PlanFilesystem } from './plan-filesystem.mjs'
 
 const quote = value => "'" + String(value).replaceAll("'", "'\\''") + "'"
 let opened = false
@@ -83,7 +84,7 @@ export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'bu
     sdkSettings.models.omReflectionThreshold = null
     sdkSettings.customProviders = runtimeProviders.map(({ apiKey, ...provider }) => provider)
     saveSettings(sdkSettings)
-    if (planOnly) workspace = new Workspace({})
+    if (planOnly) workspace = new Workspace({ filesystem: new PlanFilesystem({ basePath: commandHome }) })
     else {
       const sandbox = new LocalSandbox({ workingDirectory: cwd, env: { HOME: commandHome, TMPDIR: commandHome }, timeout: 30_000 })
       const spawn = sandbox.processes.spawn.bind(sandbox.processes)
@@ -116,6 +117,7 @@ export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'bu
       skills: workspace.skills,
       availableSkills,
       runtime,
+      workspace,
       async run({ prompt, threadId, maxTurns = 6, timeoutMs = 180_000 }) {
         if (typeof prompt !== 'string' || !prompt.trim()) throw Error('prompt required')
         const thread = threadId ? { id: threadId } : await runtime.session.thread.create({ title: card })
