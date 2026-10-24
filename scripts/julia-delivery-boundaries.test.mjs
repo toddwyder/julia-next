@@ -37,7 +37,7 @@ test('candidate processes receive operating-system plumbing but no controller se
   };
   const launch = productionLauncher('C:\\candidate', { run, environment, findExecutable: () => 'codex', sessionRoot: 'C:\\missing' });
   await launch('builder', {
-    configuration: { harness: 'codex', model: null, maker: 'OpenAI' }, prompt: 'offline',
+    configuration: { harness: 'codex', model: null, maker: 'OpenAI' }, prompt: 'build',
     started: async ({ pid }) => { recordedPid = pid; },
   });
   assert.equal(recordedPid, 42);

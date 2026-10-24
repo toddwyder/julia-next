@@ -248,15 +248,6 @@ export async function startMastraDelivery(issueId, configuration, {
   const launchInput = { issueId, configuration, authorization, runPath, runId };
   try { await writeOnce(launchInputPath, launchInput); }
   catch (error) { throw new Error(`saved workflow launch differs from this request: ${error.message}`); }
-  if (!adapters && process.env.JULIA_DELIVERY_OFFLINE_FIXTURE === '1') {
-    const { createOfflineDeliveryAdapters } = await import('../ops/mastra-agents/reviewer/support/offline-delivery-adapters.mjs');
-    await writeFile(join(runDirectory, 'JUL-196-approved.json'), `${JSON.stringify({ identifier: issueId })}\n`);
-    adapters = createOfflineDeliveryAdapters({
-      directory: runDirectory,
-      callsPath: join(runDirectory, 'calls.jsonl'),
-      verdicts: (process.env.JULIA_DELIVERY_OFFLINE_VERDICTS ?? 'PASS').split(',').map(value => value.trim()),
-    });
-  }
   const runtime = await createDeliveryWorkflowRuntime({
     storagePath: join(runDirectory, 'mastra.db'), runDirectory,
     summaryPath: join(dirname(resolve(runPath)), 'delivery-summary.log'),

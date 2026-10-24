@@ -13,7 +13,7 @@ function findings(file, text) {
 
 test('refuses a test that names an outside service and a stand-in together', () => {
   const result = findings('test/linear-sync.test.mjs', "import { fakeLinear } from './fake-linear.mjs';\ntest('syncs', () => fakeLinear());\n");
-  assert.equal(result.length, 1);
+  assert.equal(result.length, 2);
   assert.match(result[0], /test\/linear-sync\.test\.mjs:1: a test names an outside service and a stand-in together/);
 });
 
@@ -51,6 +51,32 @@ test('keeps a local server test that names no outside service', () => {
 
 test('keeps an outside-service test that uses no stand-in', () => {
   assert.deepEqual(findings('test/linear.test.mjs', "test('reads Linear', async () => fetch('https://api.linear.app'));\n"), []);
+});
+
+test('keeps a no-network guard and its restore', () => {
+  assert.deepEqual(findings('test/credentials.test.mjs', [
+    "test('reads a local credential for the openai-codex service', async () => {",
+    '  const originalFetch = globalThis.fetch;',
+    '  globalThis.fetch = () => { throw new Error(\'must not use the network\') };',
+    '  try { await readLocalCredential(); } finally { globalThis.fetch = originalFetch; }',
+    '});',
+  ].join('\n')), []);
+});
+
+test('keeps plain loopback host strings and synthetic credential names', () => {
+  assert.deepEqual(findings('test/host.test.mjs', [
+    "test('matches the Tailscale host and loopback', () => {",
+    "  assert.equal(isAllowed('127.0.0.1:43123'), true);",
+    "  const access = 'openai-codex-synthetic-access';",
+    '});',
+  ].join('\n')), []);
+});
+
+test('keeps retired-name regexes that name an old stand-in file', () => {
+  assert.deepEqual(findings('test/retired.test.mjs', [
+    "assert.doesNotMatch(suite, /service-dropbox\\.test/);",
+    "assert.doesNotMatch(suite, /stand-in-seat\\.test/);",
+  ].join('\n')), []);
 });
 
 test('ignores a non-test file even when it contains the same words', () => {

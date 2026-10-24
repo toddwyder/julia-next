@@ -8,7 +8,7 @@ Working document. Each line is a decision Todd agreed in conversation.
 - Clean-up is one pull request with no card. Settled scope: the no-fakes CI check; the four writing-for-agents rules as one script that triage runs before showing Todd a brief; removal of live server-state descriptions from the setup notes; confirmation that Start's admission check accepts the current triage card shape by running it on JUL-263; this plan update.
 - GitHub merge protection moves to the UAT-and-merge card (order of work 8).
 - The pstack folder move, the framework-lint fix and the Code review column removal are cut.
-- The dashboard board is parked.
+- The board-style dashboard view is parked. The Linear board flow stands as written, without the Code review column change.
 
 ## Standing rule
 - Every correction is fixed as high in poteto's inverse pyramid as it will go ([inverse-pyramid.md](../principles/inverse-pyramid.md)). Writing it into a file and hoping the agent follows it is not a fix.
@@ -74,7 +74,7 @@ Working document. Each line is a decision Todd agreed in conversation.
 | Cap reached | Card stops where it is | Is the stop |
 - Every send-back reruns everything after the build (evidence review, staging/smoke, UAT if any): changed code voids earlier passes.
 - A stopped card stays in its column; Todd gets a Linear notification with a plain explanation, the root cause, and a restart plan for his OK (existing stop rule).
-- **Board:** parked (Todd, 24 Oct). The earlier shape was Triage, Backlog → Ready → Implementation → Evidence review → Staging/smoke test → (UAT) → Complete; Canceled, Duplicate. **Remediation** was kept for sent-back cards so retries show at a glance. **Code review** is removed (pstack reviews code inside the build).
+- **Board:** the Linear board flow stands as written: Triage, Backlog → Ready → Implementation → Evidence review → Staging/smoke test → (UAT) → Complete; Canceled, Duplicate. **Remediation** is kept for sent-back cards so retries show at a glance. The Code review column stays (its removal is cut, 24 Oct). The board-style dashboard view is parked (Todd, 24 Oct).
 
 ## Retro and learning (12:18–12:21)
 - **Automatic retro:** after every merge the machine starts a retro run (same trigger as the verification upkeep). It runs pstack's `/correct` on the card's history: evidence-review findings, failed checks, UAT send-backs, and Todd's corrections from the advisor's retro notes. Output: a PR of checks and code fixes, each as high in the pyramid as it will go, each shown failing on the real past mistake.

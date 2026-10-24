@@ -1,38 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createServer } from 'node:http';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createModelJournal } from '../src/model-journal.mjs';
-import { checkedFetch } from '../src/reviewer.mjs';
-
-test('provider dispatch durably journals one request and its exact response', async t => {
-  const directory = await mkdtemp(join(tmpdir(), 'jul223-journal-'));
-  t.after(() => rm(directory, { recursive: true, force: true }));
-  const responseBody = '{"id":"journal-1","choices":[{"message":{"content":"raw reply"},"finish_reason":"stop"}],"usage":{"prompt_tokens":2,"completion_tokens":3}}';
-  const server = createServer(async (request, response) => {
-    for await (const _chunk of request) { /* consume */ }
-    response.writeHead(200, { 'content-type': 'application/json' });
-    response.end(responseBody);
-  });
-  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
-  t.after(() => new Promise(resolve => server.close(resolve)));
-  const path = join(directory, 'model-events.json');
-  const journal = await createModelJournal({ path });
-
-  await checkedFetch(
-    `http://127.0.0.1:${server.address().port}`,
-    { method: 'POST', body: JSON.stringify({ messages: [{ role: 'user', content: 'review' }] }) },
-    async () => {}, null, async () => {}, journal.record,
-  );
-
-  const events = JSON.parse(await readFile(path, 'utf8'));
-  assert.deepEqual(events.map(event => event.kind), ['request', 'response', 'usage']);
-  assert.deepEqual(events[0].body.messages, [{ role: 'user', content: 'review' }]);
-  assert.equal(events[1].raw, responseBody);
-  assert.deepEqual(events[2].usage, { prompt_tokens: 2, completion_tokens: 3 });
-});
 
 test('journal overflow fails before a verdict and becomes a warning after one', async t => {
   const directory = await mkdtemp(join(tmpdir(), 'jul223-journal-bound-'));

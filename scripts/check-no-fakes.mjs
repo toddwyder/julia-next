@@ -3,9 +3,8 @@
 // a test that names an outside service and replaces it with a local server,
 // a mock, a stub, a fake or an offline fixture is refused.
 //
-// The repository test suite runs this against the tests added or changed by the
-// commit under test, so existing local unit fixtures stay where they are while
-// new stand-ins stop.
+// The repository test suite runs this over every tracked test file, so no
+// stand-in for an outside service can remain anywhere in the repository.
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
@@ -19,11 +18,13 @@ const SKIPPED = new Set([
   'scripts/no-fakes-repository.test.mjs',
 ]);
 
-const SERVICE = /\b(?:linear|github|google|firebase|firestore|gmail|vercel|axiom|sentry|openai|anthropic|claude|chatgpt|deepseek|commandcode|tailscale|rclone|supabase|powersync|dropbox|stripe|slack|workos|oauth|provider|llm|reviewer)\b/i;
-const STANDIN_WORD = /\b(?:mock|mocked|mocking|stub|stubbed|fake|faked|stand-in|offline|canned|synthetic)\b/i;
+const SERVICE_NAMES = 'linear|github|google|firebase|firestore|gmail|vercel|axiom|sentry|openai|anthropic|claude|chatgpt|deepseek|commandcode|tailscale|rclone|supabase|powersync|dropbox|stripe|slack|workos|oauth|provider|llm|reviewer';
+const SERVICE = new RegExp(`\\b(?:${SERVICE_NAMES})\\b`, 'i');
+const EXPLICIT_STANDIN = new RegExp(`\\b(?:fake|mock|stub|stand-?in)[-_ ]?(?:${SERVICE_NAMES})\\b|\\b(?:${SERVICE_NAMES})[-_ ]?(?:fake|mock|stub|stand-?in)\\b`, 'i');
+const STANDIN_WORD = /\b(?:mock|mocked|mocking|stub|stubbed|fake|faked|stand-in|offline|canned)\b/i;
 const MOCK_LIBRARY = /\b(?:nock|msw|sinon|proxyquire|fetch-mock|MockAgent|setupServer)\b|\b(?:vi|jest)\.mock\s*\(|\bmock\.module\s*\(/i;
 const GLOBAL_FETCH = /\b(?:globalThis|global|window)\.fetch\s*=/;
-const LOCAL_SERVER = /\b(?:createServer|createSecureServer)\s*\(|\.listen\s*\(|\b(?:127\.0\.0\.1|localhost|0\.0\.0\.0)\b/;
+const LOCAL_SERVER = /\b(?:createServer|createSecureServer)\s*\(|\.listen\s*\(/;
 
 export function isTestFile(path) {
   const file = String(path).replaceAll('\\', '/');
@@ -36,6 +37,11 @@ function lineNumber(lines, index) {
 
 function finding(file, line, message) {
   return `${file}:${line}: ${message}`;
+}
+
+function isNoNetworkGuard(lines, index) {
+  const window = lines.slice(index, index + 8).join('\n');
+  return /\bthrow\b/.test(window) && !/\bResponse\b|\bjson\s*\(/.test(window);
 }
 
 function nearbyService(lines, index) {
@@ -57,7 +63,7 @@ export function findFakeOutsideServices({ file, text }) {
   if (serviceLine === -1) return [];
 
   lines.forEach((line, index) => {
-    if (SERVICE.test(line) && STANDIN_WORD.test(line)) {
+    if (EXPLICIT_STANDIN.test(line) || (SERVICE.test(line) && STANDIN_WORD.test(line))) {
       found.add(finding(file, lineNumber(lines, index), 'a test names an outside service and a stand-in together'));
     }
     if (LOCAL_SERVER.test(line)) {
@@ -67,7 +73,7 @@ export function findFakeOutsideServices({ file, text }) {
         found.add(finding(file, lineNumber(lines, index), `a local server stands in for the outside service named on line ${service}`));
       }
     }
-    if (GLOBAL_FETCH.test(line)) {
+    if (GLOBAL_FETCH.test(line) && !/=\s*original(?:Fetch)?\b/.test(line) && !isNoNetworkGuard(lines, index)) {
       const service = nearbyService(lines, index);
       if (service && !globalFetchFor.has(service)) {
         globalFetchFor.add(service);
@@ -120,16 +126,12 @@ export function checkNoFakes({ root = process.cwd(), base = null, all = false } 
 
 function main(args) {
   const root = resolve(args.includes('--root') ? args[args.indexOf('--root') + 1] : '.');
-  const all = args.includes('--all');
   const baseIndex = args.indexOf('--base');
   const base = baseIndex > -1 ? args[baseIndex + 1] : process.env.NO_FAKES_BASE || null;
-  if (!all && !base && !baseFromGit(root)) {
-    console.log('No earlier commit to compare; no changed tests to check.');
-    return;
-  }
+  const all = args.includes('--all') || !base;
   const findings = checkNoFakes({ root, base, all });
   if (!findings.length) {
-    console.log('No changed test stands in for an outside service.');
+    console.log(all ? 'No test stands in for an outside service.' : 'No changed test stands in for an outside service.');
     return;
   }
   console.error(findings.join('\n'));
