@@ -85,7 +85,7 @@ The agreed fixes from the JUL-231 retro are folded into the cards below.
 
 ## Order of work (agreed 12:24)
 1. Models and money: both subscriptions, $2 cap, Sol's price recorded, $0 rule retired, Claude ADR.
-2. Live view: one status record (dashboard with live pstack checklist for Todd; pushed to GitHub for the advisor; kept as one updated comment on the card's Linear card, Todd 12:59).
+2. Live view: the dashboard shows the running build’s pstack checklist, ticking off steps as they finish.
 3. Deployment safety: updater as sole service starter from main, owns the Tailscale route, its test, proofs through Todd's address; remove stale live-state docs. (`CLAUDE.md` already fixed: it imports `AGENTS.md`, PR #320.)
 4. Clean-up: GitHub merge protection (drop the AGENTS CI line), pstack in its own folder + duplicate-skill-name CI check + retire Pocock `tdd`/`teach` (and the `ask-matt` reference), retire pre-plan (including updating Start's admission check to the short brief: it still requires pre-plan-era fields; that check also runs four writing-for-agents rules as one script: no text copied from repo docs, criteria in outcome form, no implementation words in criteria, no negations in criteria; the planner agent runs the same script before showing Todd a brief; Todd 13:29), empty-lint fix, no-fakes CI check, remove Code review column.
 5. Evidence there: build result requires checklist and evidence index.
