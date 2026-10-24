@@ -76,3 +76,15 @@ test('skill instructions cannot point agents at missing files regardless of phra
   assert.match(result.stderr, /\.claude\/skills\/review\/SKILL\.md:1: \.claude\/skills\/missing\/SKILL\.md does not exist/);
   assert.match(result.stderr, /\.claude\/skills\/review\/SKILL\.md:1: \.\/references\/missing\.md does not exist/);
 });
+
+test('a skill may point at a repository-root script or its own script', t => {
+  const f = fixture(t);
+  mkdirSync(join(f.root, 'scripts'), { recursive: true });
+  mkdirSync(join(f.root, '.claude/skills/review/scripts'), { recursive: true });
+  f.write('scripts/check.mjs', '');
+  f.write('.claude/skills/review/scripts/local.mjs', '');
+  f.write('.claude/skills/review/SKILL.md', 'Run `node scripts/check.mjs` or `node scripts/local.mjs`.\n');
+  assert.equal(f.run().status, 0);
+  f.write('.claude/skills/review/SKILL.md', 'Run `node scripts/missing.mjs`.\n');
+  assert.match(f.run().stderr, /does not exist; fix the reference or restore \.claude\/skills\/review\/scripts\/missing\.mjs or scripts\/missing\.mjs/);
+});

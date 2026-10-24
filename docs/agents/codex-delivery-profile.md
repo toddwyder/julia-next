@@ -1,10 +1,8 @@
 # Server Codex delivery profile
 
-Todd approved the permanent server setup, including sudoers, on 2026-10-20.
-Installed versions: Codex CLI 0.163.0, sudo 1.9.15p5, systemd 255,
-Git 2.43.0 and GitHub CLI 2.45.0. No model, credentials or spend limit changes.
-Codex startup update checks are disabled; the npm installation has no automatic
-update job configured by this setup.
+This profile records the server Codex delivery setup Todd approved on 2026-10-20.
+It changes no model, credential or spend limit. Codex startup update checks are
+disabled; this setup configures no automatic update job.
 
 ## Default permissions
 
@@ -41,21 +39,18 @@ Commands that already fit within the sandbox do not necessarily prompt.
 
 Copy only the exact reviewed candidate's required files into
 `/opt/julia-control/reviewer` as `ubuntu`, using the approved delivery plan and
-preserving installed dependencies unless that plan changes them. This setup does
-not choose a card, install a new application version, or start the pending laptop
-runner. The installed tree was made writable for delivery without changing its
-contents:
+preserving installed dependencies unless that plan changes them. Make the
+installed tree writable for delivery without changing its contents:
 
 ```sh
 sudo chown -R ubuntu:julia-control /opt/julia-control/reviewer
 sudo find /opt/julia-control/reviewer -type d -exec chmod g+s '{}' +
 ```
 
-The service still runs as `julia-control`. New deployed files must remain readable
+The service runs as `julia-control`. New deployed files must remain readable
 by that user. The setgid directories preserve its group on newly created files.
-The source tree and its existing dependencies remain in their existing location.
-No credentials, service unit, root-owned secret launcher or state database were
-changed. Application code is never executed as root by the activation helper.
+No credentials, service unit, root-owned secret launcher or state database change
+in this setup. Application code is never executed as root by the activation helper.
 
 Install this exact script at
 `/usr/local/sbin/julia-control-deploy-and-restart`, owned `root:root`, mode `0755`.
@@ -112,9 +107,8 @@ systemctl status julia-control.service
 
 The helper records requested/succeeded/failed restart events under journal tag
 `julia-control-delivery`, returns nonzero on failure, and checks systemd's active
-state. Active state is not HTTP readiness; check the existing control page at
-`https://ovh.tail91f394.ts.net/julia-control` afterward. It does not automatically
-roll back a failed application deployment.
+state. Active state is not HTTP readiness; check the configured control page
+afterward. It does not automatically roll back a failed application deployment.
 
 ## Execution rules
 
@@ -201,14 +195,12 @@ prefix_rule(pattern = ["git", "push", "origin", ["--mirror", "+HEAD:main", "+HEA
 
 ## Enforcement limits
 
-- The existing `ubuntu` account has `(ALL) NOPASSWD: ALL` from the host's
-  `90-cloud-init-users` sudoers file. This operator access is preserved. The new
-  sudoers entry grants only the no-argument helper, but it does **not** revoke
-  the account's pre-existing administrator privileges. Therefore the helper is
-  the only privileged command explicitly **allowed by this delivery policy**;
-  this is not an OS-enforced confinement of the `ubuntu` account. Approved
-  escalation, alternate sudo syntax, other tools, or configuration overrides can
-  still reach existing host privileges. No claim is made that every possible
+- The `ubuntu` account keeps its pre-existing administrator privileges. This
+  profile does not revoke them. The new sudoers entry grants only the no-argument
+  helper, so the helper is the only privileged command explicitly **allowed by
+  this delivery policy**; this is not an OS-enforced confinement of `ubuntu`.
+  Approved escalation, alternate sudo syntax, other tools, or configuration
+  overrides can still reach host privileges. No claim is made that every possible
   way of restarting another service is technically prevented.
 - Codex 0.163.0 rules match prefixes, not arbitrary argument positions or
   substrings. Listed direct service mutations/root-shell forms and common force
@@ -222,42 +214,9 @@ prefix_rule(pattern = ["git", "push", "origin", ["--mirror", "+HEAD:main", "+HEA
   the user configuration and project rules, are not immutable against a human
   administrator. New sessions are required after configuration edits.
 
-Todd explicitly directed that remaining enforcement gaps be documented rather
-than block completion. Removing the host's existing administrative access or
-introducing a separate delivery account is outside this setup.
-
-## Behavior proof
-
-A fresh ephemeral `codex exec` session used the saved defaults without sandbox,
-approval or profile overrides on 2026-10-20:
-
-- DNS lookup of `github.com` succeeded.
-- A real no-change deployment rewrote the installed `control-server.ts` bytes,
-  flushed them, restored timestamps and asserted its SHA-256 stayed
-  `5b5c9fc7aa945b615f840f19a2886f7317e1af29d75a6431c4fd6822fbf41b70`.
-  An anonymous `O_TMPFILE` write in `/opt/julia-control` left no directory entry.
-  The process reported `NoNewPrivs: 1` and `Seccomp: 2`.
-- Appending `ssh.service` to the helper returned 64; Julia's PID and start time
-  were unchanged. No other service restart was attempted.
-- The no-argument helper exited 0 without prompting, changed Julia's PID from
-  `86550` to `104282`, and the service reported active. Both restart events were
-  read back from the real journal. Source content was unchanged by verification.
-- A scratch branch `codex-delivery-scratch-20261020` received empty commit
-  `625329e`, was pushed with ordinary signed-in HTTPS access, then deleted
-  remotely and locally. No existing untracked files were staged.
-
-Policy checks use `codex execpolicy check --rules
-.codex/rules/repository.rules COMMAND...`. Positive cases include ordinary Git
-pushes, the fixed helper and status. Negative cases include direct
-`sudo -n systemctl restart ssh.service`, `git push --force`, and
-`git push origin HEAD --force`; their decisions are `forbidden`. No force push
-or unrelated service restart is executed as a test.
-
-These server checks are the maker's self-check. They do not constitute independent
-review. The Windows `verify-machine` drives cover laptop prerequisites and its
-launcher; neither that launcher nor any Windows machine part changes here, so
-those drives are outside this server-only proof. There is no changed browser
-application surface requiring a new Julia UI proof.
+This setup documents the remaining enforcement gaps rather than blocking
+completion. Removing the host's administrative access or introducing a separate
+delivery account is outside this setup.
 
 ## Documentation map
 

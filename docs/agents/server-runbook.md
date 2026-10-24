@@ -1,6 +1,6 @@
 # Julia server runbook
 
-Linear holds cards and requirements. GitHub holds code, pull requests, and CI. Mastra Factory is retired and is not a server route.
+Linear holds cards and requirements. GitHub holds code, pull requests, and CI. Mastra Factory is retired; do not use it as a server route.
 
 ## Authority
 

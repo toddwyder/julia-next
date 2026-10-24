@@ -29,21 +29,16 @@ identity, timeout, interruption handling and substantive review validation.
 Only the CommandCode reviewer child receives this key; native workers exclude
 it, all `OP_` bootstrap variables and the operator's service credentials.
 
-The VPS's Linear personal key and CommandCode key were imported into the existing
-Julia vault and read back unchanged. The laptop CommandCode login and the VPS key
-resolve to the same account and active GOAT subscription. Machine access remains
-the existing read-only Julia service account. Preserve the existing references,
-bootstrap configuration and encrypted token when adding fields; do not replace
-the configuration with a fresh default migration file.
+Preserve the existing references, bootstrap configuration and encrypted token
+when adding fields; do not replace the configuration with a fresh default
+migration file.
 
-The VPS Axiom token differs from the canonical Julia vault token and was not
-overwritten or imported. Current laptop telemetry uses the vault token. Confirm
-any deployment projections before revoking the older token. Sentry runtime uses
-the DSN already in Julia; its old personal management token has no current code
-consumer. Supabase, PowerSync, native DeepSeek and the old controller's Linear
-client ID/secret have no current laptop or application consumer. These are
-**candidates to revoke later**, subject to account inventory. No VPS credential,
-service, account or OVH resource is changed by this migration.
+Confirm any deployment projections before revoking an older token. Sentry
+runtime uses the DSN already in Julia; an old personal management token has no
+code consumer. Supabase, PowerSync, native DeepSeek and the old controller's
+Linear client ID/secret have no current laptop or application consumer. These
+are **candidates to revoke later**, subject to account inventory. This migration
+changes no credential, service, account or OVH resource.
 
 ## Launch Julia delivery
 
@@ -71,7 +66,9 @@ The Windows bootstrap helper implements this restricted account with a 90-day ex
 
 The helper stores only a current-user DPAPI-encrypted token, with file access restricted to that Windows user and SYSTEM. It clears personal `OP_` variables while running, verifies that the account sees exactly the Julia vault, and restores the original environment afterward. Its resolution probe uses the same validated reference snapshot as delivery and prints only a field count. Provisioning writes durable intent before creating the account; interruption or failed persistence parks the operation until account inspection/revocation, rather than creating duplicates. A token cannot be moved to another user or machine by copying the encrypted file. Before the recorded expiry, explicitly revoke/reprovision the account through 1Password administration. Never remove provisioning intent merely to force a retry.
 
-Machine migration status: the Julia vault was created and the located Axiom/Sentry fields matched on vault readback. Vercel and Linear credentials were absent. Original files and service destinations were retained. After Todd explicitly approved the scope/lifetime/storage, the restricted runner account and encrypted bootstrap were provisioned. Both the provision check and a separate subsequent check verified single-vault access and resolution of all six imported fields. The subsequent check did not require personal-account authentication. Access expires January 6, 2027, Pacific time. Live service proof remains deferred to first cards.
+Run the provision check and a separate resolution check before first use. The
+restricted runner account must see only the Julia vault and resolve every
+imported field. Live service proof belongs to the first cards.
 
 Vercel's application runtime still needs its deployment environment values. Those are runtime projections of the canonical vault, rather than another manually maintained source. Migrating this runner does not delete cloud configuration or alter the paused Factory's credentials/service. The controlled Sentry error and actual Axiom delivery event remain first-card proofs.
 

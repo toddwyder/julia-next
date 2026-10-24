@@ -18,3 +18,6 @@ ops/factory/app/src/mastra/public/factory/
 .playwright-cli/
 # Local proof artifacts for verify-julia (retained after run cleanup)
 .artifacts/verify-julia/
+
+# Command Code local session state
+.commandcode/
