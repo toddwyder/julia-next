@@ -79,7 +79,7 @@ $ git -C /home/ubuntu/julia-machine-main branch -vv
 
 ## Remote branches
 
-`git ls-remote --heads origin` reported only `refs/heads/main` after the cleanup. Stale remote-tracking refs were pruned in each checkout.
+`git ls-remote --heads origin` reported `refs/heads/main` and `refs/heads/cleanup/2026-10-24`, the open pull-request branch. Stale remote-tracking refs were pruned in each checkout.
 
 ## Readback worktree
 
