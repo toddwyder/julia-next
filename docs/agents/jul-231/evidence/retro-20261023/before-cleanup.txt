@@ -1,0 +1,76 @@
+=== time
+Fri Oct 23 17:33:03 UTC 2026
+=== main checkout
+main
+2a7b101da37b60633922a6fd200b85abdb338095
+2a7b101da37b60633922a6fd200b85abdb338095
+(end status)
+=== julia units (user)
+  UNIT                                   LOAD   ACTIVE   SUB     DESCRIPTION
+  julia-machine-control.service          loaded active   running Julia control page from main
+  julia-machine-main.service             loaded inactive dead    Update Julia machine after merges to main
+  julia-machine-runner.service           loaded active   running Julia build runner from main
+  julia-server-tests.service             loaded inactive dead    Run structurally owned server tests for Julia candidate heads
+  julia-verification-maintenance.service loaded inactive dead    Maintain Julia verification skills after merges
+  julia-machine-main.timer               loaded active   waiting Observe Julia main for merged machine updates
+  julia-server-tests.timer               loaded active   waiting Observe Julia candidate heads for server-owned tests
+  julia-verification-maintenance.timer   loaded active   waiting Observe Julia main for newly merged changes
+
+Legend: LOAD   → Reflects whether the unit definition was properly loaded.
+        ACTIVE → The high-level unit activation state, i.e. generalization of SUB.
+        SUB    → The low-level unit activation state, values depend on unit type.
+
+8 loaded units listed.
+To show all installed unit files use 'systemctl list-unit-files'.
+=== julia units (system)
+  UNIT                        LOAD      ACTIVE SUB     DESCRIPTION
+● julia-control-proof.service not-found failed failed  julia-control-proof.service
+  julia-control.service       loaded    active running Julia control page (loopback; exposed over Tailscale Serve)
+
+Legend: LOAD   → Reflects whether the unit definition was properly loaded.
+        ACTIVE → The high-level unit activation state, i.e. generalization of SUB.
+        SUB    → The low-level unit activation state, values depend on unit type.
+
+2 loaded units listed.
+To show all installed unit files use 'systemctl list-unit-files'.
+=== julia timers
+Fri 2026-10-23 17:33:07 UTC       3s Fri 2026-10-23 17:32:33 UTC 30s ago julia-server-tests.timer             julia-server-tests.service
+Fri 2026-10-23 17:33:35 UTC      31s Fri 2026-10-23 17:32:34 UTC 29s ago julia-verification-maintenance.timer julia-verification-maintenance.service
+Fri 2026-10-23 17:33:36 UTC      32s Fri 2026-10-23 17:32:35 UTC 28s ago julia-machine-main.timer             julia-machine-main.service
+=== julia-machine-runner
+MainPID=460297
+ExecStart={ path=/usr/local/bin/node ; argv[]=/usr/local/bin/node /home/ubuntu/.local/lib/julia-machine/server-main.mjs run /home/ubuntu/.config/julia-machine/config.json runner ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }
+WorkingDirectory=/home/ubuntu/julia-machine-main
+ActiveState=active
+SubState=running
+=== julia-machine-control
+MainPID=460323
+ExecStart={ path=/usr/local/bin/node ; argv[]=/usr/local/bin/node /home/ubuntu/.local/lib/julia-machine/server-main.mjs run /home/ubuntu/.config/julia-machine/config.json control ; ignore_errors=no ; start_time=[Fri 2026-10-23 17:23:12 UTC] ; stop_time=[n/a] ; pid=460323 ; code=(null) ; status=0/0 }
+WorkingDirectory=/home/ubuntu/julia-machine-main
+ActiveState=active
+SubState=running
+=== processes
+pid 128395 cwd=
+/usr/local/bin/op run --env-file /etc/julia-control/secrets.env -- /usr/local/bin/node --experimental-strip-types /opt/julia-control/reviewer/src/mastra/control-server.ts 
+pid 128444 cwd=
+/usr/local/bin/node --experimental-strip-types /opt/julia-control/reviewer/src/mastra/control-server.ts 
+pid 460309 cwd=/home/ubuntu/julia-machine-main
+/opt/node-v24.14.1/bin/node /home/ubuntu/julia-machine-main/scripts/julia-agents.mjs -- /opt/node-v24.14.1/bin/node /home/ubuntu/julia-machine-main/ops/build-runner/jobs.mjs 
+pid 460331 cwd=/home/ubuntu/julia-machine-main
+/opt/node-v24.14.1/bin/node /home/ubuntu/julia-machine-main/scripts/julia-agents.mjs -- /opt/node-v24.14.1/bin/node /home/ubuntu/julia-machine-main/ops/mastra-agents/reviewer/src/mastra/control-server.ts 
+pid 460355 cwd=/home/ubuntu/julia-machine-main
+op run --env-file /home/ubuntu/julia-machine-main/scripts/julia-agents.env -- /opt/node-v24.14.1/bin/node /home/ubuntu/julia-machine-main/ops/build-runner/jobs.mjs 
+pid 460360 cwd=/home/ubuntu/julia-machine-main
+op run --env-file /home/ubuntu/julia-machine-main/scripts/julia-agents.env -- /opt/node-v24.14.1/bin/node /home/ubuntu/julia-machine-main/ops/mastra-agents/reviewer/src/mastra/control-server.ts 
+pid 460392 cwd=/home/ubuntu/julia-machine-main
+/opt/node-v24.14.1/bin/node /home/ubuntu/julia-machine-main/ops/build-runner/jobs.mjs 
+pid 460398 cwd=/home/ubuntu/julia-machine-main
+/opt/node-v24.14.1/bin/node /home/ubuntu/julia-machine-main/ops/mastra-agents/reviewer/src/mastra/control-server.ts 
+=== old JUL-231 units
+Unit julia-jul231-runner.service could not be found.
+Unit julia-jul231-control.service could not be found.
+-rw-r--r-- 1 ubuntu ubuntu  184 Oct 21 17:35 julia-control-jul231.service
+(end ls)
+=== health
+runner 200
+control 200
