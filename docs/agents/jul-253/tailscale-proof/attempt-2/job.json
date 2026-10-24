@@ -1,0 +1,45 @@
+{
+  "runId": "jul-254-551c2aab2a1005b421fffb7fb1bd0464",
+  "snapshot": {
+    "runId": "jul-254-551c2aab2a1005b421fffb7fb1bd0464",
+    "card": {
+      "identifier": "JUL-254",
+      "state": "Ready",
+      "description": "## Agent Brief\n\n**Category:** enhancement / machine proof fixture\n\n**Summary:** Run the marker-file practice build requested by Todd for [JUL-253](https://linear.app/julia-next/issue/JUL-253/connect-subscriptions-and-enforce-the-dollar2-card-cap) through the server Start page.\n\n**Current behavior:**\n\nThis practice marker is absent from the [JUL-253](https://linear.app/julia-next/issue/JUL-253/connect-subscriptions-and-enforce-the-dollar2-card-cap) candidate.\n\n**Desired behavior:**\n\nCreate `JUL-253-START-PRACTICE.txt` containing exactly `Julia subscriptions build through Start.` followed by exactly one newline. The resulting clean candidate commit contains this marker as its repository change.\n\n**Key interfaces:**\n\n`JUL-253-START-PRACTICE.txt` is the requested output. The server Start page supplies the saved card to the machine.\n\n**Acceptance criteria:**\n\n* The marker exists in the candidate commit with exactly the approved sentence and one newline.\n* The candidate commit is clean and non-empty, with the marker as its sole repository change.\n* The saved build uses Sol for the main session and DeepSeek for coding, with their actual requests and API-price debits recorded in this practice card's shared ledger under the existing $2 cap.\n\n**Proof:**\n\nUse the real server Start page through Todd's Tailscale address. Read the marker bytes from the exact resulting commit. Retain the Start response, job result, pstack checklist/events and ledger entries for Sol and DeepSeek.\n\n**Out of scope:**\n\nPublishing or merging the marker into Julia. Production deployment, household behavior and cleanup of pre-existing OVH leftovers belong outside this practice fixture. Pstack's internal build, code review and verification remain part of the machine run.\n\n**Authorization:**\n\nTodd explicitly requested one practice-card build through the server Start route for [JUL-253](https://linear.app/julia-next/issue/JUL-253/connect-subscriptions-and-enforce-the-dollar2-card-cap) on 23 October 2026 after the OVH readback was pushed. This card records that authorized practice scope. The $2 per-card cap and agreed model split remain unchanged.\n\n**Same-card retry record:**\n\nThe first server Start run failed before inference because request logging consumed the native streamed request body. Its ledger remains at zero spent and zero held. The next run uses the repaired request observer. The approved marker bytes, acceptance criteria, chosen Sol/DeepSeek roles and existing $2 practice-card ledger are unchanged.",
+      "frameworkMaps": [],
+      "title": "Practice JUL-253 through server Start"
+    },
+    "roles": {
+      "orchestrator": {
+        "route": "openai-codex",
+        "modelId": "gpt-6-sol",
+        "company": "OpenAI",
+        "service": "ChatGPT plan",
+        "wire": "responses",
+        "effort": "medium"
+      },
+      "coder": {
+        "route": "commandcode",
+        "modelId": "deepseek/deepseek-v4.1-flash",
+        "company": "DeepSeek",
+        "service": "CommandCode",
+        "wire": "chat",
+        "effort": "medium"
+      }
+    },
+    "state": "ready-for-build",
+    "initializedAt": "2026-10-23T23:01:26.969Z"
+  },
+  "settingsPath": "/home/ubuntu/julia-jul-253/ops/build-runner/machine-settings.json",
+  "worktree": "/home/ubuntu/.local/state/julia-jul253-start-proof/jobs/jul-254-551c2aab2a1005b421fffb7fb1bd0464/worktree",
+  "baseCommit": "808c6c8a070a387097185508d44c30ede7babb3f",
+  "runnerPid": 587150,
+  "state": "failed",
+  "workerPid": 587321,
+  "result": null,
+  "error": {
+    "message": "session not completed",
+    "stack": "Error: session not completed\n    at main (file:///home/ubuntu/julia-jul-253/ops/build-runner/worker.mjs:108:60)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)"
+  },
+  "createdAt": "2026-10-23T23:01:31.086Z"
+}

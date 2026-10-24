@@ -9,9 +9,9 @@ export function testOwners(root = process.cwd()) {
     .split('\0').filter(path => path && existsSync(join(root, path)));
   const paths = new Set(files);
   const owners = files.filter(path => path === 'package.json' || path.endsWith('/package.json')).map(manifest => {
-    const directory = dirname(manifest);
-    const npmLock = join(directory, 'package-lock.json');
-    const bunLock = join(directory, 'bun.lock');
+    const directory = dirname(manifest).replaceAll('\\', '/');
+    const npmLock = join(directory, 'package-lock.json').replaceAll('\\', '/');
+    const bunLock = join(directory, 'bun.lock').replaceAll('\\', '/');
     const lockfile = paths.has(npmLock) ? npmLock : paths.has(bunLock) ? bunLock : null;
     if (!lockfile) throw new Error(`Dependency owner ${directory} has no committed lockfile`);
     return { directory, lockfile, runtime: lockfile.endsWith('bun.lock') ? 'bun' : 'node', tests: { local: [], server: [], browser: [] } };

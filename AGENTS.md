@@ -27,7 +27,9 @@ An open PR to main with the proof in it and CI green.
 
 | Rule | Enforcement |
 | --- | --- |
-| Inline Markdown links and slash-containing source paths in the entry points resolve. | `node scripts/check-agent-links.mjs` checks AGENTS.md, CLAUDE.md and CODING_STANDARDS.md locally and in CI. |
+| Skill names are unique across the installed catalogs. | `node scripts/check-skill-names.mjs` rejects duplicate frontmatter names. |
+| Current agent-read files point only at paths that exist. | `node scripts/check-agent-links.mjs` checks the entry points, pstack skills, `ask-matt`, and generated recovery prompt. |
+| Every branch except `main` has an open pull request to `main`. | `node scripts/check-branch-pr.mjs` audits GitHub branches and open pull requests in CI. |
 
 <!-- BEGIN:nextjs-agent-rules -->
 

@@ -14,7 +14,7 @@ give the reason.
 
 ## Build
 
-Build test-first with `.claude/skills/tdd/SKILL.md`.
+Build test-first with `.agents/skills/tdd/SKILL.md`.
 
 ## Reviewer checks
 

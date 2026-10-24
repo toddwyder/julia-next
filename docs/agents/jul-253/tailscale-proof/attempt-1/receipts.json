@@ -1,0 +1,29 @@
+[
+  {
+    "result": {
+      "status": "error",
+      "text": "",
+      "finishReason": "error",
+      "toolCalls": [],
+      "toolResults": [],
+      "threadId": "30241f02-892d-4526-9e0d-5b77a792edb4",
+      "error": {
+        "name": "Error",
+        "message": "Invalid HTTP request",
+        "stack": "Error: Invalid HTTP request\n    at fail (file:///home/ubuntu/julia-jul-253/ops/build-runner/transport.mjs:7:25)\n    at guardedFetch (file:///home/ubuntu/julia-jul-253/ops/build-runner/transport.mjs:169:63)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async globalThis.fetch (file:///home/ubuntu/julia-jul-253/ops/build-runner/worker.mjs:104:26)\n    at async file:///home/ubuntu/julia-jul-253/ops/build-runner/node_modules/@mastra/code-sdk/dist/providers/openai-codex.js:165:44\n    at async postToApi (file:///home/ubuntu/julia-jul-253/ops/build-runner/node_modules/@ai-sdk/openai/node_modules/@ai-sdk/provider-utils/dist/index.mjs:2727:22)\n    at async OpenAIResponsesLanguageModel.doStream (file:///home/ubuntu/julia-jul-253/ops/build-runner/node_modules/@ai-sdk/openai/dist/index.mjs:6960:50)\n    at async AISDKV6LanguageModel.doStream (file:///home/ubuntu/julia-jul-253/ops/build-runner/node_modules/@mastra/core/dist/llm-DtX483Xc.js:105:10)\n    at async ModelRouterLanguageModel.doStream (file:///home/ubuntu/julia-jul-253/ops/build-runner/node_modules/@mastra/core/dist/llm-DtX483Xc.js:8413:25)"
+      },
+      "exitCode": 1
+    },
+    "threadId": "30241f02-892d-4526-9e0d-5b77a792edb4",
+    "account": {
+      "card": "JUL-254",
+      "ceilingNano": 2000000000,
+      "stopped": false,
+      "spentNano": 0,
+      "heldNano": 0,
+      "remainingNano": 2000000000,
+      "pricedBlocked": false,
+      "requests": []
+    }
+  }
+]

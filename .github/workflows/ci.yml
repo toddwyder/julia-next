@@ -3,13 +3,31 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
+  repository-hygiene:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.14.1
+      - name: Require unique skill names
+        run: node scripts/check-skill-names.mjs
+      - name: Require current agent-read paths
+        run: node scripts/check-agent-links.mjs
+      - name: Require an open pull request for every branch
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/check-branch-pr.mjs
+
   package-tests:
     runs-on: ubuntu-22.04
     permissions:
@@ -74,10 +92,11 @@ jobs:
         run: node scripts/await-server-tests.mjs "$CANDIDATE_HEAD"
 
   checks:
-    needs: [package-tests, web, server-tests]
+    needs: [repository-hygiene, package-tests, web, server-tests]
     if: always()
     runs-on: ubuntu-22.04
     env:
+      REPOSITORY_HYGIENE: ${{ needs.repository-hygiene.result }}
       PACKAGE_TESTS: ${{ needs.package-tests.result }}
       WEB: ${{ needs.web.result }}
       SERVER_TESTS: ${{ needs.server-tests.result }}
@@ -85,6 +104,7 @@ jobs:
       - name: Require every test environment to pass
         run: |
           set -euo pipefail
+          [[ "$REPOSITORY_HYGIENE" == success ]]
           [[ "$PACKAGE_TESTS" == success ]]
           [[ "$WEB" == success ]]
           [[ "$SERVER_TESTS" == success ]]

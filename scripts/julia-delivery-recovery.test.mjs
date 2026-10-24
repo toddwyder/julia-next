@@ -39,7 +39,7 @@ test('a Codex recovery fix is independently reviewed by unpinned Gemini, verifie
     fix: async request => {
       calls.push(['fix', request]);
       assert.equal(request.configuration.model, null);
-      assert.match(request.prompt, /diagnosing-bugs\/SKILL\.md/);
+      assert.match(request.prompt, /reproduce-and-fix-issues\/SKILL\.md/);
       assert.match(request.prompt, /Do not run the complete runner suite/);
       assert.match(request.prompt, /Do not put TEMP or TMP inside the repository/);
       sourceDirty = true;

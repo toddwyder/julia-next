@@ -11,7 +11,10 @@ function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), 'agent-links-'));
   t.after(() => rmSync(root, { force: true, recursive: true }));
   for (const file of ['AGENTS.md', 'CLAUDE.md', 'CODING_STANDARDS.md']) writeFileSync(join(root, file), '# Work\n');
-  const write = (file, content) => writeFileSync(join(root, file), content);
+  const write = (file, content) => {
+    mkdirSync(join(root, file, '..'), { recursive: true });
+    writeFileSync(join(root, file), content);
+  };
   const run = () => spawnSync(process.execPath, [cli, root], { encoding: 'utf8' });
   return { root, write, run };
 }
@@ -61,4 +64,12 @@ test('root file references and source files beyond JavaScript must exist', t => 
   f.write('scripts/windows.ps1', '');
   result = f.run();
   assert.equal(result.status, 0, result.stderr);
+});
+
+test('skill instructions cannot point agents at missing files', t => {
+  const f = fixture(t);
+  f.write('.agents/skills/recovery/SKILL.md', 'Read `.agents/skills/diagnosing-bugs/SKILL.md`.\n');
+  const result = f.run();
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /\.agents\/skills\/recovery\/SKILL\.md:1: \.agents\/skills\/diagnosing-bugs\/SKILL\.md does not exist/);
 });

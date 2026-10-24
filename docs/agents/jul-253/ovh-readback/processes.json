@@ -1,0 +1,405 @@
+[
+  {
+    "pid": 50685,
+    "comm": "codex",
+    "cwd": "/home/ubuntu",
+    "exe": "/home/ubuntu/.codex/packages/app-server-daemon/releases/0.164.0-x86_64-unknown-linux-musl/bin/codex",
+    "argvPathReferences": [
+      "/home/ubuntu/.codex/packages/app-server-daemon/releases/0.164.0-x86_64-unknown-linux-musl/bin/codex"
+    ],
+    "openFilePaths": [
+      "/home/ubuntu/.codex/app-server-daemon/daemon-updater.stderr.log",
+      "/home/ubuntu/.codex/tmp/arg0-linux/codex-arg0n4hnRa/.lock",
+      "/tmp/codex-daemon-1000/1e0f90e6d46ccf59f93df07af65ff26025c696c5667f733393970edbe63e8732.lock"
+    ]
+  },
+  {
+    "pid": 51137,
+    "comm": "tmux: server",
+    "cwd": "/home/ubuntu/julia-next",
+    "exe": "/usr/bin/tmux",
+    "argvPathReferences": [],
+    "openFilePaths": []
+  },
+  {
+    "pid": 51138,
+    "comm": "bash",
+    "cwd": "/home/ubuntu/julia-next",
+    "exe": "/usr/bin/bash",
+    "argvPathReferences": [],
+    "openFilePaths": []
+  },
+  {
+    "pid": 52679,
+    "comm": "MainThread",
+    "cwd": "/home/ubuntu/julia-next",
+    "exe": "/opt/node-v24.14.1/bin/node",
+    "argvPathReferences": [
+      "/usr/local/bin/codex"
+    ],
+    "openFilePaths": []
+  },
+  {
+    "pid": 52686,
+    "comm": "codex",
+    "cwd": "/home/ubuntu/julia-next",
+    "exe": "/opt/node-v24.14.1/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin/codex",
+    "argvPathReferences": [
+      "/opt/node-v24.14.1/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin/codex"
+    ],
+    "openFilePaths": [
+      "/home/ubuntu/.codex/tmp/arg0-linux/codex-arg0u21LBX/.lock"
+    ]
+  },
+  {
+    "pid": 94175,
+    "comm": "codex",
+    "cwd": "/tmp/framework-map-publish-candidate/ops/mastra-agents/reviewer (deleted)",
+    "exe": "/home/ubuntu/.codex/packages/app-server-daemon/releases/0.163.0-x86_64-unknown-linux-musl/bin/codex",
+    "argvPathReferences": [
+      "/home/ubuntu/julia-next",
+      "/home/ubuntu/julia-next/.agents",
+      "/home/ubuntu/julia-next/.aws",
+      "/home/ubuntu/julia-next/.codex",
+      "/home/ubuntu/julia-next/.git",
+      "/tmp/framework-map-publish-candidate/ops/mastra-agents/reviewer"
+    ],
+    "openFilePaths": []
+  },
+  {
+    "pid": 95047,
+    "comm": "codex",
+    "cwd": "/tmp/framework-map-publish-candidate/ops/mastra-agents/reviewer (deleted)",
+    "exe": "/home/ubuntu/.codex/packages/app-server-daemon/releases/0.163.0-x86_64-unknown-linux-musl/bin/codex",
+    "argvPathReferences": [
+      "/home/ubuntu/julia-next",
+      "/home/ubuntu/julia-next/.agents",
+      "/home/ubuntu/julia-next/.aws",
+      "/home/ubuntu/julia-next/.codex",
+      "/home/ubuntu/julia-next/.git",
+      "/tmp/framework-map-publish-candidate/ops/mastra-agents/reviewer"
+    ],
+    "openFilePaths": []
+  },
+  {
+    "pid": 102867,
+    "comm": "MainThread",
+    "cwd": "/home/ubuntu/julia-next",
+    "exe": "/opt/node-v24.14.1/bin/node",
+    "argvPathReferences": [
+      "/usr/local/bin/codex"
+    ],
+    "openFilePaths": []
+  },
+  {
+    "pid": 102874,
+    "comm": "codex",
+    "cwd": "/home/ubuntu/julia-next",
+    "exe": "/opt/node-v24.14.1/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin/codex",
+    "argvPathReferences": [
+      "/opt/node-v24.14.1/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin/codex"
+    ],
+    "openFilePaths": [
+      "/home/ubuntu/.codex/logs_2.sqlite",
+      "/home/ubuntu/.codex/logs_2.sqlite-shm",
+      "/home/ubuntu/.codex/logs_2.sqlite-wal",
+      "/home/ubuntu/.codex/tmp/arg0-linux/codex-arg0JmGHW0/.lock"
+    ]
+  },
+  {
+    "pid": 134402,
+    "comm": "tmux: client",
+    "cwd": "/home/ubuntu/julia-next",
+    "exe": "/usr/bin/tmux",
+    "argvPathReferences": [],
+    "openFilePaths": []
+  },
+  {
+    "pid": 187091,
+    "comm": "MainThread",
+    "cwd": "/home/ubuntu/julia-next",
+    "exe": "/opt/node-v24.14.1/bin/node",
+    "argvPathReferences": [
+      "/usr/local/bin/codex"
+    ],
+    "openFilePaths": []
+  },
+  {
+    "pid": 187098,
+    "comm": "codex",
+    "cwd": "/home/ubuntu/julia-next",
+    "exe": "/opt/node-v24.14.1/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin/codex",
+    "argvPathReferences": [
+      "/opt/node-v24.14.1/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin/codex"
+    ],
+    "openFilePaths": [
+      "/home/ubuntu/.codex/logs_2.sqlite",
+      "/home/ubuntu/.codex/logs_2.sqlite-shm",
+      "/home/ubuntu/.codex/logs_2.sqlite-wal",
+      "/home/ubuntu/.codex/tmp/arg0-linux/codex-arg0Y0VBca/.lock"
+    ]
+  },
+  {
+    "pid": 319826,
+    "comm": "codex",
+    "cwd": "/home/ubuntu",
+    "exe": "/home/ubuntu/.codex/packages/app-server-daemon/releases/0.164.0-x86_64-unknown-linux-musl/bin/codex",
+    "argvPathReferences": [
+      "/home/ubuntu/.codex/packages/app-server-daemon/releases/0.164.0-x86_64-unknown-linux-musl/bin/codex"
+    ],
+    "openFilePaths": [
+      "/home/ubuntu/.codex/.sqlite-maintenance.lock",
+      "/home/ubuntu/.codex/app-server-daemon/daemon.stderr.log",
+      "/home/ubuntu/.codex/goals_1.sqlite",
+      "/home/ubuntu/.codex/goals_1.sqlite-shm",
+      "/home/ubuntu/.codex/goals_1.sqlite-wal",
+      "/home/ubuntu/.codex/logs_2.sqlite",
+      "/home/ubuntu/.codex/logs_2.sqlite-shm",
+      "/home/ubuntu/.codex/logs_2.sqlite-wal",
+      "/home/ubuntu/.codex/queue_1.sqlite",
+      "/home/ubuntu/.codex/queue_1.sqlite-shm",
+      "/home/ubuntu/.codex/queue_1.sqlite-wal",
+      "/home/ubuntu/.codex/sessions/2026/10/23/rollout-2026-10-23T20-31-52-01a16a76-7bed-7cf2-b59f-28093e5363c3.jsonl",
+      "/home/ubuntu/.codex/sessions/2026/10/23/rollout-2026-10-23T20-57-12-01a16a8d-ac6e-7723-af49-818a2b16be4c.jsonl",
+      "/home/ubuntu/.codex/sessions/2026/10/23/rollout-2026-10-23T22-34-26-01a16ae6-b398-7123-a5ca-42b7b3526def.jsonl",
+      "/home/ubuntu/.codex/sessions/2026/10/23/rollout-2026-10-23T22-34-32-01a16ae6-c975-7861-bc38-98885b020f4b.jsonl",
+      "/home/ubuntu/.codex/state_5.sqlite",
+      "/home/ubuntu/.codex/state_5.sqlite-shm",
+      "/home/ubuntu/.codex/state_5.sqlite-wal",
+      "/home/ubuntu/.codex/thread-writer-locks/01a16a76-7bed-7cf2-b59f-28093e5363c3.lock",
+      "/home/ubuntu/.codex/thread-writer-locks/01a16a8d-ac6e-7723-af49-818a2b16be4c.lock",
+      "/home/ubuntu/.codex/thread-writer-locks/01a16ae6-b398-7123-a5ca-42b7b3526def.lock",
+      "/home/ubuntu/.codex/thread-writer-locks/01a16ae6-c975-7861-bc38-98885b020f4b.lock",
+      "/home/ubuntu/.codex/thread_history_1.sqlite",
+      "/home/ubuntu/.codex/thread_history_1.sqlite-shm",
+      "/home/ubuntu/.codex/thread_history_1.sqlite-wal",
+      "/home/ubuntu/.codex/tmp/arg0-linux/codex-arg0KzmljY/.lock",
+      "/tmp/codex-daemon-1000/3995b33bdf9eda101b673291de44dded1a1e7e8a3687e9ea65b51472a4acfa9e.lock"
+    ]
+  },
+  {
+    "pid": 478133,
+    "comm": "MainThread",
+    "cwd": "/home/ubuntu/julia-next",
+    "exe": "/opt/node-v24.14.1/bin/node",
+    "argvPathReferences": [
+      "/usr/local/bin/codex"
+    ],
+    "openFilePaths": []
+  },
+  {
+    "pid": 478140,
+    "comm": "codex",
+    "cwd": "/home/ubuntu/julia-next",
+    "exe": "/opt/node-v24.14.1/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin/codex",
+    "argvPathReferences": [
+      "/opt/node-v24.14.1/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin/codex"
+    ],
+    "openFilePaths": [
+      "/home/ubuntu/.codex/logs_2.sqlite",
+      "/home/ubuntu/.codex/logs_2.sqlite-shm",
+      "/home/ubuntu/.codex/logs_2.sqlite-wal",
+      "/home/ubuntu/.codex/tmp/arg0-linux/codex-arg0BCvCHu/.lock"
+    ]
+  },
+  {
+    "pid": 533197,
+    "comm": "MainThread",
+    "cwd": "/home/ubuntu/julia-machine-main",
+    "exe": "/opt/node-v24.14.1/bin/node",
+    "argvPathReferences": [
+      "/home/ubuntu/.config/julia-machine/config.json",
+      "/home/ubuntu/.local/lib/julia-machine/server-main.mjs",
+      "/usr/local/bin/node"
+    ],
+    "openFilePaths": []
+  },
+  {
+    "pid": 533215,
+    "comm": "MainThread",
+    "cwd": "/home/ubuntu/julia-machine-main",
+    "exe": "/opt/node-v24.14.1/bin/node",
+    "argvPathReferences": [
+      "/home/ubuntu/julia-machine-main/ops/build-runner/jobs.mjs",
+      "/home/ubuntu/julia-machine-main/scripts/julia-agents.mjs",
+      "/opt/node-v24.14.1/bin/node"
+    ],
+    "openFilePaths": []
+  },
+  {
+    "pid": 533231,
+    "comm": "MainThread",
+    "cwd": "/home/ubuntu/julia-machine-main",
+    "exe": "/opt/node-v24.14.1/bin/node",
+    "argvPathReferences": [
+      "/home/ubuntu/.config/julia-machine/config.json",
+      "/home/ubuntu/.local/lib/julia-machine/server-main.mjs",
+      "/usr/local/bin/node"
+    ],
+    "openFilePaths": []
+  },
+  {
+    "pid": 533240,
+    "comm": "MainThread",
+    "cwd": "/home/ubuntu/julia-machine-main",
+    "exe": "/opt/node-v24.14.1/bin/node",
+    "argvPathReferences": [
+      "/home/ubuntu/julia-machine-main/ops/mastra-agents/reviewer/src/mastra/control-server.ts",
+      "/home/ubuntu/julia-machine-main/scripts/julia-agents.mjs",
+      "/opt/node-v24.14.1/bin/node"
+    ],
+    "openFilePaths": []
+  },
+  {
+    "pid": 533256,
+    "comm": "op",
+    "cwd": "/home/ubuntu/julia-machine-main",
+    "exe": "/usr/local/bin/op",
+    "argvPathReferences": [
+      "/home/ubuntu/julia-machine-main/ops/build-runner/jobs.mjs",
+      "/home/ubuntu/julia-machine-main/scripts/julia-agents.env",
+      "/opt/node-v24.14.1/bin/node"
+    ],
+    "openFilePaths": []
+  },
+  {
+    "pid": 533263,
+    "comm": "op",
+    "cwd": "/home/ubuntu/julia-machine-main",
+    "exe": "/usr/local/bin/op",
+    "argvPathReferences": [
+      "/home/ubuntu/julia-machine-main/ops/mastra-agents/reviewer/src/mastra/control-server.ts",
+      "/home/ubuntu/julia-machine-main/scripts/julia-agents.env",
+      "/opt/node-v24.14.1/bin/node"
+    ],
+    "openFilePaths": []
+  },
+  {
+    "pid": 533270,
+    "comm": "MainThread",
+    "cwd": "/home/ubuntu/julia-machine-main",
+    "exe": "/opt/node-v24.14.1/bin/node",
+    "argvPathReferences": [
+      "/home/ubuntu/julia-machine-main/ops/build-runner/jobs.mjs",
+      "/opt/node-v24.14.1/bin/node"
+    ],
+    "openFilePaths": []
+  },
+  {
+    "pid": 533282,
+    "comm": "MainThread",
+    "cwd": "/home/ubuntu/julia-machine-main",
+    "exe": "/opt/node-v24.14.1/bin/node",
+    "argvPathReferences": [
+      "/home/ubuntu/julia-machine-main/ops/mastra-agents/reviewer/src/mastra/control-server.ts",
+      "/opt/node-v24.14.1/bin/node"
+    ],
+    "openFilePaths": [
+      "/home/ubuntu/.local/state/julia-jul231/initialization.db",
+      "/home/ubuntu/.local/state/julia-jul231/initialization.db-shm",
+      "/home/ubuntu/.local/state/julia-jul231/initialization.db-wal"
+    ]
+  },
+  {
+    "pid": 572921,
+    "comm": "bash",
+    "cwd": "/home/ubuntu/julia-jul-253-handoff",
+    "exe": "/usr/bin/bash",
+    "argvPathReferences": [
+      "/home/ubuntu/.agents/pstack-models.md",
+      "/home/ubuntu/.bashrc",
+      "/home/ubuntu/.codex/config.toml",
+      "/home/ubuntu/.config/git/",
+      "/home/ubuntu/.config/systemd/",
+      "/home/ubuntu/.gitconfig",
+      "/home/ubuntu/.local/state/julia-jul253/ovh-inventory-progress.txt",
+      "/home/ubuntu/.profile",
+      "/home/ubuntu/julia-jul-253",
+      "/home/ubuntu/julia-jul-253-handoff",
+      "/home/ubuntu/julia-jul-253-handoff/docs/agents/jul-253/ovh-readback",
+      "/home/ubuntu/julia-machine-main",
+      "/home/ubuntu/julia-next",
+      "/home/ubuntu/julia-next/.agents/skills",
+      "/home/ubuntu/julia-next/.agents/skills/",
+      "/opt/julia-control",
+      "/usr/local/bin/julia",
+      "/usr/local/sbin/julia",
+      "/var/lib/julia",
+      "/var/lib/julia-build"
+    ],
+    "openFilePaths": []
+  },
+  {
+    "pid": 572927,
+    "comm": "sudo",
+    "cwd": "/home/ubuntu/julia-jul-253-handoff",
+    "exe": "/usr/bin/sudo",
+    "argvPathReferences": [],
+    "openFilePaths": [
+      "/home/ubuntu/.local/state/julia-jul253/ovh-inventory-progress.txt"
+    ]
+  },
+  {
+    "pid": 572928,
+    "comm": "python3",
+    "cwd": "/home/ubuntu/julia-jul-253-handoff",
+    "exe": "/usr/bin/python3.12",
+    "argvPathReferences": [],
+    "openFilePaths": [
+      "/home/ubuntu/.local/state/julia-jul253/ovh-inventory-progress.txt"
+    ]
+  },
+  {
+    "pid": 573209,
+    "comm": "flock",
+    "cwd": "/home/ubuntu",
+    "exe": "/usr/bin/flock",
+    "argvPathReferences": [
+      "/home/ubuntu/.config/julia-server-tests/config.json",
+      "/home/ubuntu/.local/lib/julia-server-tests/worker.mjs",
+      "/home/ubuntu/.local/state/julia-server-tests/worker.lock",
+      "/usr/local/bin/node"
+    ],
+    "openFilePaths": [
+      "/home/ubuntu/.local/state/julia-server-tests/worker.lock"
+    ]
+  },
+  {
+    "pid": 573213,
+    "comm": "MainThread",
+    "cwd": "/home/ubuntu",
+    "exe": "/opt/node-v24.14.1/bin/node",
+    "argvPathReferences": [
+      "/home/ubuntu/.config/julia-server-tests/config.json",
+      "/home/ubuntu/.local/lib/julia-server-tests/worker.mjs",
+      "/usr/local/bin/node"
+    ],
+    "openFilePaths": [
+      "/home/ubuntu/.local/state/julia-server-tests/worker.lock"
+    ]
+  },
+  {
+    "pid": 573490,
+    "comm": "git",
+    "cwd": "/home/ubuntu/.local/state/julia-server-tests/8a0d87cbc9c56458c367a2cd2b6bae4083c48722/receipt",
+    "exe": "/usr/bin/git",
+    "argvPathReferences": [],
+    "openFilePaths": []
+  },
+  {
+    "pid": 573491,
+    "comm": "git",
+    "cwd": "/home/ubuntu/.local/state/julia-server-tests/8a0d87cbc9c56458c367a2cd2b6bae4083c48722/receipt",
+    "exe": "/usr/lib/git-core/git",
+    "argvPathReferences": [],
+    "openFilePaths": []
+  },
+  {
+    "pid": 573493,
+    "comm": "git-remote-http",
+    "cwd": "/home/ubuntu/.local/state/julia-server-tests/8a0d87cbc9c56458c367a2cd2b6bae4083c48722/receipt",
+    "exe": "/usr/lib/git-core/git-remote-http",
+    "argvPathReferences": [],
+    "openFilePaths": []
+  }
+]
