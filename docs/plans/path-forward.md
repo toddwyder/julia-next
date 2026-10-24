@@ -40,9 +40,10 @@ Working document. Each line is a decision Todd agreed in conversation.
 - Decided: retire Pocock's `tdd` and `teach`; pstack's versions everywhere. (pstack `teach` = explain a piece of work plainly; agents never start it themselves; it can explain an already-found root cause, while finding one is the debugging skills' job.) Pocock's `ask-matt` reference to `/teach` changes too.
 - Structural fix: pstack lives in its own folder, so updating pstack is one replacement; CI fails if two installed skills share a name.
 
-## Evidence check (12:09–12:12)
-- **Is the evidence there:** structural, via retro fix 1 (build result can't be saved without pstack's checklist, regression results and the generated evidence index; the machine won't advance a card with pieces missing).
-- **Is the evidence right** (does it prove each criterion where Todd uses it): **kept** (Todd, 12:12). The hold was reversed: wrong-but-present evidence got past pstack and the builder's report twice today and was stopped only by the advisor's human review. The machine starts a review after each build, by a model from a different company than the builder; input is only the card's criteria, the evidence index and the raw files; per-criterion verdict (proven / not proven / wrong thing tested); a failure returns the card to the build; at most two rounds. This is JUL-252's job.
+## Evidence check (12:09–12:12, revised 24 Oct)
+- **Is the evidence there:** **dropped** (Todd, 24 Oct). No evidence index. The reviewer reads the proof folder for the exact candidate commit; a missing or thin proof folder is a failed criterion, not a separate gate. The "evidence is there" card is dropped.
+- **Is the evidence right** (does it prove each criterion where Todd uses it): **kept** (Todd, 12:12; inputs settled 24 Oct). Wrong-but-present evidence got past pstack and the builder's report twice on 23 Oct and was stopped only by the advisor's human review. The machine starts a review after each build, by a model from a different company than the builder; input is only the card's criteria and the proof folder; per-criterion verdict (proven / not proven / wrong thing tested), each verdict naming its proof file. A first failure moves the card to **Remediation**, where a fix starts automatically on poteto's **Bug fix** playbook from the review's findings; a second failure runs poteto's **Investigation** playbook for the root cause, then the card stops. At most two reviews. This is JUL-252's job.
+- **Playbook conformity (Todd, 24 Oct):** every build and remediation run records the playbook it must follow (a build: the playbook it declares; first remediation: Bug fix; second: Investigation). The machine saves no result for a run whose checklist does not follow that playbook.
 - **Checkpoint (Todd, 12:12):** after five cards have been through the review, look at what it actually caught (real catches vs noise, cost) and decide again whether to keep it. Goes into JUL-252 as Todd's decision when it's triaged.
 - `/interrogate` stays inside the build as pstack's code review (it reviews the diff, not the evidence).
 
@@ -59,7 +60,8 @@ Working document. Each line is a decision Todd agreed in conversation.
 ## Failures after Implementation and the board (12:15–12:16)
 | Failure | What happens | Stop rule |
 |---|---|---|
-| Evidence review: a criterion not proven | Back to the build with the findings | 2nd review failure stops the card |
+| Evidence review: a criterion not proven | 1st: card to Remediation, fix starts automatically on the Bug fix playbook from the findings. 2nd: Investigation playbook for the root cause, then stop | 2nd review failure stops the card |
+| A checklist does not follow the run's required playbook | The run is refused; no result is saved | Card stays where it is |
 | Staging or smoke test fails | Back to the build with the failing tests | 2nd proof failure stops the card |
 | UAT send-back | Back to the build with Todd's note | 2nd send-back stops the card |
 | Live check after merge fails | Revert (Julia) / roll back (machine), then back to the build | Counts |
@@ -88,9 +90,8 @@ The agreed fixes from the JUL-231 retro are folded into the cards below.
 2. Live view: the dashboard shows the running build’s pstack checklist, ticking off steps as they finish.
 3. Deployment safety: updater as sole service starter from main, owns the Tailscale route, its test, proofs through Todd's address; remove stale live-state docs. (`CLAUDE.md` already fixed: it imports `AGENTS.md`, PR #320.)
 4. Clean-up: GitHub merge protection (drop the AGENTS CI line), pstack in its own folder + duplicate-skill-name CI check + retire Pocock `tdd`/`teach` (and the `ask-matt` reference), retire pre-plan (including updating Start's admission check to the short brief: it still requires pre-plan-era fields; that check also runs four writing-for-agents rules as one script: no text copied from repo docs, criteria in outcome form, no implementation words in criteria, no negations in criteria; the planner agent runs the same script before showing Todd a brief; Todd 13:29), empty-lint fix, no-fakes CI check, remove Code review column.
-5. Evidence there: build result requires checklist and evidence index.
-6. Evidence review (JUL-252) with the five-card checkpoint.
-7. Staging: regression suite against the Vercel preview; `verify-julia` rewritten for Linux and a given address.
-8. UAT and merge: notification, accept/send-back, automatic merge, live check, revert/rollback.
-9. Automatic retro: `/correct` after merge, plain-English list, Todd approves.
+5. Evidence review (JUL-252) with the five-card checkpoint. The "evidence there" card is dropped: no index, the reviewer reads the proof folder. (Todd, 24 Oct)
+6. Staging: regression suite against the Vercel preview; `verify-julia` rewritten for Linux and a given address.
+7. UAT and merge: notification, accept/send-back, automatic merge, live check, revert/rollback.
+8. Automatic retro: `/correct` after merge, plain-English list, Todd approves.
 Cards 1–4 are built by the planner agent in fresh sessions. From card 5 on, the machine builds the cards itself (Start's admission check accepts the short brief once card 4 lands, and card 1 lets the machine use paid models); the planner agent shapes cards with Todd. (Todd, 13:33)

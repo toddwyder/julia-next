@@ -18,3 +18,16 @@ The first CI run failed because scripts/agent-docs.test.mjs still required the o
 Framework map: connected Linear tools and https://linear.app/developers/graphql, reached through its llms.txt; installed gh 2.45.0 help for pr create, checks and merge. This changes documentation only.
 
 User instructions override the skill's generic approval and prose templates: create the settled card now, use the exact one-line cancellation, post only a link in the reply, and merge after green CI.
+
+## 24 October revisit
+
+Todd settled the review's inputs and failure handling on 24 October. The card was re-triaged in place; the status stays Backlog until Todd says settled.
+
+- No evidence index. The reviewer reads the proof folder for the exact candidate commit; a missing or thin proof folder is a failed criterion.
+- The "evidence is there" card is dropped. No Linear card existed for it, so nothing was canceled.
+- First failed review: the card moves to Remediation and a fix starts automatically on the Bug fix playbook from the review's findings.
+- Second failed review: an Investigation run reports the root cause, then the card stops.
+- Every build and remediation run records its required playbook (build: the playbook it declares; first remediation: Bug fix; second: Investigation). The machine saves no result for a run whose checklist follows a different playbook.
+- The five-card checkpoint stays.
+
+Maker self-check: live Linear readback in evidence/2026-10-24-triage/readback.json confirms the title, labels, status and comment. The description matches card-brief.md after Linear's Markdown normalisation of bullet markers and ordered-list indentation. The review implementation does not exist yet: ops/build-runner/worker.mjs ends at ready-for-review, and ops/build-runner/pstack-session.mjs checks that a checklist exists, not that it follows a playbook.

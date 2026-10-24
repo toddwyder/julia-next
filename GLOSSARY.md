@@ -210,6 +210,12 @@ _Avoid_: Feature, story, epic, screen
 What Proof produces, showing that every acceptance criterion was met. No Evidence means not done.
 _Avoid_: Demo, proof of work, "it works"
 
+**Evidence review**:
+The automatic check after a build: a model from a different company than the builder gives every
+acceptance criterion a verdict of proven, not proven or wrong thing tested, naming the proof file it
+rests on. The reviewer reads the card's criteria and the proof folder.
+_Avoid_: Code review, sign-off, approval
+
 **Adversarial review**:
 A review by a different model maker than the builder's that tries to break the work rather
 than confirm it, giving a verdict on every acceptance criterion or naming the evidence that is
@@ -221,6 +227,11 @@ The checks a pull request passes before merge: CI on GitHub's runners and Factor
 review, both on the same head. A failed gate bounces the work back to the builder.
 There is no pre-merge Todd approval.
 _Avoid_: Review, QA, approval
+
+**Remediation**:
+The board column a card moves to when an evidence review fails. A fix starts automatically on the
+Bug fix playbook from the review's findings; a second failure stops the card after an Investigation.
+_Avoid_: Rework, retry, bounce
 
 **Bounce**:
 A gate or Todd sending work back to its builder, through Factory, with the reason it failed.
