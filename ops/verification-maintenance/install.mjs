@@ -30,7 +30,7 @@ if (action === 'uninstall') {
   if (!existsSync(configFile)) writeFileSync(configFile, JSON.stringify({ repository: 'https://github.com/toddwyder/julia-next.git', githubRepository: 'toddwyder/julia-next', branch: 'main', state: join(home, '.local/state/julia-verification-maintenance') }, null, 2) + '\n');
   for (const name of ['maintenance.mjs', 'notify-blocked.mjs']) cpSync(join(here, name), join(installation, name));
   const config = JSON.parse(readFileSync(configFile, 'utf8'));
-  config.notification ??= { root: '/home/ubuntu/julia-next', issue: 'JUL-251' };
+  config.notification ??= { root: '/home/ubuntu/julia-machine-main', issue: 'JUL-251' };
   writeFileSync(configFile, JSON.stringify(config, null, 2) + '\n');
   const baseline = poll(JSON.parse(readFileSync(configFile, 'utf8')));
   for (const name of names) cpSync(join(here, 'systemd', name), join(units, name));

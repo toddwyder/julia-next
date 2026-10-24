@@ -25,6 +25,7 @@ Todd's explicit continuation supersedes the prior parking decision. The missing 
 | Claude Haiku prices and bounds | https://platform.claude.com/docs/en/models/haiku-5-5/overview | Both prompt-length price tiers are configured. The stock conversation scope writes one-hour caches. The configured TTL and both one-hour cache-write price tiers match that default. |
 | Settled Claude subscription decision | https://support.claude.com/en/articles/15036540-use-the-claude-agent-sdk-with-your-claude-plan and https://code.mastra.ai/configuration | ADR 0022 records Todd's decision. Pro still needs its real request; no alternative Claude connection is authorized. |
 | Locked SDK install | Installed npm 11.11.0 `npm help ci` | `npm ci --prefix ops/build-runner --no-audit --no-fund`; SDK remains pinned at 1.14.0. |
+| Audit every GitHub branch for an open PR to main in CI | [REST branches](https://docs.github.com/en/rest/branches/branches?apiVersion=2022-11-28), [REST pull requests](https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28), [REST pagination](https://docs.github.com/en/rest/using-the-rest-api/using-pagination-in-the-rest-api), and [Actions workflow syntax](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax) | `check-branch-pr.mjs` paginates both list endpoints, matches open same-repository PR heads targeting main, and the CI job grants read-only contents and pull-request access. Red and green live results are retained in `evidence/restart/branch-pr-*.txt`. |
 
 ## Runtime dependency matrix
 

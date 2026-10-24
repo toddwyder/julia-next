@@ -15,8 +15,7 @@ function agentReadFiles(root) {
     }
   };
   visit(resolve(root, '.agents/skills'));
-  const askMatt = resolve(root, '.claude/skills/ask-matt/SKILL.md');
-  if (existsSync(askMatt)) files.push(askMatt);
+  visit(resolve(root, '.claude/skills'));
   const recoveryPrompt = resolve(root, 'scripts/julia-delivery-recovery.mjs');
   if (existsSync(recoveryPrompt)) files.push(recoveryPrompt);
   return files;
@@ -49,19 +48,22 @@ export function checkAgentLinks(root = process.cwd()) {
         continue;
       }
       if (inFence) continue;
+      const isSkill = file.endsWith('/SKILL.md');
       const references = [...line.matchAll(/\[[^\]]*\]\(([^\s)]+)\)/g)]
-        .map(match => ({ destination: match[1], base: dirname(source) }));
+        .map(match => match[1])
+        .filter(destination => !isSkill || !destination.startsWith('./'))
+        .map(destination => ({ destination, base: dirname(source) }));
       for (const match of line.matchAll(/^@([^\s]+)$/g)) references.push({ destination: match[1], base: dirname(source) });
       const prose = line.replace(/\[[^\]]*\]\([^)]*\)/g, '').replace(/\b[\w+.-]+:\/\/\S+/g, '');
       for (const match of prose.matchAll(/(?<![\w:/\\])(?:\.?[\w@-]+\/)+[\w@.-]*/g)) {
         const destination = match[0].replace(/\.$/, '');
         if (destination.startsWith('node_modules/') || line.slice(match.index + match[0].length).startsWith('<')) continue;
         const isEntryPoint = entryPoints.includes(file);
-        const isAgentSkill = file.endsWith('/SKILL.md');
-        const isSkillReference = destination.endsWith('/SKILL.md');
-        const isReadInstruction = isSkillReference && !destination.startsWith('.cursor/') && /\b(?:read|follow|load|open)\b/i.test(prose);
-        if (!isEntryPoint && !isReadInstruction) continue;
-        const sourceRelative = isAgentSkill && !destination.startsWith('.agents/') && !destination.startsWith('.claude/');
+        const isRepositoryPath = /^(?:\.agents|\.claude)\/skills\/.+\/SKILL\.md$/.test(destination);
+        const isSkillResource = /^(?:references|playbooks)\//.test(destination)
+          || /^scripts\/.+\.[a-z][\w-]*$/i.test(destination);
+        if (!isEntryPoint && !isRepositoryPath && !(isSkill && isSkillResource)) continue;
+        const sourceRelative = isSkill && isSkillResource;
         const base = sourceRelative ? dirname(source) : root;
         if (destination.endsWith('/') || /\.[a-z][\w-]*$/i.test(destination)) references.push({ destination, base });
       }
