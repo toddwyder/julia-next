@@ -164,6 +164,88 @@ test('planning rejects any exposed tool before the plan', async () => {
   }
 })
 
+test('planning accepts a tool the runtime refused before it ran', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'builder-plan-refused-'))
+  const builderHome = join(root, 'worktree', '.builder-home')
+  const jobDir = join(root, 'job')
+  const events = []
+  try {
+    await mkdir(jobDir, { recursive: true })
+    const runner = {
+      run: async () => {
+        events.push({ type: 'tool_start', toolCallId: 'call-1', toolName: 'mastra_workspace_list_files', args: { path: '.' } })
+        events.push({ type: 'tool_end', toolCallId: 'call-1', isError: true, result: 'Tool "mastra_workspace_list_files" not found. Available tools: none' })
+        return { result: { status: 'completed', text: 'Files\n- PRACTICE.txt\n\nSteps\n1. Write it.' }, threadId: 'refused-thread' }
+      },
+    }
+    await captureBuilderPlan({ runner, builderHome, jobDir, card: { identifier: 'JUL-263' }, events, status: async () => '' })
+    assert.match(await readFile(join(jobDir, 'pstack-plan.md'), 'utf8'), /^Files/m)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('planning rejects a tool call that actually ran', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'builder-plan-ran-'))
+  const builderHome = join(root, 'worktree', '.builder-home')
+  const jobDir = join(root, 'job')
+  const events = []
+  try {
+    await mkdir(jobDir, { recursive: true })
+    const runner = {
+      run: async () => {
+        events.push({ type: 'tool_start', toolCallId: 'call-2', toolName: 'mastra_workspace_read_file', args: { path: 'README.md' } })
+        events.push({ type: 'tool_end', toolCallId: 'call-2', isError: false, result: 'hello' })
+        return { result: { status: 'completed', text: 'Files\n- PRACTICE.txt\n\nSteps\n1. Write it.' }, threadId: 'ran-thread' }
+      },
+    }
+    await assert.rejects(captureBuilderPlan({ runner, builderHome, jobDir, card: { identifier: 'JUL-263' }, events, status: async () => '' }), /exposed a tool/)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('planning rejects a subagent even when no tool ran', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'builder-plan-subagent-'))
+  const builderHome = join(root, 'worktree', '.builder-home')
+  const jobDir = join(root, 'job')
+  const events = []
+  try {
+    await mkdir(jobDir, { recursive: true })
+    const runner = {
+      run: async () => {
+        events.push({ type: 'subagent_start', toolCallId: 'call-3', modelId: 'reflection/beam:free', task: 'read files' })
+        return { result: { status: 'completed', text: 'Files\n- PRACTICE.txt\n\nSteps\n1. Write it.' }, threadId: 'subagent-thread' }
+      },
+    }
+    await assert.rejects(captureBuilderPlan({ runner, builderHome, jobDir, card: { identifier: 'JUL-263' }, events, status: async () => '' }), /exposed a tool/)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('planning retries a malformed plan once', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'builder-plan-retry-'))
+  const builderHome = join(root, 'worktree', '.builder-home')
+  const jobDir = join(root, 'job')
+  try {
+    await mkdir(jobDir, { recursive: true })
+    let calls = 0
+    const runner = {
+      run: async () => {
+        calls += 1
+        if (calls === 1) return { result: { status: 'completed', text: 'I will create the marker.' }, threadId: 'bad-shape' }
+        return { result: { status: 'completed', text: 'Files\n- PRACTICE.txt\n\nSteps\n1. Write it.' }, threadId: 'good-shape' }
+      },
+    }
+    await captureBuilderPlan({ runner, builderHome, jobDir, card: { identifier: 'JUL-263' }, events: [], status: async () => '' })
+    assert.equal(calls, 2)
+    assert.match(await readFile(join(jobDir, 'pstack-plan.md'), 'utf8'), /^Files/m)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('planning fails if the model changes repository files or writes an oversized plan', async () => {
   const root = await mkdtemp(join(tmpdir(), 'builder-plan-invalid-'))
   const worktree = join(root, 'worktree')

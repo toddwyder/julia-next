@@ -2,3 +2,6 @@
 2026-10-24	The checklist parser accepts numbered steps and the done marker	The first real Beam practice build wrote numbered steps with `done:` and the dashboard showed nothing.
 2026-10-24	Practice runs are builds whose two roles are the machinery model	Practice uses Beam; the runner can recognise that from the saved roles.
 2026-10-24	Card JUL-263 created in Ready with two criteria	No Live view card existed; Todd settled the card and asked for Ready.
+2026-10-24	The plan-only turn disables workspace tools too	Beam read repository files during planning and the build failed closed.
+2026-10-24	A refused tool call is not tool exposure	The runtime returned `Tool "..." not found`; nothing ran, so the plan is not contaminated.
+2026-10-24	A malformed plan gets one retry	Beam's plan shape varies; a second short attempt keeps practice runs from stopping on prose.

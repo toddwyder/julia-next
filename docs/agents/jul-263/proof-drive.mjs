@@ -10,6 +10,7 @@ const base = process.env.JULIA_CONTROL_URL ?? 'https://ovh.tail91f394.ts.net/jul
 const card = process.env.PRACTICE_CARD ?? 'JUL-264'
 const model = process.env.PRACTICE_MODEL ?? 'reflection/beam:free'
 const effort = process.env.PRACTICE_EFFORT ?? 'high'
+const coderEffort = process.env.PRACTICE_CODER_EFFORT ?? effort
 const outDir = fileURLToPath(new URL(process.env.PROOF_OUT ?? './proof/final/', import.meta.url))
 const timeoutMs = Number(process.env.PROOF_TIMEOUT_MS ?? 30 * 60 * 1000)
 const pollMs = Number(process.env.PROOF_POLL_MS ?? 2000)
@@ -20,6 +21,7 @@ const consoleEvents = []
 const pageErrors = []
 const snapshots = []
 const shots = {}
+const pinned = { runId: process.env.PROOF_RUN_ID || null }
 
 const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 1280, height: 1200 } })
@@ -36,7 +38,9 @@ async function jobs() {
 }
 
 function jobFor(list) {
-  return (Array.isArray(list) ? list : []).filter(job => job.snapshot?.card?.identifier === card).sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt))).at(-1)
+  const jobs = Array.isArray(list) ? list : []
+  if (pinned.runId) return jobs.find(job => job.runId === pinned.runId)
+  return jobs.filter(job => job.snapshot?.card?.identifier === card).sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt))).at(-1)
 }
 
 function counts(job) {
@@ -74,12 +78,17 @@ try {
     const beam = options.find(option => option.value === beamValue) ?? options.find(option => option.value.includes(model))
     if (!beam) throw new Error(`Beam is not offered for ${legendText}: ${JSON.stringify(options)}`)
     await selects.first().selectOption(beam.value)
-    await selects.nth(1).selectOption(effort)
+    await selects.nth(1).selectOption(legendText === 'Coder' ? coderEffort : effort)
   }
   await shot('start-selected', null)
 
+  const startResponse = page.waitForResponse(response => response.request().method() === 'POST' && response.url().includes('/api/start'), { timeout: 120000 })
   await page.getByRole('button', { name: /^Start$/ }).click()
   const started = Date.now()
+  const startBody = await (await startResponse).json()
+  if (!startBody.build?.runId) throw new Error(`Start returned no build: ${JSON.stringify(startBody)}`)
+  pinned.runId = startBody.build.runId
+  await writeFile(join(outDir, 'start-ui-response.json'), JSON.stringify(startBody, null, 2))
   let job
   while (Date.now() - started < 120000) {
     const list = await jobs()
@@ -93,6 +102,7 @@ try {
   await shot('running', null)
   let startShot = false
   let middleShot = false
+  let startDone = null
   const startFallback = Date.now() + 180000
   while (Date.now() - started < timeoutMs) {
     const list = await jobs()
@@ -104,8 +114,9 @@ try {
 
     if (!startShot && (countsNow.total > 0 || Date.now() > startFallback)) {
       startShot = true
+      startDone = countsNow.done
       await shot('start', job)
-    } else if (!middleShot && countsNow.total > 0 && countsNow.done > 0 && countsNow.done < countsNow.total) {
+    } else if (startShot && !middleShot && job.state === 'running' && countsNow.total > 0 && countsNow.done !== startDone) {
       middleShot = true
       await shot('middle', job)
     }
