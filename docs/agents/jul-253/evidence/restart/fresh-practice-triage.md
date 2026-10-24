@@ -14,6 +14,8 @@ Create one fresh practice card to prove the cleaned JUL-253 candidate through th
 
 The Tailscale control state has no Ready cards. JUL-254 exists in Implementation. Linear reports that JUL-255 does not exist. No fresh card can therefore be selected on the Start page, and no new tracker issue has been created.
 
+The local computer-use inventory currently exposes no browser. As in the retained JUL-254 proof, the authorized drive will use the server's installed Playwright against the Tailscale page and will retain screenshots plus network and console records.
+
 ## Desired behavior
 
 The fresh card asks the machine to create `JUL-253-START-PRACTICE-2.txt` containing exactly `Julia cleaned Start proof.` followed by one newline, with that marker as the practice candidate's only repository change.
