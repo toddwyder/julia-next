@@ -13,9 +13,9 @@ interrogate reviewers: openai/gpt-6-sol, commandcode/deepseek/deepseek-v4.1-flas
 hardest tasks: openai/gpt-6-sol
 main session: openai/gpt-6-sol
 judgment and prose: openai/gpt-6-sol
-how explorer: openai/gpt-6-sol
-how explainer: openai/gpt-6-sol
-why investigators: openai/gpt-6-sol
+how explorer: commandcode/deepseek/deepseek-v4.1-flash
+how explainer: commandcode/deepseek/deepseek-v4.1-flash
+why investigators: commandcode/deepseek/deepseek-v4.1-flash
 why synthesizer: openai/gpt-6-sol
 reflect tooling: openai/gpt-6-sol
 reflect judgment, divergent, synthesizer: openai/gpt-6-sol

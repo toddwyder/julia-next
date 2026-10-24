@@ -5,6 +5,19 @@ import platform
 import sys
 
 
+class SockFilter(ctypes.Structure):
+    _fields_ = [
+        ("code", ctypes.c_ushort),
+        ("jt", ctypes.c_ubyte),
+        ("jf", ctypes.c_ubyte),
+        ("k", ctypes.c_uint32),
+    ]
+
+
+class SockFprog(ctypes.Structure):
+    _fields_ = [("len", ctypes.c_ushort), ("filter", ctypes.POINTER(SockFilter))]
+
+
 def checked(result):
     if result < 0:
         raise OSError(ctypes.get_errno(), "builder filesystem boundary unavailable")
@@ -45,13 +58,36 @@ def restrict(workspace, home, executable):
     checked(libc.prctl(38, 1, 0, 0, 0))
     checked(libc.syscall(446, ruleset, 0))
     os.close(ruleset)
+    socket_syscall, connect_syscall = {
+        "x86_64": (41, 42),
+        "aarch64": (198, 203),
+    }[platform.machine()]
+    program = (SockFilter * 6)(
+        SockFilter(0x20, 0, 0, 0),
+        SockFilter(0x15, 0, 1, socket_syscall),
+        SockFilter(0x06, 0, 0, 0x00050000 | 1),
+        SockFilter(0x15, 0, 1, connect_syscall),
+        SockFilter(0x06, 0, 0, 0x00050000 | 1),
+        SockFilter(0x06, 0, 0, 0x7FFF0000),
+    )
+    checked(libc.prctl(22, 2, ctypes.byref(SockFprog(len(program), program))))
+
+
+def contained_path(path, workspace):
+    resolved = os.path.realpath(path)
+    if os.path.commonpath((workspace, resolved)) != workspace:
+        raise RuntimeError("builder command cwd is outside workspace")
+    return resolved
 
 
 if __name__ == "__main__":
     config = json.loads(sys.argv[1])
     try:
-        os.chdir(config["cwd"])
-        restrict(config["workspace"], config["home"], config["executable"])
+        workspace = os.path.realpath(config["workspace"])
+        home = contained_path(config["home"], workspace)
+        cwd = contained_path(config["cwd"], workspace)
+        os.chdir(cwd)
+        restrict(workspace, home, config["executable"])
         os.execve("/bin/bash", ["bash", "--noprofile", "--norc", "-c", sys.argv[2]], {
             "PATH": "/usr/local/bin:/usr/bin:/bin",
             "HOME": config["home"],

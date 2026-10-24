@@ -5,6 +5,7 @@ import { execFile as execFileCb } from 'node:child_process'
 import { promisify } from 'node:util'
 import { openRunner } from './adapter.mjs'
 import { createPstackSession, inspectPstackRun } from './pstack-session.mjs'
+import { captureBuilderPlan } from './builder-boundary.mjs'
 
 const execFile = promisify(execFileCb)
 
@@ -101,6 +102,15 @@ async function main() {
     let decisions
     let internalReview
     try {
+      receipt = await captureBuilderPlan({
+        runner,
+        builderHome,
+        jobDir,
+        card,
+        events,
+        status: async () => (await execFile('git', ['-C', job.worktree, 'status', '--porcelain'])).stdout,
+      })
+      receipts.push(receipt)
       for (let turn = 0; turn < 4; turn += 1) {
         const instruction = turn === 0 ? prompt : workflowFeedback.at(-1)
         receipt = await runner.run({ prompt: instruction, ...(receipt?.threadId ? { threadId: receipt.threadId } : {}), maxTurns: 100, timeoutMs: 900000 })
@@ -129,6 +139,7 @@ async function main() {
     await atomicWriteText(join(jobDir, 'pstack-checklist.md'), checklist)
     await atomicWriteText(join(jobDir, 'pstack-decisions.tsv'), decisions)
     await atomicWriteJson(join(jobDir, 'pstack-state.json'), runner.runtime.session.state.get())
+    const plan = await readFile(join(jobDir, 'pstack-plan.md'), 'utf8')
 
     if (runner.runtime?.session?.model?.get?.() !== orchestratorModel) throw new Error('session model mismatch')
     if (account?.stopped !== false) throw new Error('account stopped')
@@ -156,6 +167,7 @@ async function main() {
       baseCommit: job.baseCommit,
       candidateCommit,
       account,
+      plan,
       internalReview,
       downstreamReviewStarted: false,
       completedAt: new Date().toISOString(),

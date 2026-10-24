@@ -131,7 +131,7 @@ try {
   assert.equal(typeof result.actualModels.orchestrator, 'string');
   assert.equal(typeof result.actualModels.coder, 'string');
 
-  const names = ['settings.json', 'events.jsonl', 'requests.jsonl', 'ledger.json', 'receipt.json', 'job.json', 'pstack-checklist.md', 'pstack-decisions.tsv', 'pstack-state.json', 'receipts.json', 'workflow-feedback.json'];
+  const names = ['settings.json', 'events.jsonl', 'requests.jsonl', 'ledger.json', 'receipt.json', 'job.json', 'pstack-plan.md', 'pstack-checklist.md', 'pstack-decisions.tsv', 'pstack-state.json', 'receipts.json', 'workflow-feedback.json'];
   for (const name of names) await copyFile(path.join(path.dirname(finalJob.worktree), name), path.join(outputDir, 'job-files', name));
   const settings = JSON.parse(await readFile(path.join(outputDir, 'job-files', 'settings.json'), 'utf8'));
   const events = (await readFile(path.join(outputDir, 'job-files', 'events.jsonl'), 'utf8')).trim().split(/\n/).filter(Boolean).map(JSON.parse);
