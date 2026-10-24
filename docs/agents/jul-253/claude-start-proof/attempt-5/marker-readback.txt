@@ -1,0 +1,5 @@
+JUL-253-START-PRACTICE-4.txt
+bytes: 39
+sha256: f357c278e8ff34954f1ec09fdddffddb987bc1f6373af1b78fdd5f0dab23549b
+content:
+Julia Claude and DeepSeek Start proof.

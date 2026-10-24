@@ -1,0 +1,4 @@
+model	role	requests	input	output	cache_read	cache_write	cost_nano	cost_usd
+anthropic/claude-haiku-5-5	orchestrator	115	288	110741	5631533	783487	268412030	0.268412030
+commandcode/deepseek/deepseek-v4.1-flash	orchestrator	100	155485	51311	1732480	0	113416140	0.113416140
+TOTAL		215					381828170	0.381828170
