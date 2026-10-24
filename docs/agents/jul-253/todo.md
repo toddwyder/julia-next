@@ -31,3 +31,15 @@ The earlier parking decision is superseded by Todd's instruction to build all in
 - [ ] Complete Todd's Claude Pro account approval using the already-started stock flow.
 - [ ] Verify each subscription with a real request. Do not use another Claude connection if Pro fails.
 - [ ] Publish review/evidence and get exact-head CI green.
+
+## Restart completion
+
+- [x] Inherit the exact-head green result for `ab6e94a`.
+- [x] Refresh the standalone server checkout and drive JUL-255 through the real Tailscale Start page.
+- [x] Retain the terminal failure, exact ledger totals, clean worktree readback, and browser evidence.
+- [x] Restore the normal route and services after the failed attempt.
+- [x] Add a red/green regression and repair the builder/host ownership boundary.
+- [ ] Publish the boundary repair and retained evidence, then obtain exact-head CI.
+- [ ] Obtain Todd's approval for the post-repair practice-card triage brief before creating a new issue.
+- [ ] Complete the final real Start proof on a fresh approved card.
+- [ ] Run the final adversarial review against that exact successful candidate and proof bundle.
