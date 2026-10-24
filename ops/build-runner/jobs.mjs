@@ -13,6 +13,21 @@ const RUN_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
 const CHECKLIST_LIMIT = 256 * 1024
 const pendingStarts = new Map()
 
+const SKIPPED_STEP = /\b(?:skip(?:ped)?|n\/a|not applicable|out of scope)\b/i
+
+function checklistStatus(text, checked) {
+  if (checked) return 'finished'
+  if (/\bdone:/i.test(text)) return 'finished'
+  if (SKIPPED_STEP.test(text)) return 'skipped'
+  return 'pending'
+}
+
+export function summarizeChecklist(items) {
+  const summary = { finished: 0, skipped: 0, pending: 0 }
+  for (const item of items) summary[item.status] += 1
+  return summary
+}
+
 export function parseChecklist(text) {
   const items = []
   for (const line of String(text).split(/\r?\n/)) {
@@ -21,14 +36,14 @@ export function parseChecklist(text) {
     const checkbox = /^[ \t]*(?:[-*]|\d+[.)])\s+\[([ xX])\]\s+(.+)$/.exec(line)
     if (checkbox) {
       const item = checkbox[2].trim()
-      if (item) items.push({ text: item, done: checkbox[1].toLowerCase() === 'x', depth })
+      if (item) items.push({ text: item, status: checklistStatus(item, checkbox[1].toLowerCase() === 'x'), depth })
       continue
     }
     const numbered = /^[ \t]*\d+[.)]\s+(.+)$/.exec(line)
     if (!numbered) continue
     const item = numbered[1].trim()
     if (!item) continue
-    items.push({ text: item, done: /\bdone:/i.test(item), depth })
+    items.push({ text: item, status: checklistStatus(item, false), depth })
   }
   return items
 }
@@ -37,7 +52,8 @@ async function readChecklistFile(file) {
   try {
     const info = await stat(file)
     if (!info.isFile() || info.size > CHECKLIST_LIMIT) return null
-    return { items: parseChecklist(await readFile(file, 'utf8')), updatedAt: info.mtime.toISOString() }
+    const items = parseChecklist(await readFile(file, 'utf8'))
+    return { items, summary: summarizeChecklist(items), updatedAt: info.mtime.toISOString() }
   } catch (error) {
     if (error?.code === 'ENOENT') return null
     throw error
@@ -53,7 +69,7 @@ async function withChecklist(job, jobsDir) {
     const checklist = await readChecklistFile(file)
     if (checklist) return { ...job, checklist }
   }
-  return { ...job, checklist: { items: [], updatedAt: null } }
+  return { ...job, checklist: { items: [], summary: { finished: 0, skipped: 0, pending: 0 }, updatedAt: null } }
 }
 
 async function isMachineryPractice(snapshot, settingsPath) {

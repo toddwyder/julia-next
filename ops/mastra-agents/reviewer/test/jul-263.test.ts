@@ -60,7 +60,15 @@ const activity = InitializationActivitySchema.parse({
   linearMutations: 0,
 });
 
-function runningJob(items: { text: string; done: boolean; depth: number }[]) {
+type ChecklistStatus = 'finished' | 'skipped' | 'pending';
+
+function checklist(items: { text: string; status: ChecklistStatus; depth: number }[]) {
+  const summary = { finished: 0, skipped: 0, pending: 0 };
+  for (const item of items) summary[item.status] += 1;
+  return { items, summary, updatedAt: iso };
+}
+
+function runningJob(items: { text: string; status: ChecklistStatus; depth: number }[]) {
   return BuildJobSchema.parse({
     runId: snapshot.runId,
     snapshot,
@@ -71,15 +79,15 @@ function runningJob(items: { text: string; done: boolean; depth: number }[]) {
     state: 'running',
     result: null,
     error: null,
-    checklist: { items, updatedAt: iso },
+    checklist: checklist(items),
   });
 }
 
 test('the dashboard shows the running build checklist and its ticks move', async () => {
   let job = runningJob([
-    { text: 'Read the card', done: true, depth: 0 },
-    { text: 'Write the test', done: false, depth: 0 },
-    { text: 'Run the test', done: false, depth: 0 },
+    { text: 'Read the card', status: 'finished', depth: 0 },
+    { text: 'Write the test', status: 'pending', depth: 0 },
+    { text: 'Run the test', status: 'pending', depth: 0 },
   ]);
 
   const server = await startControlPageServer({
@@ -103,18 +111,60 @@ test('the dashboard shows the running build checklist and its ticks move', async
     await checklist.waitFor({ state: 'visible', timeout: 10000 });
     await page.getByRole('heading', { name: 'JUL-263 · running', exact: true }).waitFor({ state: 'visible', timeout: 10000 });
     assert.equal(await checklist.locator('[data-testid="live-checklist-item"]').count(), 3);
-    assert.equal(await checklist.locator('[data-done="true"]').count(), 1);
-    assert.match(await checklist.textContent() ?? '', /1 of 3 steps finished/);
+    assert.equal(await checklist.locator('[data-status="finished"]').count(), 1);
+    assert.match(await checklist.textContent() ?? '', /1 finished, 0 skipped, 2 pending/);
 
     job = runningJob([
-      { text: 'Read the card', done: true, depth: 0 },
-      { text: 'Write the test', done: true, depth: 0 },
-      { text: 'Run the test', done: false, depth: 0 },
+      { text: 'Read the card', status: 'finished', depth: 0 },
+      { text: 'Write the test', status: 'finished', depth: 0 },
+      { text: 'Run the test', status: 'pending', depth: 0 },
     ]);
 
-    await page.waitForFunction(() => document.querySelectorAll('[data-testid="live-checklist"] [data-done="true"]').length === 2, undefined, { timeout: 10000 });
-    assert.equal(await checklist.locator('[data-done="true"]').count(), 2);
-    assert.match(await checklist.textContent() ?? '', /2 of 3 steps finished/);
+    await page.waitForFunction(() => document.querySelectorAll('[data-testid="live-checklist"] [data-status="finished"]').length === 2, undefined, { timeout: 10000 });
+    assert.equal(await checklist.locator('[data-status="finished"]').count(), 2);
+    assert.match(await checklist.textContent() ?? '', /2 finished, 0 skipped, 1 pending/);
+  } finally {
+    await browser.close();
+    await server.close();
+  }
+});
+
+test('skipped steps show as skipped, distinct from pending, with their own count', async () => {
+  const job = runningJob([
+    { text: 'Read the subsystem', status: 'skipped', depth: 0 },
+    { text: 'Explore the design', status: 'skipped', depth: 0 },
+    { text: 'Write the checkpoint', status: 'skipped', depth: 0 },
+    { text: 'Delegate the code', status: 'finished', depth: 0 },
+    { text: 'Verify the bytes', status: 'finished', depth: 0 },
+    { text: 'Make one commit', status: 'finished', depth: 0 },
+    { text: 'Interrogate the design', status: 'skipped', depth: 0 },
+    { text: 'Open a pull request', status: 'skipped', depth: 0 },
+  ]);
+
+  const server = await startControlPageServer({
+    port: 0,
+    getState: async () => ControlPageStateSchema.parse({ cards: [{ admitted: true, card }], offers: [offer] }),
+    startInitialization: async (input: z.infer<typeof StartInitializationSchema>) => {
+      assert.deepEqual(input, { card, roles });
+      return InitializationResultSchema.parse({ runId: snapshot.runId, state: 'ready-for-build', snapshot, resumed: false });
+    },
+    getRuns: async () => InitializationRunsStateSchema.parse({ runs: [], totalRuns: 0 }),
+    getActivity: () => activity,
+    getBuildJobs: async () => [job],
+  });
+
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage();
+    await page.goto(server.url);
+    const checklist = page.locator('.dashboard [data-testid="live-checklist"]');
+    await checklist.waitFor({ state: 'visible', timeout: 10000 });
+    assert.equal(await checklist.locator('[data-status="skipped"]').count(), 5);
+    assert.equal(await checklist.locator('[data-status="finished"]').count(), 3);
+    assert.equal(await checklist.locator('[data-status="pending"]').count(), 0);
+    assert.equal(await checklist.locator('.checklist-badge').count(), 5);
+    assert.match(await checklist.textContent() ?? '', /3 finished, 5 skipped/);
+    assert.doesNotMatch(await checklist.textContent() ?? '', /pending/);
   } finally {
     await browser.close();
     await server.close();
@@ -123,9 +173,12 @@ test('the dashboard shows the running build checklist and its ticks move', async
 
 test('a job checklist is validated and kept on the job record', () => {
   const parsed = BuildChecklistSchema.parse({
-    items: [{ text: 'Read the card', done: true, depth: 0 }],
+    items: [{ text: 'Read the card', status: 'finished', depth: 0 }],
+    summary: { finished: 1, skipped: 0, pending: 0 },
     updatedAt: iso,
   });
-  assert.deepEqual(parsed.items, [{ text: 'Read the card', done: true, depth: 0 }]);
-  assert.throws(() => BuildJobSchema.parse({ ...runningJob([]), checklist: { items: [{ text: '', done: false }] } }));
+  assert.deepEqual(parsed.items, [{ text: 'Read the card', status: 'finished', depth: 0 }]);
+  assert.deepEqual(parsed.summary, { finished: 1, skipped: 0, pending: 0 });
+  assert.throws(() => BuildJobSchema.parse({ ...runningJob([]), checklist: { items: [{ text: '', status: 'pending' }], summary: { finished: 0, skipped: 0, pending: 1 } } }));
+  assert.throws(() => BuildJobSchema.parse({ ...runningJob([]), checklist: { items: [], summary: { finished: 0, skipped: 0, pending: 1 } } }));
 });

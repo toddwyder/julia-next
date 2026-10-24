@@ -42,24 +42,27 @@ test('a running job carries the checklist the build is writing', async () => {
     await writeFile(checklist, '# Build checklist\n\n- [x] Read the card\n- [ ] Write the test\n- [ ] Run the test\n')
     const first = await readJob(runId, { jobsDir })
     assert.deepStrictEqual(first.checklist.items, [
-      { text: 'Read the card', done: true, depth: 0 },
-      { text: 'Write the test', done: false, depth: 0 },
-      { text: 'Run the test', done: false, depth: 0 },
+      { text: 'Read the card', status: 'finished', depth: 0 },
+      { text: 'Write the test', status: 'pending', depth: 0 },
+      { text: 'Run the test', status: 'pending', depth: 0 },
     ])
+    assert.deepStrictEqual(first.checklist.summary, { finished: 1, skipped: 0, pending: 2 })
     assert.equal(typeof first.checklist.updatedAt, 'string')
 
-    await writeFile(checklist, '# Build checklist\n\n- [x] Read the card\n- [x] Write the test\n- [ ] Run the test\n  - [x] Nested proof\n')
+    await writeFile(checklist, '# Build checklist\n\n- [x] Read the card\n- [x] Write the test\n- [ ] Run the test\n- [ ] Skip the lint gate — skip: not in this card\n  - [x] Nested proof\n')
     const middle = await readJob(runId, { jobsDir })
     assert.deepStrictEqual(middle.checklist.items, [
-      { text: 'Read the card', done: true, depth: 0 },
-      { text: 'Write the test', done: true, depth: 0 },
-      { text: 'Run the test', done: false, depth: 0 },
-      { text: 'Nested proof', done: true, depth: 1 },
+      { text: 'Read the card', status: 'finished', depth: 0 },
+      { text: 'Write the test', status: 'finished', depth: 0 },
+      { text: 'Run the test', status: 'pending', depth: 0 },
+      { text: 'Skip the lint gate — skip: not in this card', status: 'skipped', depth: 0 },
+      { text: 'Nested proof', status: 'finished', depth: 1 },
     ])
+    assert.deepStrictEqual(middle.checklist.summary, { finished: 3, skipped: 1, pending: 1 })
 
     await writeFile(checklist, '- [x] One\n- [X] Two\n1. [x] Three\n')
     const final = await readJob(runId, { jobsDir })
-    assert.deepStrictEqual(final.checklist.items.map(item => item.done), [true, true, true])
+    assert.deepStrictEqual(final.checklist.items.map(item => item.status), ['finished', 'finished', 'finished'])
 
     const listed = await listJobs({ jobsDir })
     assert.deepStrictEqual(listed[0].checklist, final.checklist)
@@ -92,17 +95,45 @@ test('reads the numbered checklist the build actually writes', async () => {
 `)
 
     const job = await readJob(runId, { jobsDir })
-    assert.deepStrictEqual(job.checklist.items.map(item => [item.text.split(' ')[0], item.done]), [
-      ['`how`', false],
-      ['`architect`', false],
-      ['Throughput', false],
-      ['Delegate', false],
-      ['Verify', true],
-      ['Rebase', true],
-      ['`interrogate`', false],
-      ['Run', false],
-      ['Machinery', true],
+    assert.deepStrictEqual(job.checklist.items.map(item => [item.text.split(' ')[0], item.status]), [
+      ['`how`', 'skipped'],
+      ['`architect`', 'skipped'],
+      ['Throughput', 'pending'],
+      ['Delegate', 'pending'],
+      ['Verify', 'finished'],
+      ['Rebase', 'finished'],
+      ['`interrogate`', 'skipped'],
+      ['Run', 'skipped'],
+      ['Machinery', 'finished'],
     ])
+    assert.deepStrictEqual(job.checklist.summary, { finished: 3, skipped: 4, pending: 2 })
+  } finally {
+    await rm(tmp, { recursive: true, force: true })
+  }
+})
+
+test('the final JUL-266 checklist counts three finished and five skipped', async () => {
+  const tmp = await mkdtemp(join(tmpdir(), 'live-checklist-jul266-'))
+  try {
+    const jobsDir = join(tmp, 'jobs')
+    const worktree = join(tmp, 'worktree')
+    const runId = 'JUL-266-counts'
+    await mkdir(join(worktree, '.builder-home', 'pstack'), { recursive: true })
+    await writeJob(jobsDir, runId, worktree)
+    await writeFile(join(worktree, '.builder-home', 'pstack', 'checklist.md'), `# Checklist (Feature playbook, JUL-266)
+
+1. \`how\` over the affected subsystem. — skip: single marker file, no subsystem.
+2. \`architect\` for parallel design exploration. — skip: no design choice.
+3. Write the throughput checkpoint as four todo items. — skip: single file, no fan-out.
+4. Delegate code-writing to a subagent. — done: subagent created marker and committed 12a9643.
+5. Verify on the matching surface. — done: 32 bytes ending 0a; diff marker only.
+6. Rebase into small, ordered commits. — done: one commit 12a9643.
+7. If the design is contested, \`interrogate\` before shipping. — skip: no design.
+8. Run Opening a PR. — skip: host owns git remotes, publishing, credentials.
+`)
+    const job = await readJob(runId, { jobsDir })
+    assert.deepStrictEqual(job.checklist.summary, { finished: 3, skipped: 5, pending: 0 })
+    assert.deepStrictEqual(job.checklist.items.map(item => item.status), ['skipped', 'skipped', 'skipped', 'finished', 'finished', 'finished', 'skipped', 'skipped'])
   } finally {
     await rm(tmp, { recursive: true, force: true })
   }
@@ -120,8 +151,8 @@ test('a finished job falls back to the checklist kept beside the job', async () 
 
     const job = await readJob(runId, { jobsDir })
     assert.deepStrictEqual(job.checklist.items, [
-      { text: 'Kept step', done: true, depth: 0 },
-      { text: 'Not finished', done: false, depth: 0 },
+      { text: 'Kept step', status: 'finished', depth: 0 },
+      { text: 'Not finished', status: 'pending', depth: 0 },
     ])
   } finally {
     await rm(tmp, { recursive: true, force: true })
@@ -136,7 +167,7 @@ test('a job without a checklist still reports an empty checklist', async () => {
     await mkdir(worktree, { recursive: true })
     await writeJob(jobsDir, 'JUL-263-empty', worktree)
     const job = await readJob('JUL-263-empty', { jobsDir })
-    assert.deepStrictEqual(job.checklist, { items: [], updatedAt: null })
+    assert.deepStrictEqual(job.checklist, { items: [], summary: { finished: 0, skipped: 0, pending: 0 }, updatedAt: null })
   } finally {
     await rm(tmp, { recursive: true, force: true })
   }
