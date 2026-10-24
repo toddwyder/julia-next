@@ -31,7 +31,7 @@ credential names, or retired-name regexes. Their tests still run.
 
 | File | Real proof covering the same behavior |
 | --- | --- |
-| `ops/build-runner/test/shared-ledger.test.mjs` | `docs/agents/jul-251/evidence/build/free-beam-request.txt` shows a real Beam request settling against the shared card account; `ops/build-runner/test/ledger.test.mjs` keeps the durable ledger and cap guards. |
+| `ops/build-runner/test/shared-ledger.test.mjs` | `ops/build-runner/test/server/memory-account.test.mjs` runs one real Beam build turn with memory on and proves the main and memory requests settle on the same card account; `ops/build-runner/test/ledger.test.mjs` keeps the durable ledger and cap guards. |
 | `ops/build-runner/test/shared-ledger-driver.mjs` | Driver for the test above. |
 | `ops/build-runner/test/subscription-tools.test.mjs` | `docs/agents/jul-251/evidence/build/free-beam-request.txt` is a real free request; `ops/build-runner/test/transport.test.mjs` keeps the hosted-tool refusal guard. |
 | `ops/build-runner/test/subscription-tools-driver.mjs` | Driver for the test above. |
