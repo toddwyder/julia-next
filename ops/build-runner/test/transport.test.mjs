@@ -79,6 +79,23 @@ test('paid provider failure preserves bounded status and message while retaining
   assert.match(request.reason, /HTTP 400.*model route unavailable retry later/);
 });
 
+test('paid authentication rejection settles zero and remains visible for stock refresh retry', async t => {
+  let attempts = 0;
+  const f = await fixture(t, (_req, res) => {
+    attempts += 1;
+    if (attempts === 1) return json(res, { error: { message: 'expired' } }, 401);
+    return json(res, { usage: { prompt_tokens: 10, completion_tokens: 2 } });
+  });
+  const fetch = transport(f, { price: { input: 2, output: 3, cacheRead: 0, cacheWrite: 0 } });
+  assert.equal((await send(fetch, f.endpoint)).status, 401);
+  assert.equal((await send(fetch, f.endpoint)).status, 200);
+  const requests = f.ledger.snapshot().requests;
+  assert.equal(requests.length, 2);
+  assert.deepEqual(requests[0].usage, { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 });
+  assert.equal(requests[0].costNano, 0);
+  assert.equal(requests[1].state, 'settled');
+});
+
 test('priced requests count published token prices and positive provider charges without the retired trial stop', async t => {
   const f = await fixture(t, (_req, res) => json(res, {
     result: 'allowed', usage: { prompt_tokens: 10, completion_tokens: 2, cost_usd: 0.00002 },

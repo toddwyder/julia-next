@@ -240,6 +240,12 @@ export function createTransport({ ledger, settings, role, fetch: upstream = glob
       response = await upstream(new Request(request, { body: JSON.stringify(bounded), redirect: 'error' }));
       if (response.status >= 300 && response.status < 400) throw fail('Redirect refused');
       const text = await responseText(response.clone(), maximum);
+      if (spec.paid && [401, 403].includes(response.status)) {
+        const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+        await ledgerCall('settle', id, { usage, costNano: 0 });
+        settled = true;
+        return response;
+      }
       const providerError = providerFailure(response, text);
       if (spec.paid && providerError) throw fail(providerError);
       let usage;
