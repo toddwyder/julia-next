@@ -68,6 +68,46 @@ test('a running job carries the checklist the build is writing', async () => {
   }
 })
 
+test('reads the numbered checklist the build actually writes', async () => {
+  const tmp = await mkdtemp(join(tmpdir(), 'live-checklist-numbered-'))
+  try {
+    const jobsDir = join(tmp, 'jobs')
+    const worktree = join(tmp, 'worktree')
+    const runId = 'JUL-264-numbered'
+    await mkdir(join(worktree, '.builder-home', 'pstack'), { recursive: true })
+    await writeJob(jobsDir, runId, worktree)
+    await writeFile(join(worktree, '.builder-home', 'pstack', 'checklist.md'), `# JUL-264 checklist (Feature playbook)
+
+1. \`how\` over the affected subsystem. — n/a: single marker file, no subsystem.
+2. \`architect\` for parallel design exploration. — n/a: no design.
+3. Throughput checkpoint (four items):
+   - Blocking first steps. n/a: no gates before fan-out.
+   - Independent workstreams. n/a: single file, no parallel work.
+4. Delegate code-writing to subagent (poteto-agent / model-1). — subagent creates marker, verifies bytes, stages.
+5. Verify on the matching surface. — done: od shows 26 bytes single newline; git diff base..HEAD shows only marker.
+6. Rebase into small, ordered commits. — done: single commit c804215 on practice/jul-263-start.
+7. \`interrogate\` if contested. — n/a: not contested.
+8. Run Opening a PR. — skip: publishing is outside this saved-card session.
+9. Machinery self-check of actual changed files. — done: Beam self-check PASS.
+`)
+
+    const job = await readJob(runId, { jobsDir })
+    assert.deepStrictEqual(job.checklist.items.map(item => [item.text.split(' ')[0], item.done]), [
+      ['`how`', false],
+      ['`architect`', false],
+      ['Throughput', false],
+      ['Delegate', false],
+      ['Verify', true],
+      ['Rebase', true],
+      ['`interrogate`', false],
+      ['Run', false],
+      ['Machinery', true],
+    ])
+  } finally {
+    await rm(tmp, { recursive: true, force: true })
+  }
+})
+
 test('a finished job falls back to the checklist kept beside the job', async () => {
   const tmp = await mkdtemp(join(tmpdir(), 'live-checklist-final-'))
   try {
