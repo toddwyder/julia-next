@@ -1,30 +1,67 @@
 import { readFile, mkdir, realpath } from 'node:fs/promises'
 import { join, resolve, relative, isAbsolute, dirname, basename } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { CardLedger, CEILING_NANO } from './ledger.mjs'
+import { CardLedger } from './ledger.mjs'
 import { createTransport } from './transport.mjs'
-import { PlanFilesystem } from './plan-filesystem.mjs'
+
+export const SESSION_INACTIVITY_MS = 15 * 60 * 1000
+export const COMMAND_INACTIVITY_MS = 15 * 60 * 1000
 
 const quote = value => "'" + String(value).replaceAll("'", "'\\''") + "'"
 let opened = false
 
-const planningDynamicTools = ['request_access', 'create-workflow', 'list-workflows', 'get-workflow', 'run-workflow', 'delete-workflow', 'schedule_list', 'schedule_update', 'schedule_create', 'schedule_resume', 'schedule_run', 'web_search', 'notification_inbox']
-const planningBuiltinTools = ['ask_user', 'submit_plan', 'task_write', 'task_update', 'task_complete', 'task_check', 'subagent']
-const planningWorkspaceTools = ['execute_command', 'mastra_workspace_read_file', 'mastra_workspace_write_file', 'mastra_workspace_edit_file', 'mastra_workspace_list_files', 'mastra_workspace_delete', 'mastra_workspace_file_stat', 'mastra_workspace_mkdir', 'mastra_workspace_grep', 'mastra_workspace_ast_edit']
-
-export function disabledRunnerTools(planOnly) {
-  return planOnly ? [...planningDynamicTools, ...planningWorkspaceTools] : ['web_search', 'request_access']
+export function disabledRunnerTools() {
+  return ['web_search', 'request_access']
 }
 
-export function cardCeilingNano(settings, card) {
-  const value = settings?.cardCeilings?.[card]
-  if (value === undefined) return CEILING_NANO
-  if (value === null) return null
-  if (!Number.isSafeInteger(value) || value <= 0) throw new Error('Invalid card ceiling')
-  return value
+function startIdleTimer(onIdle, ms) {
+  const timer = setTimeout(onIdle, ms)
+  timer.unref?.()
+  return timer
 }
 
-export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'builder', hostInstructions, subagents, helpers, helperDefinitions, subagentDefinitions, planOnly = false }) {
+export function createCommandGuard(handle, ms = COMMAND_INACTIVITY_MS) {
+  let timer
+  const touch = () => {
+    if (timer) clearTimeout(timer)
+    timer = startIdleTimer(() => { void handle.kill() }, ms)
+  }
+  const wait = handle.wait.bind(handle)
+  return {
+    touch,
+    wait: (options = {}) => {
+      touch()
+      return wait({
+        ...options,
+        onStdout: data => { touch(); options.onStdout?.(data) },
+        onStderr: data => { touch(); options.onStderr?.(data) },
+      }).finally(() => { if (timer) clearTimeout(timer) })
+    },
+  }
+}
+
+export function guardProcessIdle(handle, ms = COMMAND_INACTIVITY_MS) {
+  const guard = createCommandGuard(handle, ms)
+  handle.wait = options => guard.wait(options)
+  guard.touch()
+  return handle
+}
+
+export function guardSessionIdle({ inactivityMs = SESSION_INACTIVITY_MS } = {}) {
+  let timer
+  let idle = false
+  const touch = () => {
+    if (timer) clearTimeout(timer)
+    timer = startIdleTimer(() => { idle = true }, inactivityMs)
+  }
+  return {
+    touch,
+    stop: () => { if (timer) clearTimeout(timer) },
+    get idle() { return idle },
+  }
+}
+
+export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'builder', hostInstructions, subagents, helpers, helperDefinitions, subagentDefinitions }) {
   if (opened) throw Error('one runner per process required')
   if (!/^[A-Z]+-\d+$/.test(card)) throw Error('valid card ID required')
   const settings = JSON.parse(await readFile(settingsPath, 'utf8'))
@@ -73,7 +110,7 @@ export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'bu
   for (const key of Object.keys(process.env)) delete process.env[key]
   Object.assign(process.env, { PATH: path ?? '/usr/local/bin:/usr/bin:/bin', HOME: stateDir, LANG: 'C.UTF-8', MASTRA_APP_DATA_DIR: appDir })
   if (settings.memory === false) process.env.MASTRACODE_DISABLE_OBSERVATIONAL_MEMORY = '1'
-  const ledger = new CardLedger({ path: ledgerPath, card, ceilingNano: cardCeilingNano(settings, card) })
+  const ledger = new CardLedger({ path: ledgerPath, card })
   const originalFetch = globalThis.fetch
   globalThis.fetch = createTransport({ settings, ledger, role, fetch: originalFetch })
   opened = true
@@ -81,14 +118,13 @@ export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'bu
   let workspace
   const providedSubagents = (subagents ?? helpers ?? helperDefinitions ?? subagentDefinitions) ?? []
   try {
-    const [{ bootLocalAgentController, runMC }, { setCredentialStoreProvider }, { setCustomProvidersSource }, { AuthStorage }, { loadSettings, saveSettings }, { Workspace, LocalFilesystem, LocalSandbox, createWorkspaceTools }, { RequestContext }] = await Promise.all([
+    const [{ bootLocalAgentController, runMC }, { setCredentialStoreProvider }, { setCustomProvidersSource }, { AuthStorage }, { loadSettings, saveSettings }, { Workspace, LocalFilesystem, LocalSandbox, createWorkspaceTools }] = await Promise.all([
       import('@mastra/code-sdk'),
       import('@mastra/code-sdk/agents/credential-resolver'),
       import('@mastra/code-sdk/agents/custom-provider-source'),
       import('@mastra/code-sdk/auth/storage'),
       import('@mastra/code-sdk/onboarding/settings'),
       import('@mastra/core/workspace'),
-      import('@mastra/core/request-context'),
     ])
     const auth = new AuthStorage(authPath)
     auth.allowEnvironmentFallback = false
@@ -105,22 +141,31 @@ export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'bu
     sdkSettings.models.omReflectionThreshold = null
     sdkSettings.customProviders = runtimeProviders.map(({ apiKey, ...provider }) => provider)
     saveSettings(sdkSettings)
-    if (planOnly) workspace = new Workspace({ filesystem: new PlanFilesystem({ basePath: commandHome }) })
-    else {
-      const sandbox = new LocalSandbox({ workingDirectory: cwd, env: { HOME: commandHome, TMPDIR: commandHome }, timeout: 30_000 })
-      const spawn = sandbox.processes.spawn.bind(sandbox.processes)
-      const launcher = fileURLToPath(new URL('./command-boundary.py', import.meta.url))
-      sandbox.processes.spawn = (command, options = {}) => {
-        const config = JSON.stringify({ workspace: cwd, home: commandHome, cwd: resolve(cwd, options.cwd ?? '.'), executable: process.execPath })
-        return spawn(`/usr/bin/python3 ${quote(launcher)} ${quote(config)} ${quote(command)}`, { ...options, env: {} })
-      }
-      workspace = new Workspace({ filesystem: new LocalFilesystem({ basePath: cwd, contained: true }), sandbox, tools: { mastra_workspace_execute_command: { name: 'execute_command' } }, skills: ['.agents/skills'] })
+    const sandbox = new LocalSandbox({ workingDirectory: cwd, env: { HOME: commandHome, TMPDIR: commandHome } })
+    const spawn = sandbox.processes.spawn.bind(sandbox.processes)
+    const launcher = fileURLToPath(new URL('./command-boundary.py', import.meta.url))
+    sandbox.processes.spawn = async (command, options = {}) => {
+      const config = JSON.stringify({ workspace: cwd, home: commandHome, cwd: resolve(cwd, options.cwd ?? '.'), executable: process.execPath })
+      const wrapped = `/usr/bin/python3 ${quote(launcher)} ${quote(config)} ${quote(command)}`
+      let touch = () => {}
+      const handle = await spawn(wrapped, {
+        ...options,
+        env: {},
+        onStdout: data => { touch(); options.onStdout?.(data) },
+        onStderr: data => { touch(); options.onStderr?.(data) },
+      })
+      const guard = createCommandGuard(handle, COMMAND_INACTIVITY_MS)
+      touch = guard.touch
+      const wait = handle.wait.bind(handle)
+      handle.wait = waitOptions => guard.wait(waitOptions)
+      guard.touch()
+      return handle
     }
+    workspace = new Workspace({ filesystem: new LocalFilesystem({ basePath: cwd, contained: true }), sandbox, tools: { mastra_workspace_execute_command: { name: 'execute_command' } }, skills: ['.agents/skills'] })
     await workspace.init()
     runtime = await bootLocalAgentController({
-      cwd, homeDir: sdkHome, workspace, modes: false, subagents: planOnly ? [] : providedSubagents, intervalHandlers: [], disabledTools: disabledRunnerTools(planOnly),
-      disableBuiltinTools: planOnly ? planningBuiltinTools : undefined,
-      hostInstructions: planOnly ? 'Return only the requested plan text. No tools, skills, files, commands, research, or delegation are available.' : hostInstructions,
+      cwd, homeDir: sdkHome, workspace, modes: false, subagents: providedSubagents, intervalHandlers: [], disabledTools: disabledRunnerTools(),
+      hostInstructions,
       disableMcp: true, disablePlugins: true, disableEnvFile: true, disableHooks: true, disableGithubSignals: true,
     })
     const tools = await createWorkspaceTools(workspace)
@@ -128,21 +173,38 @@ export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'bu
     return {
       snapshot: () => ledger.snapshot(),
       execute: async command => tools.execute_command.execute({ command }, {}),
-      memory: async () => {
-        const requestContext = new RequestContext()
-        requestContext.set('controller', { session: { modelId: runtime.session.model.get() }, state: runtime.session.state.get(), getState: () => runtime.session.state.get(), threadId: runtime.session.thread.requireId() })
-        return typeof runtime.memory === 'function' ? runtime.memory({ requestContext }) : runtime.memory
-      },
+      memory: async () => runtime.memory,
       skills: workspace.skills,
       availableSkills,
       runtime,
       workspace,
-      async run({ prompt, threadId, maxTurns = 6, timeoutMs = 180_000 }) {
+      async run({ prompt, threadId, maxTurns, timeoutMs, inactivityMs = SESSION_INACTIVITY_MS }) {
         if (typeof prompt !== 'string' || !prompt.trim()) throw Error('prompt required')
+        if (!Number.isSafeInteger(maxTurns) || maxTurns <= 0) throw Error('maxTurns required')
         const thread = threadId ? { id: threadId } : await runtime.session.thread.create({ title: card })
         await runtime.session.model.switch(settings.roles[role])
-        const result = await runMC({ controller: runtime.controller, session: runtime.session, thread: { id: thread.id }, prompt, maxTurns, timeoutMs }).result
-        return { result, threadId: thread.id, account: ledger.snapshot() }
+        const idle = guardSessionIdle({ inactivityMs })
+        const controller = new AbortController()
+        const unsubscribe = runtime.session.subscribe(() => {
+          idle.touch()
+          if (idle.idle) controller.abort()
+        })
+        const timer = setInterval(() => {
+          if (!idle.idle) return
+          controller.abort()
+          clearInterval(timer)
+        }, Math.min(1000, Math.max(10, Math.floor(inactivityMs / 4))))
+        timer.unref?.()
+        idle.touch()
+        try {
+          const result = await runMC({ controller: runtime.controller, session: runtime.session, thread: { id: thread.id }, prompt, maxTurns, timeoutMs, signal: controller.signal }).result
+          if (idle.idle) throw new Error(`session inactive for ${Math.round(inactivityMs / 60000)} minutes`)
+          return { result, threadId: thread.id, account: ledger.snapshot() }
+        } finally {
+          clearInterval(timer)
+          idle.stop()
+          unsubscribe()
+        }
       },
       async close() {
         try {
@@ -177,7 +239,7 @@ if (fileURLToPath(import.meta.url)===process.argv[1]) {
     try {
       const runner = await openRunner({ card, cwd, stateDir, settingsPath })
       try {
-        const receipt = await runner.run({ prompt })
+        const receipt = await runner.run({ prompt, maxTurns: 100, inactivityMs: SESSION_INACTIVITY_MS })
         console.log(JSON.stringify(receipt))
       } finally {
         await runner.close()

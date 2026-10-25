@@ -2,7 +2,11 @@
 
 Date: 2026-10-25
 
-Status: Accepted by Todd on 25 October 2026.
+Status: Superseded in part by Todd's 25 October 2026 decision. Card spend is recorded and reported per card; money never stops a card. The $10 cap, the per-card `cardCeilings` override and the priced-accounting block are retired. The history below is kept as the record of how the cap was reached before it was removed.
+
+## 25 October decision
+
+Todd removed the money stop after the JUL-252 rerun. Every request's settled actual usage at published API prices is recorded per card and reported by model. No reservation, cap or unresolved-accounting state refuses a request. An unpriced tool call itself is still refused. The planning step, input estimate, token counting and whole-request refusal are removed with the cap. A build stops only after 15 minutes with no activity; a runaway at the 100-turn limit or a provider that stays down pauses the build with its work kept, posts a note on the Linear card, and can be continued.
 
 The card cap counts settled actual usage at published API prices. A request reserves nothing against the cap before dispatch. The ledger still records the request's configured maximum for an unresolved outcome, but that maximum no longer refuses a request. The card stops once settled spend exceeds the cap, and later requests are refused. The request that crosses the cap completes and records its actual cost. The cap is $10 per card across every role, retry and run, including subscriptions at published API prices. Unpriced or unbounded requests are still refused before dispatch. An unknown outcome still retains its recorded maximum and blocks further priced work until reconciled.
 

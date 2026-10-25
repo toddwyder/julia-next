@@ -1,26 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_REVIEWER, requireCompleteFileReview, reviewGenerationOptions, reviewPromptContract, reviewStepBudget, reviewerConfiguration } from '../src/contract.mjs';
+import { DEFAULT_REVIEWER, requireCompleteFileReview, reviewPromptContract, reviewerConfiguration } from '../src/contract.mjs';
 import { captureCommandCodeResponse, commandCodeMetadata, reviewedFilesSchema } from '../src/reviewer.mjs';
 import { commandCodeCostEstimate } from '../src/commandcode-cost.mjs';
 
-test('the reviewer uses the approved stock generation bounds', () => {
-  assert.deepEqual(DEFAULT_REVIEWER.model, 'deepseek/deepseek-v4.1-flash');
-  assert.deepEqual(reviewGenerationOptions(['a.mjs'], ['criterion']), {
-    maxSteps: 40,
-    modelSettings: {
-      maxRetries: 0,
-      maxOutputTokens: 4096,
-      timeout: { totalMs: 1_200_000, stepMs: 15_000 },
-    },
-  });
-});
-
-test('reviewer step budget follows the immutable file inventory and contract phases', () => {
-  assert.equal(reviewStepBudget(['a.mjs'], ['criterion']), 40);
-  assert.equal(reviewStepBudget(['a.mjs', 'b.mjs', 'c.mjs', 'd.mjs'], Array(8).fill('criterion')), 70);
-  assert.throws(() => reviewStepBudget([], ['criterion']), /changed file/);
-  assert.throws(() => reviewStepBudget(['a.mjs'], []), /criterion/);
+test('the reviewer keeps its default model and has no separate generation bounds', () => {
+  assert.equal(DEFAULT_REVIEWER.model, 'deepseek/deepseek-v4.1-flash');
 });
 
 test('structured output accepts exactly the immutable changed-file inventory', () => {

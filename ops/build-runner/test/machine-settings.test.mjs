@@ -3,8 +3,6 @@ import test from 'node:test'
 import { readFile } from 'node:fs/promises'
 import { buildCatalogue, hydrateSettings } from '../catalogue.mjs'
 import { createPstackSession } from '../pstack-session.mjs'
-import { cardCeilingNano } from '../adapter.mjs'
-import { CEILING_NANO } from '../ledger.mjs'
 
 const rawSettings = JSON.parse(await readFile(new URL('../machine-settings.json', import.meta.url), 'utf8'))
 const table = await readFile(new URL('../pstack-models.md', import.meta.url), 'utf8')
@@ -49,26 +47,21 @@ const catalogue = buildCatalogue({
 
 const settings = hydrateSettings(rawSettings, catalogue)
 
-test('machine settings carry no hand-edited model list', () => {
+test('machine settings carry no hand-edited model list, card ceiling or provider allowlist', () => {
   assert.equal(Object.hasOwn(rawSettings, 'models'), false)
   assert.equal(rawSettings.providers[0].models, undefined)
+  assert.equal(rawSettings.cardCeilings, undefined)
+  assert.equal(rawSettings.networkAllow, undefined)
+  assert.deepEqual(rawSettings.providerRetry, { attempts: 3, pauseMs: 5000 })
   assert.equal(rawSettings.modelCatalogue.modelsDev, 'https://models.dev/api.json')
   assert.equal(rawSettings.modelCatalogue.commandCodePricing, 'https://commandcode.ai/docs/resources/pricing-limits')
   assert.deepEqual(Object.keys(settings.models).sort(), Object.keys(catalogue.models).sort())
   assert.deepEqual(settings.providers[0].models, catalogue.commandCodeProviderModels)
   assert.ok(settings.authPath)
   assert.ok(settings.ledgerPath)
-  assert.deepEqual(rawSettings.cardCeilings, { 'JUL-252': null })
 })
 
-test('a card can remove or move its money stop in settings', () => {
-  assert.equal(cardCeilingNano({}, 'JUL-252'), CEILING_NANO)
-  assert.equal(cardCeilingNano({ cardCeilings: { 'JUL-252': null } }, 'JUL-252'), null)
-  assert.equal(cardCeilingNano({ cardCeilings: { 'JUL-252': 20_000_000_000 } }, 'JUL-252'), 20_000_000_000)
-  assert.throws(() => cardCeilingNano({ cardCeilings: { 'JUL-252': 0 } }, 'JUL-252'), /Invalid card ceiling/)
-})
-
-test('normal machine sessions use Claude and DeepSeek and preserve the two-model panels', () => {
+test('normal machine sessions use Claude and DeepSeek with 100-step helpers', () => {
   const session = createPstackSession(settings, { roles: settings.roles, card: { identifier: 'JUL-253' } }, table)
   assert.equal(session.orchestratorModel, 'anthropic/claude-haiku-5-5')
   assert.equal(session.coderModel, 'commandcode/deepseek/deepseek-v4.1-flash')

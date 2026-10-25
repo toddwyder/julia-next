@@ -13,7 +13,6 @@ import { cardAdmissionInput, fetchLinearIssue } from './linear.ts'
 const configDirectory = process.env.JULIA_CONFIG_DIRECTORY ?? join(process.env.USERPROFILE ?? process.cwd(), '.julia')
 const connectionsPath = process.env.JULIA_CONNECTIONS_PATH ?? join(configDirectory, 'connections.json')
 const defaultsPath = process.env.JULIA_ROLE_DEFAULTS_PATH ?? join(configDirectory, 'role-defaults.json')
-const acceptedLimits = { builderUsd: 2, reviewerUsd: 1, crashFixerUsd: 0.5, fixReviewerUsd: 0.25, builderMinutes: 90, reviewerMinutes: 30, crashFixerMinutes: 20, fixReviewerMinutes: 10 } as const
 
 export async function connectionCommand(args: string[]) {
   const [action = 'list', id, route, company, service, secretReference] = args
@@ -87,7 +86,7 @@ export async function initCommand(args: string[]) {
   const card = await fetchLinearCard(issueOrPath)
   if (decision === undefined) {
     const choices = validateRoleDefaults(RoleDefaultsSchema.parse(JSON.parse(await readFile(defaultsPath, 'utf8'))), { allowSameService })
-    return InitResultSchema.parse({ status: 'awaiting-decision', issueId: card.identifier, choices, limits: acceptedLimits })
+    return InitResultSchema.parse({ status: 'awaiting-decision', issueId: card.identifier, choices })
   }
   if (decision === 'Cancel') return InitResultSchema.parse({ status: 'cancelled', issueId: card.identifier })
   if (decision !== 'Start') throw new Error('$init accepts exactly Start or Cancel')
@@ -111,7 +110,7 @@ export async function initCommand(args: string[]) {
   }
   try {
     const saved = await loadSavedSnapshot(snapshotPath, card.identifier)
-    return InitResultSchema.parse({ status: 'started', resumed: true, snapshotPath, choices: saved.roles, limits: acceptedLimits, snapshot: saved, delivery: await dispatch(saved) })
+    return InitResultSchema.parse({ status: 'started', resumed: true, snapshotPath, choices: saved.roles, snapshot: saved, delivery: await dispatch(saved) })
   } catch (error: unknown) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
   }
@@ -124,9 +123,9 @@ export async function initCommand(args: string[]) {
   const saved = DeliveryRunSnapshotSchema.parse({ issueId: card.identifier, roles, allowSameService, savedAt: new Date().toISOString() })
   await atomicJson(snapshotPath, saved)
   if (process.env.JULIA_VERIFY_MACHINE === '1' && process.env.JULIA_STOP_AFTER_SNAPSHOT === '1') {
-    return InitResultSchema.parse({ status: 'started', resumed: false, snapshotPath, choices: saved.roles, limits: acceptedLimits, snapshot: saved, delivery: { status: 'stopped-at-safe-boundary' } })
+    return InitResultSchema.parse({ status: 'started', resumed: false, snapshotPath, choices: saved.roles, snapshot: saved, delivery: { status: 'stopped-at-safe-boundary' } })
   }
-  return InitResultSchema.parse({ status: 'started', resumed: false, snapshotPath, choices: saved.roles, limits: acceptedLimits, snapshot: saved, delivery: await dispatch(saved) })
+  return InitResultSchema.parse({ status: 'started', resumed: false, snapshotPath, choices: saved.roles, snapshot: saved, delivery: await dispatch(saved) })
 }
 
 async function main() {

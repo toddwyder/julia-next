@@ -141,6 +141,51 @@ test('Start stays blocked for a card that failed admission', () => {
   assert.throws(() => validateInitializationRequest({ card, roles }, state as never), /JUL-242 cannot start/)
 })
 
+test('the Start form remembers the last model choices for both roles', async t => {
+  const first = ModelOfferSchema.parse({
+    route: 'commandcode', modelId: 'vendor/one', name: 'Vendor One', company: 'Vendor', service: 'CommandCode',
+    codingCapable: true, wire: 'chat', supportedEfforts: ['low', 'medium', 'high'],
+  })
+  const second = ModelOfferSchema.parse({
+    route: 'claude', modelId: 'claude-opus-5-5', name: 'Claude Opus 5.5', company: 'Anthropic', service: 'Claude subscription',
+    codingCapable: true, wire: 'messages', supportedEfforts: ['low', 'medium', 'high', 'max'],
+  })
+  const server = await startControlPageServer({
+    port: 0,
+    getState: async () => ({
+      cards: [{ admitted: true, card: ReadyCardSchema.parse({ identifier: 'JUL-238', title: 'A settled card', state: 'Ready', description: settledBrief }) }],
+      offers: [first, second],
+    }),
+    startInitialization: async () => { throw new Error('must not start') },
+    getRuns: async () => InitializationRunsStateSchema.parse({ runs: [], totalRuns: 0 }),
+    getActivity: () => createInitializationActivityRecorder().snapshot(),
+  })
+  t.after(() => server.close())
+  const browser = await chromium.launch({ headless: true })
+  t.after(() => browser.close())
+  const page = await browser.newPage()
+  await page.addInitScript(() => {
+    localStorage.setItem('julia-control-model-choices', JSON.stringify({
+      orchestrator: { key: 'claude::claude-opus-5-5', effort: 'max' },
+      coder: { key: 'commandcode::vendor/one', effort: 'high' },
+    }))
+  })
+  await page.goto(server.url)
+  await page.getByRole('heading', { name: 'Initialize a Ready card' }).waitFor()
+  const models = page.getByLabel('Route and model')
+  const efforts = page.getByLabel('Effort')
+  assert.equal(await models.nth(0).inputValue(), 'claude::claude-opus-5-5')
+  assert.equal(await efforts.nth(0).inputValue(), 'max')
+  assert.equal(await models.nth(1).inputValue(), 'commandcode::vendor/one')
+  assert.equal(await efforts.nth(1).inputValue(), 'high')
+
+  await models.nth(1).selectOption('claude::claude-opus-5-5')
+  await efforts.nth(1).selectOption('medium')
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('julia-control-model-choices')!))
+  assert.deepEqual(stored.coder, { key: 'claude::claude-opus-5-5', effort: 'medium' })
+  assert.deepEqual(stored.orchestrator, { key: 'claude::claude-opus-5-5', effort: 'max' })
+})
+
 test('the page lists every Ready card and blocks Start for one that cannot start', async t => {
   const offer = ModelOfferSchema.parse({
     route: 'commandcode', modelId: 'vendor/one', name: 'Vendor One', company: 'Vendor', service: 'CommandCode',

@@ -2,6 +2,29 @@
 
 Read-only audit at `07b75c0`. Sources: the code below, the saved job directories, `docs/agents/**/proof` and `evidence`, the shared `cards.sqlite` ledger (read-only), and the runner/control/updater journals. "None found" means no saved trip in those sources; it does not prove the guard is unreachable. No machine or code changes were made; this file is the only change.
 
+## Todd's decisions, 25 October 2026
+
+The table below is the audit that these decisions changed. Rows are kept for history; "retired" means the guard no longer exists.
+
+| Decision | Change | Rows |
+| --- | --- | --- |
+| Money never stops a card; spend is recorded and reported per card. Clear the priced-accounting block. | No cap, stop row, remaining balance, priced block or held-reservation refusal. The ledger records settled usage and spend by model. | 1-6 |
+| A build stops only after 15 minutes with no activity. | The 15-minute total session timeout is replaced by a 15-minute inactivity watchdog. | 10 |
+| A command follows the same no-activity rule. | The 30-second command timeout is replaced by a 15-minute inactivity kill. | 15 |
+| Helpers get 100 steps. | Every pstack helper runs to 100 steps. | 23 |
+| No output-length limit; send each model's maximum. | The 8,192-token output cap is removed; the request carries the model's published maximum. | 38 |
+| Remove the machine's separate planning step; pstack plans. | Plan-only runner, plan workspace, plan retries and plan size/shape checks are deleted. | 12, 13, 22, 32, 33, 66 |
+| Remove rules forcing pstack's process. | Coder task, coder activity, two-model panel, machinery self-check and the four-turn evidence retry are removed. Missing checklist or no real change is reported unproven and goes to Remediation. | 21, 24-31 |
+| Remove old money leftovers. | Local input estimate, token counting and whole-request refusal are removed; an unpriced hosted tool call is still refused. | 1, 4, 39, 40, 42 |
+| Start after a failed run starts fresh. | A failed job directory is archived under `<runId>.failed-<time>` and a new run starts. | 53 |
+| Delete dead legacy code. | Legacy delivery role budgets, output truncation, reviewer bounds and adapter run defaults are deleted. | 14, 20, 47, 48 |
+| Provider errors are retried after a pause. | Each attempt is recorded; after the last attempt the build pauses as provider-down. | 44, 46 |
+| Runaway or provider down pauses with work kept. | The job enters `paused`, keeps its worktree and thread, records a Linear note, and can be continued with `POST /jobs/:runId/continue`. | 11 |
+| Remove the checklist-matches-work check. | The host no longer rejects a checklist for skipped steps, publishing text or a missing completed item. | 30 |
+| Start remembers the last model choices. | The Start form stores route, model and effort per role in browser storage. | 51 |
+| Builder reaches only models picked on Start. | The `networkAllow` provider allowlist, runtime price validation and model identity checks are removed. | 37, 43, 45 |
+
+
 | # | Limit and scope | Value | Code location | What happens when it trips | Origin (commit and decision) | Real-run trip |
 | ---: | --- | --- | --- | --- | --- | --- |
 | 1 | Money: pre-dispatch worst-case reservation ceiling (retired) | $2 = 2,000,000,000 nano | `ledger.mjs:5,86`; `transport.mjs:232-235` | `reserve` throws `Card cost ceiling exceeded`; no HTTP; worker then throws `session not completed` | `93c6d99` "reserve and settle durable per-card request costs" and `5b8949b` "share the two-dollar card cap"; ADR 0022 ($2, reserve before dispatch). Retired by `dbc1e71` / ADR 0023 | JUL-252 `jul-252-04db241d9dbeda4fc7d58701cd7b66d2` archived 0602 (reservation $2.005552) and 0644; JUL-254 `jul-254-551c2aab2a1005b421fffb7fb1bd0464` (Sol tier); JUL-255 `jul-255-8f8ccaead8ea3061a74db741c7f02452` |

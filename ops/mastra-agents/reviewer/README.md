@@ -113,23 +113,9 @@ The reviewer is built on `@mastra/core` and provides:
 
 ## Runtime and execution budgets
 
-Reviewer execution is coordinated through `createReviewerRuntime` with explicit
-resource budgets defined in `src/contract.mjs`:
+The legacy reviewer runtime and its separate bounds are deleted: no `createReviewerRuntime`, no per-review spend ledger, no 20-minute total, 15-second step or 4,096-token output ceiling, and no memory or disk budget. Paid reviewer execution stays disabled at `runReviewer`. The report-recording seam, quote verification, journal and run-file writer remain.
 
-- **Spending ledger:** Pre-dispatch cost reservations (`review-budget.mjs`)
-  evaluated against published provider rates. Execution enforces the approved
-  $0.50 per-review ceiling and $1.00 cumulative card limit.
-- **Timeouts and step budgets:** A configured 20-minute total timeout
-  (`REVIEW_TOTAL_MS = 1200000`), a configured 15-second per-step timeout
-  (`REVIEW_STEP_MS = 15000`), and a derived `maxSteps` calculation based on the
-  inventory of changed files and criteria (`reviewStepBudget`).
-- **Memory and disk limits:** A 2 GiB free-disk preflight check, a 768 MiB
-  sampled RSS ceiling with 10 ms transient sampling, and a 128 MiB disk-growth
-  budget (`resource-budget.mjs`). Budget violations record `SYSTEM_ERROR` with
-  retained progress.
-- **Model events journal:** One bounded provider-boundary journal
-  (`model-events.json`) recording requests, raw replies, and validated token
-  usage without external database dependencies.
+- **Model events journal:** One bounded provider-boundary journal (`model-events.json`) recording requests, raw replies, and validated token usage without external database dependencies.
 
 ## Package scripts
 

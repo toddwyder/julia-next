@@ -1,8 +1,9 @@
 {
   "authPath": "/home/ubuntu/.local/share/mastracode/auth.json",
   "ledgerPath": "/home/ubuntu/.local/state/julia-machine/cards.sqlite",
-  "cardCeilings": {
-    "JUL-252": null
+  "providerRetry": {
+    "attempts": 3,
+    "pauseMs": 5000
   },
   "roles": {
     "orchestrator": "anthropic/claude-haiku-5-5",
@@ -20,13 +21,6 @@
     "commandCodeModels": "https://api.commandcode.ai/provider/v1/models",
     "commandCodePricing": "https://commandcode.ai/docs/resources/pricing-limits"
   },
-  "networkAllow": [
-    "https://api.commandcode.ai/provider/v1/models",
-    "https://models.dev/api.json",
-    "https://commandcode.ai/docs/resources/pricing-limits",
-    "https://auth.openai.com/oauth/token",
-    "https://console.anthropic.com/v1/oauth/token"
-  ],
   "memory": false,
   "machineryModel": "commandcode/reflection/beam:free"
 }

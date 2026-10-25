@@ -154,11 +154,18 @@ export async function startJob(input, options = {}) {
 
   const operation = (async () => {
     try {
+      const archiveStaleFailedRun = async () => {
+        const archive = join(opts.jobsDir, `${runId}.failed-${new Date().toISOString().replace(/[:.]/g, '-')}`)
+        await rename(join(opts.jobsDir, runId), archive)
+        return archive
+      }
+
       try {
         await stat(jobPath(opts.jobsDir, runId))
         const existing = await readJobFile(opts.jobsDir, runId)
         if (JSON.stringify(existing?.snapshot) !== JSON.stringify(snapshot)) throw new Error(`conflicting input for ${runId}`)
-        return await withChecklist(existing, opts.jobsDir)
+        if (existing.state !== 'failed') return await withChecklist(existing, opts.jobsDir)
+        await archiveStaleFailedRun()
       } catch (error) {
         if (error?.code !== 'ENOENT') throw error
       }
@@ -220,6 +227,32 @@ export async function readJob(runId, options = {}) {
   return await withChecklist(await readJobFile(opts.jobsDir, runId), opts.jobsDir)
 }
 
+export async function continueJob(runId, options = {}) {
+  if (typeof runId !== 'string' || !RUN_ID_RE.test(runId)) throw new Error('runId required')
+  const opts = resolveOpts(options)
+  const job = await readJobFile(opts.jobsDir, runId)
+  if (job.state !== 'paused') throw new Error(`build ${runId} is not paused`)
+  const jobDir = join(opts.jobsDir, runId)
+  job.state = 'running'
+  job.error = null
+  job.workerPid = null
+  await writeJobFile(opts.jobsDir, runId, job)
+  const workerPath = join(__dirname, 'worker.mjs')
+  const logFd = openSync(join(jobDir, 'worker.log'), 'a')
+  let child
+  try {
+    child = opts.spawnImpl(process.execPath, [workerPath, '--job-dir', jobDir, '--continue'], {
+      stdio: ['ignore', logFd, logFd],
+      env: opts.env ?? process.env,
+    })
+  } finally {
+    closeSync(logFd)
+  }
+  job.workerPid = child?.pid ?? null
+  await writeJobFile(opts.jobsDir, runId, job)
+  return await withChecklist(await readJobFile(opts.jobsDir, runId), opts.jobsDir)
+}
+
 export async function listJobs(options = {}) {
   const opts = resolveOpts(options)
   const entries = await readdir(opts.jobsDir, { withFileTypes: true }).catch(() => [])
@@ -260,6 +293,13 @@ function createRunnerServer(options = {}) {
       const match = url.pathname.match(/^\/jobs\/([^/]+)$/)
       if (req.method === 'GET' && match) {
         const job = await readJob(decodeURIComponent(match[1]), opts)
+        res.writeHead(200, { 'content-type': 'application/json' })
+        res.end(JSON.stringify(job))
+        return
+      }
+      const continueMatch = url.pathname.match(/^\/jobs\/([^/]+)\/continue$/)
+      if (req.method === 'POST' && continueMatch) {
+        const job = await continueJob(decodeURIComponent(continueMatch[1]), opts)
         res.writeHead(200, { 'content-type': 'application/json' })
         res.end(JSON.stringify(job))
         return
