@@ -19,6 +19,7 @@ export function resolveModelKey(settings, role) {
 export function createPstackSession(settings, snapshot, table) {
   let orchestratorModel = resolveModelKey(settings, snapshot.roles?.orchestrator)
   let coderModel = resolveModelKey(settings, snapshot.roles?.coder)
+  const reviewerModel = snapshot.roles?.reviewer ? resolveModelKey(settings, snapshot.roles.reviewer) : null
   const machineryProof = snapshot.machineryProof === true || settings.machineryProof === true
   const machineryModel = settings.machineryModel
   if (machineryProof && (!machineryModel || !settings.models?.[machineryModel])) throw new Error('machinery model must name a configured model')
@@ -54,7 +55,7 @@ export function createPstackSession(settings, snapshot, table) {
 Pstack model settings:\n${pstackModels}\n\nHarness mapping:\nTask means the subagent tool. Choose the helper whose name is the exact model ID required by the role. Each helper is general purpose; the task supplies its role.\nHome is .builder-home. Retain the pstack-authored checklist and decision log as run evidence. These required run artifacts belong at .builder-home/pstack/checklist.md and .builder-home/pstack/decisions.tsv. These files are excluded from the card's candidate diff and retained by the host as run evidence. Keep them factual. This session owns Build only; the host owns publishing the parent PR. Publishing is outside this saved-card session. Mark that playbook step out of scope rather than claiming a PR was opened or waiting for GitHub authentication. The host owns git remotes, branches, publishing, pull requests and GitHub credentials. Do not search the machine for them; mark that step out of scope and continue. The evidence review judges the result against the saved card. A missing checklist or a build with no real change is reported unproven there; this session does not decide that.
 Unavailable configured models:\n${unavailable.join('\n') || 'None'}`
   const prompt = `Saved card:\n${JSON.stringify(snapshot.card, null, 2)}\n\nRead .agents/skills/poteto-mode/SKILL.md in full and follow poteto-mode for this repository task. Select and read its matching playbook, then carry out that playbook. Reading the skill alone does not satisfy this instruction. Retain the playbook checklist and decision trail at the harness evidence paths.`
-  return { orchestratorModel, coderModel, machineryProof, helpers, pstackModels, hostInstructions, prompt }
+  return { orchestratorModel, coderModel, reviewerModel, machineryProof, helpers, pstackModels, hostInstructions, prompt }
 }
 
 export function inspectPstackRun({ events, requests, checklist, decisions, changedFiles = [] }) {

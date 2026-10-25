@@ -31,7 +31,7 @@ The native Codex stream can omit Content-Type; the guard uses the outgoing strea
 
 Stock Auto observational memory uses the stock local store, 30000-token observation threshold, 40000-token reflection threshold and stock buffering. Set `memory` to `false` to disable observational memory while retaining ordinary stock history. Local embedding assets must already be present in the adapter home's stock `.cache/mastra/fastembed-models` cache. Network downloads fail closed until their exact asset routes are explicitly configured. The proof reused the installed stock cache.
 
-Builder file tools use the contained stock filesystem. Every stock sandbox process passes through the Landlock launcher with a clean environment. Python 3, Linux Landlock ABI 3 or later, and a supported CPU architecture are required. Nested commands inherit the restriction. Failure to install it refuses the command. This provides functional file isolation under the accepted ubuntu administrator risk.
+Builder file tools use the contained stock filesystem. Every stock sandbox process passes through the Landlock launcher. The launcher keeps the filesystem fence and allows outbound network so a builder can install packages from the standard package registry. Commands receive only the keys named by `builderEnvKeys` in settings (CommandCode by default); machine-only keys such as `LINEAR_API_KEY`, `SENTRY_AUTH_TOKEN` and `AXIOM_TOKEN` are refused even if named. A missing command key fails that one command and the build continues. The machine keeps the keys that move cards or change production.
 
 Run local accounting, protocol, command and SDK retry checks from the repository root.
 
@@ -53,7 +53,7 @@ The proof forces one observation through the public stock API. It repeats that r
 
 ## Start a saved card
 
-The control page posts its saved initialization result to the separate runner's `POST /jobs`. `GET /jobs` and `GET /jobs/:runId` return the persisted job. A duplicate Start returns the same saved job. `POST /jobs/:runId/continue` restarts a paused job in its retained worktree. The worker uses the saved card, orchestrator and coder selections in one Mastra Code session, then saves `ready-for-review` after the run. A missing checklist or an empty candidate is recorded as unproven for the evidence review rather than failing the job.
+The control page posts its saved initialization result to the separate runner's `POST /jobs`. `GET /jobs` and `GET /jobs/:runId` return the persisted job. A duplicate Start returns the same saved job. `POST /jobs/:runId/continue` restarts a paused job in its retained worktree. The Start form chooses Orchestrator, Coder and Reviewer. The Reviewer must come from a different company than the Orchestrator and the Coder, and the three choices are remembered in the browser. The worker uses the saved card and the three selections, then saves `ready-for-review` after the run. A missing checklist or an empty candidate is recorded as unproven for the evidence review rather than failing the job.
 
 Set `BUILD_RUNNER_JOBS_DIR`, `BUILD_RUNNER_REPO`, `BUILD_RUNNER_SETTINGS` and `BUILD_RUNNER_PORT`, then launch `jobs.mjs` through `scripts/julia-agents.mjs`. Set the control service's `JULIA_BUILD_RUNNER_URL` to that runner. The server units and their controller live under `ops/build-runner/systemd/`.
 

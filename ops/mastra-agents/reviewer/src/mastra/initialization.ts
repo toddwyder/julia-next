@@ -44,9 +44,22 @@ export function ensureInitializationSelectionsOffered(input: StartInitialization
   return parsed
 }
 
+export function ensureDistinctReviewer(roles: StartInitialization['roles']) {
+  const reviewer = roles.reviewer
+  if (!reviewer) throw new Error('reviewer selection is required')
+  if (reviewer.company === roles.orchestrator.company) {
+    throw new Error(`reviewer ${reviewer.company} must come from a different company than the orchestrator ${roles.orchestrator.company}`)
+  }
+  if (reviewer.company === roles.coder.company) {
+    throw new Error(`reviewer ${reviewer.company} must come from a different company than the coder ${roles.coder.company}`)
+  }
+  return reviewer
+}
+
 export function validateInitializationRequest(input: StartInitialization, state: ControlPageState) {
   const parsedState = ControlPageStateSchema.parse(state)
   const parsed = ensureInitializationSelectionsOffered(input, parsedState.offers)
+  ensureDistinctReviewer(parsed.roles)
   const currentCard = parsedState.cards.find(entry => entry.card.identifier === parsed.card.identifier)
   if (!currentCard) throw new Error(`${parsed.card.identifier} is no longer a current Ready card`)
   if (!currentCard.admitted) throw new Error(`${parsed.card.identifier} cannot start: ${currentCard.card.reason}`)

@@ -18,35 +18,60 @@ async function listen(server, target) {
   })
 }
 
-test('builder commands cannot read outside the worktree or reach host services', linux, async () => {
+test('builder commands cannot read outside the worktree but can reach the package registry network', linux, async () => {
   const root = await mkdtemp(join(tmpdir(), 'builder-boundary-'))
   const workspace = join(root, 'worktree')
   const home = join(workspace, '.builder-home')
   const outside = join(root, 'outside-secret.txt')
-  const serviceSocket = join(root, 'control.sock')
   const tcp = createServer(socket => socket.destroy())
-  const unix = createServer(socket => socket.destroy())
   try {
     await mkdir(home, { recursive: true })
     await writeFile(outside, 'outside-secret\n')
     await listen(tcp, { host: '127.0.0.1', port: 0 })
-    await listen(unix, serviceSocket)
     const launcher = fileURLToPath(new URL('../command-boundary.py', import.meta.url))
     const config = JSON.stringify({ workspace, home, cwd: workspace, executable: process.execPath })
-    const attempts = [
-      ['outside-worktree', `cat '${outside}'`],
-      ['control-page', `node -e "require('net').connect(${tcp.address().port},'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(23))"`],
-      ['start-endpoint', `node -e "const http=require('http');const r=http.request({host:'127.0.0.1',port:${tcp.address().port},path:'/jobs',method:'POST'},()=>process.exit(0));r.on('error',()=>process.exit(24));r.end('{}')"`],
-      ['server-service', `node -e "require('net').connect('${serviceSocket}').on('connect',()=>process.exit(0)).on('error',()=>process.exit(25))"`],
-    ]
-    for (const [name, command] of attempts) {
-      await assert.rejects(execFile('python3', [launcher, config, command]), error => {
-        assert.notEqual(error.code, 0, `${name} unexpectedly crossed the boundary`)
-        return true
-      })
-    }
+    await assert.rejects(execFile('python3', [launcher, config, `cat '${outside}'`]), error => {
+      assert.notEqual(error.code, 0, 'outside worktree unexpectedly readable')
+      return true
+    })
+    const connected = await execFile('python3', [launcher, config, `node -e "require('net').connect(${tcp.address().port},'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(23))"`])
+    assert.equal(connected.stderr, '')
   } finally {
-    await Promise.all([new Promise(resolve => tcp.close(resolve)), new Promise(resolve => unix.close(resolve))])
+    await new Promise(resolve => tcp.close(resolve))
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('builder commands receive only configured read-only keys', linux, async () => {
+  const root = await mkdtemp(join(tmpdir(), 'builder-env-boundary-'))
+  const workspace = join(root, 'worktree')
+  const home = join(workspace, '.builder-home')
+  try {
+    await mkdir(home, { recursive: true })
+    const launcher = fileURLToPath(new URL('../command-boundary.py', import.meta.url))
+    const config = JSON.stringify({ workspace, home, cwd: workspace, executable: process.execPath, envKeys: ['PROOF_BUILDER_KEY', 'LINEAR_API_KEY'] })
+    const environment = { ...process.env, PROOF_BUILDER_KEY: 'synthetic-builder', LINEAR_API_KEY: 'synthetic-linear' }
+    const allowed = await execFile('python3', [launcher, config, 'printf %s "$PROOF_BUILDER_KEY"'], { env: environment })
+    assert.equal(allowed.stdout, 'synthetic-builder')
+    const blocked = await execFile('python3', [launcher, config, 'test -z "$LINEAR_API_KEY" && printf clean'], { env: environment })
+    assert.equal(blocked.stdout, 'clean')
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('a missing command key fails that command and the next command still runs', linux, async () => {
+  const root = await mkdtemp(join(tmpdir(), 'builder-missing-key-'))
+  const workspace = join(root, 'worktree')
+  const home = join(workspace, '.builder-home')
+  try {
+    await mkdir(home, { recursive: true })
+    const launcher = fileURLToPath(new URL('../command-boundary.py', import.meta.url))
+    const config = JSON.stringify({ workspace, home, cwd: workspace, executable: process.execPath, envKeys: ['MISSING_KEY'] })
+    await assert.rejects(execFile('python3', [launcher, config, 'test -n "$MISSING_KEY"']))
+    const next = await execFile('python3', [launcher, config, 'printf continued'])
+    assert.equal(next.stdout, 'continued')
+  } finally {
     await rm(root, { recursive: true, force: true })
   }
 })

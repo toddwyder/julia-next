@@ -5,7 +5,7 @@ import { chromium } from 'playwright'
 
 import { InitializationRunsStateSchema, ModelOfferSchema, ReadyCardSchema } from '../src/mastra/contracts.ts'
 import { createInitializationActivityRecorder } from '../src/mastra/initialization-observability.ts'
-import { validateInitializationRequest } from '../src/mastra/initialization.ts'
+import { ensureDistinctReviewer, validateInitializationRequest } from '../src/mastra/initialization.ts'
 import { admitReadyCards } from '../src/mastra/linear.ts'
 import { isAllowedControlHost, startControlPageServer } from '../src/mastra/control-page.ts'
 import { discoverAcpOffers } from '../src/mastra/routes.ts'
@@ -132,16 +132,31 @@ test('Start stays blocked for a card that failed admission', () => {
   const card = ReadyCardSchema.parse({ identifier: 'JUL-242', title: 'Card 1: Server setup', state: 'Ready', description: settledBrief })
   const offer = { route: 'commandcode', modelId: 'vendor/one', name: 'Vendor One', company: 'Vendor', service: 'CommandCode', wire: 'chat', codingCapable: true, supportedEfforts: ['low', 'medium', 'high'] }
   const other = { ...offer, modelId: 'other/two', name: 'Other Two', company: 'Other' }
+  const third = { ...offer, modelId: 'third/three', name: 'Third Three', company: 'Third' }
   const selection = pick => ({ route: pick.route, modelId: pick.modelId, company: pick.company, service: pick.service, wire: pick.wire, effort: 'medium' })
-  const roles = { orchestrator: selection(offer), coder: selection(other) }
+  const roles = { orchestrator: selection(offer), coder: selection(other), reviewer: selection(third) }
   const state = {
     cards: [{ admitted: false, card: { identifier: 'JUL-242', title: 'Card 1: Server setup', state: 'Ready', reason: 'Cannot start: missing the Acceptance criteria section' } }],
-    offers: [offer, other],
+    offers: [offer, other, third],
   }
   assert.throws(() => validateInitializationRequest({ card, roles }, state as never), /JUL-242 cannot start/)
 })
 
-test('the Start form remembers the last model choices for both roles', async t => {
+test('the reviewer must come from a different company than the orchestrator and the coder', () => {
+  const offer = { route: 'commandcode', modelId: 'vendor/one', name: 'Vendor One', company: 'Vendor', service: 'CommandCode', wire: 'chat', codingCapable: true, supportedEfforts: ['low', 'medium', 'high'] }
+  const other = { ...offer, modelId: 'other/two', name: 'Other Two', company: 'Other' }
+  const third = { ...offer, modelId: 'third/three', name: 'Third Three', company: 'Third' }
+  const selection = pick => ({ route: pick.route, modelId: pick.modelId, company: pick.company, service: pick.service, wire: pick.wire, effort: 'medium' })
+  const roles = { orchestrator: selection(offer), coder: selection(other), reviewer: selection(third) }
+  const card = ReadyCardSchema.parse({ identifier: 'JUL-242', title: 'Card 1: Server setup', state: 'Ready', description: settledBrief })
+  const state = { cards: [{ admitted: true, card }], offers: [offer, other, third] }
+  assert.equal(validateInitializationRequest({ card, roles }, state as never).roles.reviewer.company, 'Third')
+  assert.throws(() => validateInitializationRequest({ card, roles: { ...roles, reviewer: selection(offer) } }, state as never), /different company than the orchestrator/)
+  assert.throws(() => validateInitializationRequest({ card, roles: { ...roles, reviewer: selection(other) } }, state as never), /different company than the coder/)
+  assert.throws(() => ensureDistinctReviewer({ orchestrator: roles.orchestrator, coder: roles.coder } as never), /reviewer selection is required/)
+})
+
+test('the Start form remembers the last model choices for all three roles', async t => {
   const first = ModelOfferSchema.parse({
     route: 'commandcode', modelId: 'vendor/one', name: 'Vendor One', company: 'Vendor', service: 'CommandCode',
     codingCapable: true, wire: 'chat', supportedEfforts: ['low', 'medium', 'high'],
@@ -150,11 +165,15 @@ test('the Start form remembers the last model choices for both roles', async t =
     route: 'claude', modelId: 'claude-opus-5-5', name: 'Claude Opus 5.5', company: 'Anthropic', service: 'Claude subscription',
     codingCapable: true, wire: 'messages', supportedEfforts: ['low', 'medium', 'high', 'max'],
   })
+  const third = ModelOfferSchema.parse({
+    route: 'openai-codex', modelId: 'gpt-6-sol', name: 'GPT-6 Sol', company: 'OpenAI', service: 'ChatGPT plan',
+    codingCapable: true, wire: 'responses', supportedEfforts: ['low', 'medium', 'high'],
+  })
   const server = await startControlPageServer({
     port: 0,
     getState: async () => ({
       cards: [{ admitted: true, card: ReadyCardSchema.parse({ identifier: 'JUL-238', title: 'A settled card', state: 'Ready', description: settledBrief }) }],
-      offers: [first, second],
+      offers: [first, second, third],
     }),
     startInitialization: async () => { throw new Error('must not start') },
     getRuns: async () => InitializationRunsStateSchema.parse({ runs: [], totalRuns: 0 }),
@@ -168,28 +187,37 @@ test('the Start form remembers the last model choices for both roles', async t =
     localStorage.setItem('julia-control-model-choices', JSON.stringify({
       orchestrator: { key: 'claude::claude-opus-5-5', effort: 'max' },
       coder: { key: 'commandcode::vendor/one', effort: 'high' },
+      reviewer: { key: 'openai-codex::gpt-6-sol', effort: 'high' },
     }))
   })
   await page.goto(server.url)
   await page.getByRole('heading', { name: 'Initialize a Ready card' }).waitFor()
   const models = page.getByLabel('Route and model')
   const efforts = page.getByLabel('Effort')
+  assert.equal(await models.count(), 3)
   assert.equal(await models.nth(0).inputValue(), 'claude::claude-opus-5-5')
   assert.equal(await efforts.nth(0).inputValue(), 'max')
   assert.equal(await models.nth(1).inputValue(), 'commandcode::vendor/one')
   assert.equal(await efforts.nth(1).inputValue(), 'high')
+  assert.equal(await models.nth(2).inputValue(), 'openai-codex::gpt-6-sol')
+  assert.equal(await efforts.nth(2).inputValue(), 'high')
 
   await models.nth(1).selectOption('claude::claude-opus-5-5')
   await efforts.nth(1).selectOption('medium')
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('julia-control-model-choices')!))
   assert.deepEqual(stored.coder, { key: 'claude::claude-opus-5-5', effort: 'medium' })
   assert.deepEqual(stored.orchestrator, { key: 'claude::claude-opus-5-5', effort: 'max' })
+  assert.deepEqual(stored.reviewer, { key: 'openai-codex::gpt-6-sol', effort: 'high' })
 })
 
 test('the page lists every Ready card and blocks Start for one that cannot start', async t => {
   const offer = ModelOfferSchema.parse({
     route: 'commandcode', modelId: 'vendor/one', name: 'Vendor One', company: 'Vendor', service: 'CommandCode',
     codingCapable: true, wire: 'chat', supportedEfforts: ['low', 'medium', 'high'],
+  })
+  const other = ModelOfferSchema.parse({
+    route: 'claude', modelId: 'claude-opus-5-5', name: 'Claude Opus 5.5', company: 'Anthropic', service: 'Claude subscription',
+    codingCapable: true, wire: 'messages', supportedEfforts: ['low', 'medium', 'high', 'max'],
   })
   const admitted = ReadyCardSchema.parse({ identifier: 'JUL-238', title: 'A settled card', state: 'Ready', description: settledBrief })
   const server = await startControlPageServer({
@@ -199,7 +227,7 @@ test('the page lists every Ready card and blocks Start for one that cannot start
         { admitted: false, card: { identifier: 'JUL-242', title: 'Card 1: Server setup', state: 'Ready', reason: 'Cannot start: missing the Acceptance criteria section' } },
         { admitted: true, card: admitted },
       ],
-      offers: [offer],
+      offers: [offer, other],
     }),
     startInitialization: async () => { throw new Error('Start must not run for a card that cannot start') },
     getRuns: async () => InitializationRunsStateSchema.parse({ runs: [], totalRuns: 0 }),
@@ -215,6 +243,7 @@ test('the page lists every Ready card and blocks Start for one that cannot start
   await page.goto(server.url)
   await page.getByRole('heading', { name: 'Initialize a Ready card' }).waitFor()
 
+  await page.getByLabel('Route and model').nth(2).selectOption('claude::claude-opus-5-5')
   const cardSelect = page.getByLabel('Ready card')
   assert.deepEqual(await cardSelect.locator('option').allTextContents(), [
     'JUL-242 — Card 1: Server setup (cannot start)',
@@ -226,4 +255,33 @@ test('the page lists every Ready card and blocks Start for one that cannot start
   await cardSelect.selectOption('1')
   assert.equal(await page.getByRole('button', { name: 'Start' }).isDisabled(), false)
   assert.deepEqual(browserErrors, [])
+})
+
+test('the page refuses a reviewer from the same company as the orchestrator or coder', async t => {
+  const offer = ModelOfferSchema.parse({
+    route: 'commandcode', modelId: 'vendor/one', name: 'Vendor One', company: 'Vendor', service: 'CommandCode',
+    codingCapable: true, wire: 'chat', supportedEfforts: ['low', 'medium', 'high'],
+  })
+  const other = ModelOfferSchema.parse({
+    route: 'claude', modelId: 'claude-opus-5-5', name: 'Claude Opus 5.5', company: 'Anthropic', service: 'Claude subscription',
+    codingCapable: true, wire: 'messages', supportedEfforts: ['low', 'medium', 'high', 'max'],
+  })
+  const admitted = ReadyCardSchema.parse({ identifier: 'JUL-238', title: 'A settled card', state: 'Ready', description: settledBrief })
+  const server = await startControlPageServer({
+    port: 0,
+    getState: async () => ({ cards: [{ admitted: true, card: admitted }], offers: [offer, other] }),
+    startInitialization: async () => { throw new Error('must not start') },
+    getRuns: async () => InitializationRunsStateSchema.parse({ runs: [], totalRuns: 0 }),
+    getActivity: () => createInitializationActivityRecorder().snapshot(),
+  })
+  t.after(() => server.close())
+  const browser = await chromium.launch({ headless: true })
+  t.after(() => browser.close())
+  const page = await browser.newPage()
+  await page.goto(server.url)
+  await page.getByRole('heading', { name: 'Initialize a Ready card' }).waitFor()
+  assert.equal(await page.getByRole('button', { name: 'Start' }).isDisabled(), true)
+  assert.match(await page.locator('p.status').first().innerText(), /Reviewer must come from a different company/)
+  await page.getByLabel('Route and model').nth(2).selectOption('claude::claude-opus-5-5')
+  assert.equal(await page.getByRole('button', { name: 'Start' }).isDisabled(), false)
 })
