@@ -43,6 +43,7 @@ def restrict(workspace, home, executable):
     paths += [(p, read & ~(1 << 3)) for p in files]
     paths += [(workspace, access)]
     paths += [(executable, (1 << 0) | (1 << 2))]
+    paths += [(os.path.dirname(os.path.dirname(executable)), read)]
     paths += [(p, (1 << 1) | (1 << 2)) for p in ["/dev/null", "/dev/urandom", "/dev/random"]]
     for path, rights in paths:
         if not os.path.exists(path):

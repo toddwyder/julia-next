@@ -76,6 +76,21 @@ test('a missing command key fails that command and the next command still runs',
   }
 })
 
+test('the builder can run the pinned package manager toolchain', linux, async () => {
+  const root = await mkdtemp(join(tmpdir(), 'builder-npm-boundary-'))
+  const workspace = join(root, 'worktree')
+  const home = join(workspace, '.builder-home')
+  try {
+    await mkdir(home, { recursive: true })
+    const launcher = fileURLToPath(new URL('../command-boundary.py', import.meta.url))
+    const config = JSON.stringify({ workspace, home, cwd: workspace, executable: process.execPath })
+    const result = await execFile('python3', [launcher, config, 'npm --version'])
+    assert.match(result.stdout.trim(), /^\d+\.\d+\.\d+/)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('builder command cwd must remain inside the worktree', linux, async () => {
   const root = await mkdtemp(join(tmpdir(), 'builder-cwd-boundary-'))
   const workspace = join(root, 'worktree')
