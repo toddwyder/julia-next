@@ -30,20 +30,21 @@ test('review durable stop survives reopen and blocks free and paid routes only f
   let arrivals = 0;
   const upstream = async () => {
     arrivals++;
-    return Response.json(arrivals === 1 ? { usage: { cost: 0.01 } } : {});
+    return Response.json({});
   };
   let ledger = new CardLedger({ path, card: 'JUL-251' });
+  ledger.stop('fixture stop');
   await assert.rejects(send(transport(ledger, free, upstream)), /STOP WORK/);
   ledger.close();
   ledger = new CardLedger({ path, card: 'JUL-251' });
   t.after(() => ledger.close());
   assert.equal(ledger.snapshot().stopped, true);
   for (const price of [free, paid]) await assert.rejects(send(transport(ledger, price, upstream)));
-  assert.equal(arrivals, 1);
+  assert.equal(arrivals, 0);
   const other = new CardLedger({ path, card: 'JUL-252' });
   t.after(() => other.close());
   assert.equal((await send(transport(other, free, upstream))).status, 200);
-  assert.equal(arrivals, 2);
+  assert.equal(arrivals, 1);
   assert.equal(other.snapshot().stopped, false);
   assert.equal(other.snapshot().requests[0].state, 'settled');
 });
@@ -54,32 +55,35 @@ test('review stopped card blocks allowlisted metadata GET', async t => {
   const arrivals = [];
   const fetch = transport(ledger, free, async request => {
     arrivals.push(request.url);
-    return Response.json(request.url === endpoint ? { usage: { cost_usd: 0.01 } } : { models: [] });
+    return Response.json({ models: [] });
   });
   assert.equal((await fetch(metadata)).status, 200);
+  ledger.stop('fixture stop');
   await assert.rejects(send(fetch), /STOP WORK/);
   await assert.rejects(fetch(metadata), /STOP WORK/);
-  assert.deepEqual(arrivals, [metadata, endpoint]);
+  assert.deepEqual(arrivals, [metadata]);
 });
 
-test('review oversized known usage records actual cost and refuses result', async t => {
+test('review known usage above the recorded maximum is recorded and the result is accepted', async t => {
   const ledger = new CardLedger({ path: ':memory:', card: 'JUL-251' });
   t.after(() => ledger.close());
   let arrivals = 0;
   const fetch = transport(ledger, paid, async () => {
     arrivals++;
-    return Response.json({ result: 'must not escape', usage: { prompt_tokens: 101, completion_tokens: 10 } });
+    return Response.json({ result: 'escapes', usage: { prompt_tokens: 101, completion_tokens: 10 } });
   });
-  await assert.rejects(send(fetch));
+  const response = await send(fetch);
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).result, 'escapes');
   const receipt = ledger.snapshot();
   assert.equal(receipt.spentNano, 111000);
   assert.equal(receipt.requests[0].maximumNano, 110000);
   assert.equal(receipt.requests[0].costNano, 111000);
-  assert.equal(receipt.requests[0].state, 'accounting_failure');
+  assert.equal(receipt.requests[0].state, 'settled');
   assert.deepEqual(receipt.requests[0].usage, { input: 101, output: 10, cacheRead: 0, cacheWrite: 0 });
-  assert.equal(receipt.pricedBlocked, true);
-  await assert.rejects(send(fetch));
-  assert.equal(arrivals, 1);
+  assert.equal(receipt.pricedBlocked, false);
+  assert.equal((await send(fetch)).status, 200);
+  assert.equal(arrivals, 2);
 });
 
 async function adapterFixture(t, scenario) {

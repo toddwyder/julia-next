@@ -186,20 +186,25 @@ test('separate HTTP attempts create separate durable records', async t => {
   assert.notEqual(f.ledger.snapshot().requests[0].id, f.ledger.snapshot().requests[1].id);
 });
 
-test('card ceiling refuses an oversized reservation before HTTP', async t => {
-  const f = await fixture(t, (_req, res) => json(res, {}));
-  await assert.rejects(send(transport(f, { price: paid, maxInputTokens: 600000 }), f.endpoint));
-  assert.equal(f.arrivals.length, 0);
+test('an oversized reservation dispatches while settled spend is under the ten-dollar ceiling', async t => {
+  const f = await fixture(t, (_req, res) => json(res, { usage: { prompt_tokens: 10, completion_tokens: 2, prompt_tokens_details: { cached_tokens: 0, cache_write_tokens: 0 } } }));
+  const response = await send(transport(f, { price: paid, maxInputTokens: 3000000 }), f.endpoint);
+  assert.equal(response.status, 200);
+  assert.equal(f.arrivals.length, 1);
+  assert.ok(f.ledger.snapshot().requests[0].maximumNano > 10_000_000_000);
+  assert.equal(f.ledger.snapshot().stopped, false);
+  assert.ok(f.ledger.snapshot().spentNano > 0);
 });
 
-test('provider cost above a configured free reservation is recorded and stops its card', async t => {
+test('provider cost above a free reservation settles and continues under the ten-dollar ceiling', async t => {
   const f = await fixture(t, (_req, res) => json(res, { usage: { cost: 0.01 } }));
-  await assert.rejects(send(transport(f), f.endpoint), /STOP WORK/);
-  assert.equal(f.ledger.snapshot().requests[0].state, 'accounting_failure');
+  const fetch = transport(f);
+  assert.equal((await send(fetch, f.endpoint)).status, 200);
+  assert.equal(f.ledger.snapshot().requests[0].state, 'settled');
   assert.equal(f.ledger.snapshot().spentNano, 10000000);
-  await assert.rejects(send(transport(f), f.endpoint), /STOP WORK/);
-  assert.equal(f.arrivals.length, 1);
-  assert.equal(f.ledger.snapshot().stopped, true);
+  assert.equal(f.ledger.snapshot().stopped, false);
+  assert.equal((await send(fetch, f.endpoint)).status, 200);
+  assert.equal(f.arrivals.length, 2);
 });
 
 test('allowlisted authentication cannot carry inference payloads and redirects never follow', async t => {
@@ -296,19 +301,18 @@ test('local text estimate reserves framing and UTF-8 bytes without a credential 
   assert.equal(f.ledger.snapshot().spentNano, 70000);
 });
 
-test('a provider input count above the local estimate settles actual cost and stops later work', async t => {
+test('actual usage above the local estimate settles and continues under the ten-dollar ceiling', async t => {
   const f = await fixture(t, (_req, res) => json(res, { usage: { input_tokens: 211, output_tokens: 0 } }));
   const guarded = transport(f, {
     protocol: 'responses', maxInputTokens: 1000000,
     price: { ...free, input: 4, output: 15 },
     inputTokenEstimate: { method: 'utf8', multiplier: 2, framingTokens: 100 },
   });
-  await assert.rejects(send(guarded, f.endpoint, { input: 'hello', messages: undefined }), /local input estimate/);
+  assert.equal((await send(guarded, f.endpoint, { input: 'hello', messages: undefined })).status, 200);
   assert.equal(f.ledger.snapshot().spentNano, 844000);
-  assert.equal(f.ledger.snapshot().stopped, true);
-  assert.equal(f.ledger.snapshot().heldNano, 0);
-  await assert.rejects(send(guarded, f.endpoint, { input: 'hello', messages: undefined }));
-  assert.equal(f.arrivals.length, 1);
+  assert.equal(f.ledger.snapshot().stopped, false);
+  assert.equal((await send(guarded, f.endpoint, { input: 'hello', messages: undefined })).status, 200);
+  assert.equal(f.arrivals.length, 2);
 });
 
 test('a stock Codex stream without a content-type header settles its completed usage', async t => {
