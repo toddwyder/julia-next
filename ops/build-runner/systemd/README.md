@@ -11,6 +11,13 @@ advance it. An update installs the three runtime owners' locked dependencies and
 restarts the configured services. A failed install or restart leaves a pending
 record in Git metadata so the next poll retries it.
 
+The controller never restarts services while a build worker is running. It reads
+the runner service's cgroup and looks for `ops/build-runner/worker.mjs`. A merge
+that lands mid-build is deferred before the checkout advances, and the same check
+runs again after the install and before the restart. The first poll after the
+worker exits applies the merge. `buildRunning` returns false when the runner
+service or its cgroup is absent, so a stopped runner does not block updates.
+
 Install the controller at `~/.local/lib/julia-machine/server-main.mjs` and these
 four units at `~/.config/systemd/user/`. The controller reads
 `~/.config/julia-machine/config.json`:
