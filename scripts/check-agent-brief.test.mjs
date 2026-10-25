@@ -64,6 +64,13 @@ test('accepts an outcome criterion with no implementation words or negations', (
   assert.deepEqual(checkCriterion({ id: 'AC1', text: 'Each skipped step shows its own count.' }), []);
 });
 
+test('refuses more than five criteria', t => {
+  const directory = root(t, '# Rules\n\nWrite the observed behavior.\n');
+  const six = '## Outcome\n\nOne outcome.\n\n## Acceptance criteria\n\n- One.\n- Two.\n- Three.\n- Four.\n- Five.\n- Six.\n';
+  const findings = checkBrief({ text: six, file: 'brief.md', root: directory });
+  assert.deepEqual(findings, ['brief.md:12: more than five acceptance criteria (6); a card carries at most five']);
+});
+
 test('accepts a clean brief and refuses one with no criteria', t => {
   const directory = root(t, '# Rules\n\nWrite the observed behavior.\n');
   const clean = '## Outcome\n\nThe dashboard shows the live checklist.\n\n## Acceptance criteria\n\n- [ ] The dashboard shows each finished step.\n- [ ] Each skipped step has its own count.\n';

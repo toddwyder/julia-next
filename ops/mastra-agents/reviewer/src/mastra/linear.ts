@@ -62,8 +62,10 @@ function admissionReason(error: { issues: { message: string }[] }) {
     if (section) return `missing the ${section[1]} section`
     const emptySection = /^empty (.+) section$/.exec(issue.message)
     if (emptySection) return `the ${emptySection[1]} section is empty`
-    const field = /^missing nonempty (.+) field$/.exec(issue.message)
-    if (field) return `missing the ${field[1]} field`
+    const retiredSection = /^retired (.+) section$/.exec(issue.message)
+    if (retiredSection) return `the ${retiredSection[1]} section is retired`
+    if (issue.message === 'Acceptance criteria section lists no criteria') return 'the Acceptance criteria section lists no criteria'
+    if (issue.message === 'more than 5 acceptance criteria') return 'more than five acceptance criteria'
     if (issue.message === 'unresolved decision marker') return 'an unresolved decision marker must be decided first'
     return issue.message
   })

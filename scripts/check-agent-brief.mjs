@@ -164,7 +164,9 @@ export function checkBrief({ text, file = 'brief.md', root = process.cwd() }) {
     docs: markdownFiles(root, resolve(root, file)).map(path => ({ file: relative(root, path), text: readFileSync(path, 'utf8') })),
   }));
   for (const criterion of criteria) findings.push(...checkCriterion(criterion));
-  return findings.map(finding => `${file}:${criteria.find(criterion => finding.startsWith(`${criterion.id} `))?.line ?? 1}: ${finding}`);
+  const complete = findings.map(finding => `${file}:${criteria.find(criterion => finding.startsWith(`${criterion.id} `))?.line ?? 1}: ${finding}`);
+  if (criteria.length > 5) complete.push(`${file}:${criteria[5].line}: more than five acceptance criteria (${criteria.length}); a card carries at most five`);
+  return complete;
 }
 
 function main(args) {

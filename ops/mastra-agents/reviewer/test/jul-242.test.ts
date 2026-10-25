@@ -100,15 +100,14 @@ test('a genuine ACP failure still fails discovery rather than being silently dro
   ), /agent reported ENOENT/)
 })
 
-const settledBrief = `## Agent Brief
+const settledBrief = `## Outcome
 
-**Category:** enhancement
-**Summary:** A settled Ready card.
-**Current behavior:** The card is not shown.
-**Desired behavior:** The card is shown.
-**Key interfaces:** ReadyCardSchema
-**Acceptance criteria:** The card is admitted.
-**Out of scope:** Everything else.`
+The control page shows a settled Ready card.
+
+## Acceptance criteria
+
+- The page lists the card.
+- Start begins its build.`
 
 test('a Ready card that fails admission is reported as not startable without breaking the list', () => {
   const malformed = {
@@ -122,7 +121,7 @@ test('a Ready card that fails admission is reported as not startable without bre
     admitted: false,
     card: {
       identifier: 'JUL-242', title: 'Card 1: Server setup', state: 'Ready',
-      reason: 'Cannot start: missing the Outcome section; missing the Contracts section; missing the Acceptance criteria section; missing the Proof section',
+      reason: 'Cannot start: the Requirements section is retired; missing the Outcome section; missing the Acceptance criteria section',
     },
   })
   assert.equal(second.admitted, true)
@@ -136,7 +135,7 @@ test('Start stays blocked for a card that failed admission', () => {
   const selection = pick => ({ route: pick.route, modelId: pick.modelId, company: pick.company, service: pick.service, wire: pick.wire, effort: 'medium' })
   const roles = { orchestrator: selection(offer), coder: selection(other) }
   const state = {
-    cards: [{ admitted: false, card: { identifier: 'JUL-242', title: 'Card 1: Server setup', state: 'Ready', reason: 'Cannot start: missing the Proof section' } }],
+    cards: [{ admitted: false, card: { identifier: 'JUL-242', title: 'Card 1: Server setup', state: 'Ready', reason: 'Cannot start: missing the Acceptance criteria section' } }],
     offers: [offer, other],
   }
   assert.throws(() => validateInitializationRequest({ card, roles }, state as never), /JUL-242 cannot start/)
@@ -152,7 +151,7 @@ test('the page lists every Ready card and blocks Start for one that cannot start
     port: 0,
     getState: async () => ({
       cards: [
-        { admitted: false, card: { identifier: 'JUL-242', title: 'Card 1: Server setup', state: 'Ready', reason: 'Cannot start: missing the Proof section' } },
+        { admitted: false, card: { identifier: 'JUL-242', title: 'Card 1: Server setup', state: 'Ready', reason: 'Cannot start: missing the Acceptance criteria section' } },
         { admitted: true, card: admitted },
       ],
       offers: [offer],
@@ -178,7 +177,7 @@ test('the page lists every Ready card and blocks Start for one that cannot start
   ])
   await cardSelect.selectOption('0')
   assert.equal(await page.getByRole('button', { name: 'Start' }).isDisabled(), true)
-  assert.match(await page.locator('p.status').first().innerText(), /Cannot start: missing the Proof section/)
+  assert.match(await page.locator('p.status').first().innerText(), /Cannot start: missing the Acceptance criteria section/)
   await cardSelect.selectOption('1')
   assert.equal(await page.getByRole('button', { name: 'Start' }).isDisabled(), false)
   assert.deepEqual(browserErrors, [])

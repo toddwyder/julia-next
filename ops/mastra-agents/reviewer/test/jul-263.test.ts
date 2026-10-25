@@ -20,7 +20,7 @@ const card = ReadyCardSchema.parse({
   identifier: 'JUL-263',
   title: 'Live view',
   state: 'Ready',
-  description: '## Outcome\n\nDashboard checklist\n\n## Requirements\n\nLive ticks\n\n## Contracts\n\nRunner job record\n\n## Acceptance criteria\n\n* Shows the checklist\n\n## Proof\n\nBeam practice build',
+  description: '## Outcome\n\nThe dashboard shows the running build checklist.\n\n## Acceptance criteria\n\n* The dashboard shows each finished step.\n* Each skipped step has its own count.',
 });
 
 const selection = {

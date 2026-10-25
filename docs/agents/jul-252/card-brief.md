@@ -2,55 +2,10 @@
 
 ## Outcome
 
-A saved build is checked against the card's acceptance criteria by a reviewer whose company differs from the builder's, with every criterion proven or refused against the proof folder. A refused criterion sends the card to Remediation with a fix that starts on its own. A second refusal ends in an Investigation run and a stopped card.
-
-## Requirements
-
-- Review starts automatically when a build saves its result. No button and no human step.
-- The reviewer's company differs from the builder's company. The machine refuses a review it cannot staff that way.
-- The reviewer reads the card's acceptance criteria and the proof folder for the exact candidate commit. There is no evidence index.
-- The saved build result names the proof folder it leaves for the candidate commit.
-- Every acceptance criterion gets one verdict: proven, not proven, or wrong thing tested. The verdict names the proof file it rests on.
-- A review passes when every criterion is proven. Any other verdict fails it.
-- A first failed review moves the card to Remediation and starts a fix run on its own, following poteto-mode's Bug fix playbook, with the failing findings as the task.
-- A second failed review starts a read-only run that follows poteto-mode's Investigation playbook and reports the root cause. The card then stops with that root cause and a restart plan.
-- A card gets at most two evidence reviews.
-- Each build and remediation run names its required playbook. A build names the playbook it follows; the first remediation names Bug fix; the second names Investigation.
-- The machine saves no result for a build or remediation run whose checklist does not follow its required playbook.
-- The review, the fix run and the Investigation draw on the same $2 card account as the build.
-
-## Contracts
-
-- The evidence reviewer is a settings role with its own priced and bounded model. Its model entry carries the company used for the independence check.
-- A build or remediation run record carries its required playbook and its checklist.
-- A build result carries the proof folder path for its candidate commit.
-- Each review result is saved with the card's run record and carries the review round, the reviewer model and company, and one verdict per acceptance criterion, each with the proof file it cites.
-- The reviewer's input is the acceptance criteria and the files in the recorded proof folder.
-- The board uses Evidence review for the review and Remediation for a sent-back card.
+Every finished build's proof gets an adversarial review from a different company's model, with a verdict per criterion shown on the Linear card. A failed review fixes itself once, then investigates and stops the card.
 
 ## Acceptance criteria
 
-- A saved build result starts an evidence review automatically.
-- Every real-card review runs on a model whose company differs from the builder's company, and the machine refuses a review whose model company matches the builder's.
-- The review result gives each acceptance criterion one verdict of proven, unproven or wrong thing tested, with the evidence it rests on named beside it.
-- A first failed review moves the card to Remediation and starts a fix run that follows the Bug fix playbook from the failing findings.
-- A second failed review starts a read-only Investigation run, and the card then stops with the root cause and a restart plan.
-- Each card receives at most two evidence reviews.
-- A build or remediation run result is accepted with a checklist that follows the playbook required for that run, and refused when its checklist follows a different playbook.
-- The review, the fix run and the Investigation show on the same $2 card account as the build.
-
-## Proof
-
-- A Beam practice card with an acceptance criterion its build cannot prove. Its real evidence review fails, the real Bug fix run starts from the findings, and the second real failure runs Investigation and stops the card. The saved run files and review results are read back.
-- A planted checklist for a different playbook, showing the run refused with no saved result.
-- A planted reviewer from the builder's company, showing the review refused before dispatch.
-- A readback of the card account showing build, review and remediation spending on the same card.
-
-## Out of scope
-
-- Staging and the smoke test.
-- UAT, merge, and the live check after merge.
-- The automatic retro.
-- A structural "evidence is there" gate and an evidence index. Todd dropped both on 24 October.
-- Changes to the Bug fix and Investigation playbooks themselves.
-- The admission script's four writing rules for briefs.
+- A different company's model reviews each finished build's proof adversarially, starting from unproven and trying to break each claim, with nobody pressing anything.
+- The Linear card shows a verdict per criterion: proven, unproven or wrong thing tested.
+- A failed review gets one automatic Bug fix run, and a second failure runs Investigation and stops the card.

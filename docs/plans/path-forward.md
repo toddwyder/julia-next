@@ -48,6 +48,11 @@ Working document. Each line is a decision Todd agreed in conversation.
 - Decided: retire Pocock's `tdd` and `teach`; pstack's versions everywhere. (pstack `teach` = explain a piece of work plainly; agents never start it themselves; it can explain an already-found root cause, while finding one is the debugging skills' job.) Pocock's `ask-matt` reference to `/teach` changes too.
 - Structural fix: CI fails if two installed skills share a name. The separate pstack folder is cut (24 Oct).
 
+## Card shape (Todd, 24 Oct)
+- A card is a short Outcome of one or two sentences plus at most five acceptance criteria describing what Todd sees.
+- Requirements, Contracts, Proof and Out of scope sections are retired. A constraint that matters to Todd, including how something must be proven, is written as a criterion.
+- Start's admission check accepts that shape and refuses the retired sections. `scripts/check-agent-brief.mjs` refuses more than five criteria. Triage writes that shape.
+
 ## Evidence check (12:09–12:12, revised 24 Oct)
 - **Is the evidence there:** **dropped** (Todd, 24 Oct). No evidence index. The reviewer reads the proof folder for the exact candidate commit; a missing or thin proof folder is a failed criterion, not a separate gate. The "evidence is there" card is dropped.
 - **Is the evidence right** (does it prove each criterion where Todd uses it): **kept** (Todd, 12:12; inputs settled 24 Oct). Wrong-but-present evidence got past pstack and the builder's report twice on 23 Oct and was stopped only by the advisor's human review. The machine starts a review after each build, by a model from a different company than the builder; input is only the card's criteria and the proof folder; per-criterion verdict (proven / not proven / wrong thing tested), each verdict naming its proof file. A first failure moves the card to **Remediation**, where a fix starts automatically on poteto's **Bug fix** playbook from the review's findings; a second failure runs poteto's **Investigation** playbook for the root cause, then the card stops. At most two reviews. This is JUL-252's job.
