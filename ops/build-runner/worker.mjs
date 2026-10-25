@@ -8,19 +8,15 @@ import { promisify } from 'node:util'
 import { openRunner, SESSION_INACTIVITY_MS } from './adapter.mjs'
 import { hydrateSettings, loadCatalogue } from './catalogue.mjs'
 import { createPstackSession, inspectPstackRun } from './pstack-session.mjs'
-import { postLinearComment, moveLinearCard } from './linear-note.mjs'
+import { postLinearComment, moveLinearCard, fetchLinearCard } from './linear-note.mjs'
 import { pauseReason } from './worker-policy.mjs'
 import {
   REQUIRED_PLAYBOOK,
   parseCriteria,
-  declaredPlaybook,
-  checkPlaybookConformity,
   nextStage,
   parseVerdicts,
   formatVerdictNote,
-  requiredBuildPlaybook,
   requiredPlaybookForRun,
-  unprovenVerdicts,
   reviewPrompt,
   remediationPrompt,
   investigationPrompt,
@@ -29,7 +25,6 @@ import {
 const execFile = promisify(execFileCb)
 const PLAYBOOKS = '.agents/skills/poteto-mode/playbooks'
 const REVIEW_SKILL = '.agents/skills/adversarial-review/SKILL.md'
-const refusal = reason => Object.assign(new Error(`run refused: ${reason}`), { refused: `run refused: ${reason}` })
 const stop = message => Object.assign(new Error(message), { stopped: message })
 
 function argValue(name) {
@@ -129,7 +124,6 @@ async function main() {
   let decisions
   let internalReview
   const allowedEventTypes = new Set(['subagent_start', 'subagent_end', 'subagent_tool_start', 'subagent_tool_end', 'tool_start', 'tool_end', 'agent_start', 'agent_end', 'error', 'task_updated', 'state_changed', 'message_end'])
-  const criteria = parseCriteria(card)
 
   async function runStage({ role, cwd, settingsPath, stateDir: stageStateDir, hostInstructions: stageInstructions, prompt: stagePrompt, subagents = helpers }) {
     const stageRunner = await openRunner({ card: cardId, settingsPath, cwd, stateDir: stageStateDir, role, hostInstructions: stageInstructions, subagents })
@@ -163,21 +157,21 @@ async function main() {
     } catch { return false }
   }
 
-  async function assertPlaybook({ required, declared, checklistText }) {
-    const playbookText = await baseFile(`${PLAYBOOKS}/${required}.md`)
-    if (playbookText == null) throw refusal(`playbook ${required} is missing from ${PLAYBOOKS}`)
-    const conformity = checkPlaybookConformity({ required, declared, playbookText, checklistText })
-    if (!conformity.ok) throw refusal(conformity.reason)
+  async function currentCard() {
+    const latest = await fetchLinearCard({ card: cardId, apiKey: linearKey })
+    if (!latest) throw stop(`stopped: could not read ${cardId} from Linear`)
+    return latest
   }
 
-  async function writeReviewProof(tree) {
+  async function writeReviewProof(tree, { card: reviewCard, criteria, playbookText }) {
     const proofDir = join(tree, '.builder-home', 'proof')
     await mkdir(proofDir, { recursive: true })
     const { stdout: diff } = await execFile('git', ['-C', job.worktree, 'diff', `${job.baseCommit}..${candidateCommit}`], { maxBuffer: 64 * 1024 * 1024 })
     const proof = {
-      'card.json': JSON.stringify(card, null, 2),
+      'card.json': JSON.stringify(reviewCard, null, 2),
       'criteria.md': criteria.map(item => `${item.criterion}. ${item.text}`).join('\n'),
       'checklist.md': checklist ?? '',
+      'playbook.md': playbookText ?? '',
       'decisions.tsv': decisions ?? '',
       'changed-files.txt': (job.result.changedFiles ?? []).join('\n'),
       'diff.patch': diff,
@@ -188,20 +182,13 @@ async function main() {
 
   async function reviewStage() {
     const round = job.review.history.filter(entry => entry.stage === 'review').length + 1
+    const reviewCard = await currentCard()
+    const criteria = parseCriteria(reviewCard)
     if (round === 1) await moveLinearCard({ card: cardId, stateName: 'Evidence review', apiKey: linearKey })
     const reviewer = startReviewer()
     job.review.reviewer = reviewer
     await atomicWriteJson(join(jobDir, 'job.json'), job)
-    const lastRun = job.review.history.filter(entry => entry.stage !== 'review').at(-1)
-    const required = requiredPlaybookForRun({ card, history: job.review.history })
-    const declared = declaredPlaybook(checklist)
-    if (!checklist?.trim() || (required && declared !== required)) {
-      const reason = !checklist?.trim()
-        ? 'missing checklist'
-        : `checklist follows ${declared ?? 'no declared playbook'}, run requires ${required}`
-      await recordReview({ round, reviewer, verdicts: unprovenVerdicts(criteria, reason), passed: false })
-      return
-    }
+    const required = requiredPlaybookForRun({ card: reviewCard, history: job.review.history })
     const reviewDir = join(jobDir, `review-${round}`)
     const tree = join(reviewDir, 'tree')
     await rm(reviewDir, { recursive: true, force: true })
@@ -211,14 +198,16 @@ async function main() {
     const archive = join(reviewDir, 'tree.tar')
     await execFile('git', ['-C', job.worktree, 'archive', '--format=tar', '-o', archive, candidateCommit])
     await execFile('tar', ['-xf', archive, '-C', tree])
-    await writeReviewProof(tree)
+    const playbookText = required ? await readOptional(join(tree, PLAYBOOKS, `${required}.md`)) : null
+    if (required && playbookText == null) throw stop(`stopped: playbook ${required} is missing from ${PLAYBOOKS}`)
+    await writeReviewProof(tree, { card: reviewCard, criteria, playbookText })
     await runStage({
       role: 'reviewer',
       cwd: tree,
       settingsPath: reviewSettingsPath,
       stateDir: join(reviewDir, 'state'),
       hostInstructions: await baseFile(REVIEW_SKILL) ?? '',
-      prompt: reviewPrompt({ card, criteria, round }),
+      prompt: reviewPrompt({ card: reviewCard, criteria, round, requiredPlaybook: required, playbookText }),
       subagents: [],
     })
     const raw = await readOptional(join(tree, '.builder-home', 'review', 'verdicts.json'))
@@ -287,8 +276,6 @@ async function main() {
       hostInstructions: workflowInstructions,
       prompt: investigationPrompt({ card, history: job.review.history }),
     })
-    checklist = await readOptional(join(builderHome, 'pstack', 'checklist.md'))
-    await assertPlaybook({ required: REQUIRED_PLAYBOOK.investigation, declared: declaredPlaybook(checklist), checklistText: checklist })
     const rootCause = (await readOptional(join(builderHome, 'investigation', 'root-cause.md')))?.trim() || null
     const { stdout: status } = await execFile('git', ['-C', job.worktree, 'status', '--porcelain'])
     const tracked = status.split(/\r?\n/).filter(Boolean)
@@ -302,8 +289,6 @@ async function main() {
 
   async function reviewBeforePublishing() {
     job.review = { reviewer: null, history: [], outcome: null }
-    const declared = declaredPlaybook(checklist)
-    if (declared) await assertPlaybook({ required: declared, declared, checklistText: checklist })
     await atomicWriteJson(join(jobDir, 'job.json'), job)
     await runner?.close()
     runner = null

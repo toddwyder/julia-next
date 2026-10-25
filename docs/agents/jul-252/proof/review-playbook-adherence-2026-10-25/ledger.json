@@ -1,0 +1,29 @@
+{
+  "card": "JUL-270",
+  "requestCount": 132,
+  "totalCostNano": 6071559918,
+  "totalCostUSD": "6.071559918",
+  "groups": [
+    {
+      "model": "anthropic/claude-opus-5-5",
+      "role": "orchestrator",
+      "state": "settled",
+      "count": 98,
+      "cost_nano": 5640823200
+    },
+    {
+      "model": "openai/gpt-6-sol",
+      "role": "reviewer",
+      "state": "settled",
+      "count": 12,
+      "cost_nano": 416218800
+    },
+    {
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "role": "orchestrator",
+      "state": "settled",
+      "count": 22,
+      "cost_nano": 14517918
+    }
+  ]
+}

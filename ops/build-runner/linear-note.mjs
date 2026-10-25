@@ -1,3 +1,30 @@
+export async function fetchLinearCard({ card, apiKey = process.env.LINEAR_API_KEY, fetchImpl = fetch } = {}) {
+  if (!card) throw new Error('card is required')
+  if (!apiKey) return null
+  const headers = { 'content-type': 'application/json', authorization: apiKey }
+  try {
+    const response = await fetchImpl('https://api.linear.app/graphql', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ query: 'query Card($id: String!) { issue(id: $id) { identifier title description state { name } labels { nodes { name } } } }', variables: { id: card } }),
+      redirect: 'error',
+    })
+    if (!response.ok) return null
+    const body = await response.json()
+    const issue = body?.data?.issue
+    if (!issue?.identifier) return null
+    return {
+      identifier: issue.identifier,
+      title: issue.title ?? '',
+      description: issue.description ?? '',
+      state: issue.state?.name ?? '',
+      labels: (issue.labels?.nodes ?? []).map(label => label.name),
+    }
+  } catch {
+    return null
+  }
+}
+
 export async function moveLinearCard({ card, stateName, apiKey = process.env.LINEAR_API_KEY, fetchImpl = fetch } = {}) {
   if (!card || !stateName) return { moved: false, reason: 'card and state name are required' }
   if (!apiKey) return { moved: false, reason: 'LINEAR_API_KEY is not present in the runner environment' }

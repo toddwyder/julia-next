@@ -27,10 +27,10 @@ Todd settled the review's inputs and failure handling on 24 October. The card wa
 - The "evidence is there" card is dropped. No Linear card existed for it, so nothing was canceled.
 - First failed review: one round of defect fixing in Remediation, then a fresh review.
 - Second failed review: an Investigation run reports the root cause, then the card stops.
-- Every build and remediation run records its required playbook (build: the playbook it declares; first remediation: Bug fix; second: Investigation). The machine saves no result for a run whose checklist follows a different playbook.
+- Every build and remediation run records its required playbook (build: the playbook named by its card label; first remediation: Bug fix; second: Investigation). The evidence review receives that playbook's text with the run's checklist and candidate diff. A run whose checklist follows a different playbook, or whose work skips its steps, is marked unproven and takes the ordinary failed-review path.
 - The five-card checkpoint stays as Todd's later decision over the saved review results. The card delivers no report.
 
-Todd revised the brief in the same session: criteria 2 and 8 are one criterion, criterion 10 and its report are removed, and proof uses a real failing Beam practice card. The playbook-mismatch and same-company refusals stay as planted checks.
+Todd revised the brief in the same session: criteria 2 and 8 are one criterion, criterion 10 and its report are removed, and proof uses a real failing Beam practice card. The same-company refusal stays as a planted check. The playbook-mismatch refusal was replaced on 25 October by reviewer-judged playbook adherence.
 
 ## 24 October card shape
 
