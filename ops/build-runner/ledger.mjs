@@ -35,8 +35,10 @@ function request(row) {
 }
 
 export class CardLedger {
-  constructor({ path, card }) {
+  constructor({ path, card, ceilingNano = CEILING_NANO }) {
     this.card = nonempty(card, 'card');
+    if (ceilingNano !== null && (!Number.isSafeInteger(ceilingNano) || ceilingNano <= 0)) throw new TypeError('ceilingNano must be null or a positive safe integer');
+    this.ceilingNano = ceilingNano;
     this.db = new DatabaseSync(nonempty(path, 'path'));
     this.db.exec(`
       PRAGMA busy_timeout = 10000;
@@ -83,7 +85,7 @@ export class CardLedger {
       const snapshot = this.snapshot();
       if (snapshot.stopped) throw new Error('Card account is stopped');
       if (maximumNano > 0 && snapshot.pricedBlocked) throw new Error('Priced requests blocked by unresolved accounting');
-      if (BigInt(snapshot.spentNano) > BigInt(CEILING_NANO)) throw new Error('Card cost ceiling exceeded');
+      if (this.ceilingNano !== null && BigInt(snapshot.spentNano) > BigInt(this.ceilingNano)) throw new Error('Card cost ceiling exceeded');
       const id = randomUUID();
       this.db.prepare(`INSERT INTO requests
         (card,id,model,role,maximum_nano,price,bounds,state) VALUES (?,?,?,?,?,?,?,'reserved')`)
@@ -146,17 +148,18 @@ export class CardLedger {
     }
     const numeric = (value) => value <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(value) : value.toString();
     return {
-      card: this.card, ceilingNano: CEILING_NANO,
+      card: this.card, ceilingNano: this.ceilingNano,
       stopped: Boolean(this.db.prepare('SELECT reason FROM stops WHERE card = ?').get(this.card)),
       spentNano: numeric(spent), heldNano: numeric(held),
-      remainingNano: numeric(BigInt(CEILING_NANO) > spent ? BigInt(CEILING_NANO) - spent : 0n),
+      remainingNano: this.ceilingNano === null ? null : numeric(BigInt(this.ceilingNano) > spent ? BigInt(this.ceilingNano) - spent : 0n),
       pricedBlocked, requests,
     };
   }
 
   stopIfSpentExceedsCeiling() {
+    if (this.ceilingNano === null) return;
     const { spent } = this.db.prepare('SELECT COALESCE(SUM(cost_nano), 0) AS spent FROM requests WHERE card = ?').get(this.card);
-    if (BigInt(spent) > BigInt(CEILING_NANO)) this.stop('Card cost ceiling exceeded');
+    if (BigInt(spent) > BigInt(this.ceilingNano)) this.stop('Card cost ceiling exceeded');
   }
 
   stop(reason) {

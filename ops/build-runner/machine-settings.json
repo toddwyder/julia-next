@@ -1,6 +1,9 @@
 {
   "authPath": "/home/ubuntu/.local/share/mastracode/auth.json",
   "ledgerPath": "/home/ubuntu/.local/state/julia-machine/cards.sqlite",
+  "cardCeilings": {
+    "JUL-252": null
+  },
   "roles": {
     "orchestrator": "anthropic/claude-haiku-5-5",
     "coder": "commandcode/deepseek/deepseek-v4.1-flash"

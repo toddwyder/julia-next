@@ -1,0 +1,38 @@
+$ node --test --test-name-pattern="a merge is deferred while a build worker runs" ops/build-runner/test/server-main.test.mjs
+Cloning into '/tmp/server-main-z4PcGX/checkout'...
+done.
+Switched to a new branch 'feature'
+Switched to branch 'main'
+✔ a merge is deferred while a build worker runs and applies after it ends (974.123033ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1156.502599
+
+$ node --test --test-name-pattern="card ceiling of null|numeric card ceiling" ops/build-runner/test/ledger.test.mjs
+✔ a card ceiling of null removes the money stop for that card (8.301869ms)
+✔ a numeric card ceiling override moves the stop for that card (7.369313ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 206.892842
+
+$ node --test --test-name-pattern="card can remove or move|machine settings carry no hand-edited" ops/build-runner/test/machine-settings.test.mjs
+✔ machine settings carry no hand-edited model list (3.223478ms)
+✔ a card can remove or move its money stop in settings (1.134875ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 687.823757

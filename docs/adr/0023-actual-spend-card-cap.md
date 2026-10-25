@@ -12,6 +12,10 @@ JUL-252's first real build never dispatched. The 113,059-byte Opus request carri
 
 Counting with the bundled tokenizer admitted the request. Eight requests then settled at $1.223852 in actual usage. The next worst-case maximum exceeded the $0.776148 remaining, so the gate stopped the build before the agent wrote its checklist. Todd reviewed that measured usage and decided the gate should be actual spend, not a worst-case maximum.
 
+## Per-card override
+
+Machine settings may carry `cardCeilings` keyed by card identifier. A positive nano-dollar value moves that card's ceiling; `null` removes the money stop for that card only. JUL-252 carries `null` for Todd's 25 October full-cost run, so its completed spend becomes the first real data point. The $10 default remains for every other card.
+
 ## Consequences
 
 A card can spend up to the cap in real usage, even when a single request's worst-case maximum is larger. The over-cap request completes; the stop applies to later work. The recorded maximum remains useful only for an unknown outcome's final charge. The dashboard's remaining balance is counted from settled spend, not held maxima. The default cap is $10, and the ledger and tests use that number. ADR 0022's subscription connection and settlement rules remain; its $2 cap and pre-request reservation gate are superseded.

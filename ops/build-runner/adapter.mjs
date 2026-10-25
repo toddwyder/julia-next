@@ -1,7 +1,7 @@
 import { readFile, mkdir, realpath } from 'node:fs/promises'
 import { join, resolve, relative, isAbsolute, dirname, basename } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { CardLedger } from './ledger.mjs'
+import { CardLedger, CEILING_NANO } from './ledger.mjs'
 import { createTransport } from './transport.mjs'
 import { PlanFilesystem } from './plan-filesystem.mjs'
 
@@ -14,6 +14,14 @@ const planningWorkspaceTools = ['execute_command', 'mastra_workspace_read_file',
 
 export function disabledRunnerTools(planOnly) {
   return planOnly ? [...planningDynamicTools, ...planningWorkspaceTools] : ['web_search', 'request_access']
+}
+
+export function cardCeilingNano(settings, card) {
+  const value = settings?.cardCeilings?.[card]
+  if (value === undefined) return CEILING_NANO
+  if (value === null) return null
+  if (!Number.isSafeInteger(value) || value <= 0) throw new Error('Invalid card ceiling')
+  return value
 }
 
 export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'builder', hostInstructions, subagents, helpers, helperDefinitions, subagentDefinitions, planOnly = false }) {
@@ -65,7 +73,7 @@ export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'bu
   for (const key of Object.keys(process.env)) delete process.env[key]
   Object.assign(process.env, { PATH: path ?? '/usr/local/bin:/usr/bin:/bin', HOME: stateDir, LANG: 'C.UTF-8', MASTRA_APP_DATA_DIR: appDir })
   if (settings.memory === false) process.env.MASTRACODE_DISABLE_OBSERVATIONAL_MEMORY = '1'
-  const ledger = new CardLedger({ path: ledgerPath, card })
+  const ledger = new CardLedger({ path: ledgerPath, card, ceilingNano: cardCeilingNano(settings, card) })
   const originalFetch = globalThis.fetch
   globalThis.fetch = createTransport({ settings, ledger, role, fetch: originalFetch })
   opened = true

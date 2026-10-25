@@ -26,7 +26,18 @@ Task-specific items:
 10. [x] Implement Todd's 25 Oct decision: actual usage at API prices gates the card, drop the worst-case reservation gate, raise the cap to $10.
 11. [x] Retire the diagnosing-bugs skill and update the current routers to poteto-mode's Bug fix playbook.
 12. [x] Run the full runner suite, no-fakes, lint and link checks.
-13. [ ] Merge, deploy, restart JUL-252 through the Start page with Claude Opus 5.5 and DeepSeek V4.1 Flash.
-14. [ ] Capture the dashboard screenshot with the checklist ticking and the spend broken down by model and task kind.
+13. [x] Merge, deploy, restart JUL-252 through the Start page with Claude Opus 5.5 and DeepSeek V4.1 Flash. The run was interrupted by the external #339 deploy, not a money stop.
+14. [x] Capture the dashboard screenshot with the checklist ticking and the spend broken down by model and task kind.
+
+## 25 October updater defer and JUL-252 no-stop (Bug fix playbook)
+
+The red live evidence is the #339 deploy at `12:20:06Z`: the old updater restarted the runner while worker `1035904` was building and killed it. The new behavior must defer a mid-build merge until the worker ends.
+
+15. [x] Red test: a merge while a build worker is running does not advance or restart services, and applies after the worker ends.
+16. [x] Red test: a `cardCeilings` override of `null` removes the money stop for one card.
+17. [x] Implement the updater defer and the per-card ceiling override.
+18. [ ] Install the updater, start JUL-252 with Claude Opus 5.5 and DeepSeek V4.1 Flash, and prove a mid-build merge is deferred.
+19. [ ] Wait for JUL-252 to complete without a money stop.
+20. [ ] Report the final spend by model and checklist step.
 
 Decision log: [decision-log.md](decision-log.md)

@@ -11,6 +11,26 @@ function command(name, args, cwd) {
   return result.stdout.trim()
 }
 
+function runnerService(config) {
+  return config.runnerService ?? (config.services ?? []).find(service => service.includes('runner')) ?? null
+}
+
+export function buildRunning(config) {
+  const service = runnerService(config)
+  if (!service) return false
+  let cgroup
+  try { cgroup = command('systemctl', ['--user', 'show', service, '--property=ControlGroup', '--value']) } catch { return false }
+  if (!cgroup) return false
+  const procs = cgroup.startsWith('/') ? join(cgroup, 'cgroup.procs') : join('/sys/fs/cgroup', cgroup, 'cgroup.procs')
+  let pids
+  try { pids = readFileSync(procs, 'utf8').trim().split(/\s+/).filter(Boolean) } catch { return false }
+  return pids.some(pid => {
+    try {
+      return readFileSync(`/proc/${pid}/cmdline`, 'utf8').split('\0').some(arg => arg.endsWith('/ops/build-runner/worker.mjs') || arg.endsWith('worker.mjs'))
+    } catch { return false }
+  })
+}
+
 export function updateMain(config) {
   const root = resolve(config.checkout)
   const git = (...args) => command('git', args, root)
@@ -21,6 +41,9 @@ export function updateMain(config) {
   git('fetch', '--quiet', 'origin', branch)
   const current = git('rev-parse', 'HEAD')
   const remote = git('rev-parse', `origin/${branch}`)
+  const pending = resolve(root, git('rev-parse', '--git-path', 'julia-services-pending'))
+  if (current === remote && !existsSync(pending)) return { current, remote, updated: false }
+  if (buildRunning(config)) return { current, remote, updated: false, deferred: true, reason: 'build running' }
   git('merge-base', '--is-ancestor', current, remote)
   if (config.activationPullRequest) {
     const pr = JSON.parse(command('gh', ['api', `repos/${config.githubRepository}/pulls/${config.activationPullRequest}`]))
@@ -36,7 +59,6 @@ export function updateMain(config) {
     if (parents.length > 1 || associated.some(pr => pr.merged_at && pr.base.ref === branch && pr.merge_commit_sha === sha)) target = sha
   }
   if (activationMerge && commits.includes(activationMerge)) target = activationMerge
-  const pending = resolve(root, git('rev-parse', '--git-path', 'julia-services-pending'))
   if (existsSync(pending)) target = readFileSync(pending, 'utf8').trim()
   if (target === current && !existsSync(pending)) return { current, remote, updated: false }
   writeFileSync(pending, target + '\n')
@@ -46,6 +68,7 @@ export function updateMain(config) {
       if (existsSync(join(root, owner, 'package-lock.json'))) command('npm', ['ci', '--no-audit', '--no-fund'], join(root, owner))
     }
   }
+  if (buildRunning(config)) return { previous: current, current: target, remote, updated: false, deferred: true, advanced: true, reason: 'build started during update' }
   for (const service of config.legacyServices ?? []) {
     const unit = join(homedir(), '.config/systemd/user', service)
     if (!existsSync(unit)) continue
