@@ -1,6 +1,17 @@
 export function resolveModelKey(settings, role) {
   const raw = typeof role === 'string' ? role : (role?.modelId ?? role?.model)
-  const matches = settings.models?.[raw] ? [raw] : Object.keys(settings.models ?? {}).filter(key => settings.models[key]?.wireModel === raw)
+  const route = typeof role === 'string' ? undefined : (role?.route ?? role?.provider)
+  let matches = settings.models?.[raw] ? [raw] : Object.keys(settings.models ?? {}).filter(key => {
+    const spec = settings.models[key]
+    return spec?.modelId === raw || spec?.wireModel === raw
+  })
+  if (route) {
+    const routed = matches.filter(key => {
+      const spec = settings.models[key]
+      return (spec?.route ?? spec?.provider) === route
+    })
+    if (routed.length) matches = routed
+  }
   if (matches.length !== 1) throw new Error(`unknown or ambiguous model: ${raw}`)
   const key = matches[0]
   if (role && typeof role !== 'string') {
@@ -23,20 +34,27 @@ export function createPstackSession(settings, snapshot, table) {
   else if ([orchestratorModel, coderModel].includes(machineryModel)) throw new Error('machinery model cannot build a real card')
   const reviewModel = machineryProof ? machineryModel : undefined
   let panelModels = []
+  const referencedModels = new Set()
   const pstackModels = table.split(/\r?\n/).map(line => {
     if (!line.trim() || line.trimStart().startsWith('#')) return line
     const colon = line.indexOf(':')
     if (colon < 0) throw new Error('invalid pstack model line')
     const role = line.slice(0, colon)
     const ids = line.slice(colon + 1).split(',').map(value => value.trim())
-    for (const id of ids) if (!settings.models?.[id]) throw new Error(`unknown pstack model: ${id}`)
+    for (const id of ids) {
+      if (!settings.models?.[id]) throw new Error(`unknown pstack model: ${id}`)
+      referencedModels.add(id)
+    }
     if (role === 'interrogate reviewers') panelModels = ids
     if (!machineryProof) return line
     return `${role}: ${machineryModel}`
   }).join('\n')
   const reviewModels = machineryProof ? [machineryModel] : panelModels
   if (!machineryProof && (reviewModels.length !== 2 || new Set(reviewModels).size !== 2)) throw new Error('configured two-model code-review panel required')
-  const helpers = Object.keys(settings.models).filter(id => machineryProof ? id === machineryModel : id !== machineryModel).map((modelId, index) => ({
+  const helperModels = machineryProof
+    ? [machineryModel]
+    : [...new Set([...referencedModels, orchestratorModel, coderModel])].filter(id => id !== machineryModel)
+  const helpers = helperModels.map((modelId, index) => ({
     id: `model-${index + 1}`,
     name: modelId,
     description: `General task helper using exact model ${modelId}.`,

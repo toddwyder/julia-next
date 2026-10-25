@@ -3,9 +3,11 @@ import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openRunner } from '../adapter.mjs';
+import { hydrateSettings, loadCatalogue } from '../catalogue.mjs';
 
 const [model, settingsPath = 'ops/build-runner/machine-settings.json'] = process.argv.slice(2);
-const settings = JSON.parse(await readFile(settingsPath, 'utf8'));
+const catalogue = await loadCatalogue({ settingsPath });
+const settings = hydrateSettings(JSON.parse(await readFile(settingsPath, 'utf8')), catalogue);
 if (!settings.models[model]) throw Error('Configured exact model ID required');
 settings.roles = { proof: model };
 settings.memory = false;
