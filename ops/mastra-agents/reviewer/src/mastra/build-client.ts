@@ -70,7 +70,7 @@ export const BuildJobSchema = z
     settingsPath: z.string().nullable().optional(),
     worktree: z.string().min(1),
     baseCommit: z.string().min(1),
-    state: z.enum(['running', 'ready-for-review', 'failed']),
+    state: z.enum(['running', 'ready-for-review', 'failed', 'paused']),
     runnerPid: z.number().int().positive(),
     workerPid: z.number().int().positive().nullable(),
     result: BuildResultSchema.nullable(),
@@ -84,6 +84,9 @@ export const BuildJobSchema = z
   })
   .refine((job) => job.state !== 'failed' || job.error !== null, {
     message: 'failed build requires error',
+  })
+  .refine((job) => job.state !== 'paused' || job.error !== null, {
+    message: 'paused build requires its pause reason',
   });
 
 export const BuildStartResultSchema = InitializationResultSchema.extend({

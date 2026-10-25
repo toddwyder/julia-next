@@ -137,20 +137,18 @@ test('prices, bounds and wire endpoints come from the published catalogue', () =
   const opus = result.models['anthropic/claude-opus-5-5']
   assert.deepEqual(opus.price, { input: 4, output: 20, cacheRead: 0.2, cacheWrite: 8 })
   assert.equal(opus.maxInputTokens, 1000000)
-  assert.equal(opus.maxOutputTokens, 8192)
+  assert.equal(opus.maxOutputTokens, 128000)
   assert.equal(opus.publishedMaxOutputTokens, 128000)
   assert.equal(opus.endpoint, 'https://api.anthropic.com/v1/messages')
   assert.equal(opus.protocol, 'messages')
   assert.equal(opus.cacheWriteTtl, '1h')
-  assert.deepEqual(opus.inputTokenEstimate, { method: 'o200k_base', multiplier: 2, framingTokens: 4096 })
   assert.match(opus.source, /^https:\/\/models\.dev\/api\.json#/)
 
   const sol = result.models['openai/gpt-6-sol']
   assert.equal(sol.endpoint, 'https://chatgpt.com/backend-api/codex/responses')
   assert.equal(sol.protocol, 'responses')
   assert.equal(sol.maxInputTokens, 922000)
-  assert.equal(sol.maxOutputTokens, 8192)
-  assert.deepEqual(sol.inputTokenEstimate, { method: 'o200k_base', multiplier: 2, framingTokens: 4096 })
+  assert.equal(sol.maxOutputTokens, 128000)
   assert.deepEqual(sol.priceTiers, [{ aboveInputTokens: 272000, price: { input: 4, output: 15, cacheRead: 0.4, cacheWrite: 5 } }])
 
   assert.equal(result.models['openai/gpt-5.3'].wireModel, 'gpt-5.3-codex')
@@ -159,31 +157,31 @@ test('prices, bounds and wire endpoints come from the published catalogue', () =
   assert.equal(deepseek.endpoint, 'https://api.commandcode.ai/provider/v1/chat/completions')
   assert.equal(deepseek.protocol, 'chat')
   assert.equal(deepseek.maxInputTokens, 1000000)
-  assert.equal(deepseek.maxOutputTokens, 8192)
+  assert.equal(deepseek.maxOutputTokens, 384000)
   assert.deepEqual(deepseek.price, { input: 0.15, output: 0.6, cacheRead: 0.003, cacheWrite: 0 })
 })
 
 const buildNarrative = 'The evidence review starts from unproven and tries to break every claim in the saved proof. It reads the card outcome, each acceptance criterion, the candidate commit and the proof folder, then records one verdict per criterion. A review that cannot be reproduced from the saved evidence is unproven. A review that tests something other than the named criterion is wrong thing tested. The reviewer never edits the candidate and never opens a pull request. The orchestrator delegates the review to a model from a different company, waits for the handoff to end, and records the result without a human pressing anything. '
 
-test('a real-sized Claude build request reserves below the two-dollar card after planning', async t => {
+test('a real-sized Claude build request records its spend at the model bounds', async t => {
   const result = catalogue()
   const opus = result.models['anthropic/claude-opus-5-5']
   const { arrivals, endpoint } = await listenModel(t)
   const ledger = new CardLedger({ path: ':memory:', card: 'JUL-252' })
   t.after(() => ledger.close())
-  const planning = ledger.reserve({ model: 'anthropic/claude-opus-5-5', role: 'orchestrator', maximumNano: 763984000, price: opus.price, bounds: { maxInputTokens: 75018, maxOutputTokens: 8192 } })
-  ledger.settle(planning.id, { usage: { input: 4, output: 1945, cacheRead: 0, cacheWrite: 12640 }, costNano: 140036000 })
   const guarded = createTransport({ ledger, role: 'orchestrator', settings: { models: { 'anthropic/claude-opus-5-5': { ...opus, endpoint, wireModel: 'claude-opus-5-5' } } } })
   let content = ''
   while (Buffer.byteLength(JSON.stringify({ model: 'claude-opus-5-5', messages: [{ role: 'user', content }] })) < 113059) content += buildNarrative
-  const body = JSON.stringify({ model: 'claude-opus-5-5', max_tokens: 8192, messages: [{ role: 'user', content }] })
+  const body = JSON.stringify({ model: 'claude-opus-5-5', messages: [{ role: 'user', content }] })
   assert.ok(Buffer.byteLength(body) >= 113059)
   const response = await guarded(endpoint, { method: 'POST', headers: { 'content-type': 'application/json' }, body })
   assert.equal(response.status, 200)
   assert.equal(arrivals.length, 1)
-  const reservation = ledger.snapshot().requests.at(-1)
-  assert.ok(reservation.maximumNano < 1000000000, `reserved ${reservation.maximumNano} nano`)
-  assert.ok(ledger.snapshot().spentNano + reservation.maximumNano <= 2000000000)
+  assert.equal(arrivals[0].max_tokens, 128000)
+  const snapshot = ledger.snapshot()
+  assert.equal(snapshot.stopped, false)
+  assert.ok(snapshot.spentNano > 0)
+  assert.equal(snapshot.requests.at(-1).state, 'settled')
 })
 
 test('a model missing from models.dev uses the provider published list and price', () => {
@@ -192,7 +190,7 @@ test('a model missing from models.dev uses the provider published list and price
   assert.ok(beam)
   assert.deepEqual(beam.price, { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 })
   assert.equal(beam.maxInputTokens, 1048576)
-  assert.equal(beam.maxOutputTokens, 8192)
+  assert.equal(beam.maxOutputTokens, 1048576)
   assert.equal(beam.endpoint, 'https://api.commandcode.ai/provider/v1/chat/completions')
   assert.match(beam.source, /^https:\/\/commandcode\.ai\/docs\/resources\/pricing-limits#/)
   assert.match(beam.boundsSource, /^https:\/\/api\.commandcode\.ai\/provider\/v1\/models#/)

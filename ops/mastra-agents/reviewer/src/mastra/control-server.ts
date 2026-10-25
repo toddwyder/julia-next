@@ -13,6 +13,7 @@ import { discoverCatalogueOffers } from '../../../../build-runner/catalogue.mjs'
 import { createAgentActivityStore } from './agent-activity.ts'
 import { createCodexMonitor } from './agent-codex-monitor.ts'
 import { agentError } from './agent-errors.ts'
+import { notePausedBuild } from './paused-note.ts'
 
 const CONTROL_PORT = 43123
 
@@ -73,6 +74,8 @@ export async function runControlPageServer({ port = Number(process.env.JULIA_CON
   const buildRunner = process.env.JULIA_BUILD_RUNNER_URL
     ? createBuildRunnerClient(process.env.JULIA_BUILD_RUNNER_URL)
     : undefined
+  const linear = createObservedLinearClient(requiredSecret('LINEAR_API_KEY'), activity)
+  const notedBuilds = new Set<string>()
   const server = await startControlPageServer({
     port,
     tailscaleHosts,
@@ -80,7 +83,11 @@ export async function runControlPageServer({ port = Number(process.env.JULIA_CON
     getRuns: () => runtime.list(),
     getActivity: () => activity.snapshot(),
     getAgentCards: async () => ({ updatedAt: new Date().toISOString(), cards: await agentStore.cards() }),
-    getBuildJobs: () => buildRunner ? buildRunner.list() : Promise.resolve([]),
+    getBuildJobs: async () => {
+      const jobs = buildRunner ? await buildRunner.list() : []
+      for (const job of jobs) await notePausedBuild({ job: job as never, client: linear, posted: notedBuilds })
+      return jobs
+    },
     startInitialization: async input => {
       latestState = await discoverControlPageState(activity)
       const result = await runtime.start(input, latestState)

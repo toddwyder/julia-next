@@ -2,8 +2,6 @@ import { DatabaseSync } from 'node:sqlite';
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 
-export const CEILING_NANO = 10_000_000_000;
-
 function nonempty(value, name) {
   if (typeof value !== 'string' || !value.trim()) throw new TypeError(`${name} must be nonempty`);
   return value;
@@ -16,12 +14,11 @@ function integer(value, name) {
 
 function json(value, name) {
   if (value === undefined) throw new TypeError(`${name} is required`);
-  const serialized = JSON.stringify(value, (_key, item) => {
+  return JSON.stringify(value, (_key, item) => {
     if (typeof item === 'number' && !Number.isFinite(item)) throw new TypeError(`${name} must be JSON`);
     if (typeof item === 'undefined' || typeof item === 'function' || typeof item === 'symbol') throw new TypeError(`${name} must be JSON`);
     return item;
   });
-  return serialized;
 }
 
 function request(row) {
@@ -35,16 +32,13 @@ function request(row) {
 }
 
 export class CardLedger {
-  constructor({ path, card, ceilingNano = CEILING_NANO }) {
+  constructor({ path, card }) {
     this.card = nonempty(card, 'card');
-    if (ceilingNano !== null && (!Number.isSafeInteger(ceilingNano) || ceilingNano <= 0)) throw new TypeError('ceilingNano must be null or a positive safe integer');
-    this.ceilingNano = ceilingNano;
     this.db = new DatabaseSync(nonempty(path, 'path'));
     this.db.exec(`
       PRAGMA busy_timeout = 10000;
       PRAGMA journal_mode = WAL;
       PRAGMA synchronous = FULL;
-      CREATE TABLE IF NOT EXISTS stops (card TEXT PRIMARY KEY, reason TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS requests (
         card TEXT NOT NULL, id TEXT NOT NULL, model TEXT NOT NULL, role TEXT NOT NULL,
         maximum_nano INTEGER NOT NULL CHECK(maximum_nano >= 0),
@@ -82,10 +76,6 @@ export class CardLedger {
     const priceJson = json(price, 'price');
     const boundsJson = json(bounds, 'bounds');
     return this.transaction(() => {
-      const snapshot = this.snapshot();
-      if (snapshot.stopped) throw new Error('Card account is stopped');
-      if (maximumNano > 0 && snapshot.pricedBlocked) throw new Error('Priced requests blocked by unresolved accounting');
-      if (this.ceilingNano !== null && BigInt(snapshot.spentNano) > BigInt(this.ceilingNano)) throw new Error('Card cost ceiling exceeded');
       const id = randomUUID();
       this.db.prepare(`INSERT INTO requests
         (card,id,model,role,maximum_nano,price,bounds,state) VALUES (?,?,?,?,?,?,?,'reserved')`)
@@ -109,7 +99,6 @@ export class CardLedger {
       if (current.maximumNano > 0 && (usage === undefined || usage === null)) throw new Error('Priced settlement requires usage');
       this.db.prepare('UPDATE requests SET state = ?, usage = ?, cost_nano = ?, reason = ? WHERE card = ? AND id = ?')
         .run('settled', usageJson, costNano, null, this.card, id);
-      this.stopIfSpentExceedsCeiling();
       return this.get(id);
     });
   }
@@ -131,7 +120,6 @@ export class CardLedger {
       if (current.costNano !== null) return current;
       this.db.prepare('UPDATE requests SET cost_nano = maximum_nano, reason = ? WHERE card = ? AND id = ?')
         .run(`${current.reason}; full reserved maximum charged; actual usage unavailable`, this.card, id);
-      this.stopIfSpentExceedsCeiling();
       return this.get(id);
     });
   }
@@ -140,31 +128,21 @@ export class CardLedger {
     const requests = this.db.prepare('SELECT * FROM requests WHERE card = ? ORDER BY rowid').all(this.card).map(request);
     let spent = 0n;
     let held = 0n;
-    let pricedBlocked = false;
+    const spendByModel = {};
     for (const row of requests) {
       spent += BigInt(row.costNano ?? 0);
+      if (row.costNano) spendByModel[row.model] = (spendByModel[row.model] ?? 0) + row.costNano;
       if (row.state === 'reserved' || row.state === 'unknown') held += BigInt(row.maximumNano) - BigInt(row.costNano ?? 0);
-      if ((row.maximumNano > 0 && row.state === 'unknown' && row.costNano === null) || row.state === 'accounting_failure') pricedBlocked = true;
     }
     const numeric = (value) => value <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(value) : value.toString();
     return {
-      card: this.card, ceilingNano: this.ceilingNano,
-      stopped: Boolean(this.db.prepare('SELECT reason FROM stops WHERE card = ?').get(this.card)),
-      spentNano: numeric(spent), heldNano: numeric(held),
-      remainingNano: this.ceilingNano === null ? null : numeric(BigInt(this.ceilingNano) > spent ? BigInt(this.ceilingNano) - spent : 0n),
-      pricedBlocked, requests,
+      card: this.card,
+      stopped: false,
+      spentNano: numeric(spent),
+      heldNano: numeric(held),
+      spendByModel,
+      requests,
     };
-  }
-
-  stopIfSpentExceedsCeiling() {
-    if (this.ceilingNano === null) return;
-    const { spent } = this.db.prepare('SELECT COALESCE(SUM(cost_nano), 0) AS spent FROM requests WHERE card = ?').get(this.card);
-    if (BigInt(spent) > BigInt(this.ceilingNano)) this.stop('Card cost ceiling exceeded');
-  }
-
-  stop(reason) {
-    nonempty(reason, 'reason');
-    this.db.prepare('INSERT OR IGNORE INTO stops (card, reason) VALUES (?, ?)').run(this.card, reason);
   }
 
   close() { this.db.close(); }

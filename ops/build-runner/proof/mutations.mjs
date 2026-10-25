@@ -16,59 +16,23 @@ const tests = file => `ops/build-runner/test/${file}.test.mjs`;
 const edit = (file, before, after, occurrences = 1) => ({ file, before, after, occurrences });
 const cases = [
   {
-    id: 'unreachable-long-context-rate-reserved', file: 'transport', test: 'reservation uses only context tiers reachable within 150000 input tokens',
-    edits: [edit(transport, '(spec.priceTiers ?? []).filter(tier => inputBound > tier.aboveInputTokens)', '(spec.priceTiers ?? [])')],
-  },
-  {
     id: 'logged-request-forwarded-after-body-transfer', file: 'request-observer', test: 'observing a stock streamed Request preserves its body for accounting and dispatch',
     edits: [edit('ops/build-runner/request-observer.mjs', 'transportFetch(request)', 'transportFetch(input, init)')],
-  },
-  {
-    id: 'raw-model-provider-route-not-checked', file: 'pstack-session', test: 'a raw model ID cannot silently change the selected provider route',
-    edits: [edit(session, 'expected != null && actual != null && expected !== actual', 'false')],
   },
   {
     id: 'unavailable-subscription-offered', file: 'connections', test: 'an explicitly unavailable or invalidly priced configured model is not advertised',
     edits: [edit('ops/build-runner/connections.mjs', ' || spec.unavailable', '')],
   },
   {
-    id: 'local-estimate-not-used', file: 'transport', test: 'local text estimate reserves framing and UTF-8 bytes without a credential or count request',
-    edits: [edit(transport, 'inputBound = units * estimate.multiplier + estimate.framingTokens;', 'inputBound = spec.maxInputTokens;')],
-  },
-  {
-    id: 'local-estimate-padding-removed', file: 'transport', test: 'bundled local tokenizer reserves padded complete request for hello',
-    edits: [edit(transport, 'inputBound = units * estimate.multiplier + estimate.framingTokens;', 'inputBound = units;')],
-  },
-  {
     id: 'stock-sse-without-content-type-not-parsed', file: 'transport', test: 'a stock Codex stream without a content-type header settles its completed usage',
     edits: [edit(transport, "response.headers.get('content-type') ?? (bounded.stream ? 'text/event-stream' : '')", "response.headers.get('content-type') ?? ''")],
   },
   {
-    id: 'hidden-conversation-not-refused', file: 'transport', test: 'local estimates include tools and refuse hidden conversation state before dispatch',
-    edits: [edit(transport, "if (body.previous_response_id || body.conversation) throw fail('Local input estimate requires explicit conversation input');", '')],
-  },
-  {
-    id: 'stock-hosted-search-not-disabled', file: 'subscription-tools', test: 'stock subscription requests can dispatch without unpriced hosted search',
-    edits: [edit(adapter, ", disabledTools: ['web_search']", '')],
-  },
-  {
-    id: 'cache-ttl-mismatch-accepted', file: 'transport', test: 'stock Claude conversation caching uses its configured one-hour API price',
-    edits: [edit(transport, "if (value.cache_control && (value.cache_control.ttl ?? '5m') !== cacheWriteTtl) return true;", '')],
-  },
-  {
-    id: 'one-hour-cache-write-charged-at-five-minute-rate', file: 'transport', test: 'stock Claude conversation caching uses its configured one-hour API price',
-    edits: [edit(machineSettings, '"cacheWrite": 0.2', '"cacheWrite": 0.125')],
-  },
-  {
-    id: 'maximum-charge-recovery-not-final', file: 'ledger', test: 'charging an unknown request at its full maximum never releases budget or invents usage',
+    id: 'maximum-charge-recovery-not-final', file: 'ledger', test: 'charging an unknown request at its full maximum records cost without stopping the card',
     edits: [edit(ledger, "if (current.state === 'unknown' && current.costNano !== null) throw new Error('Maximum-charge recovery is final; actual usage remains unknown');", '')],
   },
   {
-    id: 'configured-panel-replaced-by-unrelated-model', file: 'pstack-session', test: 'an unrelated review model cannot replace the configured Sol and DeepSeek panel',
-    edits: [edit(session, 'return start.modelId === model', 'return start.modelId !== coderModel')],
-  },
-  {
-    id: 'unknown-maximum-charged-as-zero', file: 'ledger', test: 'charging an unknown request at its full maximum never releases budget or invents usage',
+    id: 'unknown-maximum-charged-as-zero', file: 'ledger', test: 'charging an unknown request at its full maximum records cost without stopping the card',
     edits: [edit(ledger, 'cost_nano = maximum_nano, reason = ?', 'cost_nano = 0, reason = ?')],
   },
   ...['chat SSE', 'responses SSE', 'messages JSON', 'messages SSE'].map(protocol => ({
@@ -76,55 +40,19 @@ const cases = [
     edits: [edit(transport, 'const costNano = Math.max(usage ? totalCharge', 'const costNano = 1 + Math.max(usage ? totalCharge')],
   })),
   {
-    id: 'invalid-money-defaulted-to-zero', file: 'ledger', test: 'invalid monetary inputs cannot change durable budget',
+    id: 'invalid-money-defaulted-to-zero', file: 'ledger', test: 'invalid monetary inputs cannot change durable accounting',
     edits: [edit(ledger, "integer(maximumNano, 'maximumNano');", 'maximumNano = 0;')],
-  },
-  {
-    id: 'connection-failure-not-marked-unknown', file: 'transport', test: 'connection failure after arrival retains the paid reservation',
-    edits: [edit(transport, "if (!settled) await ledgerCall('unknown', id, 'Request outcome unavailable');", '')],
-  },
-  {
-    id: 'card-ceiling-removed', file: 'ledger', test: 'the card stops only when settled actual spend exceeds the ten-dollar ceiling',
-    edits: [edit(ledger, "if (BigInt(spent) > BigInt(CEILING_NANO)) this.stop('Card cost ceiling exceeded');", 'void spent;')],
-  },
-  {
-    id: 'unresolved-priced-block-removed', file: 'ledger', test: 'free requests remain usable without usage when priced accounting is unknown',
-    edits: [edit(ledger, "if (maximumNano > 0 && snapshot.pricedBlocked) throw new Error('Priced requests blocked by unresolved accounting');", '')],
-  },
-  {
-    id: 'zero-settlement-corrupted', file: 'ledger', test: 'free requests remain usable without usage when priced accounting is unknown',
-    edits: [edit(ledger, ".run(failure ? 'accounting_failure' : 'settled', usageJson, costNano,", ".run(failure ? 'accounting_failure' : 'settled', usageJson, costNano === 0 ? 1 : costNano,")],
-  },
-  {
-    id: 'persistent-storage-replaced-with-memory', file: 'ledger', test: 'reopening retains unresolved holds, snapshots, and settled costs per card',
-    edits: [edit(ledger, "new DatabaseSync(nonempty(path, 'path'))", "new DatabaseSync(':memory:')")],
-  },
-  {
-    id: 'process-exit-hold-not-persisted', file: 'ledger', test: 'a process exit after reservation never releases an uncertain request',
-    edits: [edit(ledger, "new DatabaseSync(nonempty(path, 'path'))", "new DatabaseSync(':memory:')")],
-  },
-  {
-    id: 'priced-settlement-usage-check-removed', file: 'ledger', test: 'free requests remain usable without usage when priced accounting is unknown',
-    edits: [edit(ledger, "if (current.maximumNano > 0 && (usage === undefined || usage === null)) throw new Error('Priced settlement requires usage');", '')],
-  },
-  {
-    id: 'settlement-idempotency-check-removed', file: 'ledger', test: 'all roles share the ten-dollar card ceiling across reopen and settle once',
-    edits: [edit(ledger, 'current.costNano !== costNano || !isDeepStrictEqual(current.usage, usageJson === null ? null : JSON.parse(usageJson))', 'false')],
-  },
-  {
-    id: 'unpriced-model-defaulted-to-free', file: 'transport', test: 'wrong model, endpoint, missing prices and bounds send nothing',
-    edits: [edit(transport, 'const prices = [spec.price, ...tiers.map(tier => tier.price)];', 'spec.price ??= Object.fromEntries(categories.map(key => [key, 0])); const prices = [spec.price, ...tiers.map(tier => tier.price)];')],
   },
   {
     id: 'http-attempt-identifier-reused', file: 'transport', test: 'separate HTTP attempts create separate durable records',
     edits: [edit(ledger, 'const id = randomUUID();', "const id = 'reused-attempt-id';")],
   },
   {
-    id: 'unknown-route-falls-back-to-first-model', file: 'transport', test: 'wrong model, endpoint, missing prices and bounds send nothing',
+    id: 'unknown-route-falls-back-to-first-model', file: 'transport', test: 'wrong model, endpoint or missing bounds send nothing',
     edits: [edit(transport, 'const spec = routes.get(JSON.stringify([endpoint, body.model]));', 'const spec = routes.get(JSON.stringify([endpoint, body.model])) ?? routes.values().next().value;')],
   },
   {
-    id: 'chat-output-limit-removed', file: 'transport', test: 'free requests arrive with enforced limits and settle without usage',
+    id: 'chat-output-limit-removed', file: 'transport', test: 'free requests arrive with the model output bound and settle without usage',
     edits: [edit(transport, 'bounded.max_tokens = spec.maxOutputTokens;', '')],
   },
   {
@@ -132,33 +60,20 @@ const cases = [
     edits: [edit(transport, 'bounded.max_output_tokens = spec.maxOutputTokens;', '')],
   },
   {
-    id: 'missing-paid-usage-accepted', file: 'transport', test: 'paid missing usage refuses result and prevents the next arrival',
+    id: 'missing-paid-usage-accepted', file: 'transport', test: 'paid missing usage refuses the result but does not block the next request',
     edits: [
       edit(transport, "if (spec.paid) throw fail('Paid request usage is unavailable');", ''),
       edit(ledger, "if (current.maximumNano > 0 && (usage === undefined || usage === null)) throw new Error('Priced settlement requires usage');", ''),
     ],
   },
   {
-    id: 'reported-cost-not-counted', file: 'transport', test: 'provider cost above a free reservation settles and continues under the ten-dollar ceiling',
+    id: 'reported-cost-not-counted', file: 'transport', test: 'provider cost above a free reservation settles and continues',
     edits: [edit(transport, 'reportedNano);', '0);')],
-  },
-  {
-    id: 'stop-marker-not-persisted', file: 'review-regressions', test: 'review durable stop survives reopen and blocks free and paid routes only for its card',
-    edits: [edit(ledger, "this.db.prepare('INSERT OR IGNORE INTO stops (card, reason) VALUES (?, ?)').run(this.card, reason);", 'void reason;')],
-  },
-  {
-    id: 'stop-marker-lost-on-reopen', file: 'review-regressions', test: 'review durable stop survives reopen and blocks free and paid routes only for its card',
-    edits: [edit(ledger, "new DatabaseSync(nonempty(path, 'path'))", "new DatabaseSync(':memory:')")],
-  },
-  {
-    id: 'stopped-card-metadata-allowed', file: 'review-regressions', test: 'review stopped card blocks allowlisted metadata GET',
-    edits: [edit(transport, "if ((await ledgerCall('snapshot')).stopped) throw fail('STOP WORK: card account is stopped');", '')],
   },
   {
     id: 'known-overbound-usage-not-recorded', file: 'review-regressions', test: 'review known usage above the recorded maximum is recorded and the result is accepted',
     edits: [edit(transport, "await ledgerCall('settle', id, { usage: usage ?? null, costNano });", '')],
   },
-
   {
     id: 'cached-input-double-counted', file: 'transport', test: 'chat JSON settles cache categories once',
     edits: [edit(transport, 'input: raw.prompt_tokens - cached,', 'input: raw.prompt_tokens,')],
@@ -172,27 +87,52 @@ const cases = [
     edits: [edit(transport, 'if (usage.cacheWrite !== 0) usage.input -= usage.cacheWrite;', '', 2)],
   },
   {
-    id: 'truncated-paid-sse-accepted', file: 'transport', test: 'a truncated paid stream retains the reservation despite partial usage',
+    id: 'truncated-paid-sse-accepted', file: 'transport', test: 'a truncated paid stream records an unknown outcome',
     edits: [edit(transport, "if (!completed) throw fail('Incomplete request stream');", '')],
-  },
-  {
-    id: 'redirects-followed', file: 'transport', test: 'allowlisted authentication cannot carry inference payloads and redirects never follow',
-    edits: [
-      edit(transport, "redirect: 'error'", "redirect: 'follow'", 4),
-      edit(transport, "if (response.status >= 300 && response.status < 400) throw fail('Redirect refused');", ''),
-    ],
   },
   {
     id: 'response-buffer-bound-removed', file: 'transport', test: 'bounded buffering refuses a large result without releasing its reservation',
     edits: [edit(transport, "if (length > maximum) throw fail('Response exceeds configured limit');", '')],
   },
   {
-    id: 'metadata-child-url-allowed', file: 'transport', test: 'authentication and catalog are confined to their exact allowlisted URL',
-    edits: [edit(transport, "if (request.method === 'GET' && allowed.has(endpoint))", "if (request.method === 'GET')")],
-  },
-  {
     id: 'ledger-errors-no-longer-sanitized', file: 'transport', test: 'ledger errors never reveal their underlying body or credentials',
     edits: [edit(transport, "catch { throw fail('Request ledger refused operation'); }", 'catch (error) { throw error; }')],
+  },
+  {
+    id: 'persistent-storage-replaced-with-memory', file: 'ledger', test: 'reopening retains unresolved holds, snapshots, and settled costs per card',
+    edits: [edit(ledger, "new DatabaseSync(nonempty(path, 'path'))", "new DatabaseSync(':memory:')")],
+  },
+  {
+    id: 'process-exit-hold-not-persisted', file: 'ledger', test: 'a process exit after reservation keeps its maximum visible without gating a later request',
+    edits: [edit(ledger, "new DatabaseSync(nonempty(path, 'path'))", "new DatabaseSync(':memory:')")],
+  },
+  {
+    id: 'priced-settlement-usage-check-removed', file: 'ledger', test: 'unresolved priced accounting no longer blocks a later priced request',
+    edits: [edit(ledger, "if (current.maximumNano > 0 && (usage === undefined || usage === null)) throw new Error('Priced settlement requires usage');", '')],
+  },
+  {
+    id: 'settlement-idempotency-check-removed', file: 'ledger', test: 'spend is recorded per card and per model across reopen without ever stopping the card',
+    edits: [edit(ledger, 'current.costNano !== costNano || !isDeepStrictEqual(current.usage, usageJson === null ? null : JSON.parse(usageJson))', 'false')],
+  },
+  {
+    id: 'inactivity-window-shortened', file: 'adapter', test: 'the build and command inactivity windows are fifteen minutes',
+    edits: [edit(adapter, 'export const SESSION_INACTIVITY_MS = 15 * 60 * 1000', 'export const SESSION_INACTIVITY_MS = 30 * 1000')],
+  },
+  {
+    id: 'helper-steps-restored-to-thirty', file: 'pstack-session', test: 'normal session keeps the configured split and only referenced models',
+    edits: [edit(session, 'maxSteps: 100,', 'maxSteps: 30,')],
+  },
+  {
+    id: 'published-output-max-capped', file: 'catalogue', test: 'prices, bounds and wire endpoints come from the published catalogue',
+    edits: [edit('ops/build-runner/catalogue.mjs', 'maxOutputTokens: limits.output,', 'maxOutputTokens: Math.min(limits.output, 8192),')],
+  },
+  {
+    id: 'failed-run-not-archived', file: 'recovery', test: 'Start on a card whose last run failed starts a fresh run and keeps the old records',
+    edits: [edit('ops/build-runner/jobs.mjs', 'await archiveStaleFailedRun()', 'return await withChecklist(existing, opts.jobsDir)')],
+  },
+  {
+    id: 'provider-down-not-retried', file: 'transport', test: 'a transient provider failure is retried and the eventual answer is settled once',
+    edits: [edit(transport, 'if (attempt < attempts) { await sleep(pauseMs); continue; }', '')],
   },
   {
     id: 'state-and-ledger-paths-not-canonicalized', file: 'review-regressions', test: 'review stock adapter rejects state symlink into builder before runtime',

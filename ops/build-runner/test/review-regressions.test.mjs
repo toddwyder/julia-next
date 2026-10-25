@@ -25,31 +25,31 @@ function transport(ledger, price, upstream) {
   return createTransport({ ledger, settings: settings(price), role: 'builder', fetch: upstream });
 }
 
-test('review durable stop survives reopen and blocks free and paid routes only for its card', async t => {
+test('review money is recorded and never blocks free or paid routes', async t => {
   const path = join(await directory(t), 'cards.sqlite');
   let arrivals = 0;
   const upstream = async () => {
     arrivals++;
-    return Response.json({});
+    return Response.json({ usage: { prompt_tokens: 1, completion_tokens: 1 } });
   };
   let ledger = new CardLedger({ path, card: 'JUL-251' });
-  ledger.stop('fixture stop');
-  await assert.rejects(send(transport(ledger, free, upstream)), /STOP WORK/);
+  const first = ledger.reserve({ model: 'fixture', role: 'builder', maximumNano: 1, price: {}, bounds: {} });
+  ledger.settle(first.id, { usage: { tokens: 1 }, costNano: 1 });
   ledger.close();
   ledger = new CardLedger({ path, card: 'JUL-251' });
   t.after(() => ledger.close());
-  assert.equal(ledger.snapshot().stopped, true);
-  for (const price of [free, paid]) await assert.rejects(send(transport(ledger, price, upstream)));
-  assert.equal(arrivals, 0);
+  assert.equal(ledger.snapshot().stopped, false);
+  for (const price of [free, paid]) assert.equal((await send(transport(ledger, price, upstream))).status, 200);
+  assert.equal(arrivals, 2);
   const other = new CardLedger({ path, card: 'JUL-252' });
   t.after(() => other.close());
   assert.equal((await send(transport(other, free, upstream))).status, 200);
-  assert.equal(arrivals, 1);
+  assert.equal(arrivals, 3);
   assert.equal(other.snapshot().stopped, false);
   assert.equal(other.snapshot().requests[0].state, 'settled');
 });
 
-test('review stopped card blocks allowlisted metadata GET', async t => {
+test('review requests are not gated by an allowlist', async t => {
   const ledger = new CardLedger({ path: ':memory:', card: 'JUL-251' });
   t.after(() => ledger.close());
   const arrivals = [];
@@ -58,10 +58,8 @@ test('review stopped card blocks allowlisted metadata GET', async t => {
     return Response.json({ models: [] });
   });
   assert.equal((await fetch(metadata)).status, 200);
-  ledger.stop('fixture stop');
-  await assert.rejects(send(fetch), /STOP WORK/);
-  await assert.rejects(fetch(metadata), /STOP WORK/);
-  assert.deepEqual(arrivals, [metadata]);
+  assert.equal((await send(fetch)).status, 200);
+  assert.deepEqual(arrivals, [metadata, endpoint]);
 });
 
 test('review known usage above the recorded maximum is recorded and the result is accepted', async t => {
@@ -81,7 +79,6 @@ test('review known usage above the recorded maximum is recorded and the result i
   assert.equal(receipt.requests[0].costNano, 111000);
   assert.equal(receipt.requests[0].state, 'settled');
   assert.deepEqual(receipt.requests[0].usage, { input: 101, output: 10, cacheRead: 0, cacheWrite: 0 });
-  assert.equal(receipt.pricedBlocked, false);
   assert.equal((await send(fetch)).status, 200);
   assert.equal(arrivals, 2);
 });

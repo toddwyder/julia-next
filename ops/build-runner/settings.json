@@ -30,9 +30,6 @@
       "boundsSource": "https://commandcode.ai/docs/resources/pricing-limits"
     }
   },
-  "networkAllow": [
-    "https://api.commandcode.ai/provider/v1/models"
-  ],
   "authPath": "/home/ubuntu/.local/share/mastracode/auth.json",
   "ledgerPath": "/home/ubuntu/.local/state/julia-machine/cards.sqlite"
 }

@@ -7,7 +7,6 @@ import { normalizeAnthropicModelId, remapOpenAIModelForCodexOAuth } from '@mastr
 export const MODELS_DEV_URL = 'https://models.dev/api.json'
 export const COMMANDCODE_MODELS_URL = 'https://api.commandcode.ai/provider/v1/models'
 export const COMMANDCODE_PRICING_URL = 'https://commandcode.ai/docs/resources/pricing-limits'
-export const REQUEST_MAX_OUTPUT_TOKENS = 8192
 export const defaultSettingsPath = fileURLToPath(new URL('./machine-settings.json', import.meta.url))
 
 const CACHE_MS = 5 * 60 * 1000
@@ -24,7 +23,6 @@ const PROVIDERS = {
     settingsKey: modelId => `anthropic/${modelId}`,
     wireModel: modelId => normalizeAnthropicModelId(modelId),
     cacheWriteTtl: '1h',
-    inputTokenEstimate: { method: 'o200k_base', multiplier: 2, framingTokens: 4096 },
   },
   openai: {
     route: 'openai-codex',
@@ -36,7 +34,6 @@ const PROVIDERS = {
     endpoint: 'https://chatgpt.com/backend-api/codex/responses',
     settingsKey: modelId => `openai/${modelId}`,
     wireModel: modelId => stripProviderPrefix(remapOpenAIModelForCodexOAuth(`openai/${modelId}`)),
-    inputTokenEstimate: { method: 'o200k_base', multiplier: 2, framingTokens: 4096 },
   },
   commandcode: {
     route: 'commandcode',
@@ -178,7 +175,7 @@ function settingsFor(provider, modelId, price, tiers, model, limits) {
     wireModel,
     protocol: provider.protocol,
     maxInputTokens: limits.input,
-    maxOutputTokens: Math.min(limits.output, REQUEST_MAX_OUTPUT_TOKENS),
+    maxOutputTokens: limits.output,
     publishedMaxOutputTokens: limits.output,
     price,
     ...(tiers.length ? { priceTiers: tiers } : {}),
@@ -188,8 +185,6 @@ function settingsFor(provider, modelId, price, tiers, model, limits) {
     service: provider.service,
     company: modelCompany(modelId, model?.name),
     wire: provider.wire,
-    inputTokenEstimate: provider.inputTokenEstimate,
-    inputTokenEstimateSource: 'https://developers.openai.com/api/docs/guides/token-counting',
     ...(provider.cacheWriteTtl ? { cacheWriteTtl: provider.cacheWriteTtl } : {}),
   }
 }
@@ -286,8 +281,6 @@ function addCommandCode(catalogue, modelsDev, liveModels, pricingRows, connected
     spec.wireModel = modelId
     spec.source = fromDev ? `${MODELS_DEV_URL}#commandcode/${modelId}` : `${COMMANDCODE_PRICING_URL}#${modelId}`
     spec.boundsSource = live.context_length ? `${COMMANDCODE_MODELS_URL}#${modelId}` : spec.source
-    spec.inputTokenEstimate = { method: 'utf8', multiplier: 2, framingTokens: 4096 }
-    spec.inputTokenEstimateSource = 'https://developers.openai.com/api/docs/guides/token-counting'
     catalogue.models[`commandcode/${modelId}`] = spec
     catalogue.commandCodeProviderModels.push(modelId)
     if (connected.commandcode) catalogue.offers.push(offerFor(provider, modelId, live.name ?? dev?.name, dev ?? live))

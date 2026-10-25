@@ -2,7 +2,7 @@
 
 Date: 2026-10-12
 
-Status: Proposed
+Status: Proposed. Superseded on 25 October 2026: the reviewer runtime, its spend ledger, and its time, step, memory and disk bounds are deleted. Paid reviewer execution is disabled. This record is kept for history.
 
 ## Context
 

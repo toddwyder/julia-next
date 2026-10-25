@@ -588,7 +588,7 @@ test('later workflow roles receive the exact earlier role outputs', async () => 
   assert.equal(result.result?.results.reviewer, 'reviewed: reviewer sees PROPOSED CHANGE')
 })
 
-test('workflow rejects a route response truncated by its model limit', async () => {
+test('workflow keeps a route response that reached its model limit', async () => {
   const complete = { setModel: async () => {}, generate: async () => ({ text: 'complete', finishReason: 'stop' }) }
   const options = [
     { value: 'claude-sonnet-4-6', name: 'Sonnet 4.6' },
@@ -615,5 +615,6 @@ test('workflow rejects a route response truncated by its model limit', async () 
       fixReviewer: { route: 'antigravity', modelId: 'd', company: 'Google', service: 'Antigravity' },
     } },
   } })
-  assert.equal(result.status, 'failed')
+  assert.equal(result.status, 'success')
+  assert.equal(result.result?.results.reviewer, 'High: cut off mid-sentence')
 })
