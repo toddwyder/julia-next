@@ -24,30 +24,21 @@ import { startControlPageServer } from '../src/mastra/control-page.ts'
 import { discoverAcpOffers, discoverCommandCodeOffers } from '../src/mastra/routes.ts'
 import { createRoleExecutionWorkflow } from '../src/mastra/workflows/delivery.ts'
 
-const settledBrief = `## Agent Brief
+const settledBrief = `## Outcome
 
-**Category:** enhancement
+The control page starts a Ready card and shows its progress.
 
-**Summary:** Initialize a Ready card.
+## Acceptance criteria
 
-**Current behavior:** Initialization requires a terminal.
+- The page lists every Ready card.
+- Start begins one build for the chosen card.`
 
-**Desired behavior:** Initialization starts from a local control page.
-
-**Key interfaces:** ReadyCardSchema.
-
-**Acceptance criteria:**
-
-- The card is accepted.
-
-**Out of scope:** Delivery beyond initialization.`
-
-test('Ready card admission accepts the authoritative Agent Brief and rejects unresolved decisions', () => {
+test('Ready card admission accepts the card shape and rejects unresolved decisions', () => {
   const card = { identifier: 'JUL-230', title: 'Initialize Ready cards', state: 'Ready', description: settledBrief }
   assert.deepEqual(ReadyCardSchema.parse(card), card)
-  assert.doesNotThrow(() => ReadyCardSchema.parse({ ...card, description: settledBrief.replace('Initialization requires a terminal.', 'Admission rejects unresolved decision markers.') }))
+  assert.doesNotThrow(() => ReadyCardSchema.parse({ ...card, description: settledBrief.replace('The control page starts a Ready card and shows its progress.', 'Admission rejects unresolved decision markers.') }))
   assert.throws(() => ReadyCardSchema.parse({ ...card, state: 'Backlog' }), /expected Ready state/)
-  assert.throws(() => ReadyCardSchema.parse({ ...card, description: settledBrief.replace('**Summary:** Initialize a Ready card.', '**Summary:**') }), /nonempty Summary field/)
+  assert.throws(() => ReadyCardSchema.parse({ ...card, description: `${settledBrief}\n\n## Requirements\n\nDelivery beyond initialization.` }), /retired Requirements section/)
   assert.throws(() => ReadyCardSchema.parse({ ...card, description: `${settledBrief}\n\nTODO: choose a route` }), /unresolved decision marker/)
 })
 

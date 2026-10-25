@@ -26,7 +26,7 @@ const rawCard = {
   identifier: 'JUL-232',
   title: 'Practice',
   state: 'Ready',
-  description: '## Agent Brief\n\n**Category:** machinery\n\n**Summary:** Practice\n\n**Current behavior:** Missing marker\n\n**Desired behavior:** Add marker\n\n**Key interfaces:** marker\n\n**Acceptance criteria:** exact marker\n\n**Out of scope:** Review',
+  description: '## Outcome\n\nA practice build leaves the marker.\n\n## Acceptance criteria\n\n* The marker exists with the exact bytes.',
 };
 
 const rawOffer = {

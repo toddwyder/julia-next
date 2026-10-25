@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
 import { checkLinearCardAdmission } from '../src/mastra/card-admission-check.ts'
-import { completeCardDescription, legacyFinishConditionsCardDescription, refusedFrameworkMap } from '../support/card-admission-test-fixtures/card-admission-descriptions.mjs'
+import { completeCardDescription, refusedFrameworkMap, retiredShapeCardDescription, sixCriteriaCardDescription } from '../support/card-admission-test-fixtures/card-admission-descriptions.mjs'
 
 function linearResponse(description, comments = []) {
   return async () => new Response(JSON.stringify({
@@ -31,11 +31,18 @@ test('checks a Linear card as a Ready candidate without changing its current sta
   })
 })
 
-test('keeps accepting the legacy Finish conditions heading', async () => {
-  const result = await checkLinearCardAdmission('JUL-243', 'reference-only', linearResponse(legacyFinishConditionsCardDescription))
+test('refuses a retired section', async () => {
+  const result = await checkLinearCardAdmission('JUL-243', 'reference-only', linearResponse(retiredShapeCardDescription))
 
-  assert.equal(result.admitted, true)
-  assert.deepEqual(result.issues, [])
+  assert.equal(result.admitted, false)
+  assert.deepEqual(result.issues, ['retired Requirements section'])
+})
+
+test('refuses more than five criteria', async () => {
+  const result = await checkLinearCardAdmission('JUL-243', 'reference-only', linearResponse(sixCriteriaCardDescription))
+
+  assert.equal(result.admitted, false)
+  assert.deepEqual(result.issues, ['more than 5 acceptance criteria'])
 })
 
 test('returns the launcher contract findings for an inadmissible card', async () => {
@@ -43,10 +50,7 @@ test('returns the launcher contract findings for an inadmissible card', async ()
 
   assert.equal(result.admitted, false)
   assert.deepEqual(result.issues, [
-    'missing nonempty Requirements section',
-    'missing nonempty Contracts section',
     'missing nonempty Acceptance criteria section',
-    'missing nonempty Proof section',
   ])
 })
 
@@ -68,10 +72,7 @@ test('the command checks every requested card and exits nonzero when one fails',
       currentState: 'Triage',
       admitted: false,
       issues: [
-        'missing nonempty Requirements section',
-        'missing nonempty Contracts section',
         'missing nonempty Acceptance criteria section',
-        'missing nonempty Proof section',
       ],
     },
   ])

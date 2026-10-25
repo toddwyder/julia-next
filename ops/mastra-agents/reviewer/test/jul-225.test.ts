@@ -355,40 +355,32 @@ function assertionPasses(assertion: () => unknown) {
   try { assertion(); return true } catch { return false }
 }
 
-test('admission requires the complete settled card shape and Ready state', () => {
-  const complete = { identifier: 'JUL-225', state: 'Ready', description: '# Outcome\nA\n# Requirements\nB\n# Contracts\nC\n# Acceptance criteria\nD\n# Proof\nE' }
+test('admission requires the complete card shape and Ready state', () => {
+  const complete = { identifier: 'JUL-225', state: 'Ready', description: '# Outcome\nA complete outcome.\n# Acceptance criteria\n- The card is admitted.\n- The card starts.' }
   assert.equal(CardAdmissionSchema.parse(complete).identifier, 'JUL-225')
   assert.throws(() => CardAdmissionSchema.parse({ ...complete, state: 'Backlog' }))
-  assert.throws(() => CardAdmissionSchema.parse({ ...complete, description: '# Outcome\nA' }))
-  const nonReadyIncomplete = CardAdmissionSchema.safeParse({ ...complete, state: 'Backlog', description: '# Outcome\nA' })
+  assert.throws(() => CardAdmissionSchema.parse({ ...complete, description: '# Outcome\nA complete outcome.' }))
+  const nonReadyIncomplete = CardAdmissionSchema.safeParse({ ...complete, state: 'Backlog', description: '# Outcome\nA complete outcome.' })
   assert.equal(nonReadyIncomplete.success, false)
   if (!nonReadyIncomplete.success) {
     const messages = nonReadyIncomplete.error.issues.map(issue => issue.message)
     assert.ok(messages.includes('expected Ready state'))
-    assert.ok(messages.includes('missing nonempty Requirements section'))
-    assert.ok(messages.includes('missing nonempty Contracts section'))
     assert.ok(messages.includes('missing nonempty Acceptance criteria section'))
-    assert.ok(messages.includes('missing nonempty Proof section'))
   }
   assert.throws(() => CardAdmissionSchema.parse({ ...complete, description: `${complete.description}\nTODO: decision` }))
-  const linear = { ...complete, description: '**Outcome**\nA\n\n**Requirements**\nB\n\n**Contracts**\nC\n\n**Acceptance criteria**\nD\n\n**Proof**\nE' }
+  assert.throws(() => CardAdmissionSchema.parse({ ...complete, description: `${complete.description}\n# Requirements\nOne.` }), /retired Requirements section/)
+  assert.throws(() => CardAdmissionSchema.parse({ ...complete, description: '# Outcome\nA complete outcome.\n# Acceptance criteria\n- One.\n- Two.\n- Three.\n- Four.\n- Five.\n- Six.' }), /more than 5 acceptance criteria/)
+  const linear = { ...complete, description: '**Outcome**\nA complete outcome.\n\n**Acceptance criteria**\n\n- The card is admitted.' }
   assert.throws(() => CardAdmissionSchema.parse(linear), /missing nonempty Outcome section/)
 })
 
 test('admission keeps ordinary bold paragraphs inside a section', () => {
   const description = [
     '# Outcome',
-    '**Requirements**',
-    '**Important:** bold lines are body text, not section headings.',
+    '**Requirements** is a word this outcome uses in bold body text.',
     'A complete outcome.',
-    '# Requirements',
-    'B',
-    '# Contracts',
-    'C',
     '# Acceptance criteria',
-    'D',
-    '# Proof',
-    'E',
+    '- The card is admitted.',
   ].join('\n')
   assert.equal(CardAdmissionSchema.parse({ identifier: 'JUL-225', state: 'Ready', description }).identifier, 'JUL-225')
   assert.throws(() => CardAdmissionSchema.parse({
@@ -396,16 +388,16 @@ test('admission keeps ordinary bold paragraphs inside a section', () => {
   }), /missing nonempty Outcome section/)
   assert.throws(() => CardAdmissionSchema.parse({
     identifier: 'JUL-225', state: 'Ready',
-    description: description.replace('**Requirements**\n**Important:** bold lines are body text, not section headings.\nA complete outcome.', '# Notes\nNotes are not Outcome content.'),
+    description: description.replace('# Outcome\n**Requirements** is a word this outcome uses in bold body text.\nA complete outcome.', '# Outcome'),
   }), /empty Outcome section/)
   assert.throws(() => CardAdmissionSchema.parse({
     identifier: 'JUL-225', state: 'Ready',
-    description: description.replace('# Outcome\n**Requirements**\n**Important:** bold lines are body text, not section headings.\nA complete outcome.', '#\nOutcome\nA complete outcome.'),
+    description: description.replace('# Outcome', '#\nOutcome'),
   }), /missing nonempty Outcome section/)
 })
 
 test('admission rejects unresolved decision markers embedded in prose', () => {
-  const description = '# Outcome\nA\n# Requirements\nStatus: TBD before delivery.\n# Contracts\nC\n# Acceptance criteria\nD\n# Proof\nE'
+  const description = '# Outcome\nStatus: TBD before delivery.\n# Acceptance criteria\n- The card is admitted.'
   assert.throws(() => CardAdmissionSchema.parse({ identifier: 'JUL-225', state: 'Ready', description }), /unresolved decision marker/)
   assert.throws(() => CardAdmissionSchema.parse({ identifier: 'JUL-225', state: 'Ready', description: description.replace('Status: TBD before delivery.', '- TODO choose provider') }), /unresolved decision marker/)
   assert.throws(() => CardAdmissionSchema.parse({ identifier: 'JUL-225', state: 'Ready', description: description.replace('Status: TBD before delivery.', 'Status: unresolved decision — choose provider') }), /unresolved decision marker/)
@@ -415,7 +407,7 @@ test('admission rejects unresolved decision markers embedded in prose', () => {
   assert.throws(() => CardAdmissionSchema.parse({ identifier: 'JUL-225', state: 'Ready', description: description.replace('Status: TBD before delivery.', 'Unresolved decisions: choose provider') }), /unresolved decision marker/)
   assert.doesNotThrow(() => CardAdmissionSchema.parse({
     identifier: 'JUL-225', state: 'Ready',
-    description: '# Outcome\nA\n# Requirements\nA complete card has no unresolved decision marker.\n# Contracts\nC\n# Acceptance criteria\nD\n# Proof\nE',
+    description: '# Outcome\nA complete card has no unresolved decision marker.\n# Acceptance criteria\n- The card is admitted.',
   }))
 })
 
@@ -423,7 +415,7 @@ test('serialized Linear intake rejects an incomplete Ready card', async () => {
   const fetchImpl = async () => new Response(JSON.stringify({ data: { issue: {
     identifier: 'JUL-227', state: { name: 'Ready' }, description: '# Outcome\nOnly one section',
   } } }), { status: 200, headers: { 'content-type': 'application/json' } })
-  await assert.rejects(fetchLinearCard('JUL-227', 'reference-only', fetchImpl as typeof fetch), /missing nonempty Requirements section/)
+  await assert.rejects(fetchLinearCard('JUL-227', 'reference-only', fetchImpl as typeof fetch), /missing nonempty Acceptance criteria section/)
 })
 
 test('Cancel never dispatches and restart reuses the immutable snapshot', async () => {

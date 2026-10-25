@@ -1,6 +1,6 @@
 ---
 name: triage
-description: Move issues and external PRs through a state machine of triage roles, categorise, verify, grill if needed, and write agent-ready briefs.
+description: Move issues and external PRs through a state machine of triage roles, categorise, verify, grill if needed, and write cards an agent can build.
 disable-model-invocation: true
 ---
 
@@ -18,7 +18,7 @@ Every comment or issue posted to the issue tracker during triage **must** start 
 
 ## Reference docs
 
-- [AGENT-BRIEF.md](AGENT-BRIEF.md): how to write durable agent briefs
+- [AGENT-BRIEF.md](AGENT-BRIEF.md): how to write a card
 - [OUT-OF-SCOPE.md](OUT-OF-SCOPE.md): how the `.out-of-scope/` knowledge base works
 
 ## Roles
@@ -75,10 +75,10 @@ Show counts and a one-line summary per item. Let the maintainer pick.
 
 4. **Grill (if needed).** If the request needs fleshing out, call the Skill tool twice, for "grilling" and "domain-modeling", and grill it into shape a round of questions at a time, sharpening domain terms and updating `GLOSSARY.md`/ADRs inline as decisions land.
 
-5. **Check the brief first.** Before showing Todd a draft brief, run `node scripts/check-agent-brief.mjs <draft-file>` and fix every finding. It refuses text copied from repository docs, criteria written as steps, implementation words in criteria, and negations in criteria. Show the brief only after the check passes.
+5. **Check the brief first.** Before showing Todd a draft brief, run `node scripts/check-agent-brief.mjs <draft-file>` and fix every finding. It refuses text copied from repository docs, criteria written as steps, implementation words in criteria, negations in criteria, and more than five criteria. Show the brief only after the check passes.
 
 6. **Apply the outcome:**
-   - `ready-for-agent`: post an agent brief comment ([AGENT-BRIEF.md](AGENT-BRIEF.md)).
+   - `ready-for-agent`: write the card in the brief shape ([AGENT-BRIEF.md](AGENT-BRIEF.md)) and make it the card description.
    - `ready-for-human`: same structure as an agent brief, but note why it can't be delegated (judgment calls, external access, design decisions, manual testing).
    - `needs-info`: post triage notes (template below).
    - For `wontfix`, close the issue, with the comment depending on *why*:
@@ -89,7 +89,7 @@ Show counts and a one-line summary per item. Let the maintainer pick.
 
 ## Quick state override
 
-If the maintainer says "move #42 to ready-for-agent", trust them and apply the role directly. Confirm what you're about to do (role changes, comment, close), then act. Skip grilling. If moving to `ready-for-agent` without a grilling session, ask whether they want to write an agent brief.
+If the maintainer says "move #42 to ready-for-agent", trust them and apply the role directly. Confirm what you're about to do (role changes, comment, close), then act. Skip grilling. If moving to `ready-for-agent` without a grilling session, ask whether they want to write the card brief.
 
 ## Needs-info template
 

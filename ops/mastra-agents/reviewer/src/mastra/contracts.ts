@@ -48,41 +48,46 @@ export const RoleDefaultsSchema = z.object({
 
 const requiredSections = [
   { names: ['Outcome'] },
-  { names: ['Requirements'] },
-  { names: ['Contracts'] },
-  { names: ['Acceptance criteria', 'Finish conditions'], missingName: 'Acceptance criteria' },
-  { names: ['Proof'] },
+  { names: ['Acceptance criteria'], missingName: 'Acceptance criteria' },
 ] as const
-const requiredAgentBriefFields = ['Category', 'Summary', 'Current behavior', 'Desired behavior', 'Key interfaces', 'Acceptance criteria', 'Out of scope'] as const
+const retiredSections = ['Requirements', 'Contracts', 'Proof', 'Out of scope'] as const
+const maxCriteria = 5
 const markdownHeading = /^#{1,6}(?:[ \t]+.*)?$/im
+const criterionBullet = /^ {0,2}[-*+][ \t]+(?:\[[ xX]\][ \t]+)?\S/
+
+function sectionContent(description: string, names: readonly string[]) {
+  const headings = names.map(name => name.replace(' ', '[ \\t]+')).join('|')
+  const pattern = new RegExp(`^#{1,6}[ \\t]+(?:${headings})[ \\t]*$`, 'im')
+  const heading = pattern.exec(description)
+  if (!heading) return null
+  return description.slice(heading.index + heading[0].length).split(markdownHeading)[0]?.trim() ?? ''
+}
 
 function validateCardAdmission(card: { state: string; description: string; frameworkMaps?: string[] }, context: z.RefinementCtx) {
   if (card.state !== 'Ready') {
     context.addIssue({ code: 'custom', path: ['state'], message: 'expected Ready state' })
   }
-  if (/^##[ \t]+Agent Brief[ \t]*$/im.test(card.description)) {
-    for (const field of requiredAgentBriefFields) {
-      const label = field.replace(' ', '[ \\t]+')
-      const pattern = new RegExp(`^\\*\\*${label}:\\*\\*[ \\t]*(.*)$`, 'im')
-      const match = pattern.exec(card.description)
-      const inline = match?.[1]?.trim()
-      const following = match ? card.description.slice(match.index + match[0].length).split(/^\*\*[^\n]+:\*\*/m)[0]?.trim() : ''
-      if (!match || (!inline && !following)) {
-        context.addIssue({ code: 'custom', path: ['description'], message: `missing nonempty ${field} field` })
-      }
+  for (const name of retiredSections) {
+    const pattern = new RegExp(`^#{1,6}[ \\t]+${name.replace(' ', '[ \\t]+')}[ \\t]*:?[ \\t]*$`, 'im')
+    if (pattern.test(card.description)) {
+      context.addIssue({ code: 'custom', path: ['description'], message: `retired ${name} section` })
     }
-  } else {
-    for (const section of requiredSections) {
-      const headings = section.names.map(name => name.replace(' ', '[ \\t]+')).join('|')
-      const pattern = new RegExp(`^#{1,6}[ \\t]+(?:${headings})[ \\t]*$`, 'im')
-      const heading = pattern.exec(card.description)
-      const displayName = 'missingName' in section ? section.missingName : section.names[0]
-      if (!heading) {
-        context.addIssue({ code: 'custom', path: ['description'], message: `missing nonempty ${displayName} section` })
-        continue
-      }
-      const content = card.description.slice(heading.index + heading[0].length).split(markdownHeading)[0]?.trim()
-      if (!content) context.addIssue({ code: 'custom', path: ['description'], message: `empty ${displayName} section` })
+  }
+  for (const section of requiredSections) {
+    const displayName = 'missingName' in section ? section.missingName : section.names[0]
+    const content = sectionContent(card.description, section.names)
+    if (content === null) {
+      context.addIssue({ code: 'custom', path: ['description'], message: `missing nonempty ${displayName} section` })
+      continue
+    }
+    if (!content) {
+      context.addIssue({ code: 'custom', path: ['description'], message: `empty ${displayName} section` })
+      continue
+    }
+    if (displayName === 'Acceptance criteria') {
+      const count = content.split(/\r?\n/).filter(line => criterionBullet.test(line)).length
+      if (!count) context.addIssue({ code: 'custom', path: ['description'], message: 'Acceptance criteria section lists no criteria' })
+      if (count > maxCriteria) context.addIssue({ code: 'custom', path: ['description'], message: `more than ${maxCriteria} acceptance criteria` })
     }
   }
   const decisionText = card.description.replace(/\b(?:no|rejects?)\s+unresolved(?:[\s-]+)decisions?(?:\s+markers?)?\b/gi, '')
