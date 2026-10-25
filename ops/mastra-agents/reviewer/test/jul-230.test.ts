@@ -205,6 +205,7 @@ test('Start creates one restart-surviving suspended run and returns it for the s
   const input = StartInitializationSchema.parse({ card, roles: {
     orchestrator: { route: 'antigravity', modelId: 'gemini-pro', company: 'Google', service: 'Antigravity', effort: 'high' },
     coder: { route: 'commandcode', modelId: 'deepseek-v3', company: 'DeepSeek', service: 'CommandCode', wire: 'chat', effort: 'medium' },
+    reviewer: { route: 'claude', modelId: 'claude-sonnet-4-6', company: 'Anthropic', service: 'Claude', effort: 'high' },
   } })
 
   const firstRuntime = await createInitializationRuntime({ storagePath, activity: createInitializationActivityRecorder() })
@@ -323,6 +324,7 @@ test('browser Start sends the exact changed card and four selections through the
   const choices = [
     ['Orchestrator', 'antigravity::gemini-pro', 'high'],
     ['Coder', 'commandcode::deepseek-v3', 'low'],
+    ['Reviewer', 'claude::claude-sonnet-4-6', 'high'],
   ] as const
   for (const [role, model, effort] of choices) {
     const field = page.getByRole('group', { name: role, exact: true })
@@ -335,5 +337,6 @@ test('browser Start sends the exact changed card and four selections through the
   assert.deepEqual(Object.values(received!.roles).map(selection => [selection.route, selection.modelId, selection.effort]), [
     ['antigravity', 'gemini-pro', 'high'],
     ['commandcode', 'deepseek-v3', 'low'],
+    ['claude', 'claude-sonnet-4-6', 'high'],
   ])
 })

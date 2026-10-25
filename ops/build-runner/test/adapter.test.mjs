@@ -32,7 +32,7 @@ test('stock adapter request works while direct and nested builder commands canno
   const secretFile = join(directory, 'private-auth.json')
   await writeFile(secretFile, 'synthetic-secret-marker')
   await writeFile(settingsPath, JSON.stringify({
-    roles: { builder: 'local-fixture/fixture' }, memory: false,
+    roles: { builder: 'local-fixture/fixture' }, memory: false, builderEnvKeys: ['PROOF_API_KEY'],
     providers: [{ name: 'Local Fixture', url, models: ['fixture'], credentialEnv: 'PROOF_API_KEY' }],
     models: { 'local-fixture/fixture': { endpoint: url + '/chat/completions', wireModel: 'fixture', protocol: 'chat', maxInputTokens: 100000, maxOutputTokens: 128, price: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } } },
   }))

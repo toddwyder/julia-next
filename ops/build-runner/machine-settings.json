@@ -5,6 +5,9 @@
     "attempts": 3,
     "pauseMs": 5000
   },
+  "builderEnvKeys": [
+    "COMMANDCODE_API_KEY"
+  ],
   "roles": {
     "orchestrator": "anthropic/claude-haiku-5-5",
     "coder": "commandcode/deepseek/deepseek-v4.1-flash"

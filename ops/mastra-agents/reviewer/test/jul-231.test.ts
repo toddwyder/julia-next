@@ -40,9 +40,20 @@ const rawOffer = {
   wire: 'chat',
 };
 
+const rawReviewerOffer = {
+  route: 'claude',
+  modelId: 'claude-sonnet-4-6',
+  name: 'Sonnet 4.6',
+  company: 'Anthropic',
+  service: 'Claude',
+  codingCapable: true,
+  supportedEfforts: ['medium'],
+  wire: 'messages',
+};
+
 const controlState = ControlPageStateSchema.parse({
   cards: [{ admitted: true, card: rawCard }],
-  offers: [rawOffer],
+  offers: [rawOffer, rawReviewerOffer],
 });
 const card = controlState.cards[0].card;
 const offer = controlState.offers[0];
@@ -56,9 +67,19 @@ const selection = {
   wire: 'chat',
 } as const;
 
+const reviewerSelection = {
+  route: 'claude',
+  modelId: 'claude-sonnet-4-6',
+  company: 'Anthropic',
+  service: 'Claude',
+  effort: 'medium',
+  wire: 'messages',
+} as const;
+
 const roles = InitializationRolesSchema.parse({
   orchestrator: selection,
   coder: selection,
+  reviewer: reviewerSelection,
 });
 
 const iso = new Date('2025-07-23T12:00:00.000Z').toISOString();
@@ -145,7 +166,7 @@ test('control page shows running then saved review result', async () => {
     getState: async () =>
       ControlPageStateSchema.parse({
         cards: [{ admitted: true, card }],
-        offers: [offer],
+        offers: [offer, rawReviewerOffer],
       }),
     startInitialization,
     getRuns: async () =>
@@ -162,11 +183,11 @@ test('control page shows running then saved review result', async () => {
     const cardSelect = page.locator('select[name="card"]');
     await cardSelect.selectOption('0');
 
-    for (const legendText of ['Orchestrator', 'Coder']) {
+    for (const legendText of ['Orchestrator', 'Coder', 'Reviewer']) {
       const fieldset = page.locator('fieldset', {
         has: page.locator('legend', { hasText: legendText }),
       });
-      await fieldset.locator('select').first().selectOption({ index: 0 });
+      await fieldset.locator('select').first().selectOption({ index: legendText === 'Reviewer' ? 1 : 0 });
     }
 
     await page.getByRole('button', { name: /Start/i }).click();

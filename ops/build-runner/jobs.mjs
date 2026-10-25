@@ -76,8 +76,8 @@ function normalize(input) {
   const roles = snapshot.roles
   if (!roles || typeof roles !== 'object' || Array.isArray(roles)) throw new Error('roles required')
   const keys = Object.keys(roles)
-  if (keys.length !== 2 || !keys.includes('orchestrator') || !keys.includes('coder')) throw new Error('exact roles required')
-  for (const key of ['orchestrator', 'coder']) {
+  if (!keys.includes('orchestrator') || !keys.includes('coder') || keys.some(key => !['orchestrator', 'coder', 'reviewer'].includes(key))) throw new Error('exact roles required')
+  for (const key of ['orchestrator', 'coder', ...(roles.reviewer === undefined ? [] : ['reviewer'])]) {
     const role = roles[key]
     if (!role || typeof role !== 'object' || Array.isArray(role) || typeof role.modelId !== 'string' || !role.modelId.trim()) throw new Error(`${key} modelId required`)
   }

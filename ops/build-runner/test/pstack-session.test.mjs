@@ -52,6 +52,14 @@ test('a remapped wire model still resolves from its offered model id', () => {
   assert.equal(resolveModelKey(settings, selection), 'openai/gpt-5')
 })
 
+test('the reviewer picked on Start is resolved for the session', () => {
+  const reviewer = 'openai/gpt-6-sol'
+  const withReviewer = { ...snapshot, roles: { ...snapshot.roles, reviewer: { route: 'openai-codex', modelId: 'gpt-6-sol', company: 'OpenAI', service: 'ChatGPT plan', wire: 'responses', effort: 'high' } } }
+  const settings = { models: { ...models, [reviewer]: { wireModel: 'gpt-6-sol', route: 'openai-codex', company: 'OpenAI', service: 'ChatGPT plan', wire: 'responses' } } }
+  assert.equal(createPstackSession(settings, withReviewer, table).reviewerModel, reviewer)
+  assert.equal(createPstackSession({ models }, snapshot, table).reviewerModel, null)
+})
+
 test('a raw model ID is not rejected for provider metadata', () => {
   const settings = { models: { ...models, [sol]: { wireModel: 'gpt-6-sol', route: 'openai-codex', company: 'OpenAI', service: 'ChatGPT plan', wire: 'responses' } } };
   const input = { ...snapshot, roles: { ...snapshot.roles, orchestrator: { modelId: 'gpt-6-sol', route: 'commandcode', company: 'OpenAI', service: 'CommandCode', wire: 'chat' } } };

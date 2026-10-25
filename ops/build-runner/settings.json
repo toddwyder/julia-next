@@ -3,6 +3,9 @@
     "builder": "commandcode-free/reflection/beam:free",
     "proof": "commandcode-free/reflection/beam:free"
   },
+  "builderEnvKeys": [
+    "COMMANDCODE_API_KEY"
+  ],
   "providers": [
     {
       "name": "CommandCode Free",
