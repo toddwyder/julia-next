@@ -38,6 +38,7 @@ export const RoleSelectionSchema = z.object({ ...modelSelectionShape, effort: Ef
 export const InitializationRolesSchema = z.object({
   orchestrator: RoleSelectionSchema,
   coder: RoleSelectionSchema,
+  reviewer: RoleSelectionSchema.optional(),
 }).strict()
 export const RoleDefaultsSchema = z.object({
   builder: ModelSelectionSchema,

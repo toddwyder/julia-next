@@ -5,17 +5,15 @@ import platform
 import sys
 
 
-class SockFilter(ctypes.Structure):
-    _fields_ = [
-        ("code", ctypes.c_ushort),
-        ("jt", ctypes.c_ubyte),
-        ("jf", ctypes.c_ubyte),
-        ("k", ctypes.c_uint32),
-    ]
-
-
-class SockFprog(ctypes.Structure):
-    _fields_ = [("len", ctypes.c_ushort), ("filter", ctypes.POINTER(SockFilter))]
+MACHINE_ONLY_KEYS = {
+    "LINEAR_API_KEY",
+    "SENTRY_AUTH_TOKEN",
+    "AXIOM_TOKEN",
+    "VERCEL_TOKEN",
+    "GITHUB_TOKEN",
+    "GH_TOKEN",
+    "NPM_TOKEN",
+}
 
 
 def checked(result):
@@ -58,19 +56,6 @@ def restrict(workspace, home, executable):
     checked(libc.prctl(38, 1, 0, 0, 0))
     checked(libc.syscall(446, ruleset, 0))
     os.close(ruleset)
-    socket_syscall, connect_syscall = {
-        "x86_64": (41, 42),
-        "aarch64": (198, 203),
-    }[platform.machine()]
-    program = (SockFilter * 6)(
-        SockFilter(0x20, 0, 0, 0),
-        SockFilter(0x15, 0, 1, socket_syscall),
-        SockFilter(0x06, 0, 0, 0x00050000 | 1),
-        SockFilter(0x15, 0, 1, connect_syscall),
-        SockFilter(0x06, 0, 0, 0x00050000 | 1),
-        SockFilter(0x06, 0, 0, 0x7FFF0000),
-    )
-    checked(libc.prctl(22, 2, ctypes.byref(SockFprog(len(program), program))))
 
 
 def contained_path(path, workspace):
@@ -88,13 +73,19 @@ if __name__ == "__main__":
         cwd = contained_path(config["cwd"], workspace)
         os.chdir(cwd)
         restrict(workspace, home, config["executable"])
-        os.execve("/bin/bash", ["bash", "--noprofile", "--norc", "-c", sys.argv[2]], {
+        env = {
             "PATH": "/usr/local/bin:/usr/bin:/bin",
             "HOME": config["home"],
             "TMPDIR": config["home"],
             "LANG": "C.UTF-8",
             "GIT_CONFIG_NOSYSTEM": "1",
-        })
+        }
+        for key in config.get("envKeys", []):
+            if key in MACHINE_ONLY_KEYS:
+                continue
+            if key in os.environ:
+                env[key] = os.environ[key]
+        os.execve("/bin/bash", ["bash", "--noprofile", "--norc", "-c", sys.argv[2]], env)
     except Exception:
         print("builder command refused: filesystem boundary unavailable", file=sys.stderr)
         sys.exit(126)

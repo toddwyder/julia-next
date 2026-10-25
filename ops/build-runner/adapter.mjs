@@ -3,6 +3,7 @@ import { join, resolve, relative, isAbsolute, dirname, basename } from 'node:pat
 import { fileURLToPath } from 'node:url'
 import { CardLedger } from './ledger.mjs'
 import { createTransport } from './transport.mjs'
+import { builderCommandEnvironment, DEFAULT_BUILDER_ENV_KEYS } from './builder-env.mjs'
 
 export const SESSION_INACTIVITY_MS = 15 * 60 * 1000
 export const COMMAND_INACTIVITY_MS = 15 * 60 * 1000
@@ -102,6 +103,7 @@ export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'bu
   const ledgerInside = relative(cwd, ledgerPath)
   if (!ledgerInside.startsWith('..') && !isAbsolute(ledgerInside)) throw Error('card ledger must be outside builder workspace')
   const inheritedEnv = { ...process.env }
+  const builderEnv = builderCommandEnvironment(inheritedEnv, settings.builderEnvKeys ?? DEFAULT_BUILDER_ENV_KEYS)
   const restoreEnv = () => {
     for (const key of Object.keys(process.env)) delete process.env[key]
     Object.assign(process.env, inheritedEnv)
@@ -146,12 +148,12 @@ export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'bu
     const spawn = sandbox.processes.spawn.bind(sandbox.processes)
     const launcher = fileURLToPath(new URL('./command-boundary.py', import.meta.url))
     sandbox.processes.spawn = async (command, options = {}) => {
-      const config = JSON.stringify({ workspace: cwd, home: commandHome, cwd: resolve(cwd, options.cwd ?? '.'), executable: process.execPath })
+      const config = JSON.stringify({ workspace: cwd, home: commandHome, cwd: resolve(cwd, options.cwd ?? '.'), executable: process.execPath, envKeys: Object.keys(builderEnv) })
       const wrapped = `/usr/bin/python3 ${quote(launcher)} ${quote(config)} ${quote(command)}`
       let touch = () => {}
       const handle = await spawn(wrapped, {
         ...options,
-        env: {},
+        env: builderEnv,
         onStdout: data => { touch(); options.onStdout?.(data) },
         onStderr: data => { touch(); options.onStderr?.(data) },
       })

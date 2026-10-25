@@ -61,11 +61,11 @@ async function main() {
   settings.ledgerPath ??= join(dirname(jobDir), 'cards.sqlite')
   const pstackModels = await readFile(new URL('./pstack-models.md', import.meta.url), 'utf8')
   const session = createPstackSession(settings, { ...snapshot, machineryProof: job.machineryProof === true || snapshot.machineryProof }, pstackModels)
-  const { orchestratorModel, coderModel, helpers, hostInstructions, prompt } = session
+  const { orchestratorModel, coderModel, reviewerModel, helpers, hostInstructions, prompt } = session
   const potetoSkill = await readFile(join(job.worktree, '.agents/skills/poteto-mode/SKILL.md'), 'utf8')
   const workflowInstructions = `${hostInstructions}\n\nSelected workflow skill (authoritative):\n${potetoSkill}`
   const effectivePstackModels = session.pstackModels
-  settings.roles = { orchestrator: orchestratorModel, coder: coderModel }
+  settings.roles = { orchestrator: orchestratorModel, coder: coderModel, ...(reviewerModel ? { reviewer: reviewerModel } : {}) }
   const effectiveSettingsPath = join(jobDir, 'settings.json')
   await atomicWriteJson(effectiveSettingsPath, settings)
   const effectiveTable = { orchestrator: orchestratorModel, coder: coderModel, helpers: helpers.map(h => ({ id: h.id, modelId: h.defaultModelId })), pstackModels: effectivePstackModels, pstackModelsPath: join(jobDir, 'state', '.agents', 'pstack-models.md') }
