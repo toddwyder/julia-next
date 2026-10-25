@@ -167,7 +167,18 @@ export async function startControlPageServer({
         return sendJson(response, 200, BuildStartResultSchema.parse(await startInitialization(StartInitializationSchema.parse(await readJson(request)))))
       }
       if (method === 'GET' && url.pathname === `${CONTROL_PATH}/api/builds`) {
-        return sendJson(response, 200, BuildJobSchema.array().parse(await getBuildJobs()))
+        const jobs = await getBuildJobs()
+        const valid: z.infer<typeof BuildJobSchema>[] = []
+        for (const job of Array.isArray(jobs) ? jobs : []) {
+          const parsed = BuildJobSchema.safeParse(job)
+          if (parsed.success) {
+            valid.push(parsed.data)
+            continue
+          }
+          const runId = String((job as { runId?: unknown } | null)?.runId ?? 'unknown')
+          console.log(JSON.stringify({ event: 'build-job-invalid', ...agentError(parsed.error, { provider: 'julia-control', runId, eventKind: 'GET /api/builds' }) }))
+        }
+        return sendJson(response, 200, valid)
       }
       return sendJson(response, 404, { error: 'not found' })
     } catch (error) {
