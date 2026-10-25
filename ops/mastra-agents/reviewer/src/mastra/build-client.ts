@@ -27,7 +27,7 @@ export const BuildResultSchema = z
       })
       .passthrough(),
     internalReview: z.record(z.string(), z.unknown()),
-    downstreamReviewStarted: z.literal(false),
+    downstreamReviewStarted: z.boolean(),
     completedAt: z.string().datetime(),
   })
   .passthrough();

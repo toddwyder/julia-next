@@ -9,6 +9,11 @@
     "orchestrator": "anthropic/claude-haiku-5-5",
     "coder": "commandcode/deepseek/deepseek-v4.1-flash"
   },
+  "reviewers": [
+    "openai/gpt-6-sol",
+    "openai/gpt-5.3-codex",
+    "commandcode/qwen/qwen3.6-max-preview"
+  ],
   "providers": [
     {
       "name": "CommandCode",
