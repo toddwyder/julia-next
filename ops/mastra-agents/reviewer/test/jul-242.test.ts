@@ -71,7 +71,7 @@ test('host matching keeps loopback and the configured Tailscale name, and refuse
   assert.equal(isAllowedControlHost(`${TAILSCALE_HOST}.example.com`, configured), false)
 })
 
-function claudeStub() {
+function claudeRoute() {
   return {
     getAvailableModels: async () => [],
     connection: { session: { sessionId: 'session', configOptions: [{ id: 'model', options: [] }] } },
@@ -82,7 +82,7 @@ test('an ACP route whose agent is not installed on this host contributes no offe
   const traces: Array<{ route: string; ok: boolean }> = []
   const notInstalled = Object.assign(new Error('spawn agy_acp_server ENOENT'), { code: 'ENOENT' })
   const offers = await discoverAcpOffers(
-    { antigravity: { getAvailableModels: async () => { throw notInstalled } }, claude: claudeStub() } as never,
+    { antigravity: { getAvailableModels: async () => { throw notInstalled } }, claude: claudeRoute() } as never,
     trace => { traces.push(trace as never) },
   )
   assert.deepEqual(offers, [])
@@ -91,11 +91,11 @@ test('an ACP route whose agent is not installed on this host contributes no offe
 
 test('a genuine ACP failure still fails discovery rather than being silently dropped', async () => {
   await assert.rejects(discoverAcpOffers(
-    { antigravity: { getAvailableModels: async () => { throw new Error('agent crashed') } }, claude: claudeStub() } as never,
+    { antigravity: { getAvailableModels: async () => { throw new Error('agent crashed') } }, claude: claudeRoute() } as never,
     () => {},
   ), /agent crashed/)
   await assert.rejects(discoverAcpOffers(
-    { antigravity: { getAvailableModels: async () => { throw new Error('agent reported ENOENT for its config') } }, claude: claudeStub() } as never,
+    { antigravity: { getAvailableModels: async () => { throw new Error('agent reported ENOENT for its config') } }, claude: claudeRoute() } as never,
     () => {},
   ), /agent reported ENOENT/)
 })

@@ -67,7 +67,8 @@ test('retired controller and OVH-only routes are not executable source or deploy
 
 test('the active suite has no retired controller or OVH-only registration', () => {
   const suite = readFileSync(new URL('./julia-runner-suite.mjs', import.meta.url), 'utf8');
-  assert.doesNotMatch(suite, /HISTORICAL_TESTS|controller-(?:board|carry)\.test|stand-in-seat\.test|ops-controller|ops-sudoers|check-readiness|collect-worker-result|orca-cli|ready-queue|service-dropbox(?:-write-secret)?\.test/);
+  assert.doesNotMatch(suite, /HISTORICAL_TESTS|controller-(?:board|carry)\.test|ops-controller|ops-sudoers|check-readiness|collect-worker-result|orca-cli|ready-queue|service-dropbox(?:-write-secret)?\.test/);
+  assert.doesNotMatch(suite, /stand-in-seat\.test/);
 });
 
 test('only worker support used by the Mastra delivery path remains available', () => {

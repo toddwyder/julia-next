@@ -2,6 +2,14 @@
 
 Working document. Each line is a decision Todd agreed in conversation.
 
+## 24 October decisions (Todd)
+
+- Deployment safety is dropped. The updater as sole service starter, its ownership of the Tailscale route, its test and its proofs are not built.
+- Clean-up is one pull request with no card. Settled scope: the no-fakes CI check; the four writing-for-agents rules as one script that triage runs before showing Todd a brief; removal of live server-state descriptions from the setup notes; confirmation that Start's admission check accepts the current triage card shape by running it on JUL-263; this plan update.
+- GitHub merge protection moves to the UAT-and-merge card (order of work 8).
+- The pstack folder move, the framework-lint fix and the Code review column removal are cut.
+- The board-style dashboard view is parked. The Linear board flow stands as written, without the Code review column change.
+
 ## Standing rule
 - Every correction is fixed as high in poteto's inverse pyramid as it will go ([inverse-pyramid.md](../principles/inverse-pyramid.md)). Writing it into a file and hoping the agent follows it is not a fix.
 
@@ -26,7 +34,7 @@ Working document. Each line is a decision Todd agreed in conversation.
 ## Pre-plan retired (11:17)
 - Retired as a skill: its parts are covered by `wayfinder` / `grill-with-docs` / `triage` at the Idea step, by pstack at build (`how`, `architect`, prototype, prove-it-works, formal verification), and by learning tests in CI.
 - Kept: `triage` writes cards; Start's admission check refuses a card that doesn't qualify (structure, not prose); Todd's "settled" gate.
-- Two Todd rules lose their only text home and need a pyramid home: (1) no fake outside services in tests → CI check; (2) acceptance criteria describe what Todd needs → mostly triage's "behavioral, not procedural" brief rule, rest judged at settle.
+- Two Todd rules lose their only text home and need a pyramid home: (1) no fake outside services in tests → CI check (built in the 24 Oct clean-up); (2) acceptance criteria describe what Todd needs → triage's "behavioral, not procedural" brief rule, enforced by `scripts/check-agent-brief.mjs` in the 24 Oct clean-up, rest judged at settle.
 - If problems appear that pre-plan used to catch, the fix goes higher in the pyramid, not back into a procedure.
 
 ## Staging and smoke test (11:19–11:38)
@@ -38,7 +46,7 @@ Working document. Each line is a decision Todd agreed in conversation.
 ## Skill names (11:38–11:40)
 - Installing pstack on 22 Oct overwrote Pocock's `tdd` and `teach` in `.agents/skills`; `.claude/skills` still has Pocock's, so the same name means different things per agent.
 - Decided: retire Pocock's `tdd` and `teach`; pstack's versions everywhere. (pstack `teach` = explain a piece of work plainly; agents never start it themselves; it can explain an already-found root cause, while finding one is the debugging skills' job.) Pocock's `ask-matt` reference to `/teach` changes too.
-- Structural fix: pstack lives in its own folder, so updating pstack is one replacement; CI fails if two installed skills share a name.
+- Structural fix: CI fails if two installed skills share a name. The separate pstack folder is cut (24 Oct).
 
 ## Evidence check (12:09–12:12, revised 24 Oct)
 - **Is the evidence there:** **dropped** (Todd, 24 Oct). No evidence index. The reviewer reads the proof folder for the exact candidate commit; a missing or thin proof folder is a failed criterion, not a separate gate. The "evidence is there" card is dropped.
@@ -68,7 +76,7 @@ Working document. Each line is a decision Todd agreed in conversation.
 | Cap reached | Card stops where it is | Is the stop |
 - Every send-back reruns everything after the build (evidence review, staging/smoke, UAT if any): changed code voids earlier passes.
 - A stopped card stays in its column; Todd gets a Linear notification with a plain explanation, the root cause, and a restart plan for his OK (existing stop rule).
-- **Board:** Triage, Backlog → Ready → Implementation → Evidence review → Staging/smoke test → (UAT) → Complete; Canceled, Duplicate. **Remediation** is kept for sent-back cards so retries show at a glance. **Code review** is removed (pstack reviews code inside the build).
+- **Board:** the Linear board flow stands as written: Triage, Backlog → Ready → Implementation → Evidence review → Staging/smoke test → (UAT) → Complete; Canceled, Duplicate. **Remediation** is kept for sent-back cards so retries show at a glance. The Code review column stays (its removal is cut, 24 Oct). The board-style dashboard view is parked (Todd, 24 Oct).
 
 ## Retro and learning (12:18–12:21)
 - **Automatic retro:** after every merge the machine starts a retro run (same trigger as the verification upkeep). It runs pstack's `/correct` on the card's history: evidence-review findings, failed checks, UAT send-backs, and Todd's corrections from the advisor's retro notes. Output: a PR of checks and code fixes, each as high in the pyramid as it will go, each shown failing on the real past mistake.
@@ -88,10 +96,10 @@ The agreed fixes from the JUL-231 retro are folded into the cards below.
 ## Order of work (agreed 12:24)
 1. Models and money: both subscriptions, $2 cap, Sol's price recorded, $0 rule retired, Claude ADR.
 2. Live view: the dashboard shows the running build’s pstack checklist, ticking off steps as they finish.
-3. Deployment safety: updater as sole service starter from main, owns the Tailscale route, its test, proofs through Todd's address; remove stale live-state docs. (`CLAUDE.md` already fixed: it imports `AGENTS.md`, PR #320.)
-4. Clean-up: GitHub merge protection (drop the AGENTS CI line), pstack in its own folder + duplicate-skill-name CI check + retire Pocock `tdd`/`teach` (and the `ask-matt` reference), retire pre-plan (including updating Start's admission check to the short brief: it still requires pre-plan-era fields; that check also runs four writing-for-agents rules as one script: no text copied from repo docs, criteria in outcome form, no implementation words in criteria, no negations in criteria; the planner agent runs the same script before showing Todd a brief; Todd 13:29), empty-lint fix, no-fakes CI check, remove Code review column.
+3. Deployment safety: dropped (Todd, 24 Oct). The updater as sole service starter, its ownership of the Tailscale route, its test and its proofs are not built. Stale live-state descriptions are removed from the setup notes as part of the clean-up.
+4. Clean-up: one pull request, no card (Todd, 24 Oct). Settled scope: the no-fakes CI check; the four writing-for-agents rules as one script, run by triage before showing Todd a brief; removal of live server-state descriptions from the setup notes; confirmation that Start's admission check accepts the current triage card shape by running it on JUL-263; this plan update. Cut: the pstack folder move, the framework-lint fix and the Code review column removal. GitHub merge protection moves to card 8.
 5. Evidence review (JUL-252) with the five-card checkpoint. The "evidence there" card is dropped: no index, the reviewer reads the proof folder. (Todd, 24 Oct)
 6. Staging: regression suite against the Vercel preview; `verify-julia` rewritten for Linux and a given address.
-7. UAT and merge: notification, accept/send-back, automatic merge, live check, revert/rollback.
+7. UAT and merge: notification, accept/send-back, automatic merge, GitHub merge protection, live check, revert/rollback.
 8. Automatic retro: `/correct` after merge, plain-English list, Todd approves.
-Cards 1–4 are built by the planner agent in fresh sessions. From card 5 on, the machine builds the cards itself (Start's admission check accepts the short brief once card 4 lands, and card 1 lets the machine use paid models); the planner agent shapes cards with Todd. (Todd, 13:33)
+The clean-up is built by the planner agent in a fresh session. From card 5 on, the machine builds the cards itself (Start's admission check accepts the current triage card shape, confirmed on JUL-263 on 24 Oct, and card 1 lets the machine use paid models); the planner agent shapes cards with Todd.

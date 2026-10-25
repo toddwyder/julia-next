@@ -14,7 +14,7 @@ The receipt ref changes neither the product branch nor the PR head.
 are not rerun on subsequent polls. A failed candidate remains failed; a corrected
 head gets its own run.
 
-The service uses a copied worker at `~/.local/lib/julia-server-tests/worker.mjs`.
+Install a copy of the worker at `~/.local/lib/julia-server-tests/worker.mjs`.
 Its configuration is `~/.config/julia-server-tests/config.json`:
 
 ```json

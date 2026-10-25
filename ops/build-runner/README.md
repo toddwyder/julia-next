@@ -51,7 +51,7 @@ The proof forces one observation through the public stock API. It repeats that r
 
 The control page posts its saved initialization result to the separate runner's `POST /jobs`. `GET /jobs` and `GET /jobs/:runId` return the persisted job. A duplicate Start returns the same saved job. The worker uses the saved card, orchestrator and coder selections in one Mastra Code session, then saves `ready-for-review` after its internal review, proof and candidate checks pass.
 
-Set `BUILD_RUNNER_JOBS_DIR`, `BUILD_RUNNER_REPO`, `BUILD_RUNNER_SETTINGS` and `BUILD_RUNNER_PORT`, then launch `jobs.mjs` through `scripts/julia-agents.mjs`. Set the control service's `JULIA_BUILD_RUNNER_URL` to that runner. The exact server units used for JUL-231 are under `docs/agents/jul-231/server/`. The two services have separate lifetimes.
+Set `BUILD_RUNNER_JOBS_DIR`, `BUILD_RUNNER_REPO`, `BUILD_RUNNER_SETTINGS` and `BUILD_RUNNER_PORT`, then launch `jobs.mjs` through `scripts/julia-agents.mjs`. Set the control service's `JULIA_BUILD_RUNNER_URL` to that runner. The server units and their controller live under `ops/build-runner/systemd/`.
 
 `machine-settings.json` selects Claude as orchestrator and DeepSeek as coder. `pstack-models.md` assigns ordinary coding and swarm work to DeepSeek, hardest work and judgment to Claude, and panels to one of each. An explicit machinery run uses the configured Beam model for its roles and self-check. A same-model machinery self-check is never independent review. These settings govern machine sessions; they do not alter the current Codex chat's settings.
 
