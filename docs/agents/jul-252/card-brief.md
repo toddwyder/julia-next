@@ -2,7 +2,7 @@
 
 ## Outcome
 
-A saved build is checked against the card's acceptance criteria by a model from a different company than the builder, with every criterion proven or refused against the proof folder. A refused criterion sends the card to Remediation with a fix that starts on its own. A second refusal ends in an Investigation run and a stopped card.
+A saved build is checked against the card's acceptance criteria by a reviewer whose company differs from the builder's, with every criterion proven or refused against the proof folder. A refused criterion sends the card to Remediation with a fix that starts on its own. A second refusal ends in an Investigation run and a stopped card.
 
 ## Requirements
 
@@ -15,7 +15,7 @@ A saved build is checked against the card's acceptance criteria by a model from 
 - A first failed review moves the card to Remediation and starts a fix run on its own, following poteto-mode's Bug fix playbook, with the failing findings as the task.
 - A second failed review starts a read-only run that follows poteto-mode's Investigation playbook and reports the root cause. The card then stops with that root cause and a restart plan.
 - A card gets at most two evidence reviews.
-- Every build and remediation run records the playbook it must follow. A build follows the playbook it declares; the first remediation follows Bug fix; the second follows Investigation.
+- Each build and remediation run names its required playbook. A build names the playbook it follows; the first remediation names Bug fix; the second names Investigation.
 - The machine saves no result for a build or remediation run whose checklist does not follow its required playbook.
 - The review, the fix run and the Investigation draw on the same $2 card account as the build.
 
@@ -30,14 +30,14 @@ A saved build is checked against the card's acceptance criteria by a model from 
 
 ## Acceptance criteria
 
-1. A saved build result starts an evidence review automatically.
-2. Every real-card review runs on a model whose company differs from the builder's company, and the machine refuses a review whose model company matches the builder's.
-3. The review result gives each acceptance criterion one verdict of proven, not proven or wrong thing tested, with the proof file named beside it.
-4. A first failed review moves the card to Remediation and starts a fix run that follows the Bug fix playbook from the failing findings.
-5. A second failed review starts a read-only Investigation run, and the card then stops with the root cause and a restart plan.
-6. Each card receives at most two evidence reviews.
-7. A build or remediation run result is accepted with a checklist that follows the playbook required for that run, and refused when its checklist follows a different playbook.
-8. The review, the fix run and the Investigation show on the same $2 card account as the build.
+- A saved build result starts an evidence review automatically.
+- Every real-card review runs on a model whose company differs from the builder's company, and the machine refuses a review whose model company matches the builder's.
+- The review result gives each acceptance criterion one verdict of proven, unproven or wrong thing tested, with the evidence it rests on named beside it.
+- A first failed review moves the card to Remediation and starts a fix run that follows the Bug fix playbook from the failing findings.
+- A second failed review starts a read-only Investigation run, and the card then stops with the root cause and a restart plan.
+- Each card receives at most two evidence reviews.
+- A build or remediation run result is accepted with a checklist that follows the playbook required for that run, and refused when its checklist follows a different playbook.
+- The review, the fix run and the Investigation show on the same $2 card account as the build.
 
 ## Proof
 
