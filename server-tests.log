@@ -1,0 +1,242 @@
+Installing locked dependencies for .
+
+added 128 packages, and audited 129 packages in 17s
+
+25 packages are looking for funding
+  run `npm fund` for details
+
+3 vulnerabilities (2 high, 1 critical)
+
+To address all issues, run:
+  npm audit fix
+
+Run `npm audit` for details.
+Installing locked dependencies for .agents/skills/poteto-mode/scripts
+bun install v1.4.4 (38afee6c8)
+
++ bun-types@1.3.14
++ typescript@7.0.2
++ commander@14.0.0
+
+6 packages installed [16.00ms]
+Installing locked dependencies for ops/build-runner
+
+added 745 packages, and audited 746 packages in 54s
+
+193 packages are looking for funding
+  run `npm fund` for details
+
+42 vulnerabilities (19 moderate, 23 high)
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+Installing locked dependencies for ops/mastra-agents/reviewer
+
+added 185 packages, and audited 186 packages in 8s
+
+85 packages are looking for funding
+  run `npm fund` for details
+
+6 vulnerabilities (3 low, 3 high)
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues, run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+Installing locked dependencies for ops/server-tests
+
+up to date, audited 1 package in 413ms
+
+found 0 vulnerabilities
+Installing locked dependencies for ops/verification-maintenance
+
+up to date, audited 1 package in 426ms
+
+found 0 vulnerabilities
+
+npm notice
+npm notice New minor version of npm available! 11.11.0 -> 11.21.1
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.21.1
+npm notice To update run: npm install -g npm@11.21.1
+npm notice
+npm warn deprecated whatwg-encoding@3.1.1: Use @exodus/bytes instead for a more spec-conformant and faster implementation
+npm warn deprecated @anush008/tokenizers@0.6.0: This package has been archived. Please use the official and updated "huggingface/tokenizers" package.
+npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+
+Installing dependencies...
+Switching to root user to install dependencies...
+Get:1 https://pkgs.tailscale.com/stable/ubuntu noble InRelease
+Hit:2 http://security.ubuntu.com/ubuntu noble-security InRelease
+Hit:3 http://nova.clouds.archive.ubuntu.com/ubuntu noble InRelease
+Hit:4 http://nova.clouds.archive.ubuntu.com/ubuntu noble-updates InRelease
+Hit:5 http://nova.clouds.archive.ubuntu.com/ubuntu noble-backports InRelease
+Fetched 6649 B in 1s (8017 B/s)
+Reading package lists...
+Reading package lists...
+Building dependency tree...
+Reading state information...
+libasound2t64 is already the newest version (1.2.11-1ubuntu0.3).
+libatk-bridge2.0-0t64 is already the newest version (2.52.0-1build1).
+libatk1.0-0t64 is already the newest version (2.52.0-1build1).
+libatspi2.0-0t64 is already the newest version (2.52.0-1build1).
+libcairo2 is already the newest version (1.18.0-3build1).
+libcups2t64 is already the newest version (2.4.7-1.2ubuntu7.14).
+libdbus-1-3 is already the newest version (1.14.10-4ubuntu4.1).
+libdrm2 is already the newest version (2.4.125-1ubuntu0.1~24.04.2).
+libgbm1 is already the newest version (25.2.8-0ubuntu0.24.04.4).
+libglib2.0-0t64 is already the newest version (2.80.0-6ubuntu3.10).
+libnspr4 is already the newest version (2:4.35-1.1build1).
+libnss3 is already the newest version (2:3.98-1ubuntu0.3).
+libpango-1.0-0 is already the newest version (1.52.1+ds-1build1).
+libx11-6 is already the newest version (2:1.8.7-1ubuntu0.1).
+libxcb1 is already the newest version (1.15-1ubuntu2).
+libxcomposite1 is already the newest version (1:0.4.5-1build3).
+libxdamage1 is already the newest version (1:1.1.6-1build1).
+libxext6 is already the newest version (2:1.3.4-1build2).
+libxfixes3 is already the newest version (1:6.0.0-2build1).
+libxkbcommon0 is already the newest version (1.6.0-1build1).
+libxrandr2 is already the newest version (2:1.5.2-2build1).
+xvfb is already the newest version (2:21.1.12-1ubuntu1.9).
+fonts-noto-color-emoji is already the newest version (2.047-0ubuntu0.24.04.1).
+fonts-unifont is already the newest version (1:15.1.01-1build1).
+libfontconfig1 is already the newest version (2.15.0-1.1ubuntu2).
+libfreetype6 is already the newest version (2.13.2+dfsg-1ubuntu0.2).
+xfonts-cyrillic is already the newest version (1:1.0.5+nmu1).
+xfonts-scalable is already the newest version (1:1.0.3-1.3).
+fonts-liberation is already the newest version (1:2.1.5-3).
+fonts-ipafont-gothic is already the newest version (00303-21ubuntu1).
+fonts-wqy-zenhei is already the newest version (0.9.45-8).
+fonts-tlwg-loma-otf is already the newest version (1:0.7.3-1).
+fonts-freefont-ttf is already the newest version (20211204+svn4273-2).
+The following packages were automatically installed and are no longer required:
+  libdebuginfod-common libfwupd2 libgusb2
+Use 'sudo apt autoremove' to remove them.
+0 upgraded, 0 newly installed, 0 to remove and 5 not upgraded.
+Installing dependencies...
+Switching to root user to install dependencies...
+Get:1 https://pkgs.tailscale.com/stable/ubuntu noble InRelease
+Hit:2 http://security.ubuntu.com/ubuntu noble-security InRelease
+Hit:3 http://nova.clouds.archive.ubuntu.com/ubuntu noble InRelease
+Hit:4 http://nova.clouds.archive.ubuntu.com/ubuntu noble-updates InRelease
+Hit:5 http://nova.clouds.archive.ubuntu.com/ubuntu noble-backports InRelease
+Fetched 6649 B in 1s (8627 B/s)
+Reading package lists...
+Reading package lists...
+Building dependency tree...
+Reading state information...
+libasound2t64 is already the newest version (1.2.11-1ubuntu0.3).
+libatk-bridge2.0-0t64 is already the newest version (2.52.0-1build1).
+libatk1.0-0t64 is already the newest version (2.52.0-1build1).
+libatspi2.0-0t64 is already the newest version (2.52.0-1build1).
+libcairo2 is already the newest version (1.18.0-3build1).
+libcups2t64 is already the newest version (2.4.7-1.2ubuntu7.14).
+libdbus-1-3 is already the newest version (1.14.10-4ubuntu4.1).
+libdrm2 is already the newest version (2.4.125-1ubuntu0.1~24.04.2).
+libgbm1 is already the newest version (25.2.8-0ubuntu0.24.04.4).
+libglib2.0-0t64 is already the newest version (2.80.0-6ubuntu3.10).
+libnspr4 is already the newest version (2:4.35-1.1build1).
+libnss3 is already the newest version (2:3.98-1ubuntu0.3).
+libpango-1.0-0 is already the newest version (1.52.1+ds-1build1).
+libx11-6 is already the newest version (2:1.8.7-1ubuntu0.1).
+libxcb1 is already the newest version (1.15-1ubuntu2).
+libxcomposite1 is already the newest version (1:0.4.5-1build3).
+libxdamage1 is already the newest version (1:1.1.6-1build1).
+libxext6 is already the newest version (2:1.3.4-1build2).
+libxfixes3 is already the newest version (1:6.0.0-2build1).
+libxkbcommon0 is already the newest version (1.6.0-1build1).
+libxrandr2 is already the newest version (2:1.5.2-2build1).
+xvfb is already the newest version (2:21.1.12-1ubuntu1.9).
+fonts-noto-color-emoji is already the newest version (2.047-0ubuntu0.24.04.1).
+fonts-unifont is already the newest version (1:15.1.01-1build1).
+libfontconfig1 is already the newest version (2.15.0-1.1ubuntu2).
+libfreetype6 is already the newest version (2.13.2+dfsg-1ubuntu0.2).
+xfonts-cyrillic is already the newest version (1:1.0.5+nmu1).
+xfonts-scalable is already the newest version (1:1.0.3-1.3).
+fonts-liberation is already the newest version (1:2.1.5-3).
+fonts-ipafont-gothic is already the newest version (00303-21ubuntu1).
+fonts-wqy-zenhei is already the newest version (0.9.45-8).
+fonts-tlwg-loma-otf is already the newest version (1:0.7.3-1).
+fonts-freefont-ttf is already the newest version (20211204+svn4273-2).
+The following packages were automatically installed and are no longer required:
+  libdebuginfod-common libfwupd2 libgusb2
+Use 'sudo apt autoremove' to remove them.
+0 upgraded, 0 newly installed, 0 to remove and 5 not upgraded.
+
+
+{"owner":".","lockfile":"package-lock.json","runtime":"node","environment":"server","tests":["scripts/server/<concealed by 1Password>-agents.test.mjs"]}
+✔ server agents route resolves all eight fields and forwards literal arguments through real op (1895.840233ms)
+✔ unavailable agent passes fail before child effects without inherited authentication fallback (350.755904ms)
+✔ real op ignores inherited desktop Connect and no-masking overrides and preserves child exit (1870.506411ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4250.118234
+{"owner":"ops/build-runner","lockfile":"ops/build-runner/package-lock.json","runtime":"node","environment":"server","tests":["ops/build-runner/framework/@mastra/code-sdk/server/model-side.test.mjs","ops/build-runner/framework/@mastra/code-sdk/server/provider-settings.test.mjs","ops/build-runner/test/server/memory-account.test.mjs"]}
+{"fact":"free-provider-attempt","url":"https://api.commandcode.ai/provider/v1/chat/completions","at":"2026-10-25T16:37:24.478Z","status":200,"requestSha256":"8a93c10ca05ea8965c75bce49fbe16a4434546c53dc1f0e3d20f9311e53f1cc9","bytes":69514,"model":"reflection/beam:free"}
+{"model":"reflection/beam:free","prompt":"Hello.","result":{"status":"completed","text":"Hello! How can I help you today?","finishReason":"complete","usage":{"inputTokens":13404,"outputTokens":43,"totalTokens":13447},"toolCalls":[],"toolResults":[],"threadId":"858daa4e-1933-49ac-b9f8-2ffdea3819b4","exitCode":0},"requests":[{"requestSha256":"8a93c10ca05ea8965c75bce49fbe16a4434546c53dc1f0e3d20f9311e53f1cc9","at":"2026-10-25T16:37:24.477Z","bytes":69514,"url":"https://api.commandcode.ai/provider/v1/chat/completions","model":"reflection/beam:free","messages":[{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"user","content":"string"},{"role":"user","content":"string"}],"attempts":[{"at":"2026-10-25T16:37:24.478Z","status":200}],"status":200}]}
+✔ saved model selection resolves to an actual Beam provider request (6158.35433ms)
+{"fact":"free-provider-attempt","url":"https://api.commandcode.ai/provider/v1/chat/completions","at":"2026-10-25T16:37:27.176Z","status":200,"requestSha256":"0d74f9b4ebed27f3ede00ac6be777a13f9d91d0ddb400f8d1ad5248b5c7f52fb","bytes":69585,"model":"reflection/beam:free"}
+{"fact":"actual-hook-tool-result-before-encoding","part":{"type":"tool-result","toolCallId":"call-62314807-a63c-46ad-a990-2b651d477340","toolName":"execute_command","output":{"type":"error-json","value":{"error":true,"message":"Tool input validation failed for execute_command. Please fix the following errors and try again:\n- description: Invalid input: expected string, received undefined\n\nProvided arguments: {\n  \"command\": \"git status && echo \\\"---DIFF---\\\" && git diff --cached\"\n}","validationErrors":{"errors":[],"fields":{"description":{"errors":["Invalid input: expected string, received undefined"],"fields":{}}}}}},"providerOptions":{"mastra":{"modelOutput":{"type":"error-json","value":{"error":true,"message":"Tool input validation failed for execute_command. Please fix the following errors and try again:\n- description: Invalid input: expected string, received undefined\n\nProvided arguments: {\n  \"command\": \"git status && echo \\\"---DIFF---\\\" && git diff --cached\"\n}","validationErrors":{"errors":[],"fields":{"description":{"errors":["Invalid input: expected string, received undefined"],"fields":{}}}}}},"tokenEstimate":{"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c":{"v":8,"source":"v8:tokenx","key":"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c","tokens":5},"tool-call-args-json:280e054b7d6d17ff1bd7c608c06414fe9f4665946ffc0250676150d558d6aa2a":{"v":8,"source":"v8:tokenx","key":"tool-call-args-json:280e054b7d6d17ff1bd7c608c06414fe9f4665946ffc0250676150d558d6aa2a","tokens":21},"tool-result-model-output-json:5df23b624740c6f29545f5e51e2f53c1f1afc81641fc1c1d4139f897c46561f2":{"v":8,"source":"v8:tokenx","key":"tool-result-model-output-json:5df23b624740c6f29545f5e51e2f53c1f1afc81641fc1c1d4139f897c46561f2","tokens":161}}}},"input":{"command":"git status && echo \"---DIFF---\" && git diff --cached"}}}
+{"fact":"free-provider-attempt","url":"https://api.commandcode.ai/provider/v1/chat/completions","at":"2026-10-25T16:37:28.452Z","status":200,"requestSha256":"5b34c66fa55d1fb700e4e1c11335b52fa069aaf15163639a7cb99c1b4aa02beb","bytes":70509,"model":"reflection/beam:free"}
+{"fact":"actual-hook-tool-result-before-encoding","part":{"type":"tool-result","toolCallId":"call-62314807-a63c-46ad-a990-2b651d477340","toolName":"execute_command","output":{"type":"error-json","value":{"error":true,"message":"Tool input validation failed for execute_command. Please fix the following errors and try again:\n- description: Invalid input: expected string, received undefined\n\nProvided arguments: {\n  \"command\": \"git status && echo \\\"---DIFF---\\\" && git diff --cached\"\n}","validationErrors":{"errors":[],"fields":{"description":{"errors":["Invalid input: expected string, received undefined"],"fields":{}}}}}},"providerOptions":{"mastra":{"modelOutput":{"type":"error-json","value":{"error":true,"message":"Tool input validation failed for execute_command. Please fix the following errors and try again:\n- description: Invalid input: expected string, received undefined\n\nProvided arguments: {\n  \"command\": \"git status && echo \\\"---DIFF---\\\" && git diff --cached\"\n}","validationErrors":{"errors":[],"fields":{"description":{"errors":["Invalid input: expected string, received undefined"],"fields":{}}}}}},"tokenEstimate":{"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c":{"v":8,"source":"v8:tokenx","key":"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c","tokens":5},"tool-call-args-json:280e054b7d6d17ff1bd7c608c06414fe9f4665946ffc0250676150d558d6aa2a":{"v":8,"source":"v8:tokenx","key":"tool-call-args-json:280e054b7d6d17ff1bd7c608c06414fe9f4665946ffc0250676150d558d6aa2a","tokens":21},"tool-result-model-output-json:5df23b624740c6f29545f5e51e2f53c1f1afc81641fc1c1d4139f897c46561f2":{"v":8,"source":"v8:tokenx","key":"tool-result-model-output-json:5df23b624740c6f29545f5e51e2f53c1f1afc81641fc1c1d4139f897c46561f2","tokens":161}}}},"input":{"command":"git status && echo \"---DIFF---\" && git diff --cached"}}}
+{"fact":"actual-hook-tool-result-before-encoding","part":{"type":"tool-result","toolCallId":"call-5a93668c-6ff0-4295-a32b-7c1f2519f399","toolName":"execute_command","output":{"type":"text","value":"On branch master\nChanges to be committed:\n  (use \"git restore --staged <file>...\" to unstage)\n\tmodified:   answer.mjs\n\nChanges not staged for commit:\n  (use \"git add <file>...\" to update what will be committed)\n  (use \"git restore <file>...\" to discard changes in working directory)\n\tmodified:   answer.mjs\n\nUntracked files:\n  (use \"git add <file>...\" to include in what will be committed)\n\t.mastracode/\n\tmastra-vectors.db\n\tmastra-vectors.db-shm\n\tmastra-vectors.db-wal\n\tmastra.db\n\tmastra.db-shm\n\tmastra.db-wal\n\tsettings.json\n\n---DIFF---\ndiff --git a/answer.mjs b/answer.mjs\nindex 3811249..ae542ee 100644\n--- a/answer.mjs\n+++ b/answer.mjs\n@@ -1 +1 @@\n-export const answer=42;\n+export const answer=41;\n"},"providerOptions":{"mastra":{"modelOutput":{"type":"text","value":"On branch master\nChanges to be committed:\n  (use \"git restore --staged <file>...\" to unstage)\n\tmodified:   answer.mjs\n\nChanges not staged for commit:\n  (use \"git add <file>...\" to update what will be committed)\n  (use \"git restore <file>...\" to discard changes in working directory)\n\tmodified:   answer.mjs\n\nUntracked files:\n  (use \"git add <file>...\" to include in what will be committed)\n\t.mastracode/\n\tmastra-vectors.db\n\tmastra-vectors.db-shm\n\tmastra-vectors.db-wal\n\tmastra.db\n\tmastra.db-shm\n\tmastra.db-wal\n\tsettings.json\n\n---DIFF---\ndiff --git a/answer.mjs b/answer.mjs\nindex 3811249..ae542ee 100644\n--- a/answer.mjs\n+++ b/answer.mjs\n@@ -1 +1 @@\n-export const answer=42;\n+export const answer=41;\n"},"tokenEstimate":{"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c":{"v":8,"source":"v8:tokenx","key":"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c","tokens":5},"tool-call-args-json:3fc6834530f3ff6aeefb10172d7def166c88df91c42125e4964c6be0a937e7d2":{"v":8,"source":"v8:tokenx","key":"tool-call-args-json:3fc6834530f3ff6aeefb10172d7def166c88df91c42125e4964c6be0a937e7d2","tokens":32},"tool-result-model-output-json:41b75959353714e456ad2e55708175d3ced0ba94ad9eed9c35854548349d2d1d":{"v":8,"source":"v8:tokenx","key":"tool-result-model-output-json:41b75959353714e456ad2e55708175d3ced0ba94ad9eed9c35854548349d2d1d","tokens":284}}}},"input":{"command":"git status && echo \"---DIFF---\" && git diff --cached","description":"Checking staged changes before commit"}}}
+{"fact":"free-provider-attempt","url":"https://api.commandcode.ai/provider/v1/chat/completions","at":"2026-10-25T16:37:29.827Z","status":200,"requestSha256":"ac470a102fb0a49359266ce0384ee1d69c323416e3f676eb8c07e00bbb6c83c5","bytes":71702,"model":"reflection/beam:free"}
+{"fact":"actual-hook-tool-result-before-encoding","part":{"type":"tool-result","toolCallId":"call-62314807-a63c-46ad-a990-2b651d477340","toolName":"execute_command","output":{"type":"error-json","value":{"error":true,"message":"Tool input validation failed for execute_command. Please fix the following errors and try again:\n- description: Invalid input: expected string, received undefined\n\nProvided arguments: {\n  \"command\": \"git status && echo \\\"---DIFF---\\\" && git diff --cached\"\n}","validationErrors":{"errors":[],"fields":{"description":{"errors":["Invalid input: expected string, received undefined"],"fields":{}}}}}},"providerOptions":{"mastra":{"modelOutput":{"type":"error-json","value":{"error":true,"message":"Tool input validation failed for execute_command. Please fix the following errors and try again:\n- description: Invalid input: expected string, received undefined\n\nProvided arguments: {\n  \"command\": \"git status && echo \\\"---DIFF---\\\" && git diff --cached\"\n}","validationErrors":{"errors":[],"fields":{"description":{"errors":["Invalid input: expected string, received undefined"],"fields":{}}}}}},"tokenEstimate":{"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c":{"v":8,"source":"v8:tokenx","key":"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c","tokens":5},"tool-call-args-json:280e054b7d6d17ff1bd7c608c06414fe9f4665946ffc0250676150d558d6aa2a":{"v":8,"source":"v8:tokenx","key":"tool-call-args-json:280e054b7d6d17ff1bd7c608c06414fe9f4665946ffc0250676150d558d6aa2a","tokens":21},"tool-result-model-output-json:5df23b624740c6f29545f5e51e2f53c1f1afc81641fc1c1d4139f897c46561f2":{"v":8,"source":"v8:tokenx","key":"tool-result-model-output-json:5df23b624740c6f29545f5e51e2f53c1f1afc81641fc1c1d4139f897c46561f2","tokens":161}}}},"input":{"command":"git status && echo \"---DIFF---\" && git diff --cached"}}}
+{"fact":"actual-hook-tool-result-before-encoding","part":{"type":"tool-result","toolCallId":"call-5a93668c-6ff0-4295-a32b-7c1f2519f399","toolName":"execute_command","output":{"type":"text","value":"On branch master\nChanges to be committed:\n  (use \"git restore --staged <file>...\" to unstage)\n\tmodified:   answer.mjs\n\nChanges not staged for commit:\n  (use \"git add <file>...\" to update what will be committed)\n  (use \"git restore <file>...\" to discard changes in working directory)\n\tmodified:   answer.mjs\n\nUntracked files:\n  (use \"git add <file>...\" to include in what will be committed)\n\t.mastracode/\n\tmastra-vectors.db\n\tmastra-vectors.db-shm\n\tmastra-vectors.db-wal\n\tmastra.db\n\tmastra.db-shm\n\tmastra.db-wal\n\tsettings.json\n\n---DIFF---\ndiff --git a/answer.mjs b/answer.mjs\nindex 3811249..ae542ee 100644\n--- a/answer.mjs\n+++ b/answer.mjs\n@@ -1 +1 @@\n-export const answer=42;\n+export const answer=41;\n"},"providerOptions":{"mastra":{"modelOutput":{"type":"text","value":"On branch master\nChanges to be committed:\n  (use \"git restore --staged <file>...\" to unstage)\n\tmodified:   answer.mjs\n\nChanges not staged for commit:\n  (use \"git add <file>...\" to update what will be committed)\n  (use \"git restore <file>...\" to discard changes in working directory)\n\tmodified:   answer.mjs\n\nUntracked files:\n  (use \"git add <file>...\" to include in what will be committed)\n\t.mastracode/\n\tmastra-vectors.db\n\tmastra-vectors.db-shm\n\tmastra-vectors.db-wal\n\tmastra.db\n\tmastra.db-shm\n\tmastra.db-wal\n\tsettings.json\n\n---DIFF---\ndiff --git a/answer.mjs b/answer.mjs\nindex 3811249..ae542ee 100644\n--- a/answer.mjs\n+++ b/answer.mjs\n@@ -1 +1 @@\n-export const answer=42;\n+export const answer=41;\n"},"tokenEstimate":{"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c":{"v":8,"source":"v8:tokenx","key":"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c","tokens":5},"tool-call-args-json:3fc6834530f3ff6aeefb10172d7def166c88df91c42125e4964c6be0a937e7d2":{"v":8,"source":"v8:tokenx","key":"tool-call-args-json:3fc6834530f3ff6aeefb10172d7def166c88df91c42125e4964c6be0a937e7d2","tokens":32},"tool-result-model-output-json:41b75959353714e456ad2e55708175d3ced0ba94ad9eed9c35854548349d2d1d":{"v":8,"source":"v8:tokenx","key":"tool-result-model-output-json:41b75959353714e456ad2e55708175d3ced0ba94ad9eed9c35854548349d2d1d","tokens":284}}}},"input":{"command":"git status && echo \"---DIFF---\" && git diff --cached","description":"Checking staged changes before commit"}}}
+{"fact":"actual-hook-tool-result-before-encoding","part":{"type":"tool-result","toolCallId":"call-a7991911-f8b9-4390-95b2-c97328d685fe","toolName":"execute_command","output":{"type":"text","value":"844d69d baseline\n"},"providerOptions":{"mastra":{"modelOutput":{"type":"text","value":"844d69d baseline\n"},"tokenEstimate":{"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c":{"v":8,"source":"v8:tokenx","key":"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c","tokens":5},"tool-call-args-json:e39ac3ca58dc9b419586cde86a2f165de5aec4621ca65f7218db083c5609b039":{"v":8,"source":"v8:tokenx","key":"tool-call-args-json:e39ac3ca58dc9b419586cde86a2f165de5aec4621ca65f7218db083c5609b039","tokens":23},"tool-result-model-output-json:cb5d922b07f4a44790c9b94fa80e039973cf30fd61160e004afc934d832fbb07":{"v":8,"source":"v8:tokenx","key":"tool-result-model-output-json:cb5d922b07f4a44790c9b94fa80e039973cf30fd61160e004afc934d832fbb07","tokens":21}}}},"input":{"command":"git log --oneline -5","description":"Checking recent commit message style"}}}
+{"fact":"free-provider-attempt","url":"https://api.commandcode.ai/provider/v1/chat/completions","at":"2026-10-25T16:37:32.221Z","status":200,"requestSha256":"44502b970f4e959ff690a399b9ff9bce685cf3b34b5bd6133c6124aae2e7504a","bytes":72382,"model":"reflection/beam:free"}
+{"fact":"actual-hook-tool-result-before-encoding","part":{"type":"tool-result","toolCallId":"call-62314807-a63c-46ad-a990-2b651d477340","toolName":"execute_command","output":{"type":"error-json","value":{"error":true,"message":"Tool input validation failed for execute_command. Please fix the following errors and try again:\n- description: Invalid input: expected string, received undefined\n\nProvided arguments: {\n  \"command\": \"git status && echo \\\"---DIFF---\\\" && git diff --cached\"\n}","validationErrors":{"errors":[],"fields":{"description":{"errors":["Invalid input: expected string, received undefined"],"fields":{}}}}}},"providerOptions":{"mastra":{"modelOutput":{"type":"error-json","value":{"error":true,"message":"Tool input validation failed for execute_command. Please fix the following errors and try again:\n- description: Invalid input: expected string, received undefined\n\nProvided arguments: {\n  \"command\": \"git status && echo \\\"---DIFF---\\\" && git diff --cached\"\n}","validationErrors":{"errors":[],"fields":{"description":{"errors":["Invalid input: expected string, received undefined"],"fields":{}}}}}},"tokenEstimate":{"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c":{"v":8,"source":"v8:tokenx","key":"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c","tokens":5},"tool-call-args-json:280e054b7d6d17ff1bd7c608c06414fe9f4665946ffc0250676150d558d6aa2a":{"v":8,"source":"v8:tokenx","key":"tool-call-args-json:280e054b7d6d17ff1bd7c608c06414fe9f4665946ffc0250676150d558d6aa2a","tokens":21},"tool-result-model-output-json:5df23b624740c6f29545f5e51e2f53c1f1afc81641fc1c1d4139f897c46561f2":{"v":8,"source":"v8:tokenx","key":"tool-result-model-output-json:5df23b624740c6f29545f5e51e2f53c1f1afc81641fc1c1d4139f897c46561f2","tokens":161}}}},"input":{"command":"git status && echo \"---DIFF---\" && git diff --cached"}}}
+{"fact":"actual-hook-tool-result-before-encoding","part":{"type":"tool-result","toolCallId":"call-5a93668c-6ff0-4295-a32b-7c1f2519f399","toolName":"execute_command","output":{"type":"text","value":"On branch master\nChanges to be committed:\n  (use \"git restore --staged <file>...\" to unstage)\n\tmodified:   answer.mjs\n\nChanges not staged for commit:\n  (use \"git add <file>...\" to update what will be committed)\n  (use \"git restore <file>...\" to discard changes in working directory)\n\tmodified:   answer.mjs\n\nUntracked files:\n  (use \"git add <file>...\" to include in what will be committed)\n\t.mastracode/\n\tmastra-vectors.db\n\tmastra-vectors.db-shm\n\tmastra-vectors.db-wal\n\tmastra.db\n\tmastra.db-shm\n\tmastra.db-wal\n\tsettings.json\n\n---DIFF---\ndiff --git a/answer.mjs b/answer.mjs\nindex 3811249..ae542ee 100644\n--- a/answer.mjs\n+++ b/answer.mjs\n@@ -1 +1 @@\n-export const answer=42;\n+export const answer=41;\n"},"providerOptions":{"mastra":{"modelOutput":{"type":"text","value":"On branch master\nChanges to be committed:\n  (use \"git restore --staged <file>...\" to unstage)\n\tmodified:   answer.mjs\n\nChanges not staged for commit:\n  (use \"git add <file>...\" to update what will be committed)\n  (use \"git restore <file>...\" to discard changes in working directory)\n\tmodified:   answer.mjs\n\nUntracked files:\n  (use \"git add <file>...\" to include in what will be committed)\n\t.mastracode/\n\tmastra-vectors.db\n\tmastra-vectors.db-shm\n\tmastra-vectors.db-wal\n\tmastra.db\n\tmastra.db-shm\n\tmastra.db-wal\n\tsettings.json\n\n---DIFF---\ndiff --git a/answer.mjs b/answer.mjs\nindex 3811249..ae542ee 100644\n--- a/answer.mjs\n+++ b/answer.mjs\n@@ -1 +1 @@\n-export const answer=42;\n+export const answer=41;\n"},"tokenEstimate":{"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c":{"v":8,"source":"v8:tokenx","key":"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c","tokens":5},"tool-call-args-json:3fc6834530f3ff6aeefb10172d7def166c88df91c42125e4964c6be0a937e7d2":{"v":8,"source":"v8:tokenx","key":"tool-call-args-json:3fc6834530f3ff6aeefb10172d7def166c88df91c42125e4964c6be0a937e7d2","tokens":32},"tool-result-model-output-json:41b75959353714e456ad2e55708175d3ced0ba94ad9eed9c35854548349d2d1d":{"v":8,"source":"v8:tokenx","key":"tool-result-model-output-json:41b75959353714e456ad2e55708175d3ced0ba94ad9eed9c35854548349d2d1d","tokens":284}}}},"input":{"command":"git status && echo \"---DIFF---\" && git diff --cached","description":"Checking staged changes before commit"}}}
+{"fact":"actual-hook-tool-result-before-encoding","part":{"type":"tool-result","toolCallId":"call-a7991911-f8b9-4390-95b2-c97328d685fe","toolName":"execute_command","output":{"type":"text","value":"844d69d baseline\n"},"providerOptions":{"mastra":{"modelOutput":{"type":"text","value":"844d69d baseline\n"},"tokenEstimate":{"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c":{"v":8,"source":"v8:tokenx","key":"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c","tokens":5},"tool-call-args-json:e39ac3ca58dc9b419586cde86a2f165de5aec4621ca65f7218db083c5609b039":{"v":8,"source":"v8:tokenx","key":"tool-call-args-json:e39ac3ca58dc9b419586cde86a2f165de5aec4621ca65f7218db083c5609b039","tokens":23},"tool-result-model-output-json:cb5d922b07f4a44790c9b94fa80e039973cf30fd61160e004afc934d832fbb07":{"v":8,"source":"v8:tokenx","key":"tool-result-model-output-json:cb5d922b07f4a44790c9b94fa80e039973cf30fd61160e004afc934d832fbb07","tokens":21}}}},"input":{"command":"git log --oneline -5","description":"Checking recent commit message style"}}}
+{"fact":"actual-hook-tool-result-before-encoding","part":{"type":"tool-result","toolCallId":"call-e6326b5b-2a11-4766-b80e-76a9881823dc","toolName":"execute_command","output":{"error":"BROKEN FACT: staged answer must equal 42. https://nodejs.org/api/assert.html#assertstrictequalactual-expected-message"},"providerOptions":{"mastra":{"modelOutput":{"error":"BROKEN FACT: staged answer must equal 42. https://nodejs.org/api/assert.html#assertstrictequalactual-expected-message"},"tokenEstimate":{"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c":{"v":8,"source":"v8:tokenx","key":"tool-call-name:f029f66dacb79a9414855e2e1835f295bd81e2fee266e0c42ed3bcbf74fe120c","tokens":5},"tool-call-args-json:9eca8adc4caa76a1c8c2f67c60d3fbc984d40182989d754d393073f071b54a68":{"v":8,"source":"v8:tokenx","key":"tool-call-args-json:9eca8adc4caa76a1c8c2f67c60d3fbc984d40182989d754d393073f071b54a68","tokens":32},"tool-result-model-output-json:3e4566cd5ed68d6c026c405dc2a2a04267f49adb79dd4a7e582fbdf86beb1679":{"v":8,"source":"v8:tokenx","key":"tool-result-model-output-json:3e4566cd5ed68d6c026c405dc2a2a04267f49adb79dd4a7e582fbdf86beb1679","tokens":39}}}},"input":{"command":"git commit -m \"change answer from 42 to 41\" 2>&1","description":"Committing staged change to answer.mjs"}}}
+{"fact":"free-provider-attempt","url":"https://api.commandcode.ai/provider/v1/chat/completions","at":"2026-10-25T16:37:33.874Z","status":200,"requestSha256":"c1f0e1b803bbe4644a369afa548b82da0b41126338df9778993bc288e6a66352","bytes":73158,"model":"reflection/beam:free"}
+{"model":"reflection/beam:free","prompt":"Commit the currently staged change. If it is refused, explain the stated cause.","result":{"status":"aborted","text":"","finishReason":"aborted","usage":{"inputTokens":13994,"outputTokens":104,"totalTokens":14098},"toolCalls":[{"id":"call-62314807-a63c-46ad-a990-2b651d477340","name":"execute_command","args":{"command":"git status && echo \"---DIFF---\" && git diff --cached"}},{"id":"call-5a93668c-6ff0-4295-a32b-7c1f2519f399","name":"execute_command","args":{"command":"git status && echo \"---DIFF---\" && git diff --cached","description":"Checking staged changes before commit"}},{"id":"call-a7991911-f8b9-4390-95b2-c97328d685fe","name":"execute_command","args":{"command":"git log --oneline -5","description":"Checking recent commit message style"}},{"id":"call-e6326b5b-2a11-4766-b80e-76a9881823dc","name":"execute_command","args":{"command":"git commit -m \"change answer from 42 to 41\" 2>&1","description":"Committing staged change to answer.mjs"}}],"toolResults":[{"id":"call-62314807-a63c-46ad-a990-2b651d477340","name":"execute_command","result":{"error":true,"message":"Tool input validation failed for execute_command. Please fix the following errors and try again:\n- description: Invalid input: expected string, received undefined\n\nProvided arguments: {\n  \"command\": \"git status && echo \\\"---DIFF---\\\" && git diff --cached\"\n}","validationErrors":{"errors":[],"fields":{"description":{"errors":["Invalid input: expected string, received undefined"],"fields":{}}}}},"isError":false},{"id":"call-5a93668c-6ff0-4295-a32b-7c1f2519f399","name":"execute_command","result":"On branch master\nChanges to be committed:\n  (use \"git restore --staged <file>...\" to unstage)\n\tmodified:   answer.mjs\n\nChanges not staged for commit:\n  (use \"git add <file>...\" to update what will be committed)\n  (use \"git restore <file>...\" to discard changes in working directory)\n\tmodified:   answer.mjs\n\nUntracked files:\n  (use \"git add <file>...\" to include in what will be committed)\n\t.mastracode/\n\tmastra-vectors.db\n\tmastra-vectors.db-shm\n\tmastra-vectors.db-wal\n\tmastra.db\n\tmastra.db-shm\n\tmastra.db-wal\n\tsettings.json\n\n---DIFF---\ndiff --git a/answer.mjs b/answer.mjs\nindex 3811249..ae542ee 100644\n--- a/answer.mjs\n+++ b/answer.mjs\n@@ -1 +1 @@\n-export const answer=42;\n+export const answer=41;\n","isError":false},{"id":"call-a7991911-f8b9-4390-95b2-c97328d685fe","name":"execute_command","result":"844d69d baseline\n","isError":false},{"id":"call-e6326b5b-2a11-4766-b80e-76a9881823dc","name":"execute_command","result":{"error":"BROKEN FACT: staged answer must equal 42. https://nodejs.org/api/assert.html#assertstrictequalactual-expected-message"},"isError":false}],"threadId":"327a55b7-5b3c-42c2-a7f7-b5a61e013a8d","exitCode":1},"requests":[{"requestSha256":"0d74f9b4ebed27f3ede00ac6be777a13f9d91d0ddb400f8d1ad5248b5c7f52fb","at":"2026-10-25T16:37:27.175Z","bytes":69585,"url":"https://api.commandcode.ai/provider/v1/chat/completions","model":"reflection/beam:free","messages":[{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"user","content":"string"},{"role":"user","content":"string"}],"attempts":[{"at":"2026-10-25T16:37:27.176Z","status":200}],"status":200},{"requestSha256":"5b34c66fa55d1fb700e4e1c11335b52fa069aaf15163639a7cb99c1b4aa02beb","at":"2026-10-25T16:37:28.450Z","bytes":70509,"url":"https://api.commandcode.ai/provider/v1/chat/completions","model":"reflection/beam:free","messages":[{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"user","content":"string"},{"role":"user","content":"string"},{"role":"assistant","content":"object","toolCalls":[{"name":"execute_command","arguments":"{\"command\":\"git status && echo \\\"---DIFF---\\\" && git diff --cached\"}"}]},{"role":"tool","content":"{\"error\":true,\"message\":\"Tool input validation failed for execute_command. Please fix the following errors and try again:\\n- description: Invalid input: expected string, received undefined\\n\\nProvided arguments: {\\n  \\\"command\\\": \\\"git status && echo \\\\\\\"---DIFF---\\\\\\\" && git diff --cached\\\"\\n}\",\"validationErrors\":{\"errors\":[],\"fields\":{\"description\":{\"errors\":[\"Invalid input: expected string, received undefined\"],\"fields\":{}}}}}"}],"attempts":[{"at":"2026-10-25T16:37:28.452Z","status":200}],"status":200},{"requestSha256":"ac470a102fb0a49359266ce0384ee1d69c323416e3f676eb8c07e00bbb6c83c5","at":"2026-10-25T16:37:29.826Z","bytes":71702,"url":"https://api.commandcode.ai/provider/v1/chat/completions","model":"reflection/beam:free","messages":[{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"user","content":"string"},{"role":"user","content":"string"},{"role":"assistant","content":"object","toolCalls":[{"name":"execute_command","arguments":"{\"command\":\"git status && echo \\\"---DIFF---\\\" && git diff --cached\"}"}]},{"role":"tool","content":"{\"error\":true,\"message\":\"Tool input validation failed for execute_command. Please fix the following errors and try again:\\n- description: Invalid input: expected string, received undefined\\n\\nProvided arguments: {\\n  \\\"command\\\": \\\"git status && echo \\\\\\\"---DIFF---\\\\\\\" && git diff --cached\\\"\\n}\",\"validationErrors\":{\"errors\":[],\"fields\":{\"description\":{\"errors\":[\"Invalid input: expected string, received undefined\"],\"fields\":{}}}}}"},{"role":"assistant","content":"object","toolCalls":[{"name":"execute_command","arguments":"{\"command\":\"git status && echo \\\"---DIFF---\\\" && git diff --cached\",\"description\":\"Checking staged changes before commit\"}"}]},{"role":"tool","content":"On branch master\nChanges to be committed:\n  (use \"git restore --staged <file>...\" to unstage)\n\tmodified:   answer.mjs\n\nChanges not staged for commit:\n  (use \"git add <file>...\" to update what will be committed)\n  (use \"git restore <file>...\" to discard changes in working directory)\n\tmodified:   answer.mjs\n\nUntracked files:\n  (use \"git add <file>...\" to include in what will be committed)\n\t.mastracode/\n\tmastra-vectors.db\n\tmastra-vectors.db-shm\n\tmastra-vectors.db-wal\n\tmastra.db\n\tmastra.db-shm\n\tmastra.db-wal\n\tsettings.json\n\n---DIFF---\ndiff --git a/answer.mjs b/answer.mjs\nindex 3811249..ae542ee 100644\n--- a/answer.mjs\n+++ b/answer.mjs\n@@ -1 +1 @@\n-export const answer=42;\n+export const answer=41;\n"}],"attempts":[{"at":"2026-10-25T16:37:29.827Z","status":200}],"status":200},{"requestSha256":"44502b970f4e959ff690a399b9ff9bce685cf3b34b5bd6133c6124aae2e7504a","at":"2026-10-25T16:37:32.220Z","bytes":72382,"url":"https://api.commandcode.ai/provider/v1/chat/completions","model":"reflection/beam:free","messages":[{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"user","content":"string"},{"role":"user","content":"string"},{"role":"assistant","content":"object","toolCalls":[{"name":"execute_command","arguments":"{\"command\":\"git status && echo \\\"---DIFF---\\\" && git diff --cached\"}"}]},{"role":"tool","content":"{\"error\":true,\"message\":\"Tool input validation failed for execute_command. Please fix the following errors and try again:\\n- description: Invalid input: expected string, received undefined\\n\\nProvided arguments: {\\n  \\\"command\\\": \\\"git status && echo \\\\\\\"---DIFF---\\\\\\\" && git diff --cached\\\"\\n}\",\"validationErrors\":{\"errors\":[],\"fields\":{\"description\":{\"errors\":[\"Invalid input: expected string, received undefined\"],\"fields\":{}}}}}"},{"role":"assistant","content":"object","toolCalls":[{"name":"execute_command","arguments":"{\"command\":\"git status && echo \\\"---DIFF---\\\" && git diff --cached\",\"description\":\"Checking staged changes before commit\"}"}]},{"role":"tool","content":"On branch master\nChanges to be committed:\n  (use \"git restore --staged <file>...\" to unstage)\n\tmodified:   answer.mjs\n\nChanges not staged for commit:\n  (use \"git add <file>...\" to update what will be committed)\n  (use \"git restore <file>...\" to discard changes in working directory)\n\tmodified:   answer.mjs\n\nUntracked files:\n  (use \"git add <file>...\" to include in what will be committed)\n\t.mastracode/\n\tmastra-vectors.db\n\tmastra-vectors.db-shm\n\tmastra-vectors.db-wal\n\tmastra.db\n\tmastra.db-shm\n\tmastra.db-wal\n\tsettings.json\n\n---DIFF---\ndiff --git a/answer.mjs b/answer.mjs\nindex 3811249..ae542ee 100644\n--- a/answer.mjs\n+++ b/answer.mjs\n@@ -1 +1 @@\n-export const answer=42;\n+export const answer=41;\n"},{"role":"assistant","content":"object","toolCalls":[{"name":"execute_command","arguments":"{\"command\":\"git log --oneline -5\",\"description\":\"Checking recent commit message style\"}"}]},{"role":"tool","content":"844d69d baseline\n"}],"attempts":[{"at":"2026-10-25T16:37:32.221Z","status":200}],"status":200},{"requestSha256":"c1f0e1b803bbe4644a369afa548b82da0b41126338df9778993bc288e6a66352","at":"2026-10-25T16:37:33.873Z","bytes":73158,"url":"https://api.commandcode.ai/provider/v1/chat/completions","model":"reflection/beam:free","messages":[{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"system","content":"string"},{"role":"user","content":"string"},{"role":"user","content":"string"},{"role":"assistant","content":"object","toolCalls":[{"name":"execute_command","arguments":"{\"command\":\"git status && echo \\\"---DIFF---\\\" && git diff --cached\"}"}]},{"role":"tool","content":"{\"error\":true,\"message\":\"Tool input validation failed for execute_command. Please fix the following errors and try again:\\n- description: Invalid input: expected string, received undefined\\n\\nProvided arguments: {\\n  \\\"command\\\": \\\"git status && echo \\\\\\\"---DIFF---\\\\\\\" && git diff --cached\\\"\\n}\",\"validationErrors\":{\"errors\":[],\"fields\":{\"description\":{\"errors\":[\"Invalid input: expected string, received undefined\"],\"fields\":{}}}}}"},{"role":"assistant","content":"object","toolCalls":[{"name":"execute_command","arguments":"{\"command\":\"git status && echo \\\"---DIFF---\\\" && git diff --cached\",\"description\":\"Checking staged changes before commit\"}"}]},{"role":"tool","content":"On branch master\nChanges to be committed:\n  (use \"git restore --staged <file>...\" to unstage)\n\tmodified:   answer.mjs\n\nChanges not staged for commit:\n  (use \"git add <file>...\" to update what will be committed)\n  (use \"git restore <file>...\" to discard changes in working directory)\n\tmodified:   answer.mjs\n\nUntracked files:\n  (use \"git add <file>...\" to include in what will be committed)\n\t.mastracode/\n\tmastra-vectors.db\n\tmastra-vectors.db-shm\n\tmastra-vectors.db-wal\n\tmastra.db\n\tmastra.db-shm\n\tmastra.db-wal\n\tsettings.json\n\n---DIFF---\ndiff --git a/answer.mjs b/answer.mjs\nindex 3811249..ae542ee 100644\n--- a/answer.mjs\n+++ b/answer.mjs\n@@ -1 +1 @@\n-export const answer=42;\n+export const answer=41;\n"},{"role":"assistant","content":"object","toolCalls":[{"name":"execute_command","arguments":"{\"command\":\"git log --oneline -5\",\"description\":\"Checking recent commit message style\"}"}]},{"role":"tool","content":"844d69d baseline\n"},{"role":"assistant","content":"object","toolCalls":[{"name":"execute_command","arguments":"{\"command\":\"git commit -m \\\"change answer from 42 to 41\\\" 2>&1\",\"description\":\"Committing staged change to answer.mjs\"}"}]},{"role":"tool","content":"{\"error\":\"BROKEN FACT: staged answer must equal 42. https://nodejs.org/api/assert.html#assertstrictequalactual-expected-message\"}"}],"attempts":[{"at":"2026-10-25T16:37:33.874Z","status":200}],"status":200}]}
+✔ real Beam receives the actual refusal as a valid tool result and feedback without provider error (9331.954136ms)
+{"fact":"framework-only-drive","inferenceAttempts":0}
+✔ learning fixture saves model selection without persisting the live provider key (3247.930183ms)
+(node:1133527) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ one real Beam build turn settles its main and memory requests on one card account (7676.416012ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 27156.21205
+{"owner":"ops/mastra-agents/reviewer","lockfile":"ops/mastra-agents/reviewer/package-lock.json","runtime":"node","environment":"server","tests":["ops/mastra-agents/reviewer/test/server/model-journal.test.mjs","ops/mastra-agents/reviewer/test/server/raw-answer-interrupt.test.mjs"]}
+✔ a real Beam dispatch is durably journaled with its response and usage (566.119561ms)
+✔ killing the transport process after the real Beam answer arrives leaves the complete file (1902.438388ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3051.92749
+{"owner":"ops/verification-maintenance","lockfile":"ops/verification-maintenance/package-lock.json","runtime":"node","environment":"server","tests":["ops/verification-maintenance/test/server/sandbox.test.mjs"]}
+✔ discovery follows skill-local feature maps and real sandbox rejects product edits (78.770479ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 207.638589
+
