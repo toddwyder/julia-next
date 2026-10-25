@@ -1,10 +1,14 @@
 {
-  "capturedAt": "2026-10-25T12:19:28.433Z",
+  "capturedAt": "2026-10-25T12:58:39.781Z",
+  "status": "interrupted",
+  "interruptedAt": "2026-10-25T12:20:06Z",
+  "interruptedBy": "julia-machine-main.timer -> 5728da28bf1c107165568cddd9a3f30259a5e3f1 (merge of PR #339)",
   "capNano": 10000000000,
   "total": {
-    "requests": 81,
-    "spentNano": 6660613228,
-    "remainingNano": 3339386772,
+    "requests": 87,
+    "spentNano": 6663040330,
+    "heldNano": 78061200,
+    "remainingNano": 3336959670,
     "stopped": false
   },
   "runs": {
@@ -31,9 +35,9 @@
       }
     },
     "currentRun": {
-      "requests": 73,
-      "spentNano": 5436761228,
-      "note": "running at capture; settled actual spend gates the $10 cap",
+      "requests": 79,
+      "spentNano": 5439188330,
+      "note": "interrupted by the machine updater at 2026-10-25T12:20:06Z; settled actual spend gates the $10 cap",
       "models": {
         "anthropic/claude-opus-5-5": {
           "requests": 40,
@@ -44,8 +48,8 @@
           "costNano": 11134160
         },
         "commandcode/deepseek/deepseek-v4.1-flash": {
-          "requests": 30,
-          "costNano": 19951068
+          "requests": 36,
+          "costNano": 22378170
         }
       }
     }
@@ -55,6 +59,6 @@
     "Architect design panel candidate": "anthropic/claude-haiku-5-5 and commandcode/deepseek/deepseek-v4.1-flash",
     "Delegated coding and swarm work": "commandcode/deepseek/deepseek-v4.1-flash"
   },
-  "inFlight": 0,
+  "inFlight": 1,
   "ledgerRole": "orchestrator (the adapter opens one role for the whole session; the model identifies the task kind)"
 }

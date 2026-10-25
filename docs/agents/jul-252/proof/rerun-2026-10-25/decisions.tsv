@@ -1,0 +1,7 @@
+time	decision	why	evidence	result
+1	Playbook is Feature	New behavior in the build runner: review stage, verdicts, remediation, investigation, playbook guard	card JUL-252; poteto-mode Playbooks list	adopted
+2	Sol's plan file names replaced	No card-flow.* or settings.* state machine exists; the runner is jobs.mjs spawning worker.mjs per card	ls ops/build-runner	new files evidence-review.mjs, card-flow.mjs, playbook-guard.mjs, flow.mjs under ops/build-runner
+3	Reviewer chosen per card by company, not fixed	path-forward says "a model from a different company than the builder"; catalogue entries carry company; this card's builders are Anthropic and DeepSeek	catalogue.mjs modelCompany; machine-settings.json roles	reviewer list in machine-settings, first whose company differs from orchestrator, coder and every helper
+4	Proof folder is docs/agents/<card id lowercased>/ read from the candidate commit with git	path-forward 24 Oct: reviewer reads the proof folder for the exact candidate commit; missing proof is a failed criterion	path-forward.md Evidence check	reviewer input is criteria plus those files only
+5	No new SDK learning test	The reviewer runs through the existing openRunner adapter and stock Mastra Code SDK already covered by framework learning tests; no new framework is installed	ops/build-runner/framework/@mastra	skip Sol plan step 3
+6	Publishing out of scope	Host owns PRs, remotes and credentials	harness mapping	Opening a PR marked out of scope

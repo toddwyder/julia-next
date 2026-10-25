@@ -20,14 +20,18 @@ const first = rows.slice(0, 1)
 const second = rows.slice(1, 8)
 const current = rows.slice(8)
 const stopped = Boolean(db.prepare("select 1 from stops where card = 'JUL-252'").get())
+const heldNano = rows.reduce((sum, row) => sum + (row.state === 'reserved' || row.state === 'unknown' ? row.maximum_nano - (row.cost_nano ?? 0) : 0), 0)
 const snapshot = {
   capturedAt: new Date().toISOString(),
+  status: 'interrupted',
+  interruptedAt: '2026-10-25T12:20:06Z',
+  interruptedBy: 'julia-machine-main.timer -> 5728da28bf1c107165568cddd9a3f30259a5e3f1 (merge of PR #339)',
   capNano,
-  total: { requests: rows.length, spentNano: total(rows), remainingNano: capNano - total(rows), stopped },
+  total: { requests: rows.length, spentNano: total(rows), heldNano, remainingNano: capNano - total(rows), stopped },
   runs: {
     firstFailedRun: { requests: first.length, spentNano: total(first), note: 'plan only; the build request was refused by the old worst-case reservation', models: group(first) },
     secondFailedRun: { requests: second.length, spentNano: total(second), note: 'plan plus six build turns; the next worst-case reservation exceeded the old $2 remainder before the checklist', models: group(second) },
-    currentRun: { requests: current.length, spentNano: total(current), note: 'running at capture; settled actual spend gates the $10 cap', models: group(current) },
+    currentRun: { requests: current.length, spentNano: total(current), note: 'interrupted by the machine updater at 2026-10-25T12:20:06Z; settled actual spend gates the $10 cap', models: group(current) },
   },
   taskKinds: {
     'Main session, how, architecture synthesis, throughput checkpoint and orchestration': 'anthropic/claude-opus-5-5',
