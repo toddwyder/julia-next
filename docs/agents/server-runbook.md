@@ -20,6 +20,8 @@ The wrapper reads `/home/ubuntu/.config/julia-agents/service-account-token`, cle
 
 Installation details and unit names live in [the systemd README](../../ops/build-runner/systemd/README.md). The committed installers and service configuration own checkout paths. Permanent prerequisites live in [permanent-machine-parts.json](permanent-machine-parts.json).
 
+The server-tests worker needs Bun 1.4.4 on its service PATH (`~/.local/bin/bun`) because `test-owners.mjs --install` installs the poteto-mode scripts owner from its `bun.lock`. Without it, the server receipt fails before any test runs.
+
 ## Model connections and card accounts
 
 Use `ops/build-runner/connections.mjs` with `ops/build-runner/machine-settings.json` for stock subscription sign-ins. Todd completes only the account approval. Access and refresh tokens never enter reports or repository files.
