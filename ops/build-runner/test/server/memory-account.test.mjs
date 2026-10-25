@@ -52,7 +52,7 @@ test('one real Beam build turn settles its main and memory requests on one card 
     assert.equal(observed.observed, true, 'the real observation must reach the Beam model')
     const memoryIds = new Set(runner.snapshot().requests.map(request => request.id))
 
-    const receipt = await runner.run({ threadId: thread.id, prompt: 'Reply with BUILD_OK only. Do not use tools.' })
+    const receipt = await runner.run({ threadId: thread.id, prompt: 'Reply with BUILD_OK only. Do not use tools.', maxTurns: 100, inactivityMs: 600000 })
     assert.equal(receipt.result.status, 'completed')
     await runner.runtime.memory.settled()
 

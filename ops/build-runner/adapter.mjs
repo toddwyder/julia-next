@@ -118,13 +118,14 @@ export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'bu
   let workspace
   const providedSubagents = (subagents ?? helpers ?? helperDefinitions ?? subagentDefinitions) ?? []
   try {
-    const [{ bootLocalAgentController, runMC }, { setCredentialStoreProvider }, { setCustomProvidersSource }, { AuthStorage }, { loadSettings, saveSettings }, { Workspace, LocalFilesystem, LocalSandbox, createWorkspaceTools }] = await Promise.all([
+    const [{ bootLocalAgentController, runMC }, { setCredentialStoreProvider }, { setCustomProvidersSource }, { AuthStorage }, { loadSettings, saveSettings }, { Workspace, LocalFilesystem, LocalSandbox, createWorkspaceTools }, { RequestContext }] = await Promise.all([
       import('@mastra/code-sdk'),
       import('@mastra/code-sdk/agents/credential-resolver'),
       import('@mastra/code-sdk/agents/custom-provider-source'),
       import('@mastra/code-sdk/auth/storage'),
       import('@mastra/code-sdk/onboarding/settings'),
       import('@mastra/core/workspace'),
+      import('@mastra/core/request-context'),
     ])
     const auth = new AuthStorage(authPath)
     auth.allowEnvironmentFallback = false
@@ -173,7 +174,11 @@ export async function openRunner({ card, settingsPath, cwd, stateDir, role = 'bu
     return {
       snapshot: () => ledger.snapshot(),
       execute: async command => tools.execute_command.execute({ command }, {}),
-      memory: async () => runtime.memory,
+      memory: async () => {
+        const requestContext = new RequestContext()
+        requestContext.set('controller', { session: { modelId: runtime.session.model.get() }, state: runtime.session.state.get(), getState: () => runtime.session.state.get(), threadId: runtime.session.thread.requireId() })
+        return typeof runtime.memory === 'function' ? runtime.memory({ requestContext }) : runtime.memory
+      },
       skills: workspace.skills,
       availableSkills,
       runtime,
