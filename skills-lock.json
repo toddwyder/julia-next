@@ -29,13 +29,6 @@
       "skillPath": "skills/engineering/codebase-design/SKILL.md",
       "computedHash": "fb1d8ab98ad151551eeade003e3ae55a46578a380fd9fc3ed4dbf9c2fbce0a9f"
     },
-    "diagnosing-bugs": {
-      "source": "mattpocock/skills",
-      "sourceType": "github",
-      "ref": "v1.3.1",
-      "skillPath": "skills/engineering/diagnosing-bugs/SKILL.md",
-      "computedHash": "ed5cbc42b8ef8313ddd3d284b6a17e6c18137512aa382ad720b3dcd48316d789"
-    },
     "domain-modeling": {
       "source": "mattpocock/skills",
       "sourceType": "github",

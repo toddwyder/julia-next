@@ -32,7 +32,8 @@ test('agent instructions use the trial rulebook and the runbook marks Factory re
   assert.doesNotMatch(runbook, /Tick as you go|Finish the card/);
   const trial = read('AGENTS.md');
   assert.match(trial, /poteto-mode skill/);
-  assert.match(trial, /one \$2 total model budget/);
+  assert.match(trial, /one \$10 total model budget/);
+  assert.match(trial, /settled actual usage/);
   assert.doesNotMatch(trial, /Spending is \$0|cost readback above \$0 stops/);
   assert.match(trial, /Linear holds cards and requirements\. GitHub holds code/);
   assert.match(trial, /node scripts\/julia-agents\.mjs/);
@@ -64,12 +65,15 @@ test('retired skills stay retired and pstack owns tdd and teach', () => {
   assert.equal(existsSync(new URL('../.claude/skills/pre-plan/SKILL.md', import.meta.url)), false);
   assert.equal(existsSync(new URL('../.claude/skills/tdd/SKILL.md', import.meta.url)), false);
   assert.equal(existsSync(new URL('../.claude/skills/teach/SKILL.md', import.meta.url)), false);
+  assert.equal(existsSync(new URL('../.claude/skills/diagnosing-bugs/SKILL.md', import.meta.url)), false);
   assert.ok(existsSync(new URL('../.agents/skills/tdd/SKILL.md', import.meta.url)));
   assert.ok(existsSync(new URL('../.agents/skills/teach/SKILL.md', import.meta.url)));
+  assert.ok(existsSync(new URL('../.agents/skills/poteto-mode/playbooks/bug-fix.md', import.meta.url)));
   const locked = JSON.parse(read('skills-lock.json')).skills;
   assert.equal(locked['pre-plan'], undefined);
   assert.equal(locked.tdd, undefined);
   assert.equal(locked.teach, undefined);
+  assert.equal(locked['diagnosing-bugs'], undefined);
 });
 
 test('Todd\'s 19 October process vocabulary and restart stop are explicit', () => {

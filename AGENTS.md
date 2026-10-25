@@ -6,7 +6,7 @@ Julia uses the pstack way of working, adopted 22 October 2026 and kept after the
 - Build with the poteto-mode skill and follow it as written.
 - Todd's agreed delivery flow, decisions and order of work: [docs/plans/path-forward.md](docs/plans/path-forward.md).
 - Fix every correction as high in [the inverse pyramid](docs/principles/inverse-pyramid.md) as it will go; a written rule is the last resort.
-- Every card has one $2 total model budget across all roles, retries and runs. Count subscriptions at published API prices too. Prices, sources and request bounds live in the runner settings. Refuse unpriced or unbounded requests before dispatch. See [docs/adr/0022-subscriptions-and-card-cap.md](docs/adr/0022-subscriptions-and-card-cap.md).
+- Every card has one $10 total model budget across all roles, retries and runs, counted from settled actual usage at published API prices. Count subscriptions at published API prices too. Prices, sources and request bounds live in the runner settings. Refuse unpriced or unbounded requests before dispatch. The card stops once settled spend exceeds the cap. See [docs/adr/0023-actual-spend-card-cap.md](docs/adr/0023-actual-spend-card-cap.md).
 - Framework facts come from the installed packages, their version-matched official docs, and the learning tests under ops/build-runner/framework/. The learning tests stay green.
 - Commit and push as you go. The poteto-mode todo list and show-me-your-work decision log are committed under docs/agents/<card>/.
 - Publish with gh using the ordinary signed-in GitHub access.

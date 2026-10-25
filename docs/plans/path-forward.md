@@ -92,14 +92,14 @@ Working document. Each line is a decision Todd agreed in conversation.
 ## Models and money (12:23)
 - Connect the **ChatGPT plan** and the **Claude subscription**, all models, through Mastra Code's stock sign-ins (alongside CommandCode). The Claude decision is recorded as an ADR citing Anthropic's 7 Oct help article and Mastra's configuration page; settled, not reopened.
 - **Retire the $0 trial rule.** Every model is counted at its published API price (subscriptions included, though they aren't billed); every model needs a price and bounds or it's refused.
-- **Cap: $2 per card** (Todd, 12:23), raised from $1 to avoid stopping the first real cards. Measured floor: the one-line practice card took 54 requests (~130k fresh input, 13k output, 1.8M cache reads), about $0.06 at DeepSeek prices. Sol's API price isn't recorded yet. **Review the cap after the next real card** with its actual numbers.
+- **Cap: $10 per card, counted from settled actual usage** (Todd, 25 Oct, [ADR 0023](../adr/0023-actual-spend-card-cap.md)). The pre-request worst-case reservation no longer gates dispatch; the card stops once settled spend exceeds the cap. The earlier $2 cap was raised from $1 on 23 Oct to avoid stopping the first real cards. The JUL-252 rerun measured $1.223852 after eight Opus requests before its reservation gate stopped it, which is the measured floor this review used.
 - **Model split:** Sol for the main session and hardest work; DeepSeek for everyday coding and swarm workers; panels one Sol + one DeepSeek; Beam for free machinery checks. The evidence review runs on a different company's model than the builder (Claude makes that possible on every card).
 
 ## Retro fixes from JUL-231
 The agreed fixes from the JUL-231 retro are folded into the cards below.
 
 ## Order of work (agreed 12:24)
-1. Models and money: both subscriptions, $2 cap, Sol's price recorded, $0 rule retired, Claude ADR.
+1. Models and money: both subscriptions, $10 actual-spend cap, Sol's price recorded, $0 rule retired, Claude ADR.
 2. Live view: the dashboard shows the running build’s pstack checklist, ticking off steps as they finish.
 3. Deployment safety: dropped (Todd, 24 Oct). The updater as sole service starter, its ownership of the Tailscale route, its test and its proofs are not built. Stale live-state descriptions are removed from the setup notes as part of the clean-up.
 4. Clean-up: one pull request, no card (Todd, 24 Oct). Settled scope: the no-fakes CI check; the four writing-for-agents rules as one script, run by triage before showing Todd a brief; removal of live server-state descriptions from the setup notes; confirmation that Start's admission check accepts the current triage card shape by running it on JUL-263; this plan update. Cut: the pstack folder move, the framework-lint fix and the Code review column removal. GitHub merge protection moves to card 8.

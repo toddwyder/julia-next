@@ -40,10 +40,6 @@ const cases = [
     edits: [edit(transport, 'inputBound = units * estimate.multiplier + estimate.framingTokens;', 'inputBound = units;')],
   },
   {
-    id: 'local-estimate-overrun-ignored', file: 'transport', test: 'a provider input count above the local estimate settles actual cost and stops later work',
-    edits: [edit(transport, 'spec.inputTokenEstimate && inputTokens > inputBound', 'false')],
-  },
-  {
     id: 'stock-sse-without-content-type-not-parsed', file: 'transport', test: 'a stock Codex stream without a content-type header settles its completed usage',
     edits: [edit(transport, "response.headers.get('content-type') ?? (bounded.stream ? 'text/event-stream' : '')", "response.headers.get('content-type') ?? ''")],
   },
@@ -84,19 +80,12 @@ const cases = [
     edits: [edit(ledger, "integer(maximumNano, 'maximumNano');", 'maximumNano = 0;')],
   },
   {
-    id: 'concurrent-admission-checks-removed', file: 'ledger', test: 'separate processes cannot jointly reserve beyond the ceiling',
-    edits: [
-      edit(ledger, "if (maximumNano > 0 && snapshot.pricedBlocked) throw new Error('Priced requests blocked by unresolved accounting');", ''),
-      edit(ledger, 'BigInt(snapshot.spentNano) + BigInt(snapshot.heldNano) + BigInt(maximumNano) > BigInt(CEILING_NANO)', 'false'),
-    ],
-  },
-  {
     id: 'connection-failure-not-marked-unknown', file: 'transport', test: 'connection failure after arrival retains the paid reservation',
     edits: [edit(transport, "if (!settled) await ledgerCall('unknown', id, 'Request outcome unavailable');", '')],
   },
   {
-    id: 'card-ceiling-removed', file: 'ledger', test: 'all roles share the two-dollar card ceiling across reopen and settle once',
-    edits: [edit(ledger, 'BigInt(snapshot.spentNano) + BigInt(snapshot.heldNano) + BigInt(maximumNano) > BigInt(CEILING_NANO)', 'false')],
+    id: 'card-ceiling-removed', file: 'ledger', test: 'the card stops only when settled actual spend exceeds the ten-dollar ceiling',
+    edits: [edit(ledger, "if (BigInt(spent) > BigInt(CEILING_NANO)) this.stop('Card cost ceiling exceeded');", 'void spent;')],
   },
   {
     id: 'unresolved-priced-block-removed', file: 'ledger', test: 'free requests remain usable without usage when priced accounting is unknown',
@@ -119,20 +108,12 @@ const cases = [
     edits: [edit(ledger, "if (current.maximumNano > 0 && (usage === undefined || usage === null)) throw new Error('Priced settlement requires usage');", '')],
   },
   {
-    id: 'settlement-idempotency-check-removed', file: 'ledger', test: 'all roles share the two-dollar card ceiling across reopen and settle once',
+    id: 'settlement-idempotency-check-removed', file: 'ledger', test: 'all roles share the ten-dollar card ceiling across reopen and settle once',
     edits: [edit(ledger, 'current.costNano !== costNano || !isDeepStrictEqual(current.usage, usageJson === null ? null : JSON.parse(usageJson))', 'false')],
-  },
-  {
-    id: 'overrun-block-removed', file: 'ledger', test: 'actual cost above a reservation is durable and blocks priced work',
-    edits: [edit(ledger, 'const failure = costNano > current.maximumNano;', 'const failure = false;')],
   },
   {
     id: 'unpriced-model-defaulted-to-free', file: 'transport', test: 'wrong model, endpoint, missing prices and bounds send nothing',
     edits: [edit(transport, 'const prices = [spec.price, ...tiers.map(tier => tier.price)];', 'spec.price ??= Object.fromEntries(categories.map(key => [key, 0])); const prices = [spec.price, ...tiers.map(tier => tier.price)];')],
-  },
-  {
-    id: 'ceiling-http-dispatch-allowed', file: 'transport', test: 'card ceiling refuses an oversized reservation before HTTP',
-    edits: [edit(ledger, 'BigInt(snapshot.spentNano) + BigInt(snapshot.heldNano) + BigInt(maximumNano) > BigInt(CEILING_NANO)', 'false')],
   },
   {
     id: 'http-attempt-identifier-reused', file: 'transport', test: 'separate HTTP attempts create separate durable records',
@@ -158,12 +139,8 @@ const cases = [
     ],
   },
   {
-    id: 'reported-cost-not-counted', file: 'transport', test: 'provider cost above a configured free reservation is recorded and stops its card',
+    id: 'reported-cost-not-counted', file: 'transport', test: 'provider cost above a free reservation settles and continues under the ten-dollar ceiling',
     edits: [edit(transport, 'reportedNano);', '0);')],
-  },
-  {
-    id: 'over-reservation-stop-not-persisted', file: 'transport', test: 'provider cost above a configured free reservation is recorded and stops its card',
-    edits: [edit(transport, "await ledgerCall('stop', 'Request cost exceeds configured reservation');", '')],
   },
   {
     id: 'stop-marker-not-persisted', file: 'review-regressions', test: 'review durable stop survives reopen and blocks free and paid routes only for its card',
@@ -178,13 +155,10 @@ const cases = [
     edits: [edit(transport, "if ((await ledgerCall('snapshot')).stopped) throw fail('STOP WORK: card account is stopped');", '')],
   },
   {
-    id: 'known-overbound-usage-not-recorded', file: 'review-regressions', test: 'review oversized known usage records actual cost and refuses result',
+    id: 'known-overbound-usage-not-recorded', file: 'review-regressions', test: 'review known usage above the recorded maximum is recorded and the result is accepted',
     edits: [edit(transport, "await ledgerCall('settle', id, { usage: usage ?? null, costNano });", '')],
   },
-  {
-    id: 'known-overbound-result-accepted', file: 'review-regressions', test: 'review oversized known usage records actual cost and refuses result',
-    edits: [edit(transport, 'if (costNano > maximumNano) {', 'if (false) {')],
-  },
+
   {
     id: 'cached-input-double-counted', file: 'transport', test: 'chat JSON settles cache categories once',
     edits: [edit(transport, 'input: raw.prompt_tokens - cached,', 'input: raw.prompt_tokens,')],
