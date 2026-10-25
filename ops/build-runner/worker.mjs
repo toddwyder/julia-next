@@ -77,6 +77,10 @@ async function main() {
   const catalogue = await loadCatalogue({ settingsPath: settingsPathValue })
   const settings = hydrateSettings(JSON.parse(await readFile(settingsPathValue, 'utf8')), catalogue)
   settings.ledgerPath ??= join(dirname(jobDir), 'cards.sqlite')
+  const signInFor = { claude: 'anthropic', 'openai-codex': 'openai-codex', commandcode: 'commandcode' }
+  for (const spec of Object.values(settings.models)) {
+    if (catalogue.connected?.[signInFor[spec.route]] === false) spec.unavailable ??= 'provider not signed in'
+  }
   const pstackModels = await readFile(new URL('./pstack-models.md', import.meta.url), 'utf8')
   const session = createPstackSession(settings, { ...snapshot, machineryProof: job.machineryProof === true || snapshot.machineryProof }, pstackModels)
   const { orchestratorModel, coderModel, helpers, hostInstructions, prompt } = session
@@ -125,8 +129,8 @@ async function main() {
   const allowedEventTypes = new Set(['subagent_start', 'subagent_end', 'subagent_tool_start', 'subagent_tool_end', 'tool_start', 'tool_end', 'agent_start', 'agent_end', 'error', 'task_updated', 'state_changed', 'message_end'])
   const criteria = parseCriteria(card)
 
-  async function runStage({ role, cwd, settingsPath, stateDir: stageStateDir, hostInstructions: stageInstructions, prompt: stagePrompt }) {
-    const stageRunner = await openRunner({ card: cardId, settingsPath, cwd, stateDir: stageStateDir, role, hostInstructions: stageInstructions, subagents: helpers })
+  async function runStage({ role, cwd, settingsPath, stateDir: stageStateDir, hostInstructions: stageInstructions, prompt: stagePrompt, subagents = helpers }) {
+    const stageRunner = await openRunner({ card: cardId, settingsPath, cwd, stateDir: stageStateDir, role, hostInstructions: stageInstructions, subagents })
     globalThis.fetch = observeRequests(globalThis.fetch, requests)
     const unsubscribe = stageRunner.runtime.session.subscribe(e => { if (allowedEventTypes.has(e?.type)) events.push(e) })
     try {
@@ -191,6 +195,7 @@ async function main() {
       stateDir: join(reviewDir, 'state'),
       hostInstructions: await readFile(join(job.worktree, REVIEW_SKILL), 'utf8'),
       prompt: reviewPrompt({ card, criteria, round }),
+      subagents: [],
     })
     const raw = await readOptional(join(tree, '.builder-home', 'review', 'verdicts.json'))
     const outcome = parseVerdicts({ raw, criteria, proofFileExists: path => { try { return statSync(join(tree, path)).isFile() } catch { return false } } })
