@@ -18,39 +18,33 @@ A saved build is checked against the card's acceptance criteria by a model from 
 - Every build and remediation run records the playbook it must follow. A build follows the playbook it declares; the first remediation follows Bug fix; the second follows Investigation.
 - The machine saves no result for a build or remediation run whose checklist does not follow its required playbook.
 - The review, the fix run and the Investigation draw on the same $2 card account as the build.
-- After five reviewed cards, the review record shows what was caught, what was noise, and what the reviews cost.
 
 ## Contracts
 
 - The evidence reviewer is a settings role with its own priced and bounded model. Its model entry carries the company used for the independence check.
 - A build or remediation run record carries its required playbook and its checklist.
 - A build result carries the proof folder path for its candidate commit.
-- A review result carries the review round, the reviewer model and company, and one verdict per acceptance criterion, each with the proof file it cites.
+- Each review result is saved with the card's run record and carries the review round, the reviewer model and company, and one verdict per acceptance criterion, each with the proof file it cites.
 - The reviewer's input is the acceptance criteria and the files in the recorded proof folder.
 - The board uses Evidence review for the review and Remediation for a sent-back card.
 
 ## Acceptance criteria
 
 1. A saved build result starts an evidence review automatically.
-2. Every real-card review runs on a model whose company differs from the builder's company.
+2. Every real-card review runs on a model whose company differs from the builder's company, and the machine refuses a review whose model company matches the builder's.
 3. The review result gives each acceptance criterion one verdict of proven, not proven or wrong thing tested, with the proof file named beside it.
 4. A first failed review moves the card to Remediation and starts a fix run that follows the Bug fix playbook from the failing findings.
 5. A second failed review starts a read-only Investigation run, and the card then stops with the root cause and a restart plan.
 6. Each card receives at most two evidence reviews.
 7. A build or remediation run result is accepted with a checklist that follows the playbook required for that run, and refused when its checklist follows a different playbook.
-8. The machine refuses a review whose model company matches the builder's company.
-9. The review, the fix run and the Investigation show on the same $2 card account as the build.
-10. After five reviewed cards, a report shows what the reviews caught, what was noise, and what they cost.
+8. The review, the fix run and the Investigation show on the same $2 card account as the build.
 
 ## Proof
 
-- A practice build on the server whose saved result starts an evidence review, with the saved review result and its cited proof files read back.
-- A planted failed review that moves the card to Remediation and starts a Bug fix run from the findings, with the run's checklist and saved result read back.
-- A planted second failed review that starts an Investigation run and then stops the card, with the stop notice carrying the root cause and restart plan.
+- A Beam practice card with an acceptance criterion its build cannot prove. Its real evidence review fails, the real Bug fix run starts from the findings, and the second real failure runs Investigation and stops the card. The saved run files and review results are read back.
 - A planted checklist for a different playbook, showing the run refused with no saved result.
 - A planted reviewer from the builder's company, showing the review refused before dispatch.
 - A readback of the card account showing build, review and remediation spending on the same card.
-- The five-card report is due after five real cards have been reviewed and is recorded as Todd's later decision.
 
 ## Out of scope
 

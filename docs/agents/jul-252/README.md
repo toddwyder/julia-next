@@ -28,6 +28,8 @@ Todd settled the review's inputs and failure handling on 24 October. The card wa
 - First failed review: the card moves to Remediation and a fix starts automatically on the Bug fix playbook from the review's findings.
 - Second failed review: an Investigation run reports the root cause, then the card stops.
 - Every build and remediation run records its required playbook (build: the playbook it declares; first remediation: Bug fix; second: Investigation). The machine saves no result for a run whose checklist follows a different playbook.
-- The five-card checkpoint stays.
+- The five-card checkpoint stays as Todd's later decision over the saved review results. The card delivers no report.
 
-Maker self-check: live Linear readback in evidence/2026-10-24-triage/readback.json confirms the title, labels, status and comment. The description matches card-brief.md after Linear's Markdown normalisation of bullet markers and ordered-list indentation. The review implementation does not exist yet: ops/build-runner/worker.mjs ends at ready-for-review, and ops/build-runner/pstack-session.mjs checks that a checklist exists, not that it follows a playbook.
+Todd revised the brief in the same session: criteria 2 and 8 are one criterion, criterion 10 and its report are removed, and proof uses a real failing Beam practice card. The playbook-mismatch and same-company refusals stay as planted checks.
+
+Maker self-check: live Linear readback in evidence/2026-10-24-triage/readback.json confirms the title, labels, status and comments. The description matches card-brief.md after Linear's Markdown normalisation of bullet markers and ordered-list indentation. `card-admission-check.ts JUL-252` reports admitted true with no issues, recorded in evidence/2026-10-24-triage/brief-check.json. The review implementation does not exist yet: ops/build-runner/worker.mjs ends at ready-for-review, and ops/build-runner/pstack-session.mjs checks that a checklist exists, not that it follows a playbook.
