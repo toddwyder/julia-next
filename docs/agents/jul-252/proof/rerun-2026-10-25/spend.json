@@ -1,0 +1,60 @@
+{
+  "capturedAt": "2026-10-25T12:19:28.433Z",
+  "capNano": 10000000000,
+  "total": {
+    "requests": 81,
+    "spentNano": 6660613228,
+    "remainingNano": 3339386772,
+    "stopped": false
+  },
+  "runs": {
+    "firstFailedRun": {
+      "requests": 1,
+      "spentNano": 140036000,
+      "note": "plan only; the build request was refused by the old worst-case reservation",
+      "models": {
+        "anthropic/claude-opus-5-5": {
+          "requests": 1,
+          "costNano": 140036000
+        }
+      }
+    },
+    "secondFailedRun": {
+      "requests": 7,
+      "spentNano": 1083816000,
+      "note": "plan plus six build turns; the next worst-case reservation exceeded the old $2 remainder before the checklist",
+      "models": {
+        "anthropic/claude-opus-5-5": {
+          "requests": 7,
+          "costNano": 1083816000
+        }
+      }
+    },
+    "currentRun": {
+      "requests": 73,
+      "spentNano": 5436761228,
+      "note": "running at capture; settled actual spend gates the $10 cap",
+      "models": {
+        "anthropic/claude-opus-5-5": {
+          "requests": 40,
+          "costNano": 5405676000
+        },
+        "anthropic/claude-haiku-5-5": {
+          "requests": 3,
+          "costNano": 11134160
+        },
+        "commandcode/deepseek/deepseek-v4.1-flash": {
+          "requests": 30,
+          "costNano": 19951068
+        }
+      }
+    }
+  },
+  "taskKinds": {
+    "Main session, how, architecture synthesis, throughput checkpoint and orchestration": "anthropic/claude-opus-5-5",
+    "Architect design panel candidate": "anthropic/claude-haiku-5-5 and commandcode/deepseek/deepseek-v4.1-flash",
+    "Delegated coding and swarm work": "commandcode/deepseek/deepseek-v4.1-flash"
+  },
+  "inFlight": 0,
+  "ledgerRole": "orchestrator (the adapter opens one role for the whole session; the model identifies the task kind)"
+}

@@ -1,0 +1,132 @@
+{
+  "url": "https://ovh.tail91f394.ts.net/julia-control",
+  "capturedAt": "2026-10-25T12:11:21.862Z",
+  "card": "JUL-252 — Evidence review",
+  "orchestrator": "Claude subscription · Claude Opus 5.5 (Anthropic)",
+  "coder": "CommandCode · DeepSeek V4.1 Flash (latest) (DeepSeek)",
+  "runId": "jul-252-04db241d9dbeda4fc7d58701cd7b66d2",
+  "heading": "JUL-252 · running",
+  "finished": true,
+  "checklist": {
+    "summary": "1 finished, 1 skipped, 11 pending",
+    "items": [
+      {
+        "status": "finished",
+        "text": "✓1. `how` over the affected subsystem. done: read worker.mjs, jobs.mjs, pstack-session.mjs, builder-boundary.mjs, catalogue.mjs (company field), scripts/linear-cli.mjs, scripts/check-no-fakes.mjs, path-forward.md evidence-check and failures sections."
+      },
+      {
+        "status": "pending",
+        "text": "○2. `architect` for parallel design exploration."
+      },
+      {
+        "status": "pending",
+        "text": "○3. Write the throughput checkpoint as four todo items."
+      },
+      {
+        "status": "pending",
+        "text": "○Blocking first steps."
+      },
+      {
+        "status": "pending",
+        "text": "○Independent workstreams."
+      },
+      {
+        "status": "pending",
+        "text": "○Shared mutable state."
+      },
+      {
+        "status": "pending",
+        "text": "○Smallest safe decomposition."
+      },
+      {
+        "status": "pending",
+        "text": "○4. Delegate code-writing to a subagent using your configured feature model."
+      },
+      {
+        "status": "pending",
+        "text": "○5. Verify on the matching surface."
+      },
+      {
+        "status": "pending",
+        "text": "○6. Rebase into small, ordered commits. Stack follow-ups."
+      },
+      {
+        "status": "pending",
+        "text": "○7. If the design is contested, `interrogate` before shipping."
+      },
+      {
+        "status": "skipped",
+        "text": "–8. Run **Opening a PR**. skip: out of scope, the host owns publishing the parent PR.skipped"
+      },
+      {
+        "status": "pending",
+        "text": "○Panel review of actual changed files by anthropic/claude-haiku-5-5 and commandcode/deepseek/deepseek-v4.1-flash."
+      }
+    ]
+  },
+  "snapshots": [
+    {
+      "at": "2026-10-25T12:11:21.304Z",
+      "elapsedMs": 174165,
+      "summary": "1 finished, 1 skipped, 11 pending",
+      "items": [
+        {
+          "status": "finished",
+          "text": "✓1. `how` over the affected subsystem. done: read worker.mjs, jobs.mjs, pstack-session.mjs, builder-boundary.mjs, catalogue.mjs (company field), scripts/linear-cli.mjs, scripts/check-no-fakes.mjs, path-forward.md evidence-check and failures sections."
+        },
+        {
+          "status": "pending",
+          "text": "○2. `architect` for parallel design exploration."
+        },
+        {
+          "status": "pending",
+          "text": "○3. Write the throughput checkpoint as four todo items."
+        },
+        {
+          "status": "pending",
+          "text": "○Blocking first steps."
+        },
+        {
+          "status": "pending",
+          "text": "○Independent workstreams."
+        },
+        {
+          "status": "pending",
+          "text": "○Shared mutable state."
+        },
+        {
+          "status": "pending",
+          "text": "○Smallest safe decomposition."
+        },
+        {
+          "status": "pending",
+          "text": "○4. Delegate code-writing to a subagent using your configured feature model."
+        },
+        {
+          "status": "pending",
+          "text": "○5. Verify on the matching surface."
+        },
+        {
+          "status": "pending",
+          "text": "○6. Rebase into small, ordered commits. Stack follow-ups."
+        },
+        {
+          "status": "pending",
+          "text": "○7. If the design is contested, `interrogate` before shipping."
+        },
+        {
+          "status": "skipped",
+          "text": "–8. Run **Opening a PR**. skip: out of scope, the host owns publishing the parent PR.skipped"
+        },
+        {
+          "status": "pending",
+          "text": "○Panel review of actual changed files by anthropic/claude-haiku-5-5 and commandcode/deepseek/deepseek-v4.1-flash."
+        }
+      ]
+    }
+  ],
+  "firstScreenshot": "docs/agents/jul-252/proof/rerun-2026-10-25/dashboard-jul-252-checklist-first.png",
+  "screenshot": "docs/agents/jul-252/proof/rerun-2026-10-25/dashboard-jul-252-running.png",
+  "cardScreenshot": "docs/agents/jul-252/proof/rerun-2026-10-25/jul-252-build-card.png",
+  "consoleErrors": []
+}

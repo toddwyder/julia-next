@@ -1,0 +1,66 @@
+{
+  "capturedAt": "2026-10-25T12:16:27.976Z",
+  "heading": "JUL-252 · running",
+  "summary": "7 finished, 1 skipped, 6 pending",
+  "items": [
+    {
+      "status": "finished",
+      "text": "✓1. `how` over the affected subsystem. done: read worker.mjs, jobs.mjs, adapter.mjs, pstack-session.mjs, builder-boundary.mjs, catalogue.mjs (company field), build-client.ts, control-page.ts, scripts/linear-cli.mjs, scripts/check-no-fakes.mjs, path-forward.md evidence-check and failures sections."
+    },
+    {
+      "status": "finished",
+      "text": "✓2. `architect` for parallel design exploration. done: candidate A in .builder-home/pstack/design.md; candidate B from anthropic/claude-haiku-5-5 (stage records per process) and from commandcode/deepseek/deepseek-v4.1-flash (queued stage jobs); synthesized A with grafts."
+    },
+    {
+      "status": "finished",
+      "text": "✓3. Write the throughput checkpoint as four todo items."
+    },
+    {
+      "status": "finished",
+      "text": "✓Blocking first steps. done: data shapes and flow table fixed in design.md before code."
+    },
+    {
+      "status": "finished",
+      "text": "✓Independent workstreams. done: n/a: one coupled change in ops/build-runner, worker wiring depends on the pure modules."
+    },
+    {
+      "status": "finished",
+      "text": "✓Shared mutable state. done: worker.mjs and job.json have one writer; stages run sequentially, one runner open at a time."
+    },
+    {
+      "status": "finished",
+      "text": "✓Smallest safe decomposition. done: one coder owns the diff because worker.mjs wiring and the modules share signatures."
+    },
+    {
+      "status": "pending",
+      "text": "○4. Delegate code-writing to a subagent using your configured feature model."
+    },
+    {
+      "status": "pending",
+      "text": "○5. Verify on the matching surface."
+    },
+    {
+      "status": "pending",
+      "text": "○6. Rebase into small, ordered commits. Stack follow-ups."
+    },
+    {
+      "status": "pending",
+      "text": "○7. If the design is contested, `interrogate` before shipping."
+    },
+    {
+      "status": "skipped",
+      "text": "–8. Run **Opening a PR**. skip: out of scope, the host owns publishing the parent PR.skipped"
+    },
+    {
+      "status": "pending",
+      "text": "○Panel review of actual changed files by anthropic/claude-haiku-5-5 and commandcode/deepseek/deepseek-v4.1-flash."
+    },
+    {
+      "status": "pending",
+      "text": "○GLOSSARY.md, path-forward.md, ADR 0024."
+    }
+  ],
+  "screenshot": "docs/agents/jul-252/proof/rerun-2026-10-25/dashboard-jul-252-latest.png",
+  "cardScreenshot": "docs/agents/jul-252/proof/rerun-2026-10-25/jul-252-build-card-latest.png",
+  "consoleErrors": []
+}

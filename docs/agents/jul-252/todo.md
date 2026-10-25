@@ -26,7 +26,7 @@ Task-specific items:
 10. [x] Implement Todd's 25 Oct decision: actual usage at API prices gates the card, drop the worst-case reservation gate, raise the cap to $10.
 11. [x] Retire the diagnosing-bugs skill and update the current routers to poteto-mode's Bug fix playbook.
 12. [x] Run the full runner suite, no-fakes, lint and link checks.
-13. [ ] Merge, deploy, restart JUL-252 through the Start page with Claude Opus 5.5 and DeepSeek V4.1 Flash.
-14. [ ] Capture the dashboard screenshot with the checklist ticking and the spend broken down by model and task kind.
+13. [x] Merge, deploy, restart JUL-252 through the Start page with Claude Opus 5.5 and DeepSeek V4.1 Flash.
+14. [x] Capture the dashboard screenshot with the checklist ticking and the spend broken down by model and task kind.
 
 Decision log: [decision-log.md](decision-log.md)
