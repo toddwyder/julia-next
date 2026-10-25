@@ -201,6 +201,18 @@ test('control page shows running then saved review result', async () => {
   }
 });
 
+test('listing jobs keeps stale saved records for the page to validate', async () => {
+  const stale = { ...clientJob, runId: 'jul-232-stale', state: 'ready-for-review' as const, result: null };
+  const fetchImpl: typeof fetch = async () =>
+    new Response(JSON.stringify([stale, clientJob]), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+
+  const client = createBuildRunnerClient('http://runner.test', fetchImpl);
+  assert.deepEqual(await client.list(), [stale, clientJob]);
+});
+
 test('build runner client captures init and validates jobs', async () => {
   const calls: { input: RequestInfo | URL; init?: RequestInit }[] = [];
 
@@ -240,9 +252,10 @@ test('build runner client captures init and validates jobs', async () => {
     );
 
   const invalidClient = createBuildRunnerClient('http://runner.test', invalidFetch);
-  await assert.rejects(async () => {
-    await invalidClient.list();
-  });
+  assert.deepEqual(
+    await invalidClient.list(),
+    [{ ...clientJob, state: 'ready-for-review', result: null }],
+  );
 
   assert.throws(() =>
     BuildJobSchema.parse({ ...clientJob, state: 'ready-for-review', result: null }),
