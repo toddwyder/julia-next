@@ -104,7 +104,11 @@ The agreed fixes from the JUL-231 retro are folded into the cards below.
 3. Deployment safety: dropped (Todd, 24 Oct). The updater as sole service starter, its ownership of the Tailscale route, its test and its proofs are not built. Stale live-state descriptions are removed from the setup notes as part of the clean-up.
 4. Clean-up: one pull request, no card (Todd, 24 Oct). Settled scope: the no-fakes CI check; the four writing-for-agents rules as one script, run by triage before showing Todd a brief; removal of live server-state descriptions from the setup notes; confirmation that Start's admission check accepts the current triage card shape by running it on JUL-263; this plan update. Cut: the pstack folder move, the framework-lint fix and the Code review column removal. GitHub merge protection moves to card 8.
 5. Evidence review (JUL-252) with the five-card checkpoint. The "evidence there" card is dropped: no index, the reviewer reads the proof folder. (Todd, 24 Oct)
-6. Staging: regression suite against the Vercel preview; `verify-julia` rewritten for Linux and a given address.
-7. UAT and merge: notification, accept/send-back, automatic merge, GitHub merge protection, live check, revert/rollback.
-8. Automatic retro: `/correct` after merge, plain-English list, Todd approves.
+6. Per-task models: pstack's own role lines (main session, hardest tasks, everyday code, search, panels) replace the orchestrator/coder pair, set from JUL-252's actual spend by model and task. One pull request, no card.
+7. Julia cards start (Todd, 25 Oct). The machine builds and the evidence review checks the proof; Todd tries the Vercel preview and says yes; the advisor merges.
+
+Deferred until doing it by hand gets in the way (Todd, 25 Oct):
+- Staging: regression suite against the Vercel preview; `verify-julia` rewritten for Linux and a given address.
+- UAT and merge: notification, accept/send-back, automatic merge, GitHub merge protection, live check, revert/rollback.
+- Automatic retro: `/correct` after merge, plain-English list, Todd approves. Waits for a history of real Julia cards.
 The clean-up is built by the planner agent in a fresh session. From card 5 on, the machine builds the cards itself (Start's admission check accepts the current triage card shape, confirmed on JUL-263 on 24 Oct, and card 1 lets the machine use paid models); the planner agent shapes cards with Todd.
