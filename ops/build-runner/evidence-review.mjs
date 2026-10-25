@@ -62,8 +62,9 @@ function itemMatchesStep(item, step) {
   const itemText = normalize(item)
   const stepText = normalize(step)
   if (!itemText || !stepText) return false
-  if (stepText.startsWith(itemText) && itemText.length >= Math.min(40, stepText.length)) return true
-  return itemText.startsWith(stepText)
+  const firstSentence = stepText.split(/\.\s/)[0]
+  const needed = Math.min(40, firstSentence.length)
+  return itemText.length >= needed && itemText.slice(0, needed) === stepText.slice(0, needed)
 }
 
 export function checkPlaybookConformity({ required, declared, playbookText, checklistText }) {
