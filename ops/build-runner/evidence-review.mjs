@@ -3,6 +3,39 @@ import { parseChecklist } from './checklist.mjs'
 
 export const VERDICTS = ['proven', 'unproven', 'wrong thing tested']
 export const REQUIRED_PLAYBOOK = { remediation: 'bug-fix', investigation: 'investigation' }
+const BUILD_PLAYBOOK_BY_LABEL = {
+  feature: 'feature',
+  refactoring: 'refactoring',
+  'bug fix': 'bug-fix',
+  'bug-fix': 'bug-fix',
+  'perf issue': 'perf-issue',
+  hillclimb: 'hillclimb',
+}
+
+export function requiredBuildPlaybook(card) {
+  for (const label of card?.labels ?? []) {
+    const slug = String(label).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+    if (BUILD_PLAYBOOK_BY_LABEL[slug]) return BUILD_PLAYBOOK_BY_LABEL[slug]
+  }
+  return null
+}
+
+export function requiredPlaybookForRun({ card, history }) {
+  const lastRun = (history ?? []).filter(entry => entry?.stage !== 'review').at(-1)
+  if (lastRun?.stage === 'remediation') return REQUIRED_PLAYBOOK.remediation
+  if (lastRun?.stage === 'investigation') return REQUIRED_PLAYBOOK.investigation
+  return requiredBuildPlaybook(card)
+}
+
+export function unprovenVerdicts(criteria, reason) {
+  return (criteria ?? []).map(item => ({
+    criterion: item.criterion,
+    text: item.text,
+    proofFile: null,
+    verdict: 'unproven',
+    reason,
+  }))
+}
 
 const CRITERIA_HEADING = /^#+\s*acceptance criteria/i
 const ANY_HEADING = /^#{1,6}\s+/

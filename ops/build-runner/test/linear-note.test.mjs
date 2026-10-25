@@ -79,9 +79,9 @@ test('a Linear rejection or a missing key never throws', async () => {
     fetchImpl: async () => Response.json(issueWithStates([{ id: 'state-remediation', name: 'Remediation' }])),
   })
   assert.deepEqual(rejected, { moved: false, reason: 'Linear did not accept the state update' })
-  const offline = await moveLinearCard({
+  const unreachable = await moveLinearCard({
     card: 'JUL-252', stateName: 'Remediation', apiKey: 'synthetic',
     fetchImpl: async () => { throw new Error('socket closed') },
   })
-  assert.deepEqual(offline, { moved: false, reason: 'Linear state update failed: socket closed' })
+  assert.deepEqual(unreachable, { moved: false, reason: 'Linear state update failed: socket closed' })
 })

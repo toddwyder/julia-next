@@ -2,7 +2,7 @@ import { ControlPageCardSchema, ReadyCardSchema } from './contracts.ts'
 import type { LinearQueryClient } from './initialization-observability.ts'
 import { isFrameworkMapRecord } from './framework-map.ts'
 
-export type LinearIssue = { identifier: string; title?: string; description: string; state: { name: string }; comments?: { nodes: { body: string; createdAt?: string }[]; pageInfo: { hasNextPage: boolean; endCursor?: string } } }
+export type LinearIssue = { identifier: string; title?: string; description: string; state: { name: string }; labels?: { nodes: { name: string }[] }; comments?: { nodes: { body: string; createdAt?: string }[]; pageInfo: { hasNextPage: boolean; endCursor?: string } } }
 export type LinearReadTrace = {
   operation: 'linear-read'
   issueId: string
@@ -32,6 +32,7 @@ export function cardAdmissionInput(issue: LinearIssue) {
     : maps
   return {
     identifier: issue.identifier, state: issue.state.name, description: issue.description,
+    ...(issue.labels?.nodes ? { labels: issue.labels.nodes.map(label => label.name) } : {}),
     ...(comments ? { frameworkMaps: selected.map(comment => comment.body) } : {}),
   }
 }
@@ -103,7 +104,7 @@ export async function listReadyLinearCards(
     let after: string | null = null
     do {
       const response = await client.query(
-        'query ReadyCards($after:String) { issues(first: 50, after: $after, filter: { state: { name: { eq: "Ready" } } }) { nodes { identifier title description state { name } comments(first: 250) { nodes { body createdAt } pageInfo { hasNextPage endCursor } } } pageInfo { hasNextPage endCursor } } }',
+        'query ReadyCards($after:String) { issues(first: 50, after: $after, filter: { state: { name: { eq: "Ready" } } }) { nodes { identifier title description state { name } labels { nodes { name } } comments(first: 250) { nodes { body createdAt } pageInfo { hasNextPage endCursor } } } pageInfo { hasNextPage endCursor } } }',
         { after },
       )
       status = response.status

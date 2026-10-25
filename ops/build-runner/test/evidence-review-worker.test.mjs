@@ -36,11 +36,11 @@ async function runWorker(script, env = {}, continueAfterPause = false) {
   writeFileSync(settingsPath, JSON.stringify({
     ledgerPath: join(dir, 'cards.sqlite'),
     roles: { orchestrator: 'anthropic/claude-haiku-5-5', coder: 'commandcode/deepseek/deepseek-v4.1-flash' },
-    reviewers: ['anthropic/claude-haiku-5-5', 'openai/gpt-6-sol'],
   }))
+  const reviewer = { route: 'openai-codex', modelId: 'gpt-6-sol', company: 'OpenAI', service: 'ChatGPT plan', wire: 'responses', effort: 'high' }
   writeFileSync(join(jobDir, 'job.json'), JSON.stringify({
     runId: 'run-1', state: 'running', worktree, baseCommit, settingsPath, workerPid: null,
-    snapshot: { runId: 'run-1', card, roles: { orchestrator: 'anthropic/claude-haiku-5-5', coder: 'commandcode/deepseek/deepseek-v4.1-flash' } },
+    snapshot: { runId: 'run-1', card, roles: { orchestrator: 'anthropic/claude-haiku-5-5', coder: 'commandcode/deepseek/deepseek-v4.1-flash', reviewer } },
   }))
   const scriptPath = join(dir, 'script.json')
   const logPath = join(dir, 'log.jsonl')
@@ -125,17 +125,20 @@ test('a build whose checklist skips its declared playbook steps is refused befor
   assert.deepEqual(opened(log).map(entry => entry.role), ['orchestrator'])
 })
 
-test('a remediation run whose checklist follows a playbook other than Bug fix is refused', async () => {
+test('a remediation run whose checklist follows a playbook other than Bug fix is marked unproven, investigated, and stopped', async () => {
   const { job, log } = await runWorker([
     build,
     { files: reviewFile('unproven') },
     { files: { '.builder-home/pstack/checklist.md': checklistFor('Feature', 'feature'), 'feature.txt': 'fixed\n' } },
+    { files: { '.builder-home/pstack/checklist.md': checklistFor('Investigation', 'investigation'), '.builder-home/investigation/root-cause.md': 'Wrong playbook.' } },
   ])
   assert.equal(job.state, 'failed')
-  assert.equal(job.result, null)
-  assert.equal(job.error.refused, true)
-  assert.match(job.error.message, /checklist follows feature, run requires bug-fix/)
-  assert.equal(opened(log).length, 3)
+  assert.equal(job.error.stopped, true)
+  assert.deepEqual(job.review.history.map(entry => [entry.stage, entry.passed]), [['review', false], ['remediation', undefined], ['review', false], ['investigation', undefined]])
+  assert.match(job.review.history[2].verdicts[0].reason, /checklist follows feature, run requires bug-fix/)
+  const notes = comments(log)
+  assert.equal(notes.length, 3)
+  assert.match(notes[1], /Evidence review 2[\s\S]*\*\*unproven\*\*/)
 })
 
 test('with no signed-in reviewer from another company the card stops with a note instead of reviewing itself', async () => {
@@ -143,7 +146,7 @@ test('with no signed-in reviewer from another company the card stops with a note
   assert.equal(job.state, 'failed')
   assert.equal(job.error.stopped, true)
   assert.deepEqual(opened(log).map(entry => entry.role), ['orchestrator'])
-  assert.match(comments(log)[0], /no reviewer model from another company/)
+  assert.match(comments(log)[0], /no available reviewer model from another company/)
 })
 
 test('a reviewer citing a proof file that links outside the exported tree is recorded unproven', async () => {

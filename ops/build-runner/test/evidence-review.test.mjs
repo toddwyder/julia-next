@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
+import { requiredBuildPlaybook, requiredPlaybookForRun, unprovenVerdicts } from '../evidence-review.mjs'
 import {
   VERDICTS,
   REQUIRED_PLAYBOOK,
@@ -275,4 +276,15 @@ test('review findings: empty playbooks, decorated declarations, nested criteria 
   const result = parseVerdicts({ raw, criteria: one, proofFileExists: () => true })
   assert.equal(result.passed, false)
   assert.equal(result.verdicts[0].reason, 'reviewer gave more than one verdict')
+})
+
+test('the card label names the build playbook and a mismatch is marked unproven', () => {
+  assert.equal(requiredBuildPlaybook({ labels: ['ready-for-agent', 'Feature'] }), 'feature')
+  assert.equal(requiredBuildPlaybook({ labels: ['Bug fix'] }), 'bug-fix')
+  assert.equal(requiredBuildPlaybook({ labels: [] }), null)
+  assert.equal(requiredPlaybookForRun({ card: { labels: ['Feature'] }, history: [] }), 'feature')
+  assert.equal(requiredPlaybookForRun({ card: { labels: ['Feature'] }, history: [{ stage: 'remediation' }] }), 'bug-fix')
+  assert.deepEqual(unprovenVerdicts([{ criterion: 1, text: 'One' }], 'checklist follows feature, run requires bug-fix'), [
+    { criterion: 1, text: 'One', proofFile: null, verdict: 'unproven', reason: 'checklist follows feature, run requires bug-fix' },
+  ])
 })

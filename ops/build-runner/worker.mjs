@@ -16,9 +16,11 @@ import {
   declaredPlaybook,
   checkPlaybookConformity,
   nextStage,
-  pickReviewer,
   parseVerdicts,
   formatVerdictNote,
+  requiredBuildPlaybook,
+  requiredPlaybookForRun,
+  unprovenVerdicts,
   reviewPrompt,
   remediationPrompt,
   investigationPrompt,
@@ -187,10 +189,19 @@ async function main() {
   async function reviewStage() {
     const round = job.review.history.filter(entry => entry.stage === 'review').length + 1
     if (round === 1) await moveLinearCard({ card: cardId, stateName: 'Evidence review', apiKey: linearKey })
-    const reviewer = pickReviewer({ models: settings.models, candidates: settings.reviewers ?? [], builderModels: session.builderModels })
-    if (!reviewer) throw stop('stopped: no reviewer model from another company is configured')
+    const reviewer = startReviewer()
     job.review.reviewer = reviewer
     await atomicWriteJson(join(jobDir, 'job.json'), job)
+    const lastRun = job.review.history.filter(entry => entry.stage !== 'review').at(-1)
+    const required = requiredPlaybookForRun({ card, history: job.review.history })
+    const declared = declaredPlaybook(checklist)
+    if (!checklist?.trim() || (required && declared !== required)) {
+      const reason = !checklist?.trim()
+        ? 'missing checklist'
+        : `checklist follows ${declared ?? 'no declared playbook'}, run requires ${required}`
+      await recordReview({ round, reviewer, verdicts: unprovenVerdicts(criteria, reason), passed: false })
+      return
+    }
     const reviewDir = join(jobDir, `review-${round}`)
     const tree = join(reviewDir, 'tree')
     await rm(reviewDir, { recursive: true, force: true })
@@ -212,12 +223,29 @@ async function main() {
     })
     const raw = await readOptional(join(tree, '.builder-home', 'review', 'verdicts.json'))
     const outcome = parseVerdicts({ raw, criteria, proofFileExists: path => proofFileExists(tree, path) })
-    const entry = { stage: 'review', round, candidateCommit, verdicts: outcome.verdicts, passed: outcome.passed }
+    await recordReview({ round, reviewer, verdicts: outcome.verdicts, passed: outcome.passed })
+  }
+
+  function startReviewer() {
+    if (!reviewerModel) throw stop('stopped: no reviewer was picked on Start')
+    const spec = settings.models[reviewerModel]
+    if (spec?.unavailable) throw stop(`stopped: no available reviewer model from another company: ${spec.unavailable}`)
+    const reviewer = { model: reviewerModel, company: spec?.company ?? savedRoles.reviewer?.company ?? 'unknown' }
+    const orchestratorCompany = settings.models[orchestratorModel]?.company
+    const coderCompany = settings.models[coderModel]?.company
+    if (reviewer.company === orchestratorCompany || reviewer.company === coderCompany) {
+      throw stop(`stopped: reviewer ${reviewer.company} must come from a different company than the orchestrator and the coder`)
+    }
+    return reviewer
+  }
+
+  async function recordReview({ round, reviewer, verdicts, passed }) {
+    const entry = { stage: 'review', round, candidateCommit, verdicts, passed }
     job.review.history.push(entry)
-    entry.note = formatVerdictNote({ cardId, round, reviewer, candidateCommit, verdicts: outcome.verdicts, passed: outcome.passed, next: nextStage(job.review.history) })
+    entry.note = formatVerdictNote({ cardId, round, reviewer, candidateCommit, verdicts, passed, next: nextStage(job.review.history) })
     job.linearNote = { card: cardId, message: entry.note, ...(await postLinearComment({ card: cardId, message: entry.note, apiKey: linearKey })) }
     await atomicWriteJson(join(jobDir, 'job.json'), job)
-    if (!outcome.passed && round === 1) await moveLinearCard({ card: cardId, stateName: 'Remediation', apiKey: linearKey })
+    if (!passed && round === 1) await moveLinearCard({ card: cardId, stateName: 'Remediation', apiKey: linearKey })
   }
 
   async function remediationStage() {
@@ -233,7 +261,6 @@ async function main() {
     })
     checklist = await readOptional(join(builderHome, 'pstack', 'checklist.md'))
     decisions = await readOptional(join(builderHome, 'pstack', 'decisions.tsv'))
-    await assertPlaybook({ required: REQUIRED_PLAYBOOK.remediation, declared: declaredPlaybook(checklist), checklistText: checklist })
     const { stdout: status } = await execFile('git', ['-C', job.worktree, 'status', '--porcelain'])
     if (status.trim()) {
       await execFile('git', ['-C', job.worktree, 'add', '-A'])
@@ -276,8 +303,7 @@ async function main() {
   async function reviewBeforePublishing() {
     job.review = { reviewer: null, history: [], outcome: null }
     const declared = declaredPlaybook(checklist)
-    if (!declared) throw refusal(checklist?.trim() ? 'the checklist names no playbook' : 'missing checklist')
-    await assertPlaybook({ required: declared, declared, checklistText: checklist })
+    if (declared) await assertPlaybook({ required: declared, declared, checklistText: checklist })
     await atomicWriteJson(join(jobDir, 'job.json'), job)
     await runner?.close()
     runner = null
@@ -367,7 +393,7 @@ async function main() {
     const successResult = {
       card,
       roles: savedRoles,
-      actualModels: { orchestrator: orchestratorModel, coder: coderModel },
+      actualModels: { orchestrator: orchestratorModel, coder: coderModel, ...(reviewerModel ? { reviewer: reviewerModel } : {}) },
       threadId,
       worktree: job.worktree,
       baseCommit: job.baseCommit,

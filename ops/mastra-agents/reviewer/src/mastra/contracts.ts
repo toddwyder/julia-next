@@ -102,6 +102,7 @@ const cardIdentityShape = {
   state: nonempty,
   description: nonempty,
   frameworkMaps: z.array(z.string()).optional(),
+  labels: z.array(z.string()).optional(),
 }
 
 export const CardAdmissionSchema = z.object(cardIdentityShape).strict().superRefine(validateCardAdmission)

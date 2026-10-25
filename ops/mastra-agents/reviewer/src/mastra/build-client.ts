@@ -14,6 +14,7 @@ export const BuildResultSchema = z
     actualModels: z.object({
       orchestrator: z.string().min(1),
       coder: z.string().min(1),
+      reviewer: z.string().min(1).optional(),
     }),
     threadId: z.string().min(1),
     worktree: z.string().min(1),
