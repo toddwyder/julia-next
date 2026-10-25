@@ -1,0 +1,56 @@
+{
+  "result": {
+    "status": "error",
+    "text": "",
+    "finishReason": "error",
+    "toolCalls": [],
+    "toolResults": [],
+    "threadId": "098aead0-7a8b-43fc-abdf-588f6a9d4a31",
+    "error": {
+      "name": "Error",
+      "message": "Request ledger refused operation",
+      "stack": "Error: Request ledger refused operation\n    at fail (file:///home/ubuntu/julia-machine-main/ops/build-runner/transport.mjs:7:25)\n    at ledgerCall (file:///home/ubuntu/julia-machine-main/ops/build-runner/transport.mjs:175:65)\n    at guardedFetch (file:///home/ubuntu/julia-machine-main/ops/build-runner/transport.mjs:235:31)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async file:///home/ubuntu/julia-machine-main/ops/build-runner/request-observer.mjs:9:24\n    at async file:///home/ubuntu/julia-machine-main/ops/build-runner/node_modules/@mastra/code-sdk/dist/providers/claude-max.js:186:44\n    at async postToApi (file:///home/ubuntu/julia-machine-main/ops/build-runner/node_modules/@ai-sdk/anthropic/node_modules/@ai-sdk/provider-utils/dist/index.mjs:2727:22)\n    at async AnthropicMessagesLanguageModel.doStream (file:///home/ubuntu/julia-machine-main/ops/build-runner/node_modules/@ai-sdk/anthropic/dist/index.mjs:4984:50)\n    at async AISDKV6LanguageModel.doStream (file:///home/ubuntu/julia-machine-main/ops/build-runner/node_modules/@mastra/core/dist/llm-DtX483Xc.js:105:10)\n    at async ModelRouterLanguageModel.doStream (file:///home/ubuntu/julia-machine-main/ops/build-runner/node_modules/@mastra/core/dist/llm-DtX483Xc.js:8413:25)"
+    },
+    "exitCode": 1
+  },
+  "threadId": "098aead0-7a8b-43fc-abdf-588f6a9d4a31",
+  "account": {
+    "card": "JUL-252",
+    "ceilingNano": 2000000000,
+    "stopped": false,
+    "spentNano": 140036000,
+    "heldNano": 0,
+    "remainingNano": 1859964000,
+    "pricedBlocked": false,
+    "requests": [
+      {
+        "id": "3b872af9-368a-40dd-a302-53e9115bd3a9",
+        "card": "JUL-252",
+        "model": "anthropic/claude-opus-5-5",
+        "role": "orchestrator",
+        "maximumNano": 763984000,
+        "price": {
+          "input": 4,
+          "output": 20,
+          "cacheRead": 0.2,
+          "cacheWrite": 8
+        },
+        "bounds": {
+          "maxInputTokens": 75018,
+          "maxOutputTokens": 8192,
+          "inputCountBasis": "local UTF-8 estimate"
+        },
+        "state": "settled",
+        "usage": {
+          "input": 4,
+          "output": 1945,
+          "cacheRead": 0,
+          "cacheWrite": 12640
+        },
+        "costNano": 140036000,
+        "reason": null,
+        "costBasis": "reported usage"
+      }
+    ]
+  }
+}

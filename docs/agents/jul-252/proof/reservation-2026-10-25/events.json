@@ -1,0 +1,37 @@
+[
+  {
+    "type": "agent_start"
+  },
+  {
+    "type": "message_end",
+    "id": "67525d57-081c-49ac-948e-a8e984189409"
+  },
+  {
+    "type": "message_end",
+    "id": "047880fd-36fb-4f9d-953a-b45ec06e2daf"
+  },
+  {
+    "type": "agent_end",
+    "reason": "complete"
+  },
+  {
+    "type": "agent_start"
+  },
+  {
+    "type": "message_end",
+    "id": "456bf7f6-1ae8-403d-a5d2-3ab29af1bd7d"
+  },
+  {
+    "type": "error",
+    "error": {
+      "message": "Request ledger refused operation",
+      "name": "Error",
+      "stack": "Error: Request ledger refused operation\n    at fail (file:///home/ubuntu/julia-machine-main/ops/build-runner/transport.mjs:7:25)\n    at ledgerCall (file:///home/ubuntu/julia-machine-main/ops/build-runner/transport.mjs:175:65)\n    at guardedFetch (file:///home/ubuntu/julia-machine-main/ops/build-runner/transport.mjs:235:31)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async file:///home/ubuntu/julia-machine-main/ops/build-runner/request-observer.mjs:9:24\n    at async file:///home/ubuntu/julia-machine-main/ops/build-runner/node_modules/@mastra/code-sdk/dist/providers/claude-max.js:186:44\n    at async postToApi (file:///home/ubuntu/julia-machine-main/ops/build-runner/node_modules/@ai-sdk/anthropic/node_modules/@ai-sdk/provider-utils/dist/index.mjs:2727:22)\n    at async AnthropicMessagesLanguageModel.doStream (file:///home/ubuntu/julia-machine-main/ops/build-runner/node_modules/@ai-sdk/anthropic/dist/index.mjs:4984:50)\n    at async AISDKV6LanguageModel.doStream (file:///home/ubuntu/julia-machine-main/ops/build-runner/node_modules/@mastra/core/dist/llm-DtX483Xc.js:105:10)\n    at async ModelRouterLanguageModel.doStream (file:///home/ubuntu/julia-machine-main/ops/build-runner/node_modules/@mastra/core/dist/llm-DtX483Xc.js:8413:25)",
+      "requestUrl": "https://api.anthropic.com/v1/messages"
+    }
+  },
+  {
+    "type": "agent_end",
+    "reason": "error"
+  }
+]

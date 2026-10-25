@@ -1,0 +1,50 @@
+$ node --test --test-reporter=spec --test-name-pattern="real-sized Claude build request|prices, bounds and wire endpoints" ops/build-runner/test/catalogue.test.mjs
+✖ prices, bounds and wire endpoints come from the published catalogue (31.426622ms)
+✖ a real-sized Claude build request reserves below the two-dollar card after planning (84.295287ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 395.801413
+
+✖ failing tests:
+
+test at ops/build-runner/test/catalogue.test.mjs:135:1
+✖ prices, bounds and wire endpoints come from the published catalogue (31.426622ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+      framingTokens: 4096,
+  +   method: 'utf8',
+  -   method: 'o200k_base',
+      multiplier: 2
+    }
+  
+      at TestContext.<anonymous> (file:///home/ubuntu/julia-builder/ops/build-runner/test/catalogue.test.mjs:145:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { method: 'utf8', multiplier: 2, framingTokens: 4096 },
+    expected: { method: 'o200k_base', multiplier: 2, framingTokens: 4096 },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at ops/build-runner/test/catalogue.test.mjs:168:1
+✖ a real-sized Claude build request reserves below the two-dollar card after planning (84.295287ms)
+  Error: Request ledger refused operation
+      at fail (file:///home/ubuntu/julia-builder/ops/build-runner/transport.mjs:7:25)
+      at ledgerCall (file:///home/ubuntu/julia-builder/ops/build-runner/transport.mjs:175:65)
+      at guardedFetch (file:///home/ubuntu/julia-builder/ops/build-runner/transport.mjs:235:31)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (file:///home/ubuntu/julia-builder/ops/build-runner/test/catalogue.test.mjs:191:20)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7)
