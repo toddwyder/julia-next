@@ -260,14 +260,6 @@ export function createTransport({ ledger, settings, role, fetch: upstream = glob
       if (!Number.isSafeInteger(costNano)) throw fail('Invalid request cost');
       await ledgerCall('settle', id, { usage: usage ?? null, costNano });
       settled = true;
-      if (costNano > maximumNano) {
-        await ledgerCall('stop', 'Request cost exceeds configured reservation');
-        throw fail('STOP WORK: request cost exceeds configured reservation');
-      }
-      if (spec.inputTokenEstimate && inputTokens > inputBound) {
-        await ledgerCall('stop', 'Provider usage exceeds local input estimate');
-        throw fail('STOP WORK: provider usage exceeds local input estimate');
-      }
       return response;
     } catch (error) {
       if (response?.body) void response.body.cancel().catch(() => {});

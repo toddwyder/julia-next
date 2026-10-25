@@ -2,7 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 
-export const CEILING_NANO = 2_000_000_000;
+export const CEILING_NANO = 10_000_000_000;
 
 function nonempty(value, name) {
   if (typeof value !== 'string' || !value.trim()) throw new TypeError(`${name} must be nonempty`);
@@ -83,9 +83,7 @@ export class CardLedger {
       const snapshot = this.snapshot();
       if (snapshot.stopped) throw new Error('Card account is stopped');
       if (maximumNano > 0 && snapshot.pricedBlocked) throw new Error('Priced requests blocked by unresolved accounting');
-      if (maximumNano > 0 && BigInt(snapshot.spentNano) + BigInt(snapshot.heldNano) + BigInt(maximumNano) > BigInt(CEILING_NANO)) {
-        throw new Error('Card cost ceiling exceeded');
-      }
+      if (BigInt(snapshot.spentNano) > BigInt(CEILING_NANO)) throw new Error('Card cost ceiling exceeded');
       const id = randomUUID();
       this.db.prepare(`INSERT INTO requests
         (card,id,model,role,maximum_nano,price,bounds,state) VALUES (?,?,?,?,?,?,?,'reserved')`)
@@ -107,10 +105,9 @@ export class CardLedger {
         return current;
       }
       if (current.maximumNano > 0 && (usage === undefined || usage === null)) throw new Error('Priced settlement requires usage');
-      const failure = costNano > current.maximumNano;
       this.db.prepare('UPDATE requests SET state = ?, usage = ?, cost_nano = ?, reason = ? WHERE card = ? AND id = ?')
-        .run(failure ? 'accounting_failure' : 'settled', usageJson, costNano,
-          failure ? 'Actual cost exceeds reserved maximum' : null, this.card, id);
+        .run('settled', usageJson, costNano, null, this.card, id);
+      this.stopIfSpentExceedsCeiling();
       return this.get(id);
     });
   }
@@ -132,6 +129,7 @@ export class CardLedger {
       if (current.costNano !== null) return current;
       this.db.prepare('UPDATE requests SET cost_nano = maximum_nano, reason = ? WHERE card = ? AND id = ?')
         .run(`${current.reason}; full reserved maximum charged; actual usage unavailable`, this.card, id);
+      this.stopIfSpentExceedsCeiling();
       return this.get(id);
     });
   }
@@ -151,9 +149,14 @@ export class CardLedger {
       card: this.card, ceilingNano: CEILING_NANO,
       stopped: Boolean(this.db.prepare('SELECT reason FROM stops WHERE card = ?').get(this.card)),
       spentNano: numeric(spent), heldNano: numeric(held),
-      remainingNano: Number(BigInt(CEILING_NANO) > spent + held ? BigInt(CEILING_NANO) - spent - held : 0n),
+      remainingNano: numeric(BigInt(CEILING_NANO) > spent ? BigInt(CEILING_NANO) - spent : 0n),
       pricedBlocked, requests,
     };
+  }
+
+  stopIfSpentExceedsCeiling() {
+    const { spent } = this.db.prepare('SELECT COALESCE(SUM(cost_nano), 0) AS spent FROM requests WHERE card = ?').get(this.card);
+    if (BigInt(spent) > BigInt(CEILING_NANO)) this.stop('Card cost ceiling exceeded');
   }
 
   stop(reason) {

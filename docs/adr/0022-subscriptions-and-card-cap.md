@@ -2,7 +2,7 @@
 
 Date: 2026-10-23
 
-Status: Accepted by Todd in the 23 October path-forward decisions and JUL-253.
+Status: Accepted by Todd in the 23 October path-forward decisions and JUL-253. The $2 cap and the pre-request worst-case reservation gate are superseded by [ADR 0023](0023-actual-spend-card-cap.md) on 25 October; the subscription connection and settlement rules below remain.
 
 Use Mastra Code's stock ChatGPT and Anthropic subscription connections alongside CommandCode. Todd authorizes each subscription once. Stock AuthStorage owns persistence, access-token renewal and rejected-login handling. Account authorization does not block independent implementation work.
 

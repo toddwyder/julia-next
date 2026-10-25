@@ -1,5 +1,10 @@
 # Diagnosis: JUL-252's first build was refused before dispatch
 
+> 25 October follow-up: Todd replaced the $2 cap and the pre-request worst-case
+> reservation gate with a $10 cap counted from settled actual usage
+> ([ADR 0023](../../adr/0023-actual-spend-card-cap.md)). The tokenizer fix in
+> this document remains. The reservation figures below record the old policy.
+
 Run: `jul-252-04db241d9dbeda4fc7d58701cd7b66d2`
 Observed: `session not completed`, no checklist, Claude Opus 5.5 orchestrating and DeepSeek V4.1 Flash coding.
 
