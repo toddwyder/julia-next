@@ -1,5 +1,4 @@
 import { isAbsolute } from 'node:path'
-import { parseChecklist } from './checklist.mjs'
 
 export const VERDICTS = ['proven', 'unproven', 'wrong thing tested']
 export const REQUIRED_PLAYBOOK = { remediation: 'bug-fix', investigation: 'investigation' }
@@ -27,21 +26,9 @@ export function requiredPlaybookForRun({ card, history }) {
   return requiredBuildPlaybook(card)
 }
 
-export function unprovenVerdicts(criteria, reason) {
-  return (criteria ?? []).map(item => ({
-    criterion: item.criterion,
-    text: item.text,
-    proofFile: null,
-    verdict: 'unproven',
-    reason,
-  }))
-}
-
 const CRITERIA_HEADING = /^#+\s*acceptance criteria/i
 const ANY_HEADING = /^#{1,6}\s+/
 const BULLET = /^(?:[*+-]|\d+[.)])\s+(?:\[[ xX]\]\s+)?(.+)$/
-const PLAYBOOK_LINE = /playbook:\s*[*_`]*\s*([A-Za-z](?:[A-Za-z -]*[A-Za-z])?)/i
-const STEP_LINE = /^\d+\.\s+(.+)$/
 
 const cardLabel = card => [card?.identifier ?? card?.id, card?.title].filter(Boolean).join(' ')
 
@@ -58,61 +45,6 @@ export function parseCriteria(card) {
     if (text) criteria.push({ criterion: criteria.length + 1, text })
   }
   return criteria.length || !card?.title ? criteria : [{ criterion: 1, text: String(card.title).trim() }]
-}
-
-export function declaredPlaybook(checklistText) {
-  for (const line of String(checklistText ?? '').split(/\r?\n/)) {
-    const match = PLAYBOOK_LINE.exec(line)
-    if (!match) continue
-    const slug = match[1].toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
-    return slug || null
-  }
-  return null
-}
-
-export function playbookSteps(markdown) {
-  const steps = []
-  for (const line of String(markdown ?? '').split(/\r?\n/)) {
-    const match = STEP_LINE.exec(line)
-    if (match) steps.push(match[1].trim())
-  }
-  return steps
-}
-
-function normalize(value) {
-  return String(value ?? '')
-    .toLowerCase()
-    .replace(/[*_`]/g, '')
-    .replace(/\s*(?:skip|n\/a)\s*:.*$/i, '')
-    .replace(/^\s*\d+[.)]\s+/, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/[.:]+$/, '')
-    .trim()
-}
-
-function itemMatchesStep(item, step) {
-  const itemText = normalize(item)
-  const stepText = normalize(step)
-  if (!itemText || !stepText) return false
-  const firstSentence = stepText.split(/\.\s/)[0]
-  const needed = Math.min(40, firstSentence.length)
-  return itemText.length >= needed && itemText.slice(0, needed) === stepText.slice(0, needed)
-}
-
-export function checkPlaybookConformity({ required, declared, playbookText, checklistText }) {
-  if (!String(checklistText ?? '').trim()) return { ok: false, reason: 'missing checklist' }
-  if (declared !== required) return { ok: false, reason: `checklist follows ${declared ?? 'no declared playbook'}, run requires ${required}` }
-  const items = parseChecklist(checklistText)
-  const steps = playbookSteps(playbookText)
-  if (!steps.length) return { ok: false, reason: `playbook ${required} has no numbered steps` }
-  let cursor = -1
-  for (const [index, step] of steps.entries()) {
-    const found = items.findIndex((item, position) => position > cursor && itemMatchesStep(item.text, step))
-    if (found === -1) return { ok: false, reason: `checklist is missing playbook step ${index + 1}: ${step.slice(0, 60)}` }
-    cursor = found
-  }
-  return { ok: true }
 }
 
 export function nextStage(history) {
@@ -207,12 +139,23 @@ export function formatVerdictNote({ cardId, round, reviewer, candidateCommit, ve
   return lines.join('\n')
 }
 
-export function reviewPrompt({ card, criteria, round }) {
+export function reviewPrompt({ card, criteria, round, requiredPlaybook, playbookText }) {
+  const playbook = requiredPlaybook
+    ? `This run must follow the ${requiredPlaybook} playbook. Its full text is given here:
+
+--- playbook ${requiredPlaybook} ---
+${String(playbookText ?? '').trim()}
+--- end playbook ${requiredPlaybook} ---
+
+Judge playbook adherence as part of this review. Read the run's checklist at \`.builder-home/proof/checklist.md\` and the candidate diff at \`.builder-home/proof/diff.patch\`. If the checklist follows a different playbook, or the work skips or omits the playbook's numbered steps, every criterion is unproven.`
+    : `This card does not require a specific playbook. The run's checklist is at \`.builder-home/proof/checklist.md\` and the candidate diff is at \`.builder-home/proof/diff.patch\`.`
   return `You are the evidence reviewer for ${cardLabel(card)}. Follow .agents/skills/adversarial-review/SKILL.md in this working directory.
 
-This is evidence review round ${round}. Judge only the criteria below against the evidence supplied. Every criterion starts unproven. Try to break each claim. A criterion is proven only by a named proof file that shows the criterion holding where Todd uses the result. Testing something other than the criterion is "wrong thing tested". Never edit the tree.
+This is evidence review round ${round}. Judge the criteria below and playbook adherence against the evidence supplied. Every criterion starts unproven. Try to break each claim. A criterion is proven only by a named proof file that shows the criterion holding where Todd uses the result. Testing something other than the criterion is "wrong thing tested". Never edit the tree.
 
 The proof is the \`.builder-home/proof/\` folder: an export of the candidate commit plus the committed files.
+
+${playbook}
 
 Write \`.builder-home/review/verdicts.json\` exactly as:
 {"verdicts":[{"criterion":1,"verdict":"proven|unproven|wrong thing tested","proofFile":"relative/path","reason":"..."}]}
@@ -225,7 +168,7 @@ export function remediationPrompt({ card, verdicts }) {
   const defects = (verdicts ?? []).filter(entry => entry?.verdict !== 'proven')
   return `This is a Remediation round for ${cardLabel(card)}. Follow poteto-mode's Bug fix playbook (.agents/skills/poteto-mode/playbooks/bug-fix.md).
 
-The checklist at .builder-home/pstack/checklist.md must start with the line \`Playbook: Bug fix\` and copy that playbook's steps verbatim.
+The checklist at .builder-home/pstack/checklist.md must start with the line \`Playbook: Bug fix\` and follow that playbook.
 
 The defects are the failed evidence verdicts:
 ${defects.map(entry => `- criterion ${entry.criterion} (${entry.verdict}): ${entry.text}. ${entry.reason ?? ''}`.trimEnd()).join('\n')}
@@ -241,7 +184,7 @@ export function investigationPrompt({ card, history }) {
   })
   return `The second evidence review failed for ${cardLabel(card)}. Follow poteto-mode's Investigation playbook (.agents/skills/poteto-mode/playbooks/investigation.md).
 
-The checklist at .builder-home/pstack/checklist.md must start with \`Playbook: Investigation\` and copy that playbook's steps verbatim.
+The checklist at .builder-home/pstack/checklist.md must start with \`Playbook: Investigation\` and follow that playbook.
 
 This run is read-only: change no tracked files. Write the root cause to .builder-home/investigation/root-cause.md.
 

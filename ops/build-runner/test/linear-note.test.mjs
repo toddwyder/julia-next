@@ -1,9 +1,46 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { moveLinearCard, postLinearComment } from '../linear-note.mjs'
+import { fetchLinearCard, moveLinearCard, postLinearComment } from '../linear-note.mjs'
 
 const issueWithStates = (states) => ({
   data: { issue: { id: 'issue-uuid', team: { states: { nodes: states } } } },
+})
+
+test('the current card text and labels are read from Linear before each review', async () => {
+  const calls = []
+  const fetchImpl = async (url, init) => {
+    calls.push({ url, authorization: init.headers.authorization, redirect: init.redirect, body: JSON.parse(init.body) })
+    return Response.json({
+      data: {
+        issue: {
+          identifier: 'JUL-270',
+          title: 'Practice card',
+          description: '## Acceptance criteria\n\n* The edited wording.',
+          state: { name: 'Evidence review' },
+          labels: { nodes: [{ name: 'ready-for-agent' }, { name: 'Feature' }] },
+        },
+      },
+    })
+  }
+  const card = await fetchLinearCard({ card: 'JUL-270', apiKey: 'synthetic', fetchImpl })
+  assert.deepEqual(card, {
+    identifier: 'JUL-270',
+    title: 'Practice card',
+    description: '## Acceptance criteria\n\n* The edited wording.',
+    state: 'Evidence review',
+    labels: ['ready-for-agent', 'Feature'],
+  })
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0].authorization, 'synthetic')
+  assert.equal(calls[0].redirect, 'error')
+  assert.deepEqual(calls[0].body.variables, { id: 'JUL-270' })
+  assert.match(calls[0].body.query, /description/)
+  assert.match(calls[0].body.query, /labels/)
+  assert.equal(await fetchLinearCard({ card: 'JUL-270', apiKey: '' }), null)
+  const unavailable = await fetchLinearCard({ card: 'JUL-270', apiKey: 'synthetic', fetchImpl: async () => Response.json({ data: { issue: null } }) })
+  assert.equal(unavailable, null)
+  const unreachable = await fetchLinearCard({ card: 'JUL-270', apiKey: 'synthetic', fetchImpl: async () => { throw new Error('socket closed') } })
+  assert.equal(unreachable, null)
 })
 
 test('a pause note is posted to the card through Linear commentCreate', async () => {

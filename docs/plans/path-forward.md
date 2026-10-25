@@ -56,7 +56,7 @@ Working document. Each line is a decision Todd agreed in conversation.
 ## Evidence check (12:09–12:12, revised 24 Oct)
 - **Is the evidence there:** **dropped** (Todd, 24 Oct). No evidence index. The reviewer reads the proof folder for the exact candidate commit; a missing or thin proof folder is a failed criterion, not a separate gate. The "evidence is there" card is dropped.
 - **Is the evidence right** (does it prove each criterion where Todd uses it): **kept** (Todd, 12:12; inputs settled 24 Oct). Wrong-but-present evidence got past pstack and the builder's report twice on 23 Oct and was stopped only by the advisor's human review. The machine starts a review after each build, by a model from a different company than the builder; input is only the card's criteria and the proof folder; per-criterion verdict (proven / not proven / wrong thing tested), each verdict naming its proof file. A first failure moves the card to **Remediation** for one round of defect fixing, then a fresh review; a second failed review runs poteto's **Investigation** playbook for the root cause, then the card stops. At most two reviews. This is JUL-252's job.
-- **Playbook conformity (Todd, 24 Oct):** every build and remediation run records the playbook it must follow (a build: the playbook it declares; first remediation: Bug fix; second: Investigation). The machine saves no result for a run whose checklist does not follow that playbook.
+- **Playbook adherence (Todd, 25 Oct):** every build and remediation run records the playbook it must follow (a build: the playbook named by its card label; first remediation: Bug fix; second: Investigation). The evidence review receives the required playbook's text with the run's checklist and candidate diff. A run whose checklist follows a different playbook, or whose work skips its steps, is marked unproven and takes the ordinary failed-review path. The evidence review reads the card's current text from Linear each round, not the copy saved at Start.
 - **Checkpoint (Todd, 12:12):** after five cards have been through the review, look at what it actually caught (real catches vs noise, cost) and decide again whether to keep it. Todd's later decision over the saved review results; JUL-252 delivers no report. (Todd, 24 Oct)
 - `/interrogate` stays inside the build as pstack's code review (it reviews the diff, not the evidence).
 
@@ -74,7 +74,7 @@ Working document. Each line is a decision Todd agreed in conversation.
 | Failure | What happens | Stop rule |
 |---|---|---|
 | Evidence review: a criterion not proven | 1st: card to Remediation for one round of defect fixing, then a fresh review. 2nd: Investigation playbook for the root cause, then stop | 2nd review failure stops the card |
-| A checklist does not follow the run's required playbook | The run is refused; no result is saved | Card stays where it is |
+| A checklist follows another playbook, or the work skips its steps | The evidence review marks every criterion unproven | Same as the evidence-review row above |
 | Staging or smoke test fails | Back to the build with the failing tests | 2nd proof failure stops the card |
 | UAT send-back | Back to the build with Todd's note | 2nd send-back stops the card |
 | Live check after merge fails | Revert (Julia) / roll back (machine), then back to the build | Counts |
