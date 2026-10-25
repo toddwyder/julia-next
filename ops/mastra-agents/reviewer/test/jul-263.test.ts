@@ -83,6 +83,36 @@ function runningJob(items: { text: string; status: ChecklistStatus; depth: numbe
   });
 }
 
+test('a stale saved build does not blank the live build list', async () => {
+  const valid = runningJob([{ text: 'Read the card', status: 'finished', depth: 0 }]);
+  const stale = {
+    ...valid,
+    runId: 'jul-232-stale',
+    snapshot: {
+      ...valid.snapshot,
+      card: { ...valid.snapshot.card, description: '## Requirements\n\nThe retired shape.' },
+    },
+  };
+
+  const server = await startControlPageServer({
+    port: 0,
+    getState: async () => ControlPageStateSchema.parse({ cards: [{ admitted: true, card }], offers: [offer] }),
+    startInitialization: async () => { throw new Error('not used'); },
+    getRuns: async () => InitializationRunsStateSchema.parse({ runs: [], totalRuns: 0 }),
+    getActivity: () => activity,
+    getBuildJobs: async () => [stale, valid],
+  });
+
+  try {
+    const response = await fetch(`${server.url}/api/builds`);
+    assert.equal(response.status, 200);
+    const jobs = await response.json() as { runId: string }[];
+    assert.deepEqual(jobs.map(job => job.runId), [valid.runId]);
+  } finally {
+    await server.close();
+  }
+});
+
 test('the dashboard shows the running build checklist and its ticks move', async () => {
   let job = runningJob([
     { text: 'Read the card', status: 'finished', depth: 0 },
