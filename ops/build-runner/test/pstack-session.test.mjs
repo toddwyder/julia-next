@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createPstackSession, inspectPstackRun } from '../pstack-session.mjs'
+import { createPstackSession, inspectPstackRun, resolveModelKey } from '../pstack-session.mjs'
 
 const beam = 'commandcode/reflection/beam:free'
 const deepseek = 'commandcode/deepseek/deepseek-v4.1-flash'
@@ -23,14 +23,14 @@ test('an unrelated review model cannot replace the configured Sol and DeepSeek p
   }), /review handoff/);
 });
 
-test('normal session keeps the configured Sol/DeepSeek split and every exact model', () => {
+test('normal session keeps the configured Sol/DeepSeek split and only referenced models', () => {
   const session = createPstackSession({ models }, snapshot, table)
   assert.equal(session.orchestratorModel, sol)
   assert.equal(session.coderModel, deepseek)
   assert.equal(session.machineryProof, false)
   assert.equal(session.reviewModel, undefined)
-  assert.deepEqual(session.helpers.map(h => h.defaultModelId), [beam, deepseek, sol])
-  assert.equal(new Set(session.helpers.map(h => h.id)).size, 3)
+  assert.deepEqual(session.helpers.map(h => h.defaultModelId), [deepseek, sol])
+  assert.equal(new Set(session.helpers.map(h => h.id)).size, 2)
   assert.equal(session.helpers.some(h => ['coder', 'reviewer', 'cap-check'].includes(h.id)), false)
   assert.match(session.prompt, /follow.*poteto-mode/i)
   assert.match(session.prompt, /Ship the agreed model split\./)
@@ -38,6 +38,29 @@ test('normal session keeps the configured Sol/DeepSeek split and every exact mod
   assert.equal(session.pstackModels, table)
   assert.match(session.hostInstructions, /successful review by a different model of the actual changed files/i)
   assert.doesNotMatch(session.hostInstructions, /paid review|Trial forbids|connection core/i)
+})
+
+test('a route disambiguates a model id that two providers publish', () => {
+  const shared = { wireModel: 'claude-opus-5-5', route: 'claude', service: 'Claude subscription', company: 'Anthropic', wire: 'messages' }
+  const settings = {
+    models: {
+      'anthropic/claude-opus-5-5': shared,
+      'commandcode/claude-opus-5-5': { ...shared, route: 'commandcode', service: 'CommandCode', wire: 'messages' },
+    },
+  }
+  const selection = { route: 'commandcode', modelId: 'claude-opus-5-5', company: 'Anthropic', service: 'CommandCode', wire: 'messages', effort: 'medium' }
+  assert.equal(resolveModelKey(settings, selection), 'commandcode/claude-opus-5-5')
+  assert.equal(resolveModelKey(settings, 'anthropic/claude-opus-5-5'), 'anthropic/claude-opus-5-5')
+})
+
+test('a remapped wire model still resolves from its offered model id', () => {
+  const settings = {
+    models: {
+      'openai/gpt-5': { modelId: 'gpt-5', wireModel: 'gpt-5-codex', route: 'openai-codex', service: 'ChatGPT plan', company: 'OpenAI', wire: 'responses' },
+    },
+  }
+  const selection = { route: 'openai-codex', modelId: 'gpt-5', company: 'OpenAI', service: 'ChatGPT plan', wire: 'responses', effort: 'medium' }
+  assert.equal(resolveModelKey(settings, selection), 'openai/gpt-5')
 })
 
 test('the internal builder boundary is structural rather than a prose prohibition', () => {

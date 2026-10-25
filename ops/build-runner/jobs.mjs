@@ -6,6 +6,7 @@ import { openSync, closeSync } from 'node:fs'
 import { join, resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createServer } from 'node:http'
+import { hydrateSettings, loadCatalogue } from './catalogue.mjs'
 
 const execFile = promisify(execFileCb)
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -77,7 +78,11 @@ async function isMachineryPractice(snapshot, settingsPath) {
   let settings
   try { settings = JSON.parse(await readFile(settingsPath, 'utf8')) } catch { return false }
   const key = settings?.machineryModel
-  const wire = key ? settings.models?.[key]?.wireModel : undefined
+  if (!key) return false
+  if (!settings.models) {
+    try { settings = hydrateSettings(settings, await loadCatalogue({ settingsPath })) } catch { return false }
+  }
+  const wire = settings.models?.[key]?.wireModel
   if (!wire) return false
   return snapshot.roles?.orchestrator?.modelId === wire && snapshot.roles?.coder?.modelId === wire
 }

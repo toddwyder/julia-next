@@ -9,9 +9,10 @@ const paid = { input: 2, output: 3, cacheRead: 1, cacheWrite: 4 };
 
 test('stock Claude conversation caching uses its configured one-hour API price', async t => {
   const { createPromptCacheMiddleware } = await import('@mastra/code-sdk/providers/claude-max');
-  const { readFile } = await import('node:fs/promises');
-  const settings = JSON.parse(await readFile(new URL('../machine-settings.json', import.meta.url), 'utf8'));
-  const model = settings.models['anthropic/claude-haiku-5-5'];
+  const model = {
+    protocol: 'messages', maxInputTokens: 1000000, maxOutputTokens: 8192, cacheWriteTtl: '1h',
+    price: { input: 0.1, output: 0.5, cacheRead: 0.01, cacheWrite: 0.2 },
+  };
   const transformed = await createPromptCacheMiddleware('conversation').transformParams({ params: {
     prompt: [{ role: 'system', content: 'system' }, { role: 'user', content: 'hello' }],
   } });

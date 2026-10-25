@@ -1,9 +1,11 @@
 import { observeRequests } from './request-observer.mjs'
 import { readFile, writeFile, rename, mkdir, appendFile } from 'node:fs/promises'
 import { join, resolve, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { execFile as execFileCb } from 'node:child_process'
 import { promisify } from 'node:util'
 import { openRunner } from './adapter.mjs'
+import { hydrateSettings, loadCatalogue } from './catalogue.mjs'
 import { createPstackSession, inspectPstackRun } from './pstack-session.mjs'
 import { captureBuilderPlan } from './builder-boundary.mjs'
 
@@ -47,8 +49,9 @@ async function main() {
   const card = snapshot.card ?? {}
   const cardId = card.identifier
   const savedRoles = snapshot.roles ?? {}
-  const settingsPathValue = job.settingsPath ?? process.env.BUILD_RUNNER_SETTINGS ?? argValue('--settings') ?? resolve(process.cwd(), 'ops/build-runner/settings.json')
-  const settings = JSON.parse(await readFile(settingsPathValue, 'utf8'))
+  const settingsPathValue = job.settingsPath ?? process.env.BUILD_RUNNER_SETTINGS ?? argValue('--settings') ?? fileURLToPath(new URL('./machine-settings.json', import.meta.url))
+  const catalogue = await loadCatalogue({ settingsPath: settingsPathValue })
+  const settings = hydrateSettings(JSON.parse(await readFile(settingsPathValue, 'utf8')), catalogue)
   settings.ledgerPath ??= join(dirname(jobDir), 'cards.sqlite')
   const pstackModels = await readFile(new URL('./pstack-models.md', import.meta.url), 'utf8')
   const session = createPstackSession(settings, { ...snapshot, machineryProof: job.machineryProof === true || snapshot.machineryProof }, pstackModels)

@@ -24,7 +24,7 @@ Installation details and unit names live in [the systemd README](../../ops/build
 
 Use `ops/build-runner/connections.mjs` with `ops/build-runner/machine-settings.json` for stock subscription sign-ins. Todd completes only the account approval. Access and refresh tokens never enter reports or repository files.
 
-`machine-settings.json` owns model roles, request bounds, and the shared `authPath` and `ledgerPath`. Never replace the shared stores with per-run stores. The stock SDK owns token renewal. [ADR 0022](../adr/0022-subscriptions-and-card-cap.md) records the accounting policy.
+`machine-settings.json` owns model roles and the shared `authPath` and `ledgerPath`. It carries no model list: the Start page and the worker read model IDs, prices and bounds from the models.dev catalogue, with CommandCode's own model list and prices filling models models.dev lacks. A model without a published price is refused. Never replace the shared stores with per-run stores. The stock SDK owns token renewal. [ADR 0022](../adr/0022-subscriptions-and-card-cap.md) records the accounting policy.
 
 ## GitHub boundaries
 
