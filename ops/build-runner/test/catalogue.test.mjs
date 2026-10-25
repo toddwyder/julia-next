@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { createServer } from 'node:http'
 import {
   buildCatalogue,
   hydrateSettings,
   parseCommandCodePricingPage,
 } from '../catalogue.mjs'
+import { CardLedger } from '../ledger.mjs'
+import { createTransport } from '../transport.mjs'
 
 const modelsDev = {
   anthropic: {
@@ -139,7 +142,7 @@ test('prices, bounds and wire endpoints come from the published catalogue', () =
   assert.equal(opus.endpoint, 'https://api.anthropic.com/v1/messages')
   assert.equal(opus.protocol, 'messages')
   assert.equal(opus.cacheWriteTtl, '1h')
-  assert.deepEqual(opus.inputTokenEstimate, { method: 'utf8', multiplier: 2, framingTokens: 4096 })
+  assert.deepEqual(opus.inputTokenEstimate, { method: 'o200k_base', multiplier: 2, framingTokens: 4096 })
   assert.match(opus.source, /^https:\/\/models\.dev\/api\.json#/)
 
   const sol = result.models['openai/gpt-6-sol']
@@ -158,6 +161,29 @@ test('prices, bounds and wire endpoints come from the published catalogue', () =
   assert.equal(deepseek.maxInputTokens, 1000000)
   assert.equal(deepseek.maxOutputTokens, 8192)
   assert.deepEqual(deepseek.price, { input: 0.15, output: 0.6, cacheRead: 0.003, cacheWrite: 0 })
+})
+
+const buildNarrative = 'The evidence review starts from unproven and tries to break every claim in the saved proof. It reads the card outcome, each acceptance criterion, the candidate commit and the proof folder, then records one verdict per criterion. A review that cannot be reproduced from the saved evidence is unproven. A review that tests something other than the named criterion is wrong thing tested. The reviewer never edits the candidate and never opens a pull request. The orchestrator delegates the review to a model from a different company, waits for the handoff to end, and records the result without a human pressing anything. '
+
+test('a real-sized Claude build request reserves below the two-dollar card after planning', async t => {
+  const result = catalogue()
+  const opus = result.models['anthropic/claude-opus-5-5']
+  const { arrivals, endpoint } = await listenModel(t)
+  const ledger = new CardLedger({ path: ':memory:', card: 'JUL-252' })
+  t.after(() => ledger.close())
+  const planning = ledger.reserve({ model: 'anthropic/claude-opus-5-5', role: 'orchestrator', maximumNano: 763984000, price: opus.price, bounds: { maxInputTokens: 75018, maxOutputTokens: 8192 } })
+  ledger.settle(planning.id, { usage: { input: 4, output: 1945, cacheRead: 0, cacheWrite: 12640 }, costNano: 140036000 })
+  const guarded = createTransport({ ledger, role: 'orchestrator', settings: { models: { 'anthropic/claude-opus-5-5': { ...opus, endpoint, wireModel: 'claude-opus-5-5' } } } })
+  let content = ''
+  while (Buffer.byteLength(JSON.stringify({ model: 'claude-opus-5-5', messages: [{ role: 'user', content }] })) < 113059) content += buildNarrative
+  const body = JSON.stringify({ model: 'claude-opus-5-5', max_tokens: 8192, messages: [{ role: 'user', content }] })
+  assert.ok(Buffer.byteLength(body) >= 113059)
+  const response = await guarded(endpoint, { method: 'POST', headers: { 'content-type': 'application/json' }, body })
+  assert.equal(response.status, 200)
+  assert.equal(arrivals.length, 1)
+  const reservation = ledger.snapshot().requests.at(-1)
+  assert.ok(reservation.maximumNano < 1000000000, `reserved ${reservation.maximumNano} nano`)
+  assert.ok(ledger.snapshot().spentNano + reservation.maximumNano <= 2000000000)
 })
 
 test('a model missing from models.dev uses the provider published list and price', () => {
@@ -229,3 +255,17 @@ test('the CommandCode pricing page publishes parseable model rows', () => {
   assert.deepEqual(parseCommandCodePricingPage(html), rows)
   assert.throws(() => parseCommandCodePricingPage('<html>no rows</html>'), /did not publish model rows/)
 })
+
+async function listenModel(t) {
+  const arrivals = []
+  const server = createServer(async (req, res) => {
+    let text = ''
+    for await (const chunk of req) text += chunk
+    arrivals.push(JSON.parse(text))
+    res.writeHead(200, { 'content-type': 'application/json' })
+    res.end(JSON.stringify({ usage: { input_tokens: 28000, output_tokens: 2, cache_read_input_tokens: 12000, cache_creation_input_tokens: 1000 } }))
+  })
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+  t.after(() => new Promise(resolve => server.close(resolve)))
+  return { arrivals, endpoint: `http://127.0.0.1:${server.address().port}/v1/messages` }
+}

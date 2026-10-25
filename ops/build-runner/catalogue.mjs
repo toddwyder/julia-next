@@ -24,7 +24,7 @@ const PROVIDERS = {
     settingsKey: modelId => `anthropic/${modelId}`,
     wireModel: modelId => normalizeAnthropicModelId(modelId),
     cacheWriteTtl: '1h',
-    inputTokenEstimate: { method: 'utf8', multiplier: 2, framingTokens: 4096 },
+    inputTokenEstimate: { method: 'o200k_base', multiplier: 2, framingTokens: 4096 },
   },
   openai: {
     route: 'openai-codex',

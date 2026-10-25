@@ -1,0 +1,114 @@
+[
+  {
+    "result": {
+      "status": "completed",
+      "text": "# JUL-252 plan: Evidence review\n\nI couldn't open the repo for this plan, so I took the file paths from AGENTS.md and the card. Paths marked *(new)* are proposed names. Paths marked *(confirm)* need checking against the runner code before the build starts.\n\n## Files\n\n1. `docs/agents/JUL-252/todo.md` *(new)*: the poteto-mode todo list.\n2. `docs/agents/JUL-252/decision-log.md` *(new)*: the show-me-your-work decision log.\n3. `docs/adr/0023-evidence-review.md` *(new)*: records which other company's model is the reviewer, why, and how it fits the $2 card cap.\n4. Runner settings file *(confirm, under `ops/build-runner/`)*: the reviewer model's published price, where the price comes from, and limits on request tokens and calls.\n5. `ops/build-runner/evidence-review/prompt.md` *(new)*: the reviewer prompt. Every claim starts as unproven, and the reviewer tries to break each one. Each criterion gets one of three verdicts: `proven`, `unproven` or `wrong-thing-tested`.\n6. `ops/build-runner/evidence-review/review.mjs` *(new)*: runs the review with no human input. It loads the proof and the acceptance criteria, refuses requests that have no price or no limit, calls the reviewer and parses the verdicts.\n7. `ops/build-runner/evidence-review/linear-verdict.mjs` *(new)*: posts a table of verdicts per criterion on the Linear card.\n8. Card flow / state machine *(confirm, under `ops/build-runner/`)*: these transitions:\n   - Build done → Review\n   - Review fails → Remediation (once)\n   - Remediation → a new Review\n   - Second failure → Investigation → Stopped\n9. `ops/build-runner/evidence-review/playbook-guard.mjs` *(new)*: refuses a Remediation run unless its checklist follows poteto-mode's Bug fix playbook. It refuses an Investigation run unless its checklist follows the Investigation playbook.\n10. `ops/build-runner/framework/<reviewer-sdk>.learning.test.mjs` *(new)*: a learning test for the reviewer SDK's call and response shape, pinned to the installed version.\n11. `ops/build-runner/evidence-review/*.test.mjs` *(new)*: tests for verdict parsing, the budget refusal, the state transitions and the playbook guard.\n12. `GLOSSARY.md`: add Evidence review, Remediation and Investigation.\n\n## Steps\n\n1. Create the todo list and decision log under `docs/agents/JUL-252/`, then commit and push.\n2. Choose a reviewer from a different company than the builder, using the installed packages and their version-matched docs. Write ADR 0023.\n3. Add the reviewer's price, price source and request limits to the runner settings. Add a test that unpriced or unlimited requests are refused before they are sent.\n4. Write the SDK learning test under `ops/build-runner/framework/` and get it green.\n5. Write the adversarial prompt and `review.mjs`. Test that the output contains exactly one of the three verdicts for every criterion.\n6. Write `linear-verdict.mjs` so the verdict table posts to the card. Check it on a test card.\n7. Add the Review, Remediation and Investigation states to the card flow. Remediation is limited to one round, and the card stops after Investigation. Test every path.\n8. Add `playbook-guard.mjs` and call it before Remediation and Investigation runs are sent. Test that a checklist following a different playbook is refused.\n9. Run end to end on one real finished build with no one pressing anything. Record the cost against the $2 cap and save the proof under `docs/agents/JUL-252/`.\n10. Update `GLOSSARY.md`. Run `check-skill-names`, `check-agent-links` and the full test suite.\n11. Open a PR to `main` with the proof included, using `gh`, and get CI green.",
+      "finishReason": "complete",
+      "usage": {
+        "inputTokens": 12644,
+        "outputTokens": 1945,
+        "totalTokens": 14589
+      },
+      "toolCalls": [],
+      "toolResults": [],
+      "threadId": "52352b59-087d-4e95-a114-476b2b7f111b",
+      "exitCode": 0
+    },
+    "threadId": "52352b59-087d-4e95-a114-476b2b7f111b",
+    "account": {
+      "card": "JUL-252",
+      "ceilingNano": 2000000000,
+      "stopped": false,
+      "spentNano": 140036000,
+      "heldNano": 0,
+      "remainingNano": 1859964000,
+      "pricedBlocked": false,
+      "requests": [
+        {
+          "id": "3b872af9-368a-40dd-a302-53e9115bd3a9",
+          "card": "JUL-252",
+          "model": "anthropic/claude-opus-5-5",
+          "role": "orchestrator",
+          "maximumNano": 763984000,
+          "price": {
+            "input": 4,
+            "output": 20,
+            "cacheRead": 0.2,
+            "cacheWrite": 8
+          },
+          "bounds": {
+            "maxInputTokens": 75018,
+            "maxOutputTokens": 8192,
+            "inputCountBasis": "local UTF-8 estimate"
+          },
+          "state": "settled",
+          "usage": {
+            "input": 4,
+            "output": 1945,
+            "cacheRead": 0,
+            "cacheWrite": 12640
+          },
+          "costNano": 140036000,
+          "reason": null,
+          "costBasis": "reported usage"
+        }
+      ]
+    }
+  },
+  {
+    "result": {
+      "status": "error",
+      "text": "",
+      "finishReason": "error",
+      "toolCalls": [],
+      "toolResults": [],
+      "threadId": "098aead0-7a8b-43fc-abdf-588f6a9d4a31",
+      "error": {
+        "name": "Error",
+        "message": "Request ledger refused operation",
+        "stack": "Error: Request ledger refused operation\n    at fail (file:///home/ubuntu/julia-machine-main/ops/build-runner/transport.mjs:7:25)\n    at ledgerCall (file:///home/ubuntu/julia-machine-main/ops/build-runner/transport.mjs:175:65)\n    at guardedFetch (file:///home/ubuntu/julia-machine-main/ops/build-runner/transport.mjs:235:31)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async file:///home/ubuntu/julia-machine-main/ops/build-runner/request-observer.mjs:9:24\n    at async file:///home/ubuntu/julia-machine-main/ops/build-runner/node_modules/@mastra/code-sdk/dist/providers/claude-max.js:186:44\n    at async postToApi (file:///home/ubuntu/julia-machine-main/ops/build-runner/node_modules/@ai-sdk/anthropic/node_modules/@ai-sdk/provider-utils/dist/index.mjs:2727:22)\n    at async AnthropicMessagesLanguageModel.doStream (file:///home/ubuntu/julia-machine-main/ops/build-runner/node_modules/@ai-sdk/anthropic/dist/index.mjs:4984:50)\n    at async AISDKV6LanguageModel.doStream (file:///home/ubuntu/julia-machine-main/ops/build-runner/node_modules/@mastra/core/dist/llm-DtX483Xc.js:105:10)\n    at async ModelRouterLanguageModel.doStream (file:///home/ubuntu/julia-machine-main/ops/build-runner/node_modules/@mastra/core/dist/llm-DtX483Xc.js:8413:25)"
+      },
+      "exitCode": 1
+    },
+    "threadId": "098aead0-7a8b-43fc-abdf-588f6a9d4a31",
+    "account": {
+      "card": "JUL-252",
+      "ceilingNano": 2000000000,
+      "stopped": false,
+      "spentNano": 140036000,
+      "heldNano": 0,
+      "remainingNano": 1859964000,
+      "pricedBlocked": false,
+      "requests": [
+        {
+          "id": "3b872af9-368a-40dd-a302-53e9115bd3a9",
+          "card": "JUL-252",
+          "model": "anthropic/claude-opus-5-5",
+          "role": "orchestrator",
+          "maximumNano": 763984000,
+          "price": {
+            "input": 4,
+            "output": 20,
+            "cacheRead": 0.2,
+            "cacheWrite": 8
+          },
+          "bounds": {
+            "maxInputTokens": 75018,
+            "maxOutputTokens": 8192,
+            "inputCountBasis": "local UTF-8 estimate"
+          },
+          "state": "settled",
+          "usage": {
+            "input": 4,
+            "output": 1945,
+            "cacheRead": 0,
+            "cacheWrite": 12640
+          },
+          "costNano": 140036000,
+          "reason": null,
+          "costBasis": "reported usage"
+        }
+      ]
+    }
+  }
+]
