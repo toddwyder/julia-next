@@ -111,7 +111,7 @@ test('checklist items may be shortened, out of the steps order they may not be, 
   assert.deepEqual(checkPlaybookConformity({ required: 'feature', declared: 'feature', playbookText: text, checklistText: annotated }), { ok: true })
   const firstSentences = ['Playbook: Feature', ...steps.map((step, index) => `- [x] ${index + 1}. ${step.split('. ')[0]}.`)].join('\n')
   assert.deepEqual(checkPlaybookConformity({ required: 'feature', declared: 'feature', playbookText: text, checklistText: firstSentences }), { ok: true })
-  const stubs = checkPlaybookConformity({ required: 'feature', declared: 'feature', playbookText: text, checklistText: ['Playbook: Feature', ...steps.map((step, index) => `${index + 1}. ${step.slice(0, 12)}`)].join('\n') })
+  const stubs = checkPlaybookConformity({ required: 'feature', declared: 'feature', playbookText: text, checklistText: ['Playbook: Feature', ...steps.map((step, index) => `${index + 1}. ${step.slice(0, 20)}`)].join('\n') })
   assert.equal(stubs.ok, false)
   const reversed = checkPlaybookConformity({ required: 'feature', declared: 'feature', playbookText: text, checklistText: ['Playbook: Feature', `1. ${steps[1]}`, `2. ${steps[0]}`].join('\n') })
   assert.equal(reversed.ok, false)
