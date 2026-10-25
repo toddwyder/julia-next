@@ -15,13 +15,18 @@ function runnerService(config) {
   return config.runnerService ?? (config.services ?? []).find(service => service.includes('runner')) ?? null
 }
 
+export function cgroupProcsPath(cgroup, root = '/sys/fs/cgroup') {
+  return [join(root, cgroup, 'cgroup.procs'), join(cgroup, 'cgroup.procs')].find(existsSync) ?? null
+}
+
 export function buildRunning(config) {
   const service = runnerService(config)
   if (!service) return false
   let cgroup
   try { cgroup = command('systemctl', ['--user', 'show', service, '--property=ControlGroup', '--value']) } catch { return false }
   if (!cgroup) return false
-  const procs = cgroup.startsWith('/') ? join(cgroup, 'cgroup.procs') : join('/sys/fs/cgroup', cgroup, 'cgroup.procs')
+  const procs = cgroupProcsPath(cgroup)
+  if (!procs) return false
   let pids
   try { pids = readFileSync(procs, 'utf8').trim().split(/\s+/).filter(Boolean) } catch { return false }
   return pids.some(pid => {
