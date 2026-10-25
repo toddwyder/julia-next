@@ -85,6 +85,12 @@ test('signed-in stock subscriptions offer catalogue metadata without tokens', as
   })
 })
 
+test('subscription offers do not depend on a settings.models block', async t => {
+  const { settingsPath } = await fixture(t, ['openai-codex', 'anthropic'])
+  const offers = await stockSubscriptionOffers(settingsPath, sources)
+  assert.deepEqual(offers.map(offer => offer.route), ['claude', 'openai-codex'])
+})
+
 test('only the signed-in provider contributes stock offers', async t => {
   const { settingsPath } = await fixture(t, ['anthropic'])
   assert.deepEqual((await stockSubscriptionOffers(settingsPath, sources)).map(offer => [offer.route, offer.modelId]), [
