@@ -102,11 +102,13 @@ test('an empty or absent checklist is refused', async () => {
 test('checklist items may be shortened, out of the steps order they may not be, and extra items are allowed between', async () => {
   const text = await playbook('feature')
   const steps = playbookSteps(text)
-  const shortened = ['Playbook: Feature', `1. ${steps[0]}`, '- [x] an extra unrelated item', `2. ${steps[1].slice(0, 40)}`, ...steps.slice(2).map((step, index) => `${index + 3}. ${step}`)].join('\n')
+  const shortened = ['Playbook: Feature', ...steps.slice(0, 3).map((step, index) => `${index + 1}. ${step}`), '- [x] an extra unrelated item', `4. ${steps[3].slice(0, 50)}`, ...steps.slice(4).map((step, index) => `${index + 5}. ${step}`)].join('\n')
   assert.deepEqual(checkPlaybookConformity({ required: 'feature', declared: 'feature', playbookText: text, checklistText: shortened }), { ok: true })
   const tooShort = checkPlaybookConformity({ required: 'feature', declared: 'feature', playbookText: text, checklistText: ['Playbook: Feature', '1. how o', `2. ${steps[1]}`, `3. ${steps[2]}`].join('\n') })
   assert.equal(tooShort.ok, false)
   assert.match(tooShort.reason, /missing playbook step 1/)
+  const stubs = checkPlaybookConformity({ required: 'feature', declared: 'feature', playbookText: text, checklistText: ['Playbook: Feature', ...steps.map((step, index) => `${index + 1}. ${step.slice(0, 12)}`)].join('\n') })
+  assert.equal(stubs.ok, false)
   const reversed = checkPlaybookConformity({ required: 'feature', declared: 'feature', playbookText: text, checklistText: ['Playbook: Feature', `1. ${steps[1]}`, `2. ${steps[0]}`].join('\n') })
   assert.equal(reversed.ok, false)
   assert.match(reversed.reason, /missing playbook step 2/)
@@ -254,4 +256,19 @@ test('the three stage prompts carry what the run has to follow', () => {
   assert.match(investigation, /Evidence review round 1: failed/)
   assert.match(investigation, /Evidence review round 2: failed/)
   assert.match(investigation, /wrong thing tested/)
+})
+
+test('review findings: empty playbooks, decorated declarations, nested criteria and conflicting verdicts', () => {
+  assert.deepEqual(checkPlaybookConformity({ required: 'opening-a-pr', declared: 'opening-a-pr', playbookText: 'No numbered steps.', checklistText: 'Playbook: Opening a PR\n- [x] 1. fed the cat' }), { ok: false, reason: 'playbook opening-a-pr has no numbered steps' })
+  for (const line of ['Playbook: Bug fix.', 'Playbook: **Bug fix**', 'Playbook: Bug fix, remediation round', 'Playbook: Feature (poteto-mode playbooks/feature.md)']) {
+    assert.ok(['bug-fix', 'feature'].includes(declaredPlaybook(line)), line)
+  }
+  const nested = parseCriteria({ title: 'T', description: '## Acceptance criteria\n\n- [ ] The saved card resumes\n  - after a pause, with the same thread\n* Second.' })
+  assert.deepEqual(nested.map(item => item.text), ['The saved card resumes', 'Second.'])
+  assert.deepEqual(parseCriteria({ title: 'Only prose', description: '## Acceptance criteria\n\nIt works.' }), [{ criterion: 1, text: 'Only prose' }])
+  const one = [{ criterion: 1, text: 'One' }]
+  const raw = JSON.stringify({ verdicts: [{ criterion: 1, verdict: 'proven', proofFile: 'a.md' }, { criterion: 1, verdict: 'unproven', reason: 'broken' }] })
+  const result = parseVerdicts({ raw, criteria: one, proofFileExists: () => true })
+  assert.equal(result.passed, false)
+  assert.equal(result.verdicts[0].reason, 'reviewer gave more than one verdict')
 })

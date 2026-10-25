@@ -6,8 +6,8 @@ export const REQUIRED_PLAYBOOK = { remediation: 'bug-fix', investigation: 'inves
 
 const CRITERIA_HEADING = /^#+\s*acceptance criteria/i
 const ANY_HEADING = /^#{1,6}\s+/
-const BULLET = /^\s*(?:[*+-]|\d+[.)])\s+(.+)$/
-const PLAYBOOK_LINE = /playbook:\s*([A-Za-z][A-Za-z -]*?)\s*(?:\(|$)/i
+const BULLET = /^(?:[*+-]|\d+[.)])\s+(?:\[[ xX]\]\s+)?(.+)$/
+const PLAYBOOK_LINE = /playbook:\s*[*_`]*\s*([A-Za-z](?:[A-Za-z -]*[A-Za-z])?)/i
 const STEP_LINE = /^\d+\.\s+(.+)$/
 
 const cardLabel = card => [card?.identifier ?? card?.id, card?.title].filter(Boolean).join(' ')
@@ -24,7 +24,7 @@ export function parseCriteria(card) {
     const text = bullet[1].trim()
     if (text) criteria.push({ criterion: criteria.length + 1, text })
   }
-  return criteria
+  return criteria.length || !card?.title ? criteria : [{ criterion: 1, text: String(card.title).trim() }]
 }
 
 export function declaredPlaybook(checklistText) {
@@ -62,7 +62,7 @@ function itemMatchesStep(item, step) {
   const itemText = normalize(item)
   const stepText = normalize(step)
   if (!itemText || !stepText) return false
-  if (stepText.startsWith(itemText) && itemText.length >= Math.min(12, stepText.length)) return true
+  if (stepText.startsWith(itemText) && itemText.length >= Math.min(40, stepText.length)) return true
   return itemText.startsWith(stepText)
 }
 
@@ -71,6 +71,7 @@ export function checkPlaybookConformity({ required, declared, playbookText, chec
   if (declared !== required) return { ok: false, reason: `checklist follows ${declared ?? 'no declared playbook'}, run requires ${required}` }
   const items = parseChecklist(checklistText)
   const steps = playbookSteps(playbookText)
+  if (!steps.length) return { ok: false, reason: `playbook ${required} has no numbered steps` }
   let cursor = -1
   for (const [index, step] of steps.entries()) {
     const found = items.findIndex((item, position) => position > cursor && itemMatchesStep(item.text, step))
@@ -123,6 +124,7 @@ export function parseVerdicts({ raw, criteria, proofFileExists }) {
     problems.push({ reason: `verdicts.json is not readable JSON: ${error.message}` })
   }
   const byCriterion = new Map()
+  const conflicting = new Set()
   for (const entry of reported) {
     const number = entry?.criterion
     if (!Number.isInteger(number) || !list.some(item => item.criterion === number)) {
@@ -131,6 +133,7 @@ export function parseVerdicts({ raw, criteria, proofFileExists }) {
     }
     if (byCriterion.has(number)) {
       problems.push({ ...entry, problem: 'duplicate criterion' })
+      conflicting.add(number)
       continue
     }
     byCriterion.set(number, entry)
@@ -141,6 +144,7 @@ export function parseVerdicts({ raw, criteria, proofFileExists }) {
     if (noReadable) return { ...base, verdict: 'unproven', reason: 'reviewer wrote no readable verdicts' }
     const entry = byCriterion.get(item.criterion)
     if (!entry) return { ...base, verdict: 'unproven', reason: 'reviewer gave no verdict' }
+    if (conflicting.has(item.criterion)) return { ...base, verdict: 'unproven', reason: 'reviewer gave more than one verdict' }
     const proofFile = typeof entry.proofFile === 'string' && entry.proofFile.trim() ? entry.proofFile.trim() : null
     if (!VERDICTS.includes(entry.verdict)) {
       return { ...base, proofFile, verdict: 'unproven', reason: `reviewer verdict not recognised: ${String(entry.verdict)}` }

@@ -1,7 +1,7 @@
 import { observeRequests } from './request-observer.mjs'
 import { readFile, writeFile, rename, mkdir, appendFile, rm } from 'node:fs/promises'
-import { statSync } from 'node:fs'
-import { join, resolve, dirname } from 'node:path'
+import { realpathSync, statSync } from 'node:fs'
+import { join, resolve, dirname, relative, isAbsolute } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execFile as execFileCb } from 'node:child_process'
 import { promisify } from 'node:util'
@@ -148,8 +148,21 @@ async function main() {
     }
   }
 
+  async function baseFile(path) {
+    try { return (await execFile('git', ['-C', job.worktree, 'show', `${job.baseCommit}:${path}`], { maxBuffer: 16 * 1024 * 1024 })).stdout } catch { return null }
+  }
+
+  function proofFileExists(tree, path) {
+    try {
+      const root = realpathSync(tree)
+      const target = realpathSync(join(tree, path))
+      const inside = relative(root, target)
+      return !inside.startsWith('..') && !isAbsolute(inside) && statSync(target).isFile()
+    } catch { return false }
+  }
+
   async function assertPlaybook({ required, declared, checklistText }) {
-    const playbookText = await readOptional(join(job.worktree, PLAYBOOKS, `${required}.md`))
+    const playbookText = await baseFile(`${PLAYBOOKS}/${required}.md`)
     if (playbookText == null) throw refusal(`playbook ${required} is missing from ${PLAYBOOKS}`)
     const conformity = checkPlaybookConformity({ required, declared, playbookText, checklistText })
     if (!conformity.ok) throw refusal(conformity.reason)
@@ -193,12 +206,12 @@ async function main() {
       cwd: tree,
       settingsPath: reviewSettingsPath,
       stateDir: join(reviewDir, 'state'),
-      hostInstructions: await readFile(join(job.worktree, REVIEW_SKILL), 'utf8'),
+      hostInstructions: await baseFile(REVIEW_SKILL) ?? '',
       prompt: reviewPrompt({ card, criteria, round }),
       subagents: [],
     })
     const raw = await readOptional(join(tree, '.builder-home', 'review', 'verdicts.json'))
-    const outcome = parseVerdicts({ raw, criteria, proofFileExists: path => { try { return statSync(join(tree, path)).isFile() } catch { return false } } })
+    const outcome = parseVerdicts({ raw, criteria, proofFileExists: path => proofFileExists(tree, path) })
     const entry = { stage: 'review', round, candidateCommit, verdicts: outcome.verdicts, passed: outcome.passed }
     job.review.history.push(entry)
     entry.note = formatVerdictNote({ cardId, round, reviewer, candidateCommit, verdicts: outcome.verdicts, passed: outcome.passed, next: nextStage(job.review.history) })
@@ -268,6 +281,10 @@ async function main() {
     await atomicWriteJson(join(jobDir, 'job.json'), job)
     await runner?.close()
     runner = null
+    await runReviewLoop()
+  }
+
+  async function runReviewLoop() {
     let stage = nextStage(job.review.history)
     while (stage !== 'passed' && stage !== 'stopped') {
       const recorded = job.review.history.length
@@ -288,7 +305,16 @@ async function main() {
     }
     await atomicWriteJson(join(jobDir, 'job.json'), job)
   }
+  const resumeReview = continueRun && Boolean(job.pause?.reviewStage) && Array.isArray(job.review?.history) && Boolean(job.result?.candidateCommit)
   try {
+    if (resumeReview) {
+      candidateCommit = job.result.candidateCommit
+      checklist = await readOptional(join(jobDir, 'pstack-checklist.md'))
+      decisions = await readOptional(join(jobDir, 'pstack-decisions.tsv'))
+      job.error = null
+      job.pause = null
+      await runReviewLoop()
+    } else {
     runner = await openRunner({ card: cardId, settingsPath: effectiveSettingsPath, cwd: job.worktree, stateDir, role: 'orchestrator', hostInstructions: workflowInstructions, subagents: helpers })
     globalThis.fetch = observeRequests(globalThis.fetch, requests)
     const unsubscribe = runner.runtime.session.subscribe(e => { if (allowedEventTypes.has(e?.type)) events.push(e) })
@@ -362,13 +388,15 @@ async function main() {
     } else {
       await reviewBeforePublishing()
     }
+    }
   } catch (error) {
     failure = error
     if (error.pause) {
       job.state = 'paused'
       job.error = { message: error.pause }
-      job.result = null
-      job.pause = { reason: error.pause, message: error.pause, threadId: receipt?.threadId ?? null, at: new Date().toISOString() }
+      const reviewStage = job.review ? nextStage(job.review.history) : null
+      if (!reviewStage) job.result = null
+      job.pause = { reason: error.pause, message: error.pause, threadId: reviewStage ? null : (receipt?.threadId ?? null), ...(reviewStage ? { reviewStage } : {}), at: new Date().toISOString() }
       const note = await postLinearComment({ card: cardId, message: `${cardId} paused: ${error.pause}. Its work is kept in the run worktree and can be continued.`, apiKey: linearKey })
       job.linearNote = { card: cardId, message: job.error.message, ...note }
     } else if (error.refused) {

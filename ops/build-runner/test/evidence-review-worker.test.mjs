@@ -20,7 +20,7 @@ const card = {
 const verdicts = (verdict, proofFile = '.builder-home/proof/diff.patch') => JSON.stringify({ verdicts: [1, 2, 3].map(criterion => ({ criterion, verdict, proofFile, reason: `${verdict} by fixture` })) })
 const reviewFile = verdict => ({ '.builder-home/review/verdicts.json': verdicts(verdict) })
 
-async function runWorker(script, env = {}) {
+async function runWorker(script, env = {}, continueAfterPause = false) {
   const dir = mkdtempSync(join(tmpdir(), 'jul252-worker-'))
   const git = (...args) => execFileSync('git', ['-C', worktree, ...args], { encoding: 'utf8' }).trim()
   const worktree = join(dir, 'worktree')
@@ -46,17 +46,22 @@ async function runWorker(script, env = {}) {
   const logPath = join(dir, 'log.jsonl')
   writeFileSync(scriptPath, JSON.stringify(script))
   writeFileSync(logPath, '')
-  const child = spawn(process.execPath, ['--import', fileURLToPath(new URL('./fake-runtime/hooks.mjs', import.meta.url)), join(runnerDir, 'worker.mjs'), '--job-dir', jobDir], {
-    env: { PATH: process.env.PATH, FAKE_SCRIPT: scriptPath, FAKE_LOG: logPath, LINEAR_API_KEY: 'fixture-key', ...env },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  })
   let output = ''
-  for (const stream of [child.stdout, child.stderr]) stream.on('data', data => { output += data })
-  await new Promise(resolve => child.on('close', resolve))
-  const job = JSON.parse(readFileSync(join(jobDir, 'job.json'), 'utf8'))
+  const runOnce = async extra => {
+    const child = spawn(process.execPath, ['--import', fileURLToPath(new URL('./fake-runtime/hooks.mjs', import.meta.url)), join(runnerDir, 'worker.mjs'), '--job-dir', jobDir, ...extra], {
+      env: { PATH: process.env.PATH, FAKE_SCRIPT: scriptPath, FAKE_LOG: logPath, LINEAR_API_KEY: 'fixture-key', ...env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    for (const stream of [child.stdout, child.stderr]) stream.on('data', data => { output += data })
+    await new Promise(resolve => child.on('close', resolve))
+    return JSON.parse(readFileSync(join(jobDir, 'job.json'), 'utf8'))
+  }
+  let job = await runOnce([])
+  const paused = job
+  if (continueAfterPause) job = await runOnce(['--continue'])
   const log = readFileSync(logPath, 'utf8').split('\n').filter(Boolean).map(line => JSON.parse(line))
   rmSync(dir, { recursive: true, force: true })
-  return { job, log, output }
+  return { job, log, output, paused }
 }
 
 const opened = log => log.filter(entry => entry.kind === 'open')
@@ -139,4 +144,30 @@ test('with no signed-in reviewer from another company the card stops with a note
   assert.equal(job.error.stopped, true)
   assert.deepEqual(opened(log).map(entry => entry.role), ['orchestrator'])
   assert.match(comments(log)[0], /no reviewer model from another company/)
+})
+
+test('a reviewer citing a proof file that links outside the exported tree is recorded unproven', async () => {
+  const escape = { files: reviewFile('proven'), links: { 'escape.md': '/etc/hostname' } }
+  escape.files['.builder-home/review/verdicts.json'] = verdicts('proven', 'escape.md')
+  const { job } = await runWorker([build, escape, { files: { '.builder-home/pstack/checklist.md': checklistFor('Bug fix', 'bug-fix') } }, { files: reviewFile('proven') }])
+  assert.ok(job.review.history[0].verdicts.every(entry => entry.verdict === 'unproven'))
+})
+
+test('a review that pauses keeps the saved build and its history, and continuing resumes the loop without resetting the review count', async () => {
+  const { job, paused, log, output } = await runWorker([
+    build,
+    { files: reviewFile('unproven') },
+    { status: 'max_turns' },
+    { files: { '.builder-home/pstack/checklist.md': checklistFor('Bug fix', 'bug-fix'), 'feature.txt': 'fixed\n' } },
+    { files: reviewFile('unproven') },
+    { files: { '.builder-home/pstack/checklist.md': checklistFor('Investigation', 'investigation'), '.builder-home/investigation/root-cause.md': 'Root.' } },
+  ], {}, true)
+  assert.equal(paused.state, 'paused')
+  assert.equal(paused.pause.reviewStage, 'remediation')
+  assert.ok(paused.result.candidateCommit)
+  assert.deepEqual(paused.review.history.map(entry => entry.stage), ['review'])
+  assert.equal(job.state, 'failed', output)
+  assert.equal(job.error.stopped, true)
+  assert.deepEqual(job.review.history.map(entry => entry.stage), ['review', 'remediation', 'review', 'investigation'])
+  assert.equal(opened(log).filter(entry => entry.role === 'reviewer').length, 2)
 })

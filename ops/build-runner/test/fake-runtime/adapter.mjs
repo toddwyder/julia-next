@@ -1,11 +1,12 @@
-import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { appendFileSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
 export const SESSION_INACTIVITY_MS = 1000
 
 const log = entry => appendFileSync(process.env.FAKE_LOG, JSON.stringify(entry) + '\n')
 const script = JSON.parse(readFileSync(process.env.FAKE_SCRIPT, 'utf8'))
-let turn = 0
+const turnFile = `${process.env.FAKE_SCRIPT}.turn`
+let turn = Number((() => { try { return readFileSync(turnFile, 'utf8') } catch { return '0' } })())
 
 globalThis.fetch = async (input, init) => {
   const request = new Request(input, init)
@@ -29,12 +30,14 @@ export async function openRunner({ cwd, settingsPath, role, hostInstructions, su
     snapshot: () => ({ spentNano: 0 }),
     async run({ prompt }) {
       const step = script[turn++] ?? {}
+      writeFileSync(turnFile, String(turn))
       log({ kind: 'run', role, prompt: prompt.slice(0, 80) })
       for (const [path, text] of Object.entries(step.files ?? {})) {
         mkdirSync(dirname(join(cwd, path)), { recursive: true })
         writeFileSync(join(cwd, path), text)
       }
-      return { threadId: `thread-${turn}`, result: { status: 'completed' }, account: { spentNano: 0 } }
+      for (const [path, target] of Object.entries(step.links ?? {})) symlinkSync(target, join(cwd, path))
+      return { threadId: `thread-${turn}`, result: { status: step.status ?? 'completed' }, account: { spentNano: 0 } }
     },
     async close() {},
   }
