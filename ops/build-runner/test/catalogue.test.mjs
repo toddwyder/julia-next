@@ -168,17 +168,7 @@ const buildNarrative = 'The evidence review starts from unproven and tries to br
 test('a real-sized Claude build request reserves below the two-dollar card after planning', async t => {
   const result = catalogue()
   const opus = result.models['anthropic/claude-opus-5-5']
-  const arrivals = []
-  const server = createServer(async (req, res) => {
-    let text = ''
-    for await (const chunk of req) text += chunk
-    arrivals.push(JSON.parse(text))
-    res.writeHead(200, { 'content-type': 'application/json' })
-    res.end(JSON.stringify({ usage: { input_tokens: 28000, output_tokens: 2, cache_read_input_tokens: 12000, cache_creation_input_tokens: 1000 } }))
-  })
-  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
-  t.after(() => new Promise(resolve => server.close(resolve)))
-  const endpoint = `http://127.0.0.1:${server.address().port}/v1/messages`
+  const { arrivals, endpoint } = await listenModel(t)
   const ledger = new CardLedger({ path: ':memory:', card: 'JUL-252' })
   t.after(() => ledger.close())
   const planning = ledger.reserve({ model: 'anthropic/claude-opus-5-5', role: 'orchestrator', maximumNano: 763984000, price: opus.price, bounds: { maxInputTokens: 75018, maxOutputTokens: 8192 } })
@@ -265,3 +255,17 @@ test('the CommandCode pricing page publishes parseable model rows', () => {
   assert.deepEqual(parseCommandCodePricingPage(html), rows)
   assert.throws(() => parseCommandCodePricingPage('<html>no rows</html>'), /did not publish model rows/)
 })
+
+async function listenModel(t) {
+  const arrivals = []
+  const server = createServer(async (req, res) => {
+    let text = ''
+    for await (const chunk of req) text += chunk
+    arrivals.push(JSON.parse(text))
+    res.writeHead(200, { 'content-type': 'application/json' })
+    res.end(JSON.stringify({ usage: { input_tokens: 28000, output_tokens: 2, cache_read_input_tokens: 12000, cache_creation_input_tokens: 1000 } }))
+  })
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+  t.after(() => new Promise(resolve => server.close(resolve)))
+  return { arrivals, endpoint: `http://127.0.0.1:${server.address().port}/v1/messages` }
+}

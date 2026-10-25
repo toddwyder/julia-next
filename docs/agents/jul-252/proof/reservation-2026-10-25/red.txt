@@ -1,6 +1,6 @@
 $ node --test --test-reporter=spec --test-name-pattern="real-sized Claude build request|prices, bounds and wire endpoints" ops/build-runner/test/catalogue.test.mjs
-✖ prices, bounds and wire endpoints come from the published catalogue (31.426622ms)
-✖ a real-sized Claude build request reserves below the two-dollar card after planning (84.295287ms)
+✖ prices, bounds and wire endpoints come from the published catalogue (26.860425ms)
+✖ a real-sized Claude build request reserves below the two-dollar card after planning (80.826873ms)
 ℹ tests 2
 ℹ suites 0
 ℹ pass 0
@@ -8,12 +8,12 @@ $ node --test --test-reporter=spec --test-name-pattern="real-sized Claude build 
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 395.801413
+ℹ duration_ms 350.698595
 
 ✖ failing tests:
 
 test at ops/build-runner/test/catalogue.test.mjs:135:1
-✖ prices, bounds and wire endpoints come from the published catalogue (31.426622ms)
+✖ prices, bounds and wire endpoints come from the published catalogue (26.860425ms)
   AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
   + actual - expected
   
@@ -39,12 +39,12 @@ test at ops/build-runner/test/catalogue.test.mjs:135:1
   }
 
 test at ops/build-runner/test/catalogue.test.mjs:168:1
-✖ a real-sized Claude build request reserves below the two-dollar card after planning (84.295287ms)
+✖ a real-sized Claude build request reserves below the two-dollar card after planning (80.826873ms)
   Error: Request ledger refused operation
       at fail (file:///home/ubuntu/julia-builder/ops/build-runner/transport.mjs:7:25)
       at ledgerCall (file:///home/ubuntu/julia-builder/ops/build-runner/transport.mjs:175:65)
       at guardedFetch (file:///home/ubuntu/julia-builder/ops/build-runner/transport.mjs:235:31)
       at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
-      at async TestContext.<anonymous> (file:///home/ubuntu/julia-builder/ops/build-runner/test/catalogue.test.mjs:191:20)
+      at async TestContext.<anonymous> (file:///home/ubuntu/julia-builder/ops/build-runner/test/catalogue.test.mjs:181:20)
       at async Test.run (node:internal/test_runner/test:1125:7)
       at async Test.processPendingSubtests (node:internal/test_runner/test:787:7)

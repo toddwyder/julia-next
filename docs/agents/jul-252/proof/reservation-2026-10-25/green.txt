@@ -1,6 +1,6 @@
 $ node --test --test-reporter=spec --test-name-pattern="real-sized Claude build request|prices, bounds and wire endpoints" ops/build-runner/test/catalogue.test.mjs
-✔ prices, bounds and wire endpoints come from the published catalogue (26.711728ms)
-✔ a real-sized Claude build request reserves below the two-dollar card after planning (1747.962863ms)
+✔ prices, bounds and wire endpoints come from the published catalogue (22.863731ms)
+✔ a real-sized Claude build request reserves below the two-dollar card after planning (1585.108148ms)
 ℹ tests 2
 ℹ suites 0
 ℹ pass 2
@@ -8,4 +8,4 @@ $ node --test --test-reporter=spec --test-name-pattern="real-sized Claude build 
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 2118.877546
+ℹ duration_ms 1948.855861
