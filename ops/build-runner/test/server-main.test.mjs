@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { execFileSync, spawn, spawnSync } from 'node:child_process'
+import { cgroupProcsPath } from '../server-main.mjs'
 import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, rmSync, chmodSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -84,6 +85,19 @@ console.log(JSON.stringify(process.argv.some(arg => arg.includes('/commits/')) ?
   assert.equal(f.poll().updated, true)
   assert.equal(f.git(f.checkout, 'rev-parse', 'HEAD'), laterMerge)
   assert.equal(f.poll().updated, false)
+})
+
+test('the cgroup procs path resolves systemd-relative and absolute cgroups', t => {
+  const root = mkdtempSync(join(tmpdir(), 'cgroup-path-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  mkdirSync(join(root, 'user.slice', 'x'), { recursive: true })
+  writeFileSync(join(root, 'user.slice', 'x', 'cgroup.procs'), '1\n')
+  assert.equal(cgroupProcsPath('/user.slice/x', root), join(root, 'user.slice', 'x', 'cgroup.procs'))
+  const absolute = join(root, 'cgroup')
+  mkdirSync(absolute, { recursive: true })
+  writeFileSync(join(absolute, 'cgroup.procs'), '2\n')
+  assert.equal(cgroupProcsPath(absolute), join(absolute, 'cgroup.procs'))
+  assert.equal(cgroupProcsPath('/does/not/exist', root), null)
 })
 
 test('a merge is deferred while a build worker runs and applies after it ends', t => {
