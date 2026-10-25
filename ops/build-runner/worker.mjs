@@ -1,16 +1,36 @@
 import { observeRequests } from './request-observer.mjs'
-import { readFile, writeFile, rename, mkdir, appendFile } from 'node:fs/promises'
-import { join, resolve, dirname } from 'node:path'
+import { readFile, writeFile, rename, mkdir, appendFile, rm } from 'node:fs/promises'
+import { realpathSync, statSync } from 'node:fs'
+import { join, resolve, dirname, relative, isAbsolute } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execFile as execFileCb } from 'node:child_process'
 import { promisify } from 'node:util'
 import { openRunner, SESSION_INACTIVITY_MS } from './adapter.mjs'
 import { hydrateSettings, loadCatalogue } from './catalogue.mjs'
 import { createPstackSession, inspectPstackRun } from './pstack-session.mjs'
-import { postLinearComment } from './linear-note.mjs'
+import { postLinearComment, moveLinearCard } from './linear-note.mjs'
 import { pauseReason } from './worker-policy.mjs'
+import {
+  REQUIRED_PLAYBOOK,
+  parseCriteria,
+  declaredPlaybook,
+  checkPlaybookConformity,
+  nextStage,
+  parseVerdicts,
+  formatVerdictNote,
+  requiredBuildPlaybook,
+  requiredPlaybookForRun,
+  unprovenVerdicts,
+  reviewPrompt,
+  remediationPrompt,
+  investigationPrompt,
+} from './evidence-review.mjs'
 
 const execFile = promisify(execFileCb)
+const PLAYBOOKS = '.agents/skills/poteto-mode/playbooks'
+const REVIEW_SKILL = '.agents/skills/adversarial-review/SKILL.md'
+const refusal = reason => Object.assign(new Error(`run refused: ${reason}`), { refused: `run refused: ${reason}` })
+const stop = message => Object.assign(new Error(message), { stopped: message })
 
 function argValue(name) {
   const idx = process.argv.indexOf(name)
@@ -59,6 +79,10 @@ async function main() {
   const catalogue = await loadCatalogue({ settingsPath: settingsPathValue })
   const settings = hydrateSettings(JSON.parse(await readFile(settingsPathValue, 'utf8')), catalogue)
   settings.ledgerPath ??= join(dirname(jobDir), 'cards.sqlite')
+  const signInFor = { claude: 'anthropic', 'openai-codex': 'openai-codex', commandcode: 'commandcode' }
+  for (const spec of Object.values(settings.models)) {
+    if (catalogue.connected?.[signInFor[spec.route]] === false) spec.unavailable ??= 'provider not signed in'
+  }
   const pstackModels = await readFile(new URL('./pstack-models.md', import.meta.url), 'utf8')
   const session = createPstackSession(settings, { ...snapshot, machineryProof: job.machineryProof === true || snapshot.machineryProof }, pstackModels)
   const { orchestratorModel, coderModel, reviewerModel, helpers, hostInstructions, prompt } = session
@@ -104,8 +128,219 @@ async function main() {
   let checklist
   let decisions
   let internalReview
+  const allowedEventTypes = new Set(['subagent_start', 'subagent_end', 'subagent_tool_start', 'subagent_tool_end', 'tool_start', 'tool_end', 'agent_start', 'agent_end', 'error', 'task_updated', 'state_changed', 'message_end'])
+  const criteria = parseCriteria(card)
+
+  async function runStage({ role, cwd, settingsPath, stateDir: stageStateDir, hostInstructions: stageInstructions, prompt: stagePrompt, subagents = helpers }) {
+    const stageRunner = await openRunner({ card: cardId, settingsPath, cwd, stateDir: stageStateDir, role, hostInstructions: stageInstructions, subagents })
+    globalThis.fetch = observeRequests(globalThis.fetch, requests)
+    const unsubscribe = stageRunner.runtime.session.subscribe(e => { if (allowedEventTypes.has(e?.type)) events.push(e) })
+    try {
+      const stageReceipt = await stageRunner.run({ prompt: stagePrompt, maxTurns: 100, inactivityMs: SESSION_INACTIVITY_MS })
+      receipts.push(stageReceipt)
+      receipt = stageReceipt
+      const paused = pauseReason(stageReceipt?.result?.status, stageReceipt?.result?.error?.message)
+      if (paused) { const error = new Error(paused); error.pause = paused; throw error }
+      if (stageReceipt?.result?.status !== 'completed') throw new Error(stageReceipt?.result?.error?.message ?? `session ended ${stageReceipt?.result?.status ?? 'without a result'}`)
+      account = stageReceipt.account ?? stageRunner.snapshot()
+      return stageReceipt
+    } finally {
+      unsubscribe()
+      try { await stageRunner.close() } catch {}
+    }
+  }
+
+  async function baseFile(path) {
+    try { return (await execFile('git', ['-C', job.worktree, 'show', `${job.baseCommit}:${path}`], { maxBuffer: 16 * 1024 * 1024 })).stdout } catch { return null }
+  }
+
+  function proofFileExists(tree, path) {
+    try {
+      const root = realpathSync(tree)
+      const target = realpathSync(join(tree, path))
+      const inside = relative(root, target)
+      return !inside.startsWith('..') && !isAbsolute(inside) && statSync(target).isFile()
+    } catch { return false }
+  }
+
+  async function assertPlaybook({ required, declared, checklistText }) {
+    const playbookText = await baseFile(`${PLAYBOOKS}/${required}.md`)
+    if (playbookText == null) throw refusal(`playbook ${required} is missing from ${PLAYBOOKS}`)
+    const conformity = checkPlaybookConformity({ required, declared, playbookText, checklistText })
+    if (!conformity.ok) throw refusal(conformity.reason)
+  }
+
+  async function writeReviewProof(tree) {
+    const proofDir = join(tree, '.builder-home', 'proof')
+    await mkdir(proofDir, { recursive: true })
+    const { stdout: diff } = await execFile('git', ['-C', job.worktree, 'diff', `${job.baseCommit}..${candidateCommit}`], { maxBuffer: 64 * 1024 * 1024 })
+    const proof = {
+      'card.json': JSON.stringify(card, null, 2),
+      'criteria.md': criteria.map(item => `${item.criterion}. ${item.text}`).join('\n'),
+      'checklist.md': checklist ?? '',
+      'decisions.tsv': decisions ?? '',
+      'changed-files.txt': (job.result.changedFiles ?? []).join('\n'),
+      'diff.patch': diff,
+      'history.json': JSON.stringify(job.review.history, null, 2),
+    }
+    for (const [name, text] of Object.entries(proof)) await writeFile(join(proofDir, name), text)
+  }
+
+  async function reviewStage() {
+    const round = job.review.history.filter(entry => entry.stage === 'review').length + 1
+    if (round === 1) await moveLinearCard({ card: cardId, stateName: 'Evidence review', apiKey: linearKey })
+    const reviewer = startReviewer()
+    job.review.reviewer = reviewer
+    await atomicWriteJson(join(jobDir, 'job.json'), job)
+    const lastRun = job.review.history.filter(entry => entry.stage !== 'review').at(-1)
+    const required = requiredPlaybookForRun({ card, history: job.review.history })
+    const declared = declaredPlaybook(checklist)
+    if (!checklist?.trim() || (required && declared !== required)) {
+      const reason = !checklist?.trim()
+        ? 'missing checklist'
+        : `checklist follows ${declared ?? 'no declared playbook'}, run requires ${required}`
+      await recordReview({ round, reviewer, verdicts: unprovenVerdicts(criteria, reason), passed: false })
+      return
+    }
+    const reviewDir = join(jobDir, `review-${round}`)
+    const tree = join(reviewDir, 'tree')
+    await rm(reviewDir, { recursive: true, force: true })
+    await mkdir(tree, { recursive: true })
+    const reviewSettingsPath = join(reviewDir, 'settings.json')
+    await atomicWriteJson(reviewSettingsPath, { ...settings, roles: { ...settings.roles, reviewer: reviewer.model } })
+    const archive = join(reviewDir, 'tree.tar')
+    await execFile('git', ['-C', job.worktree, 'archive', '--format=tar', '-o', archive, candidateCommit])
+    await execFile('tar', ['-xf', archive, '-C', tree])
+    await writeReviewProof(tree)
+    await runStage({
+      role: 'reviewer',
+      cwd: tree,
+      settingsPath: reviewSettingsPath,
+      stateDir: join(reviewDir, 'state'),
+      hostInstructions: await baseFile(REVIEW_SKILL) ?? '',
+      prompt: reviewPrompt({ card, criteria, round }),
+      subagents: [],
+    })
+    const raw = await readOptional(join(tree, '.builder-home', 'review', 'verdicts.json'))
+    const outcome = parseVerdicts({ raw, criteria, proofFileExists: path => proofFileExists(tree, path) })
+    await recordReview({ round, reviewer, verdicts: outcome.verdicts, passed: outcome.passed })
+  }
+
+  function startReviewer() {
+    if (!reviewerModel) throw stop('stopped: no reviewer was picked on Start')
+    const spec = settings.models[reviewerModel]
+    if (spec?.unavailable) throw stop(`stopped: no available reviewer model from another company: ${spec.unavailable}`)
+    const reviewer = { model: reviewerModel, company: spec?.company ?? savedRoles.reviewer?.company ?? 'unknown' }
+    const orchestratorCompany = settings.models[orchestratorModel]?.company
+    const coderCompany = settings.models[coderModel]?.company
+    if (reviewer.company === orchestratorCompany || reviewer.company === coderCompany) {
+      throw stop(`stopped: reviewer ${reviewer.company} must come from a different company than the orchestrator and the coder`)
+    }
+    return reviewer
+  }
+
+  async function recordReview({ round, reviewer, verdicts, passed }) {
+    const entry = { stage: 'review', round, candidateCommit, verdicts, passed }
+    job.review.history.push(entry)
+    entry.note = formatVerdictNote({ cardId, round, reviewer, candidateCommit, verdicts, passed, next: nextStage(job.review.history) })
+    job.linearNote = { card: cardId, message: entry.note, ...(await postLinearComment({ card: cardId, message: entry.note, apiKey: linearKey })) }
+    await atomicWriteJson(join(jobDir, 'job.json'), job)
+    if (!passed && round === 1) await moveLinearCard({ card: cardId, stateName: 'Remediation', apiKey: linearKey })
+  }
+
+  async function remediationStage() {
+    const failed = (job.review.history.filter(entry => entry.stage === 'review').at(-1)?.verdicts ?? []).filter(verdict => verdict.verdict !== 'proven')
+    await rm(join(builderHome, 'pstack', 'checklist.md'), { force: true })
+    await runStage({
+      role: 'orchestrator',
+      cwd: job.worktree,
+      settingsPath: effectiveSettingsPath,
+      stateDir,
+      hostInstructions: workflowInstructions,
+      prompt: remediationPrompt({ card, verdicts: failed }),
+    })
+    checklist = await readOptional(join(builderHome, 'pstack', 'checklist.md'))
+    decisions = await readOptional(join(builderHome, 'pstack', 'decisions.tsv'))
+    const { stdout: status } = await execFile('git', ['-C', job.worktree, 'status', '--porcelain'])
+    if (status.trim()) {
+      await execFile('git', ['-C', job.worktree, 'add', '-A'])
+      await execFile('git', ['-C', job.worktree, '-c', 'user.email=builder@example.com', '-c', 'user.name=Builder', 'commit', '-m', `remediate ${cardId}`])
+    }
+    const { stdout: headOut } = await execFile('git', ['-C', job.worktree, 'rev-parse', 'HEAD'])
+    candidateCommit = headOut.trim()
+    const { stdout: changedOut } = await execFile('git', ['-C', job.worktree, 'diff', '--name-only', `${job.baseCommit}..${candidateCommit}`])
+    const changedFiles = changedOut.split(/\r?\n/).filter(Boolean)
+    job.result.candidateCommit = candidateCommit
+    job.result.changedFiles = changedFiles
+    job.result.internalReview = { ...job.result.internalReview, changedFiles }
+    job.review.history.push({ stage: 'remediation', playbook: REQUIRED_PLAYBOOK.remediation, candidateCommit, checklist })
+    await atomicWriteJson(join(jobDir, 'job.json'), job)
+  }
+
+  async function investigationStage() {
+    await rm(join(builderHome, 'pstack', 'checklist.md'), { force: true })
+    await runStage({
+      role: 'orchestrator',
+      cwd: job.worktree,
+      settingsPath: effectiveSettingsPath,
+      stateDir,
+      hostInstructions: workflowInstructions,
+      prompt: investigationPrompt({ card, history: job.review.history }),
+    })
+    checklist = await readOptional(join(builderHome, 'pstack', 'checklist.md'))
+    await assertPlaybook({ required: REQUIRED_PLAYBOOK.investigation, declared: declaredPlaybook(checklist), checklistText: checklist })
+    const rootCause = (await readOptional(join(builderHome, 'investigation', 'root-cause.md')))?.trim() || null
+    const { stdout: status } = await execFile('git', ['-C', job.worktree, 'status', '--porcelain'])
+    const tracked = status.split(/\r?\n/).filter(Boolean)
+    const entry = { stage: 'investigation', playbook: REQUIRED_PLAYBOOK.investigation, rootCause }
+    if (tracked.length) entry.defect = `investigation changed tracked files: ${tracked.join(', ')}`
+    job.review.history.push(entry)
+    await atomicWriteJson(join(jobDir, 'job.json'), job)
+    const note = `${cardId} stopped after two failed evidence reviews. Root cause: ${rootCause ?? 'not recorded'}${entry.defect ? `\n\n${entry.defect}` : ''}`
+    job.linearNote = { card: cardId, message: note, ...(await postLinearComment({ card: cardId, message: note, apiKey: linearKey })) }
+  }
+
+  async function reviewBeforePublishing() {
+    job.review = { reviewer: null, history: [], outcome: null }
+    const declared = declaredPlaybook(checklist)
+    if (declared) await assertPlaybook({ required: declared, declared, checklistText: checklist })
+    await atomicWriteJson(join(jobDir, 'job.json'), job)
+    await runner?.close()
+    runner = null
+    await runReviewLoop()
+  }
+
+  async function runReviewLoop() {
+    let stage = nextStage(job.review.history)
+    while (stage !== 'passed' && stage !== 'stopped') {
+      const recorded = job.review.history.length
+      if (stage === 'review') await reviewStage()
+      else if (stage === 'remediation') await remediationStage()
+      else await investigationStage()
+      if (job.review.history.length === recorded) throw new Error(`${stage} stage recorded no history`)
+      stage = nextStage(job.review.history)
+    }
+    job.review.outcome = stage
+    if (stage === 'passed') {
+      job.state = 'ready-for-review'
+      job.result.review = job.review
+      job.result.downstreamReviewStarted = true
+    } else {
+      job.state = 'failed'
+      job.error = { message: 'stopped after a second failed evidence review', stopped: true }
+    }
+    await atomicWriteJson(join(jobDir, 'job.json'), job)
+  }
+  const resumeReview = continueRun && Boolean(job.pause?.reviewStage) && Array.isArray(job.review?.history) && Boolean(job.result?.candidateCommit)
   try {
-    const allowedEventTypes = new Set(['subagent_start', 'subagent_end', 'subagent_tool_start', 'subagent_tool_end', 'tool_start', 'tool_end', 'agent_start', 'agent_end', 'error', 'task_updated', 'state_changed', 'message_end'])
+    if (resumeReview) {
+      candidateCommit = job.result.candidateCommit
+      checklist = await readOptional(join(jobDir, 'pstack-checklist.md'))
+      decisions = await readOptional(join(jobDir, 'pstack-decisions.tsv'))
+      job.error = null
+      job.pause = null
+      await runReviewLoop()
+    } else {
     runner = await openRunner({ card: cardId, settingsPath: effectiveSettingsPath, cwd: job.worktree, stateDir, role: 'orchestrator', hostInstructions: workflowInstructions, subagents: helpers })
     globalThis.fetch = observeRequests(globalThis.fetch, requests)
     const unsubscribe = runner.runtime.session.subscribe(e => { if (allowedEventTypes.has(e?.type)) events.push(e) })
@@ -158,31 +393,49 @@ async function main() {
     const successResult = {
       card,
       roles: savedRoles,
-      actualModels: { orchestrator: orchestratorModel, coder: coderModel },
+      actualModels: { orchestrator: orchestratorModel, coder: coderModel, ...(reviewerModel ? { reviewer: reviewerModel } : {}) },
       threadId,
       worktree: job.worktree,
       baseCommit: job.baseCommit,
       candidateCommit,
       account,
       internalReview,
+      changedFiles,
       proof: { unproven: internalReview.unproven, next: internalReview.next },
       downstreamReviewStarted: false,
       completedAt: new Date().toISOString(),
       state: 'ready-for-review',
     }
-    job.state = 'ready-for-review'
     job.result = successResult
     job.error = null
     job.pause = null
+    if (session.machineryProof) {
+      job.state = 'ready-for-review'
+    } else {
+      await reviewBeforePublishing()
+    }
+    }
   } catch (error) {
     failure = error
     if (error.pause) {
       job.state = 'paused'
       job.error = { message: error.pause }
-      job.result = null
-      job.pause = { reason: error.pause, message: error.pause, threadId: receipt?.threadId ?? null, at: new Date().toISOString() }
+      const reviewStage = job.review ? nextStage(job.review.history) : null
+      if (!reviewStage) job.result = null
+      job.pause = { reason: error.pause, message: error.pause, threadId: reviewStage ? null : (receipt?.threadId ?? null), ...(reviewStage ? { reviewStage } : {}), at: new Date().toISOString() }
       const note = await postLinearComment({ card: cardId, message: `${cardId} paused: ${error.pause}. Its work is kept in the run worktree and can be continued.`, apiKey: linearKey })
       job.linearNote = { card: cardId, message: job.error.message, ...note }
+    } else if (error.refused) {
+      job.state = 'failed'
+      job.result = null
+      job.error = { message: error.refused, refused: true }
+      const note = await postLinearComment({ card: cardId, message: `${cardId} ${error.refused}. No result was saved for this run.`, apiKey: linearKey })
+      job.linearNote = { card: cardId, message: error.refused, ...note }
+    } else if (error.stopped) {
+      job.state = 'failed'
+      job.error = { message: error.stopped, stopped: true }
+      const note = await postLinearComment({ card: cardId, message: `${cardId} ${error.stopped}.`, apiKey: linearKey })
+      job.linearNote = { card: cardId, message: error.stopped, ...note }
     } else {
       job.state = 'failed'
       job.error = { message: error.message, stack: error.stack }

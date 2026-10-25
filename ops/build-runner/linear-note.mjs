@@ -1,3 +1,37 @@
+export async function moveLinearCard({ card, stateName, apiKey = process.env.LINEAR_API_KEY, fetchImpl = fetch } = {}) {
+  if (!card || !stateName) return { moved: false, reason: 'card and state name are required' }
+  if (!apiKey) return { moved: false, reason: 'LINEAR_API_KEY is not present in the runner environment' }
+  const headers = { 'content-type': 'application/json', authorization: apiKey }
+  try {
+    const lookup = await fetchImpl('https://api.linear.app/graphql', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ query: 'query Issue($id: String!) { issue(id: $id) { id team { states { nodes { id name } } } } }', variables: { id: card } }),
+      redirect: 'error',
+    })
+    if (!lookup.ok) return { moved: false, reason: `Linear lookup failed with HTTP ${lookup.status}` }
+    const found = await lookup.json()
+    const issue = found?.data?.issue
+    if (!issue?.id) return { moved: false, reason: `Linear lookup found no issue for ${card}` }
+    const states = issue.team?.states?.nodes ?? []
+    const wanted = stateName.toLowerCase()
+    const state = states.find(node => String(node?.name ?? '').toLowerCase() === wanted)
+    if (!state?.id) return { moved: false, reason: `Linear has no state named ${stateName}` }
+    const updated = await fetchImpl('https://api.linear.app/graphql', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ query: 'mutation IssueUpdate($id: String!, $stateId: String!) { issueUpdate(id: $id, input: { stateId: $stateId }) { success } }', variables: { id: card, stateId: state.id } }),
+      redirect: 'error',
+    })
+    if (!updated.ok) return { moved: false, reason: `Linear state update failed with HTTP ${updated.status}` }
+    const body = await updated.json()
+    if (!body?.data?.issueUpdate?.success) return { moved: false, reason: 'Linear did not accept the state update' }
+    return { moved: true }
+  } catch (error) {
+    return { moved: false, reason: `Linear state update failed: ${error.message}` }
+  }
+}
+
 export async function postLinearComment({ card, message, apiKey = process.env.LINEAR_API_KEY, fetchImpl = fetch } = {}) {
   if (!card || !message) throw new Error('card and message are required')
   if (!apiKey) return { posted: false, reason: 'LINEAR_API_KEY is not present in the runner environment' }
