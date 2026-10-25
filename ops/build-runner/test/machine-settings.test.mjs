@@ -3,6 +3,8 @@ import test from 'node:test'
 import { readFile } from 'node:fs/promises'
 import { buildCatalogue, hydrateSettings } from '../catalogue.mjs'
 import { createPstackSession } from '../pstack-session.mjs'
+import { cardCeilingNano } from '../adapter.mjs'
+import { CEILING_NANO } from '../ledger.mjs'
 
 const rawSettings = JSON.parse(await readFile(new URL('../machine-settings.json', import.meta.url), 'utf8'))
 const table = await readFile(new URL('../pstack-models.md', import.meta.url), 'utf8')
@@ -56,6 +58,14 @@ test('machine settings carry no hand-edited model list', () => {
   assert.deepEqual(settings.providers[0].models, catalogue.commandCodeProviderModels)
   assert.ok(settings.authPath)
   assert.ok(settings.ledgerPath)
+  assert.deepEqual(rawSettings.cardCeilings, { 'JUL-252': null })
+})
+
+test('a card can remove or move its money stop in settings', () => {
+  assert.equal(cardCeilingNano({}, 'JUL-252'), CEILING_NANO)
+  assert.equal(cardCeilingNano({ cardCeilings: { 'JUL-252': null } }, 'JUL-252'), null)
+  assert.equal(cardCeilingNano({ cardCeilings: { 'JUL-252': 20_000_000_000 } }, 'JUL-252'), 20_000_000_000)
+  assert.throws(() => cardCeilingNano({ cardCeilings: { 'JUL-252': 0 } }, 'JUL-252'), /Invalid card ceiling/)
 })
 
 test('normal machine sessions use Claude and DeepSeek and preserve the two-model panels', () => {

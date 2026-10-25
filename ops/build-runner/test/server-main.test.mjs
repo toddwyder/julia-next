@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { execFileSync, spawnSync } from 'node:child_process'
+import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, rmSync, chmodSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -85,6 +85,43 @@ console.log(JSON.stringify(process.argv.some(arg => arg.includes('/commits/')) ?
   assert.equal(f.git(f.checkout, 'rev-parse', 'HEAD'), laterMerge)
   assert.equal(f.poll().updated, false)
 })
+
+test('a merge is deferred while a build worker runs and applies after it ends', t => {
+  const f = repository(t, { services: ['julia-machine-runner.service'] })
+  const cgroup = join(f.root, 'cgroup')
+  mkdirSync(cgroup)
+  const workerPath = join(f.root, 'worker.mjs')
+  writeFileSync(workerPath, 'setInterval(() => {}, 1000)\n')
+  const worker = spawn(process.execPath, [workerPath], { stdio: 'ignore' })
+  worker.unref()
+  t.after(() => worker.kill())
+  writeFileSync(join(cgroup, 'cgroup.procs'), `${worker.pid}\n`)
+  const restarts = join(f.root, 'restarts.log')
+  f.env.SERVICE_TEST_CGROUP = cgroup
+  f.env.SERVICE_TEST_RESTARTS = restarts
+  f.executable('systemctl', `const fs = require('node:fs');
+const args = process.argv.slice(2);
+if (args.includes('restart')) fs.appendFileSync(process.env.SERVICE_TEST_RESTARTS, args.join(' ') + '\\n');
+if (args.includes('show') && args.some(arg => arg.includes('ControlGroup'))) { console.log(process.env.SERVICE_TEST_CGROUP); process.exit(0); }
+process.exit(0);`)
+  f.git(f.upstream, 'checkout', '-b', 'feature')
+  f.commit('feature')
+  f.git(f.upstream, 'checkout', 'main')
+  f.git(f.upstream, 'merge', '--no-ff', 'feature', '-m', 'merge feature')
+  const merged = f.git(f.upstream, 'rev-parse', 'HEAD')
+
+  const deferred = f.poll()
+  assert.equal(deferred.updated, false)
+  assert.equal(deferred.deferred, true)
+  assert.equal(f.git(f.checkout, 'rev-parse', 'HEAD'), f.baseline)
+  assert.equal(existsSync(restarts), false)
+
+  writeFileSync(join(cgroup, 'cgroup.procs'), '')
+  const applied = f.poll()
+  assert.equal(applied.updated, true)
+  assert.equal(f.git(f.checkout, 'rev-parse', 'HEAD'), merged)
+  assert.match(readFileSync(restarts, 'utf8'), /restart julia-machine-runner\.service/)
+});
 
 test('a service restart failure is retried after checkout already advanced', t => {
   const f = repository(t, { services: ['fixture.service'] })

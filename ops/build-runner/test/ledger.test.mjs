@@ -133,6 +133,28 @@ test('a settled cost above its recorded maximum is durable across reopen and doe
   assert.equal(files.open().reserve(input(1)).maximumNano, 1);
 });
 
+test('a card ceiling of null removes the money stop for that card', (t) => {
+  const ledger = new CardLedger({ path: ':memory:', card: 'JUL-252', ceilingNano: null });
+  const request = ledger.reserve(input(20_000_000_000));
+  ledger.settle(request.id, { usage: { tokens: 1 }, costNano: 20_000_000_000 });
+  assert.equal(ledger.snapshot().spentNano, 20_000_000_000);
+  assert.equal(ledger.snapshot().stopped, false);
+  assert.equal(ledger.snapshot().ceilingNano, null);
+  assert.equal(ledger.snapshot().remainingNano, null);
+  assert.equal(ledger.reserve(input(1)).maximumNano, 1);
+});
+
+test('a numeric card ceiling override moves the stop for that card', (t) => {
+  const ledger = new CardLedger({ path: ':memory:', card: 'JUL-252', ceilingNano: 20_000_000_000 });
+  const first = ledger.reserve(input(15_000_000_000));
+  ledger.settle(first.id, { usage: { tokens: 1 }, costNano: 15_000_000_000 });
+  assert.equal(ledger.snapshot().stopped, false);
+  const second = ledger.reserve(input(6_000_000_000));
+  ledger.settle(second.id, { usage: { tokens: 1 }, costNano: 6_000_000_000 });
+  assert.equal(ledger.snapshot().spentNano, 21_000_000_000);
+  assert.equal(ledger.snapshot().stopped, true);
+});
+
 test('invalid monetary inputs cannot change durable budget', (t) => {
   const ledger = fixture(t).open();
   for (const bad of [-1, 0.1, Number.MAX_SAFE_INTEGER + 1, NaN, Infinity, '1']) {
