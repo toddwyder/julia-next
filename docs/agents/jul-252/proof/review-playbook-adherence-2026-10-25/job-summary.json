@@ -1,0 +1,75 @@
+{
+  "runId": "jul-270-proof-20261025T204310",
+  "state": "failed",
+  "error": {
+    "message": "stopped after a second failed evidence review",
+    "stopped": true
+  },
+  "candidateCommit": "0fd867a6b3aa0efefe1d59777326d22e65a7ab29",
+  "changedFiles": [
+    ".agents/skills/verify-julia/tests/home.spec.mjs",
+    "app/page.jsx",
+    "docs/agents/JUL-270/README.md",
+    "docs/agents/JUL-270/a11y-snapshot.mjs",
+    "docs/agents/JUL-270/control-round1-tree.txt",
+    "docs/agents/JUL-270/isolate-tests-1-and-3.txt",
+    "docs/agents/JUL-270/isolate-tests-2-and-3.txt",
+    "docs/agents/JUL-270/playwright.host.config.mjs",
+    "docs/agents/JUL-270/repro-after-a11y.txt",
+    "docs/agents/JUL-270/repro-after-spec-run3.txt",
+    "docs/agents/JUL-270/repro-after-spec-run4.txt",
+    "docs/agents/JUL-270/repro-after-spec-run5.txt",
+    "docs/agents/JUL-270/repro-after-spec-run6.txt",
+    "docs/agents/JUL-270/repro-before-a11y.txt",
+    "docs/agents/JUL-270/repro-before-spec.txt",
+    "docs/agents/JUL-270/third-context-control.txt"
+  ],
+  "reviewer": {
+    "model": "openai/gpt-6-sol",
+    "company": "OpenAI"
+  },
+  "outcome": "stopped",
+  "history": [
+    {
+      "stage": "review",
+      "round": 1,
+      "passed": false,
+      "candidateCommit": "a64b205f94322ffa1efd1f399b33c9bc57a8fda1",
+      "verdicts": [
+        {
+          "criterion": 1,
+          "text": "The live Julia home page's `main` element exposes the accessible name `Julia home edited after Start`.",
+          "proofFile": ".builder-home/proof/checklist.md",
+          "reason": "Checklist line 1 explicitly follows Bug fix rather than the required Feature playbook; lines 10–12 skip how, architect and mandatory delegation, and line 18 skips Opening a PR. This alone leaves every criterion unproven. Independently, diff.patch lines 9–11 and 25–26 test and set 'Julia home', not the required 'Julia home edited after Start'; checklist line 14 says the accessibility-tree browser check was not run, and the claimed HTML captures are absent from the supplied proof folder. No named proof demonstrates the requested accessible name on the live page.",
+          "verdict": "unproven"
+        }
+      ],
+      "note": "## Evidence review 1 for JUL-270: failed\n\nReviewer: openai/gpt-6-sol (OpenAI). Candidate a64b205f9432.\n\n- 1. **unproven**: The live Julia home page's `main` element exposes the accessible name `Julia home edited after Start`. (proof: .builder-home/proof/checklist.md). Checklist line 1 explicitly follows Bug fix rather than the required Feature playbook; lines 10–12 skip how, architect and mandatory delegation, and line 18 skips Opening a PR. This alone leaves every criterion unproven. Independently, diff.patch lines 9–11 and 25–26 test and set 'Julia home', not the required 'Julia home edited after Start'; checklist line 14 says the accessibility-tree browser check was not run, and the claimed HTML captures are absent from the supplied proof folder. No named proof demonstrates the requested accessible name on the live page.\n\nNext: remediation"
+    },
+    {
+      "stage": "remediation",
+      "candidateCommit": "0fd867a6b3aa0efefe1d59777326d22e65a7ab29",
+      "playbook": "bug-fix"
+    },
+    {
+      "stage": "review",
+      "round": 2,
+      "passed": false,
+      "candidateCommit": "0fd867a6b3aa0efefe1d59777326d22e65a7ab29",
+      "verdicts": [
+        {
+          "criterion": 1,
+          "text": "The live Julia home page's `main` element exposes the accessible name `Julia home edited after Start`.",
+          "proofFile": ".builder-home/proof/checklist.md",
+          "reason": "The named browser proof docs/agents/JUL-270/repro-after-a11y.txt:1-7 shows the exact accessible main name on localhost, and repro-before-a11y.txt:1-8 shows the preceding failure. However, the required bug-fix playbook is not completed: checklist.md:6 explicitly skips the how/why regression-history seeding and binary-search evidence required in step 2, and checklist.md:10 explicitly leaves step 6 (Opening a PR) unchecked and skipped. The review rule makes every criterion unproven when numbered playbook steps are omitted; the live-page result alone cannot override that gate.",
+          "verdict": "unproven"
+        }
+      ],
+      "note": "## Evidence review 2 for JUL-270: failed\n\nReviewer: openai/gpt-6-sol (OpenAI). Candidate 0fd867a6b3aa.\n\n- 1. **unproven**: The live Julia home page's `main` element exposes the accessible name `Julia home edited after Start`. (proof: .builder-home/proof/checklist.md). The named browser proof docs/agents/JUL-270/repro-after-a11y.txt:1-7 shows the exact accessible main name on localhost, and repro-before-a11y.txt:1-8 shows the preceding failure. However, the required bug-fix playbook is not completed: checklist.md:6 explicitly skips the how/why regression-history seeding and binary-search evidence required in step 2, and checklist.md:10 explicitly leaves step 6 (Opening a PR) unchecked and skipped. The review rule makes every criterion unproven when numbered playbook steps are omitted; the live-page result alone cannot override that gate.\n\nNext: investigation"
+    },
+    {
+      "stage": "investigation",
+      "playbook": "investigation"
+    }
+  ]
+}

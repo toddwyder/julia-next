@@ -1,0 +1,10 @@
+{
+  "identifier": "JUL-270",
+  "title": "JUL-252 practice: wrong playbook run",
+  "description": "## Outcome\n\nThe home page's main region has no accessible name, so a screen reader announces an unnamed region. Reproduce the missing accessible name and fix it.\n\n## Acceptance criteria\n\n* The live Julia home page's `main` element exposes the accessible name `Julia home edited after Start`.",
+  "state": "Ready",
+  "labels": [
+    "ready-for-agent",
+    "Feature"
+  ]
+}

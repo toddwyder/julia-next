@@ -1,0 +1,41 @@
+{
+  "data": {
+    "issue": {
+      "identifier": "JUL-270",
+      "title": "JUL-252 practice: wrong playbook run",
+      "description": "## Outcome\n\nThe home page's main region has no accessible name, so a screen reader announces an unnamed region. Reproduce the missing accessible name and fix it.\n\n## Acceptance criteria\n\n* The live Julia home page's `main` element exposes the accessible name `Julia home edited after Start`.",
+      "state": {
+        "name": "Remediation"
+      },
+      "labels": {
+        "nodes": [
+          {
+            "name": "ready-for-agent"
+          },
+          {
+            "name": "Feature"
+          }
+        ]
+      },
+      "comments": {
+        "nodes": [
+          {
+            "id": "acde4221-d19d-4abc-a9ae-2645f3b89f7a",
+            "body": "JUL-270 stopped after two failed evidence reviews. Root cause: # JUL-270 root cause: why two evidence reviews failed\n\n## Verdict\n\nThe live page is fixed. Round 2's reviewer confirmed `main \"Julia home edited after Start\"` in `docs/agents/JUL-270/repro-after-a11y.txt`. Both rounds failed on playbook adherence, not on the criterion.\n\nThe main cause is in the runner. It gives the builder and the reviewer two contracts that contradict each other. Under these contracts no Feature or Bug fix run can pass:\n\n1. The builder's host instructions say to mark the publishing step out of scope (`ops/build-runner/pstack-session.mjs:54`). That step is \"Run **Opening a PR**\", the last numbered step of both playbooks (`playbooks/bug-fix.md:13`, `playbooks/feature.md:17`).\n2. The reviewer is told that if the work \"skips or omits the playbook's numbered steps, every criterion is unproven\" (`ops/build-runner/evidence-review.mjs:150`). It gets no exemption for a step the host scoped out. It is also never told about the `skip: <reason>` allowance in `.agents/skills/poteto-mode/SKILL.md:135`.\n\nSo the reviewer is required to fail a builder that obeyed its host. Round 2 failed on exactly this: \"checklist.md:10 explicitly leaves step 6 (Opening a PR) unchecked and skipped\".\n\n## Round by round\n\n**Round 1.** The reviewer required Feature. `requiredBuildPlaybook` reads it from the live card's labels (`evidence-review.mjs:14-20`, called at `worker.mjs:191`). The builder never learned this. Its prompt says to \"Select and read its matching playbook\" by poteto-mode's own routing (`pstack-session.mjs:56`). It treated a wrong accessible name as a defect and picked Bug fix. Inferred from the round 1 verdict and commit `a64b205`: the builder also worked from the Start snapshot (`worker.mjs:69-70`), which named the target `Julia home`. The reviewer judged the live card (`worker.mjs:160-164`, `185-186`), which now reads `Julia home edited after Start`. The JUL-252 practice is designed to test that drift. The builder saw it only as a general warning in `pstack-session.mjs:54`.\n\n**Round 2.** Remediation hardcodes Bug fix (`evidence-review.mjs:169-171`). It then records `{stage: 'remediation', playbook: 'bug-fix'}` (`worker.mjs:265`), so `requiredPlaybookForRun` switches the reviewer's rubric from Feature to Bug fix (`evidence-review.mjs:24`). A test asserts this behavior (`test/evidence-review.test.mjs:209`). The code fix and the browser proof passed. Adherence failed on two steps:\n\n- Step 6, Opening a PR. Caused by the contract conflict above. The builder could not have passed this.\n- Step 2. The `how` and `why` seeding and the binary search were skipped. This one was a real builder omission. It was cheap, because `app/page.jsx:5` is the only labeled `main`. But the playbook requires it, and the reviewer enforces numbered steps literally.\n\n## Fix (for a later build card, not this read-only run)\n\n1. Reconcile the publishing contract in one place. Add this to `reviewPrompt`: a step the host marks out of scope (Opening a PR, publishing) counts as done when the checklist records `skip: out of scope, host publishes`. The alternative is to stop telling the builder to skip it. Both rules can't stand.\n2. Tell the builder the required playbook. Pass `requiredPlaybookForRun` into the build prompt in `pstack-session.mjs:56`, the way remediation and investigation already name theirs. Leaving the builder to guess a rubric the reviewer already knows only produces avoidable failures.\n3. Decide on purpose whether remediation of a Feature card should be judged as Bug fix (`evidence-review.mjs:4,24`). Bug fix steps 1 and 2 ask for a reproduced defect and a binary-searched cause. A feature that was correctly built but badly evidenced has neither.\n\n## Evidence\n\nRead this session: `ops/build-runner/evidence-review.mjs`, `worker.mjs`, `pstack-session.mjs`, `test/evidence-review.test.mjs`, `playbooks/bug-fix.md`, `playbooks/feature.md`, `playbooks/investigation.md`, `SKILL.md:135`, `docs/agents/JUL-270/README.md`, the prior `decisions.tsv`, `git log` (commits `97929a3`, `a64b205`, `858cd8e`, `0fd867a`), and both review verdicts quoted in the investigation prompt. I could not read the job record (`../job.json`, EACCES), so the card's labels are inferred from round 1's \"required Feature playbook\".",
+            "createdAt": "2026-10-25T21:02:21.381Z"
+          },
+          {
+            "id": "43c1ca84-e2ae-4020-b54b-f4edcd5144c7",
+            "body": "## Evidence review 2 for JUL-270: failed\n\nReviewer: openai/gpt-6-sol (OpenAI). Candidate 0fd867a6b3aa.\n\n- 1. **unproven**: The live Julia home page's `main` element exposes the accessible name `Julia home edited after Start`. (proof: .builder-home/proof/checklist.md). The named browser proof docs/agents/JUL-270/repro-after-a11y.txt:1-7 shows the exact accessible main name on localhost, and repro-before-a11y.txt:1-8 shows the preceding failure. However, the required bug-fix playbook is not completed: checklist.md:6 explicitly skips the how/why regression-history seeding and binary-search evidence required in step 2, and checklist.md:10 explicitly leaves step 6 (Opening a PR) unchecked and skipped. The review rule makes every criterion unproven when numbered playbook steps are omitted; the live-page result alone cannot override that gate.\n\nNext: investigation",
+            "createdAt": "2026-10-25T20:59:26.516Z"
+          },
+          {
+            "id": "3a90e2e6-0e27-4de9-be95-bc78638e354a",
+            "body": "## Evidence review 1 for JUL-270: failed\n\nReviewer: openai/gpt-6-sol (OpenAI). Candidate a64b205f9432.\n\n- 1. **unproven**: The live Julia home page's `main` element exposes the accessible name `Julia home edited after Start`. (proof: .builder-home/proof/checklist.md). Checklist line 1 explicitly follows Bug fix rather than the required Feature playbook; lines 10–12 skip how, architect and mandatory delegation, and line 18 skips Opening a PR. This alone leaves every criterion unproven. Independently, diff.patch lines 9–11 and 25–26 test and set 'Julia home', not the required 'Julia home edited after Start'; checklist line 14 says the accessibility-tree browser check was not run, and the claimed HTML captures are absent from the supplied proof folder. No named proof demonstrates the requested accessible name on the live page.\n\nNext: remediation",
+            "createdAt": "2026-10-25T20:47:11.871Z"
+          }
+        ]
+      }
+    }
+  }
+}

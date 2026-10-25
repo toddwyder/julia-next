@@ -147,7 +147,7 @@ export function reviewPrompt({ card, criteria, round, requiredPlaybook, playbook
 ${String(playbookText ?? '').trim()}
 --- end playbook ${requiredPlaybook} ---
 
-Judge playbook adherence as part of this review. Read the run's checklist at \`.builder-home/proof/checklist.md\` and the candidate diff at \`.builder-home/proof/diff.patch\`. If the checklist follows a different playbook, or the work skips or omits the playbook's numbered steps, every criterion is unproven.`
+Judge playbook adherence as part of this review. Read the run's checklist at \`.builder-home/proof/checklist.md\` and the candidate diff at \`.builder-home/proof/diff.patch\`. If the checklist follows a different playbook, or the work skips or omits the playbook's numbered steps, every criterion is unproven. A step the host has marked out of scope is not skipped work: the host owns publishing and pull requests, so an out-of-scope note on the Opening a PR step does not make a criterion unproven.`
     : `This card does not require a specific playbook. The run's checklist is at \`.builder-home/proof/checklist.md\` and the candidate diff is at \`.builder-home/proof/diff.patch\`.`
   return `You are the evidence reviewer for ${cardLabel(card)}. Follow .agents/skills/adversarial-review/SKILL.md in this working directory.
 

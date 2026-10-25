@@ -164,6 +164,8 @@ test('the review prompt gives the reviewer the required playbook, checklist and 
   assert.match(review, /1\. Reproduce it\./)
   assert.match(review, /follows a different playbook/)
   assert.match(review, /every criterion is unproven/)
+  assert.match(review, /out of scope is not skipped work/)
+  assert.match(review, /Opening a PR step does not make a criterion unproven/)
   assert.match(review, /1\. A model from a different company/)
   assert.match(review, /3\. When a review fails/)
   const withoutPlaybook = reviewPrompt({ card: jul252, criteria, round: 2 })
