@@ -126,12 +126,14 @@ export function createBuildRunnerClient(
       await rejectIfNotOk(response);
       return BuildJobSchema.parse(await response.json());
     },
-    async list(): Promise<BuildJob[]> {
+    async list(): Promise<unknown[]> {
       const response = await fetchImpl(`${baseUrl}/jobs`, {
         signal: AbortSignal.timeout(15000),
       });
       await rejectIfNotOk(response);
-      return z.array(BuildJobSchema).parse(await response.json());
+      const body = await response.json();
+      if (!Array.isArray(body)) throw new Error('Build runner jobs must be an array');
+      return body;
     },
   };
 }
