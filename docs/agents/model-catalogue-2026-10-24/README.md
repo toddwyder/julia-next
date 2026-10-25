@@ -45,11 +45,22 @@ Both requests are `settled`, `heldNano` is 0, the account is not stopped, and th
 $0.209208 of its $2.00 ceiling. No Anthropic API key was present; the stock `AuthStorage` OAuth
 sign-in served both requests.
 
+## Live Start page
+
+The deployed page at `https://ovh.tail91f394.ts.net/julia-control` now lists 133 options:
+17 Claude subscription, 34 ChatGPT plan and 82 CommandCode. The live capture is
+`proof/start-page-tailscale.png`; `proof/start-page-tailscale.json` records the option counts.
+The redeploy that first exposed the page also opened a short window where the old control
+process read the new settings file (no model list) and offered CommandCode only. The timeline,
+red-first reproduction and regression test are in [diagnosis.md](./diagnosis.md).
+
 ## Reproduce
 
 ```sh
 node scripts/julia-agents.mjs -- node ops/build-runner/proof/model-catalogue.mjs
 node scripts/julia-agents.mjs -- node ops/build-runner/proof/subscription-models.mjs
+node ops/build-runner/proof/start-page.mjs https://ovh.tail91f394.ts.net/julia-control \
+  docs/agents/model-catalogue-2026-10-24/proof
 ```
 
 The local adapter fixture `ops/build-runner/settings.json` is unchanged and is not used by the
