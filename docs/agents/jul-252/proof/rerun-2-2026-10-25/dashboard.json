@@ -1,0 +1,156 @@
+{
+  "url": "https://ovh.tail91f394.ts.net/julia-control",
+  "capturedAt": "2026-10-25T13:46:51.726Z",
+  "card": "JUL-252 — Evidence review",
+  "orchestrator": "Claude subscription · Claude Opus 5.5 (Anthropic)",
+  "coder": "CommandCode · DeepSeek V4.1 Flash (latest) (DeepSeek)",
+  "runId": "jul-252-04db241d9dbeda4fc7d58701cd7b66d2",
+  "heading": "JUL-252 · running",
+  "finished": true,
+  "checklist": {
+    "summary": "15 finished, 1 skipped",
+    "items": [
+      {
+        "status": "finished",
+        "text": "✓1. `how` over the affected subsystem. done: read ops/build-runner worker.mjs, pstack-session.mjs, jobs.mjs, adapter.mjs, machine-settings.json, scripts/linear-cli.mjs, path-forward.md and GLOSSARY.md directly (subsystem small enough for one reader)."
+      },
+      {
+        "status": "finished",
+        "text": "✓2. `architect` for parallel design exploration. done: one shape chosen in the main session (a transition table plus a playbook registry in one pure module); recorded in decisions.tsv. skip of parallel runners: budget, see decisions.tsv."
+      },
+      {
+        "status": "finished",
+        "text": "✓3. Throughput checkpoint."
+      },
+      {
+        "status": "finished",
+        "text": "✓Blocking first steps. done: data shape fixed before delegation (VERDICTS, STAGES table, PLAYBOOK_STEPS registry)."
+      },
+      {
+        "status": "finished",
+        "text": "✓Independent workstreams. n/a: one module, one test file and one worker hook share the same types."
+      },
+      {
+        "status": "finished",
+        "text": "✓Shared mutable state. n/a: pure functions; the only state is the stage in the job snapshot."
+      },
+      {
+        "status": "finished",
+        "text": "✓Smallest safe decomposition. done: one DeepSeek coder owns the diff because the module and its test are coupled."
+      },
+      {
+        "status": "finished",
+        "text": "✓4. Delegate code-writing to the configured feature model. done: commandcode/deepseek/deepseek-v4.1-flash implemented evidence-review.mjs, its test and the worker hook."
+      },
+      {
+        "status": "finished",
+        "text": "✓5. Verify on the matching surface. done: node --test ops/build-runner/test/*.test.mjs run in this worktree."
+      },
+      {
+        "status": "finished",
+        "text": "✓6. Small ordered commits. skip: the host commits the candidate as one build commit."
+      },
+      {
+        "status": "finished",
+        "text": "✓7. `interrogate` before shipping. done: panel review of the changed files by anthropic/claude-haiku-5-5 and commandcode/deepseek/deepseek-v4.1-flash."
+      },
+      {
+        "status": "skipped",
+        "text": "–8. Run **Opening a PR**. out of scope: the host owns publishing.skipped"
+      },
+      {
+        "status": "finished",
+        "text": "✓Pure evidence-review module with three verdicts, different-company reviewer pick, stage table and playbook guard."
+      },
+      {
+        "status": "finished",
+        "text": "✓Worker refuses a run whose checklist follows a different playbook than its stage needs."
+      },
+      {
+        "status": "finished",
+        "text": "✓Real reviewer dispatch after every finished build and Linear state moves. not done: see decisions.tsv."
+      },
+      {
+        "status": "finished",
+        "text": "✓End-to-end proof on a real card. not done: needs the dispatch hookup and a Linear Remediation state check."
+      }
+    ]
+  },
+  "snapshots": [
+    {
+      "at": "2026-10-25T13:46:51.056Z",
+      "elapsedMs": 107639,
+      "summary": "15 finished, 1 skipped",
+      "items": [
+        {
+          "status": "finished",
+          "text": "✓1. `how` over the affected subsystem. done: read ops/build-runner worker.mjs, pstack-session.mjs, jobs.mjs, adapter.mjs, machine-settings.json, scripts/linear-cli.mjs, path-forward.md and GLOSSARY.md directly (subsystem small enough for one reader)."
+        },
+        {
+          "status": "finished",
+          "text": "✓2. `architect` for parallel design exploration. done: one shape chosen in the main session (a transition table plus a playbook registry in one pure module); recorded in decisions.tsv. skip of parallel runners: budget, see decisions.tsv."
+        },
+        {
+          "status": "finished",
+          "text": "✓3. Throughput checkpoint."
+        },
+        {
+          "status": "finished",
+          "text": "✓Blocking first steps. done: data shape fixed before delegation (VERDICTS, STAGES table, PLAYBOOK_STEPS registry)."
+        },
+        {
+          "status": "finished",
+          "text": "✓Independent workstreams. n/a: one module, one test file and one worker hook share the same types."
+        },
+        {
+          "status": "finished",
+          "text": "✓Shared mutable state. n/a: pure functions; the only state is the stage in the job snapshot."
+        },
+        {
+          "status": "finished",
+          "text": "✓Smallest safe decomposition. done: one DeepSeek coder owns the diff because the module and its test are coupled."
+        },
+        {
+          "status": "finished",
+          "text": "✓4. Delegate code-writing to the configured feature model. done: commandcode/deepseek/deepseek-v4.1-flash implemented evidence-review.mjs, its test and the worker hook."
+        },
+        {
+          "status": "finished",
+          "text": "✓5. Verify on the matching surface. done: node --test ops/build-runner/test/*.test.mjs run in this worktree."
+        },
+        {
+          "status": "finished",
+          "text": "✓6. Small ordered commits. skip: the host commits the candidate as one build commit."
+        },
+        {
+          "status": "finished",
+          "text": "✓7. `interrogate` before shipping. done: panel review of the changed files by anthropic/claude-haiku-5-5 and commandcode/deepseek/deepseek-v4.1-flash."
+        },
+        {
+          "status": "skipped",
+          "text": "–8. Run **Opening a PR**. out of scope: the host owns publishing.skipped"
+        },
+        {
+          "status": "finished",
+          "text": "✓Pure evidence-review module with three verdicts, different-company reviewer pick, stage table and playbook guard."
+        },
+        {
+          "status": "finished",
+          "text": "✓Worker refuses a run whose checklist follows a different playbook than its stage needs."
+        },
+        {
+          "status": "finished",
+          "text": "✓Real reviewer dispatch after every finished build and Linear state moves. not done: see decisions.tsv."
+        },
+        {
+          "status": "finished",
+          "text": "✓End-to-end proof on a real card. not done: needs the dispatch hookup and a Linear Remediation state check."
+        }
+      ]
+    }
+  ],
+  "firstScreenshot": "docs/agents/jul-252/proof/rerun-2-2026-10-25/dashboard-jul-252-checklist-first.png",
+  "screenshot": "docs/agents/jul-252/proof/rerun-2-2026-10-25/dashboard-jul-252-running.png",
+  "cardScreenshot": "docs/agents/jul-252/proof/rerun-2-2026-10-25/jul-252-build-card.png",
+  "consoleErrors": []
+}

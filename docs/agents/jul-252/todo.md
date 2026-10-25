@@ -36,8 +36,8 @@ The red live evidence is the #339 deploy at `12:20:06Z`: the old updater restart
 15. [x] Red test: a merge while a build worker is running does not advance or restart services, and applies after the worker ends.
 16. [x] Red test: a `cardCeilings` override of `null` removes the money stop for one card.
 17. [x] Implement the updater defer and the per-card ceiling override.
-18. [ ] Install the updater, start JUL-252 with Claude Opus 5.5 and DeepSeek V4.1 Flash, and prove a mid-build merge is deferred.
-19. [ ] Wait for JUL-252 to complete without a money stop.
-20. [ ] Report the final spend by model and checklist step.
+18. [x] Install the updater, start JUL-252 with Claude Opus 5.5 and DeepSeek V4.1 Flash, and prove a mid-build merge is deferred. #343 merged at 13:58; the 13:58 and 14:00 polls deferred, and the merge applied at 14:02 after the build.
+19. [ ] Wait for JUL-252 to complete without a money stop. The run passed $10 with no money stop, then hit the worker's 900-second build-session timeout at 14:00:44 during the panel review and failed with `session not completed`. The time bound is the remaining blocker.
+20. [x] Report the final spend by model and checklist step. This run $4.502079354; card total $11.165119684; the split is in `proof/rerun-2-2026-10-25/report.md`.
 
 Decision log: [decision-log.md](decision-log.md)
