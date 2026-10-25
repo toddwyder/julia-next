@@ -2,10 +2,10 @@
 
 ## Outcome
 
-Every finished build's proof gets an adversarial review from a different company's model, with a verdict per criterion shown on the Linear card. A failed review fixes itself once, then investigates and stops the card.
+Every finished build's proof gets an adversarial review from a different company's model, with a verdict per criterion on the Linear card. When a review fails, the card moves to Remediation, where it goes through one round of defect fixing and then a fresh review; only when that second review also fails does an Investigation run and the card stop.
 
 ## Acceptance criteria
 
 - A different company's model reviews each finished build's proof adversarially, starting from unproven and trying to break each claim, with nobody pressing anything.
 - The Linear card shows a verdict per criterion: proven, unproven or wrong thing tested.
-- A failed review gets one automatic Bug fix run, and a second failure runs Investigation and stops the card.
+- When a review fails, the card moves to Remediation, where it goes through one round of defect fixing and then a fresh review. Only when that second review also fails does an Investigation run and the card stop.

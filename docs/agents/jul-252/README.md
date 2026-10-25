@@ -25,7 +25,7 @@ Todd settled the review's inputs and failure handling on 24 October. The card wa
 
 - No evidence index. The reviewer reads the proof folder for the exact candidate commit; a missing or thin proof folder is a failed criterion.
 - The "evidence is there" card is dropped. No Linear card existed for it, so nothing was canceled.
-- First failed review: the card moves to Remediation and a fix starts automatically on the Bug fix playbook from the review's findings.
+- First failed review: one round of defect fixing in Remediation, then a fresh review.
 - Second failed review: an Investigation run reports the root cause, then the card stops.
 - Every build and remediation run records its required playbook (build: the playbook it declares; first remediation: Bug fix; second: Investigation). The machine saves no result for a run whose checklist follows a different playbook.
 - The five-card checkpoint stays as Todd's later decision over the saved review results. The card delivers no report.
