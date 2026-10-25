@@ -75,7 +75,7 @@ independent audits, never from an agent's report. A weekly summary shows what ea
   behaviour (a plain comment where GitHub forbids an app reviewing its own pull request). The
   build step remains stock but follows the plan's named repository skill: only `implement` for a
   feature card, which already runs TDD at the plan's seams and one `code-review`;
-  `diagnosing-bugs`, then `code-review`, for a defect card.
+  poteto-mode's Bug fix playbook, then `code-review`, for a defect card.
 - **Coding standards.** Start `CODING_STANDARDS.md` with a short seed taken from the existing
   framework-first rules; it grows only through review send-backs.
 - **Cross-maker review agent.** Built from Mastra's `template-github-review-agent`, keeping its
