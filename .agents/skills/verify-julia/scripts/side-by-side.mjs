@@ -1,15 +1,18 @@
-// Captures Library, Enter a Recipe and Recipe at the reference framing and
-// writes same-size side-by-sides next to docs/design/vintage references.
-// Usage: node side-by-side.mjs <base-url> <out-dir>
+// Captures Library, Enter a Recipe and Recipe on live Julia and on a julia-next
+// build at the same width and 2x pixel density, then writes full-size
+// comparisons with live on the left. Nothing is scaled; long pages are split
+// into sections.
+// Usage: node side-by-side.mjs <julia-next-url> <out-dir> [live-url]
 import { mkdirSync, readFileSync } from 'node:fs';
 import { chromium } from '@playwright/test';
 
-const [base, out] = process.argv.slice(2);
+const [base, out, live = 'https://julia-mu-green.vercel.app'] = process.argv.slice(2);
 mkdirSync(out, { recursive: true });
 
-// References show an 800px column at ~0.485 scale inside a 1131x672 browser area.
-const VIEW = { width: 2330, height: 1384 };
-const SHOWN = { width: 1131, height: 672 };
+const WIDTH = 900;
+const SCALE = 2;
+const SECTION = 1000;
+const MAX_SECTIONS = 3;
 
 const LIBRARY = [
   'Sheet-Pan Caponata With Cod',
@@ -19,66 +22,73 @@ const LIBRARY = [
   'Basil and Tomato Fried Rice',
   'Homemade Artisan Crackers',
 ];
-const CRACKERS = {
-  ingredients: [
-    '2 cup all-purpose flour, (250g), plus more for kneading and rolling',
-    '1 tsp granulated sugar',
-    '1 tsp salt',
-    '½ tsp onion powder',
-    '½ tsp garlic powder',
-    '1 tbsp fresh rosemary, or other add-in (see Notes)*, finely chopped',
-    '⅔ cup water, (160g/ml)',
-    '3 tbsp extra-virgin olive oil, (45g/45ml), plus more for brushing on top',
-    'flaky sea salt, for topping',
-  ].join('\n'),
-  steps: 'Preheat the oven to 450°F.\nStir the flour, sugar, salt and seasonings together.',
-};
+const CRACKERS = JSON.parse(readFileSync(new URL('./side-by-side-crackers.json', import.meta.url), 'utf8'));
 
 const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: VIEW });
+const context = await browser.newContext({ viewport: { width: WIDTH, height: SECTION }, deviceScaleFactor: SCALE });
+const page = await context.newPage();
+
 await page.goto(`${base}/`);
 await page.evaluate(() => window.localStorage.clear());
-
 let crackers = '';
 for (const title of LIBRARY) {
+  const isCrackers = title === 'Homemade Artisan Crackers';
   await page.goto(`${base}/recipes/new`);
   await page.getByLabel('Recipe Title').fill(title);
-  await page.getByLabel('Ingredients').fill(title === 'Homemade Artisan Crackers' ? CRACKERS.ingredients : '1 cod fillet');
-  await page.getByLabel('Instructions').fill(title === 'Homemade Artisan Crackers' ? CRACKERS.steps : 'Bake.');
+  await page.getByLabel('Ingredients').fill(isCrackers ? CRACKERS.ingredients : '1 cod fillet');
+  await page.getByLabel('Instructions').fill(isCrackers ? CRACKERS.steps : 'Bake.');
   await page.getByRole('button', { name: 'Save Recipe' }).click();
   await page.waitForURL(/\/recipes\/(?!new$)[^/]+$/);
-  if (title === 'Homemade Artisan Crackers') crackers = page.url();
+  if (isCrackers) crackers = page.url();
 }
 
 const screens = [
-  { name: '01-library', url: `${base}/recipes` },
-  { name: '11-manual-entry', url: `${base}/recipes/new` },
-  { name: '07-recipe-detail', url: crackers },
+  { name: '01-library', title: 'Library', live: `${live}/`, ours: `${base}/recipes`, ready: 'Homemade Artisan Crackers' },
+  { name: '11-manual-entry', title: 'Enter a Recipe', live: `${live}/new`, ours: `${base}/recipes/new`, ready: 'Enter a Recipe' },
+  { name: '07-recipe-detail', title: 'Recipe', live: `${live}/recipes/07f89a01-9422-43f8-81f1-eb42adb771b1`, ours: crackers, ready: 'Preparation' },
 ];
 
-for (const screen of screens) {
-  await page.goto(screen.url);
+async function capture(url, ready, path) {
+  await page.goto(url, { waitUntil: 'load' });
+  await page.getByText(ready).first().waitFor({ timeout: 30_000 });
   await page.evaluate(() => document.fonts.ready);
-  await page.waitForLoadState('networkidle');
-  await page.screenshot({ path: `${out}/${screen.name}-julia-next.png` });
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path, fullPage: true });
+  return page.evaluate(() => document.documentElement.scrollHeight);
 }
 
-const sheet = await browser.newPage({ viewport: { width: SHOWN.width * 2 + 48, height: SHOWN.height + 72 } });
+const sheet = await browser.newPage({ deviceScaleFactor: 1 });
+const written = [];
 for (const screen of screens) {
-  const reference = readFileSync(new URL(`../../../../docs/design/vintage/${screen.name}.jpg`, import.meta.url)).toString('base64');
-  const ours = readFileSync(`${out}/${screen.name}-julia-next.png`).toString('base64');
-  await sheet.setContent(`
-    <body style="margin:0;padding:16px;background:#444;font:14px sans-serif;color:#fff;display:flex;gap:16px">
-      <figure style="margin:0"><figcaption>Reference ${screen.name}.jpg (live Julia)</figcaption>
-        <div style="width:${SHOWN.width}px;height:${SHOWN.height}px;overflow:hidden;margin-top:8px">
-          <img src="data:image/jpeg;base64,${reference}" style="display:block">
-        </div></figure>
-      <figure style="margin:0"><figcaption>julia-next (this branch)</figcaption>
-        <img src="data:image/png;base64,${ours}" style="display:block;margin-top:8px;width:${SHOWN.width}px;height:${SHOWN.height}px">
-      </figure>
-    </body>`);
-  await sheet.screenshot({ path: `${out}/${screen.name}-side-by-side.png` });
+  const livePath = `${out}/${screen.name}-live.png`;
+  const oursPath = `${out}/${screen.name}-julia-next.png`;
+  await capture(screen.live, screen.ready, livePath);
+  const oursHeight = await capture(screen.ours, screen.ready, oursPath);
+  // Sections follow julia-next's length; live's extra recipes and nutrition panel have no counterpart yet.
+  const sections = Math.min(Math.ceil(oursHeight / SECTION), MAX_SECTIONS);
+  const liveImage = readFileSync(livePath).toString('base64');
+  const oursImage = readFileSync(oursPath).toString('base64');
+  for (let i = 0; i < sections; i += 1) {
+    const label = sections === 1 ? 'whole page' : i === 0 ? 'top' : `lower ${i}`;
+    const panel = (caption, image) => `
+      <figure style="margin:0">
+        <figcaption style="height:32px">${caption}</figcaption>
+        <div style="width:${WIDTH * SCALE}px;height:${SECTION * SCALE}px;overflow:hidden;background:#fff">
+          <img src="data:image/png;base64,${image}" style="display:block;margin-top:-${i * SECTION * SCALE}px">
+        </div>
+      </figure>`;
+    await sheet.setViewportSize({ width: WIDTH * SCALE * 2 + 72, height: SECTION * SCALE + 80 });
+    await sheet.setContent(`
+      <body style="margin:0;padding:24px;background:#444;font:24px sans-serif;color:#fff;display:flex;gap:24px">
+        ${panel(`Live Julia: ${screen.title} (${label})`, liveImage)}
+        ${panel(`julia-next: ${screen.title} (${label})`, oursImage)}
+      </body>`);
+    await sheet.evaluate(() => Promise.all([...document.images].map((image) => image.decode())));
+    const file = `${out}/${screen.name}-${sections === 1 ? 'whole' : i === 0 ? 'top' : `lower-${i}`}.png`;
+    await sheet.screenshot({ path: file });
+    written.push(file);
+  }
 }
 
 await browser.close();
-console.log(out);
+console.log(written.join('\n'));

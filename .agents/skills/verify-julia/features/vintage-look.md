@@ -18,7 +18,7 @@ Open any page. The masthead is at the top. Go to Library, then Manual Entry, the
 1. Run "Before any feature" in [README.md](README.md).
 2. Visit `$RUN_URL/recipes`, `$RUN_URL/recipes/new`, and a saved recipe. Take a `pw screenshot` of each into `$EVIDENCE`.
 3. Run the drift check: `JULIA_VERIFY_URL="$RUN_URL" npx playwright test .agents/skills/verify-julia/tests/vintage.spec.mjs`.
-4. For side-by-sides against the references: `node .agents/skills/verify-julia/scripts/side-by-side.mjs "$RUN_URL" "$EVIDENCE/side-by-side"`. This writes `<screen>-julia-next.png` and `<screen>-side-by-side.png` for 01-library, 11-manual-entry and 07-recipe-detail. Open each one and look at it.
+4. For side-by-sides against live Julia: `node .agents/skills/verify-julia/scripts/side-by-side.mjs "$RUN_URL" "$EVIDENCE/side-by-side"`. Both sites are captured 900 CSS px wide at 2x pixel density and never scaled. Long pages are split into sections that follow the julia-next page's length. It writes `<screen>-<section>.png` comparisons (live on the left) for 01-library, 11-manual-entry and 07-recipe-detail, plus the raw `<screen>-live.png` and `<screen>-julia-next.png` captures. Open each comparison at 100% and check the body text is readable.
 
 ## Gotchas
 
