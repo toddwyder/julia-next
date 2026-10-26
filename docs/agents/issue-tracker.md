@@ -5,9 +5,9 @@ requirements, acceptance criteria and status. GitHub owns code, commits, pull re
 Mastra Factory and its Intake route are retired and must not be recreated or used.
 
 Use the signed-in Linear connector for card creation, description updates, comments, labels and
-status changes. Read-only or comment-only command work may use `scripts/linear-cli.mjs` through
-`scripts/julia-vault-windows.ps1`; that script does not create cards, edit descriptions or change
-status. Never expose the Linear credential outside the vault subprocess.
+status changes. Read-only or comment-only command work may use
+`node scripts/julia-agents.mjs -- node scripts/linear-cli.mjs`; that script does not create cards,
+edit descriptions or change status. Never expose the Linear credential outside that subprocess.
 
 Before creating a new card, return the detailed triage brief to Todd and wait for approval. After
 approval, create the real card before adding any dependency relationship so links use identifiers
