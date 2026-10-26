@@ -1,0 +1,7 @@
+what	why	evidence	result
+Regenerate verify-julia with /create-verification-skill and keep the name	path-forward.md says the generated skill replaces verify-julia; keeping the name keeps CODING_STANDARDS, check-pstack-pin and .gitignore references valid with no edits	scripts/check-agent-links.mjs and check-skill-names.mjs exit 0	done
+Linux-only helper; drop process-platform.mjs and Windows/PowerShell paths	Agents run on this Ubuntu server (AGENTS.md); path-forward.md asks for a Linux rewrite	launch/doctor/cleanup exit 0 on the server	done
+Split home.spec.mjs into home and install specs	One saved spec per feature in the map	2 passed in proof/playwright-test.txt	done
+Open the CLI with --browser chromium	The CLI defaults to Google Chrome, which is not installed; first proof run failed on /opt/google/chrome/chrome	second run open=0	done
+Decline formal verification	path-forward.md: JUL-271 owes it	-	declined
+Leave check-pstack-pin.test.mjs failure alone	Fails identically on the unmodified tree (@mastra/code-sdk not installed locally); unrelated to this change	git stash run: pass 4 fail 1	not in scope

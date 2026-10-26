@@ -1,0 +1,8 @@
+
+[2mRunning [22m2[2m tests using [22m2[2m workers[22m
+
+[1A[2K[1/2] .agents/skills/verify-julia/tests/home.spec.mjs:6:1 › home page shows Julia, the application version, and a welcome line
+[1A[2K[2/2] .agents/skills/verify-julia/tests/install.spec.mjs:3:1 › home page exposes an installable Julia manifest and decodable icons
+[1A[2K[32m  2 passed[39m[2m (3.5s)[22m
+
+exitCode=0

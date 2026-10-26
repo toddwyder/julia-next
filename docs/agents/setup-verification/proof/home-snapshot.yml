@@ -1,0 +1,6 @@
+- generic [active] [ref=f1e1]:
+  - main [ref=f1e2]:
+    - generic [ref=f1e3]: Julia 0.0.0
+    - paragraph [ref=f1e4]: what are we cooking today?
+  - button "Open Next.js Dev Tools" [ref=f1e10] [cursor=pointer]
+  - alert [ref=f1e14]

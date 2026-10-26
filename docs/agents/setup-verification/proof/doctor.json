@@ -1,0 +1,36 @@
+{
+  "ok": true,
+  "runId": "2026-10-26T11-54-28-088Z-293d76",
+  "url": "http://127.0.0.1:32791/",
+  "mode": "local",
+  "session": "verify-julia-2026-10-26T11-54-28-088Z-293d76",
+  "candidate": {
+    "branch": "feat/generated-verify-julia",
+    "commit": "7e00aaa2854d82eb70667be9b23fd4ab87ecb90f",
+    "dirty": true,
+    "worktreeSha256": "b94b5bf91a626281fadb30040e06d69f9b212c68c0b49b0cdaa0d46fb431569a"
+  },
+  "checks": {
+    "sameCommit": true,
+    "sameWorktree": true,
+    "serverAlive": true,
+    "portOwnedByRun": true,
+    "listenerPids": [
+      1333296
+    ],
+    "probe": {
+      "health": {
+        "status": 200,
+        "body": {
+          "status": "ok"
+        }
+      },
+      "home": {
+        "status": 200,
+        "hasMain": true
+      }
+    },
+    "usable": true
+  },
+  "at": "2026-10-26T11:54:39.089Z"
+}
