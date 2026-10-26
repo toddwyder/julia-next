@@ -1,6 +1,4 @@
 #!/usr/bin/env node
-// Lifecycle helper for the verify-julia skill. Linux only.
-// Usage: node .agents/skills/verify-julia/verify-julia.mjs launch [--url <address>] | doctor | test <spec...> | cleanup
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
