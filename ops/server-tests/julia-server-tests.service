@@ -1,8 +1,0 @@
-[Unit]
-Description=Run structurally owned server tests for Julia candidate heads
-
-[Service]
-Type=oneshot
-Environment=PATH=%h/.local/bin:/opt/node-v24.14.1/bin:/usr/local/bin:/usr/bin:/bin
-ExecStart=/usr/bin/flock --nonblock %h/.local/state/julia-server-tests/worker.lock /usr/local/bin/node %h/.local/lib/julia-server-tests/worker.mjs poll %h/.config/julia-server-tests/config.json
-TimeoutStartSec=3h
