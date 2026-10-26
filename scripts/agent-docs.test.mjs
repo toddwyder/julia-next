@@ -33,8 +33,8 @@ test('agent instructions use the trial rulebook and the runbook marks Factory re
   const trial = read('AGENTS.md');
   assert.match(trial, /poteto-mode skill/);
   assert.match(trial, /Money never stops a card/);
-  assert.match(trial, /recorded and reported per card/);
-  assert.match(trial, /15 minutes with no activity/);
+  assert.match(trial, /node scripts\/scorecard\.mjs JUL-<n> --write/);
+  assert.doesNotMatch(trial, /15 minutes with no activity|pauses on a runaway/);
   assert.doesNotMatch(trial, /one \$10 total model budget|Spending is \$0|cost readback above \$0 stops/);
   assert.match(trial, /Linear holds cards and requirements\. GitHub holds code/);
   assert.match(trial, /node scripts\/julia-agents\.mjs/);

@@ -2,7 +2,7 @@
 
 Date: 2026-10-25
 
-Status: Superseded in part by Todd's 25 October 2026 decision. Card spend is recorded and reported per card; money never stops a card. The $10 cap, the per-card `cardCeilings` override and the priced-accounting block are retired. The history below is kept as the record of how the cap was reached before it was removed.
+Status: Superseded by [0024](0024-run-scorecard-and-stop-ping.md) for spend recording, and in part by Todd's 25 October 2026 decision. Card spend is recorded and reported per card; money never stops a card. The $10 cap, the per-card `cardCeilings` override and the priced-accounting block are retired. The history below is kept as the record of how the cap was reached before it was removed.
 
 ## 25 October decision
 

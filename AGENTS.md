@@ -7,7 +7,7 @@ Julia uses the pstack way of working, adopted 22 October 2026 and kept after the
 - In Mastra Code, read `docs/harness/mastra-code.md` once per session and read the pstack models file it names at task start when it exists.
 - Todd's agreed delivery flow, decisions and order of work: [docs/plans/path-forward.md](docs/plans/path-forward.md).
 - Fix every correction as high in [the inverse pyramid](docs/principles/inverse-pyramid.md) as it will go; a written rule is the last resort.
-- Card spend is recorded and reported per card at published API prices. Money never stops a card. A build stops only after 15 minutes with no activity, or pauses on a runaway or a provider that stays down, keeping its work and posting a Linear note so it can be continued. See [docs/adr/0023-actual-spend-card-cap.md](docs/adr/0023-actual-spend-card-cap.md).
+- Every card gets a scorecard of its spend at published API prices, its models and its stops, rebuilt from Mastra Code's records with `node scripts/scorecard.mjs JUL-<n> --write` into `docs/scorecards/` and committed with the card's PR. Money never stops a card. Every stop comments on the card and sets Todd a Linear reminder. Record Todd's UAT yes in `docs/scorecards/uat.json`. See [docs/adr/0024-run-scorecard-and-stop-ping.md](docs/adr/0024-run-scorecard-and-stop-ping.md).
 - Framework facts come from the installed packages and their version-matched official docs.
 - Commit and push as you go.
 - Publish with gh using the ordinary signed-in GitHub access.
