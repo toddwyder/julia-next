@@ -1,6 +1,0 @@
-decision	why	evidence	result
-Feature playbook selected for trivial single-file marker card; no narrower playbook fits a new-file addition.	Card JUL-232 category enhancement/machine proof fixture; desired behavior is one new file.	Playbook Feature steps 1-8 followed; steps 1,2,7,8 skipped with reasons.	Completed.
-Delegated code-writing to model-1 (commandcode-free/reflection/beam:free) subagent with exact scope and success criteria.	Poteto-mode requires code delegates via subagent; feature model line is beam free.	Subagent report: branch feat/jul-232-build-phase-rehearsal-marker, commit b1ae9b4cd9affa81dafae06d103613ffaf9676ba, 1 file changed 1 insertion.	Completed.
-Verified file bytes independently (wc -c=36, xxd single trailing 0a, git status clean, git show stat only BUILD-PHASE-REHEARSAL.txt).	Principle prove-it-works: verify against real artifact.	Shell output: 36 bytes; xxd 4a...0a; status empty; stat 1 file 1 insertion.	Completed.
-Attempted distinct-model review via model-2 (deepseek-v4.1-flash).	Interrogate/review model per pstack config; model-diverse review requested.	Subagent error: "Trial forbids nonzero model prices".	Refused handoff, not a completed model-diverse review.
-Skipped Opening a PR.	Card Out of scope lists pull requests.	Saved card Out of scope section.	Skipped.

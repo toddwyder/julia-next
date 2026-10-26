@@ -1,7 +1,0 @@
-Command: npm run test:jul-230
-Working directory: ops/mastra-agents/reviewer
-Exit code: 1
-
-The first negative Host-header test used fetch, which normalized the Host header
-and received HTTP 200 instead of the expected 403. The test was corrected to
-exercise the actual HTTP boundary with node:http.

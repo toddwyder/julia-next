@@ -1,8 +1,0 @@
-decision	rationale	evidence	result
-create-marker-file	Card requires BUILD-PHASE-REHEARSAL.txt with exact content	xxd shows 36 bytes ending 0a (one newline)	file created by pstack coder
-single-commit	Acceptance: clean non-empty commit with only marker file	git status clean; one file staged	commit 2af6085 on feat/jul-232-build-phase-rehearsal-marker
-skip-subagent-delegation	Earlier waiver; corrected by correction-step-4 row	see correction-step-4	superseded
-skip-interrogate	No contested design; exact spec from card	n/a	proceeded
-correction-step-4	Earlier waiver of subagent delegation contradicted Feature playbook mandatory step 4. Redid code step via pstack coder subagent (model-1).	Subagent commit 2af6085; file bytes verified	corrected
-refused-review-handoff	Attempted distinct-model review via model-2 (deepseek-v4.1-flash). Connection core refused: "Trial forbids nonzero model prices". Recorded as refused handoff, not completed model-diverse review.	Subagent error: Trial forbids nonzero model prices	refused
-open-pr	AGENTS.md requires open PR to main	gh not authenticated in sandbox; commit ready locally	pending auth

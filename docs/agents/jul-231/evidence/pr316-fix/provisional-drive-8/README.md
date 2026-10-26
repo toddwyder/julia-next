@@ -1,1 +1,0 @@
-This drive is not acceptance evidence. Its driver passed, but the model-authored checklist still said mandatory delegation was skipped even though later tool events showed a coder helper writing the marker. The next candidate rejects that contradiction.

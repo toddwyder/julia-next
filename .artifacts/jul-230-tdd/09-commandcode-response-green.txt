@@ -1,7 +1,0 @@
-Command: npm run typecheck; npm run test:jul-230; npm run test:jul-225
-Exit code: 0
-
-TypeScript: passed
-JUL-230: 8 passed, 0 failed
-JUL-225: 30 passed, 0 failed
-PASS  CommandCode discovery rejects a malformed success payload instead of tracing an unknown count as zero

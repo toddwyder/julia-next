@@ -1,3 +1,0 @@
-Julia 0.0.0
-
-what are we cooking today?

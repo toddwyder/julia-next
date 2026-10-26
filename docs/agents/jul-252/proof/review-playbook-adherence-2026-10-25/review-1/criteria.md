@@ -1,1 +1,0 @@
-1. The live Julia home page's `main` element exposes the accessible name `Julia home edited after Start`.

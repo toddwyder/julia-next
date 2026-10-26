@@ -1,7 +1,0 @@
-MainPID=392198
-Id=julia-jul231-runner.service
-ActiveState=active
-
-MainPID=392200
-Id=julia-jul231-control.service
-ActiveState=active

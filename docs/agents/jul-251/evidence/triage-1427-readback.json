@@ -1,9 +1,0 @@
-{
-  "decision": "Todd, 22 October 2026 14:27 PT",
-  "url": "https://linear.app/julia-next/issue/JUL-251/hybrid-trial-model-neutral-connection-core-with-a-dollar1-card-ceiling",
-  "state": "Triage",
-  "changedAcceptanceCriterion": "3. A model without a price is refused, and the next request that could take the card past $1.00 is refused before it is sent. A priced model's request with missing usage is refused, and further priced requests on that card are blocked while its usage is unknown. Free models ($0) pass with or without usage.",
-  "descriptionMatchesReadback": true,
-  "labelsAndRelationsUnchanged": true,
-  "modelSpendUsd": 0
-}

@@ -1,4 +1,0 @@
-ts	phase	decision	why	evidence	result
-2026-10-23T16:50:00Z	create	Create BUILD-PHASE-REHEARSAL.txt with exact requested bytes	Card requires sole output file with exact content	od -c shows 36 bytes ending single newline	File created and byte-verified
-2026-10-23T16:55:00Z	commit	Commit only BUILD-PHASE-REHEARSAL.txt	Proof requires non-empty commit with single changed file	git show confirms one file 32222c3	Committed
-2026-10-23T17:00:00Z	review	Run distinct-model review handoff on final commit	Host required review evidence; deepseek blocked by trial, used two independent beam review passes	.builder-home/pstack/review-handoff.md	No findings after subject amend
