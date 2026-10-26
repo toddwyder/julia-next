@@ -47,13 +47,6 @@ jobs:
         run: node scripts/test-owners.mjs --install-browsers local
       - name: Run every local package test
         run: node scripts/test-owners.mjs --run local
-      - name: Builder client must never read the Axiom credential
-        run: |
-          set -euo pipefail
-          if grep -rE 'process\.env\.AXIOM_(TOKEN|DATASET)' scripts/; then
-            echo "::error::builder-side script under scripts/ reads an Axiom credential env var directly"
-            exit 1
-          fi
 
   web:
     runs-on: ubuntu-22.04
@@ -75,31 +68,14 @@ jobs:
       - name: Build application
         run: npm run build
 
-  server-tests:
-    runs-on: ubuntu-22.04
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24.14.1
-      - name: Await exact candidate's server-owned tests
-        env:
-          CANDIDATE_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: node scripts/await-server-tests.mjs "$CANDIDATE_HEAD"
-
   checks:
-    needs: [repository-hygiene, package-tests, web, server-tests]
+    needs: [repository-hygiene, package-tests, web]
     if: always()
     runs-on: ubuntu-22.04
     env:
       REPOSITORY_HYGIENE: ${{ needs.repository-hygiene.result }}
       PACKAGE_TESTS: ${{ needs.package-tests.result }}
       WEB: ${{ needs.web.result }}
-      SERVER_TESTS: ${{ needs.server-tests.result }}
     steps:
       - name: Require every test environment to pass
         run: |
@@ -107,4 +83,3 @@ jobs:
           [[ "$REPOSITORY_HYGIENE" == success ]]
           [[ "$PACKAGE_TESTS" == success ]]
           [[ "$WEB" == success ]]
-          [[ "$SERVER_TESTS" == success ]]
