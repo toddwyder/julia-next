@@ -44,7 +44,7 @@ async function probe(url) {
   const body = health.ok ? await health.json() : null;
   const home = await fetch(url, { signal: AbortSignal.timeout(30_000) });
   const html = await home.text();
-  return { health: { status: health.status, body }, home: { status: home.status, hasMain: html.includes('<main>') } };
+  return { health: { status: health.status, body }, home: { status: home.status, hasMain: /<main[\s>]/.test(html) } };
 }
 
 const usable = result => result?.health?.body?.status === 'ok' && result.home.status === 200 && result.home.hasMain;

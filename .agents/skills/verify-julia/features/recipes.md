@@ -15,7 +15,7 @@ The Library lists the recipes saved in this browser, newest first. Manual Entry 
 
 ## How to get to it (user POV)
 
-- Every page has a nav at the top: `Julia` goes home, `Library` goes to `/recipes`.
+- Every page has the masthead at the top: the Julia logo (link named `Julia`) goes home, the `Library` tab goes to `/recipes`.
 - On the Library, `Manual Entry` opens the form. A recipe row opens that recipe.
 - Nothing leaves the device: recipes are stored in this browser under the `localStorage` key `julia.recipes.v1`, as `{ "version": 1, "recipes": [...] }` with the newest first. Clearing site data deletes them, and another browser or device shows an empty Library.
 - `Back to the Library` returns to the list; the browser's own Back button works too.

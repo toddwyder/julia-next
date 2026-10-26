@@ -1,0 +1,42 @@
+/* Tokens from docs/design/vintage/DESIGN-LANGUAGE.md. vintage.spec.mjs reads that
+   document and fails if a rendered colour or font stops matching it. */
+
+:root {
+  --vintage-paper: #fdfcf7;
+  --vintage-ink: #333333;
+  --vintage-heading: #2d4f36;
+  --vintage-button: #2d5a27;
+  --vintage-terracotta: #c35231;
+  --vintage-focus: #d67d61;
+  --vintage-pale-green: #e2ebe2;
+  --vintage-terracotta-hover: #a33e20;
+  --vintage-divider: rgba(51, 51, 51, 0.15);
+  --vintage-divider-soft: rgba(51, 51, 51, 0.3);
+  --vintage-serif: var(--font-serif), Georgia, serif;
+  --vintage-sans: var(--font-sans), Helvetica, sans-serif;
+  --vintage-mono: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+html {
+  background: var(--vintage-paper);
+}
+
+body {
+  margin: 0;
+  background: var(--vintage-paper);
+  color: var(--vintage-ink);
+  font-family: var(--vintage-serif);
+}
+
+.vintage-column {
+  box-sizing: border-box;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+@media (min-width: 768px) {
+  .vintage-column {
+    padding: 0 24px;
+  }
+}

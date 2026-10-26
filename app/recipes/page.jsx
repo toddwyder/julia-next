@@ -24,43 +24,56 @@ export default function LibraryPage() {
   const searching = query.trim() !== '';
 
   return (
-    <main className={styles.page}>
-      <div className={styles.sheet}>
-        <p className={styles.eyebrow}>The Julia cookbook</p>
-        <h1 className={styles.heading}>Library</h1>
-        <Link href="/recipes/new" className={styles.action}>Manual Entry</Link>
+    <main className={`vintage-column ${styles.page}`}>
+      <div className={styles.stack}>
+        <h1 className={styles.title}>Library</h1>
 
-        <div className={styles.fieldGroup}>
-          <label className={styles.field} htmlFor="recipe-search">Search your collection</label>
+        <div className={styles.libraryActions}>
+          <Link href="/recipes/new" className={styles.outline}>Manual Entry</Link>
+        </div>
+
+        <div className={styles.searchBox}>
+          <svg className={styles.searchIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.5-3.5" />
+          </svg>
           <input
-            id="recipe-search"
             type="search"
-            className={styles.search}
+            aria-label="Search your collection"
+            className={styles.input}
             value={query}
             onChange={event => setQuery(event.target.value)}
-            placeholder="e.g. Coq au Vin, Chicken"
+            placeholder="Search your collection (e.g. Coq au Vin, Chicken)..."
           />
         </div>
 
-        {error ? <p className={styles.error} role="alert">{error}</p> : null}
-        {recipes === null ? <p className={styles.empty}>Loading your collection…</p> : null}
-        {recipes !== null && recipes.length === 0 && !error
-          ? (
-            <p className={styles.empty}>
-              {searching ? 'No recipe title matches that search.' : 'Nothing here yet. Add your first recipe with Manual Entry.'}
-            </p>
-          )
-          : null}
+        <section>
+          <h2 className={styles.sectionHeading}>Recipes</h2>
+          {error ? <p className={styles.error} role="alert">{error}</p> : null}
+          {recipes === null ? <p className={styles.loading}>Loading recipe archive...</p> : null}
+          {recipes !== null && recipes.length === 0 && !error
+            ? (
+              <div className={styles.emptyBox}>
+                <p className={styles.emptyHeading}>
+                  {searching ? "I couldn't find that in my library." : 'Your library is empty.'}
+                </p>
+                <p className={styles.emptyLine}>
+                  {searching ? "Let's adjust the seasoning and try something else." : 'Add your first recipe with Manual Entry.'}
+                </p>
+              </div>
+            )
+            : null}
 
-        <ul className={styles.list} aria-label="Recipes">
-          {(recipes ?? []).map(recipe => (
-            <li key={recipe.id} className={styles.listItem}>
-              <Link href={`/recipes/${recipe.id}`} className={styles.recipeLink}>{recipe.title}</Link>
-            </li>
-          ))}
-        </ul>
+          <ul className={styles.list} aria-label="Recipes">
+            {(recipes ?? []).map(recipe => (
+              <li key={recipe.id} className={styles.row}>
+                <Link href={`/recipes/${recipe.id}`} className={styles.recipeLink}>{recipe.title}</Link>
+              </li>
+            ))}
+          </ul>
+        </section>
 
-        <p className={styles.notice}>Recipes are saved only in this browser on this device.</p>
+        <p className={styles.notice}>❧ Recipes are saved only in this browser on this device.</p>
       </div>
     </main>
   );
