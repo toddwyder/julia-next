@@ -1,33 +1,27 @@
 # Julia verification map
 
-This map covers Julia's two existing browser surfaces: home content and install metadata/assets. Read the index before driving the app, then use the matching feature file. This does not verify installation on Todd's phone.
+Julia's user features. Each file says what the feature is, how a user reaches it, how to drive it and what proves it works. Each feature has one saved spec in `../tests/`.
 
-## Baseline preconditions
+| Feature | File | Spec |
+| --- | --- | --- |
+| Home page: name, version, welcome line | [home-content.md](home-content.md) | `tests/home.spec.mjs` |
+| Install manifest and icons | [installation-metadata-assets.md](installation-metadata-assets.md) | `tests/install.spec.mjs` |
 
-- From the repository root, run `node .agents/skills/verify-julia/verify-julia.mjs launch` and capture its JSON output as `$run`: `$run = node .agents/skills/verify-julia/verify-julia.mjs launch | ConvertFrom-Json`.
-- Run `node .agents/skills/verify-julia/verify-julia.mjs doctor`, capture its output and exit code, and require success before driving. Require it to report this candidate commit, matching dirty-tree digest, exact Next process, listener ownership, and healthy response.
-- Keep the same PowerShell session so `$run.url`, `$run.session`, and `$run.evidenceDir` stay available. If the shell is reopened, restore them with `$run = Get-Content .artifacts/verify-julia/run.json -Raw | ConvertFrom-Json`.
-- Open only the browser session named in `$run.session`; it is unique to this run and uses an in-memory profile.
+`tests/release.spec.mjs` is not a feature. It checks that production serves the merged commit, and skips unless `JULIA_SMOKE_COMMIT` is set.
 
-## Driving conventions
+## Before any feature
 
-- Run every browser command from the repository root after Doctor passes.
-- Use `$run.url` and `-s="$($run.session)"` for every CLI command. Never use an unrecorded port or another session.
-- Prefer the `main` landmark and the manifest link from the rendered home page. Use current CLI snapshots for element refs.
-- Save screenshots, snapshots, console output, manifest and icon observations, and test output under `$run.evidenceDir`.
-- Keep full snapshots and logs in files; inspect only the targeted portions needed to decide the proof.
-- The home/manifest journey has no persistent household-data side effect. Record `not applicable` rather than inventing one.
+1. `node .agents/skills/verify-julia/verify-julia.mjs launch` (or `launch --url <address>` for a deployed build).
+2. Load the run into the shell and define the browser shortcut:
 
-## Proof and skip reporting
+   ```bash
+   eval "$(node -e 'const r=require("./.artifacts/verify-julia/run.json");console.log(`RUN_URL=${r.url} RUN_SESSION=${r.session} EVIDENCE=${r.evidenceDir}`)')"
+   pw() { npx --no-install playwright cli "-s=$RUN_SESSION" "$@"; }
+   ```
 
-- Capture the user-facing action and resulting state, not just the final screen.
-- Home proof includes the navigation command, a focused home snapshot, the home screenshot, and the observed `main` text.
-- Install-metadata proof includes the home page's same-origin manifest link, the live manifest response, and both icon responses with MIME type and decoded dimensions.
-- Record candidate commit, dirty-tree SHA-256, Julia version, Playwright version, run ID, URL, process/listener identity, command exits, and console errors.
-- Read the retained artifacts after cleanup. A manifest/assets result does not prove that a phone installed Julia.
-- Before independent review, verify that the launch and Doctor candidate identity matches the exact reviewed tree, then inspect the saved behavior results and exit codes. Missing, failed, unavailable, stale, or mismatched evidence blocks a pass; rerun proof after any source change.
+3. `node .agents/skills/verify-julia/verify-julia.mjs doctor` must exit 0.
+4. `pw open --browser chromium "$RUN_URL"`.
 
-## Features
+Use only `$RUN_URL` and `$RUN_SESSION`. Save every file under `$EVIDENCE`. Finish with `node .agents/skills/verify-julia/verify-julia.mjs cleanup`.
 
-- [Home content](./home-content.md) covers the rendered Julia name/version and welcome line.
-- [Installation metadata and assets](./installation-metadata-assets.md) covers the linked web manifest, 192px/512px icons, and favicon.
+When you add a user-facing feature, add a file here with the same four sections (`Sub-features`, `How to get to it (user POV)`, `Driving it with Playwright CLI`, `Gotchas`), add its spec to `../tests/`, and add a row to the table.

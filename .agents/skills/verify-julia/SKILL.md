@@ -1,98 +1,91 @@
 ---
 name: verify-julia
-description: "Verify Julia's rendered home page and install manifest/assets in an isolated local browser session; use after changing either surface or when checking a candidate build."
+description: "Drive Julia (the household Next.js web app) the way a user does on this Linux server: launch an isolated local server or point at a given address such as a Vercel preview, check it is the right build, drive the home page and install manifest in a named Playwright CLI browser, and keep the proof. Use after changing anything a user sees, or to check a candidate build or preview."
 ---
 
 # Verify Julia
 
-Use this skill to verify the two existing public surfaces: the Julia home content and the install manifest with its PNG icons. It does not prove installation on a phone.
+Julia is a Next.js web app. Its user surface today is one page (`/`) plus the install manifest and icons. `/api/health` is a machine check, not a user surface. There is no login, database or household data yet, so verification has no persistent side effect.
+
+All commands run in bash from the repository root. Each command below reads the active run from `.artifacts/verify-julia/run.json`, so a new shell picks the run back up.
 
 ## Launch
 
-Install exactly the locked candidate dependencies from the repository root when `node_modules` is absent or stale, then start the isolated Julia development server and capture its run record:
+Install the locked dependencies when `node_modules` is missing or `package-lock.json` changed, then start one run:
 
-```powershell
+```bash
 npm ci
-$run = node .agents/skills/verify-julia/verify-julia.mjs launch | ConvertFrom-Json
-$run | ConvertTo-Json | Set-Content -Encoding utf8 "$($run.evidenceDir)\launch.json"
+node .agents/skills/verify-julia/verify-julia.mjs launch                 # local candidate
+node .agents/skills/verify-julia/verify-julia.mjs launch --url https://<preview-address>/   # a deployed build
+eval "$(node -e 'const r=require("./.artifacts/verify-julia/run.json");console.log(`RUN_URL=${r.url} RUN_SESSION=${r.session} EVIDENCE=${r.evidenceDir}`)')"
 ```
 
-The helper chooses an unused ephemeral localhost port and creates a unique run ID, Playwright session name, isolated Next.js output directory, and run-specific evidence directory returned as `$run.evidenceDir`. Launch waits until the assigned listener belongs to its Next.js process tree and `/api/health` returns `status: ok`; it does not return a merely assigned or open port. It records commit, dirty-tree digest, process identity, port, readiness result, and dependency versions, and redirects the server log into the evidence directory. Do not drive an existing or unidentified server. Keep `$run` in this PowerShell session; after opening a new shell, restore it from the active run record with `$run = Get-Content .artifacts/verify-julia/run.json -Raw | ConvertFrom-Json`.
+Local launch picks a free port on 127.0.0.1, starts `next dev` in its own process group with its own `.next/verify-julia/<run>` output folder, and logs to `$EVIDENCE/server.log`. So it runs beside any other Julia server, including one on port 3000. Remote launch starts nothing.
+
+Launch returns only when Julia is usable: `/api/health` answers `{"status":"ok"}` and `/` returns 200 with a `<main>` element. The first local compile takes about 10 to 30 seconds; the limit is 120 seconds. Launch writes `$EVIDENCE/launch.json` with the run ID, URL, browser session name, commit, branch, dirty flag, worktree SHA-256, and Node, Next.js and Playwright versions. It refuses to start while another run is active; run Cleanup first.
 
 ## Doctor
 
-Run before driving and after any unexpected failure:
+Run before driving and whenever anything looks wrong:
 
-```powershell
-$doctorOutput = node .agents/skills/verify-julia/verify-julia.mjs doctor 2>&1
-$doctorExit = $LASTEXITCODE
-$doctorOutput | Set-Content -Encoding utf8 "$($run.evidenceDir)\doctor.json"
-if ($doctorExit -ne 0) { throw "Doctor failed with exit code $doctorExit" }
+```bash
+node .agents/skills/verify-julia/verify-julia.mjs doctor
 ```
 
-Doctor requires the current checkout, commit, dirty-tree digest, and Playwright version to match the launch record. It verifies the recorded Next.js command and process creation time, then confirms that the listener belongs to that process tree. It retries `/api/health` up to three times within six seconds to tolerate a Windows cold build. It reports the run ID, URL, session name, commit, digest, process/listener IDs, tool versions, attempt count, and health result. Any mismatch fails closed; clean up that run before starting another.
+It is read-only and writes `$EVIDENCE/doctor.json`. For a local run it checks that the commit and worktree digest still match the launch record (an edit since launch fails it), the server process is alive, and every listener on the port is in that process group. For both modes it checks that health and home are usable. A remote run reports `servedCommit` from `/api/health` (Vercel sets it); compare it to the commit you meant to check. Exit code 1 means do not drive. Clean up and launch again.
 
 ## Drive
 
-Run the Playwright CLI only after Doctor passes. Use the unique session name returned in `$run.session`; the profile is in-memory, and the URL and session are isolated for this run. Never attach to or close another session. From the repo root:
+Use the Playwright CLI bundled with the locked `@playwright/test` (see the `playwright-cli` skill for every command). Always pass this run's session, so you never touch another agent's browser:
 
-```powershell
-npx --no-install playwright cli "-s=$($run.session)" open $run.url
-npx --no-install playwright cli "-s=$($run.session)" snapshot --filename "$($run.evidenceDir)\home-snapshot.yml"
+```bash
+pw() { npx --no-install playwright cli "-s=$RUN_SESSION" "$@"; }
+pw open --browser chromium "$RUN_URL"
+pw snapshot --filename "$EVIDENCE/home-snapshot.yml"
 ```
 
-Use the snapshot's current element refs or the targeted commands in the two feature recipes. Do not dump full DOM or console output into model context. The CLI's coding-agent skill is installed in the canonical `.agents/skills/playwright-cli` directory by the locked Playwright 1.63.0 CLI's `cli install --skills=agents` command.
+`--browser chromium` is required: without it the CLI looks for Google Chrome, which this server does not have. If Chromium is missing, run `npx --no-install playwright install chromium` once.
+
+Find elements by role and text from the snapshot (`main`, the `Julia <version>` line, the welcome line), not by coordinates. Each feature in [features/README.md](features/README.md) gives the exact steps. Keep snapshots and console output in files; read only the parts you need.
+
+For repeat checks, run the saved Playwright specs against this exact server. The helper sets `JULIA_VERIFY_URL`, so the Playwright config does not start its own server on port 3000:
+
+```bash
+node .agents/skills/verify-julia/verify-julia.mjs test .agents/skills/verify-julia/tests/home.spec.mjs
+```
+
+Output and exit code go to `$EVIDENCE/playwright-test.txt`. A nonzero exit is a failed proof.
 
 ## Evidence
 
-Capture the action and resulting state in `$run.evidenceDir`:
+Everything goes in `$EVIDENCE` (`.artifacts/verify-julia/<run-id>/`, git-ignored). A proof includes:
 
-```powershell
-npx --no-install playwright cli "-s=$($run.session)" goto $run.url
-npx --no-install playwright cli "-s=$($run.session)" screenshot --filename "$($run.evidenceDir)\home.png"
-npx --no-install playwright cli "-s=$($run.session)" --raw eval "JSON.stringify({url: location.href, title: document.title, main: document.querySelector('main')?.innerText})" | Set-Content -Encoding utf8 "$($run.evidenceDir)\home.json"
-```
+- `launch.json` and `doctor.json`, which say which build was checked.
+- For each step, the action and what changed: the snapshot or text saved before and after, and a screenshot of the result.
+- Real responses for anything that is not on screen. For example, save the manifest body and icon headers as files.
+- `console-errors.txt` from `pw console error`. It must be empty, or explain each line.
+- `playwright-test.txt` when you ran specs, and `server.log` for a local run.
 
-Follow the two feature-map entries for the full proof. Retain the Playwright actions and result files, screenshot, focused observations, console errors, actual manifest/icon responses, Playwright Test output and exit code, plus `launch.json`, Doctor output, and server log. Record that home/manifest verification has no persistent household-data side effect. Do not claim that manifest/icon checks prove installation on a phone. Keep full snapshots, console output, and traces on disk and inspect only relevant portions.
+Drive the real user path: open the URL and read what renders. Do not call internal functions or add test-only routes. Manifest and icon checks prove the browser can read them. They do not prove that installing on a phone works; say so when you report.
 
 ## Cleanup
 
-Close only this run's named CLI session, then stop only the verified Next.js process tree and remove only its isolated `.next` output:
-
-```powershell
-if (npx --no-install playwright cli list | Select-String -SimpleMatch $run.session) { npx --no-install playwright cli "-s=$($run.session)" close }
+```bash
 node .agents/skills/verify-julia/verify-julia.mjs cleanup
-Test-Path $run.evidenceDir
-Get-Content "$($run.evidenceDir)\launch.json" -TotalCount 20
+ls "$EVIDENCE"
 ```
 
-Cleanup can run even if server startup failed or the server has already exited. It checks the exact process command and launch time before stopping a live process; if the root exited, it only stops child processes whose command path, launch time, and recorded port identify this run. Unverified descendants and any unrelated port owner are left untouched. If descendants remain, the isolated output is preserved. Cleanup clears this run record and preserves `$run.evidenceDir`. Verify the path and `launch.json` are readable after cleanup. Never delete another run's artifact directory.
+Cleanup closes this run's browser session, stops only the process group it started (SIGTERM, then SIGKILL after 5 seconds), removes that run's `.next/verify-julia/<run>` folder, and clears `run.json`. It never kills by name or port. It keeps `$EVIDENCE` and exits 1 if `launch.json` is missing afterwards. Run it after every failed attempt too.
 
 ## Helpers
 
-The executable lifecycle helper is `.agents/skills/verify-julia/verify-julia.mjs`. Its supported commands are `launch`, `doctor`, and `cleanup`; invocation is shown above. Launch selects an ephemeral free port and writes the run record to `.artifacts/verify-julia/run.json`. `JULIA_VERIFY_URL` tells the existing Playwright config to use that exact running server and skip its default port-3000 webServer:
+`.agents/skills/verify-julia/verify-julia.mjs` (executable, Linux only, uses `ss` and `/proc`):
 
-```powershell
-$env:JULIA_VERIFY_URL = $run.url
-$testOutput = npm exec -- playwright test .agents/skills/verify-julia/tests/home.spec.mjs --reporter=line 2>&1
-$testExit = $LASTEXITCODE
-$testOutput | Set-Content -Encoding utf8 "$($run.evidenceDir)\playwright-test.txt"
-"exitCode=$testExit" | Add-Content -Encoding utf8 "$($run.evidenceDir)\playwright-test.txt"
-Remove-Item Env:JULIA_VERIFY_URL
-if ($testExit -ne 0) { throw "Playwright regression failed with exit code $testExit" }
-```
+| Command | Does |
+| --- | --- |
+| `launch [--url <address>]` | Starts a local server, or records a deployed address, and waits until it is usable. |
+| `doctor` | Read-only check that the run is worth driving. Exit code 1 means no. |
+| `test <spec...>` | Runs Playwright specs against the run's URL and saves the output. |
+| `cleanup` | Stops what launch started and keeps the evidence. |
 
-The helper does not install packages, alter household data, create a browser session, or drive UI actions. Use the existing Playwright CLI for browser work. For repeat regression, run the existing browser specs against the Doctor-verified URL; the same scripts execute without an AI model call.
-
-## Framework map
-
-| Need | Framework feature | Documentation |
-| --- | --- | --- |
-| Drive the rendered page from a named browser session | Playwright CLI sessions, snapshot, and screenshot | https://playwright.dev/docs/getting-started-cli |
-| Repeat the checked-in home and install-surface assertions | Playwright Test CLI | https://playwright.dev/docs/test-cli |
-
-For routine repeat verification, use the scripted Playwright spec; it requires no model call. Use the CLI skill for bounded first-run exploration and evidence capture.
-
-## Maintenance
-
-Use `/maintain-verification-skill` when these surfaces or their entry points change.
+Saved specs live in `tests/`. CI runs them through `scripts/test-owners.mjs`. Each feature gets one spec.

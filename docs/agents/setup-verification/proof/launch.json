@@ -1,0 +1,42 @@
+{
+  "runId": "2026-10-26T11-54-28-088Z-293d76",
+  "session": "verify-julia-2026-10-26T11-54-28-088Z-293d76",
+  "evidenceDir": "/home/ubuntu/julia-fresh-ZHhMD4/.artifacts/verify-julia/2026-10-26T11-54-28-088Z-293d76",
+  "candidate": {
+    "branch": "feat/generated-verify-julia",
+    "commit": "7e00aaa2854d82eb70667be9b23fd4ab87ecb90f",
+    "dirty": true,
+    "worktreeSha256": "b94b5bf91a626281fadb30040e06d69f9b212c68c0b49b0cdaa0d46fb431569a"
+  },
+  "versions": {
+    "node": "v24.14.1",
+    "next": "16.3.5",
+    "playwright": "1.63.0"
+  },
+  "mode": "local",
+  "url": "http://127.0.0.1:32791/",
+  "port": 32791,
+  "pid": 1333283,
+  "distDir": ".next/verify-julia/2026-10-26T11-54-28-088Z-293d76",
+  "command": [
+    "/opt/node-v24.14.1/bin/node",
+    "/home/ubuntu/julia-fresh-ZHhMD4/node_modules/next/dist/bin/next",
+    "dev",
+    "--hostname",
+    "127.0.0.1",
+    "--port",
+    "32791"
+  ],
+  "readiness": {
+    "health": {
+      "status": 200,
+      "body": {
+        "status": "ok"
+      }
+    },
+    "home": {
+      "status": 200,
+      "hasMain": true
+    }
+  }
+}
