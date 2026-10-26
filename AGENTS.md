@@ -8,7 +8,7 @@ Julia uses the pstack way of working, adopted 22 October 2026 and kept after the
 - Todd's agreed delivery flow, decisions and order of work: [docs/plans/path-forward.md](docs/plans/path-forward.md).
 - Fix every correction as high in [the inverse pyramid](docs/principles/inverse-pyramid.md) as it will go; a written rule is the last resort.
 - Card spend is recorded and reported per card at published API prices. Money never stops a card. A build stops only after 15 minutes with no activity, or pauses on a runaway or a provider that stays down, keeping its work and posting a Linear note so it can be continued. See [docs/adr/0023-actual-spend-card-cap.md](docs/adr/0023-actual-spend-card-cap.md).
-- Framework facts come from the installed packages, their version-matched official docs, and the learning tests under ops/build-runner/framework/. The learning tests stay green.
+- Framework facts come from the installed packages and their version-matched official docs.
 - Commit and push as you go. The poteto-mode todo list and show-me-your-work decision log are committed under docs/agents/<card>/.
 - Publish with gh using the ordinary signed-in GitHub access.
 
@@ -29,7 +29,7 @@ An open PR to main with the proof in it and CI green.
 | Rule | Enforcement |
 | --- | --- |
 | Skill names are unique across the installed catalogs. | `node scripts/check-skill-names.mjs` rejects duplicate frontmatter names. |
-| Current agent-read files point only at paths that exist. | `node scripts/check-agent-links.mjs` checks the entry points, pstack skills, `ask-matt`, and generated recovery prompt. |
+| Current agent-read files point only at paths that exist. | `node scripts/check-agent-links.mjs` checks the entry points, pstack skills, and `ask-matt`. |
 | Every branch except `main` has an open pull request to `main`. | `node scripts/check-branch-pr.mjs` audits GitHub branches and open pull requests in CI. |
 
 <!-- BEGIN:nextjs-agent-rules -->

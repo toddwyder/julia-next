@@ -210,37 +210,11 @@ _Avoid_: Feature, story, epic, screen
 What Proof produces, showing that every acceptance criterion was met. No Evidence means not done.
 _Avoid_: Demo, proof of work, "it works"
 
-**Evidence review**:
-The automatic check after a build: a model from a different company than the builder gives every
-acceptance criterion a verdict of proven, not proven or wrong thing tested, naming the proof file it
-rests on. The reviewer reads the card's criteria and the proof folder.
-_Avoid_: Code review, sign-off, approval
-
 **Adversarial review**:
 A review by a different model maker than the builder's that tries to break the work rather
 than confirm it, giving a verdict on every acceptance criterion or naming the evidence that is
 missing.
 _Avoid_: Second opinion, sign-off, approval
-
-**Gate**:
-The checks a pull request passes before merge: CI on GitHub's runners and Factory's different-maker
-review, both on the same head. A failed gate bounces the work back to the builder.
-There is no pre-merge Todd approval.
-_Avoid_: Review, QA, approval
-
-**Remediation**:
-The board column a card moves to when an evidence review fails. A fix starts automatically on the
-Bug fix playbook from the review's findings; a second failure stops the card after an Investigation.
-_Avoid_: Rework, retry, bounce
-
-**Bounce**:
-A gate or Todd sending work back to its builder, through Factory, with the reason it failed.
-_Avoid_: Rejection, fail, kickback
-
-**Backlog**:
-Factory's Intake column. Cards wait there, including issues an agent opens, until Todd taps one
-to start it.
-_Avoid_: Queue, inbox, ready list
 
 **Plan**:
 The builder's written approach for one card, approved automatically and saved in the pull
@@ -249,15 +223,9 @@ observability the change adds. Both reviewers check the work against it.
 _Avoid_: Design, spec, ticket
 
 **Coding standards**:
-`CODING_STANDARDS.md`, the rules Factory's code review checks against. Grows one line at a time,
+`CODING_STANDARDS.md`, the rules code review checks against. Grows one line at a time,
 added in the same pull request as the fix that showed the rule was needed.
 _Avoid_: Style guide, conventions, lint rules
-
-**Exceptions list**:
-The one list of every place we built our own piece instead of using Factory's, Mastra's, or
-GitHub's, each with the gap it fills, its approval evidence, and when it can go. It records
-existing approved pieces; the rejection check that would enforce it is not built yet.
-_Avoid_: Workarounds, patches, customisations
 
 **Rehearsal copy**:
 A Julia website built for one proposed change, running on the test data. Todd follows the
@@ -272,76 +240,14 @@ Never a console, log, terminal, developer tool, or copying between tools. Techni
 is the robot's job and happens before UAT.
 _Avoid_: QA, testing, verification (for Todd's part)
 
-**Mastra Factory**:
-The former Factory code and server service. It is **RETIRED**: its operating resources and source
-were removed; do not recreate it. The intended replacement route is the adapted JUL-122 runner,
-started on Todd's Windows laptop with `$init JUL-nnn`; both that runner and its route are pending
-implementation and verification.
-_Avoid_: Active card runner
-
-**Delivery ownership**:
-New Julia and machine cards live in Linear. Linear owns cards, requirements, acceptance criteria,
-and status. GitHub owns code, commits, pull requests, and CI. Run files own execution state. The
-adapted JUL-122 runner, started on Todd's Windows laptop with `$init JUL-nnn`, is the intended
-route. The adapted runner and `$init` wrapper are pending implementation and verification. This
-documentation checkpoint does not authorize starting delivery through them. The adapted runner's
-complete test suite must pass on Todd's Windows laptop before it is used for delivery.
-
 **Test data**:
 The one permanent set of Julia data that every rehearsal copy shares. Set up once; never
 Real Julia's data.
 _Avoid_: Staging database, sandbox, throwaway data
 
-**Needs attention**:
-Historical Factory terminology. It is not an active queue or alerting route.
-to be enough.
-_Avoid_: Stuck alert, heartbeat, ping, alarm
-
 **Real Julia**:
 The one Julia the household actually uses. Only accepted changes reach it.
 _Avoid_: Production, prod, live
-
-**Monday note**:
-The weekly summary the delivery system sends Todd, never written by him: what was accepted, what
-each card cost in model spend including failed attempts, how long cards took, and every time Todd
-was pulled in. Costs come from Mastra's traces, not agent reports. Quiet weeks say so.
-_Avoid_: Report, dashboard, metrics (in anything Todd reads)
-
-**Done by Factory**:
-The per-card line, read from Factory's own audit records, saying whether every step was done by
-Factory's agents or by Todd. Anything else means someone went around the product.
-_Avoid_: Compliance, audit trail (in anything Todd reads)
-
-**Model job**:
-A role a model fills in Factory: the builder, the reviewer helper, or the memory model. Cards,
-docs and code name the job, never the model. Each job's model is a setting in Factory or
-Mastra, changed with no card, code or install, because models change all the time.
-_Avoid_: Naming a specific model anywhere but the settings
-
-**Builder**:
-The model that writes a card's code. Chosen when the card starts, from how much quota each
-connection has left; one setting has the default.
-_Avoid_: Coder, worker model
-
-**Reviewer helper**:
-The model Factory's review hands the adversarial review to. Always from a different company
-than the builder.
-_Avoid_: Second reviewer, review model
-
-**Reviewer list**:
-The ranked list of models the reviewer helper is chosen from. Whenever the builder changes, the
-reviewer helper becomes the first model on the list from a different company than the builder.
-Edit the list to add, drop or reorder models; the rule stays.
-_Avoid_: Reviewer pairing table
-
-**Memory model**:
-The cheap model Factory uses to summarize long sessions.
-_Avoid_: OM model, observer model
-
-**Connection**:
-An account Factory may send model calls to: a subscription sign-in or a provider's key. Held in
-Factory's own settings, never in the repository.
-_Avoid_: Provider config, key file
 
 **Backup**:
 The folder in Todd's Google Drive that mirrors the household: a readable text file per
@@ -356,36 +262,6 @@ _Avoid_: Risk, gap, mechanism
 **Proof**:
 The process: a real pstack verification run against the real thing. It reports each acceptance criterion met or not met from Evidence tied to the exact candidate commit and dirty-tree digest. Any source change makes it stale.
 _Avoid_: Verify run
-
-**Work session**:
-One start or continuation of the coder's work on a card, ending at completion, interruption,
-failure or handoff. Continuing after a handoff begins a new work session.
-_Avoid_: Attempt (ambiguous with a failure count), conversation
-
-**Phase**:
-A major part of delivering a card, such as Build, Review, Proof, CI or Merge. Each phase
-contains concrete work steps.
-_Avoid_: Step (a phase contains steps)
-
-**Step (delivery)**:
-One concrete piece of work within a delivery phase. A phase's steps show what is done, what
-is being worked on and what remains, including work discovered during the run.
-_Avoid_: Phase, status update
-
-**Chief of staff**:
-The judgment role that keeps card delivery directed toward the authorized goal and decides
-how to respond when the plan no longer fits. Routine execution belongs to the runner.
-_Avoid_: Supervisor (ambiguous with routine monitoring)
-
-**Delivery decision**:
-A choice among defined, permitted next actions for a card. Fixed rules belong to the runner;
-choices requiring interpretation go to a decision model.
-_Avoid_: Judgment (needed when no suitable action can be confidently chosen)
-
-**Delivery judgment**:
-Working out a new approach when the available actions do not fit or cannot be confidently
-selected. The chief of staff diagnoses or replans within the authorized goal and limits.
-_Avoid_: Routine decision, monitoring
 
 **Proof story**:
 The single real drive that shows a card's outcome. A card that needs more than one drive to prove is too big and splits.

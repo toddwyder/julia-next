@@ -122,3 +122,7 @@ The clean-up is built by the planner agent in a fresh session. From card 5 on, t
 - **Models for pstack.** The chat itself runs on Opus 5.5. These roles run on Sol 6.1: hardest tasks; judgment and prose; how explainer; why synthesizer; reflect judgment, divergent, synthesizer. These roles run on DeepSeek V4.1 Flash: feature and refactoring; bug-fix; perf-issue; hillclimb; how explorer; why investigators; reflect tooling; swarm workers. Panels (arena runners, arena cross-judge pool, architect runners, interrogate reviewers) are Sol 6.1 plus DeepSeek V4.1 Flash. Budget: medium. All of this is set by running `/setup-pstack` during the hand run, not written by hand.
 - **At setup.** Accept the generated verification skill, which replaces `verify-julia`. Decline formal verification; JUL-271 owes it. Setup's changes reach `main` through a pull request using pstack's Opening a PR and Babysit; pstack's Shipping lands it. The proof is the generator's end-to-end proof plus a screenshot of the home page taken on the server.
 - **JUL-252 is canceled as superseded.** The evidence-review instruction agreed earlier on 25 October is superseded and must not be sent.
+
+## 26 October decisions (Todd)
+
+- **Old machine removed.** Old machine removed from main on 26 Oct 2026, kept at tag `old-machine-final` (Todd, 26 Oct 2026), overriding the 25 Oct "untouched until milestone 1" line.
