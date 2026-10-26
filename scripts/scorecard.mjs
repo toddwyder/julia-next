@@ -57,7 +57,7 @@ export function threadEvents(rows) {
       if (created) activity.push(created);
       const tool = part.toolInvocation;
       if (tool?.toolName === 'ask_user') {
-        asks.push({ answeredAt: part.updatedAt, question: tool.args?.question ?? '' });
+        asks.push({ answeredAt: part.updatedAt, question: tool.args?.question ?? '', answer: String(tool.result?.content ?? '').replace(/^User answered: /, '') });
       } else if (part.updatedAt) {
         activity.push(part.updatedAt);
       }
@@ -101,7 +101,7 @@ export function findStops(events) {
     const since = events.activity.filter(t => t < resumed).at(-1);
     if (since === undefined || since < after) continue;
     const lastText = events.texts.filter(t => t.at <= since + 1000).at(-1)?.text ?? '';
-    stops.push({ since, resumed, kind: ask ? 'question' : 'turn ended', question: ask ? ask.question : lastText, reply: user.text });
+    stops.push({ since, resumed, kind: ask ? 'question' : 'turn ended', question: ask ? ask.question : lastText, reply: ask ? ask.answer : user.text });
   }
   return stops;
 }
@@ -206,11 +206,23 @@ export function tracedCost(metrics) {
 
 const inWindow = (w, at) => at >= w.start && at < w.end;
 
-export function buildScorecard({ card, threads, prices, tracing, pulls, pings }) {
+// A stop counts against success if it starts before Todd's UAT yes on the preview.
+// The wait that ends in the yes is the UAT itself and does not count, unless that
+// same question also asked Todd for something else (recorded as `alsoAsked`).
+export function judgeStops(stops, uat) {
+  return stops.map(stop => {
+    if (!uat) return { ...stop, counts: true };
+    const yes = Date.parse(uat.yesAt);
+    const isUatWait = Math.abs(stop.resumed - yes) < 2000;
+    return { ...stop, isUatWait, counts: stop.since < yes && (!isUatWait || Boolean(uat.alsoAsked)) };
+  });
+}
+
+export function buildScorecard({ card, threads, prices, tracing, pulls, pings, uat }) {
   const windows = threads.flatMap(t => cardWindows(t, t.events)).filter(w => w.card === card);
   const pull = pulls.find(p => p.headRefName.toLowerCase().includes(card.toLowerCase()));
   const runs = [];
-  const stops = [];
+  let stops = [];
   const cost = [];
   for (const w of windows) {
     const { events, usage } = w.thread;
@@ -218,8 +230,9 @@ export function buildScorecard({ card, threads, prices, tracing, pulls, pings })
     const subagents = events.subagents.filter(s => inWindow(w, s.at));
     runs.push({ thread: w.thread.id, title: w.thread.title, start: w.start, end: Math.min(w.end, events.activity.at(-1) ?? w.start), steps: steps.length, subagents });
     for (const stop of findStops(events).filter(s => inWindow(w, s.since))) {
-      const ping = pings.find(p => p.thread === w.thread.id && Math.abs(Date.parse(p.at) - stop.since) < 5 * 60_000);
-      stops.push({ ...stop, ping, beforePull: !pull || stop.since < Date.parse(pull.createdAt) });
+      // The hook fires as the turn ends, so a stop's ping lands between its last activity (less a minute of slack) and the reply.
+      const ping = pings.find(p => p.thread === w.thread.id && Date.parse(p.at) >= stop.since - 60_000 && Date.parse(p.at) <= stop.resumed);
+      stops.push({ ...stop, ping });
     }
     const traced = tracing.metrics.filter(m => m.threadId === w.thread.id && inWindow(w, Number(m.at)));
     if (traced.some(m => m.entityName === 'Code Agent')) {
@@ -252,13 +265,13 @@ export function buildScorecard({ card, threads, prices, tracing, pulls, pings })
       cost.push({ agent: `Subagent ${modelId.split(' on ')[0]} x${calls.length}`, requested: calls[0].modelId, answered: 'not recorded before tracing', tokens: {}, usd: 0, unpriced: true, basis: 'usage not recorded before tracing' });
     }
   }
-  const before = stops.filter(s => s.beforePull);
+  stops = judgeStops(stops.sort((a, b) => a.since - b.since), uat);
+  const counted = stops.filter(s => s.counts);
   return {
-    card, windows: windows.length, runs, stops, cost, pull,
+    card, windows: windows.length, runs, stops, cost, pull, uat,
     usd: cost.reduce((a, c) => a + c.usd, 0),
-    uat: pull?.mergedAt ? 'yes' : 'pending',
-    success: pull?.mergedAt ? before.length === 0 : undefined,
-    stopsBeforePull: before.length,
+    success: uat ? counted.length === 0 : undefined,
+    stopsBeforeUat: counted.length,
   };
 }
 
@@ -267,6 +280,7 @@ const usd = n => `$${n.toFixed(2)}`;
 const minutes = ms => `${Math.round(ms / 60_000)} min`;
 const tok = n => (n == null ? '' : n >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}k` : String(n));
 const cell = s => String(s).replace(/\s+/g, ' ').replace(/\|/g, '\\|').slice(0, 160);
+const quote = s => String(s).trim().split('\n').map(l => `   > ${l}`.trimEnd());
 
 export function renderScorecard(s, generatedAt = new Date()) {
   const lines = [];
@@ -274,10 +288,11 @@ export function renderScorecard(s, generatedAt = new Date()) {
   lines.push(`Generated ${utc(generatedAt.getTime())} UTC by \`node scripts/scorecard.mjs ${s.card} --write\` from Mastra Code's records (see docs/adr/0024-run-scorecard-and-stop-ping.md).`, '');
   lines.push('## Result', '');
   const pr = s.pull ? `PR #${s.pull.number}, opened ${utc(Date.parse(s.pull.createdAt))}` : 'no PR yet';
-  const verdict = s.success === undefined ? 'not decided yet' : s.success ? 'yes' : 'no';
-  lines.push(`- Success: **${verdict}**. Stops before the PR opened: ${s.stopsBeforePull}. Todd's UAT yes: ${s.uat}${s.pull?.mergedAt ? ` (merged ${utc(Date.parse(s.pull.mergedAt))})` : ''}.`);
+  const verdict = s.success === undefined ? 'not decided yet (no UAT yes recorded)' : s.success ? 'yes' : 'no';
+  const uat = s.uat ? `${utc(Date.parse(s.uat.yesAt))} ("${cell(s.uat.said)}")` : 'not recorded';
+  lines.push(`- Success: **${verdict}**. Stops before Todd's UAT yes: ${s.stopsBeforeUat}. Todd's UAT yes: ${uat}.`);
   lines.push(`- Cost: **${usd(s.usd)}** at published API prices, ${s.cost.some(c => c.unpriced) ? 'plus the unpriced rows below' : 'every row priced'}.`);
-  lines.push(`- Stops: ${s.stops.length}, waiting ${minutes(s.stops.reduce((a, x) => a + x.resumed - x.since, 0))} in total. ${pr}.`, '');
+  lines.push(`- Stops: ${s.stops.length}, waiting ${minutes(s.stops.reduce((a, x) => a + x.resumed - x.since, 0))} in total. ${pr}${s.pull?.mergedAt ? `, merged ${utc(Date.parse(s.pull.mergedAt))}` : ''}.`, '');
   lines.push('## Cost by agent and model', '');
   lines.push('| Agent | Model requested | Model answered | Fresh input | Cache read | Cache write | Output | Cost | Basis |', '| --- | --- | --- | --- | --- | --- | --- | --- | --- |');
   for (const c of s.cost) {
@@ -287,8 +302,17 @@ export function renderScorecard(s, generatedAt = new Date()) {
   lines.push('', '## Stops', '');
   if (!s.stops.length) lines.push('None.');
   else {
-    lines.push('| # | Waiting since (UTC) | Length | Kind | Before PR | Ping | What the run asked or said last |', '| --- | --- | --- | --- | --- | --- | --- |');
-    s.stops.forEach((x, i) => lines.push(`| ${i + 1} | ${utc(x.since)} | ${minutes(x.resumed - x.since)} | ${x.kind} | ${x.beforePull ? 'yes' : 'no'} | ${x.ping ? (x.ping.comment ? `[comment](${x.ping.comment})${x.ping.notified ? '' : ', Todd not notified'}` : 'recorded, not posted') : 'none (before the stop ping)'} | ${cell(x.question)} |`));
+    const counts = x => (x.isUatWait ? (x.counts ? `yes: UAT wait that also asked ${s.uat.alsoAsked}` : 'no: the UAT wait itself') : x.counts ? 'yes' : 'no: after the UAT yes');
+    const ping = x => (x.ping ? (x.ping.comment ? `[comment](${x.ping.comment})${x.ping.notified ? ' + reminder' : ', Todd not notified'}` : 'recorded, not posted') : 'none recorded');
+    lines.push('| # | Waiting since (UTC) | Length | Kind | Counts against success | Ping |', '| --- | --- | --- | --- | --- | --- |');
+    s.stops.forEach((x, i) => lines.push(`| ${i + 1} | ${utc(x.since)} | ${minutes(x.resumed - x.since)} | ${x.kind} | ${cell(counts(x))} | ${ping(x)} |`));
+    lines.push('', '### What each stop asked', '');
+    lines.push('For a question, the ask_user text. For a turn that ended, the run\'s last message. Then what came back.', '');
+    s.stops.forEach((x, i) => {
+      lines.push(`${i + 1}. ${x.kind === 'question' ? 'Asked' : 'Last said'} at ${utc(x.since)}:`, '');
+      lines.push(...quote(x.question), '');
+      lines.push(`   Reply at ${new Date(x.resumed).toISOString().slice(11, 19)} UTC: ${x.reply?.trim() ? `"${cell(x.reply)}"` : '(empty)'}`, '');
+    });
   }
   lines.push('', '## Runs', '');
   for (const r of s.runs) {
@@ -334,7 +358,9 @@ async function main() {
   const threads = readThreads(join(data, 'mastra.db'));
   const ids = threads.filter(t => cardWindows(t, t.events).some(w => w.card === card)).map(t => t.id);
   const tracing = await readTracing(dir, process.env.MASTRA_OBSERVABILITY_DB_PATH || join(data, 'observability.duckdb'), ids);
-  const scorecard = buildScorecard({ card, threads, prices: loadPrices(dir), tracing, pulls: readPulls(card), pings: readPings(stopsFile()) });
+  const uatFile = fileURLToPath(new URL('../docs/scorecards/uat.json', import.meta.url));
+  const uat = existsSync(uatFile) ? JSON.parse(readFileSync(uatFile, 'utf8'))[card] : undefined;
+  const scorecard = buildScorecard({ card, threads, prices: loadPrices(dir), tracing, pulls: readPulls(card), pings: readPings(stopsFile()), uat });
   const markdown = renderScorecard(scorecard);
   if (flag === '--write') {
     const out = fileURLToPath(new URL(`../docs/scorecards/${card}.md`, import.meta.url));

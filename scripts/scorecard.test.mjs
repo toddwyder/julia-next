@@ -83,17 +83,29 @@ test('traced cost sums only the two total metrics, so detail metrics are not cou
   assert.deepEqual([rowsOut[1].agent, rowsOut[1].unpriced, rowsOut[1].usd], ['Explore Subagent', true, 0]);
 });
 
-test('a card scorecard prices its share of the thread, lists its subagents and judges success against its PR', () => {
+test('a card scorecard prices its share of the thread, lists its subagents and judges success against Todd\'s UAT yes', () => {
   const pulls = [{ number: 358, headRefName: 'feat/jul-273-x', createdAt: T('19:20'), mergedAt: T('19:40') }];
-  const s = buildScorecard({ card: 'JUL-273', threads: [thread], prices, tracing: { metrics: [], requested: [] }, pulls, pings: [] });
+  const s = buildScorecard({ card: 'JUL-273', threads: [thread], prices, tracing: { metrics: [], requested: [] }, pulls, pings: [], uat: { yesAt: T('19:30'), said: 'Yes.' } });
   assert.equal(s.cost[0].basis, '25% of thread total (1 of 4 model steps)');
   assert.equal(s.cost[0].usd.toFixed(4), (1.14 / 4).toFixed(4));
   assert.deepEqual(s.cost[1], { agent: 'Subagent execute x1', requested: 'openai/gpt-6.1-sol', answered: 'not recorded before tracing', tokens: {}, usd: 0, unpriced: true, basis: 'usage not recorded before tracing' });
-  assert.deepEqual([s.stops.length, s.success, s.uat], [0, true, 'yes']);
+  assert.deepEqual([s.stops.length, s.success], [0, true]);
 
-  const early = buildScorecard({ card: 'JUL-272', threads: [thread], prices, tracing: { metrics: [], requested: [] }, pulls: [{ ...pulls[0], headRefName: 'feat/jul-272-y', createdAt: T('18:25') }], pings: [] });
-  assert.deepEqual([early.stops.length, early.stopsBeforePull, early.success], [2, 1, false]);
-  assert.match(renderScorecard(early, new Date(ms('20:00'))), /Success: \*\*no\*\*\. Stops before the PR opened: 1/);
+  // JUL-272 as Todd ruled it: a stop before the yes counts, even with the PR already open.
+  const card272 = uat => buildScorecard({ card: 'JUL-272', threads: [thread], prices, tracing: { metrics: [], requested: [] }, pulls: [{ ...pulls[0], headRefName: 'feat/jul-272-y', createdAt: T('18:05') }], pings: [], uat });
+  const plain = card272({ yesAt: T('18:40'), said: 'Looks good, merged.' });
+  assert.deepEqual(plain.stops.map(x => [x.counts, Boolean(x.isUatWait)]), [[true, false], [false, true]]);
+  assert.deepEqual([plain.stopsBeforeUat, plain.success], [1, false]);
+  assert.match(renderScorecard(plain, new Date(ms('20:00'))), /Success: \*\*no\*\*\. Stops before Todd's UAT yes: 1/);
+  assert.match(renderScorecard(plain, new Date(ms('20:00'))), /1\. Asked at 2026-10-26 18:06:\n\n   > Which colour\?/);
+  assert.equal(card272({ yesAt: T('18:40'), said: 'Yes', alsoAsked: 'for a secret' }).stopsBeforeUat, 2);
+  assert.equal(card272(undefined).success, undefined);
+});
+
+test('a stop takes only a ping recorded inside it, never one from just before', () => {
+  const ping = at => ({ id: at, at: T(at), thread: 'thread-1', card: 'JUL-272', comment: `https://linear.app/${at}`, notified: true });
+  const s = buildScorecard({ card: 'JUL-272', threads: [thread], prices, tracing: { metrics: [], requested: [] }, pulls: [], pings: [ping('18:03'), ping('18:31')] });
+  assert.deepEqual(s.stops.map(x => x.ping?.id), [undefined, '18:31']);
 });
 
 test('mastra.db is read the way Mastra Code stores it, and a session maps to its card', () => {

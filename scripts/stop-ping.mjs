@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Mastra Code Notification hook: a Julia run has stopped and waits on Todd.
-// Records the stop, then posts a comment on the run's card that mentions Todd.
+// Records the stop, posts a comment on the run's card, and sets Todd a reminder on it.
 // Wired in .mastracode/hooks.json; design in docs/adr/0024-run-scorecard-and-stop-ping.md.
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
@@ -8,7 +8,7 @@ import { randomUUID } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { appDataDir, cardForThread, stopsFile } from './scorecard.mjs';
-import { postComment } from './linear-cli.mjs';
+import { linearGraphQL, postComment } from './linear-cli.mjs';
 
 const TODD_PROFILE = 'https://linear.app/julia-next/profiles/toddwyder';
 
@@ -35,19 +35,10 @@ function branchCard(cwd) {
   }
 }
 
-// Linear does not notify a user about their own comments, so a ping written with
-// Todd's LINEAR_API_KEY is silent. The "Julia controller" app posts as itself.
-async function appToken(env) {
-  if (!env.LINEAR_CLIENT_ID || !env.LINEAR_CLIENT_SECRET) return undefined;
-  const res = await fetch('https://api.linear.app/oauth/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ grant_type: 'client_credentials', client_id: env.LINEAR_CLIENT_ID, client_secret: env.LINEAR_CLIENT_SECRET, scope: 'read,write' }),
-  });
-  const body = await res.json();
-  if (!res.ok) throw new Error(`Linear token request failed: ${res.status} ${JSON.stringify(body)}`);
-  return body.access_token;
-}
+// Linear never notifies Todd about a comment written with his own key, but an issue
+// reminder he sets for himself is delivered like any notification, phone included.
+const REMINDER_LEAD_MS = 30_000;
+const REMINDER_MUTATION = `mutation Remind($id: String!, $at: DateTime!) { issueReminder(id: $id, reminderAt: $at) { success } }`;
 
 function record(file, entry) {
   mkdirSync(dirname(file), { recursive: true });
@@ -62,9 +53,11 @@ export async function handleStop(payload, env = process.env) {
   record(file, stop);
   if (!card) return { ...stop, posted: false, error: 'no card for this thread' };
   try {
-    const accessToken = await appToken(env);
-    const comment = await postComment(card, stopComment({ reason: payload.reason, message: payload.message, thread }), { accessToken, apiKey: env.LINEAR_API_KEY });
-    const ping = { id: stop.id, comment: comment.url, notified: Boolean(accessToken) };
+    const opts = { apiKey: env.LINEAR_API_KEY };
+    const comment = await postComment(card, stopComment({ reason: payload.reason, message: payload.message, thread }), opts);
+    const remindAt = new Date(Date.now() + REMINDER_LEAD_MS).toISOString();
+    const { issueReminder } = await linearGraphQL(REMINDER_MUTATION, { id: card, at: remindAt }, opts);
+    const ping = { id: stop.id, comment: comment.url, notified: issueReminder.success, remindAt };
     record(file, ping);
     return { ...stop, ...ping, posted: true };
   } catch (error) {
