@@ -1,0 +1,205 @@
+/* The vintage look from docs/design/vintage, with system font fallbacks so
+   nothing is downloaded. */
+
+.page {
+  min-height: 100vh;
+  padding: 2rem 1.25rem 4rem;
+  background: #fdfcf7;
+  color: #333333;
+  font-family: Georgia, 'Times New Roman', serif;
+  line-height: 1.6;
+}
+
+.sheet {
+  max-width: 40rem;
+  margin: 0 auto;
+}
+
+.eyebrow {
+  margin: 0;
+  color: #9c6644;
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 0.6875rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.heading {
+  margin: 0.25rem 0 1.25rem;
+  color: #2f4f3f;
+  font-size: 2rem;
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+.subheading {
+  margin: 2rem 0 0.5rem;
+  color: #2f4f3f;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.lede {
+  margin: 0 0 1.5rem;
+  color: #6b6257;
+}
+
+.action {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  border: 1px solid #333333;
+  color: #333333;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-decoration: none;
+  text-transform: uppercase;
+  background: #fdfcf7;
+}
+
+.action:hover,
+.action:focus-visible {
+  background: #2f4f3f;
+  color: #fdfcf7;
+}
+
+.search {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #d8d1c0;
+  border-radius: 0;
+  background: #fffdf8;
+  color: #333333;
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 1rem;
+}
+
+.list {
+  margin: 0 0 1.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.listItem {
+  border-bottom: 1px solid #e3ded0;
+}
+
+.recipeLink {
+  display: block;
+  padding: 0.75rem 0.25rem;
+  color: #2f4f3f;
+  font-size: 1.125rem;
+  text-decoration: none;
+  white-space: pre-wrap;
+}
+
+.recipeLink:hover,
+.recipeLink:focus-visible {
+  color: #9c6644;
+  text-decoration: underline;
+}
+
+.empty {
+  margin: 0 0 1.5rem;
+  color: #6b6257;
+  font-style: italic;
+}
+
+.fieldGroup {
+  margin: 0 0 1.25rem;
+}
+
+.field {
+  display: block;
+  margin: 0 0 0.35rem;
+  color: #6b6257;
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 0.6875rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.input,
+.textarea {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #d8d1c0;
+  border-radius: 0;
+  background: #fffdf8;
+  color: #333333;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.9375rem;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.input {
+  font-family: Helvetica, Arial, sans-serif;
+}
+
+.textarea {
+  min-height: 9rem;
+  resize: vertical;
+}
+
+.hint {
+  display: block;
+  margin-top: 0.25rem;
+  color: #8a8073;
+  font-size: 0.6875rem;
+  letter-spacing: 0.05em;
+  text-transform: none;
+}
+
+.buttons {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.submit {
+  padding: 0.5rem 1rem;
+  border: 1px solid #333333;
+  background: #2f4f3f;
+  color: #fdfcf7;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.submit:hover,
+.submit:focus-visible {
+  background: #9c6644;
+}
+
+.error {
+  margin: 0 0 1rem;
+  color: #9c6644;
+}
+
+.notice {
+  margin: 2rem 0 0;
+  color: #8a8073;
+  font-size: 0.8125rem;
+}
+
+.title {
+  margin: 0.25rem 0 1.5rem;
+  color: #2f4f3f;
+  font-size: 2.25rem;
+  font-weight: 600;
+  line-height: 1.15;
+  white-space: pre-wrap;
+}
+
+.prose {
+  margin: 0 0 1.5rem;
+  font-family: inherit;
+  white-space: pre-wrap;
+}
