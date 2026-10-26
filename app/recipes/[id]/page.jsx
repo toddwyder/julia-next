@@ -1,10 +1,21 @@
 'use client';
 
-import { use, useEffect, useState } from 'react';
+import { Fragment, use, useEffect, useState } from 'react';
 import Link from 'next/link';
 
 import { openRecipeLibrary } from '../../../lib/recipes';
 import styles from '../recipes.module.css';
+
+// One row per written line, joined by the original newlines, so the element's
+// textContent is still exactly what was typed.
+function WrittenLines({ text, rowClass }) {
+  return text.split('\n').map((line, index) => (
+    <Fragment key={index}>
+      {index > 0 ? '\n' : null}
+      <span className={line === '' ? styles.blankLine : rowClass}>{line}</span>
+    </Fragment>
+  ));
+}
 
 export default function RecipePage({ params }) {
   const { id } = use(params);
@@ -21,40 +32,53 @@ export default function RecipePage({ params }) {
 
   if (read.status === 'reading') {
     return (
-      <main className={styles.page}>
-        <div className={styles.sheet}>
-          <p className={styles.empty}>Opening the recipe…</p>
-        </div>
+      <main className={`vintage-column ${styles.page}`}>
+        <p className={styles.loading}>Loading recipe archive...</p>
       </main>
     );
   }
 
   if (read.status === 'missing') {
     return (
-      <main className={styles.page}>
-        <div className={styles.sheet}>
-          <p className={styles.empty}>This recipe is not on this device.</p>
+      <main className={`vintage-column ${styles.page}`}>
+        <div className={styles.stack}>
+          <div className={styles.emptyBox}>
+            <p className={styles.emptyHeading}>This recipe is not on this device.</p>
+          </div>
           {read.error ? <p className={styles.error} role="alert">{read.error}</p> : null}
-          <Link href="/recipes" className={styles.action}>Back to the Library</Link>
+          <div>
+            <Link href="/recipes" className={styles.typewriter}>← Back to the Library</Link>
+          </div>
         </div>
       </main>
     );
   }
 
   return (
-    <main className={styles.page}>
-      <div className={styles.sheet}>
-        <p className={styles.eyebrow}>From the Library</p>
-        <h1 className={styles.title} data-testid="recipe-title">{read.recipe.title}</h1>
+    <main className={`vintage-column ${styles.page}`}>
+      <article className={styles.stack}>
+        <h1 className={styles.recipeTitle} data-testid="recipe-title">{read.recipe.title}</h1>
 
-        <h2 className={styles.subheading}>The Ingredients</h2>
-        <p className={styles.prose} data-testid="recipe-ingredients">{read.recipe.ingredients}</p>
+        <div className={styles.band}>
+          <Link href="/recipes" className={styles.typewriter}>← Library</Link>
+        </div>
 
-        <h2 className={styles.subheading}>Preparation</h2>
-        <p className={styles.prose} data-testid="recipe-steps">{read.recipe.steps}</p>
+        <section className={styles.section}>
+          <h2 className={styles.recipeHeading}>The Ingredients</h2>
+          <div className={styles.ingredients} data-testid="recipe-ingredients">
+            <WrittenLines text={read.recipe.ingredients} rowClass={styles.ingredient} />
+          </div>
+        </section>
 
-        <Link href="/recipes" className={styles.action}>Back to the Library</Link>
-      </div>
+        <hr className={styles.divider} />
+
+        <section className={styles.section}>
+          <h2 className={styles.recipeHeading}>Preparation</h2>
+          <div className={styles.steps} data-testid="recipe-steps">
+            <WrittenLines text={read.recipe.steps} rowClass={styles.step} />
+          </div>
+        </section>
+      </article>
     </main>
   );
 }
