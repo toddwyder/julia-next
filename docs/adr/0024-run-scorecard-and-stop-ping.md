@@ -19,12 +19,12 @@ Use Mastra Code's own records and features. Add code only where Mastra Code has 
 | Cost with tracing on | Mastra Code local tracing (`observability.localTracing`), `observability.duckdb`. Mastra's own cost estimate from its bundled models.dev price table, summed over the `mastra_model_total_input_tokens` and `mastra_model_total_output_tokens` metrics only, per model and agent | same |
 | Cost before tracing | Thread `tokenUsage` in `mastra.db`, priced with the same bundled price table. A thread that holds two cards is split by the share of model steps in each card's window. Subagent and memory-model calls have no recorded usage there, so they are counted, not priced | same |
 | Model provenance | Requested model: step `model` in messages, or span `model`. Answering model: metric `model` from the provider response. Subagent requests: the `subagent` tool's `modelId` | same |
-| Success | Zero stops before the PR opens, and Todd's UAT yes (the PR is merged) | same |
-| Ping and stop record | Mastra Code `Notification` hook (`ask_question`, `tool_approval`, `plan_approval`, `sandbox_access`, `agent_done`) runs `scripts/stop-ping.mjs`, which appends the stop to `~/.local/state/julia/stops.jsonl` and comments on the card, mentioning Todd | `scripts/stop-ping.mjs`, `.mastracode/hooks.json` |
+| Success | Todd's UAT yes is recorded in `docs/scorecards/uat.json` (time, his words, and anything else that question asked), and no stop began before it. The wait that ends in the yes is the UAT and does not count, unless the same question also asked for something else | `docs/scorecards/uat.json` |
+| Ping and stop record | Mastra Code `Notification` hook (`ask_question`, `tool_approval`, `plan_approval`, `sandbox_access`, `agent_done`) runs `scripts/stop-ping.mjs`, which appends the stop to `~/.local/state/julia/stops.jsonl` comments on the card mentioning Todd, and sets Todd an `issueReminder` on the card 30 seconds later | `scripts/stop-ping.mjs`, `.mastracode/hooks.json` |
 
 Scorecards are committed at `docs/scorecards/<card>.md` in the card's PR. Mastra Code prunes traces after 14 days, so the committed scorecard is the lasting record.
 
-The ping posts as the Julia controller app with a client-credentials token minted per run, as Linear's OAuth guide asks. A comment posted with Todd's own `LINEAR_API_KEY` does not notify Todd; this was tested on JUL-274 on 26 October. Until Todd turns on client credentials for the app, the ping posts with his key and the stop record says `notified: false`.
+A comment posted with Todd's own `LINEAR_API_KEY` does not notify Todd, because Linear never notifies a user about their own comment (tested on JUL-274, 26 October). An app identity would fix that, but it needs Todd to turn on client credentials and store a secret, which he declined. An `issueReminder` set with his key needs no setup: it puts an `issueReminder` notification in his inbox, and his settings send reminders to mobile, desktop and email (checked through the API on 26 October). Whether a push reached his phone can only be checked by Todd.
 
 ## Consequences
 
