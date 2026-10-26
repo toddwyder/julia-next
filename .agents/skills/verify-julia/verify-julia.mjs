@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
-import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { join, resolve } from 'node:path';
 
@@ -47,7 +47,7 @@ async function probe(url) {
   return { health: { status: health.status, body }, home: { status: home.status, hasMain: html.includes('<main>') } };
 }
 
-const usable = result => result.health.body?.status === 'ok' && result.home.status === 200 && result.home.hasMain;
+const usable = result => result?.health?.body?.status === 'ok' && result.home.status === 200 && result.home.hasMain;
 
 function loadRun() {
   if (!existsSync(runFile)) throw new Error(`No active run: ${runFile} is missing. Run launch first.`);
@@ -59,6 +59,11 @@ async function launch(args) {
   const urlFlag = args.indexOf('--url');
   const remoteUrl = urlFlag >= 0 ? args[urlFlag + 1] : null;
   if (urlFlag >= 0 && !remoteUrl) throw new Error('--url needs an address, for example --url https://julia-abc.vercel.app');
+  if (!existsSync(join(root, 'node_modules/next/package.json'))) {
+    console.error('node_modules is missing; running npm ci');
+    const install = spawnSync('npm', ['ci'], { cwd: root, stdio: ['ignore', 2, 2] });
+    if (install.status !== 0) throw new Error(`npm ci failed with exit code ${install.status}`);
+  }
   const runId = `${new Date().toISOString().replace(/[:.]/g, '-')}-${randomBytes(3).toString('hex')}`;
   const evidenceDir = join(artifacts, runId);
   mkdirSync(evidenceDir, { recursive: true });
@@ -79,6 +84,7 @@ async function launch(args) {
     Object.assign(run, { mode: 'local', url: `http://127.0.0.1:${port}/`, port, pid: child.pid, distDir, command: [process.execPath, ...command] });
   }
   writeFileSync(runFile, JSON.stringify(run, null, 2));
+  writeFileSync(join(evidenceDir, 'launch.json'), JSON.stringify(run, null, 2));
 
   const deadline = Date.now() + 120_000;
   let last = null;
@@ -128,8 +134,8 @@ function test(specs) {
   const result = spawnSync(process.execPath, [playwright, 'test', ...specs, '--reporter=line'], {
     cwd: root, encoding: 'utf8', env: { ...process.env, JULIA_VERIFY_URL: run.url },
   });
-  const output = `${result.stdout}${result.stderr}\nexitCode=${result.status}\n`;
-  writeFileSync(join(run.evidenceDir, 'playwright-test.txt'), output);
+  const output = `$ test ${specs.join(' ')}\n${result.stdout}${result.stderr}\nexitCode=${result.status}\n\n`;
+  appendFileSync(join(run.evidenceDir, 'playwright-test.txt'), output);
   process.stdout.write(output);
   process.exitCode = result.status ?? 1;
 }
