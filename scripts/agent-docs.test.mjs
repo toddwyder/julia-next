@@ -72,8 +72,8 @@ test('retired skills stay retired and pstack owns tdd and teach', () => {
   assert.ok(existsSync(new URL('../.agents/skills/poteto-mode/playbooks/bug-fix.md', import.meta.url)));
   const locked = JSON.parse(read('skills-lock.json')).skills;
   assert.equal(locked['pre-plan'], undefined);
-  assert.equal(locked.tdd, undefined);
-  assert.equal(locked.teach, undefined);
+  assert.equal(locked.tdd?.source, 'backnotprop/pstack');
+  assert.equal(locked.teach?.source, 'backnotprop/pstack');
   assert.equal(locked['diagnosing-bugs'], undefined);
 });
 
@@ -89,9 +89,9 @@ test('Todd\'s 19 October process vocabulary and restart stop are explicit', () =
 test('formal verification skills retain exact pinned hashes under the trial mirror', () => {
   const pstackSource = read('.agents/skills/PSTACK-SOURCE.md');
   assert.match(pstackSource, /github\.com\/backnotprop\/pstack/);
-  assert.match(pstackSource, /e44668c2aad92eacf4e84df47984121fefb11b82/);
+  assert.match(pstackSource, /fad8d01588a1b1ae803f87c8a1e0de79e28cffec/);
   const expectedSkills = [
-    { file: '.agents/skills/create-formal-verification-skill/SKILL.md', blob: 'b97609fd2649e95ea2960e720b3b581a6c2cb75a', sha: '6c934cd15a9583533ff9b7a9cad62775d7e80402d26d3ba7f74f79ea21a1d8eb' },
+    { file: '.agents/skills/create-formal-verification-skill/SKILL.md', blob: '37d73f9044b6bcc0132a0e703f70d13be5ded7c3', sha: '5e489d938620883502c27c9c2f32143ae7aa8c0543088dad996b2c815d2acc52' },
     { file: '.agents/skills/maintain-formal-verification-skill/SKILL.md', blob: '5d2f7f2228a3b771ca5b03124fc265ddfc53c5fc', sha: '0c96f54293542d3818b68754562b338073958781a9684454611dca37592e2d2c' },
   ];
   for (const skill of expectedSkills) {
