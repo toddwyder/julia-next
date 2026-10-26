@@ -9,7 +9,7 @@ Julia uses the pstack way of working, adopted 22 October 2026 and kept after the
 - Fix every correction as high in [the inverse pyramid](docs/principles/inverse-pyramid.md) as it will go; a written rule is the last resort.
 - Card spend is recorded and reported per card at published API prices. Money never stops a card. A build stops only after 15 minutes with no activity, or pauses on a runaway or a provider that stays down, keeping its work and posting a Linear note so it can be continued. See [docs/adr/0023-actual-spend-card-cap.md](docs/adr/0023-actual-spend-card-cap.md).
 - Framework facts come from the installed packages and their version-matched official docs.
-- Commit and push as you go. The poteto-mode todo list and show-me-your-work decision log are committed under docs/agents/<card>/.
+- Commit and push as you go.
 - Publish with gh using the ordinary signed-in GitHub access.
 
 ## Todd
