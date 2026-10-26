@@ -1,6 +1,6 @@
 # pstack in Mastra Code
 
-Read this file once per session, then map each Cursor name in a pstack skill with the tables below. `<pstack>` means this repository: skills are under `.agents/skills/`, and `docs/` is the repository's `docs/`. If a Cursor field has no row, drop it and say so. Never pass a field or value the tool schema rejects.
+Read this file once per session, then map each Cursor name in a pstack skill with the tables below. `<pstack>` means the installed pstack folder: skills are under `.agents/skills/`; pstack's own docs are under `.agents/docs/` (the guide is `.agents/docs/guide/` and the Claude Code adapter is `.agents/docs/harness/claude-code.md`). If a Cursor field has no row, drop it and say so. Never pass a field or value the tool schema rejects.
 
 Mastra Code's stock coding agent and stock subagents are used. There are no custom agents.
 
