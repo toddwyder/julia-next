@@ -12,6 +12,7 @@ Mastra Code's stock coding agent and stock subagents are used. There are no cust
 | `subagent_type: generalPurpose` | `agentType: "execute"`. The stock subagents are `explore`, `plan`, and `execute` (`@mastra/code-sdk@1.14.0 dist/index.d.ts:37-38`). |
 | `readonly: true` | `agentType: "explore"` (`explore.md` in `dist/agents/subagents/explore.js:4-8`: read-only, `view`, `find_files`, `search_content`, `file_stat`). Use `plan` for read-only planning (`plan.js:4-8`). |
 | `readonly: false` | `agentType: "execute"` (`execute.js:3-8`: edits files and runs commands). |
+| `environment: "cloud"`, a Cursor cloud agent, or the Shipping verifier | `agentType: "execute"`, non-forked, working in its own worktree checked out at the PR head (`skills/poteto-mode/SKILL.md:107`). Never `explore` or `plan`: they have no `execute_command`, so a verifier spawned that way cannot run the change and can only return an inconclusive read (PR #355). The verifier is a fresh agent that did not write the code (`playbooks/shipping.md:5`): give it the PR number and the control skill, not the author's results, and require the commands it ran and their exit codes in its verdict. |
 | `AskQuestion` | The built-in `ask_user` tool (`@mastra/core dist/agent-controller/types.d.ts:179`; `tools.d.ts:6,9`). If the host removed it with `disableBuiltinTools`, ask in plain text (`@mastra/code-sdk dist/index.d.ts:56-61`). |
 | Open a todolist | The built-in task tools: `task_write` first, then `task_update`, `task_complete`, and `task_check` (`types.d.ts:179`; `tools.d.ts:11`). The list persists in session state under `tasks` (`dist/schema.d.ts:108`). |
 
@@ -45,6 +46,15 @@ Because the root `AGENTS.md` wins over `.mastracode/AGENTS.md`, Julia names this
 | --- | --- |
 | Transcripts in `~/.cursor/projects/<slug>/agent-transcripts/` | No per-session JSONL folder. Threads and messages persist in the LibSQL store at `~/.local/share/mastracode/mastra.db` (tables `mastra_threads` and `mastra_messages`). The path comes from `getAppDataDir()` and `getDatabasePath()` (`dist/utils/project.js:132-152`), and `getStorageConfig()` defaults to `file:<that path>` (`project.js:187-229`). Read or resume a session through `session.thread.listThreads` and `listMessages` (`@mastra/core dist/agent-controller/session.d.ts:148-160`). `MASTRA_APP_DATA_DIR` moves the whole store. |
 | `~/.agents/pstack-models.md` | A plain file, not a rule the harness loads. The root `AGENTS.md` names it so sessions read it. |
+
+## Shell environment
+
+Every `execute_command` shell gets `FORCE_COLOR=1` and `CLICOLOR_FORCE=1` on top of the parent environment (`@mastra/code-sdk@1.14.0 dist/agents/workspace.js:12-20`). `CLICOLOR_FORCE=1` makes `gh` colour `--json` output even into a pipe, so a JSON parser sees an escape byte. `NO_COLOR=1` does not override it.
+
+| pstack command | Run it in Mastra Code as |
+| --- | --- |
+| `scripts/watch-pr/watch-pr ...` (poteto-mode) | `env -u CLICOLOR_FORCE .agents/skills/poteto-mode/scripts/watch-pr/watch-pr ...`. Without it every GitHub status query fails with `JSON Parse error: Unrecognized token`, the watcher retries every 60s and shows no statuses. |
+| Any script that parses `gh ... --json` output | Prefix it with `env -u CLICOLOR_FORCE`. |
 
 ## Unproven
 

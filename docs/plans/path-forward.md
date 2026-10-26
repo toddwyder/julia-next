@@ -126,3 +126,4 @@ The clean-up is built by the planner agent in a fresh session. From card 5 on, t
 ## 26 October decisions (Todd)
 
 - **Old machine removed.** Old machine removed from main on 26 Oct 2026, kept at tag `old-machine-final` (Todd, 26 Oct 2026), overriding the 25 Oct "untouched until milestone 1" line.
+- **Coordinator chat moves to Sol 6.1.** The coordinator chat moves from Opus 5.5 to Sol 6.1 on 26 Oct 2026 because the Opus orchestrator used 34% of the weekly Claude quota (Todd, 26 Oct 2026). This overrides the 25 Oct "The chat itself runs on Opus 5.5" line. The pstack role lines are unchanged.
