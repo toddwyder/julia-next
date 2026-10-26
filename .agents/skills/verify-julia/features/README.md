@@ -6,6 +6,7 @@ Julia's user features. Each file says what the feature is, how a user reaches it
 | --- | --- | --- |
 | Home page: name, version, welcome line | [home-content.md](home-content.md) | `tests/home.spec.mjs` |
 | Recipes: add one and find it by title | [recipes.md](recipes.md) | `tests/recipes.spec.mjs` |
+| Vintage look: fonts, colours, masthead | [vintage-look.md](vintage-look.md) | `tests/vintage.spec.mjs` |
 | Install manifest and icons | [installation-metadata-assets.md](installation-metadata-assets.md) | `tests/install.spec.mjs` |
 
 `tests/release.spec.mjs` is not a feature. It checks that production serves the merged commit, and skips unless `JULIA_SMOKE_COMMIT` is set.

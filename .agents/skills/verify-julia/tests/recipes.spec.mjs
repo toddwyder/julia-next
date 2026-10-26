@@ -29,7 +29,7 @@ async function save(page, fields) {
   await page.goto('/recipes/new');
   await fillForm(page, fields);
   await page.getByRole('button', { name: 'Save Recipe' }).click();
-  await page.waitForURL(/\/recipes\/[^/]+$/);
+  await page.waitForURL(/\/recipes\/(?!new$)[^/]+$/);
 }
 
 function shownText(page) {
@@ -44,7 +44,7 @@ test('a saved recipe survives a reload and shows the typed text exactly', async 
   await startEmpty(page);
   await fillForm(page, TYPED);
   await page.getByRole('button', { name: 'Save Recipe' }).click();
-  await page.waitForURL(/\/recipes\/[^/]+$/);
+  await page.waitForURL(/\/recipes\/(?!new$)[^/]+$/);
   await expect(page.getByTestId('recipe-title')).toBeVisible();
   expect(await shownText(page)).toEqual(TYPED);
 
@@ -59,7 +59,7 @@ test('a saved recipe survives a reload and shows the typed text exactly', async 
   await expect(rows(page)).toHaveCount(1);
 
   await rows(page).locator('a').click();
-  await page.waitForURL(/\/recipes\/[^/]+$/);
+  await page.waitForURL(/\/recipes\/(?!new$)[^/]+$/);
   await expect(page.getByTestId('recipe-title')).toBeVisible();
   expect(await shownText(page)).toEqual(TYPED);
 });
@@ -85,7 +85,7 @@ test('two Save submissions in one task store one recipe', async ({ page }) => {
     form.requestSubmit();
     form.requestSubmit();
   });
-  await page.waitForURL(/\/recipes\/[^/]+$/);
+  await page.waitForURL(/\/recipes\/(?!new$)[^/]+$/);
 
   await page.goto('/recipes');
   await expect(rows(page)).toHaveCount(1);
@@ -97,7 +97,7 @@ test('a double click on Save stores one recipe', async ({ page }) => {
   await fillForm(page, A);
 
   await page.getByRole('button', { name: 'Save Recipe' }).dblclick();
-  await page.waitForURL(/\/recipes\/[^/]+$/);
+  await page.waitForURL(/\/recipes\/(?!new$)[^/]+$/);
 
   await page.goto('/recipes');
   await expect(rows(page)).toHaveCount(1);
