@@ -1,0 +1,18 @@
+Installing locked dependencies for .
+
+added 51 packages, and audited 52 packages in 16s
+
+8 packages are looking for funding
+  run `npm fund` for details
+
+3 vulnerabilities (2 high, 1 critical)
+
+To address all issues, run:
+  npm audit fix
+
+Run `npm audit` for details.
+Installing locked dependencies for .agents/skills/poteto-mode/scripts
+
+spawnSync bun ENOENT
+
+Command failed with exit 1
