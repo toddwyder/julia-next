@@ -10,7 +10,7 @@ The home page shows Julia's name, the application version and the welcome line.
 
 ## How to get to it (user POV)
 
-- Open Julia's address (`$RUN_URL`). The page has no navigation; this is the whole page.
+- Open Julia's address (`$RUN_URL`). A nav at the top links `Julia` (this page) and `Library` (`/recipes`); the main content below the nav is the whole home page.
 - An installed Julia opens the same page. This recipe checks the page, not the phone install.
 
 ## Driving it with Playwright CLI
